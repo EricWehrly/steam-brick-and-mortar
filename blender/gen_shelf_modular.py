@@ -18,7 +18,7 @@ try:
     import bpy
     from utils.scene_utils import setup_scene, create_collection, move_objects_to_collection, export_shelf_assembly
     from geometry.shelf import create_main_shelf, add_shelf_material
-    from geometry.brackets import create_bracket_support, position_brackets_on_shelf
+    from geometry.brackets import create_bracket_support, position_brackets_on_shelf, add_bracket_material
     from geometry.backing import create_backing_plane, position_backing_behind_shelf, add_backing_material
     from geometry.crown import create_crown_topper, position_crown_above_backing, add_crown_material
 except ImportError as e:
@@ -61,6 +61,9 @@ def generate_complete_shelf_assembly():
     # 2. Create bracket supports
     print("Creating bracket supports...")
     brackets = position_brackets_on_shelf(main_shelf, bracket_count=3)
+    # Apply gray material to all brackets
+    for bracket in brackets:
+        add_bracket_material(bracket, color=(0.5, 0.5, 0.5, 1.0))
     shelf_assembly['brackets'] = brackets
     shelf_assembly['all_objects'].extend(brackets)
     
