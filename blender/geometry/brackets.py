@@ -105,7 +105,7 @@ def position_brackets_on_shelf(shelf_obj, bracket_count=2):
         
         # Rotate bracket to slope down from backing to shelf support
         # Rotate around X-axis to make it slope down toward front
-        bracket.rotation_euler.z = 90  # About 17 degrees downward slope
+        bracket.rotation_euler.z = 1.5555  # About 17 degrees downward slope
         
         brackets.append(bracket)
     
