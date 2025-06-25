@@ -91,28 +91,28 @@ def create_decorative_molding(name="Molding", width=2.1, segments=8):
     return obj
 
 
-def position_crown_above_shelf(crown_obj, shelf_obj, height_offset=0.3):
+def position_crown_above_backing(crown_obj, backing_obj, height_offset=0.1):
     """
-    Position crown above the shelf.
+    Position crown centered on top of the backing.
     
     Args:
         crown_obj (bpy.types.Object): The crown object
-        shelf_obj (bpy.types.Object): The shelf object
-        height_offset (float): Height above the shelf
+        backing_obj (bpy.types.Object): The backing object
+        height_offset (float): Height above the backing
     """
-    # Position crown above shelf
-    crown_obj.location.x = shelf_obj.location.x
-    crown_obj.location.y = shelf_obj.location.y
-    crown_obj.location.z = shelf_obj.location.z + shelf_obj.dimensions.z/2 + height_offset
+    # Position crown centered on top of backing
+    crown_obj.location.x = backing_obj.location.x
+    crown_obj.location.y = backing_obj.location.y
+    crown_obj.location.z = backing_obj.location.z + backing_obj.dimensions.z/2 + height_offset
 
 
-def add_crown_material(obj, color=(0.7, 0.5, 0.3, 1.0)):
+def add_crown_material(obj, color=(0.4, 0.4, 0.4, 1.0)):
     """
-    Add a decorative material to the crown object.
+    Add a gray material to the crown object.
     
     Args:
         obj (bpy.types.Object): The crown object
-        color (tuple): RGBA color values
+        color (tuple): RGBA color values (default: dark gray)
     """
     # Create material
     mat = bpy.data.materials.new(name=f"{obj.name}_Material")

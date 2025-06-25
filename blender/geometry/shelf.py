@@ -51,13 +51,13 @@ def create_main_shelf(name="MainShelf", width=2.0, height=0.1, depth=0.4):
     return obj
 
 
-def add_shelf_material(obj, color=(0.8, 0.6, 0.4, 1.0)):
+def add_shelf_material(obj, color=(0.5, 0.5, 0.5, 1.0)):
     """
-    Add a wood-like material to the shelf.
+    Add a gray material to the shelf.
     
     Args:
         obj (bpy.types.Object): The shelf object
-        color (tuple): RGBA color values
+        color (tuple): RGBA color values (default: medium gray)
     """
     # Create material
     mat = bpy.data.materials.new(name=f"{obj.name}_Material")

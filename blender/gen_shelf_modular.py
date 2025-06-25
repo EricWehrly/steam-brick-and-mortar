@@ -20,7 +20,7 @@ try:
     from geometry.shelf import create_main_shelf, add_shelf_material
     from geometry.brackets import create_bracket_support, position_brackets_on_shelf
     from geometry.backing import create_backing_plane, position_backing_behind_shelf, add_backing_material
-    from geometry.crown import create_crown_topper, position_crown_above_shelf, add_crown_material
+    from geometry.crown import create_crown_topper, position_crown_above_backing, add_crown_material
 except ImportError as e:
     print(f"Error importing Blender modules: {e}")
     print("This script must be run within Blender or with Blender's Python interpreter")
@@ -51,10 +51,10 @@ def generate_complete_shelf_assembly():
         'all_objects': []
     }
     
-    # 1. Create main shelf
+    # 1. Create main shelf (extended depth for better proportions)
     print("Creating main shelf...")
-    main_shelf = create_main_shelf("MainShelf", width=2.0, height=0.1, depth=0.4)
-    add_shelf_material(main_shelf, color=(0.8, 0.6, 0.4, 1.0))
+    main_shelf = create_main_shelf("MainShelf", width=2.0, height=0.1, depth=0.6)
+    add_shelf_material(main_shelf, color=(0.5, 0.5, 0.5, 1.0))  # Gray color
     shelf_assembly['main_shelf'] = main_shelf
     shelf_assembly['all_objects'].append(main_shelf)
     
@@ -67,16 +67,16 @@ def generate_complete_shelf_assembly():
     # 3. Create backing plane
     print("Creating backing plane...")
     backing = create_backing_plane("Backing", width=2.2, height=1.5, thickness=0.02)
-    position_backing_behind_shelf(backing, main_shelf, offset=0.05)
-    add_backing_material(backing, color=(0.9, 0.9, 0.85, 1.0))
+    position_backing_behind_shelf(backing, main_shelf, offset=0.01)  # More flush
+    add_backing_material(backing, color=(0.7, 0.65, 0.55, 1.0))  # Darkish beige
     shelf_assembly['backing'] = backing
     shelf_assembly['all_objects'].append(backing)
     
-    # 4. Create crown/topper
+    # 4. Create crown/topper (centered on backing)
     print("Creating decorative crown...")
     crown = create_crown_topper("Crown", width=2.2, height=0.15, depth=0.1)
-    position_crown_above_shelf(crown, main_shelf, height_offset=0.3)
-    add_crown_material(crown, color=(0.7, 0.5, 0.3, 1.0))
+    position_crown_above_backing(crown, backing, height_offset=0.1)  # Centered on backing
+    add_crown_material(crown, color=(0.4, 0.4, 0.4, 1.0))  # Dark gray
     shelf_assembly['crown'] = crown
     shelf_assembly['all_objects'].append(crown)
     

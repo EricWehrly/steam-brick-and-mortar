@@ -93,28 +93,28 @@ def create_pegboard_holes(backing_obj, hole_spacing=0.1, hole_diameter=0.01):
     bpy.ops.object.mode_set(mode='OBJECT')
 
 
-def position_backing_behind_shelf(backing_obj, shelf_obj, offset=0.05):
+def position_backing_behind_shelf(backing_obj, shelf_obj, offset=0.01):
     """
-    Position backing plane behind the shelf.
+    Position backing plane behind the shelf (more flush).
     
     Args:
         backing_obj (bpy.types.Object): The backing object
         shelf_obj (bpy.types.Object): The shelf object
-        offset (float): Distance behind the shelf
+        offset (float): Small distance behind the shelf for clearance
     """
-    # Position backing behind shelf
+    # Position backing very close behind shelf
     backing_obj.location.x = shelf_obj.location.x
     backing_obj.location.y = shelf_obj.location.y - shelf_obj.dimensions.y/2 - offset
     backing_obj.location.z = shelf_obj.location.z
 
 
-def add_backing_material(obj, color=(0.9, 0.9, 0.85, 1.0)):
+def add_backing_material(obj, color=(0.7, 0.65, 0.55, 1.0)):
     """
-    Add a material to the backing object.
+    Add a darkish beige material to the backing object.
     
     Args:
         obj (bpy.types.Object): The backing object
-        color (tuple): RGBA color values
+        color (tuple): RGBA color values (default: darkish beige)
     """
     # Create material
     mat = bpy.data.materials.new(name=f"{obj.name}_Material")
