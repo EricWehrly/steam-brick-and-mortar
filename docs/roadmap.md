@@ -21,11 +21,37 @@
 - **Task 1.1.1.4**: Create requirements.txt for Python dependencies
 - **Task 1.1.1.5**: Add README.md with setup instructions
 
-#### Story 1.1.2: Development Environment Setup
-- **Task 1.1.2.1**: Document Blender 4.x installation requirements
-- **Task 1.1.2.2**: Document SteamVR Workshop Tools setup
-- **Task 1.1.2.3**: Document VS Code extensions for Lua/VScript
-- **Task 1.1.2.4**: Create development environment validation script
+#### Story 1.1.2: Development Environment Setup ✅
+- **Task 1.1.2.1**: Document Blender 4.x installation requirements ✅
+- **Task 1.1.2.2**: Document SteamVR Workshop Tools setup ✅
+- **Task 1.1.2.3**: Document VS Code extensions for Lua/VScript ✅
+- **Task 1.1.2.4**: Create development environment validation script ✅
+
+**Research Findings**:
+
+**Blender 4.x Installation Options**:
+- ✅ **Chocolatey**: `choco install blender` (v4.4.3 available, 1.1M+ downloads)
+- ✅ **Scoop**: Available in main bucket (`scoop install blender`)
+- ✅ **winget**: Available via Windows Package Manager
+- ✅ **Manual**: MSI installer from blender.org (342MB for v4.4.3)
+
+**SteamVR Workshop Tools**:
+- ❌ **No direct command-line installer available**
+- ⚠️ **Must be installed via Steam client**: Library > Tools > "SteamVR Workshop Tools"
+- 📝 **Requires Steam account and VR hardware setup**
+- 🔧 **Manual installation process documented**
+
+**VS Code Extensions (Command-line installable)**:
+- ✅ **Lua Language Support**: `code --install-extension trixnz.vscode-lua`
+- ✅ **Lua Language Server**: `code --install-extension sumneko.lua`
+- ✅ **VScript/Source Engine**: Various community extensions available
+- ✅ **Installation scriptable**: `code --install-extension <extension-id>`
+
+**Package Manager Automation Support**:
+- ✅ **Chocolatey**: Blender + VS Code + extensions
+- ✅ **Scoop**: Blender + VS Code + extensions
+- ✅ **winget**: Blender + VS Code (native Windows 10+)
+- ❌ **SteamVR Tools**: Manual installation only
 
 #### Story 1.1.3: Development Containerization
 - **Task 1.1.3.1**: Create Node.js Dockerfile with Yarn and Steam API dependencies
