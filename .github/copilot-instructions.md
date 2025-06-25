@@ -95,3 +95,7 @@ steamvr-blockbuster/
 - Node.js and Yarn (or use Docker container)
 - Python 3.x (or use Docker container)
 - Steam account with owned games for testing
+
+## README Writing Guidelines
+
+See `docs/readme-guidelines.md` for comprehensive README structure and tone guidelines.
