@@ -1,0 +1,25 @@
+# Python dependencies for SteamVR Blockbuster Shelf project
+
+# Blender Python API (bpy) - Note: This comes with Blender installation
+# bpy is not installable via pip, requires Blender 4.x
+
+# HTTP requests for Steam API (fallback if Node.js not used)
+requests>=2.31.0
+
+# File system operations and JSON handling
+pathlib2>=2.3.7
+
+# Optional: If using Python for Steam API instead of Node.js
+# python-steam-api>=1.0.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Code formatting and linting
+black>=23.7.0
+flake8>=6.0.0
+
+# Documentation generation
+sphinx>=7.1.0
+sphinx-rtd-theme>=1.3.0

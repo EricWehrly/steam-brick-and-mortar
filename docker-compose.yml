@@ -1,0 +1,24 @@
+# SteamVR Blockbuster Shelf - Development Environment
+# Focus: Blender 3D asset generation pipeline
+
+services:
+  # Generate 3D shelf models with Blender
+  blender:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.python
+    working_dir: /app
+    volumes:
+      - .:/app
+      - blender-cache:/root/.cache/blender
+    environment:
+      - PYTHONPATH=/app
+    command: >
+      sh -c "
+        pip install -r requirements.txt &&
+        echo 'Blender environment ready. Run: docker compose run blender python blender/gen_shelf.py'
+      "
+
+volumes:
+  blender-cache:
+    driver: local
