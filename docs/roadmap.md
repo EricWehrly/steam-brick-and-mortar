@@ -27,7 +27,15 @@
 - **Task 1.1.2.3**: Document VS Code extensions for Lua/VScript
 - **Task 1.1.2.4**: Create development environment validation script
 
-**Acceptance**: `npm install` and `pip install -r requirements.txt` complete successfully
+#### Story 1.1.3: Development Containerization
+- **Task 1.1.3.1**: Create Node.js Dockerfile with Yarn and Steam API dependencies
+- **Task 1.1.3.2**: Create Python Dockerfile with Blender 4.x installation
+- **Task 1.1.3.3**: Create SteamVR development Dockerfile with Lua/VScript tools
+- **Task 1.1.3.4**: Configure docker-compose.yml for multi-service development
+- **Task 1.1.3.5**: Add Docker scripts to package.json for containerized workflows
+- **Task 1.1.3.6**: Update documentation for Docker-first development approach
+
+**Acceptance**: `yarn install` and `pip install -r requirements.txt` complete successfully, or `docker compose run build` completes full setup
 
 ---
 
@@ -49,7 +57,7 @@
 - **Task 2.1.2.3**: Implement file caching and validation
 - **Task 2.1.2.4**: Generate JSON manifest with game metadata
 
-**Acceptance**: Running `node external-tool/fetch_library.js` creates JSON file with game data
+**Acceptance**: Running `docker compose run fetch` or `node external-tool/fetch_library.js` creates JSON file with game data
 
 ### Feature 2.2: File System Monitoring
 **Context**: Watch for VR interaction signals and launch games
@@ -82,7 +90,7 @@
 - **Task 3.1.2.3**: Create material assignment system
 - **Task 3.1.2.4**: Validate exports in SteamVR Workshop Tools
 
-**Acceptance**: `blender --background --python blender/gen_shelf.py` produces importable 3D assets
+**Acceptance**: `docker compose run blender` or `blender --background --python blender/gen_shelf.py` produces importable 3D assets
 
 ---
 
