@@ -14,3 +14,28 @@ https://partner.steamgames.com/doc/webapi/ISteamUser#getownedgames
 https://steamcommunity.com/sharedfiles/filedetails/?id=2914155613&utm_source=chatgpt.com
 
 https://developer.valvesoftware.com/wiki/SteamVR/Environments/Scripting?utm_source=chatgpt.com
+
+### Official SteamVR Development Resources
+- **SteamVR Environment Scripting**: https://developer.valvesoftware.com/wiki/SteamVR/Environments/Scripting
+  - *Note: Main documentation for SteamVR scripting system, covers VScript/Lua integration, entity manipulation, and VR-specific APIs.*
+
+- **SteamVR VScript API Reference**: https://developer.valvesoftware.com/wiki/SteamVR/Environments/Scripting/API
+  - *Note: Complete API reference for all VScript functions, classes, and enumerations available in SteamVR environments. Critical for entity creation, physics, audio, and VR interaction.*
+
+- **SteamVR Map Scripts**: https://developer.valvesoftware.com/wiki/SteamVR/Environments/Scripting/Map_Scripts
+  - *Note: Documentation for map-specific scripts, callback functions (OnInit, OnPlayerSpawned, etc.), and script system integration.*
+
+- **SteamVR Lua Scripting Intro**: https://developer.valvesoftware.com/wiki/SteamVR/Environments/Scripting/Lua_Scripting_Intro
+  - *Note: Tutorial covering Lua scripting basics in SteamVR, addon structure, debugging, and practical examples.*
+
+- **SteamVR Environment Getting Started**: https://developer.valvesoftware.com/wiki/SteamVR/Environments/Getting_Started
+  - *Note: Tutorial for creating SteamVR environments, Hammer editor usage, and addon development workflow.*
+
+### Key Implementation Insights from Research
+- **Entity Creation**: Use `SpawnEntityFromTableSynchronous()` for immediate prop creation
+- **File I/O**: `FileToString()` and `StringToFile()` for JSON manifest integration  
+- **VR Interaction**: `CDestinationsPropItemPhysics` class for grabbable game props
+- **Physics Props**: `prop_destinations_item_physics` classname for VR-interactive objects
+- **Sound System**: `EmitSoundOn()` and `StartSoundEvent()` for 3D positioned audio
+- **Hand Tracking**: `CPropVRHand` class and `OnPickedUp`/`OnDropped` entity hooks
+- **Debugging**: Console log filtering to "VScript" channel for development
