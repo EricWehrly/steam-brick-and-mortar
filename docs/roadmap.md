@@ -112,29 +112,65 @@
 
 ---
 
-## Milestone 4: VR Environment Core
-*Goal: Basic VR environment loads and displays static shelf*
+## Milestone 4: WebXR Implementation 🚧
+*Goal: Build cross-platform VR library browser using WebXR + Three.js*
 
-### Feature 4.1: SteamVR Addon Structure
-**Context**: Basic VR environment with static 3D models
+### Feature 4.1: WebXR Foundation
+**Context**: Core VR capabilities with Three.js and hand tracking
 
-#### Story 4.1.1: Environment Setup
-- **Task 4.1.1.1**: Create SteamVR addon manifest file
-- **Task 4.1.1.2**: Import generated shelf models (FBX/GLTF)
-- **Task 4.1.1.3**: Setup basic lighting and materials
-- **Task 4.1.1.4**: Configure VR spawn point and scale
-- **Task 4.1.1.5**: Test loading in SteamVR Home
+#### Story 4.1.1: Basic WebXR Setup
+- **Task 4.1.1.1**: Create Three.js WebXR scene with VR session management
+- **Task 4.1.1.2**: Implement hand tracking and controller input handling  
+- **Task 4.1.1.3**: Test VR session lifecycle (enter/exit VR mode)
+- **Task 4.1.1.4**: Add basic 3D environment and lighting setup
 
-#### Story 4.1.2: Basic VScript Integration + IPC Testing
-- **Task 4.1.2.1**: Create VScript entry point file
-- **Task 4.1.2.2**: ⭐ **PRIORITY**: Test `FileToString()` capability for JSON reading
-- **Task 4.1.2.3**: ⭐ **PRIORITY**: Test `StringToFile()` capability for signal writing
-- **Task 4.1.2.4**: Test file I/O limitations and workarounds  
-- **Task 4.1.2.5**: ⭐ **PRIORITY**: End-to-end test: VScript writes signal → external tool launches Steam
-- **Task 4.1.2.6**: Add basic error handling and logging
-- **Task 4.1.2.7**: Test VScript console commands for debugging
+**Acceptance**: Can enter VR, see hands/controllers, and interact with objects
 
-**Acceptance**: Environment loads in SteamVR Home with verified file I/O + external tool communication
+#### Story 4.1.2: Asset Integration
+- **Task 4.1.2.1**: Integrate GLTFLoader for Blender-generated models
+- **Task 4.1.2.2**: Load and display shelf geometry in VR space
+- **Task 4.1.2.3**: Optimize GLTF assets for web delivery (compression, textures)
+- **Task 4.1.2.4**: Implement progressive loading for large assets
+
+**Acceptance**: Blender shelf models display correctly in WebXR
+
+### Feature 4.2: Steam Integration Layer
+**Context**: Steam Web API access and game library management
+
+#### Story 4.2.1: CORS Proxy Service
+- **Task 4.2.1.1**: Create simple Node.js CORS proxy for Steam Web API
+- **Task 4.2.1.2**: Implement GetOwnedGames API endpoint wrapping
+- **Task 4.2.1.3**: Add API key management and rate limiting
+- **Task 4.2.1.4**: Test proxy service with real Steam accounts
+
+**Acceptance**: Can fetch user's Steam library via JavaScript
+
+#### Story 4.2.2: Game Data Management
+- **Task 4.2.2.1**: Implement IndexedDB storage for game library caching
+- **Task 4.2.2.2**: Create game icon/artwork downloading system
+- **Task 4.2.2.3**: Build JSON manifest generator for VR scene population
+- **Task 4.2.2.4**: Add offline capability with cached data
+
+**Acceptance**: Game library persists between sessions, icons load efficiently
+
+### Feature 4.3: VR Interaction & Game Launching
+**Context**: 3D shelf interaction and external game launching
+
+#### Story 4.3.1: VR Game Shelf
+- **Task 4.3.1.1**: Generate 3D game box props from library data
+- **Task 4.3.1.2**: Implement grab/touch interactions with game boxes
+- **Task 4.3.1.3**: Add hover effects and game information display
+- **Task 4.3.1.4**: Create spatial audio feedback for interactions
+
+**Acceptance**: Can browse and select games in 3D VR space
+
+#### Story 4.3.2: Game Launching System
+- **Task 4.3.2.1**: Test steam:// protocol URL launching in different browsers
+- **Task 4.3.2.2**: Implement fallback UI for unsupported browsers
+- **Task 4.3.2.3**: Add user education for enabling protocol handlers
+- **Task 4.3.2.4**: Create browser extension for enhanced launching (optional)
+
+**Acceptance**: Games launch successfully with clear user feedback
 
 ---
 
@@ -423,11 +459,20 @@ This UX research should happen alongside core development but not block progress
 
 ---
 
-## 🤔 **Alternative Technology Approaches**
+## 🌐 **WebXR-First Technology Approach**
 
-### **The IPC Question: Do We Need Complex Communication?**
+### **Strategic Pivot: Why WebXR is Superior**
 
-Our current SteamVR approach requires file-based IPC between VScript and external tools. This introduces complexity, potential failure points, and testing overhead. **Question**: Are there alternative technological approaches that could eliminate this complexity entirely?
+After analyzing our requirements, **WebXR emerges as the optimal approach** for our blockbuster shelf project:
+
+**✅ Eliminates IPC Complexity**: No file-based communication needed - direct Steam Web API calls
+**✅ Cross-Platform by Default**: Works on any VR headset with any OS
+**✅ Fastest Iteration Speed**: Hot reload, browser DevTools, instant testing
+**✅ Universal Distribution**: Share via URL, no installation required
+**✅ Future-Proof**: Web technologies, packageable as native apps later
+**✅ Keep Blender Pipeline**: Generated 3D assets work perfectly in WebXR
+
+**Trade-off**: Lose "VR desktop replacement" capability, but gain massive development speed and reach.
 
 ### **Key Requirements for Evaluation:**
 
@@ -451,21 +496,77 @@ Our current SteamVR approach requires file-based IPC between VScript and externa
 - CLI-driven development where possible
 - Docker/containerized development environment
 
-### **Potential Alternative Approaches:**
+### **Updated Architecture: WebXR + Blender**
 
-1. **Standalone VR Application** (Godot, Unity, Unreal)
-2. **SteamVR Environment** (Current approach - VScript + external tools)
-3. **SteamVR Dashboard Overlay** (C++ SteamVR APIs)
-4. **Desktop VR Launcher** (Traditional app that launches in VR mode)
-5. **Steam Client Modification/Plugin** (If possible)
-6. **Web-based VR** (WebXR + Steam Web API)
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Blender CLI    │    │   WebXR App     │    │  Steam Web API  │
+│                 │    │                 │    │                 │
+│ • Generate 3D   │───▶│ • Import models │◄───│ • GetOwnedGames │
+│   shelf models  │    │ • VR interaction│    │ • Game metadata │
+│ • Export GLTF   │    │ • Direct API    │    │ • Icon URLs     │
+│ • Materials     │    │ • Game launching│    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │ Browser Storage │
+                       │ • Game library  │
+                       │ • User prefs    │
+                       │ • Cache         │
+                       └─────────────────┘
+```
 
-### **Evaluation Criteria:**
-- **Development Speed**: Time to first working prototype
-- **Iteration Speed**: Time between code change and testable result
-- **Technical Complexity**: IPC requirements, API limitations, deployment
-- **Feature Completeness**: Can it meet all must-have requirements?
-- **Ecosystem Integration**: SteamVR Home replacement potential
-- **Maintenance Burden**: Long-term development and updates
+**Key Benefits:**
+- **No IPC complexity** - everything runs in same JavaScript context
+- **Instant iteration** - refresh browser to see changes
+- **Universal compatibility** - any VR headset, any platform
+- **Keep proven Blender pipeline** - GLTF export works perfectly
+- **Direct Steam integration** - fetch API calls, no external tools
 
-**Research Goal**: Identify if there's a simpler, faster, or more capable approach than our current SteamVR VScript + IPC architecture.
+### **WebXR Technology Stack Assumptions**
+
+We need to **verify these assumptions** through focused research:
+
+#### **Core WebXR Capabilities** *(Expected: ✅ Fully Supported)*
+- **VR Session Management**: Enter/exit VR mode, headset detection
+- **Hand Tracking**: 6DOF controllers, grab/touch interactions  
+- **3D Scene Rendering**: WebGL/WebGPU performance for 90fps VR
+- **GLTF Model Loading**: Import Blender-generated shelf models
+- **Spatial Audio**: 3D positioned audio for immersive video store
+
+#### **Steam Web API Integration** *(Expected: ⚠️ CORS Challenges)*
+- **GetOwnedGames API**: Fetch user's Steam library  
+- **CORS Workarounds**: Proxy server, browser extensions, or Steam OAuth
+- **Game Icons**: Download and cache game artwork
+- **Rate Limiting**: Handle Steam API quotas gracefully
+
+#### **Game Launching** *(Expected: ⚠️ Browser Security Limitations)*
+- **Steam Protocol URLs**: Launch `steam://run/appid` from browser
+- **Cross-Platform Support**: Windows/Mac/Linux compatibility
+- **User Permissions**: Browser security prompts and workarounds
+- **Fallback Methods**: Deep links, desktop notifications, manual instructions
+
+#### **Development Workflow** *(Expected: ✅ Excellent)*
+- **Hot Reload**: Instant changes without VR headset removal
+- **Browser DevTools**: Real-time debugging, performance profiling
+- **Local Development**: Simple HTTP server, no complex toolchain
+- **Asset Pipeline**: GLTF from Blender → WebXR with minimal processing
+
+#### **Distribution & Deployment** *(Expected: ✅ Trivial)*
+- **Web Hosting**: Static site deployment (GitHub Pages, Netlify, etc.)
+- **Progressive Web App**: Installable, offline capability
+- **Native Packaging**: Electron/Tauri for desktop apps (future)
+- **Mobile VR**: Quest browser, smartphone VR support
+
+### **Research Complete ✅**
+
+**Key Findings** (see `docs/webxr-research-findings.md` for full analysis):
+
+✅ **WebXR Core Capabilities**: Fully supported across target platforms  
+⚠️ **Game Launching**: Solvable via browser extensions or native app wrapper  
+⚠️ **Steam API CORS**: Requires CORS proxy service (standard solution)  
+✅ **VR Performance**: Three.js + WebXR capable of 90fps with GLTF assets  
+✅ **Development Workflow**: Hot reload and browser DevTools work excellently
+
+**Decision**: **Proceed with WebXR approach** - start with pure web implementation, package as native app if game launching UX requires it.

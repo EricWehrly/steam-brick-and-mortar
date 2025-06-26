@@ -39,3 +39,25 @@ https://developer.valvesoftware.com/wiki/SteamVR/Environments/Scripting?utm_sour
 - **Sound System**: `EmitSoundOn()` and `StartSoundEvent()` for 3D positioned audio
 - **Hand Tracking**: `CPropVRHand` class and `OnPickedUp`/`OnDropped` entity hooks
 - **Debugging**: Console log filtering to "VScript" channel for development
+
+## WebXR Development Resources
+
+### Core WebXR APIs
+- [WebXR Device API - MDN](https://developer.mozilla.org/en-US/docs/Web/API/WebXR_Device_API)
+- [WebXR Fundamentals](https://developer.mozilla.org/en-US/docs/Web/API/WebXR_Device_API/Fundamentals)
+- [WebXR Input and Input Sources](https://developer.mozilla.org/en-US/docs/Web/API/WebXR_Device_API/Inputs)
+- [WebXR Performance Guide](https://developer.mozilla.org/en-US/docs/Web/API/WebXR_Device_API/Performance)
+
+### Three.js WebXR Integration
+- [Three.js WebXRManager](https://threejs.org/docs/#api/en/renderers/webxr/WebXRManager)
+- [Three.js WebXR Examples](https://threejs.org/examples/?q=webxr)
+- [GLTFLoader Documentation](https://threejs.org/docs/#examples/en/loaders/GLTFLoader)
+- [PositionalAudio for VR](https://threejs.org/docs/#api/en/audio/PositionalAudio)
+
+### Browser Protocol Handling
+- [Custom Protocol Handler Registration](https://web.dev/custom-handlers/)
+- [Steam Protocol URLs Documentation](https://developer.valvesoftware.com/wiki/Steam_browser_protocol)
+
+### CORS Solutions
+- [Understanding CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
+- [Steam Web API Documentation](https://steamcommunity.com/dev)
