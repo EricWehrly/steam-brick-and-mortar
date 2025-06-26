@@ -420,3 +420,52 @@ Current SteamVR environments have no native way to launch games while maintainin
 4. **Offer Option D** - provide user choice once multiple approaches work
 
 This UX research should happen alongside core development but not block progress. The "desktop risk" is acceptable if the overall experience is magical.
+
+---
+
+## 🤔 **Alternative Technology Approaches**
+
+### **The IPC Question: Do We Need Complex Communication?**
+
+Our current SteamVR approach requires file-based IPC between VScript and external tools. This introduces complexity, potential failure points, and testing overhead. **Question**: Are there alternative technological approaches that could eliminate this complexity entirely?
+
+### **Key Requirements for Evaluation:**
+
+#### **Must-Have Features:**
+- Display user's Steam game library in 3D VR space
+- Allow VR interaction (grab/touch) to launch games
+- Integration with Steam Web API for game metadata
+- Reasonable development iteration speed
+- Cross-platform compatibility (Windows primary)
+
+#### **Nice-to-Have Features:**
+- **Auto-start on VR headset connection** (like SteamVR Home replacement)
+- Seamless game launching without desktop exposure
+- Integration with SteamVR ecosystem
+- Workshop/sharing capabilities
+- Multi-user/social features
+
+#### **Development Constraints:**
+- Need for rapid iteration and testing
+- Minimal "human-in-the-middle" feedback loops
+- CLI-driven development where possible
+- Docker/containerized development environment
+
+### **Potential Alternative Approaches:**
+
+1. **Standalone VR Application** (Godot, Unity, Unreal)
+2. **SteamVR Environment** (Current approach - VScript + external tools)
+3. **SteamVR Dashboard Overlay** (C++ SteamVR APIs)
+4. **Desktop VR Launcher** (Traditional app that launches in VR mode)
+5. **Steam Client Modification/Plugin** (If possible)
+6. **Web-based VR** (WebXR + Steam Web API)
+
+### **Evaluation Criteria:**
+- **Development Speed**: Time to first working prototype
+- **Iteration Speed**: Time between code change and testable result
+- **Technical Complexity**: IPC requirements, API limitations, deployment
+- **Feature Completeness**: Can it meet all must-have requirements?
+- **Ecosystem Integration**: SteamVR Home replacement potential
+- **Maintenance Burden**: Long-term development and updates
+
+**Research Goal**: Identify if there's a simpler, faster, or more capable approach than our current SteamVR VScript + IPC architecture.
