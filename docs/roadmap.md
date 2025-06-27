@@ -8,6 +8,39 @@
 
 **Incremental Progress Principle**: Each task should be achievable in a single session and immediately testable/committable without breaking the build / tests / etc.
 
+## Technology Strategy Decision 🎯
+
+**Architecture Choice**: WebXR-First with Progressive Enhancement
+**Research Documents**: 
+- `docs/webxr-research-findings.md` - WebXR feasibility analysis
+- `docs/webxr-multiplatform.md` - Multi-platform deployment research  
+- `docs/alternatives/desktop-vr.research.md` - Electron+WebXR alternative analysis
+
+**Key Decision Factors**:
+1. **Cross-Platform Reach**: WebXR works on Meta Quest browsers, desktop VR, and mobile
+2. **Development Speed**: Web technologies enable rapid iteration vs. native VR engines
+3. **Future-Proof**: WebXR standard adoption growing across all VR platforms
+4. **Zero Custom Engine Work**: Three.js + WebXR handles all VR complexity
+5. **Progressive Enhancement**: Start with web PWA, add Electron packaging as needed
+
+**Deployment Strategy**:
+- **Phase 1**: WebXR PWA hosted with HTTPS (immediate VR headset access)
+- **Phase 2**: Electron desktop apps for Windows/Mac/Linux (direct Steam launching)  
+- **Phase 3**: VR headset optimization and app store distribution
+
+**Alternative Approaches Considered**:
+- SteamVR+VScript+IPC: Complex file-based communication, limited to SteamVR ecosystem
+- Native OpenXR: 20+ weeks development time, platform-specific builds
+- Unity/Godot VR: Good engines but less cross-platform web deployment flexibility
+
+**Technology Stack**:
+- **VR Runtime**: WebXR API (browser-native VR support)
+- **3D Engine**: Three.js (mature WebGL library with WebXR integration)
+- **Physics**: Cannon.js (plug-and-play physics, integrated with Three.js)
+- **Asset Pipeline**: Blender → GLTF → Three.js GLTFLoader
+- **Desktop Packaging**: Electron + electron-builder (when needed)
+- **Deployment**: Web hosting + Progressive Web App + optional native installers
+
 ---
 
 ## Milestone 1: Foundation & Development Environment ✅
@@ -112,27 +145,41 @@
 
 ---
 
-## Milestone 4: WebXR Implementation 🚧
-*Goal: Build cross-platform VR library browser using WebXR + Three.js*
+## Milestone 4: WebXR Cross-Platform Implementation 🚧
+*Goal: Multi-platform VR library browser using WebXR-first strategy*
 
-### Feature 4.1: WebXR Foundation
-**Context**: Core VR capabilities with Three.js and hand tracking
+**Architecture**: WebXR + Three.js core with progressive enhancement to Electron desktop apps
+**Deployment Strategy**: Web-first PWA → Desktop packaging → VR headset optimization
 
-#### Story 4.1.1: Basic WebXR Setup
+### Feature 4.1: WebXR Foundation (Phase 1: Web-First Deployment)
+**Context**: Core VR capabilities with maximum cross-platform reach
+
+#### Story 4.1.1: Three.js WebXR Core
 - **Task 4.1.1.1**: Create Three.js WebXR scene with VR session management
-- **Task 4.1.1.2**: Implement hand tracking and controller input handling  
+- **Task 4.1.1.2**: Implement WebXR controller input and hand tracking
 - **Task 4.1.1.3**: Test VR session lifecycle (enter/exit VR mode)
 - **Task 4.1.1.4**: Add basic 3D environment and lighting setup
+- **Task 4.1.1.5**: Test on Chrome desktop with VR headset connected
+- **Task 4.1.1.6**: Test on Meta Quest Browser directly
 
-**Acceptance**: Can enter VR, see hands/controllers, and interact with objects
+**Acceptance**: Can enter VR, see hands/controllers, and interact with objects across platforms
 
-#### Story 4.1.2: Asset Integration
-- **Task 4.1.2.1**: Integrate GLTFLoader for Blender-generated models
-- **Task 4.1.2.2**: Load and display shelf geometry in VR space
-- **Task 4.1.2.3**: Optimize GLTF assets for web delivery (compression, textures)
-- **Task 4.1.2.4**: Implement progressive loading for large assets
+#### Story 4.1.2: Progressive Web App Setup
+- **Task 4.1.2.1**: Create PWA manifest with VR app metadata
+- **Task 4.1.2.2**: Implement service worker for offline asset caching
+- **Task 4.1.2.3**: Test PWA installation on desktop browsers
+- **Task 4.1.2.4**: Test PWA installation on Meta Quest Browser
+- **Task 4.1.2.5**: Add app icons and splash screens for all platforms
 
-**Acceptance**: Blender shelf models display correctly in WebXR
+**Acceptance**: App installs as PWA on Windows/Mac/Linux/Quest with app-like experience
+
+#### Story 4.1.3: Asset Integration
+- **Task 4.1.3.1**: Integrate GLTFLoader for Blender-generated models
+- **Task 4.1.3.2**: Load and display shelf geometry in VR space
+- **Task 4.1.3.3**: Optimize GLTF assets for web delivery (compression, textures)
+- **Task 4.1.3.4**: Implement progressive loading with Three.js TextureLoader
+
+**Acceptance**: Blender shelf models display correctly in WebXR across all platforms
 
 ### Feature 4.2: Steam Integration Layer
 **Context**: Steam Web API access and game library management
@@ -143,34 +190,70 @@
 - **Task 4.2.1.3**: Add API key management and rate limiting
 - **Task 4.2.1.4**: Test proxy service with real Steam accounts
 
-**Acceptance**: Can fetch user's Steam library via JavaScript
+**Acceptance**: Can fetch user's Steam library via JavaScript from any browser
 
 #### Story 4.2.2: Game Data Management
-- **Task 4.2.2.1**: Implement IndexedDB storage for game library caching
+- **Task 4.2.2.1**: Implement browser cache for game library data
 - **Task 4.2.2.2**: Create game icon/artwork downloading system
-- **Task 4.2.2.3**: Build JSON manifest generator for VR scene population
+- **Task 4.2.2.3**: Build JSON manifest for VR scene population
 - **Task 4.2.2.4**: Add offline capability with cached data
 
 **Acceptance**: Game library persists between sessions, icons load efficiently
 
 ### Feature 4.3: VR Interaction & Game Launching
-**Context**: 3D shelf interaction and external game launching
+**Context**: Cross-platform 3D shelf interaction and game launching
 
-#### Story 4.3.1: VR Game Shelf
+#### Story 4.3.1: WebXR Interaction System
 - **Task 4.3.1.1**: Generate 3D game box props from library data
-- **Task 4.3.1.2**: Implement grab/touch interactions with game boxes
+- **Task 4.3.1.2**: Implement grab/touch interactions using Three.js raycasting
 - **Task 4.3.1.3**: Add hover effects and game information display
 - **Task 4.3.1.4**: Create spatial audio feedback for interactions
 
-**Acceptance**: Can browse and select games in 3D VR space
+**Acceptance**: Can browse and select games in 3D VR space on all platforms
 
-#### Story 4.3.2: Game Launching System
-- **Task 4.3.2.1**: Test steam:// protocol URL launching in different browsers
-- **Task 4.3.2.2**: Implement fallback UI for unsupported browsers
-- **Task 4.3.2.3**: Add user education for enabling protocol handlers
-- **Task 4.3.2.4**: Create browser extension for enhanced launching (optional)
+#### Story 4.3.2: Cross-Platform Game Launching
+- **Task 4.3.2.1**: Test steam:// protocol URL launching in desktop browsers
+- **Task 4.3.2.2**: Add fallback UI for VR headset browsers (no Steam access)
+- **Task 4.3.2.3**: Create user education for enabling protocol handlers
+- **Task 4.3.2.4**: Add launch status feedback and error handling
 
-**Acceptance**: Games launch successfully with clear user feedback
+**Acceptance**: Games launch successfully on desktop with clear user feedback
+
+### Feature 4.4: Desktop Enhancement (Phase 2: Desktop Packaging)
+**Context**: Electron packaging for native app distribution
+
+#### Story 4.4.1: Electron Integration
+- **Task 4.4.1.1**: Create Electron wrapper around WebXR application
+- **Task 4.4.1.2**: Configure Electron Builder for Windows/Mac/Linux packaging
+- **Task 4.4.1.3**: Test desktop VR functionality via Electron + WebXR
+- **Task 4.4.1.4**: Add auto-update capability for desktop apps
+
+**Acceptance**: Desktop apps launch games directly without browser limitations
+
+#### Story 4.4.2: Platform-Specific Distribution
+- **Task 4.4.2.1**: Create Windows installer (.exe + NSIS installer)
+- **Task 4.4.2.2**: Create macOS disk image (.dmg)  
+- **Task 4.4.2.3**: Create Linux packages (AppImage + .deb)
+- **Task 4.4.2.4**: Test installation and Steam integration on all platforms
+
+**Acceptance**: Native installers work correctly on Windows/Mac/Linux
+
+### Feature 4.5: VR Headset Optimization (Phase 3: Advanced Features)
+**Context**: Headset-specific enhancements and performance optimization
+
+#### Story 4.5.1: Meta Quest Optimization
+- **Task 4.5.1.1**: Optimize WebGL rendering for Quest mobile GPU
+- **Task 4.5.1.2**: Add Quest-specific hand tracking enhancements
+- **Task 4.5.1.3**: Create Quest store listing (if native app route desired)
+- **Task 4.5.1.4**: Test performance at 90fps on Quest 2/3
+
+#### Story 4.5.2: Desktop VR Enhancement
+- **Task 4.5.2.1**: Add SteamVR-specific features (base stations, room-scale)
+- **Task 4.5.2.2**: Optimize for high-resolution headsets (Index, Vive Pro)
+- **Task 4.5.2.3**: Add Windows Mixed Reality specific features
+- **Task 4.5.2.4**: Implement adaptive quality based on system performance
+
+**Acceptance**: Optimal VR experience across all headset types and platforms
 
 ---
 

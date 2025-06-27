@@ -70,14 +70,6 @@ Include:
   - What's the development iteration speed?
   - Can it auto-start as VR desktop replacement?
 
-### 2. Standalone VR Application (Unity)
-- **Focus**: Unity with XR Toolkit
-- **Key Questions**:
-  - Unity's Steam integration capabilities
-  - VR development workflow and iteration speed
-  - Deployment and auto-start options
-  - Licensing and cost considerations
-
 ### 3. SteamVR Dashboard Overlay
 - **Focus**: Native C++ SteamVR overlay application
 - **Key Questions**:
