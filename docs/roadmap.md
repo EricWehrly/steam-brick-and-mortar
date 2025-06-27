@@ -1,4 +1,4 @@
-# SteamVR Blockbuster Shelf - Project Roadmap
+# Blockbuster Shelf VR - WebXR Implementation Roadmap
 
 ## Project Structure Overview
 - **Tasks**: Smallest unit of work that can be committed without breaking the build
@@ -38,6 +38,26 @@
 - **3D Engine**: Three.js (mature WebGL library with WebXR integration)
 - **Physics**: Cannon.js (plug-and-play physics, integrated with Three.js)
 - **Asset Pipeline**: Blender → GLTF → Three.js GLTFLoader
+
+## Final Technology Decision (CONFIRMED) ✅
+
+After completing comprehensive research across multiple approaches, **WebXR-first with Electron enhancement** is confirmed as the optimal path:
+
+### Selected: WebXR + Three.js + Electron
+**Rationale**: Best balance of development speed, cross-platform reach, and deployment flexibility.
+
+**Implementation Path**:
+1. **Immediate**: Pure WebXR PWA (works on any WebXR browser)
+2. **Enhanced**: Electron wrapper for local file system access and Steam launching
+3. **Optimized**: Platform-specific builds if performance requires
+
+**Research Validation**:
+- ✅ Cross-platform deployment paths documented (`docs/webxr-multiplatform.md`)
+- ✅ Technical feasibility confirmed (`docs/webxr-research-findings.md`)
+- ✅ Alternative architectures evaluated and timeline-compared (`docs/alternatives/`)
+- ✅ Risk mitigation strategies identified for CORS/launching challenges
+
+**Timeline**: 2-3 months for MVP vs 6+ months for native alternatives.
 - **Desktop Packaging**: Electron + electron-builder (when needed)
 - **Deployment**: Web hosting + Progressive Web App + optional native installers
 
