@@ -8,6 +8,19 @@
 
 **Incremental Progress Principle**: Each task should be achievable in a single session and immediately testable/committable without breaking the build / tests / etc.
 
+## Task Management & Current Focus
+
+**Current Task Prompt**: See `prompts/current-task.prompt.md` for detailed context on what to work on next.
+
+**Task Completion Workflow**:
+1. Read `prompts/current-task.prompt.md` for current context and priorities
+2. Complete the specified task with testing and validation
+3. Update both `prompts/current-task.prompt.md` and this roadmap file with ✅ completion markers
+4. Update the current task prompt with the next priority task
+5. Commit changes with clear description of what was accomplished
+
+**Documentation Updates**: When tasks are completed, both the roadmap and current task prompt should be updated to reflect progress and re-prioritize remaining work.
+
 ## Technology Strategy Decision 🎯
 
 **Architecture Choice**: WebXR-First with Progressive Enhancement
@@ -77,6 +90,7 @@ After completing comprehensive research across multiple approaches, **WebXR-firs
 - **Task 1.1.1.5**: Add docs/links.md with API references ✅
 - **Task 1.1.1.6**: Add docs/readme-guidelines.md ✅
 - **Task 1.1.1.7**: Add copilot instructions for project context ✅
+- **Task 1.1.1.8**: Create prompts folder with current task management ✅
 
 #### Story 1.1.2: Development Environment Setup ✅
 - **Task 1.1.2.1**: Create minimal Docker setup for Blender CLI ✅
@@ -125,13 +139,11 @@ After completing comprehensive research across multiple approaches, **WebXR-firs
 ### Feature 3.1: Steam Web API Client
 **Context**: Fetch user's Steam library and download game assets
 
-#### Story 3.1.1: Basic Node.js Environment + IPC Testing
-- **Task 3.1.1.1**: Create package.json for Node.js dependencies
-- **Task 3.1.1.2**: Add Node.js Dockerfile
-- **Task 3.1.1.3**: Update docker-compose.yml with nodejs service  
-- **Task 3.1.1.4**: Test Node.js environment setup
-- **Task 3.1.1.5**: ⭐ **PRIORITY**: Test file-based IPC with dummy VScript files
-- **Task 3.1.1.6**: ⭐ **PRIORITY**: Test filesystem watching for signal files
+#### Story 3.1.1: Basic Node.js Environment + Steam Protocol Testing
+- **Task 3.1.1.1**: Create package.json for Node.js dependencies ✅
+- **Task 3.1.1.2**: Add Node.js Dockerfile ✅
+- **Task 3.1.1.3**: Update docker-compose.yml with nodejs service ✅
+- **Task 3.1.1.4**: Test Node.js environment setup ✅
 - **Task 3.1.1.7**: ⭐ **PRIORITY**: Test Steam protocol URL execution (`steam://run/440`)
 
 #### Story 3.1.2: Steam Library Fetching
@@ -148,20 +160,17 @@ After completing comprehensive research across multiple approaches, **WebXR-firs
 
 **Acceptance**: Running `docker compose run nodejs node external-tool/fetch_library.js` creates JSON file with game data
 
-### Feature 3.2: File System Monitoring
-**Context**: Watch for VR interaction signals and launch games
+### Feature 3.2: Steam Integration for WebXR
+**Context**: Direct Steam Web API integration and browser-based game launching
 
-#### Story 3.2.1: Launch Signal Watcher + Game Transition
-- **Task 3.2.1.1**: Implement file system watcher with chokidar
-- **Task 3.2.1.2**: Parse launch signal files for game AppIDs
-- **Task 3.2.1.3**: Execute Steam protocol URLs (`steam://run/<appid>`)
-- **Task 3.2.1.4**: Add logging and error handling
-- **Task 3.2.1.5**: ⭐ **PRIORITY**: Test VScript signal writing → external tool detection
-- **Task 3.2.1.6**: ⭐ **PRIORITY**: Test game launch timing and environment transition
-- **Task 3.2.1.7**: Research environment shutdown vs. sleep strategies
-- **Task 3.2.1.8**: Implement cleanup/restore logic for failed launches
+#### Story 3.2.1: Browser-Based Game Launching
+- **Task 3.2.1.3**: Execute Steam protocol URLs (`steam://run/<appid>`) from browser
+- **Task 3.2.1.4**: Add logging and error handling for launch attempts
+- **Task 3.2.1.6**: ⭐ **PRIORITY**: Test game launch timing and browser transition UX
+- **Task 3.2.1.7**: Research browser security requirements for protocol handling
+- **Task 3.2.1.8**: Implement user education for enabling Steam protocol handlers
 
-**Acceptance**: Writing a signal file triggers game launch via Steam + smooth environment transition
+**Acceptance**: Browser can successfully launch Steam games with good user experience
 
 ---
 
@@ -278,58 +287,58 @@ After completing comprehensive research across multiple approaches, **WebXR-firs
 ---
 
 ## Milestone 5: Dynamic Content System  
-*Goal: VR environment dynamically populates with user's Steam games*
+*Goal: WebXR environment dynamically populates with user's Steam games*
 
 ### Feature 5.1: Dynamic Game Display
-**Context**: Spawn game entities based on Steam library data
+**Context**: Spawn game entities in WebXR scene based on Steam library data
 
-#### Story 5.1.1: Basic Game Entity Creation
-- **Task 5.1.1.1**: Create simple prop_physics test entity
-- **Task 5.1.1.2**: Test entity positioning on shelf
-- **Task 5.1.1.3**: Apply basic texture to test entity
-- **Task 5.1.1.4**: Verify entity physics behavior
+#### Story 5.1.1: Basic WebXR Game Entity Creation
+- **Task 5.1.1.1**: Create Three.js game box geometry with Steam game textures
+- **Task 5.1.1.2**: Test entity positioning on procedural shelf
+- **Task 5.1.1.3**: Apply Steam game artwork as box textures
+- **Task 5.1.1.4**: Verify WebXR interaction (grab, touch) with game boxes
 
-#### Story 5.1.2: Game Library Integration
-- **Task 5.1.2.1**: Read JSON manifest in VScript
-- **Task 5.1.2.2**: Spawn one game entity per JSON entry
-- **Task 5.1.2.3**: Apply game icons as entity textures
-- **Task 5.1.2.4**: Position games with proper spacing
+#### Story 5.1.2: Steam Library Integration
+- **Task 5.1.2.1**: Fetch Steam library via CORS proxy service
+- **Task 5.1.2.2**: Generate one Three.js mesh per game in library
+- **Task 5.1.2.3**: Download and apply game icons as WebGL textures
+- **Task 5.1.2.4**: Position games with proper 3D spacing on shelf
 
 #### Story 5.1.3: Dynamic Updates
-- **Task 5.1.3.1**: Detect changes in JSON manifest
-- **Task 5.1.3.2**: Update VR environment without restart
+- **Task 5.1.3.1**: Detect changes in Steam library (new purchases)
+- **Task 5.1.3.2**: Update WebXR scene without VR session restart
 - **Task 5.1.3.3**: Handle new game additions incrementally
-- **Task 5.1.3.4**: Remove games no longer in library
+- **Task 5.1.3.4**: Remove games no longer in library (refunds, etc.)
 
-**Acceptance**: VR environment shows user's actual Steam games on shelf
+**Acceptance**: WebXR environment shows user's actual Steam games as interactive 3D objects
 
 ---
 
 ## Milestone 6: Interactive Game Launching
-*Goal: Users can interact with games in VR to launch them*
+*Goal: Users can interact with games in WebXR to launch them*
 
-### Feature 6.1: Basic VR Interaction
-**Context**: Touch/grab interactions trigger game launches
+### Feature 6.1: WebXR VR Interaction
+**Context**: Three.js raycasting interactions trigger game launches
 
 #### Story 6.1.1: Interaction Detection
-- **Task 6.1.1.1**: Add interaction detection to single test entity
-- **Task 6.1.1.2**: Test grab/touch event triggering
-- **Task 6.1.1.3**: Add visual feedback for interactions
+- **Task 6.1.1.1**: Add WebXR controller raycasting to single test game
+- **Task 6.1.1.2**: Test grab/touch event triggering with VR controllers
+- **Task 6.1.1.3**: Add visual feedback for interactions (highlighting, haptics)
 - **Task 6.1.1.4**: Log interaction events for debugging
 
-#### Story 6.1.2: Launch Signal System
-- **Task 6.1.2.1**: Write launch signal files on interaction
-- **Task 6.1.2.2**: Test signal file creation from VScript
-- **Task 6.1.2.3**: Connect to file watcher for launch
-- **Task 6.1.2.4**: Test end-to-end launch for one game
+#### Story 6.1.2: Direct Launch System
+- **Task 6.1.2.1**: Execute Steam protocol URLs on game interaction
+- **Task 6.1.2.2**: Test direct browser → Steam launching flow
+- **Task 6.1.2.3**: Add user permission guidance for protocol handlers
+- **Task 6.1.2.4**: Test end-to-end launch for one game in WebXR
 
 #### Story 6.1.3: Full Launch Integration
-- **Task 6.1.3.1**: Apply interaction system to all game entities
-- **Task 6.1.3.2**: Add launch confirmation UI
-- **Task 6.1.3.3**: Handle launch failures gracefully
+- **Task 6.1.3.1**: Apply interaction system to all game entities in scene
+- **Task 6.1.3.2**: Add launch confirmation UI within VR space
+- **Task 6.1.3.3**: Handle launch failures gracefully with VR feedback
 - **Task 6.1.3.4**: Add cooldown to prevent accidental launches
 
-**Acceptance**: Grabbing a game in VR launches it via Steam
+**Acceptance**: Grabbing a game in WebXR VR launches it via Steam protocol
 
 ---
 
@@ -385,108 +394,101 @@ After completing comprehensive research across multiple approaches, **WebXR-firs
 
 ## 🔄 **Critical Integration Points & Testing Priorities**
 
-### **File-Based IPC (Inter-Process Communication)**
+### **Steam Protocol URL Testing**
 
-The VScript ↔ External Tool communication is **mission-critical** and must be thoroughly tested before building higher-level features.
+The browser → Steam game launching is **mission-critical** and must be thoroughly tested before building higher-level WebXR features.
 
-#### **Communication Flow:**
-1. **External Tool** → VScript: JSON manifest (`data/games.json`)
-2. **VScript** → External Tool: Launch signals (`launch_signals/*.signal`)  
-3. **External Tool** → System: Steam protocol execution (`steam://run/<appid>`)
+#### **Browser Integration Flow:**
+1. **WebXR App** → User selects game in VR interface
+2. **JavaScript** → Executes `window.open('steam://run/<appid>')` or similar  
+3. **Browser** → Prompts user for protocol handler permission (first time)
+4. **Steam** → Launches game and takes focus
 
-#### **File System Requirements:**
-- **Shared directory access** between SteamVR addon and external tool
-- **File locking/atomic writes** to prevent race conditions
-- **Polling vs. filesystem watching** for signal detection
-- **Signal cleanup** after processing to avoid duplicate launches
+#### **Cross-Platform Requirements:**
+- **Windows**: Steam protocol registration with browser security prompts
+- **macOS**: System-level protocol handler confirmation
+- **Linux**: Desktop environment protocol association
+- **Quest Browser**: May have limitations - needs fallback strategy
 
 #### **Testing Prerequisites:**
 ```
-PRIORITY 1: Basic IPC Testing
-├── ✅ Test file creation from VScript (StringToFile)
-├── ✅ Test file reading by external Node.js process  
-├── ✅ Test file deletion/cleanup cycle
-├── ⭐ Test signal detection latency (<100ms target)
-└── ⭐ Test concurrent access (multiple signal files)
+PRIORITY 1: Steam Protocol Testing
+├── ⭐ Test Steam protocol URL execution from browser
+├── ⭐ Test cross-platform browser security prompts  
+├── ⭐ Test protocol handler setup and user education
+└── ⭐ Test fallback strategies for browsers without Steam access
 
-PRIORITY 2: Steam Integration Testing  
-├── ⭐ Test Steam protocol URL execution
-├── ⭐ Test Steam process detection/monitoring
-├── ⭐ Test game launch success/failure feedback
-└── ⭐ Test transition timing (store→game)
+PRIORITY 2: WebXR Foundation  
+├── ⭐ Test WebXR session management across platforms
+├── ⭐ Test Three.js integration with WebXR
+├── ⭐ Test GLTF model loading from Blender assets
+└── ⭐ Test VR controller interaction basics
 ```
 
-### **Environment Transition Strategy**
+### **Browser → Steam Transition Strategy**
 
-#### **Current Limitation: No Graceful Handoff**
-- SteamVR environments **cannot directly launch and transition to games**
-- **"Desktop risk"** is unavoidable but acceptable as fallback
-- **Priority**: Minimize transition jarring/improve UX where possible
+#### **Current Reality: Browser Security Limitations**
+- Browsers **cannot directly launch and transition to games** without user permission
+- **Protocol handler prompts** are unavoidable but acceptable with good UX
+- **Priority**: Minimize friction and provide clear user guidance
 
-#### **Transition Options (Research Needed):**
+#### **Transition Options:**
 
-**Option A: Environment Shutdown**
-```lua
--- VScript approach: Clean shutdown before launch
-function PrepareForGameLaunch(appid)
-    -- 1. Save state if needed
-    -- 2. Clean up entities and resources
-    -- 3. Stop audio/effects
-    -- 4. Trigger shutdown sequence
-    SendToConsole("quit")  -- Force SteamVR Home exit
-end
+**Option A: Direct Protocol Launch** *(Recommended)*
+```javascript
+// WebXR approach: Direct Steam protocol execution
+function launchGame(appid) {
+    // 1. Show user confirmation UI in VR
+    showLaunchConfirmation(appid);
+    
+    // 2. Execute Steam protocol URL
+    window.open(`steam://run/${appid}`);
+    
+    // 3. Provide user feedback about next steps
+    showLaunchInstructions("Check your desktop - Steam is starting the game");
+}
 ```
 
-**Option B: Environment Sleep/Minimize**
-```lua
--- VScript approach: Resource reduction (if possible)
-function MinimizeForGameLaunch(appid)
-    -- 1. Stop all audio
-    StopGlobalSound("ambient.store")
+**Option B: Electron Enhanced** *(Future Enhancement)*
+```javascript
+// Electron wrapper: Enhanced desktop integration
+function launchGameElectron(appid) {
+    // 1. Direct Steam execution without browser prompts
+    require('child_process').exec(`steam://run/${appid}`);
     
-    -- 2. Hide/remove all entities  
-    for _, entity in pairs(gameEntities) do
-        SetRenderingEnabled(entity:GetEntityHandle(), false)
-    end
-    
-    -- 3. Reduce think frequency
-    ScriptSystem_RemovePerFrameUpdateFunction(updateFunction)
-    
-    -- 4. Wait for game to finish (external tool monitors)
-    -- 5. Restore environment when game exits
-end
+    // 2. Monitor Steam process if needed
+    // 3. Optional: minimize Electron window during gameplay
+}
 ```
-
-**Option C: SteamVR Dashboard Integration** *(Research Required)*
-- Investigate if SteamVR Dashboard APIs allow environment control
-- Check if games can be launched "through" the environment
-- Determine if environments can detect game state changes
 
 #### **Implementation Strategy:**
-1. **Start with Option A** (clean shutdown) - most reliable
-2. **Research Option C** (dashboard integration) - potentially seamless  
-3. **Implement Option B** (sleep/restore) - best user experience if feasible
+1. **Start with Option A** (direct protocol launch) - most reliable and simple
+2. **Add user education and clear UX** - guide users through protocol setup  
+3. **Implement Option B** (Electron enhancement) - for users wanting seamless experience
+4. **Provide choice** - let users pick web vs desktop app based on preference
 
-#### **External Tool Responsibilities:**
+#### **WebXR App Responsibilities:**
 ```javascript
-// Game launch orchestration
-async function launchGame(appid) {
-    // 1. Signal environment to prepare for shutdown
-    await writeFile('signals/prepare_shutdown.signal', appid);
+// Game launch orchestration for WebXR
+async function launchGame(appid, gameTitle) {
+    // 1. Show VR confirmation dialog
+    const confirmed = await showVRDialog(`Launch ${gameTitle}?`);
+    if (!confirmed) return;
     
-    // 2. Wait for environment acknowledgment
-    await waitForFile('signals/ready_for_launch.signal');
-    
-    // 3. Launch game via Steam
-    await exec(`steam://run/${appid}`);
-    
-    // 4. Monitor game process
-    const gameProcess = await waitForGameStart(appid);
-    
-    // 5. Optionally restore environment when game exits
-    gameProcess.on('exit', () => {
-        // Decide: restart environment or stay at desktop
-    });
+    // 2. Attempt Steam protocol launch
+    try {
+        window.open(`steam://run/${appid}`);
+        
+        // 3. Show success feedback in VR
+        showVRNotification("Game launching! Check your desktop.");
+        
+        // 4. Optional: track launch success/failure
+        setTimeout(() => checkLaunchSuccess(appid), 5000);
+        
+    } catch (error) {
+        // 5. Handle launch failures gracefully
+        showVRError("Could not launch game. Make sure Steam is installed.");
+    }
 }
 ```
 
