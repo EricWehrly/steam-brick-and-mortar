@@ -1,67 +1,58 @@
-# Copilot Instructions for SteamVR Blockbuster Shelf Project
+# Copilot Instructions for Steam Blockbuster Shelf Project
 
 ## Project Overview
-You are working on a SteamVR "Blockbuster shelf" environment that dynamically displays and launches Steam games. This project combines VR development, Blender automation, and Steam API integration.
+You are working on a **WebXR-first** "Blockbuster shelf" environment that dynamically displays and launches Steam games. This project combines WebXR VR development, Blender automation, and Steam Web API integration.
 
 ## Key Technologies & Context
-- **SteamVR Home**: VR environment with custom scripting capabilities
+- **WebXR + Three.js**: Cross-platform VR environment (primary architecture)
 - **Blender CLI**: Automated 3D model generation via Python scripts
-- **Steam Web API**: For fetching user's game library
-- **VScript (Lua)**: SteamVR's scripting language for interactive elements
-- **Node.js/Python**: External tools for API integration and file watching
+- **Steam Web API**: For fetching user's game library (via CORS proxy)
+- **Node.js**: External tools and CORS proxy service
 - **Docker**: Containerized development environment for all tools
+- **Progressive Enhancement**: Web-first PWA → Electron desktop apps
 
 ## Project Structure
 ```
-steamvr-blockbuster/
-├── blender/               # Blender scripts and .blend prototypes
-├── steamvr-addon/         # Environment addon (Hammer assets)
-│   ├── models/
-│   ├── materials/
-│   ├── sounds/
-│   ├── panorama/
-│   └── scripts/vscripts/
-│       └── map_scripts/
-├── external-tool/         # Node.js / Python daemon
-│   ├── fetch_library.js
-│   └── watcher.js
-├── docker/                # Docker development containers
-│   ├── Dockerfile.nodejs
-│   ├── Dockerfile.python
-│   └── Dockerfile.steamvr
-├── docker-compose.yml     # Multi-service development setup
+steam-brick-and-mortar/
+├── blender/               # Blender scripts for procedural 3D assets
+├── external-tool/         # Node.js tools (CORS proxy, Steam API)
+├── webxr-app/            # WebXR + Three.js VR application
+├── docker/               # Docker development containers
+├── prompts/              # Task management and current context
+├── docs/                 # Architecture decisions and research
+├── docker-compose.yml    # Multi-service development setup
 └── README.md
 ```
 
-## Core Workflow
-1. **External tool** fetches Steam library via Steam Web API
-2. **Downloads** game icons/assets to `steamvr-addon/art/`
-3. **Generates** JSON manifest with game data
-4. **Blender script** procedurally creates shelf models (CLI mode)
-5. **VScript** reads JSON, spawns interactive game props in VR
-6. **Watcher daemon** monitors for launch signals and opens games
+## Core Workflow (WebXR Architecture)
+1. **WebXR app** runs in browser with VR session management
+2. **CORS proxy** (Node.js) provides Steam Web API access
+3. **Three.js** loads Blender-generated GLTF shelf models
+4. **Steam API** fetches user's game library and artwork
+5. **WebXR interactions** trigger direct Steam protocol URLs (`steam://run/<appid>`)
+6. **Progressive enhancement** via Electron for desktop integration
 
 ## Key Components to Implement
 
 ### External Tools (`external-tool/`)
-- `fetch_library.js`: Steam Web API integration (GetOwnedGames)
-- `watcher.js`: File system monitoring for launch signals
-- Dependencies: `node-fetch`, `chokidar`, `steamapi`
+- `cors-proxy.js`: Steam Web API CORS proxy service
+- `steam-protocol-test.js`: Steam protocol URL testing utilities
+- Dependencies: Managed via **Yarn PnP** (Plug'n'Play) for performance
 - Containerized via `docker/Dockerfile.nodejs`
 
-### Blender Automation (`blender/`)
-- `gen_shelf.py`: CLI script for procedural shelf generation
-- Creates: shelf (cube), brackets (triangular prisms), backing (plane/pegboard), crown (cylindrical ovoid)
-- Exports: FBX or Source engine compatible assets
-- Usage: `docker compose run blender` or `blender --background --python blender/gen_shelf.py`
-- Containerized via `docker/Dockerfile.python`
+### WebXR Application (`webxr-app/`)
+- `index.html`: Progressive Web App entry point
+- `main.js`: Three.js + WebXR scene management
+- `steam-integration.js`: Browser-based Steam API client
+- `vr-interactions.js`: WebXR controller input and game launching
+- Asset pipeline: Blender GLTF → Three.js GLTFLoader
 
-### VR Environment (`steamvr-addon/`)
-- `populate.lua`: VScript for dynamic prop creation
-- Reads JSON manifest, spawns `prop_physics` entities
-- Sets up interaction hooks for game launching
-- Integrates 3D audio via `.vsndevts` files
-- Development tools containerized via `docker/Dockerfile.steamvr`
+### Blender Automation (`blender/`)
+- `gen_shelf_modular.py`: CLI script for procedural shelf generation
+- Creates: shelf (cube), brackets (triangular prisms), backing (plane/pegboard), crown (cylindrical ovoid)
+- Exports: GLTF and FBX for WebXR and fallback compatibility  
+- Usage: `docker compose run blender blender --background --python blender/gen_shelf_modular.py`
+- Containerized via `docker/Dockerfile.python`
 
 ## Development Guidelines
 
@@ -74,25 +65,31 @@ steamvr-blockbuster/
 6. **Error handling**: Steam API failures, missing assets, VR disconnection
 
 ### Code Style:
-- **JavaScript/Node.js**: Modern ES6+, async/await patterns, Yarn package manager
+- **JavaScript/Node.js**: Modern ES6+, async/await patterns, **Yarn PnP** package manager (NO npm)
+- **WebXR/Three.js**: ES6 modules, clean component architecture, WebGL best practices
 - **Python/Blender**: PEP 8, comprehensive docstrings for bpy operations
-- **Lua/VScript**: Clear comments, robust error checking
 - **Docker**: Multi-stage builds, non-root users, layer optimization
 - **All files**: Include setup/usage instructions in comments
+
+### Package Management:
+- **ALWAYS use Yarn PnP** for Node.js projects - it's much more performant than npm
+- **Use `.yarnrc.yml`** with `nodeLinker: pnp` for Plug'n'Play mode
+- **Never use npm install** - always use `yarn install` or `yarn add <package>`
+- **Commit `.pnp.cjs` and `.yarn/`** directories for reproducible builds
 
 ### Testing Approach:
 - Test each component independently in Docker containers
 - Mock Steam API responses during development
-- Verify Blender exports work in SteamVR Workshop Tools
+- Verify Blender exports work in WebXR browsers (Chrome, Firefox, Quest)
 - Test VR interactions with proper hardware setup
 - Use `docker compose run build` for integrated testing
 
 ## Prerequisites
 - Blender 4.x (or use Docker container)
-- SteamVR Workshop Tools
+- WebXR-compatible browser (Chrome, Firefox, Safari)
 - Docker & Docker Compose (recommended)
-- VS Code with Lua/VScript extensions
-- Node.js and Yarn (or use Docker container)
+- VS Code with WebXR/Three.js extensions
+- **Yarn** (not npm) for Node.js package management
 - Python 3.x (or use Docker container)
 - Steam account with owned games for testing
 

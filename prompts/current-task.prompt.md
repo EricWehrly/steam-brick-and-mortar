@@ -40,9 +40,20 @@
 
 Based on the roadmap's ⭐ **PRIORITY** markers, focus on these tasks in order:
 
-#### Task 3.1.1.7: ⭐ **PRIORITY** - Test Steam protocol URL execution (`steam://run/440`)
-**Status**: 🔥 **STILL CRITICAL** for WebXR approach
+### Immediate Priority Tasks
+
+Based on the roadmap's priority markers, focus on these tasks in order:
+
+#### Task 3.1.1.7: ⭐ **PRIORITY** - Test Steam protocol URL execution (`steam://run/440`) ✅
+**Status**: 🔥 **IN PROGRESS** - Infrastructure created
 **Description**: Verify that browsers can launch Steam games via protocol URLs
+**Progress**: 
+- ✅ Created Node.js test environment with Yarn PnP
+- ✅ Created HTML test page for browser testing
+- ✅ Created Node.js command-line test script
+- ✅ Updated Docker configuration for Yarn PnP
+- 🔄 **NEXT**: Run actual tests and validate Steam protocol functionality
+
 **Expected deliverable**: Test script that validates `steam://run/<appid>` works across browsers
 
 ### Next High-Priority Tasks (WebXR Foundation)
