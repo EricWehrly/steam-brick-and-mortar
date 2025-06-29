@@ -1,4 +1,4 @@
-# Python dependencies for SteamVR Blockbuster Shelf project
+# Python dependencies for Steam Brick and Mortar project
 
 # Blender Python API (bpy) - Note: This comes with Blender installation
 # bpy is not installable via pip, requires Blender 4.x

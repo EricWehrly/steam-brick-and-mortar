@@ -1,6 +1,6 @@
-# SteamVR Blockbuster Shelf
+# Steam Brick and Mortar
 
-Recreate the nostalgic Blockbuster browsing experience in VR with your Steam library. Procedurally generates 3D shelves and creates an interactive WebXR environment where you can physically browse and launch your games.
+Recreate the nostalgic brick-and-mortar video store browsing experience in VR with your Steam library. Procedurally generates 3D shelves and creates an interactive WebXR environment where you can physically browse and launch your games.
 
 ## Quick Start
 
@@ -24,7 +24,7 @@ yarn run test-browser
 
 ## 🎯 Project Vision
 
-Transform your Steam library into a virtual "Blockbuster" experience:
+Transform your Steam library into a virtual "brick-and-mortar store" experience:
 - **Procedurally generated shelves** with realistic wood textures and bracket supports
 - **Dynamic game covers** fetched from Steam API and displayed as physical game boxes
 - **WebXR VR interaction** - reach out and grab games to launch them
