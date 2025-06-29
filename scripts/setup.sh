@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Steam Blockbuster Shelf VR - Setup Script
+# Steam Brick and Mortar - Setup Script
 # WebXR-First Development Environment Setup
 # Checks and installs prerequisites for Three.js + WebXR development
 
@@ -25,7 +25,7 @@ log_header() { echo -e "\n${BOLD}${BLUE}$1${NC}"; }
 MISSING_TOOLS=()
 OPTIONAL_MISSING=()
 
-log_header "🎮 Steam Blockbuster Shelf VR - Setup"
+log_header "🎮 Steam Brick and Mortar - Setup"
 echo "Setting up WebXR-first development environment..."
 echo
 
@@ -176,7 +176,7 @@ log_header "📁 Checking Project Structure"
 
 if [ -f "package.json" ] || [ -f "webxr-app/package.json" ]; then
     log_success "Found package.json - in correct project directory"
-elif [ -f "README.md" ] && grep -q "Blockbuster Shelf" README.md 2>/dev/null; then
+elif [ -f "README.md" ] && grep -q "Steam Brick and Mortar" README.md 2>/dev/null; then
     log_success "Found project README - in correct directory"
 else
     log_warning "May not be in the correct project directory"
