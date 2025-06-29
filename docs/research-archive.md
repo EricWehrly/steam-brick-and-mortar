@@ -51,7 +51,7 @@ This document archives the completed research that led to our WebXR-first techno
 
 ## Final Decision Rationale
 
-**WebXR emerged as superior** for our blockbuster shelf project based on:
+**WebXR emerged as superior** for our Steam Brick and Mortar project based on:
 
 1. **Development Speed**: 2-3 months vs 6+ months for alternatives
 2. **Cross-Platform Reach**: Works on Meta Quest browsers, desktop VR, and mobile

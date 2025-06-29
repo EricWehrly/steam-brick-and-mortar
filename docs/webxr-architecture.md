@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-After comprehensive research across multiple VR approaches, **WebXR-first with progressive enhancement** is confirmed as the optimal architecture for the Steam Blockbuster Shelf project.
+After comprehensive research across multiple VR approaches, **WebXR-first with progressive enhancement** is confirmed as the optimal architecture for the Steam Brick and Mortar project.
 
 **Key Decision**: WebXR + Three.js core with optional Electron packaging for enhanced desktop integration.
 

@@ -13,7 +13,7 @@
 ## Tone & Content
 - **Direct and accessible** above the fold - get people started fast
 - **Acknowledge the "lark" nature**: This is a fun, experimental project
-- **Vision section**: Can be playful and aspirational (recreating Blockbuster nostalgia)
+- **Vision section**: Can be playful and aspirational (recreating nostalgic video store browsing)
 - **Technical details**: Below the fold for those who need deeper understanding
 
 ## Key Principles
