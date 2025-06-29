@@ -26,50 +26,50 @@
 
 ---
 
-## Current Task: Milestone 3 - Steam API Integration (Priority Tasks)
+## Current Task: Milestone 4 - WebXR Foundation (UI Priority)
 
-### Current Status: ⚧ WebXR Transition in Progress
+### Current Status: 🔥 **WebXR UI Development - IMMEDIATE FOCUS**
 
-**Context**: The project has recently pivoted to a **WebXR-first architecture** (see roadmap for full rationale). This eliminates complex VScript+IPC communication in favor of direct browser-based Steam Web API integration.
+**Context**: We're now focusing on the core WebXR user interface before any Steam integration. The external tool/proxy research can come later once we have a working 3D environment.
 
-**Major Architecture Change**: 
-- **Old**: SteamVR Environment + VScript + File-based IPC + External Node.js tool
-- **New**: WebXR PWA + Three.js + Direct Steam Web API + Optional Electron packaging
-
-### Immediate Priority Tasks
-
-Based on the roadmap's ⭐ **PRIORITY** markers, focus on these tasks in order:
+**Major Priority Shift**: 
+- **Previous focus**: Steam protocol testing and Node.js external tools
+- **New focus**: WebXR 3D scene with movement, camera, and shelf objects
 
 ### Immediate Priority Tasks
 
-Based on the roadmap's priority markers, focus on these tasks in order:
+#### Task 4.1.1.1: ⭐ **CURRENT PRIORITY** - Create Three.js WebXR scene with VR session management
+**Status**: 🚧 **READY TO START**
+**Description**: Set up basic WebXR scene with VR session management, camera controls, and movement
+**Expected deliverable**: Working HTML page that can enter/exit VR mode across browsers
 
-#### Task 3.1.1.7: ⭐ **PRIORITY** - Test Steam protocol URL execution (`steam://run/440`) ✅
-**Status**: 🔥 **IN PROGRESS** - Infrastructure created
-**Description**: Verify that browsers can launch Steam games via protocol URLs
-**Progress**: 
-- ✅ Created Node.js test environment with Yarn PnP
-- ✅ Created HTML test page for browser testing
-- ✅ Created Node.js command-line test script
-- ✅ Updated Docker configuration for Yarn PnP
-- 🔄 **NEXT**: Run actual tests and validate Steam protocol functionality
+#### Task 4.1.1.2: ⭐ **NEXT** - Implement WebXR controller input and hand tracking  
+**Status**: 📋 **WAITING**
+**Description**: Add VR controller detection and basic interaction capabilities
+**Expected deliverable**: VR controllers/hands visible and responsive in 3D scene
 
-**Expected deliverable**: Test script that validates `steam://run/<appid>` works across browsers
+#### Task 4.1.3.1: ⭐ **FOLLOWING** - Integrate GLTFLoader for Blender-generated models
+**Status**: � **WAITING**
+**Description**: Load and display our procedurally generated shelf in the VR scene
+**Expected deliverable**: Blender shelf models visible and positioned correctly in WebXR
 
-### Next High-Priority Tasks (WebXR Foundation)
+### Next High-Priority Tasks (After UI Foundation)
 
-Given the WebXR architecture decision, the **immediate next tasks** should be:
-
-**Task 4.1.1.6: ⭐ **PRIORITY** - Test game launch timing and browser → Steam transition**
-**Status**: 🔥 **CRITICAL** for WebXR approach
-**WebXR Version**: Test browser → Steam game launching UX and transition experience
+**Task 4.2.0.1-4.2.0.5: Steam Integration Research**
+**Status**: � **RESEARCH PHASE**
+**Description**: Research lightweight Docker container approaches for Steam API proxy
+**Goal**: Determine minimal, performant way to handle Steam Web API CORS issues
 
 ### Current Focus Recommendation
 
-Given the WebXR architecture decision, the **immediate next task** should be:
+**START WITH: WebXR UI Foundation**
+1. Set up basic WebXR scene with Three.js
+2. Test VR session management across browsers  
+3. Add camera movement and basic interaction
+4. Load Blender shelf models into the scene
+5. THEN research Steam integration approaches
 
-**NEW PRIORITY: Begin WebXR Foundation (Milestone 4.1.1)**
-- Task 4.1.1.1: Create Three.js WebXR scene with VR session management
+**Rationale**: UI-first approach allows rapid iteration and cross-browser testing. Steam integration is complex and can be optimized once we have a working 3D environment to integrate with.
 - Task 4.1.1.2: Implement WebXR controller input and hand tracking  
 - Task 4.1.1.3: Test VR session lifecycle (enter/exit VR mode)
 

@@ -144,7 +144,7 @@ After completing comprehensive research across multiple approaches, **WebXR-firs
 - **Task 3.1.1.2**: Add Node.js Dockerfile ✅
 - **Task 3.1.1.3**: Update docker-compose.yml with nodejs service ✅
 - **Task 3.1.1.4**: Test Node.js environment setup ✅
-- **Task 3.1.1.7**: ⭐ **PRIORITY**: Test Steam protocol URL execution (`steam://run/440`)
+- **Task 3.1.1.7**: Test Steam protocol URL execution (`steam://run/440`) *(deferred until UI complete)* ✅
 
 #### Story 3.1.2: Steam Library Fetching
 - **Task 3.1.2.1**: Implement Steam Web API authentication
@@ -174,19 +174,19 @@ After completing comprehensive research across multiple approaches, **WebXR-firs
 
 ---
 
-## Milestone 4: WebXR Cross-Platform Implementation 🚧
+## Milestone 4: WebXR Cross-Platform Implementation 🚧 **CURRENT PRIORITY**
 *Goal: Multi-platform VR library browser using WebXR-first strategy*
 
 **Architecture**: WebXR + Three.js core with progressive enhancement to Electron desktop apps
 **Deployment Strategy**: Web-first PWA → Desktop packaging → VR headset optimization
 
-### Feature 4.1: WebXR Foundation (Phase 1: Web-First Deployment)
+### Feature 4.1: WebXR Foundation (Phase 1: Web-First Deployment) 🔥 **IMMEDIATE FOCUS**
 **Context**: Core VR capabilities with maximum cross-platform reach
 
-#### Story 4.1.1: Three.js WebXR Core
-- **Task 4.1.1.1**: Create Three.js WebXR scene with VR session management
-- **Task 4.1.1.2**: Implement WebXR controller input and hand tracking
-- **Task 4.1.1.3**: Test VR session lifecycle (enter/exit VR mode)
+#### Story 4.1.1: Three.js WebXR Core ⭐ **CURRENT WORK**
+- **Task 4.1.1.1**: ⭐ **PRIORITY**: Create Three.js WebXR scene with VR session management
+- **Task 4.1.1.2**: ⭐ **PRIORITY**: Implement WebXR controller input and hand tracking
+- **Task 4.1.1.3**: ⭐ **PRIORITY**: Test VR session lifecycle (enter/exit VR mode)
 - **Task 4.1.1.4**: Add basic 3D environment and lighting setup
 - **Task 4.1.1.5**: Test on Chrome desktop with VR headset connected
 - **Task 4.1.1.6**: Test on Meta Quest Browser directly
@@ -203,17 +203,26 @@ After completing comprehensive research across multiple approaches, **WebXR-firs
 **Acceptance**: App installs as PWA on Windows/Mac/Linux/Quest with app-like experience
 
 #### Story 4.1.3: Asset Integration
-- **Task 4.1.3.1**: Integrate GLTFLoader for Blender-generated models
-- **Task 4.1.3.2**: Load and display shelf geometry in VR space
+- **Task 4.1.3.1**: ⭐ **PRIORITY**: Integrate GLTFLoader for Blender-generated models
+- **Task 4.1.3.2**: ⭐ **PRIORITY**: Load and display shelf geometry in VR space
 - **Task 4.1.3.3**: Optimize GLTF assets for web delivery (compression, textures)
 - **Task 4.1.3.4**: Implement progressive loading with Three.js TextureLoader
 
 **Acceptance**: Blender shelf models display correctly in WebXR across all platforms
 
-### Feature 4.2: Steam Integration Layer
+### Feature 4.2: Steam Integration Layer *(Research and Lightweight Implementation)*
 **Context**: Steam Web API access and game library management
 
-#### Story 4.2.1: CORS Proxy Service
+#### Story 4.2.0: Steam Integration Research *(New - Priority after UI complete)*
+- **Task 4.2.0.1**: Research minimal CORS proxy architectures (Docker containers)
+- **Task 4.2.0.2**: Evaluate Steam Web API rate limits and caching strategies  
+- **Task 4.2.0.3**: Compare lightweight proxy options (Express.js, Go, Rust, Python)
+- **Task 4.2.0.4**: Design minimal container footprint for Steam API proxy
+- **Task 4.2.0.5**: Document proxy security considerations and API key management
+
+**Acceptance**: Clear technical plan for lightweight Steam integration container
+
+#### Story 4.2.1: CORS Proxy Service *(Deferred until UI complete)*
 - **Task 4.2.1.1**: Create simple Node.js CORS proxy for Steam Web API
 - **Task 4.2.1.2**: Implement GetOwnedGames API endpoint wrapping
 - **Task 4.2.1.3**: Add API key management and rate limiting
