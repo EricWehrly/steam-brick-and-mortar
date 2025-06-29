@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Blockbuster Shelf - WebXR</title>
+    <meta name="description" content="VR game launcher for your Steam library">
+    
+    <!-- WebXR Polyfill for broader browser support -->
+    <script src="https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 1000;
+        }
+        
+        #webxr-button {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            z-index: 1000;
+        }
+        
+        #webxr-button:hover {
+            background: #005a9e;
+        }
+        
+        #webxr-button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <h1>Steam Blockbuster Shelf</h1>
+        <p>Loading WebXR environment...</p>
+    </div>
+    
+    <button id="webxr-button" style="display: none;">Enter VR</button>
+    
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
