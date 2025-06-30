@@ -266,10 +266,68 @@ class SteamBrickAndMortar {
             this.scene.add(shelfModel)
             console.log('✅ Shelf model loaded successfully!')
             
+            // Add placeholder game boxes on the shelf
+            this.createPlaceholderGameBoxes()
+            
         } catch (error) {
             console.error('❌ Failed to load shelf model:', error)
             console.warn('⚠️ Continuing without shelf model - check file path and format')
         }
+    }
+
+    private createPlaceholderGameBoxes() {
+        console.log('📦 Creating placeholder game boxes...')
+        
+        // Game case dimensions (roughly based on standard game box sizes)
+        const boxWidth = 0.15    // Width of game case
+        const boxHeight = 0.2    // Height of game case  
+        const boxDepth = 0.02    // Depth/thickness of game case
+        
+        // Create geometry and materials for game boxes
+        const boxGeometry = new THREE.BoxGeometry(boxWidth, boxHeight, boxDepth)
+        
+        // Create different colored materials for visual variety
+        const materials = [
+            new THREE.MeshPhongMaterial({ color: 0x4a90e2 }), // Blue
+            new THREE.MeshPhongMaterial({ color: 0xe74c3c }), // Red  
+            new THREE.MeshPhongMaterial({ color: 0x2ecc71 }), // Green
+            new THREE.MeshPhongMaterial({ color: 0xf39c12 }), // Orange
+            new THREE.MeshPhongMaterial({ color: 0x9b59b6 }), // Purple
+            new THREE.MeshPhongMaterial({ color: 0x1abc9c }), // Teal
+        ]
+        
+        // Position boxes on the shelf
+        // Assuming shelf surface is roughly at y = -0.8 (shelf at -1, plus some height)
+        const shelfSurfaceY = -0.8
+        const shelfCenterZ = -3
+        const shelfCenterX = 0
+        
+        // Create a row of game boxes
+        const numBoxes = 6
+        const spacingX = 0.18 // Space between boxes
+        const startX = -(numBoxes - 1) * spacingX / 2 // Center the row
+        
+        for (let i = 0; i < numBoxes; i++) {
+            const gameBox = new THREE.Mesh(boxGeometry, materials[i % materials.length])
+            
+            // Position each box
+            gameBox.position.set(
+                shelfCenterX + startX + (i * spacingX),  // X: spread across shelf
+                shelfSurfaceY + boxHeight / 2,           // Y: rest on shelf surface
+                shelfCenterZ + 0.1                       // Z: slightly forward from shelf back
+            )
+            
+            // Enable shadows
+            gameBox.castShadow = true
+            gameBox.receiveShadow = true
+            
+            // Add some subtle random rotation for natural look
+            gameBox.rotation.y = (Math.random() - 0.5) * 0.1 // Small random Y rotation
+            
+            this.scene.add(gameBox)
+        }
+        
+        console.log(`✅ Created ${numBoxes} placeholder game boxes on shelf`)
     }
 
     private startRenderLoop() {

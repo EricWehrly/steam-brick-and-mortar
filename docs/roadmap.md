@@ -86,7 +86,7 @@
 
 ---
 
-## Milestone 3: 3D Scene Foundation 🔥 **CURRENT PRIORITY**
+## Milestone 3: 3D Scene Foundation ✅ **COMPLETED**
 *Goal: Create working 3D scene with shelf model and placeholder game objects*
 
 ### Feature 3.0: TypeScript Build System ✅ **TESTED AND VERIFIED**
@@ -113,21 +113,21 @@
 
 **Status**: ✅ **VERIFIED** - Scene loads, cube visible, camera controls working (WASD + mouse look)
 
-#### Story 3.1.2: 3D Scene Development � **CURRENT PRIORITY**
-- **Task 3.1.2.1**: ⭐ **CURRENT PRIORITY**: Import and display Blender-generated shelf model (GLTF)
+#### Story 3.1.2: 3D Scene Development ✅ **COMPLETED**
+- **Task 3.1.2.1**: Import and display Blender-generated shelf model (GLTF) ✅ **TESTED**
 - **Task 3.1.2.2**: Implement camera controls for desktop testing ✅ **TESTED**
 - **Task 3.1.2.3**: Add basic movement/navigation system ✅ **TESTED**
 - **Task 3.1.2.4**: Configure lighting system for 3D scene ✅ **TESTED**
-- **Task 3.1.2.5**: ⭐ **NEXT**: Add placeholder game box geometry (rectangle/box for texturing)
+- **Task 3.1.2.5**: Add placeholder game box geometry (rectangle/box for texturing) ✅ **TESTED**
 
-**Acceptance**: Can view shelf model with placeholder game boxes in desktop 3D mode
+**Acceptance**: Can view shelf model with placeholder game boxes in desktop 3D mode ✅ **ACHIEVED**
 
 ---
 
 ## Milestone 4: Steam API Research & Integration
 *Goal: Research Steam Web API and integrate user's game library*
 
-### Feature 4.0: Steam Web API Research 🔥 **UPCOMING PRIORITY**
+### Feature 4.0: Steam Web API Research 🔥 **CURRENT PRIORITY**
 **Context**: Research Steam Web API capabilities and authentication options
 
 #### Story 4.0.1: API Research and Authentication Strategy 📋 **READY TO START**
