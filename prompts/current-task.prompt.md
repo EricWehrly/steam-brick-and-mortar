@@ -1,4 +1,4 @@
-# Current Task Prompt - Steam VR Blockbuster Shelf
+# Current Task Prompt - Steam Brick and Mortar
 
 ## General Task Workflow Instructions
 
@@ -28,45 +28,74 @@
 
 ## Current Task: Milestone 3 - WebXR Foundation
 
-### Current Status: 🔥 **WebXR HTML/JavaScript Foundation - IMMEDIATE FOCUS**
+### Current Status: 🔥 **WebXR BROWSER TESTING - IMMEDIATE FOCUS**
 
-**Context**: We're implementing WebXR from the ground up with a progressive approach:
-1. **HTML page with WebXR capability** (current priority)
-2. **Three.js integration with basic 3D scene**
-3. **Load and display our Blender shelf model**
-4. **Add camera controls and movement**
-5. **Enable VR mode and controller interaction**
-6. **Later**: Steam integration after we have a working 3D environment
+**Context**: Build system is now **TESTED AND WORKING**! All scripts compile and tests pass. Next critical step is testing the actual WebXR functionality in browsers.
+
+**Completed & Tested ✅**:
+- TypeScript build system ✅ **TESTED** (`yarn build` compiles successfully)
+- Unit testing framework ✅ **TESTED** (7/7 tests pass with `yarn test:run`)
+- Fixed rootDir TypeScript configuration ✅ **TESTED**
+- Vite development/build pipeline ✅ **TESTED**
+
+**Implemented but NOT Browser Tested ❌**:
+- HTML page with WebXR capability detection 🔄 **NEEDS BROWSER TESTING**
+- Three.js integration with test cube geometry 🔄 **NEEDS BROWSER TESTING**
+- Desktop mouse/keyboard controls (WASD movement, mouse look) 🔄 **NEEDS BROWSER TESTING**
+- Basic lighting system and scene setup 🔄 **NEEDS BROWSER TESTING**
+- WebXR session management (Enter/Exit VR buttons) 🔄 **NEEDS BROWSER TESTING**
+
+**⚠️ CRITICAL RISK**: Custom WebXR type definitions require expert review for VR safety
 
 **Architecture Reference**: See `docs/webxr-architecture.md` for technical details
 **Research Status**: Complete (archived in `docs/research-archive.md`)
 
 ### Immediate Priority Tasks
 
-#### Task 3.1.1.1: ⭐ **CURRENT PRIORITY** - Create basic HTML page with WebXR capability
+#### Task 3.1.1.3: ⭐ **CURRENT PRIORITY** - Test WebXR functionality in browser
 **Status**: 🚧 **READY TO START**
-**Description**: Create foundational WebXR HTML page that can detect VR capability and enter/exit VR sessions
-**Directory**: `webxr-app/` 
+**Description**: Launch the development server and validate WebXR scene works in browser
+**Directory**: `client/` 
 **Expected deliverable**: 
-- `webxr-app/index.html` - Basic HTML page with WebXR setup
-- `webxr-app/main.js` - JavaScript with WebXR session management
-- Can test WebXR capability in browser, enter/exit VR mode
-- Works on both desktop browsers and Quest Browser
+- Run `yarn serve` and verify page loads at localhost:3000
+- Confirm 3D scene with rotating green cube displays
+- Test desktop controls (WASD movement, mouse look)
+- Verify WebXR button shows appropriate state ("VR Not Available" on desktop)
+- Test on Chrome desktop (should work), Firefox (may have issues)
+- Console shows proper initialization messages
 
-**Progressive Implementation Plan**:
-1. Basic HTML with WebXR session detection
-2. Enter/Exit VR button functionality
-3. Basic console logging for WebXR events
-4. Test on Chrome desktop and Quest Browser
-
-#### Task 3.1.1.2: ⭐ **NEXT** - Add Three.js integration with basic 3D scene
-**Status**: 📋 **WAITING**
-**Description**: Integrate Three.js for 3D rendering with a simple test scene
+**Critical Testing Steps**:
+1. `yarn serve` - development server starts without errors
+2. Browser shows 3D scene with rotating cube
+3. WASD keys move camera, mouse controls look direction
+4. WebXR button appears with correct state
+5. Console logs show successful initialization
+6. No JavaScript errors in browser console
+**Status**: 🚧 **READY TO START**
+**Description**: Test that the build system actually works and fix any TypeScript compilation errors
+**Directory**: `client/` 
 **Expected deliverable**: 
-- Three.js scene with basic cube geometry
-- Camera controls for desktop testing
-- WebGL canvas rendering properly
-- Foundation for importing Blender models
+- `yarn install` completes successfully
+- `yarn build` compiles without errors
+- `yarn serve` starts development server
+- `yarn test` runs tests successfully
+- Fix any TypeScript rootDir errors or other compilation issues
+
+**Testing Steps**:
+1. Navigate to `client/` directory
+2. Run `yarn install` (first time setup)
+3. Run `yarn build` and fix any compilation errors
+4. Run `yarn serve` and verify it opens in browser
+5. Run `yarn test` and verify tests pass
+6. Document any issues found and their resolutions
+
+#### Task 3.1.1.3: ⭐ **NEXT** - Test WebXR session management in browsers
+**Status**: 📋 **WAITING FOR BUILD VALIDATION**
+**Description**: Once build works, test WebXR functionality across different browsers
+**Expected deliverable**: 
+- WebXR session lifecycle works on Chrome desktop
+- Proper error handling for unsupported browsers
+- Console logging shows proper WebXR state transitions
 
 #### Task 3.1.1.3: ⭐ **FOLLOWING** - Test WebXR session management (enter/exit VR)
 **Status**: 📋 **WAITING**

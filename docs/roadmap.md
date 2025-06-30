@@ -1,4 +1,4 @@
-# Blockbuster Shelf VR - WebXR Implementation Roadmap
+# Steam Brick and Mortar - WebXR Implementation Roadmap
 
 ## Project Overview
 
@@ -84,25 +84,42 @@
 ## Milestone 3: WebXR Foundation 🔥 **CURRENT PRIORITY**
 *Goal: Create working WebXR environment with 3D scene and interaction*
 
-### Feature 3.1: Basic Web 3D Scene ⭐ **IMMEDIATE FOCUS**
+### Feature 3.0: TypeScript Build System ✅ **TESTED AND VERIFIED**
+**Context**: Modern TypeScript workflow with fast development iteration
+
+#### Story 3.0.1: Development Environment ✅ **TESTED AND VERIFIED**
+- **Task 3.0.1.1**: Create `client/` folder with TypeScript configuration ✅ **TESTED**
+- **Task 3.0.1.2**: Set up Vite for fast development and building ✅ **TESTED**
+- **Task 3.0.1.3**: Configure Vitest for unit testing ✅ **TESTED**
+- **Task 3.0.1.4**: Add ESLint configuration focused on issue-catching 🔄 **IMPLEMENTED** (not tested)
+- **Task 3.0.1.5**: Create Yarn PnP setup for package management ✅ **TESTED**
+- **Task 3.0.1.6**: Add build scripts (`yarn build`, `yarn serve`, `yarn test`) ✅ **TESTED**
+
+**Acceptance**: `yarn serve` starts development server, `yarn build` creates production bundle, `yarn test` runs tests
+**Status**: ✅ **VERIFIED** - Build compiles successfully, tests pass (7/7), fixed rootDir TypeScript issue
+
+### Feature 3.1: Basic Web 3D Scene 🔄 **IMPLEMENTED BUT NOT TESTED**
 **Context**: Progressive implementation from hello world to full 3D scene
 
-#### Story 3.1.1: HTML/JavaScript Foundation
-- **Task 3.1.1.1**: ⭐ **CURRENT PRIORITY**: Create basic HTML page with WebXR capability
-- **Task 3.1.1.2**: Add Three.js integration with basic 3D scene
-- **Task 3.1.1.4**: Add basic cube geometry for testing
+#### Story 3.1.1: HTML/JavaScript Foundation 🔄 **IMPLEMENTED BUT NOT TESTED**
+- **Task 3.1.1.1**: Create basic HTML page with WebXR capability 🔄 **IMPLEMENTED**
+- **Task 3.1.1.2**: Add Three.js integration with basic 3D scene 🔄 **IMPLEMENTED**
+- **Task 3.1.1.3**: Add basic cube geometry for testing 🔄 **IMPLEMENTED**
 
-#### Story 3.1.2: 3D Scene Development  
+**⚠️ CRITICAL RISK**: Custom WebXR type definitions (`client/src/webxr.d.ts`) require expert review for VR safety
+
+#### Story 3.1.2: 3D Scene Development 🔄 **IMPLEMENTED BUT NOT TESTED**
 - **Task 3.1.2.1**: Import and display Blender-generated shelf model (GLTF)
-- **Task 3.1.2.2**: Implement camera controls for desktop testing
-- **Task 3.1.2.3**: Add basic movement/navigation system
-- **Task 3.1.2.4**: Configure lighting system for 3D scene
+- **Task 3.1.2.2**: Implement camera controls for desktop testing 🔄 **IMPLEMENTED**
+- **Task 3.1.2.3**: Add basic movement/navigation system 🔄 **IMPLEMENTED**
+- **Task 3.1.2.4**: Configure lighting system for 3D scene 🔄 **IMPLEMENTED**
 
 #### Story 3.1.3: WebXR Integration
-- **Task 3.1.3.1**: Enable WebXR mode with VR session management
-- **Task 3.1.3.2**: Implement VR controller input and hand tracking
-- **Task 3.1.3.3**: Test interaction with 3D objects in VR
-- **Task 3.1.3.4**: Optimize performance for VR frame rates (90fps)
+- **Task 3.1.3.1**: ⭐ **MOVED FROM 3.1.1.3**: Test WebXR session management (enter/exit VR)
+- **Task 3.1.3.2**: Enable WebXR mode with VR session management
+- **Task 3.1.3.3**: Implement VR controller input and hand tracking
+- **Task 3.1.3.4**: Test interaction with 3D objects in VR
+- **Task 3.1.3.5**: Optimize performance for VR frame rates (90fps)
 
 **Acceptance**: Can view and interact with Blender shelf model in both desktop 3D and VR modes
 
