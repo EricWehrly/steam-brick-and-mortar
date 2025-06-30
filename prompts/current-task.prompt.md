@@ -1,6 +1,13 @@
 # Current Task Prompt - Steam Brick and Mortar
+**Next Priority - Shelf Import & Game Box#### Task 4.0.1.1: 📋 **UPCOMING** - Research Steam Web API library retrieval
+**Status**: 📋 **RESEARCH TASK**
+**Description**: Research Steam Web API capabilities and authentication for retrieving user's game library
 
-## General Task Workflow Instructions
+**Architecture Reference**: See `docs/webxr-architecture.md` for technical details
+**Research Status**: Complete (archived in `docs/research-archive.md`)
+- Import Blender-generated shelf model (GLTF) 🔥 **CURRENT PRIORITY**
+- Add placeholder game box geometry (rectangle/box for texturing) 🔥 **NEXT**
+- Steam Web API research task (library retrieval and authentication) 📋 **UPCOMING** General Task Workflow Instructions
 
 ### How to Approach Tasks
 1. **Read this prompt file completely** to understand current context
@@ -26,24 +33,30 @@
 
 ---
 
-## Current Task: Milestone 3 - WebXR Foundation
+## Current Task: Milestone 3 - 3D Scene Foundation
 
-### Current Status: 🔥 **WebXR BROWSER TESTING - IMMEDIATE FOCUS**
+### Current Status: 🔥 **3D SCENE DEVELOPMENT - SHELF IMPORT**
 
-**Context**: Build system is now **TESTED AND WORKING**! All scripts compile and tests pass. Next critical step is testing the actual WebXR functionality in browsers.
+**Context**: MAJOR SUCCESS! 🎉 3D scene is **FULLY WORKING** in browser! User confirmed:
+- Scene loads properly ✅
+- Green cube visible and rendering ✅  
+- Camera movement (WASD + mouse look) working perfectly ✅
+- Navigation controls responsive ✅
 
-**Completed & Tested ✅**:
+**Completed & Browser Tested ✅**:
 - TypeScript build system ✅ **TESTED** (`yarn build` compiles successfully)
 - Unit testing framework ✅ **TESTED** (7/7 tests pass with `yarn test:run`)
 - Fixed rootDir TypeScript configuration ✅ **TESTED**
 - Vite development/build pipeline ✅ **TESTED**
+- HTML page with WebXR capability detection ✅ **BROWSER TESTED**
+- Three.js integration with test cube geometry ✅ **BROWSER TESTED**
+- Desktop mouse/keyboard controls (WASD movement, mouse look) ✅ **BROWSER TESTED**
+- Basic lighting system and scene setup ✅ **BROWSER TESTED**
 
-**Implemented but NOT Browser Tested ❌**:
-- HTML page with WebXR capability detection 🔄 **NEEDS BROWSER TESTING**
-- Three.js integration with test cube geometry 🔄 **NEEDS BROWSER TESTING**
-- Desktop mouse/keyboard controls (WASD movement, mouse look) 🔄 **NEEDS BROWSER TESTING**
-- Basic lighting system and scene setup 🔄 **NEEDS BROWSER TESTING**
-- WebXR session management (Enter/Exit VR buttons) 🔄 **NEEDS BROWSER TESTING**
+**Next Priority - Shelf Import & Game Boxes**:
+- Import Blender-generated shelf model (GLTF) 🔥 **CURRENT PRIORITY**
+- Add placeholder game box geometry (rectangle/box for texturing) 🔥 **NEXT**
+- Steam Web API research task (library retrieval and authentication) � **UPCOMING**
 
 **⚠️ CRITICAL RISK**: Custom WebXR type definitions require expert review for VR safety
 
@@ -52,26 +65,36 @@
 
 ### Immediate Priority Tasks
 
-#### Task 3.1.1.3: ⭐ **CURRENT PRIORITY** - Test WebXR functionality in browser
+#### Task 3.1.2.1: ⭐ **CURRENT PRIORITY** - Import Blender-generated shelf model (GLTF)
 **Status**: 🚧 **READY TO START**
-**Description**: Launch the development server and validate WebXR scene works in browser
-**Directory**: `client/` 
+**Description**: Replace test cube with our actual Blender shelf model
+**Directory**: `client/src/` 
 **Expected deliverable**: 
-- Run `yarn serve` and verify page loads at localhost:3000
-- Confirm 3D scene with rotating green cube displays
-- Test desktop controls (WASD movement, mouse look)
-- Verify WebXR button shows appropriate state ("VR Not Available" on desktop)
-- Test on Chrome desktop (should work), Firefox (may have issues)
-- Console shows proper initialization messages
+- Load `steamvr-addon/models/blockbuster_shelf.glb` into Three.js scene
+- Position shelf model appropriately in 3D space
+- Ensure proper scaling and lighting for the shelf
+- Maintain camera controls and navigation around the shelf
+- Remove or keep test cube for reference (user preference)
 
-**Critical Testing Steps**:
-1. `yarn serve` - development server starts without errors
-2. Browser shows 3D scene with rotating cube
-3. WASD keys move camera, mouse controls look direction
-4. WebXR button appears with correct state
-5. Console logs show successful initialization
-6. No JavaScript errors in browser console
-**Status**: 🚧 **READY TO START**
+**Critical Implementation Steps**:
+1. Use Three.js GLTFLoader to import the shelf model
+2. Position shelf at appropriate coordinates (likely center: 0,0,0)
+3. Test that model loads without errors
+4. Verify lighting works well with the shelf geometry
+5. Ensure camera navigation works around the larger shelf object
+
+#### Task 3.1.2.5: ⭐ **NEXT** - Add placeholder game box geometry  
+**Status**: 📋 **WAITING FOR SHELF**
+**Description**: Create rectangular box geometry that can be textured with game artwork
+**Expected deliverable**: 
+- Create box geometry representing game cases/boxes
+- Position multiple boxes on the shelf (test spacing)
+- Prepare boxes for future texture mapping (UV coordinates)
+- Test interaction and visual clarity of game box objects
+
+#### Task 4.0.1.1: 📋 **UPCOMING** - Research Steam Web API library retrieval
+**Status**: � **RESEARCH TASK**
+**Description**: Research Steam Web API capabilities and authentication for retrieving user's game library
 **Description**: Test that the build system actually works and fix any TypeScript compilation errors
 **Directory**: `client/` 
 **Expected deliverable**: 
