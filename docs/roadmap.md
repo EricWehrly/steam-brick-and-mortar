@@ -4,7 +4,7 @@
 
 **Current Architecture**: WebXR-first with progressive enhancement (see `docs/webxr-architecture.md`)  
 **Research Status**: Complete (archived in `docs/research-archive.md`)  
-**Current Phase**: WebXR implementation and Steam integration  
+**Current Phase**: 3D scene development and Steam integration  
 
 ## Task Management
 
@@ -81,8 +81,8 @@
 
 ---
 
-## Milestone 3: WebXR Foundation 🔥 **CURRENT PRIORITY**
-*Goal: Create working WebXR environment with 3D scene and interaction*
+## Milestone 3: 3D Scene Foundation 🔥 **CURRENT PRIORITY**
+*Goal: Create working 3D scene with shelf model and placeholder game objects*
 
 ### Feature 3.0: TypeScript Build System ✅ **TESTED AND VERIFIED**
 **Context**: Modern TypeScript workflow with fast development iteration
@@ -98,46 +98,48 @@
 **Acceptance**: `yarn serve` starts development server, `yarn build` creates production bundle, `yarn test` runs tests
 **Status**: ✅ **VERIFIED** - Build compiles successfully, tests pass (7/7), fixed rootDir TypeScript issue
 
-### Feature 3.1: Basic Web 3D Scene 🔄 **IMPLEMENTED BUT NOT TESTED**
-**Context**: Progressive implementation from hello world to full 3D scene
+### Feature 3.1: 3D Scene with Shelf and Game Boxes � **CURRENT PRIORITY**
+**Context**: Complete 3D scene foundation with shelf model and placeholder game geometry
 
-#### Story 3.1.1: HTML/JavaScript Foundation 🔄 **IMPLEMENTED BUT NOT TESTED**
-- **Task 3.1.1.1**: Create basic HTML page with WebXR capability 🔄 **IMPLEMENTED**
-- **Task 3.1.1.2**: Add Three.js integration with basic 3D scene 🔄 **IMPLEMENTED**
-- **Task 3.1.1.3**: Add basic cube geometry for testing 🔄 **IMPLEMENTED**
+#### Story 3.1.1: HTML/JavaScript Foundation ✅ **TESTED AND VERIFIED**
+- **Task 3.1.1.1**: Create basic HTML page with WebXR capability ✅ **TESTED**
+- **Task 3.1.1.2**: Add Three.js integration with basic 3D scene ✅ **TESTED**
+- **Task 3.1.1.3**: Add basic cube geometry for testing ✅ **TESTED**
 
-**⚠️ CRITICAL RISK**: Custom WebXR type definitions (`client/src/webxr.d.ts`) require expert review for VR safety
+**Status**: ✅ **VERIFIED** - Scene loads, cube visible, camera controls working (WASD + mouse look)
 
-#### Story 3.1.2: 3D Scene Development 🔄 **IMPLEMENTED BUT NOT TESTED**
-- **Task 3.1.2.1**: Import and display Blender-generated shelf model (GLTF)
-- **Task 3.1.2.2**: Implement camera controls for desktop testing 🔄 **IMPLEMENTED**
-- **Task 3.1.2.3**: Add basic movement/navigation system 🔄 **IMPLEMENTED**
-- **Task 3.1.2.4**: Configure lighting system for 3D scene 🔄 **IMPLEMENTED**
+#### Story 3.1.2: 3D Scene Development � **CURRENT PRIORITY**
+- **Task 3.1.2.1**: ⭐ **CURRENT PRIORITY**: Import and display Blender-generated shelf model (GLTF)
+- **Task 3.1.2.2**: Implement camera controls for desktop testing ✅ **TESTED**
+- **Task 3.1.2.3**: Add basic movement/navigation system ✅ **TESTED**
+- **Task 3.1.2.4**: Configure lighting system for 3D scene ✅ **TESTED**
+- **Task 3.1.2.5**: ⭐ **NEXT**: Add placeholder game box geometry (rectangle/box for texturing)
 
-#### Story 3.1.3: WebXR Integration
-- **Task 3.1.3.1**: ⭐ **MOVED FROM 3.1.1.3**: Test WebXR session management (enter/exit VR)
-- **Task 3.1.3.2**: Enable WebXR mode with VR session management
-- **Task 3.1.3.3**: Implement VR controller input and hand tracking
-- **Task 3.1.3.4**: Test interaction with 3D objects in VR
-- **Task 3.1.3.5**: Optimize performance for VR frame rates (90fps)
-
-**Acceptance**: Can view and interact with Blender shelf model in both desktop 3D and VR modes
-
-### Feature 3.2: Progressive Web App Setup
-**Context**: Make WebXR app installable and offline-capable
-
-#### Story 3.2.1: PWA Foundation
-- **Task 3.2.1.1**: Create PWA manifest with VR app metadata
-- **Task 3.2.1.2**: Implement service worker for offline asset caching
-- **Task 3.2.1.3**: Test PWA installation on desktop browsers
-- **Task 3.2.1.4**: Test PWA installation on Meta Quest Browser
-
-**Acceptance**: App installs as PWA on Windows/Mac/Linux/Quest with app-like experience
+**Acceptance**: Can view shelf model with placeholder game boxes in desktop 3D mode
 
 ---
 
-## Milestone 4: Steam API Integration
-*Goal: Fetch and display user's Steam game library*
+## Milestone 4: Steam API Research & Integration
+*Goal: Research Steam Web API and integrate user's game library*
+
+### Feature 4.0: Steam Web API Research 🔥 **UPCOMING PRIORITY**
+**Context**: Research Steam Web API capabilities and authentication options
+
+#### Story 4.0.1: API Research and Authentication Strategy 📋 **READY TO START**
+- **Task 4.0.1.1**: ⭐ **UPCOMING**: Research Steam Web API library retrieval endpoints
+  - Identify specific API call needed to retrieve user's game library
+  - Document required parameters (Steam ID, API key, etc.)
+  - Research `GetOwnedGames` vs other potential endpoints
+- **Task 4.0.1.2**: Research authentication and API access options
+  - Document Steam Web API key requirements and limitations
+  - Research browser-based authentication flows (OAuth, Steam OpenID)
+  - Evaluate CORS proxy necessity vs direct API calls
+- **Task 4.0.1.3**: Create research document with implementation recommendations
+  - Document API endpoint specifications and required parameters
+  - Outline authentication strategy (API key vs OAuth vs other)
+  - Provide implementation roadmap based on findings
+
+**Expected Deliverable**: `docs/steam-api-research.md` with implementation strategy
 
 ### Feature 4.1: Steam Web API Client
 **Context**: Browser-based Steam integration with CORS proxy
@@ -169,59 +171,97 @@
 
 ---
 
-## Milestone 5: Game Launching & Interaction
-*Goal: Users can interact with games in WebXR to launch them*
+## Milestone 5: WebXR Integration
+*Goal: Add VR capabilities to the working Steam-integrated 3D scene*
 
-### Feature 5.1: VR Interaction System
-**Context**: Three.js raycasting and WebXR controller integration
+**⚠️ CRITICAL RISK**: Custom WebXR type definitions (`client/src/webxr.d.ts`) require expert review for VR safety
 
-#### Story 5.1.1: WebXR Game Interaction
-- **Task 5.1.1.1**: Implement VR controller raycasting for game selection
-- **Task 5.1.1.2**: Add grab/touch interactions with game objects
-- **Task 5.1.1.3**: Create visual feedback (highlighting, haptics)
-- **Task 5.1.1.4**: Add game information display in VR space
+### Feature 5.0: Progressive Web App Setup
+**Context**: Make web app installable and VR-ready before WebXR implementation
 
-#### Story 5.1.2: Steam Protocol Integration
-- **Task 5.1.2.1**: Execute Steam protocol URLs (`steam://run/<appid>`) from browser
-- **Task 5.1.2.2**: Add user education for enabling Steam protocol handlers
-- **Task 5.1.2.3**: Create launch confirmation UI within VR space
-- **Task 5.1.2.4**: Test cross-platform game launching (Windows/Mac/Linux)
+#### Story 5.0.1: PWA Foundation
+- **Task 5.0.1.1**: Create PWA manifest with VR app metadata
+- **Task 5.0.1.2**: Implement service worker for offline asset caching
+- **Task 5.0.1.3**: Test PWA installation on desktop browsers
+- **Task 5.0.1.4**: Test PWA installation on Meta Quest Browser
 
-**Acceptance**: Can select and launch Steam games directly from WebXR interface
+**Acceptance**: App installs as PWA on Windows/Mac/Linux/Quest with app-like experience
 
-### Feature 5.2: Enhanced Desktop Integration
-**Context**: Electron wrapper for seamless Steam launching
+### Feature 5.1: WebXR Foundation
+**Context**: Enable VR mode on top of established 3D scene
 
-#### Story 5.2.1: Electron Packaging
-- **Task 5.2.1.1**: Create Electron wrapper around WebXR application
-- **Task 5.2.1.2**: Configure Electron Builder for platform packaging
-- **Task 5.2.1.3**: Test desktop VR functionality via Electron
-- **Task 5.2.1.4**: Add auto-update capability for desktop apps
+#### Story 5.1.1: WebXR Session Management
+- **Task 5.1.1.1**: Test WebXR session management (enter/exit VR)
+- **Task 5.1.1.2**: Enable WebXR mode with VR session management
+- **Task 5.1.1.3**: Add VR-specific camera and rendering setup
+- **Task 5.1.1.4**: Test VR mode with shelf and game objects
 
-**Acceptance**: Desktop apps launch games without browser security limitations
+#### Story 5.1.2: VR Interaction System
+- **Task 5.1.2.1**: Implement VR controller input and hand tracking
+- **Task 5.1.2.2**: Add VR controller raycasting for object selection
+- **Task 5.1.2.3**: Test interaction with game objects in VR
+- **Task 5.1.2.4**: Optimize performance for VR frame rates (90fps)
+
+**Acceptance**: Can view and interact with Steam game library in VR mode
+
+### Feature 5.2: Enhanced VR Experience
+**Context**: Polish VR interactions and user experience
+
+#### Story 5.2.1: VR Game Interaction
+- **Task 5.2.1.1**: Add grab/touch interactions with game objects
+- **Task 5.2.1.2**: Create visual feedback (highlighting, haptics)
+- **Task 5.2.1.3**: Add game information display in VR space
+- **Task 5.2.1.4**: Add haptic feedback for VR interactions
+
+**Acceptance**: Intuitive and comfortable VR game browsing experience
 
 ---
 
-## Milestone 6: Polish & Performance
-*Goal: Production-ready VR experience with optimal performance*
+## Milestone 6: Game Launching & Integration
+*Goal: Users can launch Steam games from the VR/3D interface*
 
-### Feature 6.1: Performance Optimization
-- **Task 6.1.1**: Profile and optimize VR frame rate with large game libraries
-- **Task 6.1.2**: Implement level-of-detail (LOD) system for game objects
-- **Task 6.1.3**: Add culling for off-screen games
-- **Task 6.1.4**: Optimize texture loading and memory usage
+### Feature 6.1: Steam Protocol Integration
+**Context**: Launch Steam games from browser/VR interface
 
-### Feature 6.2: Audio & Visual Polish
-- **Task 6.2.1**: Add 3D spatial audio for interactions
-- **Task 6.2.2**: Implement ambient environment sounds
-- **Task 6.2.3**: Enhance lighting and material quality
-- **Task 6.2.4**: Add particle effects for game interactions
+#### Story 6.1.1: Game Launching System
+- **Task 6.1.1.1**: Execute Steam protocol URLs (`steam://run/<appid>`) from browser
+- **Task 6.1.1.2**: Add user education for enabling Steam protocol handlers
+- **Task 6.1.1.3**: Create launch confirmation UI within 3D/VR space
+- **Task 6.1.1.4**: Test cross-platform game launching (Windows/Mac/Linux)
 
-### Feature 6.3: Error Handling & Reliability
-- **Task 6.3.1**: Handle Steam API downtime gracefully
-- **Task 6.3.2**: Recover from VR disconnection
-- **Task 6.3.3**: Add comprehensive logging system
-- **Task 6.3.4**: Create diagnostic tools for troubleshooting
+### Feature 6.2: Enhanced Desktop Integration
+**Context**: Electron wrapper for seamless Steam launching
+
+#### Story 6.2.1: Electron Packaging
+- **Task 6.2.1.1**: Create Electron wrapper around web application
+- **Task 6.2.1.2**: Configure Electron Builder for platform packaging
+- **Task 6.2.1.3**: Test desktop VR functionality via Electron
+- **Task 6.2.1.4**: Add auto-update capability for desktop apps
+
+**Acceptance**: Can select and launch Steam games directly from 3D/VR interface
+
+---
+
+## Milestone 7: Polish & Performance
+*Goal: Production-ready experience with optimal performance*
+
+### Feature 7.1: Performance Optimization
+- **Task 7.1.1**: Profile and optimize frame rate with large game libraries
+- **Task 7.1.2**: Implement level-of-detail (LOD) system for game objects
+- **Task 7.1.3**: Add culling for off-screen games
+- **Task 7.1.4**: Optimize texture loading and memory usage
+
+### Feature 7.2: Audio & Visual Polish
+- **Task 7.2.1**: Add 3D spatial audio for interactions
+- **Task 7.2.2**: Implement ambient environment sounds
+- **Task 7.2.3**: Enhance lighting and material quality
+- **Task 7.2.4**: Add particle effects for game interactions
+
+### Feature 7.3: Error Handling & Reliability
+- **Task 7.3.1**: Handle Steam API downtime gracefully
+- **Task 7.3.2**: Recover from VR disconnection
+- **Task 7.3.3**: Add comprehensive logging system
+- **Task 7.3.4**: Create diagnostic tools for troubleshooting
 
 **Acceptance**: Maintains 90+ FPS in VR with 100+ games, robust error handling, immersive audio
 
