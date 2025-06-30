@@ -10,6 +10,7 @@
  */
 
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 class SteamBrickAndMortar {
     private scene: THREE.Scene
@@ -78,11 +79,14 @@ class SteamBrickAndMortar {
         directionalLight.shadow.mapSize.height = 1024
         this.scene.add(directionalLight)
 
-        // Simple test geometry - a colorful cube
-        const geometry = new THREE.BoxGeometry(1, 1, 1)
+        // Load shelf model
+        this.loadShelfModel()
+
+        // Small test cube for reference (can be removed later)
+        const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
         const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 })
         const cube = new THREE.Mesh(geometry, material)
-        cube.position.set(0, 0, -3)
+        cube.position.set(2, 0, -1) // Move to side so it doesn't interfere with shelf
         cube.castShadow = true
         this.scene.add(cube)
 
@@ -233,6 +237,38 @@ class SteamBrickAndMortar {
                 <p>${message}</p>
                 <p>Check console for details.</p>
             `
+        }
+    }
+
+    private async loadShelfModel() {
+        const loader = new GLTFLoader()
+        
+        try {
+            console.log('📦 Loading shelf model...')
+            
+            // Load the shelf model from our public assets
+            const gltf = await loader.loadAsync('/models/blockbuster_shelf.glb')
+            
+            const shelfModel = gltf.scene
+            
+            // Position the shelf in the scene
+            shelfModel.position.set(0, -1, -3) // Center it and place it in front of camera
+            shelfModel.scale.setScalar(1) // Adjust scale if needed
+            
+            // Enable shadows for all meshes in the shelf model
+            shelfModel.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    child.castShadow = true
+                    child.receiveShadow = true
+                }
+            })
+            
+            this.scene.add(shelfModel)
+            console.log('✅ Shelf model loaded successfully!')
+            
+        } catch (error) {
+            console.error('❌ Failed to load shelf model:', error)
+            console.warn('⚠️ Continuing without shelf model - check file path and format')
         }
     }
 

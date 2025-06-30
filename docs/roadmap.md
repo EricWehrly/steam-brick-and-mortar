@@ -2,7 +2,12 @@
 
 ## Project Overview
 
-**Current Architecture**: WebXR-first with progressive enhancement (see `docs/webxr-architecture.md`)  
+**Current Architecture**: We#### Story 3.1.2: 3D Scene Development ✅ **MAJOR PROGRESS**
+- **Task 3.1.2.1**: Import and display Blender-generated shelf model (GLTF) ✅ **TESTED**
+- **Task 3.1.2.2**: Implement camera controls for desktop testing ✅ **TESTED**
+- **Task 3.1.2.3**: Add basic movement/navigation system ✅ **TESTED**
+- **Task 3.1.2.4**: Configure lighting system for 3D scene ✅ **TESTED**
+- **Task 3.1.2.5**: ⭐ **NEXT**: Add placeholder game box geometry (rectangle/box for texturing)rst with progressive enhancement (see `docs/webxr-architecture.md`)  
 **Research Status**: Complete (archived in `docs/research-archive.md`)  
 **Current Phase**: 3D scene development and Steam integration  
 
