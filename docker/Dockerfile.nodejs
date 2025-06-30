@@ -1,0 +1,38 @@
+# Node.js development environment for Steam protocol testing with Yarn PnP
+# Part of Steam Blockbuster Shelf WebXR project
+
+FROM node:18-alpine
+
+# Install system dependencies and enable Yarn PnP
+RUN apk add --no-cache \
+    bash \
+    curl \
+    git && \
+    corepack enable && \
+    corepack prepare yarn@3.6.0 --activate
+
+# Set working directory
+WORKDIR /app
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Copy Yarn configuration files
+COPY external-tool/package.json external-tool/.yarnrc.yml ./
+
+# Install dependencies using Yarn PnP
+RUN yarn install --immutable
+
+# Copy source code
+COPY external-tool/ ./
+
+# Change ownership to nodejs user
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+# Expose port for test server
+EXPOSE 8080
+
+# Default command
+CMD ["yarn", "server"]

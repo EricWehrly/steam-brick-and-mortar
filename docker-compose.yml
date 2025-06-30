@@ -1,5 +1,5 @@
 # SteamVR Blockbuster Shelf - Development Environment
-# Focus: Blender 3D asset generation pipeline
+# Focus: Blender 3D asset generation pipeline + Node.js Steam protocol testing
 
 services:
   # Generate 3D shelf models with Blender
@@ -18,6 +18,20 @@ services:
         pip install -r requirements.txt &&
         echo 'Blender environment ready. Run: docker compose run blender python blender/gen_shelf.py'
       "
+
+  # Node.js environment for Steam protocol testing and API integration
+  nodejs:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.nodejs
+    working_dir: /app
+    volumes:
+      - ./external-tool:/app
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=development
+    command: npm run test-browser
 
 volumes:
   blender-cache:
