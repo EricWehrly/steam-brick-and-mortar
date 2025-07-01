@@ -139,14 +139,14 @@
 
 **Expected Deliverable**: `docs/steam-api-research.md` with implementation strategy ✅ **ACHIEVED**
 
-#### Story 4.1.1: Game Library Integration Strategy 🔥 **DECISION POINT**
-- **Task 4.1.1.1**: ⭐ **CURRENT PRIORITY**: Choose library integration approach
-  - **Option A**: Manual library input (quick start)
-  - **Option B**: Steam profile parsing (web scraping)  
-  - **Option C**: Local Steam file parsing (Electron)
-- **Task 4.1.1.2**: Implement chosen approach for game data
-- **Task 4.1.1.3**: Integrate game data with 3D scene
-- **Task 4.1.1.4**: Test with real game libraries
+#### Story 4.1.1: AWS Lambda Proxy Infrastructure 🔥 **CURRENT PRIORITY**
+- **Task 4.1.1.1**: ⭐ **CURRENT PRIORITY**: Create Terraform infrastructure plan
+- **Task 4.1.1.2**: Implement Terraform modules for Lambda and API Gateway
+- **Task 4.1.1.3**: Configure domain and SSL certificate with existing AWS domain
+- **Task 4.1.1.4**: Deploy Steam API Lambda proxy function
+- **Task 4.1.1.5**: Test proxy endpoints with real Steam accounts
+
+**Expected Deliverable**: `docs/steam-lambda-infrastructure.md` with complete implementation plan ✅ **ACHIEVED**
 
 ### Feature 4.1: Steam Web API Client
 **Context**: Browser-based Steam integration with CORS proxy
