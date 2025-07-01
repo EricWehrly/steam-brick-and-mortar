@@ -130,21 +130,23 @@
 ### Feature 4.0: Steam Web API Research 🔥 **CURRENT PRIORITY**
 **Context**: Research Steam Web API capabilities and authentication options
 
-#### Story 4.0.1: API Research and Authentication Strategy 📋 **READY TO START**
-- **Task 4.0.1.1**: ⭐ **UPCOMING**: Research Steam Web API library retrieval endpoints
-  - Identify specific API call needed to retrieve user's game library
-  - Document required parameters (Steam ID, API key, etc.)
-  - Research `GetOwnedGames` vs other potential endpoints
-- **Task 4.0.1.2**: Research authentication and API access options
-  - Document Steam Web API key requirements and limitations
-  - Research browser-based authentication flows (OAuth, Steam OpenID)
-  - Evaluate CORS proxy necessity vs direct API calls
-- **Task 4.0.1.3**: Create research document with implementation recommendations
-  - Document API endpoint specifications and required parameters
-  - Outline authentication strategy (API key vs OAuth vs other)
-  - Provide implementation roadmap based on findings
+#### Story 4.0.1: API Research and Authentication Strategy ✅ **COMPLETED**
+- **Task 4.0.1.1**: Research Steam Web API library retrieval endpoints ✅ **COMPLETED**
+- **Task 4.0.1.2**: Research authentication and API access options ✅ **COMPLETED** 
+- **Task 4.0.1.3**: Create research document with implementation recommendations ✅ **COMPLETED**
 
-**Expected Deliverable**: `docs/steam-api-research.md` with implementation strategy
+**Key Finding**: Steam Web API requires domain registration - significant barrier for quick development
+
+**Expected Deliverable**: `docs/steam-api-research.md` with implementation strategy ✅ **ACHIEVED**
+
+#### Story 4.1.1: Game Library Integration Strategy 🔥 **DECISION POINT**
+- **Task 4.1.1.1**: ⭐ **CURRENT PRIORITY**: Choose library integration approach
+  - **Option A**: Manual library input (quick start)
+  - **Option B**: Steam profile parsing (web scraping)  
+  - **Option C**: Local Steam file parsing (Electron)
+- **Task 4.1.1.2**: Implement chosen approach for game data
+- **Task 4.1.1.3**: Integrate game data with 3D scene
+- **Task 4.1.1.4**: Test with real game libraries
 
 ### Feature 4.1: Steam Web API Client
 **Context**: Browser-based Steam integration with CORS proxy
