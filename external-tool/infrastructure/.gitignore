@@ -1,0 +1,50 @@
+# Terraform files to ignore
+
+# State files
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Variable files with secrets
+terraform.tfvars
+*.tfvars.local
+*.auto.tfvars
+
+# Terraform plans
+*.tfplan
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+
+# Terraform directories
+.terraform/
+.terraform.lock.hcl
+
+# Lambda deployment packages
+lambda_function.zip
+modules/lambda/lambda_function.zip
+
+# IDE files
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node.js dependencies in lambda-src
+lambda-src/node_modules/
+lambda-src/package-lock.json
+lambda-src/yarn.lock
