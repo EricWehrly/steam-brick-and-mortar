@@ -33,20 +33,31 @@ This directory contains Terraform infrastructure as code (IaC) for deploying a s
 
 ### 1. Configure Variables
 
-Copy and customize the environment configuration:
-
+**Public Configuration:**
+Use the provided test configuration for domain settings:
 ```bash
 # From external-tool/infrastructure/ directory
-cp environments/dev.tfvars.example environments/dev.tfvars
-# Edit dev.tfvars with your domain and settings
+# test.tfvars contains public domain configuration
 ```
 
-Create a local variables file for secrets:
+**Secure Steam API Key (Choose one method):**
 
+**Option A: Environment Variable (Recommended)**
 ```bash
-# external-tool/infrastructure/terraform.tfvars.local (not committed to git)
-steam_api_key = "YOUR_STEAM_API_KEY_HERE"
-domain_name = "your-domain.com"
+export TF_VAR_steam_api_key="YOUR_STEAM_API_KEY_HERE"
+terraform apply -var-file="test.tfvars"
+```
+
+**Option B: Local terraform.tfvars (Gitignored)**
+```bash
+# Create terraform.tfvars (automatically ignored by git)
+echo 'steam_api_key = "YOUR_STEAM_API_KEY_HERE"' > terraform.tfvars
+terraform apply -var-file="test.tfvars"
+```
+
+**Option C: Command Line**
+```bash
+terraform apply -var-file="test.tfvars" -var steam_api_key="YOUR_STEAM_API_KEY_HERE"
 ```
 
 ### 2. Initialize and Deploy
