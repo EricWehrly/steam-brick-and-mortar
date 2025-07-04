@@ -57,6 +57,15 @@ steam-brick-and-mortar/
 - **Environment parity**: Local tests should mirror production behavior
 - **Cross-platform validation**: Test on target browsers and VR devices
 
+### Terraform Workflow Standards
+When working with Terraform infrastructure:
+1. **validate**: Run `terraform validate` to check syntax and configuration
+2. **plan**: Run `terraform plan` to review proposed changes
+3. **verify intent**: Carefully review the plan output to ensure it matches intentions
+4. **apply**: Run `terraform apply` only after plan verification
+5. **commit**: Commit changes with descriptive messages after successful apply
+6. **Never skip steps**: Always follow validate → plan → verify → apply → commit sequence
+
 ## Current Status
 See `.github/terraform-progress.md` for detailed infrastructure development progress.
 
