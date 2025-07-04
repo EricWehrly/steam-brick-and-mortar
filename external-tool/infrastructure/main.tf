@@ -17,23 +17,22 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Lambda module
-# (stashed in 'lambda-infra' and 'lambda')
-# module "lambda" {
-#   source = "./modules/lambda"
+# Lambda module - Phase 2: Lambda function
+module "lambda" {
+  source = "./modules/lambda"
 
-#   project_name        = var.project_name
-#   environment         = var.environment
-#   steam_api_key       = var.steam_api_key
-#   timeout             = var.lambda_timeout
-#   memory_size         = var.lambda_memory_size
-#   log_retention_days  = var.cloudwatch_log_retention_days
-#   lambda_source_dir   = "${path.module}/lambda-src"
-#   allowed_origins     = var.allowed_origins
-#   enable_function_url = false  # We'll use API Gateway instead
+  project_name        = var.project_name
+  environment         = var.environment
+  steam_api_key       = var.steam_api_key
+  timeout             = var.lambda_timeout
+  memory_size         = var.lambda_memory_size
+  log_retention_days  = var.cloudwatch_log_retention_days
+  lambda_source_dir   = "${path.module}/lambda-src"
+  allowed_origins     = var.allowed_origins
+  enable_function_url = false  # We'll use API Gateway instead
 
-#   tags = local.common_tags
-# }
+  tags = local.common_tags
+}
 
 # # API Gateway module
 # (stashed in 'gateway' and 'gateway-infra')

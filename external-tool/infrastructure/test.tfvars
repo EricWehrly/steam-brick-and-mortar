@@ -3,3 +3,6 @@
 
 domain_name = "wehrly.com"
 route53_zone_id = "Z338L3MCT403SF"  # The active zone with more records
+
+# For testing - use placeholder (real key should be via environment variable)
+steam_api_key = "test-placeholder-key"

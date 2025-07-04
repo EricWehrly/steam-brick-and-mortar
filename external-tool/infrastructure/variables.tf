@@ -85,12 +85,12 @@ variable "api_throttle_burst_limit" {
 }
 
 # used for lambda
-# variable "steam_api_key" {
-#   description = "Steam Web API key (will be stored in Secrets Manager)"
-#   type        = string
-#   sensitive   = true
-#   # This should be provided via environment variable or terraform.tfvars
-# }
+variable "steam_api_key" {
+  description = "Steam Web API key (will be stored in Secrets Manager)"
+  type        = string
+  sensitive   = true
+  # This should be provided via environment variable or terraform.tfvars
+}
 
 variable "cloudwatch_log_retention_days" {
   description = "CloudWatch log retention in days"
