@@ -11,6 +11,7 @@
 
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { SteamApiClient } from './steam/SteamApiClient'
 
 class SteamBrickAndMortar {
     private scene: THREE.Scene
@@ -18,6 +19,7 @@ class SteamBrickAndMortar {
     private renderer: THREE.WebGLRenderer
     private xrButton: HTMLElement | null
     private loading: HTMLElement | null
+    private steamClient: SteamApiClient
 
     constructor() {
         this.scene = new THREE.Scene()
@@ -25,6 +27,7 @@ class SteamBrickAndMortar {
         this.renderer = new THREE.WebGLRenderer({ antialias: true })
         this.xrButton = document.getElementById('webxr-button')
         this.loading = document.getElementById('loading')
+        this.steamClient = new SteamApiClient('https://steam-api-dev.wehrly.com')
 
         this.init()
     }
@@ -37,6 +40,7 @@ class SteamBrickAndMortar {
             this.setupScene()
             this.setupWebXR()
             this.setupControls()
+            await this.testSteamIntegration()
             this.hideLoading()
             this.startRenderLoop()
             
@@ -328,6 +332,36 @@ class SteamBrickAndMortar {
         }
         
         console.log(`✅ Created ${numBoxes} placeholder game boxes on shelf`)
+    }
+
+    private async testSteamIntegration() {
+        console.log('🔍 Testing Steam API integration...')
+        
+        try {
+            // Test 1: Health check
+            const health = await this.steamClient.checkHealth()
+            console.log('✅ Steam API health check passed:', health.status)
+            
+            // Test 2: Resolve SpiteMonger account and fetch games
+            console.log('🔍 Testing with SpiteMonger account...')
+            const userGames = await this.steamClient.getUserGamesByVanityUrl('SpiteMonger')
+            console.log(`✅ Successfully fetched ${userGames.game_count} games for ${userGames.vanity_url}`)
+            
+            // Show sample games if available
+            if (userGames.games && userGames.games.length > 0) {
+                const sampleGames = userGames.games.slice(0, 3).map(game => game.name)
+                console.log('📦 Sample games:', sampleGames)
+            }
+            
+            // Store for later use in game generation
+            (window as any).steamTestData = userGames
+            
+            console.log('🎉 Steam API integration working perfectly!')
+            return true
+        } catch (error) {
+            console.warn('⚠️ Steam API integration test failed (but app will continue):', error)
+            return false
+        }
     }
 
     private startRenderLoop() {

@@ -5,5 +5,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
+    // Run once by default, not in watch mode
+    watch: false,
   },
 })
