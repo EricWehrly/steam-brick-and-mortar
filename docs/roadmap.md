@@ -127,7 +127,7 @@
 ## Milestone 4: Steam API Research & Integration
 *Goal: Research Steam Web API and integrate user's game library*
 
-### Feature 4.0: Steam Web API Research 🔥 **CURRENT PRIORITY**
+### Feature 4.0: Steam Web API Research ✅ **COMPLETED**
 **Context**: Research Steam Web API capabilities and authentication options
 
 #### Story 4.0.1: API Research and Authentication Strategy ✅ **COMPLETED**
@@ -139,40 +139,92 @@
 
 **Expected Deliverable**: `docs/steam-api-research.md` with implementation strategy ✅ **ACHIEVED**
 
-#### Story 4.1.1: AWS Lambda Proxy Infrastructure 🔥 **CURRENT PRIORITY**
-- **Task 4.1.1.1**: ⭐ **CURRENT PRIORITY**: Create Terraform infrastructure plan
-- **Task 4.1.1.2**: Implement Terraform modules for Lambda and API Gateway
-- **Task 4.1.1.3**: Configure domain and SSL certificate with existing AWS domain
-- **Task 4.1.1.4**: Deploy Steam API Lambda proxy function
-- **Task 4.1.1.5**: Test proxy endpoints with real Steam accounts
+### Feature 4.1: AWS Serverless Infrastructure ✅ **COMPLETED**
+**Context**: Secure, modular Terraform infrastructure for Steam API proxy
 
-**Expected Deliverable**: `docs/steam-lambda-infrastructure.md` with complete implementation plan ✅ **ACHIEVED**
+#### Story 4.1.1: Infrastructure Data Sources ✅ **COMPLETED**
+- **Task 4.1.1.1**: Create Terraform infrastructure plan ✅ **COMPLETED**
+- **Task 4.1.1.2**: Implement Route53 hosted zone discovery ✅ **COMPLETED**
+- **Task 4.1.1.3**: Implement ACM wildcard certificate discovery ✅ **COMPLETED**
+- **Task 4.1.1.4**: Test and validate data source discovery ✅ **COMPLETED**
 
-### Feature 4.1: Steam Web API Client
+#### Story 4.1.2: Lambda Function and Module ✅ **COMPLETED**
+- **Task 4.1.2.1**: Develop Node.js Lambda function with Steam API proxy ✅ **COMPLETED**
+- **Task 4.1.2.2**: Create Terraform Lambda module with IAM, Secrets Manager, CloudWatch ✅ **COMPLETED**
+- **Task 4.1.2.3**: Deploy Lambda function to AWS ✅ **COMPLETED**
+- **Task 4.1.2.4**: Test Lambda health endpoint via curl ✅ **COMPLETED**
+
+#### Story 4.1.3: API Gateway and Custom Domain ✅ **COMPLETED**
+- **Task 4.1.3.1**: Create Terraform API Gateway module (HTTP API, Lambda integration) ✅ **COMPLETED**
+- **Task 4.1.3.2**: Configure custom domain (`steam-api-dev.wehrly.com`) ✅ **COMPLETED**
+- **Task 4.1.3.3**: Set up DNS mapping and SSL certificates ✅ **COMPLETED**
+- **Task 4.1.3.4**: Configure CORS headers and endpoint routing ✅ **COMPLETED**
+- **Task 4.1.3.5**: Test API Gateway endpoints and CORS with curl ✅ **COMPLETED**
+
+#### Story 4.1.4: Security and Best Practices ✅ **COMPLETED**
+- **Task 4.1.4.1**: Remove sensitive values from committed tfvars files ✅ **COMPLETED**
+- **Task 4.1.4.2**: Document secure credential handling (env vars, gitignored files) ✅ **COMPLETED**
+- **Task 4.1.4.3**: Update .gitignore for Terraform security ✅ **COMPLETED**
+- **Task 4.1.4.4**: Add Terraform workflow standards to copilot instructions ✅ **COMPLETED**
+
+**Acceptance**: Secure, modular AWS infrastructure deployed with custom domain and CORS support ✅ **ACHIEVED**
+
+**Status**: Infrastructure fully deployed and operational. Health endpoint tested. Ready for Steam API integration testing.
+
+### Feature 4.2: Steam API Integration Testing ✅ **COMPLETED**
+**Context**: Test deployed infrastructure with real Steam accounts
+
+#### Story 4.2.1: Live Steam API Testing ✅ **COMPLETED**
+- **Task 4.2.1.1**: ✅ **COMPLETED** - Test `/resolve/{vanityurl}` endpoint with SpiteMonger account
+- **Task 4.2.1.2**: ✅ **COMPLETED** - Test `/games/{steamid}` endpoint with resolved Steam ID
+- **Task 4.2.1.3**: ✅ **COMPLETED** - Validate complete Steam API proxy workflow
+- **Task 4.2.1.4**: ✅ **COMPLETED** - Document any issues and error handling
+
+**Target Steam Account**: https://steamcommunity.com/id/SpiteMonger ✅ **VERIFIED**
+
+**Test Results**:
+- ✅ SpiteMonger vanity URL successfully resolved to Steam ID: `76561197984589530`
+- ✅ Successfully fetched **810 games** from SpiteMonger's Steam library
+- ✅ Complete workflow validated: vanity URL → Steam ID → game library
+- ✅ Error handling confirmed working (invalid URLs return proper 500 status)
+- ✅ CORS headers present and working for browser integration
+- ✅ All endpoints responding with proper JSON format
+
+**Acceptance**: Can successfully fetch Steam game library for real accounts via proxy ✅ **ACHIEVED**
+
+#### Story 4.2.2: Error Handling and Reliability
+- **Task 4.2.2.1**: Test API rate limiting behavior
+- **Task 4.2.2.2**: Test invalid Steam ID handling
+- **Task 4.2.2.3**: Test network timeout scenarios
+- **Task 4.2.2.4**: Implement client-side error recovery
+
+**Acceptance**: Can successfully fetch Steam game library for real accounts via proxy
+
+### Feature 4.3: Steam Web API Client 🔥 **CURRENT PRIORITY**
 **Context**: Browser-based Steam integration with CORS proxy
 
-#### Story 4.1.1: CORS Proxy Service
-- **Task 4.1.1.1**: Create minimal Node.js CORS proxy for Steam Web API
-- **Task 4.1.1.2**: Implement GetOwnedGames API endpoint wrapping
-- **Task 4.1.1.3**: Add API key management and rate limiting
-- **Task 4.1.1.4**: Test proxy service with real Steam accounts
+#### Story 4.3.1: WebXR Client Integration 🔥 **CURRENT PRIORITY**
+- **Task 4.3.1.1**: ⭐ **CURRENT PRIORITY**: Integrate Steam API client into TypeScript WebXR application
+- **Task 4.3.1.2**: Add Steam account input/authentication UI
+- **Task 4.3.1.3**: Cache game library data for offline use
+- **Task 4.3.1.4**: Handle API errors gracefully in WebXR interface
 
-#### Story 4.1.2: Game Library Integration
-- **Task 4.1.2.1**: Fetch user's Steam library via proxy
-- **Task 4.1.2.2**: Download and cache game icons/artwork
-- **Task 4.1.2.3**: Create JSON manifest for WebXR scene population
-- **Task 4.1.2.4**: Add offline capability with cached data
+#### Story 4.3.2: Game Library Integration
+- **Task 4.3.2.1**: Fetch user's Steam library via proxy
+- **Task 4.3.2.2**: Download and cache game icons/artwork
+- **Task 4.3.2.3**: Create JSON manifest for WebXR scene population
+- **Task 4.3.2.4**: Add offline capability with cached data
 
 **Acceptance**: Can fetch user's Steam library and cache game data for offline use
 
-### Feature 4.2: Game Display System
+### Feature 4.4: Game Display System
 **Context**: Populate 3D scene with user's actual games
 
-#### Story 4.2.1: Dynamic Game Objects
-- **Task 4.2.1.1**: Generate 3D game box objects from Steam library data
-- **Task 4.2.1.2**: Apply Steam game artwork as WebGL textures
-- **Task 4.2.1.3**: Position games with proper 3D spacing on shelf
-- **Task 4.2.1.4**: Test with libraries of different sizes (10, 50, 100+ games)
+#### Story 4.4.1: Dynamic Game Objects
+- **Task 4.4.1.1**: Generate 3D game box objects from Steam library data
+- **Task 4.4.1.2**: Apply Steam game artwork as WebGL textures
+- **Task 4.4.1.3**: Position games with proper 3D spacing on shelf
+- **Task 4.4.1.4**: Test with libraries of different sizes (10, 50, 100+ games)
 
 **Acceptance**: User's Steam games appear as interactive 3D objects on the shelf
 
