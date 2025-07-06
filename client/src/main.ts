@@ -372,6 +372,7 @@ class SteamBrickAndMortar {
                 maxRequestsPerSecond: 4, // 4 games per second as requested
                 skipCached: true,
                 prioritizeByPlaytime: true,
+                maxGames: 30, // 🚧 Development limit to avoid excessive API calls
                 onProgress: (current: number, total: number, currentGame?: any) => {
                     const percentage = Math.round((current / total) * 90) + 10 // Reserve 10% for initial fetch
                     const gameText = currentGame ? `Loading: ${currentGame.name}` : ''
@@ -810,6 +811,7 @@ class SteamBrickAndMortar {
                 maxRequestsPerSecond: 4,
                 skipCached: false, // Force refresh all games
                 prioritizeByPlaytime: true,
+                maxGames: 30, // 🚧 Development limit to avoid excessive API calls
                 onProgress: (current: number, total: number, currentGame?: any) => {
                     const percentage = Math.round((current / total) * 80) + 20 // Reserve 20% for initial fetch
                     const gameText = currentGame ? `Refreshing: ${currentGame.name}` : ''

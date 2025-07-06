@@ -344,5 +344,40 @@ describe('Steam Progressive Loading', () => {
             expect(prioritized[0].name).toBe('Half-Life 2')
             expect(prioritized[2].name).toBe('Dota 2')
         })
+        
+        it('should respect maxGames limit for development', async () => {
+            // Create a larger mock dataset
+            const largeUserData = {
+                ...mockUserData,
+                game_count: 50,
+                games: Array.from({ length: 50 }, (_, i) => ({
+                    appid: 1000 + i,
+                    name: `Test Game ${i + 1}`,
+                    playtime_forever: 100 - i, // Descending playtime
+                    img_icon_url: `icon${i}`,
+                    img_logo_url: `logo${i}`,
+                    artwork: { icon: '', logo: '', header: '', library: '' }
+                }))
+            }
+            
+            const loadedGames: SteamGame[] = []
+            const options = {
+                maxRequestsPerSecond: 10,
+                skipCached: false,
+                maxGames: 5, // Test with small limit
+                onGameLoaded: (game: SteamGame) => {
+                    loadedGames.push(game)
+                }
+            }
+            
+            await client.loadGamesProgressively(largeUserData, options)
+            
+            // Should only process 5 games despite having 50
+            expect(loadedGames).toHaveLength(5)
+            
+            // Should be the top 5 by playtime
+            expect(loadedGames[0].name).toBe('Test Game 1') // 100 minutes
+            expect(loadedGames[4].name).toBe('Test Game 5') // 96 minutes
+        })
     })
 })

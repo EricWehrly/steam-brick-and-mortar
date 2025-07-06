@@ -60,6 +60,8 @@ export interface ProgressiveLoadOptions {
     skipCached: boolean;
     /** Prioritize games by playtime */
     prioritizeByPlaytime: boolean;
+    /** Maximum number of games to process (default: 30 for development) */
+    maxGames?: number;
 }
 
 export interface RateLimitedRequest {
@@ -373,6 +375,7 @@ export class SteamApiClient {
             maxRequestsPerSecond: 4,
             skipCached: true,
             prioritizeByPlaytime: true,
+            maxGames: 30, // Development limit
             ...options
         };
         
@@ -384,6 +387,12 @@ export class SteamApiClient {
         if (config.prioritizeByPlaytime) {
             gamesToProcess.sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0));
             console.log(`📊 Prioritized by playtime: ${gamesToProcess[0]?.name} (${gamesToProcess[0]?.playtime_forever}min) first`);
+        }
+        
+        // 🚧 DEVELOPMENT LIMIT: Restrict to maxGames to avoid excessive API calls
+        if (config.maxGames && gamesToProcess.length > config.maxGames) {
+            console.log(`🔒 Development limit: Processing only top ${config.maxGames} games (${gamesToProcess.length} total)`);
+            gamesToProcess = gamesToProcess.slice(0, config.maxGames);
         }
         
         // Filter out cached games if requested
