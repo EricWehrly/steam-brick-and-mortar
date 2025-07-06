@@ -33,6 +33,12 @@ class SteamBrickAndMortar {
     private steamStatus: HTMLElement | null
     private controlsHelp: HTMLElement | null
     
+    // Progressive loading UI elements
+    private loadingProgress: HTMLElement | null
+    private progressFill: HTMLElement | null
+    private progressText: HTMLElement | null
+    private progressGame: HTMLElement | null
+    
     // Steam data state
     private currentSteamData: any = null
 
@@ -55,6 +61,12 @@ class SteamBrickAndMortar {
         this.cacheInfoDiv = document.getElementById('cache-info')
         this.steamStatus = document.getElementById('steam-status')
         this.controlsHelp = document.getElementById('controls-help')
+        
+        // Progressive loading UI elements
+        this.loadingProgress = document.getElementById('loading-progress')
+        this.progressFill = document.getElementById('progress-fill')
+        this.progressText = document.getElementById('progress-text')
+        this.progressGame = document.getElementById('progress-game')
 
         this.init()
     }
@@ -341,29 +353,59 @@ class SteamBrickAndMortar {
         
         this.showSteamStatus('Loading Steam games...', 'loading')
         this.loadGamesButton.disabled = true
+        this.showProgressUI(true)
         
         try {
             console.log(`🔍 Loading games for Steam user: ${vanityUrl}`)
             
+            // Step 1: Get basic user and game list data
+            this.updateProgress(0, 100, 'Fetching game library...')
             const userGames = await this.steamClient.getUserGamesByVanityUrl(vanityUrl)
             
             // Store the data for game generation
             this.currentSteamData = userGames
             
-            // Show success message
+            this.updateProgress(10, 100, `Found ${userGames.game_count} games. Loading details...`)
+            
+            // Step 2: Use progressive loading for game details and artwork
+            const progressOptions = {
+                maxRequestsPerSecond: 4, // 4 games per second as requested
+                skipCached: true,
+                prioritizeByPlaytime: true,
+                onProgress: (current: number, total: number, currentGame?: any) => {
+                    const percentage = Math.round((current / total) * 90) + 10 // Reserve 10% for initial fetch
+                    const gameText = currentGame ? `Loading: ${currentGame.name}` : ''
+                    this.updateProgress(percentage, 100, `Loaded ${current}/${total} games`, gameText)
+                },
+                onGameLoaded: (game: any, index: number) => {
+                    // Update game boxes in real-time as they load
+                    this.addGameBoxToScene(game, index)
+                }
+            }
+            
+            // Remove existing placeholder boxes before progressive loading
+            this.clearGameBoxes()
+            
+            // Start progressive loading
+            await this.steamClient.loadGamesProgressively(userGames, progressOptions)
+            
+            // Show completion message
+            this.updateProgress(100, 100, 'Loading complete!')
             this.showSteamStatus(
                 `✅ Successfully loaded ${userGames.game_count} games for ${userGames.vanity_url}!`, 
                 'success'
             )
             
-            console.log(`✅ Successfully fetched ${userGames.game_count} games`)
-            
-            // Update the scene with real game data
-            this.updateGameBoxesWithSteamData(userGames)
+            console.log(`✅ Progressive loading complete for ${userGames.game_count} games`)
             
             // Update cache display and offline availability
             this.updateCacheStatsDisplay()
             this.checkOfflineAvailability()
+            
+            // Hide progress after a short delay
+            setTimeout(() => {
+                this.showProgressUI(false)
+            }, 2000)
             
         } catch (error) {
             console.error('❌ Failed to load Steam games:', error)
@@ -371,6 +413,7 @@ class SteamBrickAndMortar {
                 `❌ Failed to load games. Please check the Steam profile name and try again.`, 
                 'error'
             )
+            this.showProgressUI(false)
         } finally {
             this.loadGamesButton.disabled = false
         }
@@ -385,6 +428,93 @@ class SteamBrickAndMortar {
         
         const vanityMatch = input.match(/(?:steamcommunity\.com\/id\/|\/id\/)?([^\/\s]+)\/?$/i)
         return vanityMatch ? vanityMatch[1] : input
+    }
+    
+    private showProgressUI(show: boolean) {
+        if (!this.loadingProgress) return
+        
+        this.loadingProgress.style.display = show ? 'block' : 'none'
+        
+        if (!show) {
+            // Reset progress when hiding
+            this.updateProgress(0, 100, '')
+        }
+    }
+    
+    private updateProgress(current: number, total: number, message: string, gameText: string = '') {
+        if (!this.progressFill || !this.progressText || !this.progressGame) return
+        
+        const percentage = Math.max(0, Math.min(100, (current / total) * 100))
+        
+        this.progressFill.style.width = `${percentage}%`
+        this.progressText.textContent = message
+        this.progressGame.textContent = gameText
+    }
+    
+    private clearGameBoxes() {
+        // Remove existing game boxes
+        const existingBoxes = this.scene.children.filter(child => 
+            child.userData && child.userData.isGameBox
+        )
+        existingBoxes.forEach(box => this.scene.remove(box))
+        console.log(`🗑️ Cleared ${existingBoxes.length} existing game boxes`)
+    }
+    
+    private addGameBoxToScene(game: any, index: number) {
+        // Game case dimensions
+        const boxWidth = 0.15
+        const boxHeight = 0.2
+        const boxDepth = 0.02
+        
+        const boxGeometry = new THREE.BoxGeometry(boxWidth, boxHeight, boxDepth)
+        
+        // Position configuration  
+        const shelfSurfaceY = -0.8
+        const shelfCenterZ = -3
+        const shelfCenterX = 0
+        
+        // Calculate position for this game box
+        const maxGamesToShow = 12 // Limit for visual clarity
+        const spacingX = 0.16
+        const startX = -(Math.min(maxGamesToShow, 12) - 1) * spacingX / 2
+        
+        // Only show if within our display limit
+        if (index >= maxGamesToShow) {
+            return
+        }
+        
+        // Create a material with color based on game name
+        const colorHue = this.stringToHue(game.name)
+        const material = new THREE.MeshPhongMaterial({ 
+            color: new THREE.Color().setHSL(colorHue, 0.7, 0.5)
+        })
+        
+        const gameBox = new THREE.Mesh(boxGeometry, material)
+        
+        // Mark as game box with Steam data
+        gameBox.userData = { 
+            isGameBox: true, 
+            steamGame: game,
+            appId: game.appid,
+            name: game.name,
+            playtime: game.playtime_forever
+        }
+        
+        // Position the box
+        gameBox.position.set(
+            shelfCenterX + startX + (index * spacingX),
+            shelfSurfaceY + boxHeight / 2,
+            shelfCenterZ + 0.08
+        )
+        
+        // Enable shadows
+        gameBox.castShadow = true
+        gameBox.receiveShadow = true
+        
+        // Add to scene
+        this.scene.add(gameBox)
+        
+        console.log(`📦 Added game box ${index}: ${game.name}`)
     }
     
     private showSteamStatus(message: string, type: 'loading' | 'success' | 'error') {
@@ -665,22 +795,56 @@ class SteamBrickAndMortar {
         const vanityUrl = this.extractVanityFromInput(vanityInput)
         
         this.showSteamStatus('🔄 Refreshing cache...', 'loading')
+        this.showProgressUI(true)
         
         try {
+            // Step 1: Refresh basic user data 
+            this.updateProgress(0, 100, 'Refreshing game library...')
             const refreshedData = await this.steamClient.refreshUserCache(vanityUrl)
             this.currentSteamData = refreshedData
             
+            this.updateProgress(20, 100, `Refreshing ${refreshedData.game_count} games...`)
+            
+            // Step 2: Progressive loading with forced refresh (skipCached: false)
+            const progressOptions = {
+                maxRequestsPerSecond: 4,
+                skipCached: false, // Force refresh all games
+                prioritizeByPlaytime: true,
+                onProgress: (current: number, total: number, currentGame?: any) => {
+                    const percentage = Math.round((current / total) * 80) + 20 // Reserve 20% for initial fetch
+                    const gameText = currentGame ? `Refreshing: ${currentGame.name}` : ''
+                    this.updateProgress(percentage, 100, `Refreshed ${current}/${total} games`, gameText)
+                },
+                onGameLoaded: (game: any, index: number) => {
+                    // Update game boxes in real-time as they refresh
+                    this.addGameBoxToScene(game, index)
+                }
+            }
+            
+            // Clear existing boxes before refresh
+            this.clearGameBoxes()
+            
+            // Start progressive refresh
+            await this.steamClient.loadGamesProgressively(refreshedData, progressOptions)
+            
+            this.updateProgress(100, 100, 'Refresh complete!')
             this.showSteamStatus(
                 `✅ Cache refreshed: ${refreshedData.game_count} games updated`,
                 'success'
             )
             
-            this.updateGameBoxesWithSteamData(refreshedData)
             this.updateCacheStatsDisplay()
             this.checkOfflineAvailability()
+            
+            // Hide progress after a short delay
+            setTimeout(() => {
+                this.showProgressUI(false)
+            }, 2000)
+            
         } catch (error) {
             console.error('❌ Failed to refresh cache:', error)
             this.showSteamStatus('❌ Failed to refresh cache', 'error')
+            this.showProgressUI(false)
         }
     }
     

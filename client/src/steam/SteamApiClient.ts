@@ -49,6 +49,26 @@ export interface SteamApiError {
     timestamp: string;
 }
 
+export interface ProgressiveLoadOptions {
+    /** Maximum requests per second (default: 4) */
+    maxRequestsPerSecond: number;
+    /** Callback for progress updates */
+    onProgress?: (current: number, total: number, currentGame?: SteamGame) => void;
+    /** Callback for each game loaded */
+    onGameLoaded?: (game: SteamGame, index: number) => void;
+    /** Skip games already in cache */
+    skipCached: boolean;
+    /** Prioritize games by playtime */
+    prioritizeByPlaytime: boolean;
+}
+
+export interface RateLimitedRequest {
+    appid: number;
+    resolve: (game: SteamGame) => void;
+    reject: (error: Error) => void;
+    priority: number;
+}
+
 export interface CacheEntry<T> {
     data: T;
     timestamp: number;
@@ -79,6 +99,12 @@ export class SteamApiClient {
     private readonly defaultTimeout: number = 10000; // 10 seconds
     private readonly cacheConfig: CacheConfig;
     private cache: Map<string, CacheEntry<any>> = new Map();
+    
+    // Rate limiting for progressive fetching
+    private requestQueue: RateLimitedRequest[] = [];
+    private isProcessingQueue: boolean = false;
+    private lastRequestTime: number = 0;
+    private readonly minRequestInterval: number = 250; // 250ms = 4 requests/second
 
     constructor(
         apiBaseUrl: string = 'https://steam-api-dev.wehrly.com',
@@ -331,6 +357,152 @@ export class SteamApiClient {
             // Clear corrupted cache
             localStorage.removeItem(this.cacheConfig.cachePrefix + 'state');
         }
+    }
+    
+    /**
+     * Load games progressively with rate limiting
+     * @param steamUser Base user data with game list
+     * @param options Progressive loading configuration
+     * @returns Promise that resolves when all games are processed
+     */
+    async loadGamesProgressively(
+        steamUser: SteamUser, 
+        options: Partial<ProgressiveLoadOptions> = {}
+    ): Promise<SteamGame[]> {
+        const config: ProgressiveLoadOptions = {
+            maxRequestsPerSecond: 4,
+            skipCached: true,
+            prioritizeByPlaytime: true,
+            ...options
+        };
+        
+        console.log(`🚀 Starting progressive loading for ${steamUser.games.length} games`);
+        console.log(`⚡ Rate limit: ${config.maxRequestsPerSecond} requests/second`);
+        
+        // Create copy of games and optionally sort by playtime
+        let gamesToProcess = [...steamUser.games];
+        if (config.prioritizeByPlaytime) {
+            gamesToProcess.sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0));
+            console.log(`📊 Prioritized by playtime: ${gamesToProcess[0]?.name} (${gamesToProcess[0]?.playtime_forever}min) first`);
+        }
+        
+        // Filter out cached games if requested
+        if (config.skipCached) {
+            const originalCount = gamesToProcess.length;
+            gamesToProcess = gamesToProcess.filter(game => {
+                const cached = this.getFromCache<SteamGame>(`game_details_${game.appid}`);
+                return !cached;
+            });
+            const skippedCount = originalCount - gamesToProcess.length;
+            if (skippedCount > 0) {
+                console.log(`⚡ Skipping ${skippedCount} cached games, ${gamesToProcess.length} remaining`);
+            }
+        }
+        
+        if (gamesToProcess.length === 0) {
+            console.log(`✅ All games already cached, no requests needed`);
+            config.onProgress?.(steamUser.games.length, steamUser.games.length);
+            return steamUser.games;
+        }
+        
+        const loadedGames: SteamGame[] = [];
+        const totalGames = steamUser.games.length;
+        let processedCount = totalGames - gamesToProcess.length; // Count cached games as processed
+        
+        console.log(`🎯 Processing ${gamesToProcess.length} games with rate limiting`);
+        
+        // Process games in rate-limited batches
+        for (let i = 0; i < gamesToProcess.length; i++) {
+            const game = gamesToProcess[i];
+            
+            try {
+                // Respect rate limit
+                await this.enforceRateLimit(config.maxRequestsPerSecond);
+                
+                // Try to get enhanced game details (or return basic details if API doesn't support it)
+                const enhancedGame = await this.getGameDetails(game);
+                loadedGames.push(enhancedGame);
+                processedCount++;
+                
+                // Notify progress
+                config.onProgress?.(processedCount, totalGames, enhancedGame);
+                config.onGameLoaded?.(enhancedGame, i);
+                
+                console.log(`📦 Loaded game ${i + 1}/${gamesToProcess.length}: ${enhancedGame.name}`);
+                
+            } catch (error) {
+                console.warn(`⚠️ Failed to load details for ${game.name}:`, error);
+                // Use basic game data as fallback
+                loadedGames.push(game);
+                processedCount++;
+                config.onProgress?.(processedCount, totalGames, game);
+            }
+        }
+        
+        console.log(`✅ Progressive loading complete: ${loadedGames.length} games loaded`);
+        return [...steamUser.games]; // Return all games (cached + newly loaded)
+    }
+    
+    /**
+     * Get detailed information for a specific game
+     * @param game Basic game info from Steam library
+     * @returns Promise<SteamGame> Enhanced game details
+     */
+    async getGameDetails(game: SteamGame): Promise<SteamGame> {
+        // Check cache first
+        const cached = this.getFromCache<SteamGame>(`game_details_${game.appid}`);
+        if (cached) {
+            console.log(`🔄 Cache hit for game details: ${game.name}`);
+            return cached;
+        }
+        
+        // For now, enhance the existing game data with proper artwork URLs
+        // In the future, this could call additional Steam APIs for more details
+        const enhancedGame: SteamGame = {
+            ...game,
+            artwork: {
+                icon: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`,
+                logo: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`,
+                header: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`,
+                library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
+            }
+        };
+        
+        // Cache the enhanced details
+        this.saveToCache(`game_details_${game.appid}`, enhancedGame);
+        
+        return enhancedGame;
+    }
+    
+    /**
+     * Enforce rate limiting between requests
+     * @param requestsPerSecond Maximum requests per second
+     */
+    private async enforceRateLimit(requestsPerSecond: number): Promise<void> {
+        const minInterval = 1000 / requestsPerSecond; // Convert to milliseconds
+        const timeSinceLastRequest = Date.now() - this.lastRequestTime;
+        
+        if (timeSinceLastRequest < minInterval) {
+            const waitTime = minInterval - timeSinceLastRequest;
+            console.log(`⏱️ Rate limiting: waiting ${waitTime}ms`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+        
+        this.lastRequestTime = Date.now();
+    }
+    
+    /**
+     * Get prioritized game list (most played first)
+     * @param steamUser User data with games
+     * @param limit Maximum number of games to return
+     * @returns Prioritized array of games
+     */
+    public getPrioritizedGames(steamUser: SteamUser, limit?: number): SteamGame[] {
+        const sorted = [...steamUser.games].sort((a, b) => 
+            (b.playtime_forever || 0) - (a.playtime_forever || 0)
+        );
+        
+        return limit ? sorted.slice(0, limit) : sorted;
     }
     
     // Public Cache Management Methods
