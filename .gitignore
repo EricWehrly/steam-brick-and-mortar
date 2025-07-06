@@ -161,3 +161,6 @@ public
 # TernJS port file
 .tern-port
 scripts/scratch.sh
+
+# reference materials
+reference/
