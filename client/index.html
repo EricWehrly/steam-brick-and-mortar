@@ -56,12 +56,137 @@
             width: 100vw;
             height: 100vh;
         }
+        
+        #steam-ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 400px;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+        
+        #steam-ui h2 {
+            margin: 0 0 15px 0;
+            color: #00aaff;
+            font-size: 18px;
+        }
+        
+        #steam-ui input {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background: #222;
+            color: #fff;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        #steam-ui button {
+            background: #00aaff;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        #steam-ui button:hover {
+            background: #0088cc;
+        }
+        
+        #steam-ui button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        
+        #steam-status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .status-loading {
+            background: rgba(255, 165, 0, 0.2);
+            border: 1px solid #ffa500;
+            color: #ffa500;
+        }
+        
+        .status-success {
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid #00ff00;
+            color: #00ff00;
+        }
+        
+        .status-error {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid #ff0000;
+            color: #ff0000;
+        }
+        
+        .status-hidden {
+            display: none;
+        }
+        
+        #controls-help {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #ccc;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
     <div id="loading">
         <h1>Steam Blockbuster Shelf</h1>
         <p>Loading WebXR environment...</p>
+    </div>
+    
+    <div id="steam-ui" style="display: none;">
+        <h2>🎮 Steam Account</h2>
+        <label for="steam-vanity">Steam Profile URL or Vanity Name:</label>
+        <input 
+            type="text" 
+            id="steam-vanity" 
+            placeholder="e.g., SpiteMonger or steamcommunity.com/id/SpiteMonger"
+            autocomplete="off"
+        />
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <button id="load-steam-games">Load My Games</button>
+            <button id="use-offline-data" style="display: none; background: #ff8c00;">Use Offline</button>
+        </div>
+        
+        <div id="cache-controls" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
+            <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #888;">Cache Management</h3>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button id="refresh-cache" style="background: #28a745; font-size: 12px; padding: 6px 10px;">Refresh</button>
+                <button id="clear-cache" style="background: #dc3545; font-size: 12px; padding: 6px 10px;">Clear Cache</button>
+                <button id="show-cache-stats" style="background: #17a2b8; font-size: 12px; padding: 6px 10px;">Cache Info</button>
+            </div>
+            <div id="cache-info" style="margin-top: 10px; font-size: 12px; color: #aaa; display: none;"></div>
+        </div>
+        
+        <div id="steam-status" class="status-hidden"></div>
+    </div>
+    
+    <div id="controls-help" style="display: none;">
+        <strong>Controls:</strong><br>
+        WASD - Move around<br>
+        Mouse - Look around
     </div>
     
     <button id="webxr-button" style="display: none;">Enter VR</button>
