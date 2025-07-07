@@ -1,0 +1,181 @@
+/**
+ * Simplified Steam API Client using composition layers
+ */
+
+import { HttpClient } from './http/HttpClient'
+import { CacheManager } from './cache/SimpleCacheManager'
+import { RateLimiter } from './rate-limit/RateLimiter'
+import { ImageManager } from './images/ImageManager'
+
+export interface SteamGame {
+    appid: number
+    name: string
+    playtime_forever: number
+    playtime_2weeks?: number
+    img_icon_url: string
+    img_logo_url: string
+    artwork: {
+        icon: string
+        logo: string
+        header: string
+        library: string
+    }
+}
+
+export interface SteamUser {
+    steamid: string
+    vanity_url?: string
+    game_count: number
+    games: SteamGame[]
+    retrieved_at: string
+}
+
+export interface SteamResolveResponse {
+    vanity_url: string
+    steamid: string
+    resolved_at: string
+}
+
+export interface SteamApiError {
+    error: string
+    message: string
+    timestamp: string
+}
+
+/**
+ * Simplified Steam API Client using layered composition
+ */
+export class SteamApiClient {
+    private http: HttpClient
+    private cache: CacheManager
+    private rateLimiter: RateLimiter
+    private images: ImageManager
+    
+    // Cached methods - these are the actual methods that get called
+    public getUserGames: (steamId: string) => Promise<SteamUser>
+    public resolveVanityUrl: (vanityUrl: string) => Promise<SteamResolveResponse>
+    public getGameDetails: (game: SteamGame) => Promise<SteamGame>
+
+    constructor(apiBaseUrl = 'https://steam-api-dev.wehrly.com') {
+        // Initialize all layers
+        this.http = new HttpClient({ baseUrl: apiBaseUrl })
+        this.cache = new CacheManager({ cachePrefix: 'steam_api_' })
+        this.rateLimiter = new RateLimiter({ requestsPerSecond: 4 })
+        this.images = new ImageManager()
+        
+        // Create cached versions of methods
+        this.getUserGames = this.cache.withCache(
+            this.rawGetUserGames.bind(this),
+            (steamId: string) => `games_${steamId}`
+        )
+        
+        this.resolveVanityUrl = this.cache.withCache(
+            this.rawResolveVanityUrl.bind(this),
+            (vanityUrl: string) => `resolve_${vanityUrl.toLowerCase()}`
+        )
+        
+        this.getGameDetails = this.cache.withCache(
+            this.rateLimiter.limited(this.rawGetGameDetails.bind(this)),
+            (game: SteamGame) => `game_${game.appid}`
+        )
+    }
+
+    /**
+     * Raw methods - these do the actual work
+     */
+    private async rawResolveVanityUrl(vanityUrl: string): Promise<SteamResolveResponse> {
+        if (!vanityUrl || vanityUrl.trim().length === 0) {
+            throw new Error('Vanity URL cannot be empty')
+        }
+
+        const cleanVanityUrl = vanityUrl.trim().toLowerCase()
+        const endpoint = `/resolve/${encodeURIComponent(cleanVanityUrl)}`
+        
+        return this.http.makeRequest<SteamResolveResponse>(endpoint)
+    }
+
+    private async rawGetUserGames(steamId: string): Promise<SteamUser> {
+        if (!steamId || steamId.trim().length === 0) {
+            throw new Error('Steam ID cannot be empty')
+        }
+
+        const endpoint = `/games/${encodeURIComponent(steamId)}`
+        return this.http.makeRequest<SteamUser>(endpoint)
+    }
+
+    private async rawGetGameDetails(game: SteamGame): Promise<SteamGame> {
+        // Enhance game with artwork URLs
+        const enhancedGame: SteamGame = {
+            ...game,
+            artwork: {
+                icon: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`,
+                logo: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`,
+                header: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`,
+                library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
+            }
+        }
+        
+        return enhancedGame
+    }
+
+    /**
+     * Public utility methods
+     */
+    public async loadGamesProgressively(
+        steamUser: SteamUser,
+        options: {
+            maxGames?: number
+            onProgress?: (current: number, total: number) => void
+            onGameLoaded?: (game: SteamGame) => void
+        } = {}
+    ): Promise<SteamGame[]> {
+        const { maxGames = 30, onProgress, onGameLoaded } = options
+        
+        // Sort games by playtime
+        const sortedGames = [...steamUser.games]
+            .sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0))
+            .slice(0, maxGames)
+
+        const results: SteamGame[] = []
+        
+        for (let i = 0; i < sortedGames.length; i++) {
+            const game = sortedGames[i]
+            
+            try {
+                const enhancedGame = await this.getGameDetails(game)
+                results.push(enhancedGame)
+                onGameLoaded?.(enhancedGame)
+                onProgress?.(i + 1, sortedGames.length)
+            } catch (error) {
+                console.warn(`Failed to load game ${game.name}:`, error)
+            }
+        }
+        
+        return results
+    }
+
+    /**
+     * Image methods (delegate to ImageManager)
+     */
+    public async downloadGameImage(url: string): Promise<Blob | null> {
+        return this.images.downloadImage(url)
+    }
+
+    public async downloadGameArtwork(game: SteamGame): Promise<Record<string, Blob | null>> {
+        return this.images.downloadGameArtwork(game.artwork)
+    }
+
+    /**
+     * Cache management
+     */
+    public clearCache(): void {
+        this.cache.clear()
+    }
+
+    public getCacheStats() {
+        return this.cache.getStats()
+    }
+}
+
+// Export a default instance for convenience
+export const steamApi = new SteamApiClient()
