@@ -11,4 +11,4 @@ export {
     type SteamUser,
     type SteamResolveResponse,
     type SteamApiError,
-} from './SteamApiClient';
+} from './SteamApiClientSimple';

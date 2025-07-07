@@ -427,7 +427,7 @@ class SteamBrickAndMortar {
         // - Partial URL: "steamcommunity.com/id/SpiteMonger"
         // - Profile URL: "/id/SpiteMonger"
         
-        const vanityMatch = input.match(/(?:steamcommunity\.com\/id\/|\/id\/)?([^\/\s]+)\/?$/i)
+        const vanityMatch = input.match(/(?:steamcommunity\.com\/id\/|\/id\/)?([^/\s]+)\/?$/i)
         return vanityMatch ? vanityMatch[1] : input
     }
     
@@ -455,7 +455,7 @@ class SteamBrickAndMortar {
     private clearGameBoxes() {
         // Remove existing game boxes
         const existingBoxes = this.scene.children.filter(child => 
-            child.userData && child.userData.isGameBox
+            child.userData?.isGameBox
         )
         existingBoxes.forEach(box => this.scene.remove(box))
         console.log(`🗑️ Cleared ${existingBoxes.length} existing game boxes`)
@@ -565,7 +565,7 @@ class SteamBrickAndMortar {
         
         // Remove existing placeholder boxes
         const existingBoxes = this.scene.children.filter(child => 
-            child.userData && child.userData.isGameBox
+            child.userData?.isGameBox
         )
         existingBoxes.forEach(box => this.scene.remove(box))
         
