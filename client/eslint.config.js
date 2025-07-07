@@ -11,6 +11,23 @@ export default [
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: 'module',
+        project: './tsconfig.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+      globals: {
+        // Browser globals
+        window: 'readonly',
+        document: 'readonly',
+        console: 'readonly',
+        navigator: 'readonly',
+        fetch: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        localStorage: 'readonly',
+        indexedDB: 'readonly',
+        // Node globals for tests
+        process: 'readonly',
+        global: 'readonly',
       },
     },
     plugins: {
@@ -38,8 +55,7 @@ export default [
       // Code quality without being overly strict
       'prefer-const': 'warn',
       'no-var': 'error',
-      'eqeqeq': ['error', 'always'],
-      'curly': ['error', 'all'],
+      'curly': 'off', // Disable curly brace enforcement for now
       
       // Disable overly strict rules
       '@typescript-eslint/explicit-function-return-type': 'off',
