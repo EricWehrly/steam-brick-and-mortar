@@ -115,3 +115,10 @@ export class DOMUtils {
         return input?.value?.trim() || ''
     }
 }
+
+/**
+ * Safely get an element by ID (functional approach)
+ */
+export function getElementByIdSafe<T extends HTMLElement = HTMLElement>(id: string): T | null {
+    return document.getElementById(id) as T | null
+}

@@ -13,32 +13,14 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { SteamApiClient } from './steam'
 import { ValidationUtils } from './utils'
+import { UIManager, type UIManagerEvents } from './ui'
 
 class SteamBrickAndMortar {
     private scene: THREE.Scene
     private camera: THREE.PerspectiveCamera
     private renderer: THREE.WebGLRenderer
-    private xrButton: HTMLElement | null
-    private loading: HTMLElement | null
     private steamClient: SteamApiClient
-    
-    // Steam UI elements
-    private steamUI: HTMLElement | null
-    private steamVanityInput: HTMLInputElement | null
-    private loadGamesButton: HTMLButtonElement | null
-    private useOfflineButton: HTMLButtonElement | null
-    private refreshCacheButton: HTMLButtonElement | null
-    private clearCacheButton: HTMLButtonElement | null
-    private showCacheStatsButton: HTMLButtonElement | null
-    private cacheInfoDiv: HTMLElement | null
-    private steamStatus: HTMLElement | null
-    private controlsHelp: HTMLElement | null
-    
-    // Progressive loading UI elements
-    private loadingProgress: HTMLElement | null
-    private progressFill: HTMLElement | null
-    private progressText: HTMLElement | null
-    private progressGame: HTMLElement | null
+    private uiManager: UIManager
     
     // Steam data state
     private currentSteamData: any = null
@@ -48,27 +30,17 @@ class SteamBrickAndMortar {
         this.scene = new THREE.Scene()
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
         this.renderer = new THREE.WebGLRenderer({ antialias: true })
-        this.xrButton = document.getElementById('webxr-button')
-        this.loading = document.getElementById('loading')
         this.steamClient = new SteamApiClient('https://steam-api-dev.wehrly.com')
         
-        // Steam UI elements
-        this.steamUI = document.getElementById('steam-ui')
-        this.steamVanityInput = document.getElementById('steam-vanity') as HTMLInputElement
-        this.loadGamesButton = document.getElementById('load-steam-games') as HTMLButtonElement
-        this.useOfflineButton = document.getElementById('use-offline-data') as HTMLButtonElement
-        this.refreshCacheButton = document.getElementById('refresh-cache') as HTMLButtonElement
-        this.clearCacheButton = document.getElementById('clear-cache') as HTMLButtonElement
-        this.showCacheStatsButton = document.getElementById('show-cache-stats') as HTMLButtonElement
-        this.cacheInfoDiv = document.getElementById('cache-info')
-        this.steamStatus = document.getElementById('steam-status')
-        this.controlsHelp = document.getElementById('controls-help')
-        
-        // Progressive loading UI elements
-        this.loadingProgress = document.getElementById('loading-progress')
-        this.progressFill = document.getElementById('progress-fill')
-        this.progressText = document.getElementById('progress-text')
-        this.progressGame = document.getElementById('progress-game')
+        // Initialize UI Manager with event handlers
+        this.uiManager = new UIManager({
+            steamLoadGames: (vanityUrl: string) => this.handleLoadSteamGames(vanityUrl),
+            steamUseOffline: (vanityUrl: string) => this.handleUseOfflineData(vanityUrl),
+            steamRefreshCache: () => this.handleRefreshCache(),
+            steamClearCache: () => this.handleClearCache(),
+            steamShowCacheStats: () => this.handleShowCacheStats(),
+            webxrEnterVR: () => this.handleWebXRToggle()
+        })
 
         this.init()
     }
@@ -81,17 +53,14 @@ class SteamBrickAndMortar {
             this.setupScene()
             this.setupWebXR()
             this.setupControls()
-            this.setupSteamUI()
-            // Skip health check for now - not essential for core functionality
-            this.hideLoading()
-            this.showSteamUI()
-            this.showControlsHelp()
+            this.uiManager.init()
+            this.uiManager.hideLoading()
             this.startRenderLoop()
             
             console.log('✅ WebXR environment ready!')
         } catch (error) {
             console.error('❌ Failed to initialize WebXR environment:', error)
-            this.showError('Failed to initialize WebXR environment')
+            this.uiManager.showError('Failed to initialize WebXR environment')
         }
     }
 
@@ -155,7 +124,7 @@ class SteamBrickAndMortar {
         // Check WebXR support
         if (!navigator.xr) {
             console.warn('⚠️ WebXR not supported - falling back to desktop mode')
-            this.showWebXRUnsupported()
+            this.uiManager.setWebXRSupported(false)
             return
         }
 
@@ -163,14 +132,14 @@ class SteamBrickAndMortar {
             const supported = await navigator.xr.isSessionSupported('immersive-vr')
             if (supported) {
                 console.log('✅ WebXR VR sessions supported')
-                this.showWebXRButton()
+                this.uiManager.setWebXRSupported(true)
             } else {
                 console.warn('⚠️ WebXR VR sessions not supported - desktop mode only')
-                this.showWebXRUnsupported()
+                this.uiManager.setWebXRSupported(false)
             }
         } catch (error) {
             console.warn('⚠️ WebXR session support check failed:', error)
-            this.showWebXRUnsupported()
+            this.uiManager.setWebXRSupported(false)
         }
     }
 
@@ -236,146 +205,52 @@ class SteamBrickAndMortar {
 
     private updateMovement: () => void = () => {}
 
-    private showWebXRButton() {
-        if (!this.xrButton) return
-
-        this.xrButton.style.display = 'block'
-        this.xrButton.addEventListener('click', async () => {
-            try {
-                console.log('🥽 Attempting to start WebXR session...')
-                
-                const session = await navigator.xr!.requestSession('immersive-vr')
-                await this.renderer.xr.setSession(session)
-                
-                console.log('✅ WebXR session started!')
-                this.xrButton!.textContent = 'Exit VR'
-                
-                session.addEventListener('end', () => {
-                    console.log('🚪 WebXR session ended')
-                    this.xrButton!.textContent = 'Enter VR'
-                })
-                
-            } catch (error) {
-                console.error('❌ Failed to start WebXR session:', error)
-                this.showError('Failed to enter VR mode')
-            }
-        })
-    }
-
-    private showWebXRUnsupported() {
-        if (!this.xrButton) return
-        
-        this.xrButton.style.display = 'block'
-        this.xrButton.textContent = 'VR Not Available'
-        if (this.xrButton instanceof HTMLButtonElement) {
-            this.xrButton.disabled = true
-        }
-    }
-
-    private hideLoading() {
-        if (this.loading) {
-            this.loading.style.display = 'none'
-        }
-    }
-
-    private showError(message: string) {
-        if (this.loading) {
-            this.loading.innerHTML = `
-                <h1>Error</h1>
-                <p>${message}</p>
-                <p>Check console for details.</p>
-            `
-        }
-    }
-
-    private setupSteamUI() {
-        if (!this.loadGamesButton || !this.steamVanityInput) return
-        
-        // Add event listener for the Load Games button
-        this.loadGamesButton.addEventListener('click', () => {
-            this.handleLoadSteamGames()
-        })
-        
-        // Add event listener for the Use Offline button
-        if (this.useOfflineButton) {
-            this.useOfflineButton.addEventListener('click', () => {
-                this.handleUseOfflineData()
+    private async handleWebXRToggle() {
+        try {
+            console.log('🥽 Attempting to start WebXR session...')
+            
+            const session = await navigator.xr!.requestSession('immersive-vr')
+            await this.renderer.xr.setSession(session)
+            
+            console.log('✅ WebXR session started!')
+            this.uiManager.setWebXRSessionActive(true)
+            
+            session.addEventListener('end', () => {
+                console.log('🚪 WebXR session ended')
+                this.uiManager.setWebXRSessionActive(false)
             })
+            
+        } catch (error) {
+            console.error('❌ Failed to start WebXR session:', error)
+            this.uiManager.showError('Failed to enter VR mode')
         }
-        
-        // Add event listeners for cache management buttons
-        if (this.refreshCacheButton) {
-            this.refreshCacheButton.addEventListener('click', () => {
-                this.handleRefreshCache()
-            })
-        }
-        
-        if (this.clearCacheButton) {
-            this.clearCacheButton.addEventListener('click', () => {
-                this.handleClearCache()
-            })
-        }
-        
-        if (this.showCacheStatsButton) {
-            this.showCacheStatsButton.addEventListener('click', () => {
-                this.handleShowCacheStats()
-            })
-        }
-        
-        // Add Enter key support for the input field
-        this.steamVanityInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                this.handleLoadSteamGames()
-            }
-        })
-        
-        // Add input change handler to check offline availability
-        this.steamVanityInput.addEventListener('input', () => {
-            this.checkOfflineAvailability()
-        })
-        
-        // Add placeholder example for UX
-        this.steamVanityInput.placeholder = 'e.g., SpiteMonger or steamcommunity.com/id/SpiteMonger'
-        
-        // Initial cache stats display
-        this.updateCacheStatsDisplay()
     }
-    
-    private async handleLoadSteamGames() {
-        if (!this.steamVanityInput || !this.loadGamesButton) return
+
+    private async handleLoadSteamGames(vanityUrl: string) {
+        const extractedVanity = ValidationUtils.extractVanityFromInput(vanityUrl)
         
-        const vanityInput = this.steamVanityInput.value.trim()
-        if (!vanityInput) {
-            this.showSteamStatus('Please enter a Steam profile URL or vanity name', 'error')
-            return
-        }
-        
-        // Extract vanity name from various URL formats
-        const vanityUrl = ValidationUtils.extractVanityFromInput(vanityInput)
-        
-        this.showSteamStatus('Loading Steam games...', 'loading')
-        this.loadGamesButton.disabled = true
-        this.showProgressUI(true)
+        this.uiManager.showSteamStatus('Loading Steam games...', 'loading')
+        this.uiManager.showProgress(true)
         
         try {
-            console.log(`🔍 Loading games for Steam user: ${vanityUrl}`)
+            console.log(`🔍 Loading games for Steam user: ${extractedVanity}`)
             
             // Step 1: Get basic user and game list data
-            this.updateProgress(0, 100, 'Fetching game library...')
-            const resolveResponse = await this.steamClient.resolveVanityUrl(vanityUrl)
+            this.uiManager.updateProgress(0, 100, 'Fetching game library...')
+            const resolveResponse = await this.steamClient.resolveVanityUrl(extractedVanity)
             const userGames = await this.steamClient.getUserGames(resolveResponse.steamid)
             
             // Store the data for game generation
             this.currentSteamData = userGames
             
-            this.updateProgress(10, 100, `Found ${userGames.game_count} games. Loading details...`)
+            this.uiManager.updateProgress(10, 100, `Found ${userGames.game_count} games. Loading details...`)
             
             // Step 2: Use progressive loading for game details and artwork
             const progressOptions = {
                 maxGames: 30, // 🚧 Development limit to avoid excessive API calls
                 onProgress: (current: number, total: number) => {
                     const percentage = Math.round((current / total) * 90) + 10 // Reserve 10% for initial fetch
-                    this.updateProgress(percentage, 100, `Loaded ${current}/${total} games`)
+                    this.uiManager.updateProgress(percentage, 100, `Loaded ${current}/${total} games`)
                 },
                 onGameLoaded: (game: any) => {
                     // Update game boxes in real-time as they load
@@ -390,8 +265,8 @@ class SteamBrickAndMortar {
             await this.steamClient.loadGamesProgressively(userGames, progressOptions)
             
             // Show completion message
-            this.updateProgress(100, 100, 'Loading complete!')
-            this.showSteamStatus(
+            this.uiManager.updateProgress(100, 100, 'Loading complete!')
+            this.uiManager.showSteamStatus(
                 `✅ Successfully loaded ${userGames.game_count} games for ${userGames.vanity_url}!`, 
                 'success'
             )
@@ -400,44 +275,21 @@ class SteamBrickAndMortar {
             
             // Update cache display and offline availability
             this.updateCacheStatsDisplay()
-            this.checkOfflineAvailability()
+            this.uiManager.checkOfflineAvailability(extractedVanity)
             
             // Hide progress after a short delay
             setTimeout(() => {
-                this.showProgressUI(false)
+                this.uiManager.showProgress(false)
             }, 2000)
             
         } catch (error) {
             console.error('❌ Failed to load Steam games:', error)
-            this.showSteamStatus(
+            this.uiManager.showSteamStatus(
                 `❌ Failed to load games. Please check the Steam profile name and try again.`, 
                 'error'
             )
-            this.showProgressUI(false)
-        } finally {
-            this.loadGamesButton.disabled = false
+            this.uiManager.showProgress(false)
         }
-    }
-    
-    private showProgressUI(show: boolean) {
-        if (!this.loadingProgress) return
-        
-        this.loadingProgress.style.display = show ? 'block' : 'none'
-        
-        if (!show) {
-            // Reset progress when hiding
-            this.updateProgress(0, 100, '')
-        }
-    }
-    
-    private updateProgress(current: number, total: number, message: string, gameText: string = '') {
-        if (!this.progressFill || !this.progressText || !this.progressGame) return
-        
-        const percentage = Math.max(0, Math.min(100, (current / total) * 100))
-        
-        this.progressFill.style.width = `${percentage}%`
-        this.progressText.textContent = message
-        this.progressGame.textContent = gameText
     }
     
     private clearGameBoxes() {
@@ -504,34 +356,6 @@ class SteamBrickAndMortar {
         this.scene.add(gameBox)
         
         console.log(`📦 Added game box ${index}: ${game.name}`)
-    }
-    
-    private showSteamStatus(message: string, type: 'loading' | 'success' | 'error') {
-        if (!this.steamStatus) return
-        
-        this.steamStatus.textContent = message
-        this.steamStatus.className = `status-${type}`
-        
-        // Auto-hide success messages after 5 seconds
-        if (type === 'success') {
-            setTimeout(() => {
-                if (this.steamStatus) {
-                    this.steamStatus.className = 'status-hidden'
-                }
-            }, 5000)
-        }
-    }
-    
-    private showSteamUI() {
-        if (this.steamUI) {
-            this.steamUI.style.display = 'block'
-        }
-    }
-    
-    private showControlsHelp() {
-        if (this.controlsHelp) {
-            this.controlsHelp.style.display = 'block'
-        }
     }
     
     private async checkSteamAPIHealth() {
@@ -727,84 +551,37 @@ class SteamBrickAndMortar {
     
     // Cache Management Methods
     
-    private async handleUseOfflineData() {
-        if (!this.steamVanityInput) return
-        
-        const vanityInput = this.steamVanityInput.value.trim()
-        if (!vanityInput) {
-            this.showSteamStatus('Please enter a Steam profile name first', 'error')
-            return
-        }
-        
+    private async handleUseOfflineData(vanityUrl: string) {
         // For now, just show a message that offline mode is not available in simplified client
-        this.showSteamStatus('Offline mode not available in simplified client', 'error')
+        this.uiManager.showSteamStatus('Offline mode not available in simplified client', 'error')
     }
     
     private async handleRefreshCache() {
         // For the simplified client, just reload the data normally
-        this.showSteamStatus('🔄 Reloading data...', 'loading')
+        this.uiManager.showSteamStatus('🔄 Reloading data...', 'loading')
         
-        if (this.currentSteamData) {
+        if (this.currentSteamData && this.currentSteamData.vanity_url) {
             // Re-trigger the load process
-            await this.handleLoadSteamGames()
+            await this.handleLoadSteamGames(this.currentSteamData.vanity_url)
         } else {
-            this.showSteamStatus('No data to refresh', 'error')
+            this.uiManager.showSteamStatus('No data to refresh', 'error')
         }
     }
     
     private handleClearCache() {
         this.steamClient.clearCache()
-        this.showSteamStatus('🗑️ Cache cleared successfully', 'success')
+        this.uiManager.showSteamStatus('🗑️ Cache cleared successfully', 'success')
         this.updateCacheStatsDisplay()
-        this.checkOfflineAvailability()
     }
     
     private handleShowCacheStats() {
         const stats = this.steamClient.getCacheStats()
-        
-        if (!this.cacheInfoDiv) return
-        
-        this.cacheInfoDiv.innerHTML = `
-            <strong>Cache Statistics:</strong><br>
-            • Total entries: ${stats.totalEntries}<br>
-            • Cache hits: ${stats.cacheHits}<br>
-            • Cache misses: ${stats.cacheMisses}<br>
-        `
-        
-        // Toggle visibility
-        const isHidden = this.cacheInfoDiv.style.display === 'none'
-        this.cacheInfoDiv.style.display = isHidden ? 'block' : 'none'
-        
-        if (this.showCacheStatsButton) {
-            this.showCacheStatsButton.textContent = isHidden ? 'Hide Info' : 'Cache Info'
-        }
-    }
-    
-    private checkOfflineAvailability() {
-        if (!this.steamVanityInput || !this.useOfflineButton) return
-        
-        const vanityInput = this.steamVanityInput.value.trim()
-        if (!vanityInput) {
-            this.useOfflineButton.style.display = 'none'
-            return
-        }
-        
-        // For simplified client, always hide offline button since it's not implemented
-        this.useOfflineButton.style.display = 'none'
+        this.uiManager.updateCacheStats(stats)
     }
     
     private updateCacheStatsDisplay() {
         const stats = this.steamClient.getCacheStats()
-        
-        // Update cache info if it's currently visible
-        if (this.cacheInfoDiv && this.cacheInfoDiv.style.display === 'block') {
-            this.handleShowCacheStats() // Refresh the display
-        }
-        
-        // Update button text to show entry count
-        if (this.showCacheStatsButton) {
-            this.showCacheStatsButton.textContent = `Cache Info (${stats.totalEntries})`
-        }
+        this.uiManager.updateCacheStats(stats)
     }
 
     private startRenderLoop() {

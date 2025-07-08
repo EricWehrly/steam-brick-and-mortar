@@ -4,3 +4,4 @@
 
 export { DOMUtils } from './DOMUtils'
 export { ValidationUtils } from './ValidationUtils'
+export { getElementByIdSafe } from './DOMUtils'
