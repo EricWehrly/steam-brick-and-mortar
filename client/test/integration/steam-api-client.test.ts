@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { SteamApiClient } from '../../src/steam/SteamApiClientSimple'
+import { SteamApiClient } from '../../src/steam/SteamApiClient'
 import { 
     setupFetchMock, 
     setupLocalStorageMock,

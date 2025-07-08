@@ -4,7 +4,7 @@
  */
 
 import { vi } from 'vitest'
-import type { SteamGame, SteamUser } from '../../src/steam/SteamApiClientSimple'
+import type { SteamGame, SteamUser } from '../../src/steam/SteamApiClient'
 
 export const mockGame: SteamGame = {
     appid: 220,

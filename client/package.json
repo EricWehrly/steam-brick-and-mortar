@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui", 
-    "test:live": "vitest run test/live",
+    "test:live": "vitest run test/live --config vitest.all.config.ts",
     "test:all": "vitest run --config vitest.all.config.ts",
     "clean": "rm -rf dist node_modules .vite",
     "lint": "eslint src --ext .ts,.tsx",
