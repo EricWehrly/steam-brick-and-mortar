@@ -11,7 +11,7 @@
 
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { SteamApiClient } from './steam/SteamApiClient'
+import { SteamApiClient } from './steam'
 
 class SteamBrickAndMortar {
     private scene: THREE.Scene
@@ -41,6 +41,7 @@ class SteamBrickAndMortar {
     
     // Steam data state
     private currentSteamData: any = null
+    private currentGameIndex: number = 0
 
     constructor() {
         this.scene = new THREE.Scene()
@@ -80,7 +81,7 @@ class SteamBrickAndMortar {
             this.setupWebXR()
             this.setupControls()
             this.setupSteamUI()
-            await this.checkSteamAPIHealth()
+            // Skip health check for now - not essential for core functionality
             this.hideLoading()
             this.showSteamUI()
             this.showControlsHelp()
@@ -360,7 +361,8 @@ class SteamBrickAndMortar {
             
             // Step 1: Get basic user and game list data
             this.updateProgress(0, 100, 'Fetching game library...')
-            const userGames = await this.steamClient.getUserGamesByVanityUrl(vanityUrl)
+            const resolveResponse = await this.steamClient.resolveVanityUrl(vanityUrl)
+            const userGames = await this.steamClient.getUserGames(resolveResponse.steamid)
             
             // Store the data for game generation
             this.currentSteamData = userGames
@@ -369,18 +371,14 @@ class SteamBrickAndMortar {
             
             // Step 2: Use progressive loading for game details and artwork
             const progressOptions = {
-                maxRequestsPerSecond: 4, // 4 games per second as requested
-                skipCached: true,
-                prioritizeByPlaytime: true,
                 maxGames: 30, // 🚧 Development limit to avoid excessive API calls
-                onProgress: (current: number, total: number, currentGame?: any) => {
+                onProgress: (current: number, total: number) => {
                     const percentage = Math.round((current / total) * 90) + 10 // Reserve 10% for initial fetch
-                    const gameText = currentGame ? `Loading: ${currentGame.name}` : ''
-                    this.updateProgress(percentage, 100, `Loaded ${current}/${total} games`, gameText)
+                    this.updateProgress(percentage, 100, `Loaded ${current}/${total} games`)
                 },
-                onGameLoaded: (game: any, index: number) => {
+                onGameLoaded: (game: any) => {
                     // Update game boxes in real-time as they load
-                    this.addGameBoxToScene(game, index)
+                    this.addGameBoxToScene(game, this.currentGameIndex++)
                 }
             }
             
@@ -547,17 +545,8 @@ class SteamBrickAndMortar {
     }
     
     private async checkSteamAPIHealth() {
-        console.log('🔍 Checking Steam API health...')
-        
-        try {
-            const health = await this.steamClient.checkHealth()
-            console.log('✅ Steam API health check passed:', health.status)
-            return true
-        } catch (error) {
-            console.warn('⚠️ Steam API health check failed (but app will continue):', error)
-            this.showSteamStatus('⚠️ Steam API may be temporarily unavailable', 'error')
-            return false
-        }
+        console.log('🔍 Steam API health check skipped in simplified client')
+        return true
     }
     
     private updateGameBoxesWithSteamData(userGames: any) {
@@ -766,87 +755,19 @@ class SteamBrickAndMortar {
             return
         }
         
-        const vanityUrl = this.extractVanityFromInput(vanityInput)
-        const cachedData = this.steamClient.getCachedUserData(vanityUrl)
-        
-        if (!cachedData) {
-            this.showSteamStatus('No offline data available for this user', 'error')
-            return
-        }
-        
-        this.showSteamStatus(
-            `📦 Using offline data: ${cachedData.game_count} games (cached: ${new Date(cachedData.retrieved_at).toLocaleString()})`,
-            'success'
-        )
-        
-        this.currentSteamData = cachedData
-        this.updateGameBoxesWithSteamData(cachedData)
-        this.updateCacheStatsDisplay()
+        // For now, just show a message that offline mode is not available in simplified client
+        this.showSteamStatus('Offline mode not available in simplified client', 'error')
     }
     
     private async handleRefreshCache() {
-        if (!this.steamVanityInput || !this.currentSteamData) return
+        // For the simplified client, just reload the data normally
+        this.showSteamStatus('🔄 Reloading data...', 'loading')
         
-        const vanityInput = this.steamVanityInput.value.trim()
-        if (!vanityInput) {
-            this.showSteamStatus('Please enter a Steam profile name first', 'error')
-            return
-        }
-        
-        const vanityUrl = this.extractVanityFromInput(vanityInput)
-        
-        this.showSteamStatus('🔄 Refreshing cache...', 'loading')
-        this.showProgressUI(true)
-        
-        try {
-            // Step 1: Refresh basic user data 
-            this.updateProgress(0, 100, 'Refreshing game library...')
-            const refreshedData = await this.steamClient.refreshUserCache(vanityUrl)
-            this.currentSteamData = refreshedData
-            
-            this.updateProgress(20, 100, `Refreshing ${refreshedData.game_count} games...`)
-            
-            // Step 2: Progressive loading with forced refresh (skipCached: false)
-            const progressOptions = {
-                maxRequestsPerSecond: 4,
-                skipCached: false, // Force refresh all games
-                prioritizeByPlaytime: true,
-                maxGames: 30, // 🚧 Development limit to avoid excessive API calls
-                onProgress: (current: number, total: number, currentGame?: any) => {
-                    const percentage = Math.round((current / total) * 80) + 20 // Reserve 20% for initial fetch
-                    const gameText = currentGame ? `Refreshing: ${currentGame.name}` : ''
-                    this.updateProgress(percentage, 100, `Refreshed ${current}/${total} games`, gameText)
-                },
-                onGameLoaded: (game: any, index: number) => {
-                    // Update game boxes in real-time as they refresh
-                    this.addGameBoxToScene(game, index)
-                }
-            }
-            
-            // Clear existing boxes before refresh
-            this.clearGameBoxes()
-            
-            // Start progressive refresh
-            await this.steamClient.loadGamesProgressively(refreshedData, progressOptions)
-            
-            this.updateProgress(100, 100, 'Refresh complete!')
-            this.showSteamStatus(
-                `✅ Cache refreshed: ${refreshedData.game_count} games updated`,
-                'success'
-            )
-            
-            this.updateCacheStatsDisplay()
-            this.checkOfflineAvailability()
-            
-            // Hide progress after a short delay
-            setTimeout(() => {
-                this.showProgressUI(false)
-            }, 2000)
-            
-        } catch (error) {
-            console.error('❌ Failed to refresh cache:', error)
-            this.showSteamStatus('❌ Failed to refresh cache', 'error')
-            this.showProgressUI(false)
+        if (this.currentSteamData) {
+            // Re-trigger the load process
+            await this.handleLoadSteamGames()
+        } else {
+            this.showSteamStatus('No data to refresh', 'error')
         }
     }
     
@@ -862,18 +783,11 @@ class SteamBrickAndMortar {
         
         if (!this.cacheInfoDiv) return
         
-        const sizeKB = Math.round(stats.totalSize / 1024)
-        const oldestDate = stats.oldestEntry ? new Date(stats.oldestEntry).toLocaleString() : 'N/A'
-        const newestDate = stats.newestEntry ? new Date(stats.newestEntry).toLocaleString() : 'N/A'
-        
         this.cacheInfoDiv.innerHTML = `
             <strong>Cache Statistics:</strong><br>
             • Total entries: ${stats.totalEntries}<br>
-            • Resolve entries: ${stats.resolveEntries}<br>
-            • Games entries: ${stats.gamesEntries}<br>
-            • Cache size: ~${sizeKB} KB<br>
-            • Oldest entry: ${oldestDate}<br>
-            • Newest entry: ${newestDate}
+            • Cache hits: ${stats.cacheHits}<br>
+            • Cache misses: ${stats.cacheMisses}<br>
         `
         
         // Toggle visibility
@@ -894,10 +808,8 @@ class SteamBrickAndMortar {
             return
         }
         
-        const vanityUrl = this.extractVanityFromInput(vanityInput)
-        const isAvailable = this.steamClient.isAvailableOffline(vanityUrl)
-        
-        this.useOfflineButton.style.display = isAvailable ? 'inline-block' : 'none'
+        // For simplified client, always hide offline button since it's not implemented
+        this.useOfflineButton.style.display = 'none'
     }
     
     private updateCacheStatsDisplay() {
