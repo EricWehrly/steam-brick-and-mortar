@@ -316,3 +316,11 @@
 - Better separation of concerns for future development
 
 **Acceptance**: Can fetch user's Steam library via proxy with rate limiting and no duplicate calls
+
+#### Future Roadmap: Test Suite Optimization (Post-MVP)
+- **Task**: More aggressive test suite reorganization and deduplication
+  - Further thin out live tests to single tests per major feature
+  - Maximize use of mocks in integration tests  
+  - Evaluate test redundancy and consolidate similar test patterns
+  - Performance optimization of test suite runtime
+  - **Priority**: Low (after main features are complete)
