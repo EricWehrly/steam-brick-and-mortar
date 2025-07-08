@@ -12,6 +12,7 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { SteamApiClient } from './steam'
+import { ValidationUtils } from './utils'
 
 class SteamBrickAndMortar {
     private scene: THREE.Scene
@@ -350,7 +351,7 @@ class SteamBrickAndMortar {
         }
         
         // Extract vanity name from various URL formats
-        const vanityUrl = this.extractVanityFromInput(vanityInput)
+        const vanityUrl = ValidationUtils.extractVanityFromInput(vanityInput)
         
         this.showSteamStatus('Loading Steam games...', 'loading')
         this.loadGamesButton.disabled = true
@@ -418,17 +419,6 @@ class SteamBrickAndMortar {
         }
     }
     
-    private extractVanityFromInput(input: string): string {
-        // Handle various Steam URL formats:
-        // - Direct vanity: "SpiteMonger"
-        // - Full URL: "https://steamcommunity.com/id/SpiteMonger"
-        // - Partial URL: "steamcommunity.com/id/SpiteMonger"
-        // - Profile URL: "/id/SpiteMonger"
-        
-        const vanityMatch = input.match(/(?:steamcommunity\.com\/id\/|\/id\/)?([^/\s]+)\/?$/i)
-        return vanityMatch ? vanityMatch[1] : input
-    }
-    
     private showProgressUI(show: boolean) {
         if (!this.loadingProgress) return
         
@@ -483,7 +473,7 @@ class SteamBrickAndMortar {
         }
         
         // Create a material with color based on game name
-        const colorHue = this.stringToHue(game.name)
+        const colorHue = ValidationUtils.stringToHue(game.name)
         const material = new THREE.MeshPhongMaterial({ 
             color: new THREE.Color().setHSL(colorHue, 0.7, 0.5)
         })
@@ -699,7 +689,7 @@ class SteamBrickAndMortar {
         // Create game boxes
         sortedGames.forEach((game, index) => {
             // Create a material with a color based on game name (for now)
-            const colorHue = this.stringToHue(game.name)
+            const colorHue = ValidationUtils.stringToHue(game.name)
             const material = new THREE.MeshPhongMaterial({ 
                 color: new THREE.Color().setHSL(colorHue, 0.7, 0.5)
             })
@@ -733,15 +723,6 @@ class SteamBrickAndMortar {
         })
         
         console.log(`✅ Created ${sortedGames.length} game boxes from Steam library`)
-    }
-    
-    private stringToHue(str: string): number {
-        // Generate a consistent hue value (0-1) from a string
-        let hash = 0
-        for (let i = 0; i < str.length; i++) {
-            hash = str.charCodeAt(i) + ((hash << 5) - hash)
-        }
-        return Math.abs(hash % 360) / 360
     }
     
     // Cache Management Methods
