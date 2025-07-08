@@ -317,6 +317,28 @@
 
 **Acceptance**: Can fetch user's Steam library via proxy with rate limiting and no duplicate calls
 
+#### Story 4.3.4: Restore Offline Steam Data Support 🔄 **FLAGGED FOR RESTORATION**
+- **Task 4.3.4.1**: Implement offline mode for cached Steam data
+  - Add `hasOfflineData()` method to check for cached user data
+  - Implement `loadFromCache()` to start with cached Steam games without network calls
+  - Update UI to show "Use Offline Data" button when cached data is available
+  - Add offline indicators in the UI when running in offline mode
+- **Task 4.3.4.2**: Enhanced cache management features
+  - Restore cache statistics tracking (hits/misses counters)
+  - Add cache aging/expiration indicators in UI
+  - Implement selective cache invalidation by user
+
+**Context**: During the modular refactor, offline mode functionality was simplified and removed from main.ts
+**Current State**: 
+- Basic caching works for API calls and persists to localStorage
+- UI buttons exist but show "not available in simplified client" messages
+- Cache stats show only total entries (hits/misses tracking removed)
+
+**Expected Outcome**:
+- Users can work entirely offline if they've previously loaded Steam data
+- Clear indicators when offline vs online modes are active
+- Advanced cache management for power users
+
 #### Future Roadmap: Test Suite Optimization (Post-MVP)
 - **Task**: More aggressive test suite reorganization and deduplication
   - Further thin out live tests to single tests per major feature
