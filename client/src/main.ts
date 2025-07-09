@@ -10,26 +10,31 @@
  */
 
 import * as THREE from 'three'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { SteamApiClient } from './steam'
+import { SteamApiClient, type SteamGame } from './steam'
 import { ValidationUtils } from './utils'
-import { UIManager, type UIManagerEvents } from './ui'
+import { UIManager } from './ui'
+import { SceneManager, AssetLoader, GameBoxRenderer, type SteamGameData } from './scene'
 
 class SteamBrickAndMortar {
-    private scene: THREE.Scene
-    private camera: THREE.PerspectiveCamera
-    private renderer: THREE.WebGLRenderer
+    private sceneManager: SceneManager
+    private assetLoader: AssetLoader
+    private gameBoxRenderer: GameBoxRenderer
     private steamClient: SteamApiClient
     private uiManager: UIManager
     
     // Steam data state
-    private currentSteamData: any = null
+    private currentSteamData: unknown = null
     private currentGameIndex: number = 0
 
     constructor() {
-        this.scene = new THREE.Scene()
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
-        this.renderer = new THREE.WebGLRenderer({ antialias: true })
+        this.sceneManager = new SceneManager({
+            antialias: true,
+            enableShadows: true,
+            shadowMapType: THREE.PCFSoftShadowMap,
+            outputColorSpace: THREE.SRGBColorSpace
+        })
+        this.assetLoader = new AssetLoader()
+        this.gameBoxRenderer = new GameBoxRenderer()
         this.steamClient = new SteamApiClient('https://steam-api-dev.wehrly.com')
         
         // Initialize UI Manager with event handlers
@@ -49,7 +54,6 @@ class SteamBrickAndMortar {
         console.log('🎮 Initializing Steam Brick and Mortar WebXR...')
         
         try {
-            this.setupRenderer()
             this.setupScene()
             this.setupWebXR()
             this.setupControls()
@@ -64,60 +68,44 @@ class SteamBrickAndMortar {
         }
     }
 
-    private setupRenderer() {
-        this.renderer.setSize(window.innerWidth, window.innerHeight)
-        this.renderer.setPixelRatio(window.devicePixelRatio)
-        this.renderer.outputColorSpace = THREE.SRGBColorSpace
-        this.renderer.shadowMap.enabled = true
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    private async setupScene() {
+        // Create floor
+        this.sceneManager.createFloor()
         
-        // Enable WebXR
-        this.renderer.xr.enabled = true
+        // Load shelf model
+        await this.loadShelfModel()
         
-        document.body.appendChild(this.renderer.domElement)
+        // Add test cube for reference
+        this.addTestCube()
         
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            this.camera.aspect = window.innerWidth / window.innerHeight
-            this.camera.updateProjectionMatrix()
-            this.renderer.setSize(window.innerWidth, window.innerHeight)
-        })
+        console.log('✅ Scene setup complete')
     }
 
-    private setupScene() {
-        // Basic lighting
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.6)
-        this.scene.add(ambientLight)
-        
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-        directionalLight.position.set(5, 10, 5)
-        directionalLight.castShadow = true
-        directionalLight.shadow.mapSize.width = 1024
-        directionalLight.shadow.mapSize.height = 1024
-        this.scene.add(directionalLight)
+    private async loadShelfModel() {
+        try {
+            console.log('📦 Loading shelf model...')
+            const shelfModel = await this.assetLoader.loadShelfModel()
+            this.sceneManager.addToScene(shelfModel)
+            
+            // Add placeholder game boxes
+            this.gameBoxRenderer.createPlaceholderBoxes(this.sceneManager.getScene())
+            
+            console.log('✅ Shelf model loaded successfully!')
+        } catch (error) {
+            console.error('❌ Failed to load shelf model:', error)
+            console.warn('⚠️ Continuing without shelf model - check file path and format')
+        }
+    }
 
-        // Load shelf model
-        this.loadShelfModel()
-
+    private addTestCube() {
         // Small test cube for reference (can be removed later)
         const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
         const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 })
         const cube = new THREE.Mesh(geometry, material)
         cube.position.set(2, 0, -1) // Move to side so it doesn't interfere with shelf
         cube.castShadow = true
-        this.scene.add(cube)
-
-        // Floor plane
-        const floorGeometry = new THREE.PlaneGeometry(20, 20)
-        const floorMaterial = new THREE.MeshPhongMaterial({ color: 0x808080 })
-        const floor = new THREE.Mesh(floorGeometry, floorMaterial)
-        floor.rotation.x = -Math.PI / 2
-        floor.position.y = -2
-        floor.receiveShadow = true
-        this.scene.add(floor)
-
-        // Position camera
-        this.camera.position.set(0, 1.6, 0) // Average human eye height
+        cube.name = 'cube' // For animation reference
+        this.sceneManager.addToScene(cube)
     }
 
     private async setupWebXR() {
@@ -164,9 +152,10 @@ class SteamBrickAndMortar {
 
             const deltaX = event.clientX - mouseX
             const deltaY = event.clientY - mouseY
+            const camera = this.sceneManager.getCamera()
 
-            this.camera.rotation.y -= deltaX * 0.005
-            this.camera.rotation.x -= deltaY * 0.005
+            camera.rotation.y -= deltaX * 0.005
+            camera.rotation.x -= deltaY * 0.005
 
             mouseX = event.clientX
             mouseY = event.clientY
@@ -196,10 +185,11 @@ class SteamBrickAndMortar {
         // Movement update in render loop
         this.updateMovement = () => {
             const speed = 0.1
-            if (keys.w) this.camera.translateZ(-speed)
-            if (keys.s) this.camera.translateZ(speed)
-            if (keys.a) this.camera.translateX(-speed)
-            if (keys.d) this.camera.translateX(speed)
+            const camera = this.sceneManager.getCamera()
+            if (keys.w) camera.translateZ(-speed)
+            if (keys.s) camera.translateZ(speed)
+            if (keys.a) camera.translateX(-speed)
+            if (keys.d) camera.translateX(speed)
         }
     }
 
@@ -209,8 +199,12 @@ class SteamBrickAndMortar {
         try {
             console.log('🥽 Attempting to start WebXR session...')
             
-            const session = await navigator.xr!.requestSession('immersive-vr')
-            await this.renderer.xr.setSession(session)
+            if (!navigator.xr) {
+                throw new Error('WebXR not available')
+            }
+            
+            const session = await navigator.xr.requestSession('immersive-vr')
+            await this.sceneManager.getRenderer().xr.setSession(session)
             
             console.log('✅ WebXR session started!')
             this.uiManager.setWebXRSessionActive(true)
@@ -252,7 +246,7 @@ class SteamBrickAndMortar {
                     const percentage = Math.round((current / total) * 90) + 10 // Reserve 10% for initial fetch
                     this.uiManager.updateProgress(percentage, 100, `Loaded ${current}/${total} games`)
                 },
-                onGameLoaded: (game: any) => {
+                onGameLoaded: (game: SteamGame) => {
                     // Update game boxes in real-time as they load
                     this.addGameBoxToScene(game, this.currentGameIndex++)
                 }
@@ -293,69 +287,17 @@ class SteamBrickAndMortar {
     }
     
     private clearGameBoxes() {
-        // Remove existing game boxes
-        const existingBoxes = this.scene.children.filter(child => 
-            child.userData?.isGameBox
-        )
-        existingBoxes.forEach(box => this.scene.remove(box))
-        console.log(`🗑️ Cleared ${existingBoxes.length} existing game boxes`)
+        // Remove existing game boxes using scene manager
+        const clearedCount = this.sceneManager.clearObjectsByUserData('isGameBox')
+        console.log(`🗑️ Cleared ${clearedCount} existing game boxes`)
     }
     
-    private addGameBoxToScene(game: any, index: number) {
-        // Game case dimensions
-        const boxWidth = 0.15
-        const boxHeight = 0.2
-        const boxDepth = 0.02
-        
-        const boxGeometry = new THREE.BoxGeometry(boxWidth, boxHeight, boxDepth)
-        
-        // Position configuration  
-        const shelfSurfaceY = -0.8
-        const shelfCenterZ = -3
-        const shelfCenterX = 0
-        
-        // Calculate position for this game box
-        const maxGamesToShow = 12 // Limit for visual clarity
-        const spacingX = 0.16
-        const startX = -(Math.min(maxGamesToShow, 12) - 1) * spacingX / 2
-        
-        // Only show if within our display limit
-        if (index >= maxGamesToShow) {
-            return
+    private addGameBoxToScene(game: SteamGameData, index: number) {
+        // Create game box using the game box renderer
+        const gameBox = this.gameBoxRenderer.createGameBox(this.sceneManager.getScene(), game, index)
+        if (gameBox) {
+            this.currentGameIndex = index + 1
         }
-        
-        // Create a material with color based on game name
-        const colorHue = ValidationUtils.stringToHue(game.name)
-        const material = new THREE.MeshPhongMaterial({ 
-            color: new THREE.Color().setHSL(colorHue, 0.7, 0.5)
-        })
-        
-        const gameBox = new THREE.Mesh(boxGeometry, material)
-        
-        // Mark as game box with Steam data
-        gameBox.userData = { 
-            isGameBox: true, 
-            steamGame: game,
-            appId: game.appid,
-            name: game.name,
-            playtime: game.playtime_forever
-        }
-        
-        // Position the box
-        gameBox.position.set(
-            shelfCenterX + startX + (index * spacingX),
-            shelfSurfaceY + boxHeight / 2,
-            shelfCenterZ + 0.08
-        )
-        
-        // Enable shadows
-        gameBox.castShadow = true
-        gameBox.receiveShadow = true
-        
-        // Add to scene
-        this.scene.add(gameBox)
-        
-        console.log(`📦 Added game box ${index}: ${game.name}`)
     }
     
     private async checkSteamAPIHealth() {
@@ -363,195 +305,24 @@ class SteamBrickAndMortar {
         return true
     }
     
-    private updateGameBoxesWithSteamData(userGames: any) {
+    private updateGameBoxesWithSteamData(userGames: { games?: SteamGameData[] }) {
         console.log('🎮 Updating game boxes with real Steam data...')
         
         // Remove existing placeholder boxes
-        const existingBoxes = this.scene.children.filter(child => 
-            child.userData?.isGameBox
-        )
-        existingBoxes.forEach(box => this.scene.remove(box))
+        this.gameBoxRenderer.clearGameBoxes(this.sceneManager.getScene())
         
         // Create new game boxes from Steam data
-        this.createGameBoxesFromSteamData(userGames.games || [])
+        this.createGameBoxesFromSteamData(userGames.games ?? [])
     }
 
-    private async loadShelfModel() {
-        const loader = new GLTFLoader()
-        
-        try {
-            console.log('📦 Loading shelf model...')
-            
-            // Load the shelf model from our public assets
-            const gltf = await loader.loadAsync('/models/blockbuster_shelf.glb')
-            
-            const shelfModel = gltf.scene
-            
-            // Position the shelf in the scene
-            shelfModel.position.set(0, -1, -3) // Center it and place it in front of camera
-            shelfModel.scale.setScalar(1) // Adjust scale if needed
-            
-            // Enable shadows for all meshes in the shelf model
-            shelfModel.traverse((child) => {
-                if (child instanceof THREE.Mesh) {
-                    child.castShadow = true
-                    child.receiveShadow = true
-                }
-            })
-            
-            this.scene.add(shelfModel)
-            console.log('✅ Shelf model loaded successfully!')
-            
-            // Add placeholder game boxes on the shelf
-            this.createPlaceholderGameBoxes()
-            
-        } catch (error) {
-            console.error('❌ Failed to load shelf model:', error)
-            console.warn('⚠️ Continuing without shelf model - check file path and format')
-        }
+    private createGameBoxesFromSteamData(games: SteamGameData[]) {
+        // Use the game box renderer to create boxes from Steam data
+        this.gameBoxRenderer.createGameBoxesFromSteamData(this.sceneManager.getScene(), games)
     }
 
-    private createPlaceholderGameBoxes() {
-        console.log('📦 Creating placeholder game boxes...')
-        
-        // Game case dimensions (roughly based on standard game box sizes)
-        const boxWidth = 0.15    // Width of game case
-        const boxHeight = 0.2    // Height of game case  
-        const boxDepth = 0.02    // Depth/thickness of game case
-        
-        // Create geometry and materials for game boxes
-        const boxGeometry = new THREE.BoxGeometry(boxWidth, boxHeight, boxDepth)
-        
-        // Create different colored materials for visual variety
-        const materials = [
-            new THREE.MeshPhongMaterial({ color: 0x4a90e2 }), // Blue
-            new THREE.MeshPhongMaterial({ color: 0xe74c3c }), // Red  
-            new THREE.MeshPhongMaterial({ color: 0x2ecc71 }), // Green
-            new THREE.MeshPhongMaterial({ color: 0xf39c12 }), // Orange
-            new THREE.MeshPhongMaterial({ color: 0x9b59b6 }), // Purple
-            new THREE.MeshPhongMaterial({ color: 0x1abc9c }), // Teal
-        ]
-        
-        // Position boxes on the shelf
-        // Assuming shelf surface is roughly at y = -0.8 (shelf at -1, plus some height)
-        const shelfSurfaceY = -0.8
-        const shelfCenterZ = -3
-        const shelfCenterX = 0
-        
-        // Create a row of game boxes
-        const numBoxes = 6
-        const spacingX = 0.18 // Space between boxes
-        const startX = -(numBoxes - 1) * spacingX / 2 // Center the row
-        
-        for (let i = 0; i < numBoxes; i++) {
-            const gameBox = new THREE.Mesh(boxGeometry, materials[i % materials.length])
-            
-            // Mark as game box for identification
-            gameBox.userData = { isGameBox: true, isPlaceholder: true }
-            
-            // Position each box
-            gameBox.position.set(
-                shelfCenterX + startX + (i * spacingX),  // X: spread across shelf
-                shelfSurfaceY + boxHeight / 2,           // Y: rest on shelf surface
-                shelfCenterZ + 0.1                       // Z: slightly forward from shelf back
-            )
-            
-            // Enable shadows
-            gameBox.castShadow = true
-            gameBox.receiveShadow = true
-            
-            // Add some subtle random rotation for natural look
-            gameBox.rotation.y = (Math.random() - 0.5) * 0.1 // Small random Y rotation
-            
-            this.scene.add(gameBox)
-        }
-        
-        console.log(`✅ Created ${numBoxes} placeholder game boxes on shelf`)
-    }
-    
-    private createGameBoxesFromSteamData(games: any[]) {
-        console.log(`🎮 Creating game boxes from ${games.length} Steam games...`)
-        
-        if (!games || games.length === 0) {
-            console.warn('⚠️ No games provided, keeping placeholder boxes')
-            return
-        }
-        
-        // Game case dimensions (same as placeholder)
-        const boxWidth = 0.15
-        const boxHeight = 0.2
-        const boxDepth = 0.02
-        
-        const boxGeometry = new THREE.BoxGeometry(boxWidth, boxHeight, boxDepth)
-        
-        // Position configuration
-        const shelfSurfaceY = -0.8
-        const shelfCenterZ = -3
-        const shelfCenterX = 0
-        
-        // Determine how many games to show (limit for performance and visual clarity)
-        const maxGamesToShow = Math.min(games.length, 12) // Show up to 12 games
-        const spacingX = 0.16 // Slightly tighter spacing for more games
-        const startX = -(maxGamesToShow - 1) * spacingX / 2
-        
-        // Get games with recent playtime first, then alphabetical
-        const sortedGames = [...games]
-            .filter(game => game.playtime_forever > 0) // Prioritize played games
-            .sort((a, b) => b.playtime_forever - a.playtime_forever) // Most played first
-            .slice(0, maxGamesToShow)
-        
-        // If we don't have enough played games, fill with unplayed games
-        if (sortedGames.length < maxGamesToShow) {
-            const unplayedGames = games
-                .filter(game => game.playtime_forever === 0)
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .slice(0, maxGamesToShow - sortedGames.length)
-            
-            sortedGames.push(...unplayedGames)
-        }
-        
-        // Create game boxes
-        sortedGames.forEach((game, index) => {
-            // Create a material with a color based on game name (for now)
-            const colorHue = ValidationUtils.stringToHue(game.name)
-            const material = new THREE.MeshPhongMaterial({ 
-                color: new THREE.Color().setHSL(colorHue, 0.7, 0.5)
-            })
-            
-            const gameBox = new THREE.Mesh(boxGeometry, material)
-            
-            // Mark as game box with Steam data
-            gameBox.userData = { 
-                isGameBox: true, 
-                steamGame: game,
-                appId: game.appid,
-                name: game.name,
-                playtime: game.playtime_forever
-            }
-            
-            // Position the box
-            gameBox.position.set(
-                shelfCenterX + startX + (index * spacingX),
-                shelfSurfaceY + boxHeight / 2,
-                shelfCenterZ + 0.1
-            )
-            
-            // Enable shadows
-            gameBox.castShadow = true
-            gameBox.receiveShadow = true
-            
-            // Add slight random rotation
-            gameBox.rotation.y = (Math.random() - 0.5) * 0.05
-            
-            this.scene.add(gameBox)
-        })
-        
-        console.log(`✅ Created ${sortedGames.length} game boxes from Steam library`)
-    }
-    
     // Cache Management Methods
     
-    private async handleUseOfflineData(vanityUrl: string) {
+    private async handleUseOfflineData(_vanityUrl: string) {
         // For now, just show a message that offline mode is not available in simplified client
         this.uiManager.showSteamStatus('Offline mode not available in simplified client', 'error')
     }
@@ -560,9 +331,9 @@ class SteamBrickAndMortar {
         // For the simplified client, just reload the data normally
         this.uiManager.showSteamStatus('🔄 Reloading data...', 'loading')
         
-        if (this.currentSteamData && this.currentSteamData.vanity_url) {
+        if (this.currentSteamData && (this.currentSteamData as { vanity_url?: string }).vanity_url) {
             // Re-trigger the load process
-            await this.handleLoadSteamGames(this.currentSteamData.vanity_url)
+            await this.handleLoadSteamGames((this.currentSteamData as { vanity_url: string }).vanity_url)
         } else {
             this.uiManager.showSteamStatus('No data to refresh', 'error')
         }
@@ -585,17 +356,16 @@ class SteamBrickAndMortar {
     }
 
     private startRenderLoop() {
-        this.renderer.setAnimationLoop(() => {
+        this.sceneManager.startRenderLoop(() => {
             this.updateMovement()
             
             // Rotate the test cube
-            const cube = this.scene.getObjectByName('cube') || this.scene.children.find(obj => obj instanceof THREE.Mesh)
+            const scene = this.sceneManager.getScene()
+            const cube = scene.getObjectByName('cube') || scene.children.find(obj => obj instanceof THREE.Mesh)
             if (cube) {
                 cube.rotation.x += 0.01
                 cube.rotation.y += 0.01
             }
-            
-            this.renderer.render(this.scene, this.camera)
         })
     }
 }
