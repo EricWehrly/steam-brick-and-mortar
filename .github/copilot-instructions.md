@@ -9,6 +9,7 @@ You are working on a **WebXR-first** "Steam Brick and Mortar" environment that d
 - **Steam Web API**: Game library integration via serverless proxy
 - **AWS Lambda**: Serverless Steam API proxy with Terraform infrastructure
 - **Docker**: Containerized development environment
+- **Yarn PnP**: ALWAYS use `yarn` commands - never use `npm` (see `.github/javascript-guidelines.md`)
 
 ## Project Structure
 ```
@@ -30,6 +31,7 @@ steam-brick-and-mortar/
 
 ### 🔧 **Tool Usage**
 - **Use `scripts/scratch.sh`** for complex multi-command operations
+- **ALWAYS use `yarn` not `npm`**: This project uses Yarn PnP exclusively
 - **Follow technology-specific guidelines** (see `.github/javascript-guidelines.md`, etc.)
 - **Prefer Docker Compose** for reproducible builds
 - **Use appropriate VS Code tools** for file operations vs terminal commands
