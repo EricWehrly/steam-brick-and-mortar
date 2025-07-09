@@ -299,25 +299,278 @@
 
 **Acceptance**: Progressive game loading with rate limiting and smart caching ✅ **ACHIEVED**
 
-#### Story 4.3.3: Code Quality & File Size Management 🚧 **NEW PRIORITY**
-- **Task 4.3.3.1**: ⭐ **IMMEDIATE**: Refactor large files (>500 lines) into focused modules
-- **Task 4.3.3.2**: Clean up lint errors and improve code organization
-- **Task 4.3.3.3**: Extract main.ts into smaller, focused components
+#### Story 4.3.3: Code Quality & File Size Management ✅ **COMPLETED**
+- **Task 4.3.3.1**: ⭐ **COMPLETED**: Refactor large files (>500 lines) into focused modules ✅
+- **Task 4.3.3.2**: Clean up lint errors and improve code organization ✅
+- **Task 4.3.3.3**: Extract main.ts into smaller, focused components ✅
 
-**Context**: After implementing major features, improve code maintainability and organization
-**Current Issues**: 
-- main.ts is ~900 lines (should be <300)
-- Several files exceed 500-line threshold for maintainability
-- Lint errors from rapid feature development need cleanup
+**Status**: ✅ **COMPLETED** - main.ts refactored from ~900 lines to modular architecture with focused components
 
-**Expected Outcome**:
-- All files under 500 lines with clear single responsibilities
-- Clean lint results with zero errors
-- Better separation of concerns for future development
+**Acceptance**: All files under 500 lines with clear single responsibilities ✅ **ACHIEVED**
 
-**Acceptance**: Can fetch user's Steam library via proxy with rate limiting and no duplicate calls
+---
 
-#### Story 4.3.4: Restore Offline Steam Data Support 🔄 **FLAGGED FOR RESTORATION**
+## Milestone 5: Game Art & Visual Integration 🚧 **CURRENT PRIORITY**
+*Goal: Research Steam metadata, demonstrate game artwork rendering, and establish comprehensive caching strategy*
+
+### Feature 5.1: Steam Game Metadata Research 🚧 **IMMEDIATE FOCUS**
+**Context**: Deep dive into Steam API responses to understand art assets and display opportunities
+
+#### Story 5.1.1: CDN Access Strategy Research ⭐ **NEXT TASK**
+- **Task 5.1.1.1**: Research Steam CDN and alternative artwork sources
+  - Web search Steam CDN rate limiting policies and access patterns
+  - Research alternative sources like steamdb.info, steamspy.com for artwork hosting
+  - Document rate limits, performance, and availability of different CDN sources
+  - Identify which sources provide the best resilience for high-traffic scenarios
+- **Task 5.1.1.2**: Test direct CDN access patterns and rate limits
+  - Validate that artwork URLs work without Steam API authentication
+  - Test CORS headers and browser access to Steam CDN endpoints
+  - Measure CDN response times, reliability, and rate limiting behavior
+  - Test alternative sources for performance and availability comparison
+
+**Expected Deliverable**: `docs/cdn-access-strategy.md` with rate limit analysis and source recommendations
+
+**Acceptance**: Validated CDN strategy optimized for handling traffic waves with multiple fallback sources
+
+#### Story 5.1.2: Steam Metadata Structure Analysis
+- **Task 5.1.2.1**: Research Steam game metadata structure from API responses
+  - Document complete game object structure from Steam API
+  - Identify all available image/artwork fields (icon, header, capsule, etc.)
+  - Research image URLs, formats, sizes, and CDN patterns
+  - Create sample metadata document with real game examples
+- **Task 5.1.2.2**: Analyze artwork URL patterns and CDN infrastructure
+  - Identify Steam CDN endpoints and URL construction patterns
+  - Research image size variants available (small, medium, large, original)
+  - Document artwork types: game icons, header images, capsule art, screenshots
+  - Map artwork URLs to CDN sources identified in previous research
+
+**Expected Deliverable**: `docs/steam-metadata-research.md` with complete game data structure
+
+**Acceptance**: Complete understanding of Steam game metadata and available artwork assets
+
+### Feature 5.2: Game Art Rendering Demonstration 🚧 **IMPLEMENTATION PHASE**
+**Context**: Prove concept by rendering real Steam game artwork on 3D boxes
+
+#### Story 5.2.1: Basic Texture Loading and Application
+- **Task 5.2.1.1**: Implement texture loading system for Three.js
+  - Create texture loader with error handling and fallbacks
+  - Add loading indicators for texture fetch operations
+  - Implement texture caching to avoid repeated downloads
+  - Handle different image formats and sizes gracefully
+- **Task 5.2.1.2**: Apply textures to game box geometry
+  - Modify game box creation to accept texture parameters
+  - Implement UV mapping for proper artwork display on box faces
+  - Add fallback textures for games without artwork
+  - Test with variety of image aspect ratios and resolutions
+
+**Expected Deliverable**: Game boxes displaying real Steam artwork
+
+**Acceptance**: Can visually see Steam game artwork applied to 3D boxes in the scene
+
+#### Story 5.2.2: Dynamic Art Integration with Steam Data
+- **Task 5.2.2.1**: Connect Steam game data to texture rendering
+  - Integrate artwork URLs from Steam API responses with texture system
+  - Implement progressive artwork loading as games are processed
+  - Add visual feedback for artwork loading vs. placeholder states
+  - Handle missing or broken artwork URLs gracefully
+- **Task 5.2.2.2**: Optimize texture performance for large libraries
+  - Implement texture resolution scaling based on viewing distance
+  - Add texture memory management and cleanup for large game libraries
+  - Implement lazy loading for off-screen game boxes
+  - Test performance with 500+ game libraries
+
+**Expected Deliverable**: Seamless integration of Steam artwork with game library loading
+
+**Acceptance**: Steam game library displays with proper artwork in 3D scene
+
+### Feature 5.3: Comprehensive Caching Strategy Research � **STRATEGIC PLANNING**
+**Context**: Research all caching options to optimize performance and minimize API usage
+
+#### Story 5.3.1: Browser Storage Capabilities Research
+- **Task 5.3.1.1**: Research browser storage limits and expansion options
+  - Research localStorage size limits in Chrome, Firefox, Safari
+  - Investigate IndexedDB capacity limits and quota management
+  - Research Persistent Storage API for requesting increased quotas
+  - Document browser-specific storage behaviors and limitations
+- **Task 5.3.1.2**: Design client-side storage strategy
+  - Calculate storage requirements for different library sizes
+  - Design storage priority system (metadata vs. artwork)
+  - Plan storage eviction strategies for space management
+  - Research compression options for stored data
+
+**Expected Deliverable**: `docs/browser-storage-strategy.md` with capacity planning
+
+**Acceptance**: Clear understanding of browser storage capabilities and limits
+
+#### Story 5.3.2: Infrastructure Caching Options Analysis
+- **Task 5.3.2.1**: Research cloud caching infrastructure options
+  - Document AWS CloudFront CDN integration possibilities
+  - Research Redis/ElastiCache for Lambda function caching
+  - Investigate S3 for artwork asset caching and delivery
+  - Compare costs and performance of different caching layers
+- **Task 5.3.2.2**: Evaluate user-hosted backend caching
+  - Research Docker-based local caching server options
+  - Design file-based caching system for self-hosted deployments
+  - Document trade-offs between cloud vs. local caching
+  - Plan fallback strategies when caching infrastructure unavailable
+
+**Expected Deliverable**: `docs/infrastructure-caching-strategy.md` with implementation recommendations
+
+**Acceptance**: Complete analysis of all caching options with cost/benefit analysis
+
+#### Story 5.3.3: Caching Implementation Planning
+- **Task 5.3.3.1**: Design unified caching architecture
+  - Create caching layer abstraction supporting multiple backends
+  - Plan cache invalidation and refresh strategies
+  - Design offline-first functionality with smart sync
+  - Plan cache warming strategies for new users
+- **Task 5.3.3.2**: Research Steam CDN caching implications
+  - Web search Steam CDN usage policies and rate limiting
+  - Research potential domain restrictions or API key requirements
+  - Document best practices for respectful CDN usage
+  - Plan error handling for CDN unavailability or throttling
+
+**Expected Deliverable**: Complete caching implementation plan
+
+**Acceptance**: Unified caching strategy ready for implementation
+
+---
+
+## Milestone 6: Level Layout and Spatial Design 🚧 **POST-ART INTEGRATION**
+*Goal: Design and implement the 3D environment layout for optimal game browsing*
+
+### Feature 6.1: Environment Layout Research
+**Context**: Design spatial organization for large game libraries
+
+#### Story 6.1.1: Spatial Organization Patterns
+- **Task 6.1.1.1**: Research VR/3D browsing UX patterns
+- **Task 6.1.1.2**: Design shelf arrangement and navigation systems
+- **Task 6.1.1.3**: Plan categorization and filtering spatial layouts
+- **Task 6.1.1.4**: Design user wayfinding and orientation systems
+
+**Expected Deliverable**: Level layout design document
+
+**Acceptance**: Complete spatial design ready for implementation
+
+### Feature 6.2: 3D Environment Implementation
+**Context**: Build the complete browsable environment
+
+#### Story 6.2.1: Multi-Shelf Environment
+- **Task 6.2.1.1**: Generate multiple shelf instances with Blender
+- **Task 6.2.1.2**: Implement shelf positioning and spacing systems
+- **Task 6.2.1.3**: Add environmental lighting and atmosphere
+- **Task 6.2.1.4**: Implement navigation between shelf areas
+
+**Acceptance**: Multi-shelf environment ready for game population
+
+---
+
+## Milestone 7: Input Systems and User Controls 🔮 **POST-LEVEL DESIGN**
+*Goal: Implement comprehensive input support for mouse/keyboard, gamepad, and VR controllers*
+
+### Feature 7.1: Multi-Platform Input and Controls
+**Context**: Support wide range of input methods - mouse/keyboard, gamepad, and VR controllers
+
+#### Story 7.1.1: Universal Input System Design
+- **Task 7.1.1.1**: Research input standards across mouse/keyboard, gamepad, and WebXR
+- **Task 7.1.1.2**: Design interaction patterns that work across all input types
+- **Task 7.1.1.3**: Plan input abstraction layer supporting multiple device types
+- **Task 7.1.1.4**: Create fallback systems for input method switching
+
+**Expected Deliverable**: Universal input system design document
+
+**Acceptance**: Complete input strategy supporting mouse/keyboard, gamepad, and VR
+
+#### Story 7.1.2: Input Implementation and Integration
+- **Task 7.1.2.1**: Enhance existing mouse/keyboard controls for final experience
+- **Task 7.1.2.2**: Add gamepad controller support and navigation
+- **Task 7.1.2.3**: Implement VR controller detection and WebXR integration
+- **Task 7.1.2.4**: Add input method detection and seamless switching
+
+**Expected Deliverable**: Working controls across all supported input types
+
+**Acceptance**: Can navigate and interact using mouse/keyboard, gamepad, or VR controllers
+
+**Note**: VR is an "impressor" feature - not mandatory, but impressive when available
+
+### Feature 7.2: Mappable Input Configuration
+**Context**: Allow users to customize input mappings across all supported input types
+
+#### Story 7.2.1: Universal Input Mapping System
+- **Task 7.2.1.1**: Design configurable input mapping architecture for all input types
+- **Task 7.2.1.2**: Support remapping for mouse/keyboard, gamepad, and VR controllers
+- **Task 7.2.1.3**: Implement input remapping UI that works across all interaction modes
+- **Task 7.2.1.4**: Add input accessibility options and alternative control schemes
+
+**Expected Deliverable**: Comprehensive input customization system
+
+**Acceptance**: Users can remap controls for mouse/keyboard, gamepad, or VR setup
+
+---
+
+## Milestone 8: User Experience Options 🔮 **POST-INPUT SYSTEMS**
+*Goal: Comprehensive graphics, audio, and accessibility options*
+
+### Feature 8.1: Graphics and Performance Options
+**Context**: Configurable graphics settings for different VR hardware capabilities
+
+#### Story 8.1.1: Graphics Configuration System
+- **Task 8.1.1.1**: Implement quality presets (Low/Medium/High/Ultra)
+- **Task 8.1.1.2**: Add texture quality and resolution scaling options
+- **Task 8.1.1.3**: Create lighting and shadow quality controls
+- **Task 8.1.1.4**: Add performance monitoring and auto-adjustment features
+
+**Expected Deliverable**: Comprehensive graphics options menu
+
+**Acceptance**: Users can optimize performance for their VR hardware
+
+### Feature 8.2: Audio and Accessibility Options
+**Context**: Complete audio system with accessibility features
+
+#### Story 8.2.1: Audio Configuration System
+- **Task 8.2.1.1**: Implement spatial audio settings and calibration
+- **Task 8.2.1.2**: Add audio accessibility options (visual indicators, etc.)
+- **Task 8.2.1.3**: Create audio quality and processing options
+- **Task 8.2.1.4**: Add voice control and audio navigation features
+
+**Expected Deliverable**: Complete audio and accessibility options
+
+**Acceptance**: Full audio customization with accessibility support
+
+---
+
+## Milestone 9: Steam API Compliance & Public Release 🔮 **PRE-PUBLIC RELEASE**
+*Goal: Ensure compliance with Steam API policies before public demonstration*
+
+### Feature 9.1: Steam API Compliance Research
+**Context**: Research compliance requirements for Steam API usage before public release
+
+#### Story 9.1.1: Steam API Policy Compliance Analysis
+- **Task 9.1.1.1**: Research Steam API compliance requirements
+  - Web search Steam API terms of service and developer requirements
+  - Document privacy policy requirements for Steam API integration
+  - Identify any attribution, branding, or display requirements
+  - Research user data handling and storage policy requirements
+- **Task 9.1.1.2**: Create compliance checklist and implementation plan
+  - Document all required compliance items for public release
+  - Create privacy policy template with Steam-specific requirements
+  - Plan user consent flows and data handling procedures
+  - Identify any required legal disclaimers or attributions
+
+**Expected Deliverable**: `docs/steam-api-compliance.md` with complete compliance requirements
+
+**Acceptance**: Complete compliance checklist ready for implementation before public release
+
+**Priority**: Required before showing to public - includes privacy policy creation
+
+---
+
+## Deferred Items
+
+## Deferred Items
+
+#### Story 4.3.4: Restore Offline Steam Data Support 🔄 **DEFERRED**
+Note: This may be redundant to 4.3.2.4 and should be re-evaluated when we reach here, it may not be needed.
 - **Task 4.3.4.1**: Implement offline mode for cached Steam data
   - Add `hasOfflineData()` method to check for cached user data
   - Implement `loadFromCache()` to start with cached Steam games without network calls
