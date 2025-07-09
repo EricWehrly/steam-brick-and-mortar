@@ -299,120 +299,50 @@
 
 **Acceptance**: Progressive game loading with rate limiting and smart caching ✅ **ACHIEVED**
 
+#### Story 4.3.3: Code Quality & File Size Management 🚧 **NEW PRIORITY**
+- **Task 4.3.3.1**: ⭐ **IMMEDIATE**: Refactor large files (>500 lines) into focused modules
+- **Task 4.3.3.2**: Clean up lint errors and improve code organization
+- **Task 4.3.3.3**: Extract main.ts into smaller, focused components
+
+**Context**: After implementing major features, improve code maintainability and organization
+**Current Issues**: 
+- main.ts is ~900 lines (should be <300)
+- Several files exceed 500-line threshold for maintainability
+- Lint errors from rapid feature development need cleanup
+
+**Expected Outcome**:
+- All files under 500 lines with clear single responsibilities
+- Clean lint results with zero errors
+- Better separation of concerns for future development
+
 **Acceptance**: Can fetch user's Steam library via proxy with rate limiting and no duplicate calls
 
-### Feature 4.4: Game Display System
-**Context**: Populate 3D scene with user's actual games
+#### Story 4.3.4: Restore Offline Steam Data Support 🔄 **FLAGGED FOR RESTORATION**
+- **Task 4.3.4.1**: Implement offline mode for cached Steam data
+  - Add `hasOfflineData()` method to check for cached user data
+  - Implement `loadFromCache()` to start with cached Steam games without network calls
+  - Update UI to show "Use Offline Data" button when cached data is available
+  - Add offline indicators in the UI when running in offline mode
+- **Task 4.3.4.2**: Enhanced cache management features
+  - Restore cache statistics tracking (hits/misses counters)
+  - Add cache aging/expiration indicators in UI
+  - Implement selective cache invalidation by user
 
-#### Story 4.4.1: Dynamic Game Objects
-- **Task 4.4.1.1**: Generate 3D game box objects from Steam library data
-- **Task 4.4.1.2**: Apply Steam game artwork as WebGL textures
-- **Task 4.4.1.3**: Position games with proper 3D spacing on shelf
-- **Task 4.4.1.4**: Test with libraries of different sizes (10, 50, 100+ games)
+**Context**: During the modular refactor, offline mode functionality was simplified and removed from main.ts
+**Current State**: 
+- Basic caching works for API calls and persists to localStorage
+- UI buttons exist but show "not available in simplified client" messages
+- Cache stats show only total entries (hits/misses tracking removed)
 
-**Acceptance**: User's Steam games appear as interactive 3D objects on the shelf
+**Expected Outcome**:
+- Users can work entirely offline if they've previously loaded Steam data
+- Clear indicators when offline vs online modes are active
+- Advanced cache management for power users
 
----
-
-## Milestone 5: WebXR Integration
-*Goal: Add VR capabilities to the working Steam-integrated 3D scene*
-
-**⚠️ CRITICAL RISK**: Custom WebXR type definitions (`client/src/webxr.d.ts`) require expert review for VR safety
-
-### Feature 5.0: Progressive Web App Setup
-**Context**: Make web app installable and VR-ready before WebXR implementation
-
-#### Story 5.0.1: PWA Foundation
-- **Task 5.0.1.1**: Create PWA manifest with VR app metadata
-- **Task 5.0.1.2**: Implement service worker for offline asset caching
-- **Task 5.0.1.3**: Test PWA installation on desktop browsers
-- **Task 5.0.1.4**: Test PWA installation on Meta Quest Browser
-
-**Acceptance**: App installs as PWA on Windows/Mac/Linux/Quest with app-like experience
-
-### Feature 5.1: WebXR Foundation
-**Context**: Enable VR mode on top of established 3D scene
-
-#### Story 5.1.1: WebXR Session Management
-- **Task 5.1.1.1**: Test WebXR session management (enter/exit VR)
-- **Task 5.1.1.2**: Enable WebXR mode with VR session management
-- **Task 5.1.1.3**: Add VR-specific camera and rendering setup
-- **Task 5.1.1.4**: Test VR mode with shelf and game objects
-
-#### Story 5.1.2: VR Interaction System
-- **Task 5.1.2.1**: Implement VR controller input and hand tracking
-- **Task 5.1.2.2**: Add VR controller raycasting for object selection
-- **Task 5.1.2.3**: Test interaction with game objects in VR
-- **Task 5.1.2.4**: Optimize performance for VR frame rates (90fps)
-
-**Acceptance**: Can view and interact with Steam game library in VR mode
-
-### Feature 5.2: Enhanced VR Experience
-**Context**: Polish VR interactions and user experience
-
-#### Story 5.2.1: VR Game Interaction
-- **Task 5.2.1.1**: Add grab/touch interactions with game objects
-- **Task 5.2.1.2**: Create visual feedback (highlighting, haptics)
-- **Task 5.2.1.3**: Add game information display in VR space
-- **Task 5.2.1.4**: Add haptic feedback for VR interactions
-
-**Acceptance**: Intuitive and comfortable VR game browsing experience
-
----
-
-## Milestone 6: Game Launching & Integration
-*Goal: Users can launch Steam games from the VR/3D interface*
-
-### Feature 6.1: Steam Protocol Integration
-**Context**: Launch Steam games from browser/VR interface
-
-#### Story 6.1.1: Game Launching System
-- **Task 6.1.1.1**: Execute Steam protocol URLs (`steam://run/<appid>`) from browser
-- **Task 6.1.1.2**: Add user education for enabling Steam protocol handlers
-- **Task 6.1.1.3**: Create launch confirmation UI within 3D/VR space
-- **Task 6.1.1.4**: Test cross-platform game launching (Windows/Mac/Linux)
-
-### Feature 6.2: Enhanced Desktop Integration
-**Context**: Electron wrapper for seamless Steam launching
-
-#### Story 6.2.1: Electron Packaging
-- **Task 6.2.1.1**: Create Electron wrapper around web application
-- **Task 6.2.1.2**: Configure Electron Builder for platform packaging
-- **Task 6.2.1.3**: Test desktop VR functionality via Electron
-- **Task 6.2.1.4**: Add auto-update capability for desktop apps
-
-**Acceptance**: Can select and launch Steam games directly from 3D/VR interface
-
----
-
-## Milestone 7: Polish & Performance
-*Goal: Production-ready experience with optimal performance*
-
-### Feature 7.1: Performance Optimization
-- **Task 7.1.1**: Profile and optimize frame rate with large game libraries
-- **Task 7.1.2**: Implement level-of-detail (LOD) system for game objects
-- **Task 7.1.3**: Add culling for off-screen games
-- **Task 7.1.4**: Optimize texture loading and memory usage
-
-### Feature 7.2: Audio & Visual Polish
-- **Task 7.2.1**: Add 3D spatial audio for interactions
-- **Task 7.2.2**: Implement ambient environment sounds
-- **Task 7.2.3**: Enhance lighting and material quality
-- **Task 7.2.4**: Add particle effects for game interactions
-
-### Feature 7.3: Error Handling & Reliability
-- **Task 7.3.1**: Handle Steam API downtime gracefully
-- **Task 7.3.2**: Recover from VR disconnection
-- **Task 7.3.3**: Add comprehensive logging system
-- **Task 7.3.4**: Create diagnostic tools for troubleshooting
-
-**Acceptance**: Maintains 90+ FPS in VR with 100+ games, robust error handling, immersive audio
-
----
-
-## Future Considerations
-- **Multi-user support**: Share shelves between Steam friends
-- **Custom shelf layouts**: User-configurable shelf arrangements  
-- **Game metadata**: Display playtime, achievements, reviews
-- **Voice commands**: "Launch Half-Life" voice interaction
-- **Workshop integration**: Share custom shelf designs
+#### Future Roadmap: Test Suite Optimization (Post-MVP)
+- **Task**: More aggressive test suite reorganization and deduplication
+  - Further thin out live tests to single tests per major feature
+  - Maximize use of mocks in integration tests  
+  - Evaluate test redundancy and consolidate similar test patterns
+  - Performance optimization of test suite runtime
+  - **Priority**: Low (after main features are complete)
