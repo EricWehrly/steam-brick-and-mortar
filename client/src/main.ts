@@ -10,20 +10,19 @@
  */
 
 import * as THREE from 'three'
-import { SteamApiClient, type SteamGame } from './steam'
 import { ValidationUtils } from './utils'
 import { UIManager } from './ui'
 import { SceneManager, AssetLoader, GameBoxRenderer, type SteamGameData } from './scene'
+import { SteamIntegration, type ProgressCallbacks } from './steam-integration'
 
 class SteamBrickAndMortar {
     private sceneManager: SceneManager
     private assetLoader: AssetLoader
     private gameBoxRenderer: GameBoxRenderer
-    private steamClient: SteamApiClient
+    private steamIntegration: SteamIntegration
     private uiManager: UIManager
     
-    // Steam data state
-    private currentSteamData: unknown = null
+    // Current game index for rendering
     private currentGameIndex: number = 0
 
     constructor() {
@@ -35,7 +34,10 @@ class SteamBrickAndMortar {
         })
         this.assetLoader = new AssetLoader()
         this.gameBoxRenderer = new GameBoxRenderer()
-        this.steamClient = new SteamApiClient('https://steam-api-dev.wehrly.com')
+        this.steamIntegration = new SteamIntegration({
+            apiBaseUrl: 'https://steam-api-dev.wehrly.com',
+            maxGames: 30
+        })
         
         // Initialize UI Manager with event handlers
         this.uiManager = new UIManager({
@@ -221,55 +223,34 @@ class SteamBrickAndMortar {
     }
 
     private async handleLoadSteamGames(vanityUrl: string) {
-        const extractedVanity = ValidationUtils.extractVanityFromInput(vanityUrl)
+        // Reset current game index
+        this.currentGameIndex = 0
         
-        this.uiManager.showSteamStatus('Loading Steam games...', 'loading')
+        // Remove existing placeholder boxes before loading
+        this.clearGameBoxes()
+        
         this.uiManager.showProgress(true)
         
         try {
-            console.log(`🔍 Loading games for Steam user: ${extractedVanity}`)
-            
-            // Step 1: Get basic user and game list data
-            this.uiManager.updateProgress(0, 100, 'Fetching game library...')
-            const resolveResponse = await this.steamClient.resolveVanityUrl(extractedVanity)
-            const userGames = await this.steamClient.getUserGames(resolveResponse.steamid)
-            
-            // Store the data for game generation
-            this.currentSteamData = userGames
-            
-            this.uiManager.updateProgress(10, 100, `Found ${userGames.game_count} games. Loading details...`)
-            
-            // Step 2: Use progressive loading for game details and artwork
-            const progressOptions = {
-                maxGames: 30, // 🚧 Development limit to avoid excessive API calls
-                onProgress: (current: number, total: number) => {
-                    const percentage = Math.round((current / total) * 90) + 10 // Reserve 10% for initial fetch
-                    this.uiManager.updateProgress(percentage, 100, `Loaded ${current}/${total} games`)
+            // Use SteamIntegration with progress callbacks
+            const progressCallbacks: ProgressCallbacks = {
+                onProgress: (current: number, total: number, message: string) => {
+                    this.uiManager.updateProgress(current, total, message)
                 },
-                onGameLoaded: (game: SteamGame) => {
+                onGameLoaded: (game) => {
                     // Update game boxes in real-time as they load
                     this.addGameBoxToScene(game, this.currentGameIndex++)
+                },
+                onStatusUpdate: (message: string, type: 'loading' | 'success' | 'error') => {
+                    this.uiManager.showSteamStatus(message, type)
                 }
             }
             
-            // Remove existing placeholder boxes before progressive loading
-            this.clearGameBoxes()
-            
-            // Start progressive loading
-            await this.steamClient.loadGamesProgressively(userGames, progressOptions)
-            
-            // Show completion message
-            this.uiManager.updateProgress(100, 100, 'Loading complete!')
-            this.uiManager.showSteamStatus(
-                `✅ Successfully loaded ${userGames.game_count} games for ${userGames.vanity_url}!`, 
-                'success'
-            )
-            
-            console.log(`✅ Progressive loading complete for ${userGames.game_count} games`)
+            await this.steamIntegration.loadGamesForUser(vanityUrl, progressCallbacks)
             
             // Update cache display and offline availability
             this.updateCacheStatsDisplay()
-            this.uiManager.checkOfflineAvailability(extractedVanity)
+            this.uiManager.checkOfflineAvailability(ValidationUtils.extractVanityFromInput(vanityUrl))
             
             // Hide progress after a short delay
             setTimeout(() => {
@@ -322,36 +303,52 @@ class SteamBrickAndMortar {
 
     // Cache Management Methods
     
-    private async handleUseOfflineData(_vanityUrl: string) {
-        // For now, just show a message that offline mode is not available in simplified client
-        this.uiManager.showSteamStatus('Offline mode not available in simplified client', 'error')
+    private async handleUseOfflineData(vanityUrl: string) {
+        // Check if offline data is available using SteamIntegration
+        const hasOfflineData = this.steamIntegration.hasOfflineData(vanityUrl)
+        
+        if (!hasOfflineData) {
+            this.uiManager.showSteamStatus('Offline mode not available in simplified client', 'error')
+        } else {
+            // Future: Load offline data
+            this.uiManager.showSteamStatus('Loading offline data...', 'loading')
+        }
     }
     
     private async handleRefreshCache() {
-        // For the simplified client, just reload the data normally
-        this.uiManager.showSteamStatus('🔄 Reloading data...', 'loading')
-        
-        if (this.currentSteamData && (this.currentSteamData as { vanity_url?: string }).vanity_url) {
-            // Re-trigger the load process
-            await this.handleLoadSteamGames((this.currentSteamData as { vanity_url: string }).vanity_url)
-        } else {
-            this.uiManager.showSteamStatus('No data to refresh', 'error')
+        try {
+            const progressCallbacks: ProgressCallbacks = {
+                onProgress: (current: number, total: number, message: string) => {
+                    this.uiManager.updateProgress(current, total, message)
+                },
+                onGameLoaded: (game) => {
+                    this.addGameBoxToScene(game, this.currentGameIndex++)
+                },
+                onStatusUpdate: (message: string, type: 'loading' | 'success' | 'error') => {
+                    this.uiManager.showSteamStatus(message, type)
+                }
+            }
+            
+            await this.steamIntegration.refreshData(progressCallbacks)
+            this.updateCacheStatsDisplay()
+        } catch (error) {
+            console.error('❌ Failed to refresh cache:', error)
         }
     }
     
     private handleClearCache() {
-        this.steamClient.clearCache()
+        this.steamIntegration.clearCache()
         this.uiManager.showSteamStatus('🗑️ Cache cleared successfully', 'success')
         this.updateCacheStatsDisplay()
     }
     
     private handleShowCacheStats() {
-        const stats = this.steamClient.getCacheStats()
+        const stats = this.steamIntegration.getCacheStats()
         this.uiManager.updateCacheStats(stats)
     }
     
     private updateCacheStatsDisplay() {
-        const stats = this.steamClient.getCacheStats()
+        const stats = this.steamIntegration.getCacheStats()
         this.uiManager.updateCacheStats(stats)
     }
 
