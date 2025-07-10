@@ -2,14 +2,76 @@
 
 ## Project Overview
 
-**Current Architecture**: We#### Story 3.1.2: 3D Scene Development ✅ **MAJOR PROGRESS**
-- **Task 3.1.2.1**: Import and display Blender-generated shelf model (GLTF) ✅ **TESTED**
-- **Task 3.1.2.2**: Implement camera controls for desktop testing ✅ **TESTED**
-- **Task 3.1.2.3**: Add basic movement/navigation system ✅ **TESTED**
-- **Task 3.1.2.4**: Configure lighting system for 3D scene ✅ **TESTED**
-- **Task 3.1.2.5**: ⭐ **NEXT**: Add placeholder game box geometry (rectangle/box for texturing)rst with progressive enhancement (see `docs/webxr-architecture.md`)  
+**Current Architecture**: WebXR-first with progressive enhancement (see `docs/webxr-architecture.md`)  
 **Research Status**: Complete (archived in `docs/research-archive.md`)  
-**Current Phase**: 3D scene development and Steam integration  
+**Current Phase**: Game art integration and caching strategy development  
+
+## Roadmap Phases
+
+### **Phase 1: "Ready for Me"** 🚧 **CURRENT F### Feature 5.3: Browser Storage Strategy Research 🚧 **CURRENT FOCUS**
+**Context**: Critical analysis of browser storage capabilities for artwork caching
+
+#### Story 5.3.1: Browser Storage Capabilities Research
+- **Task 5.3.1.1**: Research browser storage limits and expansion options
+  - Research localStorage size limits in Chrome, Firefox, Safari
+  - Investigate IndexedDB capacity limits and quota management  
+  - Research Persistent Storage API for requesting increased quotas
+  - Document browser-specific storage behaviors and limitations
+- **Task 5.3.1.2**: Calculate storage requirements for Steam libraries
+  - Calculate storage needs for 100, 500, 800+ game libraries
+  - Analyze artwork file sizes and compression options
+  - Design storage priority system (metadata vs. artwork)
+  - Plan storage eviction strategies for space management
+
+**Expected Deliverable**: `docs/browser-storage-strategy.md` with capacity planning
+
+**Acceptance**: Clear understanding of browser storage capabilities and realistic limits for game artwork
+
+**Priority**: **CRITICAL** - Rate limiting makes browser caching essential for large libraries
+
+---
+
+## Phase 2: "Ready for Friends" Infrastructure 🔮 **POST-GRAPHICS**
+
+### Feature 5.4: Steam API Rate Limiting Infrastructure 🔮 **PHASE 2 PRIORITY**
+**Context**: Robust handling of 20 req/min per IP Steam API constraints
+
+#### Story 5.4.1: Rate Limiting Analysis and Infrastructure Hardening
+- **Task 5.4.1.1**: Analyze AWS Lambda IP allocation and sharing risks
+  - Research AWS Lambda IP pool behavior and potential sharing
+  - Document risks of shared IP rate limiting with other API users
+  - Investigate reserved IP options or NAT Gateway solutions
+  - Plan fallback strategies for rate limit exhaustion
+- **Task 5.4.1.2**: Implement robust rate limiting and retry logic
+  - Add exponential backoff with jitter for rate limit responses
+  - Implement circuit breaker pattern for API failures
+  - Add intelligent request queuing and prioritization
+  - Create graceful degradation for large library requests
+
+**Expected Deliverable**: Hardened Steam API client handling 800+ game libraries
+
+**Acceptance**: Can reliably load large game libraries (800+ games) over 40+ minute periods
+
+**Context**: **Critical for "Ready for Friends"** - 800 games × 3 requests/game ÷ 20 req/min = 120+ minutes without caching
+
+### Feature 5.5: Comprehensive Caching Strategy Implementation 🔮 **PHASE 2 PRIORITY**CUS**
+*Goal: Demonstrate all imagined functionality with competency - personal demo-ready*
+- Complete through Milestone 6 (Level Layout)
+- Small library demos (5-20 games) acceptable
+- Rate limiting acceptable for single-user testing
+
+### **Phase 2: "Ready for Friends"** 🔮 **POST-GRAPHICS**
+*Goal: Works for people standing next to you during conversation*
+- Robust rate limiting and error handling for Steam API constraints
+- Infrastructure hardening for 20 req/min per IP limits
+- Caching strategy implementation to handle 800+ game libraries
+- Multi-user testing capability
+
+### **Phase 3: "Ready for Everyone"** 🔮 **PRE-PUBLIC**
+*Goal: Public release readiness with compliance and scalability*
+- Privacy policy and Steam API compliance
+- Production-grade infrastructure
+- Public traffic handling  
 
 ## Task Management
 
@@ -103,7 +165,7 @@
 **Acceptance**: `yarn serve` starts development server, `yarn build` creates production bundle, `yarn test` runs tests
 **Status**: ✅ **VERIFIED** - Build compiles successfully, tests pass (7/7), fixed rootDir TypeScript issue
 
-### Feature 3.1: 3D Scene with Shelf and Game Boxes � **CURRENT PRIORITY**
+### Feature 3.1: 3D Scene with Shelf and Game Boxes ✅ **COMPLETED**
 **Context**: Complete 3D scene foundation with shelf model and placeholder game geometry
 
 #### Story 3.1.1: HTML/JavaScript Foundation ✅ **TESTED AND VERIFIED**
@@ -207,7 +269,7 @@
 - **Task 4.3.1.1**: ✅ **COMPLETED** - Integrate Steam API client into TypeScript WebXR application
 - **Task 4.3.1.2**: ✅ **COMPLETED** - Add Steam account input/authentication UI
 - **Task 4.3.1.3**: ✅ **COMPLETED** - Cache game library data for offline use
-- **Task 4.3.1.4**: ⭐ **NEXT PRIORITY**: Handle API errors gracefully in WebXR interface
+- **Task 4.3.1.4**: Handle API errors gracefully in WebXR interface
 
 **Current Status Task 4.3.1.3**: ✅ **COMPLETED AND TESTED**
 - ✅ Complete localStorage caching system with automatic persistence
@@ -259,7 +321,7 @@
 
 #### Story 4.3.2: Game Library Integration ✅ **MAJOR PROGRESS**
 - **Task 4.3.2.1**: ✅ **COMPLETED** - Implement rate-limited Steam library fetching (max 4 games/sec)
-- **Task 4.3.2.2**: ⭐ **NEXT PRIORITY**: Download and cache game icons/artwork
+- **Task 4.3.2.2**: Download and cache game icons/artwork
 - **Task 4.3.2.3**: Create JSON manifest for WebXR scene population
 - **Task 4.3.2.4**: Add offline capability with cached data
 
@@ -300,7 +362,7 @@
 **Acceptance**: Progressive game loading with rate limiting and smart caching ✅ **ACHIEVED**
 
 #### Story 4.3.3: Code Quality & File Size Management ✅ **COMPLETED**
-- **Task 4.3.3.1**: ⭐ **COMPLETED**: Refactor large files (>500 lines) into focused modules ✅
+- **Task 4.3.3.1**: Refactor large files (>500 lines) into focused modules ✅ **COMPLETED**
 - **Task 4.3.3.2**: Clean up lint errors and improve code organization ✅
 - **Task 4.3.3.3**: Extract main.ts into smaller, focused components ✅
 
@@ -310,10 +372,10 @@
 
 ---
 
-## Milestone 5: Game Art & Visual Integration 🚧 **CURRENT PRIORITY**
+## Milestone 5: Game Art & Visual Integration 🚧 **IN PROGRESS**
 *Goal: Research Steam metadata, demonstrate game artwork rendering, and establish comprehensive caching strategy*
 
-### Feature 5.1: Steam Game Metadata Research 🚧 **IMMEDIATE FOCUS**
+### Feature 5.1: Steam Game Metadata Research 🚧 **IN PROGRESS**
 **Context**: Deep dive into Steam API responses to understand art assets and display opportunities
 
 #### Story 5.1.1: CDN Access Strategy Research ✅ **COMPLETED**
@@ -322,7 +384,7 @@
   - Research alternative sources like steamdb.info, steamspy.com for artwork hosting ✅
   - Document rate limits, performance, and availability of different CDN sources ✅
   - Identify which sources provide the best resilience for high-traffic scenarios ✅
-- **Task 5.1.1.2**: ⭐ **NEXT TASK**: Test direct CDN access patterns and rate limits
+- **Task 5.1.1.2**: Test direct CDN access patterns and rate limits
   - Validate that artwork URLs work without Steam API authentication
   - Test CORS headers and browser access to Steam CDN endpoints
   - Measure CDN response times, reliability, and rate limiting behavior
@@ -389,31 +451,16 @@
 **Acceptance**: Steam game library displays with proper artwork in 3D scene
 
 ### Feature 5.3: Comprehensive Caching Strategy Research � **STRATEGIC PLANNING**
-**Context**: Research all caching options to optimize performance and minimize API usage
+### Feature 5.5: Comprehensive Caching Strategy Implementation 🔮 **PHASE 2 PRIORITY**
+**Context**: Implementation of caching architecture to handle rate-limited artwork access
 
-#### Story 5.3.1: Browser Storage Capabilities Research
-- **Task 5.3.1.1**: Research browser storage limits and expansion options
-  - Research localStorage size limits in Chrome, Firefox, Safari
-  - Investigate IndexedDB capacity limits and quota management
-  - Research Persistent Storage API for requesting increased quotas
-  - Document browser-specific storage behaviors and limitations
-- **Task 5.3.1.2**: Design client-side storage strategy
-  - Calculate storage requirements for different library sizes
-  - Design storage priority system (metadata vs. artwork)
-  - Plan storage eviction strategies for space management
-  - Research compression options for stored data
-
-**Expected Deliverable**: `docs/browser-storage-strategy.md` with capacity planning
-
-**Acceptance**: Clear understanding of browser storage capabilities and limits
-
-#### Story 5.3.2: Infrastructure Caching Options Analysis
-- **Task 5.3.2.1**: Research cloud caching infrastructure options
+#### Story 5.5.1: Infrastructure Caching Options Analysis
+- **Task 5.5.1.1**: Research cloud caching infrastructure options
   - Document AWS CloudFront CDN integration possibilities
   - Research Redis/ElastiCache for Lambda function caching
   - Investigate S3 for artwork asset caching and delivery
   - Compare costs and performance of different caching layers
-- **Task 5.3.2.2**: Evaluate user-hosted backend caching
+- **Task 5.5.1.2**: Evaluate user-hosted backend caching
   - Research Docker-based local caching server options
   - Design file-based caching system for self-hosted deployments
   - Document trade-offs between cloud vs. local caching
@@ -423,13 +470,13 @@
 
 **Acceptance**: Complete analysis of all caching options with cost/benefit analysis
 
-#### Story 5.3.3: Caching Implementation Planning
-- **Task 5.3.3.1**: Design unified caching architecture
+#### Story 5.5.2: Caching Implementation Planning
+- **Task 5.5.2.1**: Design unified caching architecture
   - Create caching layer abstraction supporting multiple backends
   - Plan cache invalidation and refresh strategies
   - Design offline-first functionality with smart sync
   - Plan cache warming strategies for new users
-- **Task 5.3.3.2**: Research Steam CDN caching implications
+- **Task 5.5.2.2**: Research Steam CDN caching implications
   - Web search Steam CDN usage policies and rate limiting
   - Research potential domain restrictions or API key requirements
   - Document best practices for respectful CDN usage
@@ -441,7 +488,32 @@
 
 ---
 
-## Milestone 6: Level Layout and Spatial Design 🚧 **POST-ART INTEGRATION**
+## Phase 3: "Ready for Everyone" Compliance 🔮 **PRE-PUBLIC**
+
+### Feature 5.6: Steam API Compliance Research 🔮 **PHASE 3**
+**Context**: Research compliance requirements for Steam API usage before public release
+
+#### Story 5.6.1: Steam API Policy Compliance Analysis
+- **Task 5.6.1.1**: Research Steam API compliance requirements
+  - Web search Steam API terms of service and developer requirements
+  - Document privacy policy requirements for Steam API integration
+  - Identify any attribution, branding, or display requirements
+  - Research user data handling and storage policy requirements
+- **Task 5.6.1.2**: Create compliance checklist and implementation plan
+  - Document all required compliance items for public release
+  - Create privacy policy template with Steam-specific requirements
+  - Plan user consent flows and data handling procedures
+  - Identify any required legal disclaimers or attributions
+
+**Expected Deliverable**: `docs/steam-api-compliance.md` with complete compliance requirements
+
+**Acceptance**: Complete compliance checklist ready for implementation before public release
+
+**Priority**: Required for "Ready for Everyone" phase - includes privacy policy creation
+
+---
+
+## Milestone 6: Level Layout and Spatial Design 🚧 **PHASE 1 COMPLETION**
 *Goal: Design and implement the 3D environment layout for optimal game browsing*
 
 ### Feature 6.1: Environment Layout Research
@@ -470,7 +542,7 @@
 
 ---
 
-## Milestone 7: Input Systems and User Controls 🔮 **POST-LEVEL DESIGN**
+## Milestone 7: Input Systems and User Controls 🔮 **PHASE 1 COMPLETION**
 *Goal: Implement comprehensive input support for mouse/keyboard, gamepad, and VR controllers*
 
 ### Feature 7.1: Multi-Platform Input and Controls
@@ -513,7 +585,7 @@
 
 ---
 
-## Milestone 8: User Experience Options 🔮 **POST-INPUT SYSTEMS**
+## Milestone 8: User Experience Options 🔮 **PHASE 1 COMPLETION**
 *Goal: Comprehensive graphics, audio, and accessibility options*
 
 ### Feature 8.1: Graphics and Performance Options
@@ -541,32 +613,6 @@
 **Expected Deliverable**: Complete audio and accessibility options
 
 **Acceptance**: Full audio customization with accessibility support
-
----
-
-## Milestone 9: Steam API Compliance & Public Release 🔮 **PRE-PUBLIC RELEASE**
-*Goal: Ensure compliance with Steam API policies before public demonstration*
-
-### Feature 9.1: Steam API Compliance Research
-**Context**: Research compliance requirements for Steam API usage before public release
-
-#### Story 9.1.1: Steam API Policy Compliance Analysis
-- **Task 9.1.1.1**: Research Steam API compliance requirements
-  - Web search Steam API terms of service and developer requirements
-  - Document privacy policy requirements for Steam API integration
-  - Identify any attribution, branding, or display requirements
-  - Research user data handling and storage policy requirements
-- **Task 9.1.1.2**: Create compliance checklist and implementation plan
-  - Document all required compliance items for public release
-  - Create privacy policy template with Steam-specific requirements
-  - Plan user consent flows and data handling procedures
-  - Identify any required legal disclaimers or attributions
-
-**Expected Deliverable**: `docs/steam-api-compliance.md` with complete compliance requirements
-
-**Acceptance**: Complete compliance checklist ready for implementation before public release
-
-**Priority**: Required before showing to public - includes privacy policy creation
 
 ---
 
