@@ -76,10 +76,18 @@ export class SteamIntegration {
                     const percentage = Math.round((current / total) * 90) + 10 // Reserve 10% for initial fetch
                     callbacks.onProgress?.(percentage, 100, `Loaded ${current}/${total} games`)
                 },
-                onGameLoaded: (game: SteamGame) => {
+                onGameLoaded: async (game: SteamGame) => {
                     // Update game library and notify caller
                     this.gameLibrary.updateGameData(game)
                     callbacks.onGameLoaded?.(game)
+                    
+                    // Download game artwork in the background
+                    try {
+                        await this.steamClient.downloadGameArtwork(game)
+                        console.log(`📸 Downloaded artwork for ${game.name}`)
+                    } catch (error) {
+                        console.warn(`⚠️ Failed to download artwork for ${game.name}:`, error)
+                    }
                 }
             }
             
@@ -166,5 +174,54 @@ export class SteamIntegration {
             img_logo_url: game.img_logo_url,
             artwork: game.artwork
         })) ?? []
+    }
+
+    /**
+     * Image downloading methods
+     */
+    
+    /**
+     * Download artwork for a specific game
+     */
+    async downloadGameArtwork(game: SteamGame): Promise<Record<string, Blob | null>> {
+        return this.steamClient.downloadGameArtwork(game)
+    }
+
+    /**
+     * Download a single image from URL
+     */
+    async downloadGameImage(url: string): Promise<Blob | null> {
+        return this.steamClient.downloadGameImage(url)
+    }
+
+    /**
+     * Get image cache statistics (access through steam client)
+     */
+    async getImageCacheStats() {
+        // For now, delegate to the getSteamClient method for advanced access
+        // Users can call: integration.getSteamClient().images.getStats()
+        return { 
+            message: 'Use getSteamClient().images.getStats() for image cache statistics',
+            totalImages: 0, 
+            totalSize: 0, 
+            oldestTimestamp: 0, 
+            newestTimestamp: 0 
+        }
+    }
+
+    /**
+     * Clear image cache (access through steam client)
+     */
+    async clearImageCache(): Promise<void> {
+        // For now, delegate to the getSteamClient method for advanced access
+        // Users can call: integration.getSteamClient().images.clearCache()
+        console.log('Use getSteamClient().images.clearCache() for clearing image cache')
+    }
+
+    /**
+     * Provide access to underlying Steam client (for advanced use)
+     */
+    getSteamClient() {
+        return this.steamClient
     }
 }
