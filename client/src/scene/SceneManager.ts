@@ -9,6 +9,8 @@
  */
 
 import * as THREE from 'three'
+import { BlockbusterColors } from '../utils/Colors'
+import { MaterialUtils } from '../utils/MaterialUtils'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -32,6 +34,7 @@ export class SceneManager {
         })
 
         this.setupRenderer(options)
+        this.setupScene()
         this.setupLighting()
         this.setupCamera()
         this.setupEventListeners()
@@ -53,18 +56,31 @@ export class SceneManager {
         document.body.appendChild(this.renderer.domElement)
     }
 
+    private setupScene() {
+        // Set Blockbuster mustard yellow background
+        this.scene.background = new THREE.Color(BlockbusterColors.walls)
+    }
+
     private setupLighting() {
-        // Ambient light for overall scene brightness
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.6)
+        // Updated lighting for Blockbuster store atmosphere
+        // Fluorescent-style lighting with cool white color temperature
+        
+        // Ambient light with fluorescent cool tone
+        const ambientLight = new THREE.AmbientLight(BlockbusterColors.fluorescentCool, 0.4)
         this.scene.add(ambientLight)
         
-        // Directional light for shadows and definition
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-        directionalLight.position.set(5, 10, 5)
-        directionalLight.castShadow = true
-        directionalLight.shadow.mapSize.width = 1024
-        directionalLight.shadow.mapSize.height = 1024
-        this.scene.add(directionalLight)
+        // Main overhead directional light (simulating fluorescent fixtures)
+        const mainLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentCool, 0.8)
+        mainLight.position.set(0, 10, 0)
+        mainLight.castShadow = true
+        mainLight.shadow.mapSize.width = 1024
+        mainLight.shadow.mapSize.height = 1024
+        this.scene.add(mainLight)
+        
+        // Additional directional light for even coverage (retail store style)
+        const fillLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentWarm, 0.4)
+        fillLight.position.set(5, 8, 5)
+        this.scene.add(fillLight)
     }
 
     private setupCamera() {
@@ -138,15 +154,28 @@ export class SceneManager {
     /**
      * Create a floor plane
      */
-    public createFloor(size: number = 20, color: number = 0x808080, y: number = -2): THREE.Mesh {
+    public createFloor(size: number = 20, _color: number = BlockbusterColors.floor, y: number = -2): THREE.Mesh {
         const floorGeometry = new THREE.PlaneGeometry(size, size)
-        const floorMaterial = new THREE.MeshPhongMaterial({ color })
+        const floorMaterial = MaterialUtils.createFloorMaterial()
         const floor = new THREE.Mesh(floorGeometry, floorMaterial)
         floor.rotation.x = -Math.PI / 2
         floor.position.y = y
         floor.receiveShadow = true
         this.scene.add(floor)
         return floor
+    }
+
+    /**
+     * Create a ceiling plane
+     */
+    public createCeiling(size: number = 20, y: number = 4): THREE.Mesh {
+        const ceilingGeometry = new THREE.PlaneGeometry(size, size)
+        const ceilingMaterial = MaterialUtils.createCeilingMaterial()
+        const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
+        ceiling.rotation.x = Math.PI / 2 // Face down
+        ceiling.position.y = y
+        this.scene.add(ceiling)
+        return ceiling
     }
 
     // Getters for accessing Three.js components

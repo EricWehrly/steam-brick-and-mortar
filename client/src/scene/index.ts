@@ -11,3 +11,4 @@ export {
     type ShelfConfiguration,
     type SteamGameData 
 } from './GameBoxRenderer'
+export { SignageRenderer, type SignageConfig } from './SignageRenderer'

@@ -14,7 +14,7 @@
 import * as THREE from 'three'
 import { ValidationUtils } from '../utils'
 import { UIManager } from '../ui'
-import { SceneManager, AssetLoader, GameBoxRenderer, type SteamGameData } from '../scene'
+import { SceneManager, AssetLoader, GameBoxRenderer, SignageRenderer, type SteamGameData } from '../scene'
 import { SteamIntegration, type ProgressCallbacks } from '../steam-integration'
 import { WebXRManager, type WebXRCapabilities } from '../webxr/WebXRManager'
 import { InputManager } from '../webxr/InputManager'
@@ -46,6 +46,7 @@ export class SteamBrickAndMortarApp {
     private sceneManager: SceneManager
     private assetLoader: AssetLoader
     private gameBoxRenderer: GameBoxRenderer
+    private signageRenderer: SignageRenderer
     private steamIntegration: SteamIntegration
     private webxrManager: WebXRManager
     private inputManager: InputManager
@@ -66,6 +67,7 @@ export class SteamBrickAndMortarApp {
         
         this.assetLoader = new AssetLoader()
         this.gameBoxRenderer = new GameBoxRenderer()
+        this.signageRenderer = new SignageRenderer()
         
         // Initialize Steam integration
         this.steamIntegration = new SteamIntegration({
@@ -141,6 +143,7 @@ export class SteamBrickAndMortarApp {
 
         console.log('🧹 Disposing application resources...')
         
+        this.signageRenderer.dispose()
         this.inputManager.dispose()
         this.webxrManager.dispose()
         this.sceneManager.dispose()
@@ -152,8 +155,12 @@ export class SteamBrickAndMortarApp {
     // Scene Setup Methods
 
     private async setupScene(): Promise<void> {
-        // Create floor
+        // Create floor and ceiling
         this.sceneManager.createFloor()
+        this.sceneManager.createCeiling()
+        
+        // Create Blockbuster signage
+        this.signageRenderer.createStandardSigns(this.sceneManager.getScene())
         
         // Load shelf model
         await this.loadShelfModel()
