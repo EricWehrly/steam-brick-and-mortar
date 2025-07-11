@@ -9,6 +9,8 @@
  */
 
 import * as THREE from 'three'
+// import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js' // For high graphics setting
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { BlockbusterColors } from '../utils/Colors'
 import { MaterialUtils } from '../utils/MaterialUtils'
 
@@ -26,6 +28,9 @@ export class SceneManager {
     private animationId: number | null = null
 
     constructor(options: SceneManagerOptions = {}) {
+        // Initialize RectAreaLight uniforms (required for RectAreaLight to work)
+        RectAreaLightUniformsLib.init()
+        
         // Initialize Three.js components
         this.scene = new THREE.Scene()
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
@@ -65,12 +70,12 @@ export class SceneManager {
         // Updated lighting for Blockbuster store atmosphere
         // Fluorescent-style lighting with cool white color temperature
         
-        // Ambient light with fluorescent cool tone
-        const ambientLight = new THREE.AmbientLight(BlockbusterColors.fluorescentCool, 0.4)
+        // Reduced ambient light to let emissive fixtures show through
+        const ambientLight = new THREE.AmbientLight(BlockbusterColors.fluorescentCool, 0.1)
         this.scene.add(ambientLight)
         
-        // Main overhead directional light (simulating fluorescent fixtures)
-        const mainLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentCool, 0.8)
+        // Reduced directional light since we have point lights at fixtures
+        const mainLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentCool, 0.3)
         mainLight.position.set(0, 10, 0)
         mainLight.castShadow = true
         mainLight.shadow.mapSize.width = 1024
@@ -78,7 +83,7 @@ export class SceneManager {
         this.scene.add(mainLight)
         
         // Additional directional light for even coverage (retail store style)
-        const fillLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentWarm, 0.4)
+        const fillLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentWarm, 0.2)
         fillLight.position.set(5, 8, 5)
         this.scene.add(fillLight)
     }
@@ -176,6 +181,76 @@ export class SceneManager {
         ceiling.position.y = y
         this.scene.add(ceiling)
         return ceiling
+    }
+
+    /**
+     * Create visible fluorescent light fixtures
+     * 
+     * TODO: Make point lights optional via graphics settings - they impact performance
+     * Consider adding a lightQuality setting: 'low' (no point lights), 'medium' (some lights), 'high' (all lights)
+     */
+    public createFluorescentFixtures(): THREE.Group {
+        const fixturesGroup = new THREE.Group()
+        
+        // Create fixture geometry - rectangular tube
+        const fixtureGeometry = new THREE.BoxGeometry(4, 0.2, 0.6)
+        
+        // Create glowing material for the fixtures
+        const fixtureMaterial = new THREE.MeshStandardMaterial({
+            color: 0xF5F5F5, // Off-white
+            emissive: 0xE6F3FF, // Cool white glow
+            emissiveIntensity: 0.6, // Increased from 0.3 to make them more visible
+            roughness: 0.2,
+            metalness: 0.1,
+        })
+        
+        // Create multiple fixtures in a grid pattern
+        const fixturePositions = [
+            { x: -6, y: 3.5, z: -1 },
+            { x: -2, y: 3.5, z: -1 },
+            { x: 2, y: 3.5, z: -1 },
+            { x: 6, y: 3.5, z: -1 },
+            { x: -6, y: 3.5, z: 2 },
+            { x: -2, y: 3.5, z: 2 },
+            { x: 2, y: 3.5, z: 2 },
+            { x: 6, y: 3.5, z: 2 },
+        ]
+        
+        fixturePositions.forEach((pos, index) => {
+            const fixture = new THREE.Mesh(fixtureGeometry, fixtureMaterial)
+            fixture.position.set(pos.x, pos.y, pos.z)
+            fixture.userData = { 
+                isLightFixture: true,
+                fixtureIndex: index 
+            }
+            fixturesGroup.add(fixture)
+            
+            // TODO: Individual RectAreaLight per fixture (for highest graphics setting)
+            // const rectLight = new THREE.RectAreaLight(BlockbusterColors.fluorescentCool, 2, 3.8, 0.5)
+            // rectLight.position.set(pos.x, pos.y - 0.1, pos.z) // Slightly below fixture
+            // rectLight.lookAt(pos.x, pos.y - 2, pos.z) // Point downward
+            // const helper = new RectAreaLightHelper(rectLight)
+            // rectLight.add(helper)
+            // fixturesGroup.add(rectLight)
+        })
+        
+        // Performance optimization: Use only 2 RectAreaLights for the two rows
+        // Front row of fixtures
+        const frontRowLight = new THREE.RectAreaLight(BlockbusterColors.fluorescentCool, 3, 16, 0.5)
+        frontRowLight.position.set(0, 3.4, -1) // Center of front row
+        frontRowLight.lookAt(0, 1, -1) // Point downward
+        fixturesGroup.add(frontRowLight)
+        
+        // Back row of fixtures  
+        const backRowLight = new THREE.RectAreaLight(BlockbusterColors.fluorescentCool, 3, 16, 0.5)
+        backRowLight.position.set(0, 3.4, 2) // Center of back row
+        backRowLight.lookAt(0, 1, 2) // Point downward
+        fixturesGroup.add(backRowLight)
+        
+        this.scene.add(fixturesGroup)
+        console.log(`💡 Created ${fixturePositions.length} fluorescent fixtures`)
+        
+        return fixturesGroup
     }
 
     // Getters for accessing Three.js components

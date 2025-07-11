@@ -159,6 +159,9 @@ export class SteamBrickAndMortarApp {
         this.sceneManager.createFloor()
         this.sceneManager.createCeiling()
         
+        // Create visible fluorescent fixtures
+        this.sceneManager.createFluorescentFixtures()
+        
         // Create Blockbuster signage
         this.signageRenderer.createStandardSigns(this.sceneManager.getScene())
         
