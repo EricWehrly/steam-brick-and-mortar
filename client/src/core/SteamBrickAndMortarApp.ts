@@ -14,6 +14,7 @@
 import * as THREE from 'three'
 import { ValidationUtils } from '../utils'
 import { UIManager } from '../ui'
+import { CacheManagementUI } from '../ui/CacheManagementUI'
 import { SceneManager, AssetLoader, GameBoxRenderer, type SteamGameData } from '../scene'
 import { SteamIntegration, type ProgressCallbacks } from '../steam-integration'
 import { WebXRManager, type WebXRCapabilities } from '../webxr/WebXRManager'
@@ -50,6 +51,7 @@ export class SteamBrickAndMortarApp {
     private webxrManager: WebXRManager
     private inputManager: InputManager
     private uiManager: UIManager
+    private cacheUI: CacheManagementUI
     
     // Current game index for rendering
     private currentGameIndex: number = 0
@@ -101,6 +103,13 @@ export class SteamBrickAndMortarApp {
             steamShowCacheStats: () => this.handleShowCacheStats(),
             webxrEnterVR: () => this.handleWebXRToggle()
         })
+        
+        // Initialize Cache Management UI
+        this.cacheUI = new CacheManagementUI({
+            containerId: 'cache-management-container',
+            refreshInterval: 5000, // 5 seconds
+            autoCollapse: true
+        })
     }
 
     /**
@@ -119,6 +128,13 @@ export class SteamBrickAndMortarApp {
             await this.setupWebXR()
             this.setupControls()
             this.uiManager.init()
+            
+            // Initialize cache management UI
+            this.cacheUI.init(
+                () => this.steamIntegration.getImageCacheStats(),
+                () => this.steamIntegration.clearImageCache()
+            )
+            
             this.uiManager.hideLoading()
             this.startRenderLoop()
             
@@ -141,6 +157,7 @@ export class SteamBrickAndMortarApp {
 
         console.log('🧹 Disposing application resources...')
         
+        this.cacheUI.dispose()
         this.inputManager.dispose()
         this.webxrManager.dispose()
         this.sceneManager.dispose()
