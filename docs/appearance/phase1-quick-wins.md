@@ -102,11 +102,12 @@ const material = new THREE.MeshStandardMaterial({
 
 ## Success Criteria
 
-- [ ] **Visual Impact**: Recognizable Blockbuster color scheme
-- [ ] **Materials**: PBR materials working properly
-- [ ] **Lighting**: Even, bright "retail store" lighting
-- [ ] **Signage**: Clear, readable category signs
-- [ ] **Desktop Testing**: All improvements work smoothly in desktop 3D mode
+- [x] **Visual Impact**: Recognizable Blockbuster color scheme ✅
+- [x] **Materials**: PBR materials working properly ✅
+- [x] **Lighting**: Even, bright "retail store" lighting ✅
+- [x] **Signage**: Clear, readable category signs ✅
+- [x] **Desktop Testing**: All improvements work smoothly in desktop 3D mode ✅
+- [x] **Visible Light Sources**: Fluorescent fixtures show where light comes from ✅
 
 ---
 
