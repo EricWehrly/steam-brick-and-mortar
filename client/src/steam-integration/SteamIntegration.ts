@@ -83,6 +83,11 @@ export class SteamIntegration {
                     
                     // Download game artwork in the background
                     try {
+                        // TODO: ROADMAP - Nice to have: Game-level cache awareness
+                        // Could add isGameArtworkCached(game) check here to skip downloading
+                        // if all artwork for this game is already cached. Currently each
+                        // individual image checks cache (which works well), but a game-level
+                        // check would prevent unnecessary cache lookups for fully cached games.
                         await this.steamClient.downloadGameArtwork(game)
                         console.log(`📸 Downloaded artwork for ${game.name}`)
                     } catch (error) {
@@ -195,27 +200,17 @@ export class SteamIntegration {
     }
 
     /**
-     * Get image cache statistics (access through steam client)
+     * Get image cache statistics
      */
     async getImageCacheStats() {
-        // For now, delegate to the getSteamClient method for advanced access
-        // Users can call: integration.getSteamClient().images.getStats()
-        return { 
-            message: 'Use getSteamClient().images.getStats() for image cache statistics',
-            totalImages: 0, 
-            totalSize: 0, 
-            oldestTimestamp: 0, 
-            newestTimestamp: 0 
-        }
+        return this.steamClient.getImageCacheStats()
     }
 
     /**
-     * Clear image cache (access through steam client)
+     * Clear image cache
      */
     async clearImageCache(): Promise<void> {
-        // For now, delegate to the getSteamClient method for advanced access
-        // Users can call: integration.getSteamClient().images.clearCache()
-        console.log('Use getSteamClient().images.clearCache() for clearing image cache')
+        return this.steamClient.clearImageCache()
     }
 
     /**
