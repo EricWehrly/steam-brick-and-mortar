@@ -274,6 +274,98 @@ export class SceneManager {
         return fixturesGroup
     }
 
+    /**
+     * Demonstration of enhanced procedural textures
+     * Creates sample objects with the new texture system
+     */
+    public addEnhancedTextureDemo(): void {
+        // Create floor with enhanced carpet texture
+        const floorGeometry = new THREE.PlaneGeometry(20, 20)
+        const carpetMaterial = this.textureManager.createEnhancedProceduralCarpetMaterial({
+            color: '#8B0000',
+            fiberDensity: 0.5,
+            repeat: { x: 4, y: 4 }
+        })
+        const floor = new THREE.Mesh(floorGeometry, carpetMaterial)
+        floor.rotation.x = -Math.PI / 2
+        floor.receiveShadow = true
+        this.scene.add(floor)
+
+        // Create ceiling with enhanced popcorn texture
+        const ceilingGeometry = new THREE.PlaneGeometry(20, 20)
+        const ceilingMaterial = this.textureManager.createEnhancedProceduralCeilingMaterial({
+            color: '#F5F5DC',
+            bumpSize: 0.6,
+            density: 0.8,
+            repeat: { x: 3, y: 3 }
+        })
+        const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
+        ceiling.rotation.x = Math.PI / 2
+        ceiling.position.y = 8
+        this.scene.add(ceiling)
+
+        // Create wooden shelves with enhanced wood texture
+        for (let i = 0; i < 3; i++) {
+            const shelfGeometry = new THREE.BoxGeometry(6, 0.2, 1.5)
+            const woodMaterial = this.textureManager.createEnhancedProceduralWoodMaterial({
+                grainStrength: 0.5,
+                ringFrequency: 0.1,
+                color1: '#8B4513',
+                color2: '#A0522D',
+                color3: '#654321',
+                repeat: { x: 3, y: 1 }
+            })
+            const shelf = new THREE.Mesh(shelfGeometry, woodMaterial)
+            shelf.position.set(-5, 2 + i * 2, 0)
+            shelf.castShadow = true
+            this.scene.add(shelf)
+        }
+
+        // Create comparison objects with basic textures
+        for (let i = 0; i < 3; i++) {
+            const shelfGeometry = new THREE.BoxGeometry(6, 0.2, 1.5)
+            const basicWoodMaterial = this.textureManager.createProceduralWoodMaterial({
+                repeat: { x: 3, y: 1 }
+            })
+            const shelf = new THREE.Mesh(shelfGeometry, basicWoodMaterial)
+            shelf.position.set(5, 2 + i * 2, 0)
+            shelf.castShadow = true
+            this.scene.add(shelf)
+        }
+
+        // Add labels to show the difference
+        this.addTextLabel('Enhanced Textures', new THREE.Vector3(-5, 0.5, 2))
+        this.addTextLabel('Basic Textures', new THREE.Vector3(5, 0.5, 2))
+    }
+
+    /**
+     * Add a simple text label to the scene
+     */
+    private addTextLabel(text: string, position: THREE.Vector3): void {
+        const canvas = document.createElement('canvas')
+        const context = canvas.getContext('2d')
+        if (!context) return
+
+        canvas.width = 512
+        canvas.height = 128
+        context.fillStyle = '#ffffff'
+        context.fillRect(0, 0, canvas.width, canvas.height)
+        context.fillStyle = '#000000'
+        context.font = '48px Arial'
+        context.textAlign = 'center'
+        context.fillText(text, canvas.width / 2, canvas.height / 2 + 16)
+
+        const texture = new THREE.CanvasTexture(canvas)
+        const material = new THREE.MeshBasicMaterial({ 
+            map: texture, 
+            transparent: true 
+        })
+        const geometry = new THREE.PlaneGeometry(4, 1)
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.position.copy(position)
+        this.scene.add(mesh)
+    }
+
     // Getters for accessing Three.js components
     public getScene(): THREE.Scene {
         return this.scene

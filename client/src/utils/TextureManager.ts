@@ -356,6 +356,145 @@ export class TextureManager {
   }
 
   /**
+   * Create enhanced procedural wood material with realistic grain patterns
+   */
+  public createEnhancedProceduralWoodMaterial(options: {
+    repeat?: { x: number; y: number };
+    grainStrength?: number;
+    ringFrequency?: number;
+    color1?: string;
+    color2?: string;
+    color3?: string;
+    roughness?: number;
+    metalness?: number;
+  } = {}): THREE.MeshStandardMaterial {
+    const {
+      repeat = { x: 1, y: 1 },
+      grainStrength = 0.4,
+      ringFrequency = 0.08,
+      color1 = '#8B4513',
+      color2 = '#A0522D',
+      color3 = '#654321',
+      roughness = 0.8,
+      metalness = 0.1
+    } = options;
+
+    const cacheKey = `enhanced_proc_wood_${repeat.x}_${repeat.y}_${grainStrength}_${ringFrequency}_${color1}_${color2}_${color3}`;
+    
+    if (this.materialCache.has(cacheKey)) {
+      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
+    }
+
+    // Create enhanced procedural texture
+    const diffuseTexture = this.proceduralTextures.createEnhancedWoodTexture({
+      grainStrength,
+      ringFrequency,
+      color1,
+      color2,
+      color3
+    });
+    diffuseTexture.repeat.set(repeat.x, repeat.y);
+
+    // Create normal map for wood grain depth
+    const normalTexture = this.proceduralTextures.createWoodNormalMap({
+      strength: grainStrength * 0.6
+    });
+    normalTexture.repeat.set(repeat.x, repeat.y);
+
+    const material = new THREE.MeshStandardMaterial({
+      map: diffuseTexture,
+      normalMap: normalTexture,
+      roughness,
+      metalness,
+    });
+
+    this.materialCache.set(cacheKey, material);
+    return material;
+  }
+
+  /**
+   * Create enhanced procedural carpet material with realistic fiber patterns
+   */
+  public createEnhancedProceduralCarpetMaterial(options: {
+    repeat?: { x: number; y: number };
+    color?: string;
+    fiberDensity?: number;
+    roughness?: number;
+    metalness?: number;
+  } = {}): THREE.MeshStandardMaterial {
+    const {
+      repeat = { x: 4, y: 4 },
+      color = '#8B0000',
+      fiberDensity = 0.4,
+      roughness = 0.9,
+      metalness = 0.0
+    } = options;
+
+    const cacheKey = `enhanced_proc_carpet_${repeat.x}_${repeat.y}_${color}_${fiberDensity}_${roughness}`;
+    
+    if (this.materialCache.has(cacheKey)) {
+      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
+    }
+
+    const diffuseTexture = this.proceduralTextures.createEnhancedCarpetTexture({
+      color,
+      fiberDensity,
+      roughness: 0.8
+    });
+    diffuseTexture.repeat.set(repeat.x, repeat.y);
+
+    const material = new THREE.MeshStandardMaterial({
+      map: diffuseTexture,
+      roughness,
+      metalness,
+    });
+
+    this.materialCache.set(cacheKey, material);
+    return material;
+  }
+
+  /**
+   * Create enhanced procedural ceiling material with realistic popcorn texture
+   */
+  public createEnhancedProceduralCeilingMaterial(options: {
+    repeat?: { x: number; y: number };
+    color?: string;
+    bumpSize?: number;
+    density?: number;
+    roughness?: number;
+  } = {}): THREE.MeshStandardMaterial {
+    const {
+      repeat = { x: 2, y: 2 },
+      color = '#F5F5DC',
+      bumpSize = 0.5,
+      density = 0.7,
+      roughness = 0.7
+    } = options;
+
+    const cacheKey = `enhanced_proc_ceiling_${repeat.x}_${repeat.y}_${color}_${bumpSize}_${density}`;
+    
+    if (this.materialCache.has(cacheKey)) {
+      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
+    }
+
+    const diffuseTexture = this.proceduralTextures.createEnhancedCeilingTexture({
+      color,
+      bumpSize,
+      density
+    });
+    diffuseTexture.repeat.set(repeat.x, repeat.y);
+
+    const material = new THREE.MeshStandardMaterial({
+      map: diffuseTexture,
+      roughness,
+      metalness: 0.0,
+    });
+
+    this.materialCache.set(cacheKey, material);
+    return material;
+  }
+
+  /**
    * Dispose of all cached textures and materials
    */
   public dispose(): void {
