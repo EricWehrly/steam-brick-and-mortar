@@ -277,9 +277,9 @@ export class SteamBrickAndMortarApp {
                 onProgress: (current: number, total: number, message: string) => {
                     this.uiManager.updateProgress(current, total, message)
                 },
-                onGameLoaded: (game) => {
+                onGameLoaded: async (game) => {
                     // Update game boxes in real-time as they load
-                    this.addGameBoxToScene(game, this.currentGameIndex++)
+                    await this.addGameBoxToScene(game, this.currentGameIndex++)
                 },
                 onStatusUpdate: (message: string, type: 'loading' | 'success' | 'error') => {
                     this.uiManager.showSteamStatus(message, type)
@@ -313,12 +313,64 @@ export class SteamBrickAndMortarApp {
         console.log(`🗑️ Cleared ${clearedCount} existing game boxes`)
     }
     
-    private addGameBoxToScene(game: SteamGameData, index: number): void {
-        // Create game box using the game box renderer
+    private async addGameBoxToScene(game: SteamGameData, index: number): Promise<void> {
+        // Create game box with immediate fallback color
         const gameBox = this.gameBoxRenderer.createGameBox(this.sceneManager.getScene(), game, index)
         if (gameBox) {
             this.currentGameIndex = index + 1
+            
+            // Apply texture asynchronously when artwork is available
+            await this.applyGameArtworkTexture(gameBox, game)
         }
+    }
+
+    private async applyGameArtworkTexture(gameBox: THREE.Mesh, game: SteamGameData): Promise<void> {
+        try {
+            // Get cached artwork for this game
+            const artworkBlobs = await this.getGameArtworkBlobs(game)
+            
+            if (artworkBlobs && Object.values(artworkBlobs).some(blob => blob !== null)) {
+                // Apply texture using the GameBoxRenderer texture system
+                const textureOptions = {
+                    artworkBlobs,
+                    fallbackColor: undefined // Keep current fallback color
+                }
+                
+                // Apply texture to existing game box
+                await this.gameBoxRenderer.applyTexture(gameBox, game, textureOptions)
+                console.log(`🖼️ Applied cached artwork texture to: ${game.name}`)
+            }
+        } catch (error) {
+            console.warn(`⚠️ Failed to apply artwork texture to ${game.name}:`, error)
+        }
+    }
+
+    private async getGameArtworkBlobs(game: SteamGameData): Promise<Record<string, Blob | null> | null> {
+        // Try to get artwork from cache for all available types
+        const artworkBlobs: Record<string, Blob | null> = {}
+        let hasAnyArtwork = false
+        
+        const artworkTypes = ['library', 'header', 'logo', 'icon'] as const
+        
+        for (const type of artworkTypes) {
+            const artworkUrl = game.artwork?.[type]
+            if (artworkUrl) {
+                try {
+                    const blob = await this.steamIntegration.getSteamClient().downloadGameImage(artworkUrl)
+                    artworkBlobs[type] = blob
+                    if (blob) {
+                        hasAnyArtwork = true
+                    }
+                } catch (error) {
+                    console.debug(`Could not load ${type} artwork for ${game.name}:`, error)
+                    artworkBlobs[type] = null
+                }
+            } else {
+                artworkBlobs[type] = null
+            }
+        }
+        
+        return hasAnyArtwork ? artworkBlobs : null
     }
 
     // Cache Management Methods
@@ -341,8 +393,8 @@ export class SteamBrickAndMortarApp {
                 onProgress: (current: number, total: number, message: string) => {
                     this.uiManager.updateProgress(current, total, message)
                 },
-                onGameLoaded: (game) => {
-                    this.addGameBoxToScene(game, this.currentGameIndex++)
+                onGameLoaded: async (game) => {
+                    await this.addGameBoxToScene(game, this.currentGameIndex++)
                 },
                 onStatusUpdate: (message: string, type: 'loading' | 'success' | 'error') => {
                     this.uiManager.showSteamStatus(message, type)
