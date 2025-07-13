@@ -6,9 +6,61 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { SteamBrickAndMortarApp, type AppConfig } from '../../../src/core/SteamBrickAndMortarApp'
 
 // Mock all the manager dependencies
-vi.mock('../../../src/scene/SceneManager')
+vi.mock('../../../src/scene/SceneManager', () => {
+    return {
+        SceneManager: vi.fn().mockImplementation(() => {
+            // Create simple mock objects without relying on THREE.js constructors
+            const mockScene = {
+                add: vi.fn(),
+                remove: vi.fn(),
+                dispose: vi.fn()
+            }
+            
+            const mockCamera = {
+                position: { x: 0, y: 5, z: 10 },
+                rotation: { x: 0, y: 0, z: 0 },
+                lookAt: vi.fn()
+            }
+            
+            const mockRenderer = {
+                setSize: vi.fn(),
+                setPixelRatio: vi.fn(),
+                shadowMap: { enabled: false, type: 0 },
+                outputColorSpace: '',
+                domElement: document.createElement('canvas'),
+                dispose: vi.fn(),
+                render: vi.fn()
+            }
+            
+            return {
+                getScene: vi.fn().mockReturnValue(mockScene),
+                getCamera: vi.fn().mockReturnValue(mockCamera),
+                getRenderer: vi.fn().mockReturnValue(mockRenderer),
+                createFloor: vi.fn(),
+                createCeiling: vi.fn(),
+                createFluorescentFixtures: vi.fn(),
+                addToScene: vi.fn(),
+                clearObjectsByUserData: vi.fn().mockReturnValue(0),
+                startRenderLoop: vi.fn(),
+                dispose: vi.fn()
+            }
+        })
+    }
+})
 vi.mock('../../../src/scene/AssetLoader')
 vi.mock('../../../src/scene/GameBoxRenderer')
+vi.mock('../../../src/scene/SignageRenderer', () => {
+    return {
+        SignageRenderer: vi.fn().mockImplementation(() => ({
+            createStandardSigns: vi.fn().mockReturnValue([]),
+            createSign: vi.fn().mockReturnValue({ 
+                position: { x: 0, y: 0, z: 0 },
+                userData: { isSign: true }
+            }),
+            dispose: vi.fn()
+        }))
+    }
+})
 vi.mock('../../../src/steam-integration/SteamIntegration')
 vi.mock('../../../src/webxr/WebXRManager')
 vi.mock('../../../src/webxr/InputManager')
