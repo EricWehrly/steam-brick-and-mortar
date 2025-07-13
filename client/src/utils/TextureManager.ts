@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ProceduralTextures } from './ProceduralTextures';
 
 /**
  * Manages texture loading and material creation for the WebXR environment
@@ -9,11 +10,13 @@ export class TextureManager {
   private textureLoader: THREE.TextureLoader;
   private textureCache: Map<string, THREE.Texture>;
   private materialCache: Map<string, THREE.Material>;
+  private proceduralTextures: ProceduralTextures;
 
   private constructor() {
     this.textureLoader = new THREE.TextureLoader();
     this.textureCache = new Map();
     this.materialCache = new Map();
+    this.proceduralTextures = ProceduralTextures.getInstance();
   }
 
   public static getInstance(): TextureManager {
@@ -221,6 +224,132 @@ export class TextureManager {
     } catch (error) {
       console.warn('Some ceiling textures failed to load, using base material:', error);
     }
+
+    this.materialCache.set(cacheKey, material);
+    return material;
+  }
+
+  /**
+   * Create a wood material using procedural textures (no file dependencies)
+   */
+  public createProceduralWoodMaterial(options: {
+    repeat?: { x: number; y: number };
+    color1?: string;
+    color2?: string;
+    grainStrength?: number;
+    roughness?: number;
+    metalness?: number;
+  } = {}): THREE.MeshStandardMaterial {
+    const {
+      repeat = { x: 1, y: 1 },
+      color1 = '#8B4513',
+      color2 = '#A0522D',
+      grainStrength = 0.3,
+      roughness = 0.8,
+      metalness = 0.1
+    } = options;
+
+    const cacheKey = `proc_wood_${repeat.x}_${repeat.y}_${color1}_${color2}_${grainStrength}`;
+    
+    if (this.materialCache.has(cacheKey)) {
+      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
+    }
+
+    // Create procedural textures
+    const diffuseTexture = this.proceduralTextures.createWoodTexture({
+      color1,
+      color2,
+      grainStrength
+    });
+    diffuseTexture.repeat.set(repeat.x, repeat.y);
+
+    const normalTexture = this.proceduralTextures.createWoodNormalMap({
+      strength: grainStrength * 0.5
+    });
+    normalTexture.repeat.set(repeat.x, repeat.y);
+
+    const material = new THREE.MeshStandardMaterial({
+      map: diffuseTexture,
+      normalMap: normalTexture,
+      roughness,
+      metalness,
+    });
+
+    this.materialCache.set(cacheKey, material);
+    return material;
+  }
+
+  /**
+   * Create a carpet material using procedural textures
+   */
+  public createProceduralCarpetMaterial(options: {
+    repeat?: { x: number; y: number };
+    color?: string;
+    roughness?: number;
+    metalness?: number;
+  } = {}): THREE.MeshStandardMaterial {
+    const {
+      repeat = { x: 4, y: 4 }, // More repeats for carpet
+      color = '#8B0000',
+      roughness = 0.9,
+      metalness = 0.0
+    } = options;
+
+    const cacheKey = `proc_carpet_${repeat.x}_${repeat.y}_${color}_${roughness}`;
+    
+    if (this.materialCache.has(cacheKey)) {
+      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
+    }
+
+    const diffuseTexture = this.proceduralTextures.createCarpetTexture({
+      color,
+      roughness: 0.8
+    });
+    diffuseTexture.repeat.set(repeat.x, repeat.y);
+
+    const material = new THREE.MeshStandardMaterial({
+      map: diffuseTexture,
+      roughness,
+      metalness,
+    });
+
+    this.materialCache.set(cacheKey, material);
+    return material;
+  }
+
+  /**
+   * Create a ceiling material using procedural textures
+   */
+  public createProceduralCeilingMaterial(options: {
+    repeat?: { x: number; y: number };
+    color?: string;
+    bumpiness?: number;
+    roughness?: number;
+  } = {}): THREE.MeshStandardMaterial {
+    const {
+      repeat = { x: 2, y: 2 },
+      color = '#F5F5DC',
+      bumpiness = 0.4,
+      roughness = 0.7
+    } = options;
+
+    const cacheKey = `proc_ceiling_${repeat.x}_${repeat.y}_${color}_${bumpiness}`;
+    
+    if (this.materialCache.has(cacheKey)) {
+      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
+    }
+
+    const diffuseTexture = this.proceduralTextures.createCeilingTexture({
+      color,
+      bumpiness
+    });
+    diffuseTexture.repeat.set(repeat.x, repeat.y);
+
+    const material = new THREE.MeshStandardMaterial({
+      map: diffuseTexture,
+      roughness,
+      metalness: 0.0,
+    });
 
     this.materialCache.set(cacheKey, material);
     return material;

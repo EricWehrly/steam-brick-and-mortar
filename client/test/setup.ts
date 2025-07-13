@@ -23,6 +23,17 @@ class MockCanvas {
         drawImage: () => {},
         fillText: () => {},
         measureText: () => ({ width: 100 }),
+        createImageData: (width: number, height: number) => ({
+          width,
+          height,
+          data: new Uint8ClampedArray(width * height * 4)
+        }),
+        putImageData: () => {},
+        getImageData: (x: number, y: number, width: number, height: number) => ({
+          width,
+          height,
+          data: new Uint8ClampedArray(width * height * 4)
+        }),
         font: '',
         fillStyle: '',
         textAlign: 'left',
@@ -79,6 +90,17 @@ if (typeof globalThis !== 'undefined') {
           drawImage: () => {},
           fillText: () => {},
           measureText: () => ({ width: 100 }),
+          createImageData: (width: number, height: number) => ({
+            width,
+            height,
+            data: new Uint8ClampedArray(width * height * 4)
+          }),
+          putImageData: () => {},
+          getImageData: (x: number, y: number, width: number, height: number) => ({
+            width,
+            height,
+            data: new Uint8ClampedArray(width * height * 4)
+          }),
           font: '',
           fillStyle: '',
           textAlign: 'left',

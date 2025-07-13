@@ -13,6 +13,7 @@ import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { BlockbusterColors } from '../utils/Colors'
 import { MaterialUtils } from '../utils/MaterialUtils'
+import { TextureManager } from '../utils/TextureManager'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -26,10 +27,14 @@ export class SceneManager {
     private camera: THREE.PerspectiveCamera
     private renderer: THREE.WebGLRenderer
     private animationId: number | null = null
+    private textureManager: TextureManager
 
     constructor(options: SceneManagerOptions = {}) {
         // Initialize RectAreaLight uniforms (required for RectAreaLight to work)
         RectAreaLightUniformsLib.init()
+        
+        // Initialize texture manager
+        this.textureManager = TextureManager.getInstance()
         
         // Initialize Three.js components
         this.scene = new THREE.Scene()
@@ -157,11 +162,19 @@ export class SceneManager {
     }
 
     /**
-     * Create a floor plane
+     * Create a floor plane with procedural carpet texture
      */
     public createFloor(size: number = 20, _color: number = BlockbusterColors.floor, y: number = -2): THREE.Mesh {
         const floorGeometry = new THREE.PlaneGeometry(size, size)
-        const floorMaterial = MaterialUtils.createFloorMaterial()
+        
+        // Use procedural carpet material instead of basic material
+        const floorMaterial = this.textureManager.createProceduralCarpetMaterial({
+            repeat: { x: size / 4, y: size / 4 }, // Scale texture appropriately for room size
+            color: '#8B0000', // Blockbuster red carpet
+            roughness: 0.9,
+            metalness: 0.0
+        })
+        
         const floor = new THREE.Mesh(floorGeometry, floorMaterial)
         floor.rotation.x = -Math.PI / 2
         floor.position.y = y
@@ -171,11 +184,19 @@ export class SceneManager {
     }
 
     /**
-     * Create a ceiling plane
+     * Create a ceiling plane with procedural texture
      */
     public createCeiling(size: number = 20, y: number = 4): THREE.Mesh {
         const ceilingGeometry = new THREE.PlaneGeometry(size, size)
-        const ceilingMaterial = MaterialUtils.createCeilingMaterial()
+        
+        // Use procedural ceiling material with popcorn texture
+        const ceilingMaterial = this.textureManager.createProceduralCeilingMaterial({
+            repeat: { x: size / 8, y: size / 8 }, // More repeats for ceiling texture detail
+            color: '#F5F5DC', // Beige ceiling color
+            bumpiness: 0.4,
+            roughness: 0.7
+        })
+        
         const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
         ceiling.rotation.x = Math.PI / 2 // Face down
         ceiling.position.y = y

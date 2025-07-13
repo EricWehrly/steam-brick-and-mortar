@@ -15,11 +15,18 @@ export class ProceduralShelfGenerator {
   }
 
   /**
-   * Create a wood material for shelves
+   * Create a wood material for shelves with procedural texture
    */
   private createWoodMaterial(): THREE.Material {
-    // Use simple wood material for now, can be enhanced with textures later
-    return this.textureManager.createSimpleWoodMaterial(new THREE.Color(0x8B4513));
+    // Use procedural wood texture for realistic appearance
+    return this.textureManager.createProceduralWoodMaterial({
+      repeat: { x: 2, y: 1 }, // Wood grain runs along the length
+      color1: '#8B4513', // Saddle brown
+      color2: '#A0522D', // Sienna
+      grainStrength: 0.4,
+      roughness: 0.8,
+      metalness: 0.1
+    });
   }
 
   /**
