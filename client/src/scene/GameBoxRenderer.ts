@@ -5,6 +5,7 @@
  * - Create and position game boxes
  * - Handle game box animations
  * - Manage placeholder vs real game boxes
+ * - Apply textures from Steam artwork
  */
 
 import * as THREE from 'three'
@@ -45,6 +46,13 @@ export interface SteamGameData {
     }
 }
 
+export interface GameBoxTextureOptions {
+    artworkBlobs?: Record<string, Blob | null>
+    preferredArtworkType?: 'library' | 'header' | 'logo' | 'icon'
+    fallbackColor?: number
+    enableFallbackTexture?: boolean
+}
+
 export class GameBoxRenderer {
     private static readonly DEFAULT_DIMENSIONS: GameBoxDimensions = {
         width: 0.15,
@@ -63,6 +71,8 @@ export class GameBoxRenderer {
     private dimensions: GameBoxDimensions
     private shelfConfig: ShelfConfiguration
     private gameBoxGeometry: THREE.BoxGeometry
+    private textureLoader: THREE.TextureLoader
+    private fallbackTexture: THREE.Texture | null = null
 
     constructor(
         dimensions: Partial<GameBoxDimensions> = {},
@@ -76,6 +86,9 @@ export class GameBoxRenderer {
             this.dimensions.height,
             this.dimensions.depth
         )
+        
+        this.textureLoader = new THREE.TextureLoader()
+        this.createFallbackTexture()
     }
 
     /**
@@ -128,12 +141,24 @@ export class GameBoxRenderer {
         game: SteamGameData, 
         index: number
     ): THREE.Mesh | null {
+        return this.createGameBoxWithTexture(scene, game, index)
+    }
+
+    /**
+     * Create a game box from Steam data with optional texture support
+     */
+    public createGameBoxWithTexture(
+        scene: THREE.Scene, 
+        game: SteamGameData, 
+        index: number,
+        textureOptions?: GameBoxTextureOptions
+    ): THREE.Mesh | null {
         // Check if we're within display limits
         if (index >= this.shelfConfig.maxGames) {
             return null
         }
 
-        // Create material with color based on game name
+        // Create material - start with fallback color for immediate display
         const colorHue = ValidationUtils.stringToHue(game.name)
         const material = new THREE.MeshPhongMaterial({ 
             color: new THREE.Color().setHSL(colorHue, 0.7, 0.5)
@@ -158,6 +183,17 @@ export class GameBoxRenderer {
         // Enable shadows
         gameBox.castShadow = true
         gameBox.receiveShadow = true
+        
+        // Apply texture if provided (async operation)
+        if (textureOptions) {
+            this.applyTexture(gameBox, game, textureOptions).then((success) => {
+                if (success) {
+                    console.log(`🖼️ Applied texture to game box: ${game.name}`)
+                }
+            }).catch((error) => {
+                console.warn(`⚠️ Failed to apply texture to ${game.name}:`, error)
+            })
+        }
         
         // Add to scene
         scene.add(gameBox)
@@ -276,5 +312,135 @@ export class GameBoxRenderer {
      */
     public dispose() {
         this.gameBoxGeometry.dispose()
+    }
+
+    /**
+     * Create fallback texture for game boxes
+     */
+    private createFallbackTexture() {
+        const size = 512
+        const data = new Uint8Array(size * size * 3)
+        for (let i = 0; i < data.length; i += 3) {
+            const color = (Math.random() * 0.5 + 0.5) * 255
+            data[i] = color // R
+            data[i + 1] = color // G
+            data[i + 2] = color // B
+        }
+        const texture = new THREE.DataTexture(data, size, size, THREE.RGBFormat)
+        texture.needsUpdate = true
+        this.fallbackTexture = texture
+    }
+
+    /**
+     * Apply texture to a game box mesh
+     */
+    public async applyTexture(
+        mesh: THREE.Mesh, 
+        game: SteamGameData, 
+        options: GameBoxTextureOptions = {}
+    ): Promise<boolean> {
+        // Dispose of existing texture
+        if (mesh.userData.texture) {
+            mesh.userData.texture.dispose()
+        }
+        
+        const { artworkBlobs, fallbackColor, enableFallbackTexture } = options
+        
+        // Early return if no artwork blobs provided
+        if (!artworkBlobs) {
+            this.applyFallbackToMesh(mesh, fallbackColor, enableFallbackTexture)
+            return false
+        }
+
+        // Try to get artwork blob (prioritize library > header > logo > icon)
+        const artworkTypes = ['library', 'header', 'logo', 'icon'] as const
+        let selectedBlob: Blob | null = null
+        
+        for (const artworkType of artworkTypes) {
+            const blob = artworkBlobs[artworkType]
+            if (blob) {
+                selectedBlob = blob
+                break
+            }
+        }
+
+        if (!selectedBlob) {
+            this.applyFallbackToMesh(mesh, fallbackColor, enableFallbackTexture)
+            return false
+        }
+
+        try {
+            const texture = await this.createTextureFromBlob(selectedBlob)
+            
+            // Apply texture to the game box - properly type the material
+            const material = mesh.material as THREE.MeshPhongMaterial
+            if (material && material instanceof THREE.MeshPhongMaterial) {
+                material.map = texture
+                material.color.set(0xffffff) // Reset color to white for proper texture display
+                material.needsUpdate = true
+                mesh.userData.texture = texture
+            }
+            
+            return true
+        } catch (error) {
+            console.warn('⚠️ Failed to create texture from blob:', error)
+            this.applyFallbackToMesh(mesh, fallbackColor, enableFallbackTexture)
+            return false
+        }
+    }
+
+    /**
+     * Create a Three.js texture from a Blob
+     */
+    private async createTextureFromBlob(blob: Blob): Promise<THREE.Texture> {
+        return new Promise((resolve, reject) => {
+            const objectUrl = URL.createObjectURL(blob)
+            
+            this.textureLoader.load(
+                objectUrl,
+                (texture) => {
+                    // Configure texture for optimal quality
+                    texture.anisotropy = Math.min(16, this.textureLoader.crossOrigin ? 16 : 4)
+                    texture.wrapS = THREE.ClampToEdgeWrapping
+                    texture.wrapT = THREE.ClampToEdgeWrapping
+                    texture.minFilter = THREE.LinearFilter
+                    texture.magFilter = THREE.LinearFilter
+                    texture.needsUpdate = true
+                    
+                    // Clean up the object URL
+                    URL.revokeObjectURL(objectUrl)
+                    resolve(texture)
+                },
+                undefined,
+                (error) => {
+                    URL.revokeObjectURL(objectUrl)
+                    reject(error)
+                }
+            )
+        })
+    }
+
+    /**
+     * Apply fallback appearance to a mesh
+     */
+    private applyFallbackToMesh(
+        mesh: THREE.Mesh, 
+        fallbackColor?: number, 
+        enableFallbackTexture = true
+    ): void {
+        const material = mesh.material as THREE.MeshPhongMaterial
+        
+        if (enableFallbackTexture && this.fallbackTexture && material instanceof THREE.MeshPhongMaterial) {
+            // Apply fallback texture pattern
+            material.map = this.fallbackTexture
+            material.color.set(0xffffff)
+            material.needsUpdate = true
+        } else if (material instanceof THREE.MeshPhongMaterial) {
+            // Apply solid color fallback
+            const color = fallbackColor ?? 0x808080 // Default gray
+            material.map = null // Remove any existing texture
+            material.color.set(color)
+            material.needsUpdate = true
+        }
     }
 }

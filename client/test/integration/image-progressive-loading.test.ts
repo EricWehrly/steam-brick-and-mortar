@@ -174,8 +174,11 @@ describe('Image Progressive Loading Integration Tests', () => {
             const mockImageBlob = createMockBlob()
             const mockImageResponse = createMockFetchResponse(mockImageBlob)
             
-            // Clear any existing cache first
-            steamClient.clearCache()
+            // Clear any existing cache first and wait for completion
+            await steamClient.clearCache()
+            
+            // Give the IndexedDB mock time to complete the clear operation
+            await new Promise(resolve => setTimeout(resolve, 10))
             
             fetchMock.mockResolvedValue(mockImageResponse)
 

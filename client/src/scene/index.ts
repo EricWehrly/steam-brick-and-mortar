@@ -9,5 +9,6 @@ export {
     type GameBoxDimensions, 
     type GameBoxPosition, 
     type ShelfConfiguration,
-    type SteamGameData 
+    type SteamGameData,
+    type GameBoxTextureOptions
 } from './GameBoxRenderer'

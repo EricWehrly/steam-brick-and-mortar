@@ -203,8 +203,9 @@ export class SteamApiClient {
     /**
      * Cache management
      */
-    public clearCache(): void {
+    public async clearCache(): Promise<void> {
         this.cache.clear()
+        await this.images.clearCache()
     }
 
     public getCacheStats() {
