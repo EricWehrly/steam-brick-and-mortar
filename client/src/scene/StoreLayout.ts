@@ -3,19 +3,57 @@ import { ProceduralShelfGenerator } from './ProceduralShelfGenerator';
 import { TextureManager } from '../utils/TextureManager';
 
 /**
+ * VR Ergonomic Constants based on Phase 2C research
+ * See: docs/research/phase2c-store-layout-spatial-research.md
+ */
+export const VR_ERGONOMICS = {
+  MINIMUM_INTERACTION_DISTANCE: 0.75,  // meters
+  OPTIMAL_INTERACTION_DISTANCE: 1.2,   // meters  
+  MAXIMUM_READABLE_DISTANCE: 20,       // meters
+  PERSONAL_SPACE_BUFFER: 0.5,          // meters
+  COMFORTABLE_AISLE_WIDTH: 2.2,        // meters (wider than retail 1.07m)
+  TURNING_RADIUS: 0.75,                // meters (radius)
+  SHELF_MIN_HEIGHT: 0.8,               // meters
+  SHELF_MAX_HEIGHT: 2.0,               // meters
+  SHELF_OPTIMAL_HEIGHT: 1.4            // meters (eye level)
+} as const;
+
+/**
+ * Steam Store Category Mapping
+ * Maps Steam game genres to physical store sections
+ */
+export const STEAM_STORE_SECTIONS = {
+  NEW_TRENDING: 'new-trending',
+  ACTION: 'action',
+  ADVENTURE: 'adventure', 
+  RPG: 'rpg',
+  STRATEGY: 'strategy',
+  CASUAL: 'casual'
+} as const;
+
+/**
  * Store layout configuration
  */
 export interface StoreLayoutConfig {
-  // Room dimensions
+  // Room dimensions (VR-optimized)
   width: number;
   height: number;
   depth: number;
+  
+  // Entrance area
+  entranceZone: {
+    width: number;
+    depth: number;
+    position: THREE.Vector3;
+  };
   
   // Shelf configuration
   shelfRows: number;
   shelfUnitsPerRow: number;
   shelfSpacing: number;
   aisleWidth: number;
+  mainAisleWidth: number;
+  wallClearance: number;
   
   // Store sections
   sections: StoreSection[];
@@ -26,6 +64,16 @@ export interface StoreSection {
   position: THREE.Vector3;
   shelfCount: number;
   category: string;
+  priority: 'high' | 'medium' | 'low';
+  description?: string;
+}
+
+export interface NavigationWaypoint {
+  id: string;
+  position: THREE.Vector3;
+  type: 'entrance' | 'section' | 'aisle' | 'checkout';
+  category?: string;
+  description?: string;
 }
 
 /**
@@ -47,60 +95,87 @@ export class StoreLayout {
   }
 
   /**
-   * Create a default Blockbuster-style store layout
+   * Create VR-optimized Steam store layout based on Phase 2C research
+   * Enhanced dimensions, Steam categories, and VR ergonomics
    */
   public createDefaultLayout(): StoreLayoutConfig {
     return {
-      width: 20,
-      height: 3,
-      depth: 15,
-      shelfRows: 4,
-      shelfUnitsPerRow: 6,
-      shelfSpacing: 2.2,
-      aisleWidth: 2.0,
+      // VR-optimized room dimensions
+      width: 22,    // Enhanced from 20m for entrance buffer
+      height: 3.2,  // Slightly higher ceiling
+      depth: 16,    // Enhanced from 15m for back wall clearance
+      
+      // VR-optimized navigation
+      shelfRows: 2,                               // Front and back rows
+      shelfUnitsPerRow: 3,                        // 3 sections per row
+      shelfSpacing: 6.5,                          // Between sections
+      aisleWidth: VR_ERGONOMICS.COMFORTABLE_AISLE_WIDTH,  // 2.2m
+      mainAisleWidth: 3.0,                        // Central aisle
+      wallClearance: 1.0,                         // Distance from walls
+      
+      // Enhanced entrance zone for VR orientation
+      entranceZone: {
+        width: 6,                                 // Full width entrance
+        depth: 3,                                 // 3m buffer for orientation
+        position: new THREE.Vector3(0, 0, 6.5)
+      },
+      
+      // Steam game categories mapped to store sections
       sections: [
         {
-          name: 'New Releases',
-          position: new THREE.Vector3(-8, 0, 5),
+          name: 'New & Trending',
+          position: new THREE.Vector3(-6.5, 0, 3),    // Front-left (high visibility)
           shelfCount: 3,
-          category: 'new-releases'
+          category: STEAM_STORE_SECTIONS.NEW_TRENDING,
+          priority: 'high',
+          description: 'Recently Released & Popular Games'
         },
         {
-          name: 'Action',
-          position: new THREE.Vector3(-2, 0, 5),
+          name: 'Action Games',
+          position: new THREE.Vector3(0, 0, 3),        // Front-center  
           shelfCount: 4,
-          category: 'action'
+          category: STEAM_STORE_SECTIONS.ACTION,
+          priority: 'high',
+          description: 'Action, FPS & Fighting Games'
         },
         {
-          name: 'Comedy',
-          position: new THREE.Vector3(4, 0, 5),
+          name: 'Adventure & Story',
+          position: new THREE.Vector3(6.5, 0, 3),      // Front-right
           shelfCount: 3,
-          category: 'comedy'
+          category: STEAM_STORE_SECTIONS.ADVENTURE,
+          priority: 'medium',
+          description: 'Adventure & Narrative Games'
         },
         {
-          name: 'Family',
-          position: new THREE.Vector3(-8, 0, 0),
+          name: 'RPG & Fantasy',
+          position: new THREE.Vector3(-6.5, 0, -3),    // Back-left
           shelfCount: 4,
-          category: 'family'
+          category: STEAM_STORE_SECTIONS.RPG,
+          priority: 'medium',
+          description: 'RPG, JRPG & Fantasy Games'
         },
         {
-          name: 'Drama',
-          position: new THREE.Vector3(-2, 0, 0),
+          name: 'Strategy & Sim',
+          position: new THREE.Vector3(0, 0, -3),       // Back-center
           shelfCount: 3,
-          category: 'drama'
+          category: STEAM_STORE_SECTIONS.STRATEGY,
+          priority: 'medium',
+          description: 'Strategy & Simulation Games'
         },
         {
-          name: 'Horror',
-          position: new THREE.Vector3(4, 0, 0),
+          name: 'Casual & Family',
+          position: new THREE.Vector3(6.5, 0, -3),     // Back-right
           shelfCount: 2,
-          category: 'horror'
+          category: STEAM_STORE_SECTIONS.CASUAL,
+          priority: 'low',
+          description: 'Casual & Family Friendly Games'
         }
       ]
     };
   }
 
   /**
-   * Generate the complete store layout
+   * Generate the complete VR-optimized store layout with navigation aids
    */
   public async generateStore(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
     // Clear existing store
@@ -114,6 +189,9 @@ export class StoreLayout {
 
     // Add entrance and checkout area
     this.createEntranceArea(config);
+
+    // Add VR navigation aids and waypoints
+    this.createNavigationAids(config);
   }
 
   /**
@@ -278,6 +356,176 @@ export class StoreLayout {
         depth: config.depth
       }
     };
+  }
+
+  /**
+   * Create navigation waypoints for VR movement assistance
+   */
+  public createNavigationWaypoints(config: StoreLayoutConfig = this.createDefaultLayout()): NavigationWaypoint[] {
+    const waypoints: NavigationWaypoint[] = [];
+
+    // Entrance waypoint
+    waypoints.push({
+      id: 'entrance',
+      position: config.entranceZone.position.clone(),
+      type: 'entrance',
+      description: 'Store Entrance'
+    });
+
+    // Section waypoints (in front of each section for comfortable interaction)
+    config.sections.forEach((section, _index) => {
+      const waypointPosition = section.position.clone();
+      waypointPosition.z += VR_ERGONOMICS.OPTIMAL_INTERACTION_DISTANCE; // Position for comfortable interaction
+      
+      waypoints.push({
+        id: `section-${section.category}`,
+        position: waypointPosition,
+        type: 'section',
+        category: section.category,
+        description: section.description || section.name
+      });
+    });
+
+    // Central aisle waypoints for navigation
+    const aisleWaypoints = [
+      new THREE.Vector3(-3.25, 0, 0),  // Left aisle center
+      new THREE.Vector3(0, 0, 0),     // Store center
+      new THREE.Vector3(3.25, 0, 0),  // Right aisle center
+    ];
+
+    aisleWaypoints.forEach((position, index) => {
+      waypoints.push({
+        id: `aisle-${index}`,
+        position: position,
+        type: 'aisle',
+        description: `Navigation Point ${index + 1}`
+      });
+    });
+
+    return waypoints;
+  }
+
+  /**
+   * Create visual navigation aids (category markers, floor indicators)
+   */
+  public createNavigationAids(config: StoreLayoutConfig = this.createDefaultLayout()): void {
+    const waypoints = this.createNavigationWaypoints(config);
+
+    waypoints.forEach(waypoint => {
+      if (waypoint.type === 'section') {
+        this.createCategoryMarker(waypoint);
+      } else if (waypoint.type === 'aisle') {
+        this.createFloorMarker(waypoint);
+      }
+    });
+
+    // Create aisle boundary indicators
+    this.createAisleBoundaries(config);
+  }
+
+  /**
+   * Create floating category marker above each section
+   */
+  private createCategoryMarker(waypoint: NavigationWaypoint): void {
+    const markerGroup = new THREE.Group();
+
+    // Create a floating platform for the category name
+    const platformGeometry = new THREE.CylinderGeometry(0.8, 0.8, 0.1, 8);
+    const platformMaterial = new THREE.MeshLambertMaterial({ 
+      color: this.getCategoryColor(waypoint.category || ''),
+      transparent: true,
+      opacity: 0.8
+    });
+    
+    const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+    platform.position.copy(waypoint.position);
+    platform.position.y = VR_ERGONOMICS.SHELF_MAX_HEIGHT + 0.5; // Float above shelves
+    
+    markerGroup.add(platform);
+    
+    // Add a gentle glow effect (simple emissive material)
+    const glowGeometry = new THREE.SphereGeometry(1.0, 8, 6);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: this.getCategoryColor(waypoint.category || ''),
+      transparent: true,
+      opacity: 0.2
+    });
+    
+    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+    glow.position.copy(platform.position);
+    markerGroup.add(glow);
+
+    this.storeGroup.add(markerGroup);
+  }
+
+  /**
+   * Create subtle floor navigation markers
+   */
+  private createFloorMarker(waypoint: NavigationWaypoint): void {
+    const markerGeometry = new THREE.RingGeometry(0.3, 0.5, 8);
+    const markerMaterial = new THREE.MeshLambertMaterial({
+      color: 0x4444FF,
+      transparent: true,
+      opacity: 0.3
+    });
+    
+    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+    marker.rotation.x = -Math.PI / 2; // Lay flat on floor
+    marker.position.copy(waypoint.position);
+    marker.position.y = 0.01; // Slightly above floor
+    
+    this.storeGroup.add(marker);
+  }
+
+  /**
+   * Create visual aisle boundaries for navigation clarity
+   */
+  private createAisleBoundaries(config: StoreLayoutConfig): void {
+    const boundaryMaterial = new THREE.LineBasicMaterial({
+      color: 0x666666,
+      transparent: true,
+      opacity: 0.2
+    });
+
+    // Create subtle lines marking aisle edges
+    const aislePositions = [-6.5, 0, 6.5]; // Section center positions
+    
+    aislePositions.forEach(x => {
+      // Front to back aisle lines
+      const points = [
+        new THREE.Vector3(x - config.aisleWidth/2, 0.02, -config.depth/2 + 2),
+        new THREE.Vector3(x - config.aisleWidth/2, 0.02, config.depth/2 - 2),
+        new THREE.Vector3(x + config.aisleWidth/2, 0.02, config.depth/2 - 2),
+        new THREE.Vector3(x + config.aisleWidth/2, 0.02, -config.depth/2 + 2)
+      ];
+      
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.Line(geometry, boundaryMaterial);
+      this.storeGroup.add(line);
+    });
+  }
+
+  /**
+   * Get category-specific colors for visual organization
+   */
+  private getCategoryColor(category: string): number {
+    const colorMap: { [key: string]: number } = {
+      [STEAM_STORE_SECTIONS.NEW_TRENDING]: 0xFF6B35,  // Orange - attention grabbing
+      [STEAM_STORE_SECTIONS.ACTION]: 0xFF3131,        // Red - energetic
+      [STEAM_STORE_SECTIONS.ADVENTURE]: 0x4ECDC4,     // Teal - exploration
+      [STEAM_STORE_SECTIONS.RPG]: 0x9B59B6,           // Purple - fantasy
+      [STEAM_STORE_SECTIONS.STRATEGY]: 0x3498DB,      // Blue - analytical
+      [STEAM_STORE_SECTIONS.CASUAL]: 0x2ECC71         // Green - relaxing
+    };
+    
+    return colorMap[category] || 0x95A5A6; // Default gray
+  }
+
+  /**
+   * Get all navigation waypoints for external systems (VR movement, etc.)
+   */
+  public getNavigationWaypoints(): NavigationWaypoint[] {
+    return this.createNavigationWaypoints();
   }
 
   /**
