@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { ProceduralShelfGenerator } from '../src/scene/ProceduralShelfGenerator';
+import { ProceduralShelfGenerator } from '../../src/scene/ProceduralShelfGenerator';
 
 // Create a simple visual test scene
 export function createShelfVisualTest(): void {
