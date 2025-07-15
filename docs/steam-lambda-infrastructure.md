@@ -164,7 +164,7 @@ resource "aws_secretsmanager_secret" "steam_api_key" {
 **Development**:
 - Domain: `dev-steam-api.{domain}`
 - Rate limit: 100 req/min
-- CORS origins: `["http://localhost:3000", "http://localhost:5173"]`
+- CORS origins: `["http://localhost:3000", "http://localhost:5173"]` (supports both custom and default Vite ports)
 
 **Production**:
 - Domain: `steam-api.{domain}`
