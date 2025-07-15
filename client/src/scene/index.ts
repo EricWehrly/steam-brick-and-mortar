@@ -12,3 +12,12 @@ export {
     type SteamGameData 
 } from './GameBoxRenderer'
 export { SignageRenderer, type SignageConfig } from './SignageRenderer'
+export { 
+    StoreLayout, 
+    type StoreLayoutConfig, 
+    type StoreSection, 
+    type NavigationWaypoint,
+    VR_ERGONOMICS,
+    STEAM_STORE_SECTIONS 
+} from './StoreLayout'
+export { ProceduralShelfGenerator } from './ProceduralShelfGenerator'

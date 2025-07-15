@@ -14,7 +14,7 @@
 import * as THREE from 'three'
 import { ValidationUtils } from '../utils'
 import { UIManager } from '../ui'
-import { SceneManager, AssetLoader, GameBoxRenderer, SignageRenderer, type SteamGameData } from '../scene'
+import { SceneManager, AssetLoader, GameBoxRenderer, SignageRenderer, StoreLayout, type SteamGameData } from '../scene'
 import { SteamIntegration, type ProgressCallbacks } from '../steam-integration'
 import { WebXRManager, type WebXRCapabilities } from '../webxr/WebXRManager'
 import { InputManager } from '../webxr/InputManager'
@@ -47,6 +47,7 @@ export class SteamBrickAndMortarApp {
     private assetLoader: AssetLoader
     private gameBoxRenderer: GameBoxRenderer
     private signageRenderer: SignageRenderer
+    private storeLayout: StoreLayout
     private steamIntegration: SteamIntegration
     private webxrManager: WebXRManager
     private inputManager: InputManager
@@ -68,6 +69,9 @@ export class SteamBrickAndMortarApp {
         this.assetLoader = new AssetLoader()
         this.gameBoxRenderer = new GameBoxRenderer()
         this.signageRenderer = new SignageRenderer()
+        
+        // Initialize VR-optimized store layout (Phase 2C)
+        this.storeLayout = new StoreLayout(this.sceneManager.getScene())
         
         // Initialize Steam integration
         this.steamIntegration = new SteamIntegration({
@@ -144,6 +148,7 @@ export class SteamBrickAndMortarApp {
         console.log('🧹 Disposing application resources...')
         
         this.signageRenderer.dispose()
+        this.storeLayout.dispose()
         this.inputManager.dispose()
         this.webxrManager.dispose()
         this.sceneManager.dispose()
@@ -155,9 +160,9 @@ export class SteamBrickAndMortarApp {
     // Scene Setup Methods
 
     private async setupScene(): Promise<void> {
-        // Create floor and ceiling
-        this.sceneManager.createFloor()
-        this.sceneManager.createCeiling()
+        // Generate the complete VR-optimized store layout with Steam categories
+        console.log('🏪 Generating VR-optimized store layout...')
+        await this.storeLayout.generateStore()
         
         // Create visible fluorescent fixtures
         this.sceneManager.createFluorescentFixtures()
@@ -165,13 +170,17 @@ export class SteamBrickAndMortarApp {
         // Create Blockbuster signage
         this.signageRenderer.createStandardSigns(this.sceneManager.getScene())
         
-        // Load shelf model
+        // Load shelf model (legacy - may be replaced by procedural shelves)
         await this.loadShelfModel()
         
         // Add test cube for reference
         this.addTestCube()
         
-        console.log('✅ Scene setup complete')
+        // Log store stats
+        const stats = this.storeLayout.getStoreStats()
+        console.log('📊 Store Stats:', stats)
+        
+        console.log('✅ VR-optimized scene setup complete with Steam categories!')
     }
 
     private async loadShelfModel(): Promise<void> {
