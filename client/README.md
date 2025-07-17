@@ -23,9 +23,19 @@ yarn test
 - `yarn dev` / `yarn serve` - Start development server with hot reload
 - `yarn build` - Build production bundle
 - `yarn preview` - Preview production build locally
-- `yarn test` - Run tests in watch mode
-- `yarn test:run` - Run tests once
+
+### Testing Commands
+
+- `yarn test` - Run unit and integration tests
+- `yarn test:watch` - Run tests in watch mode
 - `yarn test:ui` - Run tests with UI
+- `yarn test:performance` - Run performance tests (slower, separate from unit tests)
+- `yarn test:live` - Run live integration tests (requires API access)
+- `yarn test:all` - Run all tests including live tests
+- `yarn test:everything` - Run all tests including performance tests
+
+### Code Quality
+
 - `yarn lint` - Check code for issues
 - `yarn lint:fix` - Fix automatically fixable issues
 - `yarn clean` - Clean build artifacts and dependencies
