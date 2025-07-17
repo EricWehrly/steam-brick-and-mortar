@@ -189,9 +189,6 @@ export class StoreLayout {
 
     // Add entrance and checkout area
     this.createEntranceArea(config);
-
-    // Add VR navigation aids and waypoints
-    this.createNavigationAids(config);
   }
 
   /**
@@ -222,8 +219,11 @@ export class StoreLayout {
     ceiling.position.y = config.height;
     this.storeGroup.add(ceiling);
 
-    // Create walls (simple for now)
-    const wallMaterial = this.textureManager.createSimpleWoodMaterial(new THREE.Color(0xF5F5DC));
+    // Create walls with proper textures
+    const wallMaterial = await this.textureManager.createWoodMaterial({
+      color: new THREE.Color(0xF5F5DC), // Beige
+      repeat: { x: 4, y: 2 }
+    });
     
     // Back wall
     const backWallGeometry = new THREE.PlaneGeometry(config.width, config.height);
@@ -281,12 +281,39 @@ export class StoreLayout {
   }
 
   /**
-   * Add a section label above the shelves
+   * Add a section label above the shelves using proper text signage
    */
   private addSectionLabel(sectionGroup: THREE.Group, section: StoreSection): void {
-    // Create a simple box as placeholder for section signage
-    const labelGeometry = new THREE.BoxGeometry(1.5, 0.3, 0.1);
-    const labelMaterial = this.textureManager.createSimpleWoodMaterial(new THREE.Color(0x000080));
+    // Create a canvas for the text
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return;
+    
+    // Style the text
+    ctx.fillStyle = '#000080'; // Blue background
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#FFFFFF'; // White text
+    ctx.font = '48px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Get display name for the section
+    const displayName = this.getSectionDisplayName(section.name);
+    ctx.fillText(displayName, canvas.width / 2, canvas.height / 2);
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    
+    // Create sign geometry and material
+    const labelGeometry = new THREE.PlaneGeometry(2.0, 0.5);
+    const labelMaterial = new THREE.MeshStandardMaterial({
+      map: texture,
+      transparent: true
+    });
     
     const label = new THREE.Mesh(labelGeometry, labelMaterial);
     label.position.set(
@@ -296,6 +323,22 @@ export class StoreLayout {
     );
     
     sectionGroup.add(label);
+  }
+
+  /**
+   * Get display name for section
+   */
+  private getSectionDisplayName(sectionName: string): string {
+    const displayNames: { [key: string]: string } = {
+      'new-trending': 'NEW & TRENDING',
+      'action': 'ACTION',
+      'adventure': 'ADVENTURE & STORY',
+      'rpg': 'RPG & FANTASY',
+      'strategy': 'STRATEGY & SIM',
+      'casual': 'CASUAL & FAMILY'
+    };
+    
+    return displayNames[sectionName] || sectionName.toUpperCase();
   }
 
   /**
