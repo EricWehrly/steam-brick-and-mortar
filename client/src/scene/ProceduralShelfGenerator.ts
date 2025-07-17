@@ -73,13 +73,13 @@ export class ProceduralShelfGenerator {
     // Front angled board
     const frontBoard = new THREE.Mesh(angledBoardGeometry, woodMaterial);
     frontBoard.position.set(0, height / 2, depth / 2);
-    frontBoard.rotation.z = angleRad;
+    frontBoard.rotation.x = -angleRad; // Changed from z to x, negative for backward lean
     shelfGroup.add(frontBoard);
 
     // Back angled board
     const backBoard = new THREE.Mesh(angledBoardGeometry, woodMaterial);
     backBoard.position.set(0, height / 2, -depth / 2);
-    backBoard.rotation.z = -angleRad;
+    backBoard.rotation.x = angleRad; // Changed from z to x, positive for backward lean
     shelfGroup.add(backBoard);
 
     // Create the two side boards
