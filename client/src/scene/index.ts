@@ -16,7 +16,6 @@ export {
     StoreLayout, 
     type StoreLayoutConfig, 
     type StoreSection, 
-    type NavigationWaypoint,
     VR_ERGONOMICS,
     STEAM_STORE_SECTIONS 
 } from './StoreLayout'

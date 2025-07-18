@@ -68,14 +68,6 @@ export interface StoreSection {
   description?: string;
 }
 
-export interface NavigationWaypoint {
-  id: string;
-  position: THREE.Vector3;
-  type: 'entrance' | 'section' | 'aisle' | 'checkout';
-  category?: string;
-  description?: string;
-}
-
 /**
  * Manages the overall store layout and shelf placement
  * Based on Blockbuster store design principles
@@ -105,7 +97,7 @@ export class StoreLayout {
       height: 3.2,  // Slightly higher ceiling
       depth: 16,    // Enhanced from 15m for back wall clearance
       
-      // VR-optimized navigation
+
       shelfRows: 2,                               // Front and back rows
       shelfUnitsPerRow: 3,                        // 3 sections per row
       shelfSpacing: 6.5,                          // Between sections
@@ -175,7 +167,7 @@ export class StoreLayout {
   }
 
   /**
-   * Generate the complete VR-optimized store layout with navigation aids
+   * Generate the complete VR-optimized store layout
    */
   public async generateStore(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
     // Clear existing store
@@ -399,176 +391,6 @@ export class StoreLayout {
         depth: config.depth
       }
     };
-  }
-
-  /**
-   * Create navigation waypoints for VR movement assistance
-   */
-  public createNavigationWaypoints(config: StoreLayoutConfig = this.createDefaultLayout()): NavigationWaypoint[] {
-    const waypoints: NavigationWaypoint[] = [];
-
-    // Entrance waypoint
-    waypoints.push({
-      id: 'entrance',
-      position: config.entranceZone.position.clone(),
-      type: 'entrance',
-      description: 'Store Entrance'
-    });
-
-    // Section waypoints (in front of each section for comfortable interaction)
-    config.sections.forEach((section, _index) => {
-      const waypointPosition = section.position.clone();
-      waypointPosition.z += VR_ERGONOMICS.OPTIMAL_INTERACTION_DISTANCE; // Position for comfortable interaction
-      
-      waypoints.push({
-        id: `section-${section.category}`,
-        position: waypointPosition,
-        type: 'section',
-        category: section.category,
-        description: section.description || section.name
-      });
-    });
-
-    // Central aisle waypoints for navigation
-    const aisleWaypoints = [
-      new THREE.Vector3(-3.25, 0, 0),  // Left aisle center
-      new THREE.Vector3(0, 0, 0),     // Store center
-      new THREE.Vector3(3.25, 0, 0),  // Right aisle center
-    ];
-
-    aisleWaypoints.forEach((position, index) => {
-      waypoints.push({
-        id: `aisle-${index}`,
-        position: position,
-        type: 'aisle',
-        description: `Navigation Point ${index + 1}`
-      });
-    });
-
-    return waypoints;
-  }
-
-  /**
-   * Create visual navigation aids (category markers, floor indicators)
-   */
-  public createNavigationAids(config: StoreLayoutConfig = this.createDefaultLayout()): void {
-    const waypoints = this.createNavigationWaypoints(config);
-
-    waypoints.forEach(waypoint => {
-      if (waypoint.type === 'section') {
-        this.createCategoryMarker(waypoint);
-      } else if (waypoint.type === 'aisle') {
-        this.createFloorMarker(waypoint);
-      }
-    });
-
-    // Create aisle boundary indicators
-    this.createAisleBoundaries(config);
-  }
-
-  /**
-   * Create floating category marker above each section
-   */
-  private createCategoryMarker(waypoint: NavigationWaypoint): void {
-    const markerGroup = new THREE.Group();
-
-    // Create a floating platform for the category name
-    const platformGeometry = new THREE.CylinderGeometry(0.8, 0.8, 0.1, 8);
-    const platformMaterial = new THREE.MeshLambertMaterial({ 
-      color: this.getCategoryColor(waypoint.category || ''),
-      transparent: true,
-      opacity: 0.8
-    });
-    
-    const platform = new THREE.Mesh(platformGeometry, platformMaterial);
-    platform.position.copy(waypoint.position);
-    platform.position.y = VR_ERGONOMICS.SHELF_MAX_HEIGHT + 0.5; // Float above shelves
-    
-    markerGroup.add(platform);
-    
-    // Add a gentle glow effect (simple emissive material)
-    const glowGeometry = new THREE.SphereGeometry(1.0, 8, 6);
-    const glowMaterial = new THREE.MeshBasicMaterial({
-      color: this.getCategoryColor(waypoint.category || ''),
-      transparent: true,
-      opacity: 0.2
-    });
-    
-    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-    glow.position.copy(platform.position);
-    markerGroup.add(glow);
-
-    this.storeGroup.add(markerGroup);
-  }
-
-  /**
-   * Create subtle floor navigation markers
-   */
-  private createFloorMarker(waypoint: NavigationWaypoint): void {
-    const markerGeometry = new THREE.RingGeometry(0.3, 0.5, 8);
-    const markerMaterial = new THREE.MeshLambertMaterial({
-      color: 0x4444FF,
-      transparent: true,
-      opacity: 0.3
-    });
-    
-    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-    marker.rotation.x = -Math.PI / 2; // Lay flat on floor
-    marker.position.copy(waypoint.position);
-    marker.position.y = 0.01; // Slightly above floor
-    
-    this.storeGroup.add(marker);
-  }
-
-  /**
-   * Create visual aisle boundaries for navigation clarity
-   */
-  private createAisleBoundaries(config: StoreLayoutConfig): void {
-    const boundaryMaterial = new THREE.LineBasicMaterial({
-      color: 0x666666,
-      transparent: true,
-      opacity: 0.2
-    });
-
-    // Create subtle lines marking aisle edges
-    const aislePositions = [-6.5, 0, 6.5]; // Section center positions
-    
-    aislePositions.forEach(x => {
-      // Front to back aisle lines
-      const points = [
-        new THREE.Vector3(x - config.aisleWidth/2, 0.02, -config.depth/2 + 2),
-        new THREE.Vector3(x - config.aisleWidth/2, 0.02, config.depth/2 - 2),
-        new THREE.Vector3(x + config.aisleWidth/2, 0.02, config.depth/2 - 2),
-        new THREE.Vector3(x + config.aisleWidth/2, 0.02, -config.depth/2 + 2)
-      ];
-      
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      const line = new THREE.Line(geometry, boundaryMaterial);
-      this.storeGroup.add(line);
-    });
-  }
-
-  /**
-   * Get category-specific colors for visual organization
-   */
-  private getCategoryColor(category: string): number {
-    const colorMap: { [key: string]: number } = {
-      [STEAM_STORE_SECTIONS.NEW_TRENDING]: 0xFF6B35,  // Orange - attention grabbing
-      [STEAM_STORE_SECTIONS.ACTION]: 0xFF3131,        // Red - energetic
-      [STEAM_STORE_SECTIONS.ADVENTURE]: 0x4ECDC4,     // Teal - exploration
-      [STEAM_STORE_SECTIONS.RPG]: 0x9B59B6,           // Purple - fantasy
-      [STEAM_STORE_SECTIONS.STRATEGY]: 0x3498DB,      // Blue - analytical
-      [STEAM_STORE_SECTIONS.CASUAL]: 0x2ECC71         // Green - relaxing
-    };
-    
-    return colorMap[category] || 0x95A5A6; // Default gray
-  }
-
-  /**
-   * Get all navigation waypoints for external systems (VR movement, etc.)
-   */
-  public getNavigationWaypoints(): NavigationWaypoint[] {
-    return this.createNavigationWaypoints();
   }
 
   /**

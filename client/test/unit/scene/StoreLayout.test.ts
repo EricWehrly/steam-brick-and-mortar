@@ -127,29 +127,4 @@ describe('StoreLayout', () => {
       expect(Math.abs(section.position.z)).toBeLessThanOrEqual(8);  // Within room bounds
     });
   });
-
-  it('should create navigation waypoints', () => {
-    const waypoints = storeLayout.getNavigationWaypoints();
-    
-    expect(waypoints.length).toBeGreaterThan(0);
-    
-    // Should have entrance waypoint
-    const entranceWaypoint = waypoints.find(w => w.type === 'entrance');
-    expect(entranceWaypoint).toBeDefined();
-    
-    // Should have section waypoints for each category
-    const sectionWaypoints = waypoints.filter(w => w.type === 'section');
-    expect(sectionWaypoints.length).toBe(6); // 6 Steam game sections
-    
-    // Should have aisle waypoints
-    const aisleWaypoints = waypoints.filter(w => w.type === 'aisle');
-    expect(aisleWaypoints.length).toBe(3); // 3 navigation points
-    
-    // Check waypoint positioning is within VR ergonomic ranges
-    waypoints.forEach(waypoint => {
-      expect(waypoint.id).toBeDefined();
-      expect(waypoint.position).toBeInstanceOf(THREE.Vector3);
-      expect(waypoint.type).toBeDefined();
-    });
-  });
 });

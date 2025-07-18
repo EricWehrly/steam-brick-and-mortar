@@ -13,3 +13,4 @@ export { SteamIntegrationMock, steamIntegrationMockFactory } from './steam-integ
 export { WebXRManagerMock, webxrManagerMockFactory } from './webxr/WebXRManager.mock'
 export { InputManagerMock, inputManagerMockFactory } from './webxr/InputManager.mock'
 export { UIManagerMock, uiManagerMockFactory } from './ui/UIManager.mock'
+export { MockTextureManager, createMockTextureManager } from './utils/TextureManager.mock'
