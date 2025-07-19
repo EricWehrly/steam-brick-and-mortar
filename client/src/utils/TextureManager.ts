@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { TextureLoader } from '../core/TextureLoader';
-import { WoodMaterialGenerator } from '../materials/WoodMaterialGenerator';
-import { CarpetMaterialGenerator } from '../materials/CarpetMaterialGenerator';
-import { CeilingMaterialGenerator } from '../materials/CeilingMaterialGenerator';
+import { TextureLoader } from './materials/TextureLoader';
+import { WoodMaterialGenerator } from './materials/WoodMaterialGenerator';
+import { CarpetMaterialGenerator } from './materials/CarpetMaterialGenerator';
+import { CeilingMaterialGenerator } from './materials/CeilingMaterialGenerator';
 
 /**
  * Manages texture loading and material creation for the store environment
@@ -17,7 +17,7 @@ export class TextureManager {
   private ceilingMaterialGenerator: CeilingMaterialGenerator;
 
   private constructor() {
-    this.textureLoader = new TextureLoader();
+    this.textureLoader = TextureLoader.getInstance();
     this.woodMaterialGenerator = new WoodMaterialGenerator();
     this.carpetMaterialGenerator = new CarpetMaterialGenerator();
     this.ceilingMaterialGenerator = new CeilingMaterialGenerator();
@@ -135,20 +135,20 @@ export class TextureManager {
   }
 
   public dispose(): void {
-    this.textureLoader.dispose();
-    this.woodMaterialGenerator.dispose();
-    this.carpetMaterialGenerator.dispose();
-    this.ceilingMaterialGenerator.dispose();
+    this.textureLoader.clearCache();
+    this.woodMaterialGenerator.clearCache();
+    this.carpetMaterialGenerator.clearCache();
+    this.ceilingMaterialGenerator.clearCache();
   }
 
   public getMemoryUsage(): {
     textureCount: number;
     materialCount: number;
   } {
-    const textureStats = this.textureLoader.getMemoryUsage();
-    const woodStats = this.woodMaterialGenerator.getMemoryUsage();
-    const carpetStats = this.carpetMaterialGenerator.getMemoryUsage();
-    const ceilingStats = this.ceilingMaterialGenerator.getMemoryUsage();
+    const textureStats = this.textureLoader.getCacheStats();
+    const woodStats = this.woodMaterialGenerator.getCacheStats();
+    const carpetStats = this.carpetMaterialGenerator.getCacheStats();
+    const ceilingStats = this.ceilingMaterialGenerator.getCacheStats();
     
     return {
       textureCount: textureStats.count,
