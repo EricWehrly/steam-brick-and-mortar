@@ -77,6 +77,7 @@ export class CeilingMaterialGenerator extends BaseMaterialGenerator {
 
   /**
    * Create a ceiling material using basic procedural textures
+   * NOTE: Using enhanced textures by default for Phase 1 development to test quality limits
    */
   public createProceduralMaterial(options: ProceduralCeilingMaterialOptions = {}): THREE.MeshStandardMaterial {
     const {
@@ -89,9 +90,11 @@ export class CeilingMaterialGenerator extends BaseMaterialGenerator {
     const cacheKey = `proc_ceiling_${repeat.x}_${repeat.y}_${color}_${bumpiness}`
     
     return this.getCachedMaterial(cacheKey, () => {
-      const diffuseTexture = this.ceilingTextureGenerator.createTexture({
+      // Create enhanced procedural textures by default for Phase 1 development
+      const diffuseTexture = this.ceilingTextureGenerator.createEnhancedTexture({
         color,
-        bumpiness
+        bumpSize: bumpiness,
+        density: 0.7
       })
       this.applyTextureOptions(diffuseTexture, { repeat })
 

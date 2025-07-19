@@ -77,6 +77,7 @@ export class CarpetMaterialGenerator extends BaseMaterialGenerator {
 
   /**
    * Create a carpet material using basic procedural textures
+   * NOTE: Using enhanced textures by default for Phase 1 development to test quality limits
    */
   public createProceduralMaterial(options: ProceduralCarpetMaterialOptions = {}): THREE.MeshStandardMaterial {
     const {
@@ -89,8 +90,10 @@ export class CarpetMaterialGenerator extends BaseMaterialGenerator {
     const cacheKey = `proc_carpet_${repeat.x}_${repeat.y}_${color}_${roughness}`
     
     return this.getCachedMaterial(cacheKey, () => {
-      const diffuseTexture = this.carpetTextureGenerator.createTexture({
+      // Create enhanced procedural textures by default for Phase 1 development
+      const diffuseTexture = this.carpetTextureGenerator.createEnhancedTexture({
         color,
+        fiberDensity: 0.4,
         roughness: 0.8
       })
       this.applyTextureOptions(diffuseTexture, { repeat })

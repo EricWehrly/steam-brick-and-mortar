@@ -112,6 +112,7 @@ export class WoodMaterialGenerator extends BaseMaterialGenerator {
 
   /**
    * Create a wood material using procedural textures (no file dependencies)
+   * NOTE: Using enhanced textures by default for Phase 1 development to test quality limits
    */
   public createProceduralMaterial(options: ProceduralWoodMaterialOptions = {}): THREE.MeshStandardMaterial {
     const {
@@ -126,16 +127,18 @@ export class WoodMaterialGenerator extends BaseMaterialGenerator {
     const cacheKey = `proc_wood_${repeat.x}_${repeat.y}_${color1}_${color2}_${grainStrength}`
     
     return this.getCachedMaterial(cacheKey, () => {
-      // Create procedural textures
-      const diffuseTexture = this.woodTextureGenerator.createTexture({
+      // Create enhanced procedural textures by default for Phase 1 development
+      const diffuseTexture = this.woodTextureGenerator.createEnhancedTexture({
+        grainStrength,
+        ringFrequency: 0.08,
         color1,
         color2,
-        grainStrength
+        color3: '#654321'
       })
       this.applyTextureOptions(diffuseTexture, { repeat })
 
       const normalTexture = this.woodTextureGenerator.createNormalMap({
-        strength: grainStrength * 0.5
+        strength: grainStrength * 0.6  // Enhanced strength for better visual feedback
       })
       this.applyTextureOptions(normalTexture, { repeat })
 
