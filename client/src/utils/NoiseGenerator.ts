@@ -62,17 +62,21 @@ export class NoiseGenerator {
 
   /**
    * Wood grain noise - specialized for wood textures
+   * Creates longitudinal grain running along the X-axis (length of the board)
    */
   public static woodGrain(x: number, y: number, ringFrequency: number = 0.1, grainStrength: number = 0.3): number {
-    // Create ring pattern
-    const distance = Math.sqrt(x * x + y * y);
-    const rings = Math.sin(distance * ringFrequency) * 0.5 + 0.5;
+    // Create grain lines running horizontally (along X-axis)
+    // This simulates wood cut along the length of the grain
+    const grainLines = Math.sin(y * ringFrequency) * 0.5 + 0.5;
     
-    // Add grain detail with Perlin noise
-    const grain = this.octaveNoise(x * 0.02, y * 0.02, 3, 0.5, 1) * grainStrength;
+    // Add subtle variation along the grain direction (X-axis)
+    const grainVariation = this.octaveNoise(x * 0.01, y * 0.05, 2, 0.3, 1) * 0.2;
     
-    // Combine rings and grain
-    return Math.max(0, Math.min(1, rings + grain));
+    // Add fine grain detail perpendicular to the main grain
+    const fineGrain = this.octaveNoise(x * 0.08, y * 0.02, 3, 0.4, 1) * grainStrength;
+    
+    // Combine grain lines with variations for realistic wood appearance
+    return Math.max(0, Math.min(1, grainLines + grainVariation + fineGrain));
   }
 
   /**
