@@ -1,22 +1,26 @@
 import * as THREE from 'three';
-import { ProceduralTextures } from './ProceduralTextures';
+import { TextureLoader } from '../core/TextureLoader';
+import { WoodMaterialGenerator } from '../materials/WoodMaterialGenerator';
+import { CarpetMaterialGenerator } from '../materials/CarpetMaterialGenerator';
+import { CeilingMaterialGenerator } from '../materials/CeilingMaterialGenerator';
 
 /**
- * Manages texture loading and material creation for the WebXR environment
- * Optimized for VR performance with proper texture formats and LOD
+ * Manages texture loading and material creation for the store environment
+ * Provides both file-based and procedural material generation with caching
  */
 export class TextureManager {
   private static instance: TextureManager;
-  private textureLoader: THREE.TextureLoader;
-  private textureCache: Map<string, THREE.Texture>;
-  private materialCache: Map<string, THREE.Material>;
-  private proceduralTextures: ProceduralTextures;
+  
+  private textureLoader: TextureLoader;
+  private woodMaterialGenerator: WoodMaterialGenerator;
+  private carpetMaterialGenerator: CarpetMaterialGenerator;
+  private ceilingMaterialGenerator: CeilingMaterialGenerator;
 
   private constructor() {
-    this.textureLoader = new THREE.TextureLoader();
-    this.textureCache = new Map();
-    this.materialCache = new Map();
-    this.proceduralTextures = ProceduralTextures.getInstance();
+    this.textureLoader = new TextureLoader();
+    this.woodMaterialGenerator = new WoodMaterialGenerator();
+    this.carpetMaterialGenerator = new CarpetMaterialGenerator();
+    this.ceilingMaterialGenerator = new CeilingMaterialGenerator();
   }
 
   public static getInstance(): TextureManager {
@@ -26,36 +30,12 @@ export class TextureManager {
     return TextureManager.instance;
   }
 
-  /**
-   * Load a texture with caching
-   */
+  // Texture loading methods
   public async loadTexture(url: string): Promise<THREE.Texture> {
-    const cachedTexture = this.textureCache.get(url);
-    if (cachedTexture) {
-      return cachedTexture;
-    }
-
-    return new Promise((resolve, reject) => {
-      this.textureLoader.load(
-        url,
-        (texture) => {
-          // Optimize texture for VR
-          texture.wrapS = THREE.RepeatWrapping;
-          texture.wrapT = THREE.RepeatWrapping;
-          texture.anisotropy = 16; // High anisotropy for VR
-          
-          this.textureCache.set(url, texture);
-          resolve(texture);
-        },
-        undefined,
-        reject
-      );
-    });
+    return this.textureLoader.loadTexture(url);
   }
 
-  /**
-   * Create a wood material with PBR properties
-   */
+  // Wood material methods
   public async createWoodMaterial(options: {
     diffuseUrl?: string;
     normalUrl?: string;
@@ -63,175 +43,16 @@ export class TextureManager {
     repeat?: { x: number; y: number };
     color?: THREE.Color;
   } = {}): Promise<THREE.MeshStandardMaterial> {
-    const {
-      diffuseUrl = '/textures/wood/wood_diffuse.jpg',
-      normalUrl = '/textures/wood/wood_normal.jpg',
-      roughnessUrl = '/textures/wood/wood_roughness.jpg',
-      repeat = { x: 1, y: 1 },
-      color = new THREE.Color(0x8B4513)
-    } = options;
-
-    const cacheKey = `wood_${diffuseUrl}_${normalUrl}_${roughnessUrl}_${repeat.x}_${repeat.y}`;
-    
-    if (this.materialCache.has(cacheKey)) {
-      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
-    }
-
-    const material = new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.8,
-      metalness: 0.1,
-    });
-
-    try {
-      // Load diffuse texture
-      if (diffuseUrl) {
-        const diffuseTexture = await this.loadTexture(diffuseUrl);
-        diffuseTexture.repeat.set(repeat.x, repeat.y);
-        material.map = diffuseTexture;
-      }
-
-      // Load normal map
-      if (normalUrl) {
-        const normalTexture = await this.loadTexture(normalUrl);
-        normalTexture.repeat.set(repeat.x, repeat.y);
-        material.normalMap = normalTexture;
-      }
-
-      // Load roughness map
-      if (roughnessUrl) {
-        const roughnessTexture = await this.loadTexture(roughnessUrl);
-        roughnessTexture.repeat.set(repeat.x, repeat.y);
-        material.roughnessMap = roughnessTexture;
-      }
-
-    } catch (error) {
-      console.warn('Some wood textures failed to load, using base material:', error);
-    }
-
-    this.materialCache.set(cacheKey, material);
-    return material;
+    return this.woodMaterialGenerator.createMaterial(options);
   }
 
-  /**
-   * Create a simple wood material without textures (for development/testing)
-   */
-  public createSimpleWoodMaterial(color: THREE.Color = new THREE.Color(0x8B4513)): THREE.MeshStandardMaterial {
-    const cacheKey = `simple_wood_${color.getHex()}`;
-    
-    if (this.materialCache.has(cacheKey)) {
-      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
-    }
-
-    const material = new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.8,
-      metalness: 0.1,
-    });
-
-    this.materialCache.set(cacheKey, material);
-    return material;
-  }
-
-  /**
-   * Create a carpet material
-   */
-  public async createCarpetMaterial(options: {
-    diffuseUrl?: string;
-    normalUrl?: string;
+  public createSimpleWoodMaterial(options: {
     repeat?: { x: number; y: number };
     color?: THREE.Color;
-  } = {}): Promise<THREE.MeshStandardMaterial> {
-    const {
-      diffuseUrl = '/textures/carpet/carpet_diffuse.jpg',
-      normalUrl = '/textures/carpet/carpet_normal.jpg',
-      repeat = { x: 4, y: 4 },
-      color = new THREE.Color(0x8B0000)
-    } = options;
-
-    const cacheKey = `carpet_${diffuseUrl}_${normalUrl}_${repeat.x}_${repeat.y}`;
-    
-    if (this.materialCache.has(cacheKey)) {
-      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
-    }
-
-    const material = new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.9,
-      metalness: 0.0,
-    });
-
-    try {
-      if (diffuseUrl) {
-        const diffuseTexture = await this.loadTexture(diffuseUrl);
-        diffuseTexture.repeat.set(repeat.x, repeat.y);
-        material.map = diffuseTexture;
-      }
-
-      if (normalUrl) {
-        const normalTexture = await this.loadTexture(normalUrl);
-        normalTexture.repeat.set(repeat.x, repeat.y);
-        material.normalMap = normalTexture;
-      }
-    } catch (error) {
-      console.warn('Some carpet textures failed to load, using base material:', error);
-    }
-
-    this.materialCache.set(cacheKey, material);
-    return material;
+  } = {}): THREE.MeshStandardMaterial {
+    return this.woodMaterialGenerator.createSimpleMaterial(options);
   }
 
-  /**
-   * Create a ceiling material (popcorn ceiling)
-   */
-  public async createCeilingMaterial(options: {
-    diffuseUrl?: string;
-    normalUrl?: string;
-    repeat?: { x: number; y: number };
-    color?: THREE.Color;
-  } = {}): Promise<THREE.MeshStandardMaterial> {
-    const {
-      diffuseUrl = '/textures/ceiling/ceiling_diffuse.jpg',
-      normalUrl = '/textures/ceiling/ceiling_normal.jpg',
-      repeat = { x: 2, y: 2 },
-      color = new THREE.Color(0xF5F5DC)
-    } = options;
-
-    const cacheKey = `ceiling_${diffuseUrl}_${normalUrl}_${repeat.x}_${repeat.y}`;
-    
-    if (this.materialCache.has(cacheKey)) {
-      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
-    }
-
-    const material = new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.9,
-      metalness: 0.0,
-    });
-
-    try {
-      if (diffuseUrl) {
-        const diffuseTexture = await this.loadTexture(diffuseUrl);
-        diffuseTexture.repeat.set(repeat.x, repeat.y);
-        material.map = diffuseTexture;
-      }
-
-      if (normalUrl) {
-        const normalTexture = await this.loadTexture(normalUrl);
-        normalTexture.repeat.set(repeat.x, repeat.y);
-        material.normalMap = normalTexture;
-      }
-    } catch (error) {
-      console.warn('Some ceiling textures failed to load, using base material:', error);
-    }
-
-    this.materialCache.set(cacheKey, material);
-    return material;
-  }
-
-  /**
-   * Create a wood material using procedural textures (no file dependencies)
-   */
   public createProceduralWoodMaterial(options: {
     repeat?: { x: number; y: number };
     color1?: string;
@@ -240,124 +61,9 @@ export class TextureManager {
     roughness?: number;
     metalness?: number;
   } = {}): THREE.MeshStandardMaterial {
-    const {
-      repeat = { x: 1, y: 1 },
-      color1 = '#8B4513',
-      color2 = '#A0522D',
-      grainStrength = 0.3,
-      roughness = 0.8,
-      metalness = 0.1
-    } = options;
-
-    const cacheKey = `proc_wood_${repeat.x}_${repeat.y}_${color1}_${color2}_${grainStrength}`;
-    
-    if (this.materialCache.has(cacheKey)) {
-      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
-    }
-
-    // Create procedural textures
-    const diffuseTexture = this.proceduralTextures.createWoodTexture({
-      color1,
-      color2,
-      grainStrength
-    });
-    diffuseTexture.repeat.set(repeat.x, repeat.y);
-
-    const normalTexture = this.proceduralTextures.createWoodNormalMap({
-      strength: grainStrength * 0.5
-    });
-    normalTexture.repeat.set(repeat.x, repeat.y);
-
-    const material = new THREE.MeshStandardMaterial({
-      map: diffuseTexture,
-      normalMap: normalTexture,
-      roughness,
-      metalness,
-    });
-
-    this.materialCache.set(cacheKey, material);
-    return material;
+    return this.woodMaterialGenerator.createProceduralMaterial(options);
   }
 
-  /**
-   * Create a carpet material using procedural textures
-   */
-  public createProceduralCarpetMaterial(options: {
-    repeat?: { x: number; y: number };
-    color?: string;
-    roughness?: number;
-    metalness?: number;
-  } = {}): THREE.MeshStandardMaterial {
-    const {
-      repeat = { x: 4, y: 4 }, // More repeats for carpet
-      color = '#8B0000',
-      roughness = 0.9,
-      metalness = 0.0
-    } = options;
-
-    const cacheKey = `proc_carpet_${repeat.x}_${repeat.y}_${color}_${roughness}`;
-    
-    if (this.materialCache.has(cacheKey)) {
-      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
-    }
-
-    const diffuseTexture = this.proceduralTextures.createCarpetTexture({
-      color,
-      roughness: 0.8
-    });
-    diffuseTexture.repeat.set(repeat.x, repeat.y);
-
-    const material = new THREE.MeshStandardMaterial({
-      map: diffuseTexture,
-      roughness,
-      metalness,
-    });
-
-    this.materialCache.set(cacheKey, material);
-    return material;
-  }
-
-  /**
-   * Create a ceiling material using procedural textures
-   */
-  public createProceduralCeilingMaterial(options: {
-    repeat?: { x: number; y: number };
-    color?: string;
-    bumpiness?: number;
-    roughness?: number;
-  } = {}): THREE.MeshStandardMaterial {
-    const {
-      repeat = { x: 2, y: 2 },
-      color = '#F5F5DC',
-      bumpiness = 0.4,
-      roughness = 0.7
-    } = options;
-
-    const cacheKey = `proc_ceiling_${repeat.x}_${repeat.y}_${color}_${bumpiness}`;
-    
-    if (this.materialCache.has(cacheKey)) {
-      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
-    }
-
-    const diffuseTexture = this.proceduralTextures.createCeilingTexture({
-      color,
-      bumpiness
-    });
-    diffuseTexture.repeat.set(repeat.x, repeat.y);
-
-    const material = new THREE.MeshStandardMaterial({
-      map: diffuseTexture,
-      roughness,
-      metalness: 0.0,
-    });
-
-    this.materialCache.set(cacheKey, material);
-    return material;
-  }
-
-  /**
-   * Create enhanced procedural wood material with realistic grain patterns
-   */
   public createEnhancedProceduralWoodMaterial(options: {
     repeat?: { x: number; y: number };
     grainStrength?: number;
@@ -368,53 +74,28 @@ export class TextureManager {
     roughness?: number;
     metalness?: number;
   } = {}): THREE.MeshStandardMaterial {
-    const {
-      repeat = { x: 1, y: 1 },
-      grainStrength = 0.4,
-      ringFrequency = 0.08,
-      color1 = '#8B4513',
-      color2 = '#A0522D',
-      color3 = '#654321',
-      roughness = 0.8,
-      metalness = 0.1
-    } = options;
-
-    const cacheKey = `enhanced_proc_wood_${repeat.x}_${repeat.y}_${grainStrength}_${ringFrequency}_${color1}_${color2}_${color3}`;
-    
-    if (this.materialCache.has(cacheKey)) {
-      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
-    }
-
-    // Create enhanced procedural texture
-    const diffuseTexture = this.proceduralTextures.createEnhancedWoodTexture({
-      grainStrength,
-      ringFrequency,
-      color1,
-      color2,
-      color3
-    });
-    diffuseTexture.repeat.set(repeat.x, repeat.y);
-
-    // Create normal map for wood grain depth
-    const normalTexture = this.proceduralTextures.createWoodNormalMap({
-      strength: grainStrength * 0.6
-    });
-    normalTexture.repeat.set(repeat.x, repeat.y);
-
-    const material = new THREE.MeshStandardMaterial({
-      map: diffuseTexture,
-      normalMap: normalTexture,
-      roughness,
-      metalness,
-    });
-
-    this.materialCache.set(cacheKey, material);
-    return material;
+    return this.woodMaterialGenerator.createEnhancedProceduralMaterial(options);
   }
 
-  /**
-   * Create enhanced procedural carpet material with realistic fiber patterns
-   */
+  // Carpet material methods
+  public async createCarpetMaterial(options: {
+    diffuseUrl?: string;
+    normalUrl?: string;
+    repeat?: { x: number; y: number };
+    color?: THREE.Color;
+  } = {}): Promise<THREE.MeshStandardMaterial> {
+    return this.carpetMaterialGenerator.createMaterial(options);
+  }
+
+  public createProceduralCarpetMaterial(options: {
+    repeat?: { x: number; y: number };
+    color?: string;
+    roughness?: number;
+    metalness?: number;
+  } = {}): THREE.MeshStandardMaterial {
+    return this.carpetMaterialGenerator.createProceduralMaterial(options);
+  }
+
   public createEnhancedProceduralCarpetMaterial(options: {
     repeat?: { x: number; y: number };
     color?: string;
@@ -422,40 +103,19 @@ export class TextureManager {
     roughness?: number;
     metalness?: number;
   } = {}): THREE.MeshStandardMaterial {
-    const {
-      repeat = { x: 4, y: 4 },
-      color = '#8B0000',
-      fiberDensity = 0.4,
-      roughness = 0.9,
-      metalness = 0.0
-    } = options;
-
-    const cacheKey = `enhanced_proc_carpet_${repeat.x}_${repeat.y}_${color}_${fiberDensity}_${roughness}`;
-    
-    if (this.materialCache.has(cacheKey)) {
-      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
-    }
-
-    const diffuseTexture = this.proceduralTextures.createEnhancedCarpetTexture({
-      color,
-      fiberDensity,
-      roughness: 0.8
-    });
-    diffuseTexture.repeat.set(repeat.x, repeat.y);
-
-    const material = new THREE.MeshStandardMaterial({
-      map: diffuseTexture,
-      roughness,
-      metalness,
-    });
-
-    this.materialCache.set(cacheKey, material);
-    return material;
+    return this.carpetMaterialGenerator.createEnhancedProceduralMaterial(options);
   }
 
-  /**
-   * Create enhanced procedural ceiling material with realistic popcorn texture
-   */
+  // Ceiling material methods
+  public createProceduralCeilingMaterial(options: {
+    repeat?: { x: number; y: number };
+    color?: string;
+    bumpiness?: number;
+    roughness?: number;
+  } = {}): THREE.MeshStandardMaterial {
+    return this.ceilingMaterialGenerator.createProceduralMaterial(options);
+  }
+
   public createEnhancedProceduralCeilingMaterial(options: {
     repeat?: { x: number; y: number };
     color?: string;
@@ -463,57 +123,36 @@ export class TextureManager {
     density?: number;
     roughness?: number;
   } = {}): THREE.MeshStandardMaterial {
-    const {
-      repeat = { x: 2, y: 2 },
-      color = '#F5F5DC',
-      bumpSize = 0.5,
-      density = 0.7,
-      roughness = 0.7
-    } = options;
-
-    const cacheKey = `enhanced_proc_ceiling_${repeat.x}_${repeat.y}_${color}_${bumpSize}_${density}`;
-    
-    if (this.materialCache.has(cacheKey)) {
-      return this.materialCache.get(cacheKey) as THREE.MeshStandardMaterial;
-    }
-
-    const diffuseTexture = this.proceduralTextures.createEnhancedCeilingTexture({
-      color,
-      bumpSize,
-      density
-    });
-    diffuseTexture.repeat.set(repeat.x, repeat.y);
-
-    const material = new THREE.MeshStandardMaterial({
-      map: diffuseTexture,
-      roughness,
-      metalness: 0.0,
-    });
-
-    this.materialCache.set(cacheKey, material);
-    return material;
+    return this.ceilingMaterialGenerator.createEnhancedProceduralMaterial(options);
   }
 
-  /**
-   * Dispose of all cached textures and materials
-   */
+  // Management methods
+  public clearCache(): void {
+    this.textureLoader.clearCache();
+    this.woodMaterialGenerator.clearCache();
+    this.carpetMaterialGenerator.clearCache();
+    this.ceilingMaterialGenerator.clearCache();
+  }
+
   public dispose(): void {
-    this.textureCache.forEach((texture) => texture.dispose());
-    this.materialCache.forEach((material) => material.dispose());
-    this.textureCache.clear();
-    this.materialCache.clear();
+    this.textureLoader.dispose();
+    this.woodMaterialGenerator.dispose();
+    this.carpetMaterialGenerator.dispose();
+    this.ceilingMaterialGenerator.dispose();
   }
 
-  /**
-   * Get memory usage statistics
-   */
   public getMemoryUsage(): {
     textureCount: number;
     materialCount: number;
   } {
+    const textureStats = this.textureLoader.getMemoryUsage();
+    const woodStats = this.woodMaterialGenerator.getMemoryUsage();
+    const carpetStats = this.carpetMaterialGenerator.getMemoryUsage();
+    const ceilingStats = this.ceilingMaterialGenerator.getMemoryUsage();
+    
     return {
-      textureCount: this.textureCache.size,
-      materialCount: this.materialCache.size
-    };
+      textureCount: textureStats.count,
+      materialCount: woodStats.count + carpetStats.count + ceilingStats.count
+    }
   }
 }

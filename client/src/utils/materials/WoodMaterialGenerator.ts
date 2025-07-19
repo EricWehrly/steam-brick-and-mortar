@@ -132,12 +132,12 @@ export class WoodMaterialGenerator extends BaseMaterialGenerator {
         color2,
         grainStrength
       })
-      diffuseTexture.repeat.set(repeat.x, repeat.y)
+      this.applyTextureOptions(diffuseTexture, { repeat })
 
       const normalTexture = this.woodTextureGenerator.createNormalMap({
         strength: grainStrength * 0.5
       })
-      normalTexture.repeat.set(repeat.x, repeat.y)
+      this.applyTextureOptions(normalTexture, { repeat })
 
       return new THREE.MeshStandardMaterial({
         map: diffuseTexture,
@@ -174,13 +174,13 @@ export class WoodMaterialGenerator extends BaseMaterialGenerator {
         color2,
         color3
       })
-      diffuseTexture.repeat.set(repeat.x, repeat.y)
+      this.applyTextureOptions(diffuseTexture, { repeat })
 
       // Create normal map for wood grain depth
       const normalTexture = this.woodTextureGenerator.createNormalMap({
         strength: grainStrength * 0.6
       })
-      normalTexture.repeat.set(repeat.x, repeat.y)
+      this.applyTextureOptions(normalTexture, { repeat })
 
       return new THREE.MeshStandardMaterial({
         map: diffuseTexture,
