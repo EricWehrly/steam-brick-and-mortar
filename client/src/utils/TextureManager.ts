@@ -107,6 +107,15 @@ export class TextureManager {
   }
 
   // Ceiling material methods
+  public async createCeilingMaterial(options: {
+    diffuseUrl?: string;
+    normalUrl?: string;
+    repeat?: { x: number; y: number };
+    color?: THREE.Color;
+  } = {}): Promise<THREE.MeshStandardMaterial> {
+    return this.ceilingMaterialGenerator.createMaterial(options);
+  }
+
   public createProceduralCeilingMaterial(options: {
     repeat?: { x: number; y: number };
     color?: string;
