@@ -67,12 +67,26 @@ export class SteamBrickAndMortarApp {
         })
         
         this.assetLoader = new AssetLoader()
-        this.gameBoxRenderer = new GameBoxRenderer()
+        this.gameBoxRenderer = new GameBoxRenderer(
+            undefined, // Use default dimensions
+            { maxGames: config.steam?.maxGames ?? 100 }, // Match Steam integration max games
+            { 
+                // Performance configuration for large libraries
+                maxTextureSize: 1024,
+                nearDistance: 2.0,
+                farDistance: 10.0,
+                highResolutionSize: 512,
+                mediumResolutionSize: 256,
+                lowResolutionSize: 128,
+                maxActiveTextures: Math.min(50, (config.steam?.maxGames ?? 100) / 2), // Scale with library size
+                frustumCullingEnabled: true
+            }
+        )
         
         // Initialize Steam integration
         this.steamIntegration = new SteamIntegration({
             apiBaseUrl: config.steam?.apiBaseUrl ?? 'https://steam-api-dev.wehrly.com',
-            maxGames: config.steam?.maxGames ?? 30
+            maxGames: config.steam?.maxGames ?? 100 // Increased from 30 to support larger libraries
         })
         
         // Initialize WebXR components with callbacks
@@ -330,15 +344,21 @@ export class SteamBrickAndMortarApp {
             const artworkBlobs = await this.getGameArtworkBlobs(game)
             
             if (artworkBlobs && Object.values(artworkBlobs).some(blob => blob !== null)) {
-                // Apply texture using the GameBoxRenderer texture system
+                // Calculate viewing distance for performance optimization
+                const camera = this.sceneManager.getCamera()
+                const viewingDistance = camera.position.distanceTo(gameBox.position)
+                
+                // Apply optimized texture using the GameBoxRenderer texture system
                 const textureOptions = {
                     artworkBlobs,
-                    fallbackColor: undefined // Keep current fallback color
+                    fallbackColor: undefined, // Keep current fallback color
+                    enableLazyLoading: true, // Enable lazy loading for performance
+                    viewingDistance
                 }
                 
-                // Apply texture to existing game box
-                await this.gameBoxRenderer.applyTexture(gameBox, game, textureOptions)
-                console.log(`🖼️ Applied cached artwork texture to: ${game.name}`)
+                // Apply optimized texture to existing game box
+                await this.gameBoxRenderer.applyOptimizedTexture(gameBox, game, textureOptions)
+                console.log(`🖼️ Applied optimized artwork texture to: ${game.name}`)
             }
         } catch (error) {
             console.warn(`⚠️ Failed to apply artwork texture to ${game.name}:`, error)
@@ -427,14 +447,26 @@ export class SteamBrickAndMortarApp {
     // Render Loop
 
     private startRenderLoop(): void {
+        let lastPerformanceUpdate = 0
+        const performanceUpdateInterval = 1000 // Update performance data every second
+        
         this.sceneManager.startRenderLoop(() => {
+            const now = Date.now()
+            
             // Update camera movement using InputManager
             const camera = this.sceneManager.getCamera()
             this.inputManager.updateCameraMovement(camera)
             
+            // Update performance data periodically
+            if (now - lastPerformanceUpdate > performanceUpdateInterval) {
+                this.gameBoxRenderer.updatePerformanceData(camera, this.sceneManager.getScene())
+                this.gameBoxRenderer.cleanupOffScreenTextures()
+                lastPerformanceUpdate = now
+            }
+            
             // Rotate the test cube
             const scene = this.sceneManager.getScene()
-            const cube = scene.getObjectByName('cube') || scene.children.find(obj => obj instanceof THREE.Mesh)
+            const cube = scene.getObjectByName('cube') ?? scene.children.find(obj => obj instanceof THREE.Mesh)
             if (cube) {
                 cube.rotation.x += 0.01
                 cube.rotation.y += 0.01
@@ -470,5 +502,12 @@ export class SteamBrickAndMortarApp {
      */
     getIsInitialized(): boolean {
         return this.isInitialized
+    }
+
+    /**
+     * Get performance statistics for debugging and monitoring
+     */
+    getPerformanceStats(): ReturnType<GameBoxRenderer['getPerformanceStats']> {
+        return this.gameBoxRenderer.getPerformanceStats()
     }
 }
