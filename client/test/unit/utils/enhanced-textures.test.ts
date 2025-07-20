@@ -91,8 +91,8 @@ describe('ProceduralTextures Enhanced', () => {
       const texture = proceduralTextures.createEnhancedWoodTexture()
       
       expect(texture).toBeInstanceOf(THREE.Texture)
-      expect(texture.image.width).toBe(512)
-      expect(texture.image.height).toBe(512)
+      expect(texture.image.width).toBe(2048)
+      expect(texture.image.height).toBe(2048)
       expect(texture.wrapS).toBe(THREE.RepeatWrapping)
       expect(texture.wrapT).toBe(THREE.RepeatWrapping)
     })
@@ -287,9 +287,9 @@ describe('VR Performance Considerations', () => {
     const proceduralTextures = ProceduralTextures.getInstance()
     const texture = proceduralTextures.createEnhancedWoodTexture()
     
-    // 512x512 is a good balance for VR
-    expect(texture.image.width).toBe(512)
-    expect(texture.image.height).toBe(512)
+    // 2048x2048 for high-fidelity VR experience (Phase 1 - enhanced quality)
+    expect(texture.image.width).toBe(2048)
+    expect(texture.image.height).toBe(2048)
   })
 
   it('should handle large numbers of materials without memory leaks', () => {

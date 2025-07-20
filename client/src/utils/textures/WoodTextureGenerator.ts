@@ -27,8 +27,8 @@ export class WoodTextureGenerator extends BaseTextureGenerator {
    */
   public createTexture(options: WoodTextureOptions = {}): THREE.Texture {
     const {
-      width = 512,
-      height = 512,
+      width = 2048,
+      height = 2048,
       grainStrength = 0.3,
       color1 = '#8B4513', // Saddle brown
       color2 = '#A0522D'  // Sienna
@@ -76,8 +76,8 @@ export class WoodTextureGenerator extends BaseTextureGenerator {
    */
   public createEnhancedTexture(options: EnhancedWoodTextureOptions = {}): THREE.Texture {
     const {
-      width = 512,
-      height = 512,
+      width = 2048,
+      height = 2048,
       grainStrength = 0.4,
       ringFrequency = 0.08,
       color1 = '#8B4513', // Saddle brown
@@ -110,10 +110,12 @@ export class WoodTextureGenerator extends BaseTextureGenerator {
           
           const grainValue = NoiseGenerator.woodGrain(offsetX, offsetY, ringFrequency, grainStrength)
           
-          // Add fine detail with octave noise
-          const detail = NoiseGenerator.octaveNoise(x * 0.05, y * 0.05, 3, 0.5, 1) * 0.15
+          // Add multiple layers of detail for high-resolution textures
+          const coarseDetail = NoiseGenerator.octaveNoise(x * 0.03, y * 0.03, 3, 0.5, 1) * 0.12
+          const fineDetail = NoiseGenerator.octaveNoise(x * 0.08, y * 0.08, 4, 0.4, 1) * 0.08
+          const ultraFineDetail = NoiseGenerator.octaveNoise(x * 0.15, y * 0.15, 2, 0.3, 1) * 0.05
           
-          const finalValue = Math.max(0, Math.min(1, grainValue + detail))
+          const finalValue = Math.max(0, Math.min(1, grainValue + coarseDetail + fineDetail + ultraFineDetail))
           
           // Interpolate between three colors for more realistic wood
           let r, g, b
@@ -146,8 +148,8 @@ export class WoodTextureGenerator extends BaseTextureGenerator {
    */
   public createNormalMap(options: WoodNormalMapOptions = {}): THREE.Texture {
     const {
-      width = 512,
-      height = 512,
+      width = 2048,
+      height = 2048,
       strength = 0.5
     } = options
 
