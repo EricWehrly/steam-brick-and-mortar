@@ -1,5 +1,23 @@
 # Tech Debt Backlog
 
+## Critical Issues
+
+### Fix Duplicated Console Logs on Application Startup
+**Priority**: High  
+**Effort**: 1-2 hours  
+**Context**: Console logs are appearing twice during application initialization, creating confusing debug output and potentially indicating duplicate initialization paths.
+
+**Investigation Required**:
+1. Check if TextureManager or other managers are being instantiated multiple times
+2. Verify that logging in material generators isn't being called redundantly
+3. Review initialization flow in SteamBrickAndMortarApp to ensure single execution path
+4. Check for any duplicate event listeners or observers causing repeated log statements
+
+**Expected Resolution**:
+- Clean, single console output during startup
+- Verification that managers are only initialized once
+- Clear initialization flow without redundant operations
+
 ## Testing Infrastructure
 
 ### Review and Reclassify Existing Tests for Performance Testing

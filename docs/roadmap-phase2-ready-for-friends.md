@@ -142,13 +142,14 @@
 ### Feature 8.1: Graphics and Performance Options
 **Context**: Configurable graphics settings for different VR hardware capabilities
 
-**NOTE**: Phase 1 defaults to enhanced/high-quality textures for development testing. User toggles will allow optimization for different hardware in Phase 2.
+**NOTE**: Phase 1 defaults to enhanced/high-quality textures at 2048x2048 resolution for development testing. User toggles will allow optimization for different hardware in Phase 2.
 
 #### Story 8.1.1: Graphics Configuration System
 - **Task 8.1.1.1**: Implement quality presets (Low/Medium/High/Ultra)
 - **Task 8.1.1.2**: Add texture quality and resolution scaling options
   - **Include**: Performance/Quality toggle for procedural textures (basic vs enhanced)
-  - **Include**: Texture resolution scaling (512px/1024px/2048px options)
+  - **Include**: Texture resolution scaling (512px/1024px/2048px/4096px options)
+  - **Current Default**: 2048x2048 enhanced textures (Phase 1 high-fidelity approach)
 - **Task 8.1.1.3**: Create lighting and shadow quality controls
 - **Task 8.1.1.4**: Add performance monitoring and auto-adjustment features
 
