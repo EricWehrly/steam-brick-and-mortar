@@ -107,7 +107,37 @@ if (typeof globalThis !== 'undefined') {
           textBaseline: 'top'
         }
       }
-      // Return null for WebGL contexts in test environment
+      if (contextType === 'webgl' || contextType === 'webgl2') {
+        // Return a dummy WebGL context object to prevent Not implemented errors
+        return {
+          getExtension: () => null,
+          getParameter: () => null,
+          getContextAttributes: () => ({}),
+          createShader: () => ({}),
+          shaderSource: () => {},
+          compileShader: () => {},
+          createProgram: () => ({}),
+          attachShader: () => {},
+          linkProgram: () => {},
+          useProgram: () => {},
+          getShaderParameter: () => true,
+          getShaderInfoLog: () => '',
+          getProgramParameter: () => true,
+          getProgramInfoLog: () => '',
+          createBuffer: () => ({}),
+          bindBuffer: () => {},
+          bufferData: () => {},
+          enableVertexAttribArray: () => {},
+          vertexAttribPointer: () => {},
+          viewport: () => {},
+          clearColor: () => {},
+          clear: () => {},
+          drawArrays: () => {},
+          drawElements: () => {},
+          // Add more methods as needed for Three.js compatibility
+        }
+      }
+      // Return null for other context types
       return null
     }
   }

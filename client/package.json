@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui", 
     "test:performance": "vitest run --config vitest.performance.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:live": "vitest run test/live --config vitest.all.config.ts",
     "test:all": "vitest run --config vitest.all.config.ts",
     "clean": "rm -rf dist node_modules .vite",

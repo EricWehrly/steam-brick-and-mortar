@@ -68,8 +68,10 @@ When working with Terraform infrastructure:
 5. **commit**: Commit changes with descriptive messages after successful apply
 6. **Never skip steps**: Always follow validate → plan → verify → apply → commit sequence
 
-## Current Status
-See `.github/terraform-progress.md` for detailed infrastructure development progress.
+
+## Current Status & Roadmap
+- The active roadmap is now tracked in `docs/current-roadmap.md` (single source of truth for priorities and next steps).
+- See `.github/terraform-progress.md` for detailed infrastructure development progress.
 
 ## Reference Files
 - **JavaScript/Node.js**: `.github/javascript-guidelines.md`

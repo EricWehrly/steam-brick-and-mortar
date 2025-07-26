@@ -6,13 +6,13 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
     watch: false,
-    // Default config excludes live tests, performance tests, and integration tests
+    // Integration tests only
+    include: [
+      '**/integration/**/*.int.test.ts'
+    ],
     exclude: [
       '**/node_modules/**',
-      '**/dist/**',
-      '**/live/**',
-      '**/performance/**',
-      '**/integration/**'
+      '**/dist/**'
     ]
   },
 })
