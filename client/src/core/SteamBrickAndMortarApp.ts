@@ -15,6 +15,7 @@ import * as THREE from 'three'
 import { ValidationUtils } from '../utils'
 import { UIManager } from '../ui'
 import { SceneManager, AssetLoader, GameBoxRenderer, SignageRenderer, StoreLayout, type SteamGameData } from '../scene'
+import { CacheManagementUI } from '../ui/CacheManagementUI'
 import { SteamIntegration, type ProgressCallbacks } from '../steam-integration'
 import { WebXRManager, type WebXRCapabilities } from '../webxr/WebXRManager'
 import { InputManager } from '../webxr/InputManager'
@@ -52,6 +53,7 @@ export class SteamBrickAndMortarApp {
     private webxrManager: WebXRManager
     private inputManager: InputManager
     private uiManager: UIManager
+    private cacheUI: CacheManagementUI
     
     // Current game index for rendering
     private currentGameIndex: number = 0
@@ -67,16 +69,30 @@ export class SteamBrickAndMortarApp {
         })
         
         this.assetLoader = new AssetLoader()
-        this.gameBoxRenderer = new GameBoxRenderer()
         this.signageRenderer = new SignageRenderer()
         
         // Initialize VR-optimized store layout (Phase 2C)
         this.storeLayout = new StoreLayout(this.sceneManager.getScene())
+        this.gameBoxRenderer = new GameBoxRenderer(
+            undefined, // Use default dimensions
+            { maxGames: config.steam?.maxGames ?? 100 }, // Match Steam integration max games
+            { 
+                // Performance configuration for large libraries
+                maxTextureSize: 1024,
+                nearDistance: 2.0,
+                farDistance: 10.0,
+                highResolutionSize: 512,
+                mediumResolutionSize: 256,
+                lowResolutionSize: 128,
+                maxActiveTextures: Math.min(50, (config.steam?.maxGames ?? 100) / 2), // Scale with library size
+                frustumCullingEnabled: true
+            }
+        )
         
         // Initialize Steam integration
         this.steamIntegration = new SteamIntegration({
             apiBaseUrl: config.steam?.apiBaseUrl ?? 'https://steam-api-dev.wehrly.com',
-            maxGames: config.steam?.maxGames ?? 30
+            maxGames: config.steam?.maxGames ?? 100 // Increased from 30 to support larger libraries
         })
         
         // Initialize WebXR components with callbacks
@@ -107,6 +123,13 @@ export class SteamBrickAndMortarApp {
             steamShowCacheStats: () => this.handleShowCacheStats(),
             webxrEnterVR: () => this.handleWebXRToggle()
         })
+        
+        // Initialize Cache Management UI
+        this.cacheUI = new CacheManagementUI({
+            containerId: 'cache-management-container',
+            refreshInterval: 5000, // 5 seconds
+            autoCollapse: true
+        })
     }
 
     /**
@@ -125,6 +148,13 @@ export class SteamBrickAndMortarApp {
             await this.setupWebXR()
             this.setupControls()
             this.uiManager.init()
+            
+            // Initialize cache management UI
+            this.cacheUI.init(
+                () => this.steamIntegration.getImageCacheStats(),
+                () => this.steamIntegration.clearImageCache()
+            )
+            
             this.uiManager.hideLoading()
             this.startRenderLoop()
             
@@ -149,6 +179,7 @@ export class SteamBrickAndMortarApp {
         
         this.signageRenderer.dispose()
         this.storeLayout.dispose()
+        this.cacheUI.dispose()
         this.inputManager.dispose()
         this.webxrManager.dispose()
         this.sceneManager.dispose()
@@ -279,9 +310,9 @@ export class SteamBrickAndMortarApp {
                 onProgress: (current: number, total: number, message: string) => {
                     this.uiManager.updateProgress(current, total, message)
                 },
-                onGameLoaded: (game) => {
+                onGameLoaded: async (game) => {
                     // Update game boxes in real-time as they load
-                    this.addGameBoxToScene(game, this.currentGameIndex++)
+                    await this.addGameBoxToScene(game, this.currentGameIndex++)
                 },
                 onStatusUpdate: (message: string, type: 'loading' | 'success' | 'error') => {
                     this.uiManager.showSteamStatus(message, type)
@@ -315,12 +346,70 @@ export class SteamBrickAndMortarApp {
         console.log(`🗑️ Cleared ${clearedCount} existing game boxes`)
     }
     
-    private addGameBoxToScene(game: SteamGameData, index: number): void {
-        // Create game box using the game box renderer
+    private async addGameBoxToScene(game: SteamGameData, index: number): Promise<void> {
+        // Create game box with immediate fallback color
         const gameBox = this.gameBoxRenderer.createGameBox(this.sceneManager.getScene(), game, index)
         if (gameBox) {
             this.currentGameIndex = index + 1
+            
+            // Apply texture asynchronously when artwork is available
+            await this.applyGameArtworkTexture(gameBox, game)
         }
+    }
+
+    private async applyGameArtworkTexture(gameBox: THREE.Mesh, game: SteamGameData): Promise<void> {
+        try {
+            // Get cached artwork for this game
+            const artworkBlobs = await this.getGameArtworkBlobs(game)
+            
+            if (artworkBlobs && Object.values(artworkBlobs).some(blob => blob !== null)) {
+                // Calculate viewing distance for performance optimization
+                const camera = this.sceneManager.getCamera()
+                const viewingDistance = camera.position.distanceTo(gameBox.position)
+                
+                // Apply optimized texture using the GameBoxRenderer texture system
+                const textureOptions = {
+                    artworkBlobs,
+                    fallbackColor: undefined, // Keep current fallback color
+                    enableLazyLoading: true, // Enable lazy loading for performance
+                    viewingDistance
+                }
+                
+                // Apply optimized texture to existing game box
+                await this.gameBoxRenderer.applyOptimizedTexture(gameBox, game, textureOptions)
+                console.log(`🖼️ Applied optimized artwork texture to: ${game.name}`)
+            }
+        } catch (error) {
+            console.warn(`⚠️ Failed to apply artwork texture to ${game.name}:`, error)
+        }
+    }
+
+    private async getGameArtworkBlobs(game: SteamGameData): Promise<Record<string, Blob | null> | null> {
+        // Try to get artwork from cache for all available types
+        const artworkBlobs: Record<string, Blob | null> = {}
+        let hasAnyArtwork = false
+        
+        const artworkTypes = ['library', 'header', 'logo', 'icon'] as const
+        
+        for (const type of artworkTypes) {
+            const artworkUrl = game.artwork?.[type]
+            if (artworkUrl) {
+                try {
+                    const blob = await this.steamIntegration.getSteamClient().downloadGameImage(artworkUrl)
+                    artworkBlobs[type] = blob
+                    if (blob) {
+                        hasAnyArtwork = true
+                    }
+                } catch (error) {
+                    console.debug(`Could not load ${type} artwork for ${game.name}:`, error)
+                    artworkBlobs[type] = null
+                }
+            } else {
+                artworkBlobs[type] = null
+            }
+        }
+        
+        return hasAnyArtwork ? artworkBlobs : null
     }
 
     // Cache Management Methods
@@ -343,8 +432,8 @@ export class SteamBrickAndMortarApp {
                 onProgress: (current: number, total: number, message: string) => {
                     this.uiManager.updateProgress(current, total, message)
                 },
-                onGameLoaded: (game) => {
-                    this.addGameBoxToScene(game, this.currentGameIndex++)
+                onGameLoaded: async (game) => {
+                    await this.addGameBoxToScene(game, this.currentGameIndex++)
                 },
                 onStatusUpdate: (message: string, type: 'loading' | 'success' | 'error') => {
                     this.uiManager.showSteamStatus(message, type)
@@ -377,14 +466,26 @@ export class SteamBrickAndMortarApp {
     // Render Loop
 
     private startRenderLoop(): void {
+        let lastPerformanceUpdate = 0
+        const performanceUpdateInterval = 1000 // Update performance data every second
+        
         this.sceneManager.startRenderLoop(() => {
+            const now = Date.now()
+            
             // Update camera movement using InputManager
             const camera = this.sceneManager.getCamera()
             this.inputManager.updateCameraMovement(camera)
             
+            // Update performance data periodically
+            if (now - lastPerformanceUpdate > performanceUpdateInterval) {
+                this.gameBoxRenderer.updatePerformanceData(camera, this.sceneManager.getScene())
+                this.gameBoxRenderer.cleanupOffScreenTextures()
+                lastPerformanceUpdate = now
+            }
+            
             // Rotate the test cube
             const scene = this.sceneManager.getScene()
-            const cube = scene.getObjectByName('cube') || scene.children.find(obj => obj instanceof THREE.Mesh)
+            const cube = scene.getObjectByName('cube') ?? scene.children.find(obj => obj instanceof THREE.Mesh)
             if (cube) {
                 cube.rotation.x += 0.01
                 cube.rotation.y += 0.01
@@ -420,5 +521,12 @@ export class SteamBrickAndMortarApp {
      */
     getIsInitialized(): boolean {
         return this.isInitialized
+    }
+
+    /**
+     * Get performance statistics for debugging and monitoring
+     */
+    getPerformanceStats(): ReturnType<GameBoxRenderer['getPerformanceStats']> {
+        return this.gameBoxRenderer.getPerformanceStats()
     }
 }

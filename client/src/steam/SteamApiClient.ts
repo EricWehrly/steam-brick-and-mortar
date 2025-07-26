@@ -91,7 +91,16 @@ export class SteamApiClient {
         const cleanVanityUrl = vanityUrl.trim().toLowerCase()
         const endpoint = `/resolve/${encodeURIComponent(cleanVanityUrl)}`
         
-        return this.http.makeRequest<SteamResolveResponse>(endpoint)
+        console.log(`🔍 Resolving vanity URL: "${vanityUrl}" -> "${cleanVanityUrl}" -> endpoint: ${endpoint}`)
+        
+        try {
+            const response = await this.http.makeRequest<SteamResolveResponse>(endpoint)
+            console.log('✅ Vanity URL resolved successfully:', response)
+            return response
+        } catch (error) {
+            console.error('❌ Failed to resolve vanity URL:', error)
+            throw error
+        }
     }
 
     private async rawGetUserGames(steamId: string): Promise<SteamUser> {
@@ -100,7 +109,22 @@ export class SteamApiClient {
         }
 
         const endpoint = `/games/${encodeURIComponent(steamId)}`
-        return this.http.makeRequest<SteamUser>(endpoint)
+        
+        console.log(`🎮 Fetching games for Steam ID: ${steamId}`)
+        
+        try {
+            const response = await this.http.makeRequest<SteamUser>(endpoint)
+            console.log(`✅ Fetched ${response.game_count} games for user ${response.vanity_url || steamId}`)
+            
+            if (response.game_count === 0) {
+                console.warn('⚠️ User has 0 games - this might indicate privacy settings or an empty library')
+            }
+            
+            return response
+        } catch (error) {
+            console.error('❌ Failed to fetch user games:', error)
+            throw error
+        }
     }
 
     private async rawGetGameDetails(game: SteamGame): Promise<SteamGame> {
@@ -166,10 +190,22 @@ export class SteamApiClient {
     }
 
     /**
+     * Image cache management
+     */
+    public async getImageCacheStats() {
+        return this.images.getStats()
+    }
+
+    public async clearImageCache(): Promise<void> {
+        return this.images.clearCache()
+    }
+
+    /**
      * Cache management
      */
-    public clearCache(): void {
+    public async clearCache(): Promise<void> {
         this.cache.clear()
+        await this.images.clearCache()
     }
 
     public getCacheStats() {

@@ -17,11 +17,32 @@ export interface ImageLoadOptions {
     onImageError?: (url: string, error: Error) => void;
 }
 
+export interface StorageQuotaInfo {
+    usage: number;
+    quota: number;
+    usagePercent: number;
+    usageMB: number;
+    quotaMB: number;
+    available: number;
+    isNearLimit: boolean;
+    isSupported: boolean;
+}
+
+export interface ImageCacheStats {
+    totalImages: number;
+    totalSize: number;
+    oldestTimestamp: number;
+    newestTimestamp: number;
+    storageQuota?: StorageQuotaInfo;
+}
+
 export class ImageManager {
     private db: IDBDatabase | null = null;
     private readonly dbName = 'SteamGameImages';
     private readonly dbVersion = 1;
     private readonly storeName = 'gameImages';
+    private readonly QUOTA_WARNING_THRESHOLD = 0.8; // 80%
+    private readonly QUOTA_CRITICAL_THRESHOLD = 0.95; // 95%
 
     constructor() {
         this.initializeDB();
@@ -92,35 +113,44 @@ export class ImageManager {
         return results;
     }
 
-    async getStats() {
+    async getStats(): Promise<ImageCacheStats> {
         if (!this.db) return { totalImages: 0, totalSize: 0, oldestTimestamp: 0, newestTimestamp: 0 };
 
-        return new Promise<{
-            totalImages: number;
-            totalSize: number;
-            oldestTimestamp: number;
-            newestTimestamp: number;
-        }>((resolve, reject) => {
-            const transaction = this.db!.transaction([this.storeName], 'readonly');
+        return new Promise<ImageCacheStats>((resolve, reject) => {
+            if (!this.db) {
+                resolve({ totalImages: 0, totalSize: 0, oldestTimestamp: 0, newestTimestamp: 0 });
+                return;
+            }
+            
+            const transaction = this.db.transaction([this.storeName], 'readonly');
             const store = transaction.objectStore(this.storeName);
             const request = store.getAll();
             
-            request.onsuccess = () => {
+            request.onsuccess = async () => {
                 const images = request.result as ImageCacheEntry[];
                 
                 if (images.length === 0) {
-                    resolve({ totalImages: 0, totalSize: 0, oldestTimestamp: 0, newestTimestamp: 0 });
+                    const storageQuota = await this.getStorageQuotaInfo(0);
+                    resolve({ 
+                        totalImages: 0, 
+                        totalSize: 0, 
+                        oldestTimestamp: 0, 
+                        newestTimestamp: 0,
+                        storageQuota 
+                    });
                     return;
                 }
                 
                 const totalSize = images.reduce((sum, img) => sum + img.size, 0);
                 const timestamps = images.map(img => img.timestamp);
+                const storageQuota = await this.getStorageQuotaInfo(totalSize);
                 
                 resolve({
                     totalImages: images.length,
                     totalSize,
                     oldestTimestamp: Math.min(...timestamps),
-                    newestTimestamp: Math.max(...timestamps)
+                    newestTimestamp: Math.max(...timestamps),
+                    storageQuota
                 });
             };
             
@@ -132,7 +162,12 @@ export class ImageManager {
         if (!this.db) return;
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([this.storeName], 'readwrite');
+            if (!this.db) {
+                resolve();
+                return;
+            }
+            
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
             const store = transaction.objectStore(this.storeName);
             const request = store.clear();
             
@@ -172,7 +207,12 @@ export class ImageManager {
         if (!this.db) return;
 
         return new Promise((resolve) => {
-            const transaction = this.db!.transaction([this.storeName], 'readwrite');
+            if (!this.db) {
+                resolve();
+                return;
+            }
+            
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
             const store = transaction.objectStore(this.storeName);
             
             const entry: ImageCacheEntry = {
@@ -192,7 +232,12 @@ export class ImageManager {
         if (!this.db) return null;
 
         return new Promise((resolve) => {
-            const transaction = this.db!.transaction([this.storeName], 'readonly');
+            if (!this.db) {
+                resolve(null);
+                return;
+            }
+            
+            const transaction = this.db.transaction([this.storeName], 'readonly');
             const store = transaction.objectStore(this.storeName);
             const request = store.get(url);
             
@@ -224,12 +269,65 @@ export class ImageManager {
         if (!this.db) return;
 
         return new Promise((resolve) => {
-            const transaction = this.db!.transaction([this.storeName], 'readwrite');
+            if (!this.db) {
+                resolve();
+                return;
+            }
+            
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
             const store = transaction.objectStore(this.storeName);
             const request = store.delete(url);
             
             request.onsuccess = () => resolve();
             request.onerror = () => resolve();
         });
+    }
+
+    private async getStorageQuotaInfo(totalUsed: number): Promise<StorageQuotaInfo> {
+        if (typeof navigator === 'undefined' || !navigator.storage?.estimate) {
+            return {
+                usage: totalUsed,
+                quota: 0,
+                usagePercent: 0,
+                usageMB: totalUsed / (1024 * 1024),
+                quotaMB: 0,
+                available: 0,
+                isNearLimit: false,
+                isSupported: false
+            };
+        }
+
+        try {
+            const estimate = await navigator.storage.estimate();
+            const { quota = 0, usage = 0 } = estimate;
+            const quotaMB = quota / (1024 * 1024);
+            const usageMB = usage / (1024 * 1024);
+            const available = quota - usage;
+            const usagePercent = quota > 0 ? (usage / quota) * 100 : 0;
+            const isNearLimit = quota > 0 && (usage / quota) > this.QUOTA_WARNING_THRESHOLD;
+            const isSupported = quota > 0;
+
+            return {
+                usage,
+                quota,
+                usagePercent,
+                usageMB,
+                quotaMB,
+                available,
+                isNearLimit,
+                isSupported
+            };
+        } catch {
+            return {
+                usage: totalUsed,
+                quota: 0,
+                usagePercent: 0,
+                usageMB: totalUsed / (1024 * 1024),
+                quotaMB: 0,
+                available: 0,
+                isNearLimit: false,
+                isSupported: false
+            };
+        }
     }
 }

@@ -76,10 +76,23 @@ export class SteamIntegration {
                     const percentage = Math.round((current / total) * 90) + 10 // Reserve 10% for initial fetch
                     callbacks.onProgress?.(percentage, 100, `Loaded ${current}/${total} games`)
                 },
-                onGameLoaded: (game: SteamGame) => {
+                onGameLoaded: async (game: SteamGame) => {
                     // Update game library and notify caller
                     this.gameLibrary.updateGameData(game)
                     callbacks.onGameLoaded?.(game)
+                    
+                    // Download game artwork in the background
+                    try {
+                        // TODO: ROADMAP - Nice to have: Game-level cache awareness
+                        // Could add isGameArtworkCached(game) check here to skip downloading
+                        // if all artwork for this game is already cached. Currently each
+                        // individual image checks cache (which works well), but a game-level
+                        // check would prevent unnecessary cache lookups for fully cached games.
+                        await this.steamClient.downloadGameArtwork(game)
+                        console.log(`📸 Downloaded artwork for ${game.name}`)
+                    } catch (error) {
+                        console.warn(`⚠️ Failed to download artwork for ${game.name}:`, error)
+                    }
                 }
             }
             
@@ -166,5 +179,44 @@ export class SteamIntegration {
             img_logo_url: game.img_logo_url,
             artwork: game.artwork
         })) ?? []
+    }
+
+    /**
+     * Image downloading methods
+     */
+    
+    /**
+     * Download artwork for a specific game
+     */
+    async downloadGameArtwork(game: SteamGame): Promise<Record<string, Blob | null>> {
+        return this.steamClient.downloadGameArtwork(game)
+    }
+
+    /**
+     * Download a single image from URL
+     */
+    async downloadGameImage(url: string): Promise<Blob | null> {
+        return this.steamClient.downloadGameImage(url)
+    }
+
+    /**
+     * Get image cache statistics
+     */
+    async getImageCacheStats() {
+        return this.steamClient.getImageCacheStats()
+    }
+
+    /**
+     * Clear image cache
+     */
+    async clearImageCache(): Promise<void> {
+        return this.steamClient.clearImageCache()
+    }
+
+    /**
+     * Provide access to underlying Steam client (for advanced use)
+     */
+    getSteamClient() {
+        return this.steamClient
     }
 }
