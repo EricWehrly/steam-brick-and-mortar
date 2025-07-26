@@ -10,6 +10,7 @@
 
 import * as THREE from 'three'
 import { ValidationUtils } from '../utils'
+import { MaterialUtils } from '../utils/MaterialUtils'
 
 export interface GameBoxDimensions {
     width: number
@@ -204,9 +205,7 @@ export class GameBoxRenderer {
 
         // Create material - start with fallback color for immediate display
         const colorHue = ValidationUtils.stringToHue(game.name)
-        const material = new THREE.MeshPhongMaterial({ 
-            color: new THREE.Color().setHSL(colorHue, 0.7, 0.5)
-        })
+        const material = MaterialUtils.createGameBoxMaterialFromName(colorHue)
         
         const gameBox = new THREE.Mesh(this.gameBoxGeometry, material)
         
@@ -308,15 +307,8 @@ export class GameBoxRenderer {
         )
     }
 
-    private createPlaceholderMaterials(): THREE.MeshPhongMaterial[] {
-        return [
-            new THREE.MeshPhongMaterial({ color: 0x4a90e2 }), // Blue
-            new THREE.MeshPhongMaterial({ color: 0xe74c3c }), // Red  
-            new THREE.MeshPhongMaterial({ color: 0x2ecc71 }), // Green
-            new THREE.MeshPhongMaterial({ color: 0xf39c12 }), // Orange
-            new THREE.MeshPhongMaterial({ color: 0x9b59b6 }), // Purple
-            new THREE.MeshPhongMaterial({ color: 0x1abc9c }), // Teal
-        ]
+    private createPlaceholderMaterials(): THREE.MeshStandardMaterial[] {
+        return MaterialUtils.createGameBoxMaterials()
     }
 
     private calculateStartX(numBoxes: number): number {

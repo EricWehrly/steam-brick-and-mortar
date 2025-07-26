@@ -9,6 +9,12 @@
  */
 
 import * as THREE from 'three'
+// import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js' // For high graphics setting
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
+import { BlockbusterColors } from '../utils/Colors'
+import { MaterialUtils } from '../utils/MaterialUtils'
+import { TextureManager } from '../utils/TextureManager'
+import { PropRenderer } from './PropRenderer'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -22,8 +28,16 @@ export class SceneManager {
     private camera: THREE.PerspectiveCamera
     private renderer: THREE.WebGLRenderer
     private animationId: number | null = null
+    private textureManager: TextureManager
+    private propRenderer: PropRenderer
 
     constructor(options: SceneManagerOptions = {}) {
+        // Initialize RectAreaLight uniforms (required for RectAreaLight to work)
+        RectAreaLightUniformsLib.init()
+        
+        // Initialize texture manager
+        this.textureManager = TextureManager.getInstance()
+        
         // Initialize Three.js components
         this.scene = new THREE.Scene()
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
@@ -31,7 +45,11 @@ export class SceneManager {
             antialias: options.antialias ?? true 
         })
 
+        // Initialize prop renderer for atmospheric elements
+        this.propRenderer = new PropRenderer(this.scene)
+
         this.setupRenderer(options)
+        this.setupScene()
         this.setupLighting()
         this.setupCamera()
         this.setupEventListeners()
@@ -53,18 +71,31 @@ export class SceneManager {
         document.body.appendChild(this.renderer.domElement)
     }
 
+    private setupScene() {
+        // Set Blockbuster mustard yellow background
+        this.scene.background = new THREE.Color(BlockbusterColors.walls)
+    }
+
     private setupLighting() {
-        // Ambient light for overall scene brightness
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.6)
+        // Updated lighting for Blockbuster store atmosphere
+        // Fluorescent-style lighting with cool white color temperature
+        
+        // Reduced ambient light to let emissive fixtures show through
+        const ambientLight = new THREE.AmbientLight(BlockbusterColors.fluorescentCool, 0.1)
         this.scene.add(ambientLight)
         
-        // Directional light for shadows and definition
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-        directionalLight.position.set(5, 10, 5)
-        directionalLight.castShadow = true
-        directionalLight.shadow.mapSize.width = 1024
-        directionalLight.shadow.mapSize.height = 1024
-        this.scene.add(directionalLight)
+        // Reduced directional light since we have point lights at fixtures
+        const mainLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentCool, 0.3)
+        mainLight.position.set(0, 10, 0)
+        mainLight.castShadow = true
+        mainLight.shadow.mapSize.width = 1024
+        mainLight.shadow.mapSize.height = 1024
+        this.scene.add(mainLight)
+        
+        // Additional directional light for even coverage (retail store style)
+        const fillLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentWarm, 0.2)
+        fillLight.position.set(5, 8, 5)
+        this.scene.add(fillLight)
     }
 
     private setupCamera() {
@@ -136,17 +167,184 @@ export class SceneManager {
     }
 
     /**
-     * Create a floor plane
+     * Create a floor plane with procedural carpet texture
      */
-    public createFloor(size: number = 20, color: number = 0x808080, y: number = -2): THREE.Mesh {
+    public createFloor(size: number = 20, _color: number = BlockbusterColors.floor, y: number = -2): THREE.Mesh {
         const floorGeometry = new THREE.PlaneGeometry(size, size)
-        const floorMaterial = new THREE.MeshPhongMaterial({ color })
+        
+        // Use procedural carpet material instead of basic material
+        const floorMaterial = this.textureManager.createProceduralCarpetMaterial({
+            repeat: { x: size / 4, y: size / 4 }, // Scale texture appropriately for room size
+            color: '#8B0000', // Blockbuster red carpet
+            roughness: 0.9,
+            metalness: 0.0
+        })
+        
         const floor = new THREE.Mesh(floorGeometry, floorMaterial)
         floor.rotation.x = -Math.PI / 2
         floor.position.y = y
         floor.receiveShadow = true
         this.scene.add(floor)
         return floor
+    }
+
+    /**
+     * Create a ceiling plane with procedural texture
+     */
+    public createCeiling(size: number = 20, y: number = 4): THREE.Mesh {
+        const ceilingGeometry = new THREE.PlaneGeometry(size, size)
+        
+        // Use procedural ceiling material with popcorn texture
+        const ceilingMaterial = this.textureManager.createProceduralCeilingMaterial({
+            repeat: { x: size / 8, y: size / 8 }, // More repeats for ceiling texture detail
+            color: '#F5F5DC', // Beige ceiling color
+            bumpiness: 0.4,
+            roughness: 0.7
+        })
+        
+        const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
+        ceiling.rotation.x = Math.PI / 2 // Face down
+        ceiling.position.y = y
+        this.scene.add(ceiling)
+        return ceiling
+    }
+
+    /**
+     * Create fluorescent light fixtures using PropRenderer
+     * Positioned just below the ceiling at the correct height
+     */
+    public createFluorescentFixtures(ceilingHeight: number = 3.2): THREE.Group {
+        // Use PropRenderer to create proper ceiling-mounted fixtures
+        return this.propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16, {
+            width: 4,
+            height: 0.15,
+            depth: 0.6,
+            emissiveIntensity: 0.8,
+            rows: 2,
+            fixturesPerRow: 4
+        })
+    }
+
+    /**
+     * Demonstration of enhanced procedural textures
+     * Creates sample objects with the new texture system
+     */
+    public addEnhancedTextureDemo(): void {
+        // Create floor with enhanced carpet texture
+        const floorGeometry = new THREE.PlaneGeometry(20, 20)
+        const carpetMaterial = this.textureManager.createEnhancedProceduralCarpetMaterial({
+            color: '#8B0000',
+            fiberDensity: 0.5,
+            repeat: { x: 4, y: 4 }
+        })
+        const floor = new THREE.Mesh(floorGeometry, carpetMaterial)
+        floor.rotation.x = -Math.PI / 2
+        floor.receiveShadow = true
+        this.scene.add(floor)
+
+        // Create ceiling with enhanced popcorn texture
+        const ceilingGeometry = new THREE.PlaneGeometry(20, 20)
+        const ceilingMaterial = this.textureManager.createEnhancedProceduralCeilingMaterial({
+            color: '#F5F5DC',
+            bumpSize: 0.6,
+            density: 0.8,
+            repeat: { x: 3, y: 3 }
+        })
+        const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
+        ceiling.rotation.x = Math.PI / 2
+        ceiling.position.y = 8
+        this.scene.add(ceiling)
+
+        // Create wooden shelves with enhanced wood texture
+        for (let i = 0; i < 3; i++) {
+            const shelfGeometry = new THREE.BoxGeometry(6, 0.2, 1.5)
+            const woodMaterial = this.textureManager.createEnhancedProceduralWoodMaterial({
+                grainStrength: 0.5,
+                ringFrequency: 0.1,
+                color1: '#8B4513',
+                color2: '#A0522D',
+                color3: '#654321',
+                repeat: { x: 3, y: 1 }
+            })
+            const shelf = new THREE.Mesh(shelfGeometry, woodMaterial)
+            shelf.position.set(-5, 2 + i * 2, 0)
+            shelf.castShadow = true
+            this.scene.add(shelf)
+        }
+
+        // Create comparison objects with basic textures
+        for (let i = 0; i < 3; i++) {
+            const shelfGeometry = new THREE.BoxGeometry(6, 0.2, 1.5)
+            const basicWoodMaterial = this.textureManager.createProceduralWoodMaterial({
+                repeat: { x: 3, y: 1 }
+            })
+            const shelf = new THREE.Mesh(shelfGeometry, basicWoodMaterial)
+            shelf.position.set(5, 2 + i * 2, 0)
+            shelf.castShadow = true
+            this.scene.add(shelf)
+        }
+
+        // Add labels to show the difference
+        this.addTextLabel('Enhanced Textures', new THREE.Vector3(-5, 0.5, 2))
+        this.addTextLabel('Basic Textures', new THREE.Vector3(5, 0.5, 2))
+    }
+
+    /**
+     * Add a simple text label to the scene
+     */
+    private addTextLabel(text: string, position: THREE.Vector3): void {
+        const canvas = document.createElement('canvas')
+        const context = canvas.getContext('2d')
+        if (!context) return
+
+        canvas.width = 512
+        canvas.height = 128
+        context.fillStyle = '#ffffff'
+        context.fillRect(0, 0, canvas.width, canvas.height)
+        context.fillStyle = '#000000'
+        context.font = '48px Arial'
+        context.textAlign = 'center'
+        context.fillText(text, canvas.width / 2, canvas.height / 2 + 16)
+
+        const texture = new THREE.CanvasTexture(canvas)
+        const material = new THREE.MeshBasicMaterial({ 
+            map: texture, 
+            transparent: true 
+        })
+        const geometry = new THREE.PlaneGeometry(4, 1)
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.position.copy(position)
+        this.scene.add(mesh)
+    }
+
+    // Atmospheric Props Methods (Phase 2.4)
+
+    /**
+     * Create wire rack displays for snack/merchandise areas
+     */
+    public createWireRackDisplay(position: THREE.Vector3): THREE.Group {
+        return this.propRenderer.createWireRackDisplay(position)
+    }
+
+    /**
+     * Create category dividers between shelf sections
+     */
+    public createCategoryDivider(position: THREE.Vector3, height: number = 2.2): THREE.Group {
+        return this.propRenderer.createCategoryDivider(position, height)
+    }
+
+    /**
+     * Create subtle floor navigation markers
+     */
+    public createFloorMarkers(roomWidth: number = 22, roomDepth: number = 16): THREE.Group {
+        return this.propRenderer.createFloorMarkers(roomWidth, roomDepth)
+    }
+
+    /**
+     * Get the PropRenderer instance for advanced prop manipulation
+     */
+    public getPropRenderer(): PropRenderer {
+        return this.propRenderer
     }
 
     // Getters for accessing Three.js components
@@ -167,6 +365,7 @@ export class SceneManager {
      */
     public dispose() {
         this.stopRenderLoop()
+        this.propRenderer.dispose()
         this.renderer.dispose()
         document.body.removeChild(this.renderer.domElement)
     }

@@ -1,18 +1,62 @@
 /**
  * Unit tests for SteamBrickAndMortarApp orchestrator class
+ * 
+ * This test file uses clean, external mock implementations that are:
+ * - Externally housed in test/mocks/ for easy maintenance and reuse
+ * - Well-documented with inline comments (no separate README)
+ * - Cleanly referenced via factory functions (3 lines per mock vs 4+ lines inline)
+ * - Reusable across multiple test files
+ * - Each mock exports both the mock class and an async factory function
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { SteamBrickAndMortarApp, type AppConfig } from '../../../src/core/SteamBrickAndMortarApp'
 
-// Mock all the manager dependencies
-vi.mock('../../../src/scene/SceneManager')
-vi.mock('../../../src/scene/AssetLoader')
-vi.mock('../../../src/scene/GameBoxRenderer')
-vi.mock('../../../src/steam-integration/SteamIntegration')
-vi.mock('../../../src/webxr/WebXRManager')
-vi.mock('../../../src/webxr/InputManager')
-vi.mock('../../../src/ui/UIManager')
+// Clean one-line mock setup using external factory functions
+vi.mock('../../../src/scene/SceneManager', async () => {
+    const { sceneManagerMockFactory } = await import('../../mocks/scene/SceneManager.mock')
+    return sceneManagerMockFactory()
+})
+
+vi.mock('../../../src/scene/AssetLoader', async () => {
+    const { assetLoaderMockFactory } = await import('../../mocks/scene/AssetLoader.mock')
+    return assetLoaderMockFactory()
+})
+
+vi.mock('../../../src/scene/GameBoxRenderer', async () => {
+    const { gameBoxRendererMockFactory } = await import('../../mocks/scene/GameBoxRenderer.mock')
+    return gameBoxRendererMockFactory()
+})
+
+vi.mock('../../../src/scene/SignageRenderer', async () => {
+    const { signageRendererMockFactory } = await import('../../mocks/scene/SignageRenderer.mock')
+    return signageRendererMockFactory()
+})
+
+vi.mock('../../../src/scene/StoreLayout', async () => {
+    const { storeLayoutMockFactory } = await import('../../mocks/scene/StoreLayout.mock')
+    return storeLayoutMockFactory()
+})
+
+vi.mock('../../../src/steam-integration/SteamIntegration', async () => {
+    const { steamIntegrationMockFactory } = await import('../../mocks/steam-integration/SteamIntegration.mock')
+    return steamIntegrationMockFactory()
+})
+
+vi.mock('../../../src/webxr/WebXRManager', async () => {
+    const { webxrManagerMockFactory } = await import('../../mocks/webxr/WebXRManager.mock')
+    return webxrManagerMockFactory()
+})
+
+vi.mock('../../../src/webxr/InputManager', async () => {
+    const { inputManagerMockFactory } = await import('../../mocks/webxr/InputManager.mock')
+    return inputManagerMockFactory()
+})
+
+vi.mock('../../../src/ui/UIManager', async () => {
+    const { uiManagerMockFactory } = await import('../../mocks/ui/UIManager.mock')
+    return uiManagerMockFactory()
+})
 
 describe('SteamBrickAndMortarApp Unit Tests', () => {
     let app: SteamBrickAndMortarApp
@@ -144,14 +188,22 @@ describe('SteamBrickAndMortarApp Unit Tests', () => {
 
     describe('Error Handling', () => {
         it('should handle initialization errors gracefully', async () => {
-            // Mock scene manager to throw error
-            const mockSceneManager = app.getSceneManager()
-            vi.spyOn(mockSceneManager, 'createFloor').mockImplementation(() => {
+            // Create a fresh app instance for this test
+            const errorApp = new SteamBrickAndMortarApp({
+                scene: {
+                    antialias: false,
+                    enableShadows: false
+                }
+            })
+
+            // Mock the WebXR manager to throw error during checkCapabilities
+            const mockWebXRManager = errorApp.getWebXRManager()
+            vi.spyOn(mockWebXRManager, 'checkCapabilities').mockImplementation(() => {
                 throw new Error('Scene creation failed')
             })
 
-            await expect(app.init()).rejects.toThrow('Scene creation failed')
-            expect(app.getIsInitialized()).toBe(false)
+            await expect(errorApp.init()).rejects.toThrow('Scene creation failed')
+            expect(errorApp.getIsInitialized()).toBe(false)
         })
 
         it('should handle WebXR setup errors gracefully', async () => {
