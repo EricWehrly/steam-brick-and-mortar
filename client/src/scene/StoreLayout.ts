@@ -339,7 +339,7 @@ export class StoreLayout {
   private createEntranceArea(config: StoreLayoutConfig): void {
     // Simple entrance marker (can be enhanced later)
     const entranceGeometry = new THREE.BoxGeometry(3, 0.1, 2);
-    const entranceMaterial = this.textureManager.createSimpleWoodMaterial(new THREE.Color(0x8B4513));
+    const entranceMaterial = this.textureManager.createSimpleWoodMaterial({ color: new THREE.Color(0x8B4513) });
     
     const entrance = new THREE.Mesh(entranceGeometry, entranceMaterial);
     entrance.position.set(0, 0.05, config.depth / 2 - 1);

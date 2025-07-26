@@ -38,7 +38,7 @@ describe('TextureManager API Integration Tests', () => {
       return document.createElement(tagName)
     })
 
-    textureManager = new TextureManager()
+    textureManager = TextureManager.getInstance()
   })
 
   describe('API Method Availability', () => {

@@ -14,6 +14,7 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 import { BlockbusterColors } from '../utils/Colors'
 import { MaterialUtils } from '../utils/MaterialUtils'
 import { TextureManager } from '../utils/TextureManager'
+import { PropRenderer } from './PropRenderer'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -28,6 +29,7 @@ export class SceneManager {
     private renderer: THREE.WebGLRenderer
     private animationId: number | null = null
     private textureManager: TextureManager
+    private propRenderer: PropRenderer
 
     constructor(options: SceneManagerOptions = {}) {
         // Initialize RectAreaLight uniforms (required for RectAreaLight to work)
@@ -42,6 +44,9 @@ export class SceneManager {
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: options.antialias ?? true 
         })
+
+        // Initialize prop renderer for atmospheric elements
+        this.propRenderer = new PropRenderer(this.scene)
 
         this.setupRenderer(options)
         this.setupScene()
@@ -205,73 +210,19 @@ export class SceneManager {
     }
 
     /**
-     * Create visible fluorescent light fixtures
-     * 
-     * TODO: Make point lights optional via graphics settings - they impact performance
-     * Consider adding a lightQuality setting: 'low' (no point lights), 'medium' (some lights), 'high' (all lights)
+     * Create fluorescent light fixtures using PropRenderer
+     * Positioned just below the ceiling at the correct height
      */
-    public createFluorescentFixtures(): THREE.Group {
-        const fixturesGroup = new THREE.Group()
-        
-        // Create fixture geometry - rectangular tube
-        const fixtureGeometry = new THREE.BoxGeometry(4, 0.2, 0.6)
-        
-        // Create glowing material for the fixtures
-        const fixtureMaterial = new THREE.MeshStandardMaterial({
-            color: 0xF5F5F5, // Off-white
-            emissive: 0xE6F3FF, // Cool white glow
-            emissiveIntensity: 0.6, // Increased from 0.3 to make them more visible
-            roughness: 0.2,
-            metalness: 0.1,
+    public createFluorescentFixtures(ceilingHeight: number = 3.2): THREE.Group {
+        // Use PropRenderer to create proper ceiling-mounted fixtures
+        return this.propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16, {
+            width: 4,
+            height: 0.15,
+            depth: 0.6,
+            emissiveIntensity: 0.8,
+            rows: 2,
+            fixturesPerRow: 4
         })
-        
-        // Create multiple fixtures in a grid pattern
-        const fixturePositions = [
-            { x: -6, y: 3.5, z: -1 },
-            { x: -2, y: 3.5, z: -1 },
-            { x: 2, y: 3.5, z: -1 },
-            { x: 6, y: 3.5, z: -1 },
-            { x: -6, y: 3.5, z: 2 },
-            { x: -2, y: 3.5, z: 2 },
-            { x: 2, y: 3.5, z: 2 },
-            { x: 6, y: 3.5, z: 2 },
-        ]
-        
-        fixturePositions.forEach((pos, index) => {
-            const fixture = new THREE.Mesh(fixtureGeometry, fixtureMaterial)
-            fixture.position.set(pos.x, pos.y, pos.z)
-            fixture.userData = { 
-                isLightFixture: true,
-                fixtureIndex: index 
-            }
-            fixturesGroup.add(fixture)
-            
-            // TODO: Individual RectAreaLight per fixture (for highest graphics setting)
-            // const rectLight = new THREE.RectAreaLight(BlockbusterColors.fluorescentCool, 2, 3.8, 0.5)
-            // rectLight.position.set(pos.x, pos.y - 0.1, pos.z) // Slightly below fixture
-            // rectLight.lookAt(pos.x, pos.y - 2, pos.z) // Point downward
-            // const helper = new RectAreaLightHelper(rectLight)
-            // rectLight.add(helper)
-            // fixturesGroup.add(rectLight)
-        })
-        
-        // Performance optimization: Use only 2 RectAreaLights for the two rows
-        // Front row of fixtures
-        const frontRowLight = new THREE.RectAreaLight(BlockbusterColors.fluorescentCool, 3, 16, 0.5)
-        frontRowLight.position.set(0, 3.4, -1) // Center of front row
-        frontRowLight.lookAt(0, 1, -1) // Point downward
-        fixturesGroup.add(frontRowLight)
-        
-        // Back row of fixtures  
-        const backRowLight = new THREE.RectAreaLight(BlockbusterColors.fluorescentCool, 3, 16, 0.5)
-        backRowLight.position.set(0, 3.4, 2) // Center of back row
-        backRowLight.lookAt(0, 1, 2) // Point downward
-        fixturesGroup.add(backRowLight)
-        
-        this.scene.add(fixturesGroup)
-        console.log(`💡 Created ${fixturePositions.length} fluorescent fixtures`)
-        
-        return fixturesGroup
     }
 
     /**
@@ -366,6 +317,36 @@ export class SceneManager {
         this.scene.add(mesh)
     }
 
+    // Atmospheric Props Methods (Phase 2.4)
+
+    /**
+     * Create wire rack displays for snack/merchandise areas
+     */
+    public createWireRackDisplay(position: THREE.Vector3): THREE.Group {
+        return this.propRenderer.createWireRackDisplay(position)
+    }
+
+    /**
+     * Create category dividers between shelf sections
+     */
+    public createCategoryDivider(position: THREE.Vector3, height: number = 2.2): THREE.Group {
+        return this.propRenderer.createCategoryDivider(position, height)
+    }
+
+    /**
+     * Create subtle floor navigation markers
+     */
+    public createFloorMarkers(roomWidth: number = 22, roomDepth: number = 16): THREE.Group {
+        return this.propRenderer.createFloorMarkers(roomWidth, roomDepth)
+    }
+
+    /**
+     * Get the PropRenderer instance for advanced prop manipulation
+     */
+    public getPropRenderer(): PropRenderer {
+        return this.propRenderer
+    }
+
     // Getters for accessing Three.js components
     public getScene(): THREE.Scene {
         return this.scene
@@ -384,6 +365,7 @@ export class SceneManager {
      */
     public dispose() {
         this.stopRenderLoop()
+        this.propRenderer.dispose()
         this.renderer.dispose()
         document.body.removeChild(this.renderer.domElement)
     }

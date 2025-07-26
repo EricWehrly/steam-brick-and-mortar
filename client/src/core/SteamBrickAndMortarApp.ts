@@ -164,8 +164,8 @@ export class SteamBrickAndMortarApp {
         console.log('🏪 Generating VR-optimized store layout...')
         await this.storeLayout.generateStore()
         
-        // Create visible fluorescent fixtures
-        this.sceneManager.createFluorescentFixtures()
+        // Create visible fluorescent fixtures (positioned just below ceiling)
+        this.sceneManager.createFluorescentFixtures(3.2)
         
         // Create Blockbuster signage
         this.signageRenderer.createStandardSigns(this.sceneManager.getScene())

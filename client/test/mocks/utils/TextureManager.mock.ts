@@ -134,7 +134,9 @@ export class MockTextureManager {
   /**
    * Create a simple wood material (non-async version)
    */
-  public createSimpleWoodMaterial(color: THREE.Color = new THREE.Color(0x8B4513)): THREE.MeshStandardMaterial {
+  public createSimpleWoodMaterial(options: { color?: THREE.Color } | THREE.Color = new THREE.Color(0x8B4513)): THREE.MeshStandardMaterial {
+    // Handle both direct Color and options object
+    const color = options instanceof THREE.Color ? options : (options.color || new THREE.Color(0x8B4513));
     const cacheKey = `simple_wood_${color.getHexString()}`;
     
     if (this.materialCache.has(cacheKey)) {
