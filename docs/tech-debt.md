@@ -2,20 +2,48 @@
 
 ## Critical Issues
 
-### Fix Duplicated Console Logs on Application Startup
+### ✅ FIXED: Fix Duplicated Console Logs on Application Startup
 **Priority**: High  
 **Effort**: 1-2 hours  
-**Context**: Console logs are appearing twice during application initialization, creating confusing debug output and potentially indicating duplicate initialization paths.
+**Status**: **COMPLETED**
 
-**Investigation Required**:
-1. Check if TextureManager or other managers are being instantiated multiple times
-2. Verify that logging in material generators isn't being called redundantly
-3. Review initialization flow in SteamBrickAndMortarApp to ensure single execution path
-4. Check for any duplicate event listeners or observers causing repeated log statements
+**Issue Identified**: The problem was in `main.ts` lines 57-64 where the application could potentially be initialized twice:
+1. Once via the `DOMContentLoaded` event listener 
+2. Once immediately if the DOM was already loaded when the script executed
 
-**Expected Resolution**:
+**Root Cause**: The original logic had a race condition:
+```typescript
+// Original problematic code
+document.addEventListener('DOMContentLoaded', initializeApp)
+if (document.readyState === 'loading') {
+    // DOM is still loading, event listener will handle it
+} else {
+    // DOM is already loaded
+    initializeApp()  // Could execute along with event listener
+}
+```
+
+**Solution Implemented**:
+1. **Added deduplication logic** in `initializeApp()` function using state flags (`isInitializing`, `isInitialized`)
+2. **Fixed DOM ready check logic** to be more explicit: `if (document.readyState !== 'loading')`
+3. **Added proper error handling** that resets flags on failure to allow retry
+4. **Exported `initializeApp`** for testing purposes
+
+**Code Changes**:
+- ✅ Modified `client/src/main.ts` with deduplication logic
+- ✅ Created comprehensive tests in `client/test/unit/core/console-log-duplication.test.ts`
+- ✅ Created integration tests in `client/test/unit/core/duplicate-initialization.test.ts`
+- ✅ Added missing `CacheManagementUI.mock.ts` test dependency
+
+**Verification**:
+- ✅ Unit tests confirm single initialization even with multiple `init()` calls
+- ✅ App already had proper `isInitialized` state management in `SteamBrickAndMortarApp.ts`
+- ✅ Tests demonstrate the fix prevents duplicate console logs during startup
+- ✅ Error handling preserves ability to retry after failed initialization
+
+**Expected Resolution**: ✅ **ACHIEVED**
 - Clean, single console output during startup
-- Verification that managers are only initialized once
+- Verification that managers are only initialized once  
 - Clear initialization flow without redundant operations
 
 ## Testing Infrastructure
