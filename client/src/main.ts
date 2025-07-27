@@ -8,10 +8,22 @@
 
 import { SteamBrickAndMortarApp } from './core'
 
+// Track if initialization is already in progress or completed
+let isInitializing = false
+let isInitialized = false
+
 /**
  * Initialize the Steam Brick and Mortar application
  */
-async function initializeApp(): Promise<void> {
+export async function initializeApp(): Promise<void> {
+    // Prevent duplicate initialization
+    if (isInitializing || isInitialized) {
+        console.debug('⚠️ App initialization already in progress or completed, skipping duplicate attempt')
+        return
+    }
+    
+    isInitializing = true
+    
     try {
         console.log('🚀 Starting Steam Brick and Mortar...')
         
@@ -37,6 +49,7 @@ async function initializeApp(): Promise<void> {
             ;(window as typeof window & { steamBrickAndMortarApp: SteamBrickAndMortarApp }).steamBrickAndMortarApp = app
         }
         
+        isInitialized = true
         console.log('🎉 Steam Brick and Mortar initialized successfully!')
         
     } catch (error) {
@@ -48,6 +61,12 @@ async function initializeApp(): Promise<void> {
             errorElement.textContent = 'Failed to initialize application. Please refresh to try again.'
             errorElement.style.color = '#ff6b6b'
         }
+        
+        // Reset flags so user can try again
+        isInitializing = false
+        isInitialized = false
+    } finally {
+        isInitializing = false
     }
 }
 
@@ -55,9 +74,7 @@ async function initializeApp(): Promise<void> {
 document.addEventListener('DOMContentLoaded', initializeApp)
 
 // Also initialize immediately if DOM is already loaded
-if (document.readyState === 'loading') {
-    // DOM is still loading, event listener will handle it
-} else {
-    // DOM is already loaded
+if (document.readyState !== 'loading') {
+    // DOM is already loaded, initialize immediately
     initializeApp()
 }
