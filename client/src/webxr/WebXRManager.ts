@@ -9,6 +9,7 @@
  */
 
 import * as THREE from 'three'
+import { Logger } from '../utils/Logger'
 // Use global WebXR types from webxr.d.ts
 
 export interface WebXRCapabilities {
@@ -28,6 +29,7 @@ export interface WebXRSessionCallbacks {
  * Manages WebXR session lifecycle and capabilities
  */
 export class WebXRManager {
+    private static readonly logger = Logger.withContext(WebXRManager.name)
     private renderer: THREE.WebGLRenderer | null = null
     private currentSession: XRSession | null = null
     private capabilities: WebXRCapabilities = {
@@ -59,7 +61,7 @@ export class WebXRManager {
         this.capabilities.hasNavigatorXR = !!navigator.xr
         
         if (!this.capabilities.hasNavigatorXR) {
-            console.warn('⚠️ WebXR not supported - falling back to desktop mode')
+            WebXRManager.logger.warn('WebXR not supported - falling back to desktop mode')
             this.capabilities.isSupported = false
             this.capabilities.supportsImmersiveVR = false
             this.callbacks.onSupportChange?.(this.capabilities)
@@ -72,12 +74,12 @@ export class WebXRManager {
             this.capabilities.isSupported = this.capabilities.supportsImmersiveVR
 
             if (this.capabilities.supportsImmersiveVR) {
-                console.log('✅ WebXR VR sessions supported')
+                WebXRManager.logger.info('WebXR VR sessions supported')
             } else {
-                console.warn('⚠️ WebXR VR sessions not supported - desktop mode only')
+                WebXRManager.logger.warn('WebXR VR sessions not supported - desktop mode only')
             }
         } catch (error) {
-            console.warn('⚠️ WebXR session support check failed:', error)
+            WebXRManager.logger.warn('WebXR session support check failed:', error)
             this.capabilities.isSupported = false
             this.capabilities.supportsImmersiveVR = false
         }

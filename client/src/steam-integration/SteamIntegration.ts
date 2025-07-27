@@ -10,6 +10,7 @@
 
 import { SteamApiClient, type SteamGame } from '../steam'
 import { ValidationUtils } from '../utils'
+import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
 import type { SteamGameData } from '../scene'
 
@@ -34,6 +35,7 @@ export interface LoadGamesOptions {
  * Manages high-level Steam integration workflow
  */
 export class SteamIntegration {
+    private static readonly logger = Logger.withContext(SteamIntegration.name)
     private steamClient: SteamApiClient
     private gameLibrary: GameLibraryManager
     private config: Required<SteamIntegrationConfig>
@@ -59,7 +61,7 @@ export class SteamIntegration {
             callbacks.onStatusUpdate?.('Loading Steam games...', 'loading')
             callbacks.onProgress?.(0, 100, 'Fetching game library...')
             
-            console.log(`🔍 Loading games for Steam user: ${extractedVanity}`)
+            SteamIntegration.logger.info(`Loading games for Steam user: ${extractedVanity}`)
             
             const resolveResponse = await this.steamClient.resolveVanityUrl(extractedVanity)
             const userGames = await this.steamClient.getUserGames(resolveResponse.steamid)
@@ -89,9 +91,9 @@ export class SteamIntegration {
                         // individual image checks cache (which works well), but a game-level
                         // check would prevent unnecessary cache lookups for fully cached games.
                         await this.steamClient.downloadGameArtwork(game)
-                        console.log(`📸 Downloaded artwork for ${game.name}`)
+                        SteamIntegration.logger.debug(`Downloaded artwork for ${game.name}`)
                     } catch (error) {
-                        console.warn(`⚠️ Failed to download artwork for ${game.name}:`, error)
+                        SteamIntegration.logger.warn(`Failed to download artwork for ${game.name}:`, error)
                     }
                 }
             }
@@ -106,12 +108,12 @@ export class SteamIntegration {
                 'success'
             )
             
-            console.log(`✅ Progressive loading complete for ${userGames.game_count} games`)
+            SteamIntegration.logger.info(`Progressive loading complete for ${userGames.game_count} games`)
             
             return this.gameLibrary.getState()
             
         } catch (error) {
-            console.error('❌ Failed to load Steam games:', error)
+            SteamIntegration.logger.error('Failed to load Steam games:', error)
             callbacks.onStatusUpdate?.(
                 `❌ Failed to load games. Please check the Steam profile name and try again.`, 
                 'error'
@@ -135,24 +137,15 @@ export class SteamIntegration {
         return this.loadGamesForUser(currentState.userData.vanity_url, callbacks)
     }
 
-    /**
-     * Clear all cached data
-     */
     clearCache(): void {
         this.steamClient.clearCache()
         this.gameLibrary.clear()
     }
 
-    /**
-     * Get cache statistics
-     */
     getCacheStats() {
         return this.steamClient.getCacheStats()
     }
 
-    /**
-     * Get current game library state
-     */
     getGameLibraryState(): GameLibraryState {
         return this.gameLibrary.getState()
     }
@@ -180,35 +173,19 @@ export class SteamIntegration {
             artwork: game.artwork
         })) ?? []
     }
-
-    /**
-     * Image downloading methods
-     */
     
-    /**
-     * Download artwork for a specific game
-     */
     async downloadGameArtwork(game: SteamGame): Promise<Record<string, Blob | null>> {
         return this.steamClient.downloadGameArtwork(game)
     }
 
-    /**
-     * Download a single image from URL
-     */
     async downloadGameImage(url: string): Promise<Blob | null> {
         return this.steamClient.downloadGameImage(url)
     }
 
-    /**
-     * Get image cache statistics
-     */
     async getImageCacheStats() {
         return this.steamClient.getImageCacheStats()
     }
 
-    /**
-     * Clear image cache
-     */
     async clearImageCache(): Promise<void> {
         return this.steamClient.clearImageCache()
     }
