@@ -80,8 +80,8 @@ describe('GameBoxRenderer Texture Tests', () => {
             expect(gameBox).toBeTruthy()
             
             // Should have a colored material based on game name
-            const material = gameBox!.material as THREE.MeshPhongMaterial
-            expect(material).toBeInstanceOf(THREE.MeshPhongMaterial)
+            const material = gameBox!.material as THREE.MeshStandardMaterial
+            expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
             expect(material.color).toBeDefined()
         })
 
