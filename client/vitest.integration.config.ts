@@ -6,6 +6,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
     watch: false,
+    // Reduce output verbosity
+    silent: false,
+    reporters: ['basic'],
     // Integration tests only
     include: [
       '**/integration/**/*.int.test.ts'
