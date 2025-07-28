@@ -13,7 +13,7 @@
 
 import * as THREE from 'three'
 import { ValidationUtils } from '../utils'
-import { UIManager } from '../ui'
+import { UIManager, PerformanceMonitor } from '../ui'
 import { SceneManager, AssetLoader, GameBoxRenderer, SignageRenderer, StoreLayout, type SteamGameData } from '../scene'
 import { CacheManagementUI } from '../ui/CacheManagementUI'
 import { SteamIntegration, type ProgressCallbacks } from '../steam-integration'
@@ -54,6 +54,7 @@ export class SteamBrickAndMortarApp {
     private inputManager: InputManager
     private uiManager: UIManager
     private cacheUI: CacheManagementUI
+    private performanceMonitor: PerformanceMonitor
     
     // Current game index for rendering
     private currentGameIndex: number = 0
@@ -130,6 +131,15 @@ export class SteamBrickAndMortarApp {
             refreshInterval: 5000, // 5 seconds
             autoCollapse: true
         })
+        
+        // Initialize Performance Monitor
+        this.performanceMonitor = new PerformanceMonitor({
+            position: 'top-right',
+            showMemory: true,
+            showDrawCalls: true,
+            updateInterval: 100,
+            precision: 1
+        })
     }
 
     /**
@@ -158,6 +168,9 @@ export class SteamBrickAndMortarApp {
             this.uiManager.hideLoading()
             this.startRenderLoop()
             
+            // Start performance monitoring
+            this.performanceMonitor.start()
+            
             this.isInitialized = true
             console.log('✅ WebXR environment ready!')
         } catch (error) {
@@ -177,6 +190,7 @@ export class SteamBrickAndMortarApp {
 
         console.log('🧹 Disposing application resources...')
         
+        this.performanceMonitor.dispose()
         this.signageRenderer.dispose()
         this.storeLayout.dispose()
         this.cacheUI.dispose()
@@ -480,6 +494,10 @@ export class SteamBrickAndMortarApp {
             if (now - lastPerformanceUpdate > performanceUpdateInterval) {
                 this.gameBoxRenderer.updatePerformanceData(camera, this.sceneManager.getScene())
                 this.gameBoxRenderer.cleanupOffScreenTextures()
+                
+                // Update performance monitor with Three.js renderer stats
+                this.performanceMonitor.updateRenderStats(this.sceneManager.getRenderer())
+                
                 lastPerformanceUpdate = now
             }
             
@@ -528,5 +546,19 @@ export class SteamBrickAndMortarApp {
      */
     getPerformanceStats(): ReturnType<GameBoxRenderer['getPerformanceStats']> {
         return this.gameBoxRenderer.getPerformanceStats()
+    }
+    
+    /**
+     * Toggle the performance monitor display
+     */
+    togglePerformanceMonitor(): void {
+        this.performanceMonitor.toggle()
+    }
+    
+    /**
+     * Get current performance statistics from the performance monitor
+     */
+    getCurrentPerformanceStats() {
+        return this.performanceMonitor.getStats()
     }
 }
