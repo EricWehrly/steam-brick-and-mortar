@@ -11,8 +11,13 @@ This document tracks the current, actionable roadmap for the project. For histor
   - roadmap.md
 
 ## Current Focus
+- **🚧 ACTIVE**: Pause Menu Feature Implementation (see `pause-menu-feature-plan.md`)
+  - Escape key pause menu system
+  - Consolidate cache management into settings
+  - Reduce Steam profile input width, add focus expansion
+  - Extensible menu architecture for future features
 - Post-merge validation and codebase cleanup
-- Large file audit and refactoring
+- Large file audit and refactoring  
 - DRY/code quality improvements
 - Tech debt reduction
 - Shelf appearance and arrangement updates
