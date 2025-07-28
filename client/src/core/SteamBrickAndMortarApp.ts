@@ -15,7 +15,9 @@ import * as THREE from 'three'
 import { ValidationUtils } from '../utils'
 import { UIManager, PerformanceMonitor } from '../ui'
 import { SceneManager, AssetLoader, GameBoxRenderer, SignageRenderer, StoreLayout, type SteamGameData } from '../scene'
-import { CacheManagementUI } from '../ui/CacheManagementUI'
+import { PauseMenuManager } from '../ui/pause/PauseMenuManager'
+import { CacheManagementPanel } from '../ui/pause/panels/CacheManagementPanel'
+import { HelpPanel } from '../ui/pause/panels/HelpPanel'
 import { SteamIntegration, type ProgressCallbacks } from '../steam-integration'
 import { WebXRManager, type WebXRCapabilities } from '../webxr/WebXRManager'
 import { InputManager } from '../webxr/InputManager'
@@ -53,8 +55,9 @@ export class SteamBrickAndMortarApp {
     private webxrManager: WebXRManager
     private inputManager: InputManager
     private uiManager: UIManager
-    private cacheUI: CacheManagementUI
     private performanceMonitor: PerformanceMonitor
+    private pauseMenuManager: PauseMenuManager
+    private cacheManagementPanel: CacheManagementPanel | null = null
     
     // Current game index for rendering
     private currentGameIndex: number = 0
@@ -125,13 +128,6 @@ export class SteamBrickAndMortarApp {
             webxrEnterVR: () => this.handleWebXRToggle()
         })
         
-        // Initialize Cache Management UI
-        this.cacheUI = new CacheManagementUI({
-            containerId: 'cache-management-container',
-            refreshInterval: 5000, // 5 seconds
-            autoCollapse: true
-        })
-        
         // Initialize Performance Monitor
         this.performanceMonitor = new PerformanceMonitor({
             position: 'top-right',
@@ -140,6 +136,21 @@ export class SteamBrickAndMortarApp {
             updateInterval: 100,
             precision: 1
         })
+
+        // Initialize Pause Menu System
+        this.pauseMenuManager = new PauseMenuManager(
+            {
+                containerId: 'pause-menu-overlay',
+                overlayClass: 'pause-menu-overlay',
+                menuClass: 'pause-menu'
+            },
+            {
+                onPauseInput: () => this.handleInputPause(),
+                onResumeInput: () => this.handleInputResume(),
+                onMenuOpen: () => this.handlePauseMenuOpen(),
+                onMenuClose: () => this.handlePauseMenuClose()
+            }
+        )
     }
 
     /**
@@ -159,11 +170,21 @@ export class SteamBrickAndMortarApp {
             this.setupControls()
             this.uiManager.init()
             
-            // Initialize cache management UI
-            this.cacheUI.init(
+            // Initialize pause menu system
+            this.pauseMenuManager.init()
+            
+            // Register pause menu panels
+            const cachePanel = new CacheManagementPanel()
+            cachePanel.initCacheFunctions(
                 () => this.steamIntegration.getImageCacheStats(),
                 () => this.steamIntegration.clearImageCache()
             )
+            this.cacheManagementPanel = cachePanel
+            this.pauseMenuManager.registerPanel(cachePanel)
+            this.pauseMenuManager.registerPanel(new HelpPanel())
+            
+            // Initialize settings button
+            this.initializeSettingsButton()
             
             this.uiManager.hideLoading()
             this.startRenderLoop()
@@ -191,9 +212,9 @@ export class SteamBrickAndMortarApp {
         console.log('🧹 Disposing application resources...')
         
         this.performanceMonitor.dispose()
+        this.pauseMenuManager.dispose()
         this.signageRenderer.dispose()
         this.storeLayout.dispose()
-        this.cacheUI.dispose()
         this.inputManager.dispose()
         this.webxrManager.dispose()
         this.sceneManager.dispose()
@@ -307,6 +328,30 @@ export class SteamBrickAndMortarApp {
         this.inputManager.updateCameraRotation(camera, deltaX, deltaY)
     }
 
+    // Pause Menu Event Handlers
+
+    private handleInputPause(): void {
+        // Pause input handling - stop camera movement
+        this.inputManager.stopListening()
+        console.log('⏸️ Input paused')
+    }
+
+    private handleInputResume(): void {
+        // Resume input handling - restart camera movement
+        this.inputManager.startListening()
+        console.log('▶️ Input resumed')
+    }
+
+    private handlePauseMenuOpen(): void {
+        console.log('📋 Pause menu opened')
+        // Additional logic when pause menu opens (e.g., pause animations)
+    }
+
+    private handlePauseMenuClose(): void {
+        console.log('📋 Pause menu closed')
+        // Additional logic when pause menu closes (e.g., resume animations)
+    }
+
     // Steam Integration Event Handlers
 
     private async handleLoadSteamGames(vanityUrl: string): Promise<void> {
@@ -335,6 +380,9 @@ export class SteamBrickAndMortarApp {
             
             await this.steamIntegration.loadGamesForUser(vanityUrl, progressCallbacks)
             
+            // Enable cache management actions now that Steam profile is loaded
+            this.cacheManagementPanel?.enableCacheActions()
+            
             // Update cache display and offline availability
             this.updateCacheStatsDisplay()
             this.uiManager.checkOfflineAvailability(ValidationUtils.extractVanityFromInput(vanityUrl))
@@ -351,6 +399,9 @@ export class SteamBrickAndMortarApp {
                 'error'
             )
             this.uiManager.showProgress(false)
+            
+            // Disable cache management actions on error
+            this.cacheManagementPanel?.disableCacheActions()
         }
     }
     
@@ -560,5 +611,19 @@ export class SteamBrickAndMortarApp {
      */
     getCurrentPerformanceStats() {
         return this.performanceMonitor.getStats()
+    }
+    
+    /**
+     * Initialize the settings button that opens the pause menu
+     */
+    private initializeSettingsButton(): void {
+        const settingsButton = document.getElementById('settings-button')
+        if (settingsButton) {
+            settingsButton.addEventListener('click', () => {
+                this.pauseMenuManager.open()
+            })
+        } else {
+            console.warn('Settings button not found in DOM')
+        }
     }
 }

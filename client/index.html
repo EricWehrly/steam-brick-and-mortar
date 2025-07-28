@@ -59,13 +59,15 @@
         
         #steam-ui {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.8);
             border: 1px solid #444;
             border-radius: 8px;
-            padding: 20px;
-            max-width: 400px;
+            padding: 15px;
+            min-width: 320px;
+            width: auto;
             z-index: 1000;
             backdrop-filter: blur(10px);
         }
@@ -77,7 +79,7 @@
         }
         
         #steam-ui input {
-            width: 100%;
+            width: 280px;
             padding: 10px;
             margin: 8px 0;
             border: 1px solid #555;
@@ -96,7 +98,6 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
-            margin-top: 10px;
         }
         
         #steam-ui button:hover {
@@ -203,7 +204,7 @@
             placeholder="e.g., SpiteMonger or steamcommunity.com/id/SpiteMonger"
             autocomplete="off"
         />
-        <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <div style="display: flex; gap: 8px;">
             <button id="load-steam-games">Load My Games</button>
             <button id="use-offline-data" style="display: none; background: #ff8c00;">Use Offline</button>
         </div>
@@ -217,29 +218,11 @@
             <div class="progress-game" id="progress-game"></div>
         </div>
         
-        <div id="cache-controls" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #444;">
-            <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #888;">Cache Management</h3>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button id="refresh-cache" style="background: #28a745; font-size: 12px; padding: 6px 10px;">Refresh</button>
-                <button id="clear-cache" style="background: #dc3545; font-size: 12px; padding: 6px 10px;">Clear Cache</button>
-                <button id="show-cache-stats" style="background: #17a2b8; font-size: 12px; padding: 6px 10px;">Cache Info</button>
-            </div>
-            <div id="cache-info" style="margin-top: 10px; font-size: 12px; color: #aaa; display: none;"></div>
-        </div>
-        
-        <div id="loading-progress" style="display: none;">
-            <div class="progress-bar">
-                <div class="progress-fill" id="progress-fill"></div>
-            </div>
-            <div class="progress-text" id="progress-text">Loading games...</div>
-            <div class="progress-game" id="progress-game"></div>
-        </div>
-        
         <div id="steam-status" class="status-hidden"></div>
     </div>
     
-    <!-- Advanced Cache Management UI -->
-    <div id="cache-management-container" style="position: absolute; top: 20px; right: 20px; max-width: 350px; z-index: 1000;"></div>
+    <!-- Settings Button -->
+    <button id="settings-button" style="position: absolute; top: 20px; left: 20px; z-index: 1000; padding: 10px 15px; background: rgba(0, 0, 0, 0.8); color: white; border: 1px solid #333; border-radius: 5px; cursor: pointer; font-size: 14px;">⚙️ Settings</button>
     
     <div id="controls-help" style="display: none;">
         <strong>Controls:</strong><br>
