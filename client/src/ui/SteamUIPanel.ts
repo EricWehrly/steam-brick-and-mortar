@@ -3,6 +3,8 @@
  */
 
 import { getElementByIdSafe } from '../utils'
+import { renderTemplate } from '../utils/TemplateEngine'
+import steamCacheStatsTemplate from '../templates/steam-ui/cache-stats.html?raw'
 
 export interface SteamUIPanelEvents {
   onLoadGames: (vanityUrl: string) => void
@@ -161,12 +163,7 @@ export class SteamUIPanel {
   showCacheStatsInfo(stats: { totalEntries: number; cacheHits: number; cacheMisses: number }): void {
     if (!this.cacheInfoDiv) return
     
-    this.cacheInfoDiv.innerHTML = `
-      <strong>Cache Statistics:</strong><br>
-      • Total entries: ${stats.totalEntries}<br>
-      • Cache hits: ${stats.cacheHits}<br>
-      • Cache misses: ${stats.cacheMisses}<br>
-    `
+    this.cacheInfoDiv.innerHTML = renderTemplate(steamCacheStatsTemplate, stats)
     
     // Toggle visibility
     const isHidden = this.cacheInfoDiv.style.display === 'none'

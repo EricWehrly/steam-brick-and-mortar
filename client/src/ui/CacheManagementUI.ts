@@ -12,6 +12,10 @@
  */
 
 import type { ImageCacheStats } from '../steam/images/ImageManager'
+import { renderTemplate } from '../utils/TemplateEngine'
+import cacheMainTemplate from '../templates/cache-management/main.html?raw'
+import cacheStatsTemplate from '../templates/cache-management/stats.html?raw'
+import cacheErrorTemplate from '../templates/cache-management/error.html?raw'
 import '../styles/components/cache-management-ui.css'
 
 export interface CacheUIConfig {
@@ -92,25 +96,10 @@ export class CacheManagementUI {
     private render(): void {
         if (!this.container) return
 
-        this.container.innerHTML = `
-            <div class="cache-management">
-                <div class="cache-header" id="cache-header">
-                    <h3>🗄️ Cache Management</h3>
-                    <button class="toggle-btn" id="cache-toggle">
-                        ${this.isCollapsed ? '▼' : '▲'}
-                    </button>
-                </div>
-                <div class="cache-content ${this.isCollapsed ? 'collapsed' : ''}" id="cache-content">
-                    <div class="cache-stats" id="cache-stats">
-                        <div class="loading">Loading cache statistics...</div>
-                    </div>
-                    <div class="cache-controls">
-                        <button class="refresh-btn" id="cache-refresh">🔄 Refresh</button>
-                        <button class="clear-btn" id="cache-clear">🗑️ Clear Cache</button>
-                    </div>
-                </div>
-            </div>
-        `
+        this.container.innerHTML = renderTemplate(cacheMainTemplate, {
+            collapsed: this.isCollapsed,
+            expanded: !this.isCollapsed
+        })
 
         this.attachEventListeners()
         this.refresh() // Initial load
@@ -152,56 +141,39 @@ export class CacheManagementUI {
         const { totalImages, totalSize, storageQuota } = stats
         const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2)
         
-        let quotaInfo = ''
-        let quotaBar = ''
+        let quotaData = {}
         
         if (storageQuota?.isSupported) {
             const { usageMB, quotaMB, usagePercent, isNearLimit } = storageQuota
             const quotaClass = usagePercent > 95 ? 'critical' : usagePercent > 80 ? 'warning' : ''
             
-            quotaInfo = `
-                <div class="stat-row">
-                    <span class="stat-label">Storage Usage:</span>
-                    <span class="stat-value">${usageMB.toFixed(1)} / ${quotaMB.toFixed(1)} MB (${usagePercent.toFixed(1)}%)</span>
-                </div>
-            `
-            
-            quotaBar = `
-                <div class="quota-bar">
-                    <div class="quota-fill ${quotaClass}" style="width: ${Math.min(usagePercent, 100)}%"></div>
-                </div>
-                ${isNearLimit ? '<div class="error">⚠️ Storage usage is high!</div>' : ''}
-            `
+            quotaData = {
+                hasQuotaInfo: true,
+                usageMB: usageMB.toFixed(1),
+                quotaMB: quotaMB.toFixed(1),
+                usagePercent: usagePercent.toFixed(1),
+                quotaClass,
+                quotaFillPercent: Math.min(usagePercent, 100),
+                isNearLimit
+            }
         }
 
-        statsContainer.innerHTML = `
-            <div class="stat-row">
-                <span class="stat-label">Images Cached:</span>
-                <span class="stat-value">${totalImages}</span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-label">Cache Size:</span>
-                <span class="stat-value">${sizeInMB} MB</span>
-            </div>
-            ${quotaInfo}
-            ${quotaBar}
-            ${stats.totalImages > 0 ? `
-                <div class="stat-row">
-                    <span class="stat-label">Oldest:</span>
-                    <span class="stat-value">${new Date(stats.oldestTimestamp).toLocaleString()}</span>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Newest:</span>
-                    <span class="stat-value">${new Date(stats.newestTimestamp).toLocaleString()}</span>
-                </div>
-            ` : ''}
-        `
+        const templateData = {
+            totalImages,
+            sizeInMB,
+            hasImages: totalImages > 0,
+            oldestDate: totalImages > 0 ? new Date(stats.oldestTimestamp).toLocaleString() : '',
+            newestDate: totalImages > 0 ? new Date(stats.newestTimestamp).toLocaleString() : '',
+            ...quotaData
+        }
+
+        statsContainer.innerHTML = renderTemplate(cacheStatsTemplate, templateData)
     }
 
     private showError(message: string): void {
         const statsContainer = document.getElementById('cache-stats')
         if (statsContainer) {
-            statsContainer.innerHTML = `<div class="error">${message}</div>`
+            statsContainer.innerHTML = renderTemplate(cacheErrorTemplate, { message })
         }
     }
 

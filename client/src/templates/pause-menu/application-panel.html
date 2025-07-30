@@ -1,0 +1,154 @@
+<!-- Application Control -->
+<div class="app-section">
+    <h4>Application Control</h4>
+    <div class="control-buttons">
+        <button id="app-resume-btn" class="app-btn primary">
+            <span class="btn-icon">▶️</span>
+            <span class="btn-text">Resume</span>
+            <span class="btn-shortcut">ESC</span>
+        </button>
+    </div>
+</div>
+
+<!-- Performance Settings -->
+<div class="app-section">
+    <h4>Performance Settings</h4>
+    <div class="settings-grid">
+        <div class="setting-item">
+            <label for="quality-select">Graphics Quality:</label>
+            <select id="quality-select" class="setting-select">
+                <option value="low" {{#selected qualityLow}}selected{{/selected}}>Low</option>
+                <option value="medium" {{#selected qualityMedium}}selected{{/selected}}>Medium</option>
+                <option value="high" {{#selected qualityHigh}}selected{{/selected}}>High</option>
+                <option value="ultra" {{#selected qualityUltra}}selected{{/selected}}>Ultra</option>
+            </select>
+        </div>
+        
+        <div class="setting-item">
+            <label for="target-fps-select">Target FPS:</label>
+            <select id="target-fps-select" class="setting-select">
+                <option value="30" {{#selected fps30}}selected{{/selected}}>30 FPS</option>
+                <option value="60" {{#selected fps60}}selected{{/selected}}>60 FPS</option>
+                <option value="90" {{#selected fps90}}selected{{/selected}}>90 FPS (VR)</option>
+                <option value="120" {{#selected fps120}}selected{{/selected}}>120 FPS</option>
+                <option value="144" {{#selected fps144}}selected{{/selected}}>144 FPS</option>
+            </select>
+        </div>
+        
+        <div class="setting-item checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="vsync-toggle" {{#checked enableVSync}}checked{{/checked}}>
+                <span class="checkmark"></span>
+                <span class="label-text">Enable V-Sync</span>
+            </label>
+        </div>
+    </div>
+</div>
+
+<!-- Interface Settings -->
+<div class="app-section">
+    <h4>Interface Settings</h4>
+    <div class="settings-grid">
+        <div class="setting-item checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="show-fps-toggle" {{#checked showFPS}}checked{{/checked}}>
+                <span class="checkmark"></span>
+                <span class="label-text">Show FPS Counter</span>
+            </label>
+        </div>
+        
+        <div class="setting-item checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="show-perf-toggle" {{#checked showPerformanceStats}}checked{{/checked}}>
+                <span class="checkmark"></span>
+                <span class="label-text">Show Performance Stats</span>
+            </label>
+        </div>
+        
+        <div class="setting-item checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="hide-ui-vr-toggle" {{#checked hideUIInVR}}checked{{/checked}}>
+                <span class="checkmark"></span>
+                <span class="label-text">Hide UI in VR Mode</span>
+            </label>
+        </div>
+        
+        <div class="setting-item checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="fullscreen-start-toggle" {{#checked fullscreenOnStart}}checked{{/checked}}>
+                <span class="checkmark"></span>
+                <span class="label-text">Fullscreen on Start</span>
+            </label>
+        </div>
+    </div>
+</div>
+
+<!-- Debug Settings (for development) -->
+<div class="app-section debug-section">
+    <h4>Debug & Development</h4>
+    <div class="settings-grid">
+        <div class="setting-item checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="enable-console-toggle" {{#checked enableConsole}}checked{{/checked}}>
+                <span class="checkmark"></span>
+                <span class="label-text">Enable Console</span>
+            </label>
+        </div>
+        
+        <div class="setting-item checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="verbose-logging-toggle" {{#checked verboseLogging}}checked{{/checked}}>
+                <span class="checkmark"></span>
+                <span class="label-text">Verbose Logging</span>
+            </label>
+        </div>
+        
+        <div class="setting-item checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="show-debug-toggle" {{#checked showDebugInfo}}checked{{/checked}}>
+                <span class="checkmark"></span>
+                <span class="label-text">Show Debug Info</span>
+            </label>
+        </div>
+    </div>
+    
+    <div class="debug-actions">
+        <button id="open-console-btn" class="debug-btn">
+            <span class="btn-icon">💻</span>
+            Open Developer Console
+        </button>
+        <button id="export-logs-btn" class="debug-btn">
+            <span class="btn-icon">📋</span>
+            Export Debug Logs
+        </button>
+    </div>
+</div>
+
+<!-- General Settings -->
+<div class="app-section">
+    <h4>General Settings</h4>
+    <div class="settings-grid">
+        <div class="setting-item checkbox-item">
+            <label class="checkbox-label">
+                <input type="checkbox" id="auto-save-toggle" {{#checked autoSave}}checked{{/checked}}>
+                <span class="checkmark"></span>
+                <span class="label-text">Auto-save Settings</span>
+            </label>
+        </div>
+    </div>
+    
+    <div class="general-actions">
+        <button id="reset-settings-btn" class="action-btn warning">
+            <span class="btn-icon">🔄</span>
+            Reset to Defaults
+        </button>
+        <button id="export-settings-btn" class="action-btn">
+            <span class="btn-icon">📁</span>
+            Export Settings
+        </button>
+        <button id="import-settings-btn" class="action-btn">
+            <span class="btn-icon">📂</span>
+            Import Settings
+        </button>
+    </div>
+</div>

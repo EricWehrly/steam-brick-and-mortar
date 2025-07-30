@@ -1,0 +1,18 @@
+<!-- Cache Management Main Template -->
+<div class="cache-management">
+    <div class="cache-header" id="cache-header">
+        <h3>🗄️ Cache Management</h3>
+        <button class="toggle-btn" id="cache-toggle">
+            {{#collapsed}}▼{{/collapsed}}{{#expanded}}▲{{/expanded}}
+        </button>
+    </div>
+    <div class="cache-content {{#collapsed}}collapsed{{/collapsed}}" id="cache-content">
+        <div class="cache-stats" id="cache-stats">
+            <div class="loading">Loading cache statistics...</div>
+        </div>
+        <div class="cache-controls">
+            <button class="refresh-btn" id="cache-refresh">🔄 Refresh</button>
+            <button class="clear-btn" id="cache-clear">🗑️ Clear Cache</button>
+        </div>
+    </div>
+</div>

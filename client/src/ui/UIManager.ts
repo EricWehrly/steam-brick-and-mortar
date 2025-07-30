@@ -5,6 +5,8 @@
 import { SteamUIPanel } from './SteamUIPanel'
 import { ProgressDisplay } from './ProgressDisplay'
 import { WebXRUIPanel } from './WebXRUIPanel'
+import { renderTemplate } from '../utils/TemplateEngine'
+import uiErrorTemplate from '../templates/ui/error.html?raw'
 
 export interface UIManagerEvents {
   steamLoadGames: (vanityUrl: string) => void
@@ -96,11 +98,7 @@ export class UIManager {
   showError(message: string): void {
     const loading = document.getElementById('loading')
     if (loading) {
-      loading.innerHTML = `
-        <h1>Error</h1>
-        <p>${message}</p>
-        <p>Check console for details.</p>
-      `
+      loading.innerHTML = renderTemplate(uiErrorTemplate, { message })
     }
   }
 }

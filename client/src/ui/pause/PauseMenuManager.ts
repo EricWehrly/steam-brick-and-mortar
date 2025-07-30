@@ -5,6 +5,8 @@
  */
 
 import { PauseMenuPanel } from './PauseMenuPanel'
+import { renderTemplate } from '../../utils/TemplateEngine'
+import pauseMenuStructureTemplate from '../../templates/pause-menu/main-structure.html?raw'
 import '../../styles/pause-menu/pause-menu-manager.css'
 
 export interface PauseMenuState {
@@ -207,18 +209,7 @@ export class PauseMenuManager {
         // Create menu container
         this.menuContainer = document.createElement('div')
         this.menuContainer.className = this.config.menuClass
-        this.menuContainer.innerHTML = `
-            <div class="pause-menu-header">
-                <h2>⏸️ Pause Menu</h2>
-                <button class="close-btn" id="pause-menu-close">✕</button>
-            </div>
-            <div class="pause-menu-tabs" id="pause-menu-tabs">
-                <!-- Panel tabs will be added here -->
-            </div>
-            <div class="pause-menu-content" id="pause-menu-content">
-                <!-- Panel content will be added here -->
-            </div>
-        `
+        this.menuContainer.innerHTML = renderTemplate(pauseMenuStructureTemplate, {})
 
         this.overlay.appendChild(this.menuContainer)
         document.body.appendChild(this.overlay)

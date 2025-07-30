@@ -1,0 +1,31 @@
+<!-- Cache Statistics Display Template -->
+<div class="stat-row">
+    <span class="stat-label">Images Cached:</span>
+    <span class="stat-value">{{totalImages}}</span>
+</div>
+<div class="stat-row">
+    <span class="stat-label">Cache Size:</span>
+    <span class="stat-value">{{sizeInMB}} MB</span>
+</div>
+{{#hasQuotaInfo}}
+<div class="stat-row">
+    <span class="stat-label">Storage Usage:</span>
+    <span class="stat-value">{{usageMB}} / {{quotaMB}} MB ({{usagePercent}}%)</span>
+</div>
+<div class="quota-bar">
+    <div class="quota-fill {{quotaClass}}" style="width: {{quotaFillPercent}}%"></div>
+</div>
+{{#isNearLimit}}
+<div class="error">⚠️ Storage usage is high!</div>
+{{/isNearLimit}}
+{{/hasQuotaInfo}}
+{{#hasImages}}
+<div class="stat-row">
+    <span class="stat-label">Oldest:</span>
+    <span class="stat-value">{{oldestDate}}</span>
+</div>
+<div class="stat-row">
+    <span class="stat-label">Newest:</span>
+    <span class="stat-value">{{newestDate}}</span>
+</div>
+{{/hasImages}}

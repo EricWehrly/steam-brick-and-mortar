@@ -12,6 +12,8 @@
 
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import '../../../styles/pause-menu/application-panel.css'
+import { renderTemplate } from '../../../utils/TemplateEngine'
+import applicationPanelTemplate from '../../../templates/pause-menu/application-panel.html?raw'
 
 export interface ApplicationSettings {
     // Performance Settings
@@ -57,150 +59,31 @@ export class ApplicationPanel extends PauseMenuPanel {
     }
 
     public render(): string {
-        return `
-            <!-- Performance Settings -->
-            <div class="app-section">
-                <h4>Performance Settings</h4>
-                    <div class="settings-grid">
-                        <div class="setting-item">
-                            <label for="quality-select">Graphics Quality:</label>
-                            <select id="quality-select" class="setting-select">
-                                <option value="low" ${this.settings.qualityLevel === 'low' ? 'selected' : ''}>Low</option>
-                                <option value="medium" ${this.settings.qualityLevel === 'medium' ? 'selected' : ''}>Medium</option>
-                                <option value="high" ${this.settings.qualityLevel === 'high' ? 'selected' : ''}>High</option>
-                                <option value="ultra" ${this.settings.qualityLevel === 'ultra' ? 'selected' : ''}>Ultra</option>
-                            </select>
-                        </div>
-                        
-                        <div class="setting-item">
-                            <label for="target-fps-select">Target FPS:</label>
-                            <select id="target-fps-select" class="setting-select">
-                                <option value="30" ${this.settings.targetFPS === 30 ? 'selected' : ''}>30 FPS</option>
-                                <option value="60" ${this.settings.targetFPS === 60 ? 'selected' : ''}>60 FPS</option>
-                                <option value="90" ${this.settings.targetFPS === 90 ? 'selected' : ''}>90 FPS (VR)</option>
-                                <option value="120" ${this.settings.targetFPS === 120 ? 'selected' : ''}>120 FPS</option>
-                                <option value="144" ${this.settings.targetFPS === 144 ? 'selected' : ''}>144 FPS</option>
-                            </select>
-                        </div>
-                        
-                        <div class="setting-item checkbox-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="vsync-toggle" ${this.settings.enableVSync ? 'checked' : ''}>
-                                <span class="checkmark"></span>
-                                <span class="label-text">Enable V-Sync</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Interface Settings -->
-                <div class="app-section">
-                    <h4>Interface Settings</h4>
-                    <div class="settings-grid">
-                        <div class="setting-item checkbox-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="show-fps-toggle" ${this.settings.showFPS ? 'checked' : ''}>
-                                <span class="checkmark"></span>
-                                <span class="label-text">Show FPS Counter</span>
-                            </label>
-                        </div>
-                        
-                        <div class="setting-item checkbox-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="show-perf-toggle" ${this.settings.showPerformanceStats ? 'checked' : ''}>
-                                <span class="checkmark"></span>
-                                <span class="label-text">Show Performance Stats</span>
-                            </label>
-                        </div>
-                        
-                        <div class="setting-item checkbox-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="hide-ui-vr-toggle" ${this.settings.hideUIInVR ? 'checked' : ''}>
-                                <span class="checkmark"></span>
-                                <span class="label-text">Hide UI in VR Mode</span>
-                            </label>
-                        </div>
-                        
-                        <div class="setting-item checkbox-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="fullscreen-start-toggle" ${this.settings.fullscreenOnStart ? 'checked' : ''}>
-                                <span class="checkmark"></span>
-                                <span class="label-text">Fullscreen on Start</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Debug Settings (for development) -->
-                <div class="app-section debug-section">
-                    <h4>Debug & Development</h4>
-                    <div class="settings-grid">
-                        <div class="setting-item checkbox-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="enable-console-toggle" ${this.settings.enableConsole ? 'checked' : ''}>
-                                <span class="checkmark"></span>
-                                <span class="label-text">Enable Console</span>
-                            </label>
-                        </div>
-                        
-                        <div class="setting-item checkbox-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="verbose-logging-toggle" ${this.settings.verboseLogging ? 'checked' : ''}>
-                                <span class="checkmark"></span>
-                                <span class="label-text">Verbose Logging</span>
-                            </label>
-                        </div>
-                        
-                        <div class="setting-item checkbox-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="show-debug-toggle" ${this.settings.showDebugInfo ? 'checked' : ''}>
-                                <span class="checkmark"></span>
-                                <span class="label-text">Show Debug Info</span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="debug-actions">
-                        <button id="open-console-btn" class="debug-btn">
-                            <span class="btn-icon">💻</span>
-                            Open Developer Console
-                        </button>
-                        <button id="export-logs-btn" class="debug-btn">
-                            <span class="btn-icon">📋</span>
-                            Export Debug Logs
-                        </button>
-                    </div>
-                </div>
-
-                <!-- General Settings -->
-                <div class="app-section">
-                    <h4>General Settings</h4>
-                    <div class="settings-grid">
-                        <div class="setting-item checkbox-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="auto-save-toggle" ${this.settings.autoSave ? 'checked' : ''}>
-                                <span class="checkmark"></span>
-                                <span class="label-text">Auto-save Settings</span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="general-actions">
-                        <button id="reset-settings-btn" class="action-btn warning">
-                            <span class="btn-icon">🔄</span>
-                            Reset to Defaults
-                        </button>
-                        <button id="export-settings-btn" class="action-btn">
-                            <span class="btn-icon">📁</span>
-                            Export Settings
-                        </button>
-                        <button id="import-settings-btn" class="action-btn">
-                            <span class="btn-icon">📂</span>
-                            Import Settings
-                        </button>
-                    </div>
-                </div>
-        `
+        return renderTemplate(applicationPanelTemplate, {
+            // Quality level selections
+            qualityLow: this.settings.qualityLevel === 'low',
+            qualityMedium: this.settings.qualityLevel === 'medium',
+            qualityHigh: this.settings.qualityLevel === 'high',
+            qualityUltra: this.settings.qualityLevel === 'ultra',
+            
+            // FPS selections
+            fps30: this.settings.targetFPS === 30,
+            fps60: this.settings.targetFPS === 60,
+            fps90: this.settings.targetFPS === 90,
+            fps120: this.settings.targetFPS === 120,
+            fps144: this.settings.targetFPS === 144,
+            
+            // Checkbox states
+            enableVSync: this.settings.enableVSync,
+            showFPS: this.settings.showFPS,
+            showPerformanceStats: this.settings.showPerformanceStats,
+            hideUIInVR: this.settings.hideUIInVR,
+            fullscreenOnStart: this.settings.fullscreenOnStart,
+            enableConsole: this.settings.enableConsole,
+            verboseLogging: this.settings.verboseLogging,
+            showDebugInfo: this.settings.showDebugInfo,
+            autoSave: this.settings.autoSave
+        })
     }
 
     public attachEvents(): void {
