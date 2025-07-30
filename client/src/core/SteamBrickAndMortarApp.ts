@@ -18,6 +18,7 @@ import { SceneManager, AssetLoader, GameBoxRenderer, SignageRenderer, StoreLayou
 import { PauseMenuManager } from '../ui/pause/PauseMenuManager'
 import { CacheManagementPanel } from '../ui/pause/panels/CacheManagementPanel'
 import { HelpPanel } from '../ui/pause/panels/HelpPanel'
+import { ApplicationPanel } from '../ui/pause/panels/ApplicationPanel'
 import { SteamIntegration, type ProgressCallbacks } from '../steam-integration'
 import { WebXRManager, type WebXRCapabilities } from '../webxr/WebXRManager'
 import { InputManager } from '../webxr/InputManager'
@@ -58,6 +59,7 @@ export class SteamBrickAndMortarApp {
     private performanceMonitor: PerformanceMonitor
     private pauseMenuManager: PauseMenuManager
     private cacheManagementPanel: CacheManagementPanel | null = null
+    private applicationPanel: ApplicationPanel | null = null
     
     // Current game index for rendering
     private currentGameIndex: number = 0
@@ -181,7 +183,17 @@ export class SteamBrickAndMortarApp {
             )
             this.cacheManagementPanel = cachePanel
             this.pauseMenuManager.registerPanel(cachePanel)
+            
+            // Add help panel
             this.pauseMenuManager.registerPanel(new HelpPanel())
+            
+            // Add application panel with callbacks
+            const applicationPanel = new ApplicationPanel()
+            applicationPanel.initialize({
+                onSettingsChanged: (settings) => this.handleSettingsChange(settings)
+            })
+            this.applicationPanel = applicationPanel
+            this.pauseMenuManager.registerPanel(applicationPanel)
             
             // Initialize settings button
             this.initializeSettingsButton()
@@ -625,5 +637,87 @@ export class SteamBrickAndMortarApp {
         } else {
             console.warn('Settings button not found in DOM')
         }
+    }
+
+    /**
+     * Handle application settings changes
+     */
+    private handleSettingsChange(settings: Partial<import('../ui/pause/panels/ApplicationPanel').ApplicationSettings>): void {
+        console.log('⚙️ Application settings changed:', settings)
+        
+        // Handle performance settings
+        if (settings.showFPS !== undefined) {
+            // Toggle FPS display based on setting
+            if (settings.showFPS) {
+                this.performanceMonitor.show()
+            } else {
+                this.performanceMonitor.hide()
+            }
+        }
+        
+        if (settings.showPerformanceStats !== undefined) {
+            // Toggle performance stats visibility
+            if (settings.showPerformanceStats) {
+                this.performanceMonitor.show()
+            } else {
+                this.performanceMonitor.hide()
+            }
+        }
+        
+        if (settings.targetFPS !== undefined) {
+            // Update target FPS (this would need to be implemented in the render loop)
+            console.log(`🎯 Target FPS set to: ${settings.targetFPS}`)
+        }
+        
+        if (settings.qualityLevel !== undefined) {
+            // Update graphics quality settings
+            console.log(`🎨 Graphics quality set to: ${settings.qualityLevel}`)
+            this.updateGraphicsQuality(settings.qualityLevel)
+        }
+        
+        if (settings.enableVSync !== undefined) {
+            // Update V-Sync setting
+            console.log(`🔄 V-Sync ${settings.enableVSync ? 'enabled' : 'disabled'}`)
+        }
+        
+        // Handle interface settings
+        if (settings.hideUIInVR !== undefined) {
+            // Handle VR UI visibility (when VR support is available)
+            console.log(`👓 VR UI visibility setting: ${!settings.hideUIInVR}`)
+        }
+        
+        // Handle debug settings
+        if (settings.enableConsole !== undefined || settings.verboseLogging !== undefined) {
+            console.log('🐛 Debug settings updated')
+        }
+    }
+
+    /**
+     * Update graphics quality based on setting
+     */
+    private updateGraphicsQuality(quality: 'low' | 'medium' | 'high' | 'ultra'): void {
+        // This would update renderer settings, shadow quality, etc.
+        const renderer = this.sceneManager.getRenderer()
+        
+        switch (quality) {
+            case 'low':
+                renderer.shadowMap.enabled = false
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1))
+                break
+            case 'medium':
+                renderer.shadowMap.enabled = true
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
+                break
+            case 'high':
+                renderer.shadowMap.enabled = true
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+                break
+            case 'ultra':
+                renderer.shadowMap.enabled = true
+                renderer.setPixelRatio(window.devicePixelRatio)
+                break
+        }
+        
+        console.log(`🎨 Graphics quality applied: ${quality}`)
     }
 }

@@ -62,9 +62,75 @@ describe('SteamBrickAndMortarApp Unit Tests', () => {
     let app: SteamBrickAndMortarApp
 
     beforeEach(() => {
-        // Mock DOM elements
+        // Mock DOM elements with proper Node interface
         const mockCanvas = document.createElement('canvas')
-        vi.spyOn(document, 'createElement').mockReturnValue(mockCanvas)
+        
+        // Create proper mock elements that satisfy Node interface
+        const createMockElement = (tagName: string) => {
+            const element = {
+                tagName: tagName.toUpperCase(),
+                id: '',
+                innerHTML: '',
+                textContent: '',
+                className: '',
+                style: new Proxy({}, {
+                    set() { return true },
+                    get() { return '' }
+                }),
+                appendChild: vi.fn(),
+                removeChild: vi.fn(),
+                remove: vi.fn(), // Add remove method for element disposal
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                setAttribute: vi.fn(),
+                getAttribute: vi.fn(),
+                hasAttribute: vi.fn(),
+                querySelector: vi.fn(),
+                querySelectorAll: vi.fn(),
+                classList: {
+                    add: vi.fn(),
+                    remove: vi.fn(),
+                    contains: vi.fn(),
+                    toggle: vi.fn()
+                },
+                // Mock Node interface properties
+                nodeType: 1, // ELEMENT_NODE
+                nodeName: tagName.toUpperCase(),
+                parentNode: null,
+                childNodes: [],
+                firstChild: null,
+                lastChild: null,
+                previousSibling: null,
+                nextSibling: null
+            }
+            return element
+        }
+        
+        // Mock createElement to return proper Node-like objects
+        vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+            if (tagName === 'canvas') {
+                return mockCanvas
+            } else {
+                return createMockElement(tagName) as unknown as HTMLElement
+            }
+        })
+        
+        // Mock document.head and document.body
+        const mockHead = createMockElement('head')
+        const mockBody = createMockElement('body')
+        
+        Object.defineProperty(document, 'head', {
+            value: mockHead,
+            configurable: true
+        })
+        
+        Object.defineProperty(document, 'body', {
+            value: mockBody,
+            configurable: true
+        })
+        
+        // Mock getElementById to avoid style duplication detection
+        vi.spyOn(document, 'getElementById').mockReturnValue(null)
         
         // Mock getBoundingClientRect
         vi.spyOn(mockCanvas, 'getBoundingClientRect').mockReturnValue({

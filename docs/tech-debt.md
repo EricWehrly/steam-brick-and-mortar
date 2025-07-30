@@ -2,51 +2,28 @@
 
 ## Critical Issues
 
-### ✅ FIXED: Fix Duplicated Console Logs on Application Startup
-**Priority**: High  
-**Effort**: 1-2 hours  
-**Status**: **COMPLETED**
-
-**Issue Identified**: The problem was in `main.ts` lines 57-64 where the application could potentially be initialized twice:
-1. Once via the `DOMContentLoaded` event listener 
-2. Once immediately if the DOM was already loaded when the script executed
-
-**Root Cause**: The original logic had a race condition:
-```typescript
-// Original problematic code
-document.addEventListener('DOMContentLoaded', initializeApp)
-if (document.readyState === 'loading') {
-    // DOM is still loading, event listener will handle it
-} else {
-    // DOM is already loaded
-    initializeApp()  // Could execute along with event listener
-}
-```
-
-**Solution Implemented**:
-1. **Added deduplication logic** in `initializeApp()` function using state flags (`isInitializing`, `isInitialized`)
-2. **Fixed DOM ready check logic** to be more explicit: `if (document.readyState !== 'loading')`
-3. **Added proper error handling** that resets flags on failure to allow retry
-4. **Exported `initializeApp`** for testing purposes
-
-**Code Changes**:
-- ✅ Modified `client/src/main.ts` with deduplication logic
-- ✅ Created comprehensive tests in `client/test/unit/core/console-log-duplication.test.ts`
-- ✅ Created integration tests in `client/test/unit/core/duplicate-initialization.test.ts`
-- ✅ Added missing `CacheManagementUI.mock.ts` test dependency
-
-**Verification**:
-- ✅ Unit tests confirm single initialization even with multiple `init()` calls
-- ✅ App already had proper `isInitialized` state management in `SteamBrickAndMortarApp.ts`
-- ✅ Tests demonstrate the fix prevents duplicate console logs during startup
-- ✅ Error handling preserves ability to retry after failed initialization
-
-**Expected Resolution**: ✅ **ACHIEVED**
-- Clean, single console output during startup
-- Verification that managers are only initialized once  
-- Clear initialization flow without redundant operations
-
 ## Testing Infrastructure
+
+### Implement Missing Integration Test Coverage
+**Priority**: Medium  
+**Effort**: 6-8 hours  
+**Context**: After improving the Steam texture integration test to use proper public API patterns, we identified significant gaps in integration test coverage that need to be addressed.
+
+**Tasks**:
+- See detailed implementation plan in `docs/integration-test-coverage-plan.md`
+- Implement component integration tests for Steam API + Integration layer boundaries
+- Add texture loading and image cache integration tests  
+- Create scene rendering integration tests without WebGL dependency
+- Add error handling integration tests for network failures and partial data scenarios
+- Implement progressive loading integration tests for callback workflows
+
+**Benefits**:
+- Better detection of integration boundary issues
+- More comprehensive coverage of user-facing workflows
+- Improved confidence in component interactions
+- Better separation between unit and integration test concerns
+
+**Reference**: Coverage gap analysis from integration test architecture review
 
 ### Review and Reclassify Existing Tests for Performance Testing
 **Priority**: Medium  

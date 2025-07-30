@@ -75,28 +75,30 @@ describe('Main.ts Initialization Logic', () => {
         mockDocument.readyState = 'complete'
         
         // Import main.ts logic (simulating script loading after DOM ready)
+        // This will automatically call initializeApp() once due to the module-level code
         const { initializeApp } = await import('../../../src/main')
         
-        // Simulate the two execution paths that could happen:
+        // Simulate additional calls that might happen:
         
-        // 1. Event listener setup (this always happens)
+        // 1. Event listener setup (this always happens but won't fire since DOM is complete)
         mockDocument.addEventListener('DOMContentLoaded', initializeApp)
         
-        // 2. Immediate execution (happens when DOM is already ready)
-        await initializeApp() // First call
+        // 2. Explicit call (should be prevented since module already initialized)
+        await initializeApp() // This should be prevented
         
-        // 3. Potential duplicate call if event fires later (shouldn't happen, but could in edge cases)
-        await initializeApp() // Second call - should be prevented
+        // 3. Another duplicate call
+        await initializeApp() // This should also be prevented
         
         // Verify that app was only created and initialized once
+        // (even though initializeApp was called 3 times total: once from module import, twice explicitly)
         expect(MockSteamBrickAndMortarApp).toHaveBeenCalledTimes(1)
         expect(mockApp.init).toHaveBeenCalledTimes(1)
         
-        // Check for the prevention debug message on second call
+        // Check for the prevention debug message on the two explicit calls
         const debugMessages = consoleSpy.debug.mock.calls.filter(call => 
             call[0]?.includes('App initialization already in progress or completed')
         )
-        expect(debugMessages).toHaveLength(1)
+        expect(debugMessages).toHaveLength(2)
         
         // Should have only one startup and success message
         const startupMessages = consoleSpy.log.mock.calls.filter(call => 
