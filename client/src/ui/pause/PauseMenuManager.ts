@@ -5,6 +5,7 @@
  */
 
 import { PauseMenuPanel } from './PauseMenuPanel'
+import '../../styles/pause-menu/pause-menu-manager.css'
 
 export interface PauseMenuState {
     isOpen: boolean
@@ -55,7 +56,6 @@ export class PauseMenuManager {
      */
     init(): void {
         this.createMenuStructure()
-        this.addStyles()
         this.setupKeyboardHandling()
         console.log('🎛️ Pause menu system initialized')
     }
@@ -308,131 +308,6 @@ export class PauseMenuManager {
         return activeElement.tagName === 'INPUT' ||
                activeElement.tagName === 'TEXTAREA' ||
                (activeElement as HTMLElement).contentEditable === 'true'
-    }
-
-    /**
-     * Add CSS styles for the pause menu
-     */
-    private addStyles(): void {
-        const style = document.createElement('style')
-        style.id = 'pause-menu-styles'
-        style.textContent = `
-            .pause-menu-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                background: rgba(0, 0, 0, 0.8);
-                backdrop-filter: blur(5px);
-                z-index: 10000;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .pause-menu {
-                background: #1a1a1a;
-                border: 1px solid #444;
-                border-radius: 12px;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-                max-width: 800px;
-                width: 90vw;
-                max-height: 85vh;
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-            }
-
-            .pause-menu-header {
-                padding: 8px 15px;
-                border-bottom: 1px solid #333;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                background: #222;
-            }
-
-            .pause-menu-header h2 {
-                margin: 0;
-                color: #00aaff;
-                font-size: 16px;
-            }
-
-            .close-btn {
-                background: #444;
-                border: none;
-                color: #fff;
-                width: 26px;
-                height: 26px;
-                border-radius: 50%;
-                cursor: pointer;
-                font-size: 14px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .close-btn:hover {
-                background: #666;
-            }
-
-            .pause-menu-tabs {
-                display: flex;
-                background: #2a2a2a;
-                border-bottom: 1px solid #333;
-                overflow-x: auto;
-                min-height: 44px;
-            }
-
-            .pause-menu-tab {
-                background: none;
-                border: none;
-                color: #ccc;
-                padding: 12px 18px;
-                cursor: pointer;
-                font-size: 14px;
-                white-space: nowrap;
-                border-bottom: 2px solid transparent;
-                transition: all 0.2s ease;
-                min-height: 44px;
-                display: flex;
-                align-items: center;
-            }
-
-            .pause-menu-tab:hover {
-                background: #333;
-                color: #fff;
-            }
-
-            .pause-menu-tab.active {
-                color: #00aaff;
-                border-bottom-color: #00aaff;
-                background: #333;
-            }
-
-            .pause-menu-content {
-                flex: 1;
-                overflow-y: auto;
-                padding: 0;
-            }
-
-            .pause-menu-panel {
-                display: none;
-                height: 100%;
-            }
-
-            .panel-content {
-                padding: 15px;
-                color: #ccc;
-                min-height: 200px;
-            }
-        `
-
-        // Only add if not already present
-        if (!document.getElementById('pause-menu-styles')) {
-            document.head.appendChild(style)
-        }
     }
 
     /**

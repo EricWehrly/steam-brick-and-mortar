@@ -1,0 +1,268 @@
+/* Application Panel Styles */
+
+.pause-menu-panel {
+    padding: 20px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.panel-header {
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.panel-header h3 {
+    margin: 0 0 8px 0;
+    color: #fff;
+    font-size: 1.4em;
+}
+
+.panel-header p {
+    margin: 0;
+    color: #aaa;
+    font-size: 0.9em;
+}
+
+.app-section {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #333;
+}
+
+.app-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.app-section h4 {
+    margin: 0 0 16px 0;
+    color: #fff;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+.control-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.app-btn {
+    flex: 1;
+    min-width: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border: 1px solid #444;
+    border-radius: 8px;
+    color: #fff;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.app-btn.primary {
+    background: linear-gradient(135deg, #2a5470 0%, #1e3a52 100%);
+    border-color: #3d6b8a;
+}
+
+.app-btn.secondary {
+    background: linear-gradient(135deg, #444 0%, #2a2a2a 100%);
+    border-color: #555;
+}
+
+.app-btn.warning {
+    background: linear-gradient(135deg, #8b4513 0%, #654321 100%);
+    border-color: #a0522d;
+}
+
+.app-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.app-btn.primary:hover {
+    background: linear-gradient(135deg, #326082 0%, #23435f 100%);
+    border-color: #4a7fa3;
+}
+
+.app-btn.secondary:hover {
+    background: linear-gradient(135deg, #555 0%, #333 100%);
+    border-color: #666;
+}
+
+.app-btn.warning:hover {
+    background: linear-gradient(135deg, #a0522d 0%, #734a26 100%);
+    border-color: #cd853f;
+}
+
+.btn-icon {
+    font-size: 1.1em;
+}
+
+.btn-shortcut {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 0.7em;
+    color: #aaa;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.settings-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.setting-item label:not(.checkbox-label) {
+    color: #ccc;
+    font-size: 0.9em;
+    min-width: 120px;
+}
+
+.setting-select {
+    background: #333;
+    border: 1px solid #555;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    min-width: 120px;
+}
+
+.setting-select:focus {
+    outline: none;
+    border-color: #2a5470;
+    box-shadow: 0 0 0 2px rgba(42, 84, 112, 0.3);
+}
+
+.checkbox-item {
+    justify-content: flex-start;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+    color: #ccc;
+    font-size: 0.9em;
+}
+
+.checkbox-label input[type="checkbox"] {
+    display: none;
+}
+
+.checkmark {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #555;
+    border-radius: 4px;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.checkbox-label input:checked + .checkmark {
+    background: #2a5470;
+    border-color: #3d6b8a;
+}
+
+.checkmark::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 6px;
+    height: 10px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.checkbox-label input:checked + .checkmark::after {
+    opacity: 1;
+}
+
+.debug-section {
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.debug-actions,
+.general-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+.debug-btn,
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #444;
+    border-radius: 6px;
+    color: #ccc;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.debug-btn:hover,
+.action-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: #666;
+    color: #fff;
+}
+
+.action-btn.warning {
+    background: rgba(139, 69, 19, 0.3);
+    border-color: #8b4513;
+    color: #cd853f;
+}
+
+.action-btn.warning:hover {
+    background: rgba(139, 69, 19, 0.5);
+    border-color: #a0522d;
+    color: #daa520;
+}
+
+@media (max-width: 600px) {
+    .control-buttons {
+        flex-direction: column;
+    }
+    
+    .app-btn {
+        min-width: auto;
+    }
+    
+    .debug-actions,
+    .general-actions {
+        flex-direction: column;
+    }
+    
+    .debug-btn,
+    .action-btn {
+        justify-content: center;
+    }
+}

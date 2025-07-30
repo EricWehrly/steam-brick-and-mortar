@@ -3,6 +3,7 @@
  */
 
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
+import '../../../styles/pause-menu/help-panel.css'
 
 export class HelpPanel extends PauseMenuPanel {
     readonly id = 'help'
@@ -98,7 +99,6 @@ export class HelpPanel extends PauseMenuPanel {
     }
 
     attachEvents(): void {
-        this.addPanelStyles()
         // No interactive elements in this basic help panel
     }
 
@@ -110,95 +110,7 @@ export class HelpPanel extends PauseMenuPanel {
         // Panel hidden - no special actions needed
     }
 
-    /**
-     * Add panel-specific styles
-     */
-    private addPanelStyles(): void {
-        const style = document.createElement('style')
-        style.id = 'help-panel-styles'
-        style.textContent = `
-            .help-section {
-                padding: 20px;
-                border-bottom: 1px solid #333;
-            }
-
-            .help-section:last-child {
-                border-bottom: none;
-            }
-
-            .help-section h4 {
-                margin: 0 0 15px 0;
-                color: #00aaff;
-                font-size: 14px;
-                font-weight: 600;
-            }
-
-            .control-list {
-                display: grid;
-                gap: 10px;
-            }
-
-            .control-item {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 10px 15px;
-                background: #2a2a2a;
-                border-radius: 6px;
-                border-left: 3px solid #00aaff;
-            }
-
-            .control-key {
-                background: #444;
-                color: #fff;
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-family: monospace;
-                font-size: 12px;
-                font-weight: 600;
-                min-width: 60px;
-                text-align: center;
-            }
-
-            .control-desc {
-                color: #ccc;
-                font-size: 13px;
-                flex: 1;
-                margin-left: 15px;
-            }
-
-            .help-text {
-                color: #ccc;
-                line-height: 1.5;
-            }
-
-            .help-text p {
-                margin: 0 0 15px 0;
-                font-size: 13px;
-            }
-
-            .help-text p:last-child {
-                margin-bottom: 0;
-            }
-
-            .help-text strong {
-                color: #fff;
-            }
-        `
-
-        // Only add if not already present
-        if (!document.getElementById('help-panel-styles')) {
-            document.head.appendChild(style)
-        }
-    }
-
     dispose(): void {
-        // Remove panel styles
-        const styles = document.getElementById('help-panel-styles')
-        if (styles) {
-            styles.remove()
-        }
-        
         super.dispose()
     }
 }

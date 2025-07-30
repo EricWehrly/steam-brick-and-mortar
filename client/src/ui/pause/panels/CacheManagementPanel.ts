@@ -6,6 +6,7 @@
 
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import type { ImageCacheStats } from '../../../steam/images/ImageManager'
+import '../../../styles/pause-menu/cache-management-panel.css'
 
 export interface CacheStats {
     imageCount: number
@@ -152,8 +153,6 @@ export class CacheManagementPanel extends PauseMenuPanel {
             const target = e.target as HTMLInputElement
             this.setSetting('preload', target.checked)
         })
-
-        this.addPanelStyles()
     }
 
     onShow(): void {
@@ -512,184 +511,8 @@ export class CacheManagementPanel extends PauseMenuPanel {
         }
     }
 
-    /**
-     * Add panel-specific styles
-     */
-    private addPanelStyles(): void {
-        const style = document.createElement('style')
-        style.id = 'cache-panel-styles'
-        style.textContent = `
-            .cache-section {
-                padding: 15px;
-                border-bottom: 1px solid #333;
-            }
-
-            .cache-section:last-child {
-                border-bottom: none;
-            }
-
-            .cache-section h4 {
-                margin: 0 0 12px 0;
-                color: #00aaff;
-                font-size: 14px;
-                font-weight: 600;
-            }
-
-            .cache-stats {
-                display: grid;
-                gap: 10px;
-            }
-
-            .stat-item {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 8px 12px;
-                background: #2a2a2a;
-                border-radius: 6px;
-            }
-
-            .stat-label {
-                color: #ccc;
-                font-size: 13px;
-            }
-
-            .stat-value {
-                color: #fff;
-                font-weight: 600;
-                font-size: 13px;
-            }
-
-            .cache-actions {
-                display: flex;
-                gap: 10px;
-                flex-wrap: wrap;
-            }
-
-            .cache-btn {
-                background: #444;
-                border: 1px solid #555;
-                color: #fff;
-                padding: 10px 16px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 13px;
-                transition: all 0.2s ease;
-                min-width: 120px;
-            }
-
-            .cache-btn:hover:not([disabled]) {
-                background: #555;
-                border-color: #666;
-            }
-
-            .cache-btn:disabled {
-                opacity: 0.6;
-                cursor: not-allowed;
-            }
-
-            .cache-btn-primary {
-                background: #00aaff;
-                border-color: #0088cc;
-            }
-
-            .cache-btn-primary:hover:not([disabled]) {
-                background: #0088cc;
-                border-color: #0066aa;
-            }
-
-            .cache-settings {
-                display: grid;
-                gap: 15px;
-            }
-
-            .setting-item {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-            }
-
-            .setting-item label {
-                color: #ccc;
-                font-size: 13px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                cursor: pointer;
-            }
-
-            .setting-item input[type="checkbox"] {
-                width: 16px;
-                height: 16px;
-            }
-
-            .setting-item input[type="number"] {
-                background: #333;
-                border: 1px solid #555;
-                color: #fff;
-                padding: 6px 10px;
-                border-radius: 4px;
-                width: 80px;
-                margin-left: 10px;
-            }
-
-            .cache-log {
-                background: #222;
-                border: 1px solid #333;
-                border-radius: 6px;
-                padding: 15px;
-                max-height: 200px;
-                overflow-y: auto;
-                font-family: monospace;
-                font-size: 12px;
-            }
-
-            .cache-log p {
-                margin: 0 0 8px 0;
-                color: #ccc;
-                line-height: 1.4;
-            }
-
-            .cache-log p:last-child {
-                margin-bottom: 0;
-            }
-
-            .cache-message {
-                padding: 10px 15px;
-                margin-bottom: 15px;
-                border-radius: 6px;
-                font-size: 13px;
-                font-weight: 500;
-            }
-
-            .cache-message-success {
-                background: rgba(0, 170, 0, 0.2);
-                border: 1px solid rgba(0, 170, 0, 0.4);
-                color: #00ff00;
-            }
-
-            .cache-message-error {
-                background: rgba(255, 0, 0, 0.2);
-                border: 1px solid rgba(255, 0, 0, 0.4);
-                color: #ff6666;
-            }
-        `
-
-        // Only add if not already present
-        if (!document.getElementById('cache-panel-styles')) {
-            document.head.appendChild(style)
-        }
-    }
-
     dispose(): void {
         this.stopStatsUpdate()
-        
-        // Remove panel styles
-        const styles = document.getElementById('cache-panel-styles')
-        if (styles) {
-            styles.remove()
-        }
-        
         super.dispose()
     }
 }
