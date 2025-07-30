@@ -58,18 +58,6 @@ export class ApplicationPanel extends PauseMenuPanel {
 
     public render(): string {
         return `
-            <!-- Application Controls -->
-            <div class="app-section">
-                <h4>Application Control</h4>
-                <div class="control-buttons">
-                    <button id="app-resume-btn" class="app-btn primary">
-                        <span class="btn-icon">▶️</span>
-                        <span class="btn-text">Resume</span>
-                        <span class="btn-shortcut">ESC</span>
-                    </button>
-                </div>
-            </div>
-
             <!-- Performance Settings -->
             <div class="app-section">
                 <h4>Performance Settings</h4>
