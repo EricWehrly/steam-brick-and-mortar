@@ -79,7 +79,8 @@
         }
         
         #steam-ui input {
-            width: 280px;
+            width: 50%;
+            min-width: 280px;
             padding: 10px;
             margin: 8px 0;
             border: 1px solid #555;
@@ -88,6 +89,13 @@
             color: #fff;
             font-size: 14px;
             box-sizing: border-box;
+            transition: width 0.3s ease;
+        }
+        
+        #steam-ui input:focus {
+            width: 100%;
+            outline: 2px solid #00aaff;
+            outline-offset: 2px;
         }
         
         #steam-ui button {
