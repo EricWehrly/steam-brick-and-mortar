@@ -2,10 +2,11 @@
 <div class="app-section">
     <h4>Application Control</h4>
     <div class="control-buttons">
-        <button id="app-resume-btn" class="app-btn primary">
-            <span class="btn-icon">▶️</span>
-            <span class="btn-text">Resume</span>
-            <span class="btn-shortcut">ESC</span>
+        <!-- TODO: Consider moving fullscreen button to main pause menu header for better accessibility -->
+        <button id="app-fullscreen-btn" class="app-btn secondary">
+            <span class="btn-icon">🖥️</span>
+            <span class="btn-text">Toggle Fullscreen</span>
+            <span class="btn-shortcut">F11</span>
         </button>
     </div>
 </div>
@@ -22,25 +23,6 @@
                 <option value="high" {{#selected qualityHigh}}selected{{/selected}}>High</option>
                 <option value="ultra" {{#selected qualityUltra}}selected{{/selected}}>Ultra</option>
             </select>
-        </div>
-        
-        <div class="setting-item">
-            <label for="target-fps-select">Target FPS:</label>
-            <select id="target-fps-select" class="setting-select">
-                <option value="30" {{#selected fps30}}selected{{/selected}}>30 FPS</option>
-                <option value="60" {{#selected fps60}}selected{{/selected}}>60 FPS</option>
-                <option value="90" {{#selected fps90}}selected{{/selected}}>90 FPS (VR)</option>
-                <option value="120" {{#selected fps120}}selected{{/selected}}>120 FPS</option>
-                <option value="144" {{#selected fps144}}selected{{/selected}}>144 FPS</option>
-            </select>
-        </div>
-        
-        <div class="setting-item checkbox-item">
-            <label class="checkbox-label">
-                <input type="checkbox" id="vsync-toggle" {{#checked enableVSync}}checked{{/checked}}>
-                <span class="checkmark"></span>
-                <span class="label-text">Enable V-Sync</span>
-            </label>
         </div>
     </div>
 </div>
@@ -72,14 +54,6 @@
                 <span class="label-text">Hide UI in VR Mode</span>
             </label>
         </div>
-        
-        <div class="setting-item checkbox-item">
-            <label class="checkbox-label">
-                <input type="checkbox" id="fullscreen-start-toggle" {{#checked fullscreenOnStart}}checked{{/checked}}>
-                <span class="checkmark"></span>
-                <span class="label-text">Fullscreen on Start</span>
-            </label>
-        </div>
     </div>
 </div>
 
@@ -87,14 +61,6 @@
 <div class="app-section debug-section">
     <h4>Debug & Development</h4>
     <div class="settings-grid">
-        <div class="setting-item checkbox-item">
-            <label class="checkbox-label">
-                <input type="checkbox" id="enable-console-toggle" {{#checked enableConsole}}checked{{/checked}}>
-                <span class="checkmark"></span>
-                <span class="label-text">Enable Console</span>
-            </label>
-        </div>
-        
         <div class="setting-item checkbox-item">
             <label class="checkbox-label">
                 <input type="checkbox" id="verbose-logging-toggle" {{#checked verboseLogging}}checked{{/checked}}>
@@ -113,10 +79,6 @@
     </div>
     
     <div class="debug-actions">
-        <button id="open-console-btn" class="debug-btn">
-            <span class="btn-icon">💻</span>
-            Open Developer Console
-        </button>
         <button id="export-logs-btn" class="debug-btn">
             <span class="btn-icon">📋</span>
             Export Debug Logs

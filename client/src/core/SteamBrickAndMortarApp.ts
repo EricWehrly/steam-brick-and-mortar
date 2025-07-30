@@ -664,20 +664,10 @@ export class SteamBrickAndMortarApp {
             }
         }
         
-        if (settings.targetFPS !== undefined) {
-            // Update target FPS (this would need to be implemented in the render loop)
-            console.log(`🎯 Target FPS set to: ${settings.targetFPS}`)
-        }
-        
         if (settings.qualityLevel !== undefined) {
             // Update graphics quality settings
             console.log(`🎨 Graphics quality set to: ${settings.qualityLevel}`)
             this.updateGraphicsQuality(settings.qualityLevel)
-        }
-        
-        if (settings.enableVSync !== undefined) {
-            // Update V-Sync setting
-            console.log(`🔄 V-Sync ${settings.enableVSync ? 'enabled' : 'disabled'}`)
         }
         
         // Handle interface settings
@@ -687,7 +677,7 @@ export class SteamBrickAndMortarApp {
         }
         
         // Handle debug settings
-        if (settings.enableConsole !== undefined || settings.verboseLogging !== undefined) {
+        if (settings.verboseLogging !== undefined) {
             console.log('🐛 Debug settings updated')
         }
     }

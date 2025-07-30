@@ -17,8 +17,6 @@ import applicationPanelTemplate from '../../../templates/pause-menu/application-
 
 export interface ApplicationSettings {
     // Performance Settings
-    targetFPS: number
-    enableVSync: boolean
     qualityLevel: 'low' | 'medium' | 'high' | 'ultra'
     
     // Interface Settings
@@ -27,13 +25,11 @@ export interface ApplicationSettings {
     hideUIInVR: boolean
     
     // Debug Settings
-    enableConsole: boolean
     verboseLogging: boolean
     showDebugInfo: boolean
     
     // General Settings
     autoSave: boolean
-    fullscreenOnStart: boolean
 }
 
 export class ApplicationPanel extends PauseMenuPanel {
@@ -66,20 +62,10 @@ export class ApplicationPanel extends PauseMenuPanel {
             qualityHigh: this.settings.qualityLevel === 'high',
             qualityUltra: this.settings.qualityLevel === 'ultra',
             
-            // FPS selections
-            fps30: this.settings.targetFPS === 30,
-            fps60: this.settings.targetFPS === 60,
-            fps90: this.settings.targetFPS === 90,
-            fps120: this.settings.targetFPS === 120,
-            fps144: this.settings.targetFPS === 144,
-            
             // Checkbox states
-            enableVSync: this.settings.enableVSync,
             showFPS: this.settings.showFPS,
             showPerformanceStats: this.settings.showPerformanceStats,
             hideUIInVR: this.settings.hideUIInVR,
-            fullscreenOnStart: this.settings.fullscreenOnStart,
-            enableConsole: this.settings.enableConsole,
             verboseLogging: this.settings.verboseLogging,
             showDebugInfo: this.settings.showDebugInfo,
             autoSave: this.settings.autoSave
@@ -89,31 +75,21 @@ export class ApplicationPanel extends PauseMenuPanel {
     public attachEvents(): void {
         // Application control buttons
         const resumeBtn = this.container?.querySelector('#app-resume-btn')
-
+        const fullscreenBtn = this.container?.querySelector('#app-fullscreen-btn')
+        
         resumeBtn?.addEventListener('click', () => this.resume())
+        fullscreenBtn?.addEventListener('click', () => this.toggleFullscreen())
 
         // Performance settings
         const qualitySelect = this.container?.querySelector('#quality-select') as HTMLSelectElement
-        const targetFpsSelect = this.container?.querySelector('#target-fps-select') as HTMLSelectElement
-        const vsyncToggle = this.container?.querySelector('#vsync-toggle') as HTMLInputElement
-
         qualitySelect?.addEventListener('change', (e) => {
             this.updateSetting('qualityLevel', (e.target as HTMLSelectElement).value as ApplicationSettings['qualityLevel'])
-        })
-
-        targetFpsSelect?.addEventListener('change', (e) => {
-            this.updateSetting('targetFPS', parseInt((e.target as HTMLSelectElement).value))
-        })
-
-        vsyncToggle?.addEventListener('change', (e) => {
-            this.updateSetting('enableVSync', (e.target as HTMLInputElement).checked)
         })
 
         // Interface settings
         const showFpsToggle = this.container?.querySelector('#show-fps-toggle') as HTMLInputElement
         const showPerfToggle = this.container?.querySelector('#show-perf-toggle') as HTMLInputElement
         const hideUiVrToggle = this.container?.querySelector('#hide-ui-vr-toggle') as HTMLInputElement
-        const fullscreenStartToggle = this.container?.querySelector('#fullscreen-start-toggle') as HTMLInputElement
 
         showFpsToggle?.addEventListener('change', (e) => {
             this.updateSetting('showFPS', (e.target as HTMLInputElement).checked)
@@ -127,18 +103,9 @@ export class ApplicationPanel extends PauseMenuPanel {
             this.updateSetting('hideUIInVR', (e.target as HTMLInputElement).checked)
         })
 
-        fullscreenStartToggle?.addEventListener('change', (e) => {
-            this.updateSetting('fullscreenOnStart', (e.target as HTMLInputElement).checked)
-        })
-
         // Debug settings
-        const enableConsoleToggle = this.container?.querySelector('#enable-console-toggle') as HTMLInputElement
         const verboseLoggingToggle = this.container?.querySelector('#verbose-logging-toggle') as HTMLInputElement
         const showDebugToggle = this.container?.querySelector('#show-debug-toggle') as HTMLInputElement
-
-        enableConsoleToggle?.addEventListener('change', (e) => {
-            this.updateSetting('enableConsole', (e.target as HTMLInputElement).checked)
-        })
 
         verboseLoggingToggle?.addEventListener('change', (e) => {
             this.updateSetting('verboseLogging', (e.target as HTMLInputElement).checked)
@@ -150,16 +117,12 @@ export class ApplicationPanel extends PauseMenuPanel {
 
         // General settings
         const autoSaveToggle = this.container?.querySelector('#auto-save-toggle') as HTMLInputElement
-
         autoSaveToggle?.addEventListener('change', (e) => {
             this.updateSetting('autoSave', (e.target as HTMLInputElement).checked)
         })
 
         // Debug action buttons
-        const openConsoleBtn = this.container?.querySelector('#open-console-btn')
         const exportLogsBtn = this.container?.querySelector('#export-logs-btn')
-
-        openConsoleBtn?.addEventListener('click', () => this.openConsole())
         exportLogsBtn?.addEventListener('click', () => this.exportLogs())
 
         // General action buttons
@@ -189,6 +152,26 @@ export class ApplicationPanel extends PauseMenuPanel {
         this.container?.dispatchEvent(new CustomEvent('pause-menu-close', { bubbles: true }))
     }
 
+    private toggleFullscreen(): void {
+        // TODO: Consider moving this fullscreen functionality to the main pause menu header
+        // for better accessibility and more prominent placement
+        try {
+            if (!document.fullscreenElement) {
+                // Enter fullscreen
+                document.documentElement.requestFullscreen().catch((err) => {
+                    console.warn('Failed to enter fullscreen:', err)
+                })
+            } else {
+                // Exit fullscreen
+                document.exitFullscreen().catch((err) => {
+                    console.warn('Failed to exit fullscreen:', err)
+                })
+            }
+        } catch (error) {
+            console.warn('Fullscreen API not supported or failed:', error)
+        }
+    }
+
     private updateSetting<K extends keyof ApplicationSettings>(
         key: K,
         value: ApplicationSettings[K]
@@ -202,13 +185,6 @@ export class ApplicationPanel extends PauseMenuPanel {
         if (this.settings.autoSave) {
             this.saveSettings()
         }
-    }
-
-    private openConsole(): void {
-        // Open browser developer console
-        console.log('🔧 Developer Console Access')
-        console.log('Application settings:', this.settings)
-        console.log('Use this console for debugging the Steam Brick and Mortar application.')
     }
 
     private exportLogs(): void {
@@ -298,19 +274,13 @@ export class ApplicationPanel extends PauseMenuPanel {
     private refreshSettingsDisplay(): void {
         // Update all form elements to reflect current settings
         const qualitySelect = this.container?.querySelector('#quality-select') as HTMLSelectElement
-        const targetFpsSelect = this.container?.querySelector('#target-fps-select') as HTMLSelectElement
-        
         if (qualitySelect) qualitySelect.value = this.settings.qualityLevel
-        if (targetFpsSelect) targetFpsSelect.value = this.settings.targetFPS.toString()
         
         // Update all checkboxes
         const checkboxes = [
-            { id: '#vsync-toggle', setting: 'enableVSync' as const },
             { id: '#show-fps-toggle', setting: 'showFPS' as const },
             { id: '#show-perf-toggle', setting: 'showPerformanceStats' as const },
             { id: '#hide-ui-vr-toggle', setting: 'hideUIInVR' as const },
-            { id: '#fullscreen-start-toggle', setting: 'fullscreenOnStart' as const },
-            { id: '#enable-console-toggle', setting: 'enableConsole' as const },
             { id: '#verbose-logging-toggle', setting: 'verboseLogging' as const },
             { id: '#show-debug-toggle', setting: 'showDebugInfo' as const },
             { id: '#auto-save-toggle', setting: 'autoSave' as const }
@@ -349,8 +319,6 @@ export class ApplicationPanel extends PauseMenuPanel {
     private getDefaultSettings(): ApplicationSettings {
         return {
             // Performance Settings
-            targetFPS: 60,
-            enableVSync: true,
             qualityLevel: 'high',
             
             // Interface Settings
@@ -359,13 +327,11 @@ export class ApplicationPanel extends PauseMenuPanel {
             hideUIInVR: true,
             
             // Debug Settings
-            enableConsole: false,
             verboseLogging: false,
             showDebugInfo: false,
             
             // General Settings
-            autoSave: true,
-            fullscreenOnStart: false
+            autoSave: true
         }
     }
 
@@ -377,10 +343,6 @@ export class ApplicationPanel extends PauseMenuPanel {
         
         // Validate specific fields if present
         if (settingsObj.qualityLevel && !['low', 'medium', 'high', 'ultra'].includes(settingsObj.qualityLevel as string)) {
-            return false
-        }
-        
-        if (settingsObj.targetFPS && (typeof settingsObj.targetFPS !== 'number' || settingsObj.targetFPS < 30 || settingsObj.targetFPS > 144)) {
             return false
         }
         
