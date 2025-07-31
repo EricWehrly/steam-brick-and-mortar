@@ -1,10 +1,19 @@
 # Steam Brick and Mortar - Roadmap Overview
 
+## Documentation Hierarchy
+
+**This document**: High-level roadmap overview and current status  
+**Detailed phase documents**: Complete task breakdowns and implementation details
+- [`roadmap-phase1-ready-for-me.md`](../roadmap-phase1-ready-for-me.md) - Detailed Phase 1 milestones and tasks
+- [`roadmap-phase2-ready-for-friends.md`](../roadmap-phase2-ready-for-friends.md) - Detailed Phase 2 milestones and tasks  
+- [`roadmap-phase3-ready-for-everyone.md`](../roadmap-phase3-ready-for-everyone.md) - Detailed Phase 3 milestones and tasks
+
 ## Project Overview
 
 **Current Architecture**: WebXR-first with progressive enhancement (see `docs/webxr-architecture.md`)  
 **Research Status**: Complete (archived in `docs/research-archive.md`)  
-**Current Phase**: Game art integration and caching strategy development  
+**Current Phase**: UI consolidation and pause menu system  
+**Current Task**: [Pause Menu Feature Implementation](./pause-menu-feature-plan.md)
 
 ## Three-Phase Development Strategy
 
@@ -17,6 +26,7 @@
 - ✅ 3D Scene Foundation (Milestone 3)
 - ✅ Steam API Research & Integration (Milestone 4)
 - ✅ Game Art & Visual Integration (Milestone 5) - **COMPLETED**
+- 🔄 **Pause Menu & UI Consolidation** - **CURRENT TASK**
 - 🔄 Level Layout and Spatial Design (Milestone 6) - **NEXT**
 
 **Major Achievements**:

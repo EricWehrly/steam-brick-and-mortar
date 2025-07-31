@@ -1,3 +1,7 @@
+---
+applyTo: '**/*.test.*'
+---
+
 # Test Organization Guidelines
 
 This document explains how tests are organized in the Steam Brick and Mortar project to ensure maintainability, clarity, and appropriate test execution.
