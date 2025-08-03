@@ -136,6 +136,32 @@
 
 ---
 
+## Milestone 7.5: UI System Redesign 🔮
+*Goal: Consistent, scalable UI design system ready for VR implementation*
+
+### Feature 7.5.1: UI Design System Consolidation
+**Context**: Create unified UI design language that works across desktop and VR
+
+#### Story 7.5.1: Base UI Optimization and Standardization
+- **Task 7.5.1.1**: Steam profile input design refinement
+  - Reduce default width footprint for better screen utilization
+  - Enhanced expand-on-interaction behavior for better UX
+  - Consistent styling with other UI components
+- **Task 7.5.1.2**: UI component standardization
+  - Establish consistent color scheme, typography, and spacing
+  - Standardize button sizes, input fields, and panel layouts
+  - Create reusable UI component library
+- **Task 7.5.1.3**: VR-ready UI architecture planning
+  - Design UI components that can adapt to 3D spatial layout
+  - Plan transition strategy from 2D overlay to 3D spatial UI
+  - Consider interaction patterns for touch/controller input
+
+**Expected Deliverable**: Unified UI design system with VR-ready architecture
+
+**Acceptance**: All UI components follow consistent design language and are prepared for VR transition
+
+---
+
 ## Milestone 8: User Experience Options 🔮
 *Goal: Comprehensive graphics, audio, and accessibility options*
 

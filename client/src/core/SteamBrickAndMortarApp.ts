@@ -19,6 +19,8 @@ import { PauseMenuManager } from '../ui/pause/PauseMenuManager'
 import { CacheManagementPanel } from '../ui/pause/panels/CacheManagementPanel'
 import { HelpPanel } from '../ui/pause/panels/HelpPanel'
 import { ApplicationPanel } from '../ui/pause/panels/ApplicationPanel'
+import { GameSettingsPanel } from '../ui/pause/panels/GameSettingsPanel'
+import { DebugPanel, type DebugStats } from '../ui/pause/panels/DebugPanel'
 import { SteamIntegration, type ProgressCallbacks } from '../steam-integration'
 import { WebXRManager, type WebXRCapabilities } from '../webxr/WebXRManager'
 import { InputManager } from '../webxr/InputManager'
@@ -195,6 +197,17 @@ export class SteamBrickAndMortarApp {
             this.applicationPanel = applicationPanel
             this.pauseMenuManager.registerPanel(applicationPanel)
             
+            // Add game settings panel
+            const gameSettingsPanel = new GameSettingsPanel()
+            this.pauseMenuManager.registerPanel(gameSettingsPanel)
+            
+            // Add debug panel with callbacks
+            const debugPanel = new DebugPanel()
+            debugPanel.initialize({
+                onGetDebugStats: () => this.getDebugStats()
+            })
+            this.pauseMenuManager.registerPanel(debugPanel)
+            
             // Initialize settings button
             this.initializeSettingsButton()
             
@@ -233,6 +246,92 @@ export class SteamBrickAndMortarApp {
         
         this.isInitialized = false
         console.log('✅ Application disposed')
+    }
+
+    /**
+     * Get comprehensive debug statistics for the debug panel
+     */
+    private async getDebugStats(): Promise<DebugStats> {
+        const scene = this.sceneManager.getScene()
+        const renderer = this.sceneManager.getRenderer()
+        const info = renderer.info
+
+        // Count scene objects
+        let meshCount = 0
+        let lightCount = 0
+        let cameraCount = 0
+
+        scene.traverse((object) => {
+            if (object instanceof THREE.Mesh) meshCount++
+            if (object instanceof THREE.Light) lightCount++
+            if (object instanceof THREE.Camera) cameraCount++
+        })
+
+        // Get performance stats
+        const performanceStats = this.performanceMonitor.getStats()
+        
+        // Get cache stats
+        const imageCacheStats = await this.steamIntegration.getImageCacheStats()
+        
+        // Get WebGL context info
+        const gl = renderer.getContext()
+        const debugInfo = renderer.debug
+        
+        // Get memory info if available
+        const performanceObj = window.performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number } }
+        const memoryInfo = performanceObj.memory ?? {
+            usedJSHeapSize: 0,
+            totalJSHeapSize: 0
+        }
+
+        // Get storage quota info
+        let quotaUsed = 0
+        let quotaTotal = 0
+        try {
+            if ('storage' in navigator && 'estimate' in navigator.storage) {
+                const estimate = await navigator.storage.estimate()
+                quotaUsed = estimate.usage ?? 0
+                quotaTotal = estimate.quota ?? 0
+            }
+        } catch {
+            // Storage API not available
+        }
+
+        return {
+            sceneObjects: {
+                total: scene.children.length,
+                meshes: meshCount,
+                lights: lightCount,
+                cameras: cameraCount,
+                textures: info.memory.textures,
+                materials: Object.keys(scene.userData.materials ?? {}).length,
+                geometries: info.memory.geometries
+            },
+            performance: {
+                fps: performanceStats.fps,
+                frameTime: performanceStats.frameTime,
+                memoryUsed: memoryInfo.usedJSHeapSize,
+                memoryTotal: memoryInfo.totalJSHeapSize,
+                triangles: info.render.triangles,
+                drawCalls: info.render.calls
+            },
+            cache: {
+                imageCount: imageCacheStats.totalImages,
+                imageCacheSize: imageCacheStats.totalSize,
+                gameDataCount: 0, // TODO: Implement getGameDataCount in SteamIntegration
+                gameDataSize: 0, // TODO: Implement getGameDataSize in SteamIntegration
+                quotaUsed,
+                quotaTotal
+            },
+            system: {
+                userAgent: navigator.userAgent,
+                webxrSupported: 'xr' in navigator, // Simple check for WebXR support
+                webglVersion: renderer.capabilities.isWebGL2 ? 'WebGL 2.0' : 'WebGL 1.0',
+                maxTextureSize: renderer.capabilities.maxTextureSize,
+                vendor: debugInfo.checkShaderErrors ? 'Debug Mode' : gl.getParameter(gl.VENDOR) ?? 'Unknown',
+                renderer: gl.getParameter(gl.RENDERER) ?? 'Unknown'
+            }
+        }
     }
 
     // Scene Setup Methods
