@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator';
 import { TextureManager } from '../utils/TextureManager';
+import { Logger } from '../utils/Logger';
 
 /**
  * VR Ergonomic Constants based on Phase 2C research
@@ -73,6 +74,8 @@ export interface StoreSection {
  * Based on Blockbuster store design principles
  */
 export class StoreLayout {
+  private static readonly logger = Logger.withContext('StoreLayout')
+  
   private scene: THREE.Scene;
   private shelfGenerator: ProceduralShelfGenerator;
   private textureManager: TextureManager;
@@ -190,7 +193,7 @@ export class StoreLayout {
         await this.createRoomStructure(config);
         this.createEntranceArea(config);
         
-        console.log('✅ Basic room structure ready')
+        StoreLayout.logger.info('Basic room structure ready')
     }
 
     /**
@@ -200,7 +203,7 @@ export class StoreLayout {
         // Only create shelf sections, assuming room structure already exists
         await this.createShelfSections(config);
         
-        console.log('✅ Store shelves added to existing room')
+        StoreLayout.logger.info('Store shelves added to existing room')
     }
 
     /**
@@ -208,7 +211,7 @@ export class StoreLayout {
      */
     public async generateShelvesChunked(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
         await this.createShelfSectionsChunked(config);
-        console.log('✅ Store shelves added to existing room (chunked)')
+        StoreLayout.logger.info('Store shelves added to existing room (chunked)')
     }
 
     /**
@@ -216,7 +219,7 @@ export class StoreLayout {
      */
     public async generateShelvesGPUOptimized(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
         await this.createShelfSectionsGPUOptimized(config);
-        console.log('✅ Store shelves added to existing room (GPU-optimized)')
+        StoreLayout.logger.info('Store shelves added to existing room (GPU-optimized)')
     }  /**
    * Create the basic room structure (floor, walls, ceiling)
    */
@@ -317,7 +320,7 @@ export class StoreLayout {
             const sectionGroup = new THREE.Group();
             sectionGroup.name = section.name;
             
-            console.log(`🏗️ Creating section: ${section.name} (${section.shelfCount} shelves)`);
+            StoreLayout.logger.info(`Creating section: ${section.name} (${section.shelfCount} shelves)`);
             
             // Create shelves in chunks
             for (let i = 0; i < section.shelfCount; i += SHELF_CHUNK_SIZE) {
@@ -353,7 +356,7 @@ export class StoreLayout {
             this.addSectionLabel(sectionGroup, section);
             this.storeGroup.add(sectionGroup);
             
-            console.log(`✅ Section ${section.name} complete`);
+            StoreLayout.logger.info(`Section ${section.name} complete`);
         }
     }
 
@@ -367,7 +370,7 @@ export class StoreLayout {
         const shelfComponentsPerUnit = 8; // 2 angled + 2 side + 4 horizontal boards per shelf
         const totalComponents = totalShelves * shelfComponentsPerUnit;
         
-        console.log(`🚀 GPU: Creating ${totalShelves} shelves (${totalComponents} components) with instanced rendering`);
+        StoreLayout.logger.info(`GPU: Creating ${totalShelves} shelves (${totalComponents} components) with instanced rendering`);
         
         // Create shared geometries for different shelf components
         const woodMaterial = this.textureManager.createSimpleWoodMaterial({ color: new THREE.Color(0x8B4513) });
@@ -462,7 +465,7 @@ export class StoreLayout {
         this.storeGroup.add(sideBoards);
         this.storeGroup.add(horizontalShelves);
         
-        console.log(`⚡ GPU: Instanced rendering complete - ${totalShelves} shelves in ${totalComponents} draw calls reduced to 3`);
+        StoreLayout.logger.info(`GPU: Instanced rendering complete - ${totalShelves} shelves in ${totalComponents} draw calls reduced to 3`);
     }  /**
    * Add a section label above the shelves using proper text signage
    */
