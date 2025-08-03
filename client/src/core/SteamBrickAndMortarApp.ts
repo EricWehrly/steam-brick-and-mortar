@@ -13,6 +13,8 @@
 
 import * as THREE from 'three'
 import { ValidationUtils } from '../utils'
+import { Logger } from '../utils/Logger'
+import { PerformanceProfiler } from '../utils/PerformanceProfiler'
 import { UIManager, PerformanceMonitor } from '../ui'
 import { SceneManager, AssetLoader, GameBoxRenderer, SignageRenderer, StoreLayout, type SteamGameData } from '../scene'
 import { PauseMenuManager } from '../ui/pause/PauseMenuManager'
@@ -47,6 +49,9 @@ export interface AppConfig {
  * Main application class that orchestrates all subsystems
  */
 export class SteamBrickAndMortarApp {
+    private static readonly logger = Logger.withContext(SteamBrickAndMortarApp.name)
+    private readonly profiler = new PerformanceProfiler()
+    
     private sceneManager: SceneManager
     private assetLoader: AssetLoader
     private gameBoxRenderer: GameBoxRenderer
@@ -160,56 +165,35 @@ export class SteamBrickAndMortarApp {
      */
     async init(): Promise<void> {
         if (this.isInitialized) {
-            console.warn('⚠️ App already initialized')
+            SteamBrickAndMortarApp.logger.warn('App already initialized')
             return
         }
 
-        const startTime = window.performance.now()
-        console.log('🎮 Initializing Steam Brick and Mortar WebXR...')
+        this.profiler.start('total-initialization')
+        SteamBrickAndMortarApp.logger.info('Initializing Steam Brick and Mortar WebXR...')
         
         try {
             // Instrument each major initialization step
-            const sceneStart = window.performance.now()
-            await this.setupScene()
-            const sceneTime = window.performance.now() - sceneStart
-            console.log(`⏱️ Scene setup: ${sceneTime.toFixed(2)}ms`)
+            await this.profiler.measure('scene-setup', () => this.setupScene())
+            await this.profiler.measure('webxr-setup', () => this.setupWebXR())
             
-            const webxrStart = window.performance.now()
-            await this.setupWebXR()
-            const webxrTime = window.performance.now() - webxrStart
-            console.log(`⏱️ WebXR setup: ${webxrTime.toFixed(2)}ms`)
+            this.profiler.measureSync('controls-setup', () => this.setupControls())
+            this.profiler.measureSync('ui-manager-init', () => this.uiManager.init())
             
-            const controlsStart = window.performance.now()
-            this.setupControls()
-            const controlsTime = window.performance.now() - controlsStart
-            console.log(`⏱️ Controls setup: ${controlsTime.toFixed(2)}ms`)
+            await this.profiler.measure('pause-menu-system', () => this.initializePauseMenuSystem())
             
-            const uiStart = window.performance.now()
-            this.uiManager.init()
-            const uiTime = window.performance.now() - uiStart
-            console.log(`⏱️ UI Manager init: ${uiTime.toFixed(2)}ms`)
+            this.profiler.measureSync('final-setup', () => {
+                this.uiManager.hideLoading()
+                this.startRenderLoop()
+                this.performanceMonitor.start()
+                this.isInitialized = true
+            })
             
-            const pauseMenuStart = window.performance.now()
-            await this.initializePauseMenuSystem()
-            const pauseMenuTime = window.performance.now() - pauseMenuStart
-            console.log(`⏱️ Pause menu system: ${pauseMenuTime.toFixed(2)}ms`)
-            
-            const finalSetupStart = window.performance.now()
-            this.uiManager.hideLoading()
-            this.startRenderLoop()
-            
-            // Start performance monitoring
-            this.performanceMonitor.start()
-            
-            this.isInitialized = true
-            const finalSetupTime = window.performance.now() - finalSetupStart
-            console.log(`⏱️ Final setup: ${finalSetupTime.toFixed(2)}ms`)
-            
-            const totalTime = window.performance.now() - startTime
-            console.log(`🎯 Total initialization time: ${totalTime.toFixed(2)}ms`)
-            console.log('✅ WebXR environment ready!')
+            const totalTime = this.profiler.end('total-initialization')
+            PerformanceProfiler.logSummary('Total initialization time', totalTime)
+            SteamBrickAndMortarApp.logger.info('WebXR environment ready!')
         } catch (error) {
-            console.error('❌ Failed to initialize WebXR environment:', error)
+            SteamBrickAndMortarApp.logger.error('Failed to initialize WebXR environment:', error)
             this.uiManager.showError('Failed to initialize WebXR environment')
             throw error
         }
@@ -220,45 +204,36 @@ export class SteamBrickAndMortarApp {
      */
     private async initializePauseMenuSystem(): Promise<void> {
         // Initialize pause menu system
-        const pauseMenuInitStart = window.performance.now()
-        this.pauseMenuManager.init()
-        const pauseMenuInitTime = window.performance.now() - pauseMenuInitStart
-        console.log(`  ⏱️ Pause menu init: ${pauseMenuInitTime.toFixed(2)}ms`)
+        this.profiler.measureSync('pause-menu-init', () => this.pauseMenuManager.init())
         
         // Register pause menu panels
         const cachePanel = new CacheManagementPanel()
-        const cachePanelStart = window.performance.now()
-        cachePanel.initCacheFunctions(
-            () => this.steamIntegration.getImageCacheStats(),
-            () => this.steamIntegration.clearImageCache()
-        )
-        this.cacheManagementPanel = cachePanel
-        this.pauseMenuManager.registerPanel(cachePanel)
-        const cachePanelTime = window.performance.now() - cachePanelStart
-        console.log(`  ⏱️ Cache panel setup: ${cachePanelTime.toFixed(2)}ms`)
+        this.profiler.measureSync('cache-panel-setup', () => {
+            cachePanel.initCacheFunctions(
+                () => this.steamIntegration.getImageCacheStats(),
+                () => this.steamIntegration.clearImageCache()
+            )
+            this.cacheManagementPanel = cachePanel
+            this.pauseMenuManager.registerPanel(cachePanel)
+        })
         
         // Add help panel
-        const helpPanelStart = window.performance.now()
-        this.pauseMenuManager.registerPanel(new HelpPanel())
-        const helpPanelTime = window.performance.now() - helpPanelStart
-        console.log(`  ⏱️ Help panel setup: ${helpPanelTime.toFixed(2)}ms`)
+        this.profiler.measureSync('help-panel-setup', () => {
+            this.pauseMenuManager.registerPanel(new HelpPanel())
+        })
         
         // Add application panel with callbacks
-        const appPanelStart = window.performance.now()
-        const applicationPanel = new ApplicationPanel()
-        applicationPanel.initialize({
-            onSettingsChanged: (settings) => this.handleSettingsChange(settings)
+        this.profiler.measureSync('application-panel-setup', () => {
+            const applicationPanel = new ApplicationPanel()
+            applicationPanel.initialize({
+                onSettingsChanged: (settings) => this.handleSettingsChange(settings)
+            })
+            this.applicationPanel = applicationPanel
+            this.pauseMenuManager.registerPanel(applicationPanel)
         })
-        this.applicationPanel = applicationPanel
-        this.pauseMenuManager.registerPanel(applicationPanel)
-        const appPanelTime = window.performance.now() - appPanelStart
-        console.log(`  ⏱️ Application panel setup: ${appPanelTime.toFixed(2)}ms`)
         
         // Initialize settings button
-        const settingsButtonStart = window.performance.now()
-        this.initializeSettingsButton()
-        const settingsButtonTime = window.performance.now() - settingsButtonStart
-        console.log(`  ⏱️ Settings button setup: ${settingsButtonTime.toFixed(2)}ms`)
+        this.profiler.measureSync('settings-button-setup', () => this.initializeSettingsButton())
     }
 
     /**
@@ -269,7 +244,7 @@ export class SteamBrickAndMortarApp {
             return
         }
 
-        console.log('🧹 Disposing application resources...')
+        SteamBrickAndMortarApp.logger.info('Disposing application resources...')
         
         this.performanceMonitor.dispose()
         this.pauseMenuManager.dispose()
@@ -280,97 +255,84 @@ export class SteamBrickAndMortarApp {
         this.sceneManager.dispose()
         
         this.isInitialized = false
-        console.log('✅ Application disposed')
+        SteamBrickAndMortarApp.logger.info('Application disposed')
     }
 
     // Scene Setup Methods
 
     private async setupScene(): Promise<void> {
-        const setupSceneStart = window.performance.now()
-        console.log('🏪 Setting up basic VR environment...')
+        SteamBrickAndMortarApp.logger.info('Setting up basic VR environment...')
         
         // Create the basic room structure first (non-blocking)
-        const basicEnvStart = window.performance.now()
-        await this.setupBasicEnvironment()
-        const basicEnvTime = window.performance.now() - basicEnvStart
-        console.log(`  ⏱️ Basic environment: ${basicEnvTime.toFixed(2)}ms`)
+        await this.profiler.measure('basic-environment', () => this.setupBasicEnvironment())
         
         // Create visible fluorescent fixtures (positioned just below ceiling)
-        const lightingStart = window.performance.now()
-        this.sceneManager.createFluorescentFixtures(3.2)
-        const lightingTime = window.performance.now() - lightingStart
-        console.log(`  ⏱️ Lighting fixtures: ${lightingTime.toFixed(2)}ms`)
+        this.profiler.measureSync('lighting-fixtures', () => 
+            this.sceneManager.createFluorescentFixtures(3.2)
+        )
         
         // Create Blockbuster signage
-        const signageStart = window.performance.now()
-        this.signageRenderer.createStandardSigns(this.sceneManager.getScene())
-        const signageTime = window.performance.now() - signageStart
-        console.log(`  ⏱️ Signage creation: ${signageTime.toFixed(2)}ms`)
+        this.profiler.measureSync('signage-creation', () => 
+            this.signageRenderer.createStandardSigns(this.sceneManager.getScene())
+        )
         
         // Add test cube for reference
-        const cubeStart = window.performance.now()
-        this.addTestCube()
-        const cubeTime = window.performance.now() - cubeStart
-        console.log(`  ⏱️ Test cube: ${cubeTime.toFixed(2)}ms`)
+        this.profiler.measureSync('test-cube', () => this.addTestCube())
         
-        const setupSceneTotal = window.performance.now() - setupSceneStart
-        console.log(`  🎯 Total scene setup: ${setupSceneTotal.toFixed(2)}ms`)
-        console.log('✅ Basic VR environment ready! Loading shelves in background...')
+        SteamBrickAndMortarApp.logger.info('Basic VR environment ready! Loading shelves in background...')
         
         // Generate shelves asynchronously after the app is ready
         this.generateShelvesAsync()
     }
 
     private async setupBasicEnvironment(): Promise<void> {
-        const configStart = window.performance.now()
         // Create just the room structure (floor, walls, ceiling) without shelves
-        const config = this.storeLayout.createDefaultLayout()
-        const configTime = window.performance.now() - configStart
-        console.log(`    ⏱️ Layout config: ${configTime.toFixed(2)}ms`)
+        const config = this.profiler.measureSync('layout-config', () => 
+            this.storeLayout.createDefaultLayout()
+        )
         
-        const roomStart = window.performance.now()
-        await this.storeLayout.generateBasicRoom(config)
-        const roomTime = window.performance.now() - roomStart
-        console.log(`    ⏱️ Room generation: ${roomTime.toFixed(2)}ms`)
+        await this.profiler.measure('room-generation', () => 
+            this.storeLayout.generateBasicRoom(config)
+        )
     }
 
     private async generateShelvesAsync(): Promise<void> {
         try {
-            console.log('🏗️ Generating store shelves...')
+            SteamBrickAndMortarApp.logger.info('Generating store shelves...')
             
             // Use GPU-optimized instanced shelf generation for maximum performance
             const gpuStart = window.performance.now()
             await this.storeLayout.generateShelvesGPUOptimized()
             const gpuTime = window.performance.now() - gpuStart
-            console.log(`⚡ GPU-optimized shelf generation: ${gpuTime.toFixed(2)}ms`)
             
             // Load legacy shelf model if needed (can be removed later)
-            await this.loadShelfModel()
+            await this.profiler.measure('legacy-shelf-model', () => this.loadShelfModel())
             
             // Log store stats
             const stats = this.storeLayout.getStoreStats()
-            console.log('📊 Store Stats:', stats)
+            SteamBrickAndMortarApp.logger.info('Store Stats:', stats)
             
-            console.log('✅ Store shelves generation complete!')
+            PerformanceProfiler.logTiming('GPU-optimized shelf generation', gpuTime)
+            SteamBrickAndMortarApp.logger.info('Store shelves generation complete!')
         } catch (error) {
-            console.error('❌ Failed to generate shelves:', error)
-            console.warn('⚠️ Continuing without procedural shelves - basic environment available')
+            SteamBrickAndMortarApp.logger.error('Failed to generate shelves:', error)
+            SteamBrickAndMortarApp.logger.warn('Continuing without procedural shelves - basic environment available')
         }
     }
 
     private async loadShelfModel(): Promise<void> {
         try {
-            console.log('📦 Loading shelf model...')
+            SteamBrickAndMortarApp.logger.info('Loading shelf model...')
             const shelfModel = await this.assetLoader.loadShelfModel()
             this.sceneManager.addToScene(shelfModel)
             
             // Add placeholder game boxes
             this.gameBoxRenderer.createPlaceholderBoxes(this.sceneManager.getScene())
             
-            console.log('✅ Shelf model loaded successfully!')
+            SteamBrickAndMortarApp.logger.info('Shelf model loaded successfully!')
         } catch (error) {
-            console.error('❌ Failed to load shelf model:', error)
-            console.warn('⚠️ Continuing without shelf model - check file path and format')
+            SteamBrickAndMortarApp.logger.error('Failed to load shelf model:', error)
+            SteamBrickAndMortarApp.logger.warn('Continuing without shelf model - check file path and format')
         }
     }
 
@@ -394,16 +356,17 @@ export class SteamBrickAndMortarApp {
         const rendererSetupStart = window.performance.now()
         this.webxrManager.setRenderer(this.sceneManager.getRenderer())
         const rendererSetupTime = window.performance.now() - rendererSetupStart
-        console.log(`  ⏱️ WebXR renderer setup: ${rendererSetupTime.toFixed(2)}ms`)
         
         // Check WebXR capabilities
         const capabilitiesStart = window.performance.now()
         await this.webxrManager.checkCapabilities()
         const capabilitiesTime = window.performance.now() - capabilitiesStart
-        console.log(`  ⏱️ WebXR capabilities check: ${capabilitiesTime.toFixed(2)}ms`)
         
         const webxrSetupTotal = window.performance.now() - webxrSetupStart
-        console.log(`  🎯 Total WebXR setup: ${webxrSetupTotal.toFixed(2)}ms`)
+        SteamBrickAndMortarApp.logger.info(`WebXR setup completed in ${webxrSetupTotal.toFixed(2)}ms`, {
+            rendererSetup: `${rendererSetupTime.toFixed(2)}ms`,
+            capabilitiesCheck: `${capabilitiesTime.toFixed(2)}ms`
+        })
     }
 
     private setupControls(): void {
@@ -414,17 +377,17 @@ export class SteamBrickAndMortarApp {
     // WebXR Event Handlers
 
     private handleWebXRSessionStart(): void {
-        console.log('✅ WebXR session started!')
+        SteamBrickAndMortarApp.logger.info('WebXR session started successfully')
         this.uiManager.setWebXRSessionActive(true)
     }
 
     private handleWebXRSessionEnd(): void {
-        console.log('🚪 WebXR session ended')
+        SteamBrickAndMortarApp.logger.info('WebXR session ended')
         this.uiManager.setWebXRSessionActive(false)
     }
 
     private handleWebXRError(error: Error): void {
-        console.error('❌ WebXR error:', error)
+        SteamBrickAndMortarApp.logger.error('WebXR error occurred:', error)
         this.uiManager.showError('Failed to enter VR mode')
     }
 
@@ -437,7 +400,7 @@ export class SteamBrickAndMortarApp {
             await this.webxrManager.startVRSession()
         } catch (error) {
             // Error handling is done in the WebXRManager callbacks
-            console.debug('WebXR toggle failed:', error)
+            SteamBrickAndMortarApp.logger.debug('WebXR toggle failed:', error)
         }
     }
 
@@ -453,22 +416,22 @@ export class SteamBrickAndMortarApp {
     private handleInputPause(): void {
         // Pause input handling - stop camera movement
         this.inputManager.stopListening()
-        console.log('⏸️ Input paused')
+        SteamBrickAndMortarApp.logger.info('Input paused')
     }
 
     private handleInputResume(): void {
         // Resume input handling - restart camera movement
         this.inputManager.startListening()
-        console.log('▶️ Input resumed')
+        SteamBrickAndMortarApp.logger.info('Input resumed')
     }
 
     private handlePauseMenuOpen(): void {
-        console.log('📋 Pause menu opened')
+        SteamBrickAndMortarApp.logger.info('Pause menu opened')
         // Additional logic when pause menu opens (e.g., pause animations)
     }
 
     private handlePauseMenuClose(): void {
-        console.log('📋 Pause menu closed')
+        SteamBrickAndMortarApp.logger.info('Pause menu closed')
         // Additional logic when pause menu closes (e.g., resume animations)
     }
 
@@ -513,7 +476,7 @@ export class SteamBrickAndMortarApp {
             }, 2000)
             
         } catch (error) {
-            console.error('❌ Failed to load Steam games:', error)
+            SteamBrickAndMortarApp.logger.error('Failed to load Steam games:', error)
             this.uiManager.showSteamStatus(
                 `❌ Failed to load games. Please check the Steam profile name and try again.`, 
                 'error'
@@ -528,7 +491,7 @@ export class SteamBrickAndMortarApp {
     private clearGameBoxes(): void {
         // Remove existing game boxes using scene manager
         const clearedCount = this.sceneManager.clearObjectsByUserData('isGameBox')
-        console.log(`🗑️ Cleared ${clearedCount} existing game boxes`)
+        SteamBrickAndMortarApp.logger.info(`Cleared ${clearedCount} existing game boxes`)
     }
     
     private async addGameBoxToScene(game: SteamGameData, index: number): Promise<void> {
@@ -562,10 +525,10 @@ export class SteamBrickAndMortarApp {
                 
                 // Apply optimized texture to existing game box
                 await this.gameBoxRenderer.applyOptimizedTexture(gameBox, game, textureOptions)
-                console.log(`🖼️ Applied optimized artwork texture to: ${game.name}`)
+                SteamBrickAndMortarApp.logger.info(`Applied optimized artwork texture to: ${game.name}`)
             }
         } catch (error) {
-            console.warn(`⚠️ Failed to apply artwork texture to ${game.name}:`, error)
+            SteamBrickAndMortarApp.logger.warn(`Failed to apply artwork texture to ${game.name}:`, error)
         }
     }
 
@@ -586,7 +549,7 @@ export class SteamBrickAndMortarApp {
                         hasAnyArtwork = true
                     }
                 } catch (error) {
-                    console.debug(`Could not load ${type} artwork for ${game.name}:`, error)
+                    SteamBrickAndMortarApp.logger.debug(`Could not load ${type} artwork for ${game.name}:`, error)
                     artworkBlobs[type] = null
                 }
             } else {
@@ -628,7 +591,7 @@ export class SteamBrickAndMortarApp {
             await this.steamIntegration.refreshData(progressCallbacks)
             this.updateCacheStatsDisplay()
         } catch (error) {
-            console.error('❌ Failed to refresh cache:', error)
+            SteamBrickAndMortarApp.logger.error('Failed to refresh cache:', error)
         }
     }
     
@@ -743,7 +706,7 @@ export class SteamBrickAndMortarApp {
                 this.pauseMenuManager.open()
             })
         } else {
-            console.warn('Settings button not found in DOM')
+            SteamBrickAndMortarApp.logger.warn('Settings button not found in DOM')
         }
     }
 
@@ -751,7 +714,7 @@ export class SteamBrickAndMortarApp {
      * Handle application settings changes
      */
     private handleSettingsChange(settings: Partial<import('../ui/pause/panels/ApplicationPanel').ApplicationSettings>): void {
-        console.log('⚙️ Application settings changed:', settings)
+        SteamBrickAndMortarApp.logger.info('Application settings changed:', settings)
         
         // Handle performance settings
         if (settings.showFPS !== undefined) {
@@ -774,19 +737,19 @@ export class SteamBrickAndMortarApp {
         
         if (settings.qualityLevel !== undefined) {
             // Update graphics quality settings
-            console.log(`🎨 Graphics quality set to: ${settings.qualityLevel}`)
+            SteamBrickAndMortarApp.logger.info(`Graphics quality set to: ${settings.qualityLevel}`)
             this.updateGraphicsQuality(settings.qualityLevel)
         }
         
         // Handle interface settings
         if (settings.hideUIInVR !== undefined) {
             // Handle VR UI visibility (when VR support is available)
-            console.log(`👓 VR UI visibility setting: ${!settings.hideUIInVR}`)
+            SteamBrickAndMortarApp.logger.info(`VR UI visibility setting: ${!settings.hideUIInVR}`)
         }
         
         // Handle debug settings
         if (settings.verboseLogging !== undefined) {
-            console.log('🐛 Debug settings updated')
+            SteamBrickAndMortarApp.logger.info('Debug settings updated')
         }
     }
 
@@ -816,6 +779,6 @@ export class SteamBrickAndMortarApp {
                 break
         }
         
-        console.log(`🎨 Graphics quality applied: ${quality}`)
+        SteamBrickAndMortarApp.logger.info(`Graphics quality applied: ${quality}`)
     }
 }
