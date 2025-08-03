@@ -258,6 +258,26 @@
 
 ---
 
+## TBD: Features Under Consideration for Phase 2
+
+*These features were identified during Phase 1 development but deferred pending Phase 2 scope prioritization*
+
+### UI/UX Polish & Consistency
+- **Steam Profile Input Refinement**: Reduce input width to 50%, expand on focus with smooth transitions
+- **Pause Menu Polish**: Smooth animations, advanced accessibility features, VR-ready UI architecture
+- **Design System**: Consistent UI components, theme/customization system, multi-language support
+- **Advanced Performance Options**: Hardware-specific graphics presets and auto-detection
+
+### Developer Experience & Extensibility
+- **Plugin/Extension System**: Community additions and modular panel architecture
+- **Enhanced Debug Tools**: Advanced Three.js scene inspection and performance profiling
+- **Hot Reload System**: Live preview for UI/content changes during development
+- **Automated Testing**: Visual regression testing and performance benchmarking
+
+**Note**: These items will be evaluated against Phase 2 core infrastructure priorities. UX polish items may be deferred to Phase 3 depending on infrastructure complexity and timeline.
+
+---
+
 ## Phase 2 Completion Criteria
 
 **Infrastructure Resilience**:
