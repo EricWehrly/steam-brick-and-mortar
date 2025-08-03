@@ -349,6 +349,11 @@
 
 ---
 
+test out raytracing / shaders
+TODO: Ask human operator to help flesh out this task
+
+--- 
+
 ## Phase 1 Deferred Items
 
 ### Story 4.2.2: Error Handling and Reliability - **DEFERRED TO PHASE 2**
