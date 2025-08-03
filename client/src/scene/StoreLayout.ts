@@ -166,24 +166,58 @@ export class StoreLayout {
     };
   }
 
-  /**
-   * Generate the complete VR-optimized store layout
-   */
-  public async generateStore(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
-    // Clear existing store
-    this.clearStore();
+    /**
+     * Generate the complete VR-optimized store layout
+     */
+    public async generateStore(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
+        // Clear existing store
+        this.clearStore();
 
-    // Create room structure
-    await this.createRoomStructure(config);
+        // Create room structure and shelves together (legacy method)
+        await this.createRoomStructure(config);
+        await this.createShelfSections(config);
+        this.createEntranceArea(config);
+    }
 
-    // Create shelf sections
-    await this.createShelfSections(config);
+    /**
+     * Generate just the basic room structure without shelves (for fast startup)
+     */
+    public async generateBasicRoom(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
+        // Clear existing store
+        this.clearStore();
 
-    // Add entrance and checkout area
-    this.createEntranceArea(config);
-  }
+        // Create only the room structure (floor, walls, ceiling)
+        await this.createRoomStructure(config);
+        this.createEntranceArea(config);
+        
+        console.log('✅ Basic room structure ready')
+    }
 
-  /**
+    /**
+     * Generate and add shelves to the existing room (called asynchronously)
+     */
+    public async generateShelves(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
+        // Only create shelf sections, assuming room structure already exists
+        await this.createShelfSections(config);
+        
+        console.log('✅ Store shelves added to existing room')
+    }
+
+    /**
+     * Generate shelves using chunked processing to avoid blocking the event loop
+     */
+    public async generateShelvesChunked(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
+        await this.createShelfSectionsChunked(config);
+        console.log('✅ Store shelves added to existing room (chunked)')
+    }
+
+    /**
+     * Generate shelves using GPU-optimized instanced rendering for maximum performance
+     */
+    public async generateShelvesGPUOptimized(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
+        await this.createShelfSectionsGPUOptimized(config);
+        console.log('✅ Store shelves added to existing room (GPU-optimized)')
+    }  /**
    * Create the basic room structure (floor, walls, ceiling)
    */
   private async createRoomStructure(config: StoreLayoutConfig): Promise<void> {
@@ -237,42 +271,199 @@ export class StoreLayout {
     this.storeGroup.add(rightWall);
   }
 
-  /**
-   * Create shelf sections based on configuration
-   */
-  private async createShelfSections(config: StoreLayoutConfig): Promise<void> {
-    for (const section of config.sections) {
-      const sectionGroup = new THREE.Group();
-      sectionGroup.name = section.name;
-      
-      // Create shelves for this section
-      for (let i = 0; i < section.shelfCount; i++) {
-        const shelfPosition = new THREE.Vector3(
-          section.position.x + i * config.shelfSpacing,
-          section.position.y,
-          section.position.z
-        );
-        
-        const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition, {
-          width: 2.0,
-          height: 2.0,
-          depth: 0.4,
-          angle: 12,
-          shelfCount: 4,
-          boardThickness: 0.05
-        });
-        
-        sectionGroup.add(shelfUnit);
-      }
-      
-      // Add section label (simple text for now)
-      this.addSectionLabel(sectionGroup, section);
-      
-      this.storeGroup.add(sectionGroup);
+    /**
+     * Create shelf sections based on configuration
+     */
+    private async createShelfSections(config: StoreLayoutConfig): Promise<void> {
+        for (const section of config.sections) {
+            const sectionGroup = new THREE.Group();
+            sectionGroup.name = section.name;
+            
+            // Create shelves for this section
+            for (let i = 0; i < section.shelfCount; i++) {
+                const shelfPosition = new THREE.Vector3(
+                    section.position.x + i * config.shelfSpacing,
+                    section.position.y,
+                    section.position.z
+                );
+                
+                const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition, {
+                    width: 2.0,
+                    height: 2.0,
+                    depth: 0.4,
+                    angle: 12,
+                    shelfCount: 4,
+                    boardThickness: 0.05
+                });
+                
+                sectionGroup.add(shelfUnit);
+            }
+            
+            // Add section label (simple text for now)
+            this.addSectionLabel(sectionGroup, section);
+            
+            this.storeGroup.add(sectionGroup);
+        }
     }
-  }
 
-  /**
+    /**
+     * Create shelf sections with chunked processing to avoid blocking the event loop
+     */
+    private async createShelfSectionsChunked(config: StoreLayoutConfig): Promise<void> {
+        const SHELF_CHUNK_SIZE = 2; // Process 2 shelves at a time
+        const CHUNK_DELAY = 16; // ~60fps (16ms between chunks)
+        
+        for (const section of config.sections) {
+            const sectionGroup = new THREE.Group();
+            sectionGroup.name = section.name;
+            
+            console.log(`🏗️ Creating section: ${section.name} (${section.shelfCount} shelves)`);
+            
+            // Create shelves in chunks
+            for (let i = 0; i < section.shelfCount; i += SHELF_CHUNK_SIZE) {
+                const chunkEnd = Math.min(i + SHELF_CHUNK_SIZE, section.shelfCount);
+                
+                // Process this chunk
+                for (let j = i; j < chunkEnd; j++) {
+                    const shelfPosition = new THREE.Vector3(
+                        section.position.x + j * config.shelfSpacing,
+                        section.position.y,
+                        section.position.z
+                    );
+                    
+                    const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition, {
+                        width: 2.0,
+                        height: 2.0,
+                        depth: 0.4,
+                        angle: 12,
+                        shelfCount: 4,
+                        boardThickness: 0.05
+                    });
+                    
+                    sectionGroup.add(shelfUnit);
+                }
+                
+                // Yield control back to the event loop after each chunk
+                if (chunkEnd < section.shelfCount) {
+                    await new Promise(resolve => setTimeout(resolve, CHUNK_DELAY));
+                }
+            }
+            
+            // Add section label
+            this.addSectionLabel(sectionGroup, section);
+            this.storeGroup.add(sectionGroup);
+            
+            console.log(`✅ Section ${section.name} complete`);
+        }
+    }
+
+    /**
+     * Create shelf sections using GPU-optimized instanced rendering
+     * This generates all shelves in a single draw call per component type
+     */
+    private async createShelfSectionsGPUOptimized(config: StoreLayoutConfig): Promise<void> {
+        // Calculate total number of shelves needed
+        const totalShelves = config.sections.reduce((sum, section) => sum + section.shelfCount, 0);
+        const shelfComponentsPerUnit = 8; // 2 angled + 2 side + 4 horizontal boards per shelf
+        const totalComponents = totalShelves * shelfComponentsPerUnit;
+        
+        console.log(`🚀 GPU: Creating ${totalShelves} shelves (${totalComponents} components) with instanced rendering`);
+        
+        // Create shared geometries for different shelf components
+        const woodMaterial = this.textureManager.createSimpleWoodMaterial({ color: new THREE.Color(0x8B4513) });
+        
+        // Instanced geometries for different shelf parts
+        const angledBoardGeometry = new THREE.BoxGeometry(2.0, 2.0, 0.05);
+        const sideBoardGeometry = new THREE.BoxGeometry(0.05, 2.0, 0.4);
+        const horizontalShelfGeometry = new THREE.BoxGeometry(2.0, 0.05, 0.4);
+        
+        // Create instanced meshes
+        const angledBoards = new THREE.InstancedMesh(angledBoardGeometry, woodMaterial, totalShelves * 2); // 2 per shelf
+        const sideBoards = new THREE.InstancedMesh(sideBoardGeometry, woodMaterial, totalShelves * 2); // 2 per shelf  
+        const horizontalShelves = new THREE.InstancedMesh(horizontalShelfGeometry, woodMaterial, totalShelves * 4); // 4 per shelf
+        
+        let angledInstanceIndex = 0;
+        let sideInstanceIndex = 0;
+        let horizontalInstanceIndex = 0;
+        
+        const tempMatrix = new THREE.Matrix4();
+        const angleRad = (12 * Math.PI) / 180; // 12 degrees
+        
+        // Generate instances for each section
+        for (const section of config.sections) {
+            const sectionGroup = new THREE.Group();
+            sectionGroup.name = section.name;
+            
+            for (let i = 0; i < section.shelfCount; i++) {
+                const shelfBasePosition = new THREE.Vector3(
+                    section.position.x + i * config.shelfSpacing,
+                    section.position.y,
+                    section.position.z
+                );
+                
+                // Front angled board
+                tempMatrix.makeRotationX(-angleRad);
+                tempMatrix.setPosition(
+                    shelfBasePosition.x,
+                    shelfBasePosition.y + 1.0, // height/2
+                    shelfBasePosition.z + 0.2  // depth/2
+                );
+                angledBoards.setMatrixAt(angledInstanceIndex++, tempMatrix);
+                
+                // Back angled board
+                tempMatrix.makeRotationX(angleRad);
+                tempMatrix.setPosition(
+                    shelfBasePosition.x,
+                    shelfBasePosition.y + 1.0,
+                    shelfBasePosition.z - 0.2
+                );
+                angledBoards.setMatrixAt(angledInstanceIndex++, tempMatrix);
+                
+                // Left side board
+                tempMatrix.makeTranslation(
+                    shelfBasePosition.x - 1.0, // -width/2
+                    shelfBasePosition.y + 1.0,
+                    shelfBasePosition.z
+                );
+                sideBoards.setMatrixAt(sideInstanceIndex++, tempMatrix);
+                
+                // Right side board
+                tempMatrix.makeTranslation(
+                    shelfBasePosition.x + 1.0, // +width/2
+                    shelfBasePosition.y + 1.0,
+                    shelfBasePosition.z
+                );
+                sideBoards.setMatrixAt(sideInstanceIndex++, tempMatrix);
+                
+                // Horizontal shelves (4 per unit)
+                for (let shelfIndex = 1; shelfIndex <= 4; shelfIndex++) {
+                    const shelfY = shelfBasePosition.y + (shelfIndex * 2.0) / 5; // distribute evenly
+                    tempMatrix.makeTranslation(
+                        shelfBasePosition.x,
+                        shelfY,
+                        shelfBasePosition.z
+                    );
+                    horizontalShelves.setMatrixAt(horizontalInstanceIndex++, tempMatrix);
+                }
+            }
+            
+            // Add section label
+            this.addSectionLabel(sectionGroup, section);
+            this.storeGroup.add(sectionGroup);
+        }
+        
+        // Update instance matrices and add to scene
+        angledBoards.instanceMatrix.needsUpdate = true;
+        sideBoards.instanceMatrix.needsUpdate = true;
+        horizontalShelves.instanceMatrix.needsUpdate = true;
+        
+        // Add instanced meshes to store group
+        this.storeGroup.add(angledBoards);
+        this.storeGroup.add(sideBoards);
+        this.storeGroup.add(horizontalShelves);
+        
+        console.log(`⚡ GPU: Instanced rendering complete - ${totalShelves} shelves in ${totalComponents} draw calls reduced to 3`);
+    }  /**
    * Add a section label above the shelves using proper text signage
    */
   private addSectionLabel(sectionGroup: THREE.Group, section: StoreSection): void {

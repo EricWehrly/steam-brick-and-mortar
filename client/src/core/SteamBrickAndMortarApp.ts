@@ -164,40 +164,37 @@ export class SteamBrickAndMortarApp {
             return
         }
 
+        const startTime = window.performance.now()
         console.log('🎮 Initializing Steam Brick and Mortar WebXR...')
         
         try {
+            // Instrument each major initialization step
+            const sceneStart = window.performance.now()
             await this.setupScene()
+            const sceneTime = window.performance.now() - sceneStart
+            console.log(`⏱️ Scene setup: ${sceneTime.toFixed(2)}ms`)
+            
+            const webxrStart = window.performance.now()
             await this.setupWebXR()
+            const webxrTime = window.performance.now() - webxrStart
+            console.log(`⏱️ WebXR setup: ${webxrTime.toFixed(2)}ms`)
+            
+            const controlsStart = window.performance.now()
             this.setupControls()
+            const controlsTime = window.performance.now() - controlsStart
+            console.log(`⏱️ Controls setup: ${controlsTime.toFixed(2)}ms`)
+            
+            const uiStart = window.performance.now()
             this.uiManager.init()
+            const uiTime = window.performance.now() - uiStart
+            console.log(`⏱️ UI Manager init: ${uiTime.toFixed(2)}ms`)
             
-            // Initialize pause menu system
-            this.pauseMenuManager.init()
+            const pauseMenuStart = window.performance.now()
+            await this.initializePauseMenuSystem()
+            const pauseMenuTime = window.performance.now() - pauseMenuStart
+            console.log(`⏱️ Pause menu system: ${pauseMenuTime.toFixed(2)}ms`)
             
-            // Register pause menu panels
-            const cachePanel = new CacheManagementPanel()
-            cachePanel.initCacheFunctions(
-                () => this.steamIntegration.getImageCacheStats(),
-                () => this.steamIntegration.clearImageCache()
-            )
-            this.cacheManagementPanel = cachePanel
-            this.pauseMenuManager.registerPanel(cachePanel)
-            
-            // Add help panel
-            this.pauseMenuManager.registerPanel(new HelpPanel())
-            
-            // Add application panel with callbacks
-            const applicationPanel = new ApplicationPanel()
-            applicationPanel.initialize({
-                onSettingsChanged: (settings) => this.handleSettingsChange(settings)
-            })
-            this.applicationPanel = applicationPanel
-            this.pauseMenuManager.registerPanel(applicationPanel)
-            
-            // Initialize settings button
-            this.initializeSettingsButton()
-            
+            const finalSetupStart = window.performance.now()
             this.uiManager.hideLoading()
             this.startRenderLoop()
             
@@ -205,12 +202,63 @@ export class SteamBrickAndMortarApp {
             this.performanceMonitor.start()
             
             this.isInitialized = true
+            const finalSetupTime = window.performance.now() - finalSetupStart
+            console.log(`⏱️ Final setup: ${finalSetupTime.toFixed(2)}ms`)
+            
+            const totalTime = window.performance.now() - startTime
+            console.log(`🎯 Total initialization time: ${totalTime.toFixed(2)}ms`)
             console.log('✅ WebXR environment ready!')
         } catch (error) {
             console.error('❌ Failed to initialize WebXR environment:', error)
             this.uiManager.showError('Failed to initialize WebXR environment')
             throw error
         }
+    }
+
+    /**
+     * Initialize pause menu system with instrumentation
+     */
+    private async initializePauseMenuSystem(): Promise<void> {
+        // Initialize pause menu system
+        const pauseMenuInitStart = window.performance.now()
+        this.pauseMenuManager.init()
+        const pauseMenuInitTime = window.performance.now() - pauseMenuInitStart
+        console.log(`  ⏱️ Pause menu init: ${pauseMenuInitTime.toFixed(2)}ms`)
+        
+        // Register pause menu panels
+        const cachePanel = new CacheManagementPanel()
+        const cachePanelStart = window.performance.now()
+        cachePanel.initCacheFunctions(
+            () => this.steamIntegration.getImageCacheStats(),
+            () => this.steamIntegration.clearImageCache()
+        )
+        this.cacheManagementPanel = cachePanel
+        this.pauseMenuManager.registerPanel(cachePanel)
+        const cachePanelTime = window.performance.now() - cachePanelStart
+        console.log(`  ⏱️ Cache panel setup: ${cachePanelTime.toFixed(2)}ms`)
+        
+        // Add help panel
+        const helpPanelStart = window.performance.now()
+        this.pauseMenuManager.registerPanel(new HelpPanel())
+        const helpPanelTime = window.performance.now() - helpPanelStart
+        console.log(`  ⏱️ Help panel setup: ${helpPanelTime.toFixed(2)}ms`)
+        
+        // Add application panel with callbacks
+        const appPanelStart = window.performance.now()
+        const applicationPanel = new ApplicationPanel()
+        applicationPanel.initialize({
+            onSettingsChanged: (settings) => this.handleSettingsChange(settings)
+        })
+        this.applicationPanel = applicationPanel
+        this.pauseMenuManager.registerPanel(applicationPanel)
+        const appPanelTime = window.performance.now() - appPanelStart
+        console.log(`  ⏱️ Application panel setup: ${appPanelTime.toFixed(2)}ms`)
+        
+        // Initialize settings button
+        const settingsButtonStart = window.performance.now()
+        this.initializeSettingsButton()
+        const settingsButtonTime = window.performance.now() - settingsButtonStart
+        console.log(`  ⏱️ Settings button setup: ${settingsButtonTime.toFixed(2)}ms`)
     }
 
     /**
@@ -238,27 +286,76 @@ export class SteamBrickAndMortarApp {
     // Scene Setup Methods
 
     private async setupScene(): Promise<void> {
-        // Generate the complete VR-optimized store layout with Steam categories
-        console.log('🏪 Generating VR-optimized store layout...')
-        await this.storeLayout.generateStore()
+        const setupSceneStart = window.performance.now()
+        console.log('🏪 Setting up basic VR environment...')
+        
+        // Create the basic room structure first (non-blocking)
+        const basicEnvStart = window.performance.now()
+        await this.setupBasicEnvironment()
+        const basicEnvTime = window.performance.now() - basicEnvStart
+        console.log(`  ⏱️ Basic environment: ${basicEnvTime.toFixed(2)}ms`)
         
         // Create visible fluorescent fixtures (positioned just below ceiling)
+        const lightingStart = window.performance.now()
         this.sceneManager.createFluorescentFixtures(3.2)
+        const lightingTime = window.performance.now() - lightingStart
+        console.log(`  ⏱️ Lighting fixtures: ${lightingTime.toFixed(2)}ms`)
         
         // Create Blockbuster signage
+        const signageStart = window.performance.now()
         this.signageRenderer.createStandardSigns(this.sceneManager.getScene())
-        
-        // Load shelf model (legacy - may be replaced by procedural shelves)
-        await this.loadShelfModel()
+        const signageTime = window.performance.now() - signageStart
+        console.log(`  ⏱️ Signage creation: ${signageTime.toFixed(2)}ms`)
         
         // Add test cube for reference
+        const cubeStart = window.performance.now()
         this.addTestCube()
+        const cubeTime = window.performance.now() - cubeStart
+        console.log(`  ⏱️ Test cube: ${cubeTime.toFixed(2)}ms`)
         
-        // Log store stats
-        const stats = this.storeLayout.getStoreStats()
-        console.log('📊 Store Stats:', stats)
+        const setupSceneTotal = window.performance.now() - setupSceneStart
+        console.log(`  🎯 Total scene setup: ${setupSceneTotal.toFixed(2)}ms`)
+        console.log('✅ Basic VR environment ready! Loading shelves in background...')
         
-        console.log('✅ VR-optimized scene setup complete with Steam categories!')
+        // Generate shelves asynchronously after the app is ready
+        this.generateShelvesAsync()
+    }
+
+    private async setupBasicEnvironment(): Promise<void> {
+        const configStart = window.performance.now()
+        // Create just the room structure (floor, walls, ceiling) without shelves
+        const config = this.storeLayout.createDefaultLayout()
+        const configTime = window.performance.now() - configStart
+        console.log(`    ⏱️ Layout config: ${configTime.toFixed(2)}ms`)
+        
+        const roomStart = window.performance.now()
+        await this.storeLayout.generateBasicRoom(config)
+        const roomTime = window.performance.now() - roomStart
+        console.log(`    ⏱️ Room generation: ${roomTime.toFixed(2)}ms`)
+    }
+
+    private async generateShelvesAsync(): Promise<void> {
+        try {
+            console.log('🏗️ Generating store shelves...')
+            
+            // Use GPU-optimized instanced shelf generation for maximum performance
+            const gpuStart = window.performance.now()
+            await this.storeLayout.generateShelvesGPUOptimized()
+            const gpuTime = window.performance.now() - gpuStart
+            console.log(`⚡ GPU-optimized shelf generation: ${gpuTime.toFixed(2)}ms`)
+            
+            // Load legacy shelf model if needed (can be removed later)
+            await this.loadShelfModel()
+            
+            // Log store stats
+            const stats = this.storeLayout.getStoreStats()
+            console.log('📊 Store Stats:', stats)
+            
+            console.log('✅ Store shelves generation complete!')
+        } catch (error) {
+            console.error('❌ Failed to generate shelves:', error)
+            console.warn('⚠️ Continuing without procedural shelves - basic environment available')
+        }
     }
 
     private async loadShelfModel(): Promise<void> {
@@ -291,11 +388,22 @@ export class SteamBrickAndMortarApp {
     // WebXR Setup Methods
 
     private async setupWebXR(): Promise<void> {
+        const webxrSetupStart = window.performance.now()
+        
         // Set the renderer for WebXR
+        const rendererSetupStart = window.performance.now()
         this.webxrManager.setRenderer(this.sceneManager.getRenderer())
+        const rendererSetupTime = window.performance.now() - rendererSetupStart
+        console.log(`  ⏱️ WebXR renderer setup: ${rendererSetupTime.toFixed(2)}ms`)
         
         // Check WebXR capabilities
+        const capabilitiesStart = window.performance.now()
         await this.webxrManager.checkCapabilities()
+        const capabilitiesTime = window.performance.now() - capabilitiesStart
+        console.log(`  ⏱️ WebXR capabilities check: ${capabilitiesTime.toFixed(2)}ms`)
+        
+        const webxrSetupTotal = window.performance.now() - webxrSetupStart
+        console.log(`  🎯 Total WebXR setup: ${webxrSetupTotal.toFixed(2)}ms`)
     }
 
     private setupControls(): void {
