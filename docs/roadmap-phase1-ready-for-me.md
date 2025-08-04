@@ -11,7 +11,7 @@
 - Rate limiting acceptable for single-user testing
 - Basic error handling sufficient
 
-**Phase 1 Completion Status**: ~75% complete - solid foundation, working Steam integration, need graphics and level layout
+**Phase 1 Completion Status**: ~80% complete - solid foundation, working Steam integration with caching, pause menu system functional, moving to visual enhancements and game population
 
 ---
 
@@ -214,13 +214,27 @@
 - SteamGridDB: 1 req/sec free tier, Pro tier available for higher traffic
 - Hybrid strategy recommended: Steam CDN primary + SteamGridDB fallback + aggressive caching
 
-#### Story 5.1.2: Steam Metadata Structure Analysis
-- **Task 5.1.2.1**: Research Steam game metadata structure from API responses
+#### Story 5.1.2: Steam Categories and User Profile Research 🔄 **NEXT PRIORITY**
+- **Task 5.1.2.1**: Research Steam category systems and user profile data
+  - Research what categories/tags can be retrieved from Steam Web API
+  - Investigate Steam Store categories vs. user-defined categories vs. community tags
+  - Research user profile endpoints for category preferences and library organization
+  - Document available categorization options beyond hardcoded categories
+- **Task 5.1.2.2**: Create categorization strategy document
+  - Present summary of available category systems in markdown document
+  - Recommend approach for dynamic category generation from Steam data
+  - Plan integration with existing game loading workflow
+  - Design fallback strategies for games without category data
+
+**Expected Deliverable**: `docs/steam-categorization-research.md` with implementation recommendations
+
+#### Story 5.1.3: Steam Metadata Structure Analysis **LOWER PRIORITY**
+- **Task 5.1.3.1**: Research Steam game metadata structure from API responses
   - Document complete game object structure from Steam API
   - Identify all available image/artwork fields (icon, header, capsule, etc.)
   - Research image URLs, formats, sizes, and CDN patterns
   - Create sample metadata document with real game examples
-- **Task 5.1.2.2**: Analyze artwork URL patterns and CDN infrastructure
+- **Task 5.1.3.2**: Analyze artwork URL patterns and CDN infrastructure
   - Identify Steam CDN endpoints and URL construction patterns
   - Research image size variants available (small, medium, large, original)
   - Document artwork types: game icons, header images, capsule art, screenshots
@@ -309,6 +323,53 @@
 
 **Acceptance**: Image caching works seamlessly with UI for monitoring and management ✅
 
+### Feature 5.5: Enhanced Game Library Caching & UI 🔄 **HIGH PRIORITY**
+**Context**: Improved caching strategy with dedicated game list cache and enhanced user interface
+
+#### Story 5.5.1: Dedicated Game List Cache 🔄
+- **Task 5.5.1.1**: Create lightweight game list cache entry
+  - Implement dedicated cache for user's game list with app ID and name only
+  - Design cache structure to support quick lookups by app ID
+  - Add cache entry for lightweight game manifest (separate from detailed game data)
+  - Ensure app ID can be used as key to reference detailed cache entries for artwork/metadata
+- **Task 5.5.1.2**: Integrate game list cache with loading workflow
+  - Modify Steam library loading to populate dedicated game list cache
+  - Enable lookups from game list cache to detailed cache entries
+  - Add cache invalidation and refresh strategies for game list vs. detailed data
+  - Test cache consistency between game list and detailed game data
+
+**Expected Deliverable**: Lightweight game list cache supporting quick app ID/name lookups
+
+#### Story 5.5.2: Load from Cache UI Enhancement 🔄
+- **Task 5.5.2.1**: Add "Load from Cache" button to Steam Account panel
+  - Create conditional button that appears when game list cache is populated
+  - Implement cache-based game loading that bypasses Steam API calls
+  - Add user feedback for cache-based loading (progress, game count, etc.)
+  - Design removable button system for future iteration (if user input becomes unnecessary)
+- **Task 5.5.2.2**: Integrate cache loading with game population
+  - Connect "Load from Cache" to shelf population system
+  - Use app ID from cache for detailed data lookups
+  - Implement fallback to Steam API if cached detailed data is missing
+  - Add cache hit/miss statistics and reporting
+
+**Expected Deliverable**: User-friendly cache loading interface with progress feedback
+
+#### Story 5.5.3: Development Limiting and Safety Controls 🔄
+- **Task 5.5.3.1**: Add game count governor to loading modal
+  - Create checkbox control in "Load my games" modal to limit games to 10
+  - Make 10-game limit checked by default during development phase
+  - Add clear labeling indicating this is for testing/development purposes
+  - Design for easy removal once stable performance is validated
+- **Task 5.5.3.2**: Implement smart game limiting
+  - Ensure game limiting applies to both Steam API and cache loading
+  - Add logic to select most interesting/relevant games when limiting (e.g., most played)
+  - Provide user feedback about limitation (e.g., "Showing 10 of 850 games")
+  - Plan for graceful expansion beyond 10 games in future iterations
+
+**Expected Deliverable**: Configurable game limiting for safe development testing
+
+**Acceptance**: Users can load games from cache with improved UI controls and development safety limits
+
 ### Future Enhancements (Roadmap TODOs)
 - **Game-level cache optimization**: Check if all artwork for a game is cached before downloading
 - **Optional cache UI**: Make cache management UI configurable via user settings
@@ -323,34 +384,101 @@
 ## 🔄 Milestone 6: Level Layout and Spatial Design - **PHASE 1 COMPLETION**
 *Goal: Design and implement the 3D environment layout for optimal game browsing*
 
-### Feature 6.1: Environment Layout Research
+### Feature 6.1: Enhanced Shelf Visuals and Materials 🔄 **HIGH PRIORITY**
+**Context**: Convert shelf appearance to realistic MDF veneer look with consistent branding colors
+
+#### Story 6.1.1: Shelf Material System Redesign 🔄
+- **Task 6.1.1.1**: Research and implement MDF veneer appearance
+  - Research visual characteristics of MDF prefab shelving with veneer
+  - Design material system to simulate wood veneer texture and appearance
+  - Implement glossy white interior surfaces for shelf compartments
+  - Add realistic lighting response for veneer and glossy surfaces
+- **Task 6.1.1.2**: Establish brand color system with glossy blue accents
+  - Define consistent blue color constant for all project visuals
+  - Apply glossy blue material to vertical support posts/brackets
+  - Ensure blue color is easily adjustable across all shelf components
+  - Document brand color guidelines for future visual consistency
+
+**Expected Deliverable**: Realistic MDF veneer shelves with brand-consistent blue accents
+
+#### Story 6.1.2: Wall-Mounted Shelf Implementation 🔄
+- **Task 6.1.2.1**: Design wall-mounted shelf geometry
+  - Create single-sided shelf models for wall mounting (no backing)
+  - Modify existing Blender shelf generation for wall-mount variants
+  - Design wall attachment systems and visual mounting hardware
+  - Ensure visual consistency with floor shelves while adapting to wall mounting
+- **Task 6.1.2.2**: Evaluate shelf type system architecture
+  - Design system to support multiple shelf types (floor, wall, corner, etc.)
+  - Plan for parameterized shelf generation based on type and placement
+  - Create modular system for future shelf type additions
+  - Document shelf type architecture for implementation guidance
+
+**Expected Deliverable**: Wall-mounted shelf system with extensible architecture
+
+### Feature 6.2: Game Population and Dynamic Shelf Generation 🔄 **HIGH PRIORITY**
+**Context**: Smart shelf spawning and game placement system for optimal space utilization
+
+#### Story 6.2.1: Smart Shelf Generation 🔄
+- **Task 6.2.1.1**: Implement conditional shelf spawning
+  - Create system where floor shelves spawn only when games are available to populate them
+  - Design shelf capacity calculation (games per shelf based on size/spacing)
+  - Implement shelf generation triggered by game loading progress
+  - Add visual feedback for shelf generation process
+- **Task 6.2.1.2**: Game-to-shelf assignment system
+  - Implement algorithm to assign games to shelves based on capacity
+  - Create smart spacing system for game placement on shelves
+  - Add overflow handling for libraries larger than available shelf space
+  - Design for future categorization-based shelf assignment
+
+**Expected Deliverable**: Dynamic shelf generation that scales with user's game library
+
+#### Story 6.2.2: Game Placement and Positioning 🔄
+- **Task 6.2.2.1**: Verify and enhance game spawning on shelves
+  - Audit current game spawning behavior to confirm games appear on shelves
+  - Implement proper game box positioning relative to shelf geometry
+  - Add collision detection to prevent game boxes from overlapping
+  - Ensure game boxes respect shelf boundaries and spacing
+- **Task 6.2.2.2**: Game organization and layout system
+  - Implement consistent game spacing and alignment on shelves
+  - Add support for different game box sizes (if artwork aspect ratios vary)
+  - Create visual hierarchy system for game placement (featured games, etc.)
+  - Plan for future sorting and categorization integration
+
+**Expected Deliverable**: Clean game placement system with proper shelf integration
+
+### Feature 6.3: Advanced Lighting and Graphics Settings 🔄 **FUTURE ENHANCEMENT**
+**Context**: Configurable lighting system with performance scaling options
+
+#### Story 6.3.1: Lighting Settings System 🔄
+- **Task 6.3.1.1**: Design tiered lighting system
+  - Create lighting quality settings from "simple" to "ouch my eyes"
+  - Design visual control as notched line (|---|---|) interface
+  - Plan lighting feature progression: basic → enhanced → advanced → raytracing
+  - Research WebGL pathtracing integration possibilities (THREE.js-PathTracing-Renderer)
+- **Task 6.3.1.2**: Implement lighting quality levels
+  - Level 1 "Simple": Basic ambient + directional lighting
+  - Level 2 "Enhanced": Added point lights for shelf illumination
+  - Level 3 "Advanced": Shadows, reflections, enhanced materials
+  - Level 4 "Ouch My Eyes": Full pathtracing/raytracing if technically feasible
+
+**Expected Deliverable**: Configurable lighting system with performance-appropriate options
+
+**Note**: Pathtracing research link: https://erichlof.github.io/THREE.js-PathTracing-Renderer/
+
+### Feature 6.4: Environment Layout Research **LOWER PRIORITY**
 **Context**: Design spatial organization for large game libraries
 
-#### Story 6.1.1: Spatial Organization Patterns
-- **Task 6.1.1.1**: Research VR/3D browsing UX patterns
-- **Task 6.1.1.2**: Design shelf arrangement and navigation systems
-- **Task 6.1.1.3**: Plan categorization and filtering spatial layouts
-- **Task 6.1.1.4**: Design user wayfinding and orientation systems
+#### Story 6.4.1: Spatial Organization Patterns
+- **Task 6.4.1.1**: Research VR/3D browsing UX patterns
+- **Task 6.4.1.2**: Design shelf arrangement and navigation systems
+- **Task 6.4.1.3**: Plan categorization and filtering spatial layouts
+- **Task 6.4.1.4**: Design user wayfinding and orientation systems
 
 **Expected Deliverable**: Level layout design document
 
 **Acceptance**: Complete spatial design ready for implementation
 
-### Feature 6.2: 3D Environment Implementation
-**Context**: Build the complete browsable environment
-
-#### Story 6.2.1: Multi-Shelf Environment
-- **Task 6.2.1.1**: Generate multiple shelf instances with Blender
-- **Task 6.2.1.2**: Implement shelf positioning and spacing systems
-- **Task 6.2.1.3**: Add environmental lighting and atmosphere
-- **Task 6.2.1.4**: Implement navigation between shelf areas
-
-**Acceptance**: Multi-shelf environment ready for game population
-
----
-
-test out raytracing / shaders
-TODO: Ask human operator to help flesh out this task
+**Note**: Advanced lighting research includes WebGL pathtracing investigation
 
 --- 
 
@@ -376,15 +504,22 @@ TODO: Ask human operator to help flesh out this task
 
 **Active Phase**: Phase 1 - "Ready for Me"  
 **Current Milestone**: Milestone 5 - Game Art & Visual Integration  
-**Current Feature**: Feature 5.1 - Steam Game Metadata Research  
-**Next Task**: Task 5.1.1.2 - Test direct CDN access patterns and rate limits
+**Current Feature**: Pause Menu Feature Cleanup (see `docs/active/pause-menu-feature-plan.md`)  
+**Next Priority After Pause Menu**: Feature 5.5 - Enhanced Game Library Caching & UI
+
+**Upcoming High-Priority Items** (Post-Pause Menu):
+1. **Steam Categories Research** (Task 5.1.2.1) - Research dynamic category systems from Steam data
+2. **Enhanced Game Library Caching** (Feature 5.5) - Dedicated game list cache with "Load from Cache" UI
+3. **Visual Shelf Improvements** (Feature 6.1) - MDF veneer appearance with brand blue accents
+4. **Smart Game Population** (Feature 6.2) - Dynamic shelf spawning and game placement
 
 **Recent Completions**:
 - ✅ CDN Access Strategy Research (Task 5.1.1.1) - Delivered `docs/cdn-access-strategy.md`
 - ✅ Comprehensive Steam API integration with caching and offline capability
 - ✅ Progressive game loading with rate limiting (4 games/second)
+- ✅ Image caching system with management UI
 
-**Phase 1 Progress**: ~75% complete
+**Phase 1 Progress**: ~80% complete
 - ✅ Solid technical foundation (Milestones 1-4)
-- 🚧 Graphics integration in progress (Milestone 5)  
-- 🔄 Level layout remaining (Milestone 6)
+- 🚧 Graphics integration and pause menu cleanup in progress (Milestone 5)  
+- 🔄 Enhanced visuals and level layout next (Milestone 6)
