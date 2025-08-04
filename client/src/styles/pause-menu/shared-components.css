@@ -1,0 +1,250 @@
+/**
+ * Shared Components for Pause Menu Panels
+ * 
+ * Common button styles, form controls, and layout patterns
+ * used across multiple pause menu panels.
+ */
+
+/* ===== SHARED BUTTON STYLES ===== */
+
+/* Base button class for all pause menu buttons */
+.pause-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid #555;
+    border-radius: 6px;
+    background: #444;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 120px;
+    text-decoration: none;
+    outline: none;
+}
+
+.pause-btn:hover:not([disabled]) {
+    background: #555;
+    border-color: #666;
+    transform: translateY(-1px);
+}
+
+.pause-btn:active:not([disabled]) {
+    transform: translateY(0);
+}
+
+.pause-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Button variants */
+.pause-btn.primary {
+    background: linear-gradient(135deg, #2a5470 0%, #1e3a52 100%);
+    border-color: #3d6b8a;
+}
+
+.pause-btn.primary:hover:not([disabled]) {
+    background: linear-gradient(135deg, #3d6b8a 0%, #2a5470 100%);
+    border-color: #4a7ba0;
+}
+
+.pause-btn.secondary {
+    background: linear-gradient(135deg, #444 0%, #2a2a2a 100%);
+    border-color: #555;
+}
+
+.pause-btn.secondary:hover:not([disabled]) {
+    background: linear-gradient(135deg, #555 0%, #444 100%);
+    border-color: #666;
+}
+
+.pause-btn.warning {
+    background: linear-gradient(135deg, #8b4513 0%, #654321 100%);
+    border-color: #a0522d;
+}
+
+.pause-btn.warning:hover:not([disabled]) {
+    background: linear-gradient(135deg, #a0522d 0%, #8b4513 100%);
+    border-color: #cd853f;
+}
+
+.pause-btn.accent {
+    background: #00aaff;
+    border-color: #0088cc;
+}
+
+.pause-btn.accent:hover:not([disabled]) {
+    background: #0088cc;
+    border-color: #0066aa;
+}
+
+/* ===== SHARED FORM CONTROLS ===== */
+
+/* Base input styling */
+.pause-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.pause-input:focus {
+    outline: none;
+    border-color: #0088cc;
+    background: #333;
+    box-shadow: 0 0 0 2px rgba(0, 136, 204, 0.2);
+}
+
+.pause-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Select dropdowns */
+.pause-select {
+    width: 100%;
+    padding: 8px 12px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pause-select:focus {
+    outline: none;
+    border-color: #0088cc;
+    background: #333;
+    box-shadow: 0 0 0 2px rgba(0, 136, 204, 0.2);
+}
+
+/* Checkbox styling */
+.pause-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #fff;
+}
+
+.pause-checkbox input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    accent-color: #0088cc;
+    cursor: pointer;
+}
+
+.pause-checkbox:hover {
+    color: #ccc;
+}
+
+/* ===== SHARED LAYOUTS ===== */
+
+/* Stat item layout (used in multiple panels) */
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #333;
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    color: #ccc;
+    font-size: 13px;
+}
+
+.stat-value {
+    color: #fff;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+/* Setting item layout */
+.setting-item {
+    margin-bottom: 16px;
+}
+
+.setting-label {
+    display: block;
+    color: #ccc;
+    font-size: 13px;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+/* Button groups */
+.btn-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-group .pause-btn {
+    flex: 1;
+    min-width: 120px;
+}
+
+/* Action sections */
+.action-section {
+    padding: 16px 0;
+    border-bottom: 1px solid #333;
+}
+
+.action-section:last-child {
+    border-bottom: none;
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+/* Performance status indicators */
+.status-good { color: #4caf50; }
+.status-warning { color: #ff9800; }
+.status-error { color: #f44336; }
+
+/* Text utilities */
+.text-muted { color: #888; }
+.text-small { font-size: 12px; }
+.font-mono { font-family: 'Courier New', monospace; }
+
+/* Layout utilities */
+.flex-row { display: flex; gap: 12px; align-items: center; }
+.flex-col { display: flex; flex-direction: column; gap: 8px; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-grow { flex: 1; }
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+    .btn-group {
+        flex-direction: column;
+    }
+    
+    .pause-btn {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .stat-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+}

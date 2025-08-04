@@ -9,6 +9,8 @@
  */
 
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
+import { renderTemplate } from '../../../utils/TemplateEngine'
+import debugPanelTemplate from '../templates/debug-panel.html?raw'
 import '../../../styles/pause-menu/debug-panel.css'
 
 export interface DebugStats {
@@ -77,147 +79,51 @@ export class DebugPanel extends PauseMenuPanel {
     }
 
     render(): string {
-        return `
-            <div class="debug-content">
-                <div class="debug-actions">
-                    <button id="refresh-debug" class="debug-button refresh">🔄 Refresh Stats</button>
-                    <button id="toggle-console" class="debug-button console ${this.consoleVisible ? 'active' : ''}">
-                        ${this.consoleVisible ? '🙈 Hide Console' : '👁️ Show Console'}
-                    </button>
-                    <button id="export-debug" class="debug-button export">📋 Export Debug Info</button>
-                </div>
-
-                <div class="debug-sections">
-                    <div class="debug-section">
-                        <h4>🎬 Three.js Scene</h4>
-                        <div class="debug-stats">
-                            <div class="stat-item">
-                                <span class="stat-label">Total Objects:</span>
-                                <span class="stat-value">${this.stats.sceneObjects.total}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Meshes:</span>
-                                <span class="stat-value">${this.stats.sceneObjects.meshes}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Lights:</span>
-                                <span class="stat-value">${this.stats.sceneObjects.lights}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Cameras:</span>
-                                <span class="stat-value">${this.stats.sceneObjects.cameras}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Textures:</span>
-                                <span class="stat-value">${this.stats.sceneObjects.textures}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Materials:</span>
-                                <span class="stat-value">${this.stats.sceneObjects.materials}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Geometries:</span>
-                                <span class="stat-value">${this.stats.sceneObjects.geometries}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="debug-section">
-                        <h4>⚡ Performance</h4>
-                        <div class="debug-stats">
-                            <div class="stat-item ${this.getPerformanceClass('fps')}">
-                                <span class="stat-label">FPS:</span>
-                                <span class="stat-value">${this.stats.performance.fps.toFixed(1)}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Frame Time:</span>
-                                <span class="stat-value">${this.stats.performance.frameTime.toFixed(2)}ms</span>
-                            </div>
-                            <div class="stat-item ${this.getPerformanceClass('memory')}">
-                                <span class="stat-label">Memory Used:</span>
-                                <span class="stat-value">${this.formatBytes(this.stats.performance.memoryUsed)}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Memory Total:</span>
-                                <span class="stat-value">${this.formatBytes(this.stats.performance.memoryTotal)}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Triangles:</span>
-                                <span class="stat-value">${this.stats.performance.triangles.toLocaleString()}</span>
-                            </div>
-                            <div class="stat-item ${this.getPerformanceClass('drawCalls')}">
-                                <span class="stat-label">Draw Calls:</span>
-                                <span class="stat-value">${this.stats.performance.drawCalls}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="debug-section">
-                        <h4>💾 Cache Status</h4>
-                        <div class="debug-stats">
-                            <div class="stat-item">
-                                <span class="stat-label">Cached Images:</span>
-                                <span class="stat-value">${this.stats.cache.imageCount}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Image Cache Size:</span>
-                                <span class="stat-value">${this.formatBytes(this.stats.cache.imageCacheSize)}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Game Data Count:</span>
-                                <span class="stat-value">${this.stats.cache.gameDataCount}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Game Data Size:</span>
-                                <span class="stat-value">${this.formatBytes(this.stats.cache.gameDataSize)}</span>
-                            </div>
-                            <div class="stat-item ${this.getPerformanceClass('quota')}">
-                                <span class="stat-label">Storage Quota:</span>
-                                <span class="stat-value">${this.formatQuotaUsage()}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="debug-section">
-                        <h4>🖥️ System Info</h4>
-                        <div class="debug-stats">
-                            <div class="stat-item">
-                                <span class="stat-label">WebXR Support:</span>
-                                <span class="stat-value ${this.stats.system.webxrSupported ? 'good' : 'warning'}">
-                                    ${this.stats.system.webxrSupported ? '✅ Available' : '❌ Not Available'}
-                                </span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">WebGL Version:</span>
-                                <span class="stat-value">${this.stats.system.webglVersion}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Max Texture Size:</span>
-                                <span class="stat-value">${this.stats.system.maxTextureSize}px</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">GPU Vendor:</span>
-                                <span class="stat-value">${this.stats.system.vendor}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">GPU Renderer:</span>
-                                <span class="stat-value">${this.stats.system.renderer}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="debug-console" class="debug-console ${this.consoleVisible ? 'visible' : 'hidden'}">
-                    <div class="console-header">
-                        <h5>🖥️ Debug Console</h5>
-                        <button id="clear-console" class="console-button">Clear</button>
-                    </div>
-                    <div id="console-output" class="console-output">
-                        <div class="console-line info">Debug console initialized. Use console.log() for output.</div>
-                    </div>
-                </div>
-            </div>
-        `
+        // Flatten the hierarchical stats data for the simple template engine
+        const templateData = {
+            // Console state
+            consoleActiveClass: this.consoleVisible ? 'active' : '',
+            consoleButtonText: this.consoleVisible ? '🙈 Hide Console' : '👁️ Show Console',
+            consoleVisibilityClass: this.consoleVisible ? 'visible' : 'hidden',
+            
+            // Scene objects (flattened)
+            sceneObjectsTotal: this.stats.sceneObjects.total,
+            sceneObjectsMeshes: this.stats.sceneObjects.meshes,
+            sceneObjectsLights: this.stats.sceneObjects.lights,
+            sceneObjectsCameras: this.stats.sceneObjects.cameras,
+            sceneObjectsTextures: this.stats.sceneObjects.textures,
+            sceneObjectsMaterials: this.stats.sceneObjects.materials,
+            sceneObjectsGeometries: this.stats.sceneObjects.geometries,
+            
+            // Performance (flattened and formatted)
+            performanceFpsClass: this.getPerformanceClass('fps'),
+            performanceFps: this.stats.performance.fps.toFixed(1),
+            performanceFrameTime: this.stats.performance.frameTime.toFixed(2) + 'ms',
+            performanceMemoryClass: this.getPerformanceClass('memory'),
+            performanceMemoryUsed: this.formatBytes(this.stats.performance.memoryUsed),
+            performanceMemoryTotal: this.formatBytes(this.stats.performance.memoryTotal),
+            performanceTriangles: this.stats.performance.triangles.toLocaleString(),
+            performanceDrawCallsClass: this.getPerformanceClass('drawCalls'),
+            performanceDrawCalls: this.stats.performance.drawCalls,
+            
+            // Cache (flattened and formatted)
+            cacheImageCount: this.stats.cache.imageCount,
+            cacheImageSize: this.formatBytes(this.stats.cache.imageCacheSize),
+            cacheGameDataCount: this.stats.cache.gameDataCount,
+            cacheGameDataSize: this.formatBytes(this.stats.cache.gameDataSize),
+            cacheQuotaClass: this.getPerformanceClass('quota'),
+            cacheQuotaUsage: this.formatQuotaUsage(),
+            
+            // System (flattened and formatted)
+            systemWebxrClass: this.stats.system.webxrSupported ? 'good' : 'warning',
+            systemWebxrText: this.stats.system.webxrSupported ? '✅ Available' : '❌ Not Available',
+            systemWebglVersion: this.stats.system.webglVersion,
+            systemMaxTextureSize: this.stats.system.maxTextureSize + 'px',
+            systemVendor: this.stats.system.vendor,
+            systemRenderer: this.stats.system.renderer
+        }
+        
+        return renderTemplate(debugPanelTemplate, templateData)
     }
 
     attachEvents(): void {
@@ -481,7 +387,7 @@ export class DebugPanel extends PauseMenuPanel {
         }
         
         updateStat('stat-fps', Math.round(stats.fps))
-        updateStat('stat-frame-time', stats.frameTime, 'ms')
+        updateStat('stat-frame-time', parseFloat(stats.frameTime.toFixed(2)), 'ms')
         updateStat('stat-memory-used', Math.round(stats.memoryUsed / 1024 / 1024), 'MB')
         updateStat('stat-memory-total', Math.round(stats.memoryTotal / 1024 / 1024), 'MB')
         updateStat('stat-triangles', stats.triangles)
@@ -494,12 +400,21 @@ export class DebugPanel extends PauseMenuPanel {
             if (element) element.textContent = value.toString() + suffix
         }
         
+        const updateQuotaUsage = () => {
+            const element = document.getElementById('stat-quota-used')
+            if (element) {
+                const used = this.formatBytes(stats.quotaUsed)
+                const total = this.formatBytes(stats.quotaTotal)
+                const percent = ((stats.quotaUsed / stats.quotaTotal) * 100).toFixed(1)
+                element.textContent = `${used} / ${total} (${percent}%)`
+            }
+        }
+        
         updateStat('stat-image-count', stats.imageCount)
         updateStat('stat-image-cache-size', Math.round(stats.imageCacheSize / 1024 / 1024), 'MB')
         updateStat('stat-game-data-count', stats.gameDataCount)
         updateStat('stat-game-data-size', Math.round(stats.gameDataSize / 1024), 'KB')
-        updateStat('stat-quota-used', Math.round(stats.quotaUsed / 1024 / 1024), 'MB')
-        updateStat('stat-quota-total', Math.round(stats.quotaTotal / 1024 / 1024), 'MB')
+        updateQuotaUsage()
     }
 
     private updateSystemStats(stats: DebugStats['system']): void {
@@ -508,7 +423,6 @@ export class DebugPanel extends PauseMenuPanel {
             if (element) element.textContent = value.toString()
         }
         
-        updateStat('stat-user-agent', stats.userAgent)
         updateStat('stat-webxr-supported', stats.webxrSupported ? 'Yes' : 'No')
         updateStat('stat-webgl-version', stats.webglVersion)
         updateStat('stat-max-texture-size', stats.maxTextureSize + 'px')

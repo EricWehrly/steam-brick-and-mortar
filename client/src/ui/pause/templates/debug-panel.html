@@ -1,0 +1,139 @@
+<div class="debug-content">
+    <div class="debug-actions">
+        <button id="refresh-debug" class="debug-button refresh">🔄 Refresh Stats</button>
+        <button id="toggle-console" class="debug-button console {{consoleActiveClass}}">
+            {{consoleButtonText}}
+        </button>
+        <button id="export-debug" class="debug-button export">📋 Export Debug Info</button>
+    </div>
+
+    <div class="debug-sections">
+        <div class="debug-section">
+            <h4>🎬 Three.js Scene</h4>
+            <div class="debug-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Total Objects:</span>
+                    <span class="stat-value" id="stat-total-objects">{{sceneObjectsTotal}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Meshes:</span>
+                    <span class="stat-value" id="stat-meshes">{{sceneObjectsMeshes}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Lights:</span>
+                    <span class="stat-value" id="stat-lights">{{sceneObjectsLights}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Cameras:</span>
+                    <span class="stat-value" id="stat-cameras">{{sceneObjectsCameras}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Textures:</span>
+                    <span class="stat-value" id="stat-textures">{{sceneObjectsTextures}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Materials:</span>
+                    <span class="stat-value" id="stat-materials">{{sceneObjectsMaterials}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Geometries:</span>
+                    <span class="stat-value" id="stat-geometries">{{sceneObjectsGeometries}}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h4>⚡ Performance</h4>
+            <div class="debug-stats">
+                <div class="stat-item {{performanceFpsClass}}">
+                    <span class="stat-label">FPS:</span>
+                    <span class="stat-value" id="stat-fps">{{performanceFps}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Frame Time:</span>
+                    <span class="stat-value" id="stat-frame-time">{{performanceFrameTime}}</span>
+                </div>
+                <div class="stat-item {{performanceMemoryClass}}">
+                    <span class="stat-label">Memory Used:</span>
+                    <span class="stat-value" id="stat-memory-used">{{performanceMemoryUsed}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Memory Total:</span>
+                    <span class="stat-value" id="stat-memory-total">{{performanceMemoryTotal}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Triangles:</span>
+                    <span class="stat-value" id="stat-triangles">{{performanceTriangles}}</span>
+                </div>
+                <div class="stat-item {{performanceDrawCallsClass}}">
+                    <span class="stat-label">Draw Calls:</span>
+                    <span class="stat-value" id="stat-draw-calls">{{performanceDrawCalls}}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h4>💾 Cache Status</h4>
+            <div class="debug-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Cached Images:</span>
+                    <span class="stat-value" id="stat-image-count">{{cacheImageCount}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Image Cache Size:</span>
+                    <span class="stat-value" id="stat-image-cache-size">{{cacheImageSize}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Game Data Count:</span>
+                    <span class="stat-value" id="stat-game-data-count">{{cacheGameDataCount}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Game Data Size:</span>
+                    <span class="stat-value" id="stat-game-data-size">{{cacheGameDataSize}}</span>
+                </div>
+                <div class="stat-item {{cacheQuotaClass}}">
+                    <span class="stat-label">Storage Quota:</span>
+                    <span class="stat-value" id="stat-quota-used">{{cacheQuotaUsage}}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h4>🖥️ System Info</h4>
+            <div class="debug-stats">
+                <div class="stat-item">
+                    <span class="stat-label">WebXR Support:</span>
+                    <span class="stat-value {{systemWebxrClass}}" id="stat-webxr-supported">
+                        {{systemWebxrText}}
+                    </span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">WebGL Version:</span>
+                    <span class="stat-value" id="stat-webgl-version">{{systemWebglVersion}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Max Texture Size:</span>
+                    <span class="stat-value" id="stat-max-texture-size">{{systemMaxTextureSize}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">GPU Vendor:</span>
+                    <span class="stat-value" id="stat-vendor">{{systemVendor}}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">GPU Renderer:</span>
+                    <span class="stat-value" id="stat-renderer">{{systemRenderer}}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="debug-console" class="debug-console {{consoleVisibilityClass}}">
+        <div class="console-header">
+            <h5>🖥️ Debug Console</h5>
+            <button id="clear-console" class="console-button">Clear</button>
+        </div>
+        <div id="console-output" class="console-output">
+            <div class="console-line info">Debug console initialized. Use console.log() for output.</div>
+        </div>
+    </div>
+</div>

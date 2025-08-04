@@ -1,3 +1,11 @@
+/**
+ * Cache Management Panel Styles
+ * Uses shared components from shared-components.css
+ */
+
+@import './shared-components.css';
+
+/* Cache-specific sections */
 .cache-section {
     padding: 15px;
     border-bottom: 1px solid #333;
@@ -14,38 +22,29 @@
     font-weight: 600;
 }
 
+/* Cache stats grid layout */
 .cache-stats {
     display: grid;
     gap: 10px;
 }
 
-.stat-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
+.cache-stats .stat-item {
     background: #2a2a2a;
     border-radius: 6px;
+    padding: 8px 12px;
+    border-bottom: none; /* Override shared component */
 }
 
-.stat-label {
-    color: #ccc;
-    font-size: 13px;
-}
-
-.stat-value {
-    color: #fff;
-    font-weight: 600;
-    font-size: 13px;
-}
-
+/* Button group for cache actions */
 .cache-actions {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
 }
 
+/* Legacy class aliases - panels should be updated to use .pause-btn directly */
 .cache-btn {
+    /* Use shared pause-btn styles */
     background: #444;
     border: 1px solid #555;
     color: #fff;
@@ -77,18 +76,20 @@
     border-color: #0066aa;
 }
 
+/* Cache settings layout */
 .cache-settings {
     display: grid;
     gap: 15px;
 }
 
-.setting-item {
+.cache-settings .setting-item {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin-bottom: 0; /* Override shared setting-item */
 }
 
-.setting-item label {
+.cache-settings .setting-item label {
     color: #ccc;
     font-size: 13px;
     display: flex;
@@ -97,21 +98,13 @@
     cursor: pointer;
 }
 
-.setting-item input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-}
-
-.setting-item input[type="number"] {
-    background: #333;
-    border: 1px solid #555;
-    color: #fff;
-    padding: 6px 10px;
-    border-radius: 4px;
+/* Number input specific styling */
+.cache-settings input[type="number"] {
     width: 80px;
     margin-left: 10px;
 }
 
+/* Cache log component */
 .cache-log {
     background: #222;
     border: 1px solid #333;
@@ -133,6 +126,7 @@
     margin-bottom: 0;
 }
 
+/* Status messages */
 .cache-message {
     padding: 10px 15px;
     margin-bottom: 15px;
