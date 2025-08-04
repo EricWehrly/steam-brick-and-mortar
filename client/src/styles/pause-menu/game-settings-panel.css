@@ -1,0 +1,250 @@
+/* Game Settings Panel Styles */
+.game-settings-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.settings-section {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--pause-border);
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.settings-section h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    color: var(--pause-accent);
+    border-bottom: 1px solid var(--pause-border);
+    padding-bottom: 0.5rem;
+}
+
+.setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    gap: 1rem;
+}
+
+.setting-row:last-child {
+    margin-bottom: 0;
+}
+
+.setting-label {
+    color: var(--pause-text);
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+}
+
+.setting-control {
+    flex: 0 0 auto;
+    min-width: 120px;
+}
+
+.setting-input {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--pause-border);
+    background: var(--pause-background);
+    color: var(--pause-text);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    transition: border-color 0.2s ease;
+}
+
+.setting-input:focus {
+    outline: none;
+    border-color: var(--pause-accent);
+    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
+}
+
+.setting-select {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--pause-border);
+    background: var(--pause-background);
+    color: var(--pause-text);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.setting-select:focus {
+    outline: none;
+    border-color: var(--pause-accent);
+    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
+}
+
+.setting-checkbox {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--pause-accent);
+}
+
+.setting-number {
+    width: 80px;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--pause-border);
+    background: var(--pause-background);
+    color: var(--pause-text);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    text-align: center;
+    transition: border-color 0.2s ease;
+}
+
+.setting-number:focus {
+    outline: none;
+    border-color: var(--pause-accent);
+    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
+}
+
+.setting-description {
+    font-size: 0.75rem;
+    color: var(--pause-text-secondary);
+    margin-top: 0.25rem;
+    font-style: italic;
+}
+
+.setting-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--pause-border);
+}
+
+.setting-button {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--pause-border);
+    background: var(--pause-background);
+    color: var(--pause-text);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.setting-button:hover {
+    background: var(--pause-hover);
+    border-color: var(--pause-accent);
+}
+
+.setting-button.primary {
+    background: var(--pause-accent);
+    color: var(--pause-text-inverse);
+    border-color: var(--pause-accent);
+}
+
+.setting-button.primary:hover {
+    background: rgba(74, 222, 128, 0.8);
+}
+
+.setting-button.danger {
+    border-color: #f87171;
+    color: #f87171;
+}
+
+.setting-button.danger:hover {
+    background: rgba(248, 113, 113, 0.1);
+}
+
+/* Steam profile section styles */
+.steam-profile-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.steam-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    border: 1px solid var(--pause-border);
+}
+
+.steam-profile-details {
+    flex: 1;
+}
+
+.steam-username {
+    font-weight: 500;
+    color: var(--pause-text);
+    margin: 0;
+}
+
+.steam-id {
+    font-size: 0.75rem;
+    color: var(--pause-text-secondary);
+    font-family: 'Courier New', monospace;
+    margin: 0.25rem 0 0 0;
+}
+
+.steam-status {
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.steam-status.online {
+    background: rgba(74, 222, 128, 0.2);
+    color: #4ade80;
+}
+
+.steam-status.offline {
+    background: rgba(156, 163, 175, 0.2);
+    color: #9ca3af;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .setting-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .setting-control {
+        width: 100%;
+        min-width: 0;
+    }
+    
+    .setting-actions {
+        flex-direction: column;
+    }
+    
+    .setting-button {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .steam-profile-info {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+/* Dark theme adjustments */
+@media (prefers-color-scheme: dark) {
+    .settings-section {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .steam-profile-info {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}

@@ -1,0 +1,61 @@
+<div class="cache-section">
+    <div class="cache-stats" id="cache-stats">
+        <div class="stat-item">
+            <span class="stat-label">Images Cached:</span>
+            <span class="stat-value" id="cache-image-count">{{imageCount}}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Total Size:</span>
+            <span class="stat-value" id="cache-total-size">{{totalSize}}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Last Updated:</span>
+            <span class="stat-value" id="cache-last-update">{{lastUpdate}}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Browser Cache API:</span>
+            <span class="stat-value">{{cacheApiStatus}}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Storage Quota:</span>
+            <span class="stat-value" id="storage-quota">{{storageQuota}}</span>
+        </div>
+    </div>
+</div>
+
+<div class="cache-section">
+    <div class="cache-actions">
+        <button class="cache-btn cache-btn-primary" id="refresh-cache-btn" {{refreshButtonDisabled}}>
+            🔄 Refresh Cache
+        </button>
+        <button class="cache-btn cache-btn-secondary" id="clear-cache-btn" {{clearButtonDisabled}}>
+            🗑️ Clear Cache
+        </button>
+        <button class="cache-btn cache-btn-secondary" id="download-missing-btn" {{downloadButtonDisabled}}>
+            📥 Download Missing
+        </button>
+    </div>
+</div>
+
+<div class="cache-section">
+    <div class="cache-settings">
+        <div class="setting-item">
+            <label for="auto-download-toggle">
+                <input type="checkbox" id="auto-download-toggle" {{autoDownloadChecked}}>
+                Auto-download missing images
+            </label>
+        </div>
+        <div class="setting-item">
+            <label for="cache-limit-input">
+                Max cache size (MB):
+                <input type="number" id="cache-limit-input" value="{{cacheLimitValue}}" min="100" max="5000" step="100">
+            </label>
+        </div>
+        <div class="setting-item">
+            <label for="preload-toggle">
+                <input type="checkbox" id="preload-toggle" {{preloadChecked}}>
+                Preload next page images
+            </label>
+        </div>
+    </div>
+</div>

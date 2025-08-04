@@ -1,0 +1,105 @@
+<div class="game-settings-content">
+    <div class="settings-section">
+        <h4>🔗 Steam Profile</h4>
+        <div class="setting-item">
+            <label class="setting-label">
+                <input type="checkbox" id="auto-load-profile" {{#autoLoadProfile}}checked{{/autoLoadProfile}}>
+                <span class="checkmark"></span>
+                Auto-load last used Steam profile
+            </label>
+            <p class="setting-description">Automatically load your most recently used Steam profile on startup</p>
+        </div>
+        <div class="setting-item">
+            <label class="setting-label">
+                <input type="checkbox" id="save-profile-history" {{#saveProfileHistory}}checked{{/saveProfileHistory}}>
+                <span class="checkmark"></span>
+                Save profile history
+            </label>
+            <p class="setting-description">Remember previously accessed Steam profiles for quick access</p>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h4>📚 Game Library</h4>
+        <div class="setting-item">
+            <label class="setting-label">Default sort order:</label>
+            <select id="default-sort-order" class="setting-select">
+                <option value="name" {{#sortByName}}selected{{/sortByName}}>Alphabetical</option>
+                <option value="playtime" {{#sortByPlaytime}}selected{{/sortByPlaytime}}>Most Played</option>
+                <option value="recent" {{#sortByRecent}}selected{{/sortByRecent}}>Recently Played</option>
+                <option value="rating" {{#sortByRating}}selected{{/sortByRating}}>Highest Rated</option>
+            </select>
+        </div>
+        <div class="setting-item">
+            <label class="setting-label">
+                <input type="checkbox" id="show-unplayed" {{#showUnplayedGames}}checked{{/showUnplayedGames}}>
+                <span class="checkmark"></span>
+                Show unplayed games
+            </label>
+            <p class="setting-description">Include games with 0 minutes played in the library</p>
+        </div>
+        <div class="setting-item">
+            <label class="setting-label">
+                <input type="checkbox" id="show-hidden" {{#showHiddenGames}}checked{{/showHiddenGames}}>
+                <span class="checkmark"></span>
+                Show hidden games
+            </label>
+            <p class="setting-description">Include games marked as hidden in Steam</p>
+        </div>
+        <div class="setting-item">
+            <label class="setting-label">Minimum playtime filter:</label>
+            <div class="input-group">
+                <input type="number" id="minimum-playtime" class="setting-input" 
+                       value="{{minimumPlaytime}}" min="0" max="10000" step="1">
+                <span class="input-suffix">minutes</span>
+            </div>
+            <p class="setting-description">Only show games with at least this much playtime (0 = show all)</p>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h4>🖼️ Artwork & Performance</h4>
+        <div class="setting-item">
+            <label class="setting-label">
+                <input type="checkbox" id="load-artwork-auto" {{#loadArtworkAutomatically}}checked{{/loadArtworkAutomatically}}>
+                <span class="checkmark"></span>
+                Load artwork automatically
+            </label>
+            <p class="setting-description">Download game artwork when loading library (disable for slower connections)</p>
+        </div>
+        <div class="setting-item">
+            <label class="setting-label">Artwork quality:</label>
+            <select id="artwork-quality" class="setting-select">
+                <option value="low" {{#artworkQualityLow}}selected{{/artworkQualityLow}}>Low (faster loading)</option>
+                <option value="medium" {{#artworkQualityMedium}}selected{{/artworkQualityMedium}}>Medium (balanced)</option>
+                <option value="high" {{#artworkQualityHigh}}selected{{/artworkQualityHigh}}>High (best quality)</option>
+            </select>
+        </div>
+        <div class="setting-item">
+            <label class="setting-label">Concurrent downloads:</label>
+            <div class="input-group">
+                <input type="number" id="max-concurrent-loads" class="setting-input" 
+                       value="{{maxConcurrentLoads}}" min="1" max="10" step="1">
+                <span class="input-suffix">files</span>
+            </div>
+            <p class="setting-description">Maximum number of artwork files to download simultaneously</p>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h4>🔒 Privacy & Data</h4>
+        <div class="setting-item">
+            <label class="setting-label">
+                <input type="checkbox" id="cache-game-data" {{#cacheGameData}}checked{{/cacheGameData}}>
+                <span class="checkmark"></span>
+                Cache game data locally
+            </label>
+            <p class="setting-description">Store game information locally for faster loading (recommended)</p>
+        </div>
+    </div>
+
+    <div class="settings-actions">
+        <button id="reset-game-settings" class="reset-button">Reset to Defaults</button>
+        <button id="export-game-settings" class="export-button">Export Settings</button>
+    </div>
+</div>

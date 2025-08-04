@@ -5,6 +5,8 @@
  */
 
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
+import { renderTemplate } from '../../../utils/TemplateEngine'
+import cacheManagementPanelTemplate from '../templates/cache-management-panel.html?raw'
 import type { ImageCacheStats } from '../../../steam/images/ImageManager'
 import '../../../styles/pause-menu/cache-management-panel.css'
 
@@ -56,69 +58,29 @@ export class CacheManagementPanel extends PauseMenuPanel {
     }
 
     render(): string {
-        return `
-            <div class="cache-section">
-                <div class="cache-stats" id="cache-stats">
-                    <div class="stat-item">
-                        <span class="stat-label">Images Cached:</span>
-                        <span class="stat-value" id="cache-image-count">Loading...</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Total Size:</span>
-                        <span class="stat-value" id="cache-total-size">Loading...</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Last Updated:</span>
-                        <span class="stat-value" id="cache-last-update">Loading...</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Browser Cache API:</span>
-                        <span class="stat-value">${('caches' in window) ? 'Available' : 'Not available'}</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Storage Quota:</span>
-                        <span class="stat-value" id="storage-quota">Calculating...</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="cache-section">
-                <div class="cache-actions">
-                    <button class="cache-btn cache-btn-primary" id="refresh-cache-btn" disabled>
-                        🔄 Refresh Cache
-                    </button>
-                    <button class="cache-btn cache-btn-secondary" id="clear-cache-btn" disabled>
-                        🗑️ Clear Cache
-                    </button>
-                    <button class="cache-btn cache-btn-secondary" id="download-missing-btn" disabled>
-                        📥 Download Missing
-                    </button>
-                </div>
-            </div>
-
-            <div class="cache-section">
-                <div class="cache-settings">
-                    <div class="setting-item">
-                        <label for="auto-download-toggle">
-                            <input type="checkbox" id="auto-download-toggle" checked>
-                            Auto-download missing images
-                        </label>
-                    </div>
-                    <div class="setting-item">
-                        <label for="cache-limit-input">
-                            Max cache size (MB):
-                            <input type="number" id="cache-limit-input" value="500" min="100" max="5000" step="100">
-                        </label>
-                    </div>
-                    <div class="setting-item">
-                        <label for="preload-toggle">
-                            <input type="checkbox" id="preload-toggle">
-                            Preload next page images
-                        </label>
-                    </div>
-                </div>
-            </div>
-        `
+        const settings = this.getSettings()
+        
+        // Prepare template data with current state
+        const templateData = {
+            // Cache stats (will be updated via refreshStats)
+            imageCount: this.cacheStats.imageCount || 'Loading...',
+            totalSize: this.cacheStats.totalSize ? this.formatBytes(this.cacheStats.totalSize) : 'Loading...',
+            lastUpdate: this.cacheStats.lastUpdate ? this.cacheStats.lastUpdate.toLocaleString() : 'Loading...',
+            cacheApiStatus: ('caches' in window) ? 'Available' : 'Not available',
+            storageQuota: 'Calculating...',
+            
+            // Button states (initially disabled until functions are available)
+            refreshButtonDisabled: !this.onGetStats ? 'disabled' : '',
+            clearButtonDisabled: !this.onClearCache ? 'disabled' : '',
+            downloadButtonDisabled: 'disabled', // No download function yet
+            
+            // Settings values from localStorage
+            autoDownloadChecked: settings.autoDownload !== false ? 'checked' : '',
+            cacheLimitValue: settings.cacheLimit || 500,
+            preloadChecked: settings.preload ? 'checked' : ''
+        }
+        
+        return renderTemplate(cacheManagementPanelTemplate, templateData)
     }
 
     attachEvents(): void {

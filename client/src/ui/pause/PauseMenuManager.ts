@@ -200,6 +200,29 @@ export class PauseMenuManager {
      * Create the HTML structure for the pause menu
      */
     private createMenuStructure(): void {
+        // Check if pause menu structure already exists
+        const existingOverlay = document.getElementById(this.config.containerId)
+        if (existingOverlay) {
+            console.log('🔄 Found existing pause menu structure, reusing it')
+            this.overlay = existingOverlay
+            this.menuContainer = existingOverlay.querySelector(`.${this.config.menuClass}`)
+            
+            // Verify required elements exist, if not recreate them
+            if (!this.menuContainer || !existingOverlay.querySelector('#pause-menu-tabs')) {
+                console.log('⚠️ Existing structure incomplete, recreating...')
+                existingOverlay.remove()
+                this.createNewMenuStructure()
+            } else {
+                // Setup event handlers for existing structure
+                this.setupEventHandlers()
+            }
+            return
+        }
+        
+        this.createNewMenuStructure()
+    }
+
+    private createNewMenuStructure(): void {
         // Create overlay
         this.overlay = document.createElement('div')
         this.overlay.id = this.config.containerId
@@ -214,6 +237,12 @@ export class PauseMenuManager {
         this.overlay.appendChild(this.menuContainer)
         document.body.appendChild(this.overlay)
 
+        this.setupEventHandlers()
+    }
+
+    private setupEventHandlers(): void {
+        if (!this.overlay) return
+        
         // Setup close button
         const closeBtn = this.overlay.querySelector('#pause-menu-close')
         if (closeBtn) {
@@ -233,7 +262,17 @@ export class PauseMenuManager {
      */
     private createPanelTab(panel: PauseMenuPanel): void {
         const tabsContainer = document.getElementById('pause-menu-tabs')
-        if (!tabsContainer) return
+        if (!tabsContainer) {
+            console.warn(`⚠️ Cannot create tab for panel '${panel.id}': tabs container not found`)
+            return
+        }
+
+        // Check if tab already exists (prevent duplicates)
+        const existingTab = document.getElementById(`tab-${panel.id}`)
+        if (existingTab) {
+            console.log(`🔄 Tab for panel '${panel.id}' already exists, skipping creation`)
+            return
+        }
 
         const tab = document.createElement('button')
         tab.id = `tab-${panel.id}`
@@ -243,6 +282,7 @@ export class PauseMenuManager {
         tab.addEventListener('click', () => this.showPanel(panel.id))
         
         tabsContainer.appendChild(tab)
+        console.log(`📋 Created tab for panel: ${panel.title}`)
     }
 
     /**
@@ -311,19 +351,36 @@ export class PauseMenuManager {
         }
 
         // Dispose all panels
-        this.panels.forEach(panel => panel.dispose())
+        this.panels.forEach(panel => {
+            try {
+                panel.dispose()
+            } catch (error) {
+                console.warn(`Failed to dispose panel ${panel.id}:`, error)
+            }
+        })
         this.panels.clear()
 
         // Remove DOM elements
         if (this.overlay) {
-            this.overlay.remove()
+            try {
+                this.overlay.remove()
+            } catch (error) {
+                console.warn('Failed to remove overlay:', error)
+            }
             this.overlay = null
         }
+
+        // Reset container reference
+        this.menuContainer = null
 
         // Remove styles
         const styles = document.getElementById('pause-menu-styles')
         if (styles) {
-            styles.remove()
+            try {
+                styles.remove()
+            } catch (error) {
+                console.warn('Failed to remove styles:', error)
+            }
         }
 
         console.log('🗑️ Pause menu system disposed')

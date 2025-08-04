@@ -136,6 +136,32 @@
 
 ---
 
+## Milestone 7.5: UI System Redesign 🔮
+*Goal: Consistent, scalable UI design system ready for VR implementation*
+
+### Feature 7.5.1: UI Design System Consolidation
+**Context**: Create unified UI design language that works across desktop and VR
+
+#### Story 7.5.1: Base UI Optimization and Standardization
+- **Task 7.5.1.1**: Steam profile input design refinement
+  - Reduce default width footprint for better screen utilization
+  - Enhanced expand-on-interaction behavior for better UX
+  - Consistent styling with other UI components
+- **Task 7.5.1.2**: UI component standardization
+  - Establish consistent color scheme, typography, and spacing
+  - Standardize button sizes, input fields, and panel layouts
+  - Create reusable UI component library
+- **Task 7.5.1.3**: VR-ready UI architecture planning
+  - Design UI components that can adapt to 3D spatial layout
+  - Plan transition strategy from 2D overlay to 3D spatial UI
+  - Consider interaction patterns for touch/controller input
+
+**Expected Deliverable**: Unified UI design system with VR-ready architecture
+
+**Acceptance**: All UI components follow consistent design language and are prepared for VR transition
+
+---
+
 ## Milestone 8: User Experience Options 🔮
 *Goal: Comprehensive graphics, audio, and accessibility options*
 
@@ -229,6 +255,26 @@
 **Expected Deliverable**: Complete monitoring and observability system
 
 **Acceptance**: Can detect and diagnose issues before they impact users
+
+---
+
+## TBD: Features Under Consideration for Phase 2
+
+*These features were identified during Phase 1 development but deferred pending Phase 2 scope prioritization*
+
+### UI/UX Polish & Consistency
+- **Steam Profile Input Refinement**: Reduce input width to 50%, expand on focus with smooth transitions
+- **Pause Menu Polish**: Smooth animations, advanced accessibility features, VR-ready UI architecture
+- **Design System**: Consistent UI components, theme/customization system, multi-language support
+- **Advanced Performance Options**: Hardware-specific graphics presets and auto-detection
+
+### Developer Experience & Extensibility
+- **Plugin/Extension System**: Community additions and modular panel architecture
+- **Enhanced Debug Tools**: Advanced Three.js scene inspection and performance profiling
+- **Hot Reload System**: Live preview for UI/content changes during development
+- **Automated Testing**: Visual regression testing and performance benchmarking
+
+**Note**: These items will be evaluated against Phase 2 core infrastructure priorities. UX polish items may be deferred to Phase 3 depending on infrastructure complexity and timeline.
 
 ---
 
