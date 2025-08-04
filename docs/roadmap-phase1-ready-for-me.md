@@ -214,19 +214,25 @@
 - SteamGridDB: 1 req/sec free tier, Pro tier available for higher traffic
 - Hybrid strategy recommended: Steam CDN primary + SteamGridDB fallback + aggressive caching
 
-#### Story 5.1.2: Steam Categories and User Profile Research 🔄 **NEXT PRIORITY**
-- **Task 5.1.2.1**: Research Steam category systems and user profile data
-  - Research what categories/tags can be retrieved from Steam Web API
-  - Investigate Steam Store categories vs. user-defined categories vs. community tags
-  - Research user profile endpoints for category preferences and library organization
-  - Document available categorization options beyond hardcoded categories
-- **Task 5.1.2.2**: Create categorization strategy document
-  - Present summary of available category systems in markdown document
-  - Recommend approach for dynamic category generation from Steam data
-  - Plan integration with existing game loading workflow
-  - Design fallback strategies for games without category data
+#### Story 5.1.2: Steam Categories and User Profile Research ✅
+- **Task 5.1.2.1**: Research Steam category systems and user profile data ✅
+  - Research what categories/tags can be retrieved from Steam Web API ✅
+  - Investigate Steam Store categories vs. user-defined categories vs. community tags ✅
+  - Research user profile endpoints for category preferences and library organization ✅
+  - Document available categorization options beyond hardcoded categories ✅
+- **Task 5.1.2.2**: Create categorization strategy document ✅
+  - Present summary of available category systems in markdown document ✅
+  - Recommend approach for dynamic category generation from Steam data ✅
+  - Plan integration with existing game loading workflow ✅
+  - Design fallback strategies for games without category data ✅
 
-**Expected Deliverable**: `docs/steam-categorization-research.md` with implementation recommendations
+**Expected Deliverable**: `docs/steam-categorization-research.md` with implementation recommendations ✅
+
+**Key Findings**:
+- **Steam Store API**: Provides official genres and categories (200 req/5min limit)
+- **Community Tags**: Most nuanced categorization reflecting actual player perception
+- **Recommended Approach**: Phased implementation starting with Steam Store genres/categories
+- **Rate Limit Strategy**: Integrate with existing game loading API calls to avoid additional limits
 
 #### Story 5.1.3: Steam Metadata Structure Analysis **LOWER PRIORITY**
 - **Task 5.1.3.1**: Research Steam game metadata structure from API responses
@@ -374,6 +380,7 @@
 - **Game-level cache optimization**: Check if all artwork for a game is cached before downloading
 - **Optional cache UI**: Make cache management UI configurable via user settings
 - **Advanced cache management**: Per-image management, FIFO eviction, manual cache policies
+- **Steam Categories Implementation**: Implement dynamic categorization system from research findings in `docs/steam-categorization-research.md` (Phase 1 scope for basic genre/category integration, Phase 2 for advanced community tags)
 
 **Acceptance**: Clear understanding of browser storage capabilities and realistic limits for game artwork
 
@@ -428,7 +435,7 @@
   - Implement algorithm to assign games to shelves based on capacity
   - Create smart spacing system for game placement on shelves
   - Add overflow handling for libraries larger than available shelf space
-  - Design for future categorization-based shelf assignment
+  - Design for future categorization-based shelf assignment (integrate Steam categories research findings)
 
 **Expected Deliverable**: Dynamic shelf generation that scales with user's game library
 
@@ -508,18 +515,19 @@
 **Next Priority After Pause Menu**: Feature 5.5 - Enhanced Game Library Caching & UI
 
 **Upcoming High-Priority Items** (Post-Pause Menu):
-1. **Steam Categories Research** (Task 5.1.2.1) - Research dynamic category systems from Steam data
-2. **Enhanced Game Library Caching** (Feature 5.5) - Dedicated game list cache with "Load from Cache" UI
-3. **Visual Shelf Improvements** (Feature 6.1) - MDF veneer appearance with brand blue accents
-4. **Smart Game Population** (Feature 6.2) - Dynamic shelf spawning and game placement
+1. **Enhanced Game Library Caching** (Feature 5.5) - Dedicated game list cache with "Load from Cache" UI
+2. **Visual Shelf Improvements** (Feature 6.1) - MDF veneer appearance with brand blue accents
+3. **Smart Game Population** (Feature 6.2) - Dynamic shelf spawning and game placement
+4. **Steam Categories Integration** (Future) - Implement dynamic categorization from research findings
 
 **Recent Completions**:
+- ✅ **Steam Categories Research** (Task 5.1.2) - Delivered comprehensive `docs/steam-categorization-research.md`
 - ✅ CDN Access Strategy Research (Task 5.1.1.1) - Delivered `docs/cdn-access-strategy.md`
 - ✅ Comprehensive Steam API integration with caching and offline capability
 - ✅ Progressive game loading with rate limiting (4 games/second)
 - ✅ Image caching system with management UI
 
-**Phase 1 Progress**: ~80% complete
+**Phase 1 Progress**: ~82% complete
 - ✅ Solid technical foundation (Milestones 1-4)
 - 🚧 Graphics integration and pause menu cleanup in progress (Milestone 5)  
 - 🔄 Enhanced visuals and level layout next (Milestone 6)
