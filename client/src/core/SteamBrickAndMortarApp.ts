@@ -177,7 +177,9 @@ export class SteamBrickAndMortarApp {
             // Initialize pause menu system
             this.pauseMenuManager.init()
             
-            // Register pause menu panels
+            // Register pause menu panels in original visual order
+            
+            // Cache management panel (utility)
             const cachePanel = new CacheManagementPanel()
             cachePanel.initCacheFunctions(
                 () => this.steamIntegration.getImageCacheStats(),
@@ -186,10 +188,10 @@ export class SteamBrickAndMortarApp {
             this.cacheManagementPanel = cachePanel
             this.pauseMenuManager.registerPanel(cachePanel)
             
-            // Add help panel
+            // Help panel
             this.pauseMenuManager.registerPanel(new HelpPanel())
             
-            // Add application panel with callbacks
+            // Application panel (main settings)
             const applicationPanel = new ApplicationPanel()
             applicationPanel.initialize({
                 onSettingsChanged: (settings) => this.handleSettingsChange(settings)
@@ -197,11 +199,11 @@ export class SteamBrickAndMortarApp {
             this.applicationPanel = applicationPanel
             this.pauseMenuManager.registerPanel(applicationPanel)
             
-            // Add game settings panel
+            // Game settings panel (game-specific settings)
             const gameSettingsPanel = new GameSettingsPanel()
             this.pauseMenuManager.registerPanel(gameSettingsPanel)
             
-            // Add debug panel with callbacks
+            // Debug panel (developer tools)
             const debugPanel = new DebugPanel()
             debugPanel.initialize({
                 onGetDebugStats: () => this.getDebugStats()

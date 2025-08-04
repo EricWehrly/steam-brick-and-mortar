@@ -42,6 +42,15 @@ export class PauseMenuManager {
     private panels: Map<string, PauseMenuPanel> = new Map()
     private overlay: HTMLElement | null = null
     private menuContainer: HTMLElement | null = null
+    
+    // Define logical keyboard navigation order (independent of visual tab order)
+    private keyboardNavigationOrder: string[] = [
+        'help',           // 1. Help (first - user orientation)
+        'application',    // 2. Application (app-level settings)
+        'cache-management', // 3. Cache (utility)
+        'game-settings',  // 4. Game settings (primary user controls)
+        'debug'           // 5. Debug (last - developer tools)
+    ]
 
     constructor(config: PauseMenuConfig = {}, callbacks: PauseMenuCallbacks = {}) {
         this.config = {
@@ -104,6 +113,14 @@ export class PauseMenuManager {
         const targetPanel = panelId || this.getFirstPanelId()
         if (targetPanel) {
             this.showPanel(targetPanel)
+            
+            // Set focus to the active tab for keyboard navigation
+            setTimeout(() => {
+                const activeTab = document.getElementById(`tab-${targetPanel}`)
+                if (activeTab) {
+                    activeTab.focus()
+                }
+            }, 0) // Delay to ensure DOM is ready
         }
 
         // Callbacks
@@ -279,25 +296,67 @@ export class PauseMenuManager {
         tab.className = 'pause-menu-tab'
         tab.innerHTML = `${panel.icon} ${panel.title}`
         
+        // Accessibility attributes
+        tab.setAttribute('role', 'tab')
+        tab.setAttribute('aria-controls', `panel-${panel.id}`)
+        tab.setAttribute('aria-selected', 'false')
+        tab.setAttribute('tabindex', '-1') // Will be set to 0 for active tab
+        
+        // Keyboard and mouse event handling
         tab.addEventListener('click', () => this.showPanel(panel.id))
+        tab.addEventListener('keydown', (e) => this.handleTabKeydown(e, panel.id))
         
         tabsContainer.appendChild(tab)
         console.log(`📋 Created tab for panel: ${panel.title}`)
     }
 
     /**
-     * Update the active tab styling
+     * Handle keyboard events on individual tabs
+     */
+    private handleTabKeydown(event: KeyboardEvent, panelId: string): void {
+        switch (event.key) {
+            case 'ArrowLeft':
+            case 'ArrowRight':
+                event.preventDefault()
+                this.navigateTabs(event.key === 'ArrowRight' ? 1 : -1)
+                break
+                
+            case 'Enter':
+            case ' ':
+                event.preventDefault()
+                this.showPanel(panelId)
+                break
+                
+            case 'Home':
+                event.preventDefault()
+                this.activatePanelByIndex(0)
+                break
+                
+            case 'End': {
+                event.preventDefault()
+                this.activatePanelByIndex(this.keyboardNavigationOrder.length - 1)
+                break
+            }
+        }
+    }
+
+    /**
+     * Update the active tab styling and accessibility attributes
      */
     private updateActiveTab(panelId: string): void {
-        // Remove active class from all tabs
+        // Remove active class and update accessibility for all tabs
         document.querySelectorAll('.pause-menu-tab').forEach(tab => {
             tab.classList.remove('active')
+            tab.setAttribute('aria-selected', 'false')
+            tab.setAttribute('tabindex', '-1')
         })
 
-        // Add active class to current tab
+        // Add active class and update accessibility for current tab
         const activeTab = document.getElementById(`tab-${panelId}`)
         if (activeTab) {
             activeTab.classList.add('active')
+            activeTab.setAttribute('aria-selected', 'true')
+            activeTab.setAttribute('tabindex', '0')
         }
     }
 
@@ -321,12 +380,128 @@ export class PauseMenuManager {
      */
     private setupKeyboardHandling(): void {
         document.addEventListener('keydown', (event) => {
-            // Only handle escape if not in an input field
-            if (event.key === 'Escape' && !this.isInputFocused()) {
-                event.preventDefault()
-                this.toggle()
+            // Only handle pause menu shortcuts when menu is open
+            if (this.state.isOpen) {
+                this.handleMenuKeyboard(event)
+            } else {
+                // Global shortcuts when menu is closed
+                this.handleGlobalKeyboard(event)
             }
         })
+    }
+
+    /**
+     * Handle keyboard events when menu is open
+     */
+    private handleMenuKeyboard(event: KeyboardEvent): void {
+        switch (event.key) {
+            case 'Escape':
+                if (!this.isInputFocused()) {
+                    event.preventDefault()
+                    this.close()
+                }
+                break
+
+            case 'Tab':
+                // Let browser handle tab naturally for form controls within panels
+                // This ensures proper accessibility for inputs, buttons, etc.
+                break
+
+            case 'ArrowLeft':
+            case 'ArrowRight':
+                // Arrow keys for tab navigation
+                if (!this.isInputFocused()) {
+                    event.preventDefault()
+                    this.navigateTabs(event.key === 'ArrowRight' ? 1 : -1)
+                }
+                break
+
+            case 'ArrowUp':
+            case 'ArrowDown':
+                // Optional: Arrow up/down for tab navigation (alternative to left/right)
+                if (!this.isInputFocused() && event.ctrlKey) {
+                    event.preventDefault()
+                    this.navigateTabs(event.key === 'ArrowDown' ? 1 : -1)
+                }
+                break
+
+            case 'Enter':
+            case ' ':
+                // Activate focused tab
+                if (document.activeElement?.classList.contains('pause-menu-tab')) {
+                    event.preventDefault()
+                    ;(document.activeElement as HTMLElement).click()
+                }
+                break
+
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+                // Number key shortcuts for direct panel access
+                if (!this.isInputFocused() && event.altKey) {
+                    event.preventDefault()
+                    const panelIndex = parseInt(event.key) - 1
+                    this.activatePanelByIndex(panelIndex)
+                }
+                break
+        }
+    }
+
+    /**
+     * Handle global keyboard shortcuts when menu is closed
+     */
+    private handleGlobalKeyboard(event: KeyboardEvent): void {
+        switch (event.key) {
+            case 'Escape':
+                if (!this.isInputFocused()) {
+                    event.preventDefault()
+                    this.open()
+                }
+                break
+        }
+    }
+
+    /**
+     * Navigate between tabs using keyboard in logical order
+     */
+    private navigateTabs(direction: number): void {
+        // Get current active panel ID
+        const currentPanelId = this.state.activePanel
+        if (!currentPanelId) return
+
+        // Find current position in logical navigation order
+        const currentIndex = this.keyboardNavigationOrder.indexOf(currentPanelId)
+        if (currentIndex === -1) return
+
+        // Calculate new index with wrapping
+        const newIndex = (currentIndex + direction + this.keyboardNavigationOrder.length) % this.keyboardNavigationOrder.length
+        const newPanelId = this.keyboardNavigationOrder[newIndex]
+
+        // Switch to the new panel
+        this.showPanel(newPanelId)
+        
+        // Focus the tab for keyboard navigation visibility
+        const newTab = document.getElementById(`tab-${newPanelId}`)
+        if (newTab) {
+            newTab.focus()
+        }
+    }
+
+    /**
+     * Activate panel by numeric index (for Alt+Number shortcuts) using logical order
+     */
+    private activatePanelByIndex(index: number): void {
+        if (index >= 0 && index < this.keyboardNavigationOrder.length) {
+            const panelId = this.keyboardNavigationOrder[index]
+            this.showPanel(panelId)
+            
+            const tab = document.getElementById(`tab-${panelId}`)
+            if (tab) {
+                tab.focus()
+            }
+        }
     }
 
     /**
