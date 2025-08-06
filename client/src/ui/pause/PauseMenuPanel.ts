@@ -93,7 +93,11 @@ export abstract class PauseMenuPanel {
         if (!this.container) return
 
         const panelHtml = `
-            <div id="panel-${this.id}" class="${this.config.className}" style="display: none;">
+            <div id="panel-${this.id}" 
+                 class="${this.config.className}" 
+                 role="tabpanel" 
+                 aria-labelledby="tab-${this.id}"
+                 style="display: none;">
                 <div class="panel-header">
                     <h3>${this.icon} ${this.title}</h3>
                 </div>
