@@ -95,19 +95,6 @@ export class AssetLoader {
     }
 
     /**
-     * Load the shelf model specifically
-     */
-    public async loadShelfModel(onProgress?: (progress: LoadProgress) => void): Promise<THREE.Group> {
-        const shelfModel = await this.loadModel('/models/blockbuster_shelf.glb', {
-            position: new THREE.Vector3(0, -1, -3),
-            scale: 1,
-            enableShadows: true
-        }, onProgress)
-
-        return shelfModel
-    }
-
-    /**
      * Enable shadows for all meshes in a model
      */
     private enableShadowsForModel(model: THREE.Group) {

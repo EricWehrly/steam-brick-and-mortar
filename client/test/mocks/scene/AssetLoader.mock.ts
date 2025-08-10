@@ -4,10 +4,6 @@
 import { vi } from 'vitest'
 
 export const AssetLoaderMock = vi.fn().mockImplementation(() => ({
-    loadShelfModel: vi.fn().mockResolvedValue({
-        position: { x: 0, y: 0, z: 0 },
-        userData: { isShelfModel: true }
-    }),
     dispose: vi.fn()
 }))
 

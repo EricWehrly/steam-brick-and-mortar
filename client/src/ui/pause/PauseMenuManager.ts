@@ -4,10 +4,21 @@
  * Handles menu state, panel switching, and integration with input system
  */
 
+import * as THREE from 'three'
 import { PauseMenuPanel } from './PauseMenuPanel'
 import { renderTemplate } from '../../utils/TemplateEngine'
 import pauseMenuStructureTemplate from '../../templates/pause-menu/main-structure.html?raw'
 import '../../styles/pause-menu/pause-menu-manager.css'
+
+// Panel imports for default registration
+import { CacheManagementPanel } from './panels/CacheManagementPanel'
+import { HelpPanel } from './panels/HelpPanel'
+import { ApplicationPanel, type ApplicationSettings } from './panels/ApplicationPanel'
+import { GameSettingsPanel } from './panels/GameSettingsPanel'
+import { DebugPanel } from './panels/DebugPanel'
+import type { DebugStats } from '../../core'
+import type { ImageCacheStats } from '../../steam/images/ImageManager'
+import type { PerformanceMonitor } from '../PerformanceMonitor'
 
 export interface PauseMenuState {
     isOpen: boolean
@@ -29,6 +40,20 @@ export interface PauseMenuCallbacks {
     onMenuClose?: () => void
 }
 
+export interface SystemDependencies {
+    performanceMonitor: PerformanceMonitor
+    renderer: THREE.WebGLRenderer
+}
+
+export interface DefaultPanelCallbacks {
+    // Cache management
+    onGetImageCacheStats?: () => Promise<ImageCacheStats>
+    onClearImageCache?: () => Promise<void>
+    
+    // Debug stats
+    onGetDebugStats?: () => Promise<DebugStats>
+}
+
 export class PauseMenuManager {
     private state: PauseMenuState = {
         isOpen: false,
@@ -39,11 +64,14 @@ export class PauseMenuManager {
 
     private config: Required<PauseMenuConfig>
     private callbacks: PauseMenuCallbacks
+    private systemDependencies: SystemDependencies | null = null
     private panels: Map<string, PauseMenuPanel> = new Map()
     private overlay: HTMLElement | null = null
     private menuContainer: HTMLElement | null = null
+    private cacheManagementPanel: CacheManagementPanel | null = null
+    private applicationPanel: ApplicationPanel | null = null
 
-    constructor(config: PauseMenuConfig = {}, callbacks: PauseMenuCallbacks = {}) {
+    constructor(config: PauseMenuConfig = {}, callbacks: PauseMenuCallbacks = {}, systemDependencies?: SystemDependencies) {
         this.config = {
             containerId: 'pause-menu-overlay',
             overlayClass: 'pause-menu-overlay',
@@ -51,6 +79,7 @@ export class PauseMenuManager {
             ...config
         }
         this.callbacks = callbacks
+        this.systemDependencies = systemDependencies || null
     }
 
     /**
@@ -63,6 +92,13 @@ export class PauseMenuManager {
     }
 
     /**
+     * Set system dependencies for settings management
+     */
+    setSystemDependencies(dependencies: SystemDependencies): void {
+        this.systemDependencies = dependencies
+    }
+
+    /**
      * Register a panel with the pause menu
      */
     registerPanel(panel: PauseMenuPanel): void {
@@ -70,6 +106,59 @@ export class PauseMenuManager {
         panel.init()
         this.createPanelTab(panel)
         console.log(`📋 Registered pause menu panel: ${panel.title}`)
+    }
+
+    /**
+     * Register all default panels with their callbacks
+     */
+    registerDefaultPanels(callbacks: DefaultPanelCallbacks): void {
+        // Register cache management panel
+        if (callbacks.onGetImageCacheStats && callbacks.onClearImageCache) {
+            const cachePanel = new CacheManagementPanel()
+            cachePanel.initCacheFunctions(
+                callbacks.onGetImageCacheStats,
+                callbacks.onClearImageCache
+            )
+            this.cacheManagementPanel = cachePanel
+            this.registerPanel(cachePanel)
+        }
+        
+        // Register help panel
+        this.registerPanel(new HelpPanel())
+        
+        // Register application panel
+        const applicationPanel = new ApplicationPanel()
+        applicationPanel.initialize({
+            onSettingsChanged: (settings) => this.handleSettingsChange(settings)
+        })
+        this.applicationPanel = applicationPanel
+        this.registerPanel(applicationPanel)
+        
+        // Register game settings panel
+        this.registerPanel(new GameSettingsPanel())
+        
+        // Register debug panel
+        if (callbacks.onGetDebugStats) {
+            const debugPanel = new DebugPanel()
+            debugPanel.initialize({
+                onGetDebugStats: callbacks.onGetDebugStats
+            })
+            this.registerPanel(debugPanel)
+        }
+    }
+
+    /**
+     * Get the cache management panel for external access
+     */
+    getCacheManagementPanel(): CacheManagementPanel | null {
+        return this.cacheManagementPanel
+    }
+
+    /**
+     * Get the application panel for external access
+     */
+    getApplicationPanel(): ApplicationPanel | null {
+        return this.applicationPanel
     }
 
     /**
@@ -384,5 +473,86 @@ export class PauseMenuManager {
         }
 
         console.log('🗑️ Pause menu system disposed')
+    }
+
+    /**
+     * Handle application settings changes
+     */
+    private handleSettingsChange(settings: Partial<ApplicationSettings>): void {
+        if (!this.systemDependencies) {
+            console.warn('⚠️ System dependencies not provided - cannot apply settings changes')
+            return
+        }
+
+        console.log('⚙️ Application settings changed:', settings)
+        
+        // Handle performance settings
+        if (settings.showFPS !== undefined) {
+            // Toggle FPS display based on setting
+            if (settings.showFPS) {
+                this.systemDependencies.performanceMonitor.show()
+            } else {
+                this.systemDependencies.performanceMonitor.hide()
+            }
+        }
+        
+        if (settings.showPerformanceStats !== undefined) {
+            // Toggle performance stats visibility
+            if (settings.showPerformanceStats) {
+                this.systemDependencies.performanceMonitor.show()
+            } else {
+                this.systemDependencies.performanceMonitor.hide()
+            }
+        }
+        
+        if (settings.qualityLevel !== undefined) {
+            // Update graphics quality settings
+            console.log(`🎨 Graphics quality set to: ${settings.qualityLevel}`)
+            this.updateGraphicsQuality(settings.qualityLevel)
+        }
+        
+        // Handle interface settings
+        if (settings.hideUIInVR !== undefined) {
+            // Handle VR UI visibility (when VR support is available)
+            console.log(`👓 VR UI visibility setting: ${!settings.hideUIInVR}`)
+        }
+        
+        // Handle debug settings
+        if (settings.verboseLogging !== undefined) {
+            console.log('🐛 Debug settings updated')
+        }
+    }
+
+    /**
+     * Update graphics quality based on setting
+     */
+    private updateGraphicsQuality(quality: 'low' | 'medium' | 'high' | 'ultra'): void {
+        if (!this.systemDependencies) {
+            console.warn('⚠️ System dependencies not provided - cannot update graphics quality')
+            return
+        }
+
+        const renderer = this.systemDependencies.renderer
+        
+        switch (quality) {
+            case 'low':
+                renderer.shadowMap.enabled = false
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1))
+                break
+            case 'medium':
+                renderer.shadowMap.enabled = true
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
+                break
+            case 'high':
+                renderer.shadowMap.enabled = true
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+                break
+            case 'ultra':
+                renderer.shadowMap.enabled = true
+                renderer.setPixelRatio(window.devicePixelRatio)
+                break
+        }
+        
+        console.log(`🎨 Graphics quality applied: ${quality}`)
     }
 }

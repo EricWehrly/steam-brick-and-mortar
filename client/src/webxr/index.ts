@@ -11,6 +11,12 @@ export {
 } from './WebXRManager'
 
 export {
+    WebXRCoordinator,
+    type WebXRCoordinatorCallbacks,
+    type WebXRCoordinatorConfig
+} from './WebXRCoordinator'
+
+export {
     InputManager,
     type InputState,
     type MovementOptions,
