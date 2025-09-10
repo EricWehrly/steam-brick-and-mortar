@@ -21,6 +21,7 @@ import { SteamGameManager } from './SteamGameManager'
 import { SteamIntegration } from '../steam-integration'
 import { SteamWorkflowManager } from '../steam-integration/SteamWorkflowManager'
 import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
+import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { type WebXRCapabilities } from '../webxr/WebXRManager'
 import { EventManager } from './EventManager'
 
@@ -51,6 +52,7 @@ export class SteamBrickAndMortarApp {
     private sceneManager: SceneManager
     private sceneCoordinator: SceneCoordinator
     private webxrCoordinator: WebXRCoordinator
+    private webxrEventHandler: WebXREventHandler
     private uiCoordinator: UICoordinator
     private performanceMonitor: PerformanceMonitor
     private steamIntegration: SteamIntegration
@@ -101,7 +103,7 @@ export class SteamBrickAndMortarApp {
             }
         })
 
-        // Initialize WebXR coordinator
+        // Initialize WebXR coordinator (callbacks now handled by WebXREventHandler)
         this.webxrCoordinator = new WebXRCoordinator(
             {
                 input: {
@@ -110,24 +112,20 @@ export class SteamBrickAndMortarApp {
                 }
             },
             {
-                onSessionStart: () => this.handleWebXRSessionStart(),
-                onSessionEnd: () => this.handleWebXRSessionEnd(),
-                onError: (error: Error) => this.handleWebXRError(error),
-                onSupportChange: (capabilities: WebXRCapabilities) => this.handleWebXRSupportChange(capabilities)
+                // Events will be emitted by WebXRCoordinator and handled by WebXREventHandler
+                onSessionStart: () => this.emitWebXRSessionStartEvent(),
+                onSessionEnd: () => this.emitWebXRSessionEndEvent(),
+                onError: (error: Error) => this.emitWebXRErrorEvent(error),
+                onSupportChange: (capabilities: WebXRCapabilities) => this.emitWebXRSupportChangeEvent(capabilities)
             }
         )
 
-        // Initialize UI coordinator with reduced callbacks (Steam events now handled by EventManager)
+        // Initialize UI coordinator with minimal callbacks (most events now handled by EventManager)
         this.uiCoordinator = new UICoordinator(
             this.performanceMonitor,
             {
-                onWebXRToggle: () => this.handleWebXRToggle(),
                 onGetImageCacheStats: () => this.steamIntegration.getImageCacheStats(),
-                onGetDebugStats: () => this.getDebugStats(),
-                onPauseInput: () => this.handleInputPause(),
-                onResumeInput: () => this.handleInputResume(),
-                onMenuOpen: () => this.handlePauseMenuOpen(),
-                onMenuClose: () => this.handlePauseMenuClose()
+                onGetDebugStats: () => this.getDebugStats()
             }
         )
 
@@ -152,6 +150,13 @@ export class SteamBrickAndMortarApp {
         this.steamWorkflowManager = new SteamWorkflowManager(
             this.steamIntegration,
             this.steamGameManager,
+            this.uiCoordinator,
+            this.eventManager
+        )
+
+        // Initialize webxr event handler to handle WebXR and input interactions
+        this.webxrEventHandler = new WebXREventHandler(
+            this.webxrCoordinator,
             this.uiCoordinator,
             this.eventManager
         )
@@ -198,6 +203,7 @@ export class SteamBrickAndMortarApp {
         
         // Dispose workflow managers first
         this.steamWorkflowManager.dispose()
+        this.webxrEventHandler.dispose()
         this.eventManager.dispose()
         
         // Then dispose coordinators
@@ -208,6 +214,37 @@ export class SteamBrickAndMortarApp {
         
         this.isInitialized = false
         console.log('✅ Application disposed')
+    }
+
+    // WebXR event emission methods - bridge WebXRCoordinator callbacks to events
+    private emitWebXRSessionStartEvent(): void {
+        this.eventManager.emit('webxr:session-start', {
+            timestamp: Date.now(),
+            source: 'system' as const
+        })
+    }
+
+    private emitWebXRSessionEndEvent(): void {
+        this.eventManager.emit('webxr:session-end', {
+            timestamp: Date.now(),
+            source: 'system' as const
+        })
+    }
+
+    private emitWebXRErrorEvent(error: Error): void {
+        this.eventManager.emit('webxr:error', {
+            error,
+            timestamp: Date.now(),
+            source: 'system' as const
+        })
+    }
+
+    private emitWebXRSupportChangeEvent(capabilities: WebXRCapabilities): void {
+        this.eventManager.emit('webxr:support-change', {
+            capabilities,
+            timestamp: Date.now(),
+            source: 'system' as const
+        })
     }
 
     private async getDebugStats(): Promise<DebugStats> {
@@ -243,42 +280,6 @@ export class SteamBrickAndMortarApp {
                 cube.rotation.y += 0.01
             }
         })
-    }
-
-    private handleWebXRSessionStart(): void {
-        this.uiCoordinator.updateWebXRSessionState(true)
-    }
-
-    private handleWebXRSessionEnd(): void {
-        this.uiCoordinator.updateWebXRSessionState(false)
-    }
-
-    private handleWebXRError(_error: Error): void {
-        this.uiCoordinator.showError('Failed to enter VR mode')
-    }
-
-    private handleWebXRSupportChange(capabilities: WebXRCapabilities): void {
-        this.uiCoordinator.updateWebXRSupport(capabilities)
-    }
-
-    private async handleWebXRToggle(): Promise<void> {
-        await this.webxrCoordinator.handleWebXRToggle()
-    }
-
-    private handleInputPause(): void {
-        this.webxrCoordinator.pauseInput()
-    }
-
-    private handleInputResume(): void {
-        this.webxrCoordinator.resumeInput()
-    }
-
-    private handlePauseMenuOpen(): void {
-        this.webxrCoordinator.pauseInput()
-    }
-
-    private handlePauseMenuClose(): void {
-        this.webxrCoordinator.resumeInput()
     }
 
     getIsInitialized(): boolean {

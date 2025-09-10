@@ -17,7 +17,7 @@ import { UIManager } from '../ui/UIManager'
 import { PauseMenuManager } from '../ui/pause/PauseMenuManager'
 import { PerformanceMonitor } from '../ui/PerformanceMonitor'
 import { EventManager } from '../core/EventManager'
-import { SteamEventTypes, WebXREventTypes, UIEventTypes } from '../types/InteractionEvents'
+import { SteamEventTypes, WebXREventTypes, InputEventTypes, UIEventTypes } from '../types/InteractionEvents'
 import type { DebugStats } from '../core/DebugStatsProvider'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { ImageCacheStats } from '../steam/images/ImageManager'
@@ -63,7 +63,7 @@ export class UICoordinator {
             steamRefreshCache: () => this.emitSteamRefreshCacheEvent(),
             steamClearCache: () => this.emitSteamClearCacheEvent(),
             steamShowCacheStats: () => this.emitSteamCacheStatsEvent(),
-            webxrEnterVR: () => this.handleWebXRToggle()
+            webxrEnterVR: () => this.emitWebXRToggleEvent()
         })
 
         // Initialize Pause Menu System
@@ -74,10 +74,10 @@ export class UICoordinator {
                 menuClass: 'pause-menu'
             },
             {
-                onPauseInput: () => this.handleInputPause(),
-                onResumeInput: () => this.handleInputResume(),
-                onMenuOpen: () => this.handlePauseMenuOpen(),
-                onMenuClose: () => this.handlePauseMenuClose()
+                onPauseInput: () => this.emitInputPauseEvent('menu'),
+                onResumeInput: () => this.emitInputResumeEvent('menu'),
+                onMenuOpen: () => this.emitMenuOpenEvent('pause'),
+                onMenuClose: () => this.emitMenuCloseEvent('pause')
             }
         )
     }
@@ -270,24 +270,44 @@ export class UICoordinator {
         })
     }
 
-    private handleInputPause(): void {
-        console.log('⏸️ Input paused')
-        this.callbacks.onPauseInput?.()
+    // WebXR and Input event emission methods - replace callbacks with events
+    private emitWebXRToggleEvent(): void {
+        this.eventManager.emit(WebXREventTypes.Toggle, {
+            timestamp: Date.now(),
+            source: 'ui' as const
+        })
     }
 
-    private handleInputResume(): void {
-        console.log('▶️ Input resumed')
-        this.callbacks.onResumeInput?.()
+    private emitInputPauseEvent(reason: 'menu' | 'user' | 'system'): void {
+        this.eventManager.emit(InputEventTypes.Pause, {
+            reason,
+            timestamp: Date.now(),
+            source: 'ui' as const
+        })
     }
 
-    private handlePauseMenuOpen(): void {
-        console.log('📋 Pause menu opened')
-        this.callbacks.onMenuOpen?.()
+    private emitInputResumeEvent(reason: 'menu' | 'user' | 'system'): void {
+        this.eventManager.emit(InputEventTypes.Resume, {
+            reason,
+            timestamp: Date.now(),
+            source: 'ui' as const
+        })
     }
 
-    private handlePauseMenuClose(): void {
-        console.log('📋 Pause menu closed')
-        this.callbacks.onMenuClose?.()
+    private emitMenuOpenEvent(menuType: 'pause' | 'settings' | 'debug'): void {
+        this.eventManager.emit(UIEventTypes.MenuOpen, {
+            menuType,
+            timestamp: Date.now(),
+            source: 'ui' as const
+        })
+    }
+
+    private emitMenuCloseEvent(menuType: 'pause' | 'settings' | 'debug'): void {
+        this.eventManager.emit(UIEventTypes.MenuClose, {
+            menuType,
+            timestamp: Date.now(),
+            source: 'ui' as const
+        })
     }
 
     private initializeSettingsButton(): void {
