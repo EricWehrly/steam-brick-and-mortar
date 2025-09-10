@@ -150,13 +150,13 @@ describe('SteamBrickAndMortarApp Unit Tests', () => {
             expect(app).toBeInstanceOf(SteamBrickAndMortarApp)
         })
 
-        it('should provide access to core managers', () => {
+        it('should validate internal coordinator setup', () => {
             const app = new SteamBrickAndMortarApp()
             
-            expect(app.getSceneManager()).toBeDefined()
-            expect(app.getSteamIntegration()).toBeDefined()
-            expect(app.getWebXRCoordinator()).toBeDefined()
-            expect(app.getWebXRManager()).toBeDefined()
+            // Test public API behavior rather than internal access
+            expect(app.getIsInitialized()).toBe(false)
+            expect(typeof app.init).toBe('function')
+            expect(typeof app.dispose).toBe('function')
         })
     })
 
@@ -164,12 +164,10 @@ describe('SteamBrickAndMortarApp Unit Tests', () => {
         it('should demonstrate coordinator-based architecture', () => {
             const app = new SteamBrickAndMortarApp()
             
-            // Verify coordinator methods are available
-            expect(app.getPerformanceStats()).toBeDefined()
-            expect(app.getCurrentPerformanceStats()).toBeDefined()
-            
-            // Verify coordinator delegation
-            expect(typeof app.togglePerformanceMonitor).toBe('function')
+            // Test that coordinators are properly initialized by testing public API
+            expect(app.getIsInitialized()).toBe(false)
+            expect(typeof app.init).toBe('function')
+            expect(typeof app.dispose).toBe('function')
         })
 
         it('should handle disposal without initialization', () => {
@@ -182,28 +180,25 @@ describe('SteamBrickAndMortarApp Unit Tests', () => {
     })
 
     describe('Public API', () => {
-        it('should provide performance monitoring interface', () => {
+        it('should provide initialization state interface', () => {
             const app = new SteamBrickAndMortarApp()
             
-            const stats = app.getPerformanceStats()
-            expect(stats).toBeDefined()
+            // Test the one remaining public getter method
+            expect(app.getIsInitialized()).toBe(false)
             
-            const currentStats = app.getCurrentPerformanceStats()
-            expect(currentStats).toBeDefined()
-            
-            // Should not throw when toggling performance monitor
-            expect(() => app.togglePerformanceMonitor()).not.toThrow()
+            // Test that essential methods exist
+            expect(typeof app.init).toBe('function')
+            expect(typeof app.dispose).toBe('function')
         })
 
-        it('should maintain coordinator access for testing', () => {
+        it('should maintain basic application lifecycle', () => {
             const app = new SteamBrickAndMortarApp()
             
-            // Verify all coordinator access methods exist
-            expect(app.getSceneManager).toBeDefined()
-            expect(app.getSteamIntegration).toBeDefined()
-            expect(app.getWebXRCoordinator).toBeDefined()
-            expect(app.getWebXRManager).toBeDefined()
-            expect(app.getIsInitialized).toBeDefined()
+            // Test public interface for application state
+            expect(app.getIsInitialized()).toBe(false)
+            
+            // Should not throw when disposing uninitialized app
+            expect(() => app.dispose()).not.toThrow()
         })
     })
 

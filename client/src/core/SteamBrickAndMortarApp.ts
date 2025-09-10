@@ -20,7 +20,7 @@ import { DebugStatsProvider, type DebugStats } from './DebugStatsProvider'
 import { SteamGameManager } from './SteamGameManager'
 import { SteamIntegration, type ProgressCallbacks } from '../steam-integration'
 import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
-import { WebXRManager, type WebXRCapabilities } from '../webxr/WebXRManager'
+import { type WebXRCapabilities } from '../webxr/WebXRManager'
 
 /**
  * Configuration options for the Steam Brick and Mortar application
@@ -369,35 +369,7 @@ export class SteamBrickAndMortarApp {
         this.uiCoordinator.updateCacheStats(stats)
     }
 
-    getSceneManager(): SceneManager {
-        return this.sceneManager
-    }
-
-    getSteamIntegration(): SteamIntegration {
-        return this.steamIntegration
-    }
-
-    getWebXRCoordinator(): WebXRCoordinator {
-        return this.webxrCoordinator
-    }
-
-    getWebXRManager(): WebXRManager {
-        return this.webxrCoordinator.getWebXRManager()
-    }
-
     getIsInitialized(): boolean {
         return this.isInitialized
-    }
-
-    getPerformanceStats(): ReturnType<SceneCoordinator['getPerformanceStats']> {
-        return this.sceneCoordinator.getPerformanceStats()
-    }
-    
-    togglePerformanceMonitor(): void {
-        this.uiCoordinator.togglePerformanceMonitor()
-    }
-    
-    getCurrentPerformanceStats() {
-        return this.uiCoordinator.getCurrentPerformanceStats()
     }
 }
