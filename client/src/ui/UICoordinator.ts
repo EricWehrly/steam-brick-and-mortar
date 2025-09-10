@@ -16,6 +16,8 @@ import * as THREE from 'three'
 import { UIManager } from '../ui/UIManager'
 import { PauseMenuManager } from '../ui/pause/PauseMenuManager'
 import { PerformanceMonitor } from '../ui/PerformanceMonitor'
+import { EventManager } from '../core/EventManager'
+import { SteamEventTypes, WebXREventTypes, UIEventTypes } from '../types/InteractionEvents'
 import type { DebugStats } from '../core/DebugStatsProvider'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { ImageCacheStats } from '../steam/images/ImageManager'
@@ -43,6 +45,7 @@ export class UICoordinator {
     private uiManager: UIManager
     private pauseMenuManager: PauseMenuManager
     private performanceMonitor: PerformanceMonitor
+    private eventManager: EventManager
     private callbacks: UICoordinatorCallbacks
 
     constructor(
@@ -51,14 +54,15 @@ export class UICoordinator {
     ) {
         this.performanceMonitor = performanceMonitor
         this.callbacks = callbacks
+        this.eventManager = EventManager.getInstance()
 
-        // Initialize UI Manager with Steam and WebXR event handlers
+        // Initialize UI Manager with Steam and WebXR event handlers that emit events
         this.uiManager = new UIManager({
-            steamLoadGames: (vanityUrl: string) => this.handleLoadSteamGames(vanityUrl),
-            steamUseOffline: (vanityUrl: string) => this.handleUseOfflineData(vanityUrl),
-            steamRefreshCache: () => this.handleRefreshCache(),
-            steamClearCache: () => this.handleClearCache(),
-            steamShowCacheStats: () => this.handleShowCacheStats(),
+            steamLoadGames: (vanityUrl: string) => this.emitSteamLoadGamesEvent(vanityUrl),
+            steamUseOffline: (vanityUrl: string) => this.emitSteamUseOfflineEvent(vanityUrl),
+            steamRefreshCache: () => this.emitSteamRefreshCacheEvent(),
+            steamClearCache: () => this.emitSteamClearCacheEvent(),
+            steamShowCacheStats: () => this.emitSteamCacheStatsEvent(),
             webxrEnterVR: () => this.handleWebXRToggle()
         })
 
@@ -94,10 +98,10 @@ export class UICoordinator {
             renderer: renderer
         })
         
-        // Register all default panels with their callbacks
+        // Register all default panels with callbacks
         this.pauseMenuManager.registerDefaultPanels({
             onGetImageCacheStats: () => this.callbacks.onGetImageCacheStats?.(),
-            onClearImageCache: () => this.callbacks.onClearImageCache?.(),
+            onClearImageCache: async () => this.emitClearImageCacheEvent(),
             onGetDebugStats: () => this.callbacks.onGetDebugStats?.()
         })
 
@@ -221,24 +225,49 @@ export class UICoordinator {
         await this.callbacks.onWebXRToggle?.()
     }
 
-    private async handleLoadSteamGames(vanityUrl: string): Promise<void> {
-        await this.callbacks.onLoadSteamGames?.(vanityUrl)
+    // Steam event emission methods - replace callbacks with events
+    private emitSteamLoadGamesEvent(vanityUrl: string): void {
+        this.eventManager.emit(SteamEventTypes.LoadGames, { 
+            vanityUrl,
+            timestamp: Date.now(),
+            source: 'ui' as const 
+        })
     }
 
-    private async handleUseOfflineData(vanityUrl: string): Promise<void> {
-        await this.callbacks.onUseOfflineData?.(vanityUrl)
+    private emitSteamUseOfflineEvent(vanityUrl: string): void {
+        this.eventManager.emit(SteamEventTypes.UseOffline, { 
+            vanityUrl,
+            timestamp: Date.now(),
+            source: 'ui' as const 
+        })
     }
 
-    private async handleRefreshCache(): Promise<void> {
-        await this.callbacks.onRefreshCache?.()
+    private emitSteamRefreshCacheEvent(): void {
+        this.eventManager.emit(SteamEventTypes.CacheRefresh, {
+            timestamp: Date.now(),
+            source: 'ui' as const 
+        })
     }
 
-    private handleClearCache(): void {
-        this.callbacks.onClearCache?.()
+    private emitSteamClearCacheEvent(): void {
+        this.eventManager.emit(SteamEventTypes.CacheClear, {
+            timestamp: Date.now(),
+            source: 'ui' as const 
+        })
     }
 
-    private handleShowCacheStats(): void {
-        this.callbacks.onShowCacheStats?.()
+    private emitSteamCacheStatsEvent(): void {
+        this.eventManager.emit(SteamEventTypes.CacheStats, {
+            timestamp: Date.now(),
+            source: 'ui' as const 
+        })
+    }
+
+    private emitClearImageCacheEvent(): void {
+        this.eventManager.emit(SteamEventTypes.ImageCacheClear, {
+            timestamp: Date.now(),
+            source: 'ui' as const 
+        })
     }
 
     private handleInputPause(): void {

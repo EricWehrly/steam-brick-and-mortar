@@ -25,6 +25,7 @@ steam-brick-and-mortar/
 ## Development Principles
 
 ### 🎯 **Test-Driven Development**
+- **Run unit tests before every commit**: Validate all functionality locally before committing
 - **Test locally first**: Validate all functionality before deploying
 - **Incremental commits**: Each working phase gets its own commit
 - **Document what was tested**: Distinguish between implemented vs validated
@@ -44,6 +45,7 @@ steam-brick-and-mortar/
 ## Workflow Guidelines
 
 ### Git Strategy
+- **Run unit tests before committing**: Ensure all tests pass before each commit
 - **Meaningful commits**: Group related changes, describe what and why
 - **Review git status** before committing to understand changes
 - **Separate concerns**: Don't mix implementation with documentation

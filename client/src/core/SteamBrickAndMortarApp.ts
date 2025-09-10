@@ -18,9 +18,11 @@ import { UICoordinator, PerformanceMonitor, type PerformanceStats } from '../ui'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { DebugStatsProvider, type DebugStats } from './DebugStatsProvider'
 import { SteamGameManager } from './SteamGameManager'
-import { SteamIntegration, type ProgressCallbacks } from '../steam-integration'
+import { SteamIntegration } from '../steam-integration'
+import { SteamWorkflowManager } from '../steam-integration/SteamWorkflowManager'
 import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { type WebXRCapabilities } from '../webxr/WebXRManager'
+import { EventManager } from './EventManager'
 
 /**
  * Configuration options for the Steam Brick and Mortar application
@@ -54,6 +56,8 @@ export class SteamBrickAndMortarApp {
     private steamIntegration: SteamIntegration
     private debugStatsProvider: DebugStatsProvider
     private steamGameManager: SteamGameManager
+    private eventManager: EventManager
+    private steamWorkflowManager: SteamWorkflowManager
     
     // State
     private isInitialized: boolean = false
@@ -113,18 +117,12 @@ export class SteamBrickAndMortarApp {
             }
         )
 
-        // Initialize UI coordinator with all callbacks
+        // Initialize UI coordinator with reduced callbacks (Steam events now handled by EventManager)
         this.uiCoordinator = new UICoordinator(
             this.performanceMonitor,
             {
                 onWebXRToggle: () => this.handleWebXRToggle(),
-                onLoadSteamGames: (vanityUrl: string) => this.handleLoadSteamGames(vanityUrl),
-                onUseOfflineData: (vanityUrl: string) => this.handleUseOfflineData(vanityUrl),
-                onRefreshCache: () => this.handleRefreshCache(),
-                onClearCache: () => this.handleClearCache(),
-                onShowCacheStats: () => this.handleShowCacheStats(),
                 onGetImageCacheStats: () => this.steamIntegration.getImageCacheStats(),
-                onClearImageCache: () => this.steamIntegration.clearImageCache(),
                 onGetDebugStats: () => this.getDebugStats(),
                 onPauseInput: () => this.handleInputPause(),
                 onResumeInput: () => this.handleInputResume(),
@@ -145,6 +143,17 @@ export class SteamBrickAndMortarApp {
             this.sceneCoordinator.getGameBoxRenderer(),
             this.sceneManager,
             this.steamIntegration
+        )
+
+        // Initialize event manager for interaction architecture
+        this.eventManager = EventManager.getInstance()
+
+        // Initialize steam workflow manager to handle Steam interactions
+        this.steamWorkflowManager = new SteamWorkflowManager(
+            this.steamIntegration,
+            this.steamGameManager,
+            this.uiCoordinator,
+            this.eventManager
         )
     }
 
@@ -187,6 +196,11 @@ export class SteamBrickAndMortarApp {
 
         console.log('🧹 Disposing application resources...')
         
+        // Dispose workflow managers first
+        this.steamWorkflowManager.dispose()
+        this.eventManager.dispose()
+        
+        // Then dispose coordinators
         this.uiCoordinator.dispose()
         this.webxrCoordinator.dispose()
         this.sceneCoordinator.dispose()
@@ -265,108 +279,6 @@ export class SteamBrickAndMortarApp {
 
     private handlePauseMenuClose(): void {
         this.webxrCoordinator.resumeInput()
-    }
-
-    private async handleLoadSteamGames(vanityUrl: string): Promise<void> {
-        this.prepareForGameLoading()
-        
-        try {
-            const progressCallbacks = this.createProgressCallbacks()
-            await this.steamIntegration.loadGamesForUser(vanityUrl, progressCallbacks)
-            
-            this.handleGameLoadingSuccess(vanityUrl)
-        } catch (error) {
-            this.handleGameLoadingError(error)
-        }
-    }
-
-    private prepareForGameLoading(): void {
-        // Reset current game index
-        this.steamGameManager.resetGameIndex()
-        
-        // Remove existing placeholder boxes before loading
-        this.steamGameManager.clearGameBoxes()
-        
-        this.uiCoordinator.showProgress(true)
-    }
-
-    private createProgressCallbacks(): ProgressCallbacks {
-        return {
-            onProgress: (current: number, total: number, message: string) => {
-                this.uiCoordinator.updateProgress(current, total, message)
-            },
-            onGameLoaded: async (game) => {
-                // Update game boxes in real-time as they load
-                await this.steamGameManager.addGameBoxToScene(game, this.steamGameManager.getCurrentGameIndex())
-            },
-            onStatusUpdate: (message: string, type: 'loading' | 'success' | 'error') => {
-                this.uiCoordinator.showSteamStatus(message, type)
-            }
-        }
-    }
-
-    private handleGameLoadingSuccess(vanityUrl: string): void {
-        // Enable cache management actions now that Steam profile is loaded
-        this.uiCoordinator.enableCacheActions()
-        
-        // Update cache display and offline availability
-        this.updateCacheStatsDisplay()
-        this.uiCoordinator.checkOfflineAvailability(ValidationUtils.extractVanityFromInput(vanityUrl))
-        
-        // Hide progress after a short delay
-        setTimeout(() => {
-            this.uiCoordinator.showProgress(false)
-        }, 2000)
-    }
-
-    private handleGameLoadingError(error: unknown): void {
-        console.error('❌ Failed to load Steam games:', error)
-        this.uiCoordinator.showSteamStatus(
-            `❌ Failed to load games. Please check the Steam profile name and try again.`, 
-            'error'
-        )
-        this.uiCoordinator.showProgress(false)
-        
-        // Disable cache management actions on error
-        this.uiCoordinator.disableCacheActions()
-    }
-    
-    private async handleUseOfflineData(vanityUrl: string): Promise<void> {
-        // Check if offline data is available using SteamIntegration
-        const hasOfflineData = this.steamIntegration.hasOfflineData(vanityUrl)
-        
-        if (!hasOfflineData) {
-            this.uiCoordinator.showSteamStatus('Offline mode not available in simplified client', 'error')
-        } else {
-            // Future: Load offline data
-            this.uiCoordinator.showSteamStatus('Loading offline data...', 'loading')
-        }
-    }
-    
-    private async handleRefreshCache(): Promise<void> {
-        try {
-            const progressCallbacks = this.createProgressCallbacks()
-            await this.steamIntegration.refreshData(progressCallbacks)
-            this.updateCacheStatsDisplay()
-        } catch (error) {
-            console.error('❌ Failed to refresh cache:', error)
-        }
-    }
-    
-    private handleClearCache(): void {
-        this.steamIntegration.clearCache()
-        this.uiCoordinator.showSteamStatus('🗑️ Cache cleared successfully', 'success')
-        this.updateCacheStatsDisplay()
-    }
-    
-    private handleShowCacheStats(): void {
-        const stats = this.steamIntegration.getCacheStats()
-        this.uiCoordinator.updateCacheStats(stats)
-    }
-    
-    private updateCacheStatsDisplay(): void {
-        const stats = this.steamIntegration.getCacheStats()
-        this.uiCoordinator.updateCacheStats(stats)
     }
 
     getIsInitialized(): boolean {
