@@ -14,7 +14,7 @@
 
 import * as THREE from 'three'
 import { ValidationUtils } from '../utils'
-import { UICoordinator, PerformanceMonitor } from '../ui'
+import { UICoordinator, PerformanceMonitor, type PerformanceStats } from '../ui'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { DebugStatsProvider, type DebugStats } from './DebugStatsProvider'
 import { SteamGameManager } from './SteamGameManager'
@@ -371,5 +371,18 @@ export class SteamBrickAndMortarApp {
 
     getIsInitialized(): boolean {
         return this.isInitialized
+    }
+
+    // Test-only getters - minimal interface for testing
+    getSteamIntegration(): SteamIntegration {
+        return this.steamIntegration
+    }
+
+    getSceneManager(): SceneManager {
+        return this.sceneManager
+    }
+
+    getCurrentPerformanceStats(): PerformanceStats {
+        return this.performanceMonitor.getStats()
     }
 }
