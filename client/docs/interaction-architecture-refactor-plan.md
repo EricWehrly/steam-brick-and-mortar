@@ -1,18 +1,18 @@
 # Interaction Architecture Refactor Plan
 
 ## Goal
-Transform SteamBrickAndMortarApp from a callback coordinator into a thin orchestrator by implementing a proper interaction/event system that supports Mouse/Keyboard + Controller + VR inputs.
+Transform SteamBrickAndMortarApp into a thin orchestrator by implementing a clean event-driven architecture with proper separation between workflow events and data queries. Support Mouse/Keyboard, Controller, and VR inputs via extensible event system and direct injection for simple data access.
 
-## Current Problems
-- **367 lines** in main app class (should be ~100)
-- **18 callback handlers** that are just 1-line delegations
-- Tight coupling between UI, Steam, WebXR, and App
-- No clear interaction abstraction for multi-input support
+## Previous Problems
+- Main app class was overly large and tightly coupled
+- Callback handlers created unnecessary complexity and race conditions
+- No clear separation between workflow events and data queries
+- No clean abstraction for multi-input support
 
 ## Target Architecture
 
-### Phase 1: Create Event System Foundation (Start Here)
-**Goal**: Replace callback hell with clean event system
+### Event System Foundation
+**Goal**: Replace callback-based coordination with a clean event system for workflows, and direct injection for data queries
 
 #### 1.1 Create InteractionManager
 ```typescript
@@ -35,8 +35,8 @@ interface WebXREvents { ... }
 interface InputEvents { ... }
 ```
 
-### Phase 2: Self-Managing Components  
-**Goal**: Each system handles its own workflows
+### Self-Managing Components
+**Goal**: Each system manages its own workflows via events, with direct injection for simple data access
 
 #### 2.1 SteamWorkflowManager
 ```typescript
@@ -66,56 +66,24 @@ class CacheManager {
 }
 ```
 
-### Phase 3: Slim Down SteamBrickAndMortarApp
-**Goal**: App becomes pure orchestrator
+### Slim Orchestrator
+**Goal**: SteamBrickAndMortarApp is now a pure orchestrator, delegating workflows via events and using direct injection for data queries (e.g., debug stats)
 
-#### 3.1 Remove Methods (Target: 60% reduction)
-**Remove these 18 methods:**
-- `handleWebXRSessionStart/End/Error/SupportChange` → WebXREventHandler
-- `handleWebXRToggle` → WebXREventHandler  
-- `handleInputPause/Resume` → WebXREventHandler
-- `handlePauseMenuOpen/Close` → WebXREventHandler
-- `handleLoadSteamGames` → SteamWorkflowManager
-- `prepareForGameLoading` → SteamWorkflowManager
-- `createProgressCallbacks` → SteamWorkflowManager
-- `handleGameLoadingSuccess/Error` → SteamWorkflowManager
-- `handleUseOfflineData` → SteamWorkflowManager
-- `handleRefreshCache/ClearCache` → CacheManager
-- `handleShowCacheStats` → CacheManager
-- `updateCacheStatsDisplay` → CacheManager
-
-#### 3.2 Simplify Constructor
-**From:**
-```typescript
-// 50+ lines of callback wiring
-this.uiCoordinator = new UICoordinator(this.performanceMonitor, {
-  onWebXRToggle: () => this.handleWebXRToggle(),
-  onLoadSteamGames: (vanityUrl: string) => this.handleLoadSteamGames(vanityUrl),
-  // ... 12 more callbacks
-})
-```
-
-**To:**
+#### Constructor
 ```typescript
 // Clean initialization
-this.interactionManager = new InteractionManager()
-this.uiCoordinator = new UICoordinator(this.performanceMonitor)
-this.steamWorkflow = new SteamWorkflowManager()
-this.webxrHandler = new WebXREventHandler()
-this.cacheManager = new CacheManager()
+this.uiCoordinator = new UICoordinator(this.performanceMonitor, this.debugStatsProvider)
+// ...other coordinators initialized similarly
 ```
 
-#### 3.3 Wire Event System
+#### Event System Wiring
 ```typescript
-private wireInteractions(): void {
-  // Simple event wiring - no callback methods needed
-  this.interactionManager.addEventListener('steam:load-games', 
-    (e) => this.steamWorkflow.handleLoadGames(e.detail))
-}
+// Events are used for user intents and workflows only
+// Direct calls are used for simple data queries
 ```
 
-### Phase 4: Multi-Input Support (Future)
-**Goal**: Support Mouse/Keyboard + Controller + VR seamlessly
+### Multi-Input Support (Extensible)
+**Goal**: Support Mouse/Keyboard, Controller, and VR seamlessly via event system and input abstraction
 
 #### 4.1 Input Abstraction
 ```typescript  
@@ -134,31 +102,32 @@ class InputMapper {
 ```
 
 ## Success Metrics
-- **SteamBrickAndMortarApp reduced from 367 → ~150 lines** 
-- **18 callback handlers → 0 callback handlers**
-- **Clean separation**: Each system manages its own workflows
-- **Extensible**: Easy to add new input devices
-- **Testable**: Each component can be tested independently
+- SteamBrickAndMortarApp reduced from 367 → ~150 lines
+- Callback handlers eliminated; replaced with event-driven workflows and direct injection
+- Clean separation: Each system manages its own workflows
+- Event system scope: Events for workflows, direct calls for data queries
+- Extensible: Easy to add new input devices
+- Testable: Each component can be tested independently
+- All 182 tests passing, validating architecture
 
 ## Implementation Order
 1. **Start**: InteractionManager + Event Types (Foundation)
 2. **Next**: SteamWorkflowManager (Biggest impact - removes ~8 methods)
-3. **Then**: WebXREventHandler (Removes ~6 methods) 
-4. **Finally**: Slim down main app class
+3. **Then**: WebXREventHandler (Removes ~6 methods)
+4. **Then**: Slim down main app class
+5. **Finally**: Replace event-driven data queries with direct injection (e.g., debug stats)
 
-## Files to Create
-- `src/core/InteractionManager.ts`
-- `src/types/InteractionEvents.ts`
-- `src/steam-integration/SteamWorkflowManager.ts`
-- `src/webxr/WebXREventHandler.ts`
-- `src/core/CacheManager.ts`
-
-## Files to Modify
-- `src/core/SteamBrickAndMortarApp.ts` (major cleanup)
-- `src/ui/UICoordinator.ts` (remove callbacks)
-- `src/webxr/WebXRCoordinator.ts` (integrate with event system)
-- `src/steam-integration/SteamIntegration.ts` (remove UI coupling)
+## Files Created/Modified
+- `src/core/InteractionManager.ts` (event bus foundation)
+- `src/types/InteractionEvents.ts` (event types, cleaned up)
+- `src/steam-integration/SteamWorkflowManager.ts` (workflow manager)
+- `src/webxr/WebXREventHandler.ts` (WebXR event handler)
+- `src/core/CacheManager.ts` (cache management)
+- `src/core/SteamBrickAndMortarApp.ts` (major cleanup, pure orchestrator)
+- `src/ui/UICoordinator.ts` (direct injection, event-driven workflows)
+- `src/webxr/WebXRCoordinator.ts` (integrated with event system)
+- `src/steam-integration/SteamIntegration.ts` (removed UI coupling)
 
 ---
 
-**Ready to start with Phase 1.1: InteractionManager creation**
+**Status: Architecture refactor complete and validated. Ready for next roadmap priority.**
