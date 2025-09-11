@@ -54,6 +54,9 @@
 - Caching strategy implementation to handle 800+ game libraries
 - Multi-user testing capability
 - Input Systems and User Controls (Milestone 7)
+  - Enhanced camera controls with configurable roll system
+  - Movement acceleration and speed customization
+  - Camera reset and player positioning features
 - User Experience Options (Milestone 8)
 
 **Key Requirements**:

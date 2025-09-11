@@ -134,6 +134,62 @@
 
 **Acceptance**: Users can remap controls for mouse/keyboard, gamepad, or VR setup
 
+### Feature 7.3: Advanced Camera Control Options
+**Context**: Enhanced camera controls with configurable options for improved user experience
+
+#### Story 7.3.1: Camera Roll Control System
+- **Task 7.3.1.1**: Implement Q/E roll control toggle system
+  - Add settings panel option to enable/disable Q/E camera roll controls
+  - Default to disabled for simplified control scheme
+  - Provide easy restoration of functionality via boolean toggle
+  - Include clear labeling and help text for roll controls
+- **Task 7.3.1.2**: Add camera roll acceleration and speed limiting
+  - Implement configurable maximum roll speed setting
+  - Add floating-point acceleration value towards max roll speed
+  - Create smooth acceleration curve for responsive but controlled rolling
+  - Include settings panel controls for roll speed customization
+
+**Expected Deliverable**: Configurable camera roll system with smooth acceleration
+
+**Acceptance**: Users can toggle roll controls on/off and customize roll speed/acceleration
+
+#### Story 7.3.2: Movement Speed and Acceleration System
+- **Task 7.3.2.1**: Implement configurable movement acceleration
+  - Add acceleration system for WASD movement controls
+  - Implement configurable maximum movement speeds per direction
+  - Create smooth acceleration curves for all movement types
+  - Plan architecture to support future vertical movement controls
+- **Task 7.3.2.2**: Add movement speed customization options
+  - Include movement speed settings in controls panel
+  - Provide separate speed controls for different movement types
+  - Add preset options (Slow/Normal/Fast) with custom override
+  - Include real-time preview of movement speed changes
+
+**Expected Deliverable**: Comprehensive movement speed and acceleration system
+
+**Acceptance**: Users can customize movement speeds and acceleration for all control types
+
+#### Story 7.3.3: Camera Reset and Player Positioning
+- **Task 7.3.3.1**: Implement camera view reset functionality
+  - Add hotkey to reset camera orientation to default view
+  - Include "Reset Camera" button in pause menu controls section
+  - Preserve player position while resetting camera orientation only
+  - Add smooth transition animation for camera reset
+- **Task 7.3.3.2**: Add player position reset features
+  - Implement "Return to Origin" functionality in help menu
+  - Add hotkey to teleport player back to initial spawn location
+  - Include confirmation dialog for position reset to prevent accidents
+  - Reset both camera position and orientation to initial state
+- **Task 7.3.3.3**: Enhanced camera reset options
+  - Add partial reset options (orientation only vs. full reset)
+  - Implement "Reset to Last Safe Position" for error recovery
+  - Include settings to customize default camera position and orientation
+  - Add visual feedback during reset operations
+
+**Expected Deliverable**: Comprehensive camera and position reset system
+
+**Acceptance**: Users can easily reset camera view and return to spawn with clear controls and feedback
+
 ---
 
 ## Milestone 7.5: UI System Redesign 🔮
@@ -182,6 +238,22 @@
 **Expected Deliverable**: Comprehensive graphics options menu
 
 **Acceptance**: Users can optimize performance for their VR hardware
+
+#### Story 8.1.2: Controls and Interaction Settings Panel
+- **Task 8.1.2.1**: Implement dedicated controls settings section
+  - Create organized controls panel within settings menu
+  - Include movement speed, camera sensitivity, and input options
+  - Integrate camera roll controls toggle and speed settings
+  - Add keybinding configuration interface for future expansion
+- **Task 8.1.2.2**: Add interaction and accessibility controls
+  - Include interaction sensitivity and timing controls
+  - Add accessibility options for movement and camera controls
+  - Implement preset control schemes for different user preferences
+  - Include preview/test area for trying control changes
+
+**Expected Deliverable**: Comprehensive controls settings panel integrated with graphics options
+
+**Acceptance**: Users can access and modify all movement, camera, and interaction settings from unified interface
 
 ### Feature 8.2: Audio and Accessibility Options
 **Context**: Complete audio system with accessibility features
