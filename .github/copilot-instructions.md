@@ -26,7 +26,9 @@ steam-brick-and-mortar/
 
 ### 🎯 **Test-Driven Development**
 - **Run unit tests before every commit**: Validate all functionality locally before committing
-- **Test locally first**: Validate all functionality before deploying
+- **Write tests for new components**: Every new class/module requires corresponding unit tests
+- **Update tests when changing behavior**: Interface changes must include test updates that verify the new behavior
+- **Test event-driven workflows**: Ensure event emissions and handlers are tested, not just mocked
 - **Incremental commits**: Each working phase gets its own commit
 - **Document what was tested**: Distinguish between implemented vs validated
 
@@ -41,6 +43,10 @@ steam-brick-and-mortar/
 - **WebXR Types**: Custom definitions in `client/src/webxr.d.ts` require expert review
 - **VR Safety**: Incorrect spatial/timing assumptions can cause physical discomfort
 - **Secrets Management**: Use environment variables locally, AWS Secrets Manager in production
+- **Event System Scope**: Events are for user intents and workflows, NOT data queries
+  - ✅ **Use Events**: User actions (load games, enter VR), complex workflows, state changes
+  - ❌ **Don't Use Events**: Simple data queries, request-response patterns, synchronous operations
+  - **Rule**: If you need the return value immediately, use direct calls, not events
 
 ## Workflow Guidelines
 
