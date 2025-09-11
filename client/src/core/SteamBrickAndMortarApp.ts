@@ -60,10 +60,10 @@ export class SteamBrickAndMortarApp {
     private steamGameManager: SteamGameManager
     private eventManager: EventManager
     private steamWorkflowManager: SteamWorkflowManager
-    
+
     // State
     private isInitialized: boolean = false
-
+    
     constructor(config: AppConfig = {}) {
         // Initialize core scene management
         this.sceneManager = new SceneManager({
@@ -120,20 +120,17 @@ export class SteamBrickAndMortarApp {
             }
         )
 
-        // Initialize UI coordinator with minimal callbacks (most events now handled by EventManager)
-        this.uiCoordinator = new UICoordinator(
-            this.performanceMonitor,
-            {
-                onGetImageCacheStats: () => this.steamIntegration.getImageCacheStats(),
-                onGetDebugStats: () => this.getDebugStats()
-            }
-        )
-
         // Initialize debug stats provider
         this.debugStatsProvider = new DebugStatsProvider(
             this.sceneManager,
             this.steamIntegration,
             this.performanceMonitor
+        )
+
+        // Initialize UI coordinator (events now handled by EventManager)
+        this.uiCoordinator = new UICoordinator(
+            this.performanceMonitor,
+            this.debugStatsProvider
         )
 
         // Initialize steam game manager with scene coordinator's game box renderer
@@ -245,10 +242,6 @@ export class SteamBrickAndMortarApp {
             timestamp: Date.now(),
             source: 'system' as const
         })
-    }
-
-    private async getDebugStats(): Promise<DebugStats> {
-        return await this.debugStatsProvider.getDebugStats()
     }
 
     private startRenderLoop(): void {

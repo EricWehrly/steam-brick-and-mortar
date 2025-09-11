@@ -18,14 +18,15 @@ import { SteamGameManager } from '../core/SteamGameManager'
 import { UICoordinator } from '../ui/UICoordinator'
 import { ValidationUtils } from '../utils'
 import { Logger } from '../utils/Logger'
-import { SteamEventTypes } from '../types/InteractionEvents'
+import { SteamEventTypes, UIEventTypes } from '../types/InteractionEvents'
 import type {
     SteamLoadGamesEvent,
     SteamUseOfflineEvent,
     SteamCacheClearEvent,
     SteamCacheRefreshEvent,
     SteamCacheStatsEvent,
-    SteamImageCacheClearEvent
+    SteamImageCacheClearEvent,
+    ImageCacheStatsRequestEvent
 } from '../types/InteractionEvents'
 
 export class SteamWorkflowManager {
@@ -35,6 +36,9 @@ export class SteamWorkflowManager {
     private steamGameManager: SteamGameManager
     private uiCoordinator: UICoordinator
     private boundHandlers: Record<string, EventListener>
+    
+    // Store pending image cache stats requests
+    private pendingImageStatsRequests: Array<(stats: any) => void> = []
 
     constructor(
         steamIntegration: SteamIntegration,
@@ -53,7 +57,8 @@ export class SteamWorkflowManager {
             onClearCache: this.onClearCache.bind(this),
             onRefreshCache: this.onRefreshCache.bind(this),
             onShowCacheStats: this.onShowCacheStats.bind(this),
-            onClearImageCache: this.onClearImageCache.bind(this)
+            onClearImageCache: this.onClearImageCache.bind(this),
+            onImageCacheStatsRequest: this.onImageCacheStatsRequest.bind(this)
         }
         
         this.setupEventListeners()
@@ -67,6 +72,22 @@ export class SteamWorkflowManager {
         this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.boundHandlers.onRefreshCache)
         this.eventManager.registerEventHandler(SteamEventTypes.CacheStats, this.boundHandlers.onShowCacheStats)
         this.eventManager.registerEventHandler(SteamEventTypes.ImageCacheClear, this.boundHandlers.onClearImageCache)
+        this.eventManager.registerEventHandler(UIEventTypes.ImageCacheStatsRequest, this.boundHandlers.onImageCacheStatsRequest)
+    }
+
+    /**
+     * Request image cache stats asynchronously
+     * @param callback Function to call with the stats result
+     */
+    public requestImageCacheStats(callback: (stats: any) => void): void {
+        // Add callback to pending requests
+        this.pendingImageStatsRequests.push(callback);
+        
+        // Emit the event to trigger stats retrieval
+        this.eventManager.emit(UIEventTypes.ImageCacheStatsRequest, {
+            timestamp: Date.now(),
+            source: 'system' as const
+        });
     }
 
     private onLoadGames = (event: CustomEvent<SteamLoadGamesEvent>) => {
@@ -189,6 +210,30 @@ export class SteamWorkflowManager {
         this.uiCoordinator.updateCacheStats(stats)
     }
 
+    private async onImageCacheStatsRequest(): Promise<void> {
+        try {
+            if (!this.steamIntegration) return;
+            
+            // Get image cache stats
+            const cacheStats = await this.steamIntegration.getImageCacheStats();
+            
+            // Process any pending requests
+            const callbacks = [...this.pendingImageStatsRequests];
+            this.pendingImageStatsRequests.length = 0;
+            
+            // Fulfill all pending callbacks
+            callbacks.forEach(callback => callback(cacheStats));
+            
+        } catch (error) {
+            console.error('Error getting image cache stats:', error);
+            
+            // Call pending callbacks with null to indicate error
+            const callbacks = [...this.pendingImageStatsRequests];
+            this.pendingImageStatsRequests.length = 0;
+            callbacks.forEach(callback => callback(null));
+        }
+    }
+
     dispose(): void {
         this.eventManager.deregisterEventHandler(SteamEventTypes.LoadGames, this.boundHandlers.onLoadGames)
         this.eventManager.deregisterEventHandler(SteamEventTypes.UseOffline, this.boundHandlers.onUseOfflineData)
@@ -196,6 +241,7 @@ export class SteamWorkflowManager {
         this.eventManager.deregisterEventHandler(SteamEventTypes.CacheRefresh, this.boundHandlers.onRefreshCache)
         this.eventManager.deregisterEventHandler(SteamEventTypes.CacheStats, this.boundHandlers.onShowCacheStats)
         this.eventManager.deregisterEventHandler(SteamEventTypes.ImageCacheClear, this.boundHandlers.onClearImageCache)
+        this.eventManager.deregisterEventHandler(UIEventTypes.ImageCacheStatsRequest, this.boundHandlers.onImageCacheStatsRequest)
         
         SteamWorkflowManager.logger.info('SteamWorkflowManager disposed')
     }

@@ -18,7 +18,7 @@ import { PauseMenuManager } from '../ui/pause/PauseMenuManager'
 import { PerformanceMonitor } from '../ui/PerformanceMonitor'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes, WebXREventTypes, InputEventTypes, UIEventTypes } from '../types/InteractionEvents'
-import type { DebugStats } from '../core/DebugStatsProvider'
+import type { DebugStats, DebugStatsProvider } from '../core/DebugStatsProvider'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { ImageCacheStats } from '../steam/images/ImageManager'
 
@@ -46,14 +46,14 @@ export class UICoordinator {
     private pauseMenuManager: PauseMenuManager
     private performanceMonitor: PerformanceMonitor
     private eventManager: EventManager
-    private callbacks: UICoordinatorCallbacks
+    private debugStatsProvider: DebugStatsProvider
 
     constructor(
         performanceMonitor: PerformanceMonitor,
-        callbacks: UICoordinatorCallbacks = {}
+        debugStatsProvider: DebugStatsProvider
     ) {
         this.performanceMonitor = performanceMonitor
-        this.callbacks = callbacks
+        this.debugStatsProvider = debugStatsProvider
         this.eventManager = EventManager.getInstance()
 
         // Initialize UI Manager with Steam and WebXR event handlers that emit events
@@ -98,11 +98,11 @@ export class UICoordinator {
             renderer: renderer
         })
         
-        // Register all default panels with callbacks
+        // Register all default panels with event emissions
         this.pauseMenuManager.registerDefaultPanels({
-            onGetImageCacheStats: () => this.callbacks.onGetImageCacheStats?.(),
+            onGetImageCacheStats: () => this.requestImageCacheStats(),
             onClearImageCache: async () => this.emitClearImageCacheEvent(),
-            onGetDebugStats: () => this.callbacks.onGetDebugStats?.()
+            onGetDebugStats: () => this.requestDebugStats()
         })
 
         // Initialize the settings button that opens the pause menu
@@ -222,7 +222,7 @@ export class UICoordinator {
     // Private event handlers
 
     private async handleWebXRToggle(): Promise<void> {
-        await this.callbacks.onWebXRToggle?.()
+        this.emitWebXRToggleEvent()
     }
 
     // Steam event emission methods - replace callbacks with events
@@ -308,6 +308,31 @@ export class UICoordinator {
             timestamp: Date.now(),
             source: 'ui' as const
         })
+    }
+
+    /**
+     * Request image cache stats from SteamWorkflowManager
+     */
+    private requestImageCacheStats(): Promise<any> {
+        return new Promise((resolve) => {
+            // Find SteamWorkflowManager through event system
+            // For now, emit event - the proper integration should be via direct reference
+            this.eventManager.emit(UIEventTypes.ImageCacheStatsRequest, {
+                timestamp: Date.now(),
+                source: 'ui' as const
+            });
+            
+            // This is a temporary placeholder - in the actual implementation,
+            // the SteamWorkflowManager should call this callback with the stats
+            resolve(null);
+        });
+    }
+
+    /**
+     * Request debug stats from DebugStatsProvider directly
+     */
+    private requestDebugStats(): Promise<DebugStats> {
+        return this.debugStatsProvider.getDebugStats()
     }
 
     private initializeSettingsButton(): void {

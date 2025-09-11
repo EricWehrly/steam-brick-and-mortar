@@ -84,7 +84,7 @@ export interface MenuCloseEvent extends BaseInteractionEvent {
     menuType: 'pause' | 'settings' | 'debug'
 }
 
-export interface DebugStatsRequestEvent extends BaseInteractionEvent {
+export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
     // No additional data needed
 }
 
@@ -117,7 +117,7 @@ export const InputEventTypes = {
 export const UIEventTypes = {
     MenuOpen: 'ui:menu-open',
     MenuClose: 'ui:menu-close',
-    DebugStatsRequest: 'ui:debug-stats-request'
+    ImageCacheStatsRequest: 'ui:image-cache-stats-request'
 } as const
 
 // =============================================================================
@@ -151,7 +151,7 @@ export interface InteractionEventMap {
     // UI events
     [UIEventTypes.MenuOpen]: MenuOpenEvent
     [UIEventTypes.MenuClose]: MenuCloseEvent
-    [UIEventTypes.DebugStatsRequest]: DebugStatsRequestEvent
+    [UIEventTypes.ImageCacheStatsRequest]: ImageCacheStatsRequestEvent
 }
 
 /**

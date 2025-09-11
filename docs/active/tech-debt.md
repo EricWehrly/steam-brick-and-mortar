@@ -2,6 +2,9 @@
 
 ## Critical Issues
 
+- Remove redundant javadoc comments which are doing little more than costing additional context to read files.
+   (But keep comments where they're adding value and cannot be rolled cleanly into method signatures)
+
 ## Testing Infrastructure
 
 ### Implement Missing Integration Test Coverage
