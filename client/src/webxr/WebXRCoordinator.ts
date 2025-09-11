@@ -99,7 +99,10 @@ export class WebXRCoordinator {
         // Handle keyboard movement
         this.inputManager.updateCameraMovement(camera)
         
-        // Handle pending mouse rotation
+        // Handle Q/E roll rotation
+        this.inputManager.updateCameraRoll(camera)
+        
+        // Handle pending mouse rotation (Y-axis only now)
         if (this.pendingMouseDeltas) {
             this.inputManager.updateCameraRotation(camera, this.pendingMouseDeltas.deltaX, this.pendingMouseDeltas.deltaY)
             this.pendingMouseDeltas = null // Clear after processing
