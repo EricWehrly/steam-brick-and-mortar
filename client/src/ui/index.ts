@@ -3,6 +3,10 @@
  */
 
 export { UIManager } from './UIManager'
+export { 
+    UICoordinator, 
+    type UICoordinatorCallbacks 
+} from './UICoordinator'
 export { SteamUIPanel } from './SteamUIPanel'
 export { ProgressDisplay } from './ProgressDisplay'
 export { WebXRUIPanel } from './WebXRUIPanel'

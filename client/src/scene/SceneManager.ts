@@ -1,11 +1,16 @@
 /**
- * Scene Manager - Three.js Scene Setup and Management
+ * Scene Coordinator - Complete 3D Scene Management and Coordination
  * 
- * Handles:
- * - Scene initialization
- * - Lighting setup
- * - Camera management
- * - Render loop coordination
+ * This coordinator manages the entire 3D scene lifecycle and delegates
+ * specific rendering tasks to specialized renderers:
+ * - Three.js scene, camera, and renderer initialization
+ * - Lighting and atmospheric setup
+ * - Scene object management and coordination
+ * - Render loop orchestration with performance monitoring
+ * - Integration point for GameBoxRenderer, SignageRenderer, etc.
+ * 
+ * The App should only need to call high-level methods like setupScene()
+ * and should not need direct access to individual renderers.
  */
 
 import * as THREE from 'three'

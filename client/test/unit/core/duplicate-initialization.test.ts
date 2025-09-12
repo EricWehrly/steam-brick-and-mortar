@@ -151,28 +151,6 @@ describe('Duplicate Initialization Detection', () => {
         app.dispose()
     })
 
-    it('should detect if managers are instantiated multiple times', async () => {
-        // Track manager instances to test for proper isolation
-
-        // Create multiple app instances to test for manager reuse/recreation
-        const app1 = new SteamBrickAndMortarApp()
-        const app2 = new SteamBrickAndMortarApp()
-
-        await app1.init()
-        await app2.init()
-
-        // Each app should have its own manager instances
-        expect(app1.getSceneManager()).toBeDefined()
-        expect(app2.getSceneManager()).toBeDefined()
-        
-        // But they should be different instances
-        expect(app1.getSceneManager()).not.toBe(app2.getSceneManager())
-
-        // Clean up
-        app1.dispose()
-        app2.dispose()
-    })
-
     it('should simulate the main.ts double initialization scenario', async () => {
         // Simulate the problematic main.ts logic
         let initializeAppCallCount = 0

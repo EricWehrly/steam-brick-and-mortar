@@ -15,6 +15,8 @@ export interface InputState {
         a: boolean
         s: boolean
         d: boolean
+        q: boolean
+        e: boolean
     }
     mouse: {
         down: boolean
@@ -39,7 +41,7 @@ export interface InputCallbacks {
  */
 export class InputManager {
     private inputState: InputState = {
-        keys: { w: false, a: false, s: false, d: false },
+        keys: { w: false, a: false, s: false, d: false, q: false, e: false },
         mouse: { down: false, x: 0, y: 0 }
     }
     
@@ -162,6 +164,18 @@ export class InputManager {
                     this.callbacks.onKeyPress?.('d')
                 }
                 break
+            case 'KeyQ': 
+                if (!this.inputState.keys.q) {
+                    this.inputState.keys.q = true
+                    this.callbacks.onKeyPress?.('q')
+                }
+                break
+            case 'KeyE': 
+                if (!this.inputState.keys.e) {
+                    this.inputState.keys.e = true
+                    this.callbacks.onKeyPress?.('e')
+                }
+                break
         }
     }
 
@@ -183,6 +197,14 @@ export class InputManager {
                 this.inputState.keys.d = false
                 this.callbacks.onKeyRelease?.('d')
                 break
+            case 'KeyQ': 
+                this.inputState.keys.q = false
+                this.callbacks.onKeyRelease?.('q')
+                break
+            case 'KeyE': 
+                this.inputState.keys.e = false
+                this.callbacks.onKeyRelease?.('e')
+                break
         }
     }
 
@@ -197,11 +219,20 @@ export class InputManager {
     }
 
     /**
-     * Apply mouse movement to camera rotation
+     * Apply mouse movement to camera rotation (Y-axis only)
      */
     updateCameraRotation(camera: THREE.Camera, deltaX: number, deltaY: number): void {
+        // Mouse left/right only affects Y-axis rotation (yaw)
         camera.rotation.y -= deltaX * this.options.mouseSensitivity
-        camera.rotation.x -= deltaY * this.options.mouseSensitivity
+        // Note: deltaY is ignored - pitch controls removed from mouse
+    }
+
+    /**
+     * Apply Q/E key roll rotation to a camera
+     */
+    updateCameraRoll(camera: THREE.Camera): void {
+        if (this.inputState.keys.q) camera.rotation.z += this.options.speed * 2 // Roll left
+        if (this.inputState.keys.e) camera.rotation.z -= this.options.speed * 2 // Roll right
     }
 
     /**
@@ -230,7 +261,7 @@ export class InputManager {
      */
     isMoving(): boolean {
         const { keys } = this.inputState
-        return keys.w || keys.a || keys.s || keys.d
+        return keys.w || keys.a || keys.s || keys.d || keys.q || keys.e
     }
 
     /**

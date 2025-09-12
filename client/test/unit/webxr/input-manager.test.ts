@@ -122,7 +122,7 @@ describe('InputManager Unit Tests', () => {
       inputManager.startListening();
     });
 
-    it('should handle WASD key press events', () => {
+    it('should handle WASD and QE key press events', () => {
       const handleKeyDown = (document.addEventListener as any).mock.calls
         .find((call: any) => call[0] === 'keydown')?.[1];
       
@@ -148,9 +148,19 @@ describe('InputManager Unit Tests', () => {
       handleKeyDown?.({ code: 'KeyD' } as MockKeyboardEvent);
       expect(inputManager.getInputState().keys.d).toBe(true);
       expect(mockCallbacks.onKeyPress).toHaveBeenCalledWith('d');
+      
+      // Test Q key (roll left)
+      handleKeyDown?.({ code: 'KeyQ' } as MockKeyboardEvent);
+      expect(inputManager.getInputState().keys.q).toBe(true);
+      expect(mockCallbacks.onKeyPress).toHaveBeenCalledWith('q');
+
+      // Test E key (roll right)
+      handleKeyDown?.({ code: 'KeyE' } as MockKeyboardEvent);
+      expect(inputManager.getInputState().keys.e).toBe(true);
+      expect(mockCallbacks.onKeyPress).toHaveBeenCalledWith('e');
     });
 
-    it('should handle WASD key release events', () => {
+    it('should handle WASD and QE key release events', () => {
       const handleKeyDown = (document.addEventListener as any).mock.calls
         .find((call: any) => call[0] === 'keydown')?.[1];
       const handleKeyUp = (document.addEventListener as any).mock.calls
@@ -167,6 +177,23 @@ describe('InputManager Unit Tests', () => {
       handleKeyUp?.({ code: 'KeyW' } as MockKeyboardEvent);
       expect(inputManager.getInputState().keys.w).toBe(false);
       expect(mockCallbacks.onKeyRelease).toHaveBeenCalledWith('w');
+      
+      // Test Q key press and release
+      handleKeyDown?.({ code: 'KeyQ' } as MockKeyboardEvent);
+      expect(inputManager.getInputState().keys.q).toBe(true);
+      
+      handleKeyUp?.({ code: 'KeyQ' } as MockKeyboardEvent);
+      expect(inputManager.getInputState().keys.q).toBe(false);
+      expect(mockCallbacks.onKeyRelease).toHaveBeenCalledWith('q');
+      
+      // Test E key press and release
+      handleKeyDown?.({ code: 'KeyE' } as MockKeyboardEvent);
+      expect(inputManager.getInputState().keys.e).toBe(true);
+      
+      handleKeyUp?.({ code: 'KeyE' } as MockKeyboardEvent);
+      expect(inputManager.getInputState().keys.e).toBe(false);
+      expect(mockCallbacks.onKeyRelease).toHaveBeenCalledWith('e');
+      
       expect(inputManager.isMoving()).toBe(false);
     });
 
@@ -282,14 +309,34 @@ describe('InputManager Unit Tests', () => {
       expect(mockCamera.position.z).toBeLessThan(initialPosition.z);
     });
 
-    it('should apply mouse movement to camera rotation', () => {
+    it('should apply mouse movement to camera rotation (Y-axis only)', () => {
       const initialRotation = { x: mockCamera.rotation.x, y: mockCamera.rotation.y };
       
       inputManager.updateCameraRotation(mockCamera, 10, -5);
       
-      // Camera rotation should have changed
+      // Only Y-axis rotation should change from mouse movement
       expect(mockCamera.rotation.y).not.toBe(initialRotation.y);
-      expect(mockCamera.rotation.x).not.toBe(initialRotation.x);
+      expect(mockCamera.rotation.x).toBe(initialRotation.x); // X-axis should remain unchanged
+    });
+
+    it('should apply Q/E keys to camera roll rotation', () => {
+      const handleKeyDown = (document.addEventListener as any).mock.calls
+        .find((call: any) => call[0] === 'keydown')?.[1];
+      
+      const initialRotation = { z: mockCamera.rotation.z };
+      
+      // Test Q key (roll left)
+      handleKeyDown?.({ code: 'KeyQ' } as MockKeyboardEvent);
+      inputManager.updateCameraRoll(mockCamera);
+      expect(mockCamera.rotation.z).toBeGreaterThan(initialRotation.z);
+      
+      // Reset rotation and test E key (roll right)
+      mockCamera.rotation.z = initialRotation.z;
+      inputManager.getInputState().keys.q = false;
+      
+      handleKeyDown?.({ code: 'KeyE' } as MockKeyboardEvent);
+      inputManager.updateCameraRoll(mockCamera);
+      expect(mockCamera.rotation.z).toBeLessThan(initialRotation.z);
     });
 
     it('should move camera in all directions', () => {
