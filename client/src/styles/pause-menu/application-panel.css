@@ -1,4 +1,5 @@
 /* Application Panel Styles */
+@import './shared-components.css';
 
 .pause-menu-panel {
     padding: 20px;
@@ -45,58 +46,6 @@
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
-}
-
-.app-btn {
-    flex: 1;
-    min-width: 120px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 12px 16px;
-    border: 1px solid #444;
-    border-radius: 8px;
-    color: #fff;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    position: relative;
-}
-
-.app-btn.primary {
-    background: linear-gradient(135deg, #2a5470 0%, #1e3a52 100%);
-    border-color: #3d6b8a;
-}
-
-.app-btn.secondary {
-    background: linear-gradient(135deg, #444 0%, #2a2a2a 100%);
-    border-color: #555;
-}
-
-.app-btn.warning {
-    background: linear-gradient(135deg, #8b4513 0%, #654321 100%);
-    border-color: #a0522d;
-}
-
-.app-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.app-btn.primary:hover {
-    background: linear-gradient(135deg, #326082 0%, #23435f 100%);
-    border-color: #4a7fa3;
-}
-
-.app-btn.secondary:hover {
-    background: linear-gradient(135deg, #555 0%, #333 100%);
-    border-color: #666;
-}
-
-.app-btn.warning:hover {
-    background: linear-gradient(135deg, #a0522d 0%, #734a26 100%);
-    border-color: #cd853f;
 }
 
 .btn-icon {
