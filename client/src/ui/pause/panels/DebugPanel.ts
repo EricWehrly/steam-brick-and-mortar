@@ -82,7 +82,7 @@ export class DebugPanel extends PauseMenuPanel {
         // Flatten the hierarchical stats data for the simple template engine
         const templateData = {
             // Console state
-            consoleActiveClass: this.consoleVisible ? 'active' : '',
+            consoleActiveClass: this.consoleVisible ? 'primary' : 'secondary',
             consoleButtonText: this.consoleVisible ? '🙈 Hide Console' : '👁️ Show Console',
             consoleVisibilityClass: this.consoleVisible ? 'visible' : 'hidden',
             

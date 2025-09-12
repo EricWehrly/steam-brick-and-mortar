@@ -1,4 +1,6 @@
 /* Debug Panel Styles */
+@import './shared-components.css';
+
 .debug-content {
     display: flex;
     flex-direction: column;
@@ -12,36 +14,6 @@
     gap: 0.5rem;
     flex-wrap: wrap;
     margin-bottom: 1rem;
-}
-
-.debug-button {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--pause-border);
-    background: var(--pause-background);
-    color: var(--pause-text);
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.875rem;
-    transition: all 0.2s ease;
-}
-
-.debug-button:hover {
-    background: var(--pause-hover);
-    border-color: var(--pause-accent);
-}
-
-.debug-button.active {
-    background: var(--pause-accent);
-    color: var(--pause-text-inverse);
-}
-
-.debug-button.refresh {
-    font-weight: 500;
-}
-
-.debug-button.export {
-    background: var(--pause-accent);
-    color: var(--pause-text-inverse);
 }
 
 .debug-sections {
