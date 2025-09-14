@@ -16,6 +16,7 @@ export interface UIManagerEvents {
   steamClearCache: () => void
   steamShowCacheStats: () => void
   webxrEnterVR: () => void
+  checkCacheAvailability?: (vanityUrl: string) => boolean
 }
 
 export class UIManager {
@@ -30,7 +31,8 @@ export class UIManager {
       onUseOffline: this.events.steamUseOffline,
       onRefreshCache: this.events.steamRefreshCache,
       onClearCache: this.events.steamClearCache,
-      onShowCacheStats: this.events.steamShowCacheStats
+      onShowCacheStats: this.events.steamShowCacheStats,
+      checkCacheAvailability: this.events.checkCacheAvailability
     })
     
     this.progressDisplay = new ProgressDisplay()

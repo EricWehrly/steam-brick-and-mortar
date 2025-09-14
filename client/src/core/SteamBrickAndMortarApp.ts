@@ -132,7 +132,8 @@ export class SteamBrickAndMortarApp {
         this.uiCoordinator = new UICoordinator(
             this.performanceMonitor,
             this.debugStatsProvider,
-            () => this.steamIntegration.getImageCacheStats()
+            () => this.steamIntegration.getImageCacheStats(),
+            this.steamIntegration
         )
 
         // Initialize steam game manager with scene coordinator's game box renderer

@@ -21,6 +21,7 @@ import { SteamEventTypes, WebXREventTypes, InputEventTypes, UIEventTypes } from 
 import type { DebugStats, DebugStatsProvider } from '../core/DebugStatsProvider'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { ImageCacheStats } from '../steam/images/ImageManager'
+import type { SteamIntegration } from '../steam-integration/SteamIntegration'
 
 /**
  * Coordinates high-level UI workflows and component interactions
@@ -32,11 +33,13 @@ export class UICoordinator {
     private eventManager: EventManager
     private debugStatsProvider: DebugStatsProvider
     private cacheStatsProvider?: () => Promise<ImageCacheStats>
+    private steamIntegration?: SteamIntegration
 
     constructor(
         performanceMonitor: PerformanceMonitor,
         debugStatsProvider: DebugStatsProvider,
-        cacheStatsProvider?: () => Promise<ImageCacheStats>
+        cacheStatsProvider?: () => Promise<ImageCacheStats>,
+        steamIntegration?: SteamIntegration
     ) {
         if (!performanceMonitor) {
             throw new Error('PerformanceMonitor is required')
@@ -48,6 +51,7 @@ export class UICoordinator {
         this.performanceMonitor = performanceMonitor
         this.debugStatsProvider = debugStatsProvider
         this.cacheStatsProvider = cacheStatsProvider
+        this.steamIntegration = steamIntegration
         this.eventManager = EventManager.getInstance()
 
         // Initialize UI Manager with Steam and WebXR event handlers that emit events
@@ -58,7 +62,8 @@ export class UICoordinator {
             steamRefreshCache: () => this.emitSteamRefreshCacheEvent(),
             steamClearCache: () => this.emitSteamClearCacheEvent(),
             steamShowCacheStats: () => this.emitSteamCacheStatsEvent(),
-            webxrEnterVR: () => this.emitWebXRToggleEvent()
+            webxrEnterVR: () => this.emitWebXRToggleEvent(),
+            checkCacheAvailability: (vanityUrl: string) => this.steamIntegration?.hasCachedData(vanityUrl) ?? false
         })
 
         // Initialize Pause Menu System
