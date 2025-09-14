@@ -380,6 +380,18 @@
 
 **Expected Deliverable**: Simple development mode toggle for safer testing workflows
 
+### Feature 5.6: Settings Menu Polish & Functionality Review 🔄 **DEFERRED TO PHASE 2**
+**Context**: Polish pause menu settings UI and connect disconnected functionality from pause menu system implementation
+
+**Rationale**: Focus on environment rendering and core functionality first. Settings menu polish is better appreciated when the overall experience is more complete.
+
+**Identified Issues** (for future implementation):
+- Visual: "Game Settings" tab styling inconsistencies, redundant cache information display
+- Functional: Disconnected checkboxes (FPS counter, performance stats), unimplemented controls
+- Need to audit and connect all settings controls when UI polish becomes priority
+
+**Moved to Phase 2**: Will address settings menu polish and functionality connections after core environment and user experience is solid.
+
 ### Future Enhancements (Roadmap TODOs)
 - **Game-level cache optimization**: Check if all artwork for a game is cached before downloading
 - **Optional cache UI**: Make cache management UI configurable via user settings
