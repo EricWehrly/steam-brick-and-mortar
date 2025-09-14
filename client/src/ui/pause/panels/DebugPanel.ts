@@ -12,6 +12,7 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import debugPanelTemplate from '../templates/debug-panel.html?raw'
 import '../../../styles/pause-menu/debug-panel.css'
+import { SteamLauncher, type LaunchResult } from '../../../steam/SteamLauncher'
 
 export interface DebugStats {
     // Three.js Scene Stats
@@ -137,6 +138,11 @@ export class DebugPanel extends PauseMenuPanel {
             consoleButton.addEventListener('click', () => this.toggleConsole())
         }
 
+        const steamLaunchButton = document.getElementById('test-steam-launch')
+        if (steamLaunchButton) {
+            steamLaunchButton.addEventListener('click', () => this.testSteamLaunch())
+        }
+
         const exportButton = document.getElementById('export-debug')
         if (exportButton) {
             exportButton.addEventListener('click', () => this.exportDebugInfo())
@@ -214,6 +220,56 @@ export class DebugPanel extends PauseMenuPanel {
         const consoleOutput = document.getElementById('console-output')
         if (consoleOutput) {
             consoleOutput.innerHTML = '<div class="console-line info">Console cleared.</div>'
+        }
+    }
+
+    private async testSteamLaunch(): Promise<void> {
+        console.log('🎮 Testing Steam game launch functionality...')
+        
+        // Show immediate feedback
+        this.addConsoleMessage('info', '🎮 Testing Steam launch with Hexcells Infinite...')
+        
+        try {
+            // Test the Steam launcher
+            const result: LaunchResult = await SteamLauncher.testSteamLaunch()
+            
+            // Log the result
+            if (result.success) {
+                if (result.method === 'protocol') {
+                    console.log('✅ Steam protocol test successful')
+                    this.addConsoleMessage('info', '✅ Steam protocol working! Game should launch in Steam.')
+                } else if (result.method === 'store') {
+                    console.log('⚠️ Steam protocol unavailable, fallback used')  
+                    this.addConsoleMessage('warning', '⚠️ Steam protocol not available - opened store page.')
+                }
+            } else {
+                console.error('❌ Steam launch test failed')
+                this.addConsoleMessage('error', '❌ Steam launch test failed - check if Steam is installed.')
+            }
+            
+            // Also log environment info for debugging
+            const envInfo = SteamLauncher.getEnvironmentInfo()
+            console.log('🔍 Environment info:', envInfo)
+            this.addConsoleMessage('info', `🔍 Browser: ${envInfo.userAgent.substring(0, 50)}...`)
+            this.addConsoleMessage('info', `🔐 Secure context: ${envInfo.isSecureContext}`)
+            
+        } catch (error) {
+            console.error('💥 Steam launch test error:', error)
+            this.addConsoleMessage('error', `💥 Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        }
+    }
+
+    /**
+     * Add a message to the debug console
+     */
+    private addConsoleMessage(type: 'info' | 'warning' | 'error', message: string): void {
+        const consoleOutput = document.getElementById('console-output')
+        if (consoleOutput) {
+            const line = document.createElement('div')
+            line.className = `console-line ${type}`
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
+            consoleOutput.appendChild(line)
+            consoleOutput.scrollTop = consoleOutput.scrollHeight
         }
     }
 
