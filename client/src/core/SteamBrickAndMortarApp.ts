@@ -89,6 +89,7 @@ export class SteamBrickAndMortarApp {
         })
 
         // Initialize scene coordinator with performance configuration
+        // TODO: all (most?) of this should go into advanced visual settings)
         this.sceneCoordinator = new SceneCoordinator(this.sceneManager, {
             maxGames: config.steam?.maxGames ?? 100,
             performance: {
@@ -130,7 +131,8 @@ export class SteamBrickAndMortarApp {
         // Initialize UI coordinator (events now handled by EventManager)
         this.uiCoordinator = new UICoordinator(
             this.performanceMonitor,
-            this.debugStatsProvider
+            this.debugStatsProvider,
+            () => this.steamIntegration.getImageCacheStats()
         )
 
         // Initialize steam game manager with scene coordinator's game box renderer
@@ -145,10 +147,9 @@ export class SteamBrickAndMortarApp {
 
         // Initialize steam workflow manager to handle Steam interactions
         this.steamWorkflowManager = new SteamWorkflowManager(
+            this.eventManager,
             this.steamIntegration,
-            this.steamGameManager,
-            this.uiCoordinator,
-            this.eventManager
+            this.uiCoordinator
         )
 
         // Initialize webxr event handler to handle WebXR and input interactions

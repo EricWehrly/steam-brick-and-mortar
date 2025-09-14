@@ -128,12 +128,16 @@ export class SteamApiClient {
     }
 
     private async rawGetGameDetails(game: SteamGame): Promise<SteamGame> {
-        // Enhance game with artwork URLs
+        // Enhance game with artwork URLs - handle missing image URLs gracefully
         const enhancedGame: SteamGame = {
             ...game,
             artwork: {
-                icon: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`,
-                logo: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`,
+                icon: game.img_icon_url 
+                    ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
+                    : '',
+                logo: game.img_logo_url 
+                    ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`
+                    : '',
                 header: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`,
                 library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
             }
@@ -210,6 +214,20 @@ export class SteamApiClient {
 
     public getCacheStats() {
         return this.cache.getStats()
+    }
+    
+    /**
+     * Check if cache contains specific key
+     */
+    public hasCached(key: string): boolean {
+        return this.cache.get(key) !== null
+    }
+    
+    /**
+     * Get cached item (for internal use)
+     */
+    public getCached<T>(key: string): T | null {
+        return this.cache.get<T>(key)
     }
 }
 

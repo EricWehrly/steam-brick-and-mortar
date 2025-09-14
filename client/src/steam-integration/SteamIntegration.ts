@@ -8,7 +8,7 @@
  * - Cache management
  */
 
-import { SteamApiClient, type SteamGame } from '../steam'
+import { SteamApiClient, type SteamGame, type SteamUser, type SteamResolveResponse } from '../steam'
 import { ValidationUtils } from '../utils'
 import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
@@ -69,7 +69,7 @@ export class SteamIntegration {
             // Update game library state
             this.gameLibrary.setUserData(userGames)
             
-            callbacks.onProgress?.(10, 100, `Found ${userGames.game_count} games. Loading details...`)
+            callbacks.onProgress?.(10, 100, `Found ${userGames.game_count} games. Loading details for top ${Math.min(this.config.maxGames, userGames.game_count)}...`)
             
             // Step 2: Progressive loading of game details and artwork
             const progressOptions: LoadGamesOptions = {
@@ -102,13 +102,14 @@ export class SteamIntegration {
             await this.steamClient.loadGamesProgressively(userGames, progressOptions)
             
             // Complete loading
+            const actualGamesLoaded = Math.min(this.config.maxGames, userGames.game_count)
             callbacks.onProgress?.(100, 100, 'Loading complete!')
             callbacks.onStatusUpdate?.(
-                `✅ Successfully loaded ${userGames.game_count} games for ${userGames.vanity_url}!`, 
+                `✅ Successfully loaded ${actualGamesLoaded} games for ${userGames.vanity_url}!`, 
                 'success'
             )
             
-            SteamIntegration.logger.info(`Progressive loading complete for ${userGames.game_count} games`)
+            SteamIntegration.logger.info(`Progressive loading complete for ${actualGamesLoaded} games (max: ${this.config.maxGames})`)
             
             return this.gameLibrary.getState()
             
@@ -156,6 +157,118 @@ export class SteamIntegration {
     hasOfflineData(_vanityUrl: string): boolean {
         // For now, return false as offline mode is not implemented in simplified client
         return false
+    }
+
+    /**
+     * Check if cached data is available for a user
+     */
+    hasCachedData(vanityUrl: string): boolean {
+        const extractedVanity = ValidationUtils.extractVanityFromInput(vanityUrl)
+        
+        // Check if we have cached resolve data
+        const resolveKey = `resolve_${extractedVanity.toLowerCase()}`
+        if (!this.steamClient.hasCached(resolveKey)) {
+            return false
+        }
+        
+        const cachedResolve = this.steamClient.getCached<SteamResolveResponse>(resolveKey)
+        if (!cachedResolve) {
+            return false
+        }
+        
+        // Check if we have cached games data for the resolved Steam ID
+        const gamesKey = `games_${cachedResolve.steamid}`
+        return this.steamClient.hasCached(gamesKey)
+    }
+
+    /**
+     * Load games from cache only (no Steam API calls)
+     */
+    async loadGamesFromCache(vanityUrl: string, callbacks: ProgressCallbacks = {}): Promise<GameLibraryState> {
+        const extractedVanity = ValidationUtils.extractVanityFromInput(vanityUrl)
+        
+        try {
+            callbacks.onStatusUpdate?.('Loading from cache...', 'loading')
+            callbacks.onProgress?.(0, 100, 'Reading cached data...')
+            
+            SteamIntegration.logger.info(`Loading cached games for Steam user: ${extractedVanity}`)
+            
+            // Get cached resolve and games data
+            const steamId = await this.getCachedSteamId(extractedVanity)
+            
+            if (!steamId) {
+                throw new Error('No cached resolve data found')
+            }
+            
+            const cachedGames = this.steamClient.getCached<SteamUser>(`games_${steamId}`)
+            if (!cachedGames) {
+                throw new Error('No cached games data found')
+            }
+            
+            // Update game library state with cached data
+            this.gameLibrary.setUserData(cachedGames)
+            
+            callbacks.onProgress?.(20, 100, `Loading ${cachedGames.game_count} games from cache...`)
+            
+            // Process cached games with progress feedback
+            const maxGames = Math.min(this.config.maxGames, cachedGames.games.length)
+            const sortedGames = [...cachedGames.games]
+                .sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0))
+                .slice(0, maxGames)
+
+            for (let i = 0; i < sortedGames.length; i++) {
+                const game = sortedGames[i]
+                
+                // Get cached game details or create basic details
+                const gameKey = `game_${game.appid}`
+                let enhancedGame = this.steamClient.getCached<SteamGame>(gameKey)
+                
+                if (!enhancedGame) {
+                    // Create basic artwork URLs if not cached
+                    enhancedGame = {
+                        ...game,
+                        artwork: {
+                            icon: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`,
+                            logo: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`,
+                            header: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`,
+                            library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
+                        }
+                    }
+                }
+                
+                // Update game library and notify caller
+                this.gameLibrary.updateGameData(enhancedGame)
+                callbacks.onGameLoaded?.(enhancedGame)
+                
+                const percentage = Math.round(((i + 1) / sortedGames.length) * 80) + 20 // 20-100%
+                callbacks.onProgress?.(percentage, 100, `Loaded ${i + 1}/${sortedGames.length} games from cache`)
+            }
+            
+            // Complete loading
+            callbacks.onProgress?.(100, 100, 'Cache loading complete!')
+            callbacks.onStatusUpdate?.(
+                `✅ Loaded ${sortedGames.length} games from cache for ${cachedGames.vanity_url}!`, 
+                'success'
+            )
+            
+            SteamIntegration.logger.info(`Cache loading complete for ${sortedGames.length} games`)
+            
+            return this.gameLibrary.getState()
+            
+        } catch (error) {
+            SteamIntegration.logger.error('Failed to load games from cache:', error)
+            callbacks.onStatusUpdate?.(
+                `❌ Failed to load from cache. Try "Load My Games" instead.`, 
+                'error'
+            )
+            throw error
+        }
+    }
+
+    private async getCachedSteamId(vanityUrl: string): Promise<string | null> {
+        const resolveKey = `resolve_${vanityUrl.toLowerCase()}`
+        const cachedResolve = this.steamClient.getCached<SteamResolveResponse>(resolveKey)
+        return cachedResolve?.steamid || null
     }
 
     /**

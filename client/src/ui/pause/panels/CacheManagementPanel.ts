@@ -49,7 +49,15 @@ export class CacheManagementPanel extends PauseMenuPanel {
     /**
      * Convert ImageCacheStats to internal CacheStats format
      */
-    private convertCacheStats(imageStats: ImageCacheStats): CacheStats {
+    private convertCacheStats(imageStats: ImageCacheStats | null): CacheStats {
+        if (!imageStats) {
+            return {
+                imageCount: 0,
+                totalSize: 0,
+                lastUpdate: null
+            }
+        }
+        
         return {
             imageCount: imageStats.totalImages,
             totalSize: imageStats.totalSize,
@@ -65,7 +73,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
             // Cache stats (will be updated via refreshStats)
             imageCount: this.cacheStats.imageCount || 'Loading...',
             totalSize: this.cacheStats.totalSize ? this.formatBytes(this.cacheStats.totalSize) : 'Loading...',
-            lastUpdate: this.cacheStats.lastUpdate ? this.cacheStats.lastUpdate.toLocaleString() : 'Loading...',
+            lastUpdate: this.cacheStats.lastUpdate?.toLocaleString() || 'Never',
             cacheApiStatus: ('caches' in window) ? 'Available' : 'Not available',
             storageQuota: 'Calculating...',
             
@@ -92,29 +100,35 @@ export class CacheManagementPanel extends PauseMenuPanel {
         const clearBtn = panel.querySelector('#clear-cache-btn')
         const downloadBtn = panel.querySelector('#download-missing-btn')
 
-        this.addEventListener(refreshBtn as HTMLElement, 'click', () => this.refreshCache())
-        this.addEventListener(clearBtn as HTMLElement, 'click', () => this.clearCache())
-        this.addEventListener(downloadBtn as HTMLElement, 'click', () => this.downloadMissing())
+        if (refreshBtn) this.addEventListener(refreshBtn as HTMLElement, 'click', () => this.refreshCache())
+        if (clearBtn) this.addEventListener(clearBtn as HTMLElement, 'click', () => this.clearCache())
+        if (downloadBtn) this.addEventListener(downloadBtn as HTMLElement, 'click', () => this.downloadMissing())
 
         // Settings
         const autoDownloadToggle = panel.querySelector('#auto-download-toggle') as HTMLInputElement
         const cacheLimitInput = panel.querySelector('#cache-limit-input') as HTMLInputElement
         const preloadToggle = panel.querySelector('#preload-toggle') as HTMLInputElement
 
-        this.addEventListener(autoDownloadToggle, 'change', (e) => {
-            const target = e.target as HTMLInputElement
-            this.setSetting('autoDownload', target.checked)
-        })
+        if (autoDownloadToggle) {
+            this.addEventListener(autoDownloadToggle, 'change', (e) => {
+                const target = e.target as HTMLInputElement
+                this.setSetting('autoDownload', target.checked)
+            })
+        }
 
-        this.addEventListener(cacheLimitInput, 'change', (e) => {
-            const target = e.target as HTMLInputElement
-            this.setSetting('cacheLimit', parseInt(target.value))
-        })
+        if (cacheLimitInput) {
+            this.addEventListener(cacheLimitInput, 'change', (e) => {
+                const target = e.target as HTMLInputElement
+                this.setSetting('cacheLimit', parseInt(target.value))
+            })
+        }
 
-        this.addEventListener(preloadToggle, 'change', (e) => {
-            const target = e.target as HTMLInputElement
-            this.setSetting('preload', target.checked)
-        })
+        if (preloadToggle) {
+            this.addEventListener(preloadToggle, 'change', (e) => {
+                const target = e.target as HTMLInputElement
+                this.setSetting('preload', target.checked)
+            })
+        }
     }
 
     onShow(): void {
@@ -181,8 +195,13 @@ export class CacheManagementPanel extends PauseMenuPanel {
         try {
             // Use Steam integration function if available, otherwise fallback to browser cache
             if (this.onGetStats) {
-                const imageStats = await this.onGetStats()
-                this.cacheStats = this.convertCacheStats(imageStats)
+                try {
+                    const imageStats = await this.onGetStats()
+                    this.cacheStats = this.convertCacheStats(imageStats)
+                } catch (error) {
+                    console.warn('onGetStats failed, falling back to browser cache:', error)
+                    this.cacheStats = await this.getCacheInfo()
+                }
             } else {
                 const cacheStats = await this.getCacheInfo()
                 this.cacheStats = cacheStats

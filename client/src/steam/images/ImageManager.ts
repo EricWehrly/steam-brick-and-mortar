@@ -103,10 +103,15 @@ export class ImageManager {
         const results: Record<string, Blob | null> = {};
 
         for (const [type, url] of Object.entries(artworkUrls)) {
-            if (url) {
+            if (url && url.trim() !== '') {
                 results[type] = await this.downloadImage(url, options);
                 // Small delay between downloads
                 await new Promise(resolve => setTimeout(resolve, 100));
+            } else {
+                // TODO: try something different
+                console.warn(`Skipping empty or invalid URL for ${type}`);
+                // Skip empty or invalid URLs
+                results[type] = null;
             }
         }
 
