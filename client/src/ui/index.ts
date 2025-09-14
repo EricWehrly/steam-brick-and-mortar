@@ -4,8 +4,7 @@
 
 export { UIManager } from './UIManager'
 export { 
-    UICoordinator, 
-    type UICoordinatorCallbacks 
+    UICoordinator
 } from './UICoordinator'
 export { SteamUIPanel } from './SteamUIPanel'
 export { ProgressDisplay } from './ProgressDisplay'

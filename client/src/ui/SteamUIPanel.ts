@@ -8,16 +8,19 @@ import steamCacheStatsTemplate from '../templates/steam-ui/cache-stats.html?raw'
 
 export interface SteamUIPanelEvents {
   onLoadGames: (vanityUrl: string) => void
+  onLoadFromCache: (vanityUrl: string) => void
   onUseOffline: (vanityUrl: string) => void
   onRefreshCache: () => void
   onClearCache: () => void
   onShowCacheStats: () => void
+  checkCacheAvailability?: (vanityUrl: string) => boolean
 }
 
 export class SteamUIPanel {
   private steamUI: HTMLElement | null
   private steamVanityInput: HTMLInputElement | null
   private loadGamesButton: HTMLButtonElement | null
+  private loadFromCacheButton: HTMLButtonElement | null
   private useOfflineButton: HTMLButtonElement | null
   private refreshCacheButton: HTMLButtonElement | null
   private clearCacheButton: HTMLButtonElement | null
@@ -30,6 +33,7 @@ export class SteamUIPanel {
     this.steamUI = document.getElementById('steam-ui')
     this.steamVanityInput = getElementByIdSafe('steam-vanity') as HTMLInputElement
     this.loadGamesButton = getElementByIdSafe('load-steam-games') as HTMLButtonElement
+    this.loadFromCacheButton = getElementByIdSafe('load-from-cache') as HTMLButtonElement
     this.useOfflineButton = getElementByIdSafe('use-offline-data') as HTMLButtonElement
     this.refreshCacheButton = getElementByIdSafe('refresh-cache') as HTMLButtonElement
     this.clearCacheButton = getElementByIdSafe('clear-cache') as HTMLButtonElement
@@ -50,6 +54,16 @@ export class SteamUIPanel {
         const vanityUrl = this.getVanityInput()
         if (vanityUrl) {
           this.events.onLoadGames(vanityUrl)
+        }
+      })
+    }
+    
+    // Load from Cache button
+    if (this.loadFromCacheButton) {
+      this.loadFromCacheButton.addEventListener('click', () => {
+        const vanityUrl = this.getVanityInput()
+        if (vanityUrl) {
+          this.events.onLoadFromCache(vanityUrl)
         }
       })
     }
@@ -94,10 +108,14 @@ export class SteamUIPanel {
         }
       })
       
-      // Input change handler for offline availability
+      // Input change handler for cache and offline availability
       this.steamVanityInput.addEventListener('input', () => {
         const vanityUrl = this.steamVanityInput?.value.trim() || ''
         this.checkOfflineAvailability(vanityUrl)
+        
+        // Check cache availability and show/hide Load from Cache button
+        const hasCache = this.events.checkCacheAvailability?.(vanityUrl) || false
+        this.checkCacheAvailability(vanityUrl, hasCache)
       })
     }
   }
@@ -172,6 +190,18 @@ export class SteamUIPanel {
     if (this.showCacheStatsButton) {
       this.showCacheStatsButton.textContent = isHidden ? 'Hide Info' : 'Cache Info'
     }
+  }
+  
+  checkCacheAvailability(vanityUrl: string, hasCache: boolean): void {
+    if (!this.loadFromCacheButton) return
+    
+    if (!vanityUrl || !hasCache) {
+      this.loadFromCacheButton.style.display = 'none'
+      return
+    }
+    
+    // Show the Load from Cache button when cached data is available
+    this.loadFromCacheButton.style.display = 'inline-block'
   }
   
   checkOfflineAvailability(vanityUrl: string): void {

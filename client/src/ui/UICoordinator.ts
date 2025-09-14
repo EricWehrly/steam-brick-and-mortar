@@ -22,22 +22,6 @@ import type { DebugStats, DebugStatsProvider } from '../core/DebugStatsProvider'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { ImageCacheStats } from '../steam/images/ImageManager'
 
-export interface UICoordinatorCallbacks {
-    onWebXRToggle?: () => Promise<void>
-    onLoadSteamGames?: (vanityUrl: string) => Promise<void>
-    onUseOfflineData?: (vanityUrl: string) => Promise<void>
-    onRefreshCache?: () => Promise<void>
-    onClearCache?: () => void
-    onShowCacheStats?: () => void
-    onGetImageCacheStats?: () => Promise<ImageCacheStats>
-    onClearImageCache?: () => Promise<void>
-    onGetDebugStats?: () => Promise<DebugStats>
-    onPauseInput?: () => void
-    onResumeInput?: () => void
-    onMenuOpen?: () => void
-    onMenuClose?: () => void
-}
-
 /**
  * Coordinates high-level UI workflows and component interactions
  */
@@ -47,18 +31,29 @@ export class UICoordinator {
     private performanceMonitor: PerformanceMonitor
     private eventManager: EventManager
     private debugStatsProvider: DebugStatsProvider
+    private cacheStatsProvider?: () => Promise<ImageCacheStats>
 
     constructor(
         performanceMonitor: PerformanceMonitor,
-        debugStatsProvider: DebugStatsProvider
+        debugStatsProvider: DebugStatsProvider,
+        cacheStatsProvider?: () => Promise<ImageCacheStats>
     ) {
+        if (!performanceMonitor) {
+            throw new Error('PerformanceMonitor is required')
+        }
+        if (!debugStatsProvider) {
+            throw new Error('DebugStatsProvider is required')
+        }
+
         this.performanceMonitor = performanceMonitor
         this.debugStatsProvider = debugStatsProvider
+        this.cacheStatsProvider = cacheStatsProvider
         this.eventManager = EventManager.getInstance()
 
         // Initialize UI Manager with Steam and WebXR event handlers that emit events
         this.uiManager = new UIManager({
             steamLoadGames: (vanityUrl: string) => this.emitSteamLoadGamesEvent(vanityUrl),
+            steamLoadFromCache: (vanityUrl: string) => this.emitSteamLoadFromCacheEvent(vanityUrl),
             steamUseOffline: (vanityUrl: string) => this.emitSteamUseOfflineEvent(vanityUrl),
             steamRefreshCache: () => this.emitSteamRefreshCacheEvent(),
             steamClearCache: () => this.emitSteamClearCacheEvent(),
@@ -100,7 +95,7 @@ export class UICoordinator {
         
         // Register all default panels with event emissions
         this.pauseMenuManager.registerDefaultPanels({
-            onGetImageCacheStats: () => this.requestImageCacheStats(),
+            onGetImageCacheStats: this.cacheStatsProvider || (() => Promise.resolve({ totalImages: 0, totalSize: 0, oldestTimestamp: 0, newestTimestamp: 0 })),
             onClearImageCache: async () => this.emitClearImageCacheEvent(),
             onGetDebugStats: () => this.requestDebugStats()
         })
@@ -234,6 +229,14 @@ export class UICoordinator {
         })
     }
 
+    private emitSteamLoadFromCacheEvent(vanityUrl: string): void {
+        this.eventManager.emit(SteamEventTypes.LoadFromCache, { 
+            vanityUrl,
+            timestamp: Date.now(),
+            source: 'ui' as const 
+        })
+    }
+
     private emitSteamUseOfflineEvent(vanityUrl: string): void {
         this.eventManager.emit(SteamEventTypes.UseOffline, { 
             vanityUrl,
@@ -308,24 +311,6 @@ export class UICoordinator {
             timestamp: Date.now(),
             source: 'ui' as const
         })
-    }
-
-    /**
-     * Request image cache stats from SteamWorkflowManager
-     */
-    private requestImageCacheStats(): Promise<any> {
-        return new Promise((resolve) => {
-            // Find SteamWorkflowManager through event system
-            // For now, emit event - the proper integration should be via direct reference
-            this.eventManager.emit(UIEventTypes.ImageCacheStatsRequest, {
-                timestamp: Date.now(),
-                source: 'ui' as const
-            });
-            
-            // This is a temporary placeholder - in the actual implementation,
-            // the SteamWorkflowManager should call this callback with the stats
-            resolve(null);
-        });
     }
 
     /**

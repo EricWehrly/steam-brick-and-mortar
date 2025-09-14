@@ -10,6 +10,7 @@ import uiErrorTemplate from '../templates/ui/error.html?raw'
 
 export interface UIManagerEvents {
   steamLoadGames: (vanityUrl: string) => void
+  steamLoadFromCache: (vanityUrl: string) => void
   steamUseOffline: (vanityUrl: string) => void
   steamRefreshCache: () => void
   steamClearCache: () => void
@@ -25,6 +26,7 @@ export class UIManager {
   constructor(private events: UIManagerEvents) {
     this.steamUIPanel = new SteamUIPanel({
       onLoadGames: this.events.steamLoadGames,
+      onLoadFromCache: this.events.steamLoadFromCache,
       onUseOffline: this.events.steamUseOffline,
       onRefreshCache: this.events.steamRefreshCache,
       onClearCache: this.events.steamClearCache,

@@ -16,6 +16,10 @@ export interface SteamLoadGamesEvent extends BaseInteractionEvent {
     vanityUrl: string
 }
 
+export interface SteamLoadFromCacheEvent extends BaseInteractionEvent {
+    vanityUrl: string
+}
+
 export interface SteamUseOfflineEvent extends BaseInteractionEvent {
     vanityUrl: string
 }
@@ -94,6 +98,7 @@ export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
 
 export const SteamEventTypes = {
     LoadGames: 'steam:load-games',
+    LoadFromCache: 'steam:load-from-cache',
     UseOffline: 'steam:use-offline', 
     CacheClear: 'steam:cache-clear',
     CacheRefresh: 'steam:cache-refresh',
@@ -131,6 +136,7 @@ export const UIEventTypes = {
 export interface InteractionEventMap {
     // Steam events
     [SteamEventTypes.LoadGames]: SteamLoadGamesEvent
+    [SteamEventTypes.LoadFromCache]: SteamLoadFromCacheEvent
     [SteamEventTypes.UseOffline]: SteamUseOfflineEvent
     [SteamEventTypes.CacheClear]: SteamCacheClearEvent
     [SteamEventTypes.CacheRefresh]: SteamCacheRefreshEvent
