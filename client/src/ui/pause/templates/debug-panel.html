@@ -1,9 +1,6 @@
 <div class="debug-content">
     <div class="debug-actions">
         <button id="refresh-debug" class="pause-btn secondary">🔄 Refresh Stats</button>
-        <button id="toggle-console" class="pause-btn {{consoleActiveClass}}">
-            {{consoleButtonText}}
-        </button>
         <button id="test-steam-launch" class="pause-btn primary">🎮 Test Game Launch</button>
         <button id="export-debug" class="pause-btn accent">📋 Export Debug Info</button>
     </div>
@@ -125,16 +122,6 @@
                     <span class="stat-value" id="stat-renderer">{{systemRenderer}}</span>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div id="debug-console" class="debug-console {{consoleVisibilityClass}}">
-        <div class="console-header">
-            <h5>🖥️ Debug Console</h5>
-            <button id="clear-console" class="console-button">Clear</button>
-        </div>
-        <div id="console-output" class="console-output">
-            <div class="console-line info">Debug console initialized. Use console.log() for output.</div>
         </div>
     </div>
 </div>

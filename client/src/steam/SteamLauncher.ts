@@ -5,6 +5,8 @@
  * from the Steam client. Provides fallback options for error cases.
  */
 
+import { Logger } from '../utils/Logger'
+
 export interface LaunchResult {
     success: boolean
     method: 'protocol' | 'store' | 'failed'
@@ -12,6 +14,7 @@ export interface LaunchResult {
 }
 
 export class SteamLauncher {
+    private static readonly logger = Logger.withContext(SteamLauncher.name)
     /**
      * Launch a Steam game using the steam:// protocol
      * @param appid Steam application ID
@@ -23,14 +26,14 @@ export class SteamLauncher {
         const storeUrl = `https://store.steampowered.com/app/${appid}`
         const gameLabel = gameName || `AppID ${appid}`
         
-        console.log(`🎮 Attempting to launch: ${gameLabel} (${appid})`)
+        SteamLauncher.logger.info(`Attempting to launch: ${gameLabel} (${appid})`)
         
         try {
             // Attempt to launch via Steam protocol
             const launched = this.openSteamProtocol(steamUrl)
             
             if (launched) {
-                console.log(`✅ Steam protocol launched: ${gameLabel}`)
+                SteamLauncher.logger.info(`Steam protocol launched: ${gameLabel}`)
                 return {
                     success: true,
                     method: 'protocol',
@@ -40,19 +43,19 @@ export class SteamLauncher {
                 throw new Error('Steam protocol not available')
             }
         } catch (error) {
-            console.warn(`⚠️ Steam protocol failed for ${gameLabel}:`, error)
+            SteamLauncher.logger.warn(`Steam protocol failed for ${gameLabel}:`, error)
             
             // Fallback to Steam store page
             try {
                 window.open(storeUrl, '_blank')
-                console.log(`🌐 Opened Steam store page: ${gameLabel}`)
+                SteamLauncher.logger.info(`Opened Steam store page: ${gameLabel}`)
                 return {
                     success: true,
                     method: 'store',
                     message: `Opened Steam store page for ${gameLabel}`
                 }
             } catch (storeError) {
-                console.error(`❌ All launch methods failed for ${gameLabel}:`, storeError)
+                SteamLauncher.logger.error(`All launch methods failed for ${gameLabel}:`, storeError)
                 return {
                     success: false,
                     method: 'failed',
@@ -98,7 +101,7 @@ export class SteamLauncher {
             
             return true // Assume success - browser handles protocol errors
         } catch (error) {
-            console.error('Steam protocol error:', error)
+            SteamLauncher.logger.error('Steam protocol error:', error)
             return false
         }
     }
