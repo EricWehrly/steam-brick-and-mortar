@@ -28,6 +28,9 @@ export interface CacheStats {
 export class CacheManager {
     private cache: Map<string, CacheEntry<any>> = new Map()
     private readonly config: CacheConfig
+    private pendingWrites: boolean = false
+    private writeTimeout: number | null = null
+    private readonly WRITE_DEBOUNCE_MS = 2000 // 2 seconds
 
     constructor(config: Partial<CacheConfig> = {}) {
         this.config = {
@@ -39,6 +42,13 @@ export class CacheManager {
         
         if (this.config.enableCache && typeof localStorage !== 'undefined') {
             this.loadFromStorage()
+            
+            // Save immediately on page unload to prevent data loss
+            if (typeof window !== 'undefined') {
+                window.addEventListener('beforeunload', () => {
+                    this.saveImmediately()
+                })
+            }
         }
     }
 
@@ -101,7 +111,7 @@ export class CacheManager {
             timestamp: Date.now()
         })
         
-        this.saveToStorage()
+        this.scheduleSave()
     }
 
     /**
@@ -109,9 +119,38 @@ export class CacheManager {
      */
     clear(): void {
         this.cache.clear()
-        if (typeof localStorage !== 'undefined') {
-            localStorage.removeItem('cache_state')
+        this.saveImmediately() // Save immediately on clear
+    }
+
+    /**
+     * Force immediate save to storage (for critical operations)
+     */
+    saveImmediately(): void {
+        if (this.writeTimeout) {
+            clearTimeout(this.writeTimeout)
+            this.writeTimeout = null
         }
+        this.pendingWrites = false
+        this.saveToStorage()
+    }
+
+    /**
+     * Schedule a debounced save to storage
+     */
+    private scheduleSave(): void {
+        // Clear any existing timeout
+        if (this.writeTimeout) {
+            clearTimeout(this.writeTimeout)
+            this.writeTimeout = null
+        }
+
+        this.pendingWrites = true
+
+        this.writeTimeout = setTimeout(() => {
+            this.saveToStorage()
+            this.pendingWrites = false
+            this.writeTimeout = null
+        }, this.WRITE_DEBOUNCE_MS)
     }
 
     /**
@@ -146,8 +185,14 @@ export class CacheManager {
 
     private saveToStorage(): void {
         try {
-            const entries = Array.from(this.cache.entries())
-            localStorage.setItem('cache_state', JSON.stringify(entries))
+            if (typeof localStorage !== 'undefined') {
+                if (this.cache.size === 0) {    // no cache to store
+                    localStorage.removeItem('cache_state')
+                } else {
+                    const entries = Array.from(this.cache.entries())
+                    localStorage.setItem('cache_state', JSON.stringify(entries))
+                }
+            }
         } catch (error) {
             console.warn('Failed to save cache to storage:', error)
         }

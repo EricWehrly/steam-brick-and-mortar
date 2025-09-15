@@ -199,4 +199,96 @@ describe('CacheManager Unit Tests', () => {
             consoleSpy.mockRestore()
         })
     })
+
+    describe('Debounced localStorage Writes', () => {
+        it('should batch multiple writes within debounce window', () => {
+            // Set multiple values rapidly
+            cacheManager.set('key1', { data: 'value1' })
+            cacheManager.set('key2', { data: 'value2' })
+            cacheManager.set('key3', { data: 'value3' })
+            
+            // localStorage should not have been called yet
+            expect(localStorageMock.setItem).not.toHaveBeenCalled()
+            
+            // Advance timers to trigger debounced save
+            vi.advanceTimersByTime(2100) // Past the 2000ms debounce
+            
+            // Now localStorage should have been called exactly once
+            expect(localStorageMock.setItem).toHaveBeenCalledTimes(1)
+            expect(localStorageMock.setItem).toHaveBeenCalledWith(
+                'cache_state',
+                expect.stringContaining('key1')
+            )
+        })
+
+        it('should save immediately on clear()', () => {
+            // Set a value first
+            cacheManager.set('key', { data: 'value' })
+            vi.clearAllMocks() // Clear the mock calls from set()
+            
+            // Clear should save immediately
+            cacheManager.clear()
+            
+            // localStorage should be called immediately (removeItem for empty cache)
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('cache_state')
+            
+            // No pending timers should exist
+            expect(vi.getTimerCount()).toBe(0)
+        })
+
+        it('should save immediately on saveImmediately()', () => {
+            // Set a value to create pending write
+            cacheManager.set('key', { data: 'value' })
+            vi.clearAllMocks()
+            
+            // Force immediate save
+            cacheManager.saveImmediately()
+            
+            // localStorage should be called immediately
+            expect(localStorageMock.setItem).toHaveBeenCalledTimes(1)
+            
+            // No pending timers should exist
+            expect(vi.getTimerCount()).toBe(0)
+        })
+
+        it('should cancel previous timeout when new writes arrive', () => {
+            // First write
+            cacheManager.set('key1', { data: 'value1' })
+            
+            // Wait partway through debounce period
+            vi.advanceTimersByTime(1000)
+            
+            // Second write should reset the timer
+            cacheManager.set('key2', { data: 'value2' })
+            
+            // Wait the original timeout period (should not save yet)
+            vi.advanceTimersByTime(1500)
+            expect(localStorageMock.setItem).not.toHaveBeenCalled()
+            
+            // Wait the full new timeout period
+            vi.advanceTimersByTime(1000)
+            expect(localStorageMock.setItem).toHaveBeenCalledTimes(1)
+        })
+
+        it('should handle multiple cache instances independently', () => {
+            // Create second cache manager
+            const cacheManager2 = new CacheManager()
+            
+            // Clear mocks after both instances are created
+            vi.clearAllMocks()
+            
+            // Set values in both
+            cacheManager.set('key1', { data: 'value1' })
+            cacheManager2.set('key2', { data: 'value2' })
+            
+            // Advance time for first cache's debounce
+            vi.advanceTimersByTime(2100)
+            
+            // Both localStorage calls should have happened (one for each instance)
+            expect(localStorageMock.setItem).toHaveBeenCalledTimes(2)
+            
+            // All timers should be cleared
+            expect(vi.getTimerCount()).toBe(0)
+        })
+    })
 })
