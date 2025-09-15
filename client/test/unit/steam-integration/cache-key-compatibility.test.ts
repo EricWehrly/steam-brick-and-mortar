@@ -14,7 +14,8 @@ describe('SteamIntegration Cache Key Compatibility', () => {
         mockSteamClient = {
             getAllCacheKeys: vi.fn(),
             getCached: vi.fn(),
-            hasCached: vi.fn()
+            hasCached: vi.fn(),
+            getCachedUsers: vi.fn()
         }
         
         steamIntegration = new SteamIntegration()
@@ -23,27 +24,15 @@ describe('SteamIntegration Cache Key Compatibility', () => {
     })
 
     it('should handle prefixed cache keys correctly', () => {
-        // Mock cache keys without prefix (as getAllKeys should return after stripping)
-        mockSteamClient.getAllCacheKeys.mockReturnValue([
-            'resolve_spitemonger',
-            'games_76561197984589530',
-            'other_key'
+        // Mock the optimized getCachedUsers method
+        mockSteamClient.getCachedUsers.mockReturnValue([
+            {
+                vanityUrl: 'spitemonger',
+                displayName: 'spitemonger',
+                gameCount: 42,
+                steamId: '76561197984589530'
+            }
         ])
-
-        // Mock resolve data
-        mockSteamClient.getCached.mockImplementation((key: string) => {
-            if (key === 'resolve_spitemonger') {
-                return { steamid: '76561197984589530', vanity_url: 'spitemonger' }
-            }
-            if (key === 'games_76561197984589530') {
-                return { 
-                    vanity_url: 'spitemonger',
-                    game_count: 42,
-                    games: []
-                }
-            }
-            return null
-        })
 
         const cachedUsers = steamIntegration.getCachedUsers()
 
@@ -57,73 +46,43 @@ describe('SteamIntegration Cache Key Compatibility', () => {
     })
 
     it('should handle non-prefixed cache keys correctly', () => {
-        // Mock cache keys without prefix (theoretical format after stripping)
-        mockSteamClient.getAllCacheKeys.mockReturnValue([
-            'resolve_spitemonger',
-            'games_76561197984589530',
-            'other_key'
+        // Mock the optimized getCachedUsers method
+        mockSteamClient.getCachedUsers.mockReturnValue([
+            {
+                vanityUrl: 'spitemonger',
+                displayName: 'spitemonger',
+                gameCount: 42,
+                steamId: '76561197984589530'
+            }
         ])
-
-        // Mock resolve data
-        mockSteamClient.getCached.mockImplementation((key: string) => {
-            if (key === 'resolve_spitemonger') {
-                return { steamid: '76561197984589530', vanity_url: 'spitemonger' }
-            }
-            if (key === 'games_76561197984589530') {
-                return { 
-                    vanity_url: 'spitemonger',
-                    game_count: 42,
-                    games: []
-                }
-            }
-            return null
-        })
 
         const cachedUsers = steamIntegration.getCachedUsers()
 
         expect(cachedUsers).toHaveLength(1)
         expect(cachedUsers[0]).toEqual({
             vanityUrl: 'spitemonger',
-            displayName: 'spitemonger', 
+            displayName: 'spitemonger',
             gameCount: 42,
             steamId: '76561197984589530'
         })
     })
 
     it('should handle mixed cache key formats', () => {
-        // Mock keys as getAllKeys should return them (without prefix)
-        mockSteamClient.getAllCacheKeys.mockReturnValue([
-            'resolve_user1',
-            'resolve_user2',
-            'games_76561197984589530',
-            'games_76561197984589531',
-            'other_key'
+        // Mock the optimized getCachedUsers method to return multiple users
+        mockSteamClient.getCachedUsers.mockReturnValue([
+            {
+                vanityUrl: 'user1',
+                displayName: 'user1',
+                gameCount: 10,
+                steamId: '76561197984589530'
+            },
+            {
+                vanityUrl: 'user2',
+                displayName: 'user2',
+                gameCount: 20,
+                steamId: '76561197984589531'
+            }
         ])
-
-        // Mock resolve data
-        mockSteamClient.getCached.mockImplementation((key: string) => {
-            if (key === 'resolve_user1') {
-                return { steamid: '76561197984589530', vanity_url: 'user1' }
-            }
-            if (key === 'resolve_user2') {
-                return { steamid: '76561197984589531', vanity_url: 'user2' }
-            }
-            if (key === 'games_76561197984589530') {
-                return { 
-                    vanity_url: 'user1',
-                    game_count: 10,
-                    games: []
-                }
-            }
-            if (key === 'games_76561197984589531') {
-                return { 
-                    vanity_url: 'user2',
-                    game_count: 20,
-                    games: []
-                }
-            }
-            return null
-        })
 
         const cachedUsers = steamIntegration.getCachedUsers()
 
@@ -145,5 +104,33 @@ describe('SteamIntegration Cache Key Compatibility', () => {
         const result = steamIntegration.hasCachedData('testuser')
         expect(result).toBe(true)
         expect(mockSteamClient.getCached).toHaveBeenCalledWith('resolve_testuser')
+    })
+
+    it('should use optimized getCachedUsers implementation', () => {
+        const mockUsers = [
+            {
+                vanityUrl: 'testuser1',
+                displayName: 'Test User 1',
+                gameCount: 100,
+                steamId: '76561197984589530'
+            },
+            {
+                vanityUrl: 'testuser2', 
+                displayName: 'Test User 2',
+                gameCount: 200,
+                steamId: '76561197984589531'
+            }
+        ]
+
+        mockSteamClient.getCachedUsers.mockReturnValue(mockUsers)
+
+        const result = steamIntegration.getCachedUsers()
+
+        expect(result).toEqual(mockUsers)
+        expect(mockSteamClient.getCachedUsers).toHaveBeenCalledTimes(1)
+        
+        // Verify it doesn't call the old inefficient methods
+        expect(mockSteamClient.getAllCacheKeys).not.toHaveBeenCalled()
+        expect(mockSteamClient.getCached).not.toHaveBeenCalled()
     })
 })

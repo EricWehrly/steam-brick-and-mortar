@@ -182,36 +182,8 @@ export class SteamIntegration {
      * Get all cached users with their vanity URLs and display names
      */
     getCachedUsers(): Array<{ vanityUrl: string, displayName: string, gameCount: number, steamId: string }> {
-        const cachedUsers: Array<{ vanityUrl: string, displayName: string, gameCount: number, steamId: string }> = []
-        
-        // Get all resolve cache entries to find cached users
-        // getAllKeys() should return keys without the prefix
-        const allKeys = this.steamClient.getAllCacheKeys()
-        const resolveEntries = allKeys.filter(key => key.startsWith('resolve_'))
-        
-        for (const resolveKey of resolveEntries) {
-            // Extract vanity URL from key (should already be without prefix)
-            const vanityUrl = resolveKey.replace('resolve_', '')
-            
-            const resolveData = this.steamClient.getCached<SteamResolveResponse>(resolveKey)
-            
-            if (resolveData && resolveData.steamid) {
-                // Check if we also have games data for this user
-                const gamesKey = `games_${resolveData.steamid}`
-                const gamesData = this.steamClient.getCached<SteamUser>(gamesKey)
-                
-                if (gamesData) {
-                    cachedUsers.push({
-                        vanityUrl: vanityUrl,
-                        displayName: gamesData.vanity_url || vanityUrl,
-                        gameCount: gamesData.game_count || 0,
-                        steamId: resolveData.steamid
-                    })
-                }
-            }
-        }
-        
-        return cachedUsers.sort((a, b) => a.displayName.localeCompare(b.displayName))
+        // Use the optimized implementation from SteamApiClient
+        return this.steamClient.getCachedUsers()
     }
 
     /**

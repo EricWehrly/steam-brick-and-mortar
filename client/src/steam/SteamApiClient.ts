@@ -236,6 +236,52 @@ export class SteamApiClient {
     public getAllCacheKeys(): string[] {
         return this.cache.getAllKeys()
     }
+
+    /**
+     * Get cached users efficiently (optimized implementation)
+     */
+    public getCachedUsers(): Array<{ vanityUrl: string, displayName: string, gameCount: number, steamId: string }> {
+        const cachedUsers: Array<{ vanityUrl: string, displayName: string, gameCount: number, steamId: string }> = []
+        const userMap = new Map<string, { vanityUrl?: string, resolveData?: SteamResolveResponse, gamesData?: SteamUser }>()
+        
+        // Single pass through all cache keys to collect user data
+        const allKeys = this.cache.getAllKeys()
+        
+        for (const key of allKeys) {
+            if (key.startsWith('resolve_')) {
+                const vanityUrl = key.replace('resolve_', '')
+                const resolveData = this.cache.get<SteamResolveResponse>(key)
+                if (resolveData && resolveData.steamid) {
+                    const existing = userMap.get(resolveData.steamid) || {}
+                    existing.vanityUrl = vanityUrl
+                    existing.resolveData = resolveData
+                    userMap.set(resolveData.steamid, existing)
+                }
+            } else if (key.startsWith('games_')) {
+                const steamId = key.replace('games_', '')
+                const gamesData = this.cache.get<SteamUser>(key)
+                if (gamesData) {
+                    const existing = userMap.get(steamId) || {}
+                    existing.gamesData = gamesData
+                    userMap.set(steamId, existing)
+                }
+            }
+        }
+        
+        // Build final user list from users who have both resolve and games data
+        for (const [steamId, userData] of userMap.entries()) {
+            if (userData.resolveData && userData.gamesData) {
+                cachedUsers.push({
+                    vanityUrl: userData.vanityUrl || userData.gamesData.vanity_url || steamId,
+                    displayName: userData.gamesData.vanity_url || userData.vanityUrl || steamId,
+                    gameCount: userData.gamesData.game_count || 0,
+                    steamId: steamId
+                })
+            }
+        }
+        
+        return cachedUsers.sort((a, b) => a.displayName.localeCompare(b.displayName))
+    }
 }
 
 // Export a default instance for convenience
