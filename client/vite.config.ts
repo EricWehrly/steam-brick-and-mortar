@@ -15,6 +15,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true, // Fail if port is occupied instead of auto-incrementing
     open: true,
     host: true
   },
