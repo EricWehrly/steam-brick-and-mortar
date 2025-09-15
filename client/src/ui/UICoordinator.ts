@@ -102,6 +102,12 @@ export class UICoordinator {
         this.pauseMenuManager.registerDefaultPanels({
             onGetImageCacheStats: this.cacheStatsProvider || (() => Promise.resolve({ totalImages: 0, totalSize: 0, oldestTimestamp: 0, newestTimestamp: 0 })),
             onClearImageCache: async () => this.emitClearImageCacheEvent(),
+            onGetCachedUsers: () => Promise.resolve(this.steamIntegration?.getCachedUsers() ?? []),
+            onLoadCachedUser: async (steamId: string) => {
+                if (this.steamIntegration) {
+                    await this.steamIntegration.loadGamesFromCache(steamId)
+                }
+            },
             onGetDebugStats: () => this.requestDebugStats()
         })
 

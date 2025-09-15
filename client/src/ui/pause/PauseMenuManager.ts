@@ -11,7 +11,7 @@ import pauseMenuStructureTemplate from '../../templates/pause-menu/main-structur
 import '../../styles/pause-menu/pause-menu-manager.css'
 
 // Panel imports for default registration
-import { CacheManagementPanel } from './panels/CacheManagementPanel'
+import { CacheManagementPanel, type CachedUser } from './panels/CacheManagementPanel'
 import { HelpPanel } from './panels/HelpPanel'
 import { ApplicationPanel, type ApplicationSettings } from './panels/ApplicationPanel'
 import { GameSettingsPanel } from './panels/GameSettingsPanel'
@@ -49,6 +49,8 @@ export interface DefaultPanelCallbacks {
     // Cache management
     onGetImageCacheStats?: () => Promise<ImageCacheStats>
     onClearImageCache?: () => Promise<void>
+    onGetCachedUsers?: () => Promise<CachedUser[]>
+    onLoadCachedUser?: (steamId: string) => Promise<void>
     
     // Debug stats
     onGetDebugStats?: () => Promise<DebugStats>
@@ -117,7 +119,9 @@ export class PauseMenuManager {
             const cachePanel = new CacheManagementPanel()
             cachePanel.initCacheFunctions(
                 callbacks.onGetImageCacheStats,
-                callbacks.onClearImageCache
+                callbacks.onClearImageCache,
+                callbacks.onGetCachedUsers,
+                callbacks.onLoadCachedUser
             )
             this.cacheManagementPanel = cachePanel
             this.registerPanel(cachePanel)

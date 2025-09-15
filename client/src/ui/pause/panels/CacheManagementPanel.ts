@@ -16,6 +16,13 @@ export interface CacheStats {
     lastUpdate: Date | null
 }
 
+export interface CachedUser {
+    vanityUrl: string
+    displayName: string
+    gameCount: number
+    steamId: string
+}
+
 export class CacheManagementPanel extends PauseMenuPanel {
     readonly id = 'cache-management'
     readonly title = 'Cache Management'
@@ -27,9 +34,12 @@ export class CacheManagementPanel extends PauseMenuPanel {
         lastUpdate: null
     }
     
+    private cachedUsers: CachedUser[] = []
     private updateInterval: number | null = null
     private onGetStats?: () => Promise<ImageCacheStats>
     private onClearCache?: () => Promise<void>
+    private onGetCachedUsers?: () => Promise<CachedUser[]>
+    private onLoadCachedUser?: (vanityUrl: string) => Promise<void>
 
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)
@@ -40,10 +50,14 @@ export class CacheManagementPanel extends PauseMenuPanel {
      */
     initCacheFunctions(
         getStats: () => Promise<ImageCacheStats>,
-        clearCache: () => Promise<void>
+        clearCache: () => Promise<void>,
+        getCachedUsers?: () => Promise<CachedUser[]>,
+        loadCachedUser?: (vanityUrl: string) => Promise<void>
     ): void {
         this.onGetStats = getStats
         this.onClearCache = clearCache
+        this.onGetCachedUsers = getCachedUsers
+        this.onLoadCachedUser = loadCachedUser
     }
     
     /**
@@ -68,6 +82,11 @@ export class CacheManagementPanel extends PauseMenuPanel {
     render(): string {
         const settings = this.getSettings()
         
+        // Get cached users for dropdown - handle case where users haven't loaded yet
+        const cachedUsersOptions = this.cachedUsers.length > 0
+            ? this.cachedUsers.map(user => `<option value="${user.vanityUrl}">${user.displayName} (${user.gameCount} games)</option>`).join('')
+            : '<option value="" disabled>Loading cached users...</option>'
+        
         // Prepare template data with current state
         const templateData = {
             // Cache stats (will be updated via refreshStats)
@@ -76,6 +95,9 @@ export class CacheManagementPanel extends PauseMenuPanel {
             lastUpdate: this.cacheStats.lastUpdate?.toLocaleString() || 'Never',
             cacheApiStatus: ('caches' in window) ? 'Available' : 'Not available',
             storageQuota: 'Calculating...',
+            
+            // Cached users dropdown
+            cachedUsersOptions: cachedUsersOptions,
             
             // Button states (initially disabled until functions are available)
             refreshButtonDisabled: !this.onGetStats ? 'disabled' : '',
@@ -99,10 +121,22 @@ export class CacheManagementPanel extends PauseMenuPanel {
         const refreshBtn = panel.querySelector('#refresh-cache-btn')
         const clearBtn = panel.querySelector('#clear-cache-btn')
         const downloadBtn = panel.querySelector('#download-missing-btn')
+        
+        // Cached users controls
+        const cachedUsersSelect = panel.querySelector('#cached-users-select') as HTMLSelectElement
+        const loadCachedUserBtn = panel.querySelector('#load-cached-user-btn')
 
         if (refreshBtn) this.addEventListener(refreshBtn as HTMLElement, 'click', () => this.refreshCache())
         if (clearBtn) this.addEventListener(clearBtn as HTMLElement, 'click', () => this.clearCache())
         if (downloadBtn) this.addEventListener(downloadBtn as HTMLElement, 'click', () => this.downloadMissing())
+        
+        if (cachedUsersSelect) {
+            this.addEventListener(cachedUsersSelect, 'change', () => this.onCachedUserSelectionChange())
+        }
+        
+        if (loadCachedUserBtn) {
+            this.addEventListener(loadCachedUserBtn as HTMLElement, 'click', () => this.loadSelectedCachedUser())
+        }
 
         // Settings
         const autoDownloadToggle = panel.querySelector('#auto-download-toggle') as HTMLInputElement
@@ -135,10 +169,73 @@ export class CacheManagementPanel extends PauseMenuPanel {
         this.startStatsUpdate()
         this.updateCacheStats()
         this.updateStorageQuotaDisplay() // Get initial storage quota
+        this.loadCachedUsers()
     }
 
     onHide(): void {
         this.stopStatsUpdate()
+    }
+
+    /**
+     * Refresh cached users data and update dropdown
+     * Call this when cache contents may have changed
+     */
+    refreshCachedUsers(): void {
+        // Only reload if panel is currently visible and function is available
+        if (this.isVisible && this.onGetCachedUsers) {
+            this.loadCachedUsers()
+        }
+    }
+
+    /**
+     * Load cached users for dropdown
+     */
+    private async loadCachedUsers(): Promise<void> {
+        if (this.onGetCachedUsers) {
+            try {
+                this.cachedUsers = await this.onGetCachedUsers()
+                // Refresh the dropdown immediately after loading
+                this.refreshCachedUsersDropdown()
+            } catch (error) {
+                console.error('Failed to load cached users:', error)
+                this.cachedUsers = []
+                // Still refresh to show empty state
+                this.refreshCachedUsersDropdown()
+            }
+        }
+    }
+
+    /**
+     * Refresh the cached users dropdown with current data
+     */
+    private refreshCachedUsersDropdown(): void {
+        const panel = this.getPanelElement()
+        if (!panel) return
+
+        const select = panel.querySelector('#cached-users-select') as HTMLSelectElement
+        if (!select) return
+
+        // Generate options HTML based on current cached users state
+        let options = ''
+        if (this.cachedUsers.length > 0) {
+            options = this.cachedUsers
+                .map(user => `<option value="${user.vanityUrl}">${user.displayName} (${user.gameCount} games)</option>`)
+                .join('')
+        } else {
+            // Show appropriate message for empty state
+            options = this.onGetCachedUsers 
+                ? '<option value="" disabled>No cached users found</option>'
+                : '<option value="" disabled>Cache loading not available</option>'
+        }
+
+        // Update select options (preserve the default option)
+        select.innerHTML = `<option value="">Select a cached user...</option>${options}`
+        
+        // Update the load button state
+        const loadBtn = panel.querySelector('#load-cached-user-btn') as HTMLButtonElement
+        if (loadBtn) {
+            loadBtn.disabled = true // Disable until user makes a selection
+        }
     }
 
     /**
@@ -367,6 +464,54 @@ export class CacheManagementPanel extends PauseMenuPanel {
         } finally {
             btn.textContent = '🗑️ Clear Cache'
             btn.removeAttribute('disabled')
+        }
+    }
+
+    /**
+     * Handle cached user selection change
+     */
+    private onCachedUserSelectionChange(): void {
+        const panel = this.getPanelElement()
+        if (!panel) return
+
+        const select = panel.querySelector('#cached-users-select') as HTMLSelectElement
+        const loadBtn = panel.querySelector('#load-cached-user-btn') as HTMLButtonElement
+
+        if (select && loadBtn) {
+            loadBtn.disabled = !select.value
+        }
+    }
+
+    /**
+     * Load the selected cached user
+     */
+    private async loadSelectedCachedUser(): Promise<void> {
+        const panel = this.getPanelElement()
+        if (!panel) return
+
+        const select = panel.querySelector('#cached-users-select') as HTMLSelectElement
+        const loadBtn = panel.querySelector('#load-cached-user-btn') as HTMLButtonElement
+
+        if (!select || !loadBtn || !select.value) return
+
+        const selectedVanityUrl = select.value
+
+        loadBtn.textContent = '📋 Loading...'
+        loadBtn.disabled = true
+
+        try {
+            if (this.onLoadCachedUser) {
+                await this.onLoadCachedUser(selectedVanityUrl)
+                this.showSuccess(`Loaded cached games for ${selectedVanityUrl}`)
+            } else {
+                this.showError('Load cached user function not available')
+            }
+        } catch (error) {
+            console.error('Failed to load cached user:', error)
+            this.showError('Failed to load cached user games')
+        } finally {
+            loadBtn.textContent = '📋 Load Selected User'
+            loadBtn.disabled = !select.value
         }
     }
 

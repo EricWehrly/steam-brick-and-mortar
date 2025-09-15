@@ -229,6 +229,13 @@ export class SteamApiClient {
     public getCached<T>(key: string): T | null {
         return this.cache.get<T>(key)
     }
+
+    /**
+     * Get all cache keys (for inspection/management)
+     */
+    public getAllCacheKeys(): string[] {
+        return this.cache.getAllKeys()
+    }
 }
 
 // Export a default instance for convenience

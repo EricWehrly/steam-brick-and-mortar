@@ -24,6 +24,19 @@
 </div>
 
 <div class="cache-section">
+    <h4>Load from Cached Users</h4>
+    <div class="cached-users" id="cached-users">
+        <select id="cached-users-select" class="cached-users-select">
+            <option value="">Select a cached user...</option>
+            {{cachedUsersOptions}}
+        </select>
+        <button class="cache-btn cache-btn-primary" id="load-cached-user-btn" disabled>
+            📋 Load Selected User
+        </button>
+    </div>
+</div>
+
+<div class="cache-section">
     <div class="cache-actions">
         <button class="cache-btn cache-btn-primary" id="refresh-cache-btn" {{refreshButtonDisabled}}>
             🔄 Refresh Cache

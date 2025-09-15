@@ -125,6 +125,13 @@ export class CacheManager {
         }
     }
 
+    /**
+     * Get all cache keys (without prefix)
+     */
+    getAllKeys(): string[] {
+        return Array.from(this.cache.keys()).map(key => key.replace(this.config.cachePrefix, ''))
+    }
+
     private loadFromStorage(): void {
         try {
             const stored = localStorage.getItem('cache_state')
