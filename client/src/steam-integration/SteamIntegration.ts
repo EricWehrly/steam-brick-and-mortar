@@ -43,7 +43,7 @@ export class SteamIntegration {
     constructor(config: SteamIntegrationConfig = {}) {
         this.config = {
             apiBaseUrl: config.apiBaseUrl || 'https://steam-api-dev.wehrly.com',
-            maxGames: config.maxGames || 30
+            maxGames: config.maxGames || 10
         }
         
         this.steamClient = new SteamApiClient(this.config.apiBaseUrl)

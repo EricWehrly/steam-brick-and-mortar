@@ -157,7 +157,7 @@ export class SteamApiClient {
             onGameLoaded?: (game: SteamGame) => void
         } = {}
     ): Promise<SteamGame[]> {
-        const { maxGames = 30, onProgress, onGameLoaded } = options
+        const { maxGames = 10, onProgress, onGameLoaded } = options
         
         // Sort games by playtime
         const sortedGames = [...steamUser.games]
