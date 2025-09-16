@@ -62,3 +62,40 @@
 - `test/live/` - Check for real-world performance measurements
 
 **Reference**: Performance test framework established in commit `4d48180`
+
+## Cache Performance Optimization (Remaining Items)
+
+### Cache Operation Optimizations
+**Priority**: Medium  
+**Effort**: 3-4 hours  
+**Context**: Critical cache performance bottlenecks have been resolved (debounced writes, LRU eviction, user list index). Remaining optimizations provide moderate performance improvements for edge cases and background operations.
+
+**Completed Foundation** ✅:
+- Story 1.1: Debounced localStorage writes (eliminates UI blocking)
+- Story 1.2: Cached user list index (O(1) user lookup vs O(n×m))  
+- Story 1.3: LRU cache size management (prevents memory leaks)
+
+**Remaining Tasks**:
+
+#### **Story 2.1: Optimize hasCachedData()**
+**Effort**: 1-2 hours  
+**Implementation**:
+- Cache resolve lookup result during `hasCachedData()` execution
+- Add `getCachedUserData()` that returns both resolve and games in single lookup
+- Optimize cache key generation to avoid repeated string operations
+
+#### **Story 2.2: Smart CacheManagementPanel Refresh**
+**Effort**: 1-2 hours  
+**Implementation**:
+- Increase refresh interval from 5s to 8s when panel visible
+- Pause refresh when panel not visible 
+- Add manual refresh button for immediate updates
+- Cache stats between refreshes to avoid repeated computation
+
+**Benefits**:
+- Reduced redundant cache lookups
+- Better background resource usage
+- Improved cache management panel UX
+- Minor performance gains for heavy cache users
+
+**Reference**: Detailed analysis in archived `cache-refactor-plan.md` (moved to tech debt after critical items completed)
