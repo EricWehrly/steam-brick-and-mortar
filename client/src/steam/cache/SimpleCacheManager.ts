@@ -9,15 +9,22 @@ export interface CacheConfig {
     enableCache: boolean
     /** Cache key prefix for localStorage */
     cachePrefix: string
+    /** Maximum cache size in bytes (default: 100MB) */
+    maxCacheSize: number
+    /** Maximum number of cache entries (default: 1000) */
+    maxEntries: number
 }
 
 export interface CacheEntry<T> {
     data: T
     timestamp: number
+    lastAccessed: number
+    size?: number // Estimated size in bytes
 }
 
 export interface CacheStats {
     totalEntries: number
+    totalSize: number
     cacheHits: number
     cacheMisses: number
 }
@@ -37,6 +44,8 @@ export class CacheManager {
             cacheDuration: 60 * 60 * 1000, // 1 hour default
             enableCache: true,
             cachePrefix: 'cache_',
+            maxCacheSize: 100 * 1024 * 1024, // 100MB default
+            maxEntries: 1000, // 1000 entries default
             ...config
         }
         
@@ -83,17 +92,21 @@ export class CacheManager {
             return null
         }
         
-        const entry = this.cache.get(this.config.cachePrefix + key)
+        const fullKey = this.config.cachePrefix + key
+        const entry = this.cache.get(fullKey)
         if (!entry) {
             return null
         }
         
         // Check expiration
-        const age = Date.now() - entry.timestamp
+        const age = performance.now() - entry.timestamp
         if (age > this.config.cacheDuration) {
-            this.cache.delete(this.config.cachePrefix + key)
+            this.cache.delete(fullKey)
             return null
         }
+        
+        // Update access time for LRU tracking
+        entry.lastAccessed = performance.now()
         
         return entry.data
     }
@@ -106,12 +119,19 @@ export class CacheManager {
             return
         }
         
-        this.cache.set(this.config.cachePrefix + key, {
+        const now = performance.now()
+        const entry: CacheEntry<T> = {
             data,
-            timestamp: Date.now()
-        })
+            timestamp: now,
+            lastAccessed: now,
+            size: this.estimateSize(data)
+        }
         
-        this.scheduleSave()
+        const fullKey = this.config.cachePrefix + key
+        this.cache.set(fullKey, entry)
+        
+        // Defer cache resolution (size limits + storage) to avoid blocking
+        this.deferCacheResolution()
     }
 
     /**
@@ -131,13 +151,105 @@ export class CacheManager {
             this.writeTimeout = null
         }
         this.pendingWrites = false
-        this.saveToStorage()
+        
+        // Perform immediate cache resolution (size management + storage)
+        this.performCacheResolution()
     }
 
     /**
-     * Schedule a debounced save to storage
+     * Get cache statistics including size information
      */
-    private scheduleSave(): void {
+    getStats(): CacheStats {
+        const totalSize = Array.from(this.cache.values())
+            .reduce((sum, entry) => sum + (entry.size || 0), 0)
+        
+        return {
+            totalEntries: this.cache.size,
+            totalSize,
+            cacheHits: 0, // Could track this if needed
+            cacheMisses: 0 // Could track this if needed
+        }
+    }
+
+    /**
+     * Estimate size of data in bytes
+     */
+    private estimateSize<T>(data: T): number {
+        try {
+            // Simple estimation using JSON string length
+            const jsonString = JSON.stringify(data)
+            return jsonString.length * 2 // UTF-16 characters are 2 bytes each
+        } catch (error) {
+            // Fallback for non-serializable data
+            return 1024 // 1KB default estimate
+        }
+    }
+
+    /**
+     * Enforce cache size limits using LRU eviction
+     */
+    private enforceSizeLimits(): void {
+        // Check entry count limit
+        if (this.cache.size > this.config.maxEntries) {
+            const entriesToEvict = this.cache.size - this.config.maxEntries
+            this.evictLRUEntries(entriesToEvict)
+        }
+
+        // Check size limit
+        const currentSize = this.calculateTotalSize()
+        if (currentSize > this.config.maxCacheSize) {
+            // Evict entries until we're under the limit
+            this.evictBySize(this.config.maxCacheSize * 0.8) // Target 80% of max to avoid frequent evictions
+        }
+    }
+
+    /**
+     * Calculate total cache size in bytes
+     */
+    private calculateTotalSize(): number {
+        return Array.from(this.cache.values())
+            .reduce((sum, entry) => sum + (entry.size || 0), 0)
+    }
+
+    /**
+     * Evict least recently used entries
+     */
+    private evictLRUEntries(count: number): void {
+        // Sort entries by lastAccessed time (oldest first)
+        const sortedEntries = Array.from(this.cache.entries())
+            .sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed)
+
+        // Remove the oldest entries
+        for (let i = 0; i < Math.min(count, sortedEntries.length); i++) {
+            const [key] = sortedEntries[i]
+            this.cache.delete(key)
+        }
+    }
+
+    /**
+     * Evict entries by size until target size is reached
+     */
+    private evictBySize(targetSize: number): void {
+        // Sort entries by lastAccessed time (oldest first)
+        const sortedEntries = Array.from(this.cache.entries())
+            .sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed)
+
+        let currentSize = this.calculateTotalSize()
+        
+        for (const [key, entry] of sortedEntries) {
+            if (currentSize <= targetSize) {
+                break
+            }
+            
+            this.cache.delete(key)
+            currentSize -= (entry.size || 0)
+        }
+    }
+
+    /**
+     * Defer cache resolution (size management + storage) to avoid blocking operations
+     */
+    private deferCacheResolution(): void {
         // Clear any existing timeout
         if (this.writeTimeout) {
             clearTimeout(this.writeTimeout)
@@ -146,22 +258,22 @@ export class CacheManager {
 
         this.pendingWrites = true
 
-        this.writeTimeout = setTimeout(() => {
-            this.saveToStorage()
-            this.pendingWrites = false
-            this.writeTimeout = null
-        }, this.WRITE_DEBOUNCE_MS)
+        this.writeTimeout = setTimeout(this.performCacheResolution.bind(this), this.WRITE_DEBOUNCE_MS)
     }
 
     /**
-     * Get cache statistics
+     * Named timeout handler for cache resolution (for better debugging)
      */
-    getStats(): CacheStats {
-        return {
-            totalEntries: this.cache.size,
-            cacheHits: 0, // Could track this if needed
-            cacheMisses: 0 // Could track this if needed
-        }
+    private performCacheResolution(): void {
+        // Enforce size limits first
+        this.enforceSizeLimits()
+        
+        // Then save to storage
+        this.saveToStorage()
+        
+        // Reset state
+        this.pendingWrites = false
+        this.writeTimeout = null
     }
 
     /**
