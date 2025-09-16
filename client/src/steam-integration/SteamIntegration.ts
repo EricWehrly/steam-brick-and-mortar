@@ -161,6 +161,11 @@ export class SteamIntegration {
 
     /**
      * Check if cached data is available for a user
+     * 
+     * TODO: Story 5.5.1 (backlogged) - Potential optimization to reduce from 2 cache lookups to 1,
+     * but previous implementation created data duplication issues. Consider alternative approaches like
+     * single-pass cache check or result memoization if this becomes a performance bottleneck.
+     * See docs/active/tech-debt.md for detailed analysis.
      */
     hasCachedData(vanityUrl: string): boolean {
         const extractedVanity = ValidationUtils.extractVanityFromInput(vanityUrl)

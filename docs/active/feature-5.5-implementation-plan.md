@@ -58,6 +58,8 @@ client/src/ui/UICoordinator.ts               - Wired SteamIntegration.hasCachedD
 
 ### **Story 5.5.1: Dedicated Game List Cache** (Priority 2 - Performance Optimization)
 
+Moved to backlog to introduce optimization later, when priorities align.
+
 **Goal**: Create lightweight app ID + name cache for quick "cache available" checks and replace existing heavy lookups
 
 **Files to Modify:**
@@ -169,7 +171,7 @@ client/src/core/EventManager.ts               - Add focus management events if n
 - LRU cache size management (Story 1.3) ✅
 - Critical performance bottlenecks resolved
 
-**🔄 NEXT:** Story 5.5.1 - Lightweight Game List Cache
+**🔄 BACKLOGGED:** Story 5.5.1 - Lightweight Game List Cache
 - Build on completed cache optimization foundation
 - Implement quick cache availability checking
 - Replace heavy cache inspections with lightweight lookups
