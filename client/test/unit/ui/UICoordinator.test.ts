@@ -16,7 +16,7 @@ vi.mock('../../../src/core/EventManager')
 describe('UICoordinator Cache Integration Tests', () => {
     let performanceMonitor: PerformanceMonitor
     let debugStatsProvider: DebugStatsProvider
-    let mockCacheStatsProvider: Mock<[], Promise<ImageCacheStats>>
+    let mockCacheStatsProvider: Mock
     let uiCoordinator: UICoordinator
 
     const mockImageCacheStats: ImageCacheStats = {

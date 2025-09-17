@@ -91,6 +91,8 @@ describe('Application Startup Integration', () => {
         const { SteamWorkflowManager } = await import('../../src/steam-integration/SteamWorkflowManager')
         const { SteamIntegration } = await import('../../src/steam-integration/SteamIntegration')
         const { UICoordinator } = await import('../../src/ui/UICoordinator')
+        const { SceneCoordinator } = await import('../../src/scene/SceneCoordinator')
+        const { SceneManager } = await import('../../src/scene/SceneManager')
         const { PerformanceMonitor } = await import('../../src/ui/PerformanceMonitor')
         const { EventManager } = await import('../../src/core/EventManager')
 
@@ -121,13 +123,18 @@ describe('Application Startup Integration', () => {
             mockDebugStatsProvider,
             () => mockSteamIntegration.getImageCacheStats()
         )
+        
+        // Create mock SceneCoordinator
+        const mockSceneManager = new SceneManager()
+        const mockSceneCoordinator = new SceneCoordinator(mockSceneManager)
 
         // This should not throw the "Cannot read properties of undefined (reading 'bind')" error
         expect(() => {
             new SteamWorkflowManager(
                 mockEventManager,
                 mockSteamIntegration,
-                mockUICoordinator
+                mockUICoordinator,
+                mockSceneCoordinator
             )
         }).not.toThrow()
     })

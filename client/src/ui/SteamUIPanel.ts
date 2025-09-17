@@ -13,6 +13,7 @@ export interface SteamUIPanelEvents {
   onRefreshCache: () => void
   onClearCache: () => void
   onShowCacheStats: () => void
+  onDevModeToggle?: (isEnabled: boolean) => void
   checkCacheAvailability?: (vanityUrl: string) => boolean
 }
 
@@ -27,6 +28,7 @@ export class SteamUIPanel {
   private showCacheStatsButton: HTMLButtonElement | null
   private cacheInfoDiv: HTMLElement | null
   private steamStatus: HTMLElement | null
+  private devModeToggle: HTMLInputElement | null
   
   constructor(private events: SteamUIPanelEvents) {
     // Get UI elements
@@ -40,6 +42,7 @@ export class SteamUIPanel {
     this.showCacheStatsButton = getElementByIdSafe('show-cache-stats') as HTMLButtonElement
     this.cacheInfoDiv = document.getElementById('cache-info')
     this.steamStatus = document.getElementById('steam-status')
+    this.devModeToggle = document.getElementById('dev-mode-toggle') as HTMLInputElement
   }
   
   init(): void {
@@ -116,6 +119,14 @@ export class SteamUIPanel {
         // Check cache availability and show/hide Load from Cache button
         const hasCache = this.events.checkCacheAvailability?.(vanityUrl) || false
         this.checkCacheAvailability(vanityUrl, hasCache)
+      })
+    }
+    
+    // Development mode toggle
+    if (this.devModeToggle) {
+      this.devModeToggle.addEventListener('change', () => {
+        const isEnabled = this.devModeToggle?.checked ?? true
+        this.events.onDevModeToggle?.(isEnabled)
       })
     }
   }
@@ -214,5 +225,12 @@ export class SteamUIPanel {
     
     // For simplified client, always hide offline button since it's not implemented
     this.useOfflineButton.style.display = 'none'
+  }
+  
+  /**
+   * Get the current development mode state
+   */
+  isDevelopmentMode(): boolean {
+    return this.devModeToggle?.checked ?? true
   }
 }

@@ -10,9 +10,10 @@
 
 import type { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
-import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamUseOfflineEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent } from '../types/InteractionEvents'
+import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamUseOfflineEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
 import type { SteamIntegration } from './SteamIntegration'
 import type { UICoordinator } from '../ui'
+import type { SceneCoordinator } from '../scene'
 import { Logger } from '../utils/Logger'
 
 export class SteamWorkflowManager {
@@ -21,6 +22,7 @@ export class SteamWorkflowManager {
     private eventManager: EventManager
     private steamIntegration: SteamIntegration
     private uiCoordinator: UICoordinator
+    private sceneCoordinator: SceneCoordinator
     private boundHandlers: {
         onLoadGames: (event: CustomEvent<SteamLoadGamesEvent>) => void;
         onLoadFromCache: (event: CustomEvent<SteamLoadFromCacheEvent>) => void;
@@ -29,16 +31,19 @@ export class SteamWorkflowManager {
         onClearCache: (event: CustomEvent<SteamCacheClearEvent>) => void;
         onShowCacheStats: (event: CustomEvent<SteamCacheStatsEvent>) => void;
         onClearImageCache: (event: CustomEvent<SteamImageCacheClearEvent>) => void;
+        onDevModeToggle: (event: CustomEvent<SteamDevModeToggleEvent>) => void;
     }
     
     constructor(
         eventManager: EventManager,
         steamIntegration: SteamIntegration,
-        uiCoordinator: UICoordinator
+        uiCoordinator: UICoordinator,
+        sceneCoordinator: SceneCoordinator
     ) {
         this.eventManager = eventManager
         this.steamIntegration = steamIntegration
         this.uiCoordinator = uiCoordinator
+        this.sceneCoordinator = sceneCoordinator
         
         // Bind all handlers to maintain proper 'this' context
         this.boundHandlers = {
@@ -48,7 +53,8 @@ export class SteamWorkflowManager {
             onRefreshCache: this.onRefreshCache.bind(this),
             onClearCache: this.onClearCache.bind(this),
             onShowCacheStats: this.onShowCacheStats.bind(this),
-            onClearImageCache: this.onClearImageCache.bind(this)
+            onClearImageCache: this.onClearImageCache.bind(this),
+            onDevModeToggle: this.onDevModeToggle.bind(this)
         }
         
         this.registerEventHandlers()
@@ -62,6 +68,7 @@ export class SteamWorkflowManager {
         this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.boundHandlers.onClearCache)
         this.eventManager.registerEventHandler(SteamEventTypes.CacheStats, this.boundHandlers.onShowCacheStats)
         this.eventManager.registerEventHandler(SteamEventTypes.ImageCacheClear, this.boundHandlers.onClearImageCache)
+        this.eventManager.registerEventHandler(SteamEventTypes.DevModeToggle, this.boundHandlers.onDevModeToggle)
         // Note: ImageCacheStatsRequest handler removed - stats accessed directly via UICoordinator
     }
     
@@ -248,6 +255,33 @@ export class SteamWorkflowManager {
         } catch (error) {
             SteamWorkflowManager.logger.error('Image cache clear workflow failed:', error)
             console.error('Failed to clear image cache.')
+        }
+    }
+
+    /**
+     * Development mode toggle workflow
+     */
+    private async onDevModeToggle(event: CustomEvent<SteamDevModeToggleEvent>): Promise<void> {
+        try {
+            const { isEnabled } = event.detail
+            SteamWorkflowManager.logger.info(`Starting dev mode toggle workflow: ${isEnabled ? 'enabled' : 'disabled'}`)
+            
+            // Set max games based on development mode
+            const maxGames = isEnabled ? 20 : 100
+            this.steamIntegration.updateMaxGames(maxGames)
+            this.sceneCoordinator.updateMaxGames(maxGames)
+            
+            const message = isEnabled 
+                ? `🔧 Development mode enabled (limiting to ${maxGames} games for faster testing)`
+                : `📚 Development mode disabled (showing up to ${maxGames} games)`
+            
+            console.log(message)
+            
+            SteamWorkflowManager.logger.info(`Dev mode toggle workflow completed: maxGames set to ${maxGames}`)
+            
+        } catch (error) {
+            SteamWorkflowManager.logger.error('Dev mode toggle workflow failed:', error)
+            console.error('Failed to toggle development mode.')
         }
     }
 

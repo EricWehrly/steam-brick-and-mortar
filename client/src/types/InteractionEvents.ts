@@ -40,6 +40,10 @@ export interface SteamImageCacheClearEvent extends BaseInteractionEvent {
     // No additional data needed
 }
 
+export interface SteamDevModeToggleEvent extends BaseInteractionEvent {
+    isEnabled: boolean
+}
+
 // =============================================================================
 // WEBXR EVENTS  
 // =============================================================================
@@ -103,7 +107,8 @@ export const SteamEventTypes = {
     CacheClear: 'steam:cache-clear',
     CacheRefresh: 'steam:cache-refresh',
     CacheStats: 'steam:cache-stats',
-    ImageCacheClear: 'steam:image-cache-clear'
+    ImageCacheClear: 'steam:image-cache-clear',
+    DevModeToggle: 'steam:dev-mode-toggle'
 } as const
 
 export const WebXREventTypes = {
@@ -142,6 +147,7 @@ export interface InteractionEventMap {
     [SteamEventTypes.CacheRefresh]: SteamCacheRefreshEvent
     [SteamEventTypes.CacheStats]: SteamCacheStatsEvent
     [SteamEventTypes.ImageCacheClear]: SteamImageCacheClearEvent
+    [SteamEventTypes.DevModeToggle]: SteamDevModeToggleEvent
     
     // WebXR events
     [WebXREventTypes.Toggle]: WebXRToggleEvent

@@ -15,6 +15,7 @@ export interface UIManagerEvents {
   steamRefreshCache: () => void
   steamClearCache: () => void
   steamShowCacheStats: () => void
+  steamDevModeToggle?: (isEnabled: boolean) => void
   webxrEnterVR: () => void
   checkCacheAvailability?: (vanityUrl: string) => boolean
 }
@@ -32,6 +33,7 @@ export class UIManager {
       onRefreshCache: this.events.steamRefreshCache,
       onClearCache: this.events.steamClearCache,
       onShowCacheStats: this.events.steamShowCacheStats,
+      onDevModeToggle: this.events.steamDevModeToggle,
       checkCacheAvailability: this.events.checkCacheAvailability
     })
     
@@ -63,6 +65,10 @@ export class UIManager {
   
   checkOfflineAvailability(vanityUrl: string): void {
     this.steamUIPanel.checkOfflineAvailability(vanityUrl)
+  }
+  
+  isDevelopmentMode(): boolean {
+    return this.steamUIPanel.isDevelopmentMode()
   }
   
   // Progress UI delegation

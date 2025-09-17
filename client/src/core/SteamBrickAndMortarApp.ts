@@ -150,7 +150,8 @@ export class SteamBrickAndMortarApp {
         this.steamWorkflowManager = new SteamWorkflowManager(
             this.eventManager,
             this.steamIntegration,
-            this.uiCoordinator
+            this.uiCoordinator,
+            this.sceneCoordinator
         )
 
         // Initialize webxr event handler to handle WebXR and input interactions

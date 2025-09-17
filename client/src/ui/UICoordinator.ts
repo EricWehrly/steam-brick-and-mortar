@@ -62,6 +62,7 @@ export class UICoordinator {
             steamRefreshCache: () => this.emitSteamRefreshCacheEvent(),
             steamClearCache: () => this.emitSteamClearCacheEvent(),
             steamShowCacheStats: () => this.emitSteamCacheStatsEvent(),
+            steamDevModeToggle: (isEnabled: boolean) => this.emitSteamDevModeToggleEvent(isEnabled),
             webxrEnterVR: () => this.emitWebXRToggleEvent(),
             checkCacheAvailability: (vanityUrl: string) => this.steamIntegration?.hasCachedData(vanityUrl) ?? false
         })
@@ -272,6 +273,14 @@ export class UICoordinator {
 
     private emitSteamCacheStatsEvent(): void {
         this.eventManager.emit(SteamEventTypes.CacheStats, {
+            timestamp: Date.now(),
+            source: 'ui' as const 
+        })
+    }
+
+    private emitSteamDevModeToggleEvent(isEnabled: boolean): void {
+        this.eventManager.emit(SteamEventTypes.DevModeToggle, {
+            isEnabled,
             timestamp: Date.now(),
             source: 'ui' as const 
         })

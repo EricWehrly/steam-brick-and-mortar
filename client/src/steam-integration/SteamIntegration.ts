@@ -319,6 +319,21 @@ export class SteamIntegration {
     }
 
     /**
+     * Update the maximum games setting for development mode
+     */
+    updateMaxGames(maxGames: number): void {
+        this.config.maxGames = maxGames
+        SteamIntegration.logger.info(`Updated maxGames setting to: ${maxGames}`)
+    }
+
+    /**
+     * Get current maxGames setting
+     */
+    getMaxGames(): number {
+        return this.config.maxGames
+    }
+
+    /**
      * Provide access to underlying Steam client (for advanced use)
      */
     getSteamClient() {
