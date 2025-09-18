@@ -107,7 +107,7 @@ describe('Console Log Duplication Issue', () => {
             typeof log === 'string' && log.includes('Initializing Steam Brick and Mortar WebXR')
         )
         const readyMessages = allLogCalls.filter(log => 
-            typeof log === 'string' && log.includes('WebXR environment ready!')
+            typeof log === 'string' && log.includes('Application initialized successfully!')
         )
 
         expect(initMessages.length).toBe(1)

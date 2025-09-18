@@ -6,18 +6,40 @@ import { vi } from 'vitest'
 
 export const UICoordinatorMock = vi.fn().mockImplementation(() => ({
     setupUI: vi.fn().mockResolvedValue(undefined),
-    initializeUI: vi.fn().mockResolvedValue(undefined),
-    showPauseMenu: vi.fn(),
-    hidePauseMenu: vi.fn(),
-    updateDebugInfo: vi.fn(),
-    hideLoadingScreen: vi.fn(),
-    showLoadingScreen: vi.fn(),
-    updateLoadingProgress: vi.fn(),
-    handleWindowResize: vi.fn(),
-    isPauseMenuVisible: vi.fn().mockReturnValue(false),
-    updateRenderStats: vi.fn(),
-    showError: vi.fn(),
-    dispose: vi.fn()
+    setSteamWorkflowManager: vi.fn(),
+    dispose: vi.fn(),
+    // Expose specialized coordinators
+    steam: {
+        showError: vi.fn(),
+        updateCacheStats: vi.fn(),
+        updateProgress: vi.fn(),
+        showProgress: vi.fn(),
+        showSteamStatus: vi.fn(),
+        checkOfflineAvailability: vi.fn(),
+        setDevMode: vi.fn(),
+        loadGames: vi.fn(),
+        loadFromCache: vi.fn(),
+        useOffline: vi.fn(),
+        refreshCache: vi.fn(),
+        clearCache: vi.fn(),
+        showCacheStats: vi.fn(),
+        checkCacheAvailability: vi.fn()
+    },
+    webxr: {
+        updateWebXRSessionState: vi.fn(),
+        updateWebXRSupport: vi.fn(),
+        toggleVR: vi.fn()
+    },
+    system: {
+        enableCacheActions: vi.fn(),
+        disableCacheActions: vi.fn(),
+        updateRenderStats: vi.fn(),
+        togglePerformanceMonitor: vi.fn(),
+        getCurrentPerformanceStats: vi.fn().mockReturnValue({}),
+        openPauseMenu: vi.fn(),
+        setupPauseMenu: vi.fn(),
+        startPerformanceMonitoring: vi.fn()
+    }
 }))
 
 export async function uiCoordinatorMockFactory() {

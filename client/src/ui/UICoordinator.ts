@@ -1,39 +1,36 @@
 /**
- * UI Coordinator - High-Level UI Event Coordination and Management
+ * UI Coordinator - UI Architecture Orchestrator
  * 
- * This coordinator handles complex UI workflows that involve multiple
- * UI components and external systems:
- * - Settings button and pause menu integration
- * - Steam loading workflow coordination
- * - WebXR UI state management
- * - Cache management UI workflows
+ * Acts like an index.ts file - sets up and exposes specialized coordinators
+ * for direct access by the main app. No more pass-through delegation.
  * 
- * The App should only need to call setupUI() and basic event handlers
- * without managing individual UI component interactions.
+ * Architecture:
+ * - steam: SteamUICoordinator - Steam workflows and state management
+ * - webxr: WebXRUICoordinator - WebXR-specific UI management  
+ * - system: SystemUICoordinator - System-level UI (pause menu, performance, settings)
+ * 
+ * Usage: app.uiCoordinator.steam.showError() instead of app.uiCoordinator.showError()
  */
 
 import * as THREE from 'three'
 import { UIManager } from '../ui/UIManager'
-import { PauseMenuManager } from '../ui/pause/PauseMenuManager'
 import { PerformanceMonitor } from '../ui/PerformanceMonitor'
-import { EventManager } from '../core/EventManager'
-import { SteamEventTypes, WebXREventTypes, InputEventTypes, UIEventTypes } from '../types/InteractionEvents'
-import type { DebugStats, DebugStatsProvider } from '../core/DebugStatsProvider'
-import type { WebXRCapabilities } from '../webxr/WebXRManager'
+import type { DebugStatsProvider } from '../core/DebugStatsProvider'
 import type { ImageCacheStats } from '../steam/images/ImageManager'
 import type { SteamIntegration } from '../steam-integration/SteamIntegration'
+import type { SteamWorkflowManager } from '../steam-integration/SteamWorkflowManager'
+import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from './coordinators'
 
 /**
- * Coordinates high-level UI workflows and component interactions
+ * Orchestrates UI architecture by setting up and exposing specialized coordinators
  */
 export class UICoordinator {
     private uiManager: UIManager
-    private pauseMenuManager: PauseMenuManager
-    private performanceMonitor: PerformanceMonitor
-    private eventManager: EventManager
-    private debugStatsProvider: DebugStatsProvider
-    private cacheStatsProvider?: () => Promise<ImageCacheStats>
-    private steamIntegration?: SteamIntegration
+    
+    // Expose coordinators for direct access by the app
+    public readonly steam: SteamUICoordinator
+    public readonly webxr: WebXRUICoordinator
+    public readonly system: SystemUICoordinator
 
     constructor(
         performanceMonitor: PerformanceMonitor,
@@ -48,39 +45,37 @@ export class UICoordinator {
             throw new Error('DebugStatsProvider is required')
         }
 
-        this.performanceMonitor = performanceMonitor
-        this.debugStatsProvider = debugStatsProvider
-        this.cacheStatsProvider = cacheStatsProvider
-        this.steamIntegration = steamIntegration
-        this.eventManager = EventManager.getInstance()
-
-        // Initialize UI Manager with Steam and WebXR event handlers that emit events
-        this.uiManager = new UIManager({
-            steamLoadGames: (vanityUrl: string) => this.emitSteamLoadGamesEvent(vanityUrl),
-            steamLoadFromCache: (vanityUrl: string) => this.emitSteamLoadFromCacheEvent(vanityUrl),
-            steamUseOffline: (vanityUrl: string) => this.emitSteamUseOfflineEvent(vanityUrl),
-            steamRefreshCache: () => this.emitSteamRefreshCacheEvent(),
-            steamClearCache: () => this.emitSteamClearCacheEvent(),
-            steamShowCacheStats: () => this.emitSteamCacheStatsEvent(),
-            steamDevModeToggle: (isEnabled: boolean) => this.emitSteamDevModeToggleEvent(isEnabled),
-            webxrEnterVR: () => this.emitWebXRToggleEvent(),
-            checkCacheAvailability: (vanityUrl: string) => this.steamIntegration?.hasCachedData(vanityUrl) ?? false
-        })
-
-        // Initialize Pause Menu System
-        this.pauseMenuManager = new PauseMenuManager(
-            {
-                containerId: 'pause-menu-overlay',
-                overlayClass: 'pause-menu-overlay',
-                menuClass: 'pause-menu'
-            },
-            {
-                onPauseInput: () => this.emitInputPauseEvent('menu'),
-                onResumeInput: () => this.emitInputResumeEvent('menu'),
-                onMenuOpen: () => this.emitMenuOpenEvent('pause'),
-                onMenuClose: () => this.emitMenuCloseEvent('pause')
-            }
+        // Initialize specialized coordinators and expose them publicly
+        this.steam = new SteamUICoordinator()
+        this.webxr = new WebXRUICoordinator()
+        this.system = new SystemUICoordinator(
+            performanceMonitor,
+            debugStatsProvider,
+            cacheStatsProvider,
+            steamIntegration
         )
+
+        // Initialize UI Manager with Steam and WebXR handlers that delegate to coordinators
+        this.uiManager = new UIManager({
+            steamLoadGames: (vanityUrl: string) => this.steam.loadGames(vanityUrl),
+            steamLoadFromCache: (vanityUrl: string) => this.steam.loadFromCache(vanityUrl),
+            steamUseOffline: (vanityUrl: string) => this.steam.useOffline(vanityUrl),
+            steamRefreshCache: () => this.steam.refreshCache(),
+            steamClearCache: () => this.steam.clearCache(),
+            steamShowCacheStats: () => this.steam.showCacheStats(),
+            steamDevModeToggle: (isEnabled: boolean) => this.steam.setDevMode(isEnabled),
+            webxrEnterVR: () => this.webxr.toggleVR()
+        }, steamIntegration!)
+    }
+
+    /**
+     * Set workflow manager for direct method calls
+     */
+    setSteamWorkflowManager(steamWorkflowManager: SteamWorkflowManager, steamIntegration: SteamIntegration): void {
+        // Initialize coordinators with their dependencies
+        this.steam.init(steamWorkflowManager, steamIntegration, this.uiManager)
+        this.webxr.init(this.uiManager)
+        this.system.init(this.uiManager)
     }
 
     /**
@@ -90,264 +85,18 @@ export class UICoordinator {
         // Initialize UI Manager
         this.uiManager.init()
 
-        // Initialize pause menu system
-        this.pauseMenuManager.init()
-        
-        // Provide system dependencies for settings management
-        this.pauseMenuManager.setSystemDependencies({
-            performanceMonitor: this.performanceMonitor,
-            renderer: renderer
-        })
-        
-        // Register all default panels with event emissions
-        this.pauseMenuManager.registerDefaultPanels({
-            onGetImageCacheStats: this.cacheStatsProvider || (() => Promise.resolve({ totalImages: 0, totalSize: 0, oldestTimestamp: 0, newestTimestamp: 0 })),
-            onClearImageCache: async () => this.emitClearImageCacheEvent(),
-            onGetCachedUsers: () => Promise.resolve(this.steamIntegration?.getCachedUsers() ?? []),
-            onLoadCachedUser: async (steamId: string) => {
-                if (this.steamIntegration) {
-                    await this.steamIntegration.loadGamesFromCache(steamId)
-                }
-            },
-            onGetDebugStats: () => this.requestDebugStats()
-        })
+        // Setup specialized coordinators
+        this.system.setupPauseMenu(renderer)
+        this.system.startPerformanceMonitoring()
 
-        // Initialize the settings button that opens the pause menu
-        this.initializeSettingsButton()
-
-        // Hide loading and start performance monitoring
+        // Hide loading
         this.uiManager.hideLoading()
-        this.performanceMonitor.start()
     }
 
     /**
-     * Update WebXR support status in UI
-     */
-    updateWebXRSupport(capabilities: WebXRCapabilities): void {
-        this.uiManager.setWebXRSupported(capabilities.supportsImmersiveVR)
-    }
-
-    /**
-     * Update WebXR session state in UI
-     */
-    updateWebXRSessionState(isActive: boolean): void {
-        this.uiManager.setWebXRSessionActive(isActive)
-    }
-
-    /**
-     * Show error message in UI
-     */
-    showError(message: string): void {
-        this.uiManager.showError(message)
-    }
-
-    /**
-     * Update cache statistics display
-     */
-    updateCacheStats(stats: { totalEntries: number; cacheHits: number; cacheMisses: number }): void {
-        this.uiManager.updateCacheStats(stats)
-    }
-
-    /**
-     * Update progress display for Steam loading
-     */
-    updateProgress(current: number, total: number, message: string): void {
-        this.uiManager.updateProgress(current, total, message)
-    }
-
-    /**
-     * Show/hide progress display
-     */
-    showProgress(show: boolean): void {
-        this.uiManager.showProgress(show)
-    }
-
-    /**
-     * Show Steam status message
-     */
-    showSteamStatus(message: string, type: 'loading' | 'success' | 'error'): void {
-        this.uiManager.showSteamStatus(message, type)
-    }
-
-    /**
-     * Check offline availability for a vanity URL
-     */
-    checkOfflineAvailability(vanityUrl: string): void {
-        this.uiManager.checkOfflineAvailability(vanityUrl)
-    }
-
-    /**
-     * Enable cache management actions in pause menu
-     */
-    enableCacheActions(): void {
-        this.pauseMenuManager.getCacheManagementPanel()?.enableCacheActions()
-    }
-
-    /**
-     * Disable cache management actions in pause menu
-     */
-    disableCacheActions(): void {
-        this.pauseMenuManager.getCacheManagementPanel()?.disableCacheActions()
-    }
-
-    /**
-     * Open the pause menu
-     */
-    openPauseMenu(): void {
-        this.pauseMenuManager.open()
-    }
-
-    /**
-     * Toggle performance monitor display
-     */
-    togglePerformanceMonitor(): void {
-        this.performanceMonitor.toggle()
-    }
-
-    /**
-     * Get current performance statistics
-     */
-    getCurrentPerformanceStats() {
-        return this.performanceMonitor.getStats()
-    }
-
-    /**
-     * Update performance monitor with renderer stats
-     */
-    updateRenderStats(renderer: THREE.WebGLRenderer): void {
-        this.performanceMonitor.updateRenderStats(renderer)
-    }
-
-    /**
-     * Clean up UI resources
+     * Clean up UI resources - dispose all coordinators
      */
     dispose(): void {
-        this.performanceMonitor.dispose()
-        this.pauseMenuManager.dispose()
-    }
-
-    // Private event handlers
-
-    private async handleWebXRToggle(): Promise<void> {
-        this.emitWebXRToggleEvent()
-    }
-
-    // Steam event emission methods - replace callbacks with events
-    private emitSteamLoadGamesEvent(vanityUrl: string): void {
-        this.eventManager.emit(SteamEventTypes.LoadGames, { 
-            vanityUrl,
-            timestamp: Date.now(),
-            source: 'ui' as const 
-        })
-    }
-
-    private emitSteamLoadFromCacheEvent(vanityUrl: string): void {
-        this.eventManager.emit(SteamEventTypes.LoadFromCache, { 
-            vanityUrl,
-            timestamp: Date.now(),
-            source: 'ui' as const 
-        })
-    }
-
-    private emitSteamUseOfflineEvent(vanityUrl: string): void {
-        this.eventManager.emit(SteamEventTypes.UseOffline, { 
-            vanityUrl,
-            timestamp: Date.now(),
-            source: 'ui' as const 
-        })
-    }
-
-    private emitSteamRefreshCacheEvent(): void {
-        this.eventManager.emit(SteamEventTypes.CacheRefresh, {
-            timestamp: Date.now(),
-            source: 'ui' as const 
-        })
-    }
-
-    private emitSteamClearCacheEvent(): void {
-        this.eventManager.emit(SteamEventTypes.CacheClear, {
-            timestamp: Date.now(),
-            source: 'ui' as const 
-        })
-    }
-
-    private emitSteamCacheStatsEvent(): void {
-        this.eventManager.emit(SteamEventTypes.CacheStats, {
-            timestamp: Date.now(),
-            source: 'ui' as const 
-        })
-    }
-
-    private emitSteamDevModeToggleEvent(isEnabled: boolean): void {
-        this.eventManager.emit(SteamEventTypes.DevModeToggle, {
-            isEnabled,
-            timestamp: Date.now(),
-            source: 'ui' as const 
-        })
-    }
-
-    private emitClearImageCacheEvent(): void {
-        this.eventManager.emit(SteamEventTypes.ImageCacheClear, {
-            timestamp: Date.now(),
-            source: 'ui' as const 
-        })
-    }
-
-    // WebXR and Input event emission methods - replace callbacks with events
-    private emitWebXRToggleEvent(): void {
-        this.eventManager.emit(WebXREventTypes.Toggle, {
-            timestamp: Date.now(),
-            source: 'ui' as const
-        })
-    }
-
-    private emitInputPauseEvent(reason: 'menu' | 'user' | 'system'): void {
-        this.eventManager.emit(InputEventTypes.Pause, {
-            reason,
-            timestamp: Date.now(),
-            source: 'ui' as const
-        })
-    }
-
-    private emitInputResumeEvent(reason: 'menu' | 'user' | 'system'): void {
-        this.eventManager.emit(InputEventTypes.Resume, {
-            reason,
-            timestamp: Date.now(),
-            source: 'ui' as const
-        })
-    }
-
-    private emitMenuOpenEvent(menuType: 'pause' | 'settings' | 'debug'): void {
-        this.eventManager.emit(UIEventTypes.MenuOpen, {
-            menuType,
-            timestamp: Date.now(),
-            source: 'ui' as const
-        })
-    }
-
-    private emitMenuCloseEvent(menuType: 'pause' | 'settings' | 'debug'): void {
-        this.eventManager.emit(UIEventTypes.MenuClose, {
-            menuType,
-            timestamp: Date.now(),
-            source: 'ui' as const
-        })
-    }
-
-    /**
-     * Request debug stats from DebugStatsProvider directly
-     */
-    private requestDebugStats(): Promise<DebugStats> {
-        return this.debugStatsProvider.getDebugStats()
-    }
-
-    private initializeSettingsButton(): void {
-        const settingsButton = document.getElementById('settings-button')
-        if (settingsButton) {
-            settingsButton.addEventListener('click', () => {
-                this.pauseMenuManager.open()
-            })
-        } else {
-            console.warn('Settings button not found in DOM')
-        }
+        this.system.dispose()
     }
 }

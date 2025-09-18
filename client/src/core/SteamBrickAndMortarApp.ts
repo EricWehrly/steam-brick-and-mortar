@@ -154,6 +154,9 @@ export class SteamBrickAndMortarApp {
             this.sceneCoordinator
         )
 
+        // Wire up the refactored UI coordinators
+        this.uiCoordinator.setSteamWorkflowManager(this.steamWorkflowManager, this.steamIntegration)
+
         // Initialize webxr event handler to handle WebXR and input interactions
         this.webxrEventHandler = new WebXREventHandler(
             this.webxrCoordinator,
@@ -175,10 +178,10 @@ export class SteamBrickAndMortarApp {
             this.startRenderLoop()
             
             this.isInitialized = true
-            console.log('✅ WebXR environment ready!')
+            console.log('✅ Application initialized successfully!')
         } catch (error) {
-            console.error('❌ Failed to initialize WebXR environment:', error)
-            this.uiCoordinator.showError('Failed to initialize WebXR environment')
+            console.error('❌ Failed to initialize application:', error)
+            // Don't show UI error - app isn't fully initialized yet
             throw error
         }
     }
@@ -186,12 +189,20 @@ export class SteamBrickAndMortarApp {
     private async initializeCoordinators(): Promise<void> {
         // Setup scene with complete store layout
         await this.sceneCoordinator.setupCompleteScene()
+        console.log('✅ Scene setup complete')
         
         // Setup UI with all components
         await this.uiCoordinator.setupUI(this.sceneManager.getRenderer())
+        console.log('✅ UI setup complete')
         
-        // Setup WebXR with input handling
-        await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
+        // Setup WebXR with input handling (optional - may fail without VR hardware)
+        try {
+            await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
+            console.log('✅ WebXR setup complete')
+        } catch (error) {
+            console.warn('⚠️ WebXR setup failed (expected without VR hardware):', error)
+            // This is expected - continue without WebXR
+        }
     }
 
     dispose(): void {
@@ -248,33 +259,10 @@ export class SteamBrickAndMortarApp {
     }
 
     private startRenderLoop(): void {
-        let lastPerformanceUpdate = 0
-        const performanceUpdateInterval = 1000 // Update performance data every second
-        
-        this.sceneManager.startRenderLoop(() => {
-            const now = Date.now()
-            const camera = this.sceneManager.getCamera()
-            
-            // Update camera movement via WebXR coordinator
-            this.webxrCoordinator.updateCameraMovement(camera)
-            
-            // Update performance data periodically
-            if (now - lastPerformanceUpdate > performanceUpdateInterval) {
-                this.sceneCoordinator.updatePerformanceData(camera)
-                
-                // Update UI performance monitor with Three.js renderer stats
-                this.uiCoordinator.updateRenderStats(this.sceneManager.getRenderer())
-                
-                lastPerformanceUpdate = now
-            }
-            
-            // Rotate the test cube
-            const scene = this.sceneManager.getScene()
-            const cube = scene.getObjectByName('cube') ?? scene.children.find(obj => obj instanceof THREE.Mesh)
-            if (cube) {
-                cube.rotation.x += 0.01
-                cube.rotation.y += 0.01
-            }
+        this.sceneManager.startRenderLoop({
+            webxrCoordinator: this.webxrCoordinator,
+            sceneCoordinator: this.sceneCoordinator,
+            systemUICoordinator: this.uiCoordinator.system
         })
     }
 

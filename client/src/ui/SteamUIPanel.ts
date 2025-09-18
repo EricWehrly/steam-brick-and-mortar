@@ -5,6 +5,7 @@
 import { getElementByIdSafe } from '../utils'
 import { renderTemplate } from '../utils/TemplateEngine'
 import steamCacheStatsTemplate from '../templates/steam-ui/cache-stats.html?raw'
+import type { SteamIntegration } from '../steam-integration/SteamIntegration'
 
 export interface SteamUIPanelEvents {
   onLoadGames: (vanityUrl: string) => void
@@ -14,7 +15,6 @@ export interface SteamUIPanelEvents {
   onClearCache: () => void
   onShowCacheStats: () => void
   onDevModeToggle?: (isEnabled: boolean) => void
-  checkCacheAvailability?: (vanityUrl: string) => boolean
 }
 
 export class SteamUIPanel {
@@ -30,7 +30,10 @@ export class SteamUIPanel {
   private steamStatus: HTMLElement | null
   private devModeToggle: HTMLInputElement | null
   
-  constructor(private events: SteamUIPanelEvents) {
+  constructor(
+    private events: SteamUIPanelEvents,
+    private steamIntegration: SteamIntegration
+  ) {
     // Get UI elements
     this.steamUI = document.getElementById('steam-ui')
     this.steamVanityInput = getElementByIdSafe('steam-vanity') as HTMLInputElement
@@ -117,7 +120,7 @@ export class SteamUIPanel {
         this.checkOfflineAvailability(vanityUrl)
         
         // Check cache availability and show/hide Load from Cache button
-        const hasCache = this.events.checkCacheAvailability?.(vanityUrl) || false
+        const hasCache = this.steamIntegration.hasCachedData(vanityUrl)
         this.checkCacheAvailability(vanityUrl, hasCache)
       })
     }

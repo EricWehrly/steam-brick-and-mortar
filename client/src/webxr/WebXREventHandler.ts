@@ -118,22 +118,22 @@ export class WebXREventHandler {
 
     private handleWebXRSessionStart(_event: WebXRSessionStartEvent): void {
         WebXREventHandler.logger.info('WebXR session started')
-        this.uiCoordinator.updateWebXRSessionState(true)
+        this.uiCoordinator.webxr.updateWebXRSessionState(true)
     }
 
     private handleWebXRSessionEnd(_event: WebXRSessionEndEvent): void {
         WebXREventHandler.logger.info('WebXR session ended')
-        this.uiCoordinator.updateWebXRSessionState(false)
+        this.uiCoordinator.webxr.updateWebXRSessionState(false)
     }
 
     private handleWebXRError(event: WebXRErrorEvent): void {
         WebXREventHandler.logger.error('WebXR error occurred:', event.error)
-        this.uiCoordinator.showError('Failed to enter VR mode')
+        this.uiCoordinator.steam.showError('Failed to enter VR mode')
     }
 
     private handleWebXRSupportChange(event: WebXRSupportChangeEvent): void {
         WebXREventHandler.logger.info('WebXR capabilities changed:', event.capabilities)
-        this.uiCoordinator.updateWebXRSupport(event.capabilities)
+        this.uiCoordinator.webxr.updateWebXRSupport(event.capabilities)
     }
 
     private handleInputPause(event: InputPauseEvent): void {
