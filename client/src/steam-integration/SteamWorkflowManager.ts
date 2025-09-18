@@ -10,7 +10,7 @@
 
 import type { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
-import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamUseOfflineEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
+import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamUseOfflineEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
 import type { SteamIntegration } from './SteamIntegration'
 import type { UICoordinator } from '../ui'
 import type { SceneCoordinator } from '../scene'
@@ -23,16 +23,6 @@ export class SteamWorkflowManager {
     private steamIntegration: SteamIntegration
     private uiCoordinator: UICoordinator
     private sceneCoordinator: SceneCoordinator
-    private boundHandlers: {
-        onLoadGames: (event: CustomEvent<SteamLoadGamesEvent>) => void;
-        onLoadFromCache: (event: CustomEvent<SteamLoadFromCacheEvent>) => void;
-        onUseOfflineData: (event: CustomEvent<SteamUseOfflineEvent>) => void;
-        onRefreshCache: (event: CustomEvent<SteamCacheRefreshEvent>) => void;
-        onClearCache: (event: CustomEvent<SteamCacheClearEvent>) => void;
-        onShowCacheStats: (event: CustomEvent<SteamCacheStatsEvent>) => void;
-        onClearImageCache: (event: CustomEvent<SteamImageCacheClearEvent>) => void;
-        onDevModeToggle: (event: CustomEvent<SteamDevModeToggleEvent>) => void;
-    }
     
     constructor(
         eventManager: EventManager,
@@ -45,31 +35,14 @@ export class SteamWorkflowManager {
         this.uiCoordinator = uiCoordinator
         this.sceneCoordinator = sceneCoordinator
         
-        // Bind all handlers to maintain proper 'this' context
-        this.boundHandlers = {
-            onLoadGames: this.onLoadGames.bind(this),
-            onLoadFromCache: this.onLoadFromCache.bind(this),
-            onUseOfflineData: this.onUseOfflineData.bind(this),
-            onRefreshCache: this.onRefreshCache.bind(this),
-            onClearCache: this.onClearCache.bind(this),
-            onShowCacheStats: this.onShowCacheStats.bind(this),
-            onClearImageCache: this.onClearImageCache.bind(this),
-            onDevModeToggle: this.onDevModeToggle.bind(this)
-        }
-        
-        this.registerEventHandlers()
-    }
-    
-    private registerEventHandlers(): void {
-        this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.boundHandlers.onLoadGames)
-        this.eventManager.registerEventHandler(SteamEventTypes.LoadFromCache, this.boundHandlers.onLoadFromCache)
-        this.eventManager.registerEventHandler(SteamEventTypes.UseOffline, this.boundHandlers.onUseOfflineData)
-        this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.boundHandlers.onRefreshCache)
-        this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.boundHandlers.onClearCache)
-        this.eventManager.registerEventHandler(SteamEventTypes.CacheStats, this.boundHandlers.onShowCacheStats)
-        this.eventManager.registerEventHandler(SteamEventTypes.ImageCacheClear, this.boundHandlers.onClearImageCache)
-        this.eventManager.registerEventHandler(SteamEventTypes.DevModeToggle, this.boundHandlers.onDevModeToggle)
-        // Note: ImageCacheStatsRequest handler removed - stats accessed directly via UICoordinator
+        // Register event handlers directly - no intermediate layers
+        this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.onLoadGames.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.LoadFromCache, this.onLoadFromCache.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.UseOffline, this.onUseOfflineData.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.onRefreshCache.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.onClearCache.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.ImageCacheClear, this.onClearImageCache.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.DevModeToggle, this.onDevModeToggle.bind(this))
     }
     
     /**
@@ -216,31 +189,6 @@ export class SteamWorkflowManager {
     }
 
     /**
-     * Show cache stats workflow
-     */
-    private async onShowCacheStats(event: CustomEvent<SteamCacheStatsEvent>): Promise<void> {
-        try {
-            SteamWorkflowManager.logger.info('Starting show cache stats workflow')
-            
-            const stats = this.steamIntegration.getCacheStats()
-            
-            // Format stats for display
-            const message = `Cache Stats:\n` +
-                `- Entries: ${stats.totalEntries}\n` +
-                `- Cache hits: ${stats.cacheHits}\n` +
-                `- Cache misses: ${stats.cacheMisses}`
-            
-            console.log(message)
-            
-            SteamWorkflowManager.logger.info('Show cache stats workflow completed successfully')
-            
-        } catch (error) {
-            SteamWorkflowManager.logger.error('Show cache stats workflow failed:', error)
-            console.error('Failed to get cache statistics.')
-        }
-    }
-
-    /**
      * Clear image cache workflow
      */
     private async onClearImageCache(event: CustomEvent<SteamImageCacheClearEvent>): Promise<void> {
@@ -262,8 +210,9 @@ export class SteamWorkflowManager {
      * Development mode toggle workflow
      */
     private async onDevModeToggle(event: CustomEvent<SteamDevModeToggleEvent>): Promise<void> {
+        const { isEnabled } = event.detail
+        
         try {
-            const { isEnabled } = event.detail
             SteamWorkflowManager.logger.info(`Starting dev mode toggle workflow: ${isEnabled ? 'enabled' : 'disabled'}`)
             
             // Set max games based on development mode
@@ -282,6 +231,30 @@ export class SteamWorkflowManager {
         } catch (error) {
             SteamWorkflowManager.logger.error('Dev mode toggle workflow failed:', error)
             console.error('Failed to toggle development mode.')
+        }
+    }
+
+    /**
+     * Show cache stats directly (replaces event-based approach)
+     */
+    showCacheStats(): void {
+        try {
+            SteamWorkflowManager.logger.info('Starting show cache stats workflow')
+            
+            const stats = this.steamIntegration.getCacheStats()
+            
+            const message = `Cache Stats:\n` +
+                           `Total Entries: ${stats.totalEntries}\n` +
+                           `Cache Hits: ${stats.cacheHits}\n` +
+                           `Cache Misses: ${stats.cacheMisses}\n` +
+                           `Hit Rate: ${stats.totalEntries > 0 ? Math.round((stats.cacheHits / (stats.cacheHits + stats.cacheMisses)) * 100) : 0}%`
+            
+            alert(message)
+            SteamWorkflowManager.logger.info('Show cache stats workflow completed successfully')
+            
+        } catch (error) {
+            SteamWorkflowManager.logger.error('Show cache stats workflow failed:', error)
+            alert(`Error getting cache stats: ${error}`)
         }
     }
 
