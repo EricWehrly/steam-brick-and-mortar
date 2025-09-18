@@ -7,6 +7,7 @@ import { ProgressDisplay } from './ProgressDisplay'
 import { WebXRUIPanel } from './WebXRUIPanel'
 import { renderTemplate } from '../utils/TemplateEngine'
 import uiErrorTemplate from '../templates/ui/error.html?raw'
+import type { SteamIntegration } from '../steam-integration/SteamIntegration'
 
 export interface UIManagerEvents {
   steamLoadGames: (vanityUrl: string) => void
@@ -17,15 +18,18 @@ export interface UIManagerEvents {
   steamShowCacheStats: () => void
   steamDevModeToggle?: (isEnabled: boolean) => void
   webxrEnterVR: () => void
-  checkCacheAvailability?: (vanityUrl: string) => boolean
 }
 
 export class UIManager {
-  private steamUIPanel: SteamUIPanel
-  private progressDisplay: ProgressDisplay
-  private webxrUIPanel: WebXRUIPanel
+  // Expose UI panels directly instead of using delegation
+  public readonly steamUIPanel: SteamUIPanel
+  public readonly progressDisplay: ProgressDisplay
+  public readonly webxrUIPanel: WebXRUIPanel
   
-  constructor(private events: UIManagerEvents) {
+  constructor(
+    private events: UIManagerEvents,
+    private steamIntegration: SteamIntegration
+  ) {
     this.steamUIPanel = new SteamUIPanel({
       onLoadGames: this.events.steamLoadGames,
       onLoadFromCache: this.events.steamLoadFromCache,
@@ -33,9 +37,8 @@ export class UIManager {
       onRefreshCache: this.events.steamRefreshCache,
       onClearCache: this.events.steamClearCache,
       onShowCacheStats: this.events.steamShowCacheStats,
-      onDevModeToggle: this.events.steamDevModeToggle,
-      checkCacheAvailability: this.events.checkCacheAvailability
-    })
+      onDevModeToggle: this.events.steamDevModeToggle
+    }, this.steamIntegration)
     
     this.progressDisplay = new ProgressDisplay()
     
@@ -52,41 +55,6 @@ export class UIManager {
     // Show initial UI state
     this.showSteamUI()
     this.showControlsHelp()
-  }
-  
-  // Steam UI delegation
-  showSteamStatus(message: string, type: 'loading' | 'success' | 'error'): void {
-    this.steamUIPanel.showStatus(message, type)
-  }
-  
-  updateCacheStats(stats: { totalEntries: number; cacheHits: number; cacheMisses: number }): void {
-    this.steamUIPanel.updateCacheStats(stats)
-  }
-  
-  checkOfflineAvailability(vanityUrl: string): void {
-    this.steamUIPanel.checkOfflineAvailability(vanityUrl)
-  }
-  
-  isDevelopmentMode(): boolean {
-    return this.steamUIPanel.isDevelopmentMode()
-  }
-  
-  // Progress UI delegation
-  showProgress(show: boolean): void {
-    this.progressDisplay.show(show)
-  }
-  
-  updateProgress(current: number, total: number, message: string, gameText?: string): void {
-    this.progressDisplay.update(current, total, message, gameText)
-  }
-  
-  // WebXR UI delegation
-  setWebXRSupported(supported: boolean): void {
-    this.webxrUIPanel.setSupported(supported)
-  }
-  
-  setWebXRSessionActive(active: boolean): void {
-    this.webxrUIPanel.setSessionActive(active)
   }
   
   // Overall UI state

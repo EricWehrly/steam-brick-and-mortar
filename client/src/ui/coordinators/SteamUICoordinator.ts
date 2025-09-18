@@ -1,0 +1,180 @@
+/**
+ * Steam UI Coordinator - Steam-specific UI workflows and state management
+ * 
+ * This coordinator handles Steam-related UI operations with direct method calls
+ * instead of events for simple operations (following refactor plan feedback).
+ * 
+ * Responsibilities:
+ * - Steam loading workflows
+ * - Development mode management  
+ * - Cache operations
+ * - Progress and status updates
+ */
+
+import { EventManager } from '../../core/EventManager'
+import { SteamEventTypes } from '../../types/InteractionEvents'
+import type { SteamWorkflowManager } from '../../steam-integration/SteamWorkflowManager'
+import type { SteamIntegration } from '../../steam-integration/SteamIntegration'
+import type { UIManager } from '../UIManager'
+
+export class SteamUICoordinator {
+    private eventManager: EventManager
+    private steamWorkflowManager?: SteamWorkflowManager
+    private steamIntegration?: SteamIntegration
+    private uiManager?: UIManager
+
+    constructor() {
+        this.eventManager = EventManager.getInstance()
+    }
+
+    /**
+     * Initialize with required dependencies
+     */
+    init(
+        steamWorkflowManager: SteamWorkflowManager,
+        steamIntegration: SteamIntegration,
+        uiManager: UIManager
+    ): void {
+        this.steamWorkflowManager = steamWorkflowManager
+        this.steamIntegration = steamIntegration
+        this.uiManager = uiManager
+    }
+
+    // Direct method calls for simple operations (no events needed)
+
+    /**
+     * Set development mode - direct method call instead of event
+     * This addresses the feedback about events being overkill for simple operations
+     */
+    async setDevMode(enabled: boolean): Promise<void> {
+        if (!this.steamWorkflowManager) {
+            console.warn('SteamUICoordinator not initialized - cannot set dev mode')
+            return
+        }
+
+        // Direct method call - no events needed for simple config changes
+        await this.steamWorkflowManager.setDevMode(enabled)
+    }
+
+    // Event-based methods for complex workflows (keep events for these)
+
+    /**
+     * Load Steam games workflow - complex operation with progress callbacks
+     */
+    loadGames(vanityUrl: string): void {
+        this.eventManager.emit(SteamEventTypes.LoadGames, {
+            vanityUrl,
+            timestamp: Date.now(),
+            source: 'ui' as const
+        })
+    }
+
+    /**
+     * Load games from cache workflow  
+     */
+    loadFromCache(vanityUrl: string): void {
+        this.eventManager.emit(SteamEventTypes.LoadFromCache, {
+            vanityUrl,
+            timestamp: Date.now(),
+            source: 'ui' as const
+        })
+    }
+
+    /**
+     * Use offline data workflow
+     */
+    useOffline(vanityUrl: string): void {
+        this.eventManager.emit(SteamEventTypes.UseOffline, {
+            vanityUrl,
+            timestamp: Date.now(),
+            source: 'ui' as const
+        })
+    }
+
+    /**
+     * Refresh cache workflow
+     */
+    refreshCache(): void {
+        this.eventManager.emit(SteamEventTypes.CacheRefresh, {
+            timestamp: Date.now(),
+            source: 'ui' as const
+        })
+    }
+
+    /**
+     * Clear cache workflow
+     */
+    clearCache(): void {
+        this.eventManager.emit(SteamEventTypes.CacheClear, {
+            timestamp: Date.now(),
+            source: 'ui' as const
+        })
+    }
+
+    /**
+     * Show cache stats workflow - direct method call instead of event
+     */
+    showCacheStats(): void {
+        if (!this.steamWorkflowManager) {
+            console.warn('SteamUICoordinator not initialized - cannot show cache stats')
+            return
+        }
+
+        // Direct method call - no events needed for simple data display
+        this.steamWorkflowManager.showCacheStats()
+    }
+
+    /**
+     * Clear image cache workflow
+     */
+    clearImageCache(): void {
+        this.eventManager.emit(SteamEventTypes.ImageCacheClear, {
+            timestamp: Date.now(),
+            source: 'ui' as const
+        })
+    }
+
+    // UI state management methods
+
+    /**
+     * Update progress display for Steam loading
+     */
+    updateProgress(current: number, total: number, message: string): void {
+        this.uiManager?.progressDisplay.update(current, total, message)
+    }
+
+    /**
+     * Show/hide progress display
+     */
+    showProgress(show: boolean): void {
+        this.uiManager?.progressDisplay.show(show)
+    }
+
+    /**
+     * Show Steam status message
+     */
+    showSteamStatus(message: string, type: 'loading' | 'success' | 'error'): void {
+        this.uiManager?.steamUIPanel.showStatus(message, type)
+    }
+
+    /**
+     * Check offline availability for a vanity URL
+     */
+    checkOfflineAvailability(vanityUrl: string): void {
+        this.uiManager?.steamUIPanel.checkOfflineAvailability(vanityUrl)
+    }
+
+    /**
+     * Update cache statistics display
+     */
+    updateCacheStats(stats: { totalEntries: number; cacheHits: number; cacheMisses: number }): void {
+        this.uiManager?.steamUIPanel.updateCacheStats(stats)
+    }
+
+    /**
+     * Show error message
+     */
+    showError(message: string): void {
+        this.uiManager?.showError(message)
+    }
+}

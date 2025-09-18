@@ -7,12 +7,22 @@ export const UIManagerMock = vi.fn().mockImplementation(() => ({
     init: vi.fn(),
     hideLoading: vi.fn(),
     showError: vi.fn(),
-    setWebXRSessionActive: vi.fn(),
-    setWebXRSupported: vi.fn(),
-    showSteamStatus: vi.fn(),
-    showProgress: vi.fn(),
-    updateProgress: vi.fn(),
-    dispose: vi.fn()
+    
+    // Expose UI panels as public readonly properties (replacing delegation methods)
+    steamUIPanel: {
+        showStatus: vi.fn(),
+        updateCacheStats: vi.fn(),
+        checkOfflineAvailability: vi.fn(),
+        isDevelopmentMode: vi.fn().mockReturnValue(false)
+    },
+    progressDisplay: {
+        show: vi.fn(),
+        update: vi.fn()
+    },
+    webxrUIPanel: {
+        setSupported: vi.fn(),
+        setSessionActive: vi.fn()
+    }
 }))
 
 // Export async factory function for vi.mock() - enables one-line usage
