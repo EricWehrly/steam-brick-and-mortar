@@ -112,16 +112,17 @@ export class SteamUICoordinator {
     }
 
     /**
-     * Show cache stats workflow - direct method call instead of event
+     * Show cache stats in proper UI - no longer uses alert
      */
     showCacheStats(): void {
-        if (!this.steamWorkflowManager) {
+        if (!this.steamWorkflowManager || !this.steamIntegration) {
             console.warn('SteamUICoordinator not initialized - cannot show cache stats')
             return
         }
 
-        // Direct method call - no events needed for simple data display
-        this.steamWorkflowManager.showCacheStats()
+        // Get stats and update UI directly - no events or alerts needed
+        const stats = this.steamIntegration.getCacheStats()
+        this.uiManager?.steamUIPanel.updateCacheStats(stats)
     }
 
     /**

@@ -235,30 +235,6 @@ export class SteamWorkflowManager {
     }
 
     /**
-     * Show cache stats directly (replaces event-based approach)
-     */
-    showCacheStats(): void {
-        try {
-            SteamWorkflowManager.logger.info('Starting show cache stats workflow')
-            
-            const stats = this.steamIntegration.getCacheStats()
-            
-            const message = `Cache Stats:\n` +
-                           `Total Entries: ${stats.totalEntries}\n` +
-                           `Cache Hits: ${stats.cacheHits}\n` +
-                           `Cache Misses: ${stats.cacheMisses}\n` +
-                           `Hit Rate: ${stats.totalEntries > 0 ? Math.round((stats.cacheHits / (stats.cacheHits + stats.cacheMisses)) * 100) : 0}%`
-            
-            alert(message)
-            SteamWorkflowManager.logger.info('Show cache stats workflow completed successfully')
-            
-        } catch (error) {
-            SteamWorkflowManager.logger.error('Show cache stats workflow failed:', error)
-            alert(`Error getting cache stats: ${error}`)
-        }
-    }
-
-    /**
      * Clean up event handlers when workflow manager is destroyed
      */
     dispose(): void {
