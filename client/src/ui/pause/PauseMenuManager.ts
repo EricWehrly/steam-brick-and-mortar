@@ -90,7 +90,6 @@ export class PauseMenuManager {
     init(): void {
         this.createMenuStructure()
         this.setupKeyboardHandling()
-        console.log('🎛️ Pause menu system initialized')
     }
 
     /**
@@ -107,7 +106,6 @@ export class PauseMenuManager {
         this.panels.set(panel.id, panel)
         panel.init()
         this.createPanelTab(panel)
-        console.log(`📋 Registered pause menu panel: ${panel.title}`)
     }
 
     /**
@@ -201,8 +199,6 @@ export class PauseMenuManager {
 
         // Callbacks
         this.callbacks.onMenuOpen?.()
-        
-        console.log('⏸️ Pause menu opened')
     }
 
     /**
@@ -232,8 +228,6 @@ export class PauseMenuManager {
 
         // Callbacks
         this.callbacks.onMenuClose?.()
-        
-        console.log('▶️ Pause menu closed')
     }
 
     /**
@@ -375,7 +369,6 @@ export class PauseMenuManager {
         tab.addEventListener('click', () => this.showPanel(panel.id))
         
         tabsContainer.appendChild(tab)
-        console.log(`📋 Created tab for panel: ${panel.title}`)
     }
 
     /**
@@ -475,8 +468,6 @@ export class PauseMenuManager {
                 console.warn('Failed to remove styles:', error)
             }
         }
-
-        console.log('🗑️ Pause menu system disposed')
     }
 
     /**
@@ -487,8 +478,6 @@ export class PauseMenuManager {
             console.warn('⚠️ System dependencies not provided - cannot apply settings changes')
             return
         }
-
-        console.log('⚙️ Application settings changed:', settings)
         
         // Handle performance settings
         if (settings.showFPS !== undefined) {
@@ -510,20 +499,7 @@ export class PauseMenuManager {
         }
         
         if (settings.qualityLevel !== undefined) {
-            // Update graphics quality settings
-            console.log(`🎨 Graphics quality set to: ${settings.qualityLevel}`)
             this.updateGraphicsQuality(settings.qualityLevel)
-        }
-        
-        // Handle interface settings
-        if (settings.hideUIInVR !== undefined) {
-            // Handle VR UI visibility (when VR support is available)
-            console.log(`👓 VR UI visibility setting: ${!settings.hideUIInVR}`)
-        }
-        
-        // Handle debug settings
-        if (settings.verboseLogging !== undefined) {
-            console.log('🐛 Debug settings updated')
         }
     }
 
@@ -556,7 +532,5 @@ export class PauseMenuManager {
                 renderer.setPixelRatio(window.devicePixelRatio)
                 break
         }
-        
-        console.log(`🎨 Graphics quality applied: ${quality}`)
     }
 }

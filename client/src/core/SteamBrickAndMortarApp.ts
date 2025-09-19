@@ -170,8 +170,6 @@ export class SteamBrickAndMortarApp {
             console.warn('⚠️ App already initialized')
             return
         }
-
-        console.log('🎮 Initializing Steam Brick and Mortar WebXR...')
         
         try {
             await this.initializeCoordinators()
@@ -192,16 +190,13 @@ export class SteamBrickAndMortarApp {
     private async initializeCoordinators(): Promise<void> {
         // Setup scene with complete store layout
         await this.sceneCoordinator.setupCompleteScene()
-        console.log('✅ Scene setup complete')
         
         // Setup UI with all components
         await this.uiCoordinator.setupUI(this.sceneManager.getRenderer())
-        console.log('✅ UI setup complete')
         
         // Setup WebXR with input handling (optional - may fail without VR hardware)
         try {
             await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
-            console.log('✅ WebXR setup complete')
         } catch (error) {
             console.warn('⚠️ WebXR setup failed (expected without VR hardware):', error)
             // This is expected - continue without WebXR
@@ -212,8 +207,6 @@ export class SteamBrickAndMortarApp {
         if (!this.isInitialized) {
             return
         }
-
-        console.log('🧹 Disposing application resources...')
         
         // Dispose workflow managers first
         this.steamWorkflowManager.dispose()

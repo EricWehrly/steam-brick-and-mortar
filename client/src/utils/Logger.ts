@@ -81,7 +81,7 @@ export class Logger {
 
   debug(message: string, ...args: unknown[]): void {
     if (this.shouldLog(LogLevel.DEBUG)) {
-      console.log(this.formatMessage('DEBUG', message), ...args)
+      console.debug(this.formatMessage('DEBUG', message), ...args)
     }
   }
 
