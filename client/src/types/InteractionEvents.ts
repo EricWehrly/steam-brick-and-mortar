@@ -44,6 +44,11 @@ export interface SteamDevModeToggleEvent extends BaseInteractionEvent {
     isEnabled: boolean
 }
 
+export interface SteamDataLoadedEvent extends BaseInteractionEvent {
+    vanityUrl: string
+    gameCount: number
+}
+
 // =============================================================================
 // WEBXR EVENTS  
 // =============================================================================
@@ -108,7 +113,8 @@ export const SteamEventTypes = {
     CacheRefresh: 'steam:cache-refresh',
     CacheStats: 'steam:cache-stats',
     ImageCacheClear: 'steam:image-cache-clear',
-    DevModeToggle: 'steam:dev-mode-toggle'
+    DevModeToggle: 'steam:dev-mode-toggle',
+    DataLoaded: 'steam:data-loaded'
 } as const
 
 export const WebXREventTypes = {
@@ -148,6 +154,7 @@ export interface InteractionEventMap {
     [SteamEventTypes.CacheStats]: SteamCacheStatsEvent
     [SteamEventTypes.ImageCacheClear]: SteamImageCacheClearEvent
     [SteamEventTypes.DevModeToggle]: SteamDevModeToggleEvent
+    [SteamEventTypes.DataLoaded]: SteamDataLoadedEvent
     
     // WebXR events
     [WebXREventTypes.Toggle]: WebXRToggleEvent

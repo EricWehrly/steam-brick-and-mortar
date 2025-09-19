@@ -75,6 +75,14 @@ export class SteamWorkflowManager {
             
             SteamWorkflowManager.logger.info(`Load games workflow completed successfully`)
             
+            // Emit steam-data-loaded event for UI components that need to react
+            this.eventManager.emit(SteamEventTypes.DataLoaded, {
+                vanityUrl,
+                gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
+                timestamp: Date.now(),
+                source: 'system' as const
+            })
+            
         } catch (error) {
             SteamWorkflowManager.logger.error('Load games workflow failed:', error)
             // this.uiCoordinator.showStatusMessage(
@@ -117,6 +125,14 @@ export class SteamWorkflowManager {
             })
             
             SteamWorkflowManager.logger.info(`Load from cache workflow completed successfully`)
+            
+            // Emit steam-data-loaded event for UI components that need to react
+            this.eventManager.emit(SteamEventTypes.DataLoaded, {
+                vanityUrl,
+                gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
+                timestamp: Date.now(),
+                source: 'system' as const
+            })
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Load from cache workflow failed:', error)
@@ -163,6 +179,17 @@ export class SteamWorkflowManager {
             }
             
             SteamWorkflowManager.logger.info('Cache refresh workflow completed successfully')
+            
+            // Emit steam-data-loaded event for UI components that need to react
+            const gameState = this.steamIntegration.getGameLibraryState()
+            if (gameState.userData?.vanity_url) {
+                this.eventManager.emit(SteamEventTypes.DataLoaded, {
+                    vanityUrl: gameState.userData.vanity_url,
+                    gameCount: gameState.userData.games?.length || 0,
+                    timestamp: Date.now(),
+                    source: 'system' as const
+                })
+            }
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Cache refresh workflow failed:', error)

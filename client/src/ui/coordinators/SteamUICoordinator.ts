@@ -52,8 +52,11 @@ export class SteamUICoordinator {
             return
         }
 
-        // Direct method call - no events needed for simple config changes
-        await this.steamWorkflowManager.setDevMode(enabled)
+        // Direct method call - simple dev mode toggle (no complex workflow needed)
+        console.log(`Dev mode ${enabled ? 'enabled' : 'disabled'}`)
+        
+        // Could store in localStorage or send to SteamIntegration if needed
+        localStorage.setItem('steam-dev-mode', enabled.toString())
     }
 
     // Event-based methods for complex workflows (keep events for these)
