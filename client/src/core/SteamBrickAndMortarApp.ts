@@ -14,7 +14,7 @@
 
 import * as THREE from 'three'
 import { ValidationUtils } from '../utils'
-import { UICoordinator, PerformanceMonitor, type PerformanceStats } from '../ui'
+import { UICoordinator, PerformanceMonitor, type PerformanceStats, ToastManager } from '../ui'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { DebugStatsProvider, type DebugStats } from './DebugStatsProvider'
 import { SteamGameManager } from './SteamGameManager'
@@ -179,6 +179,9 @@ export class SteamBrickAndMortarApp {
             
             this.isInitialized = true
             console.log('✅ Application initialized successfully!')
+            
+            // Test the toast notification system
+            ToastManager.getInstance().success('🎮 Steam Brick and Mortar is ready to explore!', { duration: 5000 })
         } catch (error) {
             console.error('❌ Failed to initialize application:', error)
             // Don't show UI error - app isn't fully initialized yet
