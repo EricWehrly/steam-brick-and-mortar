@@ -1,129 +1,219 @@
 # Tech Debt Backlog
 
+## Intake Queue
+*New items requiring triage and prioritization*
+
+<!-- Add new tech debt items here for processing -->
+
+---
+
 ## Critical Issues
+*Must fix - blocks core functionality or introduces serious bugs*
 
-- Remove redundant javadoc comments which are doing little more than costing additional context to read files.
-   (But keep comments where they're adding value and cannot be rolled cleanly into method signatures)
+*No critical issues currently identified*
 
-## Testing Infrastructure
+---
 
-### Implement Missing Integration Test Coverage
-**Priority**: Medium  
-**Effort**: 6-8 hours  
-**Context**: After improving the Steam texture integration test to use proper public API patterns, we identified significant gaps in integration test coverage that need to be addressed.
+## High Priority
+*Should fix soon - impacts user experience or developer productivity*
 
-**Tasks**:
-- See detailed implementation plan in `docs/integration-test-coverage-plan.md`
-- Implement component integration tests for Steam API + Integration layer boundaries
-- Add texture loading and image cache integration tests  
-- Create scene rendering integration tests without WebGL dependency
-- Add error handling integration tests for network failures and partial data scenarios
-- Implement progressive loading integration tests for callback workflows
+### User Experience
 
-**Benefits**:
-- Better detection of integration boundary issues
-- More comprehensive coverage of user-facing workflows
-- Improved confidence in component interactions
-- Better separation between unit and integration test concerns
-
-**Reference**: Coverage gap analysis from integration test architecture review
-
-### Review and Reclassify Existing Tests for Performance Testing
-**Priority**: Medium  
+#### Fix Input Focus Management Conflicts
+**Priority**: High  
 **Effort**: 2-3 hours  
-**Context**: After establishing our new performance testing framework with `vitest.performance.config.ts`, we need to audit existing tests to identify any that are actually performance tests disguised as unit tests.
+**Context**: Critical UX issue - typing in input fields triggers camera movement, menu interactions conflict with game controls
 
 **Tasks**:
-1. Scan all existing test files in `test/unit/`, `test/integration/`, and `test/live/` directories
-2. Look for tests that:
-   - Measure execution time or timing-sensitive operations
-   - Test memory usage, allocation, or cleanup
-   - Verify rendering performance or frame rates
-   - Test large data sets or stress scenarios
-   - Use `setTimeout`, `setInterval`, or measure async operation duration
-   - Test resource loading/caching performance
-   - Verify optimization effectiveness
+- Disable WASD/mouse controls when Steam vanity input field has focus
+- Disable game controls when pause menu or other UI elements are active
+- Implement focus event management in WebXRCoordinator
+- Add input field focus detection in SteamUIPanel
+- Ensure controls re-enable when focus returns to game area
 
-3. Extract identified performance tests into dedicated `.perf.test.ts` files
-4. Update test configurations to run performance tests separately
-5. Ensure performance tests use appropriate thresholds and benchmarking
+**Files to Modify**:
+- `client/src/webxr/WebXRCoordinator.ts` - Add input focus state management
+- `client/src/ui/SteamUIPanel.ts` - Track input field focus states
+- `client/src/ui/pause/PauseMenuManager.ts` - Communicate menu focus to input system
 
-**Benefits**:
-- Proper separation of concerns between unit and performance tests
-- Better CI/CD pipeline optimization (performance tests can run separately)
-- More accurate performance regression detection
-- Cleaner, faster unit test suite
+**Benefits**: Eliminates control conflicts, prevents accidental camera movement while typing, improved user experience
 
-**Files to Review**:
-- `test/unit/core/steam-brick-and-mortar-app.test.ts` - Check for timing-sensitive tests
-- `test/unit/scene/` - Look for rendering performance tests
-- `test/unit/steam-integration/` - Check for API response time tests
-- `test/integration/` - Look for end-to-end performance scenarios
-- `test/live/` - Check for real-world performance measurements
+**Source**: Feature 5.5.4 - marked as critical UX issue during Feature 5.5 implementation
 
-**Reference**: Performance test framework established in commit `4d48180`
+### Code Quality & Documentation
 
-## Cache Performance Optimization (Remaining Items)
+#### Remove Redundant Javadoc Comments
+**Priority**: High  
+**Effort**: 2-3 hours  
+**Context**: Many files have verbose javadoc comments that add little value beyond method signatures
 
-### Cache Operation Optimizations
+**Tasks**:
+- Audit all TypeScript files for redundant comments
+- Keep comments only where they add genuine value beyond signatures
+- Focus on complex business logic, edge cases, and architectural decisions
+- Remove boilerplate documentation that duplicates type information
+
+**Benefits**: Reduced code noise, improved readability, less maintenance overhead
+
+---
+
+## Medium Priority  
+*Good to fix - improves code quality and maintainability*
+
+### UI Polish & Consistency
+
+#### Standardize Cache Management UI Styling
+**Priority**: Medium  
+**Effort**: 1-2 hours  
+**Context**: Cache scrolling view buttons/inputs inconsistent with main UI styling
+
+**Tasks**:
+- Apply consistent button styling from main UI components
+- Standardize input field appearance and behavior
+- Ensure hover states and focus indicators match UI system
+- Test styling across different viewport sizes
+
+**Benefits**: More polished user experience, consistent visual design
+
+**Status**: Deferred from Phase 1 - suitable for UI polish phase
+
+#### Improve Preview Button State Management
+**Priority**: Medium  
+**Effort**: 1-2 hours  
+**Context**: "Initialize preview" button should change state after initialization
+
+**Tasks**:
+- Change button text/appearance after preview initialization
+- Add onMenuClose event handler to reset button state
+- Consider "Close Preview" functionality vs simple state reset
+- Ensure consistent behavior across menu open/close cycles
+
+**Benefits**: Better UI feedback, clearer interaction state
+
+**Status**: Deferred from Phase 1 - non-essential functionality
+
+### Performance & Architecture
+
+#### Input Management Simplification
 **Priority**: Medium  
 **Effort**: 3-4 hours  
-**Context**: Critical cache performance bottlenecks have been resolved (debounced writes, LRU eviction, user list index). Remaining optimizations provide moderate performance improvements for edge cases and background operations.
+**Context**: InputManager has complex callback chains that could be simplified
 
-**Completed Foundation** ✅:
-- Story 1.1: Debounced localStorage writes (eliminates UI blocking)
-- Story 1.2: Cached user list index (O(1) user lookup vs O(n×m))  
-- Story 1.3: LRU cache size management (prevents memory leaks)
+**Tasks**:
+- Review camera update flow for over-engineering
+- Consider direct method calls vs callbacks for simple updates
+- Streamline movement update callback chains
+- Maintain flexibility while reducing complexity
 
-**Remaining Tasks**:
+**Benefits**: Simpler input handling, easier debugging, reduced callback overhead
 
-#### **Story 2.1: Optimize hasCachedData()**
+#### WebXR Manager Callback Streamlining
+**Priority**: Medium  
+**Effort**: 2-3 hours  
+**Context**: WebXR state changes passed through multiple callback layers unnecessarily
+
+**Tasks**:
+- Identify simple state updates that could use direct method calls
+- Review session state change propagation
+- Simplify supported/session active flag management
+- Maintain event system for complex state changes
+
+**Benefits**: Reduced WebXR state management complexity, clearer data flow
+
+### Cache Performance (Remaining Optimizations)
+
+#### Optimize hasCachedData() Method
+**Priority**: Medium  
 **Effort**: 1-2 hours  
-**Implementation**:
-- Cache resolve lookup result during `hasCachedData()` execution
-- Add `getCachedUserData()` that returns both resolve and games in single lookup
-- Optimize cache key generation to avoid repeated string operations
+**Context**: Minor optimization for frequent cache lookups
 
-#### **Story 2.2: Smart CacheManagementPanel Refresh**
+**Tasks**:
+- Cache resolve lookup result during execution
+- Add `getCachedUserData()` combining resolve + games lookup
+- Optimize cache key generation to reduce string operations
+
+**Benefits**: Reduced redundant cache lookups, minor performance improvement
+
+#### Smart Cache Management Panel Refresh
+**Priority**: Medium  
 **Effort**: 1-2 hours  
-**Implementation**:
-- Increase refresh interval from 5s to 8s when panel visible
-- Pause refresh when panel not visible 
-- Add manual refresh button for immediate updates
-- Cache stats between refreshes to avoid repeated computation
+**Context**: Current 5-second refresh can be optimized
 
-**Benefits**:
-- Reduced redundant cache lookups
-- Better background resource usage
-- Improved cache management panel UX
-- Minor performance gains for heavy cache users
+**Tasks**:
+- Increase refresh interval to 8s when panel visible
+- Pause refresh when panel not visible
+- Add manual refresh button
+- Cache stats between automatic refreshes
 
-**Reference**: Detailed analysis in archived `cache-refactor-plan.md` (moved to tech debt after critical items completed)
+**Benefits**: Better background resource usage, improved panel UX
 
-## Feature 5.5 Backlogged Items
+---
 
-### Story 5.5.1: Dedicated Game List Cache
-**Priority**: Low-Medium  
-**Effort**: 4-6 hours  
-**Context**: Original implementation created data duplication and consistency issues. The performance benefit (reducing 2 cache lookups to 1) was minimal compared to the complexity and memory overhead of storing duplicate game data.
+## Low Priority
+*Nice to have - minimal impact on core functionality*
 
-**Original Goal**: Create lightweight app ID + name cache structure for quick "cache available" checks to replace heavy cache inspections in `SteamUIPanel.checkOfflineAvailability()` and `SteamIntegration.hasCachedData()`.
+### Testing Infrastructure
 
-**Problems Identified**:
-- Data duplication: Storing same game data in resolve, games, and gamelist caches
-- Memory overhead: More cache entries trigger LRU eviction more frequently  
-- Data consistency: Gamelist cache could become stale if games data updates
-- Questionable benefit: Hash map lookups are already fast, 2 vs 1 lookup not meaningful bottleneck
+#### Implement Missing Integration Test Coverage
+**Priority**: Low  
+**Effort**: 6-8 hours  
+**Context**: Identified gaps in integration test coverage
 
-**Alternative Approaches to Consider**:
-1. **Single-pass cache check**: Combine resolve + games lookup into single method
-2. **Cache result memoization**: Cache the hasCachedData result temporarily during UI updates
-3. **Smart cache key generation**: Optimize key generation to avoid repeated string operations
-4. **UI optimization**: Reduce frequency of cache availability checks instead of optimizing the check itself
+**Tasks**:
+- See detailed plan in `docs/integration-test-coverage-plan.md`
+- Add Steam API + Integration layer boundary tests
+- Implement texture loading integration tests
+- Create scene rendering tests without WebGL dependency
+- Add progressive loading integration tests
 
-**Files with potential optimizations**:
-- `client/src/steam-integration/SteamIntegration.ts` - `hasCachedData()` method
-- `client/src/ui/SteamUIPanel.ts` - `checkOfflineAvailability()` usage patterns
-- `client/src/ui/UICoordinator.ts` - Cache availability callback frequency
+**Benefits**: Better integration boundary coverage, improved confidence in workflows
 
-**Reference**: Reverted after analysis showed data duplication outweighed performance benefits
+#### Review and Reclassify Performance Tests
+**Priority**: Low  
+**Effort**: 2-3 hours  
+**Context**: Some unit tests may actually be performance tests
+
+**Tasks**:
+- Audit existing tests for timing/performance measurements
+- Extract performance tests to `.perf.test.ts` files
+- Update test configurations for separate performance runs
+- Ensure proper benchmarking thresholds
+
+**Benefits**: Cleaner test separation, better performance regression detection
+
+---
+
+## Archived/Completed
+
+### Feature 5.5.1: Dedicated Game List Cache
+**Status**: **Cancelled** - Data duplication outweighed performance benefits  
+**Original Effort**: 4-6 hours  
+**Context**: Analysis showed minimal performance gain vs complexity and memory overhead
+
+**Analysis Results**:
+- Hash map lookups already fast (2 vs 1 lookup not meaningful bottleneck)
+- Data duplication created consistency issues
+- Memory overhead triggered LRU eviction more frequently
+- Alternative optimizations provide better ROI
+
+**Alternative Solutions Applied**:
+- Debounced localStorage writes ✅
+- Cached user list index ✅  
+- LRU cache size management ✅
+
+---
+
+## Priority Definitions
+
+- **Critical**: Blocks core functionality, introduces serious bugs, or security issues
+- **High**: Significantly impacts user experience, developer productivity, or code quality
+- **Medium**: Moderate improvements to performance, maintainability, or user experience  
+- **Low**: Minor enhancements, nice-to-have features, or preparatory work for future changes
+
+## Workflow
+
+1. **Intake**: New items added to Intake Queue
+2. **Triage**: Regular review to assign priority and effort estimates
+3. **Planning**: High/Critical items planned into development cycles
+4. **Implementation**: Items moved to appropriate project milestones
+5. **Completion**: Items moved to Archived section with status notes

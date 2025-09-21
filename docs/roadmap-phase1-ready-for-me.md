@@ -407,6 +407,28 @@
 ## 🔄 Milestone 6: Level Layout and Spatial Design - **PHASE 1 COMPLETION**
 *Goal: Design and implement the 3D environment layout for optimal game browsing*
 
+### Feature 6.0: Event-Driven Startup Flow 🔄 
+**Context**: Use events to control startup flow and defer model generation until game is ready
+
+#### Story 6.0.1: GameStart Event Implementation 🔄
+- **Task 6.0.1.1**: Implement GameStart event emission
+  - Add `GameStart` event emission after render loop is established and prerequisites complete
+  - Use existing EventManager to emit event when game is ready
+  - Ensure render loop startup is one of the checked prerequisites  
+  - Document what constitutes "game ready" state for future expansion
+- **Task 6.0.1.2**: Connect model generation to GameStart event
+  - Move 3D model generation from initialization to GameStart event handler
+  - Leverage existing DataLoaded event where appropriate
+  - Keep model loading simple and event-driven without overcomplicating
+
+**Expected Deliverable**: Simple event-driven startup with GameStart event controlling model generation
+
+**Future Enhancement**: Multi-event prerequisite system (series of startup events with GameStart requiring all boxes ticked)
+
+**Acceptance**: GameStart event fires after render loop, triggering deferred model generation
+
+**Context**: **Simple paradigm shift** - Leverage events for better startup flow control without overcomplication
+
 ### Feature 6.1: Enhanced Shelf Visuals and Materials 🔄 **HIGH PRIORITY**
 **Context**: Convert shelf appearance to realistic MDF veneer look with consistent branding colors
 
