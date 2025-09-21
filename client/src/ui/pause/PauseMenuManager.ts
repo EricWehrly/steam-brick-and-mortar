@@ -19,6 +19,9 @@ import { DebugPanel } from './panels/DebugPanel'
 import type { DebugStats } from '../../core'
 import type { ImageCacheStats } from '../../steam/images/ImageManager'
 import type { PerformanceMonitor } from '../PerformanceMonitor'
+import { EventManager } from '../../core/EventManager'
+import { SteamEventTypes } from '../../types/InteractionEvents'
+import type { SteamDataLoadedEvent } from '../../types/InteractionEvents'
 
 export interface PauseMenuState {
     isOpen: boolean
@@ -51,6 +54,8 @@ export interface DefaultPanelCallbacks {
     onClearImageCache?: () => Promise<void>
     onGetCachedUsers?: () => Promise<CachedUser[]>
     onLoadCachedUser?: (steamId: string) => Promise<void>
+    onGetImageUrls?: () => Promise<string[]>
+    onGetCachedBlob?: (url: string) => Promise<Blob | null>
     
     // Debug stats
     onGetDebugStats?: () => Promise<DebugStats>
@@ -72,6 +77,7 @@ export class PauseMenuManager {
     private menuContainer: HTMLElement | null = null
     private cacheManagementPanel: CacheManagementPanel | null = null
     private applicationPanel: ApplicationPanel | null = null
+    private eventManager: EventManager
 
     constructor(config: PauseMenuConfig = {}, callbacks: PauseMenuCallbacks = {}, systemDependencies?: SystemDependencies) {
         this.config = {
@@ -82,6 +88,7 @@ export class PauseMenuManager {
         }
         this.callbacks = callbacks
         this.systemDependencies = systemDependencies || null
+        this.eventManager = EventManager.getInstance()
     }
 
     /**
@@ -90,6 +97,27 @@ export class PauseMenuManager {
     init(): void {
         this.createMenuStructure()
         this.setupKeyboardHandling()
+        this.setupEventListeners()
+    }
+
+    /**
+     * Setup event listeners for steam data loading
+     */
+    private setupEventListeners(): void {
+        this.eventManager.registerEventHandler(
+            SteamEventTypes.DataLoaded, 
+            this.onSteamDataLoaded.bind(this)
+        )
+    }
+
+    /**
+     * Handle steam data loaded event - refresh panels that depend on data
+     */
+    private onSteamDataLoaded(event: CustomEvent<SteamDataLoadedEvent>): void {
+        // Refresh cache management panel if it exists and is visible
+        if (this.cacheManagementPanel) {
+            this.cacheManagementPanel.refreshTemplate()
+        }
     }
 
     /**
@@ -119,7 +147,9 @@ export class PauseMenuManager {
                 callbacks.onGetImageCacheStats,
                 callbacks.onClearImageCache,
                 callbacks.onGetCachedUsers,
-                callbacks.onLoadCachedUser
+                callbacks.onLoadCachedUser,
+                callbacks.onGetImageUrls,
+                callbacks.onGetCachedBlob
             )
             this.cacheManagementPanel = cachePanel
             this.registerPanel(cachePanel)
@@ -435,6 +465,13 @@ export class PauseMenuManager {
         if (this.state.isOpen) {
             this.close()
         }
+
+        // It's more complicated, but we could have the eventManager install an "onDispose" hook
+        // Remove event listeners
+        this.eventManager.removeEventListener(
+            SteamEventTypes.DataLoaded,
+            this.onSteamDataLoaded.bind(this)
+        )
 
         // Dispose all panels
         this.panels.forEach(panel => {

@@ -318,6 +318,14 @@ export class SteamIntegration {
         return this.steamClient.clearImageCache()
     }
 
+    async getAllCachedImageUrls(): Promise<string[]> {
+        return await this.steamClient.getAllCachedImageUrls()
+    }
+
+    async getCachedImageBlob(url: string): Promise<Blob | null> {
+        return await this.steamClient.getCachedImageBlob(url)
+    }
+
     /**
      * Update the maximum games setting for development mode
      */

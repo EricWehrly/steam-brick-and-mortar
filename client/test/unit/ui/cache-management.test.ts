@@ -134,10 +134,24 @@ describe('Cache Management Integration Tests', () => {
         })
 
         it('should show fallback text for null lastUpdate', () => {
+            // Mock cache API as available so the stats section is shown
+            Object.defineProperty(globalThis.window, 'caches', {
+                value: {},
+                writable: true,
+                configurable: true
+            })
+            
+            // Set cache stats with null lastUpdate
+            ;(cachePanel as any).cacheStats = {
+                imageCount: 5,
+                totalSize: 1024,
+                lastUpdate: null
+            }
+            
             // Test the template rendering with null lastUpdate
             const templateData = cachePanel.render()
             
-            // Should contain 'Never' when no lastUpdate
+            // Should contain 'Never' when no lastUpdate and cache API is available
             expect(templateData).toContain('Never')
         })
     })

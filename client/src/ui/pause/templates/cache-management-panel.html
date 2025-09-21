@@ -1,26 +1,62 @@
 <div class="cache-section">
     <div class="cache-stats" id="cache-stats">
+        {{#if cacheApiUnavailable}}
+        <div class="stat-item error">
+            <span class="stat-label">Browser Cache API:</span>
+            <span class="stat-value">{{cacheApiStatus}}</span>
+        </div>
+        {{else}}
         <div class="stat-item">
             <span class="stat-label">Images Cached:</span>
             <span class="stat-value" id="cache-image-count">{{imageCount}}</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Total Size:</span>
-            <span class="stat-value" id="cache-total-size">{{totalSize}}</span>
         </div>
         <div class="stat-item">
             <span class="stat-label">Last Updated:</span>
             <span class="stat-value" id="cache-last-update">{{lastUpdate}}</span>
         </div>
         <div class="stat-item">
-            <span class="stat-label">Browser Cache API:</span>
-            <span class="stat-value">{{cacheApiStatus}}</span>
-        </div>
-        <div class="stat-item">
             <span class="stat-label">Storage Quota:</span>
             <span class="stat-value" id="storage-quota">{{storageQuota}}</span>
         </div>
+        {{/if}}
     </div>
+</div>
+
+<div class="cache-section">
+    <h4>Cached Image Previewer</h4>
+    {{#if hasImages}}
+    <div class="image-previewer" id="image-previewer">
+        <div class="previewer-controls">
+            <button class="cache-btn cache-btn-secondary" id="initialize-previewer-btn">
+                🖼️ Initialize Preview
+            </button>
+            <div class="previewer-navigation" id="previewer-navigation" style="display: none;">
+                <button class="nav-btn" id="prev-image-btn" aria-label="Previous image">
+                    ◀
+                </button>
+                <div class="image-counter">
+                    <input type="number" id="image-index-input" min="1" max="{{imageCount}}" value="1" class="index-input">
+                    <span class="counter-separator">of</span>
+                    <span id="total-images">{{imageCount}}</span>
+                </div>
+                <button class="nav-btn" id="next-image-btn" aria-label="Next image">
+                    ▶
+                </button>
+            </div>
+        </div>
+        <div class="image-preview-container" id="image-preview-container" style="display: none;">
+            <img id="preview-image" class="preview-image" alt="Cached game image" />
+            <div class="image-info">
+                <span id="image-name" class="image-name"></span>
+                <span id="image-size" class="image-size"></span>
+            </div>
+        </div>
+    </div>
+    {{else}}
+    <div class="no-images-message">
+        <p>No cached images available for preview.</p>
+    </div>
+    {{/if}}
 </div>
 
 <div class="cache-section">

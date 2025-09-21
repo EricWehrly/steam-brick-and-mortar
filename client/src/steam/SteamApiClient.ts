@@ -204,6 +204,14 @@ export class SteamApiClient {
         return this.images.clearCache()
     }
 
+    public async getAllCachedImageUrls(): Promise<string[]> {
+        return await this.images.getAllCachedImageUrls()
+    }
+
+    public async getCachedImageBlob(url: string): Promise<Blob | null> {
+        return await this.images.getCachedImageBlob(url)
+    }
+
     /**
      * Cache management
      */

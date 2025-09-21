@@ -40,6 +40,11 @@ export class CacheManagementPanel extends PauseMenuPanel {
     private onClearCache?: () => Promise<void>
     private onGetCachedUsers?: () => Promise<CachedUser[]>
     private onLoadCachedUser?: (vanityUrl: string) => Promise<void>
+    private onGetImageUrls?: () => Promise<string[]>
+    private onGetCachedBlob?: (url: string) => Promise<Blob | null>
+    private imageUrls: string[] = []
+    private currentImageIndex: number = 0
+    private previewerInitialized: boolean = false
 
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)
@@ -52,12 +57,16 @@ export class CacheManagementPanel extends PauseMenuPanel {
         getStats: () => Promise<ImageCacheStats>,
         clearCache: () => Promise<void>,
         getCachedUsers?: () => Promise<CachedUser[]>,
-        loadCachedUser?: (vanityUrl: string) => Promise<void>
+        loadCachedUser?: (vanityUrl: string) => Promise<void>,
+        getImageUrls?: () => Promise<string[]>,
+        getCachedBlob?: (url: string) => Promise<Blob | null>
     ): void {
         this.onGetStats = getStats
         this.onClearCache = clearCache
         this.onGetCachedUsers = getCachedUsers
         this.onLoadCachedUser = loadCachedUser
+        this.onGetImageUrls = getImageUrls
+        this.onGetCachedBlob = getCachedBlob
     }
     
     /**
@@ -94,7 +103,9 @@ export class CacheManagementPanel extends PauseMenuPanel {
             totalSize: this.cacheStats.totalSize ? this.formatBytes(this.cacheStats.totalSize) : 'Loading...',
             lastUpdate: this.cacheStats.lastUpdate?.toLocaleString() || 'Never',
             cacheApiStatus: ('caches' in window) ? 'Available' : 'Not available',
+            cacheApiUnavailable: !('caches' in window),
             storageQuota: 'Calculating...',
+            hasImages: this.cacheStats.imageCount > 0,
             
             // Cached users dropdown
             cachedUsersOptions: cachedUsersOptions,
@@ -111,6 +122,34 @@ export class CacheManagementPanel extends PauseMenuPanel {
         }
         
         return renderTemplate(cacheManagementPanelTemplate, templateData)
+    }
+
+    /**
+     * Refresh the panel template with current data
+     * Called when Steam data loads to update hasImages state
+     */
+    refreshTemplate(): void {
+        
+        const panel = this.getPanelElement()
+        if (!panel) {
+            return
+        }
+
+        const contentContainer = panel.querySelector('.panel-content')
+        if (!contentContainer) {
+            return
+        }
+        
+        // Re-render the template with current data
+        contentContainer.innerHTML = this.render()
+        
+        // Re-attach event listeners since we replaced the content
+        this.attachEvents()
+        
+        // If this panel is visible, refresh the stats
+        if (this.isVisible) {
+            this.updateCacheStats()
+        }
     }
 
     attachEvents(): void {
@@ -163,6 +202,44 @@ export class CacheManagementPanel extends PauseMenuPanel {
                 this.setSetting('preload', target.checked)
             })
         }
+
+        // Image previewer event listeners
+        const initPreviewBtn = panel.querySelector('#initialize-previewer-btn')
+        const prevBtn = panel.querySelector('#prev-image-btn')
+        const nextBtn = panel.querySelector('#next-image-btn')
+        const indexInput = panel.querySelector('#image-index-input') as HTMLInputElement
+
+        if (initPreviewBtn) {
+            this.addEventListener(initPreviewBtn as HTMLElement, 'click', () => this.initializePreviewer())
+        }
+        if (prevBtn) {
+            this.addEventListener(prevBtn as HTMLElement, 'click', () => this.previousImage())
+        }
+        if (nextBtn) {
+            this.addEventListener(nextBtn as HTMLElement, 'click', () => this.nextImage())
+        }
+        if (indexInput) {
+            this.addEventListener(indexInput, 'change', (e) => {
+                const target = e.target as HTMLInputElement
+                const index = parseInt(target.value, 10)
+                if (!isNaN(index)) {
+                    this.goToImage(index)
+                }
+            })
+        }
+
+        // Keyboard navigation for image previewer
+        document.addEventListener('keydown', (e) => {
+            if (!this.previewerInitialized) return
+            
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault()
+                this.previousImage()
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault()
+                this.nextImage()
+            }
+        })
     }
 
     onShow(): void {
@@ -637,8 +714,174 @@ export class CacheManagementPanel extends PauseMenuPanel {
         }
     }
 
+    /**
+     * Initialize the image previewer
+     */
+    private async initializePreviewer(): Promise<void> {
+        if (!this.onGetImageUrls) {
+            this.showError('Image URL getter not available')
+            return
+        }
+
+        try {
+            this.imageUrls = await this.onGetImageUrls()
+            
+            if (this.imageUrls.length === 0) {
+                this.showError('No cached images available')
+                return
+            }
+
+            this.currentImageIndex = 0
+            this.previewerInitialized = true
+            this.showPreviewerNavigation()
+            this.loadCurrentImage()
+            this.showSuccess('Image previewer initialized')
+        } catch (error) {
+            console.error('Failed to initialize image previewer:', error)
+            this.showError('Failed to initialize image previewer')
+        }
+    }
+
+    /**
+     * Navigate to previous image
+     */
+    private previousImage(): void {
+        if (!this.previewerInitialized || this.imageUrls.length === 0) return
+        
+        this.currentImageIndex = this.currentImageIndex > 0 
+            ? this.currentImageIndex - 1 
+            : this.imageUrls.length - 1
+        this.loadCurrentImage()
+        this.updateIndexInput()
+    }
+
+    /**
+     * Navigate to next image
+     */
+    private nextImage(): void {
+        if (!this.previewerInitialized || this.imageUrls.length === 0) return
+        
+        this.currentImageIndex = this.currentImageIndex < this.imageUrls.length - 1 
+            ? this.currentImageIndex + 1 
+            : 0
+        this.loadCurrentImage()
+        this.updateIndexInput()
+    }
+
+    /**
+     * Jump to specific image index
+     */
+    private goToImage(index: number): void {
+        if (!this.previewerInitialized || this.imageUrls.length === 0) return
+        
+        const boundedIndex = Math.max(0, Math.min(index - 1, this.imageUrls.length - 1)) // Convert 1-based to 0-based
+        this.currentImageIndex = boundedIndex
+        this.loadCurrentImage()
+    }
+
+    /**
+     * Show previewer navigation controls
+     */
+    private showPreviewerNavigation(): void {
+        const panel = this.getPanelElement()
+        if (!panel) return
+
+        const navigation = panel.querySelector('#previewer-navigation') as HTMLElement
+        const container = panel.querySelector('#image-preview-container') as HTMLElement
+        
+        if (navigation) navigation.style.display = 'flex'
+        if (container) container.style.display = 'block'
+    }
+
+    /**
+     * Load current image into preview
+     */
+    private async loadCurrentImage(): Promise<void> {
+        if (this.imageUrls.length === 0) return
+
+        const panel = this.getPanelElement()
+        if (!panel) return
+
+        const imageElement = panel.querySelector('#preview-image') as HTMLImageElement
+        const nameElement = panel.querySelector('#image-name')
+        
+        if (!imageElement) return
+
+        const currentUrl = this.imageUrls[this.currentImageIndex]
+        
+        try {
+            // We need to get the cached blob and create a blob URL for display
+            // For now, we'll need access to ImageManager to get the blob
+            // This is a temporary approach - we need the actual blob retrieval
+            
+            // Check if we have a way to get the cached blob
+            if (this.onGetCachedBlob) {
+                const blob = await this.onGetCachedBlob(currentUrl)
+                if (blob) {
+                    // Create a blob URL for display
+                    const blobUrl = URL.createObjectURL(blob)
+                    imageElement.src = blobUrl
+                    
+                    // Store the blob URL to clean it up later
+                    if (imageElement.dataset.blobUrl) {
+                        URL.revokeObjectURL(imageElement.dataset.blobUrl)
+                    }
+                    imageElement.dataset.blobUrl = blobUrl
+                } else {
+                    // Fallback to direct URL if blob not found
+                    imageElement.src = currentUrl
+                }
+            } else {
+                // Fallback to direct URL if no blob getter available
+                imageElement.src = currentUrl
+            }
+        } catch (error) {
+            console.error('Failed to load cached image:', error)
+            // Fallback to direct URL on error
+            imageElement.src = currentUrl
+        }
+        
+        // Extract filename from URL for display
+        const filename = currentUrl.split('/').pop() || 'Unknown'
+        if (nameElement) {
+            nameElement.textContent = filename
+        }
+
+        // Update image size info when loaded
+        imageElement.onload = () => {
+            const sizeElement = panel.querySelector('#image-size')
+            if (sizeElement) {
+                sizeElement.textContent = `${imageElement.naturalWidth} × ${imageElement.naturalHeight}`
+            }
+        }
+    }
+
+    /**
+     * Update the index input value
+     */
+    private updateIndexInput(): void {
+        const panel = this.getPanelElement()
+        if (!panel) return
+
+        const indexInput = panel.querySelector('#image-index-input') as HTMLInputElement
+        if (indexInput) {
+            indexInput.value = (this.currentImageIndex + 1).toString() // Convert 0-based to 1-based
+        }
+    }
+
     dispose(): void {
         this.stopStatsUpdate()
+        
+        // Clean up any blob URLs to prevent memory leaks
+        const panel = this.getPanelElement()
+        if (panel) {
+            const imageElement = panel.querySelector('#preview-image') as HTMLImageElement
+            if (imageElement && imageElement.dataset.blobUrl) {
+                URL.revokeObjectURL(imageElement.dataset.blobUrl)
+                delete imageElement.dataset.blobUrl
+            }
+        }
+        
         super.dispose()
     }
 }
