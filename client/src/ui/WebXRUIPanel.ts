@@ -30,7 +30,7 @@ export class WebXRUIPanel {
   setSupported(supported: boolean): void {
     if (!this.xrButton) return
     
-    this.xrButton.style.display = 'block'
+    this.xrButton.classList.remove('hidden')
     
     if (supported) {
       this.xrButton.textContent = 'Enter VR'
@@ -53,7 +53,7 @@ export class WebXRUIPanel {
   
   showControlsHelp(): void {
     if (this.controlsHelp) {
-      this.controlsHelp.style.display = 'block'
+      this.controlsHelp.classList.remove('hidden')
     }
   }
 }

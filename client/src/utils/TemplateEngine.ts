@@ -11,22 +11,23 @@ export interface TemplateValues {
  * Supports:
  * - {{value}} - simple interpolation
  * - {{#if condition}}content{{/if}} - conditional blocks
+ * - {{#if condition}}content{{else}}alternative{{/if}} - conditional with else
  * - {{#selected value}}selected{{/selected}} - selected attribute helper
  * - {{#checked value}}checked{{/checked}} - checked attribute helper
  */
 export function interpolateTemplate(template: string, values: TemplateValues): string {
     let result = template
 
-    // Handle simple interpolation {{value}}
-    result = result.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    // Handle conditional blocks with else FIRST: {{#if condition}}content{{else}}alternative{{/if}}
+    result = result.replace(/\{\{#if\s+(\w+)\s*\}\}([\s\S]*?)\{\{else\}\}([\s\S]*?)\{\{\/if\}\}/g, (match, key, ifContent, elseContent) => {
         const value = values[key]
-        return value !== undefined ? String(value) : ''
+        return value ? (ifContent || '') : (elseContent || '')
     })
 
-    // Handle conditional blocks {{#if condition}}content{{/if}}
-    result = result.replace(/\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (match, key, content) => {
+    // Handle conditional blocks without else: {{#if condition}}content{{/if}}
+    result = result.replace(/\{\{#if\s+(\w+)\s*\}\}([\s\S]*?)\{\{\/if\}\}/g, (match, key, content) => {
         const value = values[key]
-        return value ? content : ''
+        return value ? (content || '') : ''
     })
 
     // Handle selected attribute helper {{#selected value}}selected{{/selected}}
@@ -39,6 +40,12 @@ export function interpolateTemplate(template: string, values: TemplateValues): s
     result = result.replace(/\{\{#checked\s+(\w+)\}\}([\s\S]*?)\{\{\/checked\}\}/g, (match, key, content) => {
         const value = values[key]
         return value ? content : ''
+    })
+
+    // Handle simple interpolation LAST: {{value}}
+    result = result.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        const value = values[key]
+        return value !== undefined ? String(value) : ''
     })
 
     return result

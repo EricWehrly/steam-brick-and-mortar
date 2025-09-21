@@ -14,7 +14,7 @@
 
 import * as THREE from 'three'
 import { ValidationUtils } from '../utils'
-import { UICoordinator, PerformanceMonitor, type PerformanceStats } from '../ui'
+import { UICoordinator, PerformanceMonitor, type PerformanceStats, ToastManager } from '../ui'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { DebugStatsProvider, type DebugStats } from './DebugStatsProvider'
 import { SteamGameManager } from './SteamGameManager'
@@ -89,6 +89,7 @@ export class SteamBrickAndMortarApp {
         })
 
         // Initialize scene coordinator with performance configuration
+        // TODO: all (most?) of this should go into advanced visual settings)
         this.sceneCoordinator = new SceneCoordinator(this.sceneManager, {
             maxGames: config.steam?.maxGames ?? 100,
             performance: {
@@ -130,7 +131,9 @@ export class SteamBrickAndMortarApp {
         // Initialize UI coordinator (events now handled by EventManager)
         this.uiCoordinator = new UICoordinator(
             this.performanceMonitor,
-            this.debugStatsProvider
+            this.debugStatsProvider,
+            () => this.steamIntegration.getImageCacheStats(),
+            this.steamIntegration
         )
 
         // Initialize steam game manager with scene coordinator's game box renderer
@@ -145,11 +148,14 @@ export class SteamBrickAndMortarApp {
 
         // Initialize steam workflow manager to handle Steam interactions
         this.steamWorkflowManager = new SteamWorkflowManager(
+            this.eventManager,
             this.steamIntegration,
-            this.steamGameManager,
             this.uiCoordinator,
-            this.eventManager
+            this.sceneCoordinator
         )
+
+        // Wire up the refactored UI coordinators
+        this.uiCoordinator.setSteamWorkflowManager(this.steamWorkflowManager, this.steamIntegration)
 
         // Initialize webxr event handler to handle WebXR and input interactions
         this.webxrEventHandler = new WebXREventHandler(
@@ -164,18 +170,19 @@ export class SteamBrickAndMortarApp {
             console.warn('⚠️ App already initialized')
             return
         }
-
-        console.log('🎮 Initializing Steam Brick and Mortar WebXR...')
         
         try {
             await this.initializeCoordinators()
             this.startRenderLoop()
             
             this.isInitialized = true
-            console.log('✅ WebXR environment ready!')
+            console.log('✅ Application initialized successfully!')
+            
+            // Test the toast notification system
+            ToastManager.getInstance().success('🎮 Steam Brick and Mortar is ready to explore!', { duration: 5000 })
         } catch (error) {
-            console.error('❌ Failed to initialize WebXR environment:', error)
-            this.uiCoordinator.showError('Failed to initialize WebXR environment')
+            console.error('❌ Failed to initialize application:', error)
+            // Don't show UI error - app isn't fully initialized yet
             throw error
         }
     }
@@ -185,18 +192,24 @@ export class SteamBrickAndMortarApp {
         await this.sceneCoordinator.setupCompleteScene()
         
         // Setup UI with all components
-        await this.uiCoordinator.setupUI(this.sceneManager.getRenderer())
+        await this.uiCoordinator.setupUI(
+            this.sceneManager.getRenderer(),
+            this.steamWorkflowManager
+        )
         
-        // Setup WebXR with input handling
-        await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
+        // Setup WebXR with input handling (optional - may fail without VR hardware)
+        try {
+            await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
+        } catch (error) {
+            console.warn('⚠️ WebXR setup failed (expected without VR hardware):', error)
+            // This is expected - continue without WebXR
+        }
     }
 
     dispose(): void {
         if (!this.isInitialized) {
             return
         }
-
-        console.log('🧹 Disposing application resources...')
         
         // Dispose workflow managers first
         this.steamWorkflowManager.dispose()
@@ -245,33 +258,10 @@ export class SteamBrickAndMortarApp {
     }
 
     private startRenderLoop(): void {
-        let lastPerformanceUpdate = 0
-        const performanceUpdateInterval = 1000 // Update performance data every second
-        
-        this.sceneManager.startRenderLoop(() => {
-            const now = Date.now()
-            const camera = this.sceneManager.getCamera()
-            
-            // Update camera movement via WebXR coordinator
-            this.webxrCoordinator.updateCameraMovement(camera)
-            
-            // Update performance data periodically
-            if (now - lastPerformanceUpdate > performanceUpdateInterval) {
-                this.sceneCoordinator.updatePerformanceData(camera)
-                
-                // Update UI performance monitor with Three.js renderer stats
-                this.uiCoordinator.updateRenderStats(this.sceneManager.getRenderer())
-                
-                lastPerformanceUpdate = now
-            }
-            
-            // Rotate the test cube
-            const scene = this.sceneManager.getScene()
-            const cube = scene.getObjectByName('cube') ?? scene.children.find(obj => obj instanceof THREE.Mesh)
-            if (cube) {
-                cube.rotation.x += 0.01
-                cube.rotation.y += 0.01
-            }
+        this.sceneManager.startRenderLoop({
+            webxrCoordinator: this.webxrCoordinator,
+            sceneCoordinator: this.sceneCoordinator,
+            systemUICoordinator: this.uiCoordinator.system
         })
     }
 

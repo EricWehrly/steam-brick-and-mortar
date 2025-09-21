@@ -128,12 +128,16 @@ export class SteamApiClient {
     }
 
     private async rawGetGameDetails(game: SteamGame): Promise<SteamGame> {
-        // Enhance game with artwork URLs
+        // Enhance game with artwork URLs - handle missing image URLs gracefully
         const enhancedGame: SteamGame = {
             ...game,
             artwork: {
-                icon: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`,
-                logo: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`,
+                icon: game.img_icon_url 
+                    ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
+                    : '',
+                logo: game.img_logo_url 
+                    ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`
+                    : '',
                 header: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`,
                 library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
             }
@@ -153,7 +157,7 @@ export class SteamApiClient {
             onGameLoaded?: (game: SteamGame) => void
         } = {}
     ): Promise<SteamGame[]> {
-        const { maxGames = 30, onProgress, onGameLoaded } = options
+        const { maxGames = 10, onProgress, onGameLoaded } = options
         
         // Sort games by playtime
         const sortedGames = [...steamUser.games]
@@ -200,6 +204,14 @@ export class SteamApiClient {
         return this.images.clearCache()
     }
 
+    public async getAllCachedImageUrls(): Promise<string[]> {
+        return await this.images.getAllCachedImageUrls()
+    }
+
+    public async getCachedImageBlob(url: string): Promise<Blob | null> {
+        return await this.images.getCachedImageBlob(url)
+    }
+
     /**
      * Cache management
      */
@@ -210,6 +222,73 @@ export class SteamApiClient {
 
     public getCacheStats() {
         return this.cache.getStats()
+    }
+    
+    /**
+     * Check if cache contains specific key
+     */
+    public hasCached(key: string): boolean {
+        return this.cache.get(key) !== null
+    }
+    
+    /**
+     * Get cached item (for internal use)
+     */
+    public getCached<T>(key: string): T | null {
+        return this.cache.get<T>(key)
+    }
+
+    /**
+     * Get all cache keys (for inspection/management)
+     */
+    public getAllCacheKeys(): string[] {
+        return this.cache.getAllKeys()
+    }
+
+    /**
+     * Get cached users efficiently (optimized implementation)
+     */
+    public getCachedUsers(): Array<{ vanityUrl: string, displayName: string, gameCount: number, steamId: string }> {
+        const cachedUsers: Array<{ vanityUrl: string, displayName: string, gameCount: number, steamId: string }> = []
+        const userMap = new Map<string, { vanityUrl?: string, resolveData?: SteamResolveResponse, gamesData?: SteamUser }>()
+        
+        // Single pass through all cache keys to collect user data
+        const allKeys = this.cache.getAllKeys()
+        
+        for (const key of allKeys) {
+            if (key.startsWith('resolve_')) {
+                const vanityUrl = key.replace('resolve_', '')
+                const resolveData = this.cache.get<SteamResolveResponse>(key)
+                if (resolveData && resolveData.steamid) {
+                    const existing = userMap.get(resolveData.steamid) || {}
+                    existing.vanityUrl = vanityUrl
+                    existing.resolveData = resolveData
+                    userMap.set(resolveData.steamid, existing)
+                }
+            } else if (key.startsWith('games_')) {
+                const steamId = key.replace('games_', '')
+                const gamesData = this.cache.get<SteamUser>(key)
+                if (gamesData) {
+                    const existing = userMap.get(steamId) || {}
+                    existing.gamesData = gamesData
+                    userMap.set(steamId, existing)
+                }
+            }
+        }
+        
+        // Build final user list from users who have both resolve and games data
+        for (const [steamId, userData] of userMap.entries()) {
+            if (userData.resolveData && userData.gamesData) {
+                cachedUsers.push({
+                    vanityUrl: userData.vanityUrl || userData.gamesData.vanity_url || steamId,
+                    displayName: userData.gamesData.vanity_url || userData.vanityUrl || steamId,
+                    gameCount: userData.gamesData.game_count || 0,
+                    steamId: steamId
+                })
+            }
+        }
+        
+        return cachedUsers.sort((a, b) => a.displayName.localeCompare(b.displayName))
     }
 }
 

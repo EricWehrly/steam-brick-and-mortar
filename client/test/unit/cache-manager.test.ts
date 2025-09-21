@@ -199,4 +199,224 @@ describe('CacheManager Unit Tests', () => {
             consoleSpy.mockRestore()
         })
     })
+
+    describe('Debounced localStorage Writes', () => {
+        it('should batch multiple writes within debounce window', () => {
+            // Set multiple values rapidly
+            cacheManager.set('key1', { data: 'value1' })
+            cacheManager.set('key2', { data: 'value2' })
+            cacheManager.set('key3', { data: 'value3' })
+            
+            // localStorage should not have been called yet
+            expect(localStorageMock.setItem).not.toHaveBeenCalled()
+            
+            // Advance timers to trigger debounced save
+            vi.advanceTimersByTime(2100) // Past the 2000ms debounce
+            
+            // Now localStorage should have been called exactly once
+            expect(localStorageMock.setItem).toHaveBeenCalledTimes(1)
+            expect(localStorageMock.setItem).toHaveBeenCalledWith(
+                'cache_state',
+                expect.stringContaining('key1')
+            )
+        })
+
+        it('should save immediately on clear()', () => {
+            // Set a value first
+            cacheManager.set('key', { data: 'value' })
+            vi.clearAllMocks() // Clear the mock calls from set()
+            
+            // Clear should save immediately
+            cacheManager.clear()
+            
+            // localStorage should be called immediately (removeItem for empty cache)
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('cache_state')
+            
+            // No pending timers should exist
+            expect(vi.getTimerCount()).toBe(0)
+        })
+
+        it('should save immediately on saveImmediately()', () => {
+            // Set a value to create pending write
+            cacheManager.set('key', { data: 'value' })
+            vi.clearAllMocks()
+            
+            // Force immediate save
+            cacheManager.saveImmediately()
+            
+            // localStorage should be called immediately
+            expect(localStorageMock.setItem).toHaveBeenCalledTimes(1)
+            
+            // No pending timers should exist
+            expect(vi.getTimerCount()).toBe(0)
+        })
+
+        it('should cancel previous timeout when new writes arrive', () => {
+            // First write
+            cacheManager.set('key1', { data: 'value1' })
+            
+            // Wait partway through debounce period
+            vi.advanceTimersByTime(1000)
+            
+            // Second write should reset the timer
+            cacheManager.set('key2', { data: 'value2' })
+            
+            // Wait the original timeout period (should not save yet)
+            vi.advanceTimersByTime(1500)
+            expect(localStorageMock.setItem).not.toHaveBeenCalled()
+            
+            // Wait the full new timeout period
+            vi.advanceTimersByTime(1000)
+            expect(localStorageMock.setItem).toHaveBeenCalledTimes(1)
+        })
+
+        it('should handle multiple cache instances independently', () => {
+            // Create second cache manager
+            const cacheManager2 = new CacheManager()
+            
+            // Clear mocks after both instances are created
+            vi.clearAllMocks()
+            
+            // Set values in both
+            cacheManager.set('key1', { data: 'value1' })
+            cacheManager2.set('key2', { data: 'value2' })
+            
+            // Advance time for first cache's debounce
+            vi.advanceTimersByTime(2100)
+            
+            // Both localStorage calls should have happened (one for each instance)
+            expect(localStorageMock.setItem).toHaveBeenCalledTimes(2)
+            
+            // All timers should be cleared
+            expect(vi.getTimerCount()).toBe(0)
+        })
+    })
+
+    describe('Cache Size Management', () => {
+        it('should enforce entry count limits using LRU eviction', () => {
+            // Create cache with small limits for testing
+            const smallCache = new CacheManager({ 
+                maxEntries: 2,
+                maxCacheSize: 1024 * 1024 // 1MB
+            })
+            
+            // Add more entries than the limit
+            smallCache.set('key1', { data: 'value1' })
+            smallCache.set('key2', { data: 'value2' })
+            smallCache.set('key3', { data: 'value3' }) // This should trigger eviction
+            
+            // Advance timers to trigger debounced cache resolution
+            vi.advanceTimersByTime(2100)
+            
+            // Only the newest 2 entries should remain
+            expect(smallCache.get('key1')).toBeNull() // Should be evicted (oldest)
+            expect(smallCache.get('key2')).not.toBeNull()
+            expect(smallCache.get('key3')).not.toBeNull()
+            
+            const stats = smallCache.getStats()
+            expect(stats.totalEntries).toBe(2)
+        })
+
+        it('should update access times for LRU tracking', () => {
+            const cache = new CacheManager({ 
+                maxEntries: 2,
+                maxCacheSize: 1024 * 1024
+            })
+            
+            // Add entries with time separation
+            cache.set('key1', { data: 'value1' })
+            vi.advanceTimersByTime(100) // T+100
+            cache.set('key2', { data: 'value2' })
+            vi.advanceTimersByTime(100) // T+200
+            
+            // Access key1 to update its access time (should be T+200 now)
+            cache.get('key1')
+            vi.advanceTimersByTime(100) // T+300
+            
+            // Add a third entry (should evict key2, not key1, since key1 was accessed more recently)
+            cache.set('key3', { data: 'value3' })
+            
+            // Advance timers to trigger debounced cache resolution
+            vi.advanceTimersByTime(2100)
+            
+            expect(cache.get('key1')).not.toBeNull() // Should remain (recently accessed)
+            expect(cache.get('key2')).toBeNull() // Should be evicted (not recently accessed)
+            expect(cache.get('key3')).not.toBeNull() // Should remain (newest)
+        })
+
+        it('should provide cache statistics with size information', () => {
+            const cache = new CacheManager()
+            
+            cache.set('small', 'data')
+            cache.set('large', { largeData: 'x'.repeat(1000) })
+            
+            const stats = cache.getStats()
+            
+            expect(stats.totalEntries).toBe(2)
+            expect(stats.totalSize).toBeGreaterThan(0)
+            expect(typeof stats.totalSize).toBe('number')
+            expect(stats.cacheHits).toBe(0)
+            expect(stats.cacheMisses).toBe(0)
+        })
+
+        it('should handle size estimation for different data types', () => {
+            const cache = new CacheManager()
+            
+            // Test different data types
+            cache.set('string', 'hello')
+            cache.set('number', 42)
+            cache.set('object', { name: 'test', value: 123 })
+            cache.set('array', [1, 2, 3, 4, 5])
+            
+            const stats = cache.getStats()
+            expect(stats.totalEntries).toBe(4)
+            expect(stats.totalSize).toBeGreaterThan(0)
+        })
+
+        it('should handle non-serializable data gracefully', () => {
+            const cache = new CacheManager()
+            
+            // Create circular reference (non-serializable)
+            const circular: any = { name: 'test' }
+            circular.self = circular
+            
+            // Should not throw and should use fallback size estimation
+            expect(() => cache.set('circular', circular)).not.toThrow()
+            
+            const stats = cache.getStats()
+            expect(stats.totalEntries).toBe(1)
+            expect(stats.totalSize).toBe(1024) // Fallback size
+        })
+
+        it('should evict by size when size limit is exceeded', () => {
+            // Create cache with small size limit
+            const cache = new CacheManager({
+                maxEntries: 100, // High entry limit
+                maxCacheSize: 1000 // Small size limit (1KB)
+            })
+            
+            // Add large data entries
+            cache.set('large1', 'x'.repeat(500)) // ~500 bytes
+            vi.advanceTimersByTime(10)
+            cache.set('large2', 'x'.repeat(500)) // ~500 bytes
+            vi.advanceTimersByTime(10)
+            cache.set('large3', 'x'.repeat(500)) // This should trigger size-based eviction
+            
+            // Advance timers to trigger debounced cache resolution
+            vi.advanceTimersByTime(2100)
+            
+            // Should evict oldest entries to stay under size limit
+            const stats = cache.getStats()
+            expect(stats.totalSize).toBeLessThanOrEqual(1000)
+            
+            // Verify that not all entries remain (some were evicted)
+            const remainingEntries = [
+                cache.get('large1'),
+                cache.get('large2'), 
+                cache.get('large3')
+            ].filter(entry => entry !== null).length
+            
+            expect(remainingEntries).toBeLessThan(3)
+        })
+    })
 })

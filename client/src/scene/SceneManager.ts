@@ -118,13 +118,45 @@ export class SceneManager {
     }
 
     /**
-     * Start the render loop
+     * Start the render loop with integrated frame updates
      */
-    public startRenderLoop(onBeforeRender?: () => void) {
+    public startRenderLoop(dependencies?: {
+        webxrCoordinator?: any,
+        sceneCoordinator?: any,
+        systemUICoordinator?: any
+    }) {
+        let lastPerformanceUpdate = 0
+        const performanceUpdateInterval = 1000 // Update performance data every second
+        
         this.renderer.setAnimationLoop(() => {
-            if (onBeforeRender) {
-                onBeforeRender()
+            const now = Date.now()
+            
+            // Update camera movement via WebXR coordinator
+            if (dependencies?.webxrCoordinator) {
+                dependencies.webxrCoordinator.updateCameraMovement(this.camera)
             }
+            
+            // Update performance data periodically
+            if (now - lastPerformanceUpdate > performanceUpdateInterval) {
+                if (dependencies?.sceneCoordinator) {
+                    dependencies.sceneCoordinator.updatePerformanceData(this.camera)
+                }
+                
+                // Update UI performance monitor with Three.js renderer stats
+                if (dependencies?.systemUICoordinator) {
+                    dependencies.systemUICoordinator.updateRenderStats(this.renderer)
+                }
+                
+                lastPerformanceUpdate = now
+            }
+            
+            // Rotate the test cube
+            const cube = this.scene.getObjectByName('cube') ?? this.scene.children.find(obj => obj instanceof THREE.Mesh)
+            if (cube) {
+                cube.rotation.x += 0.01
+                cube.rotation.y += 0.01
+            }
+            
             this.renderer.render(this.scene, this.camera)
         })
     }

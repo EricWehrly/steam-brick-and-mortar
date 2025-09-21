@@ -159,4 +159,11 @@ export class SceneCoordinator {
         const stats = this.storeLayout.getStoreStats()
         console.log('📊 Store Stats:', stats)
     }
+
+    /**
+     * Update the maximum games setting for development mode
+     */
+    updateMaxGames(maxGames: number): void {
+        this.gameBoxRenderer.updateShelfConfig({ maxGames })
+    }
 }

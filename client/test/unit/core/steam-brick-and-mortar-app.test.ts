@@ -72,20 +72,28 @@ vi.mock('../../../src/webxr/WebXRCoordinator', () => ({
 vi.mock('../../../src/ui/UICoordinator', () => ({
     UICoordinator: vi.fn().mockImplementation(() => ({
         setupUI: vi.fn().mockResolvedValue(undefined),
-        showError: vi.fn(),
-        updateWebXRSessionState: vi.fn(),
-        updateWebXRSupport: vi.fn(),
-        showProgress: vi.fn(),
-        updateProgress: vi.fn(),
-        showSteamStatus: vi.fn(),
-        enableCacheActions: vi.fn(),
-        disableCacheActions: vi.fn(),
-        updateCacheStats: vi.fn(),
-        checkOfflineAvailability: vi.fn(),
-        updateRenderStats: vi.fn(),
-        togglePerformanceMonitor: vi.fn(),
-        getCurrentPerformanceStats: vi.fn().mockReturnValue({}),
-        dispose: vi.fn()
+        setSteamWorkflowManager: vi.fn(),
+        dispose: vi.fn(),
+        // Expose specialized coordinators
+        steam: {
+            showError: vi.fn(),
+            updateCacheStats: vi.fn(),
+            updateProgress: vi.fn(),
+            showProgress: vi.fn(),
+            showSteamStatus: vi.fn(),
+            checkOfflineAvailability: vi.fn()
+        },
+        webxr: {
+            updateWebXRSessionState: vi.fn(),
+            updateWebXRSupport: vi.fn()
+        },
+        system: {
+            enableCacheActions: vi.fn(),
+            disableCacheActions: vi.fn(),
+            updateRenderStats: vi.fn(),
+            togglePerformanceMonitor: vi.fn(),
+            getCurrentPerformanceStats: vi.fn().mockReturnValue({})
+        }
     }))
 }))
 

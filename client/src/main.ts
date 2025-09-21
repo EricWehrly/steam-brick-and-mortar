@@ -6,6 +6,7 @@
  * SteamBrickAndMortarApp orchestrator class.
  */
 
+import './styles/main.css'
 import { SteamBrickAndMortarApp } from './core'
 
 // Track if initialization is already in progress or completed

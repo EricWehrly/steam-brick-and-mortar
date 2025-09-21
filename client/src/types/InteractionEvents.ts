@@ -16,6 +16,10 @@ export interface SteamLoadGamesEvent extends BaseInteractionEvent {
     vanityUrl: string
 }
 
+export interface SteamLoadFromCacheEvent extends BaseInteractionEvent {
+    vanityUrl: string
+}
+
 export interface SteamUseOfflineEvent extends BaseInteractionEvent {
     vanityUrl: string
 }
@@ -34,6 +38,15 @@ export interface SteamCacheStatsEvent extends BaseInteractionEvent {
 
 export interface SteamImageCacheClearEvent extends BaseInteractionEvent {
     // No additional data needed
+}
+
+export interface SteamDevModeToggleEvent extends BaseInteractionEvent {
+    isEnabled: boolean
+}
+
+export interface SteamDataLoadedEvent extends BaseInteractionEvent {
+    vanityUrl: string
+    gameCount: number
 }
 
 // =============================================================================
@@ -94,11 +107,14 @@ export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
 
 export const SteamEventTypes = {
     LoadGames: 'steam:load-games',
+    LoadFromCache: 'steam:load-from-cache',
     UseOffline: 'steam:use-offline', 
     CacheClear: 'steam:cache-clear',
     CacheRefresh: 'steam:cache-refresh',
     CacheStats: 'steam:cache-stats',
-    ImageCacheClear: 'steam:image-cache-clear'
+    ImageCacheClear: 'steam:image-cache-clear',
+    DevModeToggle: 'steam:dev-mode-toggle',
+    DataLoaded: 'steam:data-loaded'
 } as const
 
 export const WebXREventTypes = {
@@ -131,11 +147,14 @@ export const UIEventTypes = {
 export interface InteractionEventMap {
     // Steam events
     [SteamEventTypes.LoadGames]: SteamLoadGamesEvent
+    [SteamEventTypes.LoadFromCache]: SteamLoadFromCacheEvent
     [SteamEventTypes.UseOffline]: SteamUseOfflineEvent
     [SteamEventTypes.CacheClear]: SteamCacheClearEvent
     [SteamEventTypes.CacheRefresh]: SteamCacheRefreshEvent
     [SteamEventTypes.CacheStats]: SteamCacheStatsEvent
     [SteamEventTypes.ImageCacheClear]: SteamImageCacheClearEvent
+    [SteamEventTypes.DevModeToggle]: SteamDevModeToggleEvent
+    [SteamEventTypes.DataLoaded]: SteamDataLoadedEvent
     
     // WebXR events
     [WebXREventTypes.Toggle]: WebXRToggleEvent

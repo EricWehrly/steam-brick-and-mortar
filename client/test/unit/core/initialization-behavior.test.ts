@@ -1,25 +1,14 @@
 /**
- * Test to verify application initialization idempotency and prevent duplicate initialization
+ * Test application initialization behavior without coupling to log messages
  * 
- * Focus: Behavioral testing - ensuring init() can be called safely multiple times
- * without causing problems, not testing specific log messages.
+ * Focus: Verify that initialization works correctly and handles edge cases,
+ * not testing throwaway console output.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { SteamBrickAndMortarApp } from '../../../src/core/SteamBrickAndMortarApp'
 
-// Mock DOM and window
-const mockDocument = {
-    addEventListener: vi.fn(),
-    readyState: 'loading' as Document['readyState'],
-    getElementById: vi.fn().mockReturnValue(null)
-}
-
-const mockWindow = {
-    steamBrickAndMortarApp: undefined
-}
-
-// Mock the dependencies
+// Mock all dependencies
 vi.mock('../../../src/scene/SceneManager', async () => {
     const { sceneManagerMockFactory } = await import('../../mocks/scene/SceneManager.mock')
     return sceneManagerMockFactory()
@@ -70,20 +59,12 @@ vi.mock('../../../src/ui/CacheManagementUI', async () => {
     return cacheManagementUIMockFactory()
 })
 
-describe('Application Initialization Idempotency', () => {
+describe('Application Initialization Behavior', () => {
     beforeEach(() => {
-        // Reset DOM mock
-        mockDocument.addEventListener.mockClear()
-        mockDocument.readyState = 'loading'
-        mockWindow.steamBrickAndMortarApp = undefined
-    })
-
-    afterEach(() => {
-        // Clean up
         vi.clearAllMocks()
     })
 
-    it('should allow multiple init() calls without breaking', async () => {
+    it('should initialize successfully', async () => {
         const app = new SteamBrickAndMortarApp({
             scene: {
                 antialias: false,
@@ -99,38 +80,53 @@ describe('Application Initialization Idempotency', () => {
             }
         })
 
-        // Initialize once
         await expect(app.init()).resolves.not.toThrow()
-
-        // Initialize again - should not throw
-        await expect(app.init()).resolves.not.toThrow()
-
-        // Clean up
         app.dispose()
     })
 
-    it('should prevent duplicate initialization side effects', async () => {
-        // Track how many times expensive operations are called
-        let sceneSetupCount = 0
-        let uiSetupCount = 0
-        
+    it('should handle multiple initialization calls safely', async () => {
         const app = new SteamBrickAndMortarApp()
         
-        // Spy on expensive operations
+        // Multiple init calls should not cause issues
+        await expect(app.init()).resolves.not.toThrow()
+        await expect(app.init()).resolves.not.toThrow()
+        await expect(app.init()).resolves.not.toThrow()
+        
+        app.dispose()
+    })
+
+    it('should allow reinitialization after disposal', async () => {
+        const app = new SteamBrickAndMortarApp()
+
+        // Initialize, dispose, then reinitialize
+        await app.init()
+        app.dispose()
+        await expect(app.init()).resolves.not.toThrow()
+        
+        app.dispose()
+    })
+
+    it('should not reinitialize expensive operations on duplicate init calls', async () => {
+        const app = new SteamBrickAndMortarApp()
+        
+        // Track method calls that should only happen once
+        let sceneSetupCalls = 0
+        let uiSetupCalls = 0
+        
         const originalSetupScene = (app as any).setupScene?.bind(app)
         const originalSetupUI = (app as any).setupUI?.bind(app)
         
         if (originalSetupScene) {
-            vi.spyOn(app as any, 'setupScene').mockImplementation(async () => {
-                sceneSetupCount++
-                return originalSetupScene?.()
+            vi.spyOn(app as any, 'setupScene').mockImplementation(async (...args) => {
+                sceneSetupCalls++
+                return originalSetupScene(...args)
             })
         }
         
         if (originalSetupUI) {
-            vi.spyOn(app as any, 'setupUI').mockImplementation(async () => {
-                uiSetupCount++
-                return originalSetupUI?.()
+            vi.spyOn(app as any, 'setupUI').mockImplementation(async (...args) => {
+                uiSetupCalls++
+                return originalSetupUI(...args)
             })
         }
 
@@ -139,26 +135,13 @@ describe('Application Initialization Idempotency', () => {
         await app.init()
         await app.init()
 
-        // Expensive setup should only happen once
+        // Expensive operations should not repeat
         if (originalSetupScene) {
-            expect(sceneSetupCount).toBeLessThanOrEqual(1)
+            expect(sceneSetupCalls).toBeLessThanOrEqual(1)
         }
         if (originalSetupUI) {
-            expect(uiSetupCount).toBeLessThanOrEqual(1)
+            expect(uiSetupCalls).toBeLessThanOrEqual(1)
         }
-
-        app.dispose()
-    })
-
-    it('should handle reinitialization after disposal', async () => {
-        const app = new SteamBrickAndMortarApp()
-
-        // Initialize, dispose, then reinitialize
-        await app.init()
-        app.dispose()
-
-        // Should be able to initialize again after disposal
-        await expect(app.init()).resolves.not.toThrow()
 
         app.dispose()
     })

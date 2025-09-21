@@ -31,6 +31,10 @@ export class CacheManagementUI {
     private isCollapsed: boolean = true
     private onGetStats?: () => Promise<ImageCacheStats>
     private onClearCache?: () => Promise<void>
+    private getImageUrls?: () => Promise<string[]>
+    private imageUrls: string[] = []
+    private currentImageIndex: number = 0
+    private previewerInitialized: boolean = false
 
     constructor(config: CacheUIConfig) {
         this.config = {
@@ -45,10 +49,16 @@ export class CacheManagementUI {
      */
     init(
         getStats: () => Promise<ImageCacheStats>,
-        clearCache: () => Promise<void>
+        clearCache: () => Promise<void>,
+        getImageUrls?: () => Promise<string[]>
     ): void {
         this.onGetStats = getStats
         this.onClearCache = clearCache
+        
+        // Store image URL getter for previewer
+        if (getImageUrls) {
+            this.getImageUrls = getImageUrls
+        }
         
         this.container = document.getElementById(this.config.containerId)
         if (!this.container) {
@@ -93,6 +103,68 @@ export class CacheManagementUI {
         this.updateCollapseState()
     }
 
+    /**
+     * Initialize the image previewer
+     */
+    async initializePreviewer(): Promise<void> {
+        if (!this.getImageUrls) {
+            console.warn('Image URL getter not provided')
+            return
+        }
+
+        try {
+            this.imageUrls = await this.getImageUrls()
+            if (this.imageUrls.length === 0) {
+                console.warn('No cached images available')
+                return
+            }
+
+            this.currentImageIndex = 0
+            this.previewerInitialized = true
+            this.showPreviewerNavigation()
+            this.loadCurrentImage()
+        } catch (error) {
+            console.error('Failed to initialize image previewer:', error)
+        }
+    }
+
+    /**
+     * Navigate to previous image
+     */
+    previousImage(): void {
+        if (!this.previewerInitialized || this.imageUrls.length === 0) return
+        
+        this.currentImageIndex = this.currentImageIndex > 0 
+            ? this.currentImageIndex - 1 
+            : this.imageUrls.length - 1
+        this.loadCurrentImage()
+        this.updateIndexInput()
+    }
+
+    /**
+     * Navigate to next image
+     */
+    nextImage(): void {
+        if (!this.previewerInitialized || this.imageUrls.length === 0) return
+        
+        this.currentImageIndex = this.currentImageIndex < this.imageUrls.length - 1 
+            ? this.currentImageIndex + 1 
+            : 0
+        this.loadCurrentImage()
+        this.updateIndexInput()
+    }
+
+    /**
+     * Jump to specific image index
+     */
+    goToImage(index: number): void {
+        if (!this.previewerInitialized || this.imageUrls.length === 0) return
+        
+        const boundedIndex = Math.max(0, Math.min(index - 1, this.imageUrls.length - 1)) // Convert 1-based to 0-based
+        this.currentImageIndex = boundedIndex
+        this.loadCurrentImage()
+    }
+
     private render(): void {
         if (!this.container) return
 
@@ -119,6 +191,37 @@ export class CacheManagementUI {
         
         refreshBtn?.addEventListener('click', () => this.refresh())
         clearBtn?.addEventListener('click', () => this.clearCache())
+
+        // Image previewer event listeners
+        const initPreviewBtn = document.getElementById('initialize-previewer-btn')
+        const prevBtn = document.getElementById('prev-image-btn')
+        const nextBtn = document.getElementById('next-image-btn')
+        const indexInput = document.getElementById('image-index-input') as HTMLInputElement
+
+        initPreviewBtn?.addEventListener('click', () => this.initializePreviewer())
+        prevBtn?.addEventListener('click', () => this.previousImage())
+        nextBtn?.addEventListener('click', () => this.nextImage())
+        
+        indexInput?.addEventListener('change', (e) => {
+            const target = e.target as HTMLInputElement
+            const index = parseInt(target.value, 10)
+            if (!isNaN(index)) {
+                this.goToImage(index)
+            }
+        })
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (!this.previewerInitialized) return
+            
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault()
+                this.previousImage()
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault()
+                this.nextImage()
+            }
+        })
     }
 
     private updateCollapseState(): void {
@@ -164,6 +267,9 @@ export class CacheManagementUI {
             hasImages: totalImages > 0,
             oldestDate: totalImages > 0 ? new Date(stats.oldestTimestamp).toLocaleString() : '',
             newestDate: totalImages > 0 ? new Date(stats.newestTimestamp).toLocaleString() : '',
+            imageCount: totalImages,
+            cacheApiUnavailable: !storageQuota?.isSupported,
+            cacheApiStatus: storageQuota?.isSupported ? 'Available' : 'Not Supported',
             ...quotaData
         }
 
@@ -214,6 +320,47 @@ export class CacheManagementUI {
         if (this.refreshTimer !== null) {
             window.clearInterval(this.refreshTimer)
             this.refreshTimer = null
+        }
+    }
+
+    private showPreviewerNavigation(): void {
+        const navigation = document.getElementById('previewer-navigation')
+        const container = document.getElementById('image-preview-container')
+        
+        if (navigation) navigation.style.display = 'flex'
+        if (container) container.style.display = 'block'
+    }
+
+    private loadCurrentImage(): void {
+        if (this.imageUrls.length === 0) return
+
+        const imageElement = document.getElementById('preview-image') as HTMLImageElement
+        const nameElement = document.getElementById('image-name')
+        
+        if (!imageElement) return
+
+        const currentUrl = this.imageUrls[this.currentImageIndex]
+        imageElement.src = currentUrl
+        
+        // Extract filename from URL for display
+        const filename = currentUrl.split('/').pop() || 'Unknown'
+        if (nameElement) {
+            nameElement.textContent = filename
+        }
+
+        // Update image size info when loaded
+        imageElement.onload = () => {
+            const sizeElement = document.getElementById('image-size')
+            if (sizeElement) {
+                sizeElement.textContent = `${imageElement.naturalWidth} × ${imageElement.naturalHeight}`
+            }
+        }
+    }
+
+    private updateIndexInput(): void {
+        const indexInput = document.getElementById('image-index-input') as HTMLInputElement
+        if (indexInput) {
+            indexInput.value = (this.currentImageIndex + 1).toString() // Convert 0-based to 1-based
         }
     }
 }

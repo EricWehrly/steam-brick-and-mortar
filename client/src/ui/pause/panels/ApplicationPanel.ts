@@ -14,6 +14,7 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import '../../../styles/pause-menu/application-panel.css'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import applicationPanelTemplate from '../../../templates/pause-menu/application-panel.html?raw'
+import { ToastManager } from '../../ToastManager'
 
 export interface ApplicationSettings {
     // Performance Settings
@@ -232,6 +233,7 @@ export class ApplicationPanel extends PauseMenuPanel {
         URL.revokeObjectURL(url)
     }
 
+    // TODO: replace 'alert's with toast messages
     private importSettings(): void {
         const input = document.createElement('input')
         input.type = 'file'
@@ -255,13 +257,13 @@ export class ApplicationPanel extends PauseMenuPanel {
                         // Notify of settings import
                         this.onSettingsChanged?.(this.settings)
                         
-                        window.alert('Settings imported successfully!')
+                        ToastManager.getInstance().success('Settings imported successfully!')
                     } else {
-                        window.alert('Invalid settings file format.')
+                        ToastManager.getInstance().error('Invalid settings file format.')
                     }
                 } catch (error) {
                     console.error('Failed to import settings:', error)
-                    window.alert('Failed to import settings. Please check the file format.')
+                    ToastManager.getInstance().error('Failed to import settings. Please check the file format.')
                 }
             }
             

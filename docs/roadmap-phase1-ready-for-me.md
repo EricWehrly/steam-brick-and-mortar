@@ -329,52 +329,68 @@
 
 **Acceptance**: Image caching works seamlessly with UI for monitoring and management ✅
 
-### Feature 5.5: Enhanced Game Library Caching & UI 🔄 **HIGH PRIORITY**
-**Context**: Improved caching strategy with dedicated game list cache and enhanced user interface
+### Feature 5.5: Enhanced Game Library Caching & UI ✅ **ANALYSIS COMPLETE - READY FOR IMPLEMENTATION**
+**Context**: Improved caching strategy with user-friendly cache loading and development controls
 
-#### Story 5.5.1: Dedicated Game List Cache 🔄
-- **Task 5.5.1.1**: Create lightweight game list cache entry
-  - Implement dedicated cache for user's game list with app ID and name only
-  - Design cache structure to support quick lookups by app ID
-  - Add cache entry for lightweight game manifest (separate from detailed game data)
-  - Ensure app ID can be used as key to reference detailed cache entries for artwork/metadata
+**Implementation Plan**: See [`docs/active/feature-5.5-implementation-plan.md`](./active/feature-5.5-implementation-plan.md) for detailed implementation plan.
+
+**Key Findings from Analysis**:
+- ✅ **Excellent cache infrastructure** already in place (IndexedDB image cache, localStorage Steam data cache)
+- ✅ **Robust progressive loading** with rate limiting and error handling  
+- ✅ **Comprehensive cache management UI** via pause menu system
+- 🔄 **Missing UI enhancements**: "Load from Cache" button and workflow
+- 🔄 **Missing optimization**: Lightweight game list cache for quick availability checks
+- 🔄 **Optional enhancement**: Development mode toggle (current 30-game limit is reasonable)
+
+#### Story 5.5.1: Dedicated Game List Cache 🔄 **READY FOR IMPLEMENTATION**
+- **Task 5.5.1.1**: Create lightweight game list cache entry *(4-6 hours estimated)*
+  - Implement cache entry with app ID + name + playtime for quick lookups
+  - Add hasGameListInCache() method for fast availability checks
+  - Integrate with existing SimpleCacheManager infrastructure
 - **Task 5.5.1.2**: Integrate game list cache with loading workflow
-  - Modify Steam library loading to populate dedicated game list cache
-  - Enable lookups from game list cache to detailed cache entries
-  - Add cache invalidation and refresh strategies for game list vs. detailed data
-  - Test cache consistency between game list and detailed game data
+  - Update loadGamesForUser to populate lightweight cache
+  - Connect cache availability checks to UI button logic
+  - Maintain cache consistency between game list and detailed data
 
 **Expected Deliverable**: Lightweight game list cache supporting quick app ID/name lookups
 
-#### Story 5.5.2: Load from Cache UI Enhancement 🔄
-- **Task 5.5.2.1**: Add "Load from Cache" button to Steam Account panel
-  - Create conditional button that appears when game list cache is populated
-  - Implement cache-based game loading that bypasses Steam API calls
-  - Add user feedback for cache-based loading (progress, game count, etc.)
-  - Design removable button system for future iteration (if user input becomes unnecessary)
+#### Story 5.5.2: Load from Cache UI Enhancement 🔄 **HIGH PRIORITY - READY FOR IMPLEMENTATION**
+- **Task 5.5.2.1**: Add "Load from Cache" button to Steam Account panel *(3-4 hours estimated)*
+  - Create conditional button that appears when game list cache is populated  
+  - Add cache-based loading workflow that bypasses Steam API calls
+  - Implement progress feedback for cache vs API loading states
+  - Design button visibility logic using game list cache availability checks
 - **Task 5.5.2.2**: Integrate cache loading with game population
-  - Connect "Load from Cache" to shelf population system
-  - Use app ID from cache for detailed data lookups
-  - Implement fallback to Steam API if cached detailed data is missing
-  - Add cache hit/miss statistics and reporting
+  - Connect "Load from Cache" to existing shelf population system
+  - Use cached data with fallback to Steam API for missing detailed data
+  - Add user feedback distinguishing cache vs API loading
 
 **Expected Deliverable**: User-friendly cache loading interface with progress feedback
 
-#### Story 5.5.3: Development Limiting and Safety Controls 🔄
-- **Task 5.5.3.1**: Add game count governor to loading modal
-  - Create checkbox control in "Load my games" modal to limit games to 10
-  - Make 10-game limit checked by default during development phase
-  - Add clear labeling indicating this is for testing/development purposes
-  - Design for easy removal once stable performance is validated
-- **Task 5.5.3.2**: Implement smart game limiting
-  - Ensure game limiting applies to both Steam API and cache loading
-  - Add logic to select most interesting/relevant games when limiting (e.g., most played)
-  - Provide user feedback about limitation (e.g., "Showing 10 of 850 games")
-  - Plan for graceful expansion beyond 10 games in future iterations
+#### Story 5.5.3: Development Safety Controls 🔄 **OPTIONAL ENHANCEMENT**
+- **Task 5.5.3.1**: Add simple development mode toggle *(1-2 hours estimated)*
+  - Create "🔧 Development Mode" checkbox in Steam UI (checked by default)
+  - Apply reasonable game limiting when enabled (keep current 30-game limit or reduce to 15-20)
+  - Add clear user feedback about game limitation status
+  - Avoid complex dev vs prod environment detection (unnecessary scope creep)
+- **Task 5.5.3.2**: Implement smart game limiting logic
+  - Ensure game limiting applies to both Steam API and cache loading workflows  
+  - Use existing playtime-based sorting for most relevant games
+  - Provide clear feedback: "Showing 15 of 850 games (development mode)"
 
-**Expected Deliverable**: Configurable game limiting for safe development testing
+**Expected Deliverable**: Simple development mode toggle for safer testing workflows
 
-**Acceptance**: Users can load games from cache with improved UI controls and development safety limits
+### Feature 5.6: Settings Menu Polish & Functionality Review 🔄 **DEFERRED TO PHASE 2**
+**Context**: Polish pause menu settings UI and connect disconnected functionality from pause menu system implementation
+
+**Rationale**: Focus on environment rendering and core functionality first. Settings menu polish is better appreciated when the overall experience is more complete.
+
+**Identified Issues** (for future implementation):
+- Visual: "Game Settings" tab styling inconsistencies, redundant cache information display
+- Functional: Disconnected checkboxes (FPS counter, performance stats), unimplemented controls
+- Need to audit and connect all settings controls when UI polish becomes priority
+
+**Moved to Phase 2**: Will address settings menu polish and functionality connections after core environment and user experience is solid.
 
 ### Future Enhancements (Roadmap TODOs)
 - **Game-level cache optimization**: Check if all artwork for a game is cached before downloading

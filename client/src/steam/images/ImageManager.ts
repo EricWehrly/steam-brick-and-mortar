@@ -103,10 +103,15 @@ export class ImageManager {
         const results: Record<string, Blob | null> = {};
 
         for (const [type, url] of Object.entries(artworkUrls)) {
-            if (url) {
+            if (url && url.trim() !== '') {
                 results[type] = await this.downloadImage(url, options);
                 // Small delay between downloads
                 await new Promise(resolve => setTimeout(resolve, 100));
+            } else {
+                // TODO: try something different
+                console.warn(`Skipping empty or invalid URL for ${type}`);
+                // Skip empty or invalid URLs
+                results[type] = null;
             }
         }
 
@@ -174,6 +179,44 @@ export class ImageManager {
             request.onsuccess = () => resolve();
             request.onerror = () => reject(new Error('Failed to clear image cache'));
         });
+    }
+
+    /**
+     * Get all cached image URLs for preview functionality
+     */
+    async getAllCachedImageUrls(): Promise<string[]> {
+        if (!this.db) {
+            return []
+        }
+
+        return new Promise((resolve, reject) => {
+            if (!this.db) {
+                resolve([])
+                return
+            }
+            
+            const transaction = this.db.transaction([this.storeName], 'readonly')
+            const store = transaction.objectStore(this.storeName)
+            const request = store.getAllKeys()
+            
+            request.onsuccess = () => {
+                // Keys in our IndexedDB are the image URLs
+                resolve(request.result as string[])
+            };
+            
+            request.onerror = () => {
+                console.error('Failed to get cached image URLs:', request.error)
+                resolve([]) // Return empty array on error instead of rejecting
+            };
+        });
+    }
+
+    /**
+     * Get a cached image blob by URL for preview
+     */
+    async getCachedImageBlob(url: string): Promise<Blob | null> {
+        const cacheEntry = await this.getFromCache(url);
+        return cacheEntry?.blob || null;
     }
 
     private async initializeDB(): Promise<void> {

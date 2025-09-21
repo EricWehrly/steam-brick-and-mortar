@@ -1,4 +1,7 @@
 /* Main application styles */
+@import './components/toast.css';
+@import './components/pause-menu.css';
+@import './components/steam-ui.css';
 
 body {
     margin: 0;
@@ -7,6 +10,12 @@ body {
     color: #fff;
     font-family: Arial, sans-serif;
     overflow: hidden;
+}
+
+canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
 }
 
 #loading {
@@ -41,12 +50,6 @@ body {
     cursor: not-allowed;
 }
 
-canvas {
-    display: block;
-    width: 100vw;
-    height: 100vh;
-}
-
 #controls-help {
     position: absolute;
     bottom: 20px;
@@ -57,4 +60,52 @@ canvas {
     border-radius: 4px;
     font-size: 12px;
     z-index: 1000;
+}
+
+/* Steam-specific button variants */
+.button-cache {
+    background: #4a90e2;
+}
+
+.button-cache:hover {
+    background: #357abd;
+}
+
+.button-offline {
+    background: #ff8c00;
+}
+
+.button-offline:hover {
+    background: #e67c00;
+}
+
+
+/* UI component utilities */
+.hidden {
+    display: none;
+}
+
+.button-group {
+    display: flex;
+    gap: 8px;
+}
+
+/* Pause menu trigger button styles */
+.settings-button {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 1000;
+    padding: 10px 15px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: 1px solid #333;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.settings-button:hover {
+    background: rgba(0, 0, 0, 0.9);
+    border-color: #555;
 }

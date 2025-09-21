@@ -11,7 +11,7 @@ import pauseMenuStructureTemplate from '../../templates/pause-menu/main-structur
 import '../../styles/pause-menu/pause-menu-manager.css'
 
 // Panel imports for default registration
-import { CacheManagementPanel } from './panels/CacheManagementPanel'
+import { CacheManagementPanel, type CachedUser } from './panels/CacheManagementPanel'
 import { HelpPanel } from './panels/HelpPanel'
 import { ApplicationPanel, type ApplicationSettings } from './panels/ApplicationPanel'
 import { GameSettingsPanel } from './panels/GameSettingsPanel'
@@ -19,6 +19,9 @@ import { DebugPanel } from './panels/DebugPanel'
 import type { DebugStats } from '../../core'
 import type { ImageCacheStats } from '../../steam/images/ImageManager'
 import type { PerformanceMonitor } from '../PerformanceMonitor'
+import { EventManager } from '../../core/EventManager'
+import { SteamEventTypes } from '../../types/InteractionEvents'
+import type { SteamDataLoadedEvent } from '../../types/InteractionEvents'
 
 export interface PauseMenuState {
     isOpen: boolean
@@ -49,6 +52,10 @@ export interface DefaultPanelCallbacks {
     // Cache management
     onGetImageCacheStats?: () => Promise<ImageCacheStats>
     onClearImageCache?: () => Promise<void>
+    onGetCachedUsers?: () => Promise<CachedUser[]>
+    onLoadCachedUser?: (steamId: string) => Promise<void>
+    onGetImageUrls?: () => Promise<string[]>
+    onGetCachedBlob?: (url: string) => Promise<Blob | null>
     
     // Debug stats
     onGetDebugStats?: () => Promise<DebugStats>
@@ -70,6 +77,7 @@ export class PauseMenuManager {
     private menuContainer: HTMLElement | null = null
     private cacheManagementPanel: CacheManagementPanel | null = null
     private applicationPanel: ApplicationPanel | null = null
+    private eventManager: EventManager
 
     constructor(config: PauseMenuConfig = {}, callbacks: PauseMenuCallbacks = {}, systemDependencies?: SystemDependencies) {
         this.config = {
@@ -80,6 +88,7 @@ export class PauseMenuManager {
         }
         this.callbacks = callbacks
         this.systemDependencies = systemDependencies || null
+        this.eventManager = EventManager.getInstance()
     }
 
     /**
@@ -88,7 +97,27 @@ export class PauseMenuManager {
     init(): void {
         this.createMenuStructure()
         this.setupKeyboardHandling()
-        console.log('🎛️ Pause menu system initialized')
+        this.setupEventListeners()
+    }
+
+    /**
+     * Setup event listeners for steam data loading
+     */
+    private setupEventListeners(): void {
+        this.eventManager.registerEventHandler(
+            SteamEventTypes.DataLoaded, 
+            this.onSteamDataLoaded.bind(this)
+        )
+    }
+
+    /**
+     * Handle steam data loaded event - refresh panels that depend on data
+     */
+    private onSteamDataLoaded(event: CustomEvent<SteamDataLoadedEvent>): void {
+        // Refresh cache management panel if it exists and is visible
+        if (this.cacheManagementPanel) {
+            this.cacheManagementPanel.refreshTemplate()
+        }
     }
 
     /**
@@ -105,7 +134,6 @@ export class PauseMenuManager {
         this.panels.set(panel.id, panel)
         panel.init()
         this.createPanelTab(panel)
-        console.log(`📋 Registered pause menu panel: ${panel.title}`)
     }
 
     /**
@@ -117,7 +145,11 @@ export class PauseMenuManager {
             const cachePanel = new CacheManagementPanel()
             cachePanel.initCacheFunctions(
                 callbacks.onGetImageCacheStats,
-                callbacks.onClearImageCache
+                callbacks.onClearImageCache,
+                callbacks.onGetCachedUsers,
+                callbacks.onLoadCachedUser,
+                callbacks.onGetImageUrls,
+                callbacks.onGetCachedBlob
             )
             this.cacheManagementPanel = cachePanel
             this.registerPanel(cachePanel)
@@ -197,8 +229,6 @@ export class PauseMenuManager {
 
         // Callbacks
         this.callbacks.onMenuOpen?.()
-        
-        console.log('⏸️ Pause menu opened')
     }
 
     /**
@@ -228,8 +258,6 @@ export class PauseMenuManager {
 
         // Callbacks
         this.callbacks.onMenuClose?.()
-        
-        console.log('▶️ Pause menu closed')
     }
 
     /**
@@ -371,7 +399,6 @@ export class PauseMenuManager {
         tab.addEventListener('click', () => this.showPanel(panel.id))
         
         tabsContainer.appendChild(tab)
-        console.log(`📋 Created tab for panel: ${panel.title}`)
     }
 
     /**
@@ -439,6 +466,13 @@ export class PauseMenuManager {
             this.close()
         }
 
+        // It's more complicated, but we could have the eventManager install an "onDispose" hook
+        // Remove event listeners
+        this.eventManager.removeEventListener(
+            SteamEventTypes.DataLoaded,
+            this.onSteamDataLoaded.bind(this)
+        )
+
         // Dispose all panels
         this.panels.forEach(panel => {
             try {
@@ -471,8 +505,6 @@ export class PauseMenuManager {
                 console.warn('Failed to remove styles:', error)
             }
         }
-
-        console.log('🗑️ Pause menu system disposed')
     }
 
     /**
@@ -483,8 +515,6 @@ export class PauseMenuManager {
             console.warn('⚠️ System dependencies not provided - cannot apply settings changes')
             return
         }
-
-        console.log('⚙️ Application settings changed:', settings)
         
         // Handle performance settings
         if (settings.showFPS !== undefined) {
@@ -506,20 +536,7 @@ export class PauseMenuManager {
         }
         
         if (settings.qualityLevel !== undefined) {
-            // Update graphics quality settings
-            console.log(`🎨 Graphics quality set to: ${settings.qualityLevel}`)
             this.updateGraphicsQuality(settings.qualityLevel)
-        }
-        
-        // Handle interface settings
-        if (settings.hideUIInVR !== undefined) {
-            // Handle VR UI visibility (when VR support is available)
-            console.log(`👓 VR UI visibility setting: ${!settings.hideUIInVR}`)
-        }
-        
-        // Handle debug settings
-        if (settings.verboseLogging !== undefined) {
-            console.log('🐛 Debug settings updated')
         }
     }
 
@@ -552,7 +569,5 @@ export class PauseMenuManager {
                 renderer.setPixelRatio(window.devicePixelRatio)
                 break
         }
-        
-        console.log(`🎨 Graphics quality applied: ${quality}`)
     }
 }
