@@ -69,7 +69,7 @@ export class UIManager {
   hideLoading(): void {
     const loading = document.getElementById('loading')
     if (loading) {
-      loading.style.display = 'none'
+      loading.classList.add('hidden')
     }
   }
   

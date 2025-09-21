@@ -789,8 +789,8 @@ export class CacheManagementPanel extends PauseMenuPanel {
         const navigation = panel.querySelector('#previewer-navigation') as HTMLElement
         const container = panel.querySelector('#image-preview-container') as HTMLElement
         
-        if (navigation) navigation.style.display = 'flex'
-        if (container) container.style.display = 'block'
+        if (navigation) navigation.classList.remove('hidden')
+        if (container) container.classList.remove('hidden')
     }
 
     /**

@@ -154,7 +154,7 @@ export class SteamUIPanel {
   
   show(): void {
     if (this.steamUI) {
-      this.steamUI.style.display = 'block'
+      this.steamUI.classList.remove('hidden')
     }
   }
   
@@ -210,24 +210,24 @@ export class SteamUIPanel {
     if (!this.loadFromCacheButton) return
     
     if (!vanityUrl || !hasCache) {
-      this.loadFromCacheButton.style.display = 'none'
+      this.loadFromCacheButton.classList.add('hidden')
       return
     }
     
     // Show the Load from Cache button when cached data is available
-    this.loadFromCacheButton.style.display = 'inline-block'
+    this.loadFromCacheButton.classList.remove('hidden')
   }
   
   checkOfflineAvailability(vanityUrl: string): void {
     if (!this.useOfflineButton) return
     
     if (!vanityUrl) {
-      this.useOfflineButton.style.display = 'none'
+      this.useOfflineButton.classList.add('hidden')
       return
     }
     
     // For simplified client, always hide offline button since it's not implemented
-    this.useOfflineButton.style.display = 'none'
+    this.useOfflineButton.classList.add('hidden')
   }
   
   /**

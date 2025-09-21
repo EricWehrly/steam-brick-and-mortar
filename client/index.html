@@ -195,6 +195,70 @@
             font-size: 12px;
             z-index: 1000;
         }
+        
+        /* Settings button styles */
+        .settings-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 1px solid #333;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .settings-button:hover {
+            background: rgba(0, 0, 0, 0.9);
+            border-color: #555;
+        }
+        
+        /* UI component utilities */
+        .hidden {
+            display: none;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .button-cache {
+            background: #4a90e2;
+        }
+        
+        .button-cache:hover {
+            background: #357abd;
+        }
+        
+        .button-offline {
+            background: #ff8c00;
+        }
+        
+        .button-offline:hover {
+            background: #e67c00;
+        }
+        
+        .dev-mode-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #444;
+        }
+        
+        .dev-mode-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #ccc;
+        }
+        
+        .dev-mode-checkbox {
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -203,7 +267,7 @@
         <p>Setting up your shop...</p>
     </div>
     
-    <div id="steam-ui" style="display: none;">
+    <div id="steam-ui" class="hidden">
         <h2>🎮 Steam Account</h2>
         <label for="steam-vanity">Steam Profile URL or Vanity Name:</label>
         <input 
@@ -212,22 +276,22 @@
             placeholder="e.g., SpiteMonger or steamcommunity.com/id/SpiteMonger"
             autocomplete="off"
         />
-        <div style="display: flex; gap: 8px;">
+        <div class="button-group">
             <button id="load-steam-games">Load My Games</button>
-            <button id="load-from-cache" style="display: none; background: #4a90e2;">📋 Load from Cache</button>
-            <button id="use-offline-data" style="display: none; background: #ff8c00;">Use Offline</button>
+            <button id="load-from-cache" class="hidden button-cache">📋 Load from Cache</button>
+            <button id="use-offline-data" class="hidden button-offline">Use Offline</button>
         </div>
         
         <!-- Development Mode Toggle -->
-        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #444;">
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #ccc;">
-                <input type="checkbox" id="dev-mode-toggle" checked style="margin: 0;">
+        <div class="dev-mode-section">
+            <label class="dev-mode-label">
+                <input type="checkbox" id="dev-mode-toggle" checked class="dev-mode-checkbox">
                 Limit to 20 games (dev mode)
             </label>
         </div>
         
         <!-- Progressive loading indicator -->
-        <div id="loading-progress" style="display: none;">
+        <div id="loading-progress" class="hidden">
             <div class="progress-bar">
                 <div class="progress-fill" id="progress-fill"></div>
             </div>
@@ -239,16 +303,16 @@
     </div>
     
     <!-- Settings Button -->
-    <button id="settings-button" style="position: absolute; top: 20px; left: 20px; z-index: 1000; padding: 10px 15px; background: rgba(0, 0, 0, 0.8); color: white; border: 1px solid #333; border-radius: 5px; cursor: pointer; font-size: 14px;">⚙️ Settings</button>
+    <button id="settings-button" class="settings-button">⚙️ Settings</button>
     
-    <div id="controls-help" style="display: none;">
+    <div id="controls-help" class="hidden">
         <strong>Controls:</strong><br>
         WASD - Move around<br>
         Mouse - Look left/right<br>
         Q/E - Roll camera
     </div>
     
-    <button id="webxr-button" style="display: none;">Enter VR</button>
+    <button id="webxr-button" class="hidden">Enter VR</button>
     
     <script type="module" src="/src/main.ts"></script>
 </body>
