@@ -13,9 +13,11 @@ import { PauseMenuManager } from '../pause/PauseMenuManager'
 import { PerformanceMonitor } from '../PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
 import { InputEventTypes, UIEventTypes } from '../../types/InteractionEvents'
+import type { SteamLoadFromCacheEvent } from '../../types/InteractionEvents'
 import type { DebugStats, DebugStatsProvider } from '../../core/DebugStatsProvider'
 import type { ImageCacheStats } from '../../steam/images/ImageManager'
 import type { SteamIntegration } from '../../steam-integration/SteamIntegration'
+import type { SteamWorkflowManager } from '../../steam-integration/SteamWorkflowManager'
 import type { UIManager } from '../UIManager'
 
 export class SystemUICoordinator {
@@ -25,6 +27,7 @@ export class SystemUICoordinator {
     private debugStatsProvider: DebugStatsProvider
     private cacheStatsProvider?: () => Promise<ImageCacheStats>
     private steamIntegration?: SteamIntegration
+    private steamWorkflowManager?: SteamWorkflowManager
     private uiManager?: UIManager
 
     constructor(
@@ -37,35 +40,21 @@ export class SystemUICoordinator {
         this.debugStatsProvider = debugStatsProvider
         this.cacheStatsProvider = cacheStatsProvider
         this.steamIntegration = steamIntegration
+        
         this.eventManager = EventManager.getInstance()
-
-        // Initialize Pause Menu System
-        this.pauseMenuManager = new PauseMenuManager(
-            {
-                containerId: 'pause-menu-overlay',
-                overlayClass: 'pause-menu-overlay',
-                menuClass: 'pause-menu'
-            },
-            {
-                onPauseInput: () => this.emitInputPauseEvent('menu'),
-                onResumeInput: () => this.emitInputResumeEvent('menu'),
-                onMenuOpen: () => this.emitMenuOpenEvent('pause'),
-                onMenuClose: () => this.emitMenuCloseEvent('pause')
-            }
-        )
+        this.pauseMenuManager = new PauseMenuManager()
     }
 
-    /**
-     * Initialize with required dependencies
-     */
-    init(uiManager: UIManager): void {
+    public setUIManager(uiManager: UIManager): void {
         this.uiManager = uiManager
     }
 
-    /**
-     * Setup pause menu system
-     */
-    setupPauseMenu(renderer: THREE.WebGLRenderer): void {
+    public async init(
+        renderer: THREE.WebGLRenderer,
+        steamWorkflowManager?: SteamWorkflowManager
+    ): Promise<void> {
+        this.steamWorkflowManager = steamWorkflowManager
+        
         // Initialize pause menu system
         this.pauseMenuManager.init()
         
@@ -81,137 +70,77 @@ export class SystemUICoordinator {
             onClearImageCache: async () => this.emitClearImageCacheEvent(),
             onGetCachedUsers: () => Promise.resolve(this.steamIntegration?.getCachedUsers() ?? []),
             onLoadCachedUser: async (steamId: string) => {
-                if (this.steamIntegration) {
+                if (this.steamWorkflowManager) {
+                    this.eventManager.emit<SteamLoadFromCacheEvent>('steam:load-from-cache', { 
+                        vanityUrl: steamId,
+                        timestamp: Date.now(),
+                        source: 'ui'
+                    })
+                } else if (this.steamIntegration) {
                     await this.steamIntegration.loadGamesFromCache(steamId)
                 }
             },
-            onGetDebugStats: () => this.requestDebugStats()
+            onGetImageUrls: async () => {
+                const urls = await (this.steamIntegration?.getAllCachedImageUrls() ?? [])
+                return urls
+            },
+            onGetCachedBlob: async (url: string) => {
+                const blob = await (this.steamIntegration?.getCachedImageBlob(url) ?? null)
+                return blob
+            }
         })
 
-        // Initialize the settings button that opens the pause menu
-        this.initializeSettingsButton()
+        // Setup event handlers
+        this.registerEventHandlers()
+        
+        // Setup Settings button click handler
+        this.setupSettingsButton()
     }
 
-    /**
-     * Open the pause menu
-     */
-    openPauseMenu(): void {
-        this.pauseMenuManager.open()
-    }
-
-    /**
-     * Toggle performance monitor display
-     */
-    togglePerformanceMonitor(): void {
-        this.performanceMonitor.toggle()
-    }
-
-    /**
-     * Get current performance statistics
-     */
-    getCurrentPerformanceStats() {
-        return this.performanceMonitor.getStats()
-    }
-
-    /**
-     * Update performance monitor with renderer stats
-     */
-    updateRenderStats(renderer: THREE.WebGLRenderer): void {
-        this.performanceMonitor.updateRenderStats(renderer)
-    }
-
-    /**
-     * Start performance monitoring
-     */
-    startPerformanceMonitoring(): void {
-        this.performanceMonitor.start()
-    }
-
-    /**
-     * Enable cache management actions in pause menu
-     */
-    enableCacheActions(): void {
-        this.pauseMenuManager.getCacheManagementPanel()?.enableCacheActions()
-    }
-
-    /**
-     * Disable cache management actions in pause menu
-     */
-    disableCacheActions(): void {
-        this.pauseMenuManager.getCacheManagementPanel()?.disableCacheActions()
-    }
-
-    /**
-     * Show error message
-     */
-    showError(message: string): void {
-        this.uiManager?.showError(message)
-    }
-
-    /**
-     * Clean up system UI resources
-     */
-    dispose(): void {
-        this.performanceMonitor.dispose()
-        this.pauseMenuManager.dispose()
-    }
-
-    // Private helper methods
-
-    private emitInputPauseEvent(reason: 'menu' | 'user' | 'system'): void {
-        this.eventManager.emit(InputEventTypes.Pause, {
-            reason,
-            timestamp: Date.now(),
-            source: 'ui' as const
-        })
-    }
-
-    private emitInputResumeEvent(reason: 'menu' | 'user' | 'system'): void {
-        this.eventManager.emit(InputEventTypes.Resume, {
-            reason,
-            timestamp: Date.now(),
-            source: 'ui' as const
-        })
-    }
-
-    private emitMenuOpenEvent(menuType: 'pause' | 'settings' | 'debug'): void {
-        this.eventManager.emit(UIEventTypes.MenuOpen, {
-            menuType,
-            timestamp: Date.now(),
-            source: 'ui' as const
-        })
-    }
-
-    private emitMenuCloseEvent(menuType: 'pause' | 'settings' | 'debug'): void {
-        this.eventManager.emit(UIEventTypes.MenuClose, {
-            menuType,
-            timestamp: Date.now(),
-            source: 'ui' as const
-        })
-    }
-
-    private emitClearImageCacheEvent(): void {
-        this.eventManager.emit('steam.imageCacheClear', {
-            timestamp: Date.now(),
-            source: 'ui' as const
-        })
-    }
-
-    /**
-     * Request debug stats from DebugStatsProvider directly
-     */
-    private requestDebugStats(): Promise<DebugStats> {
-        return this.debugStatsProvider.getDebugStats()
-    }
-
-    private initializeSettingsButton(): void {
+    private setupSettingsButton(): void {
         const settingsButton = document.getElementById('settings-button')
         if (settingsButton) {
             settingsButton.addEventListener('click', () => {
-                this.pauseMenuManager.open()
+                this.pauseMenuManager.toggle()
             })
-        } else {
-            console.warn('Settings button not found in DOM')
         }
+    }
+
+    private registerEventHandlers(): void {
+        // Register UI event handlers for pause menu
+        this.eventManager.registerEventHandler(UIEventTypes.MenuOpen, (event) => {
+            this.pauseMenuManager.open()
+        })
+
+        this.eventManager.registerEventHandler(UIEventTypes.MenuClose, (event) => {
+            this.pauseMenuManager.close()
+        })
+    }
+
+    private async emitClearImageCacheEvent(): Promise<void> {
+        this.eventManager.emit('steam:image-cache-clear', {
+            timestamp: Date.now(),
+            source: 'ui'
+        })
+    }
+
+    public getPauseMenuManager(): PauseMenuManager {
+        return this.pauseMenuManager
+    }
+
+    public getPerformanceMonitor(): PerformanceMonitor {
+        return this.performanceMonitor
+    }
+
+    public updateRenderStats(renderer: THREE.WebGLRenderer): void {
+        this.performanceMonitor.updateRenderStats(renderer)
+    }
+
+    public dispose(): void {
+        this.pauseMenuManager?.dispose()
+        this.performanceMonitor?.dispose()
+        
+        // Deregister event handlers
+        // Note: EventManager will handle cleanup of all registered handlers
     }
 }

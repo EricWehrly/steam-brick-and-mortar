@@ -75,19 +75,18 @@ export class UICoordinator {
         // Initialize coordinators with their dependencies
         this.steam.init(steamWorkflowManager, steamIntegration, this.uiManager)
         this.webxr.init(this.uiManager)
-        this.system.init(this.uiManager)
+        // Note: SystemUICoordinator.init is called separately in setupUI with renderer
     }
 
     /**
      * Complete UI setup - call this once during app initialization
      */
-    async setupUI(renderer: THREE.WebGLRenderer): Promise<void> {
+    async setupUI(renderer: THREE.WebGLRenderer, steamWorkflowManager?: SteamWorkflowManager): Promise<void> {
         // Initialize UI Manager
         this.uiManager.init()
 
-        // Setup specialized coordinators
-        this.system.setupPauseMenu(renderer)
-        this.system.startPerformanceMonitoring()
+        // Setup system coordinator with renderer and workflow manager
+        await this.system.init(renderer, steamWorkflowManager)
 
         // Hide loading
         this.uiManager.hideLoading()

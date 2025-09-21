@@ -192,7 +192,10 @@ export class SteamBrickAndMortarApp {
         await this.sceneCoordinator.setupCompleteScene()
         
         // Setup UI with all components
-        await this.uiCoordinator.setupUI(this.sceneManager.getRenderer())
+        await this.uiCoordinator.setupUI(
+            this.sceneManager.getRenderer(),
+            this.steamWorkflowManager
+        )
         
         // Setup WebXR with input handling (optional - may fail without VR hardware)
         try {
