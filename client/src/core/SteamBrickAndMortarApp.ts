@@ -24,6 +24,7 @@ import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { type WebXRCapabilities } from '../webxr/WebXRManager'
 import { EventManager } from './EventManager'
+import { GameEventTypes, type GameStartEvent } from '../types/InteractionEvents'
 
 /**
  * Configuration options for the Steam Brick and Mortar application
@@ -257,12 +258,22 @@ export class SteamBrickAndMortarApp {
         })
     }
 
+    private emitGameStartEvent(): void {
+        this.eventManager.emit<GameStartEvent>(GameEventTypes.Start, {
+            timestamp: Date.now(),
+            source: 'system' as const
+        })
+    }
+
     private startRenderLoop(): void {
         this.sceneManager.startRenderLoop({
             webxrCoordinator: this.webxrCoordinator,
             sceneCoordinator: this.sceneCoordinator,
             systemUICoordinator: this.uiCoordinator.system
         })
+
+        // Emit GameStart event after render loop is established and application is ready
+        this.emitGameStartEvent()
     }
 
     getIsInitialized(): boolean {
