@@ -24,6 +24,7 @@ import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { type WebXRCapabilities } from '../webxr/WebXRManager'
 import { EventManager } from './EventManager'
+import { GameEventTypes, type GameStartEvent } from '../types/InteractionEvents'
 
 /**
  * Configuration options for the Steam Brick and Mortar application
@@ -167,7 +168,6 @@ export class SteamBrickAndMortarApp {
 
     async init(): Promise<void> {
         if (this.isInitialized) {
-            console.warn('⚠️ App already initialized')
             return
         }
         
@@ -176,37 +176,24 @@ export class SteamBrickAndMortarApp {
             this.startRenderLoop()
             
             this.isInitialized = true
-            console.log('✅ Application initialized successfully!')
+
+            this.emitGameStartEvent()
             
-            // Test the toast notification system
-            ToastManager.getInstance().success('🎮 Steam Brick and Mortar is ready to explore!', { duration: 5000 })
+            ToastManager.getInstance().success('Steam Brick and Mortar is ready to explore!', { duration: 5000 })
         } catch (error) {
-            console.error('❌ Failed to initialize application:', error)
-            // Don't show UI error - app isn't fully initialized yet
+            console.error('Failed to initialize application:', error)
             throw error
         }
     }
 
     private async initializeCoordinators(): Promise<void> {
-        // Setup scene with complete store layout
-        await this.sceneCoordinator.setupCompleteScene()
-        
-        // Setup UI with all components
-        await this.uiCoordinator.setupUI(
-            this.sceneManager.getRenderer(),
-            this.steamWorkflowManager
-        )
-        
-        // Setup WebXR with input handling (optional - may fail without VR hardware)
-        try {
-            await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
-        } catch (error) {
-            console.warn('⚠️ WebXR setup failed (expected without VR hardware):', error)
-            // This is expected - continue without WebXR
-        }
-    }
+        // Setup UI with all components (Steam workflow manager will be set later)
+        await this.uiCoordinator.setupUI(this.sceneManager.getRenderer(),
+            this.steamWorkflowManager)
 
-    dispose(): void {
+        // Setup WebXR capabilities
+        await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
+    }    dispose(): void {
         if (!this.isInitialized) {
             return
         }
@@ -257,6 +244,13 @@ export class SteamBrickAndMortarApp {
         })
     }
 
+    private emitGameStartEvent(): void {
+        this.eventManager.emit<GameStartEvent>(GameEventTypes.Start, {
+            timestamp: Date.now(),
+            source: 'system' as const
+        })
+    }
+
     private startRenderLoop(): void {
         this.sceneManager.startRenderLoop({
             webxrCoordinator: this.webxrCoordinator,
@@ -265,6 +259,7 @@ export class SteamBrickAndMortarApp {
         })
     }
 
+    // TODO: This method exists solely for testing purposes - remove or refactor
     getIsInitialized(): boolean {
         return this.isInitialized
     }

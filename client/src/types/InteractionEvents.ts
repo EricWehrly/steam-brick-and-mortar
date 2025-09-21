@@ -102,6 +102,15 @@ export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
 }
 
 // =============================================================================
+// GAME EVENTS
+// =============================================================================
+
+export interface GameStartEvent extends BaseInteractionEvent {
+    // Emitted when the application is ready and the game can start
+    // This signals that the render loop is established and UI is operational
+}
+
+// =============================================================================
 // EVENT TYPE CONSTANTS
 // =============================================================================
 
@@ -134,6 +143,10 @@ export const UIEventTypes = {
     MenuOpen: 'ui:menu-open',
     MenuClose: 'ui:menu-close',
     ImageCacheStatsRequest: 'ui:image-cache-stats-request'
+} as const
+
+export const GameEventTypes = {
+    Start: 'game:start'
 } as const
 
 // =============================================================================
@@ -171,6 +184,9 @@ export interface InteractionEventMap {
     [UIEventTypes.MenuOpen]: MenuOpenEvent
     [UIEventTypes.MenuClose]: MenuCloseEvent
     [UIEventTypes.ImageCacheStatsRequest]: ImageCacheStatsRequestEvent
+    
+    // Game events
+    [GameEventTypes.Start]: GameStartEvent
 }
 
 /**

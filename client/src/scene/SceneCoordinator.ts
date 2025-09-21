@@ -17,6 +17,8 @@ import { SceneManager } from './SceneManager'
 import { GameBoxRenderer } from './GameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
 import { StoreLayout } from './StoreLayout'
+import { EventManager } from '../core/EventManager'
+import { GameEventTypes } from '../types/InteractionEvents'
 
 export interface SceneCoordinatorConfig {
     maxGames?: number
@@ -66,6 +68,11 @@ export class SceneCoordinator {
                 frustumCullingEnabled: config.performance?.frustumCullingEnabled ?? true
             }
         )
+
+        // Register for GameStart event to trigger scene setup
+        EventManager.getInstance().registerEventHandler(GameEventTypes.Start, () => {
+            this.setupCompleteScene()
+        })
     }
 
     /**
