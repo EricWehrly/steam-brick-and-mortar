@@ -1,6 +1,5 @@
 /* Main application styles */
 @import './components/toast.css';
-@import './components/pause-menu.css';
 @import './components/steam-ui.css';
 
 body {
