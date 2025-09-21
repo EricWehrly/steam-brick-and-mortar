@@ -73,6 +73,9 @@ export class Logger {
     }
   }
 
+  // TODO: try to source something other than "Logger"
+  // Because the logger class is calling the console.log, _any_ logs using it appear to come from the logger class
+  // rather than the proper, calling class
   info(message: string, ...args: unknown[]): void {
     if (this.shouldLog(LogLevel.INFO)) {
       console.log(this.formatMessage('INFO', message), ...args)
