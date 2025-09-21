@@ -40,6 +40,29 @@
 
 **Source**: Feature 5.5.4 - marked as critical UX issue during Feature 5.5 implementation
 
+### Architecture & Structure
+
+#### Refactor Panel/Tab Naming and Architecture
+**Priority**: High  
+**Effort**: 3-4 hours  
+**Context**: Current "panels" are actually functioning as tabs - need architectural refactor to prevent building more tech debt on incorrect structure
+
+**Tasks**:
+- Rename current "Panel" classes to "Tab" to reflect actual behavior
+- Define true Panel concept as logical UI groupings within tabs
+- Update pause menu system to use correct Tab/Panel hierarchy
+- Plan Panel extraction system for breaking large tab sections into separate files
+- Update component relationships and dependency injection accordingly
+
+**Files to Modify**:
+- `client/src/ui/pause/` - All panel classes need Tab renaming
+- Pause menu management and navigation logic
+- Component registration and organization system
+
+**Benefits**: Correct semantic architecture, enables future component separation, prevents building on incorrect structure
+
+**Rationale**: Don't want to keep building on top of current misnaming - architectural foundation improvement
+
 ### Code Quality & Documentation
 
 #### Remove Redundant Javadoc Comments
@@ -93,6 +116,49 @@
 **Status**: Deferred from Phase 1 - non-essential functionality
 
 ### Performance & Architecture
+
+### UI Polish & Consistency
+
+#### Fix Pause Menu Double Scrollbars
+**Priority**: High  
+**Effort**: 1-2 hours  
+**Context**: Two scrollbars appear in pause menu when screen space is reduced (notably on cache page) - user-facing UX issue
+
+**Tasks**:
+- Investigate CSS overflow settings on pause menu containers
+- Identify which elements are creating competing scroll contexts
+- Implement proper scroll container hierarchy (single scrollable area)
+- Test across different viewport sizes to ensure fix works consistently
+
+**Benefits**: Cleaner UI appearance, better responsive design, improved user experience
+
+#### Standardize Cache Management UI Styling
+
+#### Prevent Redundant Image Cache Downloads
+**Priority**: High  
+**Effort**: 2-3 hours  
+**Context**: System currently may redownload images that are already cached, wasting bandwidth and time
+
+**Tasks**:
+- Add cache existence check before initiating image downloads
+- Update ImageManager to verify cached images before fetching
+- Ensure cache hit logic prevents redundant network requests
+- Add logging to verify cache behavior and confirm download elimination
+
+**Benefits**: Reduced bandwidth usage, faster loading times, better cache utilization
+
+#### Remove Dead Event Code from SteamWorkflowManager  
+**Priority**: High  
+**Effort**: 1-2 hours  
+**Context**: SteamWorkflowManager contains extensive unused event code for image cache stats
+
+**Tasks**:
+- Audit SteamWorkflowManager for unused image cache stats event handlers
+- Remove dead event listeners and related code
+- Clean up any associated event definitions if no longer used
+- Verify removal doesn't break existing functionality
+
+**Benefits**: Cleaner codebase, reduced maintenance overhead, improved code readability
 
 #### Input Management Simplification
 **Priority**: Medium  
@@ -154,6 +220,32 @@
 
 ### Testing Infrastructure
 
+#### Review and Reclassify Performance Tests
+**Priority**: Low  
+**Effort**: 2-3 hours  
+**Context**: Some unit tests may actually be performance tests that should be separated
+
+**Tasks**:
+- Audit existing tests for timing/performance measurements
+- Extract performance tests to `.perf.test.ts` files
+- Update test configurations for separate performance runs
+- Ensure proper benchmarking thresholds
+
+**Benefits**: Cleaner test separation, better performance regression detection
+
+#### Remove Dead Event Code from SteamWorkflowManager  
+**Priority**: Low  
+**Effort**: 1-2 hours  
+**Context**: SteamWorkflowManager contains extensive unused event code for image cache stats - internal maintenance
+
+**Tasks**:
+- Audit SteamWorkflowManager for unused image cache stats event handlers
+- Remove dead event listeners and related code
+- Clean up any associated event definitions if no longer used
+- Verify removal doesn't break existing functionality
+
+**Benefits**: Cleaner codebase, reduced maintenance overhead, improved code readability
+
 #### Implement Missing Integration Test Coverage
 **Priority**: Low  
 **Effort**: 6-8 hours  
@@ -167,11 +259,6 @@
 - Add progressive loading integration tests
 
 **Benefits**: Better integration boundary coverage, improved confidence in workflows
-
-#### Review and Reclassify Performance Tests
-**Priority**: Low  
-**Effort**: 2-3 hours  
-**Context**: Some unit tests may actually be performance tests
 
 **Tasks**:
 - Audit existing tests for timing/performance measurements

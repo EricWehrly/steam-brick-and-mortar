@@ -569,3 +569,19 @@
 - ✅ Solid technical foundation (Milestones 1-4)
 - 🚧 Graphics integration and pause menu cleanup in progress (Milestone 5)  
 - 🔄 Enhanced visuals and level layout next (Milestone 6)
+
+---
+
+## 📋 Phase 1 Completion Decision Point
+
+**Note for Claude/Development Team**: Before moving from Phase 1 to Phase 2, prioritize clearing High Priority tech debt to avoid building additional complexity on unstable foundations.
+
+**Recommended Pre-Phase-2 Tech Debt Focus** (see `docs/active/tech-debt.md`):
+1. **Architecture & Structure**: Panel/Tab refactor (prevents building on incorrect structure)
+2. **User Experience**: Input focus management (critical UX issue), fix double scrollbars
+3. **Performance & Architecture**: Prevent redundant image downloads
+4. **Code Quality**: Javadoc cleanup (improves development experience)
+
+**Rationale**: Phase 2 infrastructure hardening works best with clean architectural foundations. Address structural issues now to prevent compound complexity later.
+
+**Decision Trigger**: Complete remaining Phase 1 features → Tech debt cleanup sprint → Begin Phase 2
