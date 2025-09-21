@@ -1,5 +1,18 @@
 /**
- * GameStart Event Implementation Test
+ * GameStart Event Implvi.mock('../../../src/scene/SceneCoordinator', () => ({
+    SceneCoordinator: vi.fn().mockImplementation(() => ({
+        setupCompleteScene: vi.fn().mockResolvedValue(undefined),
+        updatePerformanceData: vi.fn(),
+        getPerformanceStats: vi.fn().mockReturnValue({}),
+        getGameBoxRenderer: vi.fn().mockReturnValue({
+            updatePerformanceData: vi.fn()
+        }),
+        getStoreLayout: vi.fn().mockReturnValue({
+            dispose: vi.fn()
+        }),
+        dispose: vi.fn()
+    }))
+}))
  * 
  * Tests that the GameStart event is properly emitted after the render loop
  * is established and the application is ready for interaction.
@@ -29,10 +42,14 @@ vi.mock('../../../src/scene/SceneManager', () => ({
 vi.mock('../../../src/scene/SceneCoordinator', () => ({
     SceneCoordinator: vi.fn().mockImplementation(() => ({
         setupCompleteScene: vi.fn().mockResolvedValue(undefined),
+        setupBasicScene: vi.fn().mockResolvedValue(undefined),
         updatePerformanceData: vi.fn(),
         getPerformanceStats: vi.fn().mockReturnValue({}),
         getGameBoxRenderer: vi.fn().mockReturnValue({
             updatePerformanceData: vi.fn()
+        }),
+        getStoreLayout: vi.fn().mockReturnValue({
+            generateStore: vi.fn().mockResolvedValue(undefined)
         }),
         dispose: vi.fn()
     }))
@@ -216,5 +233,27 @@ describe('GameStart Event Implementation', () => {
         // Test that it has BaseInteractionEvent properties
         expect(typeof capturedEvent!.timestamp).toBe('number')
         expect(typeof capturedEvent!.source).toBe('string')
+    })
+
+    it('should use matching event type constants for registration and emission', async () => {
+        // This test ensures we don't accidentally use string literals that don't match the constants
+        // Since registration happens in SceneCoordinator constructor (tested separately),
+        // we focus on verifying emission uses the correct constant
+        const spyEmit = vi.spyOn(eventManager, 'emit')
+        
+        // Act: Initialize the application
+        await app.init()
+        
+        // Assert: Verify that emission uses the correct event type constant
+        expect(spyEmit).toHaveBeenCalledWith(
+            GameEventTypes.Start, 
+            expect.any(Object)
+        )
+        
+        // Verify the constant value matches what registration should use
+        expect(GameEventTypes.Start).toBe('game:start')
+        
+        // Note: SceneCoordinator event registration is tested separately in scene-coordinator-events.test.ts
+        // This ensures both emission and registration use the same GameEventTypes.Start constant
     })
 })
