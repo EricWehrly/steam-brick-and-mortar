@@ -257,13 +257,13 @@ export class ApplicationPanel extends PauseMenuPanel {
                         // Notify of settings import
                         this.onSettingsChanged?.(this.settings)
                         
-                        ToastManager.getInstance().success('Settings imported successfully!')
+                        ToastManager.success('Settings imported successfully!')
                     } else {
-                        ToastManager.getInstance().error('Invalid settings file format.')
+                        ToastManager.error('Invalid settings file format.')
                     }
                 } catch (error) {
                     console.error('Failed to import settings:', error)
-                    ToastManager.getInstance().error('Failed to import settings. Please check the file format.')
+                    ToastManager.error('Failed to import settings. Please check the file format.')
                 }
             }
             

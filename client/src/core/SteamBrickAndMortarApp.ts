@@ -179,7 +179,7 @@ export class SteamBrickAndMortarApp {
 
             this.emitGameStartEvent()
             
-            ToastManager.getInstance().success('Steam Brick and Mortar is ready to explore!', { duration: 5000 })
+            ToastManager.success('Steam Brick and Mortar is ready to explore!', { duration: 5000 })
         } catch (error) {
             console.error('Failed to initialize application:', error)
             throw error

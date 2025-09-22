@@ -109,13 +109,12 @@ vi.mock('../../../src/ui/PerformanceMonitor', () => ({
 
 vi.mock('../../../src/ui/ToastManager', () => ({
     ToastManager: {
-        getInstance: vi.fn().mockReturnValue({
-            success: vi.fn(),
-            error: vi.fn(),
-            info: vi.fn(),
-            warn: vi.fn(),
-            dispose: vi.fn()
-        })
+        getInstance: vi.fn(),
+        // Static convenience methods
+        success: vi.fn(),
+        error: vi.fn(),
+        info: vi.fn(),
+        warning: vi.fn()
     }
 }))
 
