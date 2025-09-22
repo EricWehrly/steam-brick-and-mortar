@@ -31,9 +31,23 @@ export class ToastManager {
         return ToastManager.instance
     }
 
-    /**
-     * Create the toast container if it doesn't exist
-     */
+    // Static convenience methods - no need to access instance
+    static success(message: string, options: ToastOptions = {}): void {
+        ToastManager.getInstance().show(message, 'success', options)
+    }
+
+    static error(message: string, options: ToastOptions = {}): void {
+        ToastManager.getInstance().show(message, 'error', { duration: 6000, ...options })
+    }
+
+    static info(message: string, options: ToastOptions = {}): void {
+        ToastManager.getInstance().show(message, 'info', options)
+    }
+
+    static warning(message: string, options: ToastOptions = {}): void {
+        ToastManager.getInstance().show(message, 'warning', options)
+    }
+
     private createContainer(): void {
         if (this.container) return
 
@@ -49,10 +63,7 @@ export class ToastManager {
         document.body.appendChild(this.container)
     }
 
-    /**
-     * Show a toast notification
-     */
-    show(message: string, type: ToastType = 'info', options: ToastOptions = {}): void {
+    private show(message: string, type: ToastType = 'info', options: ToastOptions = {}): void {
         if (!this.container) {
             this.createContainer()
         }
