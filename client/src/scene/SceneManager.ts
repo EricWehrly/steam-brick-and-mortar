@@ -72,11 +72,7 @@ export class SceneManager {
      */
     private async initializeSkybox(): Promise<void> {
         try {
-            const result = await this.skyboxManager.applySkybox(SkyboxPresets.aurora)
-            console.log(`✅ Skybox applied using ${result.method} method`)
-            if (result.error) {
-                console.warn(`Skybox warning: ${result.error}`)
-            }
+            await this.skyboxManager.applySkybox(SkyboxPresets.aurora)
         } catch (error) {
             console.error('Failed to apply skybox, using default:', error)
             // Ultimate fallback to current gold color if something goes wrong
@@ -98,21 +94,6 @@ export class SceneManager {
         this.renderer.xr.enabled = true
         
         document.body.appendChild(this.renderer.domElement)
-    }
-
-    private async setupScene(): Promise<void> {
-        // Try to set aurora skybox with intelligent fallbacks
-        try {
-            const result = await this.skyboxManager.applySkybox(SkyboxPresets.aurora)
-            console.log(`✅ Skybox applied using ${result.method} method`)
-            if (result.error) {
-                console.warn(`Skybox warning: ${result.error}`)
-            }
-        } catch (error) {
-            console.error('Failed to apply skybox, using default:', error)
-            // Ultimate fallback to current gold color if something goes wrong
-            this.scene.background = new THREE.Color(BlockbusterColors.walls)
-        }
     }
 
     private setupLighting() {
