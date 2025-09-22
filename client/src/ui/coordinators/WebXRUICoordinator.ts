@@ -7,7 +7,7 @@
  * - WebXR-specific UI updates
  */
 
-import { EventManager } from '../../core/EventManager'
+import { EventManager, EventSource } from '../../core/EventManager'
 import { WebXREventTypes } from '../../types/InteractionEvents'
 import type { WebXRCapabilities } from '../../webxr/WebXRManager'
 import type { UIManager } from '../UIManager'
@@ -47,7 +47,7 @@ export class WebXRUICoordinator {
     toggleVR(): void {
         this.eventManager.emit(WebXREventTypes.Toggle, {
             timestamp: Date.now(),
-            source: 'ui' as const
+            source: EventSource.UI
         })
     }
 }

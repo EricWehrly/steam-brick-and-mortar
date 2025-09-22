@@ -9,6 +9,7 @@
  */
 
 import type { EventManager } from '../core/EventManager'
+import { EventSource } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
 import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamUseOfflineEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
 import type { SteamIntegration } from './SteamIntegration'
@@ -81,7 +82,7 @@ export class SteamWorkflowManager {
                 vanityUrl,
                 gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
                 timestamp: Date.now(),
-                source: 'system' as const
+                source: EventSource.System
             })
             
         } catch (error) {
@@ -132,7 +133,7 @@ export class SteamWorkflowManager {
                 vanityUrl,
                 gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
                 timestamp: Date.now(),
-                source: 'system' as const
+                source: EventSource.System
             })
             
         } catch (error) {
@@ -188,7 +189,7 @@ export class SteamWorkflowManager {
                     vanityUrl: gameState.userData.vanity_url,
                     gameCount: gameState.userData.games?.length || 0,
                     timestamp: Date.now(),
-                    source: 'system' as const
+                    source: EventSource.System
                 })
             }
             

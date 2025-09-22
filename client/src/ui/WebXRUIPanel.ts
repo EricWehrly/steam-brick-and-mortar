@@ -2,7 +2,7 @@
  * WebXRUIPanel - Manages WebXR-specific UI controls
  */
 
-import { EventManager } from '../core/EventManager'
+import { EventManager, EventSource } from '../core/EventManager'
 import { WebXREventTypes } from '../types/InteractionEvents'
 
 export class WebXRUIPanel {
@@ -25,7 +25,7 @@ export class WebXRUIPanel {
       this.xrButton.addEventListener('click', () => {
         this.eventManager.emit(WebXREventTypes.Toggle, {
           timestamp: Date.now(),
-          source: 'ui' as const
+          source: EventSource.UI
         })
       })
     }

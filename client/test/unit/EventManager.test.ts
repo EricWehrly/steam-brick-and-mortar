@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { EventManager } from '../../src/core/EventManager'
+import { EventManager, EventSource } from '../../src/core/EventManager'
 import { SteamEventTypes } from '../../src/types/InteractionEvents'
 
 describe('EventManager Unit Tests', () => {
@@ -25,7 +25,7 @@ describe('EventManager Unit Tests', () => {
         it('should emit events with proper structure', () => {
             const mockHandler = vi.fn()
             const eventType = SteamEventTypes.LoadGames
-            const testDetail = { vanityUrl: 'testuser', timestamp: Date.now(), source: 'ui' as const }
+            const testDetail = { vanityUrl: 'testuser', timestamp: Date.now(), source: EventSource.UI }
             
             eventManager.registerEventHandler(eventType, mockHandler)
             eventManager.emit(eventType, testDetail)
@@ -40,7 +40,7 @@ describe('EventManager Unit Tests', () => {
             const mockHandler1 = vi.fn()
             const mockHandler2 = vi.fn()
             const eventType = SteamEventTypes.LoadGames
-            const testDetail = { vanityUrl: 'test', timestamp: Date.now(), source: 'ui' as const }
+            const testDetail = { vanityUrl: 'test', timestamp: Date.now(), source: EventSource.UI }
             
             eventManager.registerEventHandler(eventType, mockHandler1)
             eventManager.registerEventHandler(eventType, mockHandler2)
@@ -53,7 +53,7 @@ describe('EventManager Unit Tests', () => {
         it('should deregister handlers', () => {
             const mockHandler = vi.fn()
             const eventType = SteamEventTypes.LoadGames
-            const testDetail = { vanityUrl: 'test', timestamp: Date.now(), source: 'ui' as const }
+            const testDetail = { vanityUrl: 'test', timestamp: Date.now(), source: EventSource.UI }
             
             eventManager.registerEventHandler(eventType, mockHandler)
             eventManager.deregisterEventHandler(eventType, mockHandler)

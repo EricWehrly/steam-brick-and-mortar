@@ -11,7 +11,7 @@
 import * as THREE from 'three'
 import { PauseMenuManager } from '../pause/PauseMenuManager'
 import { PerformanceMonitor } from '../PerformanceMonitor'
-import { EventManager } from '../../core/EventManager'
+import { EventManager, EventSource } from '../../core/EventManager'
 import { InputEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import type { SteamLoadFromCacheEvent } from '../../types/InteractionEvents'
 import type { DebugStats, DebugStatsProvider } from '../../core/DebugStatsProvider'
@@ -74,7 +74,7 @@ export class SystemUICoordinator {
                     this.eventManager.emit<SteamLoadFromCacheEvent>('steam:load-from-cache', { 
                         vanityUrl: steamId,
                         timestamp: Date.now(),
-                        source: 'ui'
+                        source: EventSource.UI
                     })
                 } else if (this.steamIntegration) {
                     await this.steamIntegration.loadGamesFromCache(steamId)
@@ -120,7 +120,7 @@ export class SystemUICoordinator {
     private async emitClearImageCacheEvent(): Promise<void> {
         this.eventManager.emit('steam:image-cache-clear', {
             timestamp: Date.now(),
-            source: 'ui'
+            source: EventSource.UI
         })
     }
 

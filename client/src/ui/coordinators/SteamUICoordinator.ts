@@ -11,7 +11,7 @@
  * - Progress and status updates
  */
 
-import { EventManager } from '../../core/EventManager'
+import { EventManager, EventSource } from '../../core/EventManager'
 import { SteamEventTypes } from '../../types/InteractionEvents'
 import { UIManager } from '../UIManager'
 import type { SteamWorkflowManager } from '../../steam-integration/SteamWorkflowManager'
@@ -65,7 +65,7 @@ export class SteamUICoordinator {
         this.eventManager.emit(SteamEventTypes.LoadGames, {
             vanityUrl,
             timestamp: Date.now(),
-            source: 'ui' as const
+            source: EventSource.UI
         })
     }
 
@@ -76,7 +76,7 @@ export class SteamUICoordinator {
         this.eventManager.emit(SteamEventTypes.LoadFromCache, {
             vanityUrl,
             timestamp: Date.now(),
-            source: 'ui' as const
+            source: EventSource.UI
         })
     }
 
@@ -87,7 +87,7 @@ export class SteamUICoordinator {
         this.eventManager.emit(SteamEventTypes.UseOffline, {
             vanityUrl,
             timestamp: Date.now(),
-            source: 'ui' as const
+            source: EventSource.UI
         })
     }
 
@@ -97,7 +97,7 @@ export class SteamUICoordinator {
     refreshCache(): void {
         this.eventManager.emit(SteamEventTypes.CacheRefresh, {
             timestamp: Date.now(),
-            source: 'ui' as const
+            source: EventSource.UI
         })
     }
 
@@ -107,7 +107,7 @@ export class SteamUICoordinator {
     clearCache(): void {
         this.eventManager.emit(SteamEventTypes.CacheClear, {
             timestamp: Date.now(),
-            source: 'ui' as const
+            source: EventSource.UI
         })
     }
 
@@ -131,7 +131,7 @@ export class SteamUICoordinator {
     clearImageCache(): void {
         this.eventManager.emit(SteamEventTypes.ImageCacheClear, {
             timestamp: Date.now(),
-            source: 'ui' as const
+            source: EventSource.UI
         })
     }
 

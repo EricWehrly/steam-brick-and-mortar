@@ -23,8 +23,8 @@ import { SteamWorkflowManager } from '../steam-integration/SteamWorkflowManager'
 import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { type WebXRCapabilities } from '../webxr/WebXRManager'
-import { EventManager } from './EventManager'
-import { GameEventTypes, type GameStartEvent } from '../types/InteractionEvents'
+import { EventManager, EventSource } from './EventManager'
+import { GameEventTypes, WebXREventTypes, type GameStartEvent } from '../types/InteractionEvents'
 
 /**
  * Configuration options for the Steam Brick and Mortar application
@@ -215,16 +215,16 @@ export class SteamBrickAndMortarApp {
 
     // WebXR event emission methods - bridge WebXRCoordinator callbacks to events
     private emitWebXRSessionStartEvent(): void {
-        this.eventManager.emit('webxr:session-start', {
+        this.eventManager.emit(WebXREventTypes.SessionStart, {
             timestamp: Date.now(),
-            source: 'system' as const
+            source: EventSource.System
         })
     }
 
     private emitWebXRSessionEndEvent(): void {
         this.eventManager.emit('webxr:session-end', {
             timestamp: Date.now(),
-            source: 'system' as const
+            source: EventSource.System
         })
     }
 
@@ -232,7 +232,7 @@ export class SteamBrickAndMortarApp {
         this.eventManager.emit('webxr:error', {
             error,
             timestamp: Date.now(),
-            source: 'system' as const
+            source: EventSource.System
         })
     }
 
@@ -240,14 +240,14 @@ export class SteamBrickAndMortarApp {
         this.eventManager.emit('webxr:support-change', {
             capabilities,
             timestamp: Date.now(),
-            source: 'system' as const
+            source: EventSource.System
         })
     }
 
     private emitGameStartEvent(): void {
         this.eventManager.emit<GameStartEvent>(GameEventTypes.Start, {
             timestamp: Date.now(),
-            source: 'system' as const
+            source: EventSource.System
         })
     }
 

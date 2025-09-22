@@ -4,7 +4,7 @@
 
 import { getElementByIdSafe } from '../utils'
 import { renderTemplate } from '../utils/TemplateEngine'
-import { EventManager } from '../core/EventManager'
+import { EventManager, EventSource } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
 import steamCacheStatsTemplate from '../templates/steam-ui/cache-stats.html?raw'
 
@@ -53,7 +53,7 @@ export class SteamUIPanel {
           this.eventManager.emit(SteamEventTypes.LoadGames, {
             vanityUrl,
             timestamp: Date.now(),
-            source: 'ui' as const
+            source: EventSource.UI
           })
         }
       })
@@ -67,7 +67,7 @@ export class SteamUIPanel {
           this.eventManager.emit(SteamEventTypes.LoadFromCache, {
             vanityUrl,
             timestamp: Date.now(),
-            source: 'ui' as const
+            source: EventSource.UI
           })
         }
       })
@@ -81,7 +81,7 @@ export class SteamUIPanel {
           this.eventManager.emit(SteamEventTypes.UseOffline, {
             vanityUrl,
             timestamp: Date.now(),
-            source: 'ui' as const
+            source: EventSource.UI
           })
         }
       })
@@ -92,7 +92,7 @@ export class SteamUIPanel {
       this.refreshCacheButton.addEventListener('click', () => {
         this.eventManager.emit(SteamEventTypes.CacheRefresh, {
           timestamp: Date.now(),
-          source: 'ui' as const
+          source: EventSource.UI
         })
       })
     }
@@ -101,7 +101,7 @@ export class SteamUIPanel {
       this.clearCacheButton.addEventListener('click', () => {
         this.eventManager.emit(SteamEventTypes.CacheClear, {
           timestamp: Date.now(),
-          source: 'ui' as const
+          source: EventSource.UI
         })
       })
     }
@@ -110,7 +110,7 @@ export class SteamUIPanel {
       this.showCacheStatsButton.addEventListener('click', () => {
         this.eventManager.emit(SteamEventTypes.CacheStats, {
           timestamp: Date.now(),
-          source: 'ui' as const
+          source: EventSource.UI
         })
       })
     }
@@ -124,7 +124,7 @@ export class SteamUIPanel {
             this.eventManager.emit(SteamEventTypes.LoadGames, {
               vanityUrl,
               timestamp: Date.now(),
-              source: 'ui' as const
+              source: EventSource.UI
             })
           }
         }
@@ -148,7 +148,7 @@ export class SteamUIPanel {
         this.eventManager.emit(SteamEventTypes.DevModeToggle, {
           isEnabled,
           timestamp: Date.now(),
-          source: 'ui' as const
+          source: EventSource.UI
         })
       })
     }
