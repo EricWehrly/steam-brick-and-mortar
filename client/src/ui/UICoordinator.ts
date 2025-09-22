@@ -60,16 +60,6 @@ export class UICoordinator {
     }
 
     /**
-     * Set workflow manager for direct method calls
-     */
-    setSteamWorkflowManager(steamWorkflowManager: SteamWorkflowManager, steamIntegration: SteamIntegration): void {
-        // Initialize coordinators with their dependencies
-        this.steam.init(steamWorkflowManager, steamIntegration)
-        this.webxr.init(this.uiManager)
-        // Note: SystemUICoordinator.init is called separately in setupUI with renderer
-    }
-
-    /**
      * Complete UI setup - call this once during app initialization
      */
     async setupUI(renderer: THREE.WebGLRenderer, steamWorkflowManager?: SteamWorkflowManager): Promise<void> {

@@ -34,12 +34,12 @@ describe('StoreLayout', () => {
     const config = storeLayout.createDefaultLayout();
     
     const sectionNames = config.sections.map(s => s.name);
-    expect(sectionNames).toContain('New & Trending');     // Updated from 'New Releases'
-    expect(sectionNames).toContain('Action Games');       // Updated from 'Action'
-    expect(sectionNames).toContain('Adventure & Story');  // Updated from 'Comedy'
-    expect(sectionNames).toContain('RPG & Fantasy');      // New Steam category
-    expect(sectionNames).toContain('Strategy & Sim');     // New Steam category
-    expect(sectionNames).toContain('Casual & Family');    // Updated from 'Family'
+    expect(sectionNames).toContain('New & Trending');
+    expect(sectionNames).toContain('Action Games');
+    expect(sectionNames).toContain('Adventure & Story');
+    expect(sectionNames).toContain('RPG & Fantasy');
+    expect(sectionNames).toContain('Strategy & Sim');
+    expect(sectionNames).toContain('Casual & Family');
     
     // Check categories match Steam store sections
     const categories = config.sections.map(s => s.category);

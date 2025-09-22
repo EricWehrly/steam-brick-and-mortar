@@ -6,7 +6,6 @@ import { vi } from 'vitest'
 
 export const UICoordinatorMock = vi.fn().mockImplementation(() => ({
     setupUI: vi.fn().mockResolvedValue(undefined),
-    setSteamWorkflowManager: vi.fn(),
     dispose: vi.fn(),
     // Expose specialized coordinators
     steam: {

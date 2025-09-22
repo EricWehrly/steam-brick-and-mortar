@@ -13,8 +13,8 @@ import { EventSource } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
 import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamUseOfflineEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
 import type { SteamIntegration } from './SteamIntegration'
-import type { UICoordinator } from '../ui'
 import type { SceneCoordinator } from '../scene'
+import type { UICoordinator } from '../ui'
 import { Logger } from '../utils/Logger'
 
 export class SteamWorkflowManager {
@@ -22,19 +22,19 @@ export class SteamWorkflowManager {
     
     private eventManager: EventManager
     private steamIntegration: SteamIntegration
-    private uiCoordinator: UICoordinator
     private sceneCoordinator: SceneCoordinator
+    private uiCoordinator: UICoordinator
     
     constructor(
         eventManager: EventManager,
         steamIntegration: SteamIntegration,
-        uiCoordinator: UICoordinator,
-        sceneCoordinator: SceneCoordinator
+        sceneCoordinator: SceneCoordinator,
+        uiCoordinator: UICoordinator
     ) {
         this.eventManager = eventManager
         this.steamIntegration = steamIntegration
-        this.uiCoordinator = uiCoordinator
         this.sceneCoordinator = sceneCoordinator
+        this.uiCoordinator = uiCoordinator
         
         // Register event handlers directly - no intermediate layers
         this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.onLoadGames.bind(this))
@@ -226,16 +226,9 @@ export class SteamWorkflowManager {
             
             const stats = this.steamIntegration.getCacheStats()
             if (stats) {
-                // Delegate to the UI coordinator's steam interface
-                // This maintains the existing architecture while using events
-                // The SteamUICoordinator.showCacheStats() method already handles the UI update
-                const steamCoordinator = (this.uiCoordinator as any).steam
-                if (steamCoordinator && steamCoordinator.showCacheStats) {
-                    steamCoordinator.showCacheStats()
-                    SteamWorkflowManager.logger.info('Cache stats displayed successfully!')
-                } else {
-                    SteamWorkflowManager.logger.warn('Steam coordinator not available for cache stats display.')
-                }
+                // Call steam UI coordinator directly instead of going through UIManager
+                this.uiCoordinator.steam.updateCacheStats(stats)
+                SteamWorkflowManager.logger.info('Cache stats displayed successfully!')
             } else {
                 SteamWorkflowManager.logger.warn('No cache stats available.')
             }

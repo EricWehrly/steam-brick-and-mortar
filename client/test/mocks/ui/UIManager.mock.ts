@@ -25,5 +25,23 @@ export const UIManagerMock = vi.fn().mockImplementation(() => ({
     }
 }))
 
+// Add static methods to the mock constructor
+;(UIManagerMock as any).getInstance = vi.fn().mockReturnValue({
+    steamUIPanel: {
+        showStatus: vi.fn(),
+        updateCacheStats: vi.fn(),
+        checkOfflineAvailability: vi.fn(),
+        isDevelopmentMode: vi.fn().mockReturnValue(false)
+    },
+    progressDisplay: {
+        show: vi.fn(),
+        update: vi.fn()
+    },
+    webxrUIPanel: {
+        setSupported: vi.fn(),
+        setSessionActive: vi.fn()
+    }
+})
+
 // Export async factory function for vi.mock() - enables one-line usage
 export const uiManagerMockFactory = async () => ({ UIManager: UIManagerMock })

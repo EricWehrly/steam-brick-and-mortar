@@ -14,27 +14,12 @@
 import { EventManager, EventSource } from '../../core/EventManager'
 import { SteamEventTypes } from '../../types/InteractionEvents'
 import { UIManager } from '../UIManager'
-import type { SteamWorkflowManager } from '../../steam-integration/SteamWorkflowManager'
-import type { SteamIntegration } from '../../steam-integration/SteamIntegration'
 
 export class SteamUICoordinator {
     private eventManager: EventManager
-    private steamWorkflowManager?: SteamWorkflowManager
-    private steamIntegration?: SteamIntegration
 
     constructor() {
         this.eventManager = EventManager.getInstance()
-    }
-
-    /**
-     * Initialize with required dependencies
-     */
-    init(
-        steamWorkflowManager: SteamWorkflowManager,
-        steamIntegration: SteamIntegration
-    ): void {
-        this.steamWorkflowManager = steamWorkflowManager
-        this.steamIntegration = steamIntegration
     }
 
     // Direct method calls for simple operations (no events needed)
@@ -44,16 +29,18 @@ export class SteamUICoordinator {
      * This addresses the feedback about events being overkill for simple operations
      */
     async setDevMode(enabled: boolean): Promise<void> {
-        if (!this.steamWorkflowManager) {
-            console.warn('SteamUICoordinator not initialized - cannot set dev mode')
-            return
-        }
-
         // Direct method call - simple dev mode toggle (no complex workflow needed)
         console.log(`Dev mode ${enabled ? 'enabled' : 'disabled'}`)
         
-        // Could store in localStorage or send to SteamIntegration if needed
+        // Store in localStorage and emit event for workflow manager to handle
         localStorage.setItem('steam-dev-mode', enabled.toString())
+        
+        // Emit event for SteamWorkflowManager to handle the actual logic
+        this.eventManager.emit(SteamEventTypes.DevModeToggle, {
+            isEnabled: enabled,
+            timestamp: Date.now(),
+            source: EventSource.UI
+        })
     }
 
     // Event-based methods for complex workflows (keep events for these)
@@ -113,16 +100,14 @@ export class SteamUICoordinator {
 
     /**
      * Show cache stats in proper UI - no longer uses alert
+     * Delegates to workflow manager through events
      */
     showCacheStats(): void {
-        if (!this.steamWorkflowManager || !this.steamIntegration) {
-            console.warn('SteamUICoordinator not initialized - cannot show cache stats')
-            return
-        }
-
-        // Get stats and update UI directly - no events or alerts needed
-        const stats = this.steamIntegration.getCacheStats()
-        UIManager.getInstance().steamUIPanel.updateCacheStats(stats)
+        // Emit event for SteamWorkflowManager to handle getting stats and updating UI
+        this.eventManager.emit(SteamEventTypes.CacheStats, {
+            timestamp: Date.now(),
+            source: EventSource.UI
+        })
     }
 
     /**
