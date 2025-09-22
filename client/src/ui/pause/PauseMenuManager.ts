@@ -13,7 +13,7 @@ import '../../styles/pause-menu/pause-menu-manager.css'
 // Panel imports for default registration
 import { CacheManagementPanel, type CachedUser } from './panels/CacheManagementPanel'
 import { HelpPanel } from './panels/HelpPanel'
-import { ApplicationPanel, type ApplicationSettings } from './panels/ApplicationPanel'
+import { ApplicationPanel } from './panels/ApplicationPanel'
 import { GameSettingsPanel } from './panels/GameSettingsPanel'
 import { DebugPanel } from './panels/DebugPanel'
 import type { DebugStats } from '../../core'
@@ -22,6 +22,7 @@ import type { PerformanceMonitor } from '../PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
 import { SteamEventTypes } from '../../types/InteractionEvents'
 import type { SteamDataLoadedEvent } from '../../types/InteractionEvents'
+import type { ApplicationSettings } from '../../core/AppSettings'
 
 export interface PauseMenuState {
     isOpen: boolean

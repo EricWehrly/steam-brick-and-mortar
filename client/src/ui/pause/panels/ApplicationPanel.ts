@@ -8,6 +8,9 @@
  * - Debug and development tools
  * 
  * Central hub for all non-Steam related application configuration.
+ * 
+ * This panel serves as a UI representation of the AppSettings service,
+ * displaying current settings and allowing user interaction to modify them.
  */
 
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
@@ -15,35 +18,22 @@ import '../../../styles/pause-menu/application-panel.css'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import applicationPanelTemplate from '../../../templates/pause-menu/application-panel.html?raw'
 import { ToastManager } from '../../ToastManager'
-
-export interface ApplicationSettings {
-    // Performance Settings
-    qualityLevel: 'low' | 'medium' | 'high' | 'ultra'
-    
-    // Interface Settings
-    showFPS: boolean
-    showPerformanceStats: boolean
-    hideUIInVR: boolean
-    
-    // Debug Settings
-    verboseLogging: boolean
-    showDebugInfo: boolean
-    
-    // General Settings
-    autoSave: boolean
-}
+import { AppSettings, type ApplicationSettings } from '../../../core/AppSettings'
+import { EventManager, EventSource } from '../../../core/EventManager'
 
 export class ApplicationPanel extends PauseMenuPanel {
     public readonly id = 'application'
     public readonly title = 'Application'
     public readonly icon = '⚙️'
     
-    private settings: ApplicationSettings
+    private appSettings: AppSettings
+    private eventManager: EventManager
     private onSettingsChanged?: (settings: Partial<ApplicationSettings>) => void
 
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)
-        this.settings = this.loadSettings()
+        this.appSettings = AppSettings.getInstance()
+        this.eventManager = EventManager.getInstance()
     }
 
     /**
@@ -56,20 +46,21 @@ export class ApplicationPanel extends PauseMenuPanel {
     }
 
     public render(): string {
+        const currentSettings = this.appSettings.getAllSettings()
         return renderTemplate(applicationPanelTemplate, {
             // Quality level selections
-            qualityLow: this.settings.qualityLevel === 'low',
-            qualityMedium: this.settings.qualityLevel === 'medium',
-            qualityHigh: this.settings.qualityLevel === 'high',
-            qualityUltra: this.settings.qualityLevel === 'ultra',
+            qualityLow: currentSettings.qualityLevel === 'low',
+            qualityMedium: currentSettings.qualityLevel === 'medium',
+            qualityHigh: currentSettings.qualityLevel === 'high',
+            qualityUltra: currentSettings.qualityLevel === 'ultra',
             
             // Checkbox states
-            showFPS: this.settings.showFPS,
-            showPerformanceStats: this.settings.showPerformanceStats,
-            hideUIInVR: this.settings.hideUIInVR,
-            verboseLogging: this.settings.verboseLogging,
-            showDebugInfo: this.settings.showDebugInfo,
-            autoSave: this.settings.autoSave
+            showFPS: currentSettings.showFPS,
+            showPerformanceStats: currentSettings.showPerformanceStats,
+            hideUIInVR: currentSettings.hideUIInVR,
+            verboseLogging: currentSettings.verboseLogging,
+            showDebugInfo: currentSettings.showDebugInfo,
+            autoSave: currentSettings.autoSave
         })
     }
 
@@ -140,12 +131,8 @@ export class ApplicationPanel extends PauseMenuPanel {
         // Update settings display when panel is shown
         this.refreshSettingsDisplay()
     }
-
     public onHide(): void {
-        // Auto-save settings when panel is hidden
-        if (this.settings.autoSave) {
-            this.saveSettings()
-        }
+
     }
 
     private resume(): void {
@@ -177,22 +164,18 @@ export class ApplicationPanel extends PauseMenuPanel {
         key: K,
         value: ApplicationSettings[K]
     ): void {
-        this.settings[key] = value
+        this.appSettings.setSetting(key, value, EventSource.UI)
         
         // Notify of settings change
         this.onSettingsChanged?.({ [key]: value })
-        
-        // Auto-save if enabled
-        if (this.settings.autoSave) {
-            this.saveSettings()
-        }
     }
 
     private exportLogs(): void {
         // TODO: Implement log export functionality
+        const currentSettings = this.appSettings.getAllSettings()
         const logs = {
             timestamp: new Date().toISOString(),
-            settings: this.settings,
+            settings: currentSettings,
             userAgent: navigator.userAgent,
             url: window.location.href
         }
@@ -211,17 +194,17 @@ export class ApplicationPanel extends PauseMenuPanel {
 
     private resetSettings(): void {
         if (window.confirm('Are you sure you want to reset all settings to defaults?\n\nThis cannot be undone.')) {
-            this.settings = this.getDefaultSettings()
-            this.saveSettings()
+            this.appSettings.resetToDefaults(EventSource.UI)
             this.refreshSettingsDisplay()
             
             // Notify of complete settings reset
-            this.onSettingsChanged?.(this.settings)
+            const currentSettings = this.appSettings.getAllSettings()
+            this.onSettingsChanged?.(currentSettings)
         }
     }
 
     private exportSettings(): void {
-        const dataStr = JSON.stringify(this.settings, null, 2)
+        const dataStr = this.appSettings.exportSettings()
         const dataBlob = new Blob([dataStr], { type: 'application/json' })
         const url = URL.createObjectURL(dataBlob)
         
@@ -248,14 +231,13 @@ export class ApplicationPanel extends PauseMenuPanel {
                 try {
                     const importedSettings = JSON.parse(event.target?.result as string)
                     
-                    // Validate imported settings
-                    if (this.validateSettings(importedSettings)) {
-                        this.settings = { ...this.getDefaultSettings(), ...importedSettings }
-                        this.saveSettings()
+                    // Use AppSettings validation and import
+                    if (this.appSettings.importSettings(importedSettings, EventSource.UI)) {
                         this.refreshSettingsDisplay()
                         
                         // Notify of settings import
-                        this.onSettingsChanged?.(this.settings)
+                        const currentSettings = this.appSettings.getAllSettings()
+                        this.onSettingsChanged?.(currentSettings)
                         
                         ToastManager.success('Settings imported successfully!')
                     } else {
@@ -275,8 +257,10 @@ export class ApplicationPanel extends PauseMenuPanel {
 
     private refreshSettingsDisplay(): void {
         // Update all form elements to reflect current settings
+        const currentSettings = this.appSettings.getAllSettings()
+        
         const qualitySelect = this.container?.querySelector('#quality-select') as HTMLSelectElement
-        if (qualitySelect) qualitySelect.value = this.settings.qualityLevel
+        if (qualitySelect) qualitySelect.value = currentSettings.qualityLevel
         
         // Update all checkboxes
         const checkboxes = [
@@ -291,85 +275,22 @@ export class ApplicationPanel extends PauseMenuPanel {
         checkboxes.forEach(({ id, setting }) => {
             const checkbox = this.container?.querySelector(id) as HTMLInputElement
             if (checkbox) {
-                checkbox.checked = this.settings[setting]
+                checkbox.checked = currentSettings[setting]
             }
         })
     }
 
-    private loadSettings(): ApplicationSettings {
-        try {
-            const saved = localStorage.getItem('steam-brick-mortar-app-settings')
-            if (saved) {
-                const parsed = JSON.parse(saved)
-                return { ...this.getDefaultSettings(), ...parsed }
-            }
-        } catch (error) {
-            console.warn('Failed to load settings:', error)
-        }
-        
-        return this.getDefaultSettings()
-    }
-
-    private saveSettings(): void {
-        try {
-            localStorage.setItem('steam-brick-mortar-app-settings', JSON.stringify(this.settings))
-        } catch (error) {
-            console.error('Failed to save settings:', error)
-        }
-    }
-
-    private getDefaultSettings(): ApplicationSettings {
-        return {
-            // Performance Settings
-            qualityLevel: 'high',
-            
-            // Interface Settings
-            showFPS: false,
-            showPerformanceStats: false,
-            hideUIInVR: true,
-            
-            // Debug Settings
-            verboseLogging: false,
-            showDebugInfo: false,
-            
-            // General Settings
-            autoSave: true
-        }
-    }
-
-    private validateSettings(settings: unknown): settings is Partial<ApplicationSettings> {
-        // Basic validation of settings structure
-        if (typeof settings !== 'object' || settings === null) return false
-        
-        const settingsObj = settings as Record<string, unknown>
-        
-        // Validate specific fields if present
-        if (settingsObj.qualityLevel && !['low', 'medium', 'high', 'ultra'].includes(settingsObj.qualityLevel as string)) {
-            return false
-        }
-        
-        return true
-    }
-
     public getSettings(): ApplicationSettings {
-        return { ...this.settings }
+        return this.appSettings.getAllSettings()
     }
 
     public updateSettings(newSettings: Partial<ApplicationSettings>): void {
-        this.settings = { ...this.settings, ...newSettings }
+        this.appSettings.updateSettings(newSettings, EventSource.UI)
         this.refreshSettingsDisplay()
-        
-        if (this.settings.autoSave) {
-            this.saveSettings()
-        }
     }
 
     public dispose(): void {
-        // Save settings on disposal
-        if (this.settings.autoSave) {
-            this.saveSettings()
-        }
-        
+        // No need to manually save - AppSettings handles persistence automatically
         super.dispose()
     }
 }

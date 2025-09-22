@@ -25,6 +25,7 @@ import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { type WebXRCapabilities } from '../webxr/WebXRManager'
 import { EventManager, EventSource } from './EventManager'
 import { GameEventTypes, WebXREventTypes, type GameStartEvent } from '../types/InteractionEvents'
+import { AppSettings } from './AppSettings'
 
 /**
  * Configuration options for the Steam Brick and Mortar application
@@ -61,6 +62,7 @@ export class SteamBrickAndMortarApp {
     private steamGameManager: SteamGameManager
     private eventManager: EventManager
     private steamWorkflowManager: SteamWorkflowManager
+    private appSettings: AppSettings
 
     // State
     private isInitialized: boolean = false
@@ -168,6 +170,8 @@ export class SteamBrickAndMortarApp {
         }
         
         try {
+            this.appSettings = AppSettings.getInstance()
+            
             await this.initializeCoordinators()
             this.startRenderLoop()
             
@@ -199,6 +203,12 @@ export class SteamBrickAndMortarApp {
      */
     private async tryAutoLoadCachedUser(): Promise<void> {
         try {
+            // Check if auto-load is enabled in settings
+            if (!this.appSettings.getSetting('autoLoadProfile')) {
+                console.log('Auto-load cached user is disabled in settings')
+                return
+            }
+            
             const cachedUsers = this.steamIntegration.getCachedUsers()
             if (cachedUsers.length > 0) {
                 const firstUser = cachedUsers[0]
