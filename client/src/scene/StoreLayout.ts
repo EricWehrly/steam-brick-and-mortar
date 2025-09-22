@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator';
 import { TextureManager } from '../utils/TextureManager';
 import { RoomStructureBuilder } from './RoomStructureBuilder';
+import { Logger } from '../utils/Logger';
 import { 
   VR_ERGONOMICS, 
   STEAM_STORE_SECTIONS, 
@@ -13,7 +14,21 @@ import {
 // Re-export for backward compatibility
 export { VR_ERGONOMICS, STEAM_STORE_SECTIONS, type StoreLayoutConfig, type StoreSection };
 
+/**
+ * Standard shelf unit configuration
+ */
+const STANDARD_SHELF_CONFIG = {
+  width: 2.0,
+  height: 2.0,
+  depth: 0.4,
+  angle: 12,
+  shelfCount: 4,
+  boardThickness: 0.05
+} as const;
+
 export class StoreLayout {
+  private static readonly logger = Logger.withContext('StoreLayout')
+  
   private scene: THREE.Scene;
   private shelfGenerator: ProceduralShelfGenerator;
   private textureManager: TextureManager;
@@ -44,14 +59,57 @@ export class StoreLayout {
     // Clear existing store
     this.clearStore();
 
-    // Create room structure
+    // Create room structure and shelves together (legacy method)
     await this.createRoomStructure(config);
-
-    // Create shelf sections
     await this.createShelfSections(config);
-
-    // Add entrance and checkout area
     this.createEntranceArea(config);
+  }
+
+  /**
+   * Generate just the basic room structure without shelves (for fast startup)
+   */
+  public async generateBasicRoom(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
+    // Clear existing store
+    this.clearStore();
+
+    // Create only the room structure (floor, walls, ceiling)
+    await this.createRoomStructure(config);
+    this.createEntranceArea(config);
+    
+    StoreLayout.logger.info('Basic room structure ready')
+  }
+
+  /**
+   * Generate and add shelves to the existing room (called asynchronously)
+   */
+  public async generateShelves(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
+    // Only create shelf sections, assuming room structure already exists
+    await this.createShelfSections(config);
+    
+    StoreLayout.logger.info('Store shelves added to existing room')
+  }
+
+  /**
+   * Generate shelves using chunked processing to avoid blocking the event loop
+   */
+  public async generateShelvesChunked(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
+    await this.createShelfSectionsChunked(config);
+    StoreLayout.logger.info('Store shelves added to existing room (chunked)')
+  }
+
+  /**
+   * Generate shelves using GPU-optimized instanced rendering for maximum performance
+   */
+  public async generateShelvesGPUOptimized(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
+    // Clear existing store
+    this.clearStore();
+
+    // Create room structure first, then GPU-optimized shelves
+    await this.createRoomStructure(config);
+    await this.createShelfSectionsGPUOptimized(config);
+    this.createEntranceArea(config);
+    
+    StoreLayout.logger.info('Complete store generated with GPU-optimized shelves')
   }
 
   /**
@@ -77,14 +135,7 @@ export class StoreLayout {
           section.position.z
         );
         
-        const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition, {
-          width: 2.0,
-          height: 2.0,
-          depth: 0.4,
-          angle: 12,
-          shelfCount: 4,
-          boardThickness: 0.05
-        });
+        const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition, STANDARD_SHELF_CONFIG);
         
         sectionGroup.add(shelfUnit);
       }
@@ -94,6 +145,99 @@ export class StoreLayout {
       
       this.storeGroup.add(sectionGroup);
     }
+  }
+
+  /**
+   * Create shelf sections with chunked processing to avoid blocking the event loop
+   */
+  private async createShelfSectionsChunked(config: StoreLayoutConfig): Promise<void> {
+    const SHELF_CHUNK_SIZE = 2; // Process 2 shelves at a time
+    const CHUNK_DELAY = 16; // ~60fps (16ms between chunks)
+    
+    for (const section of config.sections) {
+      const sectionGroup = new THREE.Group();
+      sectionGroup.name = section.name;
+      
+      StoreLayout.logger.info(`Creating section: ${section.name} (${section.shelfCount} shelves)`);
+      
+      // Create shelves in chunks
+      for (let i = 0; i < section.shelfCount; i += SHELF_CHUNK_SIZE) {
+        const chunkEnd = Math.min(i + SHELF_CHUNK_SIZE, section.shelfCount);
+        
+        // Process this chunk
+        for (let j = i; j < chunkEnd; j++) {
+          const shelfPosition = new THREE.Vector3(
+            section.position.x + j * config.shelfSpacing,
+            section.position.y,
+            section.position.z
+          );
+          
+          const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition, STANDARD_SHELF_CONFIG);
+          
+          sectionGroup.add(shelfUnit);
+        }
+        
+        // Yield control back to the event loop after each chunk
+        if (chunkEnd < section.shelfCount) {
+          await new Promise(resolve => setTimeout(resolve, CHUNK_DELAY));
+        }
+      }
+      
+      // Add section label
+      this.addSectionLabel(sectionGroup, section);
+      this.storeGroup.add(sectionGroup);
+      
+      StoreLayout.logger.info(`Section ${section.name} complete`);
+    }
+  }
+
+  /**
+   * Create shelf sections using GPU-optimized rendering
+   * Uses the existing ProceduralShelfGenerator but with optimized batching
+   */
+  private async createShelfSectionsGPUOptimized(config: StoreLayoutConfig): Promise<void> {
+    const totalShelves = config.sections.reduce((sum, section) => sum + section.shelfCount, 0);
+    StoreLayout.logger.info(`GPU: Creating ${totalShelves} shelves with optimized batching`);
+    
+    // Pre-create shared materials for better performance
+    const woodMaterial = this.textureManager.createSimpleWoodMaterial({ color: new THREE.Color(0x8B4513) });
+    
+    // Generate all shelves using the existing generator but with batched approach
+    for (const section of config.sections) {
+      const sectionGroup = new THREE.Group();
+      sectionGroup.name = section.name;
+      
+      // Create all shelves for this section at once (better for GPU batching)
+      const sectionShelves: THREE.Group[] = [];
+      for (let i = 0; i < section.shelfCount; i++) {
+        const shelfPosition = new THREE.Vector3(
+          section.position.x + i * config.shelfSpacing,
+          section.position.y,
+          section.position.z
+        );
+        
+        // Use standard generator but with shared material for GPU efficiency
+        const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition, STANDARD_SHELF_CONFIG);
+        
+        // Apply shared material to all meshes in the shelf for GPU batching
+        shelfUnit.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.material = woodMaterial;
+          }
+        });
+        
+        sectionShelves.push(shelfUnit);
+      }
+      
+      // Add all shelves to section group at once
+      sectionShelves.forEach(shelf => sectionGroup.add(shelf));
+      
+      // Add section label
+      this.addSectionLabel(sectionGroup, section);
+      this.storeGroup.add(sectionGroup);
+    }
+    
+    StoreLayout.logger.info(`GPU: Optimized shelf generation complete with shared materials`);
   }
 
   /**

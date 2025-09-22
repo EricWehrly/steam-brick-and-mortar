@@ -137,8 +137,8 @@ export class SceneCoordinator {
     // Private setup methods
 
     private async setupStoreLayout(): Promise<void> {
-        // Generate the complete VR-optimized store layout with Steam categories
-        await this.storeLayout.generateStore()
+        // Generate the complete VR-optimized store layout with GPU optimization
+        await this.storeLayout.generateShelvesGPUOptimized()
     }
 
     private setupLighting(): void {
