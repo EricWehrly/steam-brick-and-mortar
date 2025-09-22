@@ -175,6 +175,9 @@ export class SteamBrickAndMortarApp {
 
             this.emitGameStartEvent()
             
+            // Auto-load first cached user if available
+            await this.tryAutoLoadCachedUser()
+            
             ToastManager.success('Steam Brick and Mortar is ready to explore!', { duration: 5000 })
         } catch (error) {
             console.error('Failed to initialize application:', error)
@@ -189,6 +192,27 @@ export class SteamBrickAndMortarApp {
 
         // Setup WebXR capabilities
         await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
+    }
+
+    /**
+     * Try to automatically load the first cached user on startup
+     */
+    private async tryAutoLoadCachedUser(): Promise<void> {
+        try {
+            const cachedUsers = this.steamIntegration.getCachedUsers()
+            if (cachedUsers.length > 0) {
+                const firstUser = cachedUsers[0]
+                console.log(`Auto-loading cached user: ${firstUser.displayName} (${firstUser.vanityUrl})`)
+                
+                // Load from cache using the established workflow
+                this.uiCoordinator.steam.loadFromCache(firstUser.vanityUrl)
+                
+                ToastManager.info(`Auto-loaded ${firstUser.displayName} (${firstUser.gameCount} games)`, { duration: 3000 })
+            }
+        } catch (error) {
+            console.warn('Failed to auto-load cached user:', error)
+            // Don't throw - this is a nice-to-have feature
+        }
     }    dispose(): void {
         if (!this.isInitialized) {
             return
