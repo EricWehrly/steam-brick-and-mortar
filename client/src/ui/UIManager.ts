@@ -7,44 +7,21 @@ import { ProgressDisplay } from './ProgressDisplay'
 import { WebXRUIPanel } from './WebXRUIPanel'
 import { renderTemplate } from '../utils/TemplateEngine'
 import uiErrorTemplate from '../templates/ui/error.html?raw'
-import type { SteamIntegration } from '../steam-integration/SteamIntegration'
-
-export interface UIManagerEvents {
-  steamLoadGames: (vanityUrl: string) => void
-  steamLoadFromCache: (vanityUrl: string) => void
-  steamUseOffline: (vanityUrl: string) => void
-  steamRefreshCache: () => void
-  steamClearCache: () => void
-  steamShowCacheStats: () => void
-  steamDevModeToggle?: (isEnabled: boolean) => void
-  webxrEnterVR: () => void
-}
 
 export class UIManager {
+  private static instance: UIManager | null = null
+  
   // Expose UI panels directly instead of using delegation
   public readonly steamUIPanel: SteamUIPanel
   public readonly progressDisplay: ProgressDisplay
   public readonly webxrUIPanel: WebXRUIPanel
   
-  constructor(
-    private events: UIManagerEvents,
-    private steamIntegration: SteamIntegration
-  ) {
-    this.steamUIPanel = new SteamUIPanel({
-      onLoadGames: this.events.steamLoadGames,
-      onLoadFromCache: this.events.steamLoadFromCache,
-      onUseOffline: this.events.steamUseOffline,
-      onRefreshCache: this.events.steamRefreshCache,
-      onClearCache: this.events.steamClearCache,
-      onShowCacheStats: this.events.steamShowCacheStats,
-      onDevModeToggle: this.events.steamDevModeToggle
-    }, this.steamIntegration)
+  constructor() {
+    this.steamUIPanel = new SteamUIPanel()
     
     this.progressDisplay = new ProgressDisplay()
     
-    this.webxrUIPanel = new WebXRUIPanel({
-      onEnterVR: this.events.webxrEnterVR
-    })
+    this.webxrUIPanel = new WebXRUIPanel()
   }
   
   init(): void {
@@ -78,5 +55,16 @@ export class UIManager {
     if (loading) {
       loading.innerHTML = renderTemplate(uiErrorTemplate, { message })
     }
+  }
+
+  /**
+   * Get singleton instance - creates itself when first accessed
+   */
+  static getInstance(): UIManager {
+    if (!UIManager.instance) {
+      // Self-initialize with no dependencies - truly self-sufficient
+      UIManager.instance = new UIManager()
+    }
+    return UIManager.instance
   }
 }

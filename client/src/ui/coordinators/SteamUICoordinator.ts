@@ -13,15 +13,14 @@
 
 import { EventManager } from '../../core/EventManager'
 import { SteamEventTypes } from '../../types/InteractionEvents'
+import { UIManager } from '../UIManager'
 import type { SteamWorkflowManager } from '../../steam-integration/SteamWorkflowManager'
 import type { SteamIntegration } from '../../steam-integration/SteamIntegration'
-import type { UIManager } from '../UIManager'
 
 export class SteamUICoordinator {
     private eventManager: EventManager
     private steamWorkflowManager?: SteamWorkflowManager
     private steamIntegration?: SteamIntegration
-    private uiManager?: UIManager
 
     constructor() {
         this.eventManager = EventManager.getInstance()
@@ -32,12 +31,10 @@ export class SteamUICoordinator {
      */
     init(
         steamWorkflowManager: SteamWorkflowManager,
-        steamIntegration: SteamIntegration,
-        uiManager: UIManager
+        steamIntegration: SteamIntegration
     ): void {
         this.steamWorkflowManager = steamWorkflowManager
         this.steamIntegration = steamIntegration
-        this.uiManager = uiManager
     }
 
     // Direct method calls for simple operations (no events needed)
@@ -125,7 +122,7 @@ export class SteamUICoordinator {
 
         // Get stats and update UI directly - no events or alerts needed
         const stats = this.steamIntegration.getCacheStats()
-        this.uiManager?.steamUIPanel.updateCacheStats(stats)
+        UIManager.getInstance().steamUIPanel.updateCacheStats(stats)
     }
 
     /**
@@ -144,41 +141,34 @@ export class SteamUICoordinator {
      * Update progress display for Steam loading
      */
     updateProgress(current: number, total: number, message: string): void {
-        this.uiManager?.progressDisplay.update(current, total, message)
+        UIManager.getInstance().progressDisplay.update(current, total, message)
     }
 
     /**
      * Show/hide progress display
      */
     showProgress(show: boolean): void {
-        this.uiManager?.progressDisplay.show(show)
+        UIManager.getInstance().progressDisplay.show(show)
     }
 
     /**
      * Show Steam status message
      */
     showSteamStatus(message: string, type: 'loading' | 'success' | 'error'): void {
-        this.uiManager?.steamUIPanel.showStatus(message, type)
+        UIManager.getInstance().steamUIPanel.showStatus(message, type)
     }
 
     /**
      * Check offline availability for a vanity URL
      */
     checkOfflineAvailability(vanityUrl: string): void {
-        this.uiManager?.steamUIPanel.checkOfflineAvailability(vanityUrl)
+        UIManager.getInstance().steamUIPanel.checkOfflineAvailability(vanityUrl)
     }
 
     /**
      * Update cache statistics display
      */
     updateCacheStats(stats: { totalEntries: number; cacheHits: number; cacheMisses: number }): void {
-        this.uiManager?.steamUIPanel.updateCacheStats(stats)
-    }
-
-    /**
-     * Show error message
-     */
-    showError(message: string): void {
-        this.uiManager?.showError(message)
+        UIManager.getInstance().steamUIPanel.updateCacheStats(stats)
     }
 }
