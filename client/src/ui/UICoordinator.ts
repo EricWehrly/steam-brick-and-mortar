@@ -13,7 +13,7 @@
  */
 
 import * as THREE from 'three'
-import { UIManager } from '../ui/UIManager'
+import { UIManager } from './UIManager'
 import { PerformanceMonitor } from '../ui/PerformanceMonitor'
 import type { DebugStatsProvider } from '../core/DebugStatsProvider'
 import type { ImageCacheStats } from '../steam/images/ImageManager'
@@ -55,27 +55,8 @@ export class UICoordinator {
             steamIntegration
         )
 
-        // Initialize UI Manager with Steam and WebXR handlers that delegate to coordinators
-        this.uiManager = new UIManager({
-            steamLoadGames: (vanityUrl: string) => this.steam.loadGames(vanityUrl),
-            steamLoadFromCache: (vanityUrl: string) => this.steam.loadFromCache(vanityUrl),
-            steamUseOffline: (vanityUrl: string) => this.steam.useOffline(vanityUrl),
-            steamRefreshCache: () => this.steam.refreshCache(),
-            steamClearCache: () => this.steam.clearCache(),
-            steamShowCacheStats: () => this.steam.showCacheStats(),
-            steamDevModeToggle: (isEnabled: boolean) => this.steam.setDevMode(isEnabled),
-            webxrEnterVR: () => this.webxr.toggleVR()
-        }, steamIntegration!)
-    }
-
-    /**
-     * Set workflow manager for direct method calls
-     */
-    setSteamWorkflowManager(steamWorkflowManager: SteamWorkflowManager, steamIntegration: SteamIntegration): void {
-        // Initialize coordinators with their dependencies
-        this.steam.init(steamWorkflowManager, steamIntegration, this.uiManager)
-        this.webxr.init(this.uiManager)
-        // Note: SystemUICoordinator.init is called separately in setupUI with renderer
+        // Initialize UI Manager - completely self-sufficient, no dependencies
+        this.uiManager = new UIManager()
     }
 
     /**

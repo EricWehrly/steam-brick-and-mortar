@@ -12,6 +12,7 @@ export interface ToastOptions {
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
+// TODO: queuing system to ensure toasts don't flood the screen
 export class ToastManager {
     private static instance: ToastManager | null = null
     private container: HTMLElement | null = null
@@ -21,19 +22,30 @@ export class ToastManager {
         this.createContainer()
     }
 
-    /**
-     * Get singleton instance
-     */
-    static getInstance(): ToastManager {
+    private static getInstance(): ToastManager {
         if (!ToastManager.instance) {
             ToastManager.instance = new ToastManager()
         }
         return ToastManager.instance
     }
 
-    /**
-     * Create the toast container if it doesn't exist
-     */
+    // Static convenience methods - no need to access instance
+    static success(message: string, options: ToastOptions = {}): void {
+        ToastManager.getInstance().show(message, 'success', options)
+    }
+
+    static error(message: string, options: ToastOptions = {}): void {
+        ToastManager.getInstance().show(message, 'error', { duration: 6000, ...options })
+    }
+
+    static info(message: string, options: ToastOptions = {}): void {
+        ToastManager.getInstance().show(message, 'info', options)
+    }
+
+    static warning(message: string, options: ToastOptions = {}): void {
+        ToastManager.getInstance().show(message, 'warning', options)
+    }
+
     private createContainer(): void {
         if (this.container) return
 
@@ -49,10 +61,7 @@ export class ToastManager {
         document.body.appendChild(this.container)
     }
 
-    /**
-     * Show a toast notification
-     */
-    show(message: string, type: ToastType = 'info', options: ToastOptions = {}): void {
+    private show(message: string, type: ToastType = 'info', options: ToastOptions = {}): void {
         if (!this.container) {
             this.createContainer()
         }
@@ -77,38 +86,7 @@ export class ToastManager {
             this.removeToast(toast)
         }, duration)
     }
-
-    /**
-     * Show success toast
-     */
-    success(message: string, options: ToastOptions = {}): void {
-        this.show(message, 'success', options)
-    }
-
-    /**
-     * Show error toast
-     */
-    error(message: string, options: ToastOptions = {}): void {
-        this.show(message, 'error', { duration: 6000, ...options })
-    }
-
-    /**
-     * Show info toast
-     */
-    info(message: string, options: ToastOptions = {}): void {
-        this.show(message, 'info', options)
-    }
-
-    /**
-     * Show warning toast
-     */
-    warning(message: string, options: ToastOptions = {}): void {
-        this.show(message, 'warning', options)
-    }
-
-    /**
-     * Create a toast element
-     */
+    
     private createToast(message: string, type: ToastType, options: ToastOptions): HTMLElement {
         const toast = document.createElement('div')
         toast.className = `toast toast-${type}`
@@ -131,9 +109,6 @@ export class ToastManager {
         return toast
     }
 
-    /**
-     * Remove a toast with exit animation
-     */
     private removeToast(toast: HTMLElement): void {
         toast.classList.remove('toast-enter')
         toast.classList.add('toast-exit')
@@ -146,20 +121,9 @@ export class ToastManager {
         }, 5000) // Match CSS transition duration
     }
 
-    /**
-     * Clear all toasts
-     */
-    clear(): void {
-        if (this.container) {
-            this.container.innerHTML = ''
-        }
-    }
-
-    /**
-     * Clean up resources
-     */
     dispose(): void {
-        this.clear()
+        if(this.container) this.container.innerHTML = '';
+
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container)
         }

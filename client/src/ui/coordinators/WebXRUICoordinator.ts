@@ -7,38 +7,30 @@
  * - WebXR-specific UI updates
  */
 
-import { EventManager } from '../../core/EventManager'
+import { EventManager, EventSource } from '../../core/EventManager'
 import { WebXREventTypes } from '../../types/InteractionEvents'
 import type { WebXRCapabilities } from '../../webxr/WebXRManager'
-import type { UIManager } from '../UIManager'
+import { UIManager } from '../UIManager'
 
 export class WebXRUICoordinator {
     private eventManager: EventManager
-    private uiManager?: UIManager
 
     constructor() {
         this.eventManager = EventManager.getInstance()
     }
 
     /**
-     * Initialize with required dependencies
-     */
-    init(uiManager: UIManager): void {
-        this.uiManager = uiManager
-    }
-
-    /**
      * Update WebXR support status in UI
      */
     updateWebXRSupport(capabilities: WebXRCapabilities): void {
-        this.uiManager?.webxrUIPanel.setSupported(capabilities.supportsImmersiveVR)
+        UIManager.getInstance().webxrUIPanel.setSupported(capabilities.supportsImmersiveVR)
     }
 
     /**
      * Update WebXR session state in UI
      */
     updateWebXRSessionState(isActive: boolean): void {
-        this.uiManager?.webxrUIPanel.setSessionActive(isActive)
+        UIManager.getInstance().webxrUIPanel.setSessionActive(isActive)
     }
 
     /**
@@ -47,7 +39,7 @@ export class WebXRUICoordinator {
     toggleVR(): void {
         this.eventManager.emit(WebXREventTypes.Toggle, {
             timestamp: Date.now(),
-            source: 'ui' as const
+            source: EventSource.UI
         })
     }
 }

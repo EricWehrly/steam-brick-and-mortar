@@ -72,7 +72,6 @@ vi.mock('../../../src/webxr/WebXRCoordinator', () => ({
 vi.mock('../../../src/ui/UICoordinator', () => ({
     UICoordinator: vi.fn().mockImplementation(() => ({
         setupUI: vi.fn().mockResolvedValue(undefined),
-        setSteamWorkflowManager: vi.fn(),
         dispose: vi.fn(),
         // Expose specialized coordinators
         steam: {

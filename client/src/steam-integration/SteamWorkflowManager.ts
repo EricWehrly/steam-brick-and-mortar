@@ -9,11 +9,12 @@
  */
 
 import type { EventManager } from '../core/EventManager'
+import { EventSource } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
-import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamUseOfflineEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
+import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamUseOfflineEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
 import type { SteamIntegration } from './SteamIntegration'
-import type { UICoordinator } from '../ui'
 import type { SceneCoordinator } from '../scene'
+import type { UICoordinator } from '../ui'
 import { Logger } from '../utils/Logger'
 
 export class SteamWorkflowManager {
@@ -21,19 +22,19 @@ export class SteamWorkflowManager {
     
     private eventManager: EventManager
     private steamIntegration: SteamIntegration
-    private uiCoordinator: UICoordinator
     private sceneCoordinator: SceneCoordinator
+    private uiCoordinator: UICoordinator
     
     constructor(
         eventManager: EventManager,
         steamIntegration: SteamIntegration,
-        uiCoordinator: UICoordinator,
-        sceneCoordinator: SceneCoordinator
+        sceneCoordinator: SceneCoordinator,
+        uiCoordinator: UICoordinator
     ) {
         this.eventManager = eventManager
         this.steamIntegration = steamIntegration
-        this.uiCoordinator = uiCoordinator
         this.sceneCoordinator = sceneCoordinator
+        this.uiCoordinator = uiCoordinator
         
         // Register event handlers directly - no intermediate layers
         this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.onLoadGames.bind(this))
@@ -41,6 +42,7 @@ export class SteamWorkflowManager {
         this.eventManager.registerEventHandler(SteamEventTypes.UseOffline, this.onUseOfflineData.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.onRefreshCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.onClearCache.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.CacheStats, this.onCacheStats.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.ImageCacheClear, this.onClearImageCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.DevModeToggle, this.onDevModeToggle.bind(this))
     }
@@ -61,15 +63,15 @@ export class SteamWorkflowManager {
             await this.steamIntegration.loadGamesForUser(vanityUrl, {
                 onProgress: (current: number, total: number, message: string) => {
                     // this.uiCoordinator.updateProgress(current, total, message)
-                    console.log(`Progress: ${current}/${total} - ${message}`)
+                    SteamWorkflowManager.logger.debug(`Progress: ${current}/${total} - ${message}`)
                 },
                 onGameLoaded: (game) => {
                     // this.uiCoordinator.addGameToScene(game)
-                    console.log(`Game loaded: ${game.name}`)
+                    SteamWorkflowManager.logger.debug(`Game loaded: ${game.name}`)
                 },
                 onStatusUpdate: (message: string, type) => {
                     // this.uiCoordinator.showStatusMessage(message, type)
-                    console.log(`Status: ${message} (${type})`)
+                    SteamWorkflowManager.logger.info(`Status: ${message} (${type})`)
                 }
             })
             
@@ -80,7 +82,7 @@ export class SteamWorkflowManager {
                 vanityUrl,
                 gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
                 timestamp: Date.now(),
-                source: 'system' as const
+                source: EventSource.System
             })
             
         } catch (error) {
@@ -89,7 +91,7 @@ export class SteamWorkflowManager {
             //     'Failed to load Steam games. Please check your profile name and try again.',
             //     'error'
             // )
-            console.error('Failed to load Steam games. Please check your profile name and try again.')
+            SteamWorkflowManager.logger.error('Failed to load Steam games. Please check your profile name and try again.')
         }
     }
     
@@ -104,23 +106,23 @@ export class SteamWorkflowManager {
             
             // Check if cached data is available
             if (!this.steamIntegration.hasCachedData(vanityUrl)) {
-                console.error('No cached data found. Please use "Load My Games" first.')
+                SteamWorkflowManager.logger.warn('No cached data found. Please use "Load My Games" first.')
                 return
             }
             
             // Show loading UI - TODO: implement proper UI methods
-            console.log('Loading games from cache...')
+            SteamWorkflowManager.logger.info('Loading games from cache...')
             
             // Load games from cache with progress callbacks
             await this.steamIntegration.loadGamesFromCache(vanityUrl, {
                 onProgress: (current: number, total: number, message: string) => {
-                    console.log(`Progress: ${current}/${total} - ${message}`)
+                    SteamWorkflowManager.logger.debug(`Progress: ${current}/${total} - ${message}`)
                 },
                 onGameLoaded: (game) => {
-                    console.log(`Game loaded from cache: ${game.name}`)
+                    SteamWorkflowManager.logger.debug(`Game loaded from cache: ${game.name}`)
                 },
                 onStatusUpdate: (message: string, type) => {
-                    console.log(`Status: ${message} (${type})`)
+                    SteamWorkflowManager.logger.info(`Status: ${message} (${type})`)
                 }
             })
             
@@ -131,12 +133,12 @@ export class SteamWorkflowManager {
                 vanityUrl,
                 gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
                 timestamp: Date.now(),
-                source: 'system' as const
+                source: EventSource.System
             })
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Load from cache workflow failed:', error)
-            console.error('Failed to load games from cache. Try "Load My Games" instead.')
+            SteamWorkflowManager.logger.error('Failed to load games from cache. Try "Load My Games" instead.')
         }
     }
 
@@ -147,7 +149,7 @@ export class SteamWorkflowManager {
         SteamWorkflowManager.logger.info('Use offline data workflow triggered')
         
         // TODO: Implement offline data functionality
-        console.warn('Offline mode is not yet implemented.')
+        SteamWorkflowManager.logger.warn('Offline mode is not yet implemented.')
     }
 
     /**
@@ -158,23 +160,23 @@ export class SteamWorkflowManager {
             SteamWorkflowManager.logger.info('Starting cache refresh workflow')
             
             // Show loading UI - TODO: implement proper UI methods
-            console.log('Refreshing cached data...')
+            SteamWorkflowManager.logger.info('Refreshing cached data...')
             
             // Refresh data with progress callbacks
             const result = await this.steamIntegration.refreshData({
                 onProgress: (current: number, total: number, message: string) => {
-                    console.log(`Progress: ${current}/${total} - ${message}`)
+                    SteamWorkflowManager.logger.debug(`Progress: ${current}/${total} - ${message}`)
                 },
                 onGameLoaded: (game) => {
-                    console.log(`Game refreshed: ${game.name}`)
+                    SteamWorkflowManager.logger.debug(`Game refreshed: ${game.name}`)
                 },
                 onStatusUpdate: (message: string, type) => {
-                    console.log(`Status: ${message} (${type})`)
+                    SteamWorkflowManager.logger.info(`Status: ${message} (${type})`)
                 }
             })
             
             if (!result) {
-                console.error('No data to refresh.')
+                SteamWorkflowManager.logger.warn('No data to refresh.')
                 return
             }
             
@@ -187,13 +189,13 @@ export class SteamWorkflowManager {
                     vanityUrl: gameState.userData.vanity_url,
                     gameCount: gameState.userData.games?.length || 0,
                     timestamp: Date.now(),
-                    source: 'system' as const
+                    source: EventSource.System
                 })
             }
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Cache refresh workflow failed:', error)
-            console.error('Failed to refresh cache data.')
+            SteamWorkflowManager.logger.error('Failed to refresh cache data.')
         }
     }
 
@@ -205,13 +207,37 @@ export class SteamWorkflowManager {
             SteamWorkflowManager.logger.info('Starting cache clear workflow')
             
             this.steamIntegration.clearCache()
-            console.log('Cache cleared successfully!')
+            SteamWorkflowManager.logger.info('Cache cleared successfully!')
             
             SteamWorkflowManager.logger.info('Cache clear workflow completed successfully')
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Cache clear workflow failed:', error)
-            console.error('Failed to clear cache.')
+            SteamWorkflowManager.logger.error('Failed to clear cache.')
+        }
+    }
+
+    /**
+     * Show cache stats workflow
+     */
+    private async onCacheStats(event: CustomEvent<SteamCacheStatsEvent>): Promise<void> {
+        try {
+            SteamWorkflowManager.logger.info('Starting cache stats workflow')
+            
+            const stats = this.steamIntegration.getCacheStats()
+            if (stats) {
+                // Call steam UI coordinator directly instead of going through UIManager
+                this.uiCoordinator.steam.updateCacheStats(stats)
+                SteamWorkflowManager.logger.info('Cache stats displayed successfully!')
+            } else {
+                SteamWorkflowManager.logger.warn('No cache stats available.')
+            }
+            
+            SteamWorkflowManager.logger.info('Cache stats workflow completed successfully')
+            
+        } catch (error) {
+            SteamWorkflowManager.logger.error('Cache stats workflow failed:', error)
+            SteamWorkflowManager.logger.error('Failed to display cache stats.')
         }
     }
 
@@ -223,13 +249,13 @@ export class SteamWorkflowManager {
             SteamWorkflowManager.logger.info('Starting image cache clear workflow')
             
             await this.steamIntegration.clearImageCache()
-            console.log('Image cache cleared successfully!')
+            SteamWorkflowManager.logger.info('Image cache cleared successfully!')
             
             SteamWorkflowManager.logger.info('Image cache clear workflow completed successfully')
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Image cache clear workflow failed:', error)
-            console.error('Failed to clear image cache.')
+            SteamWorkflowManager.logger.error('Failed to clear image cache.')
         }
     }
 
@@ -251,13 +277,13 @@ export class SteamWorkflowManager {
                 ? `🔧 Development mode enabled (limiting to ${maxGames} games for faster testing)`
                 : `📚 Development mode disabled (showing up to ${maxGames} games)`
             
-            console.log(message)
+            SteamWorkflowManager.logger.info(message)
             
             SteamWorkflowManager.logger.info(`Dev mode toggle workflow completed: maxGames set to ${maxGames}`)
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Dev mode toggle workflow failed:', error)
-            console.error('Failed to toggle development mode.')
+            SteamWorkflowManager.logger.error('Failed to toggle development mode.')
         }
     }
 

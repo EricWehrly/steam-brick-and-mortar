@@ -12,7 +12,4 @@ export { WebXRUIPanel } from './WebXRUIPanel'
 export { PerformanceMonitor } from './PerformanceMonitor'
 export { ToastManager } from './ToastManager'
 
-export type { UIManagerEvents } from './UIManager'
-export type { SteamUIPanelEvents } from './SteamUIPanel'
-export type { WebXRUIPanelEvents } from './WebXRUIPanel'
 export type { PerformanceStats, PerformanceConfig } from './PerformanceMonitor'

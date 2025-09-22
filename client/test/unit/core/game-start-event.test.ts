@@ -73,7 +73,6 @@ vi.mock('../../../src/webxr/WebXREventHandler', () => ({
 vi.mock('../../../src/ui/UICoordinator', () => ({
     UICoordinator: vi.fn().mockImplementation(() => ({
         setupUI: vi.fn().mockResolvedValue(undefined),
-        setSteamWorkflowManager: vi.fn(),
         dispose: vi.fn(),
         steam: {
             showError: vi.fn(),
@@ -109,13 +108,12 @@ vi.mock('../../../src/ui/PerformanceMonitor', () => ({
 
 vi.mock('../../../src/ui/ToastManager', () => ({
     ToastManager: {
-        getInstance: vi.fn().mockReturnValue({
-            success: vi.fn(),
-            error: vi.fn(),
-            info: vi.fn(),
-            warn: vi.fn(),
-            dispose: vi.fn()
-        })
+        getInstance: vi.fn(),
+        // Static convenience methods
+        success: vi.fn(),
+        error: vi.fn(),
+        info: vi.fn(),
+        warning: vi.fn()
     }
 }))
 
@@ -252,8 +250,5 @@ describe('GameStart Event Implementation', () => {
         
         // Verify the constant value matches what registration should use
         expect(GameEventTypes.Start).toBe('game:start')
-        
-        // Note: SceneCoordinator event registration is tested separately in scene-coordinator-events.test.ts
-        // This ensures both emission and registration use the same GameEventTypes.Start constant
     })
 })

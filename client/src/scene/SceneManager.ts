@@ -1,7 +1,7 @@
 /**
  * Scene Coordinator - Complete 3D Scene Management and Coordination
  * 
- * This coordinator manages the entire 3D scene lifecycle and delegates
+ * This coordinator manag    private setupRenderer(options: SceneManagerOptions) { scene lifecycle and delegates
  * specific rendering tasks to specialized renderers:
  * - Three.js scene, camera, and renderer initialization
  * - Lighting and atmospheric setup
@@ -19,6 +19,7 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 import { BlockbusterColors } from '../utils/Colors'
 import { MaterialUtils } from '../utils/MaterialUtils'
 import { TextureManager } from '../utils/TextureManager'
+import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
 
 export interface SceneManagerOptions {
@@ -35,6 +36,7 @@ export class SceneManager {
     private animationId: number | null = null
     private textureManager: TextureManager
     private propRenderer: PropRenderer
+    private skyboxManager: SkyboxManager
 
     constructor(options: SceneManagerOptions = {}) {
         // Initialize RectAreaLight uniforms (required for RectAreaLight to work)
@@ -53,11 +55,29 @@ export class SceneManager {
         // Initialize prop renderer for atmospheric elements
         this.propRenderer = new PropRenderer(this.scene)
 
+        // Initialize skybox manager
+        this.skyboxManager = new SkyboxManager(this.scene)
+
         this.setupRenderer(options)
-        this.setupScene()
         this.setupLighting()
         this.setupCamera()
         this.setupEventListeners()
+        
+        // Initialize skybox asynchronously (non-blocking)
+        this.initializeSkybox()
+    }
+
+    /**
+     * Initialize skybox asynchronously - called during construction
+     */
+    private async initializeSkybox(): Promise<void> {
+        try {
+            await this.skyboxManager.applySkybox(SkyboxPresets.aurora)
+        } catch (error) {
+            console.error('Failed to apply skybox, using default:', error)
+            // Ultimate fallback to current gold color if something goes wrong
+            this.scene.background = new THREE.Color(BlockbusterColors.walls)
+        }
     }
 
     private setupRenderer(options: SceneManagerOptions) {
@@ -74,11 +94,6 @@ export class SceneManager {
         this.renderer.xr.enabled = true
         
         document.body.appendChild(this.renderer.domElement)
-    }
-
-    private setupScene() {
-        // Set Blockbuster mustard yellow background
-        this.scene.background = new THREE.Color(BlockbusterColors.walls)
     }
 
     private setupLighting() {
@@ -402,6 +417,7 @@ export class SceneManager {
      */
     public dispose() {
         this.stopRenderLoop()
+        this.skyboxManager.dispose()
         this.propRenderer.dispose()
         this.renderer.dispose()
         document.body.removeChild(this.renderer.domElement)

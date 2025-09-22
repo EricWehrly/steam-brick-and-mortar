@@ -23,8 +23,9 @@ import { SteamWorkflowManager } from '../steam-integration/SteamWorkflowManager'
 import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { type WebXRCapabilities } from '../webxr/WebXRManager'
-import { EventManager } from './EventManager'
-import { GameEventTypes, type GameStartEvent } from '../types/InteractionEvents'
+import { EventManager, EventSource } from './EventManager'
+import { GameEventTypes, WebXREventTypes, type GameStartEvent } from '../types/InteractionEvents'
+import { AppSettings } from './AppSettings'
 
 /**
  * Configuration options for the Steam Brick and Mortar application
@@ -61,6 +62,7 @@ export class SteamBrickAndMortarApp {
     private steamGameManager: SteamGameManager
     private eventManager: EventManager
     private steamWorkflowManager: SteamWorkflowManager
+    private appSettings: AppSettings
 
     // State
     private isInitialized: boolean = false
@@ -90,7 +92,6 @@ export class SteamBrickAndMortarApp {
         })
 
         // Initialize scene coordinator with performance configuration
-        // TODO: all (most?) of this should go into advanced visual settings)
         this.sceneCoordinator = new SceneCoordinator(this.sceneManager, {
             maxGames: config.steam?.maxGames ?? 100,
             performance: {
@@ -151,12 +152,9 @@ export class SteamBrickAndMortarApp {
         this.steamWorkflowManager = new SteamWorkflowManager(
             this.eventManager,
             this.steamIntegration,
-            this.uiCoordinator,
-            this.sceneCoordinator
+            this.sceneCoordinator,
+            this.uiCoordinator
         )
-
-        // Wire up the refactored UI coordinators
-        this.uiCoordinator.setSteamWorkflowManager(this.steamWorkflowManager, this.steamIntegration)
 
         // Initialize webxr event handler to handle WebXR and input interactions
         this.webxrEventHandler = new WebXREventHandler(
@@ -172,6 +170,8 @@ export class SteamBrickAndMortarApp {
         }
         
         try {
+            this.appSettings = AppSettings.getInstance()
+            
             await this.initializeCoordinators()
             this.startRenderLoop()
             
@@ -179,7 +179,10 @@ export class SteamBrickAndMortarApp {
 
             this.emitGameStartEvent()
             
-            ToastManager.getInstance().success('Steam Brick and Mortar is ready to explore!', { duration: 5000 })
+            // Auto-load first cached user if available
+            await this.tryAutoLoadCachedUser()
+            
+            ToastManager.success('Steam Brick and Mortar is ready to explore!', { duration: 5000 })
         } catch (error) {
             console.error('Failed to initialize application:', error)
             throw error
@@ -193,6 +196,33 @@ export class SteamBrickAndMortarApp {
 
         // Setup WebXR capabilities
         await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
+    }
+
+    /**
+     * Try to automatically load the first cached user on startup
+     */
+    private async tryAutoLoadCachedUser(): Promise<void> {
+        try {
+            // Check if auto-load is enabled in settings
+            if (!this.appSettings.getSetting('autoLoadProfile')) {
+                console.log('Auto-load cached user is disabled in settings')
+                return
+            }
+            
+            const cachedUsers = this.steamIntegration.getCachedUsers()
+            if (cachedUsers.length > 0) {
+                const firstUser = cachedUsers[0]
+                console.log(`Auto-loading cached user: ${firstUser.displayName} (${firstUser.vanityUrl})`)
+                
+                // Load from cache using the established workflow
+                this.uiCoordinator.steam.loadFromCache(firstUser.vanityUrl)
+                
+                ToastManager.info(`Auto-loaded ${firstUser.displayName} (${firstUser.gameCount} games)`, { duration: 3000 })
+            }
+        } catch (error) {
+            console.warn('Failed to auto-load cached user:', error)
+            // Don't throw - this is a nice-to-have feature
+        }
     }    dispose(): void {
         if (!this.isInitialized) {
             return
@@ -215,16 +245,16 @@ export class SteamBrickAndMortarApp {
 
     // WebXR event emission methods - bridge WebXRCoordinator callbacks to events
     private emitWebXRSessionStartEvent(): void {
-        this.eventManager.emit('webxr:session-start', {
+        this.eventManager.emit(WebXREventTypes.SessionStart, {
             timestamp: Date.now(),
-            source: 'system' as const
+            source: EventSource.System
         })
     }
 
     private emitWebXRSessionEndEvent(): void {
         this.eventManager.emit('webxr:session-end', {
             timestamp: Date.now(),
-            source: 'system' as const
+            source: EventSource.System
         })
     }
 
@@ -232,7 +262,7 @@ export class SteamBrickAndMortarApp {
         this.eventManager.emit('webxr:error', {
             error,
             timestamp: Date.now(),
-            source: 'system' as const
+            source: EventSource.System
         })
     }
 
@@ -240,14 +270,14 @@ export class SteamBrickAndMortarApp {
         this.eventManager.emit('webxr:support-change', {
             capabilities,
             timestamp: Date.now(),
-            source: 'system' as const
+            source: EventSource.System
         })
     }
 
     private emitGameStartEvent(): void {
         this.eventManager.emit<GameStartEvent>(GameEventTypes.Start, {
             timestamp: Date.now(),
-            source: 'system' as const
+            source: EventSource.System
         })
     }
 

@@ -4,20 +4,12 @@
 
 import { getElementByIdSafe } from '../utils'
 import { renderTemplate } from '../utils/TemplateEngine'
+import { EventManager, EventSource } from '../core/EventManager'
+import { SteamEventTypes } from '../types/InteractionEvents'
 import steamCacheStatsTemplate from '../templates/steam-ui/cache-stats.html?raw'
-import type { SteamIntegration } from '../steam-integration/SteamIntegration'
-
-export interface SteamUIPanelEvents {
-  onLoadGames: (vanityUrl: string) => void
-  onLoadFromCache: (vanityUrl: string) => void
-  onUseOffline: (vanityUrl: string) => void
-  onRefreshCache: () => void
-  onClearCache: () => void
-  onShowCacheStats: () => void
-  onDevModeToggle?: (isEnabled: boolean) => void
-}
 
 export class SteamUIPanel {
+  private eventManager: EventManager
   private steamUI: HTMLElement | null
   private steamVanityInput: HTMLInputElement | null
   private loadGamesButton: HTMLButtonElement | null
@@ -30,10 +22,9 @@ export class SteamUIPanel {
   private steamStatus: HTMLElement | null
   private devModeToggle: HTMLInputElement | null
   
-  constructor(
-    private events: SteamUIPanelEvents,
-    private steamIntegration: SteamIntegration
-  ) {
+  constructor() {
+    this.eventManager = EventManager.getInstance()
+    
     // Get UI elements
     this.steamUI = document.getElementById('steam-ui')
     this.steamVanityInput = getElementByIdSafe('steam-vanity') as HTMLInputElement
@@ -59,7 +50,11 @@ export class SteamUIPanel {
       this.loadGamesButton.addEventListener('click', () => {
         const vanityUrl = this.getVanityInput()
         if (vanityUrl) {
-          this.events.onLoadGames(vanityUrl)
+          this.eventManager.emit(SteamEventTypes.LoadGames, {
+            vanityUrl,
+            timestamp: Date.now(),
+            source: EventSource.UI
+          })
         }
       })
     }
@@ -69,7 +64,11 @@ export class SteamUIPanel {
       this.loadFromCacheButton.addEventListener('click', () => {
         const vanityUrl = this.getVanityInput()
         if (vanityUrl) {
-          this.events.onLoadFromCache(vanityUrl)
+          this.eventManager.emit(SteamEventTypes.LoadFromCache, {
+            vanityUrl,
+            timestamp: Date.now(),
+            source: EventSource.UI
+          })
         }
       })
     }
@@ -79,7 +78,11 @@ export class SteamUIPanel {
       this.useOfflineButton.addEventListener('click', () => {
         const vanityUrl = this.getVanityInput()
         if (vanityUrl) {
-          this.events.onUseOffline(vanityUrl)
+          this.eventManager.emit(SteamEventTypes.UseOffline, {
+            vanityUrl,
+            timestamp: Date.now(),
+            source: EventSource.UI
+          })
         }
       })
     }
@@ -87,19 +90,28 @@ export class SteamUIPanel {
     // Cache management buttons
     if (this.refreshCacheButton) {
       this.refreshCacheButton.addEventListener('click', () => {
-        this.events.onRefreshCache()
+        this.eventManager.emit(SteamEventTypes.CacheRefresh, {
+          timestamp: Date.now(),
+          source: EventSource.UI
+        })
       })
     }
     
     if (this.clearCacheButton) {
       this.clearCacheButton.addEventListener('click', () => {
-        this.events.onClearCache()
+        this.eventManager.emit(SteamEventTypes.CacheClear, {
+          timestamp: Date.now(),
+          source: EventSource.UI
+        })
       })
     }
     
     if (this.showCacheStatsButton) {
       this.showCacheStatsButton.addEventListener('click', () => {
-        this.events.onShowCacheStats()
+        this.eventManager.emit(SteamEventTypes.CacheStats, {
+          timestamp: Date.now(),
+          source: EventSource.UI
+        })
       })
     }
     
@@ -109,7 +121,11 @@ export class SteamUIPanel {
         if (event.key === 'Enter') {
           const vanityUrl = this.getVanityInput()
           if (vanityUrl) {
-            this.events.onLoadGames(vanityUrl)
+            this.eventManager.emit(SteamEventTypes.LoadGames, {
+              vanityUrl,
+              timestamp: Date.now(),
+              source: EventSource.UI
+            })
           }
         }
       })
@@ -119,9 +135,9 @@ export class SteamUIPanel {
         const vanityUrl = this.steamVanityInput?.value.trim() || ''
         this.checkOfflineAvailability(vanityUrl)
         
-        // Check cache availability and show/hide Load from Cache button
-        const hasCache = this.steamIntegration.hasCachedData(vanityUrl)
-        this.checkCacheAvailability(vanityUrl, hasCache)
+        // Show/hide Load from Cache button based on input presence
+        // The actual cache availability will be handled by the workflow manager
+        this.checkCacheAvailability(vanityUrl, Boolean(vanityUrl))
       })
     }
     
@@ -129,7 +145,11 @@ export class SteamUIPanel {
     if (this.devModeToggle) {
       this.devModeToggle.addEventListener('change', () => {
         const isEnabled = this.devModeToggle?.checked ?? true
-        this.events.onDevModeToggle?.(isEnabled)
+        this.eventManager.emit(SteamEventTypes.DevModeToggle, {
+          isEnabled,
+          timestamp: Date.now(),
+          source: EventSource.UI
+        })
       })
     }
   }

@@ -17,6 +17,7 @@ import { EventManager } from '../core/EventManager'
 import { WebXRCoordinator } from './WebXRCoordinator'
 import { UICoordinator } from '../ui/UICoordinator'
 import { Logger } from '../utils/Logger'
+import { ToastManager } from '../ui/ToastManager'
 import { WebXREventTypes, InputEventTypes, UIEventTypes } from '../types/InteractionEvents'
 import type { WebXRCapabilities } from './WebXRManager'
 import type {
@@ -128,7 +129,7 @@ export class WebXREventHandler {
 
     private handleWebXRError(event: WebXRErrorEvent): void {
         WebXREventHandler.logger.error('WebXR error occurred:', event.error)
-        this.uiCoordinator.steam.showError('Failed to enter VR mode')
+        ToastManager.error('Failed to enter VR mode')
     }
 
     private handleWebXRSupportChange(event: WebXRSupportChangeEvent): void {

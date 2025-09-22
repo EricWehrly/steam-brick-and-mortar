@@ -133,8 +133,8 @@ describe('Application Startup Integration', () => {
             new SteamWorkflowManager(
                 mockEventManager,
                 mockSteamIntegration,
-                mockUICoordinator,
-                mockSceneCoordinator
+                mockSceneCoordinator,
+                mockUICoordinator
             )
         }).not.toThrow()
     })

@@ -1,8 +1,17 @@
 import { Logger } from '../utils/Logger'
 
+export enum EventSource {
+    UI = 'ui',
+    Keyboard = 'keyboard',
+    Mouse = 'mouse',
+    Gamepad = 'gamepad',
+    VRController = 'vr-controller',
+    System = 'system'
+}
+
 export interface BaseInteractionEvent {
     timestamp: number
-    source: 'ui' | 'keyboard' | 'mouse' | 'gamepad' | 'vr-controller' | 'system'
+    source: EventSource
 }
 
 export class EventManager extends EventTarget {
@@ -24,7 +33,7 @@ export class EventManager extends EventTarget {
     public emit<T extends BaseInteractionEvent>(
         eventType: string, 
         detail: T,
-        source: T['source'] = 'system'
+        source: T['source'] = EventSource.System as T['source']
     ): boolean {
         const event = new CustomEvent(eventType, {
             detail: {

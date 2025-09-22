@@ -12,10 +12,11 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import gameSettingsPanelTemplate from '../../../templates/pause-menu/game-settings-panel.html?raw'
 import '../../../styles/pause-menu/game-settings-panel.css'
+import { AppSettings } from '../../../core/AppSettings'
+import { EventSource } from '../../../core/EventManager'
 
 export interface SteamSettings {
-    // Steam Profile Settings
-    autoLoadLastProfile: boolean
+    // Steam Profile Settings (autoLoadProfile moved to AppSettings)
     saveProfileHistory: boolean
     defaultSortOrder: 'name' | 'playtime' | 'recent' | 'rating'
     
@@ -38,8 +39,8 @@ export class GameSettingsPanel extends PauseMenuPanel {
     readonly title = 'Game Settings'
     readonly icon = '🎮'
 
+    private appSettings: AppSettings
     private settings: SteamSettings = {
-        autoLoadLastProfile: true,
         saveProfileHistory: true,
         defaultSortOrder: 'playtime',
         showUnplayedGames: true,
@@ -55,6 +56,7 @@ export class GameSettingsPanel extends PauseMenuPanel {
 
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)
+        this.appSettings = AppSettings.getInstance()
         this.loadSettings()
     }
 
@@ -64,8 +66,8 @@ export class GameSettingsPanel extends PauseMenuPanel {
 
     render(): string {
         return renderTemplate(gameSettingsPanelTemplate, {
-            // Steam Profile settings
-            autoLoadProfile: this.settings.autoLoadLastProfile,
+            // Steam Profile settings (auto-load from AppSettings, others from local settings)
+            autoLoadProfile: this.appSettings.getSetting('autoLoadProfile'),
             saveProfileHistory: this.settings.saveProfileHistory,
             
             // Game Library sort options
@@ -99,8 +101,16 @@ export class GameSettingsPanel extends PauseMenuPanel {
     }
 
     private attachCheckboxEvents(): void {
-        const checkboxes = [
-            { id: 'auto-load-profile', setting: 'autoLoadLastProfile' as keyof SteamSettings },
+        // Auto-load profile checkbox uses AppSettings
+        const autoLoadProfileElement = document.getElementById('auto-load-profile') as HTMLInputElement
+        if (autoLoadProfileElement) {
+            autoLoadProfileElement.addEventListener('change', () => {
+                this.appSettings.setSetting('autoLoadProfile', autoLoadProfileElement.checked, EventSource.UI)
+            })
+        }
+        
+        // Other checkboxes use local settings
+        const localCheckboxes = [
             { id: 'save-profile-history', setting: 'saveProfileHistory' as keyof SteamSettings },
             { id: 'show-unplayed', setting: 'showUnplayedGames' as keyof SteamSettings },
             { id: 'show-hidden', setting: 'showHiddenGames' as keyof SteamSettings },
@@ -108,7 +118,7 @@ export class GameSettingsPanel extends PauseMenuPanel {
             { id: 'cache-game-data', setting: 'cacheGameData' as keyof SteamSettings }
         ]
 
-        checkboxes.forEach(({ id, setting }) => {
+        localCheckboxes.forEach(({ id, setting }) => {
             const element = document.getElementById(id) as HTMLInputElement
             if (element) {
                 element.addEventListener('change', () => {
@@ -173,8 +183,8 @@ export class GameSettingsPanel extends PauseMenuPanel {
     }
 
     private resetToDefaults(): void {
+        // Reset local Steam settings to defaults
         this.settings = {
-            autoLoadLastProfile: true,
             saveProfileHistory: true,
             defaultSortOrder: 'playtime',
             showUnplayedGames: true,
@@ -185,6 +195,9 @@ export class GameSettingsPanel extends PauseMenuPanel {
             maxConcurrentLoads: 4,
             cacheGameData: true
         }
+        
+        // Reset the autoLoadProfile setting in AppSettings as well
+        this.appSettings.setSetting('autoLoadProfile', false, EventSource.UI)
         
         this.saveSettings()
         this.refreshSettingsDisplay() // Re-render with default values
@@ -250,9 +263,14 @@ export class GameSettingsPanel extends PauseMenuPanel {
     private refreshSettingsDisplay(): void {
         if (!this.container) return
         
-        // Update checkboxes to reflect current settings
-        const checkboxes = [
-            { id: 'auto-load-profile', setting: 'autoLoadLastProfile' as keyof SteamSettings },
+        // Update auto-load checkbox from AppSettings
+        const autoLoadElement = document.getElementById('auto-load-profile') as HTMLInputElement
+        if (autoLoadElement) {
+            autoLoadElement.checked = this.appSettings.getSetting('autoLoadProfile')
+        }
+        
+        // Update other checkboxes from local settings
+        const localCheckboxes = [
             { id: 'save-profile-history', setting: 'saveProfileHistory' as keyof SteamSettings },
             { id: 'show-unplayed', setting: 'showUnplayedGames' as keyof SteamSettings },
             { id: 'show-hidden', setting: 'showHiddenGames' as keyof SteamSettings },
@@ -260,7 +278,7 @@ export class GameSettingsPanel extends PauseMenuPanel {
             { id: 'cache-game-data', setting: 'cacheGameData' as keyof SteamSettings }
         ]
         
-        checkboxes.forEach(({ id, setting }) => {
+        localCheckboxes.forEach(({ id, setting }) => {
             const element = document.getElementById(id) as HTMLInputElement
             if (element) {
                 element.checked = Boolean(this.settings[setting])
