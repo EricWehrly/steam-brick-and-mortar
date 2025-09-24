@@ -111,6 +111,22 @@ export interface GameStartEvent extends BaseInteractionEvent {
 }
 
 // =============================================================================
+// LIGHTING EVENTS
+// =============================================================================
+
+export interface LightingToggleEvent extends BaseInteractionEvent {
+    enabled: boolean
+}
+
+export interface LightingDebugToggleEvent extends BaseInteractionEvent {
+    enabled: boolean
+}
+
+export interface CeilingToggleEvent extends BaseInteractionEvent {
+    visible: boolean
+}
+
+// =============================================================================
 // EVENT TYPE CONSTANTS
 // =============================================================================
 
@@ -147,6 +163,15 @@ export const UIEventTypes = {
 
 export const GameEventTypes = {
     Start: 'game:start'
+} as const
+
+export const LightingEventTypes = {
+    Toggle: 'lighting:toggle',
+    DebugToggle: 'lighting:debug-toggle'
+} as const
+
+export const CeilingEventTypes = {
+    Toggle: 'ceiling:toggle'
 } as const
 
 // =============================================================================
