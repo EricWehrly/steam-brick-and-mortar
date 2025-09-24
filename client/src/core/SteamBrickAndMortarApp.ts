@@ -27,9 +27,6 @@ import { EventManager, EventSource } from './EventManager'
 import { GameEventTypes, WebXREventTypes, type GameStartEvent } from '../types/InteractionEvents'
 import { AppSettings } from './AppSettings'
 
-/**
- * Configuration options for the Steam Brick and Mortar application
- */
 export interface AppConfig {
     scene?: {
         antialias?: boolean
@@ -47,9 +44,6 @@ export interface AppConfig {
     }
 }
 
-/**
- * Main application class that orchestrates all subsystems via coordinators
- */
 export class SteamBrickAndMortarApp {
     private sceneManager: SceneManager
     private sceneCoordinator: SceneCoordinator
@@ -91,19 +85,36 @@ export class SteamBrickAndMortarApp {
             maxGames: config.steam?.maxGames ?? 100
         })
 
-        // Initialize scene coordinator with performance configuration
+        // Initialize scene coordinator with visual system configuration
         this.sceneCoordinator = new SceneCoordinator(this.sceneManager, {
             maxGames: config.steam?.maxGames ?? 100,
-            performance: {
-                maxTextureSize: 1024,
-                nearDistance: 2.0,
-                farDistance: 10.0,
-                highResolutionSize: 512,
-                mediumResolutionSize: 256,
-                lowResolutionSize: 128,
-                maxActiveTextures: Math.min(50, (config.steam?.maxGames ?? 100) / 2),
-                frustumCullingEnabled: true
+            props: {
+                // TODO: Game limiting: OFF by default, configurable via UI settings
+                // maxGames: 100,
+                // TODO: Wire this to UI settings panel for user control
+            },
+            lighting: {
+                quality: 'enhanced',
+                enableShadows: true
+            },
+            environment: {
+                skyboxPreset: 'aurora'
             }
+            
+            /* TODO: Future Performance Configuration Roadmap
+             * Re-implement these granular performance settings when needed:
+             * performance: {
+             *     maxTextureSize: 1024,
+             *     nearDistance: 2.0,
+             *     farDistance: 10.0,
+             *     highResolutionSize: 512,
+             *     mediumResolutionSize: 256,
+             *     lowResolutionSize: 128,
+             *     maxActiveTextures: Math.min(50, maxGames / 2),
+             *     frustumCullingEnabled: true
+             * }
+             * These should be exposed via UI settings when performance tuning becomes necessary.
+             */
         })
 
         // Initialize WebXR coordinator (callbacks now handled by WebXREventHandler)
@@ -198,9 +209,6 @@ export class SteamBrickAndMortarApp {
         await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
     }
 
-    /**
-     * Try to automatically load the first cached user on startup
-     */
     private async tryAutoLoadCachedUser(): Promise<void> {
         try {
             // Check if auto-load is enabled in settings
