@@ -13,9 +13,27 @@
 
 import { EventManager, EventSource } from './EventManager'
 
+// Lighting Quality Constants
+export const LIGHTING_QUALITY = {
+    SIMPLE: 'simple',
+    ENHANCED: 'enhanced', 
+    ADVANCED: 'advanced',
+    OUCH_MY_EYES: 'ouch-my-eyes'
+} as const
+
+export type LightingQuality = typeof LIGHTING_QUALITY[keyof typeof LIGHTING_QUALITY]
+
 export interface ApplicationSettings {
     // Performance Settings
     qualityLevel: 'low' | 'medium' | 'high' | 'ultra'
+    
+    // Graphics Settings
+    lightingQuality: LightingQuality
+    enableShadows: boolean
+    ceilingHeight: number
+    enableLighting: boolean
+    showLightingDebug: boolean
+    showCeiling: boolean
     
     // Interface Settings
     showFPS: boolean
@@ -227,6 +245,14 @@ export class AppSettings {
         return {
             // Performance Settings
             qualityLevel: 'high',
+            
+            // Graphics Settings
+            lightingQuality: LIGHTING_QUALITY.ENHANCED,
+            enableShadows: true,
+            ceilingHeight: 3.2,
+            enableLighting: true,
+            showLightingDebug: false,
+            showCeiling: true,
             
             // Interface Settings
             showFPS: false,
