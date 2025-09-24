@@ -219,28 +219,6 @@ export class SceneManager {
     }
 
     /**
-     * Create a floor plane with procedural carpet texture
-     */
-    public createFloor(size: number = 20, _color: number = BlockbusterColors.floor, y: number = -2): THREE.Mesh {
-        const floorGeometry = new THREE.PlaneGeometry(size, size)
-        
-        // Use procedural carpet material instead of basic material
-        const floorMaterial = this.textureManager.createProceduralCarpetMaterial({
-            repeat: { x: size / 4, y: size / 4 }, // Scale texture appropriately for room size
-            color: '#8B0000', // Blockbuster red carpet
-            roughness: 0.9,
-            metalness: 0.0
-        })
-        
-        const floor = new THREE.Mesh(floorGeometry, floorMaterial)
-        floor.rotation.x = -Math.PI / 2
-        floor.position.y = y
-        floor.receiveShadow = true
-        this.scene.add(floor)
-        return floor
-    }
-
-    /**
      * Create a ceiling plane with procedural texture
      */
     public createCeiling(size: number = 20, y: number = 4): THREE.Mesh {
