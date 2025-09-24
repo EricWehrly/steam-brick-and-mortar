@@ -1,93 +1,96 @@
 /**
  * Scene Coordinator - High-Level Scene Setup and Management
  * 
- * This coordinator handles complex scene setup operations that require
- * coordination between multiple renderers and managers:
- * - Complete store layout generation
- * - Renderer initialization and coordination  
- * - Test object management
- * - Scene performance monitoring integration
+ * This coordinator orchestrates the complete visual system setup with
+ * organized visual buckets loaded in    }
+
+    public dispose(): void {nce:
+ * 1. Environment (skybox, room structure, spatial foundation)
+ * 2. Lighting (illumination systems, shadows, atmosphere)  
+ * 3. Props (shelves, games, signage, interactive objects)
  * 
- * The App should only need to call setupCompleteScene() to get a fully
- * configured 3D environment without managing individual renderers.
+ * This sequential loading creates a smooth transition for players as
+ * they see the space build up in logical layers.
  */
 
 import * as THREE from 'three'
 import { SceneManager } from './SceneManager'
-import { GameBoxRenderer } from './GameBoxRenderer'
-import { SignageRenderer } from './SignageRenderer'
-import { StoreLayout } from './StoreLayout'
+import { EnvironmentRenderer } from './EnvironmentRenderer'
+import { LightingRenderer } from './LightingRenderer'
+import { StorePropsRenderer } from './StorePropsRenderer'
 import { EventManager } from '../core/EventManager'
-import { GameEventTypes } from '../types/InteractionEvents'
+import { GameEventTypes, CeilingEventTypes, type CeilingToggleEvent } from '../types/InteractionEvents'
+import { AppSettings } from '../core/AppSettings'
 
 export interface SceneCoordinatorConfig {
     maxGames?: number
-    performance?: {
-        maxTextureSize?: number
-        nearDistance?: number
-        farDistance?: number
-        highResolutionSize?: number
-        mediumResolutionSize?: number
-        lowResolutionSize?: number
-        maxActiveTextures?: number
-        frustumCullingEnabled?: boolean
+    environment?: {
+        skyboxPreset?: string
+        roomSize?: { width: number, depth: number, height: number }
+        proceduralTextures?: boolean
+    }
+    lighting?: {
+        quality?: 'simple' | 'enhanced' | 'advanced' | 'ouch-my-eyes'
+        enableShadows?: boolean
+        ceilingHeight?: number
+    }
+    props?: {
+        enableTestObjects?: boolean
+        maxGames?: number
     }
 }
 
-/**
- * Coordinates complex scene setup and renderer management
- */
 export class SceneCoordinator {
     private sceneManager: SceneManager
-    private gameBoxRenderer: GameBoxRenderer
-    private signageRenderer: SignageRenderer
-    private storeLayout: StoreLayout
+    private environmentRenderer: EnvironmentRenderer
+    private lightingRenderer: LightingRenderer
+    private propsRenderer: StorePropsRenderer
+    private appSettings: AppSettings
 
     constructor(sceneManager: SceneManager, config: SceneCoordinatorConfig = {}) {
         this.sceneManager = sceneManager
+        this.appSettings = AppSettings.getInstance()
         
-        // Initialize store layout
-        this.storeLayout = new StoreLayout(this.sceneManager.getScene())
-        
-        // Initialize signage renderer
-        this.signageRenderer = new SignageRenderer()
-        
-        // Initialize VR-optimized game box renderer
-        this.gameBoxRenderer = new GameBoxRenderer(
-            undefined, // Use default dimensions
-            { maxGames: config.maxGames ?? 100 },
-            { 
-                // Performance configuration for large libraries
-                maxTextureSize: config.performance?.maxTextureSize ?? 1024,
-                nearDistance: config.performance?.nearDistance ?? 2.0,
-                farDistance: config.performance?.farDistance ?? 10.0,
-                highResolutionSize: config.performance?.highResolutionSize ?? 512,
-                mediumResolutionSize: config.performance?.mediumResolutionSize ?? 256,
-                lowResolutionSize: config.performance?.lowResolutionSize ?? 128,
-                maxActiveTextures: config.performance?.maxActiveTextures ?? Math.min(50, (config.maxGames ?? 100) / 2),
-                frustumCullingEnabled: config.performance?.frustumCullingEnabled ?? true
-            }
+        // Initialize visual system renderers
+        this.environmentRenderer = new EnvironmentRenderer(this.sceneManager.getScene(), this.appSettings)
+        this.lightingRenderer = new LightingRenderer(
+            this.sceneManager.getScene(),
+            this.sceneManager.getRenderer()
         )
+        this.propsRenderer = new StorePropsRenderer(this.sceneManager.getScene())
 
         // Register for GameStart event to trigger scene setup
         EventManager.getInstance().registerEventHandler(GameEventTypes.Start, () => {
-            this.setupCompleteScene()
+            this.setupCompleteScene(config)
+        })
+
+        // Register for ceiling toggle events
+        EventManager.getInstance().registerEventHandler(CeilingEventTypes.Toggle, (event: CustomEvent<CeilingToggleEvent>) => {
+            this.environmentRenderer.setCeilingVisibility(event.detail.visible)
         })
     }
 
-    /**
-     * Set up the complete scene with store layout, signage, and test objects
-     */
-    async setupCompleteScene(): Promise<void> {
+    async setupCompleteScene(config: SceneCoordinatorConfig = {}): Promise<void> {
         console.log('🏪 Setting up complete VR-optimized store scene...')
+        console.log('📋 Loading sequence: Environment → Props → Lighting (for proper shadows)')
         
         try {
-            await this.setupStoreLayout()
-            this.setupLighting()
-            this.setupSignage()
-            this.addTestObjects()
-            this.logStoreStats()
+            // PHASE 1: Environment Foundation
+            console.log('🌍 Phase 1/3: Setting up environment...')
+            await this.setupEnvironment(config.environment)
             
+            // PHASE 2: Props and Interactive Objects (before lighting for shadows)
+            console.log('🎁 Phase 2/3: Setting up props...')
+            await this.setupProps(config.props)
+            
+            // PHASE 3: Lighting Systems (after props for proper shadow casting)
+            console.log('💡 Phase 3/3: Setting up lighting...')
+            await this.setupLighting(config.lighting)
+            
+            // Refresh shadows now that all props are in place
+            this.lightingRenderer.refreshShadows()
+            
+            this.logSceneStats()
             console.log('✅ Complete scene setup finished!')
         } catch (error) {
             console.error('❌ Failed to set up scene:', error)
@@ -96,81 +99,137 @@ export class SceneCoordinator {
     }
 
     /**
+     * Set up environment foundation (Phase 1)
+     */
+    private async setupEnvironment(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
+        // Use ceiling height from settings if not explicitly provided
+        const ceilingHeight = config.roomSize?.height ?? this.appSettings.getSetting('ceilingHeight')
+        
+        await this.environmentRenderer.setupEnvironment({
+            skyboxPreset: config.skyboxPreset ?? 'aurora',
+            roomSize: config.roomSize ?? { 
+                width: 22, 
+                depth: 16, 
+                height: ceilingHeight 
+            },
+            proceduralTextures: config.proceduralTextures ?? true
+        })
+    }
+
+    /**
+     * Set up lighting systems (Phase 2)  
+     */
+    private async setupLighting(config: SceneCoordinatorConfig['lighting'] = {}): Promise<void> {
+        // Use AppSettings as primary source, fall back to config, then defaults
+        const lightingQuality = config.quality ?? this.appSettings.getSetting('lightingQuality')
+        const enableShadows = config.enableShadows ?? this.appSettings.getSetting('enableShadows')
+        const ceilingHeight = config.ceilingHeight ?? this.appSettings.getSetting('ceilingHeight')
+
+        await this.lightingRenderer.setupLighting({
+            quality: lightingQuality,
+            enableShadows: enableShadows,
+            ceilingHeight: ceilingHeight
+        })
+    }
+
+    /**
+     * Set up props and interactive objects (Phase 3)
+     */
+    private async setupProps(config: SceneCoordinatorConfig['props'] = {}): Promise<void> {
+        await this.propsRenderer.setupProps({
+            enableTestObjects: config.enableTestObjects ?? false,
+            maxGames: config.maxGames ?? 100,
+            enableShelves: true,
+            enableGameBoxes: true,
+            enableSignage: true
+        })
+    }
+
+    /**
+     * Add atmospheric props after main setup
+     */
+    public async addAtmosphericProps(): Promise<void> {
+        await this.propsRenderer.addAtmosphericProps()
+    }
+
+    /**
      * Update performance data for all renderers
      * Call this from the render loop
      */
     updatePerformanceData(camera: THREE.Camera): void {
-        this.gameBoxRenderer.updatePerformanceData(camera, this.sceneManager.getScene())
-        this.gameBoxRenderer.cleanupOffScreenTextures()
+        this.propsRenderer.updatePerformanceData(camera)
     }
 
     /**
-     * Get performance statistics from the game box renderer
+     * Get performance statistics
      */
-    getPerformanceStats(): ReturnType<GameBoxRenderer['getPerformanceStats']> {
-        return this.gameBoxRenderer.getPerformanceStats()
+    getPerformanceStats(): ReturnType<StorePropsRenderer['getPerformanceStats']> {
+        return this.propsRenderer.getPerformanceStats()
     }
 
     /**
-     * Get access to the game box renderer for game management
+     * Get access to renderers for specific needs
      */
-    getGameBoxRenderer(): GameBoxRenderer {
-        return this.gameBoxRenderer
+    public getEnvironmentRenderer(): EnvironmentRenderer {
+        return this.environmentRenderer
+    }
+
+    public getLightingRenderer(): LightingRenderer {
+        return this.lightingRenderer
+    }
+
+    public getPropsRenderer(): StorePropsRenderer {
+        return this.propsRenderer
     }
 
     /**
-     * Get access to the store layout for debugging
+     * Legacy compatibility - get game box renderer
      */
-    getStoreLayout(): StoreLayout {
-        return this.storeLayout
+    getGameBoxRenderer() {
+        return this.propsRenderer.getGameBoxRenderer()
+    }
+
+    /**
+     * Legacy compatibility - get store layout
+     */
+    getStoreLayout() {
+        return this.propsRenderer.getStoreLayout()
     }
 
     /**
      * Clean up all scene resources
      */
     dispose(): void {
-        this.signageRenderer.dispose()
-        this.storeLayout.dispose()
-        // Note: GameBoxRenderer cleanup is handled by SteamGameManager
+        this.environmentRenderer.dispose()
+        this.lightingRenderer.dispose()
+        this.propsRenderer.dispose()
     }
 
-    // Private setup methods
-
-    private async setupStoreLayout(): Promise<void> {
-        // Generate the complete VR-optimized store layout with GPU optimization
-        await this.storeLayout.generateShelvesGPUOptimized()
-    }
-
-    private setupLighting(): void {
-        // Create visible fluorescent fixtures (positioned just below ceiling)
-        this.sceneManager.createFluorescentFixtures(3.2)
-    }
-
-    private setupSignage(): void {
-        // Create Blockbuster signage
-        this.signageRenderer.createStandardSigns(this.sceneManager.getScene())
-    }
-
-    private addTestObjects(): void {
-        // Small test cube for reference (can be removed later)
-        const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
-        const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 })
-        const cube = new THREE.Mesh(geometry, material)
-        cube.position.set(2, 0, -1) // Move to side so it doesn't interfere with shelf
-        cube.castShadow = true
-        cube.name = 'cube' // For animation reference
-        this.sceneManager.addToScene(cube)
-    }
-
-    private logStoreStats(): void {
-        const stats = this.storeLayout.getStoreStats()
-        console.log('📊 Store Stats:', stats)
+    /**
+     * Update lighting quality dynamically
+     */
+    public async updateLightingQuality(quality: 'simple' | 'enhanced' | 'advanced' | 'ouch-my-eyes'): Promise<void> {
+        await this.lightingRenderer.updateLightingQuality(quality)
     }
 
     /**
      * Update the maximum games setting for development mode
      */
     updateMaxGames(maxGames: number): void {
-        this.gameBoxRenderer.updateShelfConfig({ maxGames })
+        this.propsRenderer.updateMaxGames(maxGames)
+    }
+
+    /**
+     * Log comprehensive scene statistics
+     */
+    private logSceneStats(): void {
+        const envStats = this.environmentRenderer.getEnvironmentStats()
+        const lightStats = this.lightingRenderer.getLightingStats()
+        const propsStats = this.propsRenderer.getPropsStats()
+        
+        console.log('📊 Scene Statistics:')
+        console.log(`   🌍 Environment: ${envStats.objectCount} objects, skybox: ${envStats.skyboxActive}`)
+        console.log(`   💡 Lighting: ${lightStats.lightCount} lights, quality: ${lightStats.quality}`)
+        console.log(`   🎁 Props: ${propsStats.totalProps} objects, shelves: ${propsStats.shelvesGenerated}`)
     }
 }

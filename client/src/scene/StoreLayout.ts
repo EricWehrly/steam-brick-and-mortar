@@ -59,10 +59,11 @@ export class StoreLayout {
     // Clear existing store
     this.clearStore();
 
-    // Create room structure and shelves together (legacy method)
-    await this.createRoomStructure(config);
+    // Create only shelves - room structure handled by EnvironmentRenderer
     await this.createShelfSections(config);
     this.createEntranceArea(config);
+    
+    StoreLayout.logger.info('Store shelves generated (room structure handled by EnvironmentRenderer)')
   }
 
   /**
@@ -72,11 +73,10 @@ export class StoreLayout {
     // Clear existing store
     this.clearStore();
 
-    // Create only the room structure (floor, walls, ceiling)
-    await this.createRoomStructure(config);
+    // Create only entrance area - room structure handled by EnvironmentRenderer
     this.createEntranceArea(config);
     
-    StoreLayout.logger.info('Basic room structure ready')
+    StoreLayout.logger.info('Basic room ready (room structure handled by EnvironmentRenderer)')
   }
 
   /**
@@ -104,12 +104,11 @@ export class StoreLayout {
     // Clear existing store
     this.clearStore();
 
-    // Create room structure first, then GPU-optimized shelves
-    await this.createRoomStructure(config);
+    // Create only GPU-optimized shelves - room structure handled by EnvironmentRenderer
     await this.createShelfSectionsGPUOptimized(config);
     this.createEntranceArea(config);
     
-    StoreLayout.logger.info('Complete store generated with GPU-optimized shelves')
+    StoreLayout.logger.info('GPU-optimized shelves generated (room structure handled by EnvironmentRenderer)')
   }
 
   /**
