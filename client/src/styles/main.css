@@ -28,8 +28,8 @@ canvas {
 
 #webxr-button {
     position: absolute;
-    bottom: 20px;
-    right: 20px;
+    bottom: 20px; /* Now below controls */
+    left: 20px; /* Moved to left to be under controls */
     padding: 12px 24px;
     background: #007acc;
     color: white;
@@ -51,7 +51,7 @@ canvas {
 
 #controls-help {
     position: absolute;
-    bottom: 20px;
+    bottom: 80px; /* Moved up to make room for VR button */
     left: 20px;
     background: rgba(0, 0, 0, 0.7);
     color: #ccc;
