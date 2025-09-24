@@ -43,9 +43,15 @@ describe('Scene Coordinator Event Registration', () => {
     })
 
     it('should register for GameStart event using correct event type constant', () => {
-        // Mock scene manager
+        // Mock scene manager with proper scene mock that includes add method
         const mockSceneManager = {
-            getScene: vi.fn().mockReturnValue({})
+            getScene: vi.fn().mockReturnValue({
+                add: vi.fn(), // EnvironmentRenderer needs this
+                remove: vi.fn() // For potential cleanup
+            }),
+            getRenderer: vi.fn().mockReturnValue({
+                shadowMap: { enabled: false }
+            })
         }
 
         // Act: Create SceneCoordinator (should register event handler in constructor)
