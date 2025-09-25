@@ -1,7 +1,11 @@
 /**
  * SceneManager Lighting Tests  
  * 
- * Tests for ceiling fixture positioning and lighting alignment
+ * Tests for       rectLights.forEach(light => {
+        expect(light.position.y).toBeLessThan(ceilingHeight)
+        expect(light.position.y).toBeCloseTo(3.005, 3) // Updated position calculation (fixtureY - 0.1)
+        expect(light.position.y).toBeGreaterThan(2.5) // Reasonable height range
+      })ng fixture positioning and lighting alignment
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -57,7 +61,7 @@ describe('SceneManager Lighting Integration', () => {
       // RectAreaLights should be positioned for optimal illumination
       rectLights.forEach(light => {
         expect(light.position.y).toBeLessThan(ceilingHeight)
-        expect(light.position.y).toBeCloseTo(3.055, 3) // Positioned for downward illumination
+        expect(light.position.y).toBeCloseTo(3.005, 3) // Updated position calculation (fixtureY - 0.1)
         expect(light.position.y).toBeGreaterThan(2.5) // Reasonable height above floor
       })
     })

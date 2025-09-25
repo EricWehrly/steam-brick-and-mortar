@@ -11,6 +11,7 @@
 import * as THREE from 'three'
 import { PauseMenuManager } from '../pause/PauseMenuManager'
 import { PerformanceMonitor } from '../PerformanceMonitor'
+import { LightingControlsPanel } from '../LightingControlsPanel'
 import { EventManager, EventSource } from '../../core/EventManager'
 import { InputEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import type { SteamLoadFromCacheEvent } from '../../types/InteractionEvents'
@@ -23,6 +24,7 @@ import type { UIManager } from '../UIManager'
 export class SystemUICoordinator {
     private pauseMenuManager: PauseMenuManager
     private performanceMonitor: PerformanceMonitor
+    private lightingControlsPanel?: LightingControlsPanel
     private eventManager: EventManager
     private debugStatsProvider: DebugStatsProvider
     private cacheStatsProvider?: () => Promise<ImageCacheStats>
@@ -95,6 +97,12 @@ export class SystemUICoordinator {
         
         // Setup Settings button click handler
         this.setupSettingsButton()
+        
+        // Setup Lighting Controls button
+        this.setupLightingControlsButton()
+        
+        // Initialize integrated lighting controls panel
+        this.initializeLightingControls()
     }
 
     private setupSettingsButton(): void {
@@ -103,6 +111,33 @@ export class SystemUICoordinator {
             settingsButton.addEventListener('click', () => {
                 this.pauseMenuManager.toggle()
             })
+        }
+    }
+
+    private setupLightingControlsButton(): void {
+        const lightingButton = document.getElementById('lighting-controls-button')
+        if (lightingButton) {
+            lightingButton.addEventListener('click', () => {
+                this.toggleLightingControls()
+            })
+        }
+    }
+
+    private toggleLightingControls(): void {
+        if (!this.lightingControlsPanel) {
+            // Initialize the panel if it doesn't exist yet
+            this.initializeLightingControls()
+            return
+        }
+        
+        this.lightingControlsPanel.toggle()
+    }
+
+    public initializeLightingControls(): void {
+        if (!this.lightingControlsPanel) {
+            this.lightingControlsPanel = new LightingControlsPanel()
+            // Show the integrated panel by default since the button is now part of it
+            this.lightingControlsPanel.show()
         }
     }
 
@@ -139,6 +174,13 @@ export class SystemUICoordinator {
     public dispose(): void {
         this.pauseMenuManager?.dispose()
         this.performanceMonitor?.dispose()
+        this.lightingControlsPanel?.dispose()
+        
+        // Remove lighting controls button
+        const lightingButton = document.getElementById('lighting-controls-button')
+        if (lightingButton?.parentNode) {
+            lightingButton.parentNode.removeChild(lightingButton)
+        }
         
         // Deregister event handlers
         // Note: EventManager will handle cleanup of all registered handlers
