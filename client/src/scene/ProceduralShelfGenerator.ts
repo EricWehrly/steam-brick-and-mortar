@@ -74,12 +74,16 @@ export class ProceduralShelfGenerator {
     const frontBoard = new THREE.Mesh(angledBoardGeometry, woodMaterial);
     frontBoard.position.set(0, height / 2, depth / 2);
     frontBoard.rotation.x = -angleRad; // Changed from z to x, negative for backward lean
+    frontBoard.castShadow = true;
+    frontBoard.receiveShadow = true;
     shelfGroup.add(frontBoard);
 
     // Back angled board
     const backBoard = new THREE.Mesh(angledBoardGeometry, woodMaterial);
     backBoard.position.set(0, height / 2, -depth / 2);
     backBoard.rotation.x = angleRad; // Changed from z to x, positive for backward lean
+    backBoard.castShadow = true;
+    backBoard.receiveShadow = true;
     shelfGroup.add(backBoard);
 
     // Create the two side boards
@@ -92,11 +96,15 @@ export class ProceduralShelfGenerator {
     // Left side board
     const leftBoard = new THREE.Mesh(sideBoardGeometry, woodMaterial);
     leftBoard.position.set(-width / 2, height / 2, 0);
+    leftBoard.castShadow = true;
+    leftBoard.receiveShadow = true;
     shelfGroup.add(leftBoard);
 
     // Right side board
     const rightBoard = new THREE.Mesh(sideBoardGeometry, woodMaterial);
     rightBoard.position.set(width / 2, height / 2, 0);
+    rightBoard.castShadow = true;
+    rightBoard.receiveShadow = true;
     shelfGroup.add(rightBoard);
 
     // Create horizontal shelves
@@ -134,6 +142,8 @@ export class ProceduralShelfGenerator {
 
       const shelf = new THREE.Mesh(shelfGeometry, woodMaterial);
       shelf.position.set(0, shelfY, 0);
+      shelf.castShadow = true;
+      shelf.receiveShadow = true;
       parent.add(shelf);
     }
   }
