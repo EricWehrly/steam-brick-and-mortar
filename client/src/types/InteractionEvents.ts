@@ -5,6 +5,8 @@
  * Events are namespaced by system for clarity and organization.
  */
 
+// I really don't like that we let this get imported ... YOLO
+import * as THREE from 'three'
 import type { BaseInteractionEvent } from '../core/EventManager'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 
@@ -126,6 +128,14 @@ export interface CeilingToggleEvent extends BaseInteractionEvent {
     visible: boolean
 }
 
+// TODO: Can we do this without importing THREE?
+export interface LightCreatedEvent extends BaseInteractionEvent {
+    light: THREE.Light
+    scene: THREE.Scene
+    lightType: string
+    lightName?: string
+}
+
 // =============================================================================
 // EVENT TYPE CONSTANTS
 // =============================================================================
@@ -167,7 +177,8 @@ export const GameEventTypes = {
 
 export const LightingEventTypes = {
     Toggle: 'lighting:toggle',
-    DebugToggle: 'lighting:debug-toggle'
+    DebugToggle: 'lighting:debug-toggle',
+    Created: 'lighting:created'
 } as const
 
 export const CeilingEventTypes = {
@@ -212,6 +223,11 @@ export interface InteractionEventMap {
     
     // Game events
     [GameEventTypes.Start]: GameStartEvent
+    
+    // Lighting events
+    [LightingEventTypes.Toggle]: LightingToggleEvent
+    [LightingEventTypes.DebugToggle]: LightingDebugToggleEvent
+    [LightingEventTypes.Created]: LightCreatedEvent
 }
 
 /**

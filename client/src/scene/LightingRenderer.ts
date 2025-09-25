@@ -19,6 +19,7 @@ import { LightingDebugHelper } from './LightingDebugHelper'
 import { AppSettings } from '../core/AppSettings'
 import { EventManager } from '../core/EventManager'
 import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent } from '../types/InteractionEvents'
+import { LightFactory } from '../lighting/LightFactory'
 
 // Lighting configuration constants
 const LIGHT_NAMES = {
@@ -68,6 +69,7 @@ export class LightingRenderer {
     private debugHelper: LightingDebugHelper
     private config: LightingConfig = {}
     private eventManager: EventManager
+    private lightFactory: LightFactory
 
     constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
         this.scene = scene
@@ -83,6 +85,7 @@ export class LightingRenderer {
         this.lightingGroup = new THREE.Group()
         this.lightingGroup.name = 'lighting'
         this.scene.add(this.lightingGroup)
+        this.lightFactory = new LightFactory(this.scene)
         
         // Register for lighting events
         this.setupEventListeners()
@@ -173,15 +176,17 @@ export class LightingRenderer {
         console.log('💡 Setting up SIMPLE lighting - basic illumination only')
         
         // Higher ambient light to compensate for fewer light sources
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4)
-        ambientLight.name = LIGHT_NAMES.AMBIENT
-        this.lightingGroup.add(ambientLight)
+        this.lightFactory.createAmbientLight(0xffffff, 0.4, { 
+            name: LIGHT_NAMES.AMBIENT,
+            parent: this.lightingGroup
+        })
         
         // Single directional light
-        const mainLight = new THREE.DirectionalLight(0xffffff, 0.6)
-        mainLight.position.set(0, 10, 0)
-        mainLight.name = LIGHT_NAMES.MAIN_DIRECTIONAL
-        this.lightingGroup.add(mainLight)
+        this.lightFactory.createDirectionalLight(0xffffff, 0.6, { 
+            name: LIGHT_NAMES.MAIN_DIRECTIONAL,
+            parent: this.lightingGroup,
+            position: [0, 10, 0]
+        })
         
         console.log(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
     }
@@ -189,26 +194,29 @@ export class LightingRenderer {
     private async setupEnhancedLighting(): Promise<void> {
         console.log('💡 Setting up ENHANCED lighting - fluorescent fixtures + basic lights')
         
-        const ambientLight = new THREE.AmbientLight(BlockbusterColors.fluorescentCool, this.config.ambientIntensity)
-        ambientLight.name = LIGHT_NAMES.AMBIENT
-        this.lightingGroup.add(ambientLight)
+        this.lightFactory.createAmbientLight(BlockbusterColors.fluorescentCool, this.config.ambientIntensity, {
+            name: LIGHT_NAMES.AMBIENT,
+            parent: this.lightingGroup
+        })
         
         // Position main directional light INSIDE the store space (below ceiling)
-        const mainLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentCool, this.config.directionalIntensity)
-        mainLight.position.set(0, this.config.ceilingHeight! - 0.5, 0) // Just below ceiling
+        const mainLight = this.lightFactory.createDirectionalLight(BlockbusterColors.fluorescentCool, this.config.directionalIntensity, {
+            name: LIGHT_NAMES.MAIN_DIRECTIONAL,
+            parent: this.lightingGroup,
+            position: [0, this.config.ceilingHeight! - 0.5, 0]
+        })
         if (this.config.enableShadows) {
             mainLight.castShadow = true
             mainLight.shadow.mapSize.width = this.config.shadowMapSize!
             mainLight.shadow.mapSize.height = this.config.shadowMapSize!
         }
-        mainLight.name = LIGHT_NAMES.MAIN_DIRECTIONAL
-        this.lightingGroup.add(mainLight)
         
         // Position fill light INSIDE the store space  
-        const fillLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentWarm, this.config.fillLightIntensity)
-        fillLight.position.set(5, this.config.ceilingHeight! - 0.8, 5) // Also inside store
-        fillLight.name = LIGHT_NAMES.FILL
-        this.lightingGroup.add(fillLight)
+        this.lightFactory.createDirectionalLight(BlockbusterColors.fluorescentWarm, this.config.fillLightIntensity, {
+            name: LIGHT_NAMES.FILL,
+            parent: this.lightingGroup,
+            position: [5, this.config.ceilingHeight! - 0.8, 5]
+        })
         
         await this.setupFluorescentFixtures()
         
@@ -283,41 +291,40 @@ export class LightingRenderer {
         ]
         
         pointLightPositions.forEach((pos, index) => {
-            const pointLight = new THREE.PointLight(BlockbusterColors.fluorescentCool, 0.4, 10)
-            pointLight.position.set(pos.x, pos.y, pos.z)
+            const pointLight = this.lightFactory.createPointLight(BlockbusterColors.fluorescentCool, 0.4, 10, undefined, {
+                name: `${LIGHT_NAMES.POINT_LIGHT}-${index}`,
+                parent: this.lightingGroup,
+                position: [pos.x, pos.y, pos.z]
+            })
             if (this.config.enableShadows) {
                 pointLight.castShadow = true
                 pointLight.shadow.mapSize.width = SHADOW_MAP_SIZES.LOW
                 pointLight.shadow.mapSize.height = SHADOW_MAP_SIZES.LOW
             }
-            pointLight.name = `${LIGHT_NAMES.POINT_LIGHT}-${index}`
-            this.lightingGroup.add(pointLight)
         })
     }
 
     private addDramaticLighting(): void {
-        const spotLight1 = new THREE.SpotLight(0xffffff, 1.0, 15, Math.PI / 6, 0.2, 1)
-        spotLight1.position.set(0, 8, 0)
+        const spotLight1 = this.lightFactory.createSpotLight(0xffffff, 1.0, 15, Math.PI / 6, 0.2, 1, {
+            name: LIGHT_NAMES.DRAMATIC_SPOTLIGHT,
+            parent: this.lightingGroup,
+            position: [0, 8, 0]
+        })
         spotLight1.target.position.set(0, 0, 0)
         if (this.config.enableShadows) {
             spotLight1.castShadow = true
             spotLight1.shadow.mapSize.width = SHADOW_MAP_SIZES.MEDIUM
             spotLight1.shadow.mapSize.height = SHADOW_MAP_SIZES.MEDIUM
         }
-        spotLight1.name = LIGHT_NAMES.DRAMATIC_SPOTLIGHT
-        this.lightingGroup.add(spotLight1)
         this.lightingGroup.add(spotLight1.target)
         
         const accentColors = [0xff4444, 0x44ff44, 0x4444ff]
         accentColors.forEach((color, index) => {
-            const accentLight = new THREE.PointLight(color, 0.3, 8)
-            accentLight.position.set(
-                (index - 1) * 6,
-                1.5,
-                -6
-            )
-            accentLight.name = `${LIGHT_NAMES.ACCENT_LIGHT}-${index}`
-            this.lightingGroup.add(accentLight)
+            this.lightFactory.createPointLight(color, 0.3, 8, undefined, {
+                name: `${LIGHT_NAMES.ACCENT_LIGHT}-${index}`,
+                parent: this.lightingGroup,
+                position: [(index - 1) * 6, 1.5, -6]
+            })
         })
     }
 
