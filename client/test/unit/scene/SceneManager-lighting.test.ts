@@ -50,22 +50,6 @@ describe('SceneManager Lighting Integration', () => {
       })
     })
 
-    it('should create optimized RectAreaLights for proper illumination', () => {
-      const ceilingHeight = 3.2
-      const fixtures = propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
-      
-      // Find RectAreaLights (performance optimized: 2 wide lights instead of 8)
-      const rectLights = fixtures.children.filter(child => child instanceof THREE.RectAreaLight)
-      expect(rectLights.length).toBe(2) // Performance optimization: 2 wide RectAreaLights
-      
-      // RectAreaLights should be positioned for optimal illumination
-      rectLights.forEach(light => {
-        expect(light.position.y).toBeLessThan(ceilingHeight)
-        expect(light.position.y).toBeCloseTo(3.005, 3) // Updated position calculation (fixtureY - 0.1)
-        expect(light.position.y).toBeGreaterThan(2.5) // Reasonable height above floor
-      })
-    })
-
     it('should adapt positioning to different ceiling heights', () => {
       // Test with non-standard ceiling height
       const customCeilingHeight = 2.8

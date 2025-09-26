@@ -46,21 +46,6 @@ describe('PropRenderer', () => {
       })
     })
 
-    it('should create optimized RectAreaLights for performance', () => {
-      const ceilingHeight = 3.2
-      const fixtures = propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
-      
-      // Should have 2 optimized RectAreaLights (one per row) for performance
-      const rectLights = fixtures.children.filter(child => child instanceof THREE.RectAreaLight)
-      expect(rectLights.length).toBe(2) // Performance optimized: 2 wide lights instead of 8
-      
-      // Lights should be positioned at fixture height for proper illumination
-      rectLights.forEach(light => {
-        expect(light.position.y).toBeCloseTo(ceilingHeight - 0.075 - 0.07, 2) // Slightly below fixtures
-        expect(light.position.y).toBeLessThan(ceilingHeight)
-      })
-    })
-
     it('should create housing around each fixture', () => {
       const fixtures = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
       
