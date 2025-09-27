@@ -16,16 +16,17 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 import { BlockbusterColors } from '../utils/Colors'
 import { PropRenderer } from './PropRenderer'
 import { LightingDebugHelper } from './LightingDebugHelper'
-import { AppSettings } from '../core/AppSettings'
+import { AppSettings, LIGHTING_QUALITY, type LightingQuality } from '../core/AppSettings'
 import { EventManager } from '../core/EventManager'
-import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent } from '../types/InteractionEvents'
+import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent } from '../types/InteractionEvents'
 import { LightFactory } from '../lighting/LightFactory'
 
 // Lighting configuration constants
 const LIGHT_NAMES = {
     AMBIENT: 'ambient-light',
     MAIN_DIRECTIONAL: 'main-directional-light', 
-    FILL: 'fill-light',
+    FILL: 'window-fill-light',
+    RIM_LIGHT: 'rim-light',
     FLUORESCENT_FIXTURES: 'fluorescent-fixtures',
     DRAMATIC_SPOTLIGHT: 'dramatic-spotlight',
     POINT_LIGHT: 'point-light',
@@ -53,12 +54,12 @@ export interface LightingConfig {
     fillLightIntensity?: number
     /** Ceiling height for fluorescent fixtures */
     ceilingHeight?: number
-    /** Enable shadows (performance impact) */
-    enableShadows?: boolean
-    /** Shadow map resolution */
+    /** Shadow quality (0=off, 1=low, 2=medium, 3=high, 4=ultra) */
+    shadowQuality?: number
+    /** Shadow map resolution (derived from shadowQuality) */
     shadowMapSize?: number
-    /** Lighting quality level: 'simple' | 'enhanced' | 'advanced' | 'ouch-my-eyes' */
-    quality?: 'simple' | 'enhanced' | 'advanced' | 'ouch-my-eyes'
+    /** Lighting quality level */
+    quality?: LightingQuality
 }
 
 export class LightingRenderer {
@@ -101,10 +102,15 @@ export class LightingRenderer {
         this.eventManager.registerEventHandler(LightingEventTypes.DebugToggle, (event: CustomEvent<LightingDebugToggleEvent>) => {
             this.toggleDebugVisualization(event.detail.enabled)
         })
+        
+        // Listen for lighting quality change events
+        this.eventManager.registerEventHandler(LightingEventTypes.QualityChanged, (event: CustomEvent<LightingQualityChangedEvent>) => {
+            this.updateLightingQuality(event.detail.quality)
+        })
     }
 
     public async setupLighting(config: LightingConfig = {}): Promise<void> {
-        this.config = { ...this.getDefaultConfig(), ...config }
+        this.config = { ...this.getCurrentConfig(), ...config }
         
         console.log(`💡 Setting up ${this.config.quality} lighting...`)
         
@@ -132,39 +138,61 @@ export class LightingRenderer {
         }
     }
 
-    private getDefaultConfig(): LightingConfig {
+    private getCurrentConfig(): LightingConfig {
+        const appSettings = AppSettings.getInstance()
+        const shadowQuality = appSettings.getSetting('shadowQuality')
         return {
-            ambientIntensity: 0.1,
-            directionalIntensity: 0.3,
-            fillLightIntensity: 0.2,
-            ceilingHeight: 3.2,
-            enableShadows: true,
-            shadowMapSize: 1024,
-            quality: 'enhanced'
+            ambientIntensity: 0.02, // Much lower, disabled by default
+            directionalIntensity: 0.15, // Reduced by 50% 
+            fillLightIntensity: 0.12, // Reduced by 40%
+            ceilingHeight: appSettings.getSetting('ceilingHeight'),
+            shadowQuality: shadowQuality,
+            shadowMapSize: this.getShadowMapSizeForQuality(shadowQuality),
+            quality: appSettings.getSetting('lightingQuality')
         }
     }
 
     private configureShadows(): void {
-        if (this.config.enableShadows) {
-            this.renderer.shadowMap.enabled = true
-            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
-        } else {
+        const shadowQuality = this.config.shadowQuality || 0
+        
+        if (shadowQuality === 0) {
             this.renderer.shadowMap.enabled = false
+            return
+        }
+        
+        this.renderer.shadowMap.enabled = true
+        
+        // Set shadow map type based on quality
+        if (shadowQuality >= 4) {
+            this.renderer.shadowMap.type = THREE.VSMShadowMap // Ultra quality
+        } else {
+            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap // Standard quality
+        }
+    }
+
+    private getShadowMapSizeForQuality(shadowQuality: number): number {
+        switch (shadowQuality) {
+            case 0: return 0 // Shadows disabled
+            case 1: return SHADOW_MAP_SIZES.LOW    // 512
+            case 2: return SHADOW_MAP_SIZES.MEDIUM // 1024
+            case 3: return SHADOW_MAP_SIZES.HIGH   // 2048
+            case 4: return SHADOW_MAP_SIZES.ULTRA  // 4096
+            default: return SHADOW_MAP_SIZES.MEDIUM
         }
     }
 
     private async setupLightsByQuality(): Promise<void> {
         switch (this.config.quality) {
-            case 'simple':
+            case LIGHTING_QUALITY.SIMPLE:
                 await this.setupSimpleLighting()
                 break
-            case 'enhanced':
+            case LIGHTING_QUALITY.ENHANCED:
                 await this.setupEnhancedLighting()
                 break
-            case 'advanced':
+            case LIGHTING_QUALITY.ADVANCED:
                 await this.setupAdvancedLighting()
                 break
-            case 'ouch-my-eyes':
+            case LIGHTING_QUALITY.OUCH_MY_EYES:
                 await this.setupOuchMyEyesLighting()
                 break
             default:
@@ -192,35 +220,38 @@ export class LightingRenderer {
     }
 
     private async setupEnhancedLighting(): Promise<void> {
-        console.log('💡 Setting up ENHANCED lighting - fluorescent fixtures + basic lights')
+        console.log('💡 Setting up ENHANCED lighting - optimized retail atmosphere')
         
-        this.lightFactory.createAmbientLight(BlockbusterColors.fluorescentCool, this.config.ambientIntensity, {
+        // Ambient light: disabled by default, toggleable in panel
+        const ambientLight = this.lightFactory.createAmbientLight(0xFFF8E7, this.config.ambientIntensity, {
             name: LIGHT_NAMES.AMBIENT,
             parent: this.lightingGroup
         })
+        // Start disabled - user can toggle on via lighting panel
+        ambientLight.visible = false
         
-        // Position main directional light INSIDE the store space (below ceiling)
-        const mainLight = this.lightFactory.createDirectionalLight(BlockbusterColors.fluorescentCool, this.config.directionalIntensity, {
-            name: LIGHT_NAMES.MAIN_DIRECTIONAL,
-            parent: this.lightingGroup,
-            position: [0, this.config.ceilingHeight! - 0.5, 0]
-        })
-        if (this.config.enableShadows) {
-            mainLight.castShadow = true
-            mainLight.shadow.mapSize.width = this.config.shadowMapSize!
-            mainLight.shadow.mapSize.height = this.config.shadowMapSize!
-        }
-        
-        // Position fill light INSIDE the store space  
-        this.lightFactory.createDirectionalLight(BlockbusterColors.fluorescentWarm, this.config.fillLightIntensity, {
+        // Window fill light: simulates natural light from storefront
+        // Positioned from front-left at angle to create depth
+        this.lightFactory.createDirectionalLight(0xFFF5E6, this.config.fillLightIntensity, {
             name: LIGHT_NAMES.FILL,
             parent: this.lightingGroup,
-            position: [5, this.config.ceilingHeight! - 0.8, 5]
+            position: [-8, this.config.ceilingHeight! - 1, 8]
         })
         
+        // Subtle rim light: defines edges, prevents flat lighting
+        // Cool temperature, very low intensity, non-shadow casting
+        const rimLight = this.lightFactory.createDirectionalLight(BlockbusterColors.fluorescentCool, 0.08, {
+            name: 'rim-light',
+            parent: this.lightingGroup,
+            position: [3, this.config.ceilingHeight! + 1, -5]
+        })
+        // Rim light doesn't cast shadows for performance
+        rimLight.castShadow = false
+        
+        // Primary illumination: RectAreaLights from ceiling fixtures
         await this.setupFluorescentFixtures()
         
-        console.log(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added`)
+        console.log(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient disabled by default)`)
     }
 
     private async setupAdvancedLighting(): Promise<void> {
@@ -228,11 +259,6 @@ export class LightingRenderer {
         
         await this.setupEnhancedLighting()
         this.addPointLights()
-        
-        if (this.config.enableShadows) {
-            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
-            this.upgradeShadowQuality(SHADOW_MAP_SIZES.HIGH)
-        }
         
         console.log(`✅ Advanced lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
@@ -243,24 +269,7 @@ export class LightingRenderer {
         await this.setupAdvancedLighting()
         this.addDramaticLighting()
         
-        if (this.config.enableShadows) {
-            this.renderer.shadowMap.type = THREE.VSMShadowMap
-            this.upgradeShadowQuality(SHADOW_MAP_SIZES.ULTRA)
-        }
-        
         console.log(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
-    }
-
-    private upgradeShadowQuality(shadowMapSize: number): void {
-        const lights = this.lightingGroup.children.filter(child => 
-            child instanceof THREE.DirectionalLight || child instanceof THREE.SpotLight
-        )
-        lights.forEach(light => {
-            if ((light instanceof THREE.DirectionalLight || light instanceof THREE.SpotLight) && light.shadow) {
-                light.shadow.mapSize.width = shadowMapSize
-                light.shadow.mapSize.height = shadowMapSize
-            }
-        })
     }
 
     private async setupFluorescentFixtures(): Promise<void> {
@@ -272,7 +281,7 @@ export class LightingRenderer {
                 width: 4,
                 height: 0.15,
                 depth: 0.6,
-                emissiveIntensity: 0.8,
+                emissiveIntensity: 0.6, // Reduced from 0.8 for comfort
                 rows: 2,
                 fixturesPerRow: 4
             }
@@ -283,25 +292,25 @@ export class LightingRenderer {
     }
 
     private addPointLights(): void {
+        // Strategic accent lights for special displays and atmosphere
+        // Positioned to highlight key areas without overwhelming
         const pointLightPositions = [
-            { x: -8, y: 2.5, z: 4 },
-            { x: 8, y: 2.5, z: 4 },
-            { x: -8, y: 2.5, z: -4 },
-            { x: 8, y: 2.5, z: -4 }
+            { x: -6, y: 1.8, z: 6, color: 0xFFE4B5, intensity: 0.2 }, // Warm accent - front left
+            { x: 6, y: 1.8, z: 6, color: 0xFFE4B5, intensity: 0.2 },  // Warm accent - front right
+            { x: 0, y: 2.2, z: -7, color: BlockbusterColors.fluorescentCool, intensity: 0.15 } // Cool back wall accent
         ]
         
-        pointLightPositions.forEach((pos, index) => {
-            const pointLight = this.lightFactory.createPointLight(BlockbusterColors.fluorescentCool, 0.4, 10, undefined, {
-                name: `${LIGHT_NAMES.POINT_LIGHT}-${index}`,
+        pointLightPositions.forEach((light, index) => {
+            const pointLight = this.lightFactory.createPointLight(light.color, light.intensity, 8, 2, {
+                name: `${LIGHT_NAMES.ACCENT_LIGHT}-${index}`,
                 parent: this.lightingGroup,
-                position: [pos.x, pos.y, pos.z]
+                position: [light.x, light.y, light.z]
             })
-            if (this.config.enableShadows) {
-                pointLight.castShadow = true
-                pointLight.shadow.mapSize.width = SHADOW_MAP_SIZES.LOW
-                pointLight.shadow.mapSize.height = SHADOW_MAP_SIZES.LOW
-            }
+            // Accent lights don't cast shadows for performance
+            pointLight.castShadow = false
         })
+        
+        console.log('💡 Added strategic accent lighting for atmosphere')
     }
 
     private addDramaticLighting(): void {
@@ -311,10 +320,11 @@ export class LightingRenderer {
             position: [0, 8, 0]
         })
         spotLight1.target.position.set(0, 0, 0)
-        if (this.config.enableShadows) {
+        if ((this.config.shadowQuality || 0) > 0) {
             spotLight1.castShadow = true
-            spotLight1.shadow.mapSize.width = SHADOW_MAP_SIZES.MEDIUM
-            spotLight1.shadow.mapSize.height = SHADOW_MAP_SIZES.MEDIUM
+            const shadowMapSize = this.getShadowMapSizeForQuality(this.config.shadowQuality || 0)
+            spotLight1.shadow.mapSize.width = shadowMapSize
+            spotLight1.shadow.mapSize.height = shadowMapSize
         }
         this.lightingGroup.add(spotLight1.target)
         
@@ -328,10 +338,12 @@ export class LightingRenderer {
         })
     }
 
-    public async updateLightingQuality(quality: LightingConfig['quality']): Promise<void> {
+    public async updateLightingQuality(quality: LightingQuality): Promise<void> {
         this.debugHelper.clearHelpers()
         this.clearLights()
-        this.config.quality = quality
+        
+        // Refresh full config from AppSettings to get updated shadows/ceiling height too
+        this.config = { ...this.getCurrentConfig(), quality }
         await this.setupLightsByQuality()
         
         // Only show debug helpers if setting is enabled
@@ -389,25 +401,26 @@ export class LightingRenderer {
         console.log('✅ Shadow refresh completed')
     }
 
-    public updateIntensities(intensities: {
-        ambient?: number
-        directional?: number
-        fill?: number
-    }): void {
-        const ambientLight = this.lightingGroup.getObjectByName(LIGHT_NAMES.AMBIENT) as THREE.AmbientLight
-        if (ambientLight && intensities.ambient !== undefined) {
-            ambientLight.intensity = intensities.ambient
+
+
+    /**
+     * Toggle specific light by name on/off
+     */
+    public toggleLightByName(lightName: string, enabled: boolean): void {
+        const light = this.lightingGroup.getObjectByName(lightName) as THREE.Light
+        if (light) {
+            light.visible = enabled
+            console.log(`💡 ${lightName} light ${enabled ? 'enabled' : 'disabled'}`)
+        } else {
+            console.warn(`⚠️ Light '${lightName}' not found for toggle`)
         }
-        
-        const directionalLight = this.lightingGroup.getObjectByName(LIGHT_NAMES.MAIN_DIRECTIONAL) as THREE.DirectionalLight
-        if (directionalLight && intensities.directional !== undefined) {
-            directionalLight.intensity = intensities.directional
-        }
-        
-        const fillLight = this.lightingGroup.getObjectByName(LIGHT_NAMES.FILL) as THREE.DirectionalLight
-        if (fillLight && intensities.fill !== undefined) {
-            fillLight.intensity = intensities.fill
-        }
+    }
+
+    /**
+     * Toggle ambient light on/off (convenience method)
+     */
+    public toggleAmbientLight(enabled: boolean): void {
+        this.toggleLightByName(LIGHT_NAMES.AMBIENT, enabled)
     }
 
     public getLightingStats(): {
@@ -432,7 +445,7 @@ export class LightingRenderer {
         return {
             lightCount: this.lightingGroup.children.length,
             shadowsEnabled: this.renderer.shadowMap.enabled,
-            quality: this.config.quality ?? 'enhanced',
+            quality: this.config.quality ?? LIGHTING_QUALITY.ENHANCED,
             ambientIntensity: ambientLight?.intensity ?? 0,
             directionalIntensity: directionalLight?.intensity ?? 0,
             lightTypes

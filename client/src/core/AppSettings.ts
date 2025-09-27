@@ -29,7 +29,7 @@ export interface ApplicationSettings {
     
     // Graphics Settings
     lightingQuality: LightingQuality
-    enableShadows: boolean
+    shadowQuality: number // 0=off, 1=low, 2=medium, 3=high, 4=ultra
     ceilingHeight: number
     enableLighting: boolean
     showLightingDebug: boolean
@@ -89,6 +89,21 @@ export class AppSettings {
      */
     public getSetting<K extends keyof ApplicationSettings>(key: K): ApplicationSettings[K] {
         return this.settings[key]
+    }
+
+    /**
+     * Get the default value for a specific setting
+     */
+    public getDefaultSetting<K extends keyof ApplicationSettings>(key: K): ApplicationSettings[K] {
+        const defaults = this.getDefaultSettings()
+        return defaults[key]
+    }
+
+    /**
+     * Check if a setting is currently at its default value
+     */
+    public isSettingAtDefault<K extends keyof ApplicationSettings>(key: K): boolean {
+        return this.settings[key] === this.getDefaultSetting(key)
     }
 
     /**
@@ -248,7 +263,7 @@ export class AppSettings {
             
             // Graphics Settings
             lightingQuality: LIGHTING_QUALITY.ENHANCED,
-            enableShadows: true,
+            shadowQuality: 2, // Medium shadows by default
             ceilingHeight: 3.2,
             enableLighting: true,
             showLightingDebug: false,

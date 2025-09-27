@@ -20,9 +20,9 @@ import { DebugPanel } from './panels/DebugPanel'
 import type { DebugStats } from '../../core'
 import type { ImageCacheStats } from '../../steam/images/ImageManager'
 import type { PerformanceMonitor } from '../PerformanceMonitor'
-import { EventManager } from '../../core/EventManager'
+import { EventManager, EventSource } from '../../core/EventManager'
 import { SteamEventTypes, LightingEventTypes } from '../../types/InteractionEvents'
-import type { SteamDataLoadedEvent, LightingToggleEvent, LightingDebugToggleEvent } from '../../types/InteractionEvents'
+import type { SteamDataLoadedEvent, LightingToggleEvent, LightingDebugToggleEvent, LightingQualityChangedEvent } from '../../types/InteractionEvents'
 import type { ApplicationSettings } from '../../core/AppSettings'
 
 export interface PauseMenuState {
@@ -528,9 +528,16 @@ export class PauseMenuManager {
         }
 
         // Handle graphics settings
-        if (settings.lightingQuality !== undefined || settings.enableShadows !== undefined) {
-            console.log('🎨 Graphics settings changed, scene reload may be required for full effect')
-            // Note: Scene changes require SceneCoordinator integration (handled in next step)
+        if (settings.lightingQuality !== undefined || settings.shadowQuality !== undefined) {
+            console.log('🎨 Graphics settings changed, applying lighting update...')
+            // Emit lighting quality change event
+            if (settings.lightingQuality !== undefined) {
+                this.eventManager.emit(LightingEventTypes.QualityChanged, {
+                    quality: settings.lightingQuality,
+                    timestamp: Date.now(),
+                    source: EventSource.UI
+                })
+            }
         }
 
         if (settings.ceilingHeight !== undefined) {

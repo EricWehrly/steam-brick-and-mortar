@@ -14,17 +14,15 @@
  */
 
 import * as THREE from 'three'
-// import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js' // For high graphics setting
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { BlockbusterColors } from '../utils/Colors'
-import { MaterialUtils } from '../utils/MaterialUtils'
 import { TextureManager } from '../utils/TextureManager'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
 
 export interface SceneManagerOptions {
     antialias?: boolean
-    enableShadows?: boolean
+    shadowQuality?: number // 0=off, 1=low, 2=medium, 3=high, 4=ultra
     shadowMapType?: THREE.ShadowMapType
     outputColorSpace?: THREE.ColorSpace
 }
@@ -33,7 +31,6 @@ export class SceneManager {
     private scene: THREE.Scene
     private camera: THREE.PerspectiveCamera
     private renderer: THREE.WebGLRenderer
-    private animationId: number | null = null
     private textureManager: TextureManager
     private propRenderer: PropRenderer
     private skyboxManager: SkyboxManager
@@ -59,7 +56,6 @@ export class SceneManager {
         this.skyboxManager = new SkyboxManager(this.scene)
 
         this.setupRenderer(options)
-        this.setupLighting()
         this.setupCamera()
         this.setupEventListeners()
         
@@ -85,37 +81,18 @@ export class SceneManager {
         this.renderer.setPixelRatio(window.devicePixelRatio)
         this.renderer.outputColorSpace = options.outputColorSpace ?? THREE.SRGBColorSpace
         
-        if (options.enableShadows ?? true) {
+        const shadowQuality = options.shadowQuality ?? 2 // Default to medium shadows
+        if (shadowQuality > 0) {
             this.renderer.shadowMap.enabled = true
             this.renderer.shadowMap.type = options.shadowMapType ?? THREE.PCFSoftShadowMap
+        } else {
+            this.renderer.shadowMap.enabled = false
         }
         
         // Enable WebXR
         this.renderer.xr.enabled = true
         
         document.body.appendChild(this.renderer.domElement)
-    }
-
-    private setupLighting() {
-        // Updated lighting for Blockbuster store atmosphere
-        // Fluorescent-style lighting with cool white color temperature
-        
-        // Reduced ambient light to let emissive fixtures show through
-        const ambientLight = new THREE.AmbientLight(BlockbusterColors.fluorescentCool, 0.1)
-        this.scene.add(ambientLight)
-        
-        // Reduced directional light since we have point lights at fixtures
-        const mainLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentCool, 0.3)
-        mainLight.position.set(0, 10, 0)
-        mainLight.castShadow = true
-        mainLight.shadow.mapSize.width = 1024
-        mainLight.shadow.mapSize.height = 1024
-        this.scene.add(mainLight)
-        
-        // Additional directional light for even coverage (retail store style)
-        const fillLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentWarm, 0.2)
-        fillLight.position.set(5, 8, 5)
-        this.scene.add(fillLight)
     }
 
     private setupCamera() {

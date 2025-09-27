@@ -12,7 +12,7 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import graphicsSettingsPanelTemplate from '../../../templates/pause-menu/graphics-settings-panel.html?raw'
 import '../../../styles/pause-menu/graphics-settings-panel.css'
-import { AppSettings, type ApplicationSettings } from '../../../core/AppSettings'
+import { AppSettings, LIGHTING_QUALITY, type ApplicationSettings } from '../../../core/AppSettings'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import { CeilingEventTypes, type CeilingToggleEvent } from '../../../types/InteractionEvents'
 
@@ -36,13 +36,14 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     render(): string {
         return renderTemplate(graphicsSettingsPanelTemplate, {
             // Lighting Quality
-            lightingQualitySimple: this.appSettings.getSetting('lightingQuality') === 'simple',
-            lightingQualityEnhanced: this.appSettings.getSetting('lightingQuality') === 'enhanced',
-            lightingQualityAdvanced: this.appSettings.getSetting('lightingQuality') === 'advanced',
-            lightingQualityOuch: this.appSettings.getSetting('lightingQuality') === 'ouch-my-eyes',
+            lightingQualitySimple: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.SIMPLE,
+            lightingQualityEnhanced: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.ENHANCED,
+            lightingQualityAdvanced: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.ADVANCED,
+            lightingQualityOuch: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.OUCH_MY_EYES,
             
             // Shadow Settings
-            enableShadows: this.appSettings.getSetting('enableShadows'),
+            shadowQuality: this.appSettings.getSetting('shadowQuality'),
+            shadowQualityLabel: this.getShadowQualityLabel(this.appSettings.getSetting('shadowQuality')),
             
             // Ceiling Height
             ceilingHeight: this.appSettings.getSetting('ceilingHeight'),
@@ -72,12 +73,7 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     }
 
     private attachCheckboxEvents(): void {
-        const shadowsCheckbox = document.getElementById('enable-shadows') as HTMLInputElement
-        if (shadowsCheckbox) {
-            shadowsCheckbox.addEventListener('change', () => {
-                this.updateSetting('enableShadows', shadowsCheckbox.checked)
-            })
-        }
+        // Shadow quality is now handled by slider in attachSliderEvents()
 
         const lightingCheckbox = document.getElementById('enable-lighting') as HTMLInputElement
         if (lightingCheckbox) {
@@ -110,6 +106,18 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     }
 
     private attachSliderEvents(): void {
+        // Shadow quality slider
+        const shadowQualitySlider = document.getElementById('shadow-quality') as HTMLInputElement
+        const shadowQualityValue = document.getElementById('shadow-quality-value') as HTMLElement
+        if (shadowQualitySlider && shadowQualityValue) {
+            shadowQualitySlider.addEventListener('input', () => {
+                const quality = parseInt(shadowQualitySlider.value)
+                shadowQualityValue.textContent = this.getShadowQualityLabel(quality)
+                this.updateSetting('shadowQuality', quality)
+            })
+        }
+
+        // Ceiling height slider
         const ceilingHeightSlider = document.getElementById('ceiling-height') as HTMLInputElement
         const ceilingHeightValue = document.getElementById('ceiling-height-value') as HTMLSpanElement
 
@@ -134,6 +142,17 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         }
     }
 
+    private getShadowQualityLabel(quality: number): string {
+        switch (quality) {
+            case 0: return 'Off'
+            case 1: return 'Low'
+            case 2: return 'Medium'
+            case 3: return 'High'
+            case 4: return 'Ultra'
+            default: return 'Medium'
+        }
+    }
+
     private updateSetting<K extends keyof ApplicationSettings>(
         key: K, 
         value: ApplicationSettings[K]
@@ -146,8 +165,8 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
 
     private resetToDefaults(): void {
         // Reset graphics settings to defaults
-        this.appSettings.setSetting('lightingQuality', 'enhanced', EventSource.UI)
-        this.appSettings.setSetting('enableShadows', true, EventSource.UI)
+        this.appSettings.setSetting('lightingQuality', LIGHTING_QUALITY.ENHANCED, EventSource.UI)
+        this.appSettings.setSetting('shadowQuality', 2, EventSource.UI) // Medium shadows
         this.appSettings.setSetting('ceilingHeight', 3.2, EventSource.UI)
         this.appSettings.setSetting('enableLighting', true, EventSource.UI)
         this.appSettings.setSetting('showLightingDebug', false, EventSource.UI)
@@ -157,8 +176,8 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         
         // Notify that all settings changed
         this.onSettingsChanged?.({
-            lightingQuality: 'enhanced',
-            enableShadows: true,
+            lightingQuality: LIGHTING_QUALITY.ENHANCED,
+            shadowQuality: 2, // Medium shadows
             ceilingHeight: 3.2,
             enableLighting: true,
             showLightingDebug: false,
@@ -185,10 +204,13 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             lightingSelect.value = this.appSettings.getSetting('lightingQuality')
         }
         
-        // Update shadows checkbox
-        const shadowsCheckbox = document.getElementById('enable-shadows') as HTMLInputElement
-        if (shadowsCheckbox) {
-            shadowsCheckbox.checked = this.appSettings.getSetting('enableShadows')
+        // Update shadow quality slider
+        const shadowQualitySlider = document.getElementById('shadow-quality') as HTMLInputElement
+        const shadowQualityValue = document.getElementById('shadow-quality-value') as HTMLElement
+        if (shadowQualitySlider && shadowQualityValue) {
+            const quality = this.appSettings.getSetting('shadowQuality')
+            shadowQualitySlider.value = quality.toString()
+            shadowQualityValue.textContent = this.getShadowQualityLabel(quality)
         }
         
         // Update ceiling height slider and display

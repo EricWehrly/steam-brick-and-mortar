@@ -8,10 +8,10 @@
     <section class="setting-section">
       <div class="setting-group">
         <label class="setting-label" for="lighting-quality">
-          💡 Lighting Quality <span class="reload-required">⚠️ Requires scene reload</span>
+          💡 Lighting Quality
         </label>
         <p class="setting-description">
-          Higher quality provides better visuals but may impact performance. Changes require scene reload to take full effect.
+          Higher quality provides better visuals but may impact performance. Changes apply immediately.
         </p>
         <div class="setting-control">
           <select id="lighting-quality" class="setting-select">
@@ -35,18 +35,29 @@
     <!-- Shadow Settings Section -->
     <section class="setting-section">
       <div class="setting-group">
-        <label class="setting-label">
-          🌓 Shadow Settings <span class="reload-required">⚠️ Requires scene reload</span>
+        <label class="setting-label" for="shadow-quality">
+          🌓 Shadow Quality: <span id="shadow-quality-value">{{shadowQualityLabel}}</span> <span class="reload-not-required">✨ Updates instantly</span>
         </label>
         <p class="setting-description">
-          Dynamic shadows improve depth perception but require additional processing. Changes require scene reload.
+          Higher shadow quality improves depth perception but requires more processing power. Set to "Off" to disable shadows entirely.
         </p>
         <div class="setting-control">
-          <label class="checkbox-container">
-            <input type="checkbox" id="enable-shadows" {{#enableShadows}}checked{{/enableShadows}}>
-            <span class="checkbox-checkmark"></span>
-            Enable Dynamic Shadows
-          </label>
+          <input 
+            type="range" 
+            id="shadow-quality" 
+            class="setting-slider"
+            min="0" 
+            max="4" 
+            step="1" 
+            value="{{shadowQuality}}"
+          >
+          <div class="slider-labels">
+            <span>Off</span>
+            <span>Low</span>
+            <span>Medium</span>
+            <span>High</span>
+            <span>Ultra</span>
+          </div>
         </div>
       </div>
     </section>

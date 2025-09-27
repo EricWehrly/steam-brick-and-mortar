@@ -114,10 +114,10 @@ export class PropRenderer {
     // Performance optimization: Use only 2 wide RectAreaLights for the two rows
     // This provides good lighting coverage while maintaining VR performance
     
-    // Front row lighting (covers 4 fixtures)
+    // Front row lighting (covers 4 fixtures) - optimized intensity
     const frontRowLight = this.lightFactory.createRectAreaLight(
       BlockbusterColors.fluorescentCool,
-      8,
+      4, // Reduced from 8 to 4 for better balance
       roomWidth * 0.8,
       depth * 0.9,
       {
@@ -129,10 +129,10 @@ export class PropRenderer {
     frontRowLight.position.set(0, fixtureY - 0.12, -roomDepth * 0.25)
     frontRowLight.rotation.x = -Math.PI / 2
     
-    // Back row lighting (covers 4 fixtures)
+    // Back row lighting (covers 4 fixtures) - optimized intensity
     const backRowLight = this.lightFactory.createRectAreaLight(
       BlockbusterColors.fluorescentCool,
-      8,
+      4, // Reduced from 8 to 4 for better balance
       roomWidth * 0.8,
       depth * 0.9,
       {

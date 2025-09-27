@@ -17,6 +17,7 @@ import { ValidationUtils } from '../utils'
 import { UICoordinator, PerformanceMonitor, type PerformanceStats, ToastManager } from '../ui'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { DebugStatsProvider, type DebugStats } from './DebugStatsProvider'
+import { LIGHTING_QUALITY } from './AppSettings'
 import { SteamGameManager } from './SteamGameManager'
 import { SteamIntegration } from '../steam-integration'
 import { SteamWorkflowManager } from '../steam-integration/SteamWorkflowManager'
@@ -30,7 +31,7 @@ import { AppSettings } from './AppSettings'
 export interface AppConfig {
     scene?: {
         antialias?: boolean
-        enableShadows?: boolean
+        shadowQuality?: number
         shadowMapType?: THREE.ShadowMapType
         outputColorSpace?: THREE.ColorSpace
     }
@@ -65,7 +66,7 @@ export class SteamBrickAndMortarApp {
         // Initialize core scene management
         this.sceneManager = new SceneManager({
             antialias: config.scene?.antialias ?? true,
-            enableShadows: config.scene?.enableShadows ?? true,
+            shadowQuality: config.scene?.shadowQuality ?? 2, // Medium shadows by default
             shadowMapType: config.scene?.shadowMapType ?? THREE.PCFSoftShadowMap,
             outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
         })
@@ -94,8 +95,8 @@ export class SteamBrickAndMortarApp {
                 // TODO: Wire this to UI settings panel for user control
             },
             lighting: {
-                quality: 'enhanced',
-                enableShadows: true
+                quality: LIGHTING_QUALITY.ENHANCED,
+                shadowQuality: 2 // Medium shadows
             },
             environment: {
                 skyboxPreset: 'aurora'

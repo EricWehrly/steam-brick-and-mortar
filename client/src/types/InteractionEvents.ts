@@ -6,6 +6,7 @@
  */
 
 // I really don't like that we let this get imported ... YOLO
+import type { LightingQuality } from '../core/AppSettings'
 import * as THREE from 'three'
 import type { BaseInteractionEvent } from '../core/EventManager'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
@@ -124,6 +125,10 @@ export interface LightingDebugToggleEvent extends BaseInteractionEvent {
     enabled: boolean
 }
 
+export interface LightingQualityChangedEvent extends BaseInteractionEvent {
+    quality: LightingQuality
+}
+
 export interface CeilingToggleEvent extends BaseInteractionEvent {
     visible: boolean
 }
@@ -178,6 +183,7 @@ export const GameEventTypes = {
 export const LightingEventTypes = {
     Toggle: 'lighting:toggle',
     DebugToggle: 'lighting:debug-toggle',
+    QualityChanged: 'lighting:quality-changed',
     Created: 'lighting:created'
 } as const
 
@@ -227,6 +233,7 @@ export interface InteractionEventMap {
     // Lighting events
     [LightingEventTypes.Toggle]: LightingToggleEvent
     [LightingEventTypes.DebugToggle]: LightingDebugToggleEvent
+    [LightingEventTypes.QualityChanged]: LightingQualityChangedEvent
     [LightingEventTypes.Created]: LightCreatedEvent
 }
 

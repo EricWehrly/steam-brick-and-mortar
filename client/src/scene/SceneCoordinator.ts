@@ -20,7 +20,7 @@ import { LightingRenderer } from './LightingRenderer'
 import { StorePropsRenderer } from './StorePropsRenderer'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes, CeilingEventTypes, type CeilingToggleEvent } from '../types/InteractionEvents'
-import { AppSettings } from '../core/AppSettings'
+import { AppSettings, type LightingQuality } from '../core/AppSettings'
 
 export interface SceneCoordinatorConfig {
     maxGames?: number
@@ -30,8 +30,8 @@ export interface SceneCoordinatorConfig {
         proceduralTextures?: boolean
     }
     lighting?: {
-        quality?: 'simple' | 'enhanced' | 'advanced' | 'ouch-my-eyes'
-        enableShadows?: boolean
+        quality?: LightingQuality
+        shadowQuality?: number
         ceilingHeight?: number
     }
     props?: {
@@ -122,12 +122,12 @@ export class SceneCoordinator {
     private async setupLighting(config: SceneCoordinatorConfig['lighting'] = {}): Promise<void> {
         // Use AppSettings as primary source, fall back to config, then defaults
         const lightingQuality = config.quality ?? this.appSettings.getSetting('lightingQuality')
-        const enableShadows = config.enableShadows ?? this.appSettings.getSetting('enableShadows')
+        const shadowQuality = config.shadowQuality ?? this.appSettings.getSetting('shadowQuality')
         const ceilingHeight = config.ceilingHeight ?? this.appSettings.getSetting('ceilingHeight')
 
         await this.lightingRenderer.setupLighting({
             quality: lightingQuality,
-            enableShadows: enableShadows,
+            shadowQuality: shadowQuality,
             ceilingHeight: ceilingHeight
         })
     }
@@ -203,13 +203,6 @@ export class SceneCoordinator {
         this.environmentRenderer.dispose()
         this.lightingRenderer.dispose()
         this.propsRenderer.dispose()
-    }
-
-    /**
-     * Update lighting quality dynamically
-     */
-    public async updateLightingQuality(quality: 'simple' | 'enhanced' | 'advanced' | 'ouch-my-eyes'): Promise<void> {
-        await this.lightingRenderer.updateLightingQuality(quality)
     }
 
     /**
