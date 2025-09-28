@@ -91,10 +91,10 @@ describe('Lighting Controls Panel Debug Helper Integration', () => {
         
         // Create the lighting panel
         lightingPanel = new LightingControlsPanel()
-        
+
         // Manually set the scene (simulating getting it from a light creation event)
         ;(lightingPanel as any).scene = scene
-        
+
         // Manually populate light groups to simulate discovered lights
         ;(lightingPanel as any).lightGroups = new Map([
             ['PointLight', {
@@ -113,6 +113,9 @@ describe('Lighting Controls Panel Debug Helper Integration', () => {
                 enabled: true
             }]
         ])
+
+        // Enable debug indicators for all tests
+        ;(lightingPanel as any).debugIndicatorEnabled = true
     })
 
     afterEach(() => {

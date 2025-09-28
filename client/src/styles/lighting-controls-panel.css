@@ -1,0 +1,135 @@
+/**
+ * Lighting Controls Panel Styles
+ */
+
+.lighting-controls-panel {
+    position: absolute;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    width: 280px;
+    max-height: 60vh;
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid #333;
+    border-radius: 8px;
+    color: white;
+    font-family: Arial, sans-serif;
+    z-index: 1000;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.lighting-controls-panel .clickable-header {
+    padding: 8px 12px;
+    background: rgba(40, 40, 40, 0.9);
+    border-bottom: 1px solid #555;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+}
+
+.lighting-controls-panel .clickable-header:hover {
+    background: rgba(60, 60, 60, 0.9);
+}
+
+.lighting-controls-panel .clickable-header h3 {
+    margin: 0;
+    font-size: 14px;
+    user-select: none;
+}
+
+.lighting-controls-panel .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.lighting-controls-panel .toggle-indicator {
+    font-size: 12px;
+    color: #aaa;
+    user-select: none;
+    transition: transform 0.2s ease;
+}
+
+.lighting-controls-panel .refresh-button {
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+.lighting-controls-panel .refresh-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.lighting-controls-panel .panel-content {
+    padding: 12px;
+    overflow-y: auto;
+    flex: 1;
+    display: block;
+}
+
+.lighting-controls-panel .panel-content.collapsed {
+    display: none;
+}
+
+.lighting-controls-panel .master-controls {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #444;
+}
+
+.lighting-controls-panel .control-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+    cursor: pointer;
+}
+
+.lighting-controls-panel .control-item input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.lighting-controls-panel .control-label {
+    font-size: 13px;
+    user-select: none;
+}
+
+.lighting-controls-panel .light-info {
+    margin-left: auto;
+    font-size: 11px;
+    color: #888;
+}
+
+.lighting-controls-panel .light-group {
+    margin-bottom: 8px;
+}
+
+.lighting-controls-panel .group-control .control-label {
+    font-weight: bold;
+}
+
+.lighting-controls-panel .individual-lights h4 {
+    margin: 12px 0 8px 0;
+    font-size: 12px;
+    color: #ccc;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.lighting-controls-panel .light-control {
+    padding-left: 12px;
+    font-size: 12px;
+}
+
+.lighting-controls-panel .light-control .control-label {
+    font-weight: normal;
+}

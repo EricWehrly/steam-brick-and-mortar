@@ -11,6 +11,8 @@
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../core/EventManager'
 import { LightingEventTypes, type LightCreatedEvent, type LightingSystemReadyEvent } from '../types/InteractionEvents'
+import { AppSettings } from '../core/AppSettings'
+import '../styles/lighting-controls-panel.css'
 
 interface LightGroupInfo {
     type: string
@@ -26,10 +28,17 @@ export class LightingControlsPanel {
     private lightCreatedHandler: (event: CustomEvent<LightCreatedEvent>) => void
     private lightingSystemReadyHandler: (event: CustomEvent<LightingSystemReadyEvent>) => void
 
+    private appSettings: AppSettings
+    private debugIndicatorEnabled: boolean
+    private panelCollapsed: boolean = true
+
     constructor() {
         this.eventManager = EventManager.getInstance()
         this.lightCreatedHandler = this.onLightCreated.bind(this)
         this.lightingSystemReadyHandler = this.onLightingSystemReady.bind(this)
+    this.appSettings = AppSettings.getInstance()
+        this.debugIndicatorEnabled = this.appSettings.getSetting('showLightingDebug') ?? false
+        this.panelCollapsed = true
         this.container = this.createPanel()
         this.setupEventListeners()
         // No initial scan - we'll scan when we get the first light event or system ready event
@@ -44,14 +53,18 @@ export class LightingControlsPanel {
                 <h3>💡 Lighting Controls</h3>
                 <div class="header-controls">
                     <button class="refresh-button" id="refresh-lights">🔄</button>
-                    <span class="toggle-indicator" id="toggle-indicator">▼</span>
+                    <span class="toggle-indicator" id="toggle-indicator">▶</span>
                 </div>
             </div>
-            <div class="panel-content" id="lighting-panel-content">
+            <div class="panel-content collapsed" id="lighting-panel-content">
                 <div class="master-controls">
                     <label class="control-item">
                         <input type="checkbox" id="all-lights-toggle" checked>
                         <span class="control-label">All Lights</span>
+                    </label>
+                    <label class="control-item">
+                        <input type="checkbox" id="debug-indicator-toggle" ${this.debugIndicatorEnabled ? 'checked' : ''}>
+                        <span class="control-label">Show Debug Indicators</span>
                     </label>
                 </div>
                 <div class="light-groups" id="light-groups-container">
@@ -63,24 +76,8 @@ export class LightingControlsPanel {
             </div>
         `
 
-        // Position the panel in middle-right
-        panel.style.cssText = `
-            position: absolute;
-            top: 50%;
-            right: 20px;
-            transform: translateY(-50%);
-            width: 280px;
-            max-height: 60vh;
-            background: rgba(0, 0, 0, 0.85);
-            border: 2px solid #333;
-            border-radius: 8px;
-            color: white;
-            font-family: Arial, sans-serif;
-            z-index: 1000;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        `
+        // Apply CSS class for styling
+        panel.className = 'lighting-controls-panel'
 
         // Hide the separate lighting controls button since we're integrating it into the panel
         const separateButton = document.getElementById('lighting-controls-button')
@@ -88,58 +85,7 @@ export class LightingControlsPanel {
             separateButton.style.display = 'none'
         }
 
-        // Add styles for the clickable header and better layout
-        const style = document.createElement('style')
-        style.textContent = `
-            .lighting-controls-panel .clickable-header {
-                padding: 8px 12px;
-                background: rgba(40, 40, 40, 0.9);
-                border-bottom: 1px solid #555;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                transition: background-color 0.2s ease;
-            }
-            .lighting-controls-panel .clickable-header:hover {
-                background: rgba(60, 60, 60, 0.9);
-            }
-            .lighting-controls-panel .clickable-header h3 {
-                margin: 0;
-                font-size: 14px;
-                user-select: none;
-            }
-            .lighting-controls-panel .header-controls {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            .lighting-controls-panel .toggle-indicator {
-                font-size: 12px;
-                color: #aaa;
-                user-select: none;
-                transition: transform 0.2s ease;
-            }
-            .lighting-controls-panel .refresh-button {
-                background: none;
-                border: none;
-                color: #aaa;
-                cursor: pointer;
-                font-size: 12px;
-                padding: 2px 4px;
-                border-radius: 3px;
-                transition: background-color 0.2s ease;
-            }
-            .lighting-controls-panel .refresh-button:hover {
-                background: rgba(255, 255, 255, 0.1);
-                color: white;
-            }
-            .lighting-controls-panel .panel-content {
-                padding: 12px;
-                overflow-y: auto;
-                flex: 1;
-            }
-        `
-        document.head.appendChild(style)
+        // Styles are now loaded from external CSS file
 
         document.body.appendChild(panel)
         this.attachEventHandlers()
@@ -157,7 +103,6 @@ export class LightingControlsPanel {
                 }
                 this.togglePanelContent()
             })
-            panelHeader.style.cursor = 'pointer'
         }
 
         // Master toggle
@@ -165,6 +110,17 @@ export class LightingControlsPanel {
         if (allLightsToggle) {
             allLightsToggle.addEventListener('change', () => {
                 this.toggleAllLights(allLightsToggle.checked)
+            })
+        }
+
+        // Debug indicator toggle
+        const debugToggle = document.getElementById('debug-indicator-toggle') as HTMLInputElement
+        if (debugToggle) {
+            debugToggle.checked = this.debugIndicatorEnabled
+            debugToggle.addEventListener('change', () => {
+                this.debugIndicatorEnabled = debugToggle.checked
+                this.appSettings.setSetting('showLightingDebug', this.debugIndicatorEnabled, EventSource.UI)
+                this.toggleAllDebugHelpers(this.debugIndicatorEnabled)
             })
         }
 
@@ -413,14 +369,9 @@ export class LightingControlsPanel {
 
     public show(): void {
         this.container.style.display = 'flex'
-        const content = document.getElementById('lighting-panel-content')
-        const indicator = document.getElementById('toggle-indicator')
         
-        if (content && indicator) {
-            content.style.display = 'block'
-            indicator.textContent = '▼'
-        }
-        
+        // Only scan lights and update UI, don't force expand the panel
+        // Let it stay in its current collapsed/expanded state
         this.scanLights()
         this.updateUI()
     }
@@ -449,15 +400,18 @@ export class LightingControlsPanel {
         
         if (!content || !indicator) return
 
-        const isCollapsed = content.style.display === 'none'
+        const isCollapsed = content.classList.contains('collapsed')
+        this.panelCollapsed = !isCollapsed // Will be the new state after toggle
         
         if (isCollapsed) {
-            content.style.display = 'block'
+            // Expand: remove collapsed class
+            content.classList.remove('collapsed')
             indicator.textContent = '▼'
             this.scanLights()
             this.updateUI()
         } else {
-            content.style.display = 'none'
+            // Collapse: add collapsed class
+            content.classList.add('collapsed')
             indicator.textContent = '▶'
         }
     }
@@ -491,9 +445,18 @@ export class LightingControlsPanel {
         })
 
         if (debugHelper) {
-            debugHelper.visible = enabled
-            // console.log(`🔍 ${enabled ? 'Showed' : 'Hid'} debug helper: ${debugHelperName}`)
+            debugHelper.visible = this.debugIndicatorEnabled && enabled
         }
+
+    }
+
+    private toggleAllDebugHelpers(enabled: boolean): void {
+        if (!this.scene) return
+        this.scene.traverse((object) => {
+            if (object.name && object.name.startsWith('debug-')) {
+                object.visible = enabled
+            }
+        })
     }
 
     public dispose(): void {

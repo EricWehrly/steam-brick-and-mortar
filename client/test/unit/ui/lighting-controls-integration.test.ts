@@ -77,19 +77,19 @@ describe('Lighting Controls Panel Integration', () => {
         expect(content).toBeTruthy()
         expect(indicator).toBeTruthy()
 
-        // Initially content should be visible
-        expect(content!.style.display).toBe('')
-        expect(indicator!.textContent).toBe('▼')
-
-        // Click header to collapse
-        header!.click()
-        expect(content!.style.display).toBe('none')
+        // Initially content should be collapsed (new default behavior)
+        expect(content!.classList.contains('collapsed')).toBe(true)
         expect(indicator!.textContent).toBe('▶')
 
-        // Click header again to expand
+        // Click header to expand
         header!.click()
-        expect(content!.style.display).toBe('block')
+        expect(content!.classList.contains('collapsed')).toBe(false)
         expect(indicator!.textContent).toBe('▼')
+
+        // Click header again to collapse
+        header!.click()
+        expect(content!.classList.contains('collapsed')).toBe(true)
+        expect(indicator!.textContent).toBe('▶')
     })
 
     it('should not toggle when clicking refresh button', () => {
@@ -138,10 +138,10 @@ describe('Lighting Controls Panel Integration', () => {
         lightingPanel.hide()
         expect(panel!.style.display).toBe('none')
 
-        // Show panel
+        // Show panel - it should be visible but remain in its collapsed state
         lightingPanel.show()
         expect(panel!.style.display).toBe('flex')
-        expect(content!.style.display).toBe('block')
-        expect(indicator!.textContent).toBe('▼')
+        expect(content!.classList.contains('collapsed')).toBe(true) // Still collapsed
+        expect(indicator!.textContent).toBe('▶') // Still showing collapsed indicator
     })
 })
