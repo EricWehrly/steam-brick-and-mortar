@@ -41,6 +41,8 @@ export interface AppConfig {
     }
 }
 
+const BACKEND_URL = 'https://steam-api-dev.wehrly.com';
+
 export class SteamBrickAndMortarApp {
     private sceneManager: SceneManager
     private sceneCoordinator: SceneCoordinator
@@ -79,7 +81,7 @@ export class SteamBrickAndMortarApp {
 
         // Initialize Steam integration
         this.steamIntegration = new SteamIntegration({
-            apiBaseUrl: config.steam?.apiBaseUrl ?? 'https://steam-api-dev.wehrly.com',
+            apiBaseUrl: config.steam?.apiBaseUrl ?? BACKEND_URL,
             maxGames: config.steam?.maxGames ?? 100
         })
 
@@ -228,6 +230,9 @@ export class SteamBrickAndMortarApp {
             return
         }
         
+        // Stop performance monitoring
+        this.performanceMonitor.stop()
+        
         // Dispose workflow managers first
         this.steamWorkflowManager.dispose()
         this.webxrEventHandler.dispose()
@@ -287,6 +292,8 @@ export class SteamBrickAndMortarApp {
             sceneCoordinator: this.sceneCoordinator,
             systemUICoordinator: this.uiCoordinator.system
         })
+        
+        this.performanceMonitor.start()
     }
 
     // TODO: This method exists solely for testing purposes - remove or refactor
