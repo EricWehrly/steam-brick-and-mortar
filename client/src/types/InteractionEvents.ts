@@ -141,6 +141,11 @@ export interface LightCreatedEvent extends BaseInteractionEvent {
     lightName?: string
 }
 
+export interface LightingSystemReadyEvent extends BaseInteractionEvent {
+    scene: THREE.Scene
+    quality: string
+}
+
 // =============================================================================
 // EVENT TYPE CONSTANTS
 // =============================================================================
@@ -184,7 +189,8 @@ export const LightingEventTypes = {
     Toggle: 'lighting:toggle',
     DebugToggle: 'lighting:debug-toggle',
     QualityChanged: 'lighting:quality-changed',
-    Created: 'lighting:created'
+    Created: 'lighting:created',
+    SystemReady: 'lighting:system-ready'
 } as const
 
 export const CeilingEventTypes = {
@@ -235,6 +241,7 @@ export interface InteractionEventMap {
     [LightingEventTypes.DebugToggle]: LightingDebugToggleEvent
     [LightingEventTypes.QualityChanged]: LightingQualityChangedEvent
     [LightingEventTypes.Created]: LightCreatedEvent
+    [LightingEventTypes.SystemReady]: LightingSystemReadyEvent
 }
 
 /**

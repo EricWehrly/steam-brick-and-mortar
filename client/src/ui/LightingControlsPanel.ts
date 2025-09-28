@@ -10,7 +10,7 @@
 
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../core/EventManager'
-import { LightingEventTypes, type LightCreatedEvent } from '../types/InteractionEvents'
+import { LightingEventTypes, type LightCreatedEvent, type LightingSystemReadyEvent } from '../types/InteractionEvents'
 
 interface LightGroupInfo {
     type: string
@@ -24,13 +24,15 @@ export class LightingControlsPanel {
     private lightGroups: Map<string, LightGroupInfo> = new Map()
     private eventManager: EventManager
     private lightCreatedHandler: (event: CustomEvent<LightCreatedEvent>) => void
+    private lightingSystemReadyHandler: (event: CustomEvent<LightingSystemReadyEvent>) => void
 
     constructor() {
         this.eventManager = EventManager.getInstance()
         this.lightCreatedHandler = this.onLightCreated.bind(this)
+        this.lightingSystemReadyHandler = this.onLightingSystemReady.bind(this)
         this.container = this.createPanel()
         this.setupEventListeners()
-        // No initial scan - we'll scan when we get the first light event
+        // No initial scan - we'll scan when we get the first light event or system ready event
     }
 
     private createPanel(): HTMLElement {
@@ -180,6 +182,8 @@ export class LightingControlsPanel {
     private setupEventListeners(): void {
         // Listen for light creation events
         this.eventManager.registerEventHandler(LightingEventTypes.Created, this.lightCreatedHandler)
+        // Listen for lighting system ready events
+        this.eventManager.registerEventHandler(LightingEventTypes.SystemReady, this.lightingSystemReadyHandler)
     }
 
     private onLightCreated(event: CustomEvent<LightCreatedEvent>): void {
@@ -192,6 +196,20 @@ export class LightingControlsPanel {
         }
         
         this.addLightToGroups(event.detail.light, event.detail.lightType)
+        this.updateUI()
+    }
+
+    private onLightingSystemReady(event: CustomEvent<LightingSystemReadyEvent>): void {
+        console.log(`💡 Lighting system ready: ${event.detail.quality} quality`)
+        
+        // Get scene from the system ready event if we don't have it yet
+        if (!this.scene) {
+            this.scene = event.detail.scene
+            this.performInitialScan() // Now we can scan for existing lights
+        }
+        
+        // Always refresh UI when system is ready (covers initial load and quality changes)
+        this.scanLights()
         this.updateUI()
     }
 
@@ -481,6 +499,7 @@ export class LightingControlsPanel {
     public dispose(): void {
         // Deregister event handlers
         this.eventManager.deregisterEventHandler(LightingEventTypes.Created, this.lightCreatedHandler)
+        this.eventManager.deregisterEventHandler(LightingEventTypes.SystemReady, this.lightingSystemReadyHandler)
         
         // Show the separate button again when disposing
         const separateButton = document.getElementById('lighting-controls-button')

@@ -17,7 +17,7 @@ import { BlockbusterColors } from '../utils/Colors'
 import { PropRenderer } from './PropRenderer'
 import { LightingDebugHelper } from './LightingDebugHelper'
 import { AppSettings, LIGHTING_QUALITY, type LightingQuality } from '../core/AppSettings'
-import { EventManager } from '../core/EventManager'
+import { EventManager, EventSource } from '../core/EventManager'
 import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent } from '../types/InteractionEvents'
 import { LightFactory } from '../lighting/LightFactory'
 
@@ -131,6 +131,14 @@ export class LightingRenderer {
             this.toggleLighting(lightingEnabled)
             
             console.log('✅ Lighting setup complete!')
+            
+            // Emit system ready event for UI components
+            this.eventManager.emit(LightingEventTypes.SystemReady, {
+                scene: this.scene,
+                quality: this.config.quality,
+                timestamp: Date.now(),
+                source: EventSource.System
+            })
         } catch (error) {
             console.error('❌ Failed to set up lighting:', error)
             // Fallback to simple lighting
@@ -351,6 +359,14 @@ export class LightingRenderer {
         if (appSettings.getSetting('showLightingDebug')) {
             this.debugHelper.addHelpersForLightGroup(this.lightingGroup)
         }
+        
+        // Emit system ready event for UI components
+        this.eventManager.emit(LightingEventTypes.SystemReady, {
+            scene: this.scene,
+            quality: this.config.quality,
+            timestamp: Date.now(),
+            source: EventSource.System
+        })
     }
 
     public toggleLighting(enabled: boolean): void {
