@@ -20,7 +20,6 @@ export class SteamUIPanel {
   private showCacheStatsButton: HTMLButtonElement | null
   private cacheInfoDiv: HTMLElement | null
   private steamStatus: HTMLElement | null
-  private devModeToggle: HTMLInputElement | null
   
   constructor() {
     this.eventManager = EventManager.getInstance()
@@ -36,7 +35,6 @@ export class SteamUIPanel {
     this.showCacheStatsButton = getElementByIdSafe('show-cache-stats') as HTMLButtonElement
     this.cacheInfoDiv = document.getElementById('cache-info')
     this.steamStatus = document.getElementById('steam-status')
-    this.devModeToggle = document.getElementById('dev-mode-toggle') as HTMLInputElement
   }
   
   init(): void {
@@ -141,17 +139,7 @@ export class SteamUIPanel {
       })
     }
     
-    // Development mode toggle
-    if (this.devModeToggle) {
-      this.devModeToggle.addEventListener('change', () => {
-        const isEnabled = this.devModeToggle?.checked ?? true
-        this.eventManager.emit(SteamEventTypes.DevModeToggle, {
-          isEnabled,
-          timestamp: Date.now(),
-          source: EventSource.UI
-        })
-      })
-    }
+
   }
   
   private setupInputPlaceholder(): void {
@@ -250,10 +238,5 @@ export class SteamUIPanel {
     this.useOfflineButton.classList.add('hidden')
   }
   
-  /**
-   * Get the current development mode state
-   */
-  isDevelopmentMode(): boolean {
-    return this.devModeToggle?.checked ?? true
-  }
+
 }

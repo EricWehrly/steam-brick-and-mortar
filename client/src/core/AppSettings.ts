@@ -49,6 +49,7 @@ export interface ApplicationSettings {
     
     // Steam Settings (moved from GameSettings for centralization)
     autoLoadProfile: boolean
+    developmentMode: boolean // Limit to 20 games for testing
 }
 
 export interface SettingChangedEvent {
@@ -282,7 +283,8 @@ export class AppSettings {
             autoSave: true,
             
             // Steam Settings  
-            autoLoadProfile: false
+            autoLoadProfile: false,
+            developmentMode: true // Default to enabled for safer testing
         }
     }
 
@@ -297,7 +299,7 @@ export class AppSettings {
         }
         
         // Validate boolean fields
-        const booleanFields = ['showFPS', 'showPerformanceStats', 'hideUIInVR', 'verboseLogging', 'showDebugInfo', 'autoSave', 'autoLoadProfile']
+        const booleanFields = ['showFPS', 'showPerformanceStats', 'hideUIInVR', 'verboseLogging', 'showDebugInfo', 'autoSave', 'autoLoadProfile', 'developmentMode']
         for (const field of booleanFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'boolean') {
                 return false

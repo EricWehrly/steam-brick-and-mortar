@@ -142,21 +142,3 @@
     font-size: 14px;
 }
 
-/* Steam development mode section */
-.dev-mode-section {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #444;
-}
-
-.dev-mode-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: #ccc;
-}
-
-.dev-mode-checkbox {
-    margin: 0;
-}
