@@ -13,11 +13,9 @@
  */
 
 import * as THREE from 'three'
-import { ValidationUtils } from '../utils'
 import { UICoordinator, PerformanceMonitor, type PerformanceStats, ToastManager } from '../ui'
 import { SceneManager, SceneCoordinator } from '../scene'
-import { DebugStatsProvider, type DebugStats } from './DebugStatsProvider'
-import { LIGHTING_QUALITY } from './AppSettings'
+import { DebugStatsProvider } from './DebugStatsProvider'
 import { SteamGameManager } from './SteamGameManager'
 import { SteamIntegration } from '../steam-integration'
 import { SteamWorkflowManager } from '../steam-integration/SteamWorkflowManager'
@@ -31,8 +29,6 @@ import { AppSettings } from './AppSettings'
 export interface AppConfig {
     scene?: {
         antialias?: boolean
-        shadowQuality?: number
-        shadowMapType?: THREE.ShadowMapType
         outputColorSpace?: THREE.ColorSpace
     }
     steam?: {
@@ -63,11 +59,12 @@ export class SteamBrickAndMortarApp {
     private isInitialized: boolean = false
     
     constructor(config: AppConfig = {}) {
+        // Initialize AppSettings first (needed for default values)
+        this.appSettings = AppSettings.getInstance()
+        
         // Initialize core scene management
         this.sceneManager = new SceneManager({
             antialias: config.scene?.antialias ?? true,
-            shadowQuality: config.scene?.shadowQuality ?? 2, // Medium shadows by default
-            shadowMapType: config.scene?.shadowMapType ?? THREE.PCFSoftShadowMap,
             outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
         })
         
@@ -93,10 +90,6 @@ export class SteamBrickAndMortarApp {
                 // TODO: Game limiting: OFF by default, configurable via UI settings
                 // maxGames: 100,
                 // TODO: Wire this to UI settings panel for user control
-            },
-            lighting: {
-                quality: LIGHTING_QUALITY.ENHANCED,
-                shadowQuality: 2 // Medium shadows
             },
             environment: {
                 skyboxPreset: 'aurora'
@@ -182,8 +175,6 @@ export class SteamBrickAndMortarApp {
         }
         
         try {
-            this.appSettings = AppSettings.getInstance()
-            
             await this.initializeCoordinators()
             this.startRenderLoop()
             

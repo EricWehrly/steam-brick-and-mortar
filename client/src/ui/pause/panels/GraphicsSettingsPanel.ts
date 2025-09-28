@@ -166,7 +166,7 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     private resetToDefaults(): void {
         // Reset graphics settings to defaults
         this.appSettings.setSetting('lightingQuality', LIGHTING_QUALITY.ENHANCED, EventSource.UI)
-        this.appSettings.setSetting('shadowQuality', 2, EventSource.UI) // Medium shadows
+        this.appSettings.setSetting('shadowQuality', this.appSettings.getDefaultSetting('shadowQuality'), EventSource.UI)
         this.appSettings.setSetting('ceilingHeight', 3.2, EventSource.UI)
         this.appSettings.setSetting('enableLighting', true, EventSource.UI)
         this.appSettings.setSetting('showLightingDebug', false, EventSource.UI)
@@ -177,7 +177,7 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         // Notify that all settings changed
         this.onSettingsChanged?.({
             lightingQuality: LIGHTING_QUALITY.ENHANCED,
-            shadowQuality: 2, // Medium shadows
+            shadowQuality: this.appSettings.getDefaultSetting('shadowQuality'),
             ceilingHeight: 3.2,
             enableLighting: true,
             showLightingDebug: false,

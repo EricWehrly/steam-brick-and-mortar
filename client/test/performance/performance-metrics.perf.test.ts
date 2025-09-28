@@ -130,8 +130,7 @@ describe.skip('Performance Measurements', () => {
         
         app = new SteamBrickAndMortarApp({
             scene: {
-                antialias: false, // Disable for faster initialization
-                shadowQuality: 0 // Shadows disabled for performance
+                antialias: false // Disable for faster initialization
             },
             steam: {
                 apiBaseUrl: 'http://test.com',

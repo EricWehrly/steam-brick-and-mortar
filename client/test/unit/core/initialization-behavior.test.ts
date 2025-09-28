@@ -67,8 +67,7 @@ describe('Application Initialization Behavior', () => {
     it('should initialize successfully', async () => {
         const app = new SteamBrickAndMortarApp({
             scene: {
-                antialias: false,
-                shadowQuality: 0 // Shadows disabled for test performance
+                antialias: false
             },
             steam: {
                 apiBaseUrl: 'http://test-api.example.com',

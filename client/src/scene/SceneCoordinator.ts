@@ -29,11 +29,6 @@ export interface SceneCoordinatorConfig {
         roomSize?: { width: number, depth: number, height: number }
         proceduralTextures?: boolean
     }
-    lighting?: {
-        quality?: LightingQuality
-        shadowQuality?: number
-        ceilingHeight?: number
-    }
     props?: {
         enableTestObjects?: boolean
         maxGames?: number
@@ -84,8 +79,8 @@ export class SceneCoordinator {
             await this.setupProps(config.props)
             
             // PHASE 3: Lighting Systems (after props for proper shadow casting)
-            console.log('💡 Phase 3/3: Setting up lighting...')
-            await this.setupLighting(config.lighting)
+            console.log('💡 Phase 3/3: Setting up lighting...')            
+            await this.lightingRenderer.setupLighting()
             
             // Refresh shadows now that all props are in place
             this.lightingRenderer.refreshShadows()
@@ -113,22 +108,6 @@ export class SceneCoordinator {
                 height: ceilingHeight 
             },
             proceduralTextures: config.proceduralTextures ?? true
-        })
-    }
-
-    /**
-     * Set up lighting systems (Phase 2)  
-     */
-    private async setupLighting(config: SceneCoordinatorConfig['lighting'] = {}): Promise<void> {
-        // Use AppSettings as primary source, fall back to config, then defaults
-        const lightingQuality = config.quality ?? this.appSettings.getSetting('lightingQuality')
-        const shadowQuality = config.shadowQuality ?? this.appSettings.getSetting('shadowQuality')
-        const ceilingHeight = config.ceilingHeight ?? this.appSettings.getSetting('ceilingHeight')
-
-        await this.lightingRenderer.setupLighting({
-            quality: lightingQuality,
-            shadowQuality: shadowQuality,
-            ceilingHeight: ceilingHeight
         })
     }
 

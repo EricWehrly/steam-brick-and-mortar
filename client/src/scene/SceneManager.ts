@@ -22,8 +22,6 @@ import { PropRenderer } from './PropRenderer'
 
 export interface SceneManagerOptions {
     antialias?: boolean
-    shadowQuality?: number // 0=off, 1=low, 2=medium, 3=high, 4=ultra
-    shadowMapType?: THREE.ShadowMapType
     outputColorSpace?: THREE.ColorSpace
 }
 
@@ -80,14 +78,6 @@ export class SceneManager {
         this.renderer.setSize(window.innerWidth, window.innerHeight)
         this.renderer.setPixelRatio(window.devicePixelRatio)
         this.renderer.outputColorSpace = options.outputColorSpace ?? THREE.SRGBColorSpace
-        
-        const shadowQuality = options.shadowQuality ?? 2 // Default to medium shadows
-        if (shadowQuality > 0) {
-            this.renderer.shadowMap.enabled = true
-            this.renderer.shadowMap.type = options.shadowMapType ?? THREE.PCFSoftShadowMap
-        } else {
-            this.renderer.shadowMap.enabled = false
-        }
         
         // Enable WebXR
         this.renderer.xr.enabled = true

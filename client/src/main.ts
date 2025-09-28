@@ -30,8 +30,7 @@ export async function initializeApp(): Promise<void> {
         
         const app = new SteamBrickAndMortarApp({
             scene: {
-                antialias: true,
-                shadowQuality: 2 // Medium shadows
+                antialias: true
             },
             steam: {
                 apiBaseUrl: 'https://steam-api-dev.wehrly.com',

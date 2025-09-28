@@ -109,8 +109,8 @@ export class LightingRenderer {
         })
     }
 
-    public async setupLighting(config: LightingConfig = {}): Promise<void> {
-        this.config = { ...this.getCurrentConfig(), ...config }
+    public async setupLighting(): Promise<void> {
+        this.config = this.getCurrentConfig()
         
         console.log(`💡 Setting up ${this.config.quality} lighting...`)
         
