@@ -79,15 +79,20 @@ export class SteamBrickAndMortarApp {
             precision: 1
         })
 
+        // Determine maxGames based on AppSettings developmentMode or config override
+        const isDevelopmentMode = this.appSettings.getSetting('developmentMode')
+        const defaultMaxGames = isDevelopmentMode ? 20 : 100
+        const maxGames = config.steam?.maxGames ?? defaultMaxGames
+
         // Initialize Steam integration
         this.steamIntegration = new SteamIntegration({
             apiBaseUrl: config.steam?.apiBaseUrl ?? BACKEND_URL,
-            maxGames: config.steam?.maxGames ?? 100
+            maxGames: maxGames
         })
 
         // Initialize scene coordinator with visual system configuration
         this.sceneCoordinator = new SceneCoordinator(this.sceneManager, {
-            maxGames: config.steam?.maxGames ?? 100,
+            maxGames: maxGames,
             props: {
                 // TODO: Game limiting: OFF by default, configurable via UI settings
                 // maxGames: 100,
