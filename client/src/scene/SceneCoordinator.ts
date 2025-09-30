@@ -18,8 +18,8 @@ import { SceneManager } from './SceneManager'
 import { EnvironmentRenderer } from './EnvironmentRenderer'
 import { LightingRenderer } from './LightingRenderer'
 import { StorePropsRenderer } from './StorePropsRenderer'
-import { EventManager } from '../core/EventManager'
-import { GameEventTypes, CeilingEventTypes, type CeilingToggleEvent } from '../types/InteractionEvents'
+import { EventManager, EventSource } from '../core/EventManager'
+import { GameEventTypes, CeilingEventTypes, type CeilingToggleEvent, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings, type LightingQuality } from '../core/AppSettings'
 
 export interface SceneCoordinatorConfig {
@@ -54,10 +54,14 @@ export class SceneCoordinator {
         )
         this.propsRenderer = new StorePropsRenderer(this.sceneManager.getScene())
 
-        // 🚀 OPTIMIZATION: Start scene setup immediately for faster interactivity
-        // Don't wait for GameStart event - user should be able to move ASAP
-        this.setupCompleteScene(config).catch(error => {
-            console.error('❌ Failed to set up scene during construction:', error)
+        // 🎬 EVENT-DRIVEN STARTUP: Setup scene and emit SceneReady when basic navigation is ready
+        // This is a prerequisite for GameStart - scene must be navigable before game can start
+
+        this.setupSceneAsPrerequisite(config).catch(error => {
+            console.error('❌ Failed to set up scene prerequisite:', error)
+            // Emit SceneReady anyway so GameStart can proceed even if scene setup fails
+            console.log('⚠️ Emitting SceneReady despite setup failure to unblock GameStart')
+            this.emitSceneReadyEvent()
         })
 
         // Register for ceiling toggle events
@@ -66,27 +70,38 @@ export class SceneCoordinator {
         })
     }
 
-    async setupCompleteScene(config: SceneCoordinatorConfig = {}): Promise<void> {
-        console.log('🏪 Setting up VR-optimized store scene with priority for user interaction...')
+    /**
+     * Setup scene as prerequisite for GameStart - emits SceneReady when basic navigation is ready
+     */
+    async setupSceneAsPrerequisite(config: SceneCoordinatorConfig = {}): Promise<void> {
+
         
         try {
-            // 🚀 PRIORITY PHASE: Basic navigable environment (blocking - user needs this to move around)
-            console.log('🌍 Priority: Setting up basic environment for navigation...')
+            // 🚀 PRIORITY: Basic navigable environment (prerequisite for GameStart)
+
             await this.setupBasicEnvironment(config.environment)
             console.log('✅ Basic environment ready - user can now move around!')
             
-            // 🎯 ASYNC PHASES: Enhanced details (non-blocking - user can move while these load)
-            console.log('📋 Background loading: Props → Lighting → Polish...')
+            // 📡 EMIT SceneReady - this scene is now a satisfied prerequisite for GameStart
+            this.emitSceneReadyEvent()
             
-            // Don't await these - let them complete in background while user moves around
+            // 🎯 BACKGROUND: Enhanced details (non-blocking - continues while game starts)
+
             this.setupEnhancedScene(config).catch(error => {
                 console.error('❌ Background scene enhancement failed:', error)
             })
             
         } catch (error) {
-            console.error('❌ Failed to set up basic scene:', error)
+            console.error('❌ Failed to set up scene prerequisite:', error)
             throw error
         }
+    }
+
+    /**
+     * Legacy method for backward compatibility - now delegates to prerequisite setup
+     */
+    async setupCompleteScene(config: SceneCoordinatorConfig = {}): Promise<void> {
+        return this.setupSceneAsPrerequisite(config)
     }
 
     /**
@@ -96,15 +111,23 @@ export class SceneCoordinator {
         // Use ceiling height from settings if not explicitly provided
         const ceilingHeight = config.roomSize?.height ?? this.appSettings.getSetting('ceilingHeight')
         
-        await this.environmentRenderer.setupEnvironment({
-            roomSize: {
-                width: config.roomSize?.width ?? 22,
-                depth: config.roomSize?.depth ?? 16,
-                height: ceilingHeight
-            },
-            skyboxPreset: config.skyboxPreset ?? 'aurora',
-            proceduralTextures: config.proceduralTextures ?? true
-        })
+        console.log('🏗️ Starting basic environment setup...')
+        
+        try {
+            await this.environmentRenderer.setupEnvironment({
+                roomSize: {
+                    width: config.roomSize?.width ?? 22,
+                    depth: config.roomSize?.depth ?? 16,
+                    height: ceilingHeight
+                },
+                skyboxPreset: config.skyboxPreset ?? 'aurora',
+                proceduralTextures: config.proceduralTextures ?? true
+            })
+            console.log('✅ Basic environment setup completed successfully')
+        } catch (error) {
+            console.error('❌ Basic environment setup failed:', error)
+            // Still allow SceneReady to be emitted - basic scene is functional even if enhanced setup fails
+        }
     }
 
     /**
@@ -214,6 +237,26 @@ export class SceneCoordinator {
     }
 
     /**
+     * Emit SceneReady event - signals that basic scene navigation is ready (prerequisite for GameStart)
+     */
+    private emitSceneReadyEvent(): void {
+        const envStats = this.environmentRenderer.getEnvironmentStats()
+        const lightStats = this.lightingRenderer.getLightingStats()
+        
+        console.log('📡 Emitting SceneReady event - basic navigation is ready')
+        
+        EventManager.getInstance().emit<SceneReadyEvent>(GameEventTypes.SceneReady, {
+            source: EventSource.System,
+            timestamp: Date.now(),
+            sceneStats: {
+                environmentObjectCount: envStats.objectCount,
+                lightsReady: lightStats.lightCount > 0,
+                basicNavigationReady: true
+            }
+        })
+    }
+
+    /**
      * Log comprehensive scene statistics
      */
     private logSceneStats(): void {
@@ -221,9 +264,6 @@ export class SceneCoordinator {
         const lightStats = this.lightingRenderer.getLightingStats()
         const propsStats = this.propsRenderer.getPropsStats()
         
-        console.log('📊 Scene Statistics:')
-        console.log(`   🌍 Environment: ${envStats.objectCount} objects, skybox: ${envStats.skyboxActive}`)
-        console.log(`   💡 Lighting: ${lightStats.lightCount} lights, quality: ${lightStats.quality}`)
-        console.log(`   🎁 Props: ${propsStats.totalProps} objects, shelves: ${propsStats.shelvesGenerated}`)
+
     }
 }

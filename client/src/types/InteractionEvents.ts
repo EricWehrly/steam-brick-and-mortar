@@ -106,9 +106,24 @@ export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
 // GAME EVENTS
 // =============================================================================
 
+export interface SceneReadyEvent extends BaseInteractionEvent {
+    // Emitted when the basic scene is navigable and ready for user interaction
+    // This is a prerequisite for GameStart - scene must be ready before game can start
+    sceneStats: {
+        environmentObjectCount: number
+        lightsReady: boolean
+        basicNavigationReady: boolean
+    }
+}
+
 export interface GameStartEvent extends BaseInteractionEvent {
-    // Emitted when the application is ready and the game can start
-    // This signals that the render loop is established and UI is operational
+    // Emitted when ALL prerequisites are ready and the game can start
+    // Prerequisites: scene ready, render loop established, UI operational
+    prerequisites: {
+        sceneReady: boolean
+        renderLoopReady: boolean
+        uiReady: boolean
+    }
 }
 
 // =============================================================================
@@ -179,6 +194,7 @@ export const UIEventTypes = {
 } as const
 
 export const GameEventTypes = {
+    SceneReady: 'game:scene-ready',
     Start: 'game:start'
 } as const
 
@@ -230,6 +246,7 @@ export interface InteractionEventMap {
     [UIEventTypes.ImageCacheStatsRequest]: ImageCacheStatsRequestEvent
     
     // Game events
+    [GameEventTypes.SceneReady]: SceneReadyEvent
     [GameEventTypes.Start]: GameStartEvent
     
     // Lighting events

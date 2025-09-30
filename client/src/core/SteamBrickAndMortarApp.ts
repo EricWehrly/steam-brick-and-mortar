@@ -23,7 +23,7 @@ import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { type WebXRCapabilities } from '../webxr/WebXRManager'
 import { EventManager, EventSource } from './EventManager'
-import { GameEventTypes, WebXREventTypes, type GameStartEvent } from '../types/InteractionEvents'
+import { GameEventTypes, WebXREventTypes, type GameStartEvent, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from './AppSettings'
 
 export interface AppConfig {
@@ -59,6 +59,14 @@ export class SteamBrickAndMortarApp {
 
     // State
     private isInitialized: boolean = false
+    
+    // GameStart prerequisite tracking
+    private prerequisites = {
+        sceneReady: false,
+        renderLoopReady: false,
+        uiReady: false
+    }
+    private gameStartEmitted = false
     
     constructor(config: AppConfig = {}) {
         // Initialize AppSettings first (needed for default values)
@@ -159,6 +167,9 @@ export class SteamBrickAndMortarApp {
 
         // Initialize event manager for interaction architecture
         this.eventManager = EventManager.getInstance()
+        
+        // Set up prerequisite event listeners
+        this.setupPrerequisiteEventListeners()
 
         // Initialize steam workflow manager to handle Steam interactions
         this.steamWorkflowManager = new SteamWorkflowManager(
@@ -183,11 +194,20 @@ export class SteamBrickAndMortarApp {
         
         try {
             await this.initializeCoordinators()
+            
+            // Mark UI as ready (coordinators initialized)
+            console.log('🎨 UI coordinators ready')
+            this.prerequisites.uiReady = true
+            this.checkGameStartPrerequisites()
+            
             this.startRenderLoop()
             
+            // Mark render loop as ready
+            console.log('🔄 Render loop ready')
+            this.prerequisites.renderLoopReady = true
+            this.checkGameStartPrerequisites()
+            
             this.isInitialized = true
-
-            this.emitGameStartEvent()
             
             // Auto-load first cached user if available
             await this.tryAutoLoadCachedUser()
@@ -284,10 +304,53 @@ export class SteamBrickAndMortarApp {
         })
     }
 
+    /**
+     * Set up event listeners for GameStart prerequisites
+     */
+    private setupPrerequisiteEventListeners(): void {
+        // Listen for SceneReady event
+        this.eventManager.registerEventHandler<SceneReadyEvent>(
+            GameEventTypes.SceneReady,
+            (event) => {
+                
+                this.prerequisites.sceneReady = true
+                this.checkGameStartPrerequisites()
+            }
+        )
+    }
+
+    /**
+     * Check if all prerequisites are met and emit GameStart if so
+     */
+    private checkGameStartPrerequisites(): void {
+        // Idempotency guard - exit early if already emitted
+        if (this.gameStartEmitted) {
+            console.log('✅ GameStart already emitted - maintaining idempotency')
+            return
+        }
+
+        const { sceneReady, renderLoopReady, uiReady } = this.prerequisites
+        
+
+        
+        if (sceneReady && renderLoopReady && uiReady) {
+            this.emitGameStartEvent()
+            this.gameStartEmitted = true
+        } else {
+            console.log('⏳ Waiting for remaining prerequisites...')
+        }
+    }
+
     private emitGameStartEvent(): void {
+        console.log('🎮 GameStart event emitted')
         this.eventManager.emit<GameStartEvent>(GameEventTypes.Start, {
             timestamp: Date.now(),
-            source: EventSource.System
+            source: EventSource.System,
+            prerequisites: {
+                sceneReady: this.prerequisites.sceneReady,
+                renderLoopReady: this.prerequisites.renderLoopReady,
+                uiReady: this.prerequisites.uiReady
+            }
         })
     }
 
