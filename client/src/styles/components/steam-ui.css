@@ -29,15 +29,6 @@
     font-size: 14px;
 }
 
-/* Responsive label text - hide extended part when not focused */
-.label-extended {
-    display: none;
-}
-
-#steam-ui:focus-within .label-extended {
-    display: inline;
-}
-
 /* Input row with flexible layout */
 .input-row {
     display: flex;
@@ -49,7 +40,7 @@
 
 #steam-ui input {
     flex: 1;
-    min-width: 200px;
+    min-width: 340px;
     padding: 10px;
     border: 1px solid #555;
     border-radius: 4px;
@@ -71,18 +62,6 @@
     /* Maintain horizontal layout always */
     flex-direction: row;
     align-items: center;
-}
-
-/* Input grows to take available space but doesn't force layout changes */
-#steam-ui input {
-    flex: 1;
-    /* Input can expand slightly on focus for better UX */
-    transition: all 0.2s ease;
-}
-
-#steam-ui input:focus {
-    /* Subtle expansion without affecting button position */
-    flex: 1.1;
 }
 
 .load-button {

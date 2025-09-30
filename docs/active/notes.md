@@ -2,11 +2,6 @@
 
 - "dissolve" in scene
 
-- make "steam account" UI
-    - much slimmer in general, remove extra junk
-    - grow when in focus
-    - go away once profile is loaded (but be restoreable)
-
 - light switch / dimmer that can be interacted with to change lights
 
 - make signs 3d instead of planes

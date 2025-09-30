@@ -37,7 +37,6 @@ export class SteamUIPanel {
   
   init(): void {
     this.setupEventListeners()
-    this.setupInputPlaceholder()
   }
   
   private setupEventListeners(): void {
@@ -123,12 +122,6 @@ export class SteamUIPanel {
     }
     
 
-  }
-  
-  private setupInputPlaceholder(): void {
-    if (this.steamUserInput) {
-      this.steamUserInput.placeholder = 'e.g., SpiteMonger, 76561198054514251, or steamcommunity.com/profiles/76561198054514251'
-    }
   }
   
   private getUserInput(): string | null {
