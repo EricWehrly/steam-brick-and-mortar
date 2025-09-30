@@ -74,7 +74,7 @@ export class SystemUICoordinator {
             onLoadCachedUser: async (steamId: string) => {
                 if (this.steamWorkflowManager) {
                     this.eventManager.emit<SteamLoadFromCacheEvent>('steam:load-from-cache', { 
-                        vanityUrl: steamId,
+                        userInput: steamId,
                         timestamp: Date.now(),
                         source: EventSource.UI
                     })

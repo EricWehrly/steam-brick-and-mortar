@@ -16,15 +16,15 @@ import type { WebXRCapabilities } from '../webxr/WebXRManager'
 // =============================================================================
 
 export interface SteamLoadGamesEvent extends BaseInteractionEvent {
-    vanityUrl: string
+    userInput: string
 }
 
 export interface SteamLoadFromCacheEvent extends BaseInteractionEvent {
-    vanityUrl: string
+    userInput: string
 }
 
 export interface SteamUseOfflineEvent extends BaseInteractionEvent {
-    vanityUrl: string
+    userInput: string
 }
 
 export interface SteamCacheClearEvent extends BaseInteractionEvent {
@@ -48,7 +48,7 @@ export interface SteamDevModeToggleEvent extends BaseInteractionEvent {
 }
 
 export interface SteamDataLoadedEvent extends BaseInteractionEvent {
-    vanityUrl: string
+    userInput: string
     gameCount: number
 }
 

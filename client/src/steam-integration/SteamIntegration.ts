@@ -13,6 +13,7 @@ import { ValidationUtils } from '../utils'
 import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
 import type { SteamGameData } from '../scene'
+import { SteamErrorMessages, type SteamErrorContext } from '../utils/SteamErrorMessages'
 
 export interface SteamIntegrationConfig {
     apiBaseUrl?: string
@@ -53,18 +54,38 @@ export class SteamIntegration {
     /**
      * Load Steam games for a user with progressive loading
      */
-    async loadGamesForUser(vanityUrl: string, callbacks: ProgressCallbacks = {}): Promise<GameLibraryState> {
-        const extractedVanity = ValidationUtils.extractVanityFromInput(vanityUrl)
+    async loadGamesForUser(userInput: string, callbacks: ProgressCallbacks = {}): Promise<GameLibraryState> {
+        const parsedInput = ValidationUtils.parseSteamUserInput(userInput)
+        let steamId: string | undefined
+        let vanityUrl: string
         
         try {
-            // Step 1: Get basic user and game list data
+            // Step 1: Get steamID (either directly provided or resolved from custom URL)
             callbacks.onStatusUpdate?.('Loading Steam games...', 'loading')
             callbacks.onProgress?.(0, 100, 'Fetching game library...')
             
-            SteamIntegration.logger.info(`Loading games for Steam user: ${extractedVanity}`)
+            SteamIntegration.logger.info(`Loading games for Steam user: ${parsedInput.value} (type: ${parsedInput.type})`)
             
-            const resolveResponse = await this.steamClient.resolveVanityUrl(extractedVanity)
-            const userGames = await this.steamClient.getUserGames(resolveResponse.steamid)
+            if (parsedInput.type === 'steamid') {
+                // Direct steamID - no resolution needed
+                steamId = parsedInput.value
+                vanityUrl = `steamid:${steamId}` // Use a placeholder since we don't know the actual custom URL
+            } else {
+                // Custom URL - resolve to get steamID
+                const resolveResponse = await this.steamClient.resolveVanityUrl(parsedInput.value)
+                steamId = resolveResponse.steamid
+                vanityUrl = resolveResponse.vanity_url
+            }
+            
+            // Validate we have a steamID before proceeding
+            if (!steamId) {
+                throw new Error('Failed to obtain valid Steam ID')
+            }
+            
+            const userGames = await this.steamClient.getUserGames(steamId)
+            
+            // Add the vanity URL to the userGames for reference
+            userGames.vanity_url = vanityUrl
             
             // Update game library state
             this.gameLibrary.setUserData(userGames)
@@ -114,11 +135,28 @@ export class SteamIntegration {
             return this.gameLibrary.getState()
             
         } catch (error) {
-            SteamIntegration.logger.error('Failed to load Steam games:', error)
-            callbacks.onStatusUpdate?.(
-                `❌ Failed to load games. Please check the Steam profile name and try again.`, 
-                'error'
-            )
+            // Log error with context about what step failed
+            const errorMessage = (error as Error).message
+            if (errorMessage.includes('vanity') || errorMessage.includes('resolve')) {
+                SteamIntegration.logger.error(`Failed to resolve Steam input "${parsedInput.value}" (${parsedInput.type}):`, error)
+            } else if (errorMessage.includes('games') || errorMessage.includes('getUserGames')) {
+                SteamIntegration.logger.error(`Failed to load games for Steam ID "${steamId || 'Unknown'}":`, error)
+            } else {
+                SteamIntegration.logger.error(`Failed during Steam integration for "${userInput}":`, error)
+            }
+            
+            // Generate contextual error message based on input and error type
+            const errorContext: SteamErrorContext = {
+                userInput: userInput,
+                parsedInputType: parsedInput.type,
+                parsedInputValue: parsedInput.value,
+                errorType: SteamErrorMessages.categorizeError(error as Error),
+                originalError: error as Error
+            }
+            
+            const userFriendlyMessage = SteamErrorMessages.generateErrorMessage(errorContext)
+            callbacks.onStatusUpdate?.(userFriendlyMessage, 'error')
+            
             throw error
         }
     }
@@ -167,20 +205,26 @@ export class SteamIntegration {
      * single-pass cache check or result memoization if this becomes a performance bottleneck.
      * See docs/active/tech-debt.md for detailed analysis.
      */
-    hasCachedData(vanityUrl: string): boolean {
-        const extractedVanity = ValidationUtils.extractVanityFromInput(vanityUrl)
+    hasCachedData(userInput: string): boolean {
+        const parsedInput = ValidationUtils.parseSteamUserInput(userInput)
         
-        // Check if we have cached resolve data
-        const resolveKey = `resolve_${extractedVanity.toLowerCase()}`
-        const cachedResolve = this.steamClient.getCached<SteamResolveResponse>(resolveKey)
-        
-        if (!cachedResolve) {
-            return false
+        if (parsedInput.type === 'steamid') {
+            // Direct steamID - check games cache directly
+            const gamesKey = `games_${parsedInput.value}`
+            return this.steamClient.hasCached(gamesKey)
+        } else {
+            // Custom URL - check if we have cached resolve data first
+            const resolveKey = `resolve_${parsedInput.value.toLowerCase()}`
+            const cachedResolve = this.steamClient.getCached<SteamResolveResponse>(resolveKey)
+            
+            if (!cachedResolve) {
+                return false
+            }
+            
+            // Check if we have cached games data for the resolved Steam ID
+            const gamesKey = `games_${cachedResolve.steamid}`
+            return this.steamClient.hasCached(gamesKey)
         }
-        
-        // Check if we have cached games data for the resolved Steam ID
-        const gamesKey = `games_${cachedResolve.steamid}`
-        return this.steamClient.hasCached(gamesKey)
     }
 
     /**
@@ -194,26 +238,32 @@ export class SteamIntegration {
     /**
      * Load games from cache only (no Steam API calls)
      */
-    async loadGamesFromCache(vanityUrl: string, callbacks: ProgressCallbacks = {}, clearExisting = true): Promise<GameLibraryState> {
-        const extractedVanity = ValidationUtils.extractVanityFromInput(vanityUrl)
+    async loadGamesFromCache(userInput: string, callbacks: ProgressCallbacks = {}, clearExisting = true): Promise<GameLibraryState> {
+        const parsedInput = ValidationUtils.parseSteamUserInput(userInput)
         
         try {
             callbacks.onStatusUpdate?.('Loading from cache...', 'loading')
             callbacks.onProgress?.(0, 100, 'Reading cached data...')
             
-            SteamIntegration.logger.info(`Loading cached games for Steam user: ${extractedVanity}`)
+            SteamIntegration.logger.info(`Loading cached games for Steam user: ${parsedInput.value} (type: ${parsedInput.type})`)
             
             // Clear existing games if requested
             if (clearExisting) {
                 this.gameLibrary.clear()
             }
             
-            // Get cached resolve and games data
-            const steamId = await this.getCachedSteamId(extractedVanity)
-            
-            if (!steamId) {
-                throw new Error('No cached resolve data found')
+            // Get steamID (either directly or from cache)
+            let steamId: string
+            if (parsedInput.type === 'steamid') {
+                steamId = parsedInput.value
+            } else {
+                const cachedSteamId = await this.getCachedSteamId(parsedInput.value)
+                if (!cachedSteamId) {
+                    throw new Error('No cached resolve data found for custom URL')
+                }
+                steamId = cachedSteamId
             }
+
             
             const cachedGames = this.steamClient.getCached<SteamUser>(`games_${steamId}`)
             if (!cachedGames) {
@@ -272,10 +322,13 @@ export class SteamIntegration {
             
         } catch (error) {
             SteamIntegration.logger.error('Failed to load games from cache:', error)
-            callbacks.onStatusUpdate?.(
-                `❌ Failed to load from cache. Try "Load My Games" instead.`, 
-                'error'
-            )
+            
+            // Generate cache-specific error message
+            const errorMessage = error instanceof Error && error.message.includes('No cached')
+                ? `❌ No cached data found for "${userInput}". Please use "Load Games" to fetch fresh data from Steam first.`
+                : `❌ Failed to load from cache. Try "Load Games" to fetch fresh data from Steam.`
+            
+            callbacks.onStatusUpdate?.(errorMessage, 'error')
             throw error
         }
     }

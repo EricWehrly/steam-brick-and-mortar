@@ -19,7 +19,8 @@ vi.mock('../../../src/steam', () => ({
 // Mock ValidationUtils
 vi.mock('../../../src/utils', () => ({
     ValidationUtils: {
-        extractVanityFromInput: vi.fn((input: string) => input.toLowerCase())
+        extractVanityFromInput: vi.fn((input: string) => input.toLowerCase()),
+        parseSteamUserInput: vi.fn((input: string) => ({ type: 'customurl', value: input.toLowerCase() }))
     }
 }))
 
@@ -173,8 +174,9 @@ describe('SteamIntegration Unit Tests', () => {
             }
             
             await expect(steamIntegration.loadGamesForUser('testuser', callbacks)).rejects.toThrow('API Error')
+            // Expect the new contextual error message that includes input type and specific guidance
             expect(callbacks.onStatusUpdate).toHaveBeenCalledWith(
-                '❌ Failed to load games. Please check the Steam profile name and try again.',
+                '❌ Steam API error occurred while looking up custom URL "testuser". Please try again in a moment.',
                 'error'
             )
         })

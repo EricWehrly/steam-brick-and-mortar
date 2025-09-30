@@ -66,14 +66,23 @@
     outline-offset: 2px;
 }
 
-/* When input is focused, expand to full width and move button below */
-#steam-ui:focus-within .input-row {
-    flex-direction: column;
-    align-items: stretch;
+/* Keep input row layout stable - no movement on focus to prevent click interference */
+.input-row {
+    /* Maintain horizontal layout always */
+    flex-direction: row;
+    align-items: center;
 }
 
-#steam-ui:focus-within input {
-    min-width: 100%;
+/* Input grows to take available space but doesn't force layout changes */
+#steam-ui input {
+    flex: 1;
+    /* Input can expand slightly on focus for better UX */
+    transition: all 0.2s ease;
+}
+
+#steam-ui input:focus {
+    /* Subtle expansion without affecting button position */
+    flex: 1.1;
 }
 
 .load-button {
@@ -85,17 +94,10 @@
     cursor: pointer;
     font-size: 14px;
     white-space: nowrap;
-    transition: all 0.3s ease;
-    /* Default state for smooth animation */
-    width: auto;
-    margin-top: 0;
-}
-
-/* When focused, load button becomes full width and moves below */
-#steam-ui:focus-within .load-button {
-    width: 100%;
-    margin-top: 8px;
-    transition: all 0.3s ease;
+    /* Fixed width to prevent movement */
+    flex-shrink: 0;
+    /* Smooth hover transitions only */
+    transition: background-color 0.2s ease;
 }
 
 #steam-ui button {

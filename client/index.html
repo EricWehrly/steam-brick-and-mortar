@@ -19,18 +19,19 @@
     </div>
     
     <div id="steam-ui" class="hidden">
-        <label for="steam-vanity">Steam Profile <span class="label-extended">URL or Vanity Name</span>:</label>
+        <label for="steam-user-input">SteamID or <span class="label-extended">(Custom or profile)</span> URL:</label>
         <div class="input-row">
             <input 
                 type="text" 
-                id="steam-vanity" 
-                placeholder="e.g., SpiteMonger or steamcommunity.com/id/SpiteMonger"
+                id="steam-user-input" 
+                placeholder="e.g. 76561197960287930 / steamcommunity.com/id/GabeLoganNewell / steamcommunity.com/profiles/76561197960287930"
                 autocomplete="off"
             />
-            <button id="load-steam-games" class="load-button">Load My Games</button>
+            <!-- Supports: Custom URL, Steam ID (17-digit number), or profile URLs -->
+            <button id="load-steam-games" class="load-button">Load Games</button>
         </div>
         <div class="button-group">
-            <button id="load-from-cache" class="hidden button-cache">📋 Load from Cache</button>
+            <button id="load-from-cache" class="hidden button-cache">Load from Cache</button>
             <button id="use-offline-data" class="hidden button-offline">Use Offline</button>
         </div>
         
