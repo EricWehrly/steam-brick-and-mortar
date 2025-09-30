@@ -18,9 +18,9 @@ describe('ProceduralShelfGenerator', () => {
     expect(shelf).toBeInstanceOf(THREE.Group);
     expect(shelf.position.equals(position)).toBe(true);
     
-    // Should have 4 boards + shelves
-    // 2 angled boards + 2 side boards + 4 horizontal shelves = 8 children
-    expect(shelf.children.length).toBe(8);
+    // Should have 4 boards + shelves + interior surfaces (Task 6.1.1.1)
+    // 2 angled boards + 2 side boards + 4 horizontal shelves + 4 interior surfaces = 12 children
+    expect(shelf.children.length).toBe(12);
   });
 
   it('should create shelves with correct dimensions', () => {
@@ -34,8 +34,8 @@ describe('ProceduralShelfGenerator', () => {
 
     const shelf = generator.generateShelfUnit(new THREE.Vector3(0, 0, 0), options);
     
-    // Should have 4 boards + 3 shelves = 7 children
-    expect(shelf.children.length).toBe(7);
+    // Should have 4 boards + 3 shelves + 3 interior surfaces = 10 children (Task 6.1.1.1)
+    expect(shelf.children.length).toBe(10);
   });
 
   it('should create a test scene', () => {

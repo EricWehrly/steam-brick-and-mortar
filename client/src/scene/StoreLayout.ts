@@ -193,13 +193,14 @@ export class StoreLayout {
   /**
    * Create shelf sections using GPU-optimized rendering
    * Uses the existing ProceduralShelfGenerator but with optimized batching
+   * Updated for Task 6.1.1.1: MDF veneer materials
    */
   private async createShelfSectionsGPUOptimized(config: StoreLayoutConfig): Promise<void> {
     const totalShelves = config.sections.reduce((sum, section) => sum + section.shelfCount, 0);
-    StoreLayout.logger.info(`GPU: Creating ${totalShelves} shelves with optimized batching`);
+    StoreLayout.logger.info(`GPU: Creating ${totalShelves} shelves with MDF veneer materials (Task 6.1.1.1)`);
     
-    // Pre-create shared materials for better performance
-    const woodMaterial = this.textureManager.createSimpleWoodMaterial({ color: new THREE.Color(0x8B4513) });
+    // Note: Individual materials are now handled by ProceduralShelfGenerator
+    // The generator uses MDF veneer, white interior, and brand blue materials automatically
     
     // Generate all shelves using the existing generator but with batched approach
     for (const section of config.sections) {
@@ -215,15 +216,10 @@ export class StoreLayout {
           section.position.z
         );
         
-        // Use standard generator but with shared material for GPU efficiency
+        // Generate shelf with MDF veneer materials (Task 6.1.1.1)
         const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition, STANDARD_SHELF_CONFIG);
-        
-        // Apply shared material to all meshes in the shelf for GPU batching
-        shelfUnit.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            child.material = woodMaterial;
-          }
-        });
+        // Materials are now handled internally by ProceduralShelfGenerator:
+        // - MDF veneer exterior, white interior, brand blue supports
         
         sectionShelves.push(shelfUnit);
       }
@@ -285,12 +281,15 @@ export class StoreLayout {
   }
 
   /**
-   * Create entrance area with checkout
+   * Create entrance area with checkout (Task 6.1.1.1: Updated with MDF veneer material)
    */
   private createEntranceArea(config: StoreLayoutConfig): void {
-    // Simple entrance marker (can be enhanced later)
+    // Simple entrance marker with MDF veneer finish
     const entranceGeometry = new THREE.BoxGeometry(3, 0.1, 2);
-    const entranceMaterial = this.textureManager.createSimpleWoodMaterial({ color: new THREE.Color(0x8B4513) });
+    const entranceMaterial = this.textureManager.createMDFVeneerMaterial({
+      repeat: { x: 3, y: 2 },
+      veneerColor: '#E6D3B7'
+    });
     
     const entrance = new THREE.Mesh(entranceGeometry, entranceMaterial);
     entrance.position.set(0, 0.05, config.depth / 2 - 1);

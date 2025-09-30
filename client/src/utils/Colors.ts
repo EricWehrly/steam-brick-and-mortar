@@ -10,8 +10,16 @@ export const BlockbusterColors = {
     ceiling: 0xF5F5F5,      // White popcorn texture
     
     // Shelving colors
-    shelfWood: 0xD2B48C,    // Light wood/tan
-    shelfAccents: 0x1C1C1C, // Black accents
+    shelfWood: 0xD2B48C,    // Light wood/tan (legacy)
+    shelfAccents: 0x1C1C1C, // Black accents (legacy)
+    
+    // MDF Veneer shelving system (Task 6.1.1.1)
+    mdfVeneer: 0xE6D3B7,        // Light oak veneer - realistic MDF with wood veneer
+    shelfInterior: 0xFFFFF8,    // Glossy white interior surfaces
+    brandBlue: 0x0066CC,        // Consistent brand blue for accents
+    
+    // Component-specific materials
+    supportPosts: 0x0066CC,     // Brand blue for vertical supports/brackets
     
     // Signage colors
     newReleasesRed: 0xDC143C,    // Crimson red background
@@ -30,6 +38,11 @@ export const BlockbusterColorsHex = {
     ceiling: '#F5F5F5',
     shelfWood: '#D2B48C',
     shelfAccents: '#1C1C1C',
+    
+    mdfVeneer: '#E6D3B7',
+    shelfInterior: '#FFFFF8',
+    brandBlue: '#0066CC',
+    supportPosts: '#0066CC',
     newReleasesRed: '#DC143C',
     newReleasesText: '#FFFFFF',
     categoryBlue: '#4169E1',
