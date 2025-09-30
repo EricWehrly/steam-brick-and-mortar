@@ -46,10 +46,6 @@ export class SteamUIPanel {
       this.loadGamesButton.addEventListener('click', () => {
         const userInput = this.getUserInput()
         if (userInput) {
-          // Keep UI visible but show loading state
-          this.setLoadingState(true)
-          this.showStatus('Loading Steam games...', 'loading')
-          
           this.eventManager.emit(SteamEventTypes.LoadGames, {
             userInput,
             timestamp: Date.now(),
@@ -170,13 +166,19 @@ export class SteamUIPanel {
     }
     this.steamStatus.className = `status-${type}`
     
-    // Auto-hide success messages after 5 seconds
-    if (type === 'success') {
-      setTimeout(() => {
-        if (this.steamStatus) {
-          this.steamStatus.className = 'status-hidden'
-        }
-      }, 5000)
+    // Manage loading state based on status type
+    if (type === 'loading') {
+      this.setLoadingState(true)
+    } else if (type === 'error' || type === 'success') {
+      this.setLoadingState(false)
+      if (type === 'success') {
+        // Auto-hide success messages after 5 seconds
+        setTimeout(() => {
+          if (this.steamStatus) {
+            this.steamStatus.className = 'status-hidden'
+          }
+        }, 5000)
+      }
     }
   }
   
@@ -200,25 +202,6 @@ export class SteamUIPanel {
         this.steamUI.classList.remove('loading')
       }
     }
-  }
-
-  /**
-   * Handle error state - re-enable UI for retry and show error message
-   */
-  handleError(errorMessage: string): void {
-    this.setLoadingState(false)  // Re-enable all controls
-    this.showStatus(errorMessage, 'error')
-    // Keep the steam UI panel visible so user can retry
-    this.show()
-  }
-
-  /**
-   * Handle successful completion - can hide UI or transition to game view
-   */
-  handleSuccess(): void {
-    this.setLoadingState(false)
-    // For now, hide the UI on success (games will be loaded)
-    this.hide()
   }
   
   updateCacheStats(stats: { totalEntries: number; cacheHits: number; cacheMisses: number }): void {
