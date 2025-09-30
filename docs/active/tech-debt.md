@@ -3,6 +3,8 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
+- make "UIEvent" a type of event and have all UI emissions use that event type with a sub-identifier for their specific UI Event.
+
 ### Graphics Settings Scene Reload Optimization
 **Priority**: Medium  
 **Effort**: 3-4 hours  
