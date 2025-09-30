@@ -38,7 +38,6 @@ vi.mock('../../../src/steam-integration/SteamIntegration', () => ({
         getCacheStats: vi.fn().mockReturnValue({}),
         getImageCacheStats: vi.fn().mockReturnValue({}),
         clearImageCache: vi.fn(),
-        hasOfflineData: vi.fn().mockReturnValue(false),
         refreshData: vi.fn().mockResolvedValue(undefined)
     }))
 }))
@@ -79,8 +78,7 @@ vi.mock('../../../src/ui/UICoordinator', () => ({
             updateCacheStats: vi.fn(),
             updateProgress: vi.fn(),
             showProgress: vi.fn(),
-            showSteamStatus: vi.fn(),
-            checkOfflineAvailability: vi.fn()
+            showSteamStatus: vi.fn()
         },
         webxr: {
             updateWebXRSessionState: vi.fn(),

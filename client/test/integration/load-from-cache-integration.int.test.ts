@@ -31,10 +31,6 @@ const mockLoadFromCacheButton = document.createElement('button')
 mockLoadFromCacheButton.id = 'load-from-cache'
 mockLoadFromCacheButton.style.display = 'none'
 
-const mockUseOfflineButton = document.createElement('button')
-mockUseOfflineButton.id = 'use-offline-data'
-mockUseOfflineButton.style.display = 'none'
-
 const mockSteamStatus = document.createElement('div')
 mockSteamStatus.id = 'steam-status'
 
@@ -54,7 +50,6 @@ describe('Load from Cache Integration', () => {
     document.body.appendChild(mockVanityInput)
     document.body.appendChild(mockLoadGamesButton)
     document.body.appendChild(mockLoadFromCacheButton)
-    document.body.appendChild(mockUseOfflineButton)
     document.body.appendChild(mockSteamStatus)
     document.body.appendChild(mockWebXRButton)
 

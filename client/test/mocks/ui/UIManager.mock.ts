@@ -12,7 +12,6 @@ export const UIManagerMock = vi.fn().mockImplementation(() => ({
     steamUIPanel: {
         showStatus: vi.fn(),
         updateCacheStats: vi.fn(),
-        checkOfflineAvailability: vi.fn(),
         isDevelopmentMode: vi.fn().mockReturnValue(false)
     },
     progressDisplay: {
@@ -30,7 +29,6 @@ export const UIManagerMock = vi.fn().mockImplementation(() => ({
     steamUIPanel: {
         showStatus: vi.fn(),
         updateCacheStats: vi.fn(),
-        checkOfflineAvailability: vi.fn(),
         isDevelopmentMode: vi.fn().mockReturnValue(false)
     },
     progressDisplay: {

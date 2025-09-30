@@ -71,14 +71,6 @@ canvas {
     background: #357abd;
 }
 
-.button-offline {
-    background: #ff8c00;
-}
-
-.button-offline:hover {
-    background: #e67c00;
-}
-
 
 /* UI component utilities */
 .hidden {

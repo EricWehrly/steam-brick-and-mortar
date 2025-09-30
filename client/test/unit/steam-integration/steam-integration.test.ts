@@ -90,13 +90,6 @@ describe('SteamIntegration Unit Tests', () => {
         })
     })
 
-    describe('Offline Data', () => {
-        test('should return false for offline data availability', () => {
-            const hasOffline = steamIntegration.hasOfflineData('testuser')
-            expect(hasOffline).toBe(false)
-        })
-    })
-
     describe('Refresh Data', () => {
         test('should return null when no current data to refresh', async () => {
             const callbacks = {

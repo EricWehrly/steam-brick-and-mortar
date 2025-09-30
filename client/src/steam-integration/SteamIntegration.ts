@@ -190,14 +190,6 @@ export class SteamIntegration {
     }
 
     /**
-     * Check if offline data is available for a user
-     */
-    hasOfflineData(_vanityUrl: string): boolean {
-        // For now, return false as offline mode is not implemented in simplified client
-        return false
-    }
-
-    /**
      * Check if cached data is available for a user
      * 
      * TODO: Story 5.5.1 (backlogged) - Potential optimization to reduce from 2 cache lookups to 1,

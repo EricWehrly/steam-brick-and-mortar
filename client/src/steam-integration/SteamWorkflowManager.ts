@@ -5,13 +5,12 @@
  * managed in SteamBrickAndMortarApp. This includes:
  * - Game loading workflow with progress tracking
  * - Cache management operations
- * - Offline data handling
  */
 
 import type { EventManager } from '../core/EventManager'
 import { EventSource } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
-import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamUseOfflineEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
+import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
 import type { SteamIntegration } from './SteamIntegration'
 import type { SceneCoordinator } from '../scene'
 import type { UICoordinator } from '../ui'
@@ -40,7 +39,6 @@ export class SteamWorkflowManager {
         // Register event handlers directly - no intermediate layers
         this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.onLoadGames.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.LoadFromCache, this.onLoadFromCache.bind(this))
-        this.eventManager.registerEventHandler(SteamEventTypes.UseOffline, this.onUseOfflineData.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.onRefreshCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.onClearCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheStats, this.onCacheStats.bind(this))
@@ -147,16 +145,6 @@ export class SteamWorkflowManager {
             SteamWorkflowManager.logger.error('Load from cache workflow failed:', error)
             // Error message handled by SteamIntegration via callbacks for consistency
         }
-    }
-
-    /**
-     * Use offline data workflow (placeholder)
-     */
-    private async onUseOfflineData(event: CustomEvent<SteamUseOfflineEvent>): Promise<void> {
-        SteamWorkflowManager.logger.info('Use offline data workflow triggered')
-        
-        // TODO: Implement offline data functionality
-        SteamWorkflowManager.logger.warn('Offline mode is not yet implemented.')
     }
 
     /**

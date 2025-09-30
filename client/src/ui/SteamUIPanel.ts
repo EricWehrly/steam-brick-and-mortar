@@ -14,7 +14,6 @@ export class SteamUIPanel {
   private steamUserInput: HTMLInputElement | null
   private loadGamesButton: HTMLButtonElement | null
   private loadFromCacheButton: HTMLButtonElement | null
-  private useOfflineButton: HTMLButtonElement | null
   private refreshCacheButton: HTMLButtonElement | null
   private clearCacheButton: HTMLButtonElement | null
   private showCacheStatsButton: HTMLButtonElement | null
@@ -29,7 +28,6 @@ export class SteamUIPanel {
     this.steamUserInput = getElementByIdSafe('steam-user-input') as HTMLInputElement
     this.loadGamesButton = getElementByIdSafe('load-steam-games') as HTMLButtonElement
     this.loadFromCacheButton = getElementByIdSafe('load-from-cache') as HTMLButtonElement
-    this.useOfflineButton = getElementByIdSafe('use-offline-data') as HTMLButtonElement
     this.refreshCacheButton = getElementByIdSafe('refresh-cache') as HTMLButtonElement
     this.clearCacheButton = getElementByIdSafe('clear-cache') as HTMLButtonElement
     this.showCacheStatsButton = getElementByIdSafe('show-cache-stats') as HTMLButtonElement
@@ -67,20 +65,6 @@ export class SteamUIPanel {
         const userInput = this.getUserInput()
         if (userInput) {
           this.eventManager.emit(SteamEventTypes.LoadFromCache, {
-            userInput,
-            timestamp: Date.now(),
-            source: EventSource.UI
-          })
-        }
-      })
-    }
-    
-    // Use Offline button
-    if (this.useOfflineButton) {
-      this.useOfflineButton.addEventListener('click', () => {
-        const userInput = this.getUserInput()
-        if (userInput) {
-          this.eventManager.emit(SteamEventTypes.UseOffline, {
             userInput,
             timestamp: Date.now(),
             source: EventSource.UI
@@ -132,10 +116,9 @@ export class SteamUIPanel {
         }
       })
       
-      // Input change handler for cache and offline availability
+      // Input change handler for cache availability
       this.steamUserInput.addEventListener('input', () => {
         const userInput = this.steamUserInput?.value.trim() || ''
-        this.checkOfflineAvailability(userInput)
         
         // Show/hide Load from Cache button based on input presence
         // The actual cache availability will be handled by the workflow manager
@@ -204,9 +187,6 @@ export class SteamUIPanel {
     }
     if (this.loadFromCacheButton) {
       this.loadFromCacheButton.disabled = isLoading
-    }
-    if (this.useOfflineButton) {
-      this.useOfflineButton.disabled = isLoading
     }
     if (this.steamUserInput) {
       this.steamUserInput.disabled = isLoading
@@ -277,18 +257,6 @@ export class SteamUIPanel {
     
     // Show the Load from Cache button when cached data is available
     this.loadFromCacheButton.classList.remove('hidden')
-  }
-  
-  checkOfflineAvailability(userInput: string): void {
-    if (!this.useOfflineButton) return
-    
-    if (!userInput) {
-      this.useOfflineButton.classList.add('hidden')
-      return
-    }
-    
-    // For simplified client, always hide offline button since it's not implemented
-    this.useOfflineButton.classList.add('hidden')
   }
   
 

@@ -5,7 +5,6 @@ import { vi } from 'vitest'
 
 export const SteamIntegrationMock = vi.fn().mockImplementation(() => ({
     loadGamesForUser: vi.fn().mockResolvedValue([]),
-    hasOfflineData: vi.fn().mockReturnValue(false),
     dispose: vi.fn()
 }))
 

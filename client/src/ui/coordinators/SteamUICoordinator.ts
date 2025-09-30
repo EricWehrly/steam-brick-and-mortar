@@ -68,17 +68,6 @@ export class SteamUICoordinator {
     }
 
     /**
-     * Use offline data workflow
-     */
-    useOffline(userInput: string): void {
-        this.eventManager.emit(SteamEventTypes.UseOffline, {
-            userInput,
-            timestamp: Date.now(),
-            source: EventSource.UI
-        })
-    }
-
-    /**
      * Refresh cache workflow
      */
     refreshCache(): void {
@@ -141,13 +130,6 @@ export class SteamUICoordinator {
      */
     showSteamStatus(message: string, type: 'loading' | 'success' | 'error'): void {
         UIManager.getInstance().steamUIPanel.showStatus(message, type)
-    }
-
-    /**
-     * Check offline availability for user input
-     */
-    checkOfflineAvailability(userInput: string): void {
-        UIManager.getInstance().steamUIPanel.checkOfflineAvailability(userInput)
     }
 
     /**

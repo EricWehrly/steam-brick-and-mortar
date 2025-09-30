@@ -23,9 +23,7 @@ export interface SteamLoadFromCacheEvent extends BaseInteractionEvent {
     userInput: string
 }
 
-export interface SteamUseOfflineEvent extends BaseInteractionEvent {
-    userInput: string
-}
+
 
 export interface SteamCacheClearEvent extends BaseInteractionEvent {
     // No additional data needed
@@ -153,7 +151,6 @@ export interface LightingSystemReadyEvent extends BaseInteractionEvent {
 export const SteamEventTypes = {
     LoadGames: 'steam:load-games',
     LoadFromCache: 'steam:load-from-cache',
-    UseOffline: 'steam:use-offline', 
     CacheClear: 'steam:cache-clear',
     CacheRefresh: 'steam:cache-refresh',
     CacheStats: 'steam:cache-stats',
@@ -209,7 +206,6 @@ export interface InteractionEventMap {
     // Steam events
     [SteamEventTypes.LoadGames]: SteamLoadGamesEvent
     [SteamEventTypes.LoadFromCache]: SteamLoadFromCacheEvent
-    [SteamEventTypes.UseOffline]: SteamUseOfflineEvent
     [SteamEventTypes.CacheClear]: SteamCacheClearEvent
     [SteamEventTypes.CacheRefresh]: SteamCacheRefreshEvent
     [SteamEventTypes.CacheStats]: SteamCacheStatsEvent
