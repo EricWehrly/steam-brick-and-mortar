@@ -44,17 +44,14 @@ export interface SteamApiError {
 
 /**
  * Simplified Steam API Client using layered composition
+ * 
+ * All public methods include explicit caching logic for transparency and easier debugging.
  */
 export class SteamApiClient {
     private http: HttpClient
     private cache: CacheManager
     private rateLimiter: RateLimiter
     private images: ImageManager
-    
-    // Cached methods - these are the actual methods that get called
-    public getUserGames: (steamId: string) => Promise<SteamUser>
-    public resolveVanityUrl: (vanityUrl: string) => Promise<SteamResolveResponse>
-    public getGameDetails: (game: SteamGame) => Promise<SteamGame>
 
     constructor(apiBaseUrl = 'https://steam-api-dev.wehrly.com') {
         // Initialize all layers
@@ -62,54 +59,69 @@ export class SteamApiClient {
         this.cache = new CacheManager({ cachePrefix: 'steam_api_' })
         this.rateLimiter = new RateLimiter({ requestsPerSecond: 4 })
         this.images = new ImageManager()
-        
-        // Create cached versions of methods
-        this.getUserGames = this.cache.withCache(
-            this.rawGetUserGames.bind(this),
-            (steamId: string) => `games_${steamId}`
-        )
-        
-        this.resolveVanityUrl = this.cache.withCache(
-            this.rawResolveVanityUrl.bind(this),
-            (vanityUrl: string) => `resolve_${vanityUrl.toLowerCase()}`
-        )
-        
-        this.getGameDetails = this.cache.withCache(
-            this.rateLimiter.limited(this.rawGetGameDetails.bind(this)),
-            (game: SteamGame) => `game_${game.appid}`
-        )
     }
 
     /**
-     * Raw methods - these do the actual work
+     * Resolve Steam vanity URL to Steam ID with caching
+     * 
+     * @param vanityUrl - The custom URL part (e.g., "SpiteMonger")
+     * @returns Promise<SteamResolveResponse> - Contains steamid and vanity_url
      */
-    private async rawResolveVanityUrl(vanityUrl: string): Promise<SteamResolveResponse> {
+    public async resolveVanityUrl(vanityUrl: string): Promise<SteamResolveResponse> {
         if (!vanityUrl || vanityUrl.trim().length === 0) {
             throw new Error('Vanity URL cannot be empty')
         }
 
         const cleanVanityUrl = vanityUrl.trim().toLowerCase()
-        const endpoint = `/resolve/${encodeURIComponent(cleanVanityUrl)}`
+        const cacheKey = `resolve_${cleanVanityUrl}`
         
+        // Check cache first
+        const cached = this.cache.get<SteamResolveResponse>(cacheKey)
+        if (cached) {
+            console.log(`📋 Using cached vanity URL resolution for: ${cleanVanityUrl}`)
+            return cached
+        }
+        
+        // Make API request
+        const endpoint = `/resolve/${encodeURIComponent(cleanVanityUrl)}`
         console.log(`🔍 Resolving vanity URL: "${vanityUrl}" -> "${cleanVanityUrl}" -> endpoint: ${endpoint}`)
         
         try {
             const response = await this.http.makeRequest<SteamResolveResponse>(endpoint)
             console.log('✅ Vanity URL resolved successfully:', response)
+            
+            // Cache the result
+            this.cache.set(cacheKey, response)
+            
             return response
         } catch (error) {
-            console.error('❌ Failed to resolve vanity URL:', error)
+            // Let the calling code handle error logging with proper context  
             throw error
         }
     }
 
-    private async rawGetUserGames(steamId: string): Promise<SteamUser> {
+    /**
+     * Get user's Steam games with caching
+     * 
+     * @param steamId - The 17-digit Steam ID
+     * @returns Promise<SteamUser> - Contains games list and user info
+     */
+    public async getUserGames(steamId: string): Promise<SteamUser> {
         if (!steamId || steamId.trim().length === 0) {
             throw new Error('Steam ID cannot be empty')
         }
 
-        const endpoint = `/games/${encodeURIComponent(steamId)}`
+        const cacheKey = `games_${steamId}`
         
+        // Check cache first
+        const cached = this.cache.get<SteamUser>(cacheKey)
+        if (cached) {
+            console.log(`📋 Using cached games data for Steam ID: ${steamId}`)
+            return cached
+        }
+        
+        // Make API request
+        const endpoint = `/games/${encodeURIComponent(steamId)}`
         console.log(`🎮 Fetching games for Steam ID: ${steamId}`)
         
         try {
@@ -120,6 +132,9 @@ export class SteamApiClient {
                 console.warn('⚠️ User has 0 games - this might indicate privacy settings or an empty library')
             }
             
+            // Cache the result
+            this.cache.set(cacheKey, response)
+            
             return response
         } catch (error) {
             console.error('❌ Failed to fetch user games:', error)
@@ -127,21 +142,43 @@ export class SteamApiClient {
         }
     }
 
-    private async rawGetGameDetails(game: SteamGame): Promise<SteamGame> {
-        // Enhance game with artwork URLs - handle missing image URLs gracefully
-        const enhancedGame: SteamGame = {
-            ...game,
-            artwork: {
-                icon: game.img_icon_url 
-                    ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
-                    : '',
-                logo: game.img_logo_url 
-                    ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`
-                    : '',
-                header: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`,
-                library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
-            }
+    /**
+     * Get enhanced game details with artwork URLs, caching, and rate limiting
+     * 
+     * @param game - Basic game info from Steam API
+     * @returns Promise<SteamGame> - Enhanced game with artwork URLs
+     */
+    public async getGameDetails(game: SteamGame): Promise<SteamGame> {
+        const cacheKey = `game_${game.appid}`
+        
+        // Check cache first
+        const cached = this.cache.get<SteamGame>(cacheKey)
+        if (cached) {
+            return cached
         }
+        
+        // Apply rate limiting for this operation
+        const enhancedGame = await this.rateLimiter.limited(async () => {
+            // Enhance game with artwork URLs - handle missing image URLs gracefully
+            const enhanced: SteamGame = {
+                ...game,
+                artwork: {
+                    icon: game.img_icon_url 
+                        ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
+                        : '',
+                    logo: game.img_logo_url 
+                        ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`
+                        : '',
+                    header: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`,
+                    library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
+                }
+            }
+            
+            return enhanced
+        })()
+        
+        // Cache the result
+        this.cache.set(cacheKey, enhancedGame)
         
         return enhancedGame
     }
