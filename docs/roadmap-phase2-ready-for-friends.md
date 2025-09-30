@@ -137,6 +137,34 @@
 
 ---
 
+## Feature 5.6: Enhanced Store Signage System 🔮
+**Context**: Immersive 3D signage elements to organize and highlight game content sections
+
+### Story 5.6.1: "New Releases" 3D Signage
+- **Task 5.6.1.1**: Implement 3D blocky letter signage system
+  - Create 3D text geometry using THREE.js TextGeometry or ExtrudeGeometry
+  - Design chunky, blockbuster-style letterforms with depth and dimension
+  - Implement configurable text depth, bevel, and styling options
+  - Add proper material handling for 3D text surfaces (front, back, sides)
+- **Task 5.6.1.2**: Position "NEW RELEASES" sign with angled mounting
+  - Position sign on designated wall section (likely back wall or prominent side wall)
+  - Implement 15-degree rotation for dynamic, eye-catching angle
+  - Calculate proper positioning relative to game shelves and store layout
+  - Ensure sign visibility from multiple viewing angles in VR space
+- **Task 5.6.1.3**: Integrate with existing signage system
+  - Extend SignageRenderer to support both 2D canvas signs and 3D blocky text
+  - Maintain compatibility with existing flat signage for category markers
+  - Add configuration options to choose between 2D and 3D signage styles
+  - Implement consistent styling and color schemes across signage types
+
+**Expected Deliverable**: 3D "NEW RELEASES" signage with angled wall mounting
+
+**Acceptance**: Prominent 3D letterforms visible at 15-degree angle, integrated with store layout
+
+**Context**: **Medium Priority** - Enhances store atmosphere and visual organization. Should be implemented alongside game content population features for cohesive store experience.
+
+---
+
 ## Milestone 7: Input Systems and User Controls 🔮
 *Goal: Implement comprehensive input support for mouse/keyboard, gamepad, and VR controllers*
 
