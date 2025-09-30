@@ -425,6 +425,14 @@
 - **Design System**: Consistent UI components, theme/customization system, multi-language support
 - **Advanced Performance Options**: Hardware-specific graphics presets and auto-detection
 
+### Visual Effects & Immersion
+- **Dissolve Animation System**: Implement smooth entrance animations for store geometry
+  - **Context**: Eliminate jarring "pop" appearance when scene loads with immersive materialization effects
+  - **Research**: See `docs/research/dissolve-animation-research.md` for technical findings and implementation approach
+  - **Priority**: Medium - Enhances user experience but not critical for core functionality
+  - **Dependencies**: Requires resolution of THREE.js material sharing issues and animation coordination
+  - **Timeline**: Estimated 5-7 days for complete implementation after material system refactoring
+
 ### Developer Experience & Extensibility
 - **Plugin/Extension System**: Community additions and modular panel architecture
 - **Enhanced Debug Tools**: Advanced Three.js scene inspection and performance profiling
