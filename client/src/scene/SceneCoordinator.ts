@@ -54,9 +54,10 @@ export class SceneCoordinator {
         )
         this.propsRenderer = new StorePropsRenderer(this.sceneManager.getScene())
 
-        // Register for GameStart event to trigger scene setup
-        EventManager.getInstance().registerEventHandler(GameEventTypes.Start, () => {
-            this.setupCompleteScene(config)
+        // 🚀 OPTIMIZATION: Start scene setup immediately for faster interactivity
+        // Don't wait for GameStart event - user should be able to move ASAP
+        this.setupCompleteScene(config).catch(error => {
+            console.error('❌ Failed to set up scene during construction:', error)
         })
 
         // Register for ceiling toggle events
@@ -66,50 +67,71 @@ export class SceneCoordinator {
     }
 
     async setupCompleteScene(config: SceneCoordinatorConfig = {}): Promise<void> {
-        console.log('🏪 Setting up complete VR-optimized store scene...')
-        console.log('📋 Loading sequence: Environment → Props → Lighting (for proper shadows)')
+        console.log('🏪 Setting up VR-optimized store scene with priority for user interaction...')
         
         try {
-            // PHASE 1: Environment Foundation
-            console.log('🌍 Phase 1/3: Setting up environment...')
-            await this.setupEnvironment(config.environment)
+            // 🚀 PRIORITY PHASE: Basic navigable environment (blocking - user needs this to move around)
+            console.log('🌍 Priority: Setting up basic environment for navigation...')
+            await this.setupBasicEnvironment(config.environment)
+            console.log('✅ Basic environment ready - user can now move around!')
             
-            // PHASE 2: Props and Interactive Objects (before lighting for shadows)
-            console.log('🎁 Phase 2/3: Setting up props...')
+            // 🎯 ASYNC PHASES: Enhanced details (non-blocking - user can move while these load)
+            console.log('📋 Background loading: Props → Lighting → Polish...')
+            
+            // Don't await these - let them complete in background while user moves around
+            this.setupEnhancedScene(config).catch(error => {
+                console.error('❌ Background scene enhancement failed:', error)
+            })
+            
+        } catch (error) {
+            console.error('❌ Failed to set up basic scene:', error)
+            throw error
+        }
+    }
+
+    /**
+     * Setup minimal environment needed for user navigation (blocking)
+     */
+    private async setupBasicEnvironment(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
+        // Use ceiling height from settings if not explicitly provided
+        const ceilingHeight = config.roomSize?.height ?? this.appSettings.getSetting('ceilingHeight')
+        
+        await this.environmentRenderer.setupEnvironment({
+            roomSize: {
+                width: config.roomSize?.width ?? 22,
+                depth: config.roomSize?.depth ?? 16,
+                height: ceilingHeight
+            },
+            skyboxPreset: config.skyboxPreset ?? 'aurora',
+            proceduralTextures: config.proceduralTextures ?? true
+        })
+    }
+
+    /**
+     * Setup enhanced scene elements in background (non-blocking)
+     */
+    private async setupEnhancedScene(config: SceneCoordinatorConfig): Promise<void> {
+        try {
+            // PHASE 1: Props and Interactive Objects
+            console.log('🎁 Background: Setting up props...')
             await this.setupProps(config.props)
             
-            // PHASE 3: Lighting Systems (after props for proper shadow casting)
-            console.log('💡 Phase 3/3: Setting up lighting...')            
+            // PHASE 2: Lighting Systems (after props for proper shadow casting)
+            console.log('💡 Background: Setting up lighting...')            
             await this.lightingRenderer.setupLighting()
             
             // Refresh shadows now that all props are in place
             this.lightingRenderer.refreshShadows()
             
             this.logSceneStats()
-            console.log('✅ Complete scene setup finished!')
+            console.log('✅ Enhanced scene setup completed!')
         } catch (error) {
-            console.error('❌ Failed to set up scene:', error)
-            throw error
+            console.error('❌ Enhanced scene setup failed:', error)
+            // Don't throw - basic scene is still functional
         }
     }
 
-    /**
-     * Set up environment foundation (Phase 1)
-     */
-    private async setupEnvironment(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
-        // Use ceiling height from settings if not explicitly provided
-        const ceilingHeight = config.roomSize?.height ?? this.appSettings.getSetting('ceilingHeight')
-        
-        await this.environmentRenderer.setupEnvironment({
-            skyboxPreset: config.skyboxPreset ?? 'aurora',
-            roomSize: config.roomSize ?? { 
-                width: 22, 
-                depth: 16, 
-                height: ceilingHeight 
-            },
-            proceduralTextures: config.proceduralTextures ?? true
-        })
-    }
+
 
     /**
      * Set up props and interactive objects (Phase 3)
