@@ -45,15 +45,16 @@ describe('StoreLayout', () => {
     expect(stats.storeSize.depth).toBe(16);   // Enhanced room depth
   });
 
-  it('should provide access to store group', () => {
-    const storeGroup = storeLayout.getStoreGroup();
+  it('should return store group from generate methods', async () => {
+    const storeGroup = await storeLayout.generateBasicRoom();
     
     expect(storeGroup).toBeInstanceOf(THREE.Group);
-    expect(scene.children).toContain(storeGroup);
+    expect(storeGroup.name).toBe('StoreLayout');
   });
 
-  it('should dispose resources properly', () => {
-    const storeGroup = storeLayout.getStoreGroup();
+  it('should dispose resources properly', async () => {
+    const storeGroup = await storeLayout.generateBasicRoom();
+    scene.add(storeGroup); // Manually add to scene for test
     
     storeLayout.dispose();
     

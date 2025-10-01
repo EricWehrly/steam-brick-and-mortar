@@ -123,26 +123,25 @@ export class StorePropsRenderer {
     private async setupShelves(): Promise<void> {
         console.log('📚 Generating shelves (auto: attempting GPU-optimized with fallbacks)...')
         
+        let storeGroup: THREE.Group;
+        
         try {
             // Attempt GPU-optimized generation first (best performance)
-            await this.storeLayout.generateShelvesGPUOptimized()
+            storeGroup = await this.storeLayout.generateShelvesGPUOptimized()
             console.log('✅ Shelves generated successfully (GPU-optimized)')
         } catch (error) {
             console.warn('❌ GPU-optimized generation failed, using basic generation...', error)
             try {
-                // Fallback to basic generation (which now also uses GPU-optimized)
-                await this.storeLayout.generateShelvesGPUOptimized()
+                // Fallback to basic generation 
+                storeGroup = await this.storeLayout.generateBasicRoom()
                 console.log('✅ Shelves generated successfully (basic fallback)')
             } catch (basicError) {
                 console.error('❌ All shelf generation methods failed:', basicError)
-                // Try at least generating a basic room structure
-                await this.storeLayout.generateBasicRoom()
-                console.log('⚠️ Using minimal room structure (emergency fallback)')
+                throw basicError;
             }
         }
 
-        // CRITICAL: Add the storeGroup to the scene so shelves and game boxes are visible
-        const storeGroup = this.storeLayout.getStoreGroup();
+        // CRITICAL: Add the returned storeGroup to the scene so shelves and game boxes are visible
         this.scene.add(storeGroup);
     }
 
@@ -237,7 +236,7 @@ export class StorePropsRenderer {
 
     public updateMaxGames(maxGames: number): void {
         if (this.gameBoxRenderer) {
-            this.gameBoxRenderer.updateShelfConfig({ maxGames })
+            this.gameBoxRenderer.updateMaxGames(maxGames)
         }
     }
 

@@ -93,7 +93,7 @@ export class GameBoxRenderer {
     }
 
     private dimensions: GameBoxDimensions
-    private shelfConfig: ShelfConfiguration
+    private maxGames: number
     private gameBoxGeometry: THREE.BoxGeometry
     private textureLoader: THREE.TextureLoader
     private fallbackTexture: THREE.Texture | null = null
@@ -111,7 +111,7 @@ export class GameBoxRenderer {
         performanceConfig: Partial<TexturePerformanceConfig> = {}
     ) {
         this.dimensions = { ...GameBoxRenderer.DEFAULT_DIMENSIONS, ...dimensions }
-        this.shelfConfig = { ...GameBoxRenderer.DEFAULT_SHELF_CONFIG, ...shelfConfig }
+        this.maxGames = shelfConfig.maxGames ?? GameBoxRenderer.DEFAULT_SHELF_CONFIG.maxGames
         
         // Initialize performance configuration
         this.performanceConfig = {
@@ -139,12 +139,13 @@ export class GameBoxRenderer {
     /**
      * Create placeholder game boxes
      */
-    public createPlaceholderBoxes(count: number = 6): THREE.Mesh[] {
+    public createPlaceholderBoxes(count: number = 6, shelfConfig?: ShelfConfiguration): THREE.Mesh[] {
         
         const materials = this.createPlaceholderMaterials()
         const boxes: THREE.Mesh[] = []
         
-        const startX = this.calculateStartX(count)
+        const config = shelfConfig ?? GameBoxRenderer.DEFAULT_SHELF_CONFIG
+        const startX = this.calculateStartX(count, config)
         
         for (let i = 0; i < count; i++) {
             const gameBox = new THREE.Mesh(
@@ -159,7 +160,7 @@ export class GameBoxRenderer {
             }
             
             // Position the box
-            const position = this.calculateBoxPosition(i, startX)
+            const position = this.calculateBoxPosition(i, startX, config)
             gameBox.position.set(position.x, position.y, position.z)
             
             // Enable shadows
@@ -196,7 +197,7 @@ export class GameBoxRenderer {
         textureOptions?: GameBoxTextureOptions
     ): THREE.Mesh | null {
         // Check if we're within display limits
-        if (index >= this.shelfConfig.maxGames) {
+        if (index >= this.maxGames) {
             return null
         }
 
@@ -216,8 +217,8 @@ export class GameBoxRenderer {
         }
         
         // Position the box
-        const startX = this.calculateStartX(this.shelfConfig.maxGames)
-        const position = this.calculateBoxPosition(index, startX)
+        const startX = this.calculateStartX(this.maxGames, GameBoxRenderer.DEFAULT_SHELF_CONFIG)
+        const position = this.calculateBoxPosition(index, startX, GameBoxRenderer.DEFAULT_SHELF_CONFIG)
         gameBox.position.set(position.x, position.y, position.z)
         
         // Enable shadows
@@ -285,10 +286,10 @@ export class GameBoxRenderer {
     }
 
     /**
-     * Update shelf configuration
+     * Update max games limit
      */
-    public updateShelfConfig(newConfig: Partial<ShelfConfiguration>) {
-        this.shelfConfig = { ...this.shelfConfig, ...newConfig }
+    public updateMaxGames(maxGames: number) {
+        this.maxGames = maxGames
     }
 
     /**
@@ -308,15 +309,15 @@ export class GameBoxRenderer {
         return MaterialUtils.createGameBoxMaterials()
     }
 
-    private calculateStartX(numBoxes: number): number {
-        return -(numBoxes - 1) * this.shelfConfig.spacing / 2
+    private calculateStartX(numBoxes: number, config: ShelfConfiguration): number {
+        return -(numBoxes - 1) * config.spacing / 2
     }
 
-    private calculateBoxPosition(index: number, startX: number): GameBoxPosition {
+    private calculateBoxPosition(index: number, startX: number, config: ShelfConfiguration): GameBoxPosition {
         return {
-            x: this.shelfConfig.centerX + startX + (index * this.shelfConfig.spacing),
-            y: this.shelfConfig.surfaceY, // Use exact Y position calculated by StoreLayout
-            z: this.shelfConfig.centerZ    // Use exact Z position calculated by StoreLayout
+            x: config.centerX + startX + (index * config.spacing),
+            y: config.surfaceY, // Use exact Y position calculated by StoreLayout
+            z: config.centerZ    // Use exact Z position calculated by StoreLayout
         }
     }
 
@@ -325,14 +326,14 @@ export class GameBoxRenderer {
         const playedGames = games
             .filter(game => game.playtime_forever > 0)
             .sort((a, b) => b.playtime_forever - a.playtime_forever)
-            .slice(0, this.shelfConfig.maxGames)
+            .slice(0, this.maxGames)
         
         // If we don't have enough played games, fill with unplayed games
-        if (playedGames.length < this.shelfConfig.maxGames) {
+        if (playedGames.length < this.maxGames) {
             const unplayedGames = games
                 .filter(game => game.playtime_forever === 0)
                 .sort((a, b) => a.name.localeCompare(b.name))
-                .slice(0, this.shelfConfig.maxGames - playedGames.length)
+                .slice(0, this.maxGames - playedGames.length)
             
             playedGames.push(...unplayedGames)
         }

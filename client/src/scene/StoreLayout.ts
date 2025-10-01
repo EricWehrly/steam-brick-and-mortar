@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator';
 import { TextureManager } from '../utils/TextureManager';
-import { RoomStructureBuilder } from './RoomStructureBuilder';
 import { Logger } from '../utils/Logger';
 import { GameBoxRenderer } from './GameBoxRenderer';
 
@@ -23,7 +22,6 @@ export class StoreLayout {
   private scene: THREE.Scene;
   private shelfGenerator: ProceduralShelfGenerator | null = null;
   private textureManager: TextureManager;
-  private roomBuilder: RoomStructureBuilder;
   private gameBoxRenderer: GameBoxRenderer;
   private readonly storeGroup: THREE.Group;
 
@@ -32,7 +30,6 @@ export class StoreLayout {
     this.storeGroup.name = "StoreLayout"
     this.gameBoxRenderer = new GameBoxRenderer()
     this.textureManager = TextureManager.getInstance()
-    this.roomBuilder = new RoomStructureBuilder()
     
     if (scene) {
       this.scene = scene;
@@ -40,49 +37,26 @@ export class StoreLayout {
     }
   }
 
-  // TODO: I think we can delete this method and just call the configfactory directly.
-  // some tests are gonna need to get updated (or deleted) tho
-  /**
-   * Create VR-optimized Steam store layout based on Phase 2C research
-   * Enhanced dimensions, Steam categories, and VR ergonomics
-   */
   public createDefaultLayout(): StoreLayoutConfig {
     return StoreLayoutConfigFactory.createDefaultLayout();
   }
 
-  /**
-   * Generate just the basic room structure without shelves (for fast startup)
-   */
-  public async generateBasicRoom(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
-    // Clear existing store
+  public async generateBasicRoom(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<THREE.Group> {
     this.clearStore();
-
-    // Create only entrance area - room structure handled by EnvironmentRenderer
     this.createEntranceArea(config);
-    
-    StoreLayout.logger.info('Basic room ready (room structure handled by EnvironmentRenderer)')
+    StoreLayout.logger.info('Basic room ready');
+    return this.storeGroup;
   }
 
-  /**
-   * Generate shelves using GPU-optimized instanced rendering for maximum performance
-   */
-  public async generateShelvesGPUOptimized(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
-    // Clear existing store
+  public async generateShelvesGPUOptimized(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<THREE.Group> {
     this.clearStore();
-
-    // Create only GPU-optimized shelves - room structure handled by EnvironmentRenderer
     await this.createShelfSectionsGPUOptimized(config);
     this.createEntranceArea(config);
-    
-    StoreLayout.logger.info('GPU-optimized shelves generated (room structure handled by EnvironmentRenderer)')
+    StoreLayout.logger.info('GPU-optimized shelves generated');
+    return this.storeGroup;
   }
 
-  /**
-   * Create single test shelf for game spawning development
-   * Uses ProceduralShelfGenerator with optional signage
-   */
   private async createShelfSectionsGPUOptimized(config: StoreLayoutConfig): Promise<void> {
-    // Creating single test shelf "The Shelf" for game spawning development
     
     // Create single centered shelf for testing
     const testShelfGroup = new THREE.Group();
@@ -101,8 +75,7 @@ export class StoreLayout {
     const shelfUnit = this.shelfGenerator.generateShelfUnit(new THREE.Vector3(0, 0, 0));
     testShelfGroup.add(shelfUnit);
     
-    // Add optional signage - example with "The Shelf" title
-    this.addOptionalSectionLabel(testShelfGroup, "The Shelf", shelfPosition);
+    this.addSectionLabel(testShelfGroup, "The Shelf", shelfPosition);
     
     // Add spotlight above the shelf
     this.addShelfSpotlight(shelfPosition);
@@ -113,99 +86,30 @@ export class StoreLayout {
     this.storeGroup.add(testShelfGroup);    // Single test shelf created with spotlight and game boxes
   }
 
-  /**
-   * Add optional section label above shelves - only if title is provided
-   */
-  private addOptionalSectionLabel(sectionGroup: THREE.Group, title: string | null, position: THREE.Vector3): void {
-    if (!title) return; // No label if no title provided
-    
-    // Create a canvas for the text
+  private addSectionLabel(sectionGroup: THREE.Group, title: string, position: THREE.Vector3): void {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 128;
     const ctx = canvas.getContext('2d');
-    
     if (!ctx) return;
     
-    // Style the text
-    ctx.fillStyle = '#000080'; // Blue background
+    ctx.fillStyle = '#000080';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.fillStyle = '#FFFFFF'; // White text
+    ctx.fillStyle = '#FFFFFF';
     ctx.font = '48px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    
     ctx.fillText(title, canvas.width / 2, canvas.height / 2);
     
-    // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
-    
-    // Create sign geometry and material
-    const labelGeometry = new THREE.PlaneGeometry(2.0, 0.5);
-    const labelMaterial = new THREE.MeshStandardMaterial({
-      map: texture,
-      transparent: true
-    });
-    
-    const label = new THREE.Mesh(labelGeometry, labelMaterial);
-    label.position.set(
-      position.x,
-      2.3, // Above shelf height
-      position.z
+    const label = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.0, 0.5),
+      new THREE.MeshStandardMaterial({ map: texture, transparent: true })
     );
-    
+    label.position.set(position.x, 2.3, position.z);
     sectionGroup.add(label);
   }
 
-  /**
-   * Add a section label above the shelves using proper text signage (legacy method)
-   */
-  private addSectionLabel(sectionGroup: THREE.Group, section: StoreSection): void {
-    // Create a canvas for the text
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) return;
-    
-    // Style the text
-    ctx.fillStyle = '#000080'; // Blue background
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.fillStyle = '#FFFFFF'; // White text
-    ctx.font = '48px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    // Get display name for the section
-    const displayName = StoreLayoutConfigFactory.getSectionDisplayName(section.name);
-    ctx.fillText(displayName, canvas.width / 2, canvas.height / 2);
-    
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    
-    // Create sign geometry and material
-    const labelGeometry = new THREE.PlaneGeometry(2.0, 0.5);
-    const labelMaterial = new THREE.MeshStandardMaterial({
-      map: texture,
-      transparent: true
-    });
-    
-    const label = new THREE.Mesh(labelGeometry, labelMaterial);
-    label.position.set(
-      section.shelfCount * 1.1, // Center above shelves
-      2.3, // Above shelf height
-      section.position.z
-    );
-    
-    sectionGroup.add(label);
-  }
-
-  /**
-   * Add spotlight above a shelf for focused illumination
-   */
   private addShelfSpotlight(position: THREE.Vector3): void {
     const spotlight = new THREE.SpotLight(0xffffff, 2.0, 10, Math.PI / 6, 0.5, 2);
     spotlight.position.set(
@@ -225,11 +129,7 @@ export class StoreLayout {
     this.storeGroup.add(spotlight.target);
   }
 
-  /**
-   * Create entrance area with checkout (Task 6.1.1.1: Updated with MDF veneer material)
-   */
   private createEntranceArea(config: StoreLayoutConfig): void {
-    // Simple entrance marker with MDF veneer finish
     const entranceGeometry = new THREE.BoxGeometry(3, 0.1, 2);
     const entranceMaterial = this.textureManager.createMDFVeneerMaterial({
       repeat: { x: 3, y: 2 },
@@ -241,32 +141,15 @@ export class StoreLayout {
     this.storeGroup.add(entrance);
   }
 
-  /**
-   * Spawn test game boxes on the shelf using GameBoxRenderer
-   */
-  /**
-   * Smart game spawning that analyzes shelf geometry to find proper positioning
-   */
   private spawnGamesOnShelf(shelfUnit: THREE.Group, parentGroup: THREE.Group): void {
-    console.log(`🎯 SMART POSITIONING: Analyzing shelf geometry for game placement`);
-    
-    // Find all shelf surfaces in the unit
     const shelfSurfaces = this.findShelfSurfaces(shelfUnit);
     console.log(`📚 Found ${shelfSurfaces.length} shelf surfaces`);
     
-    // Use all shelf surfaces now that positioning is working
-    console.log(`🎯 SPAWNING: Using all ${shelfSurfaces.length} shelf surface(s)`);
-    
-    // Spawn games on each shelf surface
     shelfSurfaces.forEach((surface, index) => {
-      console.log(`📦 Spawning games on shelf ${index + 1} at height ${surface.topY.toFixed(3)}`);
       this.spawnGamesOnSurface(surface, parentGroup, index);
     });
   }
   
-  /**
-   * Find shelf surfaces by analyzing the shelf unit geometry
-   */
   private findShelfSurfaces(shelfUnit: THREE.Group): Array<{topY: number, frontZ: number, centerX: number, width: number}> {
     const surfaces: Array<{topY: number, frontZ: number, centerX: number, width: number}> = [];
     
@@ -293,9 +176,6 @@ export class StoreLayout {
     return surfaces.sort((a, b) => a.topY - b.topY);
   }
   
-  /**
-   * Spawn games on a specific shelf surface using GameBoxRenderer
-   */
   private spawnGamesOnSurface(surface: {topY: number, frontZ: number, centerX: number, width: number}, parentGroup: THREE.Group, shelfIndex: number): void {
     // === TUNING PARAMETERS - Easy to adjust! ===
     const GAME_HEIGHT = 0.2;           // Height of game boxes
@@ -336,11 +216,7 @@ export class StoreLayout {
     
     console.log(`📦 GameBoxRenderer config for shelf ${shelfIndex + 1}:`, shelfConfig);
     
-    // Update GameBoxRenderer configuration using proper method
-    this.gameBoxRenderer.updateShelfConfig(shelfConfig);
-    
-    // Create games with GameBoxRenderer
-    const gameBoxes = this.gameBoxRenderer.createPlaceholderBoxes(5);
+    const gameBoxes = this.gameBoxRenderer.createPlaceholderBoxes(5, shelfConfig);
     
     // Move games to our parent group and log their final positions
     gameBoxes.forEach((box, boxIndex) => {
@@ -354,9 +230,6 @@ export class StoreLayout {
     console.log(`✅ Added ${gameBoxes.length} games to shelf ${shelfIndex + 1} using GameBoxRenderer`);
   }
 
-  /**
-   * Clear the current store layout
-   */
   private clearStore(): void {
     while (this.storeGroup.children.length > 0) {
       const child = this.storeGroup.children[0];
@@ -372,38 +245,15 @@ export class StoreLayout {
     }
   }
 
-  /**
-   * Get the store group for positioning or manipulation
-   */
-  public getStoreGroup(): THREE.Group {
-    return this.storeGroup;
-  }
-
-  /**
-   * Get statistics about the generated store
-   */
-  public getStoreStats(): {
-    totalShelves: number;
-    sections: number;
-    storeSize: { width: number; height: number; depth: number };
-  } {
+  public getStoreStats() {
     const config = this.createDefaultLayout();
-    const totalShelves = config.sections.reduce((sum, section) => sum + section.shelfCount, 0);
-    
     return {
-      totalShelves,
+      totalShelves: config.sections.reduce((sum, section) => sum + section.shelfCount, 0),
       sections: config.sections.length,
-      storeSize: {
-        width: config.width,
-        height: config.height,
-        depth: config.depth
-      }
+      storeSize: { width: config.width, height: config.height, depth: config.depth }
     };
   }
 
-  /**
-   * Dispose of resources
-   */
   public dispose(): void {
     this.clearStore();
     this.scene.remove(this.storeGroup);
