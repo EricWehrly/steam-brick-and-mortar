@@ -27,8 +27,6 @@ export interface PropsConfig {
     enableSignage?: boolean
     /** Enable test objects */
     enableTestObjects?: boolean
-    /** Maximum games to render */
-    maxGames?: number
     /** Performance configuration */
     performance?: {
         maxTextureSize?: number
@@ -106,7 +104,6 @@ export class StorePropsRenderer {
             enableGameBoxes: true,
             enableSignage: true,
             enableTestObjects: false, // Disabled by default for production
-            maxGames: 100,
             performance: {
                 maxTextureSize: 1024,
                 nearDistance: 2.0,
@@ -165,15 +162,7 @@ export class StorePropsRenderer {
         
         this.gameBoxRenderer = new GameBoxRenderer(
             undefined, // Use default dimensions
-            { maxGames: this.config.maxGames ?? 100 },
-            { 
-                // Performance configuration for large libraries
-                maxTextureSize: this.config.performance?.maxTextureSize ?? 1024,
-                nearDistance: this.config.performance?.nearDistance ?? 2.0,
-                farDistance: this.config.performance?.farDistance ?? 10.0,
-                maxActiveTextures: this.config.performance?.maxActiveTextures ?? 50,
-                frustumCullingEnabled: this.config.performance?.frustumCullingEnabled ?? true
-            }
+            undefined  // Use default shelf configuration
         )
         
         console.log('✅ Game box renderer initialized')
@@ -234,11 +223,7 @@ export class StorePropsRenderer {
         return this.signageRenderer
     }
 
-    public updateMaxGames(maxGames: number): void {
-        if (this.gameBoxRenderer) {
-            this.gameBoxRenderer.updateMaxGames(maxGames)
-        }
-    }
+
 
     /**
      * Get props statistics for debugging

@@ -28,7 +28,6 @@ export interface ShelfConfiguration {
     surfaceY: number
     centerZ: number
     centerX: number
-    maxGames: number
     spacing: number
 }
 
@@ -52,12 +51,13 @@ export interface GameBoxTextureOptions {
     preferredArtworkType?: 'library' | 'header' | 'logo' | 'icon'
     fallbackColor?: number
     enableFallbackTexture?: boolean
-    // Performance optimization options
+    // Performance optimization options (experimental - enable when working with many textures)
     targetResolution?: number
     enableLazyLoading?: boolean
     viewingDistance?: number
 }
 
+// Performance management interfaces (experimental - for texture optimization)
 export interface TexturePerformanceConfig {
     maxTextureSize: number
     nearDistance: number
@@ -77,6 +77,8 @@ export interface GameBoxPerformanceData {
     currentTextureSize: number
 }
 
+
+
 export class GameBoxRenderer {
     private static readonly DEFAULT_DIMENSIONS: GameBoxDimensions = {
         width: 0.15,
@@ -84,21 +86,20 @@ export class GameBoxRenderer {
         depth: 0.02
     }
 
+    // TODO: Guessing at shelf offsets should be removed entirely
     private static readonly DEFAULT_SHELF_CONFIG: ShelfConfiguration = {
         surfaceY: -0.8,
         centerZ: -3,
         centerX: 0,
-        maxGames: 100, // Increased from 12 to support larger libraries
         spacing: 0.16
     }
 
     private dimensions: GameBoxDimensions
-    private maxGames: number
     private gameBoxGeometry: THREE.BoxGeometry
     private textureLoader: THREE.TextureLoader
     private fallbackTexture: THREE.Texture | null = null
 
-    // Performance management
+    // Performance management (experimental - enable when working with many textures)
     private performanceConfig: TexturePerformanceConfig
     private activeTextures: Map<string, THREE.Texture> = new Map()
     private gameBoxPerformanceData: Map<string, GameBoxPerformanceData> = new Map()
@@ -111,9 +112,8 @@ export class GameBoxRenderer {
         performanceConfig: Partial<TexturePerformanceConfig> = {}
     ) {
         this.dimensions = { ...GameBoxRenderer.DEFAULT_DIMENSIONS, ...dimensions }
-        this.maxGames = shelfConfig.maxGames ?? GameBoxRenderer.DEFAULT_SHELF_CONFIG.maxGames
         
-        // Initialize performance configuration
+        // Initialize performance configuration (experimental features)
         this.performanceConfig = {
             maxTextureSize: 1024,
             nearDistance: 2.0,
@@ -197,9 +197,6 @@ export class GameBoxRenderer {
         textureOptions?: GameBoxTextureOptions
     ): THREE.Mesh | null {
         // Check if we're within display limits
-        if (index >= this.maxGames) {
-            return null
-        }
 
         // Create material - start with fallback color for immediate display
         const colorHue = ValidationUtils.stringToHue(game.name)
@@ -216,9 +213,10 @@ export class GameBoxRenderer {
             playtime: game.playtime_forever
         }
         
-        // Position the box
-        const startX = this.calculateStartX(this.maxGames, GameBoxRenderer.DEFAULT_SHELF_CONFIG)
-        const position = this.calculateBoxPosition(index, startX, GameBoxRenderer.DEFAULT_SHELF_CONFIG)
+        // Position the box - individual boxes use simple index-based positioning
+        // Total layout centering will be handled by higher-level methods
+        const config = GameBoxRenderer.DEFAULT_SHELF_CONFIG
+        const position = this.calculateBoxPosition(index, 0, config)
         gameBox.position.set(position.x, position.y, position.z)
         
         // Enable shadows
@@ -257,14 +255,21 @@ export class GameBoxRenderer {
             return []
         }
 
-        // Sort and limit games
+        // Sort games (no artificial limits - render all loaded games)
         const sortedGames = this.sortAndLimitGames(games)
         const boxes: THREE.Mesh[] = []
         
-        // Create game boxes
+        // Calculate centering for the entire set of boxes
+        const config = GameBoxRenderer.DEFAULT_SHELF_CONFIG
+        const startX = this.calculateStartX(sortedGames.length, config)
+        
+        // Create game boxes with proper centering
         sortedGames.forEach((game, index) => {
             const box = this.createGameBox(scene, game, index)
             if (box) {
+                // Adjust position to center the entire set
+                const currentPos = box.position
+                box.position.set(currentPos.x + startX, currentPos.y, currentPos.z)
                 boxes.push(box)
             }
         })
@@ -285,12 +290,6 @@ export class GameBoxRenderer {
         return existingBoxes.length
     }
 
-    /**
-     * Update max games limit
-     */
-    public updateMaxGames(maxGames: number) {
-        this.maxGames = maxGames
-    }
 
     /**
      * Update box dimensions (requires recreating geometry)
@@ -326,40 +325,53 @@ export class GameBoxRenderer {
         const playedGames = games
             .filter(game => game.playtime_forever > 0)
             .sort((a, b) => b.playtime_forever - a.playtime_forever)
-            .slice(0, this.maxGames)
         
-        // If we don't have enough played games, fill with unplayed games
-        if (playedGames.length < this.maxGames) {
-            const unplayedGames = games
-                .filter(game => game.playtime_forever === 0)
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .slice(0, this.maxGames - playedGames.length)
-            
-            playedGames.push(...unplayedGames)
-        }
+        // Add unplayed games alphabetically
+        const unplayedGames = games
+            .filter(game => game.playtime_forever === 0)
+            .sort((a, b) => a.name.localeCompare(b.name))
+        
+        playedGames.push(...unplayedGames)
         
         return playedGames
     }
 
     /**
-     * Dispose of resources
+     * Dispose of all resources
+     * (Important - call this when cleaning up the renderer)
      */
-    public dispose() {
+    public dispose(): void {
+        // Dispose geometry
         this.gameBoxGeometry.dispose()
+        
+        // Dispose all active textures
+        for (const texture of this.activeTextures.values()) {
+            texture.dispose()
+        }
+        
+        // Clear tracking data
+        this.activeTextures.clear()
+        this.gameBoxPerformanceData.clear()
+        
+        console.log('🧹 Disposed GameBoxRenderer and all textures')
     }
 
     /**
      * Create fallback texture for game boxes
+     * Simple by default, can be enhanced with procedural generation
      */
     private createFallbackTexture() {
-        const size = 512
+        const size = 128 // Reasonable balance between quality and performance
         const data = new Uint8Array(size * size * 3)
+        
+        // Create a subtle pattern instead of flat gray
         for (let i = 0; i < data.length; i += 3) {
-            const color = (Math.random() * 0.5 + 0.5) * 255
-            data[i] = color // R
-            data[i + 1] = color // G
-            data[i + 2] = color // B
+            const baseColor = 120 + (Math.random() * 20 - 10) // Gray with slight variation
+            data[i] = baseColor     // R
+            data[i + 1] = baseColor // G
+            data[i + 2] = baseColor // B
         }
+        
         const texture = new THREE.DataTexture(data, size, size, THREE.RGBFormat)
         texture.needsUpdate = true
         this.fallbackTexture = texture
@@ -478,8 +490,15 @@ export class GameBoxRenderer {
         }
     }
 
+    // ====================================================================
+    // EXPERIMENTAL PERFORMANCE FEATURES
+    // These features are designed for handling large numbers of textured game boxes
+    // Enable them when you start working with Steam artwork textures
+    // ====================================================================
+
     /**
      * Update performance data for all game boxes based on camera position
+     * (Experimental - enable when working with many textured game boxes)
      */
     public updatePerformanceData(camera: THREE.Camera, scene: THREE.Scene): void {
         if (!this.performanceConfig.frustumCullingEnabled) return
@@ -521,6 +540,7 @@ export class GameBoxRenderer {
 
     /**
      * Get optimal texture resolution based on viewing distance
+     * (Experimental - for dynamic texture quality)
      */
     private getOptimalTextureResolution(distance: number): number {
         const { nearDistance, farDistance, highResolutionSize, mediumResolutionSize, lowResolutionSize } = this.performanceConfig
@@ -536,6 +556,7 @@ export class GameBoxRenderer {
 
     /**
      * Create texture at specific resolution from blob
+     * (Experimental - for performance optimization)
      */
     private async createOptimizedTexture(blob: Blob, targetResolution: number): Promise<THREE.Texture> {
         return new Promise((resolve, reject) => {
@@ -589,6 +610,7 @@ export class GameBoxRenderer {
 
     /**
      * Apply texture with performance optimization
+     * (Experimental - use when you need dynamic texture quality based on distance)
      */
     public async applyOptimizedTexture(
         mesh: THREE.Mesh, 
@@ -681,6 +703,7 @@ export class GameBoxRenderer {
 
     /**
      * Clean up textures for off-screen or distant objects
+     * (Experimental - for memory management with many textures)
      */
     public cleanupOffScreenTextures(): void {
         const now = Date.now()
@@ -704,6 +727,7 @@ export class GameBoxRenderer {
 
     /**
      * Unload texture for a specific game
+     * (Experimental - internal memory management)
      */
     private unloadTextureForGame(gameId: string): void {
         // Find textures for this game
@@ -728,6 +752,7 @@ export class GameBoxRenderer {
 
     /**
      * Enforce memory limits by removing least recently used textures
+     * (Experimental - internal memory management)
      */
     private enforceTextureMemoryLimit(): void {
         const sortedGames = Array.from(this.gameBoxPerformanceData.entries())
@@ -745,7 +770,8 @@ export class GameBoxRenderer {
     }
 
     /**
-     * Get performance statistics
+     * Get comprehensive performance statistics
+     * (Experimental - for monitoring texture performance)
      */
     public getPerformanceStats(): {
         totalGameBoxes: number
@@ -769,4 +795,5 @@ export class GameBoxRenderer {
             averageDistance
         }
     }
+
 }

@@ -100,11 +100,8 @@ export class SteamBrickAndMortarApp {
 
         // Initialize scene coordinator with visual system configuration
         this.sceneCoordinator = new SceneCoordinator(this.sceneManager, {
-            maxGames: maxGames,
             props: {
-                // TODO: Game limiting: OFF by default, configurable via UI settings
-                // maxGames: 100,
-                // TODO: Wire this to UI settings panel for user control
+                // Props configuration - rendering shows all loaded games (no artificial limits)
             },
             environment: {
                 skyboxPreset: 'aurora'

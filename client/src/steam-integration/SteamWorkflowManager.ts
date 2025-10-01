@@ -263,10 +263,9 @@ export class SteamWorkflowManager {
         try {
             SteamWorkflowManager.logger.info(`Starting dev mode toggle workflow: ${isEnabled ? 'enabled' : 'disabled'}`)
             
-            // Set max games based on development mode
+            // Set max games for network calls only - rendering should show all loaded games
             const maxGames = isEnabled ? 20 : 100
             this.steamIntegration.updateMaxGames(maxGames)
-            this.sceneCoordinator.updateMaxGames(maxGames)
             
             const message = isEnabled 
                 ? `🔧 Development mode enabled (limiting to ${maxGames} games for faster testing)`

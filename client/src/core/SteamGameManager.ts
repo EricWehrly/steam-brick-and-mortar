@@ -83,7 +83,7 @@ export class SteamGameManager {
                 }
                 
                 // Apply optimized texture to existing game box
-                await this.gameBoxRenderer.applyOptimizedTexture(gameBox, game, textureOptions)
+                await this.gameBoxRenderer.applyTexture(gameBox, game, textureOptions)
                 console.log(`🖼️ Applied optimized artwork texture to: ${game.name}`)
             }
         } catch (error) {

@@ -64,8 +64,7 @@ describe('GameBoxRenderer Texture Tests', () => {
             const textureOptions: GameBoxTextureOptions = {
                 artworkBlobs: {
                     library: mockBlob
-                },
-                enableFallbackTexture: true
+                }
             }
 
             const gameBox = renderer.createGameBoxWithTexture(scene, mockGame, 0, textureOptions)
@@ -96,8 +95,7 @@ describe('GameBoxRenderer Texture Tests', () => {
                     header: null,
                     library: null
                 },
-                fallbackColor: 0xff0000, // Red
-                enableFallbackTexture: false
+                fallbackColor: 0xff0000 // Red
             }
 
             const result = await renderer.applyTexture(gameBox!, mockGame, textureOptions)
@@ -156,8 +154,7 @@ describe('GameBoxRenderer Texture Tests', () => {
             const textureOptions: GameBoxTextureOptions = {
                 artworkBlobs: {
                     library: invalidBlob
-                },
-                enableFallbackTexture: true
+                }
             }
 
             const result = await renderer.applyTexture(gameBox!, mockGame, textureOptions)
