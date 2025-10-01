@@ -19,12 +19,8 @@ const DEFAULT_SHELF_CONFIG = {
  * Creates a triangular shelf unit with angled boards and horizontal shelves
  */
 export class ProceduralShelfGenerator {
-  private scene: THREE.Scene;
-  private textureManager: TextureManager;
-
-  constructor(scene: THREE.Scene) {
-    this.scene = scene;
-    this.textureManager = TextureManager.getInstance();
+  private get textureManager(): TextureManager {
+    return TextureManager.getInstance();
   }
 
   /**
@@ -56,14 +52,6 @@ export class ProceduralShelfGenerator {
       brandColor: '#0066CC', // Consistent brand blue
       glossLevel: 0.7 // Semi-gloss finish
     });
-  }
-
-  /**
-   * @deprecated Legacy wood material - use MDF veneer materials instead
-   */
-  private createWoodMaterial(): THREE.Material {
-    // Fallback to MDF veneer for compatibility
-    return this.createMDFVeneerMaterial();
   }
 
   /**

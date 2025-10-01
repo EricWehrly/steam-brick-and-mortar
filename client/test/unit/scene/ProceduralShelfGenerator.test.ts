@@ -8,7 +8,7 @@ describe('ProceduralShelfGenerator', () => {
 
   beforeEach(() => {
     scene = new THREE.Scene();
-    generator = new ProceduralShelfGenerator(scene);
+    generator = new ProceduralShelfGenerator();
   });
 
   it('should create a shelf unit with correct structure', () => {

@@ -33,7 +33,7 @@ export class StoreLayout {
     
     if (scene) {
       this.scene = scene;
-      this.shelfGenerator = new ProceduralShelfGenerator(scene);
+      this.shelfGenerator = new ProceduralShelfGenerator();
     }
   }
 
@@ -68,7 +68,7 @@ export class StoreLayout {
     
     // Initialize shelf generator if needed (fallback for when no scene was provided)
     if (!this.shelfGenerator) {
-      this.shelfGenerator = new ProceduralShelfGenerator(this.scene || this.storeGroup as any);
+      this.shelfGenerator = new ProceduralShelfGenerator();
     }
     
     // Generate single shelf with MDF veneer materials (at origin since parent group handles positioning)
