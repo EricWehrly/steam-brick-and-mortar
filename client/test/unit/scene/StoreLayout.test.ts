@@ -12,24 +12,8 @@ describe('StoreLayout', () => {
     storeLayout = new StoreLayout(scene);
   });
 
-  it('should create a VR-optimized default layout configuration', () => {
-    const config = storeLayout.createDefaultLayout();
-    
-    expect(config).toBeDefined();
-    expect(config.width).toBe(22);    // Enhanced from 20m
-    expect(config.height).toBe(3.2);  // Enhanced from 3m
-    expect(config.depth).toBe(16);    // Enhanced from 15m
-    expect(config.sections.length).toBe(6);
-    
-    // VR-specific properties
-    expect(config.aisleWidth).toBe(2.2);      // VR ergonomic width
-    expect(config.mainAisleWidth).toBe(3.0);  // Central aisle
-    expect(config.wallClearance).toBe(1.0);   // Wall safety buffer
-    expect(config.entranceZone).toBeDefined();
-    expect(config.entranceZone.width).toBe(6);
-    expect(config.entranceZone.depth).toBe(3);
-  });
-
+  // TODO: How many of these are testing constants?
+  // (spoiler: we delete all of those)
   it('should have proper Steam game categories', () => {
     const config = storeLayout.createDefaultLayout();
     
