@@ -17,6 +17,8 @@ export interface InputState {
         d: boolean
         q: boolean
         e: boolean
+        space: boolean
+        c: boolean
     }
     mouse: {
         down: boolean
@@ -41,9 +43,15 @@ export interface InputCallbacks {
  */
 export class InputManager {
     private inputState: InputState = {
-        keys: { w: false, a: false, s: false, d: false, q: false, e: false },
+        keys: { w: false, a: false, s: false, d: false, q: false, e: false, space: false, c: false },
         mouse: { down: false, x: 0, y: 0 }
     }
+    
+    // Progressive movement tracking
+    private keyPressTime: { [key: string]: number } = {}
+    // TODO: make momentum transferable to adjacent directions (W <-> A/D <-> S)
+    private readonly ACCELERATION_TIME = 2500 // 2.5 seconds to reach max speed
+    private readonly MAX_SPEED_MULTIPLIER = 1.4
     
     private options: MovementOptions = {
         speed: 0.1,
@@ -143,24 +151,28 @@ export class InputManager {
             case 'KeyW': 
                 if (!this.inputState.keys.w) {
                     this.inputState.keys.w = true
+                    this.keyPressTime['w'] = Date.now()
                     this.callbacks.onKeyPress?.('w')
                 }
                 break
             case 'KeyA': 
                 if (!this.inputState.keys.a) {
                     this.inputState.keys.a = true
+                    this.keyPressTime['a'] = Date.now()
                     this.callbacks.onKeyPress?.('a')
                 }
                 break
             case 'KeyS': 
                 if (!this.inputState.keys.s) {
                     this.inputState.keys.s = true
+                    this.keyPressTime['s'] = Date.now()
                     this.callbacks.onKeyPress?.('s')
                 }
                 break
             case 'KeyD': 
                 if (!this.inputState.keys.d) {
                     this.inputState.keys.d = true
+                    this.keyPressTime['d'] = Date.now()
                     this.callbacks.onKeyPress?.('d')
                 }
                 break
@@ -176,6 +188,20 @@ export class InputManager {
                     this.callbacks.onKeyPress?.('e')
                 }
                 break
+            case 'Space': 
+                if (!this.inputState.keys.space) {
+                    this.inputState.keys.space = true
+                    this.keyPressTime['space'] = Date.now()
+                    this.callbacks.onKeyPress?.('space')
+                }
+                break
+            case 'KeyC': 
+                if (!this.inputState.keys.c) {
+                    this.inputState.keys.c = true
+                    this.keyPressTime['c'] = Date.now()
+                    this.callbacks.onKeyPress?.('c')
+                }
+                break
         }
     }
 
@@ -183,18 +209,22 @@ export class InputManager {
         switch (event.code) {
             case 'KeyW': 
                 this.inputState.keys.w = false
+                delete this.keyPressTime['w']
                 this.callbacks.onKeyRelease?.('w')
                 break
             case 'KeyA': 
                 this.inputState.keys.a = false
+                delete this.keyPressTime['a']
                 this.callbacks.onKeyRelease?.('a')
                 break
             case 'KeyS': 
                 this.inputState.keys.s = false
+                delete this.keyPressTime['s']
                 this.callbacks.onKeyRelease?.('s')
                 break
             case 'KeyD': 
                 this.inputState.keys.d = false
+                delete this.keyPressTime['d']
                 this.callbacks.onKeyRelease?.('d')
                 break
             case 'KeyQ': 
@@ -205,17 +235,46 @@ export class InputManager {
                 this.inputState.keys.e = false
                 this.callbacks.onKeyRelease?.('e')
                 break
+            case 'Space': 
+                this.inputState.keys.space = false
+                delete this.keyPressTime['space']
+                this.callbacks.onKeyRelease?.('space')
+                break
+            case 'KeyC': 
+                this.inputState.keys.c = false
+                delete this.keyPressTime['c']
+                this.callbacks.onKeyRelease?.('c')
+                break
         }
     }
 
     /**
-     * Apply WASD movement to a camera
+     * Calculate progressive speed based on how long key has been held
+     */
+    private getProgressiveSpeed(key: string): number {
+        const pressTime = this.keyPressTime[key]
+        if (!pressTime) return 0
+        
+        const heldTime = Date.now() - pressTime
+        const progress = Math.min(heldTime / this.ACCELERATION_TIME, 1) // 0 to 1 over 1.5s
+        
+        // Start at minimal speed, ramp up to 1.2x base speed
+        const minSpeed = this.options.speed * 0.1 // Smallest increment
+        const maxSpeed = this.options.speed * this.MAX_SPEED_MULTIPLIER
+        
+        return minSpeed + (maxSpeed - minSpeed) * progress
+    }
+
+    /**
+     * Apply WASD + Space/C movement to a camera with progressive acceleration
      */
     updateCameraMovement(camera: THREE.Camera): void {
-        if (this.inputState.keys.w) camera.translateZ(-this.options.speed)
-        if (this.inputState.keys.s) camera.translateZ(this.options.speed)
-        if (this.inputState.keys.a) camera.translateX(-this.options.speed)
-        if (this.inputState.keys.d) camera.translateX(this.options.speed)
+        if (this.inputState.keys.w) camera.translateZ(-this.getProgressiveSpeed('w'))
+        if (this.inputState.keys.s) camera.translateZ(this.getProgressiveSpeed('s'))
+        if (this.inputState.keys.a) camera.translateX(-this.getProgressiveSpeed('a'))
+        if (this.inputState.keys.d) camera.translateX(this.getProgressiveSpeed('d'))
+        if (this.inputState.keys.space) camera.translateY(this.getProgressiveSpeed('space')) // Move up
+        if (this.inputState.keys.c) camera.translateY(-this.getProgressiveSpeed('c')) // Move down
     }
 
     /**
@@ -228,11 +287,12 @@ export class InputManager {
     }
 
     /**
-     * Apply Q/E key roll rotation to a camera
+     * Apply Q/E key roll rotation to a camera - DISABLED for better UX
      */
     updateCameraRoll(camera: THREE.Camera): void {
-        if (this.inputState.keys.q) camera.rotation.z += this.options.speed * 2 // Roll left
-        if (this.inputState.keys.e) camera.rotation.z -= this.options.speed * 2 // Roll right
+        // Rotation controls disabled - they were difficult to work with
+        // if (this.inputState.keys.q) camera.rotation.z += this.options.speed * 2 // Roll left
+        // if (this.inputState.keys.e) camera.rotation.z -= this.options.speed * 2 // Roll right
     }
 
     /**
