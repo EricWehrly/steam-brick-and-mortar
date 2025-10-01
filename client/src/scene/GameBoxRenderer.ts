@@ -139,7 +139,7 @@ export class GameBoxRenderer {
     /**
      * Create placeholder game boxes
      */
-    public createPlaceholderBoxes(scene: THREE.Scene, count: number = 6): THREE.Mesh[] {
+    public createPlaceholderBoxes(count: number = 6): THREE.Mesh[] {
         
         const materials = this.createPlaceholderMaterials()
         const boxes: THREE.Mesh[] = []
@@ -169,7 +169,6 @@ export class GameBoxRenderer {
             // Add subtle random rotation for natural look
             gameBox.rotation.y = (Math.random() - 0.5) * 0.1
             
-            scene.add(gameBox)
             boxes.push(gameBox)
         }
         
@@ -316,8 +315,8 @@ export class GameBoxRenderer {
     private calculateBoxPosition(index: number, startX: number): GameBoxPosition {
         return {
             x: this.shelfConfig.centerX + startX + (index * this.shelfConfig.spacing),
-            y: this.shelfConfig.surfaceY + this.dimensions.height / 2,
-            z: this.shelfConfig.centerZ + 0.08
+            y: this.shelfConfig.surfaceY, // Use exact Y position calculated by StoreLayout
+            z: this.shelfConfig.centerZ    // Use exact Z position calculated by StoreLayout
         }
     }
 

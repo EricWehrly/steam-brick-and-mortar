@@ -81,7 +81,7 @@ export class StorePropsRenderer {
             }
             
             if (this.config.enableSignage) {
-                await this.setupSignage()
+                this.signageRenderer.createStandardSigns(this.scene);
             }
             
             if (this.config.enableTestObjects) {
@@ -128,38 +128,22 @@ export class StorePropsRenderer {
             await this.storeLayout.generateShelvesGPUOptimized()
             console.log('✅ Shelves generated successfully (GPU-optimized)')
         } catch (error) {
-            console.warn('❌ GPU-optimized generation failed, trying chunked method...', error)
+            console.warn('❌ GPU-optimized generation failed, using basic generation...', error)
             try {
-                // Fallback to chunked generation
-                await this.storeLayout.generateShelvesChunked()
-                console.log('✅ Shelves generated successfully (chunked fallback)')
-            } catch (chunkedError) {
-                console.warn('❌ Chunked generation failed, using basic method...', chunkedError)
-                try {
-                    // Final fallback to basic generation
-                    await this.storeLayout.generateStore()
-                    console.log('✅ Shelves generated successfully (basic fallback)')
-                } catch (basicError) {
-                    console.error('❌ All shelf generation methods failed:', basicError)
-                    // Try at least generating a basic room structure
-                    await this.storeLayout.generateBasicRoom()
-                    console.log('⚠️ Using minimal room structure (emergency fallback)')
-                }
+                // Fallback to basic generation (which now also uses GPU-optimized)
+                await this.storeLayout.generateShelvesGPUOptimized()
+                console.log('✅ Shelves generated successfully (basic fallback)')
+            } catch (basicError) {
+                console.error('❌ All shelf generation methods failed:', basicError)
+                // Try at least generating a basic room structure
+                await this.storeLayout.generateBasicRoom()
+                console.log('⚠️ Using minimal room structure (emergency fallback)')
             }
         }
-    }
 
-    private async setupSignage(): Promise<void> {
-        console.log('🪧 Setting up signage...')
-        
-        try {
-            // Create standard Blockbuster signage
-            this.signageRenderer.createStandardSigns(this.scene)
-            
-            console.log('✅ Signage setup complete')
-        } catch (error) {
-            console.error('❌ Failed to set up signage:', error)
-        }
+        // CRITICAL: Add the storeGroup to the scene so shelves and game boxes are visible
+        const storeGroup = this.storeLayout.getStoreGroup();
+        this.scene.add(storeGroup);
     }
 
     private async setupTestObjects(): Promise<void> {
