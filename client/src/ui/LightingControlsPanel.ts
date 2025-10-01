@@ -143,7 +143,7 @@ export class LightingControlsPanel {
     }
 
     private onLightCreated(event: CustomEvent<LightCreatedEvent>): void {
-        console.log(`💡 Light created: ${event.detail.lightType} (${event.detail.lightName || 'unnamed'})`)
+        console.debug(`💡 Light created: ${event.detail.lightType} (${event.detail.lightName || 'unnamed'})`)
         
         // Get scene from the first light event
         if (!this.scene) {
@@ -156,7 +156,7 @@ export class LightingControlsPanel {
     }
 
     private onLightingSystemReady(event: CustomEvent<LightingSystemReadyEvent>): void {
-        console.log(`💡 Lighting system ready: ${event.detail.quality} quality`)
+        console.debug(`💡 Lighting system ready: ${event.detail.quality} quality`)
         
         // Get scene from the system ready event if we don't have it yet
         if (!this.scene) {

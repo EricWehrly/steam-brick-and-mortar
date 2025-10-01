@@ -140,7 +140,6 @@ export class GameBoxRenderer {
      * Create placeholder game boxes
      */
     public createPlaceholderBoxes(scene: THREE.Scene, count: number = 6): THREE.Mesh[] {
-        console.log(`📦 Creating ${count} placeholder game boxes...`)
         
         const materials = this.createPlaceholderMaterials()
         const boxes: THREE.Mesh[] = []
@@ -174,7 +173,6 @@ export class GameBoxRenderer {
             boxes.push(gameBox)
         }
         
-        console.log(`✅ Created ${count} placeholder game boxes`)
         return boxes
     }
 

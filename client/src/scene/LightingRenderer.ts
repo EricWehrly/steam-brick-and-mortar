@@ -112,7 +112,7 @@ export class LightingRenderer {
     public async setupLighting(): Promise<void> {
         this.config = this.getCurrentConfig()
         
-        console.log(`💡 Setting up ${this.config.quality} lighting...`)
+        console.debug(`💡 Setting up ${this.config.quality} lighting...`)
         
         try {
             this.configureShadows()
@@ -209,7 +209,7 @@ export class LightingRenderer {
     }
 
     private async setupSimpleLighting(): Promise<void> {
-        console.log('💡 Setting up SIMPLE lighting - basic illumination only')
+        console.debug('💡 Setting up SIMPLE lighting - basic illumination only')
         
         // Higher ambient light to compensate for fewer light sources
         this.lightFactory.createAmbientLight(0xffffff, 0.4, { 
@@ -224,11 +224,11 @@ export class LightingRenderer {
             position: [0, 10, 0]
         })
         
-        console.log(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
+        console.debug(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
     }
 
     private async setupEnhancedLighting(): Promise<void> {
-        console.log('💡 Setting up ENHANCED lighting - optimized retail atmosphere')
+        console.debug('💡 Setting up ENHANCED lighting - optimized retail atmosphere')
         
         // Ambient light: disabled by default, toggleable in panel
         const ambientLight = this.lightFactory.createAmbientLight(0xFFF8E7, this.config.ambientIntensity, {
@@ -259,25 +259,25 @@ export class LightingRenderer {
         // Primary illumination: RectAreaLights from ceiling fixtures
         await this.setupFluorescentFixtures()
         
-        console.log(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient disabled by default)`)
+        console.debug(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient disabled by default)`)
     }
 
     private async setupAdvancedLighting(): Promise<void> {
-        console.log('💡 Setting up ADVANCED lighting - enhanced + point lights + better shadows')
+        console.debug('💡 Setting up ADVANCED lighting - enhanced + point lights + better shadows')
         
         await this.setupEnhancedLighting()
         this.addPointLights()
         
-        console.log(`✅ Advanced lighting: ${this.lightingGroup.children.length} lights/groups added`)
+        console.debug(`✅ Advanced lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
 
     private async setupOuchMyEyesLighting(): Promise<void> {
-        console.log('💡 Setting up OUCH-MY-EYES lighting - maximum visual fidelity + dramatic effects')
-        
+        console.debug('💡 Setting up OUCH-MY-EYES lighting - maximum visual fidelity + dramatic effects')
+
         await this.setupAdvancedLighting()
         this.addDramaticLighting()
         
-        console.log(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
+        console.debug(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
 
     private async setupFluorescentFixtures(): Promise<void> {
@@ -318,7 +318,7 @@ export class LightingRenderer {
             pointLight.castShadow = false
         })
         
-        console.log('💡 Added strategic accent lighting for atmosphere')
+        console.debug('💡 Added strategic accent lighting for atmosphere')
     }
 
     private addDramaticLighting(): void {
@@ -370,7 +370,7 @@ export class LightingRenderer {
     }
 
     public toggleLighting(enabled: boolean): void {
-        console.log(`💡 ${enabled ? 'Enabling' : 'Disabling'} all lights`)
+        console.debug(`💡 ${enabled ? 'Enabling' : 'Disabling'} all lights`)
         
         this.lightingGroup.traverse((child) => {
             if (child instanceof THREE.Light) {
@@ -380,7 +380,7 @@ export class LightingRenderer {
     }
 
     public toggleDebugVisualization(enabled: boolean): void {
-        console.log(`🔍 ${enabled ? 'Showing' : 'Hiding'} light debug visualization`)
+        console.debug(`🔍 ${enabled ? 'Showing' : 'Hiding'} light debug visualization`)
         
         if (enabled) {
             this.debugHelper.addHelpersForLightGroup(this.lightingGroup)
@@ -390,7 +390,7 @@ export class LightingRenderer {
     }
 
     public refreshShadows(): void {
-        console.log('🔄 Refreshing shadows after props added...')
+        console.debug('🔄 Refreshing shadows after props added...')
         
         // Update shadow cameras for all shadow-casting lights
         this.lightingGroup.traverse((child) => {
@@ -414,7 +414,7 @@ export class LightingRenderer {
         
         // Force renderer to regenerate shadow maps
         this.renderer.shadowMap.needsUpdate = true
-        console.log('✅ Shadow refresh completed')
+        console.debug('✅ Shadow refresh completed')
     }
 
 
@@ -426,7 +426,7 @@ export class LightingRenderer {
         const light = this.lightingGroup.getObjectByName(lightName) as THREE.Light
         if (light) {
             light.visible = enabled
-            console.log(`💡 ${lightName} light ${enabled ? 'enabled' : 'disabled'}`)
+            console.debug(`💡 ${lightName} light ${enabled ? 'enabled' : 'disabled'}`)
         } else {
             console.warn(`⚠️ Light '${lightName}' not found for toggle`)
         }
