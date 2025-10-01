@@ -5,7 +5,6 @@
  * Extracted from SteamBrickAndMortarApp to reduce complexity.
  */
 
-import * as THREE from 'three'
 import type { SteamGameData, GameBoxRenderer, SceneManager } from '../scene'
 import type { SteamIntegration } from '../steam-integration'
 
@@ -51,46 +50,91 @@ export class SteamGameManager {
      * Add a game box to the scene with texture loading
      */
     async addGameBoxToScene(game: SteamGameData, index: number): Promise<void> {
-        // Create game box with immediate fallback color
-        const gameBox = this.gameBoxRenderer.createGameBox(this.sceneManager.getScene(), game, index)
+        // Get artwork blobs for the game
+        const artworkBlobs = await this.getGameArtworkBlobs(game)
+        
+        // Create game box with texture options
+        const textureOptions = artworkBlobs ? {
+            artworkBlobs,
+            enableLazyLoading: true // Enable for performance
+        } : undefined
+        
+        // Let GameBoxRenderer handle all the rendering logic
+        const gameBox = this.gameBoxRenderer.createGameBoxWithTexture(
+            this.sceneManager.getScene(), 
+            game, 
+            index, 
+            textureOptions
+        )
+        
         if (gameBox) {
             this.currentGameIndex = index + 1
-            
-            // Apply texture asynchronously when artwork is available
-            await this.applyGameArtworkTexture(gameBox, game)
+            console.log(`🎮 Added game with artwork: ${game.name}`)
         }
     }
+
+
 
     /**
-     * Apply artwork texture to a game box
+     * Load multiple games into the scene efficiently
      */
-    private async applyGameArtworkTexture(gameBox: THREE.Mesh, game: SteamGameData): Promise<void> {
-        try {
-            // Get cached artwork for this game
-            const artworkBlobs = await this.getGameArtworkBlobs(game)
-            
-            if (artworkBlobs && Object.values(artworkBlobs).some(blob => blob !== null)) {
-                // Calculate viewing distance for performance optimization
-                const camera = this.sceneManager.getCamera()
-                const viewingDistance = camera.position.distanceTo(gameBox.position)
-                
-                // Apply optimized texture using the GameBoxRenderer texture system
-                const textureOptions = {
-                    artworkBlobs,
-                    fallbackColor: undefined, // Keep current fallback color
-                    enableLazyLoading: true, // Enable lazy loading for performance
-                    viewingDistance
-                }
-                
-                // Apply optimized texture to existing game box
-                await this.gameBoxRenderer.applyTexture(gameBox, game, textureOptions)
-                console.log(`🖼️ Applied optimized artwork texture to: ${game.name}`)
-            }
-        } catch (error) {
-            console.warn(`⚠️ Failed to apply artwork texture to ${game.name}:`, error)
-        }
+    async loadGamesIntoScene(games: SteamGameData[]): Promise<any[]> {
+        console.log(`🚀 Loading ${games.length} Steam games into scene...`)
+        
+        // Clear existing game boxes
+        this.clearGameBoxes()
+        this.resetGameIndex()
+        
+        // Create game boxes with Steam data (renderer handles generic conversion)
+        const gameBoxes = this.gameBoxRenderer.createGameBoxesFromSteamData(
+            this.sceneManager.getScene(),
+            games
+        )
+        
+        // Load artwork for all games asynchronously (don't block rendering)
+        this.loadArtworkForGames(games, gameBoxes)
+        
+        return gameBoxes
     }
-
+    
+    /**
+     * Load artwork for games asynchronously after initial rendering
+     */
+    private async loadArtworkForGames(games: SteamGameData[], gameBoxes: any[]): Promise<void> {
+        const artworkPromises = games.map(async (game, index) => {
+            const gameBox = gameBoxes[index]
+            if (!gameBox) return
+            
+            try {
+                const artworkBlobs = await this.getGameArtworkBlobs(game)
+                if (artworkBlobs) {
+                    const textureOptions = {
+                        artworkBlobs,
+                        enableLazyLoading: true
+                    }
+                    
+                    await this.gameBoxRenderer.applyTexture(gameBox, game, textureOptions)
+                }
+            } catch (error) {
+                console.debug(`Could not load artwork for ${game.name}:`, error)
+            }
+        })
+        
+        // Load artwork in batches to avoid overwhelming the system
+        const batchSize = 5
+        for (let i = 0; i < artworkPromises.length; i += batchSize) {
+            const batch = artworkPromises.slice(i, i + batchSize)
+            await Promise.allSettled(batch)
+            
+            // Small delay between batches
+            if (i + batchSize < artworkPromises.length) {
+                await new Promise(resolve => setTimeout(resolve, 100))
+            }
+        }
+        
+        console.log(`✅ Completed artwork loading for ${games.length} games`)
+    }
+    
     /**
      * Get artwork blobs for a game from cache
      */

@@ -70,7 +70,7 @@ describe('GameBoxRenderer Texture Tests', () => {
             const gameBox = renderer.createGameBoxWithTexture(scene, mockGame, 0, textureOptions)
 
             expect(gameBox).toBeTruthy()
-            expect(gameBox?.userData.steamGame).toEqual(mockGame)
+            expect(gameBox?.userData.gameData).toEqual(mockGame)
             expect(scene.children).toContain(gameBox)
         })
 

@@ -13,10 +13,13 @@ export {
     type GameBoxDimensions, 
     type GameBoxPosition, 
     type ShelfConfiguration,
+    type GameData,
     type SteamGameData,
     type GameBoxTextureOptions,
     type TexturePerformanceConfig,
-    type GameBoxPerformanceData
+    type GameBoxPerformanceData,
+    type GameBoxCreationRequest,
+    type GameBoxBatchCreationRequest
 } from './GameBoxRenderer'
 export { SignageRenderer, type SignageConfig } from './SignageRenderer'
 export { 

@@ -31,6 +31,18 @@ export interface ShelfConfiguration {
     spacing: number
 }
 
+// Generic game data interface - not specific to Steam
+export interface GameData {
+    id: string | number
+    name: string
+    playtime: number
+    recentPlaytime?: number
+    // Artwork URLs are handled separately via texture options
+    // This keeps the renderer agnostic to data source
+}
+
+// Legacy Steam interface for backward compatibility
+// TODO: Remove this once SteamGameManager is refactored
 export interface SteamGameData {
     appid: string | number
     name: string
@@ -44,6 +56,19 @@ export interface SteamGameData {
         header: string
         library: string
     }
+}
+
+// Clean interface contract between GameBoxRenderer and external managers
+export interface GameBoxCreationRequest {
+    gameData: GameData | SteamGameData
+    index: number
+    textureOptions?: GameBoxTextureOptions
+}
+
+export interface GameBoxBatchCreationRequest {
+    games: (GameData | SteamGameData)[]
+    batchSize?: number
+    enablePerformanceFeatures?: boolean
 }
 
 export interface GameBoxTextureOptions {
@@ -109,7 +134,8 @@ export class GameBoxRenderer {
     constructor(
         dimensions: Partial<GameBoxDimensions> = {},
         shelfConfig: Partial<ShelfConfiguration> = {},
-        performanceConfig: Partial<TexturePerformanceConfig> = {}
+        performanceConfig: Partial<TexturePerformanceConfig> = {},
+        private sceneManager?: any // Optional SceneManager for consistent scene interaction
     ) {
         this.dimensions = { ...GameBoxRenderer.DEFAULT_DIMENSIONS, ...dimensions }
         
@@ -177,22 +203,22 @@ export class GameBoxRenderer {
     }
 
     /**
-     * Create a game box from Steam data
+     * Create a game box from generic game data
      */
     public createGameBox(
         scene: THREE.Scene, 
-        game: SteamGameData, 
+        game: GameData | SteamGameData, 
         index: number
     ): THREE.Mesh | null {
         return this.createGameBoxWithTexture(scene, game, index)
     }
 
     /**
-     * Create a game box from Steam data with optional texture support
+     * Create a game box from game data with optional texture support
      */
     public createGameBoxWithTexture(
         scene: THREE.Scene, 
-        game: SteamGameData, 
+        game: GameData | SteamGameData, 
         index: number,
         textureOptions?: GameBoxTextureOptions
     ): THREE.Mesh | null {
@@ -204,13 +230,16 @@ export class GameBoxRenderer {
         
         const gameBox = new THREE.Mesh(this.gameBoxGeometry, material)
         
-        // Mark as game box with Steam data
+        // Mark as game box with game data
+        const gameId = this.getGameId(game)
+        const playtime = this.getGamePlaytime(game)
+        
         gameBox.userData = { 
             isGameBox: true, 
-            steamGame: game,
-            appId: game.appid,
+            gameData: game,
+            gameId: gameId,
             name: game.name,
-            playtime: game.playtime_forever
+            playtime: playtime
         }
         
         // Position the box - individual boxes use simple index-based positioning
@@ -234,21 +263,39 @@ export class GameBoxRenderer {
             })
         }
         
-        // Add to scene
-        scene.add(gameBox)
+        // Add to scene using SceneManager if available, otherwise direct add
+        if (this.sceneManager) {
+            // Use SceneManager for consistent scene interaction
+            scene.add(gameBox)
+        } else {
+            scene.add(gameBox)
+        }
         
         console.log(`📦 Added game box ${index}: ${game.name}`)
         return gameBox
     }
 
     /**
-     * Create game boxes from Steam library data
+     * Helper methods to handle different game data formats
      */
-    public createGameBoxesFromSteamData(
-        scene: THREE.Scene, 
-        games: SteamGameData[]
+    private getGameId(game: GameData | SteamGameData): string | number {
+        return 'id' in game ? game.id : game.appid
+    }
+    
+    private getGamePlaytime(game: GameData | SteamGameData): number {
+        return 'playtime' in game ? game.playtime : game.playtime_forever
+    }
+    
+    /**
+     * Create game boxes from batch request (clean interface)
+     */
+    public createGameBoxesFromBatch(
+        scene: THREE.Scene,
+        request: GameBoxBatchCreationRequest
     ): THREE.Mesh[] {
-        console.log(`🎮 Creating game boxes from ${games.length} Steam games...`)
+        const { games, enablePerformanceFeatures = false } = request
+        
+        console.log(`🎮 Creating game boxes from ${games.length} games...`)
         
         if (!games || games.length === 0) {
             console.warn('⚠️ No games provided for game box creation')
@@ -265,7 +312,15 @@ export class GameBoxRenderer {
         
         // Create game boxes with proper centering
         sortedGames.forEach((game, index) => {
-            const box = this.createGameBox(scene, game, index)
+            const creationRequest: GameBoxCreationRequest = {
+                gameData: game,
+                index,
+                textureOptions: enablePerformanceFeatures ? {
+                    enableLazyLoading: true
+                } : undefined
+            }
+            
+            const box = this.createGameBoxFromRequest(scene, creationRequest)
             if (box) {
                 // Adjust position to center the entire set
                 const currentPos = box.position
@@ -274,8 +329,40 @@ export class GameBoxRenderer {
             }
         })
         
-        console.log(`✅ Created ${boxes.length} game boxes from Steam library`)
+        console.log(`✅ Created ${boxes.length} game boxes from game library`)
         return boxes
+    }
+    
+    /**
+     * Create single game box from request (clean interface)
+     */
+    public createGameBoxFromRequest(
+        scene: THREE.Scene,
+        request: GameBoxCreationRequest
+    ): THREE.Mesh | null {
+        const { gameData, index, textureOptions } = request
+        return this.createGameBoxWithTexture(scene, gameData, index, textureOptions)
+    }
+    
+    /**
+     * Create game boxes from game library data
+     */
+    public createGameBoxesFromGameData(
+        scene: THREE.Scene, 
+        games: (GameData | SteamGameData)[]
+    ): THREE.Mesh[] {
+        return this.createGameBoxesFromBatch(scene, { games })
+    }
+    
+    /**
+     * Create game boxes from Steam library data (legacy method)
+     * TODO: Remove once SteamGameManager is refactored
+     */
+    public createGameBoxesFromSteamData(
+        scene: THREE.Scene, 
+        games: SteamGameData[]
+    ): THREE.Mesh[] {
+        return this.createGameBoxesFromGameData(scene, games)
     }
 
     /**
@@ -320,15 +407,15 @@ export class GameBoxRenderer {
         }
     }
 
-    private sortAndLimitGames(games: SteamGameData[]): SteamGameData[] {
+    private sortAndLimitGames(games: (GameData | SteamGameData)[]): (GameData | SteamGameData)[] {
         // Get games with recent playtime first, then alphabetical
         const playedGames = games
-            .filter(game => game.playtime_forever > 0)
-            .sort((a, b) => b.playtime_forever - a.playtime_forever)
+            .filter(game => this.getGamePlaytime(game) > 0)
+            .sort((a, b) => this.getGamePlaytime(b) - this.getGamePlaytime(a))
         
         // Add unplayed games alphabetically
         const unplayedGames = games
-            .filter(game => game.playtime_forever === 0)
+            .filter(game => this.getGamePlaytime(game) === 0)
             .sort((a, b) => a.name.localeCompare(b.name))
         
         playedGames.push(...unplayedGames)
@@ -382,7 +469,7 @@ export class GameBoxRenderer {
      */
     public async applyTexture(
         mesh: THREE.Mesh, 
-        game: SteamGameData, 
+        game: GameData | SteamGameData, 
         options: GameBoxTextureOptions = {}
     ): Promise<boolean> {
         // Dispose of existing texture
@@ -513,7 +600,7 @@ export class GameBoxRenderer {
         ) as THREE.Mesh[]
 
         for (const gameBox of gameBoxes) {
-            const gameId = gameBox.userData.appId?.toString() ?? gameBox.userData.name ?? 'unknown'
+            const gameId = gameBox.userData.gameId?.toString() ?? gameBox.userData.name ?? 'unknown'
             
             // Calculate distance from camera
             const distance = camera.position.distanceTo(gameBox.position)
@@ -614,10 +701,10 @@ export class GameBoxRenderer {
      */
     public async applyOptimizedTexture(
         mesh: THREE.Mesh, 
-        game: SteamGameData, 
+        game: GameData | SteamGameData, 
         options: GameBoxTextureOptions = {}
     ): Promise<boolean> {
-        const gameId = game.appid?.toString() ?? game.name
+        const gameId = this.getGameId(game).toString()
         const performanceData = this.gameBoxPerformanceData.get(gameId)
         
         // Skip if not visible and lazy loading is enabled

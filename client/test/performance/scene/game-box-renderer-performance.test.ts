@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { GameBoxRenderer, type SteamGameData } from '../../../src/scene'
+import { GameBoxRenderer, type SteamGameData, type TexturePerformanceConfig } from '../../../src/scene'
 
 // Mock URL object methods
 Object.defineProperty(globalThis, 'URL', {
@@ -53,7 +53,7 @@ Object.defineProperty(globalThis, 'document', {
     writable: true
 })
 
-describe.skip('GameBox Renderer Performance - SKIPPED (complex performance features removed)', () => {
+describe('GameBox Renderer Performance - Experimental Features', () => {
     let renderer: GameBoxRenderer
     let scene: THREE.Scene
     let camera: THREE.PerspectiveCamera
