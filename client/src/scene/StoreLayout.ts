@@ -14,18 +14,6 @@ import {
 // Re-export for backward compatibility
 export { VR_ERGONOMICS, STEAM_STORE_SECTIONS, type StoreLayoutConfig, type StoreSection };
 
-/**
- * Standard shelf unit configuration
- */
-const STANDARD_SHELF_CONFIG = {
-  width: 2.0,
-  height: 2.0,
-  depth: 0.4,
-  angle: 12,
-  shelfCount: 4,
-  boardThickness: 0.05
-} as const;
-
 export class StoreLayout {
   private static readonly logger = Logger.withContext('StoreLayout')
   
@@ -53,17 +41,10 @@ export class StoreLayout {
   }
 
   /**
-   * Generate the complete VR-optimized store layout
+   * Generate the complete VR-optimized store layout using GPU-optimized rendering
    */
   public async generateStore(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
-    // Clear existing store
-    this.clearStore();
-
-    // Create only shelves - room structure handled by EnvironmentRenderer
-    await this.createShelfSections(config);
-    this.createEntranceArea(config);
-    
-    StoreLayout.logger.info('Store shelves generated (room structure handled by EnvironmentRenderer)')
+    await this.generateShelvesGPUOptimized(config);
   }
 
   /**
@@ -79,23 +60,7 @@ export class StoreLayout {
     StoreLayout.logger.info('Basic room ready (room structure handled by EnvironmentRenderer)')
   }
 
-  /**
-   * Generate and add shelves to the existing room (called asynchronously)
-   */
-  public async generateShelves(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
-    // Only create shelf sections, assuming room structure already exists
-    await this.createShelfSections(config);
-    
-    StoreLayout.logger.info('Store shelves added to existing room')
-  }
 
-  /**
-   * Generate shelves using chunked processing to avoid blocking the event loop
-   */
-  public async generateShelvesChunked(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<void> {
-    await this.createShelfSectionsChunked(config);
-    StoreLayout.logger.info('Store shelves added to existing room (chunked)')
-  }
 
   /**
    * Generate shelves using GPU-optimized instanced rendering for maximum performance
@@ -118,77 +83,7 @@ export class StoreLayout {
     await this.roomBuilder.createRoomStructure(config, this.storeGroup);
   }
 
-  /**
-   * Create shelf sections based on configuration
-   */
-  private async createShelfSections(config: StoreLayoutConfig): Promise<void> {
-    for (const section of config.sections) {
-      const sectionGroup = new THREE.Group();
-      sectionGroup.name = section.name;
-      
-      // Create shelves for this section
-      for (let i = 0; i < section.shelfCount; i++) {
-        const shelfPosition = new THREE.Vector3(
-          section.position.x + i * config.shelfSpacing,
-          section.position.y,
-          section.position.z
-        );
-        
-        const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition, STANDARD_SHELF_CONFIG);
-        
-        sectionGroup.add(shelfUnit);
-      }
-      
-      // Add section label (simple text for now)
-      this.addSectionLabel(sectionGroup, section);
-      
-      this.storeGroup.add(sectionGroup);
-    }
-  }
 
-  /**
-   * Create shelf sections with chunked processing to avoid blocking the event loop
-   */
-  private async createShelfSectionsChunked(config: StoreLayoutConfig): Promise<void> {
-    const SHELF_CHUNK_SIZE = 2; // Process 2 shelves at a time
-    const CHUNK_DELAY = 16; // ~60fps (16ms between chunks)
-    
-    for (const section of config.sections) {
-      const sectionGroup = new THREE.Group();
-      sectionGroup.name = section.name;
-      
-      StoreLayout.logger.info(`Creating section: ${section.name} (${section.shelfCount} shelves)`);
-      
-      // Create shelves in chunks
-      for (let i = 0; i < section.shelfCount; i += SHELF_CHUNK_SIZE) {
-        const chunkEnd = Math.min(i + SHELF_CHUNK_SIZE, section.shelfCount);
-        
-        // Process this chunk
-        for (let j = i; j < chunkEnd; j++) {
-          const shelfPosition = new THREE.Vector3(
-            section.position.x + j * config.shelfSpacing,
-            section.position.y,
-            section.position.z
-          );
-          
-          const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition, STANDARD_SHELF_CONFIG);
-          
-          sectionGroup.add(shelfUnit);
-        }
-        
-        // Yield control back to the event loop after each chunk
-        if (chunkEnd < section.shelfCount) {
-          await new Promise(resolve => setTimeout(resolve, CHUNK_DELAY));
-        }
-      }
-      
-      // Add section label
-      this.addSectionLabel(sectionGroup, section);
-      this.storeGroup.add(sectionGroup);
-      
-      StoreLayout.logger.info(`Section ${section.name} complete`);
-    }
-  }
 
   /**
    * Create shelf sections using GPU-optimized rendering
@@ -216,10 +111,11 @@ export class StoreLayout {
           section.position.z
         );
         
-        // Generate shelf with MDF veneer materials (Task 6.1.1.1)
-        const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition, STANDARD_SHELF_CONFIG);
-        // Materials are now handled internally by ProceduralShelfGenerator:
+        // Generate shelf with MDF veneer materials (uses DEFAULT_SHELF_CONFIG from ProceduralShelfGenerator)
+        const shelfUnit = this.shelfGenerator.generateShelfUnit(shelfPosition);
+        // Materials and configuration are handled internally by ProceduralShelfGenerator:
         // - MDF veneer exterior, white interior, brand blue supports
+        // - Angle, dimensions, and extension settings from DEFAULT_SHELF_CONFIG
         
         sectionShelves.push(shelfUnit);
       }

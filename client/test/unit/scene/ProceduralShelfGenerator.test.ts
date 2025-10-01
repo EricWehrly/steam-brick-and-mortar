@@ -19,8 +19,8 @@ describe('ProceduralShelfGenerator', () => {
     expect(shelf.position.equals(position)).toBe(true);
     
     // Should have 4 boards + shelves + interior surfaces (Task 6.1.1.1)
-    // 2 angled boards + 2 side boards + 4 horizontal shelves + 4 interior surfaces = 12 children
-    expect(shelf.children.length).toBe(12);
+    // 2 angled boards + 2 side boards + 3 horizontal shelves + 3 interior surfaces = 10 children (DEFAULT_SHELF_CONFIG.shelfCount = 3)
+    expect(shelf.children.length).toBe(10);
   });
 
   it('should create shelves with correct dimensions', () => {

@@ -2,6 +2,19 @@ import * as THREE from 'three';
 import { TextureManager } from '../utils/TextureManager';
 
 /**
+ * Default shelf configuration
+ */
+const DEFAULT_SHELF_CONFIG = {
+  width: 2.0,
+  height: 2.0,
+  depth: 0.4,
+  angle: 3, // 6 degrees from vertical (reduced for less steep angles)
+  shelfCount: 3,
+  boardThickness: 0.05,
+  shelfExtensionPerLevel: 0.1 // How much each lower shelf extends forward
+} as const;
+
+/**
  * Procedural shelf generator for Phase 2 research
  * Creates a triangular shelf unit with angled boards and horizontal shelves
  */
@@ -66,14 +79,16 @@ export class ProceduralShelfGenerator {
     angle?: number; // Angle of the slanted boards in degrees
     shelfCount?: number;
     boardThickness?: number;
+    shelfExtensionPerLevel?: number;
   } = {}): THREE.Group {
     const {
-      width = 2.0,
-      height = 2.0,
-      depth = 0.4,
-      angle = 12, // 12 degrees from vertical
-      shelfCount = 4,
-      boardThickness = 0.05
+      width = DEFAULT_SHELF_CONFIG.width,
+      height = DEFAULT_SHELF_CONFIG.height,
+      depth = DEFAULT_SHELF_CONFIG.depth,
+      angle = DEFAULT_SHELF_CONFIG.angle,
+      shelfCount = DEFAULT_SHELF_CONFIG.shelfCount,
+      boardThickness = DEFAULT_SHELF_CONFIG.boardThickness,
+      shelfExtensionPerLevel = DEFAULT_SHELF_CONFIG.shelfExtensionPerLevel
     } = options;
 
     const shelfGroup = new THREE.Group();
@@ -100,16 +115,12 @@ export class ProceduralShelfGenerator {
     const frontBoard = new THREE.Mesh(angledBoardGeometry, mdfVeneerMaterial);
     frontBoard.position.set(0, height / 2, depth / 2);
     frontBoard.rotation.x = -angleRad; // Changed from z to x, negative for backward lean
-    frontBoard.castShadow = true;
-    frontBoard.receiveShadow = true;
     shelfGroup.add(frontBoard);
 
     // Back angled board  
     const backBoard = new THREE.Mesh(angledBoardGeometry, mdfVeneerMaterial);
     backBoard.position.set(0, height / 2, -depth / 2);
     backBoard.rotation.x = angleRad; // Changed from z to x, positive for backward lean
-    backBoard.castShadow = true;
-    backBoard.receiveShadow = true;
     shelfGroup.add(backBoard);
 
     // Create the two side boards - Brand blue support posts
@@ -119,22 +130,23 @@ export class ProceduralShelfGenerator {
       depth
     );
 
-    // Left side board (brand blue support post)
+    // Left side board (brand blue support post) - moved slightly outward to prevent clipping
     const leftBoard = new THREE.Mesh(sideBoardGeometry, brandAccentMaterial);
-    leftBoard.position.set(-width / 2, height / 2, 0);
-    leftBoard.castShadow = true;
-    leftBoard.receiveShadow = true;
+    leftBoard.position.set(-width / 2 - boardThickness * 0.5, height / 2, 0);
     shelfGroup.add(leftBoard);
 
-    // Right side board (brand blue support post)
+    // Right side board (brand blue support post) - moved slightly outward to prevent clipping
     const rightBoard = new THREE.Mesh(sideBoardGeometry, brandAccentMaterial);
-    rightBoard.position.set(width / 2, height / 2, 0);
-    rightBoard.castShadow = true;
-    rightBoard.receiveShadow = true;
+    rightBoard.position.set(width / 2 + boardThickness * 0.5, height / 2, 0);
     shelfGroup.add(rightBoard);
 
+    [frontBoard, backBoard, leftBoard, rightBoard].forEach(board => {
+      board.castShadow = true;
+      board.receiveShadow = true;
+    });
+
     // Create horizontal shelves with different materials for top/bottom surfaces
-    this.addHorizontalShelvesWithMaterials(shelfGroup, width, height, depth, shelfCount, boardThickness, angleRad, mdfVeneerMaterial, shelfInteriorMaterial);
+    this.addHorizontalShelvesWithMaterials(shelfGroup, width, height, depth * 1.5, shelfCount, boardThickness, angleRad, mdfVeneerMaterial, shelfInteriorMaterial, shelfExtensionPerLevel);
 
     return shelfGroup;
   }
@@ -151,7 +163,8 @@ export class ProceduralShelfGenerator {
     boardThickness: number,
     angleRad: number,
     exteriorMaterial: THREE.Material,
-    interiorMaterial: THREE.Material
+    interiorMaterial: THREE.Material,
+    shelfExtensionPerLevel: number
   ): void {
     const shelfSpacing = height / (shelfCount + 1);
 
@@ -161,11 +174,16 @@ export class ProceduralShelfGenerator {
       // Calculate shelf width at this height due to angled sides
       const widthAtHeight = width - 2 * (height - shelfY) * Math.tan(angleRad);
       
+      // Make lower shelves progressively extend forward (depth direction)
+      const shelfFromBottom = shelfCount - i + 1; // 1 for top shelf, shelfCount for bottom
+      const depthExtension = (shelfFromBottom - 1) * shelfExtensionPerLevel; // Each lower shelf extends forward
+      const shelfDepth = depth - boardThickness * 2 + depthExtension; // Account for front/back board thickness + extension
+      
       // Create shelf board with MDF veneer exterior
       const shelfGeometry = new THREE.BoxGeometry(
         widthAtHeight,
         boardThickness,
-        depth - boardThickness * 2 // Account for front/back board thickness
+        shelfDepth
       );
 
       const shelf = new THREE.Mesh(shelfGeometry, exteriorMaterial);
@@ -178,7 +196,7 @@ export class ProceduralShelfGenerator {
       const interiorGeometry = new THREE.BoxGeometry(
         widthAtHeight * 0.98, // Slightly smaller to sit on top
         boardThickness * 0.1, // Very thin interior surface
-        (depth - boardThickness * 2) * 0.98
+        shelfDepth * 0.98 // Match the extended shelf depth
       );
 
       const interiorSurface = new THREE.Mesh(interiorGeometry, interiorMaterial);
@@ -202,7 +220,7 @@ export class ProceduralShelfGenerator {
     woodMaterial: THREE.Material
   ): void {
     // Fallback to new method with same material for all surfaces
-    this.addHorizontalShelvesWithMaterials(parent, width, height, depth, shelfCount, boardThickness, angleRad, woodMaterial, woodMaterial);
+    this.addHorizontalShelvesWithMaterials(parent, width, height, depth, shelfCount, boardThickness, angleRad, woodMaterial, woodMaterial, DEFAULT_SHELF_CONFIG.shelfExtensionPerLevel);
   }
 
   /**
@@ -211,17 +229,10 @@ export class ProceduralShelfGenerator {
   public createTestScene(): THREE.Group {
     const testGroup = new THREE.Group();
     
-    // Create a single shelf unit for testing
+    // Create a single shelf unit for testing using default configuration
     const shelf = this.generateShelfUnit(
-      new THREE.Vector3(0, 0, 0),
-      {
-        width: 2.0,
-        height: 2.0,
-        depth: 0.4,
-        angle: 12,
-        shelfCount: 4,
-        boardThickness: 0.05
-      }
+      new THREE.Vector3(0, 0, 0)
+      // Uses DEFAULT_SHELF_CONFIG values
     );
 
     testGroup.add(shelf);
