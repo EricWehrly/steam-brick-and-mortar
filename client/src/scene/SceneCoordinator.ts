@@ -358,12 +358,15 @@ export class SceneCoordinator {
      * Spawn shelves dynamically based on game count
      */
     private async spawnDynamicShelves(gameCount: number): Promise<void> {
-        console.log(`📚 Spawning dynamic shelves for ${gameCount} games`)
+        console.debug(`📚 Spawning dynamic shelves for ${gameCount} games`)
         
-        const gamesPerShelf = 6 // Default games per shelf (configurable)
+        // TODO: Move these constants to shared configuration or get from StorePropsRenderer
+        const gamesPerSurface = 3 // Should match GAMES_PER_SURFACE in StorePropsRenderer
+        const surfacesPerShelf = 6 // Should match SURFACES_PER_SHELF in StorePropsRenderer (3 levels × 2 sides)
+        const gamesPerShelf = gamesPerSurface * surfacesPerShelf // 3 × 6 = 18 games per shelf
         const shelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
         
-        console.log(`📊 Calculated: Need ${shelvesNeeded} shelves for ${gameCount} games (${gamesPerShelf} games per shelf)`)
+        console.debug(`📊 Calculated: Need ${shelvesNeeded} shelves for ${gameCount} games (${gamesPerShelf} games per shelf: ${gamesPerSurface} games/surface × ${surfacesPerShelf} surfaces/shelf)`)
         
         try {
             // Get actual game data for shelf spawning

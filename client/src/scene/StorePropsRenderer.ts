@@ -19,6 +19,12 @@ import { SignageRenderer } from './SignageRenderer'
 import { PropRenderer } from './PropRenderer'
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
 
+// Configuration constants for game layout
+// TODO: Make these user-configurable in game menus
+const GAMES_PER_SURFACE = 3 // Games per shelf surface (front/back of each shelf level)
+const SURFACES_PER_SHELF = 6 // 3 shelf levels × 2 sides (front/back) = 6 surfaces per shelf unit
+// TODO: Calculate SURFACES_PER_SHELF dynamically from shelf geometry in future
+
 export interface PropsConfig {
     /** Enable shelf generation */
     enableShelves?: boolean
@@ -253,7 +259,14 @@ export class StorePropsRenderer {
      * Spawn dynamic shelves based on game count and populate with loaded games
      */
     public async spawnDynamicShelvesWithGames(shelvesNeeded: number, gameCount: number, games: any[] = []): Promise<void> {
-        console.debug(`📚 Spawning ${shelvesNeeded} dynamic shelves for ${gameCount} games with ${games.length} game data objects`)
+        // Calculate the actual shelves needed based on our configuration
+        // TODO: Remove shelvesNeeded parameter once all callers are updated to use internal calculation
+        const gamesPerShelf = GAMES_PER_SURFACE * SURFACES_PER_SHELF // 3 games × 6 surfaces = 18 games per shelf
+        const calculatedShelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
+        const actualShelvesNeeded = calculatedShelvesNeeded // Use calculated value instead of parameter
+        
+        console.debug(`📚 Spawning ${actualShelvesNeeded} dynamic shelves for ${gameCount} games with ${games.length} game data objects`)
+        console.debug(`📊 Calculation: ${gameCount} games ÷ (${GAMES_PER_SURFACE} games/surface × ${SURFACES_PER_SHELF} surfaces/shelf) = ${actualShelvesNeeded} shelves`)
         
         try {
             // Clear existing shelves if any
@@ -261,14 +274,14 @@ export class StorePropsRenderer {
             
             // Create shelf rows based on needed shelves
             const maxShelvesPerRow = 4
-            const rows = Math.ceil(shelvesNeeded / maxShelvesPerRow)
+            const rows = Math.ceil(actualShelvesNeeded / maxShelvesPerRow)
             
             for (let row = 0; row < rows; row++) {
-                const shelvesInThisRow = Math.min(maxShelvesPerRow, shelvesNeeded - (row * maxShelvesPerRow))
+                const shelvesInThisRow = Math.min(maxShelvesPerRow, actualShelvesNeeded - (row * maxShelvesPerRow))
                 await this.createShelfRow(row, shelvesInThisRow, games)
             }
             
-            console.debug(`✅ Dynamic shelves spawned: ${shelvesNeeded} shelves in ${rows} row(s)`)
+            console.debug(`✅ Dynamic shelves spawned: ${actualShelvesNeeded} shelves in ${rows} row(s)`)
             
         } catch (error) {
             console.error('❌ Failed to spawn dynamic shelves:', error)
@@ -315,8 +328,8 @@ export class StorePropsRenderer {
                 rowZ
             )
             
-            // Calculate which games belong to this shelf (6 games per shelf, both sides)
-            const gamesPerShelf = 6
+            // Calculate which games belong to this shelf (18 games per shelf: 3 rows × 2 sides × 3 games)
+            const gamesPerShelf = GAMES_PER_SURFACE * SURFACES_PER_SHELF;
             const shelfGlobalIndex = rowIndex * 4 + i // 4 shelves per row max
             const startGameIndex = shelfGlobalIndex * gamesPerShelf
             const shelfGames = games.slice(startGameIndex, startGameIndex + gamesPerShelf)
@@ -374,22 +387,20 @@ export class StorePropsRenderer {
             return;
         }
         
-        // Distribute games across available surfaces (front and back of each shelf level)
-        const gamesPerSurface = Math.ceil(games.length / (shelfSurfaces.length * 2)); // *2 for front/back
         let gameIndex = 0;
         
         for (let surfaceIdx = 0; surfaceIdx < shelfSurfaces.length && gameIndex < games.length; surfaceIdx++) {
             const surface = shelfSurfaces[surfaceIdx];
             
             // Spawn games on front side
-            const frontGames = games.slice(gameIndex, gameIndex + gamesPerSurface);
+            const frontGames = games.slice(gameIndex, gameIndex + GAMES_PER_SURFACE);
             if (frontGames.length > 0) {
                 await this.createGameBoxesWithNames(surface, parentGroup, frontGames, 'front', surfaceIdx);
                 gameIndex += frontGames.length;
             }
             
             // Spawn games on back side
-            const backGames = games.slice(gameIndex, gameIndex + gamesPerSurface);
+            const backGames = games.slice(gameIndex, gameIndex + GAMES_PER_SURFACE);
             if (backGames.length > 0) {
                 await this.createGameBoxesWithNames(surface, parentGroup, backGames, 'back', surfaceIdx);
                 gameIndex += backGames.length;
@@ -443,9 +454,9 @@ export class StorePropsRenderer {
     ): Promise<void> {
         const Z_OFFSET = 0.025;
         const Y_OFFSET = 0.11;
-        const GAME_HEIGHT = 0.2;
-        const GAME_WIDTH = 0.15;
-        const GAME_DEPTH = 0.05;
+        const GAME_HEIGHT = 0.24;  // 1.2x larger: 0.2 * 1.2 = 0.24
+        const GAME_WIDTH = 0.18;   // 1.2x larger: 0.15 * 1.2 = 0.18
+        const GAME_DEPTH = 0.05;   // Keep Z the same
         const GAME_SPACING = 0.3;
         
         // Calculate positioning
@@ -495,9 +506,9 @@ export class StorePropsRenderer {
         ctx.fillStyle = '#2c3e50'; // Dark blue-gray
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Game name text
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 24px Arial';
+        // Game name text - larger font and better contrast
+        ctx.fillStyle = '#f8f9fa';  // Almost pure white for better contrast
+        ctx.font = 'bold 48px Arial';  // Double the size: 24px * 2 = 48px
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
@@ -524,8 +535,8 @@ export class StorePropsRenderer {
         // Limit to 3 lines max
         lines = lines.slice(0, 3);
         
-        // Draw the text lines
-        const lineHeight = 30;
+        // Draw the text lines - adjust line height for larger font
+        const lineHeight = 60;  // Double the line height for larger font
         const startY = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
         
         lines.forEach((line, index) => {
