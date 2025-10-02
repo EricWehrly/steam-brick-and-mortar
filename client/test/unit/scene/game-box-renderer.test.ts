@@ -41,9 +41,11 @@ describe('GameBoxRenderer Texture Tests', () => {
     let renderer: GameBoxRenderer
     let scene: THREE.Scene
     let mockGame: SteamGameData
+    let textureManager: any
 
     beforeEach(() => {
         renderer = new GameBoxRenderer()
+        textureManager = renderer.getTextureManager()
         scene = new THREE.Scene()
         mockGame = {
             appid: '123',
@@ -98,7 +100,7 @@ describe('GameBoxRenderer Texture Tests', () => {
                 fallbackColor: 0xff0000 // Red
             }
 
-            const result = await renderer.applyTexture(gameBox!, mockGame, textureOptions)
+            const result = await textureManager.applyTexture(gameBox!, mockGame, textureOptions)
             expect(result).toBe(false) // Should return false when no valid blobs
         })
 
@@ -113,7 +115,7 @@ describe('GameBoxRenderer Texture Tests', () => {
                 }
             }
 
-            const result = await renderer.applyTexture(gameBox!, mockGame, textureOptions)
+            const result = await textureManager.applyTexture(gameBox!, mockGame, textureOptions)
             expect(result).toBe(true) // Should return true on successful texture application
         })
 
@@ -133,7 +135,7 @@ describe('GameBoxRenderer Texture Tests', () => {
                 }
             }
 
-            const result = await renderer.applyTexture(gameBox!, mockGame, textureOptions)
+            const result = await textureManager.applyTexture(gameBox!, mockGame, textureOptions)
             expect(result).toBe(true)
         })
     })
@@ -157,7 +159,7 @@ describe('GameBoxRenderer Texture Tests', () => {
                 }
             }
 
-            const result = await renderer.applyTexture(gameBox!, mockGame, textureOptions)
+            const result = await textureManager.applyTexture(gameBox!, mockGame, textureOptions)
             // Should handle errors gracefully
             expect(typeof result).toBe('boolean')
         })
@@ -179,7 +181,7 @@ describe('GameBoxRenderer Texture Tests', () => {
                 }
             }
 
-            await renderer.applyTexture(gameBox!, mockGame, textureOptions)
+            await textureManager.applyTexture(gameBox!, mockGame, textureOptions)
             
             // Should have called dispose on the old texture
             expect(mockTexture.dispose).toHaveBeenCalled()

@@ -5,8 +5,8 @@
  * with separated concerns for performance, textures, and layout.
  */
 
-// Core renderer
-export { GameBoxRenderer } from './GameBoxRenderer'
+// Core renderer (located in parent scene directory)
+export { GameBoxRenderer } from '../GameBoxRenderer'
 
 // Specialized managers
 export { GameBoxPerformanceManager } from './GameBoxPerformanceManager'

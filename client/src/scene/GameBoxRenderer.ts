@@ -378,13 +378,13 @@ export class GameBoxRenderer {
         }
     }
 
-    // Texture management delegated to GameBoxTextureManager  
-    public async applyTexture(
-        mesh: THREE.Mesh, 
-        game: GameData | SteamGameData, 
-        options: GameBoxTextureOptions = {}
-    ): Promise<boolean> {
-        return this.textureManager.applyTexture(mesh, game, options)
+    // Access to specialized managers for specific use cases
+    public getTextureManager(): GameBoxTextureManager {
+        return this.textureManager
+    }
+
+    public getPerformanceManager(): GameBoxPerformanceManager | undefined {
+        return this.performanceManager
     }
 
 }

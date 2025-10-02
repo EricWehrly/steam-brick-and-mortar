@@ -113,7 +113,7 @@ export class SteamGameManager {
                         enableLazyLoading: true
                     }
                     
-                    await this.gameBoxRenderer.applyTexture(gameBox, game, textureOptions)
+                    await this.gameBoxRenderer.getTextureManager().applyTexture(gameBox, game, textureOptions)
                 }
             } catch (error) {
                 console.debug(`Could not load artwork for ${game.name}:`, error)
