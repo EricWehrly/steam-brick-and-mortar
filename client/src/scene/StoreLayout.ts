@@ -143,15 +143,19 @@ export class StoreLayout {
 
   private spawnGamesOnShelf(shelfUnit: THREE.Group, parentGroup: THREE.Group): void {
     const shelfSurfaces = this.findShelfSurfaces(shelfUnit);
-    console.log(`📚 Found ${shelfSurfaces.length} shelf surfaces`);
+    console.debug(`📚 Found ${shelfSurfaces.length} shelf surfaces`);
     
     shelfSurfaces.forEach((surface, index) => {
-      this.spawnGamesOnSurface(surface, parentGroup, index);
+      // Spawn games on front side of shelf
+      this.spawnGamesOnSurface(surface, parentGroup, index, 'front');
+      
+      // Spawn games on back side of shelf (double-sided)
+      this.spawnGamesOnSurface(surface, parentGroup, index, 'back');
     });
   }
   
-  private findShelfSurfaces(shelfUnit: THREE.Group): Array<{topY: number, frontZ: number, centerX: number, width: number}> {
-    const surfaces: Array<{topY: number, frontZ: number, centerX: number, width: number}> = [];
+  private findShelfSurfaces(shelfUnit: THREE.Group): Array<{topY: number, frontZ: number, backZ: number, centerX: number, width: number, depth: number}> {
+    const surfaces: Array<{topY: number, frontZ: number, backZ: number, centerX: number, width: number, depth: number}> = [];
     
     // Traverse the shelf unit to find horizontal surfaces (shelves)
     shelfUnit.traverse((child) => {
@@ -164,10 +168,12 @@ export class StoreLayout {
           surfaces.push({
             topY: box.max.y,
             frontZ: box.min.z, // Front edge of shelf
+            backZ: box.max.z,   // Back edge of shelf
             centerX: (box.min.x + box.max.x) / 2,
-            width: size.x
+            width: size.x,
+            depth: size.z
           });
-          console.log(`� Found shelf surface: Y=${box.max.y.toFixed(3)}, frontZ=${box.min.z.toFixed(3)}, width=${size.x.toFixed(2)}`);
+          console.debug(`📚 Found shelf surface: Y=${box.max.y.toFixed(3)}, frontZ=${box.min.z.toFixed(3)}, backZ=${box.max.z.toFixed(3)}, depth=${size.z.toFixed(2)}`);
         }
       }
     });
@@ -176,58 +182,57 @@ export class StoreLayout {
     return surfaces.sort((a, b) => a.topY - b.topY);
   }
   
-  private spawnGamesOnSurface(surface: {topY: number, frontZ: number, centerX: number, width: number}, parentGroup: THREE.Group, shelfIndex: number): void {
+  private spawnGamesOnSurface(surface: {topY: number, frontZ: number, backZ: number, centerX: number, width: number, depth: number}, parentGroup: THREE.Group, shelfIndex: number, side: 'front' | 'back'): void {
     // === TUNING PARAMETERS - Easy to adjust! ===
     const GAME_HEIGHT = 0.2;           // Height of game boxes
-    const Z_OFFSET = -0.25;            // FLIPPED SIGN! Move games toward player (negative Z = toward camera)
-    const Y_OFFSET_ABOVE_SHELF = 0.1;  // How high above shelf surface to place games
+    const Z_OFFSET = 0.025;            // Distance from shelf edge to place games
+    const Y_OFFSET_ABOVE_SHELF = 0.11;  // How high above shelf surface to place games
     
     // === Convert world coordinates to local coordinates ===
     const parentWorldPos = parentGroup.getWorldPosition(new THREE.Vector3());
-    console.log(`   📐 Parent group world position:`, parentWorldPos);
     
     // Calculate game position in world coordinates first
-    const gameWorldY = surface.topY + Y_OFFSET_ABOVE_SHELF + GAME_HEIGHT / 2;
-    const gameWorldZ = surface.frontZ// + Z_OFFSET; // FLIPPED: negative means toward player  
-    const gameWorldX = surface.centerX;
+    const offsetSurfaceY = surface.topY + Y_OFFSET_ABOVE_SHELF;
     
-    // Convert to local coordinates relative to parent group
-    const gameY = gameWorldY - parentWorldPos.y;
-    const gameZ = gameWorldZ// - parentWorldPos.z;
-    const gameX = gameWorldX - parentWorldPos.x;
+    // Position games on front or back side of shelf
+    const offsetSurfaceZ = side === 'front' 
+      ? surface.frontZ + Z_OFFSET    // Front side: move away from front edge
+      : surface.backZ - Z_OFFSET;    // Back side: move away from back edge (toward player)
+      
+    const offsetSurfaceX = surface.centerX;
     
-    console.log(`SHELF ${shelfIndex + 1} POSITIONING:`);
+    // console.log(`SHELF ${shelfIndex + 1} POSITIONING:`);
     
-    console.log(`🎯 POSITIONING DEBUG for shelf ${shelfIndex + 1}:`);
-    console.log(`   📚 Shelf surface (world): X=${surface.centerX.toFixed(3)}, Y=${surface.topY.toFixed(3)}, Z=${surface.frontZ.toFixed(3)}`);
-    console.log(`   📐 Parent group (world): X=${parentWorldPos.x.toFixed(3)}, Y=${parentWorldPos.y.toFixed(3)}, Z=${parentWorldPos.z.toFixed(3)}`);
-    console.log(`   � Game position (world): X=${gameWorldX.toFixed(3)}, Y=${gameWorldY.toFixed(3)}, Z=${gameWorldZ.toFixed(3)}`);
-    console.log(`   🎯 Game position (local): X=${gameX.toFixed(3)}, Y=${gameY.toFixed(3)}, Z=${gameZ.toFixed(3)}`);
-    console.log(`   ⚙️ Offsets: Y_OFFSET=${Y_OFFSET_ABOVE_SHELF}, Z_OFFSET=${Z_OFFSET}`);
+    // console.log(`🎯 POSITIONING DEBUG for shelf ${shelfIndex + 1}:`);
+    // console.log(`   📚 Shelf surface (world): X=${surface.centerX.toFixed(3)}, Y=${surface.topY.toFixed(3)}, Z=${surface.frontZ.toFixed(3)}`);
+    // console.log(`   📐 Parent group (world): X=${parentWorldPos.x.toFixed(3)}, Y=${parentWorldPos.y.toFixed(3)}, Z=${parentWorldPos.z.toFixed(3)}`);
+    // console.log(`   � Game position (world): X=${gameWorldX.toFixed(3)}, Y=${gameWorldY.toFixed(3)}, Z=${gameWorldZ.toFixed(3)}`);
+    // console.log(`   🎯 Game position (local): X=${gameX.toFixed(3)}, Y=${gameY.toFixed(3)}, Z=${gameZ.toFixed(3)}`);
+    // console.log(`   ⚙️ Offsets: Y_OFFSET=${Y_OFFSET_ABOVE_SHELF}, Z_OFFSET=${Z_OFFSET}`);
     
     // === Simple config for GameBoxRenderer ===
     const shelfConfig = {
-      surfaceY: gameY,
-      centerZ: gameZ,
-      centerX: gameX,
+      surfaceY: offsetSurfaceY,
+      centerZ: offsetSurfaceZ,
+      centerX: offsetSurfaceX,
       maxGames: 5,
       spacing: 0.35
     };
     
-    console.log(`📦 GameBoxRenderer config for shelf ${shelfIndex + 1}:`, shelfConfig);
+    console.debug(`📦 GameBoxRenderer config for shelf ${shelfIndex + 1} (${side} side):`, shelfConfig);
     
     const gameBoxes = this.gameBoxRenderer.createPlaceholderBoxes(5, shelfConfig);
     
     // Move games to our parent group and log their final positions
     gameBoxes.forEach((box, boxIndex) => {
-      box.name = `game-shelf${shelfIndex + 1}-box${boxIndex + 1}`;
-      console.log(`   🎮 Game box ${boxIndex + 1} local position before:`, box.position);
+      box.name = `game-shelf${shelfIndex + 1}-${side}-box${boxIndex + 1}`;
+      console.debug(`   🎮 Game box ${boxIndex + 1} (${side}) local position before:`, box.position);
       parentGroup.add(box);
       const worldPos = box.getWorldPosition(new THREE.Vector3());
-      console.log(`   🌍 Game box ${boxIndex + 1} world position after:`, worldPos);
+      console.debug(`   🌍 Game box ${boxIndex + 1} (${side}) world position after:`, worldPos);
     });
     
-    console.log(`✅ Added ${gameBoxes.length} games to shelf ${shelfIndex + 1} using GameBoxRenderer`);
+    console.debug(`✅ Added ${gameBoxes.length} games to shelf ${shelfIndex + 1} ${side} side using GameBoxRenderer`);
   }
 
   private clearStore(): void {
