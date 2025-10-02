@@ -106,7 +106,8 @@ export class StoreLayout {
       new THREE.PlaneGeometry(2.0, 0.5),
       new THREE.MeshStandardMaterial({ map: texture, transparent: true })
     );
-    label.position.set(position.x, 2.3, position.z);
+    // Position label relative to the shelf group (which is already positioned)
+    label.position.set(0, 2.3, 0); // X=0 (centered), Y=2.3 (above shelf), Z=0 (at shelf position)
     sectionGroup.add(label);
   }
 
@@ -163,6 +164,9 @@ export class StoreLayout {
         const box = new THREE.Box3().setFromObject(child);
         const size = box.getSize(new THREE.Vector3());
         
+        // Debug: Log all mesh geometries to understand what we're finding
+        console.debug(`🔍 Checking mesh "${child.name}": size=${size.x.toFixed(2)}×${size.y.toFixed(2)}×${size.z.toFixed(2)}, Y=${box.max.y.toFixed(3)}`);
+        
         // Look for horizontal surfaces (wide, not very tall, reasonable depth)
         if (size.x > 1.5 && size.y < 0.1 && size.z > 0.3) { // Wide, thin, deep = shelf surface
           surfaces.push({
@@ -173,13 +177,37 @@ export class StoreLayout {
             width: size.x,
             depth: size.z
           });
-          console.debug(`📚 Found shelf surface: Y=${box.max.y.toFixed(3)}, frontZ=${box.min.z.toFixed(3)}, backZ=${box.max.z.toFixed(3)}, depth=${size.z.toFixed(2)}`);
+          console.debug(`📚 SHELF SURFACE DETECTED: "${child.name}" Y=${box.max.y.toFixed(3)}, frontZ=${box.min.z.toFixed(3)}, backZ=${box.max.z.toFixed(3)}, depth=${size.z.toFixed(2)}`);
         }
       }
     });
     
+    // Remove duplicate surfaces at same height (tolerance of 0.01 units)
+    // Group surfaces by similar Y values and keep only one per group
+    const uniqueSurfaces: typeof surfaces = [];
+    const tolerance = 0.01;
+    
+    for (const surface of surfaces) {
+      const existingIndex = uniqueSurfaces.findIndex(existing => 
+        Math.abs(existing.topY - surface.topY) < tolerance
+      );
+      
+      if (existingIndex === -1) {
+        // No similar surface found, add this one
+        uniqueSurfaces.push(surface);
+      } else {
+        // Similar surface found, keep the one with larger area (better detection)
+        const existing = uniqueSurfaces[existingIndex];
+        if (surface.width * surface.depth > existing.width * existing.depth) {
+          uniqueSurfaces[existingIndex] = surface;
+        }
+      }
+    }
+    
+    console.debug(`🎯 After deduplication: ${surfaces.length} → ${uniqueSurfaces.length} shelf surfaces`);
+    
     // Sort by height (bottom to top)
-    return surfaces.sort((a, b) => a.topY - b.topY);
+    return uniqueSurfaces.sort((a, b) => a.topY - b.topY);
   }
   
   private spawnGamesOnSurface(surface: {topY: number, frontZ: number, backZ: number, centerX: number, width: number, depth: number}, parentGroup: THREE.Group, shelfIndex: number, side: 'front' | 'back'): void {
@@ -220,7 +248,7 @@ export class StoreLayout {
     };
     
     console.debug(`📦 GameBoxRenderer config for shelf ${shelfIndex + 1} (${side} side):`, shelfConfig);
-    
+
     const gameBoxes = this.gameBoxRenderer.createPlaceholderBoxes(5, shelfConfig);
     
     // Move games to our parent group and log their final positions
