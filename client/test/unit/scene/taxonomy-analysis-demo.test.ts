@@ -30,7 +30,11 @@ vi.mock('../../../src/scene/StorePropsRenderer', () => ({
 vi.mock('../../../src/scene/EnvironmentRenderer', () => ({
     EnvironmentRenderer: vi.fn().mockImplementation(() => ({
         setupEnvironment: vi.fn().mockResolvedValue(undefined),
-        getEnvironmentStats: vi.fn().mockReturnValue({ meshCount: 0, lightCount: 0 })
+        getEnvironmentStats: vi.fn().mockReturnValue({ meshCount: 0, lightCount: 0 }),
+        registerCeiling: vi.fn(),
+        unregisterCeiling: vi.fn(),
+        showCeilings: vi.fn(),
+        hideCeilings: vi.fn()
     }))
 }))
 

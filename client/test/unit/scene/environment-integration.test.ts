@@ -34,7 +34,7 @@ describe('Environment Integration', () => {
             // EnvironmentRenderer is stored as private field, integration verified by no compilation errors
         })
 
-        it('should use EnvironmentRenderer when expanding store environment', async () => {
+        it('should spawn shelves without calling environment methods', async () => {
             // Mock games data for expansion
             const testGames = [
                 { appid: 1, name: 'Test Game 1' },
@@ -42,28 +42,16 @@ describe('Environment Integration', () => {
                 { appid: 3, name: 'Test Game 3' }
             ]
 
-            // Mock event data
-            const mockEventData = {
-                userId: 'test-user',
-                gameCount: testGames.length,
-                games: testGames,
-                timestamp: new Date().toISOString()
-            }
-
-            // Trigger dynamic shelf spawning (which includes environment expansion)
+            // Trigger dynamic shelf spawning (which no longer handles environment expansion)
             const shelvesNeeded = Math.ceil(testGames.length / 18) // 18 games per shelf
             await propsRenderer.spawnDynamicShelvesWithGames(shelvesNeeded, testGames.length, testGames)
 
-            // Verify EnvironmentRenderer methods were called
-            expect(mockEnvironmentRenderer.clearEnvironment).toHaveBeenCalledOnce()
-            expect(mockEnvironmentRenderer.setupEnvironment).toHaveBeenCalledOnce()
+            // Verify EnvironmentRenderer methods were NOT called (environment is now handled by RoomManager)
+            expect(mockEnvironmentRenderer.clearEnvironment).not.toHaveBeenCalled()
+            expect(mockEnvironmentRenderer.setupEnvironment).not.toHaveBeenCalled()
             
-            // Verify environment setup was called with proper config
-            const setupCall = mockEnvironmentRenderer.setupEnvironment.mock.calls[0][0]
-            expect(setupCall).toHaveProperty('roomSize')
-            expect(setupCall.roomSize).toHaveProperty('width')
-            expect(setupCall.roomSize).toHaveProperty('depth')
-            expect(setupCall.roomSize).toHaveProperty('height')
+            // Verify shelves were created in scene
+            expect(scene.children.length).toBeGreaterThan(0)
         })
 
         it('should fallback gracefully when no EnvironmentRenderer is provided', async () => {
