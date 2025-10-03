@@ -20,6 +20,7 @@ import { TextureManager } from '../utils/TextureManager'
 import { RoomEventTypes, type RoomCreateEvent, type RoomResizeEvent } from '../types/InteractionEvents'
 import type { StoreLayoutConfig } from './StoreLayoutConfig'
 import { PropRenderer } from './PropRenderer'
+import type { EnvironmentRenderer } from './EnvironmentRenderer'
 
 // ============================================================================
 // ROOM CONSTANTS - Single Source of Truth
@@ -48,14 +49,21 @@ export class RoomConstants {
 
 // Room events are imported from InteractionEvents.ts
 
-// ============================================================================
-// ROOM MANAGER
-// ============================================================================
+export interface RoomDimensions {
+    width: number
+    depth: number
+    height: number
+}
 
 export class RoomManager {
     private scene: THREE.Scene
     private textureManager: TextureManager
     private eventManager: EventManager
+    private environmentRenderer: EnvironmentRenderer
+    
+    // Async mutex to prevent concurrent room operations
+    private isProcessingResize: boolean = false
+    private pendingResizeQueue: Array<{ dimensions: RoomDimensions, resolve: () => void, reject: (error: Error) => void }> = []
     
     // Room structure objects (for reuse)
     private roomGroup: THREE.Group | null = null
@@ -75,13 +83,14 @@ export class RoomManager {
         height: RoomConstants.DEFAULT_ROOM_HEIGHT
     }
 
-    constructor(scene: THREE.Scene) {
+    constructor(scene: THREE.Scene, environmentRenderer: EnvironmentRenderer) {
         this.scene = scene
         this.textureManager = TextureManager.getInstance()
         this.eventManager = EventManager.getInstance()
+        this.environmentRenderer = environmentRenderer
         
         // Register event listeners
-        this.eventManager.registerEventHandler(RoomEventTypes.CreateInitial, this.onCreateInitialRoom.bind(this))
+        // Single event handler for room resize (handles both creation and updating)
         this.eventManager.registerEventHandler(RoomEventTypes.Resize, this.onResizeRoom.bind(this))
         
         console.debug('🏠 RoomManager initialized with event-driven architecture')
@@ -90,7 +99,7 @@ export class RoomManager {
     /**
      * Calculate required room dimensions based on game count
      */
-    static calculateDimensionsForGameCount(gameCount: number): { width: number; depth: number; height: number } {
+    static calculateDimensionsForGameCount(gameCount: number): RoomDimensions {
         if (gameCount === 0) {
             return {
                 width: RoomConstants.DEFAULT_ROOM_WIDTH,
@@ -125,105 +134,126 @@ export class RoomManager {
         }
     }
 
+    // onCreateInitialRoom removed - single onResizeRoom handles both creation and updating
+
     /**
-     * Event handler: Create initial room
+     * Event handler: Resize room (handles both initial creation and updates)
+     * Single method that either creates walls (if none exist) or updates existing walls
      */
-    private async onCreateInitialRoom(event: CustomEvent<RoomCreateEvent>): Promise<void> {
-        const config = event.detail
+    private async onResizeRoom(event: CustomEvent<any>): Promise<void> {
+        const eventData = event.detail
+        const reason = eventData.reason || 'room-resize-requested'
         
-        const dimensions = {
-            width: config.width ?? RoomConstants.DEFAULT_ROOM_WIDTH,
-            depth: config.depth ?? RoomConstants.DEFAULT_ROOM_DEPTH,
-            height: config.height ?? RoomConstants.DEFAULT_ROOM_HEIGHT
+        console.log(`🏠 Room resize requested (reason: ${reason})`)
+        
+        // RoomManager's responsibility: Determine appropriate room dimensions
+        let gameCount = 0
+        
+        // Option 1: Event provides game count
+        if (eventData.gameCount !== undefined) {
+            gameCount = eventData.gameCount
+            console.log(`📊 Using game count from event: ${gameCount}`)
+        }
+        // Option 2: Access global app instance (fallback)
+        else {
+            // @ts-ignore - accessing global for game data when event doesn't provide it
+            const globalApp = (window as any).steamBrickAndMortarApp
+            if (globalApp?.steamIntegration) {
+                const gameLibrary = globalApp.steamIntegration.getGameLibrary()
+                if (gameLibrary) {
+                    gameCount = gameLibrary.getGameCount()
+                    console.log(`📊 Using game count from global app: ${gameCount}`)
+                }
+            }
         }
         
-        console.log(`🏠 Creating initial room: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
+        // Calculate appropriate dimensions (uses defaults if gameCount is 0)
+        const dimensions = RoomManager.calculateDimensionsForGameCount(gameCount)
+        console.log(`🏠 Target room dimensions for ${gameCount} games: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
         
-        await this.createRoom(dimensions)
+        // Queue the room update to prevent concurrent operations
+        await this.queueRoomOperation(dimensions)
         
-        // Emit room created event with current dimensions for other systems to use
-        this.eventManager.emit(RoomEventTypes.Created, { 
-            dimensions, 
-            timestamp: Date.now(), 
-            source: 'room-manager' 
-        } as any)
-    }
-
-    /**
-     * Event handler: Resize existing room
-     */
-    private async onResizeRoom(event: CustomEvent<RoomResizeEvent>): Promise<void> {
-        const { width, depth, height, reason } = event.detail
-        
-        console.log(`🏠 Resizing room to ${width}x${depth}x${height} (reason: ${reason || 'unspecified'})`)
-        
-        await this.resizeRoom({ width, depth, height })
-        
-        // Emit room resized event with new dimensions for other systems to update
+        // Emit room resized event with calculated dimensions and available game data
         this.eventManager.emit(RoomEventTypes.Resized, { 
-            dimensions: { width, depth, height }, 
+            dimensions,
+            gameCount: eventData.gameCount || gameCount,
+            games: eventData.games, // Pass through any game data from the original event
             timestamp: Date.now(), 
             source: 'room-manager' 
         } as any)
     }
 
     /**
-     * Create room structure (called for initial creation)
+     * Queue room operations to prevent concurrent modifications
+     * Implements async mutex pattern to handle rapid-fire events
      */
-    private async createRoom(dimensions: { width: number; depth: number; height: number }): Promise<void> {
-        // Create room group if it doesn't exist
+    private async queueRoomOperation(dimensions: RoomDimensions): Promise<void> {
+        if (!this.isProcessingResize) {
+            // No operation in progress, process immediately
+            this.isProcessingResize = true
+            try {
+                await this.createOrUpdateRoom(dimensions)
+                
+                // Process any queued operations with the latest dimensions
+                while (this.pendingResizeQueue.length > 0) {
+                    const operation = this.pendingResizeQueue.shift()!
+                    try {
+                        await this.createOrUpdateRoom(operation.dimensions)
+                        operation.resolve()
+                    } catch (error) {
+                        operation.reject(error as Error)
+                    }
+                }
+            } finally {
+                this.isProcessingResize = false
+            }
+        } else {
+            // Operation in progress, queue this request
+            console.debug('🏠 Room operation in progress, queuing resize request')
+            return new Promise<void>((resolve, reject) => {
+                this.pendingResizeQueue.push({ dimensions, resolve, reject })
+            })
+        }
+    }
+
+    /**
+     * Create or update room (single method that never creates duplicates)
+     * Either creates walls if none exist OR updates existing walls - never both
+     */
+    private async createOrUpdateRoom(dimensions: RoomDimensions): Promise<void> {
+        // Ensure room group exists
         if (!this.roomGroup) {
             this.roomGroup = new THREE.Group()
             this.roomGroup.name = 'room-structure'
             this.scene.add(this.roomGroup)
+            console.log('🏠 Created room group')
+            
+            // TODO: move to props
+            await this.createEntranceMat(dimensions)
         }
-        
-        // Create floor
-        await this.createFloor(dimensions)
-        
-        // Create ceiling  
-        await this.createCeiling(dimensions)
-        
-        // Create walls
-        await this.createWalls(dimensions)
-        
-        // Create entrance mat
-        await this.createEntranceMat(dimensions)
-        
-        // Update current dimensions
-        this.currentDimensions = { ...dimensions }
-        
-        console.log(`✅ Room structure created: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
-    }
 
-    /**
-     * Resize existing room (reuses walls when possible)
-     */
-    private async resizeRoom(dimensions: { width: number; depth: number; height: number }): Promise<void> {
-        if (!this.roomGroup) {
-            // No existing room, create new one
-            await this.createRoom(dimensions)
-            return
+        if(!this.floor) {
+            await this.createFloor(dimensions)
         }
-        
-        console.debug('🔄 Reusing existing room objects and resizing them')
-        
-        // Resize floor
+        if(!this.ceiling) {
+            await this.createCeiling(dimensions)
+        }
+        if(!this.walls.back || !this.walls.front || !this.walls.left || !this.walls.right) {
+            console.log('🏠 Creating walls')
+            await this.createWalls(dimensions)
+        }
+    
         await this.resizeFloor(dimensions)
-        
-        // Resize ceiling
-        await this.resizeCeiling(dimensions) 
-        
-        // Reposition and resize walls
+        await this.resizeCeiling(dimensions)
         await this.resizeWalls(dimensions)
-        
-        // Update current dimensions
+
         this.currentDimensions = { ...dimensions }
         
-        console.log(`✅ Room structure resized: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
+        console.log(`✅ Room structure ready: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
     }
 
-    private async createFloor(dimensions: { width: number; depth: number; height: number }): Promise<void> {
+    private async createFloor(dimensions: RoomDimensions): Promise<void> {
         const floorGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
         const carpetMaterial = await this.textureManager.createCarpetMaterial({
             color: new THREE.Color('#6B6B6B'),
@@ -239,7 +269,7 @@ export class RoomManager {
         console.debug(`🏗️ Created room floor: ${dimensions.width}x${dimensions.depth}`)
     }
 
-    private async resizeFloor(dimensions: { width: number; depth: number; height: number }): Promise<void> {
+    private async resizeFloor(dimensions: RoomDimensions): Promise<void> {
         if (!this.floor) {
             await this.createFloor(dimensions)
             return
@@ -252,7 +282,7 @@ export class RoomManager {
         console.debug(`🔄 Resized floor: ${dimensions.width}x${dimensions.depth}`)
     }
 
-    private async createCeiling(dimensions: { width: number; depth: number; height: number }): Promise<void> {
+    private async createCeiling(dimensions: RoomDimensions): Promise<void> {
         const ceilingGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
         const ceilingMaterial = await this.textureManager.createCeilingMaterial({
             color: new THREE.Color(0xF5F5DC),
@@ -265,10 +295,14 @@ export class RoomManager {
         this.ceiling.name = 'room-ceiling'
         
         this.roomGroup!.add(this.ceiling)
+        
+        // Register ceiling with EnvironmentRenderer for visibility controls
+        this.environmentRenderer.registerCeiling(this.ceiling)
+        
         console.debug(`🏗️ Created room ceiling at height ${dimensions.height}`)
     }
 
-    private async resizeCeiling(dimensions: { width: number; depth: number; height: number }): Promise<void> {
+    private async resizeCeiling(dimensions: RoomDimensions): Promise<void> {
         if (!this.ceiling) {
             await this.createCeiling(dimensions)
             return
@@ -285,14 +319,14 @@ export class RoomManager {
     /**
      * Create entrance mat at the front of the store
      */
-    private async createEntranceMat(dimensions: { width: number; depth: number; height: number }): Promise<void> {
+    private async createEntranceMat(dimensions: RoomDimensions): Promise<void> {
         const propRenderer = new PropRenderer(this.scene)
         const entranceMat = propRenderer.createEntranceFloorMat(dimensions.width, dimensions.depth)
         this.roomGroup?.add(entranceMat)
         console.debug('🚪 Entrance mat created')
     }
 
-    private async createWalls(dimensions: { width: number; depth: number; height: number }): Promise<void> {
+    private async createWalls(dimensions: RoomDimensions): Promise<void> {
         const wallMaterial = await this.textureManager.createWoodMaterial({
             color: new THREE.Color(0xF5F5DC),
             repeat: { x: 4, y: 2 }
@@ -340,14 +374,9 @@ export class RoomManager {
         console.debug(`🏗️ Created room walls: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
     }
 
-    private async resizeWalls(dimensions: { width: number; depth: number; height: number }): Promise<void> {
-        // If walls don't exist, create them
-        if (!this.walls.back) {
-            await this.createWalls(dimensions)
-            return
-        }
-        
+    private async resizeWalls(dimensions: RoomDimensions): Promise<void> {
         // Resize and reposition back wall
+        // TODO: docs say we need to dispose, can we hack .scale or use a different object type?
         this.walls.back!.geometry.dispose()
         this.walls.back!.geometry = new THREE.PlaneGeometry(dimensions.width, dimensions.height)
         this.walls.back!.position.set(0, dimensions.height / 2, -dimensions.depth / 2)
@@ -373,7 +402,7 @@ export class RoomManager {
     /**
      * Get current room dimensions
      */
-    public getCurrentDimensions(): { width: number; depth: number; height: number } {
+    public getCurrentDimensions(): RoomDimensions {
         return { ...this.currentDimensions }
     }
 

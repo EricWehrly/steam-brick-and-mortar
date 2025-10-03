@@ -41,16 +41,66 @@ export class StoreLayout {
     return StoreLayoutConfigFactory.createDefaultLayout();
   }
 
+  /**
+   * Calculate required store dimensions for dynamic shelf layout
+   * Proper home for store dimension calculations
+   */
+  public calculateDynamicStoreDimensions(shelvesNeeded: number, options: {
+    shelfSpacingX?: number;
+    shelfSpacingZ?: number;
+    entranceClearance?: number;
+    wallClearance?: number;
+    backClearance?: number;
+    ceilingHeight?: number;
+  } = {}): { width: number; depth: number; height: number } {
+    const {
+      shelfSpacingX = 2.5,
+      shelfSpacingZ = 3,
+      entranceClearance = 6,
+      wallClearance = 2,
+      backClearance = 2,
+      ceilingHeight = 3.2
+    } = options;
+    
+    const maxShelvesPerRow = 4;
+    const rows = Math.ceil(shelvesNeeded / maxShelvesPerRow);
+    const maxShelvesInAnyRow = Math.min(maxShelvesPerRow, shelvesNeeded);
+    
+    // Calculate width: shelves + spacing + wall clearance
+    const totalShelfWidth = maxShelvesInAnyRow * shelfSpacingX;
+    const requiredWidth = totalShelfWidth + (wallClearance * 2);
+    
+    // Calculate depth: rows + spacing + entrance + back clearance
+    const totalShelfDepth = rows * shelfSpacingZ;
+    const requiredDepth = totalShelfDepth + entranceClearance + backClearance;
+    
+    return {
+      width: Math.max(requiredWidth, 12), // Minimum store width
+      depth: Math.max(requiredDepth, 10), // Minimum store depth
+      height: ceilingHeight
+    };
+  }
+
+  /**
+   * @deprecated Use dynamic store generation instead. This creates static environment that causes duplicates.
+   * TODO: Remove this method once all callers use dynamic generation
+   */
   public async generateBasicRoom(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<THREE.Group> {
+    console.warn('⚠️ generateBasicRoom is deprecated - use dynamic store generation instead');
     this.clearStore();
     this.createEntranceArea(config);
     StoreLayout.logger.info('Basic room ready');
     return this.storeGroup;
   }
 
+  /**
+   * @deprecated Use dynamic store generation instead. This creates static environment that causes duplicates.
+   * TODO: Remove this method once all callers use dynamic generation
+   */
   public async generateShelvesGPUOptimized(config: StoreLayoutConfig = this.createDefaultLayout()): Promise<THREE.Group> {
+    console.warn('⚠️ generateShelvesGPUOptimized is deprecated - use dynamic store generation instead');
     this.clearStore();
-    await this.createShelfSectionsGPUOptimized(config);
+    // await this.createShelfSectionsGPUOptimized(config);
     this.createEntranceArea(config);
     StoreLayout.logger.info('GPU-optimized shelves generated');
     return this.storeGroup;

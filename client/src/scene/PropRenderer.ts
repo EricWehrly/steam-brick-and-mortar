@@ -45,6 +45,7 @@ export class PropRenderer {
   /**
    * Create ceiling-mounted fluorescent light fixtures
    * Positioned just below the ceiling surface for realistic appearance
+   * TODO: Make this responsive to room resizing events
    */
   public createCeilingLightFixtures(ceilingHeight: number, roomWidth: number, roomDepth: number, options: LightFixtureOptions = {}): THREE.Group {
     const {
@@ -248,6 +249,34 @@ export class PropRenderer {
     
     this.propsGroup.add(dividerGroup)
     return dividerGroup
+  }
+
+  /**
+   * Create entrance floor mat for visual entrance indication
+   */
+  public createEntranceFloorMat(roomWidth: number, roomDepth: number): THREE.Group {
+    const entranceGroup = new THREE.Group()
+    entranceGroup.name = 'entrance-floor-mat'
+    
+    // Create entrance mat geometry (positioned at front of store)
+    const matWidth = Math.min(6, roomWidth * 0.4) // 40% of room width, max 6m
+    const matDepth = 1.5 // 1.5m deep entrance mat
+    const matGeometry = new THREE.PlaneGeometry(matWidth, matDepth)
+    
+    // Create mat material with different color/texture
+    const matMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8B4513, // Brown entrance mat
+      roughness: 0.8,
+      metalness: 0.1
+    })
+    
+    const mat = new THREE.Mesh(matGeometry, matMaterial)
+    mat.rotation.x = -Math.PI / 2
+    mat.position.set(0, 0.01, roomDepth / 3) // Just above floor, closer to entrance area
+    mat.name = 'entrance-mat'
+    
+    entranceGroup.add(mat)
+    return entranceGroup
   }
 
   /**

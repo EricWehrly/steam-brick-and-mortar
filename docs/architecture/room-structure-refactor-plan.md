@@ -85,13 +85,15 @@ This saves Three.js instancing time and reduces memory churn.
 - [x] Replace EnvironmentRenderer.setupEnvironment() call with room:create-initial event
 - [x] Remove duplicate environment creation logic
 
-### Step 4: Refactor StorePropsRenderer 🚧 NEXT PRIORITY
-- [ ] Remove expandStoreEnvironment() method
-- [ ] Remove all room creation constants/logic (moved to RoomManager.RoomConstants)
-- [ ] Make GAMES_PER_SURFACE and SURFACES_PER_SHELF public static properties
-- [ ] Emit room:resize event instead of creating environment
+### Step 4: Refactor StorePropsRenderer ✅ COMPLETED
+- [x] Remove expandStoreEnvironment() method - replaced with room:resize event emission
+- [x] Remove all room creation constants/logic (moved to RoomManager.RoomConstants)
+- [x] Make GAMES_PER_SURFACE and SURFACES_PER_SHELF public static properties (GameLayoutConstants)
+- [x] Emit room:resize event instead of creating environment
+- [x] Add event listener for room:resized to spawn shelves
+- [x] Update RoomManager to handle both legacy (width/depth/height) and new (gameCount) event formats
 
-**Current State**: RoomManager contains all constants and logic. StorePropsRenderer still has duplicate constants and expandStoreEnvironment() method that should be removed and replaced with room:resize event emission.
+**Current State**: Full event-driven flow implemented. StorePropsRenderer now emits room:resize events and listens for room:resized to spawn shelves. RoomManager handles dimension calculation.
 
 ### Step 5: Clean Up Dead Code 🚧 PENDING  
 - [ ] Remove or deprecate EnvironmentRenderer room creation
@@ -100,11 +102,12 @@ This saves Three.js instancing time and reduces memory churn.
 
 **Current State**: EnvironmentRenderer.setupEnvironment() is commented out in SceneCoordinator but file still exists. RoomStructureBuilder may still be used by EnvironmentRenderer.
 
-### Step 6: Update Game Loading Flow 🚧 PENDING
-- [ ] Steam data loaded → Calculate required dimensions → Emit room:resize  
-- [ ] Room resized → Spawn shelves in correctly sized room
+### Step 6: Update Game Loading Flow ✅ COMPLETED
+- [x] Steam data loaded → SceneCoordinator emits room:resize with gameCount
+- [x] RoomManager calculates dimensions → resizes room → emits room:resized  
+- [x] StorePropsRenderer receives room:resized → spawns shelves in correctly sized room
 
-**Current State**: Game spawning is restored but still uses old StorePropsRenderer.expandStoreEnvironment() flow. Need to migrate to room:resize event pattern.
+**Current State**: Full event-driven game loading flow implemented. SceneCoordinator → RoomManager → StorePropsRenderer via events.
 
 ## Immediate Fixes (Current Session) ✅ COMPLETED
 - [x] Fix light positioning relative to ceiling height
@@ -125,10 +128,9 @@ This saves Three.js instancing time and reduces memory churn.
 - Game spawning restored and working
 
 **🚧 REMAINING WORK:**
-- StorePropsRenderer still has duplicate constants and expandStoreEnvironment() method
-- Game loading still uses old expandStoreEnvironment() instead of room:resize events
-- EnvironmentRenderer cleanup needed
+- EnvironmentRenderer cleanup needed (Step 5)
 - Some integration tests failing due to legacy dependencies
+- Event data structure debugging (room:resize event format compatibility)
 
 ## Expected Benefits
 
@@ -152,3 +154,7 @@ This saves Three.js instancing time and reduces memory churn.
 - Add support for non-square room shapes
 - Implement more sophisticated wall reuse algorithms
 - Add room state persistence/caching
+- **TODO: Fluorescent Light Improvements**
+  - Make fluorescent overhead lights physically touch the ceiling (like in real life)
+  - Add rounded corners to fluorescent light fixtures for more realistic appearance
+  - Consider adding light fixture geometry that properly connects to ceiling structure

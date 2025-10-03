@@ -38,6 +38,8 @@ export class RoomStructureBuilder {
         const floor = new THREE.Mesh(floorGeometry, carpetMaterial)
         floor.rotation.x = -Math.PI / 2
         floor.position.y = 0
+        floor.name = 'room-structure-floor'
+        console.log(`🏗️ Created room floor at height 0 with name '${floor.name}'`)
         storeGroup.add(floor)
     }
 
@@ -68,22 +70,48 @@ export class RoomStructureBuilder {
         })
         
         // Back wall
-        const backWallGeometry = new THREE.PlaneGeometry(config.width, config.height)
-        const backWall = new THREE.Mesh(backWallGeometry, wallMaterial)
+        const backWall = new THREE.Mesh(
+            new THREE.PlaneGeometry(config.width, config.height),
+            wallMaterial
+        )
         backWall.position.set(0, config.height / 2, -config.depth / 2)
+        backWall.name = 'room-structure-back-wall'
+        console.log(`🏗️ Created back wall with name '${backWall.name}'`)
         storeGroup.add(backWall)
-
-        // Side walls
-        const sideWallGeometry = new THREE.PlaneGeometry(config.depth, config.height)
         
-        const leftWall = new THREE.Mesh(sideWallGeometry, wallMaterial)
-        leftWall.rotation.y = Math.PI / 2
+        // Front wall
+        const frontWall = new THREE.Mesh(
+            new THREE.PlaneGeometry(config.width, config.height),
+            wallMaterial
+        )
+        frontWall.position.set(0, config.height / 2, config.depth / 2)
+        frontWall.rotation.y = Math.PI
+        frontWall.name = 'room-structure-front-wall'
+        console.log(`🏗️ Created front wall with name '${frontWall.name}'`)
+        storeGroup.add(frontWall)
+        
+        // Left wall
+        const leftWall = new THREE.Mesh(
+            new THREE.PlaneGeometry(config.depth, config.height),
+            wallMaterial
+        )
         leftWall.position.set(-config.width / 2, config.height / 2, 0)
+        leftWall.rotation.y = Math.PI / 2
+        leftWall.name = 'room-structure-left-wall'
+        console.log(`🏗️ Created left wall with name '${leftWall.name}'`)
         storeGroup.add(leftWall)
-
-        const rightWall = new THREE.Mesh(sideWallGeometry, wallMaterial)
-        rightWall.rotation.y = -Math.PI / 2
+        
+        // Right wall
+        const rightWall = new THREE.Mesh(
+            new THREE.PlaneGeometry(config.depth, config.height),
+            wallMaterial
+        )
         rightWall.position.set(config.width / 2, config.height / 2, 0)
+        rightWall.rotation.y = -Math.PI / 2
+        rightWall.name = 'room-structure-right-wall'
+        console.log(`🏗️ Created right wall with name '${rightWall.name}'`)
         storeGroup.add(rightWall)
+        
+        // All walls created above with proper names
     }
 }

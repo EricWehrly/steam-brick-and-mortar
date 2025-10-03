@@ -3,8 +3,16 @@
  * 
  * This coordinator orchestrates the complete visual system setup with
  * organized visual buckets loaded in
- * 1. Environment (skybox, room structure, spatial foundation)
- * 2. Lighting (illumination systems, shadows, atmosphere)  
+ * 1. Environment (skybox, room structure, spatial found            // Emit room:resize event to trigger proper event-driven room expansion
+            // RoomManager will calculate dimensions and handle room structure
+            // StorePropsRenderer will listen for room:resized and spawn shelves accordingly
+            console.debug(`🗂️ Requesting room resize for ${eventData.gameCount} games`)
+            EventManager.getInstance().emit('room:resize', {
+                gameCount: eventData.gameCount,
+                timestamp: Date.now(),
+                source: 'SceneCoordinator',
+                games: this.getGamesForShelfSpawning()
+            } as any)2. Lighting (illumination systems, shadows, atmosphere)  
  * 3. Props (shelves, games, signage, interactive objects)
  * 
  * This sequential loading creates a smooth transition for players as
@@ -16,6 +24,7 @@ import { SceneManager } from './SceneManager'
 import { EnvironmentRenderer } from './EnvironmentRenderer'
 import { LightingRenderer } from './LightingRenderer'
 import { StorePropsRenderer } from './StorePropsRenderer'
+import { RoomManager } from './RoomManager'
 import { EventManager, EventSource } from '../core/EventManager'
 import { GameEventTypes, CeilingEventTypes, SteamEventTypes, type CeilingToggleEvent, type SceneReadyEvent, type SteamDataLoadedEvent } from '../types/InteractionEvents'
 import { AppSettings } from '../core/AppSettings'
@@ -37,6 +46,7 @@ export class SceneCoordinator {
     private environmentRenderer: EnvironmentRenderer
     private lightingRenderer: LightingRenderer
     private propsRenderer: StorePropsRenderer
+    private roomManager: RoomManager
     private appSettings: AppSettings
     private steamIntegration?: SteamIntegration
 
@@ -51,7 +61,10 @@ export class SceneCoordinator {
             this.sceneManager.getScene(),
             this.sceneManager.getRenderer()
         )
-        this.propsRenderer = new StorePropsRenderer(this.sceneManager.getScene())
+        // Initialize room manager for event-driven room structure
+        this.roomManager = new RoomManager(this.sceneManager.getScene(), this.environmentRenderer)
+        // Pass EnvironmentRenderer to StorePropsRenderer for proper environment integration
+        this.propsRenderer = new StorePropsRenderer(this.sceneManager.getScene(), this.environmentRenderer)
 
         // 🎬 EVENT-DRIVEN STARTUP: Setup scene and emit SceneReady when basic navigation is ready
         // This is a prerequisite for GameStart - scene must be navigable before game can start
@@ -68,10 +81,15 @@ export class SceneCoordinator {
             this.environmentRenderer.setCeilingVisibility(event.detail.visible)
         })
 
-        // Register for Steam data loaded events to spawn dynamic shelves
+        // Register for Steam data loaded events to spawn dynamic shelves  
         EventManager.getInstance().registerEventHandler(SteamEventTypes.DataLoaded, (event: CustomEvent<SteamDataLoadedEvent>) => {
             this.onSteamDataLoaded(event.detail)
         })
+        console.debug('✅ Steam data loaded event handler restored - games will spawn on shelves')
+
+        if(window) {
+            (window as any).debugListSceneObjects = this.debugListSceneObjects.bind(this);
+        }
     }
 
     async setupSceneAsPrerequisite(config: SceneCoordinatorConfig = {}): Promise<void> {
@@ -104,15 +122,23 @@ export class SceneCoordinator {
         console.log('🏗️ Starting basic environment setup...')
         
         try {
-            await this.environmentRenderer.setupEnvironment({
-                roomSize: {
-                    width: config.roomSize?.width ?? 22,
-                    depth: config.roomSize?.depth ?? 16,
-                    height: ceilingHeight
-                },
-                skyboxPreset: config.skyboxPreset ?? 'aurora',
-                proceduralTextures: config.proceduralTextures ?? true
-            })
+            // OLD WAY: Direct environment creation (causes duplicates)
+            // await this.environmentRenderer.setupEnvironment({
+            //     roomSize: {
+            //         width: config.roomSize?.width ?? 22,
+            //         depth: config.roomSize?.depth ?? 16,
+            //         height: ceilingHeight
+            //     },
+            //     skyboxPreset: config.skyboxPreset ?? 'aurora',
+            //     proceduralTextures: config.proceduralTextures ?? true
+            // })
+            
+            // Simplified: Just emit room:resize with initial defaults - RoomManager handles creation OR updating
+            EventManager.getInstance().emit('room:resize', {
+                reason: 'initial-setup',
+                timestamp: Date.now(),
+                source: 'SceneCoordinator'
+            } as any)
             console.log('✅ Basic environment setup completed successfully')
         } catch (error) {
             console.error('❌ Basic environment setup failed:', error)
@@ -162,25 +188,67 @@ export class SceneCoordinator {
         return this.propsRenderer.getGameBoxRenderer()
     }
 
+    /**
+     * Debug function to list all objects in the scene by name
+     * Useful for hunting down duplicate environment objects
+     */
+    public debugListSceneObjects(): void {
+        console.log('\n🔍 === SCENE OBJECT DEBUG LIST ===')
+        console.log(`📊 Total scene children: ${this.sceneManager.getScene().children.length}`)
+        
+        const listObjects = (obj: THREE.Object3D, indent: string = '') => {
+            const name = obj.name || `<unnamed-${obj.type}>`
+            const type = obj.type
+            const childCount = obj.children.length
+            const position = `(${obj.position.x.toFixed(2)}, ${obj.position.y.toFixed(2)}, ${obj.position.z.toFixed(2)})`
+            
+            console.log(`${indent}📦 ${name} [${type}] ${position} ${childCount > 0 ? `(${childCount} children)` : ''}`)
+            
+            if (obj.children.length > 0) {
+                obj.children.forEach(child => {
+                    listObjects(child, indent + '  ')
+                })
+            }
+        }
+        
+        this.sceneManager.getScene().children.forEach(obj => {
+            listObjects(obj)
+        })
+        
+        console.log('=== END SCENE OBJECT LIST ===\n')
+    }
+
     dispose(): void {
         this.environmentRenderer.dispose()
         this.lightingRenderer.dispose()
         this.propsRenderer.dispose()
+        this.roomManager.dispose()
     }
 
     /**
-     * Handle Steam data loaded event by spawning dynamic shelves based on game count
+     * Handle Steam data loaded event by triggering room resize for game accommodation
      */
     private async onSteamDataLoaded(eventData: SteamDataLoadedEvent): Promise<void> {
         console.log(`🎮 Steam data loaded: ${eventData.gameCount} games for user ${eventData.userInput}`)
         
         // Analyze all available taxonomies from the loaded games
-        this.analyzeTaxonomies(eventData)
+        // TODO: circle back on this for game taxonomy
+        // this.analyzeTaxonomies(eventData)
         
         try {
-            await this.spawnDynamicShelves(eventData.gameCount)
+            // Emit room:resize event to trigger proper event-driven room expansion
+            // RoomManager will calculate appropriate dimensions based on available game data
+            // StorePropsRenderer will listen for room:resized and spawn shelves accordingly
+            console.debug(`📏 Requesting room resize for ${eventData.gameCount} games`)
+            EventManager.getInstance().emit('room:resize', {
+                gameCount: eventData.gameCount,
+                games: this.getGamesForShelfSpawning(),
+                reason: 'steam-data-loaded',
+                timestamp: Date.now(),
+                source: 'SceneCoordinator'
+            } as any)
         } catch (error) {  
-            console.error('❌ Failed to spawn dynamic shelves:', error)
+            console.error('❌ Failed to trigger room resize:', error)
         }
     }
 
@@ -357,43 +425,28 @@ export class SceneCoordinator {
     /**
      * Spawn shelves dynamically based on game count
      */
-    private async spawnDynamicShelves(gameCount: number): Promise<void> {
-        console.debug(`📚 Spawning dynamic shelves for ${gameCount} games`)
+    /**
+     * Get game data for shelf spawning - extracted for reuse in event-driven flow
+     */
+    private getGamesForShelfSpawning(): any[] {
+        let games: any[] = []
         
-        // TODO: Move these constants to shared configuration or get from StorePropsRenderer
-        const gamesPerSurface = 3 // Should match GAMES_PER_SURFACE in StorePropsRenderer
-        const surfacesPerShelf = 6 // Should match SURFACES_PER_SHELF in StorePropsRenderer (3 levels × 2 sides)
-        const gamesPerShelf = gamesPerSurface * surfacesPerShelf // 3 × 6 = 18 games per shelf
-        const shelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
-        
-        console.debug(`📊 Calculated: Need ${shelvesNeeded} shelves for ${gameCount} games (${gamesPerShelf} games per shelf: ${gamesPerSurface} games/surface × ${surfacesPerShelf} surfaces/shelf)`)
-        
-        try {
-            // Get actual game data for shelf spawning
-            let games: any[] = []
-            
-            if (this.steamIntegration) {
-                games = this.steamIntegration.getGamesForScene()
-                console.log(`✅ Retrieved ${games.length} games for dynamic shelf spawning`)
+        if (this.steamIntegration) {
+            games = this.steamIntegration.getGamesForScene()
+            console.log(`✅ Retrieved ${games.length} games for shelf spawning`)
+        } else {
+            // Fallback: try to access via global app instance
+            // @ts-ignore - accessing global for game data when direct reference not available
+            const globalApp = (window as any).steamBrickAndMortarApp
+            if (globalApp?.steamIntegration) {
+                games = globalApp.steamIntegration.getGamesForScene()
+                console.log(`✅ Retrieved ${games.length} games via global access`)
             } else {
-                // Fallback: try to access via global app instance
-                // @ts-ignore - accessing global for game data when direct reference not available
-                const globalApp = (window as any).steamBrickAndMortarApp
-                if (globalApp?.steamIntegration) {
-                    games = globalApp.steamIntegration.getGamesForScene()
-                    console.log(`✅ Retrieved ${games.length} games via global access`)
-                } else {
-                    console.log(`⚠️ No SteamIntegration available - using placeholder boxes`)
-                }
+                console.log(`⚠️ No SteamIntegration available - using placeholder boxes`)
             }
-            
-            // Call propsRenderer to create shelves and place games
-            await this.propsRenderer.spawnDynamicShelvesWithGames(shelvesNeeded, gameCount, games)
-            console.log(`✅ Dynamic shelf spawning completed successfully`)
-        } catch (error) {
-            console.error('❌ Failed to spawn dynamic shelves:', error)
-            // Don't throw - let the system continue without dynamic shelves
         }
+        
+        return games
     }
 
     private emitSceneReadyEvent(): void {
