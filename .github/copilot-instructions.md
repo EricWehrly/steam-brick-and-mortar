@@ -34,7 +34,7 @@ steam-brick-and-mortar/
 
 ### 🔧 **Tool Usage**
 - **Use `scripts/scratch.sh`** for complex multi-command operations
-- **ALWAYS use `yarn` not `npm`**: This project uses Yarn PnP exclusively
+- **ALWAYS use `yarn` not `npm` or `npx`**: This project uses Yarn PnP exclusively. The latter are not set up and will error. This is desired.
 - **Follow technology-specific guidelines** (see `.github/javascript-guidelines.md`, etc.)
 - **Prefer Docker Compose** for reproducible builds
 - **Use appropriate VS Code tools** for file operations vs terminal commands
