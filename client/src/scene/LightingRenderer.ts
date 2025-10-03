@@ -18,7 +18,7 @@ import { PropRenderer } from './PropRenderer'
 import { LightingDebugHelper } from './LightingDebugHelper'
 import { AppSettings, LIGHTING_QUALITY, type LightingQuality } from '../core/AppSettings'
 import { EventManager, EventSource } from '../core/EventManager'
-import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent } from '../types/InteractionEvents'
+import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent, RoomEventTypes, type RoomCreatedEvent, type RoomResizedEvent } from '../types/InteractionEvents'
 import { LightFactory } from '../lighting/LightFactory'
 
 // Lighting configuration constants
@@ -33,10 +33,11 @@ const LIGHT_NAMES = {
     ACCENT_LIGHT: 'accent-light'
 } as const
 
-const ROOM_DIMENSIONS = {
+// Room dimensions - will be updated dynamically via room events
+let CURRENT_ROOM_DIMENSIONS = {
     WIDTH: 22,
     DEPTH: 16
-} as const
+}
 
 const SHADOW_MAP_SIZES = {
     LOW: 512,
@@ -106,6 +107,15 @@ export class LightingRenderer {
         // Listen for lighting quality change events
         this.eventManager.registerEventHandler(LightingEventTypes.QualityChanged, (event: CustomEvent<LightingQualityChangedEvent>) => {
             this.updateLightingQuality(event.detail.quality)
+        })
+
+        // Listen for room creation and resizing events to update lighting
+        this.eventManager.registerEventHandler(RoomEventTypes.Created, (event: CustomEvent<RoomCreatedEvent>) => {
+            this.updateRoomDimensions(event.detail.dimensions)
+        })
+        
+        this.eventManager.registerEventHandler(RoomEventTypes.Resized, (event: CustomEvent<RoomResizedEvent>) => {
+            this.updateRoomDimensions(event.detail.dimensions) 
         })
     }
 
@@ -283,8 +293,8 @@ export class LightingRenderer {
     private async setupFluorescentFixtures(): Promise<void> {
         const fixtures = this.propRenderer.createCeilingLightFixtures(
             this.config.ceilingHeight!,
-            ROOM_DIMENSIONS.WIDTH,
-            ROOM_DIMENSIONS.DEPTH,
+            CURRENT_ROOM_DIMENSIONS.WIDTH,
+            CURRENT_ROOM_DIMENSIONS.DEPTH,
             {
                 width: 4,
                 height: 0.15,
@@ -367,6 +377,27 @@ export class LightingRenderer {
             timestamp: Date.now(),
             source: EventSource.System
         })
+    }
+
+    private updateRoomDimensions(dimensions: { width: number; depth: number; height: number }): void {
+        console.debug(`💡 Updating lighting for room dimensions: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
+        
+        // Update current room dimensions for fluorescent fixture positioning
+        CURRENT_ROOM_DIMENSIONS.WIDTH = dimensions.width
+        CURRENT_ROOM_DIMENSIONS.DEPTH = dimensions.depth
+        
+        // Update ceiling height in config if different
+        if (this.config.ceilingHeight !== dimensions.height) {
+            this.config.ceilingHeight = dimensions.height
+        }
+        
+        // Recreate fluorescent fixtures with new dimensions if they exist
+        const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
+        if (existingFixtures) {
+            console.debug('💡 Recreating ceiling fixtures for new room size...')
+            this.lightingGroup.remove(existingFixtures)
+            this.setupFluorescentFixtures()
+        }
     }
 
     public toggleLighting(enabled: boolean): void {

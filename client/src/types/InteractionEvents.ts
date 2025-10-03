@@ -51,6 +51,33 @@ export interface SteamDataLoadedEvent extends BaseInteractionEvent {
 }
 
 // =============================================================================
+// ROOM EVENTS
+// =============================================================================
+
+export interface RoomCreateEvent extends BaseInteractionEvent {
+    width?: number
+    depth?: number
+    height?: number
+    skyboxPreset?: string
+    proceduralTextures?: boolean
+}
+
+export interface RoomResizeEvent extends BaseInteractionEvent {
+    width: number
+    depth: number
+    height: number
+    reason?: string
+}
+
+export interface RoomCreatedEvent extends BaseInteractionEvent {
+    dimensions: { width: number; depth: number; height: number }
+}
+
+export interface RoomResizedEvent extends BaseInteractionEvent {
+    dimensions: { width: number; depth: number; height: number }
+}
+
+// =============================================================================
 // WEBXR EVENTS  
 // =============================================================================
 
@@ -172,6 +199,13 @@ export const SteamEventTypes = {
     ImageCacheClear: 'steam:image-cache-clear',
     DevModeToggle: 'steam:dev-mode-toggle',
     DataLoaded: 'steam:data-loaded'
+} as const
+
+export const RoomEventTypes = {
+    CreateInitial: 'room:create-initial',
+    Resize: 'room:resize',
+    Created: 'room:created',
+    Resized: 'room:resized'
 } as const
 
 export const WebXREventTypes = {
