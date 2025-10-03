@@ -32,6 +32,13 @@ steam-brick-and-mortar/
 - **Incremental commits**: Each working phase gets its own commit
 - **Document what was tested**: Distinguish between implemented vs validated
 
+### 📝 **Logging Standards**
+- **Use Logger system, NOT console.log**: Import `Logger` from `utils/Logger` and create contextual loggers
+- **Create class-level loggers**: `private static readonly logger = Logger.withContext(ClassName.name)`
+- **Use appropriate log levels**: `.debug()`, `.info()`, `.warn()`, `.error()` based on severity
+- **Provide context**: Include relevant data and operation details in log messages
+- **Never use raw console methods**: Avoid `console.log()`, `console.warn()`, `console.error()` in production code
+
 ### 🔧 **Tool Usage**
 - **Use `scripts/scratch.sh`** for complex multi-command operations
 - **ALWAYS use `yarn` not `npm`**: This project uses Yarn PnP exclusively

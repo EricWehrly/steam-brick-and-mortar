@@ -12,6 +12,8 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import debugPanelTemplate from '../templates/debug-panel.html?raw'
 import '../../../styles/pause-menu/debug-panel.css'
+import { SteamLauncher, type LaunchResult } from '../../../steam/SteamLauncher'
+import { Logger } from '../../../utils/Logger'
 
 export interface DebugStats {
     // Three.js Scene Stats
@@ -61,11 +63,11 @@ export class DebugPanel extends PauseMenuPanel {
     readonly title = 'Debug'
     readonly icon = '🔧'
 
+    private static readonly logger = Logger.withContext(DebugPanel.name)
     private updateInterval: number | null = null
     private stats: DebugStats = this.getInitialStats()
     private currentStats: DebugStats | null = null
     private onGetDebugStats?: () => Promise<DebugStats>
-    private consoleVisible = false
 
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)
@@ -81,11 +83,6 @@ export class DebugPanel extends PauseMenuPanel {
     render(): string {
         // Flatten the hierarchical stats data for the simple template engine
         const templateData = {
-            // Console state
-            consoleActiveClass: this.consoleVisible ? 'primary' : 'secondary',
-            consoleButtonText: this.consoleVisible ? '🙈 Hide Console' : '👁️ Show Console',
-            consoleVisibilityClass: this.consoleVisible ? 'visible' : 'hidden',
-            
             // Scene objects (flattened)
             sceneObjectsTotal: this.stats.sceneObjects.total,
             sceneObjectsMeshes: this.stats.sceneObjects.meshes,
@@ -132,19 +129,14 @@ export class DebugPanel extends PauseMenuPanel {
             refreshButton.addEventListener('click', () => this.refreshStats())
         }
 
-        const consoleButton = document.getElementById('toggle-console')
-        if (consoleButton) {
-            consoleButton.addEventListener('click', () => this.toggleConsole())
+        const steamLaunchButton = document.getElementById('test-steam-launch')
+        if (steamLaunchButton) {
+            steamLaunchButton.addEventListener('click', () => this.testSteamLaunch())
         }
 
         const exportButton = document.getElementById('export-debug')
         if (exportButton) {
             exportButton.addEventListener('click', () => this.exportDebugInfo())
-        }
-
-        const clearConsoleButton = document.getElementById('clear-console')
-        if (clearConsoleButton) {
-            clearConsoleButton.addEventListener('click', () => this.clearConsole())
         }
     }
 
@@ -154,66 +146,37 @@ export class DebugPanel extends PauseMenuPanel {
                 this.stats = await this.onGetDebugStats()
                 this.currentStats = this.stats
                 this.refresh()
-                console.log('🔧 Debug stats refreshed')
+                DebugPanel.logger.debug('Debug stats refreshed')
             } catch (error) {
-                console.error('Failed to refresh debug stats:', error)
+                DebugPanel.logger.error('Failed to refresh debug stats:', error)
             }
         }
     }
 
-    private toggleConsole(): void {
-        this.consoleVisible = !this.consoleVisible
-        this.refresh()
+    private async testSteamLaunch(): Promise<void> {
+        DebugPanel.logger.info('Testing Steam game launch functionality...')
         
-        if (this.consoleVisible) {
-            this.setupConsoleCapture()
-        } else {
-            this.removeConsoleCapture()
-        }
-    }
-
-    private setupConsoleCapture(): void {
-        // Capture console output and display in debug console
-        const originalLog = console.log
-        const originalWarn = console.warn
-        const originalError = console.error
-
-        const addToConsole = (type: string, ...args: unknown[]) => {
-            const consoleOutput = document.getElementById('console-output')
-            if (consoleOutput) {
-                const line = document.createElement('div')
-                line.className = `console-line ${type}`
-                line.textContent = `[${new Date().toLocaleTimeString()}] ${args.join(' ')}`
-                consoleOutput.appendChild(line)
-                consoleOutput.scrollTop = consoleOutput.scrollHeight
+        try {
+            // Test the Steam launcher
+            const result: LaunchResult = await SteamLauncher.testSteamLaunch()
+            
+            // Log the result
+            if (result.success) {
+                if (result.method === 'protocol') {
+                    DebugPanel.logger.info('Steam protocol test successful')
+                } else if (result.method === 'store') {
+                    DebugPanel.logger.warn('Steam protocol unavailable, fallback used')  
+                }
+            } else {
+                DebugPanel.logger.error('Steam launch test failed')
             }
-        }
-
-        console.log = (...args: unknown[]) => {
-            originalLog.apply(console, args)
-            addToConsole('info', ...args)
-        }
-
-        console.warn = (...args: unknown[]) => {
-            originalWarn.apply(console, args)
-            addToConsole('warning', ...args)
-        }
-
-        console.error = (...args: unknown[]) => {
-            originalError.apply(console, args)
-            addToConsole('error', ...args)
-        }
-    }
-
-    private removeConsoleCapture(): void {
-        // Note: In a real implementation, you'd need to store the original functions
-        // and restore them here. For now, this is a placeholder.
-    }
-
-    private clearConsole(): void {
-        const consoleOutput = document.getElementById('console-output')
-        if (consoleOutput) {
-            consoleOutput.innerHTML = '<div class="console-line info">Console cleared.</div>'
+            
+            // Also log environment info for debugging
+            const envInfo = SteamLauncher.getEnvironmentInfo()
+            DebugPanel.logger.debug('Environment info:', envInfo)
+            
+        } catch (error) {
+            DebugPanel.logger.error('Steam launch test error:', error)
         }
     }
 
@@ -238,7 +201,7 @@ export class DebugPanel extends PauseMenuPanel {
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
         
-        console.log('🔧 Debug information exported')
+        DebugPanel.logger.info('Debug information exported')
     }
 
     private getInitialStats(): DebugStats {
@@ -336,12 +299,6 @@ export class DebugPanel extends PauseMenuPanel {
         if (this.updateInterval !== null) {
             window.clearInterval(this.updateInterval)
             this.updateInterval = null
-        }
-
-        // Hide console if visible
-        if (this.consoleVisible) {
-            this.consoleVisible = false
-            this.removeConsoleCapture()
         }
     }
 
@@ -442,7 +399,6 @@ export class DebugPanel extends PauseMenuPanel {
         if (this.updateInterval !== null) {
             window.clearInterval(this.updateInterval)
         }
-        this.removeConsoleCapture()
         this.onGetDebugStats = undefined
     }
 }
