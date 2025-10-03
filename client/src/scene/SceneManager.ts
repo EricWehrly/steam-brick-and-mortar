@@ -185,26 +185,7 @@ export class SceneManager {
         return objects.length
     }
 
-    /**
-     * Create a ceiling plane with procedural texture
-     */
-    public createCeiling(size: number = 20, y: number = 4): THREE.Mesh {
-        const ceilingGeometry = new THREE.PlaneGeometry(size, size)
-        
-        // Use procedural ceiling material with popcorn texture
-        const ceilingMaterial = this.textureManager.createProceduralCeilingMaterial({
-            repeat: { x: size / 8, y: size / 8 }, // More repeats for ceiling texture detail
-            color: '#F5F5DC', // Beige ceiling color
-            bumpiness: 0.4,
-            roughness: 0.7
-        })
-        
-        const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
-        ceiling.rotation.x = Math.PI / 2 // Face down
-        ceiling.position.y = y
-        this.scene.add(ceiling)
-        return ceiling
-    }
+
 
     /**
      * Create fluorescent light fixtures using PropRenderer

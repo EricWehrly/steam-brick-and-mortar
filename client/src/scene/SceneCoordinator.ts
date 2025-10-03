@@ -122,18 +122,13 @@ export class SceneCoordinator {
         console.log('🏗️ Starting basic environment setup...')
         
         try {
-            // OLD WAY: Direct environment creation (causes duplicates)
-            // await this.environmentRenderer.setupEnvironment({
-            //     roomSize: {
-            //         width: config.roomSize?.width ?? 22,
-            //         depth: config.roomSize?.depth ?? 16,
-            //         height: ceilingHeight
-            //     },
-            //     skyboxPreset: config.skyboxPreset ?? 'aurora',
-            //     proceduralTextures: config.proceduralTextures ?? true
-            // })
+            // Set up skybox first
+            await this.environmentRenderer.setupEnvironment({
+                skyboxPreset: config.skyboxPreset ?? 'aurora',
+                proceduralTextures: config.proceduralTextures ?? true
+            })
             
-            // Simplified: Just emit room:resize with initial defaults - RoomManager handles creation OR updating
+            // Room structure creation handled by RoomManager via event
             EventManager.getInstance().emit('room:resize', {
                 reason: 'initial-setup',
                 timestamp: Date.now(),

@@ -3,9 +3,11 @@
  * 
  * Handles the base environment elements that establish the space:
  * - Skybox and atmospheric background
- * - Room structure (walls, floor, ceiling) 
- * - Store geometry and spatial foundation
+ * - Ceiling visibility management (registry for show/hide controls)
  * - Environmental atmosphere and backdrop
+ * 
+ * NOTE: Room structure creation (walls, floor, ceiling) now handled by RoomManager.
+ * TODO: Consider renaming to SkyboxRenderer or merging ceiling management into RoomManager.
  * 
  * This renderer should be loaded FIRST in the visual sequence to establish
  * the foundational space that lighting and props will inhabit.
@@ -15,9 +17,7 @@ import * as THREE from 'three'
 import { BlockbusterColors } from '../utils/Colors'
 import { TextureManager } from '../utils/TextureManager'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
-import { RoomStructureBuilder } from './RoomStructureBuilder'
 import { AppSettings } from '../core/AppSettings'
-import type { StoreLayoutConfig } from './StoreLayoutConfig'
 
 export interface EnvironmentConfig {
     roomSize?: {
@@ -33,7 +33,6 @@ export class EnvironmentRenderer {
     private scene: THREE.Scene
     private textureManager: TextureManager
     private skyboxManager: SkyboxManager
-    private roomBuilder: RoomStructureBuilder
     private environmentGroup: THREE.Group
     private appSettings: AppSettings
     private ceilings: THREE.Mesh[] = []
@@ -43,7 +42,6 @@ export class EnvironmentRenderer {
         this.appSettings = appSettings
         this.textureManager = TextureManager.getInstance()
         this.skyboxManager = new SkyboxManager(scene)
-        this.roomBuilder = new RoomStructureBuilder(this)
         
         // Create group to hold all environment objects
         this.environmentGroup = new THREE.Group()
@@ -52,17 +50,14 @@ export class EnvironmentRenderer {
     }
 
     public async setupEnvironment(config: EnvironmentConfig = {}): Promise<void> {
-        console.log('🌍 Setting up environment foundation...')
+        console.log('🌍 Setting up skybox...')
         
         try {
             await this.setupSkybox(config.skyboxPreset ?? 'aurora')
-            await this.setupRoomStructure(config)
-            
-            console.log('✅ Environment foundation complete!')
+            console.log('✅ Skybox setup complete')
         } catch (error) {
-            console.error('❌ Failed to set up environment:', error)
-            // Fallback to basic environment
-            await this.setupFallbackEnvironment()
+            console.error('❌ Failed to set up skybox:', error)
+            await this.setupFallbackSkybox()
         }
     }
 
@@ -78,34 +73,7 @@ export class EnvironmentRenderer {
         }
     }
 
-    private async setupRoomStructure(config: EnvironmentConfig): Promise<void> {
-        const roomSize = config.roomSize ?? { width: 22, depth: 16, height: 4 }
-        
-        // Create store layout configuration for room building
-        const storeConfig: StoreLayoutConfig = {
-            width: roomSize.width,
-            height: roomSize.height,
-            depth: roomSize.depth,
-            entranceZone: {
-                width: 6,
-                depth: 3,
-                position: new THREE.Vector3(0, 0, 6.5)
-            },
-            shelfRows: 2,
-            shelfUnitsPerRow: 3,
-            shelfSpacing: 3.0,
-            aisleWidth: 2.2,
-            mainAisleWidth: 3.0,
-            wallClearance: 1.0,
-            sections: [] // We only need room structure, not sections
-        }
-        
-        // Use existing room builder to create walls, floor, ceiling
-        await this.roomBuilder.createRoomStructure(storeConfig, this.environmentGroup)
-        
-        // Apply current ceiling visibility setting
-        this.updateCeilingVisibility()
-    }
+
 
     public createEnhancedCeiling(size: number = 20, y: number = 4): THREE.Mesh {
         const ceilingGeometry = new THREE.PlaneGeometry(size, size)
@@ -131,33 +99,13 @@ export class EnvironmentRenderer {
         return ceiling
     }
 
-    private async setupFallbackEnvironment(): Promise<void> {
-        // Simple colored background
+    private async setupFallbackSkybox(): Promise<void> {
+        // Simple colored background as fallback
         this.scene.background = new THREE.Color(BlockbusterColors.walls)
-        
-        // Basic floor
-        const floor = this.createBasicFloor()
-        this.environmentGroup.add(floor)
-        
-        console.warn('⚠️ Using fallback environment')
+        console.warn('⚠️ Using fallback skybox')
     }
 
-    private createBasicFloor(): THREE.Mesh {
-        const floorGeometry = new THREE.PlaneGeometry(20, 20)
-        // FIXED: Use MeshStandardMaterial instead of MeshLambertMaterial for RectAreaLight compatibility
-        const floorMaterial = new THREE.MeshStandardMaterial({ 
-            color: new THREE.Color(BlockbusterColors.floor),
-            roughness: 0.8,
-            metalness: 0.1
-        })
-        
-        const floor = new THREE.Mesh(floorGeometry, floorMaterial)
-        floor.rotation.x = -Math.PI / 2
-        floor.position.y = -2
-        floor.receiveShadow = true
-        floor.name = 'basic-floor'
-        return floor
-    }
+
 
     public async changeSkybox(presetName: string): Promise<void> {
         await this.setupSkybox(presetName)

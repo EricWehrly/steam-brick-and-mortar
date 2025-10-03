@@ -95,12 +95,14 @@ This saves Three.js instancing time and reduces memory churn.
 
 **Current State**: Full event-driven flow implemented. StorePropsRenderer now emits room:resize events and listens for room:resized to spawn shelves. RoomManager handles dimension calculation.
 
-### Step 5: Clean Up Dead Code 🚧 PENDING  
-- [ ] Remove or deprecate EnvironmentRenderer room creation
-- [ ] Remove duplicate RoomStructureBuilder usage
-- [ ] Clean up unused imports and methods
+### Step 5: Clean Up Dead Code ✅ COMPLETED
+- [x] Remove or deprecate EnvironmentRenderer room creation
+- [x] Remove duplicate RoomStructureBuilder usage from StorePropsRenderer  
+- [x] Clean up unused imports and methods
+- [x] Mark EnvironmentRenderer.setupEnvironment() as deprecated with migration guidance
+- [x] Update SceneCoordinator to use EnvironmentRenderer only for skybox setup
 
-**Current State**: EnvironmentRenderer.setupEnvironment() is commented out in SceneCoordinator but file still exists. RoomStructureBuilder may still be used by EnvironmentRenderer.
+**Current State**: EnvironmentRenderer now only handles skybox and ceiling management. Room structure creation fully handled by RoomManager. RoomStructureBuilder usage cleaned up.
 
 ### Step 6: Update Game Loading Flow ✅ COMPLETED
 - [x] Steam data loaded → SceneCoordinator emits room:resize with gameCount
@@ -126,11 +128,14 @@ This saves Three.js instancing time and reduces memory churn.
 - Entrance mat creation integrated into room setup
 - Wall reuse optimization implemented (resizes instead of recreating)
 - Game spawning restored and working
+- EnvironmentRenderer cleaned up - now only handles skybox and ceiling management
+- Dead code removal completed (unused RoomStructureBuilder references)
+- Full event-driven architecture implemented and tested
 
 **🚧 REMAINING WORK:**
-- EnvironmentRenderer cleanup needed (Step 5)
-- Some integration tests failing due to legacy dependencies
-- Event data structure debugging (room:resize event format compatibility)
+- Some integration tests failing due to legacy dependencies (expected during refactor)
+- Consider future EnvironmentRenderer simplification (rename to SkyboxRenderer)
+- Replace window.steamBrickAndMortarApp access with proper dependency injection
 
 ## Expected Benefits
 

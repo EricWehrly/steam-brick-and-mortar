@@ -18,7 +18,6 @@ import { GameBoxRenderer } from './GameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
 import { PropRenderer } from './PropRenderer'
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
-import { RoomStructureBuilder } from './RoomStructureBuilder'
 import { EnvironmentRenderer } from './EnvironmentRenderer'
 import { RoomManager, RoomConstants } from './RoomManager'
 import { EventManager } from '../core/EventManager'
@@ -60,7 +59,6 @@ export class StorePropsRenderer {
     private gameBoxRenderer: GameBoxRenderer
     private signageRenderer: SignageRenderer
     private propRenderer: PropRenderer
-    private roomStructureBuilder: RoomStructureBuilder
     private propsGroup: THREE.Group
     private config: PropsConfig = {}
     private currentStoreGroup: THREE.Group | null = null // Track current store environment
@@ -69,7 +67,6 @@ export class StorePropsRenderer {
     constructor(scene: THREE.Scene, environmentRenderer?: EnvironmentRenderer) {
         this.scene = scene
         this.propRenderer = new PropRenderer(scene)
-        this.roomStructureBuilder = new RoomStructureBuilder()
         this.environmentRenderer = environmentRenderer
         
         // Create group to hold all props

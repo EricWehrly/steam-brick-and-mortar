@@ -35,5 +35,5 @@ export {
     STEAM_STORE_SECTIONS 
 } from './StoreLayout'
 export { StoreLayoutConfigFactory } from './StoreLayoutConfig'
-export { RoomStructureBuilder } from './RoomStructureBuilder'
+
 export { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
