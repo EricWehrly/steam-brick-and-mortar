@@ -1,6 +1,7 @@
 /* Main application styles */
 @import './components/toast.css';
 @import './components/steam-ui.css';
+@import './components/lighting-controls.css';
 
 body {
     margin: 0;
@@ -28,8 +29,8 @@ canvas {
 
 #webxr-button {
     position: absolute;
-    bottom: 20px;
-    right: 20px;
+    bottom: 20px; /* Now below controls */
+    left: 20px; /* Moved to left to be under controls */
     padding: 12px 24px;
     background: #007acc;
     color: white;
@@ -51,7 +52,7 @@ canvas {
 
 #controls-help {
     position: absolute;
-    bottom: 20px;
+    bottom: 80px; /* Moved up to make room for VR button */
     left: 20px;
     background: rgba(0, 0, 0, 0.7);
     color: #ccc;
@@ -68,14 +69,6 @@ canvas {
 
 .button-cache:hover {
     background: #357abd;
-}
-
-.button-offline {
-    background: #ff8c00;
-}
-
-.button-offline:hover {
-    background: #e67c00;
 }
 
 
@@ -107,4 +100,15 @@ canvas {
 .settings-button:hover {
     background: rgba(0, 0, 0, 0.9);
     border-color: #555;
+}
+
+/* Lighting controls button - positioned below settings */
+.lighting-button {
+    top: 70px; /* Position below settings button */
+    background: rgba(0, 40, 120, 0.8); /* Blue tint to distinguish from settings */
+}
+
+.lighting-button:hover {
+    background: rgba(0, 40, 120, 0.9);
+    border-color: #4a90e2;
 }

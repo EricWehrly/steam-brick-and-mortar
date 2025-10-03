@@ -137,6 +137,34 @@
 
 ---
 
+## Feature 5.6: Enhanced Store Signage System 🔮
+**Context**: Immersive 3D signage elements to organize and highlight game content sections
+
+### Story 5.6.1: "New Releases" 3D Signage
+- **Task 5.6.1.1**: Implement 3D blocky letter signage system
+  - Create 3D text geometry using THREE.js TextGeometry or ExtrudeGeometry
+  - Design chunky, blockbuster-style letterforms with depth and dimension
+  - Implement configurable text depth, bevel, and styling options
+  - Add proper material handling for 3D text surfaces (front, back, sides)
+- **Task 5.6.1.2**: Position "NEW RELEASES" sign with angled mounting
+  - Position sign on designated wall section (likely back wall or prominent side wall)
+  - Implement 15-degree rotation for dynamic, eye-catching angle
+  - Calculate proper positioning relative to game shelves and store layout
+  - Ensure sign visibility from multiple viewing angles in VR space
+- **Task 5.6.1.3**: Integrate with existing signage system
+  - Extend SignageRenderer to support both 2D canvas signs and 3D blocky text
+  - Maintain compatibility with existing flat signage for category markers
+  - Add configuration options to choose between 2D and 3D signage styles
+  - Implement consistent styling and color schemes across signage types
+
+**Expected Deliverable**: 3D "NEW RELEASES" signage with angled wall mounting
+
+**Acceptance**: Prominent 3D letterforms visible at 15-degree angle, integrated with store layout
+
+**Context**: **Medium Priority** - Enhances store atmosphere and visual organization. Should be implemented alongside game content population features for cohesive store experience.
+
+---
+
 ## Milestone 7: Input Systems and User Controls 🔮
 *Goal: Implement comprehensive input support for mouse/keyboard, gamepad, and VR controllers*
 
@@ -247,11 +275,16 @@
   - Reduce default width footprint for better screen utilization
   - Enhanced expand-on-interaction behavior for better UX
   - Consistent styling with other UI components
-- **Task 7.5.1.2**: UI component standardization
+- **Task 7.5.1.2**: Convert 2D signage to 3D elements
+  - Replace signs as planes with 3d rectangular cubes with some 'depth' to them in the world. They mainly should stop getting "backface culled".
+  - Enhance visual depth and spatial integration in the scene
+  - Improve readability and immersion with proper 3D typography
+  - Maintain performance while adding dimensional detail
+- **Task 7.5.1.3**: UI component standardization
   - Establish consistent color scheme, typography, and spacing
   - Standardize button sizes, input fields, and panel layouts
   - Create reusable UI component library
-- **Task 7.5.1.3**: VR-ready UI architecture planning
+- **Task 7.5.1.4**: VR-ready UI architecture planning
   - Design UI components that can adapt to 3D spatial layout
   - Plan transition strategy from 2D overlay to 3D spatial UI
   - Consider interaction patterns for touch/controller input
@@ -311,6 +344,42 @@
 **Expected Deliverable**: Complete audio and accessibility options
 
 **Acceptance**: Full audio customization with accessibility support
+
+---
+
+## Milestone 8.5: Interactive Scene Controls 🔮
+*Goal: In-world interactive elements that enhance immersion and usability*
+
+### Feature 8.5.1: Interactive Lighting Controls
+**Context**: Physical interactive elements in the 3D scene for lighting control - UI lighting panel incarnated as interactive 3D objects
+
+#### Story 8.5.1.1: Interactive Light Switch/Dimmer System
+- **Task 8.5.1.1**: Design interactive lighting control objects
+  - Create 3D light switch and dimmer models as interactive elements
+  - Design intuitive interaction patterns for VR and mouse/keyboard
+  - Plan integration with existing lighting system and UI controls
+  - Research interaction feedback (visual, audio, haptic for VR)
+- **Task 8.5.1.2**: Implement switch/dimmer interaction mechanics
+  - Add raycasting and collision detection for interactive elements
+  - Implement click/touch interaction for light switches
+  - Create drag/slide interaction for dimmer controls
+  - Add visual feedback for interaction states (hover, active, etc.)
+- **Task 8.5.1.3**: Integrate with existing lighting system
+  - Connect interactive controls to current lighting panel functionality
+  - Maintain synchronization between 3D controls and UI panel
+  - Implement smooth lighting transitions triggered by 3D interactions
+  - Add persistence for lighting state set via interactive controls
+- **Task 8.5.1.4**: Polish and accessibility features
+  - Add sound effects for switch clicks and dimmer adjustments
+  - Implement visual indicators for control states and ranges
+  - Ensure accessibility with keyboard/gamepad fallback controls
+  - Add help text or tooltips for discovering interactive elements
+
+**Expected Deliverable**: Interactive 3D lighting controls integrated with scene lighting system
+
+**Acceptance**: Users can control lighting by interacting with 3D switches and dimmers in the scene, with full parity to UI panel controls
+
+**Context**: **Advanced Feature for Late Phase 2** - Requires stable input system, lighting system, and interaction framework. Adds significant immersion value.
 
 ---
 
@@ -383,6 +452,14 @@
 - **Pause Menu Polish**: Smooth animations, advanced accessibility features, VR-ready UI architecture
 - **Design System**: Consistent UI components, theme/customization system, multi-language support
 - **Advanced Performance Options**: Hardware-specific graphics presets and auto-detection
+
+### Visual Effects & Immersion
+- **Dissolve Animation System**: Implement smooth entrance animations for store geometry
+  - **Context**: Eliminate jarring "pop" appearance when scene loads with immersive materialization effects
+  - **Research**: See `docs/research/dissolve-animation-research.md` for technical findings and implementation approach
+  - **Priority**: Medium - Enhances user experience but not critical for core functionality
+  - **Dependencies**: Requires resolution of THREE.js material sharing issues and animation coordination
+  - **Timeline**: Estimated 5-7 days for complete implementation after material system refactoring
 
 ### Developer Experience & Extensibility
 - **Plugin/Extension System**: Community additions and modular panel architecture

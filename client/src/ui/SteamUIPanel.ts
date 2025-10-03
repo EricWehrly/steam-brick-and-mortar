@@ -11,47 +11,42 @@ import steamCacheStatsTemplate from '../templates/steam-ui/cache-stats.html?raw'
 export class SteamUIPanel {
   private eventManager: EventManager
   private steamUI: HTMLElement | null
-  private steamVanityInput: HTMLInputElement | null
+  private steamUserInput: HTMLInputElement | null
   private loadGamesButton: HTMLButtonElement | null
   private loadFromCacheButton: HTMLButtonElement | null
-  private useOfflineButton: HTMLButtonElement | null
   private refreshCacheButton: HTMLButtonElement | null
   private clearCacheButton: HTMLButtonElement | null
   private showCacheStatsButton: HTMLButtonElement | null
   private cacheInfoDiv: HTMLElement | null
   private steamStatus: HTMLElement | null
-  private devModeToggle: HTMLInputElement | null
   
   constructor() {
     this.eventManager = EventManager.getInstance()
     
     // Get UI elements
     this.steamUI = document.getElementById('steam-ui')
-    this.steamVanityInput = getElementByIdSafe('steam-vanity') as HTMLInputElement
+    this.steamUserInput = getElementByIdSafe('steam-user-input') as HTMLInputElement
     this.loadGamesButton = getElementByIdSafe('load-steam-games') as HTMLButtonElement
     this.loadFromCacheButton = getElementByIdSafe('load-from-cache') as HTMLButtonElement
-    this.useOfflineButton = getElementByIdSafe('use-offline-data') as HTMLButtonElement
     this.refreshCacheButton = getElementByIdSafe('refresh-cache') as HTMLButtonElement
     this.clearCacheButton = getElementByIdSafe('clear-cache') as HTMLButtonElement
     this.showCacheStatsButton = getElementByIdSafe('show-cache-stats') as HTMLButtonElement
     this.cacheInfoDiv = document.getElementById('cache-info')
     this.steamStatus = document.getElementById('steam-status')
-    this.devModeToggle = document.getElementById('dev-mode-toggle') as HTMLInputElement
   }
   
   init(): void {
     this.setupEventListeners()
-    this.setupInputPlaceholder()
   }
   
   private setupEventListeners(): void {
     // Load Games button
     if (this.loadGamesButton) {
       this.loadGamesButton.addEventListener('click', () => {
-        const vanityUrl = this.getVanityInput()
-        if (vanityUrl) {
+        const userInput = this.getUserInput()
+        if (userInput) {
           this.eventManager.emit(SteamEventTypes.LoadGames, {
-            vanityUrl,
+            userInput,
             timestamp: Date.now(),
             source: EventSource.UI
           })
@@ -62,24 +57,10 @@ export class SteamUIPanel {
     // Load from Cache button
     if (this.loadFromCacheButton) {
       this.loadFromCacheButton.addEventListener('click', () => {
-        const vanityUrl = this.getVanityInput()
-        if (vanityUrl) {
+        const userInput = this.getUserInput()
+        if (userInput) {
           this.eventManager.emit(SteamEventTypes.LoadFromCache, {
-            vanityUrl,
-            timestamp: Date.now(),
-            source: EventSource.UI
-          })
-        }
-      })
-    }
-    
-    // Use Offline button
-    if (this.useOfflineButton) {
-      this.useOfflineButton.addEventListener('click', () => {
-        const vanityUrl = this.getVanityInput()
-        if (vanityUrl) {
-          this.eventManager.emit(SteamEventTypes.UseOffline, {
-            vanityUrl,
+            userInput,
             timestamp: Date.now(),
             source: EventSource.UI
           })
@@ -116,13 +97,13 @@ export class SteamUIPanel {
     }
     
     // Enter key support for input field
-    if (this.steamVanityInput) {
-      this.steamVanityInput.addEventListener('keydown', (event) => {
+    if (this.steamUserInput) {
+      this.steamUserInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
-          const vanityUrl = this.getVanityInput()
-          if (vanityUrl) {
+          const userInput = this.getUserInput()
+          if (userInput) {
             this.eventManager.emit(SteamEventTypes.LoadGames, {
-              vanityUrl,
+              userInput,
               timestamp: Date.now(),
               source: EventSource.UI
             })
@@ -130,42 +111,25 @@ export class SteamUIPanel {
         }
       })
       
-      // Input change handler for cache and offline availability
-      this.steamVanityInput.addEventListener('input', () => {
-        const vanityUrl = this.steamVanityInput?.value.trim() || ''
-        this.checkOfflineAvailability(vanityUrl)
+      // Input change handler for cache availability
+      this.steamUserInput.addEventListener('input', () => {
+        const userInput = this.steamUserInput?.value.trim() || ''
         
         // Show/hide Load from Cache button based on input presence
         // The actual cache availability will be handled by the workflow manager
-        this.checkCacheAvailability(vanityUrl, Boolean(vanityUrl))
+        this.checkCacheAvailability(userInput, Boolean(userInput))
       })
     }
     
-    // Development mode toggle
-    if (this.devModeToggle) {
-      this.devModeToggle.addEventListener('change', () => {
-        const isEnabled = this.devModeToggle?.checked ?? true
-        this.eventManager.emit(SteamEventTypes.DevModeToggle, {
-          isEnabled,
-          timestamp: Date.now(),
-          source: EventSource.UI
-        })
-      })
-    }
+
   }
   
-  private setupInputPlaceholder(): void {
-    if (this.steamVanityInput) {
-      this.steamVanityInput.placeholder = 'e.g., SpiteMonger or steamcommunity.com/id/SpiteMonger'
-    }
-  }
-  
-  private getVanityInput(): string | null {
-    if (!this.steamVanityInput) return null
+  private getUserInput(): string | null {
+    if (!this.steamUserInput) return null
     
-    const input = this.steamVanityInput.value.trim()
+    const input = this.steamUserInput.value.trim()
     if (!input) {
-      this.showStatus('Please enter a Steam profile URL or vanity name', 'error')
+      this.showStatus('Please enter a Steam Profile URL, Custom URL, or Steam ID', 'error')
       return null
     }
     
@@ -178,25 +142,58 @@ export class SteamUIPanel {
     }
   }
   
+  hide(): void {
+    if (this.steamUI) {
+      this.steamUI.classList.add('hidden')
+    }
+  }
+  
   showStatus(message: string, type: 'loading' | 'success' | 'error'): void {
     if (!this.steamStatus) return
     
-    this.steamStatus.textContent = message
+    // Use innerHTML for error messages that may contain HTML formatting, textContent for others
+    if (type === 'error' && message.includes('<br>')) {
+      this.steamStatus.innerHTML = message
+    } else {
+      this.steamStatus.textContent = message
+    }
     this.steamStatus.className = `status-${type}`
     
-    // Auto-hide success messages after 5 seconds
-    if (type === 'success') {
-      setTimeout(() => {
-        if (this.steamStatus) {
-          this.steamStatus.className = 'status-hidden'
-        }
-      }, 5000)
+    // Manage loading state based on status type
+    if (type === 'loading') {
+      this.setLoadingState(true)
+    } else if (type === 'error' || type === 'success') {
+      this.setLoadingState(false)
+      if (type === 'success') {
+        // Auto-hide success messages after 5 seconds
+        setTimeout(() => {
+          if (this.steamStatus) {
+            this.steamStatus.className = 'status-hidden'
+          }
+        }, 5000)
+      }
     }
   }
   
   setLoadingState(isLoading: boolean): void {
+    // Disable all interactive elements during loading
     if (this.loadGamesButton) {
       this.loadGamesButton.disabled = isLoading
+    }
+    if (this.loadFromCacheButton) {
+      this.loadFromCacheButton.disabled = isLoading
+    }
+    if (this.steamUserInput) {
+      this.steamUserInput.disabled = isLoading
+    }
+    
+    // Set visual state for the entire UI panel
+    if (this.steamUI) {
+      if (isLoading) {
+        this.steamUI.classList.add('loading')
+      } else {
+        this.steamUI.classList.remove('loading')
+      }
     }
   }
   
@@ -226,10 +223,10 @@ export class SteamUIPanel {
     }
   }
   
-  checkCacheAvailability(vanityUrl: string, hasCache: boolean): void {
+  checkCacheAvailability(userInput: string, hasCache: boolean): void {
     if (!this.loadFromCacheButton) return
     
-    if (!vanityUrl || !hasCache) {
+    if (!userInput || !hasCache) {
       this.loadFromCacheButton.classList.add('hidden')
       return
     }
@@ -238,22 +235,5 @@ export class SteamUIPanel {
     this.loadFromCacheButton.classList.remove('hidden')
   }
   
-  checkOfflineAvailability(vanityUrl: string): void {
-    if (!this.useOfflineButton) return
-    
-    if (!vanityUrl) {
-      this.useOfflineButton.classList.add('hidden')
-      return
-    }
-    
-    // For simplified client, always hide offline button since it's not implemented
-    this.useOfflineButton.classList.add('hidden')
-  }
-  
-  /**
-   * Get the current development mode state
-   */
-  isDevelopmentMode(): boolean {
-    return this.devModeToggle?.checked ?? true
-  }
+
 }

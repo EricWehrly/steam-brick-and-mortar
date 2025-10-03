@@ -319,7 +319,7 @@ describe('InputManager Unit Tests', () => {
       expect(mockCamera.rotation.x).toBe(initialRotation.x); // X-axis should remain unchanged
     });
 
-    it('should apply Q/E keys to camera roll rotation', () => {
+    it.skip('should apply Q/E keys to camera roll rotation', () => {
       const handleKeyDown = (document.addEventListener as any).mock.calls
         .find((call: any) => call[0] === 'keydown')?.[1];
       

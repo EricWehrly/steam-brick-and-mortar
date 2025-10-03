@@ -7,7 +7,10 @@ export {
   type WoodMaterialOptions,
   type SimpleWoodMaterialOptions,
   type ProceduralWoodMaterialOptions,
-  type EnhancedProceduralWoodMaterialOptions
+  type EnhancedProceduralWoodMaterialOptions,
+  type MDFVeneerMaterialOptions,
+  type ShelfInteriorMaterialOptions,
+  type BrandAccentMaterialOptions
 } from './WoodMaterialGenerator'
 
 export { 

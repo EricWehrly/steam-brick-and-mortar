@@ -77,6 +77,29 @@ export class TextureManager {
     return this.woodMaterialGenerator.createEnhancedProceduralMaterial(options);
   }
 
+  // MDF Veneer material methods (Task 6.1.1.1)
+  public createMDFVeneerMaterial(options: {
+    repeat?: { x: number; y: number };
+    veneerColor?: string;
+    glossiness?: number;
+    grainSubtlety?: number;
+  } = {}): THREE.MeshStandardMaterial {
+    return this.woodMaterialGenerator.createMDFVeneerMaterial(options);
+  }
+
+  public createShelfInteriorMaterial(options: {
+    glossLevel?: number;
+  } = {}): THREE.MeshStandardMaterial {
+    return this.woodMaterialGenerator.createShelfInteriorMaterial(options);
+  }
+
+  public createBrandAccentMaterial(options: {
+    brandColor?: string;
+    glossLevel?: number;
+  } = {}): THREE.MeshStandardMaterial {
+    return this.woodMaterialGenerator.createBrandAccentMaterial(options);
+  }
+
   // Carpet material methods
   public async createCarpetMaterial(options: {
     diffuseUrl?: string;

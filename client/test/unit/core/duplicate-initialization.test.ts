@@ -86,8 +86,7 @@ describe('Application Initialization Idempotency', () => {
     it('should allow multiple init() calls without breaking', async () => {
         const app = new SteamBrickAndMortarApp({
             scene: {
-                antialias: false,
-                enableShadows: false
+                antialias: false
             },
             steam: {
                 apiBaseUrl: 'http://test-api.example.com',

@@ -460,6 +460,9 @@
 
 **Expected Deliverable**: Wall-mounted shelf system with extensible architecture
 
+unmet prerequisit to 6.2:
+Games need to spawn onto shelves before we can "optimize" the process of doing so
+
 ### Feature 6.2: Game Population and Dynamic Shelf Generation 🔄 **HIGH PRIORITY**
 **Context**: Smart shelf spawning and game placement system for optimal space utilization
 

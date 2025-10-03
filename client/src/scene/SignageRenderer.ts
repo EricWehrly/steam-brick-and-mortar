@@ -83,6 +83,30 @@ export class SignageRenderer {
     }
 
     /**
+     * 🚀 FUTURE: Create 3D blocky "NEW RELEASES" signage at 15-degree angle
+     * 
+     * Roadmap implementation for Phase 2 Feature 5.6.1
+     * This will create dimensional letter forms instead of flat canvas-based signs
+     * 
+     * Planned approach:
+     * - Use THREE.TextGeometry or ExtrudeGeometry for 3D letter creation
+     * - Apply 15-degree rotation for dynamic wall mounting
+     * - Position prominently on back wall above New Releases section
+     * - Use BlockbusterColors.newReleasesRed for material styling
+     * 
+     * Example usage (future):
+     * const newReleasesSign = signageRenderer.create3DBlockySign({
+     *   text: 'NEW RELEASES',
+     *   position: new THREE.Vector3(-6, 2.5, -7.8),
+     *   rotation: new THREE.Euler(0, 0, -Math.PI / 12), // 15 degrees
+     *   depth: 0.3,
+     *   color: BlockbusterColors.newReleasesRed
+     * })
+     * 
+     * See: docs/roadmap-phase2-ready-for-friends.md Feature 5.6
+     */
+
+    /**
      * Create a single sign with text
      */
     public createSign(config: SignageConfig): THREE.Mesh {

@@ -10,6 +10,7 @@
 
 import * as THREE from 'three'
 import { BlockbusterColors } from '../utils/Colors'
+import { LightFactory } from '../lighting/LightFactory'
 
 export interface LightFixtureOptions {
   width?: number
@@ -31,12 +32,14 @@ export interface WireRackOptions {
 export class PropRenderer {
   private scene: THREE.Scene
   private propsGroup: THREE.Group
+  private lightFactory: any
 
   constructor(scene: THREE.Scene) {
-    this.scene = scene
-    this.propsGroup = new THREE.Group()
-    this.propsGroup.name = 'AtmosphericProps'
-    this.scene.add(this.propsGroup)
+  this.scene = scene
+  this.propsGroup = new THREE.Group()
+  this.propsGroup.name = 'AtmosphericProps'
+  this.scene.add(this.propsGroup)
+    this.lightFactory = new LightFactory(scene)
   }
 
   /**
@@ -92,7 +95,7 @@ export class PropRenderer {
         // Create fixture housing
         const housingGeometry = new THREE.BoxGeometry(width + 0.1, height + 0.05, depth + 0.1)
         const housing = new THREE.Mesh(housingGeometry, housingMaterial)
-        housing.position.set(fixtureX, fixtureY - 0.025, fixtureZ)
+        housing.position.set(fixtureX, fixtureY + 0.05, fixtureZ)
 
         // Create light panel
         const lightPanel = new THREE.Mesh(fixtureGeometry, fixtureMaterial)
@@ -111,17 +114,34 @@ export class PropRenderer {
     // Performance optimization: Use only 2 wide RectAreaLights for the two rows
     // This provides good lighting coverage while maintaining VR performance
     
-    // Front row lighting (covers 4 fixtures)
-    const frontRowLight = new THREE.RectAreaLight(BlockbusterColors.fluorescentCool, 4, roomWidth * 0.8, depth * 0.9)
-    frontRowLight.position.set(0, fixtureY - 0.05, -roomDepth * 0.25)
-    frontRowLight.lookAt(0, fixtureY - 2, -roomDepth * 0.25) // Point downward
-    fixturesGroup.add(frontRowLight)
+    // Front row lighting (covers 4 fixtures) - optimized intensity
+    const frontRowLight = this.lightFactory.createRectAreaLight(
+      BlockbusterColors.fluorescentCool,
+      4, // Reduced from 8 to 4 for better balance
+      roomWidth * 0.8,
+      depth * 0.9,
+      {
+        name: 'ceiling-front-row-light',
+        parent: fixturesGroup
+      }
+    )
+    // Position the RectAreaLight just below the mesh panels
+    frontRowLight.position.set(0, fixtureY - 0.12, -roomDepth * 0.25)
+    frontRowLight.rotation.x = -Math.PI / 2
     
-    // Back row lighting (covers 4 fixtures) 
-    const backRowLight = new THREE.RectAreaLight(BlockbusterColors.fluorescentCool, 4, roomWidth * 0.8, depth * 0.9)
-    backRowLight.position.set(0, fixtureY - 0.05, roomDepth * 0.25)
-    backRowLight.lookAt(0, fixtureY - 2, roomDepth * 0.25) // Point downward
-    fixturesGroup.add(backRowLight)
+    // Back row lighting (covers 4 fixtures) - optimized intensity
+    const backRowLight = this.lightFactory.createRectAreaLight(
+      BlockbusterColors.fluorescentCool,
+      4, // Reduced from 8 to 4 for better balance
+      roomWidth * 0.8,
+      depth * 0.9,
+      {
+        name: 'ceiling-back-row-light',
+        parent: fixturesGroup
+      }
+    )
+    backRowLight.position.set(0, fixtureY - 0.12, roomDepth * 0.25)
+    backRowLight.rotation.x = -Math.PI / 2
 
     this.propsGroup.add(fixturesGroup)
     console.log(`💡 Created ${rows * fixturesPerRow} ceiling-mounted fluorescent fixtures at height ${fixtureY.toFixed(2)}m with optimized lighting`)

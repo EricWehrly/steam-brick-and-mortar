@@ -6,7 +6,8 @@ export enum EventSource {
     Mouse = 'mouse',
     Gamepad = 'gamepad',
     VRController = 'vr-controller',
-    System = 'system'
+    System = 'system',
+    ManagedLight = 'managed-light'
 }
 
 export interface BaseInteractionEvent {

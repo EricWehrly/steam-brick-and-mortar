@@ -8,16 +8,24 @@ export {
     type SceneCoordinatorConfig 
 } from './SceneCoordinator'
 export { AssetLoader, type AssetLoadOptions, type LoadProgress } from './AssetLoader'
+export { GameBoxRenderer } from './GameBoxRenderer'
 export { 
-    GameBoxRenderer, 
     type GameBoxDimensions, 
     type GameBoxPosition, 
     type ShelfConfiguration,
-    type SteamGameData,
     type GameBoxTextureOptions,
+    type GameBoxCreationRequest,
+    type GameBoxBatchCreationRequest
+} from './game-box/types/GameBoxOptions'
+export {
+    type GameData,
+    type SteamGameData
+} from './game-box/types/GameData'
+export {
     type TexturePerformanceConfig,
-    type GameBoxPerformanceData
-} from './GameBoxRenderer'
+    type GameBoxPerformanceData,
+    type PerformanceStats
+} from './game-box/types/PerformanceTypes'
 export { SignageRenderer, type SignageConfig } from './SignageRenderer'
 export { 
     StoreLayout, 

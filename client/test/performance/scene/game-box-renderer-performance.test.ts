@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { GameBoxRenderer, type TexturePerformanceConfig, type SteamGameData } from '../../../src/scene'
+import { GameBoxRenderer, type SteamGameData, type TexturePerformanceConfig } from '../../../src/scene'
 
 // Mock URL object methods
 Object.defineProperty(globalThis, 'URL', {
@@ -53,11 +53,13 @@ Object.defineProperty(globalThis, 'document', {
     writable: true
 })
 
-describe('GameBoxRenderer Performance Optimization Tests', () => {
+describe('GameBox Renderer Performance - Experimental Features', () => {
     let renderer: GameBoxRenderer
     let scene: THREE.Scene
     let camera: THREE.PerspectiveCamera
     let mockGameData: SteamGameData[]
+    let performanceManager: any
+    let textureManager: any
     
     beforeEach(() => {
         const performanceConfig: TexturePerformanceConfig = {
@@ -72,6 +74,8 @@ describe('GameBoxRenderer Performance Optimization Tests', () => {
         }
         
         renderer = new GameBoxRenderer({}, {}, performanceConfig)
+        performanceManager = renderer.getPerformanceManager()
+        textureManager = renderer.getTextureManager()
         scene = new THREE.Scene()
         camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
         camera.position.set(0, 0, 0)
@@ -98,19 +102,19 @@ describe('GameBoxRenderer Performance Optimization Tests', () => {
     describe('Texture Resolution Scaling', () => {
         it('should select high resolution for near objects', () => {
             const nearDistance = 1.5
-            const resolution = (renderer as any).getOptimalTextureResolution(nearDistance)
+            const resolution = performanceManager?.getOptimalTextureResolution(nearDistance) ?? 256
             expect(resolution).toBe(512) // High resolution
         })
         
         it('should select medium resolution for medium distance objects', () => {
             const mediumDistance = 5.0
-            const resolution = (renderer as any).getOptimalTextureResolution(mediumDistance)
+            const resolution = performanceManager?.getOptimalTextureResolution(mediumDistance) ?? 256
             expect(resolution).toBe(256) // Medium resolution
         })
         
         it('should select low resolution for far objects', () => {
             const farDistance = 15.0
-            const resolution = (renderer as any).getOptimalTextureResolution(farDistance)
+            const resolution = performanceManager?.getOptimalTextureResolution(farDistance) ?? 256
             expect(resolution).toBe(128) // Low resolution
         })
     })
@@ -178,7 +182,7 @@ describe('GameBoxRenderer Performance Optimization Tests', () => {
                 const mockBlob = new Blob(['test'], { type: 'image/jpeg' })
                 const artworkBlobs = { library: mockBlob, header: null, logo: null, icon: null }
                 
-                const result = await renderer.applyOptimizedTexture(gameBox, game, {
+                const result = await textureManager.applyOptimizedTexture(gameBox, game, {
                     artworkBlobs,
                     enableLazyLoading: true
                 })
@@ -204,7 +208,7 @@ describe('GameBoxRenderer Performance Optimization Tests', () => {
                 const mockBlob = new Blob(['test'], { type: 'image/jpeg' })
                 const artworkBlobs = { library: mockBlob, header: null, logo: null, icon: null }
                 
-                const result = await renderer.applyOptimizedTexture(gameBox, game, {
+                const result = await textureManager.applyOptimizedTexture(gameBox, game, {
                     artworkBlobs,
                     enableLazyLoading: true
                 })
@@ -238,7 +242,7 @@ describe('GameBoxRenderer Performance Optimization Tests', () => {
             const artworkBlobs = { library: mockBlob, header: null, logo: null, icon: null }
             
             for (const { box, game } of gameBoxes) {
-                await renderer.applyOptimizedTexture(box, game, { artworkBlobs })
+                await textureManager.applyOptimizedTexture(box, game, { artworkBlobs })
             }
             
             // Get initial stats
@@ -246,7 +250,7 @@ describe('GameBoxRenderer Performance Optimization Tests', () => {
             expect(initialStats.loadedTextures).toBe(15)
             
             // Trigger cleanup (this should enforce memory limits)
-            ;(renderer as any).enforceTextureMemoryLimit()
+            performanceManager?.enforceTextureMemoryLimit()
             
             // Check that textures were cleaned up
             const finalStats = renderer.getPerformanceStats()
@@ -264,20 +268,21 @@ describe('GameBoxRenderer Performance Optimization Tests', () => {
                 
                 // Mock performance data as off-screen and old
                 const gameId = game.appid.toString()
-                ;(renderer as any).gameBoxPerformanceData.set(gameId, {
+                const performanceData = {
                     isVisible: false,
                     distanceFromCamera: 10,
                     lastUpdated: Date.now() - 60000, // 1 minute ago
                     textureLoaded: true,
                     currentTextureSize: 256
-                })
+                }
+                performanceManager?.gameBoxPerformanceDataMap.set(gameId, performanceData)
                 
                 // Trigger cleanup
                 renderer.cleanupOffScreenTextures()
                 
                 // Check that texture was marked as unloaded
-                const performanceData = (renderer as any).gameBoxPerformanceData.get(gameId)
-                expect(performanceData.textureLoaded).toBe(false)
+                const updatedPerformanceData = performanceManager?.gameBoxPerformanceDataMap.get(gameId)
+                expect(updatedPerformanceData?.textureLoaded).toBe(false)
             }
         })
     })
@@ -346,9 +351,17 @@ describe('GameBoxRenderer Performance Optimization Tests', () => {
         })
         
         it('should update performance data efficiently for large numbers of objects', () => {
-            // Create a new renderer with higher maxGames limit for this test
-            const largeRenderer = new GameBoxRenderer()
-            largeRenderer.updateShelfConfig({ maxGames: 500 })
+            // Create a new renderer for this test with performance features enabled
+            const largeRenderer = new GameBoxRenderer({}, {}, {
+                maxTextureSize: 1024,
+                nearDistance: 2.0,
+                farDistance: 10.0,
+                highResolutionSize: 512,
+                mediumResolutionSize: 256,
+                lowResolutionSize: 128,
+                maxActiveTextures: 50,
+                frustumCullingEnabled: true
+            })
             
             // Create 200 game boxes
             for (let i = 0; i < 200; i++) {

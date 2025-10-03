@@ -1,0 +1,131 @@
+<!-- GraphicsSettingsPanel Template -->
+<div class="graphics-settings-panel">
+
+  <!-- Settings Sections -->
+  <div class="settings-sections">
+    
+    <!-- Lighting Quality Section -->
+    <section class="setting-section">
+      <div class="setting-group">
+        <label class="setting-label" for="lighting-quality">
+          💡 Lighting Quality
+        </label>
+        <p class="setting-description">
+          Higher quality provides better visuals but may impact performance. Changes apply immediately.
+        </p>
+        <div class="setting-control">
+          <select id="lighting-quality" class="setting-select">
+            <option value="simple" {{#lightingQualitySimple}}selected{{/lightingQualitySimple}}>
+              Simple - Basic lighting only (higher ambient, fewer lights)
+            </option>
+            <option value="enhanced" {{#lightingQualityEnhanced}}selected{{/lightingQualityEnhanced}}>
+              Enhanced - Fluorescent fixtures + standard shadows
+            </option>
+            <option value="advanced" {{#lightingQualityAdvanced}}selected{{/lightingQualityAdvanced}}>
+              Advanced - Point lights + soft shadows + enhanced quality
+            </option>
+            <option value="ouch-my-eyes" {{#lightingQualityOuch}}selected{{/lightingQualityOuch}}>
+              Ouch My Eyes - Dramatic spotlights + colored accents + ultra shadows
+            </option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Shadow Settings Section -->
+    <section class="setting-section">
+      <div class="setting-group">
+        <label class="setting-label" for="shadow-quality">
+          🌓 Shadow Quality: <span id="shadow-quality-value">{{shadowQualityLabel}}</span> <span class="reload-not-required">✨ Updates instantly</span>
+        </label>
+        <p class="setting-description">
+          Higher shadow quality improves depth perception but requires more processing power. Set to "Off" to disable shadows entirely.
+        </p>
+        <div class="setting-control">
+          <input 
+            type="range" 
+            id="shadow-quality" 
+            class="setting-slider"
+            min="0" 
+            max="4" 
+            step="1" 
+            value="{{shadowQuality}}"
+          >
+          <div class="slider-labels">
+            <span>Off</span>
+            <span>Low</span>
+            <span>Medium</span>
+            <span>High</span>
+            <span>Ultra</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Environment Settings Section -->
+    <section class="setting-section">
+      <div class="setting-group">
+        <label class="setting-label" for="ceiling-height">
+          📏 Ceiling Height: <span id="ceiling-height-value">{{ceilingHeight}}m</span> <span class="reload-required">⚠️ Requires scene reload</span>
+        </label>
+        <p class="setting-description">
+          Adjust the store ceiling height for comfort and immersion. Changes require scene reload.
+        </p>
+        <div class="setting-control">
+          <input 
+            type="range" 
+            id="ceiling-height" 
+            class="setting-slider"
+            min="2.5" 
+            max="5.0" 
+            step="0.1" 
+            value="{{ceilingHeight}}"
+          >
+          <div class="slider-labels">
+            <span>2.5m</span>
+            <span>5.0m</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Debug & Testing Section -->
+    <section class="setting-section">
+      <div class="setting-group">
+        <label class="setting-label">
+          🔧 Lighting Debug & Testing
+        </label>
+        <p class="setting-description">
+          Tools to help visualize and debug the lighting system for troubleshooting.
+        </p>
+        <div class="setting-control">
+          <label class="checkbox-container" style="margin-bottom: 0.75rem;">
+            <input type="checkbox" id="enable-lighting" {{#enableLighting}}checked{{/enableLighting}}>
+            <span class="checkbox-checkmark"></span>
+            Enable Lighting (toggle lights on/off to compare lit vs unlit scene)
+          </label>
+          <label class="checkbox-container" style="margin-bottom: 0.75rem;">
+            <input type="checkbox" id="show-lighting-debug" {{#showLightingDebug}}checked{{/showLightingDebug}}>
+            <span class="checkbox-checkmark"></span>
+            Show Red Debug Shapes (visualize where lights should affect the scene)
+          </label>
+          <label class="checkbox-container">
+            <input type="checkbox" id="show-ceiling" {{#showCeiling}}checked{{/showCeiling}}>
+            <span class="checkbox-checkmark"></span>
+            Show Ceiling ("Hollywood Soundstage Mode" for debugging lights)
+          </label>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Panel Footer -->
+  <footer class="panel-footer">
+    <div class="footer-actions">
+      <button id="reset-graphics-settings" class="reset-button">
+        🔄 Reset to Defaults
+      </button>
+    </div>
+
+</div>

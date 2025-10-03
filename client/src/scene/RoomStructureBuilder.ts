@@ -8,12 +8,15 @@
 import * as THREE from 'three'
 import { TextureManager } from '../utils/TextureManager'
 import type { StoreLayoutConfig } from './StoreLayoutConfig'
+import type { EnvironmentRenderer } from './EnvironmentRenderer'
 
 export class RoomStructureBuilder {
     private textureManager: TextureManager
+    private environmentRenderer?: EnvironmentRenderer
 
-    constructor() {
+    constructor(environmentRenderer?: EnvironmentRenderer) {
         this.textureManager = TextureManager.getInstance()
+        this.environmentRenderer = environmentRenderer
     }
 
     /**
@@ -28,7 +31,7 @@ export class RoomStructureBuilder {
     private async createFloor(config: StoreLayoutConfig, storeGroup: THREE.Group): Promise<void> {
         const floorGeometry = new THREE.PlaneGeometry(config.width, config.depth)
         const carpetMaterial = await this.textureManager.createCarpetMaterial({
-            color: new THREE.Color(0x8B0000), // Dark red carpet
+            color: new THREE.Color('#6B6B6B'), // Neutral gray carpet (was dark red)
             repeat: { x: 4, y: 3 }
         })
         
@@ -48,7 +51,14 @@ export class RoomStructureBuilder {
         const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
         ceiling.rotation.x = Math.PI / 2
         ceiling.position.y = config.height
+        ceiling.name = 'room-structure-ceiling'
+        console.log(`🏗️ Created room ceiling at height ${config.height} with name '${ceiling.name}'`)
         storeGroup.add(ceiling)
+        
+        // Register ceiling with EnvironmentRenderer for visibility control
+        if (this.environmentRenderer) {
+            this.environmentRenderer.registerCeiling(ceiling)
+        }
     }
 
     private async createWalls(config: StoreLayoutConfig, storeGroup: THREE.Group): Promise<void> {

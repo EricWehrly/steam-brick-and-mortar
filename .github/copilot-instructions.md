@@ -39,6 +39,12 @@ steam-brick-and-mortar/
 - **Prefer Docker Compose** for reproducible builds
 - **Use appropriate VS Code tools** for file operations vs terminal commands
 
+### 📝 **Code Style & Documentation**
+- **NO redundant comment headings**: Don't add obvious comments like `/**\n * Get environment statistics for debugging\n */` above a method named `getEnvironmentStats()`. The method name is self-explanatory.
+- **Comments should add value**: Only add comments when they explain WHY something is done, not WHAT is being done (the code shows what)
+- **Meaningful documentation**: Comments should provide context, gotchas, business logic, or non-obvious implementation details
+- **Avoid comment noise**: If a comment doesn't make the code significantly clearer, don't add it
+
 ### ⚠️ **Critical Considerations**
 - **WebXR Types**: Custom definitions in `client/src/webxr.d.ts` require expert review
 - **VR Safety**: Incorrect spatial/timing assumptions can cause physical discomfort

@@ -15,13 +15,14 @@ import { CacheManagementPanel, type CachedUser } from './panels/CacheManagementP
 import { HelpPanel } from './panels/HelpPanel'
 import { ApplicationPanel } from './panels/ApplicationPanel'
 import { GameSettingsPanel } from './panels/GameSettingsPanel'
+import { GraphicsSettingsPanel } from './panels/GraphicsSettingsPanel'
 import { DebugPanel } from './panels/DebugPanel'
 import type { DebugStats } from '../../core'
 import type { ImageCacheStats } from '../../steam/images/ImageManager'
 import type { PerformanceMonitor } from '../PerformanceMonitor'
-import { EventManager } from '../../core/EventManager'
-import { SteamEventTypes } from '../../types/InteractionEvents'
-import type { SteamDataLoadedEvent } from '../../types/InteractionEvents'
+import { EventManager, EventSource } from '../../core/EventManager'
+import { SteamEventTypes, LightingEventTypes } from '../../types/InteractionEvents'
+import type { SteamDataLoadedEvent, LightingToggleEvent, LightingDebugToggleEvent, LightingQualityChangedEvent } from '../../types/InteractionEvents'
 import type { ApplicationSettings } from '../../core/AppSettings'
 
 export interface PauseMenuState {
@@ -169,6 +170,13 @@ export class PauseMenuManager {
         
         // Register game settings panel
         this.registerPanel(new GameSettingsPanel())
+        
+        // Register graphics settings panel
+        const graphicsPanel = new GraphicsSettingsPanel()
+        graphicsPanel.initialize({
+            onSettingsChanged: (settings) => this.handleSettingsChange(settings)
+        })
+        this.registerPanel(graphicsPanel)
         
         // Register debug panel
         if (callbacks.onGetDebugStats) {
@@ -512,32 +520,44 @@ export class PauseMenuManager {
      * Handle application settings changes
      */
     private handleSettingsChange(settings: Partial<ApplicationSettings>): void {
-        if (!this.systemDependencies) {
-            console.warn('⚠️ System dependencies not provided - cannot apply settings changes')
-            return
-        }
-        
-        // Handle performance settings
-        if (settings.showFPS !== undefined) {
-            // Toggle FPS display based on setting
-            if (settings.showFPS) {
-                this.systemDependencies.performanceMonitor.show()
-            } else {
-                this.systemDependencies.performanceMonitor.hide()
-            }
-        }
-        
-        if (settings.showPerformanceStats !== undefined) {
-            // Toggle performance stats visibility
-            if (settings.showPerformanceStats) {
-                this.systemDependencies.performanceMonitor.show()
-            } else {
-                this.systemDependencies.performanceMonitor.hide()
-            }
-        }
-        
+        console.log('⚙️ Settings changed:', settings)
+
+        // Handle quality settings
         if (settings.qualityLevel !== undefined) {
             this.updateGraphicsQuality(settings.qualityLevel)
+        }
+
+        // Handle graphics settings
+        if (settings.lightingQuality !== undefined || settings.shadowQuality !== undefined) {
+            console.log('🎨 Graphics settings changed, applying lighting update...')
+            // Emit lighting quality change event
+            if (settings.lightingQuality !== undefined) {
+                this.eventManager.emit(LightingEventTypes.QualityChanged, {
+                    quality: settings.lightingQuality,
+                    timestamp: Date.now(),
+                    source: EventSource.UI
+                })
+            }
+        }
+
+        if (settings.ceilingHeight !== undefined) {
+            console.log(`📏 Ceiling height changed to ${settings.ceilingHeight}m`)
+            // Note: Environment changes require SceneCoordinator integration (handled in next step)
+        }
+
+        // Handle lighting toggles (these can be applied immediately)
+        if (settings.enableLighting !== undefined) {
+            console.log(`💡 Lighting ${settings.enableLighting ? 'enabled' : 'disabled'}`)
+            this.eventManager.emit(LightingEventTypes.Toggle, { 
+                enabled: settings.enableLighting 
+            } as LightingToggleEvent)
+        }
+
+        if (settings.showLightingDebug !== undefined) {
+            console.log(`🔍 Lighting debug ${settings.showLightingDebug ? 'enabled' : 'disabled'}`)
+            this.eventManager.emit(LightingEventTypes.DebugToggle, { 
+                enabled: settings.showLightingDebug 
+            } as LightingDebugToggleEvent)
         }
     }
 

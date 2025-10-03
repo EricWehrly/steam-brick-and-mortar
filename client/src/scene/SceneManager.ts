@@ -14,18 +14,14 @@
  */
 
 import * as THREE from 'three'
-// import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js' // For high graphics setting
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { BlockbusterColors } from '../utils/Colors'
-import { MaterialUtils } from '../utils/MaterialUtils'
 import { TextureManager } from '../utils/TextureManager'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
 
 export interface SceneManagerOptions {
     antialias?: boolean
-    enableShadows?: boolean
-    shadowMapType?: THREE.ShadowMapType
     outputColorSpace?: THREE.ColorSpace
 }
 
@@ -33,7 +29,6 @@ export class SceneManager {
     private scene: THREE.Scene
     private camera: THREE.PerspectiveCamera
     private renderer: THREE.WebGLRenderer
-    private animationId: number | null = null
     private textureManager: TextureManager
     private propRenderer: PropRenderer
     private skyboxManager: SkyboxManager
@@ -59,7 +54,6 @@ export class SceneManager {
         this.skyboxManager = new SkyboxManager(this.scene)
 
         this.setupRenderer(options)
-        this.setupLighting()
         this.setupCamera()
         this.setupEventListeners()
         
@@ -85,37 +79,10 @@ export class SceneManager {
         this.renderer.setPixelRatio(window.devicePixelRatio)
         this.renderer.outputColorSpace = options.outputColorSpace ?? THREE.SRGBColorSpace
         
-        if (options.enableShadows ?? true) {
-            this.renderer.shadowMap.enabled = true
-            this.renderer.shadowMap.type = options.shadowMapType ?? THREE.PCFSoftShadowMap
-        }
-        
         // Enable WebXR
         this.renderer.xr.enabled = true
         
         document.body.appendChild(this.renderer.domElement)
-    }
-
-    private setupLighting() {
-        // Updated lighting for Blockbuster store atmosphere
-        // Fluorescent-style lighting with cool white color temperature
-        
-        // Reduced ambient light to let emissive fixtures show through
-        const ambientLight = new THREE.AmbientLight(BlockbusterColors.fluorescentCool, 0.1)
-        this.scene.add(ambientLight)
-        
-        // Reduced directional light since we have point lights at fixtures
-        const mainLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentCool, 0.3)
-        mainLight.position.set(0, 10, 0)
-        mainLight.castShadow = true
-        mainLight.shadow.mapSize.width = 1024
-        mainLight.shadow.mapSize.height = 1024
-        this.scene.add(mainLight)
-        
-        // Additional directional light for even coverage (retail store style)
-        const fillLight = new THREE.DirectionalLight(BlockbusterColors.fluorescentWarm, 0.2)
-        fillLight.position.set(5, 8, 5)
-        this.scene.add(fillLight)
     }
 
     private setupCamera() {
@@ -216,28 +183,6 @@ export class SceneManager {
         const objects = this.findObjectsByUserData(key, value)
         objects.forEach(obj => this.scene.remove(obj))
         return objects.length
-    }
-
-    /**
-     * Create a floor plane with procedural carpet texture
-     */
-    public createFloor(size: number = 20, _color: number = BlockbusterColors.floor, y: number = -2): THREE.Mesh {
-        const floorGeometry = new THREE.PlaneGeometry(size, size)
-        
-        // Use procedural carpet material instead of basic material
-        const floorMaterial = this.textureManager.createProceduralCarpetMaterial({
-            repeat: { x: size / 4, y: size / 4 }, // Scale texture appropriately for room size
-            color: '#8B0000', // Blockbuster red carpet
-            roughness: 0.9,
-            metalness: 0.0
-        })
-        
-        const floor = new THREE.Mesh(floorGeometry, floorMaterial)
-        floor.rotation.x = -Math.PI / 2
-        floor.position.y = y
-        floor.receiveShadow = true
-        this.scene.add(floor)
-        return floor
     }
 
     /**

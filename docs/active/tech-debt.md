@@ -3,7 +3,48 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
-<!-- Add new tech debt items here for processing -->
+- make "UIEvent" a type of event and have all UI emissions use that event type with a sub-identifier for their specific UI Event.
+
+### Graphics Settings Scene Reload Optimization
+**Priority**: Medium  
+**Effort**: 3-4 hours  
+**Context**: Graphics settings currently require full page reload (F5). Would be better if we could reload just the scene since infrastructure exists.
+
+**Tasks**:
+- Investigate which graphics settings can apply without scene reload
+- Wire scene reload functionality to graphics settings changes
+- Add "Apply Changes" button that triggers scene reload instead of page reload
+- Test lighting quality changes with scene-only reload
+- Ensure state persistence across scene reloads
+
+**Background**: Page reload works but scene reload would be more elegant and preserve UI state.
+
+### Pause Menu Tab Persistence  
+**Priority**: Low  
+**Effort**: 1-2 hours  
+**Context**: Pause menu should remember which tab was last open, even after page refresh
+
+**Tasks**:
+- Add localStorage persistence for active tab ID
+- Restore last active tab on pause menu initialization
+- Handle cases where remembered tab no longer exists
+- Add fallback to first available tab
+
+**Benefits**: Better user experience, preserves workflow context across sessions
+
+### Game Limiting UI Configuration
+**Priority**: Medium  
+**Effort**: 3-4 hours  
+**Context**: Game limiting functionality exists but not exposed in UI settings. Currently OFF by default (as intended) but should be user-configurable.
+
+**Tasks**:
+- Add "Max Games Limit" setting to UI Settings panel
+- Wire setting to existing `maxGames` configuration in SteamBrickAndMortarApp 
+- Add toggle for "Enable Game Limiting" (OFF by default)
+- Connect to existing `updateMaxGames()` methods in workflow chain
+- Add user feedback about current game counts vs. limits
+
+**Background**: Performance limiting for large libraries - not critical since realistic game counts shouldn't cause issues, but good to have available.
 
 ---
 

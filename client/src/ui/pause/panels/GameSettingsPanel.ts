@@ -13,7 +13,8 @@ import { renderTemplate } from '../../../utils/TemplateEngine'
 import gameSettingsPanelTemplate from '../../../templates/pause-menu/game-settings-panel.html?raw'
 import '../../../styles/pause-menu/game-settings-panel.css'
 import { AppSettings } from '../../../core/AppSettings'
-import { EventSource } from '../../../core/EventManager'
+import { EventManager, EventSource } from '../../../core/EventManager'
+import { SteamEventTypes } from '../../../types/InteractionEvents'
 
 export interface SteamSettings {
     // Steam Profile Settings (autoLoadProfile moved to AppSettings)
@@ -40,6 +41,7 @@ export class GameSettingsPanel extends PauseMenuPanel {
     readonly icon = '🎮'
 
     private appSettings: AppSettings
+    private eventManager: EventManager
     private settings: SteamSettings = {
         saveProfileHistory: true,
         defaultSortOrder: 'playtime',
@@ -57,6 +59,7 @@ export class GameSettingsPanel extends PauseMenuPanel {
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)
         this.appSettings = AppSettings.getInstance()
+        this.eventManager = EventManager.getInstance()
         this.loadSettings()
     }
 
@@ -77,6 +80,7 @@ export class GameSettingsPanel extends PauseMenuPanel {
             sortByRating: this.settings.defaultSortOrder === 'rating',
             
             // Game Library display options
+            developmentMode: this.appSettings.getSetting('developmentMode'),
             showUnplayedGames: this.settings.showUnplayedGames,
             showHiddenGames: this.settings.showHiddenGames,
             minimumPlaytime: this.settings.minimumPlaytime,
@@ -101,11 +105,24 @@ export class GameSettingsPanel extends PauseMenuPanel {
     }
 
     private attachCheckboxEvents(): void {
-        // Auto-load profile checkbox uses AppSettings
-        const autoLoadProfileElement = document.getElementById('auto-load-profile') as HTMLInputElement
-        if (autoLoadProfileElement) {
-            autoLoadProfileElement.addEventListener('change', () => {
-                this.appSettings.setSetting('autoLoadProfile', autoLoadProfileElement.checked, EventSource.UI)
+        // Auto-load profile is managed by AppSettings
+        const autoLoadToggle = document.getElementById('auto-load-profile') as HTMLInputElement
+        if (autoLoadToggle) {
+            autoLoadToggle.addEventListener('change', (e) => {
+                const checked = (e.target as HTMLInputElement).checked
+                this.appSettings.setSetting('autoLoadProfile', checked, EventSource.UI)
+                console.log(`🎮 App setting updated: autoLoadProfile = ${checked}`)
+            })
+        }
+        
+        // Development mode is managed by AppSettings
+        const devModeToggle = document.getElementById('dev-mode-toggle') as HTMLInputElement
+        if (devModeToggle) {
+            devModeToggle.addEventListener('change', (e) => {
+                const checked = (e.target as HTMLInputElement).checked
+                this.appSettings.setSetting('developmentMode', checked, EventSource.UI)
+                this.handleDevelopmentModeChange(checked)
+                console.log(`🎮 App setting updated: developmentMode = ${checked}`)
             })
         }
         
@@ -179,7 +196,18 @@ export class GameSettingsPanel extends PauseMenuPanel {
         // Notify callback of the change
         this.onSettingsChanged?.({ [key]: value } as Partial<SteamSettings>)
         
+
+        
         console.log(`🎮 Game setting updated: ${key} = ${value}`)
+    }
+
+    private handleDevelopmentModeChange(isEnabled: boolean): void {
+        // Emit the dev mode toggle event for SteamWorkflowManager to handle
+        this.eventManager.emit(SteamEventTypes.DevModeToggle, {
+            isEnabled,
+            timestamp: Date.now(),
+            source: EventSource.UI
+        })
     }
 
     private resetToDefaults(): void {
@@ -196,8 +224,9 @@ export class GameSettingsPanel extends PauseMenuPanel {
             cacheGameData: true
         }
         
-        // Reset the autoLoadProfile setting in AppSettings as well
+        // Reset AppSettings to defaults as well
         this.appSettings.setSetting('autoLoadProfile', false, EventSource.UI)
+        this.appSettings.setSetting('developmentMode', true, EventSource.UI)
         
         this.saveSettings()
         this.refreshSettingsDisplay() // Re-render with default values
@@ -267,6 +296,12 @@ export class GameSettingsPanel extends PauseMenuPanel {
         const autoLoadElement = document.getElementById('auto-load-profile') as HTMLInputElement
         if (autoLoadElement) {
             autoLoadElement.checked = this.appSettings.getSetting('autoLoadProfile')
+        }
+        
+        // Update development mode checkbox from AppSettings
+        const devModeElement = document.getElementById('dev-mode-toggle') as HTMLInputElement
+        if (devModeElement) {
+            devModeElement.checked = this.appSettings.getSetting('developmentMode')
         }
         
         // Update other checkboxes from local settings

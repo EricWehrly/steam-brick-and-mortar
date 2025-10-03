@@ -42,7 +42,7 @@ vi.mock('../../../src/scene/SceneManager', () => ({
 vi.mock('../../../src/scene/SceneCoordinator', () => ({
     SceneCoordinator: vi.fn().mockImplementation(() => ({
         setupCompleteScene: vi.fn().mockResolvedValue(undefined),
-        setupBasicScene: vi.fn().mockResolvedValue(undefined),
+        setupSceneAsPrerequisite: vi.fn().mockResolvedValue(undefined),
         updatePerformanceData: vi.fn(),
         getPerformanceStats: vi.fn().mockReturnValue({}),
         getGameBoxRenderer: vi.fn().mockReturnValue({
@@ -79,8 +79,7 @@ vi.mock('../../../src/ui/UICoordinator', () => ({
             updateCacheStats: vi.fn(),
             updateProgress: vi.fn(),
             showProgress: vi.fn(),
-            showSteamStatus: vi.fn(),
-            checkOfflineAvailability: vi.fn()
+            showSteamStatus: vi.fn()
         },
         webxr: {
             updateWebXRSessionState: vi.fn(),
@@ -125,7 +124,6 @@ vi.mock('../../../src/steam-integration/SteamIntegration', () => ({
         getCacheStats: vi.fn().mockReturnValue({}),
         getImageCacheStats: vi.fn().mockReturnValue({}),
         clearImageCache: vi.fn(),
-        hasOfflineData: vi.fn().mockReturnValue(false),
         refreshData: vi.fn().mockResolvedValue(undefined),
         dispose: vi.fn()
     }))
@@ -155,7 +153,7 @@ vi.mock('../../../src/core/DebugStatsProvider', () => ({
 // =============================================================================
 
 import { SteamBrickAndMortarApp } from '../../../src/core/SteamBrickAndMortarApp'
-import { EventManager } from '../../../src/core/EventManager'
+import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { GameEventTypes, type GameStartEvent } from '../../../src/types/InteractionEvents'
 
 describe('GameStart Event Implementation', () => {
@@ -187,6 +185,20 @@ describe('GameStart Event Implementation', () => {
         // Act: Initialize the application
         await app.init()
         
+        // Simulate SceneReady event emission (since SceneCoordinator is mocked)
+        eventManager.emit(GameEventTypes.SceneReady, {
+            source: EventSource.System,
+            timestamp: Date.now(),
+            sceneStats: {
+                environmentObjectCount: 5,
+                lightsReady: true,
+                basicNavigationReady: true
+            }
+        })
+        
+        // Wait for async prerequisite events to complete
+        await new Promise(resolve => setTimeout(resolve, 50))
+        
         // Assert: Verify GameStart event was emitted
         expect(gameStartEvents).toHaveLength(1)
         
@@ -204,11 +216,29 @@ describe('GameStart Event Implementation', () => {
             gameStartEvents.push(event.detail)
         })
         
-        // Act: Initialize the application multiple times
+        // Act: Initialize the application
         await app.init()
-        await app.init() // Should not emit again due to idempotency
         
-        // Assert: Verify GameStart event was emitted only once
+        // Simulate multiple SceneReady event emissions to test idempotency
+        const sceneReadyEvent = {
+            source: EventSource.System,
+            timestamp: Date.now(),
+            sceneStats: {
+                environmentObjectCount: 5,
+                lightsReady: true,
+                basicNavigationReady: true
+            }
+        }
+        
+        // Emit SceneReady multiple times - GameStart should only emit once
+        eventManager.emit(GameEventTypes.SceneReady, sceneReadyEvent)
+        eventManager.emit(GameEventTypes.SceneReady, sceneReadyEvent) // Duplicate
+        eventManager.emit(GameEventTypes.SceneReady, sceneReadyEvent) // Duplicate
+        
+        // Wait for async prerequisite events to complete
+        await new Promise(resolve => setTimeout(resolve, 50))
+        
+        // Assert: Verify GameStart event was emitted only once despite multiple SceneReady events
         expect(gameStartEvents).toHaveLength(1)
     })
 
@@ -222,6 +252,20 @@ describe('GameStart Event Implementation', () => {
         
         // Act: Initialize the application
         await app.init()
+        
+        // Simulate SceneReady event emission (since SceneCoordinator is mocked)
+        eventManager.emit(GameEventTypes.SceneReady, {
+            source: EventSource.System,
+            timestamp: Date.now(),
+            sceneStats: {
+                environmentObjectCount: 5,
+                lightsReady: true,
+                basicNavigationReady: true
+            }
+        })
+        
+        // Wait for async prerequisite events to complete
+        await new Promise(resolve => setTimeout(resolve, 50))
         
         // Assert: Verify proper event structure
         expect(capturedEvent).not.toBeNull()
@@ -241,6 +285,20 @@ describe('GameStart Event Implementation', () => {
         
         // Act: Initialize the application
         await app.init()
+        
+        // Simulate SceneReady event emission (since SceneCoordinator is mocked)
+        eventManager.emit(GameEventTypes.SceneReady, {
+            source: EventSource.System,
+            timestamp: Date.now(),
+            sceneStats: {
+                environmentObjectCount: 5,
+                lightsReady: true,
+                basicNavigationReady: true
+            }
+        })
+        
+        // Wait for async prerequisite events to complete
+        await new Promise(resolve => setTimeout(resolve, 50))
         
         // Assert: Verify that emission uses the correct event type constant
         expect(spyEmit).toHaveBeenCalledWith(

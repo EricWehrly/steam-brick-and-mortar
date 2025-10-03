@@ -19,26 +19,19 @@
     </div>
     
     <div id="steam-ui" class="hidden">
-        <h2>🎮 Steam Account</h2>
-        <label for="steam-vanity">Steam Profile URL or Vanity Name:</label>
-        <input 
-            type="text" 
-            id="steam-vanity" 
-            placeholder="e.g., SpiteMonger or steamcommunity.com/id/SpiteMonger"
-            autocomplete="off"
-        />
-        <div class="button-group">
-            <button id="load-steam-games">Load My Games</button>
-            <button id="load-from-cache" class="hidden button-cache">📋 Load from Cache</button>
-            <button id="use-offline-data" class="hidden button-offline">Use Offline</button>
+        <label for="steam-user-input">SteamID or (Custom or profile) URL:</label>
+        <div class="input-row">
+            <input 
+                type="text" 
+                id="steam-user-input" 
+                placeholder="e.g. 76561197960287930 / steamcommunity.com/id/GabeLoganNewell / steamcommunity.com/profiles/76561197960287930"
+                autocomplete="off"
+            />
+            <!-- Supports: Custom URL, Steam ID (17-digit number), or profile URLs -->
+            <button id="load-steam-games" class="load-button">Load Games</button>
         </div>
-        
-        <!-- Development Mode Toggle -->
-        <div class="dev-mode-section">
-            <label class="dev-mode-label">
-                <input type="checkbox" id="dev-mode-toggle" checked class="dev-mode-checkbox">
-                Limit to 20 games (dev mode)
-            </label>
+        <div class="button-group">
+            <button id="load-from-cache" class="hidden button-cache">Load from Cache</button>
         </div>
         
         <!-- Progressive loading indicator -->

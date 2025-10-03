@@ -48,9 +48,9 @@ export class SteamUICoordinator {
     /**
      * Load Steam games workflow - complex operation with progress callbacks
      */
-    loadGames(vanityUrl: string): void {
+    loadGames(userInput: string): void {
         this.eventManager.emit(SteamEventTypes.LoadGames, {
-            vanityUrl,
+            userInput,
             timestamp: Date.now(),
             source: EventSource.UI
         })
@@ -59,20 +59,9 @@ export class SteamUICoordinator {
     /**
      * Load games from cache workflow  
      */
-    loadFromCache(vanityUrl: string): void {
+    loadFromCache(userInput: string): void {
         this.eventManager.emit(SteamEventTypes.LoadFromCache, {
-            vanityUrl,
-            timestamp: Date.now(),
-            source: EventSource.UI
-        })
-    }
-
-    /**
-     * Use offline data workflow
-     */
-    useOffline(vanityUrl: string): void {
-        this.eventManager.emit(SteamEventTypes.UseOffline, {
-            vanityUrl,
+            userInput,
             timestamp: Date.now(),
             source: EventSource.UI
         })
@@ -141,13 +130,6 @@ export class SteamUICoordinator {
      */
     showSteamStatus(message: string, type: 'loading' | 'success' | 'error'): void {
         UIManager.getInstance().steamUIPanel.showStatus(message, type)
-    }
-
-    /**
-     * Check offline availability for a vanity URL
-     */
-    checkOfflineAvailability(vanityUrl: string): void {
-        UIManager.getInstance().steamUIPanel.checkOfflineAvailability(vanityUrl)
     }
 
     /**

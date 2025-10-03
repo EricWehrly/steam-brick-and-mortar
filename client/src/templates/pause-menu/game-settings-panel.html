@@ -22,6 +22,14 @@
     <div class="settings-section">
         <h4>📚 Game Library</h4>
         <div class="setting-item">
+            <label class="setting-label">
+                <input type="checkbox" id="dev-mode-toggle" {{#developmentMode}}checked{{/developmentMode}}>
+                <span class="checkmark"></span>
+                Development mode (limit to 20 games)
+            </label>
+            <p class="setting-description">Limit library to 20 games for faster testing and development</p>
+        </div>
+        <div class="setting-item">
             <label class="setting-label">Default sort order:</label>
             <select id="default-sort-order" class="setting-select">
                 <option value="name" {{#sortByName}}selected{{/sortByName}}>Alphabetical</option>

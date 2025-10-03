@@ -13,9 +13,27 @@
 
 import { EventManager, EventSource } from './EventManager'
 
+// Lighting Quality Constants
+export const LIGHTING_QUALITY = {
+    SIMPLE: 'simple',
+    ENHANCED: 'enhanced', 
+    ADVANCED: 'advanced',
+    OUCH_MY_EYES: 'ouch-my-eyes'
+} as const
+
+export type LightingQuality = typeof LIGHTING_QUALITY[keyof typeof LIGHTING_QUALITY]
+
 export interface ApplicationSettings {
     // Performance Settings
     qualityLevel: 'low' | 'medium' | 'high' | 'ultra'
+    
+    // Graphics Settings
+    lightingQuality: LightingQuality
+    shadowQuality: number // 0=off, 1=low, 2=medium, 3=high, 4=ultra
+    ceilingHeight: number
+    enableLighting: boolean
+    showLightingDebug: boolean
+    showCeiling: boolean
     
     // Interface Settings
     showFPS: boolean
@@ -31,6 +49,7 @@ export interface ApplicationSettings {
     
     // Steam Settings (moved from GameSettings for centralization)
     autoLoadProfile: boolean
+    developmentMode: boolean // Limit to 20 games for testing
 }
 
 export interface SettingChangedEvent {
@@ -71,6 +90,21 @@ export class AppSettings {
      */
     public getSetting<K extends keyof ApplicationSettings>(key: K): ApplicationSettings[K] {
         return this.settings[key]
+    }
+
+    /**
+     * Get the default value for a specific setting
+     */
+    public getDefaultSetting<K extends keyof ApplicationSettings>(key: K): ApplicationSettings[K] {
+        const defaults = this.getDefaultSettings()
+        return defaults[key]
+    }
+
+    /**
+     * Check if a setting is currently at its default value
+     */
+    public isSettingAtDefault<K extends keyof ApplicationSettings>(key: K): boolean {
+        return this.settings[key] === this.getDefaultSetting(key)
     }
 
     /**
@@ -228,6 +262,14 @@ export class AppSettings {
             // Performance Settings
             qualityLevel: 'high',
             
+            // Graphics Settings
+            lightingQuality: LIGHTING_QUALITY.ENHANCED,
+            shadowQuality: 2, // Medium shadows by default
+            ceilingHeight: 3.2,
+            enableLighting: true,
+            showLightingDebug: false,
+            showCeiling: true,
+            
             // Interface Settings
             showFPS: false,
             showPerformanceStats: false,
@@ -241,7 +283,8 @@ export class AppSettings {
             autoSave: true,
             
             // Steam Settings  
-            autoLoadProfile: false
+            autoLoadProfile: false,
+            developmentMode: true // Default to enabled for safer testing
         }
     }
 
@@ -256,7 +299,7 @@ export class AppSettings {
         }
         
         // Validate boolean fields
-        const booleanFields = ['showFPS', 'showPerformanceStats', 'hideUIInVR', 'verboseLogging', 'showDebugInfo', 'autoSave', 'autoLoadProfile']
+        const booleanFields = ['showFPS', 'showPerformanceStats', 'hideUIInVR', 'verboseLogging', 'showDebugInfo', 'autoSave', 'autoLoadProfile', 'developmentMode']
         for (const field of booleanFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'boolean') {
                 return false

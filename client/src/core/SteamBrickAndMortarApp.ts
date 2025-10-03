@@ -13,10 +13,9 @@
  */
 
 import * as THREE from 'three'
-import { ValidationUtils } from '../utils'
 import { UICoordinator, PerformanceMonitor, type PerformanceStats, ToastManager } from '../ui'
 import { SceneManager, SceneCoordinator } from '../scene'
-import { DebugStatsProvider, type DebugStats } from './DebugStatsProvider'
+import { DebugStatsProvider } from './DebugStatsProvider'
 import { SteamGameManager } from './SteamGameManager'
 import { SteamIntegration } from '../steam-integration'
 import { SteamWorkflowManager } from '../steam-integration/SteamWorkflowManager'
@@ -24,17 +23,12 @@ import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { type WebXRCapabilities } from '../webxr/WebXRManager'
 import { EventManager, EventSource } from './EventManager'
-import { GameEventTypes, WebXREventTypes, type GameStartEvent } from '../types/InteractionEvents'
+import { GameEventTypes, WebXREventTypes, type GameStartEvent, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from './AppSettings'
 
-/**
- * Configuration options for the Steam Brick and Mortar application
- */
 export interface AppConfig {
     scene?: {
         antialias?: boolean
-        enableShadows?: boolean
-        shadowMapType?: THREE.ShadowMapType
         outputColorSpace?: THREE.ColorSpace
     }
     steam?: {
@@ -47,9 +41,8 @@ export interface AppConfig {
     }
 }
 
-/**
- * Main application class that orchestrates all subsystems via coordinators
- */
+const BACKEND_URL = 'https://steam-api-dev.wehrly.com';
+
 export class SteamBrickAndMortarApp {
     private sceneManager: SceneManager
     private sceneCoordinator: SceneCoordinator
@@ -67,12 +60,21 @@ export class SteamBrickAndMortarApp {
     // State
     private isInitialized: boolean = false
     
+    // GameStart prerequisite tracking
+    private prerequisites = {
+        sceneReady: false,
+        renderLoopReady: false,
+        uiReady: false
+    }
+    private gameStartEmitted = false
+    
     constructor(config: AppConfig = {}) {
+        // Initialize AppSettings first (needed for default values)
+        this.appSettings = AppSettings.getInstance()
+        
         // Initialize core scene management
         this.sceneManager = new SceneManager({
             antialias: config.scene?.antialias ?? true,
-            enableShadows: config.scene?.enableShadows ?? true,
-            shadowMapType: config.scene?.shadowMapType ?? THREE.PCFSoftShadowMap,
             outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
         })
         
@@ -85,26 +87,42 @@ export class SteamBrickAndMortarApp {
             precision: 1
         })
 
+        // Determine maxGames based on AppSettings developmentMode or config override
+        const isDevelopmentMode = this.appSettings.getSetting('developmentMode')
+        const defaultMaxGames = isDevelopmentMode ? 20 : 100
+        const maxGames = config.steam?.maxGames ?? defaultMaxGames
+
         // Initialize Steam integration
         this.steamIntegration = new SteamIntegration({
-            apiBaseUrl: config.steam?.apiBaseUrl ?? 'https://steam-api-dev.wehrly.com',
-            maxGames: config.steam?.maxGames ?? 100
+            apiBaseUrl: config.steam?.apiBaseUrl ?? BACKEND_URL,
+            maxGames: maxGames
         })
 
-        // Initialize scene coordinator with performance configuration
+        // Initialize scene coordinator with visual system configuration
         this.sceneCoordinator = new SceneCoordinator(this.sceneManager, {
-            maxGames: config.steam?.maxGames ?? 100,
-            performance: {
-                maxTextureSize: 1024,
-                nearDistance: 2.0,
-                farDistance: 10.0,
-                highResolutionSize: 512,
-                mediumResolutionSize: 256,
-                lowResolutionSize: 128,
-                maxActiveTextures: Math.min(50, (config.steam?.maxGames ?? 100) / 2),
-                frustumCullingEnabled: true
+            props: {
+                // Props configuration - rendering shows all loaded games (no artificial limits)
+            },
+            environment: {
+                skyboxPreset: 'aurora'
             }
-        })
+            
+            /* TODO: Future Performance Configuration Roadmap
+             * Re-implement these granular performance settings when needed:
+             * performance: {
+             *     maxTextureSize: 1024,
+             *     nearDistance: 2.0,
+             *     farDistance: 10.0,
+             *     highResolutionSize: 512,
+             *     mediumResolutionSize: 256,
+             *     lowResolutionSize: 128,
+             *     maxActiveTextures: Math.min(50, maxGames / 2),
+             *     frustumCullingEnabled: true
+             * }
+             * These should be exposed via UI settings when performance tuning becomes necessary.
+             */
+        }, 
+        this.steamIntegration)
 
         // Initialize WebXR coordinator (callbacks now handled by WebXREventHandler)
         this.webxrCoordinator = new WebXRCoordinator(
@@ -147,6 +165,9 @@ export class SteamBrickAndMortarApp {
 
         // Initialize event manager for interaction architecture
         this.eventManager = EventManager.getInstance()
+        
+        // Set up prerequisite event listeners
+        this.setupPrerequisiteEventListeners()
 
         // Initialize steam workflow manager to handle Steam interactions
         this.steamWorkflowManager = new SteamWorkflowManager(
@@ -170,14 +191,21 @@ export class SteamBrickAndMortarApp {
         }
         
         try {
-            this.appSettings = AppSettings.getInstance()
-            
             await this.initializeCoordinators()
+            
+            // Mark UI as ready (coordinators initialized)
+            console.log('🎨 UI coordinators ready')
+            this.prerequisites.uiReady = true
+            this.checkGameStartPrerequisites()
+            
             this.startRenderLoop()
             
+            // Mark render loop as ready
+            console.log('🔄 Render loop ready')
+            this.prerequisites.renderLoopReady = true
+            this.checkGameStartPrerequisites()
+            
             this.isInitialized = true
-
-            this.emitGameStartEvent()
             
             // Auto-load first cached user if available
             await this.tryAutoLoadCachedUser()
@@ -198,9 +226,6 @@ export class SteamBrickAndMortarApp {
         await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
     }
 
-    /**
-     * Try to automatically load the first cached user on startup
-     */
     private async tryAutoLoadCachedUser(): Promise<void> {
         try {
             // Check if auto-load is enabled in settings
@@ -227,6 +252,9 @@ export class SteamBrickAndMortarApp {
         if (!this.isInitialized) {
             return
         }
+        
+        // Stop performance monitoring
+        this.performanceMonitor.stop()
         
         // Dispose workflow managers first
         this.steamWorkflowManager.dispose()
@@ -274,10 +302,53 @@ export class SteamBrickAndMortarApp {
         })
     }
 
+    /**
+     * Set up event listeners for GameStart prerequisites
+     */
+    private setupPrerequisiteEventListeners(): void {
+        // Listen for SceneReady event
+        this.eventManager.registerEventHandler<SceneReadyEvent>(
+            GameEventTypes.SceneReady,
+            (event) => {
+                
+                this.prerequisites.sceneReady = true
+                this.checkGameStartPrerequisites()
+            }
+        )
+    }
+
+    /**
+     * Check if all prerequisites are met and emit GameStart if so
+     */
+    private checkGameStartPrerequisites(): void {
+        // Idempotency guard - exit early if already emitted
+        if (this.gameStartEmitted) {
+            console.log('✅ GameStart already emitted - maintaining idempotency')
+            return
+        }
+
+        const { sceneReady, renderLoopReady, uiReady } = this.prerequisites
+        
+
+        
+        if (sceneReady && renderLoopReady && uiReady) {
+            this.emitGameStartEvent()
+            this.gameStartEmitted = true
+        } else {
+            console.log('⏳ Waiting for remaining prerequisites...')
+        }
+    }
+
     private emitGameStartEvent(): void {
+        console.log('🎮 GameStart event emitted')
         this.eventManager.emit<GameStartEvent>(GameEventTypes.Start, {
             timestamp: Date.now(),
-            source: EventSource.System
+            source: EventSource.System,
+            prerequisites: {
+                sceneReady: this.prerequisites.sceneReady,
+                renderLoopReady: this.prerequisites.renderLoopReady,
+                uiReady: this.prerequisites.uiReady
+            }
         })
     }
 
@@ -287,6 +358,8 @@ export class SteamBrickAndMortarApp {
             sceneCoordinator: this.sceneCoordinator,
             systemUICoordinator: this.uiCoordinator.system
         })
+        
+        this.performanceMonitor.start()
     }
 
     // TODO: This method exists solely for testing purposes - remove or refactor

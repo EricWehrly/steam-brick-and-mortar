@@ -5,17 +5,17 @@
  * managed in SteamBrickAndMortarApp. This includes:
  * - Game loading workflow with progress tracking
  * - Cache management operations
- * - Offline data handling
  */
 
 import type { EventManager } from '../core/EventManager'
 import { EventSource } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
-import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamUseOfflineEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
+import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
 import type { SteamIntegration } from './SteamIntegration'
 import type { SceneCoordinator } from '../scene'
 import type { UICoordinator } from '../ui'
 import { Logger } from '../utils/Logger'
+import { SteamErrorMessages } from '../utils/SteamErrorMessages'
 
 export class SteamWorkflowManager {
     private static readonly logger = Logger.withContext(SteamWorkflowManager.name)
@@ -39,7 +39,6 @@ export class SteamWorkflowManager {
         // Register event handlers directly - no intermediate layers
         this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.onLoadGames.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.LoadFromCache, this.onLoadFromCache.bind(this))
-        this.eventManager.registerEventHandler(SteamEventTypes.UseOffline, this.onUseOfflineData.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.onRefreshCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.onClearCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheStats, this.onCacheStats.bind(this))
@@ -51,35 +50,44 @@ export class SteamWorkflowManager {
      * Load Steam games workflow
      */
     private async onLoadGames(event: CustomEvent<SteamLoadGamesEvent>): Promise<void> {
-        const { vanityUrl } = event.detail
+        const { userInput } = event.detail
         
         try {
-            SteamWorkflowManager.logger.info(`Starting load games workflow for: ${vanityUrl}`)
+            SteamWorkflowManager.logger.info(`Starting load games workflow for: ${userInput}`)
             
             // Show loading UI - TODO: implement proper UI methods
             // this.uiCoordinator.showLoadingMessage('Loading Steam games...')
             
             // Load games with progress callbacks
-            await this.steamIntegration.loadGamesForUser(vanityUrl, {
+            await this.steamIntegration.loadGamesForUser(userInput, {
                 onProgress: (current: number, total: number, message: string) => {
-                    // this.uiCoordinator.updateProgress(current, total, message)
+                    this.uiCoordinator.steam.updateProgress(current, total, message)
                     SteamWorkflowManager.logger.debug(`Progress: ${current}/${total} - ${message}`)
                 },
                 onGameLoaded: (game) => {
-                    // this.uiCoordinator.addGameToScene(game)
+                    // TODO: Add scene integration for game loading
                     SteamWorkflowManager.logger.debug(`Game loaded: ${game.name}`)
                 },
                 onStatusUpdate: (message: string, type) => {
-                    // this.uiCoordinator.showStatusMessage(message, type)
+                    this.uiCoordinator.steam.showSteamStatus(message, type)
                     SteamWorkflowManager.logger.info(`Status: ${message} (${type})`)
+                    
+                    // Handle error states by re-enabling UI for retry
+                    if (type === 'error') {
+                        // Allow the UI to handle error state and re-enable controls
+                        // The status message is already shown via showSteamStatus above
+                    }
                 }
             })
             
             SteamWorkflowManager.logger.info(`Load games workflow completed successfully`)
             
+            // Handle successful completion in UI
+            this.uiCoordinator.steam.showSteamStatus('Games loaded successfully!', 'success')
+            
             // Emit steam-data-loaded event for UI components that need to react
             this.eventManager.emit(SteamEventTypes.DataLoaded, {
-                vanityUrl,
+                userInput,
                 gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
                 timestamp: Date.now(),
                 source: EventSource.System
@@ -87,11 +95,8 @@ export class SteamWorkflowManager {
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Load games workflow failed:', error)
-            // this.uiCoordinator.showStatusMessage(
-            //     'Failed to load Steam games. Please check your profile name and try again.',
-            //     'error'
-            // )
-            SteamWorkflowManager.logger.error('Failed to load Steam games. Please check your profile name and try again.')
+            // Error message is handled by SteamIntegration via callbacks.onStatusUpdate
+            // which provides contextual, user-friendly error messages
         }
     }
     
@@ -99,13 +104,13 @@ export class SteamWorkflowManager {
      * Load from cache workflow
      */
     private async onLoadFromCache(event: CustomEvent<SteamLoadFromCacheEvent>): Promise<void> {
-        const { vanityUrl } = event.detail
+        const { userInput } = event.detail
         
         try {
-            SteamWorkflowManager.logger.info(`Starting load from cache workflow for: ${vanityUrl}`)
+            SteamWorkflowManager.logger.info(`Starting load from cache workflow for: ${userInput}`)
             
             // Check if cached data is available
-            if (!this.steamIntegration.hasCachedData(vanityUrl)) {
+            if (!this.steamIntegration.hasCachedData(userInput)) {
                 SteamWorkflowManager.logger.warn('No cached data found. Please use "Load My Games" first.')
                 return
             }
@@ -114,7 +119,7 @@ export class SteamWorkflowManager {
             SteamWorkflowManager.logger.info('Loading games from cache...')
             
             // Load games from cache with progress callbacks
-            await this.steamIntegration.loadGamesFromCache(vanityUrl, {
+            await this.steamIntegration.loadGamesFromCache(userInput, {
                 onProgress: (current: number, total: number, message: string) => {
                     SteamWorkflowManager.logger.debug(`Progress: ${current}/${total} - ${message}`)
                 },
@@ -130,7 +135,7 @@ export class SteamWorkflowManager {
             
             // Emit steam-data-loaded event for UI components that need to react
             this.eventManager.emit(SteamEventTypes.DataLoaded, {
-                vanityUrl,
+                userInput,
                 gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
                 timestamp: Date.now(),
                 source: EventSource.System
@@ -138,18 +143,8 @@ export class SteamWorkflowManager {
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Load from cache workflow failed:', error)
-            SteamWorkflowManager.logger.error('Failed to load games from cache. Try "Load My Games" instead.')
+            // Error message handled by SteamIntegration via callbacks for consistency
         }
-    }
-
-    /**
-     * Use offline data workflow (placeholder)
-     */
-    private async onUseOfflineData(event: CustomEvent<SteamUseOfflineEvent>): Promise<void> {
-        SteamWorkflowManager.logger.info('Use offline data workflow triggered')
-        
-        // TODO: Implement offline data functionality
-        SteamWorkflowManager.logger.warn('Offline mode is not yet implemented.')
     }
 
     /**
@@ -186,7 +181,7 @@ export class SteamWorkflowManager {
             const gameState = this.steamIntegration.getGameLibraryState()
             if (gameState.userData?.vanity_url) {
                 this.eventManager.emit(SteamEventTypes.DataLoaded, {
-                    vanityUrl: gameState.userData.vanity_url,
+                    userInput: gameState.userData.vanity_url,
                     gameCount: gameState.userData.games?.length || 0,
                     timestamp: Date.now(),
                     source: EventSource.System
@@ -268,10 +263,9 @@ export class SteamWorkflowManager {
         try {
             SteamWorkflowManager.logger.info(`Starting dev mode toggle workflow: ${isEnabled ? 'enabled' : 'disabled'}`)
             
-            // Set max games based on development mode
+            // Set max games for network calls only - rendering should show all loaded games
             const maxGames = isEnabled ? 20 : 100
             this.steamIntegration.updateMaxGames(maxGames)
-            this.sceneCoordinator.updateMaxGames(maxGames)
             
             const message = isEnabled 
                 ? `🔧 Development mode enabled (limiting to ${maxGames} games for faster testing)`

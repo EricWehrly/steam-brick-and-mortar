@@ -35,7 +35,7 @@ describe('Performance Tests', () => {
       console.warn('WebGL not available in test environment, skipping renderer tests');
     }
     
-    shelfGenerator = new ProceduralShelfGenerator(scene);
+    shelfGenerator = new ProceduralShelfGenerator();
     storeLayout = new StoreLayout(scene);
   });
 

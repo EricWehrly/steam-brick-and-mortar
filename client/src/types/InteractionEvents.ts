@@ -5,6 +5,9 @@
  * Events are namespaced by system for clarity and organization.
  */
 
+// I really don't like that we let this get imported ... YOLO
+import type { LightingQuality } from '../core/AppSettings'
+import * as THREE from 'three'
 import type { BaseInteractionEvent } from '../core/EventManager'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 
@@ -13,16 +16,14 @@ import type { WebXRCapabilities } from '../webxr/WebXRManager'
 // =============================================================================
 
 export interface SteamLoadGamesEvent extends BaseInteractionEvent {
-    vanityUrl: string
+    userInput: string
 }
 
 export interface SteamLoadFromCacheEvent extends BaseInteractionEvent {
-    vanityUrl: string
+    userInput: string
 }
 
-export interface SteamUseOfflineEvent extends BaseInteractionEvent {
-    vanityUrl: string
-}
+
 
 export interface SteamCacheClearEvent extends BaseInteractionEvent {
     // No additional data needed
@@ -45,7 +46,7 @@ export interface SteamDevModeToggleEvent extends BaseInteractionEvent {
 }
 
 export interface SteamDataLoadedEvent extends BaseInteractionEvent {
-    vanityUrl: string
+    userInput: string
     gameCount: number
 }
 
@@ -105,9 +106,57 @@ export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
 // GAME EVENTS
 // =============================================================================
 
+export interface SceneReadyEvent extends BaseInteractionEvent {
+    // Emitted when the basic scene is navigable and ready for user interaction
+    // This is a prerequisite for GameStart - scene must be ready before game can start
+    sceneStats: {
+        environmentObjectCount: number
+        lightsReady: boolean
+        basicNavigationReady: boolean
+    }
+}
+
 export interface GameStartEvent extends BaseInteractionEvent {
-    // Emitted when the application is ready and the game can start
-    // This signals that the render loop is established and UI is operational
+    // Emitted when ALL prerequisites are ready and the game can start
+    // Prerequisites: scene ready, render loop established, UI operational
+    prerequisites: {
+        sceneReady: boolean
+        renderLoopReady: boolean
+        uiReady: boolean
+    }
+}
+
+// =============================================================================
+// LIGHTING EVENTS
+// =============================================================================
+
+export interface LightingToggleEvent extends BaseInteractionEvent {
+    enabled: boolean
+}
+
+export interface LightingDebugToggleEvent extends BaseInteractionEvent {
+    enabled: boolean
+}
+
+export interface LightingQualityChangedEvent extends BaseInteractionEvent {
+    quality: LightingQuality
+}
+
+export interface CeilingToggleEvent extends BaseInteractionEvent {
+    visible: boolean
+}
+
+// TODO: Can we do this without importing THREE?
+export interface LightCreatedEvent extends BaseInteractionEvent {
+    light: THREE.Light
+    scene: THREE.Scene
+    lightType: string
+    lightName?: string
+}
+
+export interface LightingSystemReadyEvent extends BaseInteractionEvent {
+    scene: THREE.Scene
+    quality: string
 }
 
 // =============================================================================
@@ -117,7 +166,6 @@ export interface GameStartEvent extends BaseInteractionEvent {
 export const SteamEventTypes = {
     LoadGames: 'steam:load-games',
     LoadFromCache: 'steam:load-from-cache',
-    UseOffline: 'steam:use-offline', 
     CacheClear: 'steam:cache-clear',
     CacheRefresh: 'steam:cache-refresh',
     CacheStats: 'steam:cache-stats',
@@ -146,7 +194,20 @@ export const UIEventTypes = {
 } as const
 
 export const GameEventTypes = {
+    SceneReady: 'game:scene-ready',
     Start: 'game:start'
+} as const
+
+export const LightingEventTypes = {
+    Toggle: 'lighting:toggle',
+    DebugToggle: 'lighting:debug-toggle',
+    QualityChanged: 'lighting:quality-changed',
+    Created: 'lighting:created',
+    SystemReady: 'lighting:system-ready'
+} as const
+
+export const CeilingEventTypes = {
+    Toggle: 'ceiling:toggle'
 } as const
 
 // =============================================================================
@@ -161,7 +222,6 @@ export interface InteractionEventMap {
     // Steam events
     [SteamEventTypes.LoadGames]: SteamLoadGamesEvent
     [SteamEventTypes.LoadFromCache]: SteamLoadFromCacheEvent
-    [SteamEventTypes.UseOffline]: SteamUseOfflineEvent
     [SteamEventTypes.CacheClear]: SteamCacheClearEvent
     [SteamEventTypes.CacheRefresh]: SteamCacheRefreshEvent
     [SteamEventTypes.CacheStats]: SteamCacheStatsEvent
@@ -186,7 +246,15 @@ export interface InteractionEventMap {
     [UIEventTypes.ImageCacheStatsRequest]: ImageCacheStatsRequestEvent
     
     // Game events
+    [GameEventTypes.SceneReady]: SceneReadyEvent
     [GameEventTypes.Start]: GameStartEvent
+    
+    // Lighting events
+    [LightingEventTypes.Toggle]: LightingToggleEvent
+    [LightingEventTypes.DebugToggle]: LightingDebugToggleEvent
+    [LightingEventTypes.QualityChanged]: LightingQualityChangedEvent
+    [LightingEventTypes.Created]: LightCreatedEvent
+    [LightingEventTypes.SystemReady]: LightingSystemReadyEvent
 }
 
 /**

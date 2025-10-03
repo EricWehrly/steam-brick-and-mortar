@@ -30,12 +30,11 @@ export async function initializeApp(): Promise<void> {
         
         const app = new SteamBrickAndMortarApp({
             scene: {
-                antialias: true,
-                enableShadows: true
+                antialias: true
             },
             steam: {
-                apiBaseUrl: 'https://steam-api-dev.wehrly.com',
-                maxGames: 30
+                apiBaseUrl: 'https://steam-api-dev.wehrly.com'
+                // maxGames will be determined by AppSettings developmentMode default (20 when dev mode is enabled)
             },
             input: {
                 speed: 0.1,
