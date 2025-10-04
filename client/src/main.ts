@@ -50,7 +50,6 @@ export async function initializeApp(): Promise<void> {
         }
         
         isInitialized = true
-        console.log('🎉 Steam Brick and Mortar initialized successfully!')
         
     } catch (error) {
         console.error('💥 Failed to initialize Steam Brick and Mortar:', error)

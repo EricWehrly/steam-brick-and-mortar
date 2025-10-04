@@ -18,6 +18,7 @@ vi.mock('../../../src/utils/TextureManager', () => ({
         getInstance: () => ({
             createCarpetMaterial: vi.fn().mockResolvedValue(new THREE.MeshStandardMaterial()),
             createCeilingMaterial: vi.fn().mockResolvedValue(new THREE.MeshStandardMaterial()),
+            createProceduralCeilingMaterial: vi.fn().mockReturnValue(new THREE.MeshStandardMaterial()),
             createWoodMaterial: vi.fn().mockResolvedValue(new THREE.MeshStandardMaterial())
         })
     }
@@ -35,8 +36,6 @@ describe('RoomManager DataManager Integration', () => {
     let roomManager: RoomManager
     let eventManager: EventManager
     let dataManager: DataManager
-    let mockEnvironmentRenderer: any
-
     beforeEach(() => {
         // Clean up singletons for fresh test state
         DataManager.resetInstance()
@@ -45,12 +44,7 @@ describe('RoomManager DataManager Integration', () => {
         eventManager = EventManager.getInstance()
         dataManager = DataManager.getInstance()
 
-        // Mock EnvironmentRenderer
-        mockEnvironmentRenderer = {
-            registerCeiling: vi.fn()
-        }
-
-        roomManager = new RoomManager(scene, mockEnvironmentRenderer)
+        roomManager = new RoomManager(scene)
     })
 
     afterEach(() => {

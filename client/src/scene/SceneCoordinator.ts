@@ -21,7 +21,7 @@
 
 import * as THREE from 'three'
 import { SceneManager } from './SceneManager'
-import { EnvironmentRenderer } from './EnvironmentRenderer'
+import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { LightingRenderer } from './LightingRenderer'
 import { StorePropsRenderer } from './StorePropsRenderer'
 import { RoomManager } from './RoomManager'
@@ -44,7 +44,7 @@ export interface SceneCoordinatorConfig {
 
 export class SceneCoordinator {
     private sceneManager: SceneManager
-    private environmentRenderer: EnvironmentRenderer
+    private skyboxManager: SkyboxManager
     private lightingRenderer: LightingRenderer
     private propsRenderer: StorePropsRenderer
     private roomManager: RoomManager
@@ -57,15 +57,15 @@ export class SceneCoordinator {
         this.steamIntegration = steamIntegration
         
         // Initialize visual system renderers
-        this.environmentRenderer = new EnvironmentRenderer(this.sceneManager.getScene(), this.appSettings)
+        this.skyboxManager = new SkyboxManager(this.sceneManager.getScene())
         this.lightingRenderer = new LightingRenderer(
             this.sceneManager.getScene(),
             this.sceneManager.getRenderer()
         )
-        // Initialize room manager for event-driven room structure
-        this.roomManager = new RoomManager(this.sceneManager.getScene(), this.environmentRenderer)
-        // Pass EnvironmentRenderer to StorePropsRenderer for proper environment integration
-        this.propsRenderer = new StorePropsRenderer(this.sceneManager.getScene(), this.environmentRenderer)
+        // Initialize room manager for event-driven room structure (no longer needs EnvironmentRenderer)
+        this.roomManager = new RoomManager(this.sceneManager.getScene())
+        // Initialize props renderer
+        this.propsRenderer = new StorePropsRenderer(this.sceneManager.getScene())
 
         // 🎬 EVENT-DRIVEN STARTUP: Setup scene and emit SceneReady when basic navigation is ready
         // This is a prerequisite for GameStart - scene must be navigable before game can start
@@ -79,7 +79,7 @@ export class SceneCoordinator {
 
         // Register for ceiling toggle events
         EventManager.getInstance().registerEventHandler(CeilingEventTypes.Toggle, (event: CustomEvent<CeilingToggleEvent>) => {
-            this.environmentRenderer.setCeilingVisibility(event.detail.visible)
+            this.roomManager.setCeilingVisibility(event.detail.visible)
         })
 
         // Register for Steam data loaded events to spawn dynamic shelves  
@@ -124,10 +124,9 @@ export class SceneCoordinator {
         
         try {
             // Set up skybox first
-            await this.environmentRenderer.setupEnvironment({
-                skyboxPreset: config.skyboxPreset ?? 'aurora',
-                proceduralTextures: config.proceduralTextures ?? true
-            })
+            const presetName = config.skyboxPreset ?? 'aurora'
+            const preset = (SkyboxPresets as any)[presetName] || SkyboxPresets.aurora
+            await this.skyboxManager.applySkybox(preset)
             
             // Room structure creation handled by RoomManager via event
             EventManager.getInstance().emit('room:resize', {
@@ -215,7 +214,7 @@ export class SceneCoordinator {
     }
 
     dispose(): void {
-        this.environmentRenderer.dispose()
+        this.skyboxManager.dispose()
         this.lightingRenderer.dispose()
         this.propsRenderer.dispose()
         this.roomManager.dispose()
@@ -451,7 +450,6 @@ export class SceneCoordinator {
     }
 
     private emitSceneReadyEvent(): void {
-        const envStats = this.environmentRenderer.getEnvironmentStats()
         const lightStats = this.lightingRenderer.getLightingStats()
         
         console.log('📡 Emitting SceneReady event - basic navigation is ready')
@@ -460,7 +458,7 @@ export class SceneCoordinator {
             source: EventSource.System,
             timestamp: Date.now(),
             sceneStats: {
-                environmentObjectCount: envStats.objectCount,
+                environmentObjectCount: 0, // Environment stats no longer tracked
                 lightsReady: lightStats.lightCount > 0,
                 basicNavigationReady: true
             }

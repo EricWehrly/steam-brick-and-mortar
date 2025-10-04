@@ -22,7 +22,7 @@ import { SteamEventTypes, type SteamDataLoadedEvent } from '../types/Interaction
 
 import type { StoreLayoutConfig } from './StoreLayoutConfig'
 import { PropRenderer } from './PropRenderer'
-import type { EnvironmentRenderer } from './EnvironmentRenderer'
+
 import { DataManager, DataDomain } from '../core/data'
 
 // ============================================================================
@@ -62,7 +62,7 @@ export class RoomManager {
     private scene: THREE.Scene
     private textureManager: TextureManager
     private eventManager: EventManager
-    private environmentRenderer: EnvironmentRenderer
+
     
     // Async mutex to prevent concurrent room operations
     private isProcessingResize: boolean = false
@@ -86,11 +86,10 @@ export class RoomManager {
         height: RoomConstants.DEFAULT_ROOM_HEIGHT
     }
 
-    constructor(scene: THREE.Scene, environmentRenderer: EnvironmentRenderer) {
+    constructor(scene: THREE.Scene) {
         this.scene = scene
         this.textureManager = TextureManager.getInstance()
         this.eventManager = EventManager.getInstance()
-        this.environmentRenderer = environmentRenderer
         
         // Register event listeners
         // Single event handler for room resize (handles both creation and updating)
@@ -241,16 +240,18 @@ export class RoomManager {
             this.roomGroup = new THREE.Group()
             this.roomGroup.name = 'room-structure'
             this.scene.add(this.roomGroup)
-            console.log('🏠 Created room group')
+            console.debug('🏠 Created room group')
             
             // TODO: move to props
             await this.createEntranceMat(dimensions)
         }
 
         if(!this.floor) {
+            console.log('🏠 Creating flo')
             await this.createFloor(dimensions)
         }
         if(!this.ceiling) {
+            console.log('🏠 Creating ceil')
             await this.createCeiling(dimensions)
         }
         if(!this.walls.back || !this.walls.front || !this.walls.left || !this.walls.right) {
@@ -298,9 +299,11 @@ export class RoomManager {
 
     private async createCeiling(dimensions: RoomDimensions): Promise<void> {
         const ceilingGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
-        const ceilingMaterial = await this.textureManager.createCeilingMaterial({
-            color: new THREE.Color(0xF5F5DC),
-            repeat: { x: 2, y: 2 }
+        const ceilingMaterial = this.textureManager.createProceduralCeilingMaterial({
+            color: '#F5F5DC', // Beige ceiling color
+            repeat: { x: dimensions.width / 8, y: dimensions.depth / 8 }, // More texture detail like enhanced ceiling
+            bumpiness: 0.4,
+            roughness: 0.7
         })
         
         this.ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
@@ -310,9 +313,7 @@ export class RoomManager {
         
         this.roomGroup!.add(this.ceiling)
         
-        // Register ceiling with EnvironmentRenderer for visibility controls
-        this.environmentRenderer.registerCeiling(this.ceiling)
-        
+        // Ceiling visibility is now managed directly by RoomManager
         console.debug(`🏗️ Created room ceiling at height ${dimensions.height}`)
     }
 
@@ -418,6 +419,28 @@ export class RoomManager {
      */
     public getCurrentDimensions(): RoomDimensions {
         return { ...this.currentDimensions }
+    }
+
+    /**
+     * Set ceiling visibility
+     */
+    public setCeilingVisibility(visible: boolean): void {
+        if (this.ceiling) {
+            this.ceiling.visible = visible
+            console.log(`🏠 Ceiling visibility: ${visible ? 'shown' : 'hidden'}`)
+        } else {
+            console.warn('⚠️ No ceiling found for visibility toggle')
+        }
+    }
+
+    /**
+     * Update ceiling visibility based on app settings
+     */
+    public updateCeilingVisibility(): void {
+        // This method can be called by components that need to sync ceiling visibility
+        // with app settings. For now, we'll make it publicly available but the actual
+        // settings integration should be handled by the calling component.
+        console.log('🏠 Ceiling visibility update requested')
     }
 
     /**

@@ -46,7 +46,7 @@ describe('Scene Coordinator Event Registration', () => {
         // Mock scene manager with proper scene mock that includes add method
         const mockSceneManager = {
             getScene: vi.fn().mockReturnValue({
-                add: vi.fn(), // EnvironmentRenderer needs this
+                add: vi.fn(), // Scene operations need this
                 remove: vi.fn() // For potential cleanup
             }),
             getRenderer: vi.fn().mockReturnValue({
