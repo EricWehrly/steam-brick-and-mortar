@@ -18,7 +18,7 @@ import * as THREE from 'three'
 import { EventManager } from '../core/EventManager'
 import { TextureManager } from '../utils/TextureManager'
 import { RoomEventTypes, type RoomCreateEvent, type RoomResizeEvent } from '../types/InteractionEvents'
-import { SteamEventTypes, type SteamDataLoadedEvent } from '../types/InteractionEvents'
+import { SteamEventTypes, type SteamDataLoadedEvent, CeilingEventTypes, type CeilingToggleEvent } from '../types/InteractionEvents'
 
 import type { StoreLayoutConfig } from './StoreLayoutConfig'
 import { PropRenderer } from './PropRenderer'
@@ -98,6 +98,9 @@ export class RoomManager {
         // Listen for Steam data loaded events to store data in DataManager
         this.eventManager.registerEventHandler(SteamEventTypes.DataLoaded, this.onSteamDataLoaded.bind(this))
         
+        // Listen for ceiling toggle events
+        this.eventManager.registerEventHandler(CeilingEventTypes.Toggle, this.onCeilingToggle.bind(this))
+        
         console.debug('🏠 RoomManager initialized with event-driven architecture')
     }
 
@@ -142,27 +145,32 @@ export class RoomManager {
     // onCreateInitialRoom removed - single onResizeRoom handles both creation and updating
 
     /**
-     * Event handler: Store Steam data in DataManager when loaded
+     * Event handler: React to Steam data being loaded (data already stored by SteamWorkflowManager)
+     * 
+     * ARCHITECTURAL NOTE: SteamWorkflowManager stores data in DataManager BEFORE emitting this event.
+     * This follows the principle that data ownership should stay close to source and state must be
+     * established before events that depend on that state.
      */
     private onSteamDataLoaded(event: CustomEvent<SteamDataLoadedEvent>): void {
         const eventData = event.detail
-        const dataManager = DataManager.getInstance()
+        console.debug(`🎮 Steam data loaded: ${eventData.gameCount} games for user ${eventData.userInput}`)
+        console.debug('🏠 Requesting room resize for Steam data')
         
-        // Store game count with Steam domain metadata
-        dataManager.set('steam.gameCount', eventData.gameCount, {
-            domain: DataDomain.SteamIntegration
-        })
-        
-        // Store user input for reference
-        if (eventData.userInput) {
-            dataManager.set('steam.userInput', eventData.userInput, {
-                domain: DataDomain.SteamIntegration
-            })
-        }
-        
+        // Trigger room resize now that Steam data is available in DataManager
+        this.eventManager.emit(RoomEventTypes.Resize, {
+            reason: 'steam-data-loaded',
+            timestamp: Date.now(),
+            source: 'room-manager'
+        } as any)
+    }
 
-        
-        console.debug(`📊 Stored Steam data in DataManager: ${eventData.gameCount} games for ${eventData.userInput}`)
+    private onCeilingToggle(event: CustomEvent<CeilingToggleEvent>): void {
+        if (this.ceiling) {
+            this.ceiling.visible = event.detail.visible
+            console.log(`🏠 Ceiling visibility: ${event.detail.visible ? 'shown' : 'hidden'}`)
+        } else {
+            console.warn('⚠️ No ceiling found for visibility toggle')
+        }
     }
 
     /**
@@ -191,7 +199,6 @@ export class RoomManager {
         // Emit room resized event with calculated dimensions
         this.eventManager.emit(RoomEventTypes.Resized, { 
             dimensions,
-            games: eventData.games, // Pass through any game data from the original event
             timestamp: Date.now(), 
             source: 'room-manager' 
         } as any)
@@ -246,19 +253,7 @@ export class RoomManager {
             await this.createEntranceMat(dimensions)
         }
 
-        if(!this.floor) {
-            console.log('🏠 Creating flo')
-            await this.createFloor(dimensions)
-        }
-        if(!this.ceiling) {
-            console.log('🏠 Creating ceil')
-            await this.createCeiling(dimensions)
-        }
-        if(!this.walls.back || !this.walls.front || !this.walls.left || !this.walls.right) {
-            console.log('🏠 Creating walls')
-            await this.createWalls(dimensions)
-        }
-    
+        // Let resize methods handle their own prerequisites (create if needed, then resize)
         await this.resizeFloor(dimensions)
         await this.resizeCeiling(dimensions)
         await this.resizeWalls(dimensions)
@@ -268,7 +263,29 @@ export class RoomManager {
         console.log(`✅ Room structure ready: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
     }
 
+    private async resizeFloor(dimensions: RoomDimensions): Promise<void> {
+        if (!this.floor) {
+            // Ensure roomGroup exists before creating floor
+            if (this.roomGroup) {
+                await this.createFloor(dimensions)
+            }
+            return
+        }
+        
+        // Replace geometry with new dimensions
+        this.floor.geometry.dispose()
+        this.floor.geometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
+        
+        console.debug(`🔄 Resized floor: ${dimensions.width}x${dimensions.depth}`)
+    }
+
     private async createFloor(dimensions: RoomDimensions): Promise<void> {
+        // Ensure roomGroup exists before creating floor
+        if (!this.roomGroup) {
+            console.warn('⚠️ roomGroup is null, cannot create floor')
+            return
+        }
+        
         const floorGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
         const carpetMaterial = await this.textureManager.createCarpetMaterial({
             color: new THREE.Color('#6B6B6B'),
@@ -280,24 +297,34 @@ export class RoomManager {
         this.floor.position.y = 0
         this.floor.name = 'room-floor'
         
-        this.roomGroup!.add(this.floor)
+        this.roomGroup.add(this.floor)
         console.debug(`🏗️ Created room floor: ${dimensions.width}x${dimensions.depth}`)
     }
 
-    private async resizeFloor(dimensions: RoomDimensions): Promise<void> {
-        if (!this.floor) {
-            await this.createFloor(dimensions)
+    private async resizeCeiling(dimensions: RoomDimensions): Promise<void> {
+        if (!this.ceiling) {
+            // Ensure roomGroup exists before creating ceiling
+            if (this.roomGroup) {
+                await this.createCeiling(dimensions)
+            }
             return
         }
         
-        // Replace geometry with new dimensions
-        this.floor.geometry.dispose()
-        this.floor.geometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
+        // Replace geometry and reposition
+        this.ceiling.geometry.dispose()
+        this.ceiling.geometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
+        this.ceiling.position.y = dimensions.height
         
-        console.debug(`🔄 Resized floor: ${dimensions.width}x${dimensions.depth}`)
+        console.debug(`🔄 Resized ceiling: ${dimensions.width}x${dimensions.depth} at height ${dimensions.height}`)
     }
 
     private async createCeiling(dimensions: RoomDimensions): Promise<void> {
+        // Ensure roomGroup exists before creating ceiling
+        if (!this.roomGroup) {
+            console.warn('⚠️ roomGroup is null, cannot create ceiling')
+            return
+        }
+        
         const ceilingGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
         const ceilingMaterial = this.textureManager.createProceduralCeilingMaterial({
             color: '#F5F5DC', // Beige ceiling color
@@ -311,24 +338,10 @@ export class RoomManager {
         this.ceiling.position.y = dimensions.height
         this.ceiling.name = 'room-ceiling'
         
-        this.roomGroup!.add(this.ceiling)
+        this.roomGroup.add(this.ceiling)
         
         // Ceiling visibility is now managed directly by RoomManager
         console.debug(`🏗️ Created room ceiling at height ${dimensions.height}`)
-    }
-
-    private async resizeCeiling(dimensions: RoomDimensions): Promise<void> {
-        if (!this.ceiling) {
-            await this.createCeiling(dimensions)
-            return
-        }
-        
-        // Replace geometry and reposition
-        this.ceiling.geometry.dispose()
-        this.ceiling.geometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
-        this.ceiling.position.y = dimensions.height
-        
-        console.debug(`🔄 Resized ceiling: ${dimensions.width}x${dimensions.depth} at height ${dimensions.height}`)
     }
 
     /**
@@ -339,6 +352,40 @@ export class RoomManager {
         const entranceMat = propRenderer.createEntranceFloorMat(dimensions.width, dimensions.depth)
         this.roomGroup?.add(entranceMat)
         console.debug('🚪 Entrance mat created')
+    }
+
+    private async resizeWalls(dimensions: RoomDimensions): Promise<void> {
+        // Check if walls exist before resizing
+        if (!this.walls.back || !this.walls.front || !this.walls.left || !this.walls.right) {
+            // Ensure roomGroup exists before creating walls
+            if (this.roomGroup) {
+                await this.createWalls(dimensions)
+            }
+            return
+        }
+
+        // Resize and reposition back wall
+        // TODO: docs say we need to dispose, can we hack .scale or use a different object type?
+        this.walls.back.geometry.dispose()
+        this.walls.back.geometry = new THREE.PlaneGeometry(dimensions.width, dimensions.height)
+        this.walls.back.position.set(0, dimensions.height / 2, -dimensions.depth / 2)
+        
+        // Resize and reposition front wall
+        this.walls.front.geometry.dispose()
+        this.walls.front.geometry = new THREE.PlaneGeometry(dimensions.width, dimensions.height)
+        this.walls.front.position.set(0, dimensions.height / 2, dimensions.depth / 2)
+        
+        // Resize and reposition left wall
+        this.walls.left.geometry.dispose()
+        this.walls.left.geometry = new THREE.PlaneGeometry(dimensions.depth, dimensions.height)
+        this.walls.left.position.set(-dimensions.width / 2, dimensions.height / 2, 0)
+        
+        // Resize and reposition right wall
+        this.walls.right.geometry.dispose()
+        this.walls.right.geometry = new THREE.PlaneGeometry(dimensions.depth, dimensions.height)
+        this.walls.right.position.set(dimensions.width / 2, dimensions.height / 2, 0)
+        
+        console.debug(`🔄 Resized walls: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
     }
 
     private async createWalls(dimensions: RoomDimensions): Promise<void> {
@@ -354,7 +401,14 @@ export class RoomManager {
         )
         this.walls.back.position.set(0, dimensions.height / 2, -dimensions.depth / 2)
         this.walls.back.name = 'room-back-wall'
-        this.roomGroup!.add(this.walls.back)
+        
+        // Ensure roomGroup exists before adding walls
+        if (!this.roomGroup) {
+            console.warn('⚠️ roomGroup is null, cannot add walls')
+            return
+        }
+        
+        this.roomGroup.add(this.walls.back)
         
         // Front wall
         this.walls.front = new THREE.Mesh(
@@ -389,31 +443,6 @@ export class RoomManager {
         console.debug(`🏗️ Created room walls: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
     }
 
-    private async resizeWalls(dimensions: RoomDimensions): Promise<void> {
-        // Resize and reposition back wall
-        // TODO: docs say we need to dispose, can we hack .scale or use a different object type?
-        this.walls.back!.geometry.dispose()
-        this.walls.back!.geometry = new THREE.PlaneGeometry(dimensions.width, dimensions.height)
-        this.walls.back!.position.set(0, dimensions.height / 2, -dimensions.depth / 2)
-        
-        // Resize and reposition front wall
-        this.walls.front!.geometry.dispose()
-        this.walls.front!.geometry = new THREE.PlaneGeometry(dimensions.width, dimensions.height)
-        this.walls.front!.position.set(0, dimensions.height / 2, dimensions.depth / 2)
-        
-        // Resize and reposition left wall
-        this.walls.left!.geometry.dispose()
-        this.walls.left!.geometry = new THREE.PlaneGeometry(dimensions.depth, dimensions.height)
-        this.walls.left!.position.set(-dimensions.width / 2, dimensions.height / 2, 0)
-        
-        // Resize and reposition right wall
-        this.walls.right!.geometry.dispose()
-        this.walls.right!.geometry = new THREE.PlaneGeometry(dimensions.depth, dimensions.height)
-        this.walls.right!.position.set(dimensions.width / 2, dimensions.height / 2, 0)
-        
-        console.debug(`🔄 Resized walls: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
-    }
-
     /**
      * Get current room dimensions
      */
@@ -421,27 +450,6 @@ export class RoomManager {
         return { ...this.currentDimensions }
     }
 
-    /**
-     * Set ceiling visibility
-     */
-    public setCeilingVisibility(visible: boolean): void {
-        if (this.ceiling) {
-            this.ceiling.visible = visible
-            console.log(`🏠 Ceiling visibility: ${visible ? 'shown' : 'hidden'}`)
-        } else {
-            console.warn('⚠️ No ceiling found for visibility toggle')
-        }
-    }
-
-    /**
-     * Update ceiling visibility based on app settings
-     */
-    public updateCeilingVisibility(): void {
-        // This method can be called by components that need to sync ceiling visibility
-        // with app settings. For now, we'll make it publicly available but the actual
-        // settings integration should be handled by the calling component.
-        console.log('🏠 Ceiling visibility update requested')
-    }
 
     /**
      * Dispose room manager and clean up resources

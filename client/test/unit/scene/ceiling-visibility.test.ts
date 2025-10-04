@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { vi, beforeEach, afterEach, describe, it, expect } from 'vitest'
 import { RoomManager } from '../../../src/scene/RoomManager'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
+import { CeilingEventTypes } from '../../../src/types/InteractionEvents'
 import { DataManager } from '../../../src/core/data'
 
 // Mock TextureManager to avoid external dependencies
@@ -42,8 +43,12 @@ describe('RoomManager Ceiling Visibility System', () => {
             // Wait for ceiling to be created
             await new Promise(resolve => setTimeout(resolve, 10))
             
-            // Test visibility control
-            roomManager.setCeilingVisibility(false)
+            // Test event-driven visibility control
+            EventManager.getInstance().emit(CeilingEventTypes.Toggle, {
+                visible: false,
+                timestamp: Date.now(),
+                source: EventSource.UI
+            })
             
             // Find the ceiling in the scene
             const ceiling = mockScene.children.find(child => 
@@ -53,27 +58,69 @@ describe('RoomManager Ceiling Visibility System', () => {
             if (ceiling) {
                 expect(ceiling.visible).toBe(false)
                 
-                roomManager.setCeilingVisibility(true)
+                EventManager.getInstance().emit(CeilingEventTypes.Toggle, {
+                    visible: true,
+                    timestamp: Date.now(),
+                    source: EventSource.UI
+                })
                 expect(ceiling.visible).toBe(true)
             } else {
-                // If no ceiling found, just verify the method doesn't throw
-                expect(() => roomManager.setCeilingVisibility(false)).not.toThrow()
-                expect(() => roomManager.setCeilingVisibility(true)).not.toThrow()
+                // If no ceiling found, just verify the events don't throw
+                expect(() => {
+                    EventManager.getInstance().emit(CeilingEventTypes.Toggle, {
+                        visible: false,
+                        timestamp: Date.now(),
+                        source: EventSource.UI
+                    })
+                    EventManager.getInstance().emit(CeilingEventTypes.Toggle, {
+                        visible: true,
+                        timestamp: Date.now(),
+                        source: EventSource.UI
+                    })
+                }).not.toThrow()
             }
         })
 
         it('should handle ceiling visibility when no ceiling exists', () => {
-            // Test visibility control without creating a ceiling first
+            // Test event-driven visibility control without creating a ceiling first
             expect(() => {
-                roomManager.setCeilingVisibility(false)
-                roomManager.setCeilingVisibility(true)
+                EventManager.getInstance().emit(CeilingEventTypes.Toggle, {
+                    visible: false,
+                    timestamp: Date.now(),
+                    source: EventSource.UI
+                })
+                EventManager.getInstance().emit(CeilingEventTypes.Toggle, {
+                    visible: true,
+                    timestamp: Date.now(),
+                    source: EventSource.UI
+                })
             }).not.toThrow()
         })
 
-        it('should allow updating ceiling visibility via updateCeilingVisibility method', () => {
-            // Test the public update method
+        it('should handle ceiling visibility events correctly', async () => {
+            // Create a room with ceiling via event first
+            EventManager.getInstance().emit('room:resize', {
+                reason: 'test',
+                timestamp: Date.now(),
+                source: EventSource.System
+            })
+
+            // Wait for room to be created
+            await new Promise(resolve => setTimeout(resolve, 10))
+            
+            // Test event-driven ceiling visibility toggle
             expect(() => {
-                roomManager.updateCeilingVisibility()
+                EventManager.getInstance().emit(CeilingEventTypes.Toggle, {
+                    visible: false,
+                    timestamp: Date.now(),
+                    source: EventSource.UI
+                })
+                
+                EventManager.getInstance().emit(CeilingEventTypes.Toggle, {
+                    visible: true,
+                    timestamp: Date.now(),
+                    source: EventSource.UI
+                })
             }).not.toThrow()
         })
     })

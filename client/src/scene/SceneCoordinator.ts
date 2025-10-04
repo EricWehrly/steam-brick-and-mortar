@@ -28,7 +28,6 @@ import { RoomManager } from './RoomManager'
 import { EventManager, EventSource } from '../core/EventManager'
 import { GameEventTypes, CeilingEventTypes, SteamEventTypes, type CeilingToggleEvent, type SceneReadyEvent, type SteamDataLoadedEvent } from '../types/InteractionEvents'
 import { AppSettings } from '../core/AppSettings'
-import { SteamIntegration } from '../steam-integration/SteamIntegration'
 import { DataManager } from '../core/data'
 
 export interface SceneCoordinatorConfig {
@@ -49,12 +48,10 @@ export class SceneCoordinator {
     private propsRenderer: StorePropsRenderer
     private roomManager: RoomManager
     private appSettings: AppSettings
-    private steamIntegration?: SteamIntegration
 
-    constructor(sceneManager: SceneManager, config: SceneCoordinatorConfig = {}, steamIntegration?: SteamIntegration) {
+    constructor(sceneManager: SceneManager, config: SceneCoordinatorConfig = {}) {
         this.sceneManager = sceneManager
         this.appSettings = AppSettings.getInstance()
-        this.steamIntegration = steamIntegration
         
         // Initialize visual system renderers
         this.skyboxManager = new SkyboxManager(this.sceneManager.getScene())
@@ -77,10 +74,7 @@ export class SceneCoordinator {
             this.emitSceneReadyEvent()
         })
 
-        // Register for ceiling toggle events
-        EventManager.getInstance().registerEventHandler(CeilingEventTypes.Toggle, (event: CustomEvent<CeilingToggleEvent>) => {
-            this.roomManager.setCeilingVisibility(event.detail.visible)
-        })
+
 
         // Register for Steam data loaded events to spawn dynamic shelves  
         EventManager.getInstance().registerEventHandler(SteamEventTypes.DataLoaded, (event: CustomEvent<SteamDataLoadedEvent>) => {
@@ -228,7 +222,7 @@ export class SceneCoordinator {
         
         // Analyze all available taxonomies from the loaded games
         // TODO: circle back on this for game taxonomy
-        // this.analyzeTaxonomies(eventData)
+        this.analyzeTaxonomies(eventData)
         
         try {
             // Emit room:resize event to trigger proper event-driven room expansion
@@ -236,7 +230,6 @@ export class SceneCoordinator {
             // StorePropsRenderer will listen for room:resized and spawn shelves accordingly
             console.debug(`📏 Requesting room resize for Steam data`)
             EventManager.getInstance().emit('room:resize', {
-                games: this.getGamesForShelfSpawning(),
                 reason: 'steam-data-loaded',
                 timestamp: Date.now(),
                 source: 'SceneCoordinator'
@@ -252,24 +245,13 @@ export class SceneCoordinator {
     private analyzeTaxonomies(eventData: SteamDataLoadedEvent): void {
         console.log(`\n📊 === TAXONOMY ANALYSIS FOR ${eventData.gameCount} GAMES ===`)
         
-        // Try to access actual game data from injected steamIntegration
-        let games: any[] = []
+        // Use centralized DataManager approach
+        const dataManager = DataManager.getInstance()
+        const gameCount = dataManager.get<number>('steam.gameCount') || 0
         
-        if (this.steamIntegration) {
-            games = this.steamIntegration.getGamesForScene()
-            console.log(`✅ Retrieved ${games.length} games for detailed analysis`)
-        // }else {
-        //     // Fallback: try to access via global app instance
-        //     // @ts-ignore - accessing global for game data when direct reference not available
-        //     const globalApp = (window as any).steamBrickAndMortarApp
-        //     if (globalApp?.steamIntegration) {
-        //         games = globalApp.steamIntegration.getGamesForScene()
-        //         console.log(`✅ Retrieved ${games.length} games via global access`)
-        //     } else {
-        //         console.log(`⚠️ No SteamIntegration available - using event data only`)
-        //     }
-} else { console.log(`⚠️ No SteamIntegration available - using event data only`)
-        }
+        // For taxonomy analysis, we would need actual game data from DataManager
+        // Currently we only have game count, so we'll do structural analysis
+        const games: any[] = []
         
         if (games.length > 0) {
             this.analyzeActualGameData(games, eventData)
@@ -294,7 +276,7 @@ export class SceneCoordinator {
             heavily: games.filter(g => g.playtime_forever >= 3000) // 50+ hours
         }
         
-        console.log(`� PLAYTIME CATEGORIES for your ${games.length} games:`)
+        console.log(`PLAYTIME CATEGORIES for your ${games.length} games:`)
         console.log(`   • Unplayed: ${playtimeBuckets.unplayed.length} games`)
         console.log(`   • Lightly Played (< 10h): ${playtimeBuckets.lightly.length} games`)
         console.log(`   • Moderately Played (10-50h): ${playtimeBuckets.moderately.length} games`)
@@ -416,38 +398,7 @@ export class SceneCoordinator {
         return { series, keywords: commonKeywords }
     }
 
-    /**
-     * Spawn shelves dynamically based on game count
-     */
-    /**
-     * Get game data for shelf spawning - extracted for reuse in event-driven flow
-     */
-    private getGamesForShelfSpawning(): any[] {
-        let games: any[] = []
-        
-        if (this.steamIntegration) {
-            games = this.steamIntegration.getGamesForScene()
-            console.log(`✅ Retrieved ${games.length} games for shelf spawning`)
-        } else {
-            // No SteamIntegration available - check if we have game count from DataManager
-            const dataManager = DataManager.getInstance()
-            const gameCount = dataManager.get<number>('steam.gameCount') || 0
-            
-            if (gameCount > 0) {
-                console.log(`⚠️ No SteamIntegration available but ${gameCount} games in DataManager - using placeholder boxes`)
-                // Create placeholder game objects for shelf spawning
-                games = Array.from({ length: gameCount }, (_, i) => ({
-                    id: `placeholder-${i}`,
-                    name: `Game ${i + 1}`,
-                    isPlaceholder: true
-                }))
-            } else {
-                console.log(`⚠️ No SteamIntegration available and no games in DataManager`)
-            }
-        }
-        
-        return games
-    }
+
 
     private emitSceneReadyEvent(): void {
         const lightStats = this.lightingRenderer.getLightingStats()

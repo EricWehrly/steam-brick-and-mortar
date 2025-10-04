@@ -16,6 +16,7 @@ import type { SceneCoordinator } from '../scene'
 import type { UICoordinator } from '../ui'
 import { Logger } from '../utils/Logger'
 import { SteamErrorMessages } from '../utils/SteamErrorMessages'
+import { DataManager, DataDomain } from '../core/data'
 
 export class SteamWorkflowManager {
     private static readonly logger = Logger.withContext(SteamWorkflowManager.name)
@@ -24,6 +25,7 @@ export class SteamWorkflowManager {
     private steamIntegration: SteamIntegration
     private sceneCoordinator: SceneCoordinator
     private uiCoordinator: UICoordinator
+    private dataManager: DataManager
     
     constructor(
         eventManager: EventManager,
@@ -35,6 +37,7 @@ export class SteamWorkflowManager {
         this.steamIntegration = steamIntegration
         this.sceneCoordinator = sceneCoordinator
         this.uiCoordinator = uiCoordinator
+        this.dataManager = DataManager.getInstance()
         
         // Register event handlers directly - no intermediate layers
         this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.onLoadGames.bind(this))
@@ -44,6 +47,43 @@ export class SteamWorkflowManager {
         this.eventManager.registerEventHandler(SteamEventTypes.CacheStats, this.onCacheStats.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.ImageCacheClear, this.onClearImageCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.DevModeToggle, this.onDevModeToggle.bind(this))
+    }
+    
+    /**
+     * CRITICAL ARCHITECTURAL PRINCIPLE: Data ownership and state precedence
+     * 
+     * Store Steam data in DataManager and emit SteamDataLoaded event.
+     * This ensures data is established in centralized state BEFORE any components
+     * react to the event. Data ownership stays close to source.
+     * 
+     * Principle: "Things that ARE supercede things that WILL BE"
+     * - State must be established before events that depend on that state
+     * - Data should be stored by the component closest to its source
+     */
+    private storeSteamDataAndEmitEvent(userInput: string): void {
+        const gameLibraryState = this.steamIntegration.getGameLibraryState()
+        const gameCount = gameLibraryState.userData?.games?.length || 0
+        
+        // FIRST: Store data in centralized DataManager (establish state)
+        this.dataManager.set('steam.gameCount', gameCount, {
+            domain: DataDomain.SteamIntegration
+        })
+        
+        if (userInput) {
+            this.dataManager.set('steam.userInput', userInput, {
+                domain: DataDomain.SteamIntegration
+            })
+        }
+        
+        SteamWorkflowManager.logger.info(`📊 Stored Steam data in DataManager: ${gameCount} games for ${userInput}`)
+        
+        // SECOND: Emit event now that state is established (components can safely react)
+        this.eventManager.emit(SteamEventTypes.DataLoaded, {
+            userInput,
+            gameCount,
+            timestamp: Date.now(),
+            source: EventSource.System
+        })
     }
     
     /**
@@ -85,13 +125,8 @@ export class SteamWorkflowManager {
             // Handle successful completion in UI
             this.uiCoordinator.steam.showSteamStatus('Games loaded successfully!', 'success')
             
-            // Emit steam-data-loaded event for UI components that need to react
-            this.eventManager.emit(SteamEventTypes.DataLoaded, {
-                userInput,
-                gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
-                timestamp: Date.now(),
-                source: EventSource.System
-            })
+            // Store data in DataManager and emit event (data ownership principle)
+            this.storeSteamDataAndEmitEvent(userInput)
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Load games workflow failed:', error)
@@ -133,13 +168,8 @@ export class SteamWorkflowManager {
             
             SteamWorkflowManager.logger.info(`Load from cache workflow completed successfully`)
             
-            // Emit steam-data-loaded event for UI components that need to react
-            this.eventManager.emit(SteamEventTypes.DataLoaded, {
-                userInput,
-                gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
-                timestamp: Date.now(),
-                source: EventSource.System
-            })
+            // Store data in DataManager and emit event (data ownership principle)
+            this.storeSteamDataAndEmitEvent(userInput)
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Load from cache workflow failed:', error)
@@ -177,15 +207,10 @@ export class SteamWorkflowManager {
             
             SteamWorkflowManager.logger.info('Cache refresh workflow completed successfully')
             
-            // Emit steam-data-loaded event for UI components that need to react
+            // Store data in DataManager and emit event (data ownership principle)
             const gameState = this.steamIntegration.getGameLibraryState()
             if (gameState.userData?.vanity_url) {
-                this.eventManager.emit(SteamEventTypes.DataLoaded, {
-                    userInput: gameState.userData.vanity_url,
-                    gameCount: gameState.userData.games?.length || 0,
-                    timestamp: Date.now(),
-                    source: EventSource.System
-                })
+                this.storeSteamDataAndEmitEvent(gameState.userData.vanity_url)
             }
             
         } catch (error) {

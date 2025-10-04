@@ -121,8 +121,7 @@ export class SteamBrickAndMortarApp {
              * }
              * These should be exposed via UI settings when performance tuning becomes necessary.
              */
-        }, 
-        this.steamIntegration)
+        })
 
         // Initialize WebXR coordinator (callbacks now handled by WebXREventHandler)
         this.webxrCoordinator = new WebXRCoordinator(

@@ -23,6 +23,7 @@ import { TextureManager } from '../utils/TextureManager'
 import { RoomManager, RoomConstants } from './RoomManager'
 import { EventManager } from '../core/EventManager'
 import { RoomEventTypes } from '../types/InteractionEvents'
+import { DataManager } from '../core/data'
 import type { StoreLayoutConfig } from './StoreLayoutConfig'
 
 // Configuration constants for game layout - made static and accessible
@@ -104,16 +105,27 @@ export class StorePropsRenderer {
         const eventData = event.detail
         console.debug(`🏗️ StorePropsRenderer received room:resized event:`, eventData)
         
-        if (eventData.gameCount && eventData.games) {
+        // Get game count from centralized DataManager (consistent with RoomManager approach)
+        const dataManager = DataManager.getInstance()
+        const gameCount = dataManager.get<number>('steam.gameCount') || 0
+        
+        if (gameCount > 0) {
             try {
                 // Calculate shelves needed based on game count
                 const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
-                const shelvesNeeded = Math.ceil(eventData.gameCount / gamesPerShelf)
+                const shelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
                 
-                console.debug(`📚 Spawning ${shelvesNeeded} shelves for ${eventData.gameCount} games in resized room`)
+                console.debug(`📚 Spawning ${shelvesNeeded} shelves for ${gameCount} games from DataManager in resized room`)
                 
                 // Clear existing shelves first
                 this.clearExistingShelves()
+                
+                // Create placeholder games for shelf spawning
+                const games = Array.from({ length: gameCount }, (_, i) => ({
+                    id: `placeholder-${i}`,
+                    name: `Game ${i + 1}`,
+                    isPlaceholder: true
+                }))
                 
                 // Create shelf rows based on needed shelves  
                 const maxShelvesPerRow = 4
@@ -121,7 +133,7 @@ export class StorePropsRenderer {
                 
                 for (let row = 0; row < rows; row++) {
                     const shelvesInThisRow = Math.min(maxShelvesPerRow, shelvesNeeded - (row * maxShelvesPerRow))
-                    await this.createShelfRow(row, shelvesInThisRow, eventData.games)
+                    await this.createShelfRow(row, shelvesInThisRow, games)
                 }
                 
                 console.debug(`✅ Dynamic shelves spawned via room:resized event: ${shelvesNeeded} shelves in ${rows} row(s)`)
