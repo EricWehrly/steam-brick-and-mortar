@@ -29,6 +29,7 @@ import { EventManager, EventSource } from '../core/EventManager'
 import { GameEventTypes, CeilingEventTypes, SteamEventTypes, type CeilingToggleEvent, type SceneReadyEvent, type SteamDataLoadedEvent } from '../types/InteractionEvents'
 import { AppSettings } from '../core/AppSettings'
 import { SteamIntegration } from '../steam-integration/SteamIntegration'
+import { DataManager } from '../core/data'
 
 export interface SceneCoordinatorConfig {
     environment?: {
@@ -232,11 +233,10 @@ export class SceneCoordinator {
         
         try {
             // Emit room:resize event to trigger proper event-driven room expansion
-            // RoomManager will calculate appropriate dimensions based on available game data
+            // RoomManager will get game count from DataManager and calculate appropriate dimensions
             // StorePropsRenderer will listen for room:resized and spawn shelves accordingly
-            console.debug(`📏 Requesting room resize for ${eventData.gameCount} games`)
+            console.debug(`📏 Requesting room resize for Steam data`)
             EventManager.getInstance().emit('room:resize', {
-                gameCount: eventData.gameCount,
                 games: this.getGamesForShelfSpawning(),
                 reason: 'steam-data-loaded',
                 timestamp: Date.now(),
@@ -430,14 +430,20 @@ export class SceneCoordinator {
             games = this.steamIntegration.getGamesForScene()
             console.log(`✅ Retrieved ${games.length} games for shelf spawning`)
         } else {
-            // Fallback: try to access via global app instance
-            // @ts-ignore - accessing global for game data when direct reference not available
-            const globalApp = (window as any).steamBrickAndMortarApp
-            if (globalApp?.steamIntegration) {
-                games = globalApp.steamIntegration.getGamesForScene()
-                console.log(`✅ Retrieved ${games.length} games via global access`)
+            // No SteamIntegration available - check if we have game count from DataManager
+            const dataManager = DataManager.getInstance()
+            const gameCount = dataManager.get<number>('steam.gameCount') || 0
+            
+            if (gameCount > 0) {
+                console.log(`⚠️ No SteamIntegration available but ${gameCount} games in DataManager - using placeholder boxes`)
+                // Create placeholder game objects for shelf spawning
+                games = Array.from({ length: gameCount }, (_, i) => ({
+                    id: `placeholder-${i}`,
+                    name: `Game ${i + 1}`,
+                    isPlaceholder: true
+                }))
             } else {
-                console.log(`⚠️ No SteamIntegration available - using placeholder boxes`)
+                console.log(`⚠️ No SteamIntegration available and no games in DataManager`)
             }
         }
         

@@ -18,9 +18,12 @@ import * as THREE from 'three'
 import { EventManager } from '../core/EventManager'
 import { TextureManager } from '../utils/TextureManager'
 import { RoomEventTypes, type RoomCreateEvent, type RoomResizeEvent } from '../types/InteractionEvents'
+import { SteamEventTypes, type SteamDataLoadedEvent } from '../types/InteractionEvents'
+
 import type { StoreLayoutConfig } from './StoreLayoutConfig'
 import { PropRenderer } from './PropRenderer'
 import type { EnvironmentRenderer } from './EnvironmentRenderer'
+import { DataManager, DataDomain } from '../core/data'
 
 // ============================================================================
 // ROOM CONSTANTS - Single Source of Truth
@@ -93,6 +96,9 @@ export class RoomManager {
         // Single event handler for room resize (handles both creation and updating)
         this.eventManager.registerEventHandler(RoomEventTypes.Resize, this.onResizeRoom.bind(this))
         
+        // Listen for Steam data loaded events to store data in DataManager
+        this.eventManager.registerEventHandler(SteamEventTypes.DataLoaded, this.onSteamDataLoaded.bind(this))
+        
         console.debug('🏠 RoomManager initialized with event-driven architecture')
     }
 
@@ -137,6 +143,30 @@ export class RoomManager {
     // onCreateInitialRoom removed - single onResizeRoom handles both creation and updating
 
     /**
+     * Event handler: Store Steam data in DataManager when loaded
+     */
+    private onSteamDataLoaded(event: CustomEvent<SteamDataLoadedEvent>): void {
+        const eventData = event.detail
+        const dataManager = DataManager.getInstance()
+        
+        // Store game count with Steam domain metadata
+        dataManager.set('steam.gameCount', eventData.gameCount, {
+            domain: DataDomain.SteamIntegration
+        })
+        
+        // Store user input for reference
+        if (eventData.userInput) {
+            dataManager.set('steam.userInput', eventData.userInput, {
+                domain: DataDomain.SteamIntegration
+            })
+        }
+        
+
+        
+        console.debug(`📊 Stored Steam data in DataManager: ${eventData.gameCount} games for ${eventData.userInput}`)
+    }
+
+    /**
      * Event handler: Resize room (handles both initial creation and updates)
      * Single method that either creates walls (if none exist) or updates existing walls
      */
@@ -146,26 +176,11 @@ export class RoomManager {
         
         console.log(`🏠 Room resize requested (reason: ${reason})`)
         
-        // RoomManager's responsibility: Determine appropriate room dimensions
-        let gameCount = 0
+        // RoomManager's responsibility: Get game count from centralized DataManager
+        const dataManager = DataManager.getInstance()
+        const gameCount = dataManager.get<number>('steam.gameCount') || 0
         
-        // Option 1: Event provides game count
-        if (eventData.gameCount !== undefined) {
-            gameCount = eventData.gameCount
-            console.log(`📊 Using game count from event: ${gameCount}`)
-        }
-        // Option 2: Access global app instance (fallback)
-        else {
-            // @ts-ignore - accessing global for game data when event doesn't provide it
-            const globalApp = (window as any).steamBrickAndMortarApp
-            if (globalApp?.steamIntegration) {
-                const gameLibrary = globalApp.steamIntegration.getGameLibrary()
-                if (gameLibrary) {
-                    gameCount = gameLibrary.getGameCount()
-                    console.log(`📊 Using game count from global app: ${gameCount}`)
-                }
-            }
-        }
+        console.log(`📊 Using game count from DataManager: ${gameCount}`)
         
         // Calculate appropriate dimensions (uses defaults if gameCount is 0)
         const dimensions = RoomManager.calculateDimensionsForGameCount(gameCount)
@@ -174,10 +189,9 @@ export class RoomManager {
         // Queue the room update to prevent concurrent operations
         await this.queueRoomOperation(dimensions)
         
-        // Emit room resized event with calculated dimensions and available game data
+        // Emit room resized event with calculated dimensions
         this.eventManager.emit(RoomEventTypes.Resized, { 
             dimensions,
-            gameCount: eventData.gameCount || gameCount,
             games: eventData.games, // Pass through any game data from the original event
             timestamp: Date.now(), 
             source: 'room-manager' 
