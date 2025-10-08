@@ -16,7 +16,7 @@ import { RoomEventTypes, type RoomCreateEvent, type RoomResizeEvent } from '../t
 
 import * as THREE from 'three'
 import { EventManager } from '../core/EventManager'
-import { TextureManager } from '../utils/TextureManager'
+import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 import { RoomEventTypes, type RoomCreateEvent, type RoomResizeEvent } from '../types/InteractionEvents'
 import { SteamEventTypes, type SteamDataLoadedEvent, CeilingEventTypes, type CeilingToggleEvent } from '../types/InteractionEvents'
 
@@ -60,7 +60,7 @@ export interface RoomDimensions {
 
 export class RoomManager {
     private scene: THREE.Scene
-    private textureManager: TextureManager
+    private materialManager: SharedMaterialManager
     private eventManager: EventManager
 
     
@@ -88,7 +88,7 @@ export class RoomManager {
 
     constructor(scene: THREE.Scene) {
         this.scene = scene
-        this.textureManager = TextureManager.getInstance()
+        this.materialManager = SharedMaterialManager.getInstance()
         this.eventManager = EventManager.getInstance()
         
         // Register event listeners
@@ -287,10 +287,7 @@ export class RoomManager {
         }
         
         const floorGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
-        const carpetMaterial = await this.textureManager.createCarpetMaterial({
-            color: new THREE.Color('#6B6B6B'),
-            repeat: { x: 4, y: 3 }
-        })
+        const carpetMaterial = this.materialManager.getCarpetMaterial()
         
         this.floor = new THREE.Mesh(floorGeometry, carpetMaterial)
         this.floor.rotation.x = -Math.PI / 2
@@ -326,12 +323,7 @@ export class RoomManager {
         }
         
         const ceilingGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
-        const ceilingMaterial = this.textureManager.createProceduralCeilingMaterial({
-            color: '#F5F5DC', // Beige ceiling color
-            repeat: { x: dimensions.width / 8, y: dimensions.depth / 8 }, // More texture detail like enhanced ceiling
-            bumpiness: 0.4,
-            roughness: 0.7
-        })
+        const ceilingMaterial = this.materialManager.getCeilingMaterial()
         
         this.ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
         this.ceiling.rotation.x = Math.PI / 2
@@ -389,10 +381,7 @@ export class RoomManager {
     }
 
     private async createWalls(dimensions: RoomDimensions): Promise<void> {
-        const wallMaterial = await this.textureManager.createWoodMaterial({
-            color: new THREE.Color(0xF5F5DC),
-            repeat: { x: 4, y: 2 }
-        })
+        const wallMaterial = this.materialManager.getWallWoodMaterial()
         
         // Back wall
         this.walls.back = new THREE.Mesh(

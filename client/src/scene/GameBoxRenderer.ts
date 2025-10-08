@@ -26,6 +26,7 @@ import type { TexturePerformanceConfig, GameBoxPerformanceData } from './game-bo
 import { GameBoxPerformanceManager } from './game-box/GameBoxPerformanceManager'
 import { GameBoxTextureManager } from './game-box/GameBoxTextureManager'
 import { GameBoxLayoutUtils } from './game-box/GameBoxLayoutUtils'
+import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 
 // Export types for backward compatibility
 export type {
@@ -55,6 +56,7 @@ export class GameBoxRenderer {
     // Composition: Specialized managers for different concerns
     private performanceManager?: GameBoxPerformanceManager
     private textureManager: GameBoxTextureManager
+    private materialManager: SharedMaterialManager
 
     constructor(
         dimensions: Partial<GameBoxDimensions> = {},
@@ -64,13 +66,18 @@ export class GameBoxRenderer {
     ) {
         this.dimensions = { ...GameBoxRenderer.DEFAULT_DIMENSIONS, ...dimensions }
         
+        // Create geometry instance (TODO: Replace with InstancedMesh for batching)
         this.gameBoxGeometry = new THREE.BoxGeometry(
             this.dimensions.width,
             this.dimensions.height,
             this.dimensions.depth
         )
         
-        // Initialize managers with composition
+        // Initialize shared material manager
+        this.materialManager = SharedMaterialManager.getInstance()
+        this.materialManager.initialize()
+        
+        // Initialize performance and texture managers
         if (Object.keys(performanceConfig).length > 0) {
             this.performanceManager = new GameBoxPerformanceManager(performanceConfig)
         }
@@ -141,8 +148,8 @@ export class GameBoxRenderer {
         // Check if we're within display limits
 
         // Create material - start with fallback color for immediate display
-        const colorHue = ValidationUtils.stringToHue(game.name)
-        const material = MaterialUtils.createGameBoxMaterialFromName(colorHue)
+        // Use shared material manager for better performance
+        const material = this.materialManager.getGameBoxMaterialFromName(game.name)
         
         const gameBox = new THREE.Mesh(this.gameBoxGeometry, material)
         
@@ -299,6 +306,7 @@ export class GameBoxRenderer {
      */
     public updateDimensions(newDimensions: Partial<GameBoxDimensions>) {
         this.dimensions = { ...this.dimensions, ...newDimensions }
+        // Recreate geometry with new dimensions
         this.gameBoxGeometry.dispose()
         this.gameBoxGeometry = new THREE.BoxGeometry(
             this.dimensions.width,
@@ -350,6 +358,8 @@ export class GameBoxRenderer {
         // Dispose of managers
         this.textureManager.dispose()
         this.performanceManager?.dispose()
+        
+        // Note: Shared materials are managed by SharedMaterialManager
         
         console.log('🧹 Disposed GameBoxRenderer and all managers')
     }
