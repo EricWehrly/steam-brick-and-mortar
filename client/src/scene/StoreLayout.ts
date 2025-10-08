@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator';
-import { TextureManager } from '../utils/TextureManager';
 import { Logger } from '../utils/Logger';
 import { GameBoxRenderer } from './GameBoxRenderer';
 
@@ -21,7 +20,6 @@ export class StoreLayout {
   
   private scene: THREE.Scene;
   private shelfGenerator: ProceduralShelfGenerator | null = null;
-  private textureManager: TextureManager;
   private gameBoxRenderer: GameBoxRenderer;
   private readonly storeGroup: THREE.Group;
 
@@ -29,7 +27,6 @@ export class StoreLayout {
     this.storeGroup = new THREE.Group()
     this.storeGroup.name = "StoreLayout"
     this.gameBoxRenderer = new GameBoxRenderer()
-    this.textureManager = TextureManager.getInstance()
     
     if (scene) {
       this.scene = scene;

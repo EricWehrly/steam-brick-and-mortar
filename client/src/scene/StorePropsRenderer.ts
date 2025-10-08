@@ -18,7 +18,6 @@ import { GameBoxRenderer } from './GameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
 import { PropRenderer } from './PropRenderer'
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
-import { TextureManager } from '../utils/TextureManager'
 
 import { RoomManager, RoomConstants } from './RoomManager'
 import { EventManager } from '../core/EventManager'
@@ -57,7 +56,7 @@ export interface PropsConfig {
 
 export class StorePropsRenderer {
     private scene: THREE.Scene
-    private textureManager: TextureManager
+
     private storeLayout: StoreLayout
     private gameBoxRenderer: GameBoxRenderer
     private signageRenderer: SignageRenderer
@@ -69,7 +68,7 @@ export class StorePropsRenderer {
 
     constructor(scene: THREE.Scene) {
         this.scene = scene
-        this.textureManager = TextureManager.getInstance()
+
         
         // Create group to hold all props
         this.propsGroup = new THREE.Group()
