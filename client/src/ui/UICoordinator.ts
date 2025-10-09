@@ -14,7 +14,7 @@
 
 import * as THREE from 'three'
 import { UIManager } from './UIManager'
-import { PerformanceMonitor } from '../ui/PerformanceMonitor'
+import { PerformanceMonitor } from './PerformanceMonitor'
 import type { DebugStatsProvider } from '../core/DebugStatsProvider'
 import type { ImageCacheStats } from '../steam/images/ImageManager'
 import type { SteamIntegration } from '../steam-integration/SteamIntegration'
