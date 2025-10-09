@@ -48,15 +48,18 @@ export class SceneCoordinator {
     private propsRenderer: StorePropsRenderer
     private roomManager: RoomManager
     private appSettings: AppSettings
+    private dataManager: DataManager
 
     constructor(
         sceneManager: SceneManager, 
         config: SceneCoordinatorConfig = {}, 
         storePropsRenderer?: StorePropsRenderer,
-        appSettings?: AppSettings
+        appSettings?: AppSettings,
+        dataManager?: DataManager
     ) {
         this.sceneManager = sceneManager
         this.appSettings = appSettings || AppSettings.getInstance() // Fallback for backward compatibility
+        this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
         
         // Initialize visual system renderers
         this.skyboxManager = new SkyboxManager(this.sceneManager.getScene())
@@ -65,10 +68,10 @@ export class SceneCoordinator {
             this.sceneManager.getRenderer()
         )
         // Initialize room manager for event-driven room structure (no longer needs EnvironmentRenderer)
-        this.roomManager = new RoomManager(this.sceneManager.getScene())
+        this.roomManager = new RoomManager(this.sceneManager.getScene(), this.dataManager)
         
         // Use DI-injected StorePropsRenderer or create one for backward compatibility
-        this.propsRenderer = storePropsRenderer || new StorePropsRenderer(this.sceneManager.getScene())
+        this.propsRenderer = storePropsRenderer || new StorePropsRenderer(this.sceneManager.getScene(), this.dataManager)
 
         // 🎬 EVENT-DRIVEN STARTUP: Setup scene and emit SceneReady when basic navigation is ready
         // This is a prerequisite for GameStart - scene must be navigable before game can start
@@ -252,8 +255,7 @@ export class SceneCoordinator {
         console.log(`\n📊 === TAXONOMY ANALYSIS FOR ${eventData.gameCount} GAMES ===`)
         
         // Use centralized DataManager approach
-        const dataManager = DataManager.getInstance()
-        const gameCount = dataManager.get<number>('steam.gameCount') || 0
+        const gameCount = this.dataManager.get<number>('steam.gameCount') || 0
         
         // For taxonomy analysis, we would need actual game data from DataManager
         // Currently we only have game count, so we'll do structural analysis

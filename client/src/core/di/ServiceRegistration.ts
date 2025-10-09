@@ -138,16 +138,16 @@ export class ServiceRegistration {
       [ServiceKeys.SharedMaterialManager, ServiceKeys.SceneManager]
     )
 
-    // StorePropsRenderer (depends on SceneManager and GameBoxRenderer)
+    // StorePropsRenderer (depends on SceneManager and GameBoxRenderer, dynamically resolves DataManager)
     container.registerSingleton(
       ServiceKeys.StorePropsRenderer,
       async (container) => {
         const sceneManager = await container.resolve(ServiceKeys.SceneManager) as SceneManager
         const gameBoxRenderer = await container.resolve(ServiceKeys.GameBoxRenderer) as GameBoxRenderer
         
-        console.debug('🏪 Creating StorePropsRenderer with DI dependencies')
+        console.debug('🏪 Creating StorePropsRenderer with DI dependencies and service container access')
         
-        const storePropsRenderer = new StorePropsRenderer(sceneManager.getScene())
+        const storePropsRenderer = new StorePropsRenderer(sceneManager.getScene(), container)
         storePropsRenderer.setGameBoxRenderer(gameBoxRenderer) // Inject GameBoxRenderer
         
         return storePropsRenderer
@@ -155,13 +155,14 @@ export class ServiceRegistration {
       [ServiceKeys.SceneManager, ServiceKeys.GameBoxRenderer]
     )
 
-    // SceneCoordinator (depends on SceneManager, StorePropsRenderer, and AppSettings)
+    // SceneCoordinator (depends on SceneManager, StorePropsRenderer, AppSettings, and DataManager)
     container.registerSingleton(
       ServiceKeys.SceneCoordinator,
       async (container) => {
         const sceneManager = await container.resolve(ServiceKeys.SceneManager) as SceneManager
         const storePropsRenderer = await container.resolve(ServiceKeys.StorePropsRenderer) as StorePropsRenderer
         const appSettings = await container.resolve(ServiceKeys.AppSettings) as AppSettings
+        const dataManager = await container.resolve(ServiceKeys.DataManager) as DataManager
         
         console.debug('🎬 Creating SceneCoordinator with DI dependencies')
         
@@ -173,11 +174,11 @@ export class ServiceRegistration {
           environment: {
             skyboxPreset: 'aurora'
           }
-        }, storePropsRenderer, appSettings) // Pass all DI dependencies
+        }, storePropsRenderer, appSettings, dataManager) // Pass all DI dependencies
         
         return sceneCoordinator
       },
-      [ServiceKeys.SceneManager, ServiceKeys.StorePropsRenderer, ServiceKeys.AppSettings]
+      [ServiceKeys.SceneManager, ServiceKeys.StorePropsRenderer, ServiceKeys.AppSettings, ServiceKeys.DataManager]
     )
 
     return container

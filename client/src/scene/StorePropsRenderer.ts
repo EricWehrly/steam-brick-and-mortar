@@ -23,6 +23,8 @@ import { RoomManager, RoomConstants } from './RoomManager'
 import { EventManager } from '../core/EventManager'
 import { RoomEventTypes } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
+import { ServiceContainer } from '../core/di/ServiceContainer'
+import { ServiceKeys } from '../core/di/ServiceKeys'
 import type { StoreLayoutConfig } from './StoreLayoutConfig'
 
 // Configuration constants for game layout - made static and accessible
@@ -56,6 +58,7 @@ export interface PropsConfig {
 
 export class StorePropsRenderer {
     private scene: THREE.Scene
+    private serviceContainer: ServiceContainer
 
     private storeLayout: StoreLayout
     private gameBoxRenderer: GameBoxRenderer
@@ -66,8 +69,9 @@ export class StorePropsRenderer {
     private currentStoreGroup: THREE.Group | null = null // Track current store environment
 
 
-    constructor(scene: THREE.Scene) {
+    constructor(scene: THREE.Scene, serviceContainer: ServiceContainer) {
         this.scene = scene
+        this.serviceContainer = serviceContainer
 
         
         // Create group to hold all props
@@ -104,8 +108,8 @@ export class StorePropsRenderer {
         const eventData = event.detail
         console.debug(`🏗️ StorePropsRenderer received room:resized event:`, eventData)
         
-        // Get game count from centralized DataManager (consistent with RoomManager approach)
-        const dataManager = DataManager.getInstance()
+        // Dynamically resolve DataManager from service registry when needed
+        const dataManager = await this.serviceContainer.resolve<DataManager>(ServiceKeys.DataManager)
         const gameCount = dataManager.get<number>('steam.gameCount') || 0
         
         if (gameCount > 0) {

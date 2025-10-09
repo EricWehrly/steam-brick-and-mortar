@@ -19,6 +19,7 @@ import { DebugStatsProvider } from './DebugStatsProvider'
 import { SteamGameManager } from './SteamGameManager'
 import { SteamIntegration } from '../steam-integration'
 import { SteamWorkflowManager } from '../steam-integration/SteamWorkflowManager'
+import { DataManager } from './data'
 import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { type WebXRCapabilities } from '../webxr/WebXRManager'
@@ -142,13 +143,7 @@ export class SteamBrickAndMortarApp {
         // Set up prerequisite event listeners
         this.setupPrerequisiteEventListeners()
 
-        // Initialize steam workflow manager to handle Steam interactions
-        this.steamWorkflowManager = new SteamWorkflowManager(
-            this.eventManager,
-            this.steamIntegration,
-            this.sceneCoordinator,
-            this.uiCoordinator
-        )
+        // SteamWorkflowManager will be initialized in init() method with DI-resolved dependencies
 
         // Initialize webxr event handler to handle WebXR and input interactions
         this.webxrEventHandler = new WebXREventHandler(
@@ -176,6 +171,16 @@ export class SteamBrickAndMortarApp {
                 gameBoxRenderer, // Use DI-resolved singleton GameBoxRenderer
                 this.sceneManager,
                 this.steamIntegration
+            )
+            
+            // Initialize steam workflow manager with DI-resolved DataManager
+            const dataManager = await this.container.resolve(ServiceKeys.DataManager) as DataManager
+            this.steamWorkflowManager = new SteamWorkflowManager(
+                this.eventManager,
+                this.steamIntegration,
+                this.sceneCoordinator,
+                this.uiCoordinator,
+                dataManager
             )
             
             await this.initializeCoordinators()

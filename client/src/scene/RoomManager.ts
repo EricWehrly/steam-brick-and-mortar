@@ -63,6 +63,7 @@ export class RoomManager {
     // Async mutex to prevent concurrent room operations
     private isProcessingResize: boolean = false
     private pendingResizeQueue: Array<{ dimensions: RoomDimensions, resolve: () => void, reject: (error: Error) => void }> = []
+    private dataManager: DataManager
     
     // Room structure objects (for reuse)
     private roomGroup: THREE.Group | null = null
@@ -82,8 +83,9 @@ export class RoomManager {
         height: RoomConstants.DEFAULT_ROOM_HEIGHT
     }
 
-    constructor(scene: THREE.Scene) {
+    constructor(scene: THREE.Scene, dataManager?: DataManager) {
         this.scene = scene
+        this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
         this.materialManager = SharedMaterialManager.getInstance()
         this.eventManager = EventManager.getInstance()
         
@@ -180,8 +182,7 @@ export class RoomManager {
         console.log(`🏠 Room resize requested (reason: ${reason})`)
         
         // RoomManager's responsibility: Get game count from centralized DataManager
-        const dataManager = DataManager.getInstance()
-        const gameCount = dataManager.get<number>('steam.gameCount') || 0
+        const gameCount = this.dataManager.get<number>('steam.gameCount') || 0
         
         console.log(`📊 Using game count from DataManager: ${gameCount}`)
         

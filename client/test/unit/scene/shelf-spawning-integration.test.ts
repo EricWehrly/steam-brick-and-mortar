@@ -8,14 +8,17 @@ import { StorePropsRenderer } from '../../../src/scene/StorePropsRenderer'
 import { DataManager, DataDomain } from '../../../src/core/data'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { RoomEventTypes } from '../../../src/types/InteractionEvents'
+import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
+import { ServiceKeys } from '../../../src/core/di/ServiceKeys'
 
 describe('Shelf Spawning Integration', () => {
     let scene: THREE.Scene
     let propsRenderer: StorePropsRenderer
     let dataManager: DataManager
     let eventManager: EventManager
+    let serviceContainer: ServiceContainer
 
-    beforeEach(() => {
+    beforeEach(async () => {
         // Setup THREE.js scene
         scene = new THREE.Scene()
         
@@ -26,8 +29,13 @@ describe('Shelf Spawning Integration', () => {
         // Initialize EventManager
         eventManager = EventManager.getInstance()
         
+        // Create and configure service container
+        serviceContainer = new ServiceContainer()
+        serviceContainer.registerSingleton(ServiceKeys.DataManager, async () => dataManager)
+        await serviceContainer.initialize()
+        
         // Initialize StorePropsRenderer (this registers for room:resized events)
-        propsRenderer = new StorePropsRenderer(scene)
+        propsRenderer = new StorePropsRenderer(scene, serviceContainer)
     })
 
     afterEach(() => {

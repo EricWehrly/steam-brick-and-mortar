@@ -31,13 +31,14 @@ export class SteamWorkflowManager {
         eventManager: EventManager,
         steamIntegration: SteamIntegration,
         sceneCoordinator: SceneCoordinator,
-        uiCoordinator: UICoordinator
+        uiCoordinator: UICoordinator,
+        dataManager?: DataManager
     ) {
         this.eventManager = eventManager
         this.steamIntegration = steamIntegration
         this.sceneCoordinator = sceneCoordinator
         this.uiCoordinator = uiCoordinator
-        this.dataManager = DataManager.getInstance()
+        this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
         
         // Register event handlers directly - no intermediate layers
         this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.onLoadGames.bind(this))

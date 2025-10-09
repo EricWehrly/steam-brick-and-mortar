@@ -7,14 +7,24 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import * as THREE from 'three'
 import { StorePropsRenderer } from '../../../src/scene/StorePropsRenderer'
+import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
+import { ServiceKeys } from '../../../src/core/di/ServiceKeys'
+import { DataManager } from '../../../src/core/data/DataManager'
 
 describe('StorePropsRenderer Independence', () => {
     let scene: THREE.Scene
     let propsRenderer: StorePropsRenderer
+    let serviceContainer: ServiceContainer
 
-    beforeEach(() => {
+    beforeEach(async () => {
         scene = new THREE.Scene()
-        propsRenderer = new StorePropsRenderer(scene)
+        
+        // Create and configure service container
+        serviceContainer = new ServiceContainer()
+        serviceContainer.registerSingleton(ServiceKeys.DataManager, async () => DataManager.getInstance())
+        await serviceContainer.initialize()
+        
+        propsRenderer = new StorePropsRenderer(scene, serviceContainer)
     })
 
     describe('Constructor Independence', () => {
