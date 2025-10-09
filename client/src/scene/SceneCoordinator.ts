@@ -49,7 +49,11 @@ export class SceneCoordinator {
     private roomManager: RoomManager
     private appSettings: AppSettings
 
-    constructor(sceneManager: SceneManager, config: SceneCoordinatorConfig = {}) {
+    constructor(
+        sceneManager: SceneManager, 
+        config: SceneCoordinatorConfig = {}, 
+        storePropsRenderer?: StorePropsRenderer
+    ) {
         this.sceneManager = sceneManager
         this.appSettings = AppSettings.getInstance()
         
@@ -61,8 +65,9 @@ export class SceneCoordinator {
         )
         // Initialize room manager for event-driven room structure (no longer needs EnvironmentRenderer)
         this.roomManager = new RoomManager(this.sceneManager.getScene())
-        // Initialize props renderer
-        this.propsRenderer = new StorePropsRenderer(this.sceneManager.getScene())
+        
+        // Use DI-injected StorePropsRenderer or create one for backward compatibility
+        this.propsRenderer = storePropsRenderer || new StorePropsRenderer(this.sceneManager.getScene())
 
         // 🎬 EVENT-DRIVEN STARTUP: Setup scene and emit SceneReady when basic navigation is ready
         // This is a prerequisite for GameStart - scene must be navigable before game can start

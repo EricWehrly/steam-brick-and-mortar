@@ -5,12 +5,13 @@
  * Phase 1: Focus on SharedMaterialManager and GameBoxRenderer
  */
 
-import { ServiceContainer, ServiceLifetime } from './ServiceContainer'
+import { ServiceContainer } from './ServiceContainer'
 import { ServiceKeys } from './ServiceKeys'
 import { SceneManager } from '../../scene/SceneManager'
 import { GameBoxRenderer } from '../../scene/GameBoxRenderer'
 import { SharedMaterialManager } from '../../utils/SharedMaterialManager'
 import { StorePropsRenderer } from '../../scene/StorePropsRenderer'
+import { SceneCoordinator } from '../../scene/SceneCoordinator'
 import { DataManager } from '../data/DataManager'
 import { EventManager } from '../EventManager'
 
@@ -133,6 +134,30 @@ export class ServiceRegistration {
         return storePropsRenderer
       },
       [ServiceKeys.SceneManager, ServiceKeys.GameBoxRenderer]
+    )
+
+    // SceneCoordinator (depends on SceneManager and StorePropsRenderer)
+    container.registerSingleton(
+      ServiceKeys.SceneCoordinator,
+      async (container) => {
+        const sceneManager = await container.resolve(ServiceKeys.SceneManager) as SceneManager
+        const storePropsRenderer = await container.resolve(ServiceKeys.StorePropsRenderer) as StorePropsRenderer
+        
+        console.debug('🎬 Creating SceneCoordinator with DI dependencies')
+        
+        // Create SceneCoordinator with injected dependencies
+        const sceneCoordinator = new SceneCoordinator(sceneManager, {
+          props: {
+            // Props configuration - rendering shows all loaded games (no artificial limits)  
+          },
+          environment: {
+            skyboxPreset: 'aurora'
+          }
+        }, storePropsRenderer) // Pass StorePropsRenderer as constructor parameter
+        
+        return sceneCoordinator
+      },
+      [ServiceKeys.SceneManager, ServiceKeys.StorePropsRenderer]
     )
 
     return container

@@ -112,18 +112,62 @@ describe('ServiceContainer', () => {
             expect(manager1).toBeDefined()
         })
 
-        it('should verify ServiceKeys exist for Phase 1 services', () => {
+        it('should verify ServiceKeys exist for Phase 1 and Phase 2 services', () => {
             // Verify all required service keys are defined
             expect(ServiceKeys.GameBoxRenderer).toBeDefined()
             expect(ServiceKeys.SharedMaterialManager).toBeDefined()
             expect(ServiceKeys.StorePropsRenderer).toBeDefined()
             expect(ServiceKeys.SceneManager).toBeDefined()
+            expect(ServiceKeys.SceneCoordinator).toBeDefined() // Phase 2
             expect(ServiceKeys.EventManager).toBeDefined()
             expect(ServiceKeys.DataManager).toBeDefined()
             
             // All keys should be symbols
             expect(typeof ServiceKeys.GameBoxRenderer).toBe('symbol')
             expect(typeof ServiceKeys.SharedMaterialManager).toBe('symbol')
+            expect(typeof ServiceKeys.SceneCoordinator).toBe('symbol')
+        })
+
+        it('should verify dependency chain registration for Phase 2', async () => {
+            // Test that services can be registered with complex dependency chains
+            container.registerInstance(ServiceKeys.AppConfig, {})
+            
+            // Mock SceneManager to avoid WebGL
+            container.registerSingleton(
+                ServiceKeys.SceneManager,
+                () => ({ 
+                    name: 'MockSceneManager',
+                    getScene: () => ({ add: () => {}, remove: () => {} })
+                })
+            )
+
+            // Mock GameBoxRenderer 
+            container.registerSingleton(
+                ServiceKeys.GameBoxRenderer,
+                () => ({ name: 'MockGameBoxRenderer' })
+            )
+
+            // Mock StorePropsRenderer with GameBoxRenderer dependency
+            container.registerSingleton(
+                ServiceKeys.StorePropsRenderer,
+                async (container) => {
+                    const gameBoxRenderer = await container.resolve(ServiceKeys.GameBoxRenderer)
+                    return { 
+                        name: 'MockStorePropsRenderer', 
+                        gameBoxRenderer,
+                        setGameBoxRenderer: () => {},
+                        getGameBoxRenderer: () => gameBoxRenderer
+                    }
+                },
+                [ServiceKeys.GameBoxRenderer]
+            )
+
+            await container.initialize()
+
+            // Verify dependency chain
+            const storePropsRenderer = await container.resolve(ServiceKeys.StorePropsRenderer) as any
+            expect(storePropsRenderer.name).toBe('MockStorePropsRenderer')
+            expect(storePropsRenderer.gameBoxRenderer.name).toBe('MockGameBoxRenderer')
         })
     })
 

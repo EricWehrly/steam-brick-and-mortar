@@ -94,19 +94,19 @@ export class ServiceContainer {
       throw new Error('Container must be initialized before resolving services')
     }
 
-    // Check for circular dependencies
-    if (this.resolving.has(key)) {
-      throw new Error(`Circular dependency detected: ${String(key)}`)
-    }
-
     const registration = this.services.get(key)
     if (!registration) {
       throw new Error(`Service not registered: ${String(key)}`)
     }
 
-    // Return existing singleton instance
+    // Return existing singleton instance (already created, no circular dependency possible)
     if (registration.lifetime === ServiceLifetime.Singleton && registration.instance) {
       return registration.instance
+    }
+
+    // Check for circular dependencies only when creating new instances
+    if (this.resolving.has(key)) {
+      throw new Error(`Circular dependency detected: ${String(key)}`)
     }
 
     // Mark as resolving to detect circular dependencies

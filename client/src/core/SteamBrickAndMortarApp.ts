@@ -43,14 +43,14 @@ export class SteamBrickAndMortarApp {
     
     // Services - will be resolved from container where available
     private sceneManager: SceneManager
-    private sceneCoordinator: SceneCoordinator
+    private sceneCoordinator!: SceneCoordinator // Will be resolved from DI container in init()
     private webxrCoordinator: WebXRCoordinator
     private webxrEventHandler: WebXREventHandler
     private uiCoordinator: UICoordinator
     private performanceMonitor: PerformanceMonitor
     private steamIntegration: SteamIntegration
     private debugStatsProvider: DebugStatsProvider
-    private steamGameManager: SteamGameManager
+    private steamGameManager!: SteamGameManager // Will be initialized in init() with DI-resolved GameBoxRenderer
     private eventManager: EventManager
     private steamWorkflowManager: SteamWorkflowManager
     private appSettings: AppSettings
@@ -100,30 +100,7 @@ export class SteamBrickAndMortarApp {
             maxGames: maxGames
         })
 
-        // Initialize scene coordinator with visual system configuration
-        this.sceneCoordinator = new SceneCoordinator(this.sceneManager, {
-            props: {
-                // Props configuration - rendering shows all loaded games (no artificial limits)
-            },
-            environment: {
-                skyboxPreset: 'aurora'
-            }
-            
-            /* TODO: Future Performance Configuration Roadmap
-             * Re-implement these granular performance settings when needed:
-             * performance: {
-             *     maxTextureSize: 1024,
-             *     nearDistance: 2.0,
-             *     farDistance: 10.0,
-             *     highResolutionSize: 512,
-             *     mediumResolutionSize: 256,
-             *     lowResolutionSize: 128,
-             *     maxActiveTextures: Math.min(50, maxGames / 2),
-             *     frustumCullingEnabled: true
-             * }
-             * These should be exposed via UI settings when performance tuning becomes necessary.
-             */
-        })
+        // SceneCoordinator will be resolved from DI container in init() method
 
         // Initialize WebXR coordinator (callbacks now handled by WebXREventHandler)
         this.webxrCoordinator = new WebXRCoordinator(
@@ -157,12 +134,7 @@ export class SteamBrickAndMortarApp {
             this.steamIntegration
         )
 
-        // Initialize steam game manager with scene coordinator's game box renderer
-        this.steamGameManager = new SteamGameManager(
-            this.sceneCoordinator.getGameBoxRenderer(),
-            this.sceneManager,
-            this.steamIntegration
-        )
+        // SteamGameManager will be initialized in init() method with DI-resolved GameBoxRenderer
 
         // Initialize event manager for interaction architecture
         this.eventManager = EventManager.getInstance()
@@ -194,6 +166,17 @@ export class SteamBrickAndMortarApp {
         try {
             // Initialize DI services first
             await this.container.initialize()
+            
+            // Resolve SceneCoordinator from DI container
+            this.sceneCoordinator = await this.container.resolve(ServiceKeys.SceneCoordinator) as SceneCoordinator
+            
+            // Initialize steam game manager with DI-resolved GameBoxRenderer
+            const gameBoxRenderer = await this.container.resolve(ServiceKeys.GameBoxRenderer) as GameBoxRenderer
+            this.steamGameManager = new SteamGameManager(
+                gameBoxRenderer, // Use DI-resolved singleton GameBoxRenderer
+                this.sceneManager,
+                this.steamIntegration
+            )
             
             await this.initializeCoordinators()
             
