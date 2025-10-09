@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator';
 import { Logger } from '../utils/Logger';
-import { GameBoxRenderer } from './GameBoxRenderer';
 
 import { 
   VR_ERGONOMICS, 
@@ -20,13 +19,11 @@ export class StoreLayout {
   
   private scene: THREE.Scene;
   private shelfGenerator: ProceduralShelfGenerator | null = null;
-  private gameBoxRenderer: GameBoxRenderer;
   private readonly storeGroup: THREE.Group;
 
   constructor(scene?: THREE.Scene) {
     this.storeGroup = new THREE.Group()
     this.storeGroup.name = "StoreLayout"
-    this.gameBoxRenderer = new GameBoxRenderer()
     
     if (scene) {
       this.scene = scene;
