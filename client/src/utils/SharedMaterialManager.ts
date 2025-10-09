@@ -394,46 +394,6 @@ export class SharedMaterialManager {
             poolHitRate: this.poolRequests > 0 ? this.poolHits / this.poolRequests : 0
         }
     }
-    
-    /**
-     * Debug method to check if material sharing is working
-     */
-    public debugMaterialUsage(): void {
-        console.group('🔍 SharedMaterialManager Debug Analysis')
-        
-        if (!this.materialPool) {
-            console.warn('❌ Material pool not initialized')
-            console.groupEnd()
-            return
-        }
-        
-        console.log('📊 Material Pool Status:', {
-            gameBoxMaterials: this.materialPool.gameBoxMaterials.size,
-            shelfMaterials: 3, // mdfVeneer, shelfInterior, brandAccent
-            environmentMaterials: 4, // carpet, ceiling, wallWood, basicWood
-            totalRequests: this.poolRequests,
-            poolHits: this.poolHits,
-            hitRate: `${(this.poolHits / this.poolRequests * 100).toFixed(1)}%`
-        })
-        
-        console.log('🎮 Game Box Material Palette:')
-        for (const [hue, material] of this.materialPool.gameBoxMaterials) {
-            console.log(`  Hue ${hue}°: ${material.uuid.substring(0,8)} (${material.name || 'unnamed'})`)
-        }
-        
-        console.log('🏗️ Shelf Materials:')
-        console.log(`  mdfVeneer: ${this.materialPool.mdfVeneer.uuid.substring(0,8)} (${this.materialPool.mdfVeneer.name || 'unnamed'})`)
-        console.log(`  shelfInterior: ${this.materialPool.shelfInterior.uuid.substring(0,8)} (${this.materialPool.shelfInterior.name || 'unnamed'})`)
-        console.log(`  brandAccent: ${this.materialPool.brandAccent.uuid.substring(0,8)} (${this.materialPool.brandAccent.name || 'unnamed'})`)
-        
-        console.log('🏢 Environment Materials:')
-        console.log(`  carpet: ${this.materialPool.carpetMaterial.uuid.substring(0,8)} (${this.materialPool.carpetMaterial.name || 'unnamed'})`)
-        console.log(`  ceiling: ${this.materialPool.ceilingMaterial.uuid.substring(0,8)} (${this.materialPool.ceilingMaterial.name || 'unnamed'})`)
-        console.log(`  wallWood: ${this.materialPool.wallWoodMaterial.uuid.substring(0,8)} (${this.materialPool.wallWoodMaterial.name || 'unnamed'})`)
-        console.log(`  basicWood: ${this.materialPool.basicWoodMaterial.uuid.substring(0,8)} (${this.materialPool.basicWoodMaterial.name || 'unnamed'})`)
-        
-        console.groupEnd()
-    }
 
     /**
      * Get list of all game box hues in palette

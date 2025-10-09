@@ -167,7 +167,7 @@ export class SystemUICoordinator {
         return this.performanceMonitor
     }
 
-    public updateRenderStats(renderer: THREE.WebGLRenderer): void {
+    public updateRenderStats(renderer: THREE.WebGLRenderer, scene?: THREE.Scene): void {
         this.performanceMonitor.updateRenderStats(renderer)
     }
 
