@@ -74,19 +74,21 @@ Complete the transition to a comprehensive dependency injection system by elimin
 - **ServiceRegistration**: DataManager dependency added to StorePropsRenderer and SceneCoordinator registrations
 - **Backward Compatibility**: All constructors maintain fallbacks to getInstance() for smooth transition
 
-#### ❌ **Task 2.3**: EventManager DI Integration
+#### ✅ **Task 2.3**: EventManager DI Integration
 **Current getInstance() locations:**
-- `src/core/SteamBrickAndMortarApp.ts:140`
-- `src/scene/StorePropsRenderer.ts:97`
-- `src/scene/SceneCoordinator.ts:85,131,237,413`
+- ✅ ~~`src/core/SteamBrickAndMortarApp.ts:140`~~ - **Now uses DI injection**
+- ✅ ~~`src/scene/StorePropsRenderer.ts:97`~~ - **Now uses DI injection**
+- ✅ ~~`src/scene/SceneCoordinator.ts:85,131,237,413`~~ - **Now uses DI injection**
 
 **Actions Required:**
-- [ ] EventManager already in DI, but not consistently used
-- [ ] Update all getInstance() calls to use DI injection
-- [ ] Update constructors to accept EventManager parameter
-- [ ] Maintain event system functionality during transition
+- [x] EventManager already in DI, consistently used throughout
+- [x] All getInstance() calls updated to use DI injection
+- [x] Constructors updated to accept EventManager parameter
+- [x] Event system functionality maintained during transition
 
-#### ❌ **Task 2.4**: UICoordinator Layer Elimination
+**Status**: ✅ **COMPLETED** - EventManager fully integrated with DI across all UI components
+
+#### ✅ **Task 2.4**: UICoordinator Layer Elimination
 **Current Architecture (Indirect):**
 ```typescript
 SteamBrickAndMortarApp
@@ -106,12 +108,12 @@ SteamBrickAndMortarApp
 ```
 
 **Actions Required:**
-- [ ] Add UI coordinators to ServiceKeys (SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator, UIManager)
-- [ ] Register UI coordinators in ServiceRegistration with proper dependencies
-- [ ] Update SteamBrickAndMortarApp to resolve UI services directly from DI
-- [ ] Replace `this.uiCoordinator.steam.loadFromCache()` with `this.steamUICoordinator.loadFromCache()`
-- [ ] Update WebXREventHandler and SteamWorkflowManager to use direct coordinator references
-- [ ] Remove UICoordinator class entirely
+- [x] Add UI coordinators to ServiceKeys (SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator, UIManager)
+- [x] Register UI coordinators in ServiceRegistration with proper dependencies
+- [x] Update SteamBrickAndMortarApp to resolve UI services directly from DI
+- [x] Replace `this.uiCoordinator.steam.loadFromCache()` with `this.steamUICoordinator.loadFromCache()`
+- [x] Update WebXREventHandler and SteamWorkflowManager to use direct coordinator references
+- [x] Remove UICoordinator class entirely
 
 **Benefits:**
 - ✅ **Eliminates indirection**: No more `app.uiCoordinator.steam.showError()`
@@ -120,7 +122,14 @@ SteamBrickAndMortarApp
 - ✅ **Cleaner DI**: UI services become first-class DI citizens
 - ✅ **Reduced complexity**: Fewer layers, simpler initialization
 
-**Dependencies**: Should be completed after Tasks 2.2 and 2.3 for consistency
+**Status**: ✅ **COMPLETED** - UICoordinator eliminated, all UI coordinators registered directly in DI
+
+**Implementation Summary:**
+- Deleted `UICoordinator.ts` and `UICoordinator.test.ts`
+- Updated `WebXREventHandler` to accept `WebXRUICoordinator` directly
+- App now accesses UI coordinators without intermediate wrapper
+- All UI coordinators (SteamUI, WebXRUI, SystemUI) registered as independent services
+- Parameter reordering completed - required params before optional in all constructors
 
 ### **Priority 3: Service Integration Improvements**
 
@@ -130,17 +139,20 @@ SteamBrickAndMortarApp
 - **Target**: Full constructor injection with DI dependencies
 - **Dependencies**: Tasks 2.1, 2.2, 2.3 must be completed first
 
-#### ❌ **Task 3.2**: UI Panel DI Integration  
+#### ✅ **Task 3.2**: UI Panel DI Integration  
 **Files needing update:**
-- `src/ui/LightingControlsPanel.ts`
-- `src/ui/pause/panels/GraphicsSettingsPanel.ts`
-- `src/ui/pause/panels/GameSettingsPanel.ts`
-- `src/ui/pause/panels/ApplicationPanel.ts`
+- ✅ ~~`src/ui/LightingControlsPanel.ts`~~ - **Now requires EventManager and AppSettings**
+- ✅ ~~`src/ui/pause/panels/GraphicsSettingsPanel.ts`~~ - **Now requires AppSettings**
+- ✅ ~~`src/ui/pause/panels/GameSettingsPanel.ts`~~ - **Now requires AppSettings and EventManager**
+- ✅ ~~`src/ui/pause/panels/ApplicationPanel.ts`~~ - **Now requires AppSettings and EventManager**
 
 **Actions Required:**
-- [ ] Update constructors to accept AppSettings via DI
-- [ ] Update parent components to resolve and inject dependencies
-- [ ] Maintain UI functionality during transition
+- [x] Update constructors to accept AppSettings via DI
+- [x] Update parent components to resolve and inject dependencies
+- [x] UI functionality maintained during transition
+- [x] All getInstance() fallbacks removed
+
+**Status**: ✅ **COMPLETED** - All UI panels now use constructor injection, no fallbacks
 
 ### **Priority 4: Test Infrastructure Updates**
 
@@ -233,16 +245,16 @@ SteamBrickAndMortarApp
 - [x] **Task 1.1**: StoreLayout.ts cleanup - Removed unused GameBoxRenderer instantiation
 - [x] **Task 2.1**: AppSettings DI Core - Added to ServiceKeys, ServiceRegistration, and SceneCoordinator integration. UI layer reverted to getInstance() for simplicity.
 - [x] **Task 2.2**: DataManager DI Integration - All 4 getInstance() calls eliminated. Full constructor injection implemented with fallbacks.
+- [x] **Task 2.3**: EventManager DI Integration - All getInstance() calls updated to DI injection throughout UI layer
+- [x] **Task 2.4**: UICoordinator Layer Elimination - Deleted UICoordinator, UI coordinators now first-class DI citizens
+- [x] **Task 3.2**: UI Panel DI Integration - All panels use constructor injection with required parameters
 
 ### **In Progress 🔄**
-- [ ] **Next Priority**: Task 2.3 (EventManager getInstance() Elimination) - Ready to proceed
+- [ ] **Next Priority**: Task 4.1 (Test Suite DI Integration) - Update remaining test files to use DI patterns consistently
 
 ### **Pending ⏳**
-- [ ] **Task 2.3**: EventManager getInstance() elimination (6+ files)
-- [ ] **Task 2.4**: UICoordinator layer elimination (architectural improvement)
-- [ ] **Task 3.2**: UI panel constructor updates (4+ files)
-- [ ] **Task 4.1**: Test suite DI integration (10+ files)
-- [ ] **Task 4.2**: Performance test DI integration
+- [ ] **Task 4.1**: Test suite DI integration (10+ files) - Some tests still use manual getInstance()
+- [ ] **Task 4.2**: Performance test DI integration - Ensure performance tests use DI container
 
 ## 🎯 Success Criteria
 

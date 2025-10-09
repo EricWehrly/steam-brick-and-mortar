@@ -221,20 +221,20 @@ export class ServiceRegistration {
     container: ServiceContainer,
     performanceMonitor: PerformanceMonitor,
     debugStatsProvider: DebugStatsProvider,
+    eventManager: EventManager,
+    appSettings: AppSettings,
     cacheStatsProvider?: () => Promise<any>,
-    steamIntegration?: any,
-    eventManager?: EventManager,
-    appSettings?: AppSettings
+    steamIntegration?: any
   ): void {
     container.registerInstance(
       ServiceKeys.SystemUICoordinator,
       new SystemUICoordinator(
         performanceMonitor,
         debugStatsProvider,
-        cacheStatsProvider,
-        steamIntegration,
         eventManager,
-        appSettings
+        appSettings,
+        cacheStatsProvider,
+        steamIntegration
       )
     )
     

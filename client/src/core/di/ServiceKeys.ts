@@ -23,7 +23,6 @@ export const ServiceKeys = {
   InputManager: Symbol('InputManager'),
   
   // UI services
-  UICoordinator: Symbol('UICoordinator'), // TODO: Remove when UICoordinator elimination is complete
   UIManager: Symbol('UIManager'),
   SteamUICoordinator: Symbol('SteamUICoordinator'),
   WebXRUICoordinator: Symbol('WebXRUICoordinator'), 

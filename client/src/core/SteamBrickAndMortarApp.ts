@@ -165,10 +165,10 @@ export class SteamBrickAndMortarApp {
                 this.container,
                 this.performanceMonitor,
                 this.debugStatsProvider,
-                () => this.steamIntegration.getImageCacheStats(),
-                this.steamIntegration,
                 EventManager.getInstance(), // Pass EventManager (not yet resolved from DI)
-                this.appSettings // Pass AppSettings for panel DI
+                this.appSettings, // Pass AppSettings for panel DI
+                () => this.steamIntegration.getImageCacheStats(),
+                this.steamIntegration
             )
             
             // Initialize DI services
@@ -207,15 +207,9 @@ export class SteamBrickAndMortarApp {
             )
             
             // Initialize webxr event handler now that UI coordinators are available
-            // TODO: Update WebXREventHandler to not require full UICoordinator
-            const uiCoordinatorCompat = {
-                steam: this.steamUICoordinator,
-                webxr: this.webxrUICoordinator,
-                system: this.systemUICoordinator
-            }
             this.webxrEventHandler = new WebXREventHandler(
                 this.webxrCoordinator,
-                uiCoordinatorCompat as any, // Temporary compatibility object
+                this.webxrUICoordinator,
                 this.eventManager
             )
             

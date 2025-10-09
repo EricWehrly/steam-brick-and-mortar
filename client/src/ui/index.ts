@@ -3,9 +3,6 @@
  */
 
 export { UIManager } from './UIManager'
-export { 
-    UICoordinator
-} from './UICoordinator'
 export { SteamUIPanel } from './SteamUIPanel'
 export { ProgressDisplay } from './ProgressDisplay'
 export { WebXRUIPanel } from './WebXRUIPanel'

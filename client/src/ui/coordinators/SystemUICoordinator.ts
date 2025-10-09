@@ -37,18 +37,18 @@ export class SystemUICoordinator {
     constructor(
         performanceMonitor: PerformanceMonitor,
         debugStatsProvider: DebugStatsProvider,
+        eventManager: EventManager,
+        appSettings: AppSettings,
         cacheStatsProvider?: () => Promise<ImageCacheStats>,
-        steamIntegration?: SteamIntegration,
-        eventManager?: EventManager,
-        appSettings?: AppSettings
+        steamIntegration?: SteamIntegration
     ) {
         this.performanceMonitor = performanceMonitor
         this.debugStatsProvider = debugStatsProvider
         this.cacheStatsProvider = cacheStatsProvider
         this.steamIntegration = steamIntegration
         
-        this.eventManager = eventManager || EventManager.getInstance()
-        this.appSettings = appSettings || AppSettings.getInstance() // Fallback for backward compatibility
+        this.eventManager = eventManager
+        this.appSettings = appSettings
         this.pauseMenuManager = new PauseMenuManager({}, {}, undefined, this.eventManager, this.appSettings)
     }
 

@@ -7,6 +7,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { PauseMenuManager } from '../../src/ui/pause/PauseMenuManager'
 import { CacheManagementPanel } from '../../src/ui/pause/panels/CacheManagementPanel'
 import { HelpPanel } from '../../src/ui/pause/panels/HelpPanel'
+import { EventManager } from '../../src/core/EventManager'
+import { AppSettings } from '../../src/core/AppSettings'
 
 // Mock DOM environment
 function createMockDOM() {
@@ -93,8 +95,22 @@ describe('Pause Menu Integration Tests', () => {
             onMenuClose: vi.fn()
         }
 
+        // Setup mock dependencies
+        const mockEventManager = EventManager.getInstance()
+        const mockAppSettings = AppSettings.getInstance()
+        const mockSystemDependencies = {
+            performanceMonitor: null as any,
+            renderer: null as any
+        }
+
         // Create pause menu manager
-        pauseMenuManager = new PauseMenuManager({}, mockCallbacks)
+        pauseMenuManager = new PauseMenuManager(
+            {},
+            mockCallbacks,
+            mockSystemDependencies,
+            mockEventManager,
+            mockAppSettings
+        )
     })
 
     afterEach(() => {

@@ -85,9 +85,9 @@ export class PauseMenuManager {
     constructor(
         config: PauseMenuConfig = {}, 
         callbacks: PauseMenuCallbacks = {}, 
-        systemDependencies?: SystemDependencies,
-        eventManager?: EventManager,
-        appSettings?: AppSettings
+        systemDependencies: SystemDependencies | undefined,
+        eventManager: EventManager,
+        appSettings: AppSettings
     ) {
         this.config = {
             containerId: 'pause-menu-overlay',
@@ -97,8 +97,8 @@ export class PauseMenuManager {
         }
         this.callbacks = callbacks
         this.systemDependencies = systemDependencies || null
-        this.eventManager = eventManager || EventManager.getInstance() // Fallback for backward compatibility
-        this.appSettings = appSettings || AppSettings.getInstance() // Fallback for backward compatibility
+        this.eventManager = eventManager
+        this.appSettings = appSettings
     }
 
     /**
