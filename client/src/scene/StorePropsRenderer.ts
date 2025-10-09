@@ -161,10 +161,7 @@ export class StorePropsRenderer {
                 await this.setupTestObjects()
             }
             
-            // Initialize game box renderer (games are populated later via Steam API)
-            if (this.config.enableGameBoxes) {
-                this.initializeGameBoxRenderer()
-            }
+            // GameBoxRenderer will be injected via setGameBoxRenderer() method from DI container
             
             console.log('✅ Store props setup complete!')
         } catch (error) {
@@ -207,16 +204,10 @@ export class StorePropsRenderer {
         console.debug('✅ Test objects added')
     }
 
-    // TODO: I don't think this is useful
-    private initializeGameBoxRenderer(): void {
-        console.debug('🎮 Initializing game box renderer...')
-        
-        this.gameBoxRenderer = new GameBoxRenderer(
-            undefined, // Use default dimensions
-            undefined  // Use default shelf configuration
-        )
-        
-        console.debug('✅ Game box renderer initialized')
+
+    // TODO: are we sure this class needs gameBoxRenderer?
+    public setGameBoxRenderer(gameBoxRenderer: GameBoxRenderer): void {
+        this.gameBoxRenderer = gameBoxRenderer
     }
 
     // TODO: Try this

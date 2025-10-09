@@ -14,7 +14,7 @@
 
 import * as THREE from 'three'
 import { UICoordinator, PerformanceMonitor, type PerformanceStats, ToastManager } from '../ui'
-import { SceneManager, SceneCoordinator } from '../scene'
+import { SceneManager, SceneCoordinator, GameBoxRenderer } from '../scene'
 import { DebugStatsProvider } from './DebugStatsProvider'
 import { SteamGameManager } from './SteamGameManager'
 import { SteamIntegration } from '../steam-integration'
@@ -25,25 +25,23 @@ import { type WebXRCapabilities } from '../webxr/WebXRManager'
 import { EventManager, EventSource } from './EventManager'
 import { GameEventTypes, WebXREventTypes, type GameStartEvent, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from './AppSettings'
+import { ServiceContainer, ServiceRegistration, ServiceKeys } from './di'
+import type { AppConfig as DIAppConfig } from './di'
 
-export interface AppConfig {
-    scene?: {
-        antialias?: boolean
-        outputColorSpace?: THREE.ColorSpace
-    }
+export interface AppConfig extends DIAppConfig {
     steam?: {
         apiBaseUrl?: string
         maxGames?: number
-    }
-    input?: {
-        speed?: number
-        mouseSensitivity?: number
     }
 }
 
 const BACKEND_URL = 'https://steam-api-dev.wehrly.com';
 
 export class SteamBrickAndMortarApp {
+    // DI Container - Phase 1: Core services
+    private container: ServiceContainer
+    
+    // Services - will be resolved from container where available
     private sceneManager: SceneManager
     private sceneCoordinator: SceneCoordinator
     private webxrCoordinator: WebXRCoordinator
@@ -69,10 +67,14 @@ export class SteamBrickAndMortarApp {
     private gameStartEmitted = false
     
     constructor(config: AppConfig = {}) {
+        // Initialize DI Container first
+        this.container = new ServiceContainer()
+        ServiceRegistration.configureServices(this.container, config)
+        
         // Initialize AppSettings first (needed for default values)
         this.appSettings = AppSettings.getInstance()
         
-        // Initialize core scene management
+        // Initialize core scene management (will be replaced with DI resolution in init)
         this.sceneManager = new SceneManager({
             antialias: config.scene?.antialias ?? true,
             outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
@@ -190,6 +192,9 @@ export class SteamBrickAndMortarApp {
         }
         
         try {
+            // Initialize DI services first
+            await this.container.initialize()
+            
             await this.initializeCoordinators()
             
             // Mark UI as ready (coordinators initialized)
