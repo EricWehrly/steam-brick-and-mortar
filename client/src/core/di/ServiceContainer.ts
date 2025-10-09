@@ -23,7 +23,7 @@ export interface ServiceRegistration<T> {
 
 export class ServiceContainer {
   private services = new Map<ServiceKey<any>, ServiceRegistration<any>>()
-  private resolving = new Set<ServiceKey<any>>()
+  private resolutionPath: ServiceKey<any>[] = [] // Track resolution path for circular dependency detection
   private initialized = false
 
   /**
@@ -104,21 +104,17 @@ export class ServiceContainer {
       return registration.instance
     }
 
-    // Check for circular dependencies only when creating new instances
-    if (this.resolving.has(key)) {
-      throw new Error(`Circular dependency detected: ${String(key)}`)
+    // Check for circular dependencies by looking for the service in the current resolution path
+    if (this.resolutionPath.includes(key)) {
+      const pathStr = this.resolutionPath.map(k => String(k)).join(' → ')
+      throw new Error(`Circular dependency detected: ${pathStr} → ${String(key)}`)
     }
 
-    // Mark as resolving to detect circular dependencies
-    this.resolving.add(key)
+    // Add to resolution path to track dependency chain
+    this.resolutionPath.push(key)
 
     try {
-      // Resolve dependencies first
-      const resolvedDependencies = await Promise.all(
-        registration.dependencies.map(dep => this.resolve(dep))
-      )
-
-      // Create the service instance
+      // Create the service instance (factory handles its own dependency resolution)
       const instance = await registration.factory(this)
 
       // Store singleton instance
@@ -128,7 +124,8 @@ export class ServiceContainer {
 
       return instance
     } finally {
-      this.resolving.delete(key)
+      // Remove from resolution path when resolution completes
+      this.resolutionPath.pop()
     }
   }
 
@@ -187,7 +184,7 @@ export class ServiceContainer {
     }
 
     this.services.clear()
-    this.resolving.clear()
+    this.resolutionPath.length = 0 // Clear resolution path
     this.initialized = false
   }
 }
