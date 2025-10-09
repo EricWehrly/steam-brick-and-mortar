@@ -170,6 +170,22 @@ describe('ServiceContainer', () => {
             expect(storePropsRenderer.gameBoxRenderer.name).toBe('MockGameBoxRenderer')
         })
 
+        it('should resolve AppSettings as singleton via ServiceRegistration', async () => {
+            // Configure with ServiceRegistration
+            ServiceRegistration.configureServices(container, {})
+
+            await container.initialize()
+
+            // Resolve AppSettings - should work without WebGL dependencies
+            const appSettings1 = await container.resolve(ServiceKeys.AppSettings) as any
+            const appSettings2 = await container.resolve(ServiceKeys.AppSettings) as any
+            
+            // Verify singleton behavior
+            expect(appSettings1).toBe(appSettings2)
+            expect(appSettings1).toBeDefined()
+            expect(typeof appSettings1.getSetting).toBe('function')
+        })
+
         it('should resolve complex shared dependencies (SceneCoordinator scenario)', async () => {
             // Mock SceneManager (the shared dependency)
             container.registerSingleton(

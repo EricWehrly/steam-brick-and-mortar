@@ -29,6 +29,7 @@ export const ServiceKeys = {
   // Data services
   DataManager: Symbol('DataManager'),
   EventManager: Symbol('EventManager'),
+  AppSettings: Symbol('AppSettings'),
   
   // Steam services
   SteamIntegration: Symbol('SteamIntegration'),

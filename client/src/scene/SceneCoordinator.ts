@@ -52,10 +52,11 @@ export class SceneCoordinator {
     constructor(
         sceneManager: SceneManager, 
         config: SceneCoordinatorConfig = {}, 
-        storePropsRenderer?: StorePropsRenderer
+        storePropsRenderer?: StorePropsRenderer,
+        appSettings?: AppSettings
     ) {
         this.sceneManager = sceneManager
-        this.appSettings = AppSettings.getInstance()
+        this.appSettings = appSettings || AppSettings.getInstance() // Fallback for backward compatibility
         
         // Initialize visual system renderers
         this.skyboxManager = new SkyboxManager(this.sceneManager.getScene())

@@ -76,9 +76,9 @@ export class SteamBrickAndMortarApp {
             outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
         })
         
-        // Initialize DI Container and register existing SceneManager
+        // Initialize DI Container and register existing instances
         this.container = new ServiceContainer()
-        ServiceRegistration.configureServices(this.container, config, this.sceneManager)
+        ServiceRegistration.configureServices(this.container, config, this.sceneManager, this.appSettings)
         
         // Initialize Performance Monitor
         this.performanceMonitor = new PerformanceMonitor({
