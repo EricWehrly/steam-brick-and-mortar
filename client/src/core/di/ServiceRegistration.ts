@@ -138,24 +138,25 @@ export class ServiceRegistration {
       [ServiceKeys.SharedMaterialManager, ServiceKeys.SceneManager]
     )
 
-    // StorePropsRenderer (depends on SceneManager and GameBoxRenderer, dynamically resolves DataManager)
+    // StorePropsRenderer (depends on SceneManager, GameBoxRenderer, and DataManager)
     container.registerSingleton(
       ServiceKeys.StorePropsRenderer,
       async (container) => {
         const sceneManager = await container.resolve(ServiceKeys.SceneManager) as SceneManager
         const gameBoxRenderer = await container.resolve(ServiceKeys.GameBoxRenderer) as GameBoxRenderer
+        const dataManager = await container.resolve(ServiceKeys.DataManager) as DataManager
         
-        console.debug('🏪 Creating StorePropsRenderer with DI dependencies and service container access')
+        console.debug('🏪 Creating StorePropsRenderer with DI dependencies')
         
-        const storePropsRenderer = new StorePropsRenderer(sceneManager.getScene(), container)
+        const storePropsRenderer = new StorePropsRenderer(sceneManager.getScene(), dataManager)
         storePropsRenderer.setGameBoxRenderer(gameBoxRenderer) // Inject GameBoxRenderer
         
         return storePropsRenderer
       },
-      [ServiceKeys.SceneManager, ServiceKeys.GameBoxRenderer]
+      [ServiceKeys.SceneManager, ServiceKeys.GameBoxRenderer, ServiceKeys.DataManager]
     )
 
-    // SceneCoordinator (depends on SceneManager, StorePropsRenderer, AppSettings, and DataManager)
+    // SceneCoordinator (depends on SceneManager, StorePropsRenderer, AppSettings, DataManager, and EventManager)
     container.registerSingleton(
       ServiceKeys.SceneCoordinator,
       async (container) => {
@@ -163,6 +164,7 @@ export class ServiceRegistration {
         const storePropsRenderer = await container.resolve(ServiceKeys.StorePropsRenderer) as StorePropsRenderer
         const appSettings = await container.resolve(ServiceKeys.AppSettings) as AppSettings
         const dataManager = await container.resolve(ServiceKeys.DataManager) as DataManager
+        const eventManager = await container.resolve(ServiceKeys.EventManager) as EventManager
         
         console.debug('🎬 Creating SceneCoordinator with DI dependencies')
         
@@ -174,11 +176,11 @@ export class ServiceRegistration {
           environment: {
             skyboxPreset: 'aurora'
           }
-        }, storePropsRenderer, appSettings, dataManager) // Pass all DI dependencies
+        }, storePropsRenderer, appSettings, dataManager, eventManager) // Pass all DI dependencies
         
         return sceneCoordinator
       },
-      [ServiceKeys.SceneManager, ServiceKeys.StorePropsRenderer, ServiceKeys.AppSettings, ServiceKeys.DataManager]
+      [ServiceKeys.SceneManager, ServiceKeys.StorePropsRenderer, ServiceKeys.AppSettings, ServiceKeys.DataManager, ServiceKeys.EventManager]
     )
 
     return container

@@ -83,11 +83,11 @@ export class RoomManager {
         height: RoomConstants.DEFAULT_ROOM_HEIGHT
     }
 
-    constructor(scene: THREE.Scene, dataManager?: DataManager) {
+    constructor(scene: THREE.Scene, dataManager?: DataManager, eventManager?: EventManager) {
         this.scene = scene
         this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
         this.materialManager = SharedMaterialManager.getInstance()
-        this.eventManager = EventManager.getInstance()
+        this.eventManager = eventManager || EventManager.getInstance() // DI injection with fallback
         
         // Register event listeners
         // Single event handler for room resize (handles both creation and updating)

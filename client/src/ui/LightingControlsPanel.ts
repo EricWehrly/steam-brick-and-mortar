@@ -32,8 +32,8 @@ export class LightingControlsPanel {
     private debugIndicatorEnabled: boolean
     private panelCollapsed: boolean = true
 
-    constructor() {
-        this.eventManager = EventManager.getInstance()
+    constructor(eventManager?: EventManager) {
+        this.eventManager = eventManager || EventManager.getInstance() // DI injection with fallback
         this.lightCreatedHandler = this.onLightCreated.bind(this)
         this.lightingSystemReadyHandler = this.onLightingSystemReady.bind(this)
     this.appSettings = AppSettings.getInstance()

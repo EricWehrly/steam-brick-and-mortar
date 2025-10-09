@@ -137,11 +137,8 @@ export class SteamBrickAndMortarApp {
 
         // SteamGameManager will be initialized in init() method with DI-resolved GameBoxRenderer
 
-        // Initialize event manager for interaction architecture
-        this.eventManager = EventManager.getInstance()
-        
-        // Set up prerequisite event listeners
-        this.setupPrerequisiteEventListeners()
+        // EventManager will be resolved from DI container in init() method
+        // setupPrerequisiteEventListeners() will be called after EventManager is resolved
 
         // SteamWorkflowManager will be initialized in init() method with DI-resolved dependencies
 
@@ -161,6 +158,12 @@ export class SteamBrickAndMortarApp {
         try {
             // Initialize DI services first
             await this.container.initialize()
+            
+            // Resolve EventManager from DI container
+            this.eventManager = await this.container.resolve(ServiceKeys.EventManager) as EventManager
+            
+            // Set up prerequisite event listeners now that EventManager is available
+            this.setupPrerequisiteEventListeners()
             
             // Resolve SceneCoordinator from DI container
             this.sceneCoordinator = await this.container.resolve(ServiceKeys.SceneCoordinator) as SceneCoordinator

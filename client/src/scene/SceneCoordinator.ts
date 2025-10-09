@@ -49,17 +49,20 @@ export class SceneCoordinator {
     private roomManager: RoomManager
     private appSettings: AppSettings
     private dataManager: DataManager
+    private eventManager: EventManager
 
     constructor(
         sceneManager: SceneManager, 
         config: SceneCoordinatorConfig = {}, 
         storePropsRenderer?: StorePropsRenderer,
         appSettings?: AppSettings,
-        dataManager?: DataManager
+        dataManager?: DataManager,
+        eventManager?: EventManager
     ) {
         this.sceneManager = sceneManager
         this.appSettings = appSettings || AppSettings.getInstance() // Fallback for backward compatibility
         this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
+        this.eventManager = eventManager || EventManager.getInstance() // DI injection with fallback
         
         // Initialize visual system renderers
         this.skyboxManager = new SkyboxManager(this.sceneManager.getScene())
@@ -68,7 +71,7 @@ export class SceneCoordinator {
             this.sceneManager.getRenderer()
         )
         // Initialize room manager for event-driven room structure (no longer needs EnvironmentRenderer)
-        this.roomManager = new RoomManager(this.sceneManager.getScene(), this.dataManager)
+        this.roomManager = new RoomManager(this.sceneManager.getScene(), this.dataManager, this.eventManager)
         
         // Use DI-injected StorePropsRenderer or create one for backward compatibility
         this.propsRenderer = storePropsRenderer || new StorePropsRenderer(this.sceneManager.getScene(), this.dataManager)
@@ -86,7 +89,7 @@ export class SceneCoordinator {
 
 
         // Register for Steam data loaded events to spawn dynamic shelves  
-        EventManager.getInstance().registerEventHandler(SteamEventTypes.DataLoaded, (event: CustomEvent<SteamDataLoadedEvent>) => {
+        this.eventManager.registerEventHandler(SteamEventTypes.DataLoaded, (event: CustomEvent<SteamDataLoadedEvent>) => {
             this.onSteamDataLoaded(event.detail)
         })
         console.debug('✅ Steam data loaded event handler restored - games will spawn on shelves')
@@ -132,7 +135,7 @@ export class SceneCoordinator {
             await this.skyboxManager.applySkybox(preset)
             
             // Room structure creation handled by RoomManager via event
-            EventManager.getInstance().emit('room:resize', {
+            this.eventManager.emit('room:resize', {
                 reason: 'initial-setup',
                 timestamp: Date.now(),
                 source: 'SceneCoordinator'
@@ -238,7 +241,7 @@ export class SceneCoordinator {
             // RoomManager will get game count from DataManager and calculate appropriate dimensions
             // StorePropsRenderer will listen for room:resized and spawn shelves accordingly
             console.debug(`📏 Requesting room resize for Steam data`)
-            EventManager.getInstance().emit('room:resize', {
+            this.eventManager.emit('room:resize', {
                 reason: 'steam-data-loaded',
                 timestamp: Date.now(),
                 source: 'SceneCoordinator'
@@ -413,7 +416,7 @@ export class SceneCoordinator {
         
         console.log('📡 Emitting SceneReady event - basic navigation is ready')
         
-        EventManager.getInstance().emit<SceneReadyEvent>(GameEventTypes.SceneReady, {
+        this.eventManager.emit<SceneReadyEvent>(GameEventTypes.SceneReady, {
             source: EventSource.System,
             timestamp: Date.now(),
             sceneStats: {
