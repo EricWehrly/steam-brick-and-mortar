@@ -3,6 +3,8 @@
  * 
  * Tests that RoomManager correctly stores and retrieves Steam game data
  * using the new DataManager instead of global access patterns.
+ * 
+ * Migration: Updated to use createSceneTestContainer() for proper DI isolation
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -11,6 +13,9 @@ import { RoomManager } from '../../../src/scene/RoomManager'
 import { DataManager, DataDomain } from '../../../src/core/data'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
+import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
+import { ServiceKeys } from '../../../src/core/di/ServiceKeys'
+import { createSceneTestContainer } from '../../utils/test-container-helpers'
 
 // Mock TextureManager to avoid file system dependencies
 vi.mock('../../../src/utils/TextureManager', () => ({
@@ -32,24 +37,33 @@ vi.mock('../../../src/scene/PropRenderer', () => ({
 }))
 
 describe('RoomManager DataManager Integration', () => {
+    let container: ServiceContainer
     let scene: THREE.Scene
     let roomManager: RoomManager
     let eventManager: EventManager
     let dataManager: DataManager
-    beforeEach(() => {
-        // Clean up singletons for fresh test state
-        DataManager.resetInstance()
+    
+    beforeEach(async () => {
+        // Create isolated test container
+        container = await createSceneTestContainer()
 
         scene = new THREE.Scene()
-        eventManager = EventManager.getInstance()
-        dataManager = DataManager.getInstance()
+        
+        // Resolve services from container
+        eventManager = await container.resolve(ServiceKeys.EventManager)
+        dataManager = await container.resolve(ServiceKeys.DataManager)
 
         roomManager = new RoomManager(scene)
     })
 
-    afterEach(() => {
+    afterEach(async () => {
         roomManager?.dispose()
-        DataManager.resetInstance()
+        
+        // Clear DataManager state to prevent test pollution
+        dataManager.clear()
+        
+        // Dispose container to clean up all services
+        await container.dispose()
     })
 
     describe('Steam Data Storage Integration', () => {

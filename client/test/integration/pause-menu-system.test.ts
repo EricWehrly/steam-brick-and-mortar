@@ -1,6 +1,8 @@
 /**
  * Integration test for the pause menu system
  * Tests escape key integration and menu functionality
+ * 
+ * Migration: Updated to use createSceneTestContainer() for proper DI isolation
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -9,6 +11,9 @@ import { CacheManagementPanel } from '../../src/ui/pause/panels/CacheManagementP
 import { HelpPanel } from '../../src/ui/pause/panels/HelpPanel'
 import { EventManager } from '../../src/core/EventManager'
 import { AppSettings } from '../../src/core/AppSettings'
+import { ServiceContainer } from '../../src/core/di/ServiceContainer'
+import { ServiceKeys } from '../../src/core/di/ServiceKeys'
+import { createSceneTestContainer } from '../utils/test-container-helpers'
 
 // Mock DOM environment
 function createMockDOM() {
@@ -49,11 +54,17 @@ function createMockDOM() {
 }
 
 describe('Pause Menu Integration Tests', () => {
+    let container: ServiceContainer
     let pauseMenuManager: PauseMenuManager
     let mockCallbacks: any
     let mockDOM: ReturnType<typeof createMockDOM>
+    let eventManager: EventManager
+    let appSettings: AppSettings
 
-    beforeEach(() => {
+    beforeEach(async () => {
+        // Create isolated test container
+        container = await createSceneTestContainer()
+        
         // Setup DOM mocks
         mockDOM = createMockDOM()
         vi.stubGlobal('document', mockDOM.mockDocument)
@@ -95,9 +106,10 @@ describe('Pause Menu Integration Tests', () => {
             onMenuClose: vi.fn()
         }
 
-        // Setup mock dependencies
-        const mockEventManager = EventManager.getInstance()
-        const mockAppSettings = AppSettings.getInstance()
+        // Resolve dependencies from container
+        eventManager = await container.resolve(ServiceKeys.EventManager)
+        appSettings = await container.resolve(ServiceKeys.AppSettings)
+        
         const mockSystemDependencies = {
             performanceMonitor: null as any,
             renderer: null as any
@@ -108,15 +120,18 @@ describe('Pause Menu Integration Tests', () => {
             {},
             mockCallbacks,
             mockSystemDependencies,
-            mockEventManager,
-            mockAppSettings
+            eventManager,
+            appSettings
         )
     })
 
-    afterEach(() => {
+    afterEach(async () => {
         pauseMenuManager?.dispose()
         vi.restoreAllMocks()
         vi.unstubAllGlobals()
+        
+        // Dispose container to clean up all services
+        await container.dispose()
     })
 
     describe('Initialization', () => {

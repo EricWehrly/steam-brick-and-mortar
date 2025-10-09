@@ -1,10 +1,15 @@
 /**
  * Test to trigger Steam data loaded event and see taxonomy analysis
+ * 
+ * Migration: Updated to use createSceneTestContainer() for proper DI isolation
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
+import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
+import { ServiceKeys } from '../../../src/core/di/ServiceKeys'
+import { createSceneTestContainer } from '../../utils/test-container-helpers'
 
 // Mock all dependencies
 vi.mock('../../../src/scene/SceneManager', () => ({
@@ -56,10 +61,16 @@ import { SceneCoordinator } from '../../../src/scene/SceneCoordinator'
 import { SceneManager } from '../../../src/scene/SceneManager'
 
 describe('Taxonomy Analysis Demo', () => {
+    let container: ServiceContainer
+    let eventManager: EventManager
     let sceneCoordinator: SceneCoordinator
     let sceneManager: SceneManager
 
-    beforeEach(() => {
+    beforeEach(async () => {
+        // Create test container with DI
+        container = await createSceneTestContainer()
+        eventManager = await container.resolve(ServiceKeys.EventManager)
+        
         sceneManager = new SceneManager({})
         sceneCoordinator = new SceneCoordinator(sceneManager)
         
@@ -137,8 +148,6 @@ describe('Taxonomy Analysis Demo', () => {
     })
 
     it('should show comprehensive taxonomy analysis for sample games', () => {
-        const eventManager = EventManager.getInstance()
-        
         console.log('\n🎮 === RUNNING TAXONOMY ANALYSIS DEMO ===\n')
         
         // Emit the SteamDataLoaded event to trigger analysis
@@ -156,8 +165,6 @@ describe('Taxonomy Analysis Demo', () => {
     })
 
     it('should handle missing game data gracefully', () => {
-        const eventManager = EventManager.getInstance()
-        
         // Remove mock data to test fallback
         delete (window as any).app
         
@@ -176,8 +183,11 @@ describe('Taxonomy Analysis Demo', () => {
         console.log('\n✅ === FALLBACK TEST COMPLETE ===\n')
     })
 
-    afterEach(() => {
+    afterEach(async () => {
         // Clean up global mock
         delete (window as any).app
+        
+        // Dispose of DI container
+        await container.dispose()
     })
 })

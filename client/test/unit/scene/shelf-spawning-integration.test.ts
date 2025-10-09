@@ -1,5 +1,7 @@
 /**
  * Test suite for verifying shelf spawning works with the cleaned up event architecture
+ * 
+ * Migration: Updated to use createSceneTestContainer() for proper DI isolation
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -10,39 +12,41 @@ import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { RoomEventTypes } from '../../../src/types/InteractionEvents'
 import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
 import { ServiceKeys } from '../../../src/core/di/ServiceKeys'
+import { createSceneTestContainer } from '../../utils/test-container-helpers'
 
 describe('Shelf Spawning Integration', () => {
+    let container: ServiceContainer
     let scene: THREE.Scene
     let propsRenderer: StorePropsRenderer
     let dataManager: DataManager
     let eventManager: EventManager
-    let serviceContainer: ServiceContainer
 
     beforeEach(async () => {
+        // Create isolated test container with all required services
+        container = await createSceneTestContainer()
+        
         // Setup THREE.js scene
         scene = new THREE.Scene()
         
-        // Initialize DataManager 
-        dataManager = DataManager.getInstance()
+        // Resolve services from container
+        dataManager = await container.resolve(ServiceKeys.DataManager)
+        eventManager = await container.resolve(ServiceKeys.EventManager)
+        
+        // Clear any existing data
         dataManager.clear()
         
-        // Initialize EventManager
-        eventManager = EventManager.getInstance()
-        
-        // Create and configure service container
-        serviceContainer = new ServiceContainer()
-        serviceContainer.registerSingleton(ServiceKeys.DataManager, async () => dataManager)
-        await serviceContainer.initialize()
-        
-        // Initialize StorePropsRenderer (this registers for room:resized events)
-        // Resolve DataManager from container
-        const resolvedDataManager = await serviceContainer.resolve(ServiceKeys.DataManager) as DataManager
-        propsRenderer = new StorePropsRenderer(scene, resolvedDataManager)
+        // Initialize StorePropsRenderer with resolved DataManager
+        propsRenderer = new StorePropsRenderer(scene, dataManager)
     })
 
-    afterEach(() => {
+    afterEach(async () => {
         propsRenderer.dispose()
+        
+        // Clear DataManager state to prevent test pollution
         dataManager.clear()
+        
+        // Dispose container to clean up all services
+        await container.dispose()
     })
 
     describe('Fixed Event-Driven Architecture', () => {

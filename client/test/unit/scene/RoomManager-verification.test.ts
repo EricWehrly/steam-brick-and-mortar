@@ -1,5 +1,7 @@
 /**
  * Simple test to verify RoomManager DataManager integration logs
+ * 
+ * Migration: Updated to use DI container for proper test isolation
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -7,6 +9,9 @@ import * as THREE from 'three'
 import { RoomManager } from '../../../src/scene/RoomManager'
 import { DataManager, DataDomain } from '../../../src/core/data'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
+import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
+import { ServiceKeys } from '../../../src/core/di/ServiceKeys'
+import { createSceneTestContainer } from '../../utils/test-container-helpers'
 
 // Mock complex dependencies
 vi.mock('../../../src/utils/TextureManager', () => ({
@@ -27,17 +32,22 @@ vi.mock('../../../src/scene/PropRenderer', () => ({
 }))
 
 describe('RoomManager DataManager Integration Verification', () => {
+    let container: ServiceContainer
     let scene: THREE.Scene
     let roomManager: RoomManager
     let eventManager: EventManager
     let dataManager: DataManager
     let consoleSpy: any
 
-    beforeEach(() => {
-        DataManager.resetInstance()
+    beforeEach(async () => {
+        // Create isolated DI container for this test
+        container = await createSceneTestContainer()
+        
         scene = new THREE.Scene()
-        eventManager = EventManager.getInstance()
-        dataManager = DataManager.getInstance()
+        
+        // Resolve services from container (isolated instances)
+        eventManager = await container.resolve(ServiceKeys.EventManager)
+        dataManager = await container.resolve(ServiceKeys.DataManager)
 
         // Set up console spy to capture logs
         consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -45,10 +55,12 @@ describe('RoomManager DataManager Integration Verification', () => {
         roomManager = new RoomManager(scene)
     })
 
-    afterEach(() => {
+    afterEach(async () => {
         roomManager?.dispose()
         consoleSpy?.mockRestore()
-        DataManager.resetInstance()
+        
+        // Dispose container to clean up all services
+        await container.dispose()
     })
 
     it('should verify DataManager integration with explicit log checking', async () => {

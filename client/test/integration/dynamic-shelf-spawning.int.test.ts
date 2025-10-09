@@ -1,26 +1,43 @@
 /**
  * Integration test for dynamic shelf spawning functionality
  * Verifies that shelves are properly created and added to the scene
+ * 
+ * Migration: Updated to use createSceneTestContainer() for proper DI isolation
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { StorePropsRenderer } from '../../src/scene/StorePropsRenderer'
 import { DataManager, type DataDomain } from '../../src/core/data/DataManager'
+import { ServiceContainer } from '../../src/core/di/ServiceContainer'
+import { ServiceKeys } from '../../src/core/di/ServiceKeys'
+import { createSceneTestContainer } from '../utils/test-container-helpers'
 
 describe('Dynamic Shelf Spawning Integration', () => {
+    let container: ServiceContainer
     let scene: THREE.Scene
     let propsRenderer: StorePropsRenderer
-    let mockDataManager: DataManager
+    let dataManager: DataManager
 
-    beforeEach(() => {
+    beforeEach(async () => {
+        // Create isolated test container
+        container = await createSceneTestContainer()
+        
         scene = new THREE.Scene()
         
-        // Create mock DataManager with the data it needs
-        mockDataManager = DataManager.getInstance()
-        mockDataManager.set('steam.gameCount', 12, { domain: 'steam-integration' as any, ttl: 3600000 }) // Set the game count the test expects
+        // Resolve DataManager from container
+        dataManager = await container.resolve(ServiceKeys.DataManager)
+        dataManager.set('steam.gameCount', 12, { domain: 'steam-integration' as any, ttl: 3600000 }) // Set the game count the test expects
         
-        propsRenderer = new StorePropsRenderer(scene, mockDataManager)
+        propsRenderer = new StorePropsRenderer(scene, dataManager)
+    })
+
+    afterEach(async () => {
+        // Clear DataManager state to prevent test pollution
+        dataManager.clear()
+        
+        // Dispose container to clean up all services
+        await container.dispose()
     })
 
     it('should spawn dynamic shelves and add them to scene', async () => {
