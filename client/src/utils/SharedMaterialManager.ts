@@ -14,7 +14,9 @@
 
 import * as THREE from 'three'
 import { MaterialUtils } from './MaterialUtils'
-import { TextureManager } from './TextureManager'
+import { WoodMaterialGenerator } from './materials/WoodMaterialGenerator'
+import { CarpetMaterialGenerator } from './materials/CarpetMaterialGenerator'
+import { CeilingMaterialGenerator } from './materials/CeilingMaterialGenerator'
 
 export type ShelfMaterialType = 'mdfVeneer' | 'shelfInterior' | 'brandAccent'
 
@@ -59,7 +61,11 @@ export interface GameBoxMaterialConfig {
 export class SharedMaterialManager {
     private static instance: SharedMaterialManager
     private materialPool: MaterialPool | null = null
-    private textureManager: TextureManager
+    
+    // Material generators
+    private woodMaterialGenerator: WoodMaterialGenerator
+    private carpetMaterialGenerator: CarpetMaterialGenerator
+    private ceilingMaterialGenerator: CeilingMaterialGenerator
     
     // Pool statistics
     private poolRequests = 0
@@ -67,7 +73,9 @@ export class SharedMaterialManager {
     private disposed = false
 
     private constructor() {
-        this.textureManager = TextureManager.getInstance()
+        this.woodMaterialGenerator = new WoodMaterialGenerator()
+        this.carpetMaterialGenerator = new CarpetMaterialGenerator()
+        this.ceilingMaterialGenerator = new CeilingMaterialGenerator()
     }
 
     public static getInstance(): SharedMaterialManager {
@@ -263,7 +271,7 @@ export class SharedMaterialManager {
      * Enhanced for VR close-up viewing with detailed wood grain
      */
     private createMDFVeneerMaterial(): THREE.MeshStandardMaterial {
-        return this.textureManager.createEnhancedProceduralWoodMaterial({
+        return this.woodMaterialGenerator.createEnhancedProceduralMaterial({
             repeat: { x: 6, y: 4 }, // Higher repeat for detailed grain at close VR distance
             grainStrength: 0.3,     // More visible wood character for realism
             ringFrequency: 0.01,    // Tighter growth rings for natural wood appearance
@@ -301,7 +309,7 @@ export class SharedMaterialManager {
      * Create shared carpet material for floor
      */
     private createCarpetMaterial(): THREE.MeshStandardMaterial {
-        return this.textureManager.createEnhancedProceduralCarpetMaterial({
+        return this.carpetMaterialGenerator.createEnhancedProceduralMaterial({
             color: '#8B0000',
             fiberDensity: 0.5,
             repeat: { x: 4, y: 4 }
@@ -312,7 +320,7 @@ export class SharedMaterialManager {
      * Create shared ceiling material
      */
     private createCeilingMaterial(): THREE.MeshStandardMaterial {
-        return this.textureManager.createEnhancedProceduralCeilingMaterial({
+        return this.ceilingMaterialGenerator.createEnhancedProceduralMaterial({
             color: '#F5F5DC',
             bumpSize: 0.6,
             density: 0.8,
@@ -324,7 +332,7 @@ export class SharedMaterialManager {
      * Create enhanced wall wood material
      */
     private createWallWoodMaterial(): THREE.MeshStandardMaterial {
-        return this.textureManager.createEnhancedProceduralWoodMaterial({
+        return this.woodMaterialGenerator.createEnhancedProceduralMaterial({
             grainStrength: 0.5,
             ringFrequency: 0.1,
             color1: '#8B4513',
@@ -338,7 +346,7 @@ export class SharedMaterialManager {
      * Create basic wood material  
      */
     private createBasicWoodMaterial(): THREE.MeshStandardMaterial {
-        return this.textureManager.createProceduralWoodMaterial({
+        return this.woodMaterialGenerator.createProceduralMaterial({
             repeat: { x: 3, y: 1 }
         })
     }

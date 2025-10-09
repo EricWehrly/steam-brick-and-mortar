@@ -6,15 +6,15 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import * as THREE from 'three'
 import { WoodMaterialGenerator } from '../../../../src/utils/materials/WoodMaterialGenerator'
-import { TextureManager } from '../../../../src/utils/TextureManager'
+import { SharedMaterialManager } from '../../../../src/utils/SharedMaterialManager'
 
 describe('MDF Veneer Materials - Task 6.1.1.1', () => {
   let woodMaterialGenerator: WoodMaterialGenerator
-  let textureManager: TextureManager
+  let materialManager: SharedMaterialManager
 
   beforeEach(() => {
     woodMaterialGenerator = new WoodMaterialGenerator()
-    textureManager = TextureManager.getInstance()
+    materialManager = SharedMaterialManager.getInstance()
   })
 
   describe('MDF Veneer Material', () => {
@@ -82,11 +82,11 @@ describe('MDF Veneer Materials - Task 6.1.1.1', () => {
     })
   })
 
-  describe('TextureManager Integration', () => {
-    it('should expose MDF veneer materials through TextureManager', () => {
-      const mdfMaterial = textureManager.createMDFVeneerMaterial()
-      const interiorMaterial = textureManager.createShelfInteriorMaterial()
-      const accentMaterial = textureManager.createBrandAccentMaterial()
+  describe('WoodMaterialGenerator Integration', () => {
+    it('should expose MDF veneer materials through WoodMaterialGenerator', () => {
+      const mdfMaterial = woodMaterialGenerator.createMDFVeneerMaterial()
+      const interiorMaterial = woodMaterialGenerator.createShelfInteriorMaterial()
+      const accentMaterial = woodMaterialGenerator.createBrandAccentMaterial()
 
       expect(mdfMaterial).toBeInstanceOf(THREE.MeshStandardMaterial)
       expect(interiorMaterial).toBeInstanceOf(THREE.MeshStandardMaterial)
