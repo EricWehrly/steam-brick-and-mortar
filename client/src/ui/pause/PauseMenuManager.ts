@@ -23,7 +23,7 @@ import type { PerformanceMonitor } from '../PerformanceMonitor'
 import { EventManager, EventSource } from '../../core/EventManager'
 import { SteamEventTypes, LightingEventTypes } from '../../types/InteractionEvents'
 import type { SteamDataLoadedEvent, LightingToggleEvent, LightingDebugToggleEvent, LightingQualityChangedEvent } from '../../types/InteractionEvents'
-import type { ApplicationSettings } from '../../core/AppSettings'
+import { AppSettings, type ApplicationSettings } from '../../core/AppSettings'
 
 export interface PauseMenuState {
     isOpen: boolean
@@ -80,8 +80,15 @@ export class PauseMenuManager {
     private cacheManagementPanel: CacheManagementPanel | null = null
     private applicationPanel: ApplicationPanel | null = null
     private eventManager: EventManager
+    private appSettings: AppSettings
 
-    constructor(config: PauseMenuConfig = {}, callbacks: PauseMenuCallbacks = {}, systemDependencies?: SystemDependencies) {
+    constructor(
+        config: PauseMenuConfig = {}, 
+        callbacks: PauseMenuCallbacks = {}, 
+        systemDependencies?: SystemDependencies,
+        eventManager?: EventManager,
+        appSettings?: AppSettings
+    ) {
         this.config = {
             containerId: 'pause-menu-overlay',
             overlayClass: 'pause-menu-overlay',
@@ -90,7 +97,8 @@ export class PauseMenuManager {
         }
         this.callbacks = callbacks
         this.systemDependencies = systemDependencies || null
-        this.eventManager = EventManager.getInstance()
+        this.eventManager = eventManager || EventManager.getInstance() // Fallback for backward compatibility
+        this.appSettings = appSettings || AppSettings.getInstance() // Fallback for backward compatibility
     }
 
     /**
@@ -161,7 +169,7 @@ export class PauseMenuManager {
         this.registerPanel(new HelpPanel())
         
         // Register application panel
-        const applicationPanel = new ApplicationPanel()
+        const applicationPanel = new ApplicationPanel({}, this.appSettings, this.eventManager)
         applicationPanel.initialize({
             onSettingsChanged: (settings) => this.handleSettingsChange(settings)
         })
@@ -169,10 +177,10 @@ export class PauseMenuManager {
         this.registerPanel(applicationPanel)
         
         // Register game settings panel
-        this.registerPanel(new GameSettingsPanel())
+        this.registerPanel(new GameSettingsPanel({}, this.appSettings, this.eventManager))
         
         // Register graphics settings panel
-        const graphicsPanel = new GraphicsSettingsPanel()
+        const graphicsPanel = new GraphicsSettingsPanel({}, this.appSettings)
         graphicsPanel.initialize({
             onSettingsChanged: (settings) => this.handleSettingsChange(settings)
         })

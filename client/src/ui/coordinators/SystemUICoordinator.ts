@@ -20,6 +20,7 @@ import type { ImageCacheStats } from '../../steam/images/ImageManager'
 import type { SteamIntegration } from '../../steam-integration/SteamIntegration'
 import type { SteamWorkflowManager } from '../../steam-integration/SteamWorkflowManager'
 import type { UIManager } from '../UIManager'
+import { AppSettings } from '../../core/AppSettings'
 
 export class SystemUICoordinator {
     private pauseMenuManager: PauseMenuManager
@@ -31,13 +32,15 @@ export class SystemUICoordinator {
     private steamIntegration?: SteamIntegration
     private steamWorkflowManager?: SteamWorkflowManager
     private uiManager?: UIManager
+    private appSettings: AppSettings
 
     constructor(
         performanceMonitor: PerformanceMonitor,
         debugStatsProvider: DebugStatsProvider,
         cacheStatsProvider?: () => Promise<ImageCacheStats>,
         steamIntegration?: SteamIntegration,
-        eventManager?: EventManager
+        eventManager?: EventManager,
+        appSettings?: AppSettings
     ) {
         this.performanceMonitor = performanceMonitor
         this.debugStatsProvider = debugStatsProvider
@@ -45,7 +48,8 @@ export class SystemUICoordinator {
         this.steamIntegration = steamIntegration
         
         this.eventManager = eventManager || EventManager.getInstance()
-        this.pauseMenuManager = new PauseMenuManager()
+        this.appSettings = appSettings || AppSettings.getInstance() // Fallback for backward compatibility
+        this.pauseMenuManager = new PauseMenuManager({}, {}, undefined, this.eventManager, this.appSettings)
     }
 
     public setUIManager(uiManager: UIManager): void {
@@ -136,7 +140,7 @@ export class SystemUICoordinator {
 
     public initializeLightingControls(): void {
         if (!this.lightingControlsPanel) {
-            this.lightingControlsPanel = new LightingControlsPanel()
+            this.lightingControlsPanel = new LightingControlsPanel(this.eventManager, this.appSettings)
             // Show the integrated panel by default since the button is now part of it
             this.lightingControlsPanel.show()
         }

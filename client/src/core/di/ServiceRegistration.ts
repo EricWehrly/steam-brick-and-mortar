@@ -215,14 +215,16 @@ export class ServiceRegistration {
 
   /**
    * Register SystemUICoordinator with runtime dependencies from the app
-   * Call this after app initialization when dependencies are available
+   * Call this before container initialization when dependencies are available
    */
   public static registerSystemUICoordinator(
     container: ServiceContainer,
     performanceMonitor: PerformanceMonitor,
     debugStatsProvider: DebugStatsProvider,
     cacheStatsProvider?: () => Promise<any>,
-    steamIntegration?: any
+    steamIntegration?: any,
+    eventManager?: EventManager,
+    appSettings?: AppSettings
   ): void {
     container.registerInstance(
       ServiceKeys.SystemUICoordinator,
@@ -230,7 +232,9 @@ export class ServiceRegistration {
         performanceMonitor,
         debugStatsProvider,
         cacheStatsProvider,
-        steamIntegration
+        steamIntegration,
+        eventManager,
+        appSettings
       )
     )
     

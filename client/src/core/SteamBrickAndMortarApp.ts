@@ -166,7 +166,9 @@ export class SteamBrickAndMortarApp {
                 this.performanceMonitor,
                 this.debugStatsProvider,
                 () => this.steamIntegration.getImageCacheStats(),
-                this.steamIntegration
+                this.steamIntegration,
+                EventManager.getInstance(), // Pass EventManager (not yet resolved from DI)
+                this.appSettings // Pass AppSettings for panel DI
             )
             
             // Initialize DI services
