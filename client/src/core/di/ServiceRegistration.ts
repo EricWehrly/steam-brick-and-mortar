@@ -15,6 +15,9 @@ import { SceneCoordinator } from '../../scene/SceneCoordinator'
 import { DataManager } from '../data/DataManager'
 import { EventManager } from '../EventManager'
 import { AppSettings } from '../AppSettings'
+import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../../ui/coordinators'
+import { PerformanceMonitor } from '../../ui/PerformanceMonitor'
+import type { DebugStatsProvider } from '../DebugStatsProvider'
 
 export interface AppConfig {
   // Scene configuration  
@@ -183,6 +186,54 @@ export class ServiceRegistration {
       [ServiceKeys.SceneManager, ServiceKeys.StorePropsRenderer, ServiceKeys.AppSettings, ServiceKeys.DataManager, ServiceKeys.EventManager]
     )
 
+    // UI Coordinators (direct registration, eliminating UICoordinator layer)
+    // Note: These will require runtime dependencies from the app (PerformanceMonitor, DebugStatsProvider, etc.)
+    
+    // SteamUICoordinator (no dependencies, simple instantiation)
+    container.registerSingleton(
+      ServiceKeys.SteamUICoordinator,
+      () => {
+        console.debug('🎮 Creating SteamUICoordinator singleton')
+        return new SteamUICoordinator()
+      }
+    )
+
+    // WebXRUICoordinator (no dependencies, simple instantiation)
+    container.registerSingleton(
+      ServiceKeys.WebXRUICoordinator,
+      () => {
+        console.debug('🥽 Creating WebXRUICoordinator singleton')
+        return new WebXRUICoordinator()
+      }
+    )
+
+    // SystemUICoordinator registration will be handled at app level since it needs runtime dependencies
+    // (PerformanceMonitor, DebugStatsProvider, ImageCacheStats provider, SteamIntegration)
+
     return container
+  }
+
+  /**
+   * Register SystemUICoordinator with runtime dependencies from the app
+   * Call this after app initialization when dependencies are available
+   */
+  public static registerSystemUICoordinator(
+    container: ServiceContainer,
+    performanceMonitor: PerformanceMonitor,
+    debugStatsProvider: DebugStatsProvider,
+    cacheStatsProvider?: () => Promise<any>,
+    steamIntegration?: any
+  ): void {
+    container.registerInstance(
+      ServiceKeys.SystemUICoordinator,
+      new SystemUICoordinator(
+        performanceMonitor,
+        debugStatsProvider,
+        cacheStatsProvider,
+        steamIntegration
+      )
+    )
+    
+    console.debug('🖥️ Registered SystemUICoordinator with runtime dependencies')
   }
 }

@@ -24,7 +24,10 @@ describe('StorePropsRenderer Independence', () => {
         serviceContainer.registerSingleton(ServiceKeys.DataManager, async () => DataManager.getInstance())
         await serviceContainer.initialize()
         
-        propsRenderer = new StorePropsRenderer(scene, serviceContainer)
+        // Resolve DataManager from container
+        const dataManager = await serviceContainer.resolve(ServiceKeys.DataManager) as DataManager
+        
+        propsRenderer = new StorePropsRenderer(scene, dataManager)
     })
 
     describe('Constructor Independence', () => {

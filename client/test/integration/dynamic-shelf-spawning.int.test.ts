@@ -6,14 +6,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { StorePropsRenderer } from '../../src/scene/StorePropsRenderer'
+import { DataManager, type DataDomain } from '../../src/core/data/DataManager'
 
 describe('Dynamic Shelf Spawning Integration', () => {
     let scene: THREE.Scene
     let propsRenderer: StorePropsRenderer
+    let mockDataManager: DataManager
 
     beforeEach(() => {
         scene = new THREE.Scene()
-        propsRenderer = new StorePropsRenderer(scene)
+        
+        // Create mock DataManager with the data it needs
+        mockDataManager = DataManager.getInstance()
+        mockDataManager.set('steam.gameCount', 12, { domain: 'steam-integration' as any, ttl: 3600000 }) // Set the game count the test expects
+        
+        propsRenderer = new StorePropsRenderer(scene, mockDataManager)
     })
 
     it('should spawn dynamic shelves and add them to scene', async () => {

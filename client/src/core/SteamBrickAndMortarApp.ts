@@ -13,7 +13,8 @@
  */
 
 import * as THREE from 'three'
-import { UICoordinator, PerformanceMonitor, type PerformanceStats, ToastManager } from '../ui'
+import { PerformanceMonitor, type PerformanceStats, ToastManager, UIManager } from '../ui'
+import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
 import { SceneManager, SceneCoordinator, GameBoxRenderer } from '../scene'
 import { DebugStatsProvider } from './DebugStatsProvider'
 import { SteamGameManager } from './SteamGameManager'
@@ -26,7 +27,9 @@ import { type WebXRCapabilities } from '../webxr/WebXRManager'
 import { EventManager, EventSource } from './EventManager'
 import { GameEventTypes, WebXREventTypes, type GameStartEvent, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from './AppSettings'
-import { ServiceContainer, ServiceRegistration, ServiceKeys } from './di'
+import { ServiceContainer } from './di/ServiceContainer'
+import { ServiceRegistration } from './di/ServiceRegistration'
+import { ServiceKeys } from './di/ServiceKeys'
 import type { AppConfig as DIAppConfig } from './di'
 
 export interface AppConfig extends DIAppConfig {
@@ -41,13 +44,18 @@ const BACKEND_URL = 'https://steam-api-dev.wehrly.com';
 export class SteamBrickAndMortarApp {
     // DI Container - Phase 1: Core services
     private container: ServiceContainer
+    private readonly config: AppConfig // Store config for container recreation
     
     // Services - will be resolved from container where available
     private sceneManager: SceneManager
     private sceneCoordinator!: SceneCoordinator // Will be resolved from DI container in init()
     private webxrCoordinator: WebXRCoordinator
     private webxrEventHandler: WebXREventHandler
-    private uiCoordinator: UICoordinator
+    // UI coordinators resolved from DI container
+    private steamUICoordinator: SteamUICoordinator
+    private webxrUICoordinator: WebXRUICoordinator  
+    private systemUICoordinator: SystemUICoordinator
+    private uiManager: UIManager
     private performanceMonitor: PerformanceMonitor
     private steamIntegration: SteamIntegration
     private debugStatsProvider: DebugStatsProvider
@@ -68,6 +76,9 @@ export class SteamBrickAndMortarApp {
     private gameStartEmitted = false
     
     constructor(config: AppConfig = {}) {
+        // Store config for potential container recreation
+        this.config = config
+        
         // Initialize AppSettings first (needed for default values)
         this.appSettings = AppSettings.getInstance()
         
@@ -127,13 +138,11 @@ export class SteamBrickAndMortarApp {
             this.performanceMonitor
         )
 
-        // Initialize UI coordinator (events now handled by EventManager)
-        this.uiCoordinator = new UICoordinator(
-            this.performanceMonitor,
-            this.debugStatsProvider,
-            () => this.steamIntegration.getImageCacheStats(),
-            this.steamIntegration
-        )
+        // Initialize UI Manager - completely self-sufficient, no dependencies
+        this.uiManager = new UIManager()
+        
+        // UI coordinators will be resolved from DI container in init() method
+        // SystemUICoordinator requires runtime dependencies, so we'll register it manually
 
         // SteamGameManager will be initialized in init() method with DI-resolved GameBoxRenderer
 
@@ -142,12 +151,7 @@ export class SteamBrickAndMortarApp {
 
         // SteamWorkflowManager will be initialized in init() method with DI-resolved dependencies
 
-        // Initialize webxr event handler to handle WebXR and input interactions
-        this.webxrEventHandler = new WebXREventHandler(
-            this.webxrCoordinator,
-            this.uiCoordinator,
-            this.eventManager
-        )
+        // WebXREventHandler will be initialized in init() method after UI coordinators are resolved
     }
 
     async init(): Promise<void> {
@@ -156,7 +160,16 @@ export class SteamBrickAndMortarApp {
         }
         
         try {
-            // Initialize DI services first
+            // Register SystemUICoordinator with runtime dependencies BEFORE initialization
+            ServiceRegistration.registerSystemUICoordinator(
+                this.container,
+                this.performanceMonitor,
+                this.debugStatsProvider,
+                () => this.steamIntegration.getImageCacheStats(),
+                this.steamIntegration
+            )
+            
+            // Initialize DI services
             await this.container.initialize()
             
             // Resolve EventManager from DI container
@@ -167,6 +180,11 @@ export class SteamBrickAndMortarApp {
             
             // Resolve SceneCoordinator from DI container
             this.sceneCoordinator = await this.container.resolve(ServiceKeys.SceneCoordinator) as SceneCoordinator
+            
+            // Resolve UI coordinators from DI container
+            this.steamUICoordinator = await this.container.resolve(ServiceKeys.SteamUICoordinator) as SteamUICoordinator
+            this.webxrUICoordinator = await this.container.resolve(ServiceKeys.WebXRUICoordinator) as WebXRUICoordinator
+            this.systemUICoordinator = await this.container.resolve(ServiceKeys.SystemUICoordinator) as SystemUICoordinator
             
             // Initialize steam game manager with DI-resolved GameBoxRenderer
             const gameBoxRenderer = await this.container.resolve(ServiceKeys.GameBoxRenderer) as GameBoxRenderer
@@ -182,8 +200,21 @@ export class SteamBrickAndMortarApp {
                 this.eventManager,
                 this.steamIntegration,
                 this.sceneCoordinator,
-                this.uiCoordinator,
+                this.steamUICoordinator,
                 dataManager
+            )
+            
+            // Initialize webxr event handler now that UI coordinators are available
+            // TODO: Update WebXREventHandler to not require full UICoordinator
+            const uiCoordinatorCompat = {
+                steam: this.steamUICoordinator,
+                webxr: this.webxrUICoordinator,
+                system: this.systemUICoordinator
+            }
+            this.webxrEventHandler = new WebXREventHandler(
+                this.webxrCoordinator,
+                uiCoordinatorCompat as any, // Temporary compatibility object
+                this.eventManager
             )
             
             await this.initializeCoordinators()
@@ -213,9 +244,10 @@ export class SteamBrickAndMortarApp {
     }
 
     private async initializeCoordinators(): Promise<void> {
-        // Setup UI with all components (Steam workflow manager will be set later)
-        await this.uiCoordinator.setupUI(this.sceneManager.getRenderer(),
-            this.steamWorkflowManager)
+        // Setup UI with all components (replacing UICoordinator.setupUI())
+        this.uiManager.init()
+        await this.systemUICoordinator.init(this.sceneManager.getRenderer(), this.steamWorkflowManager)
+        this.uiManager.hideLoading()
 
         // Setup WebXR capabilities
         await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
@@ -235,7 +267,7 @@ export class SteamBrickAndMortarApp {
                 console.log(`Auto-loading cached user: ${firstUser.displayName} (${firstUser.vanityUrl})`)
                 
                 // Load from cache using the established workflow
-                this.uiCoordinator.steam.loadFromCache(firstUser.vanityUrl)
+                this.steamUICoordinator.loadFromCache(firstUser.vanityUrl)
                 
                 ToastManager.info(`Auto-loaded ${firstUser.displayName} (${firstUser.gameCount} games)`, { duration: 3000 })
             }
@@ -243,7 +275,7 @@ export class SteamBrickAndMortarApp {
             console.warn('Failed to auto-load cached user:', error)
             // Don't throw - this is a nice-to-have feature
         }
-    }    dispose(): void {
+    }    async dispose(): Promise<void> {
         if (!this.isInitialized) {
             return
         }
@@ -257,10 +289,19 @@ export class SteamBrickAndMortarApp {
         this.eventManager.dispose()
         
         // Then dispose coordinators
-        this.uiCoordinator.dispose()
+        this.systemUICoordinator.dispose()
         this.webxrCoordinator.dispose()
         this.sceneCoordinator.dispose()
         this.sceneManager.dispose()
+        
+        // Dispose and recreate the DI container for clean reinitialization
+        await this.container.dispose()
+        this.container = ServiceRegistration.configureServices(
+            new ServiceContainer(),
+            this.config,
+            this.sceneManager,
+            this.appSettings
+        )
         
         this.isInitialized = false
         console.log('✅ Application disposed')
@@ -351,7 +392,7 @@ export class SteamBrickAndMortarApp {
         this.sceneManager.startRenderLoop({
             webxrCoordinator: this.webxrCoordinator,
             sceneCoordinator: this.sceneCoordinator,
-            systemUICoordinator: this.uiCoordinator.system
+            systemUICoordinator: this.systemUICoordinator
         })
         
         this.performanceMonitor.start()

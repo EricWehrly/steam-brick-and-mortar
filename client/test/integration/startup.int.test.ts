@@ -304,7 +304,7 @@ describe('Application Startup Integration', () => {
         // Import classes for testing
         const { SteamWorkflowManager } = await import('../../src/steam-integration/SteamWorkflowManager')
         const { SteamIntegration } = await import('../../src/steam-integration/SteamIntegration')
-        const { UICoordinator } = await import('../../src/ui/UICoordinator')
+        const { SteamUICoordinator } = await import('../../src/ui/coordinators')
         const { SceneCoordinator } = await import('../../src/scene/SceneCoordinator')
         const { SceneManager } = await import('../../src/scene/SceneManager')
         const { PerformanceMonitor } = await import('../../src/ui/PerformanceMonitor')
@@ -330,11 +330,7 @@ describe('Application Startup Integration', () => {
             })
         } as any
         
-        const mockUICoordinator = new UICoordinator(
-            mockPerformanceMonitor,
-            mockDebugStatsProvider,
-            () => mockSteamIntegration.getImageCacheStats()
-        )
+        const mockSteamUICoordinator = new SteamUICoordinator()
         
         // Create mock SceneCoordinator
         const mockSceneManager = new SceneManager()
@@ -346,7 +342,7 @@ describe('Application Startup Integration', () => {
                 mockEventManager,
                 mockSteamIntegration,
                 mockSceneCoordinator,
-                mockUICoordinator
+                mockSteamUICoordinator
             )
         }).not.toThrow()
     })

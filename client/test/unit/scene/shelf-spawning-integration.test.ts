@@ -35,7 +35,9 @@ describe('Shelf Spawning Integration', () => {
         await serviceContainer.initialize()
         
         // Initialize StorePropsRenderer (this registers for room:resized events)
-        propsRenderer = new StorePropsRenderer(scene, serviceContainer)
+        // Resolve DataManager from container
+        const resolvedDataManager = await serviceContainer.resolve(ServiceKeys.DataManager) as DataManager
+        propsRenderer = new StorePropsRenderer(scene, resolvedDataManager)
     })
 
     afterEach(() => {
