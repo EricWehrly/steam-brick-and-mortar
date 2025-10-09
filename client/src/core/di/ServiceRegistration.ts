@@ -65,7 +65,8 @@ export interface AppConfig {
 export class ServiceRegistration {
   public static configureServices(
     container: ServiceContainer, 
-    config: AppConfig = {}
+    config: AppConfig = {},
+    existingSceneManager?: SceneManager
   ): ServiceContainer {
     
     // Configuration (always register config first)
@@ -93,11 +94,17 @@ export class ServiceRegistration {
     )
 
     // Scene services (Three.js context required)
-    container.registerSingleton(
-      ServiceKeys.SceneManager,
-      () => new SceneManager(config.scene || {}),
-      []
-    )
+    if (existingSceneManager) {
+      // Use existing SceneManager instance from the app
+      container.registerInstance(ServiceKeys.SceneManager, existingSceneManager)
+    } else {
+      // Create new SceneManager (for testing scenarios)
+      container.registerSingleton(
+        ServiceKeys.SceneManager,
+        () => new SceneManager(config.scene || {}),
+        []
+      )
+    }
 
     // GameBoxRenderer (depends on SharedMaterialManager and SceneManager) 
     // This is the critical singleton we need to ensure single instance

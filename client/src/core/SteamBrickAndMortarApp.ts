@@ -67,18 +67,18 @@ export class SteamBrickAndMortarApp {
     private gameStartEmitted = false
     
     constructor(config: AppConfig = {}) {
-        // Initialize DI Container first
-        this.container = new ServiceContainer()
-        ServiceRegistration.configureServices(this.container, config)
-        
         // Initialize AppSettings first (needed for default values)
         this.appSettings = AppSettings.getInstance()
         
-        // Initialize core scene management (will be replaced with DI resolution in init)
+        // Initialize core scene management first - this will be shared via DI
         this.sceneManager = new SceneManager({
             antialias: config.scene?.antialias ?? true,
             outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
         })
+        
+        // Initialize DI Container and register existing SceneManager
+        this.container = new ServiceContainer()
+        ServiceRegistration.configureServices(this.container, config, this.sceneManager)
         
         // Initialize Performance Monitor
         this.performanceMonitor = new PerformanceMonitor({
