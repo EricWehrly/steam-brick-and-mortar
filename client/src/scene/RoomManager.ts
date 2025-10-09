@@ -1,9 +1,5 @@
 /**
- * Roomimport * as THREE from 'three'
-import { EventManager } from '../core/EventManager'
-import { TextureManager } from '../core/TextureManager'
-import { PropRenderer } from './PropRenderer'
-import { RoomEventTypes, type RoomCreateEvent, type RoomResizeEvent } from '../types/InteractionEvents'ager - Single Source of Truth for Room Structure
+ * RoomManager - Single Source of Truth for Room Structure
  * 
  * Centralized management of room/store structure creation and resizing.
  * Handles both initial room creation and dynamic resizing based on game count.
