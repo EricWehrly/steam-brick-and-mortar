@@ -114,34 +114,6 @@ export class GameBoxRenderer {
         return boxes
     }
 
-    public createGameBoxAtPosition(
-        scene: THREE.Scene,
-        game: SteamGameData,
-        position: THREE.Vector3,
-        textureOptions?: GameBoxTextureOptions,
-        name?: string
-    ): THREE.Mesh | null {
-        // Create core game box
-        const gameBox = this.createGameBoxCore(game, position, name)
-        
-        // Apply texture if provided (async operation)
-        if (textureOptions) {
-            this.textureManager.applyTexture(gameBox, game, textureOptions).then((success) => {
-                if (success) {
-                    console.debug(`✅ Applied texture to game box: ${game.name}`)
-                }
-            }).catch(error => {
-                console.debug(`⚠️ Failed to apply texture to game box ${game.name}:`, error)
-            })
-        }
-        
-        // Add to scene
-        scene.add(gameBox)
-        console.debug(`📦 Created positioned game box for "${game.name}" at (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`)
-        
-        return gameBox
-    }
-
     public createGameBox(
         game: SteamGameData,
         position: THREE.Vector3 = new THREE.Vector3(0, 0, 0),
@@ -153,40 +125,10 @@ export class GameBoxRenderer {
         
         // Apply texture if available
         if (textureOptions) {
-            this.textureManager.applyTexture(gameBox, game, textureOptions)
+            this.textureManager.applyTexture(gameBox, textureOptions)
         }
         
         console.debug(`📦 Created game box: ${gameBox.name} at position (${gameBox.position.x.toFixed(2)}, ${gameBox.position.y.toFixed(2)}, ${gameBox.position.z.toFixed(2)})`)
-        return gameBox
-    }
-
-    public createGameBoxWithTexture(
-        scene: THREE.Scene, 
-        game: SteamGameData, 
-        index: number,
-        textureOptions?: GameBoxTextureOptions
-    ): THREE.Mesh | null {
-        // Calculate position using GameBoxLayoutUtils
-        const config = GameBoxLayoutUtils.DEFAULT_SHELF_CONFIG
-        const position = GameBoxLayoutUtils.calculateBoxPosition(index, 0, config)
-        
-        // Create core game box
-        const gameBox = this.createGameBoxCore(game, new THREE.Vector3(position.x, position.y, position.z))
-        
-        // Apply texture if provided (async operation)
-        if (textureOptions) {
-            this.textureManager.applyTexture(gameBox, textureOptions).then((success) => {
-                if (success) {
-                    console.log(`🖼️ Applied texture to game box: ${game.name}`)
-                }
-            }).catch((error) => {
-                console.warn(`⚠️ Failed to apply texture to ${game.name}:`, error)
-            })
-        }
-        
-        scene.add(gameBox)
-        
-        console.log(`📦 Added game box ${index}: ${game.name}`)
         return gameBox
     }
 
@@ -214,65 +156,6 @@ export class GameBoxRenderer {
         gameBox.receiveShadow = true
         
         return gameBox
-    }
-    
-    public createGameBoxesFromBatch(
-        scene: THREE.Scene,
-        request: GameBoxBatchCreationRequest
-    ): THREE.Mesh[] {
-        const { games, enablePerformanceFeatures = false } = request
-        
-        console.log(`🎮 Creating game boxes from ${games.length} games...`)
-        
-        if (!games || games.length === 0) {
-            console.warn('⚠️ No games provided for game box creation')
-            return []
-        }
-
-        // Sort games (no artificial limits - render all loaded games)
-        const sortedGames = GameBoxLayoutUtils.sortAndLimitGames(games)
-        const boxes: THREE.Mesh[] = []
-        
-        // Calculate centering for the entire set of boxes
-        const config = GameBoxLayoutUtils.DEFAULT_SHELF_CONFIG
-        const startX = GameBoxLayoutUtils.calculateStartX(sortedGames.length, config)
-        
-        // Create game boxes with proper centering
-        sortedGames.forEach((game, index) => {
-            const creationRequest: GameBoxCreationRequest = {
-                gameData: game,
-                index,
-                textureOptions: enablePerformanceFeatures ? {
-                    enableLazyLoading: true
-                } : undefined
-            }
-            
-            const box = this.createGameBoxFromRequest(scene, creationRequest)
-            if (box) {
-                // Adjust position to center the entire set
-                const currentPos = box.position
-                box.position.set(currentPos.x + startX, currentPos.y, currentPos.z)
-                boxes.push(box)
-            }
-        })
-        
-        console.log(`✅ Created ${boxes.length} game boxes from game library`)
-        return boxes
-    }
-    
-    public createGameBoxFromRequest(
-        scene: THREE.Scene,
-        request: GameBoxCreationRequest
-    ): THREE.Mesh | null {
-        const { gameData, index, textureOptions } = request
-        return this.createGameBoxWithTexture(scene, gameData, index, textureOptions)
-    }
-    
-    public createGameBoxesFromGameData(
-        scene: THREE.Scene, 
-        games: SteamGameData[]
-    ): THREE.Mesh[] {
-        return this.createGameBoxesFromBatch(scene, { games })
     }
 
     public clearGameBoxes(scene: THREE.Scene): number {
