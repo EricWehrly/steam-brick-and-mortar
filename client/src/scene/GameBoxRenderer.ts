@@ -25,6 +25,7 @@ import type { TexturePerformanceConfig } from './game-box/types/PerformanceTypes
 import { GameBoxPerformanceManager } from './game-box/GameBoxPerformanceManager'
 import { GameBoxTextureManager } from './game-box/GameBoxTextureManager'
 import { GameBoxLayoutUtils } from './game-box/GameBoxLayoutUtils'
+import { InstancedLabelRenderer } from './game-box/instancing/InstancedLabelRenderer'
 import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 
 // Export types for backward compatibility
@@ -67,6 +68,10 @@ export class GameBoxRenderer {
     private performanceManager?: GameBoxPerformanceManager
     private textureManager: GameBoxTextureManager
     private materialManager: SharedMaterialManager
+    
+    // GPU Instanced label rendering
+    private instancedLabelRenderer?: InstancedLabelRenderer
+    private labelInstanceIndex: number = 0 // Track next available label instance index
 
     constructor(
         // TODO: Allow dimensions as optional per created game box, with a geometry pool
@@ -94,6 +99,52 @@ export class GameBoxRenderer {
 
         if(!GameBoxRenderer._instance) {
             GameBoxRenderer._instance = this;
+        }
+        
+        console.debug(`📦 GameBoxRenderer initialized with dimensions: ${this.dimensions.width}x${this.dimensions.height}x${this.dimensions.depth}`)
+    }
+    
+    /**
+     * Initialize GPU instanced label renderer with game data
+     * Call this once when games are loaded to enable high-performance label rendering
+     */
+    public async initializeInstancedLabelRenderer(scene: THREE.Scene, games: SteamGameData[]): Promise<void> {
+        if (this.instancedLabelRenderer) {
+            console.warn('Instanced label renderer already initialized')
+            return
+        }
+        
+        try {
+            console.log('🚀 Initializing GPU instanced label renderer...')
+            this.instancedLabelRenderer = new InstancedLabelRenderer(scene, {
+                maxInstances: games.length + 100 // Some buffer for dynamic additions
+            })
+            
+            await this.instancedLabelRenderer.initializeWithGames(games)
+            this.labelInstanceIndex = 0 // Reset index counter
+            
+            console.log('✅ GPU instanced label renderer ready - all new game boxes will use instanced labels')
+        } catch (error) {
+            console.error('❌ Failed to initialize instanced label renderer:', error)
+            this.instancedLabelRenderer = undefined
+        }
+    }
+    
+    /**
+     * Check if instanced label renderer is available and ready
+     */
+    public hasInstancedLabelRenderer(): boolean {
+        return this.instancedLabelRenderer?.isReady() || false
+    }
+    
+    /**
+     * Finalize all label instances and update GPU
+     * Call after creating a batch of game boxes for optimal performance
+     */
+    public finalizeInstancedLabels(): void {
+        if (this.instancedLabelRenderer) {
+            this.instancedLabelRenderer.updateGPU()
+            console.debug(`🔄 Finalized ${this.labelInstanceIndex} instanced labels`)
         }
     }
 
@@ -175,16 +226,25 @@ export class GameBoxRenderer {
         gameBox.receiveShadow = true
         
         // Add game name text label to the front face
-        this.addGameNameLabel(gameBox, game.name)
+        // Only use GPU instanced labels if renderer is initialized, otherwise skip labels
+        if (this.instancedLabelRenderer?.isReady()) {
+            this.addInstancedGameNameLabel(gameBox, game.name)
+        } else {
+            // Skip individual labels entirely - GPU instanced renderer will handle all labels
+            console.debug(`⏳ Skipping label for "${game.name}" - GPU instanced renderer not ready`)
+        }
         
         return gameBox
     }
 
     /**
      * Create a text label with the game name and add it to the game box
-     * The label appears on the front face of the box
+     * DEPRECATED: This method is only called as fallback when GPU instanced renderer isn't ready
      */
     private addGameNameLabel(gameBox: THREE.Mesh, gameName: string): void {
+        console.warn(`📋 Creating individual label for "${gameName}" - GPU instanced renderer not available`)
+        
+        // Legacy individual label creation (should rarely be used)
         // Create canvas for text rendering
         const canvas = document.createElement('canvas')
         const context = canvas.getContext('2d')
@@ -257,6 +317,48 @@ export class GameBoxRenderer {
         gameBox.userData.labelTexture = texture
         gameBox.userData.labelMesh = label
     }
+    
+    /**
+     * Add game name label using GPU instanced rendering (high performance)
+     * This method uses the InstancedLabelRenderer for massive performance gains
+     */
+    private addInstancedGameNameLabel(gameBox: THREE.Mesh, gameName: string): void {
+        if (!this.instancedLabelRenderer) {
+            console.warn('Instanced label renderer not available')
+            return
+        }
+        
+        // Calculate label position in world space (front face of game box)
+        const labelPosition = new THREE.Vector3()
+        gameBox.getWorldPosition(labelPosition)
+        
+        // Offset to front face of game box
+        labelPosition.z += (this.dimensions.depth / 2) + 0.001
+        
+        // Get game box rotation
+        const labelRotation = new THREE.Quaternion()
+        gameBox.getWorldQuaternion(labelRotation)
+        
+        // Set instance in the GPU instanced renderer
+        const success = this.instancedLabelRenderer.setLabelInstance(
+            this.labelInstanceIndex,
+            labelPosition,
+            labelRotation,
+            gameName
+        )
+        
+        if (success) {
+            // Store instance info for cleanup/updates
+            gameBox.userData.labelInstanceIndex = this.labelInstanceIndex
+            gameBox.userData.hasInstancedLabel = true
+            this.labelInstanceIndex++
+            
+            console.debug(`📋 Added instanced label for "${gameName}" at index ${this.labelInstanceIndex - 1}`)
+        } else {
+            console.warn(`Failed to add instanced label for "${gameName}"`)
+            // Could fallback to individual mesh here if needed
+        }
+    }
 
     public clearGameBoxes(scene: THREE.Scene): number {
         const existingBoxes = scene.children.filter(child => 
@@ -274,20 +376,29 @@ export class GameBoxRenderer {
      * Dispose of a single game box and its resources
      */
     private disposeGameBox(gameBox: THREE.Mesh): void {
-        // Dispose label texture if it exists
-        if (gameBox.userData.labelTexture) {
-            gameBox.userData.labelTexture.dispose()
+        // Dispose custom materials and textures
+        if (gameBox.material instanceof THREE.Material) {
+            gameBox.material.dispose()
+        } else if (Array.isArray(gameBox.material)) {
+            gameBox.material.forEach(mat => mat.dispose())
         }
         
-        // Dispose label mesh if it exists
-        if (gameBox.userData.labelMesh) {
-            const labelMesh = gameBox.userData.labelMesh as THREE.Mesh
-            if (labelMesh.geometry) labelMesh.geometry.dispose()
-            if (labelMesh.material) {
-                if (Array.isArray(labelMesh.material)) {
-                    labelMesh.material.forEach(mat => mat.dispose())
-                } else {
-                    labelMesh.material.dispose()
+        // Dispose geometry (shared geometry should not be disposed here)
+        // gameBox.geometry?.dispose() // Commented out to avoid disposing shared geometry
+        
+        // Handle instanced labels (no individual cleanup needed - managed by InstancedLabelRenderer)
+        if (gameBox.userData.hasInstancedLabel) {
+            console.debug(`🏷️ Game box had instanced label at index ${gameBox.userData.labelInstanceIndex}`)
+            // Note: Individual instances don't need cleanup - InstancedLabelRenderer manages the pool
+        } else {
+            // Dispose individual label resources if present (legacy method)
+            if (gameBox.userData.labelTexture) {
+                gameBox.userData.labelTexture.dispose()
+            }
+            if (gameBox.userData.labelMesh) {
+                gameBox.userData.labelMesh.geometry?.dispose()
+                if (gameBox.userData.labelMesh.material instanceof THREE.Material) {
+                    gameBox.userData.labelMesh.material.dispose()
                 }
             }
         }
@@ -309,6 +420,12 @@ export class GameBoxRenderer {
     }
 
     public dispose(): void {
+        console.debug('🧹 Disposing GameBoxRenderer resources')
+        
+        // Dispose instanced label renderer
+        this.instancedLabelRenderer?.dispose()
+        this.instancedLabelRenderer = undefined
+        
         // Dispose geometry
         this.gameBoxGeometry.dispose()
         
@@ -318,7 +435,10 @@ export class GameBoxRenderer {
         
         // Note: Shared materials are managed by SharedMaterialManager
         
-        console.log('🧹 Disposed GameBoxRenderer and all managers')
+        // Reset instance tracking
+        this.labelInstanceIndex = 0
+        
+        console.log('✅ GameBoxRenderer disposed including instanced labels')
     }
 
     // Performance features delegated to GameBoxPerformanceManager
