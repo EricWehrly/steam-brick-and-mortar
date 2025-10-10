@@ -172,6 +172,7 @@ export class DebugPanel extends PauseMenuPanel {
         }
     }
 
+    // TODO: I think this isn't doing us any good and should be deleted
     private setupConsoleCapture(): void {
         // Capture console output and display in debug console
         const originalLog = console.log

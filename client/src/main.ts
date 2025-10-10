@@ -8,6 +8,7 @@
 
 import './styles/main.css'
 import { SteamBrickAndMortarApp } from './core'
+import { TestMode } from './types/TestMode'
 
 // Track if initialization is already in progress or completed
 let isInitializing = false
@@ -39,6 +40,9 @@ export async function initializeApp(): Promise<void> {
             input: {
                 speed: 0.1,
                 mouseSensitivity: 0.005
+            },
+            tests: {
+                [TestMode.GPU_INSTANCED_TEXTURES]: 'enabled'
             }
         })
         

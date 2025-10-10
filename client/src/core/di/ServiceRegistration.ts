@@ -64,6 +64,8 @@ export interface AppConfig {
     defaultTTL?: number
     maxEntries?: number
   }
+
+  tests?: Record<string, string>
 }
 
 export class ServiceRegistration {
@@ -175,7 +177,8 @@ export class ServiceRegistration {
           },
           environment: {
             skyboxPreset: 'aurora'
-          }
+          },
+          tests: config.tests
         }, storePropsRenderer, appSettings, dataManager, eventManager) // Pass all DI dependencies
         
         return sceneCoordinator

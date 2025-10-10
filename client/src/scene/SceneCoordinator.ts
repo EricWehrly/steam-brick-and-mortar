@@ -41,6 +41,7 @@ export interface SceneCoordinatorConfig {
     props?: {
         enableTestObjects?: boolean
     }
+    tests?: Record<string, string>
 }
 
 export class SceneCoordinator {
@@ -52,6 +53,7 @@ export class SceneCoordinator {
     private appSettings: AppSettings
     private dataManager: DataManager
     private eventManager: EventManager
+    private config: SceneCoordinatorConfig
 
     constructor(
         sceneManager: SceneManager, 
@@ -61,6 +63,9 @@ export class SceneCoordinator {
         dataManager?: DataManager,
         eventManager?: EventManager
     ) {
+        // Store config for later use
+        this.config = config
+        
         // TODO: DI tho?
         this.sceneManager = sceneManager
         this.appSettings = appSettings || AppSettings.getInstance() // Fallback for backward compatibility
@@ -156,7 +161,8 @@ export class SceneCoordinator {
         await this.propsRenderer.setupProps({
             enableShelves: true,
             enableGameBoxes: true,
-            enableSignage: true
+            enableSignage: true,
+            tests: this.config.tests
         })
     }
 

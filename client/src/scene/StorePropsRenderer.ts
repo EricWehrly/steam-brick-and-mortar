@@ -24,6 +24,7 @@ import { EventManager } from '../core/EventManager'
 import { RoomEventTypes } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
+import { TestMode, getEnabledTests } from '../types/TestMode'
 
 // Configuration constants for game layout - made static and accessible
 // TODO: Make these user-configurable in game menus
@@ -42,6 +43,8 @@ export interface PropsConfig {
     enableGameBoxes?: boolean
     /** Enable signage */
     enableSignage?: boolean
+    /** Enable test objects */
+    enableTestObjects?: boolean
     /** Performance configuration */
     performance?: {
         maxTextureSize?: number
@@ -50,6 +53,8 @@ export interface PropsConfig {
         maxActiveTextures?: number
         frustumCullingEnabled?: boolean
     }
+    /** Test modes - map of test name to string value */
+    tests?: Record<string, string>
 }
 
 export class StorePropsRenderer {
@@ -132,6 +137,16 @@ export class StorePropsRenderer {
         this.config = { ...this.getDefaultConfig(), ...config }
         
         console.debug('🎁 Setting up store props...')
+        
+        // Log enabled tests
+        if (this.config.tests) {
+            const enabledTests = getEnabledTests(this.config.tests)
+            if (enabledTests.length > 0) {
+                console.log('🧪 Enabled tests:', enabledTests)
+            } else {
+                console.debug('🧪 No tests enabled')
+            }
+        }
         
         try {
             // Set up props in logical order
