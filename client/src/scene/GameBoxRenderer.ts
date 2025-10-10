@@ -175,7 +175,7 @@ export class GameBoxRenderer {
         
         // Apply texture if provided (async operation)
         if (textureOptions) {
-            this.textureManager.applyTexture(gameBox, game, textureOptions).then((success) => {
+            this.textureManager.applyTexture(gameBox, textureOptions).then((success) => {
                 if (success) {
                     console.log(`🖼️ Applied texture to game box: ${game.name}`)
                 }
