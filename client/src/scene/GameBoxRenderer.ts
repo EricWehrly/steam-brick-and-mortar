@@ -12,7 +12,7 @@ import * as THREE from 'three'
 import { MaterialUtils } from '../utils/MaterialUtils'
 
 // Import types from modular structure
-import type { GameData, SteamGameData } from './game-box/types/GameData'
+import type { SteamGameData } from './game-box/types/GameData'
 import type {
     GameBoxDimensions,
     GameBoxPosition,
@@ -29,7 +29,6 @@ import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 
 // Export types for backward compatibility
 export type {
-    GameData,
     SteamGameData,
     GameBoxDimensions,
     GameBoxPosition,
@@ -117,7 +116,7 @@ export class GameBoxRenderer {
 
     public createGameBoxAtPosition(
         scene: THREE.Scene,
-        game: GameData | SteamGameData,
+        game: SteamGameData,
         position: THREE.Vector3,
         textureOptions?: GameBoxTextureOptions,
         name?: string
@@ -144,7 +143,7 @@ export class GameBoxRenderer {
     }
 
     public createGameBox(
-        game: GameData | SteamGameData,
+        game: SteamGameData,
         position: THREE.Vector3 = new THREE.Vector3(0, 0, 0),
         textureOptions?: GameBoxTextureOptions,
         name?: string
@@ -163,7 +162,7 @@ export class GameBoxRenderer {
 
     public createGameBoxWithTexture(
         scene: THREE.Scene, 
-        game: GameData | SteamGameData, 
+        game: SteamGameData, 
         index: number,
         textureOptions?: GameBoxTextureOptions
     ): THREE.Mesh | null {
@@ -193,7 +192,7 @@ export class GameBoxRenderer {
 
     // Core creation logic used by public factory methods
     private createGameBoxCore(
-        game: GameData | SteamGameData,
+        game: SteamGameData,
         position: THREE.Vector3,
         name?: string
     ): THREE.Mesh {
@@ -271,7 +270,7 @@ export class GameBoxRenderer {
     
     public createGameBoxesFromGameData(
         scene: THREE.Scene, 
-        games: (GameData | SteamGameData)[]
+        games: SteamGameData[]
     ): THREE.Mesh[] {
         return this.createGameBoxesFromBatch(scene, { games })
     }

@@ -18,7 +18,6 @@ export {
     type GameBoxBatchCreationRequest
 } from './game-box/types/GameBoxOptions'
 export {
-    type GameData,
     type SteamGameData
 } from './game-box/types/GameData'
 export {

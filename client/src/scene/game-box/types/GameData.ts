@@ -1,23 +1,11 @@
 /**
- * Game Data Types
+ * Steam Game Data Types
  * 
- * Interface definitions for representing game data from various sources.
- * GameData is generic and source-agnostic, while SteamGameData is 
- * specific to Steam API responses.
+ * Interface definitions for representing Steam game data from Steam API responses.
+ * Since we only work with Steam games, this is the single source of truth for game data.
  */
 
-// Generic game data interface - not specific to Steam
-export interface GameData {
-    id: string | number
-    name: string
-    playtime: number
-    recentPlaytime?: number
-    // Artwork URLs are handled separately via texture options
-    // This keeps the renderer agnostic to data source
-}
-
-// Legacy Steam interface for backward compatibility
-// TODO: Remove this once SteamGameManager is refactored
+// Steam interface for Steam API responses
 export interface SteamGameData {
     appid: string | number
     name: string
