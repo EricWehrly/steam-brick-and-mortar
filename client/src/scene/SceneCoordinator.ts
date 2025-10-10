@@ -212,20 +212,6 @@ export class SceneCoordinator {
     private analyzeTaxonomies(): void {
         // Get game data from DataManager instead of event
         const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
-        const gameCount = games.length
-        
-        console.log(`\n📊 === TAXONOMY ANALYSIS FOR ${gameCount} GAMES ===`)
-        
-        this.analyzeActualGameData(games)
-        
-        console.log(`=== END TAXONOMY ANALYSIS ===\n`)
-    }
-
-    /**
-     * Analyze taxonomies from actual loaded game data
-     */
-    private analyzeActualGameData(games: SteamGameData[]): void {
-        console.log(`\n🎮 ANALYZING ${games.length} LOADED GAMES:`)
         
         // Playtime-based taxonomies
         const playtimeBuckets = {
@@ -243,36 +229,16 @@ export class SceneCoordinator {
         
         // Recent activity taxonomies
         const recentlyPlayed = games.filter(g => g.playtime_2weeks && g.playtime_2weeks > 0)
-        const notRecentlyPlayed = games.filter(g => !g.playtime_2weeks || g.playtime_2weeks === 0)
         
-        console.log(`\n⏰ RECENT ACTIVITY for your ${games.length} games:`)
         console.log(`   • Recently Played (last 2 weeks): ${recentlyPlayed.length} games`)
-        console.log(`   • Not Recently Played: ${notRecentlyPlayed.length} games`)
-        
-        // Name-based pattern analysis
-        const namePatterns = this.analyzeGameNames(games)
-        
-        console.log(`\n🏷️ NAME-BASED PATTERNS found in your ${games.length} games:`)
-        if (Object.keys(namePatterns.series).length > 0) {
-            console.log(`   • Detected Game Series:`)
-            Object.entries(namePatterns.series).forEach(([series, gameList]) => {
-                console.log(`     - ${series}: ${(gameList as any[]).length} games - [${(gameList as any[]).map(g => g.name).join(', ')}]`)
-            })
-        }
-        
-        if (namePatterns.keywords.length > 0) {
-            console.log(`   • Common Keywords: [${namePatterns.keywords.join(', ')}]`)
-        }
-        
+                
         // App ID ranges (can indicate release periods/publishers)
         const appIds = games.map(g => typeof g.appid === 'number' ? g.appid : parseInt(g.appid))
         const minAppId = Math.min(...appIds)
         const maxAppId = Math.max(...appIds)
         
-        console.log(`\n🆔 APP ID RANGES for your ${games.length} games:`)
         console.log(`   • Oldest game (lowest ID): ${minAppId}`)
         console.log(`   • Newest game (highest ID): ${maxAppId}`)
-        console.log(`   • Could group by ID ranges to approximate release eras`)
         
         // List some example games for context
         console.log(`\n📋 SAMPLE GAMES (first 5):`)
@@ -282,58 +248,6 @@ export class SceneCoordinator {
             console.log(`   • "${game.name}" - ${hours}h total, ${recentHours}h recent (ID: ${game.appid})`)
         })
     }
-
-    /**
-     * Analyze game names for series and keyword patterns
-     */
-    private analyzeGameNames(games: any[]): { series: Record<string, any[]>, keywords: string[] } {
-        const series: Record<string, any[]> = {}
-        const keywords: string[] = []
-        const keywordCounts: Record<string, number> = {}
-        
-        // Common series patterns
-        const seriesPatterns = [
-            /^(Half-Life|Portal|Counter-Strike|Team Fortress|Left 4 Dead|Dota|The Elder Scrolls|Fallout|Call of Duty|Assassin's Creed|Grand Theft Auto|Civilization|Total War)/i,
-        ]
-        
-        // Common keyword patterns
-        const keywordPatterns = [
-            /Simulator/i, /Tycoon/i, /Racing/i, /RPG/i, /Strategy/i, /Adventure/i,
-            /Puzzle/i, /Action/i, /Indie/i, /Survival/i, /Horror/i, /Fantasy/i
-        ]
-        
-        games.forEach(game => {
-            const name = game.name
-            
-            // Check for series
-            seriesPatterns.forEach(pattern => {
-                const match = name.match(pattern)
-                if (match) {
-                    const seriesName = match[1]
-                    if (!series[seriesName]) series[seriesName] = []
-                    series[seriesName].push(game)
-                }
-            })
-            
-            // Check for keywords
-            keywordPatterns.forEach(pattern => {
-                const match = name.match(pattern)
-                if (match) {
-                    const keyword = match[0]
-                    keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1
-                }
-            })
-        })
-        
-        // Only include keywords that appear multiple times
-        const commonKeywords = Object.entries(keywordCounts)
-            .filter(([, count]) => count >= 2)
-            .map(([keyword]) => keyword)
-        
-        return { series, keywords: commonKeywords }
-    }
-
-
 
     private emitSceneReadyEvent(): void {
         const lightStats = this.lightingRenderer.getLightingStats()
