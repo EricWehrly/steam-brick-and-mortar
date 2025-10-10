@@ -96,9 +96,21 @@ export class StorePropsRenderer {
     }
 
     private setupEventListeners(): void {
-        // EventManager.getInstance().registerEventHandler(RoomEventTypes.Resized, this.generateShelvesAsync.bind(this))
+        EventManager.getInstance().registerEventHandler(RoomEventTypes.Resized, this.generateShelvesAsync.bind(this))
 
-        EventManager.getInstance().registerEventHandler(SteamEventTypes.DataLoaded, () => {
+                EventManager.getInstance().registerEventHandler(SteamEventTypes.DataLoaded, async () => {
+            // Get game data for both tests and production features
+            const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
+            
+            if (games.length > 0) {
+                // Initialize GPU instanced label renderer for massive performance improvement
+                if (!this.gameBoxRenderer.hasInstancedLabelRenderer()) {
+                    console.log('🚀 Initializing GPU instanced label renderer for production...')
+                    await this.gameBoxRenderer.initializeInstancedLabelRenderer(this.scene, games)
+                }
+            }
+            
+            // Initialize GPU instancing test if enabled
             if (this.config.tests && isTestEnabled(this.config.tests, TestMode.GPU_INSTANCED_TEXTURES)) {
                 this.initializeGPUInstancedTexturesTest()
             }
@@ -542,6 +554,11 @@ export class StorePropsRenderer {
                 parentGroup.add(gameBox)  // Add directly to parent group (no scene involvement)
                 createdCount++
             }
+        }
+        
+        // Finalize instanced labels for this batch (if using GPU instanced rendering)
+        if (this.gameBoxRenderer.hasInstancedLabelRenderer()) {
+            this.gameBoxRenderer.finalizeInstancedLabels()
         }
 
         console.debug(`✅ Created ${createdCount} game boxes on shelf surface via GameBoxRenderer`)
