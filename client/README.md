@@ -2,6 +2,8 @@
 
 A TypeScript-based WebXR application for browsing and launching Steam games in VR.
 
+devs: Please see `component-interaction-map.md` for a thorough understanding of the systems and how they interact.
+
 ## Quick Start
 
 ```bash
