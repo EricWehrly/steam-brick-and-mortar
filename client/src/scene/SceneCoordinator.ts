@@ -87,11 +87,9 @@ export class SceneCoordinator {
             this.emitSceneReadyEvent()
         })
 
-
-
         // Register for Steam data loaded events to spawn dynamic shelves  
         this.eventManager.registerEventHandler(SteamEventTypes.DataLoaded, (event: CustomEvent<SteamDataLoadedEvent>) => {
-            this.onSteamDataLoaded(event.detail)
+            // this.analyzeTaxonomies();
         })
         console.debug('✅ Steam data loaded event handler restored - games will spawn on shelves')
 
@@ -134,14 +132,7 @@ export class SceneCoordinator {
             const presetName = config.skyboxPreset ?? 'aurora'
             const preset = (SkyboxPresets as any)[presetName] || SkyboxPresets.aurora
             await this.skyboxManager.applySkybox(preset)
-            
-            // Room structure creation handled by RoomManager via event
-            this.eventManager.emit('room:resize', {
-                reason: 'initial-setup',
-                timestamp: Date.now(),
-                source: 'SceneCoordinator'
-            } as any)
-            console.log('✅ Basic environment setup completed successfully')
+
         } catch (error) {
             console.error('❌ Basic environment setup failed:', error)
             // Still allow SceneReady to be emitted - basic scene is functional even if enhanced setup fails
@@ -227,34 +218,6 @@ export class SceneCoordinator {
         this.roomManager.dispose()
     }
 
-    /**
-     * Handle Steam data loaded event by triggering room resize for game accommodation
-     */
-    private async onSteamDataLoaded(eventData: SteamDataLoadedEvent): Promise<void> {
-        
-        // Analyze all available taxonomies from the loaded games
-        // TODO: circle back on this for game taxonomy
-        this.analyzeTaxonomies()
-        
-        try {
-            // Emit room:resize event to trigger proper event-driven room expansion
-            // RoomManager will get game count from DataManager and calculate appropriate dimensions
-            // StorePropsRenderer will listen for room:resized and spawn shelves accordingly
-            console.debug(`📏 Requesting room resize for Steam data`)
-            // TODO: This is at least the second place this event is happening. That's real bad. (RoomManager)
-            this.eventManager.emit('room:resize', {
-                reason: 'steam-data-loaded',
-                timestamp: Date.now(),
-                source: 'SceneCoordinator'
-            } as any)
-        } catch (error) {  
-            console.error('❌ Failed to trigger room resize:', error)
-        }
-    }
-
-    /**
-     * Analyze all available taxonomies from loaded Steam game data
-     */
     private analyzeTaxonomies(): void {
         // Get game data from DataManager instead of event
         const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
@@ -262,11 +225,7 @@ export class SceneCoordinator {
         
         console.log(`\n📊 === TAXONOMY ANALYSIS FOR ${gameCount} GAMES ===`)
         
-        if (games.length > 0) {
-            this.analyzeActualGameData(games)
-        } else {
-            this.analyzeStructuralTaxonomies()
-        }
+        this.analyzeActualGameData(games)
         
         console.log(`=== END TAXONOMY ANALYSIS ===\n`)
     }
@@ -331,34 +290,6 @@ export class SceneCoordinator {
             const recentHours = game.playtime_2weeks ? Math.round(game.playtime_2weeks / 60 * 10) / 10 : 0
             console.log(`   • "${game.name}" - ${hours}h total, ${recentHours}h recent (ID: ${game.appid})`)
         })
-    }
-
-    /**
-     * Analyze structural taxonomies when no game data is available
-     */
-    private analyzeStructuralTaxonomies(): void {
-        // Get game count from DataManager
-        const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
-        const gameCount = games.length
-        const userInput = this.dataManager.get<string>('steam.userInput') || 'unknown'
-        
-        console.log(`🔍 CURRENT DATA AVAILABLE:`)
-        console.log(`   • Game Count: ${gameCount} total games`)
-        console.log(`   • User Input: "${userInput}"`)
-        
-        // console.log(`\n❌ MISSING TAXONOMY DATA (would require API expansion):`)
-        // console.log(`   • Steam Store Genres: Action, Adventure, RPG, Strategy, etc.`)
-        // console.log(`   • Steam Store Categories: Single-player, Multiplayer, Co-op, etc.`)
-        // console.log(`   • Community Tags: Horror, Atmospheric, Pixel Art, Roguelike, etc.`)
-        // console.log(`   • Release Date: For chronological categorization`)
-        // console.log(`   • Developer/Publisher: For studio-based organization`)
-        // console.log(`   • User Reviews: For quality/popularity-based sorting`)
-        
-        // console.log(`\n💡 RECOMMENDED IMPLEMENTATION:`)
-        // console.log(`   1. Expand Steam API lambda to include genres/categories`)
-        // console.log(`   2. Add Steam Store API calls for detailed metadata`)
-        // console.log(`   3. Implement community tag fetching`)
-        // console.log(`   4. Create fallback categorization from playtime data`)
     }
 
     /**

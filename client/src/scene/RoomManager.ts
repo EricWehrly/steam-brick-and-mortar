@@ -86,17 +86,14 @@ export class RoomManager {
     constructor(scene: THREE.Scene, dataManager?: DataManager, eventManager?: EventManager) {
         this.scene = scene
         this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
+        // TODO: Why instance for this and not inject?
         this.materialManager = SharedMaterialManager.getInstance()
         this.eventManager = eventManager || EventManager.getInstance() // DI injection with fallback
         
-        // Register event listeners
-        // Single event handler for room resize (handles both creation and updating)
         this.eventManager.registerEventHandler(RoomEventTypes.Resize, this.onResizeRoom.bind(this))
         
-        // Listen for Steam data loaded events to store data in DataManager
-        this.eventManager.registerEventHandler(SteamEventTypes.DataLoaded, this.onSteamDataLoaded.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.DataLoaded, this.onResizeRoom.bind(this))
         
-        // Listen for ceiling toggle events
         this.eventManager.registerEventHandler(CeilingEventTypes.Toggle, this.onCeilingToggle.bind(this))
         
         console.debug('🏠 RoomManager initialized with event-driven architecture')
@@ -138,28 +135,6 @@ export class RoomManager {
             depth: Math.max(depth, RoomConstants.DEFAULT_ROOM_DEPTH), 
             height: RoomConstants.STORE_CEILING_HEIGHT
         }
-    }
-
-    // onCreateInitialRoom removed - single onResizeRoom handles both creation and updating
-
-    /**
-     * Event handler: React to Steam data being loaded (data already stored by SteamWorkflowManager)
-     * 
-     * ARCHITECTURAL NOTE: SteamWorkflowManager stores data in DataManager BEFORE emitting this event.
-     * This follows the principle that data ownership should stay close to source and state must be
-     * established before events that depend on that state.
-     */
-    private onSteamDataLoaded(event: CustomEvent<SteamDataLoadedEvent>): void {
-        const eventData = event.detail
-        console.debug(`🎮 Steam data loaded: ${eventData.gameCount} games for user ${eventData.userInput}`)
-        console.debug('🏠 Requesting room resize for Steam data')
-        
-        // Trigger room resize now that Steam data is available in DataManager
-        this.eventManager.emit(RoomEventTypes.Resize, {
-            reason: 'steam-data-loaded',
-            timestamp: Date.now(),
-            source: 'room-manager'
-        } as any)
     }
 
     private onCeilingToggle(event: CustomEvent<CeilingToggleEvent>): void {
