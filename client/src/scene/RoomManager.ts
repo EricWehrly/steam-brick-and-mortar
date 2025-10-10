@@ -18,8 +18,8 @@ import { SteamEventTypes, type SteamDataLoadedEvent, CeilingEventTypes, type Cei
 
 import type { StoreLayoutConfig } from './StoreLayoutConfig'
 import { PropRenderer } from './PropRenderer'
-
 import { DataManager, DataDomain } from '../core/data'
+import type { SteamGameData } from './game-box/types/GameData'
 
 // ============================================================================
 // ROOM CONSTANTS - Single Source of Truth
@@ -181,18 +181,19 @@ export class RoomManager {
         
         console.log(`🏠 Room resize requested (reason: ${reason})`)
         
-        // RoomManager's responsibility: Get game count from centralized DataManager
-        const gameCount = this.dataManager.get<number>('steam.gameCount') || 0
-        
-        console.log(`📊 Using game count from DataManager: ${gameCount}`)
+        // RoomManager's responsibility: Get games from centralized DataManager
+        const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
+        const gameCount = games.length
         
         // Calculate appropriate dimensions (uses defaults if gameCount is 0)
         const dimensions = RoomManager.calculateDimensionsForGameCount(gameCount)
-        console.log(`🏠 Target room dimensions for ${gameCount} games: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
+        console.debug(`🏠 Target room dimensions for ${gameCount} games: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
         
         // Queue the room update to prevent concurrent operations
         await this.queueRoomOperation(dimensions)
         
+        // TODO: Shouldn't above emit the event? 
+        // and does it need to be awaited?
         // Emit room resized event with calculated dimensions
         this.eventManager.emit(RoomEventTypes.Resized, { 
             dimensions,

@@ -29,6 +29,7 @@ import { EventManager, EventSource } from '../core/EventManager'
 import { GameEventTypes, CeilingEventTypes, SteamEventTypes, type CeilingToggleEvent, type SceneReadyEvent, type SteamDataLoadedEvent } from '../types/InteractionEvents'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager } from '../core/data'
+import type { SteamGameData } from './game-box/types/GameData'
 
 export interface SceneCoordinatorConfig {
     environment?: {
@@ -230,17 +231,17 @@ export class SceneCoordinator {
      * Handle Steam data loaded event by triggering room resize for game accommodation
      */
     private async onSteamDataLoaded(eventData: SteamDataLoadedEvent): Promise<void> {
-        console.log(`🎮 Steam data loaded: ${eventData.gameCount} games for user ${eventData.userInput}`)
         
         // Analyze all available taxonomies from the loaded games
         // TODO: circle back on this for game taxonomy
-        this.analyzeTaxonomies(eventData)
+        this.analyzeTaxonomies()
         
         try {
             // Emit room:resize event to trigger proper event-driven room expansion
             // RoomManager will get game count from DataManager and calculate appropriate dimensions
             // StorePropsRenderer will listen for room:resized and spawn shelves accordingly
             console.debug(`📏 Requesting room resize for Steam data`)
+            // TODO: This is at least the second place this event is happening. That's real bad. (RoomManager)
             this.eventManager.emit('room:resize', {
                 reason: 'steam-data-loaded',
                 timestamp: Date.now(),
@@ -254,20 +255,17 @@ export class SceneCoordinator {
     /**
      * Analyze all available taxonomies from loaded Steam game data
      */
-    private analyzeTaxonomies(eventData: SteamDataLoadedEvent): void {
-        console.log(`\n📊 === TAXONOMY ANALYSIS FOR ${eventData.gameCount} GAMES ===`)
+    private analyzeTaxonomies(): void {
+        // Get game data from DataManager instead of event
+        const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
+        const gameCount = games.length
         
-        // Use centralized DataManager approach
-        const gameCount = this.dataManager.get<number>('steam.gameCount') || 0
-        
-        // For taxonomy analysis, we would need actual game data from DataManager
-        // Currently we only have game count, so we'll do structural analysis
-        const games: any[] = []
+        console.log(`\n📊 === TAXONOMY ANALYSIS FOR ${gameCount} GAMES ===`)
         
         if (games.length > 0) {
-            this.analyzeActualGameData(games, eventData)
+            this.analyzeActualGameData(games)
         } else {
-            this.analyzeStructuralTaxonomies(eventData)
+            this.analyzeStructuralTaxonomies()
         }
         
         console.log(`=== END TAXONOMY ANALYSIS ===\n`)
@@ -276,7 +274,7 @@ export class SceneCoordinator {
     /**
      * Analyze taxonomies from actual loaded game data
      */
-    private analyzeActualGameData(games: any[], eventData: SteamDataLoadedEvent): void {
+    private analyzeActualGameData(games: SteamGameData[]): void {
         console.log(`\n🎮 ANALYZING ${games.length} LOADED GAMES:`)
         
         // Playtime-based taxonomies
@@ -317,7 +315,7 @@ export class SceneCoordinator {
         }
         
         // App ID ranges (can indicate release periods/publishers)
-        const appIds = games.map(g => parseInt(g.appid))
+        const appIds = games.map(g => typeof g.appid === 'number' ? g.appid : parseInt(g.appid))
         const minAppId = Math.min(...appIds)
         const maxAppId = Math.max(...appIds)
         
@@ -338,11 +336,15 @@ export class SceneCoordinator {
     /**
      * Analyze structural taxonomies when no game data is available
      */
-    private analyzeStructuralTaxonomies(eventData: SteamDataLoadedEvent): void {
+    private analyzeStructuralTaxonomies(): void {
+        // Get game count from DataManager
+        const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
+        const gameCount = games.length
+        const userInput = this.dataManager.get<string>('steam.userInput') || 'unknown'
+        
         console.log(`🔍 CURRENT DATA AVAILABLE:`)
-        console.log(`   • Game Count: ${eventData.gameCount} total games`)
-        console.log(`   • User Input: "${eventData.userInput}"`)
-        console.log(`   • Event Timestamp: ${new Date(eventData.timestamp).toISOString()}`)
+        console.log(`   • Game Count: ${gameCount} total games`)
+        console.log(`   • User Input: "${userInput}"`)
         
         // console.log(`\n❌ MISSING TAXONOMY DATA (would require API expansion):`)
         // console.log(`   • Steam Store Genres: Action, Adventure, RPG, Strategy, etc.`)

@@ -17,6 +17,7 @@ import type { SteamUICoordinator } from '../ui/coordinators'
 import { Logger } from '../utils/Logger'
 import { SteamErrorMessages } from '../utils/SteamErrorMessages'
 import { DataManager, DataDomain } from '../core/data'
+import type { SteamGameData } from '../scene/game-box/types/GameData'
 
 export class SteamWorkflowManager {
     private static readonly logger = Logger.withContext(SteamWorkflowManager.name)
@@ -63,25 +64,21 @@ export class SteamWorkflowManager {
      */
     private storeSteamDataAndEmitEvent(userInput: string): void {
         const gameLibraryState = this.steamIntegration.getGameLibraryState()
-        const gameCount = gameLibraryState.userData?.games?.length || 0
+        const games: SteamGameData[] = gameLibraryState.userData?.games || []
         
-        // FIRST: Store data in centralized DataManager (establish state)
-        this.dataManager.set('steam.gameCount', gameCount, {
+        this.dataManager.set<SteamGameData[]>('steam.games', games, {
             domain: DataDomain.SteamIntegration
         })
         
+        // TODO: Do we need this?
         if (userInput) {
             this.dataManager.set('steam.userInput', userInput, {
                 domain: DataDomain.SteamIntegration
             })
         }
         
-        SteamWorkflowManager.logger.info(`📊 Stored Steam data in DataManager: ${gameCount} games for ${userInput}`)
-        
-        // SECOND: Emit event now that state is established (components can safely react)
         this.eventManager.emit(SteamEventTypes.DataLoaded, {
             userInput,
-            gameCount,
             timestamp: Date.now(),
             source: EventSource.System
         })

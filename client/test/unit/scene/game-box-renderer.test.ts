@@ -69,10 +69,12 @@ describe('GameBoxRenderer Texture Tests', () => {
                 }
             }
 
-            const gameBox = renderer.createGameBoxWithTexture(scene, mockGame, 0, textureOptions)
+            const gameBox = renderer.createGameBox(mockGame, new THREE.Vector3(0, 0, 0), textureOptions)
 
             expect(gameBox).toBeTruthy()
             expect(gameBox?.userData.gameData).toEqual(mockGame)
+            // Note: createGameBox no longer adds to scene automatically
+            if (gameBox) scene.add(gameBox)
             expect(scene.children).toContain(gameBox)
         })
 
@@ -105,7 +107,7 @@ describe('GameBoxRenderer Texture Tests', () => {
                 fallbackColor: 0xff0000 // Red
             }
 
-            const result = await textureManager.applyTexture(gameBox!, mockGame, textureOptions)
+            const result = await textureManager.applyTexture(gameBox!, textureOptions)
             expect(result).toBe(false) // Should return false when no valid blobs
         })
 
@@ -122,7 +124,7 @@ describe('GameBoxRenderer Texture Tests', () => {
                 }
             }
 
-            const result = await textureManager.applyTexture(gameBox!, mockGame, textureOptions)
+            const result = await textureManager.applyTexture(gameBox!, textureOptions)
             expect(result).toBe(true) // Should return true on successful texture application
         })
 
@@ -144,7 +146,7 @@ describe('GameBoxRenderer Texture Tests', () => {
                 }
             }
 
-            const result = await textureManager.applyTexture(gameBox!, mockGame, textureOptions)
+            const result = await textureManager.applyTexture(gameBox!, textureOptions)
             expect(result).toBe(true)
         })
     })
@@ -170,7 +172,7 @@ describe('GameBoxRenderer Texture Tests', () => {
                 }
             }
 
-            const result = await textureManager.applyTexture(gameBox!, mockGame, textureOptions)
+            const result = await textureManager.applyTexture(gameBox!, textureOptions)
             // Should handle errors gracefully
             expect(typeof result).toBe('boolean')
         })
@@ -194,7 +196,7 @@ describe('GameBoxRenderer Texture Tests', () => {
                 }
             }
 
-            await textureManager.applyTexture(gameBox!, mockGame, textureOptions)
+            await textureManager.applyTexture(gameBox!, textureOptions)
             
             // Should have called dispose on the old texture
             expect(mockTexture.dispose).toHaveBeenCalled()
