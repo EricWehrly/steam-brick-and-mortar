@@ -311,10 +311,6 @@ describe('Application Startup Integration', () => {
         const { EventManager } = await import('../../src/core/EventManager')        // Create mock dependencies
         const mockEventManager = EventManager.getInstance()
         const mockSteamIntegration = new SteamIntegration()
-        const mockSteamGameManager = {
-            loadGames: vi.fn(),
-            dispose: vi.fn()
-        } as any
         
         const mockPerformanceMonitor = new PerformanceMonitor({
             updateInterval: 1000,

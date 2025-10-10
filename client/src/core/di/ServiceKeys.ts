@@ -35,7 +35,6 @@ export const ServiceKeys = {
   
   // Steam services
   SteamIntegration: Symbol('SteamIntegration'),
-  SteamGameManager: Symbol('SteamGameManager'),
   SteamWorkflowManager: Symbol('SteamWorkflowManager'),
   
   // Performance & Monitoring

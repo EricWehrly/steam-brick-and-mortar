@@ -17,7 +17,6 @@ import { PerformanceMonitor, type PerformanceStats, ToastManager, UIManager } fr
 import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
 import { SceneManager, SceneCoordinator, GameBoxRenderer } from '../scene'
 import { DebugStatsProvider } from './DebugStatsProvider'
-import { SteamGameManager } from './SteamGameManager'
 import { SteamIntegration } from '../steam-integration'
 import { SteamWorkflowManager } from '../steam-integration/SteamWorkflowManager'
 import { DataManager } from './data'
@@ -59,7 +58,6 @@ export class SteamBrickAndMortarApp {
     private performanceMonitor: PerformanceMonitor
     private steamIntegration: SteamIntegration
     private debugStatsProvider: DebugStatsProvider
-    private steamGameManager!: SteamGameManager // Will be initialized in init() with DI-resolved GameBoxRenderer
     private eventManager: EventManager
     private steamWorkflowManager: SteamWorkflowManager
     private appSettings: AppSettings
@@ -144,8 +142,6 @@ export class SteamBrickAndMortarApp {
         // UI coordinators will be resolved from DI container in init() method
         // SystemUICoordinator requires runtime dependencies, so we'll register it manually
 
-        // SteamGameManager will be initialized in init() method with DI-resolved GameBoxRenderer
-
         // EventManager will be resolved from DI container in init() method
         // setupPrerequisiteEventListeners() will be called after EventManager is resolved
 
@@ -187,14 +183,6 @@ export class SteamBrickAndMortarApp {
             this.steamUICoordinator = await this.container.resolve(ServiceKeys.SteamUICoordinator) as SteamUICoordinator
             this.webxrUICoordinator = await this.container.resolve(ServiceKeys.WebXRUICoordinator) as WebXRUICoordinator
             this.systemUICoordinator = await this.container.resolve(ServiceKeys.SystemUICoordinator) as SystemUICoordinator
-            
-            // Initialize steam game manager with DI-resolved GameBoxRenderer
-            const gameBoxRenderer = await this.container.resolve(ServiceKeys.GameBoxRenderer) as GameBoxRenderer
-            this.steamGameManager = new SteamGameManager(
-                gameBoxRenderer, // Use DI-resolved singleton GameBoxRenderer
-                this.sceneManager,
-                this.steamIntegration
-            )
             
             // Initialize steam workflow manager with DI-resolved DataManager
             const dataManager = await this.container.resolve(ServiceKeys.DataManager) as DataManager
