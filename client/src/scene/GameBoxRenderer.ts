@@ -155,16 +155,123 @@ export class GameBoxRenderer {
         gameBox.castShadow = true
         gameBox.receiveShadow = true
         
+        // Add game name text label to the front face
+        this.addGameNameLabel(gameBox, game.name)
+        
         return gameBox
+    }
+
+    /**
+     * Create a text label with the game name and add it to the game box
+     * The label appears on the front face of the box
+     */
+    private addGameNameLabel(gameBox: THREE.Mesh, gameName: string): void {
+        // Create canvas for text rendering
+        const canvas = document.createElement('canvas')
+        const context = canvas.getContext('2d')
+        if (!context) {
+            console.warn('Could not create canvas context for game name label')
+            return
+        }
+
+        // Set canvas size (higher resolution for better quality)
+        canvas.width = 512
+        canvas.height = 512
+
+        // Configure text rendering
+        context.fillStyle = '#000000' // Black background
+        context.fillRect(0, 0, canvas.width, canvas.height)
+        
+        context.fillStyle = '#ffffff' // White text
+        context.font = 'bold 48px Arial, sans-serif'
+        context.textAlign = 'center'
+        context.textBaseline = 'middle'
+        
+        // Word wrap the game name if it's too long
+        const maxWidth = canvas.width - 40 // 20px padding on each side
+        const words = gameName.split(' ')
+        const lines: string[] = []
+        let currentLine = words[0]
+        
+        for (let i = 1; i < words.length; i++) {
+            const testLine = currentLine + ' ' + words[i]
+            const metrics = context.measureText(testLine)
+            if (metrics.width > maxWidth) {
+                lines.push(currentLine)
+                currentLine = words[i]
+            } else {
+                currentLine = testLine
+            }
+        }
+        lines.push(currentLine)
+        
+        // Draw each line of text
+        const lineHeight = 60
+        const startY = (canvas.height - (lines.length * lineHeight)) / 2 + lineHeight / 2
+        lines.forEach((line, index) => {
+            context.fillText(line, canvas.width / 2, startY + (index * lineHeight))
+        })
+
+        // Create texture from canvas
+        const texture = new THREE.CanvasTexture(canvas)
+        texture.needsUpdate = true
+
+        // Create a plane for the label (slightly in front of the box)
+        const labelGeometry = new THREE.PlaneGeometry(this.dimensions.width * 0.95, this.dimensions.height * 0.95)
+        const labelMaterial = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide
+        })
+        
+        const label = new THREE.Mesh(labelGeometry, labelMaterial)
+        
+        // Position label slightly in front of the box (on the front face)
+        label.position.z = (this.dimensions.depth / 2) + 0.001
+        label.name = `${gameBox.name}-label`
+        
+        // Add label as child of game box so it moves with the box
+        gameBox.add(label)
+        
+        // Store texture reference for cleanup
+        gameBox.userData.labelTexture = texture
+        gameBox.userData.labelMesh = label
     }
 
     public clearGameBoxes(scene: THREE.Scene): number {
         const existingBoxes = scene.children.filter(child => 
             child.userData?.isGameBox
         )
-        existingBoxes.forEach(box => scene.remove(box))
+        existingBoxes.forEach(box => {
+            this.disposeGameBox(box as THREE.Mesh)
+            scene.remove(box)
+        })
         console.log(`🗑️ Cleared ${existingBoxes.length} existing game boxes`)
         return existingBoxes.length
+    }
+
+    /**
+     * Dispose of a single game box and its resources
+     */
+    private disposeGameBox(gameBox: THREE.Mesh): void {
+        // Dispose label texture if it exists
+        if (gameBox.userData.labelTexture) {
+            gameBox.userData.labelTexture.dispose()
+        }
+        
+        // Dispose label mesh if it exists
+        if (gameBox.userData.labelMesh) {
+            const labelMesh = gameBox.userData.labelMesh as THREE.Mesh
+            if (labelMesh.geometry) labelMesh.geometry.dispose()
+            if (labelMesh.material) {
+                if (Array.isArray(labelMesh.material)) {
+                    labelMesh.material.forEach(mat => mat.dispose())
+                } else {
+                    labelMesh.material.dispose()
+                }
+            }
+        }
     }
 
     public updateDimensions(newDimensions: Partial<GameBoxDimensions>) {
