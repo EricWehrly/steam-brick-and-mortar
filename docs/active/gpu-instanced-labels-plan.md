@@ -166,6 +166,13 @@ new SimpleInstancedTest(this.sceneManager.getScene(), 10)
 
 ### Step 2.1: Create Texture Array from Canvases
 **File**: `LabelTextureArrayManager.ts`
+
+**TEXTURE SOURCE NOTE**: 
+- IndexedDB contains `gameImages` entries with URLs to actual game images
+- These can be loaded and used directly instead of generating canvas text
+- Alternative: Generate canvas-based text labels as fallback
+- Manager should support both: URL-based image loading AND canvas-based text generation
+
 ```typescript
 import * as THREE from 'three'
 

@@ -21,11 +21,12 @@ import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
 
 import { RoomConstants } from './RoomManager'
 import { EventManager } from '../core/EventManager'
-import { RoomEventTypes } from '../types/InteractionEvents'
+import { RoomEventTypes, SteamEventTypes } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import { SimpleInstancedTest } from './test/SimpleInstancedTest'
+import { LabelTextureArrayManager } from './game-box/instancing/LabelTextureArrayManager'
 
 // Configuration constants for game layout - made static and accessible
 // TODO: Make these user-configurable in game menus
@@ -72,6 +73,7 @@ export class StorePropsRenderer {
     
     // Test instances
     private simpleInstancedTest?: SimpleInstancedTest
+    private labelTextureArrayManager?: LabelTextureArrayManager
 
     constructor(scene: THREE.Scene, dataManager: DataManager, gameBoxRenderer: GameBoxRenderer) {
         this.scene = scene
@@ -94,7 +96,13 @@ export class StorePropsRenderer {
     }
 
     private setupEventListeners(): void {
-        EventManager.getInstance().registerEventHandler(RoomEventTypes.Resized, this.generateShelvesAsync.bind(this))
+        // EventManager.getInstance().registerEventHandler(RoomEventTypes.Resized, this.generateShelvesAsync.bind(this))
+
+        EventManager.getInstance().registerEventHandler(SteamEventTypes.DataLoaded, () => {
+            if (this.config.tests && isTestEnabled(this.config.tests, TestMode.GPU_INSTANCED_TEXTURES)) {
+                this.initializeGPUInstancedTexturesTest()
+            }
+        });
     }
 
     /**
@@ -175,16 +183,72 @@ export class StorePropsRenderer {
     private initializeTests(): void {
         if (!this.config.tests) return
         
-        // GPU Instanced Textures Test - Phase 1: Simple colored quads
-        if (isTestEnabled(this.config.tests, TestMode.GPU_INSTANCED_TEXTURES)) {
-            console.log('🧪 Initializing GPU_INSTANCED_TEXTURES test (Phase 1: Simple instancing)')
-            this.simpleInstancedTest = new SimpleInstancedTest(this.scene, 10)
-        }
+        // GPU Instanced Textures Test - Phase 2: Texture arrays
+        // NOTE: This test initializes in setupEventListeners() when games are loaded
         
         // Test Objects - Simple geometric test objects
         if (isTestEnabled(this.config.tests, TestMode.SPAWN_TEST_OBJECTS)) {
             console.log('🧪 Initializing SPAWN_TEST_OBJECTS test')
             this.setupTestObjects()
+        }
+    }
+    
+    /**
+     * Initialize GPU instanced textures test with texture array
+     */
+    private initializeGPUInstancedTexturesTest(): void {
+        // Skip if already initialized
+        if (this.simpleInstancedTest) {
+            console.debug('🧪 GPU instancing test already initialized, skipping')
+            return
+        }
+        
+        try {
+            // Use games from event parameter if available
+            const gameData = this.dataManager.get<SteamGameData[]>('steam.games') || []
+            
+            // Use first 10 games if available, otherwise fall back to test labels
+            let labels: string[]
+            if (gameData.length > 0) {
+                labels = gameData.slice(0, 10).map(game => game.name)
+                console.log('🎮 Using real game names for texture array:', labels)
+            } else {
+                // Fallback test labels if no games loaded yet
+                labels = [
+                    'Half-Life 2',
+                    'Portal',
+                    'Team Fortress 2',
+                    'Left 4 Dead',
+                    'Counter-Strike',
+                    'Dota 2',
+                    'Skyrim',
+                    'Fallout 4',
+                    'Bioshock',
+                    'Dishonored'
+                ]
+                console.log('🧪 Using test labels (no games loaded yet)')
+            }
+            
+            // Create texture array manager
+            this.labelTextureArrayManager = new LabelTextureArrayManager(512)
+            const textureArray = this.labelTextureArrayManager.buildTextureArrayFromText(labels)
+            
+            // Create instanced test with texture array
+            this.simpleInstancedTest = new SimpleInstancedTest(this.scene, {
+                count: labels.length,
+                textureArray: textureArray,
+                labels: labels
+            })
+            
+            // Log stats
+            const stats = this.labelTextureArrayManager.getStats()
+            console.log('📊 Texture Array Stats:', stats)
+            
+        } catch (error) {
+            console.error('❌ Failed to initialize GPU instanced textures test:', error)
+            // Fallback to Phase 1 (colored quads)
+            console.log('⚠️ Falling back to Phase 1 (colored quads)')
+            this.simpleInstancedTest = new SimpleInstancedTest(this.scene, 10)
         }
     }
     
@@ -564,6 +628,7 @@ export class StorePropsRenderer {
         
         // Clean up test instances
         this.simpleInstancedTest?.dispose()
+        this.labelTextureArrayManager?.dispose()
         
         // Clean up dynamic store environment
         if (this.currentStoreGroup) {
