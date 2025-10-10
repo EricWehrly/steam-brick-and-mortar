@@ -19,11 +19,11 @@ import { SignageRenderer } from './SignageRenderer'
 import { PropRenderer } from './PropRenderer'
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
 
-import { RoomManager, RoomConstants } from './RoomManager'
+import { RoomConstants } from './RoomManager'
 import { EventManager } from '../core/EventManager'
 import { RoomEventTypes } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
-import type { StoreLayoutConfig } from './StoreLayoutConfig'
+import type { SteamGameData } from './game-box/types/GameData'
 
 // Configuration constants for game layout - made static and accessible
 // TODO: Make these user-configurable in game menus
@@ -71,76 +71,62 @@ export class StorePropsRenderer {
         this.scene = scene
         this.dataManager = dataManager
 
-        
-        // Create group to hold all props
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props'
         this.scene.add(this.propsGroup)
         
-        // Initialize renderers
         this.initializeRenderers()
         
-        // Set up event listeners for room events
         this.setupEventListeners()
     }
 
     private initializeRenderers(): void {
-        // Initialize store layout for shelves
         this.storeLayout = new StoreLayout(this.scene)
         
-        // Initialize signage renderer
         this.signageRenderer = new SignageRenderer()
     }
 
-    /**
-     * Set up event listeners for room management events
-     */
     private setupEventListeners(): void {
-        EventManager.getInstance().registerEventHandler(RoomEventTypes.Resized, this.onRoomResized.bind(this))
+        EventManager.getInstance().registerEventHandler(RoomEventTypes.Resized, this.generateShelvesAsync.bind(this))
     }
 
     /**
-     * Handle room resized event by spawning shelves for the new room size
+     * Generate shelves asynchronously without blocking the main thread
+     * Shelves will phase in gradually as they're created
      */
-    private async onRoomResized(event: CustomEvent): Promise<void> {
-        const eventData = event.detail
-        console.debug(`🏗️ StorePropsRenderer received room:resized event:`, eventData)
-        
-        // Get game count from centralized DataManager (consistent with RoomManager approach)
-        const gameCount = this.dataManager.get<number>('steam.gameCount') || 0
-        
-        if (gameCount > 0) {
-            try {
-                // Calculate shelves needed based on game count
-                const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
-                const shelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
+    private async generateShelvesAsync(): Promise<void> {
+
+        const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
+            const gameCount = games.length
+        try {
+            
+            // Calculate shelves needed based on game count
+            const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
+            const shelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
+            
+            console.debug(`📚 Starting async generation of ${shelvesNeeded} shelves for ${gameCount} games`)
+            
+            // Clear existing shelves first
+            this.clearExistingShelves()
+            
+            // Create shelf rows based on needed shelves  
+            const maxShelvesPerRow = 4
+            const rows = Math.ceil(shelvesNeeded / maxShelvesPerRow)
+            
+            for (let row = 0; row < rows; row++) {
+                const shelvesInThisRow = Math.min(maxShelvesPerRow, shelvesNeeded - (row * maxShelvesPerRow))
                 
-                console.debug(`📚 Spawning ${shelvesNeeded} shelves for ${gameCount} games from DataManager in resized room`)
+                // Yield to main thread between rows to keep app responsive
+                await new Promise(resolve => setTimeout(resolve, 10))
                 
-                // Clear existing shelves first
-                this.clearExistingShelves()
-                
-                // Create placeholder games for shelf spawning
-                const games = Array.from({ length: gameCount }, (_, i) => ({
-                    id: `placeholder-${i}`,
-                    name: `Game ${i + 1}`,
-                    isPlaceholder: true
-                }))
-                
-                // Create shelf rows based on needed shelves  
-                const maxShelvesPerRow = 4
-                const rows = Math.ceil(shelvesNeeded / maxShelvesPerRow)
-                
-                for (let row = 0; row < rows; row++) {
-                    const shelvesInThisRow = Math.min(maxShelvesPerRow, shelvesNeeded - (row * maxShelvesPerRow))
-                    await this.createShelfRow(row, shelvesInThisRow, games)
-                }
-                
-                console.debug(`✅ Dynamic shelves spawned via room:resized event: ${shelvesNeeded} shelves in ${rows} row(s)`)
-                
-            } catch (error) {
-                console.error('❌ Failed to spawn shelves from room:resized event:', error)
+                await this.createShelfRow(row, shelvesInThisRow, games)
+                console.debug(`✅ Completed row ${row + 1}/${rows}`)
             }
+            
+            console.debug(`✅ Async shelf generation complete: ${shelvesNeeded} shelves in ${rows} row(s)`)
+        } catch (error) {
+            console.error('❌ Failed to generate shelves asynchronously:', error)
+            throw error
         }
     }
 
@@ -268,11 +254,6 @@ export class StorePropsRenderer {
         return this.signageRenderer
     }
 
-
-
-    /**
-     * Get props statistics for debugging
-     */
     public getPropsStats(): {
         totalProps: number
         shelvesGenerated: boolean
@@ -293,8 +274,6 @@ export class StorePropsRenderer {
         }
     }
 
-
-
     /**
      * Clear ALL existing store environment from the scene
      * Eliminates duplicate walls/ceiling/floors by removing everything
@@ -308,8 +287,7 @@ export class StorePropsRenderer {
             child.name?.includes('store-environment') ||
             child.name?.includes('dynamic-store-environment') ||
             // REMOVED room-structure filter - RoomManager owns room structure, not StorePropsRenderer
-            child.name?.includes('entrance') || // Clear entrance areas
-            child.name?.includes('TheShelf') // Clear test shelves
+            child.name?.includes('entrance') // Clear entrance areas
             // NOTE: DO NOT clear lighting or room-structure - managed by other systems!
         )
         
@@ -327,7 +305,7 @@ export class StorePropsRenderer {
      * Create a row of shelves with VR-optimized spacing and navigation
      * Phase 4: Layout optimization for better VR experience
      */
-    private async createShelfRow(rowIndex: number, shelfCount: number, games: any[] = []): Promise<void> {
+    private async createShelfRow(rowIndex: number, shelfCount: number, games: SteamGameData[] = []): Promise<void> {
         const rowGroup = new THREE.Group()
         rowGroup.name = `shelf-row-${rowIndex}`
         
