@@ -32,11 +32,11 @@ export class LightingControlsPanel {
     private debugIndicatorEnabled: boolean
     private panelCollapsed: boolean = true
 
-    constructor() {
-        this.eventManager = EventManager.getInstance()
+    constructor(eventManager: EventManager, appSettings: AppSettings) {
+        this.eventManager = eventManager
         this.lightCreatedHandler = this.onLightCreated.bind(this)
         this.lightingSystemReadyHandler = this.onLightingSystemReady.bind(this)
-    this.appSettings = AppSettings.getInstance()
+        this.appSettings = appSettings
         this.debugIndicatorEnabled = this.appSettings.getSetting('showLightingDebug') ?? false
         this.panelCollapsed = true
         this.container = this.createPanel()

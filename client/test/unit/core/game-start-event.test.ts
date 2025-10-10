@@ -136,12 +136,6 @@ vi.mock('../../../src/steam-integration/SteamWorkflowManager', () => ({
 }))
 
 // Core component mocks
-vi.mock('../../../src/core/SteamGameManager', () => ({
-    SteamGameManager: vi.fn().mockImplementation(() => ({
-        dispose: vi.fn()
-    }))
-}))
-
 vi.mock('../../../src/core/DebugStatsProvider', () => ({
     DebugStatsProvider: vi.fn().mockImplementation(() => ({
         dispose: vi.fn()

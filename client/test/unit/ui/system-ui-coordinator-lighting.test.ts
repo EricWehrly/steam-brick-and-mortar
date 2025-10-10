@@ -7,6 +7,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SystemUICoordinator } from '../../../src/ui/coordinators/SystemUICoordinator'
 import { PerformanceMonitor } from '../../../src/ui/PerformanceMonitor'
+import { EventManager } from '../../../src/core/EventManager'
+import { AppSettings } from '../../../src/core/AppSettings'
 import * as THREE from 'three'
 
 // Mock dependencies
@@ -72,11 +74,17 @@ describe('SystemUICoordinator Lighting Integration', () => {
             info: { render: { triangles: 0, calls: 0 } }
         } as any
         
+        // Setup mock dependencies
+        const mockEventManager = EventManager.getInstance()
+        const mockAppSettings = AppSettings.getInstance()
+        
         // Create coordinator
         performanceMonitor = new PerformanceMonitor()
         systemCoordinator = new SystemUICoordinator(
             performanceMonitor,
-            { getDebugStats: () => ({}) } as any
+            { getDebugStats: () => ({}) } as any,
+            mockEventManager,
+            mockAppSettings
         )
         
         // Spy on console.warn to check for initialization warnings

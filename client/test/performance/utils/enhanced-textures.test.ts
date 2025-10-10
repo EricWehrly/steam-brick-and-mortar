@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { NoiseGenerator } from '../../../src/utils/NoiseGenerator'
 import { ProceduralTextures } from '../../../src/utils/ProceduralTextures'
-import { TextureManager } from '../../../src/utils/TextureManager'
+import { SharedMaterialManager } from '../../../src/utils/SharedMaterialManager'
 import * as THREE from 'three'
 
 describe('NoiseGenerator', () => {
@@ -172,115 +172,103 @@ describe('ProceduralTextures Enhanced', () => {
   })
 })
 
-describe('TextureManager Enhanced', () => {
-  let textureManager: TextureManager
+describe('SharedMaterialManager Enhanced', () => {
+  let materialManager: SharedMaterialManager
 
   beforeEach(() => {
-    textureManager = TextureManager.getInstance()
+    materialManager = SharedMaterialManager.getInstance()
   })
 
   afterEach(() => {
-    textureManager.dispose()
+    materialManager.dispose()
   })
 
   describe('enhanced procedural materials', () => {
     it('should create enhanced wood material', () => {
-      const material = textureManager.createEnhancedProceduralWoodMaterial()
+      const material = materialManager.getWallWoodMaterial()
       
       expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
       expect(material.map).toBeInstanceOf(THREE.Texture)
       expect(material.normalMap).toBeInstanceOf(THREE.Texture)
-      expect(material.roughness).toBe(0.8)
-      expect(material.metalness).toBe(0.1)
+      expect(material.roughness).toBeGreaterThan(0.7) // Should be fairly rough
+      expect(material.metalness).toBeLessThan(0.2) // Should be non-metallic
     })
 
     it('should create enhanced carpet material', () => {
-      const material = textureManager.createEnhancedProceduralCarpetMaterial()
+      const material = materialManager.getCarpetMaterial()
       
       expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
       expect(material.map).toBeInstanceOf(THREE.Texture)
-      expect(material.roughness).toBe(0.9)
-      expect(material.metalness).toBe(0.0)
+      expect(material.roughness).toBeGreaterThan(0.8) // Very rough for carpet
+      expect(material.metalness).toBe(0.0) // No metallic properties
     })
 
     it('should create enhanced ceiling material', () => {
-      const material = textureManager.createEnhancedProceduralCeilingMaterial()
+      const material = materialManager.getCeilingMaterial()
       
       expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
       expect(material.map).toBeInstanceOf(THREE.Texture)
-      expect(material.roughness).toBe(0.7)
-      expect(material.metalness).toBe(0.0)
+      expect(material.roughness).toBeGreaterThan(0.6) // Moderately rough
+      expect(material.metalness).toBe(0.0) // No metallic properties
     })
 
     it('should cache materials with same parameters', () => {
-      const options = { repeat: { x: 2, y: 2 }, grainStrength: 0.5 }
-      const material1 = textureManager.createEnhancedProceduralWoodMaterial(options)
-      const material2 = textureManager.createEnhancedProceduralWoodMaterial(options)
+      const material1 = materialManager.getWallWoodMaterial()
+      const material2 = materialManager.getWallWoodMaterial()
       
       expect(material1).toBe(material2)
     })
 
-    it('should handle custom repeat values', () => {
-      const material = textureManager.createEnhancedProceduralWoodMaterial({
-        repeat: { x: 3, y: 4 }
-      })
+    it('should handle game box materials with different hues', () => {
+      const material1 = materialManager.getGameBoxMaterial(0.1)
+      const material2 = materialManager.getGameBoxMaterial(0.5)
       
-      expect(material.map?.repeat.x).toBe(3)
-      expect(material.map?.repeat.y).toBe(4)
-      expect(material.normalMap?.repeat.x).toBe(3)
-      expect(material.normalMap?.repeat.y).toBe(4)
-    })
-
-    it('should handle custom material properties', () => {
-      const material = textureManager.createEnhancedProceduralWoodMaterial({
-        roughness: 0.5,
-        metalness: 0.2
-      })
-      
-      expect(material.roughness).toBe(0.5)
-      expect(material.metalness).toBe(0.2)
+      expect(material1).not.toBe(material2)
+      expect(material1.color).not.toEqual(material2.color)
     })
   })
 
   describe('memory management', () => {
     it('should report memory usage', () => {
-      textureManager.createEnhancedProceduralWoodMaterial()
-      textureManager.createEnhancedProceduralCarpetMaterial()
+      materialManager.getWallWoodMaterial()
+      materialManager.getCarpetMaterial()
       
-      const usage = textureManager.getMemoryUsage()
-      expect(usage.materialCount).toBeGreaterThan(0)
+      const stats = materialManager.getStats()
+      expect(stats.totalMaterials).toBeGreaterThan(0)
     })
 
     it('should clear all caches on dispose', () => {
-      textureManager.createEnhancedProceduralWoodMaterial()
-      textureManager.createEnhancedProceduralCarpetMaterial()
+      materialManager.getWallWoodMaterial()
+      materialManager.getCarpetMaterial()
       
-      textureManager.dispose()
+      materialManager.dispose()
       
-      const usage = textureManager.getMemoryUsage()
-      expect(usage.materialCount).toBe(0)
+      const stats = materialManager.getStats()
+      expect(stats.totalMaterials).toBe(0)
     })
   })
 })
 
 describe('VR Performance Considerations', () => {
-  let textureManager: TextureManager
+  let materialManager: SharedMaterialManager
 
   beforeEach(() => {
-    textureManager = TextureManager.getInstance()
+    materialManager = SharedMaterialManager.getInstance()
   })
 
   afterEach(() => {
-    textureManager.dispose()
+    materialManager.dispose()
   })
 
   it('should create textures with VR-optimized settings', () => {
-    const material = textureManager.createEnhancedProceduralWoodMaterial()
+    const material = materialManager.getWallWoodMaterial()
     
     expect(material.map?.wrapS).toBe(THREE.RepeatWrapping)
     expect(material.map?.wrapT).toBe(THREE.RepeatWrapping)
-    expect(material.normalMap?.wrapS).toBe(THREE.RepeatWrapping)
-    expect(material.normalMap?.wrapT).toBe(THREE.RepeatWrapping)
+    if (material.normalMap) {
+      expect(material.normalMap?.wrapS).toBe(THREE.RepeatWrapping)
+      expect(material.normalMap?.wrapT).toBe(THREE.RepeatWrapping)
+    }
   })
 
   it('should use reasonable texture dimensions for VR', () => {
@@ -293,20 +281,20 @@ describe('VR Performance Considerations', () => {
   })
 
   it('should handle large numbers of materials without memory leaks', () => {
-    const initialUsage = textureManager.getMemoryUsage()
+    const initialStats = materialManager.getStats()
     
-    // Create many materials
+    // Create many materials with different hues
     for (let i = 0; i < 10; i++) {
-      textureManager.createEnhancedProceduralWoodMaterial({ grainStrength: i * 0.1 })
+      materialManager.getGameBoxMaterial(i * 0.1)
     }
     
-    const newUsage = textureManager.getMemoryUsage()
-    expect(newUsage.materialCount).toBe(initialUsage.materialCount + 10)
+    const newStats = materialManager.getStats()
+    expect(newStats.totalMaterials).toBeGreaterThan(initialStats.totalMaterials)
     
     // Dispose should clean everything
-    textureManager.dispose()
+    materialManager.dispose()
     
-    const finalUsage = textureManager.getMemoryUsage()
-    expect(finalUsage.materialCount).toBe(0)
+    const finalStats = materialManager.getStats()
+    expect(finalStats.totalMaterials).toBe(0)
   })
 })

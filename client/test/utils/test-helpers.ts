@@ -5,6 +5,8 @@
 
 import { vi } from 'vitest'
 import type { SteamGame, SteamUser } from '../../src/steam/SteamApiClient'
+import { ServiceContainer, ServiceLifetime, type ServiceKey } from '../../src/core/di/ServiceContainer'
+import { ServiceKeys } from '../../src/core/di/ServiceKeys'
 
 export const mockGame: SteamGame = {
     appid: 220,
@@ -85,4 +87,152 @@ export function setupAbortControllerMock() {
     }
     ;(globalThis as any).AbortController = vi.fn(() => mockAbortController)
     return mockAbortController
+}
+
+/**
+ * TestServiceContainer - Utility for creating DI containers in tests
+ * 
+ * Provides helper methods for:
+ * - Creating clean containers for each test
+ * - Registering mock services easily  
+ * - Standard WebGL-free mocks for common services
+ * - Cleanup and isolation between tests
+ */
+export class TestServiceContainer {
+    private container: ServiceContainer
+    private disposables: (() => Promise<void> | void)[] = []
+
+    constructor() {
+        this.container = new ServiceContainer()
+    }
+
+    /**
+     * Register a mock singleton service
+     */
+    mockSingleton<T>(key: ServiceKey<T>, mockFactory: () => T | Promise<T>): TestServiceContainer {
+        this.container.registerSingleton(key, async () => {
+            const service = await mockFactory()
+            return service
+        })
+        return this
+    }
+
+    /**
+     * Register a mock transient service
+     */
+    mockTransient<T>(key: ServiceKey<T>, mockFactory: () => T | Promise<T>): TestServiceContainer {
+        this.container.registerTransient(key, async () => {
+            const service = await mockFactory()
+            return service
+        })
+        return this
+    }
+
+    /**
+     * Register standard WebGL-free mocks for common services
+     */
+    setupStandardMocks(): TestServiceContainer {
+        // Mock SceneManager without WebGL
+        this.mockSingleton(ServiceKeys.SceneManager, () => ({
+            name: 'MockSceneManager',
+            getScene: vi.fn(() => ({ add: vi.fn(), remove: vi.fn() })),
+            dispose: vi.fn()
+        }))
+
+        // Mock SharedMaterialManager  
+        this.mockSingleton(ServiceKeys.SharedMaterialManager, () => ({
+            name: 'MockSharedMaterialManager',
+            getMaterial: vi.fn(() => ({ name: 'MockMaterial' })),
+            dispose: vi.fn()
+        }))
+
+        // Mock GameBoxRenderer
+        this.mockSingleton(ServiceKeys.GameBoxRenderer, () => ({
+            name: 'MockGameBoxRenderer',
+            render: vi.fn(),
+            dispose: vi.fn()
+        }))
+
+        // Mock EventManager
+        this.mockSingleton(ServiceKeys.EventManager, () => ({
+            name: 'MockEventManager', 
+            on: vi.fn(),
+            emit: vi.fn(),
+            off: vi.fn(),
+            dispose: vi.fn()
+        }))
+
+        return this
+    }
+
+    /**
+     * Initialize the container and make it ready for service resolution
+     */
+    async initialize(): Promise<TestServiceContainer> {
+        await this.container.initialize()
+        return this
+    }
+
+    /**
+     * Resolve a service from the container
+     */
+    async resolve<T>(key: ServiceKey<T>): Promise<T> {
+        return this.container.resolve(key)
+    }
+
+    /**
+     * Get the underlying ServiceContainer for advanced usage
+     */
+    getContainer(): ServiceContainer {
+        return this.container
+    }
+
+    /**
+     * Register a cleanup function to run when disposing
+     */
+    onDispose(cleanup: () => Promise<void> | void): TestServiceContainer {
+        this.disposables.push(cleanup)
+        return this
+    }
+
+    /**
+     * Clean up the container and all registered services
+     */
+    async dispose(): Promise<void> {
+        // Run custom cleanup functions
+        await Promise.all(this.disposables.map(cleanup => cleanup()))
+        
+        // Dispose the container
+        await this.container.dispose()
+    }
+}
+
+/**
+ * Create a fresh TestServiceContainer for a test case
+ * 
+ * Example usage:
+ * ```typescript
+ * describe('MyService', () => {
+ *   let testContainer: TestServiceContainer
+ * 
+ *   beforeEach(async () => {
+ *     testContainer = await createTestContainer()
+ *       .setupStandardMocks()
+ *       .mockSingleton(ServiceKeys.MyService, () => new MockMyService())
+ *       .initialize()
+ *   })
+ * 
+ *   afterEach(async () => {
+ *     await testContainer.dispose()
+ *   })
+ * 
+ *   it('should work with DI', async () => {
+ *     const service = await testContainer.resolve(ServiceKeys.MyService)
+ *     expect(service).toBeDefined()
+ *   })
+ * })
+ * ```
+ */
+export function createTestContainer(): TestServiceContainer {
+    return new TestServiceContainer()
 }

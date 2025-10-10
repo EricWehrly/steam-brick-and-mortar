@@ -34,10 +34,13 @@ steam-brick-and-mortar/
 
 ### 🔧 **Tool Usage**
 - **Use `scripts/scratch.sh`** for complex multi-command operations
-- **ALWAYS use `yarn` not `npm`**: This project uses Yarn PnP exclusively
+- **ALWAYS use `yarn` not `npm` or `npx`**: This project uses Yarn PnP exclusively. The latter are not set up and will error. This is desired.
 - **Follow technology-specific guidelines** (see `.github/javascript-guidelines.md`, etc.)
 - **Prefer Docker Compose** for reproducible builds
 - **Use appropriate VS Code tools** for file operations vs terminal commands
+- **Read terminal output carefully**: Check exit codes and actual error messages, not just command failures
+- **Don't chain failing commands**: If `cd client && yarn tsc` fails because you're already in client/, just run `yarn tsc`
+- **Never try `npx` as fallback**: It's not configured and will never work in this Yarn PnP setup
 
 ### 📝 **Code Style & Documentation**
 - **NO redundant comment headings**: Don't add obvious comments like `/**\n * Get environment statistics for debugging\n */` above a method named `getEnvironmentStats()`. The method name is self-explanatory.

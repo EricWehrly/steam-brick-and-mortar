@@ -9,6 +9,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { LightingControlsPanel } from '../../../src/ui/LightingControlsPanel'
+import { EventManager } from '../../../src/core/EventManager'
+import { AppSettings } from '../../../src/core/AppSettings'
 
 // Mock the EventManager
 vi.mock('../../../src/core/EventManager', () => ({
@@ -40,8 +42,12 @@ describe('Lighting Controls Panel Integration', () => {
         separateButton.textContent = '💡 Lights'
         document.body.appendChild(separateButton)
         
+        // Setup mock dependencies
+        const mockEventManager = EventManager.getInstance()
+        const mockAppSettings = AppSettings.getInstance()
+        
         // Create the lighting panel
-        lightingPanel = new LightingControlsPanel()
+        lightingPanel = new LightingControlsPanel(mockEventManager, mockAppSettings)
     })
 
     afterEach(() => {

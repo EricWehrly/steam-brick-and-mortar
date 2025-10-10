@@ -7,6 +7,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { LightingControlsPanel } from '../../../src/ui/LightingControlsPanel'
+import { EventManager } from '../../../src/core/EventManager'
+import { AppSettings } from '../../../src/core/AppSettings'
 import * as THREE from 'three'
 
 // Mock the EventManager
@@ -89,8 +91,12 @@ describe('Lighting Controls Panel Debug Helper Integration', () => {
         debugRectHelper.visible = true
         scene.add(debugRectHelper)
         
+        // Setup mock dependencies
+        const mockEventManager = EventManager.getInstance()
+        const mockAppSettings = AppSettings.getInstance()
+        
         // Create the lighting panel
-        lightingPanel = new LightingControlsPanel()
+        lightingPanel = new LightingControlsPanel(mockEventManager, mockAppSettings)
 
         // Manually set the scene (simulating getting it from a light creation event)
         ;(lightingPanel as any).scene = scene

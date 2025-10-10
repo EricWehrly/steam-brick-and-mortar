@@ -29,7 +29,7 @@ describe('GameSettingsPanel Development Mode', () => {
         appSettings = AppSettings.getInstance()
         emitSpy = vi.spyOn(eventManager, 'emit')
         
-        gameSettingsPanel = new GameSettingsPanel()
+        gameSettingsPanel = new GameSettingsPanel({}, appSettings, eventManager)
     })
 
     afterEach(() => {

@@ -24,9 +24,9 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     private appSettings: AppSettings
     private onSettingsChanged?: (settings: Partial<ApplicationSettings>) => void
 
-    constructor(config: PauseMenuPanelConfig = {}) {
+    constructor(config: PauseMenuPanelConfig = {}, appSettings: AppSettings) {
         super(config)
-        this.appSettings = AppSettings.getInstance()
+        this.appSettings = appSettings
     }
 
     initialize(callbacks: { onSettingsChanged?: (settings: Partial<ApplicationSettings>) => void }): void {

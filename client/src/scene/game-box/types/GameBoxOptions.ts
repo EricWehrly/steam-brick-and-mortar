@@ -5,7 +5,7 @@
  * and batch processing configurations.
  */
 
-import type { GameData, SteamGameData } from './GameData'
+import type { SteamGameData } from './GameData'
 
 export interface GameBoxDimensions {
     width: number
@@ -39,13 +39,13 @@ export interface GameBoxTextureOptions {
 
 // Clean interface contract between GameBoxRenderer and external managers
 export interface GameBoxCreationRequest {
-    gameData: GameData | SteamGameData
+    gameData: SteamGameData
     index: number
     textureOptions?: GameBoxTextureOptions
 }
 
 export interface GameBoxBatchCreationRequest {
-    games: (GameData | SteamGameData)[]
+    games: SteamGameData[]
     batchSize?: number
     enablePerformanceFeatures?: boolean
 }

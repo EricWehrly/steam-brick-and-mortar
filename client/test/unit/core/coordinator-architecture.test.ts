@@ -21,11 +21,15 @@ describe('Coordinator Architecture Integration', () => {
             // Test that coordinator classes can be imported
             const { SceneCoordinator } = await import('../../../src/scene/SceneCoordinator')
             const { WebXRCoordinator } = await import('../../../src/webxr/WebXRCoordinator')  
-            const { UICoordinator } = await import('../../../src/ui/UICoordinator')
+            const { SystemUICoordinator } = await import('../../../src/ui/coordinators/SystemUICoordinator')
+            const { SteamUICoordinator } = await import('../../../src/ui/coordinators/SteamUICoordinator')
+            const { WebXRUICoordinator } = await import('../../../src/ui/coordinators/WebXRUICoordinator')
             
             expect(SceneCoordinator).toBeDefined()
             expect(WebXRCoordinator).toBeDefined()
-            expect(UICoordinator).toBeDefined()
+            expect(SystemUICoordinator).toBeDefined()
+            expect(SteamUICoordinator).toBeDefined()
+            expect(WebXRUICoordinator).toBeDefined()
         })
 
         it('should demonstrate coordinator responsibility separation', () => {
@@ -44,20 +48,28 @@ describe('Coordinator Architecture Integration', () => {
                     'pauseInput',
                     'resumeInput'
                 ],
-                UICoordinator: [
-                    'setupUI',
+                SystemUICoordinator: [
+                    'init',
                     'showPauseMenu',
                     'hidePauseMenu',
-                    'updateRenderStats',
+                    'updatePerformanceStats'
+                ],
+                SteamUICoordinator: [
+                    'setupUI',
+                    'showLoadingIndicator',
                     'showError'
+                ],
+                WebXRUICoordinator: [
+                    'setupWebXRUI',
+                    'updateWebXRState'
                 ]
             }
             
             // Verify the coordinator pattern addresses the complexity issue
-            expect(Object.keys(coordinatorResponsibilities)).toHaveLength(3)
+            expect(Object.keys(coordinatorResponsibilities)).toHaveLength(5)
             expect(coordinatorResponsibilities.SceneCoordinator.length).toBeGreaterThan(3)
             expect(coordinatorResponsibilities.WebXRCoordinator.length).toBeGreaterThan(3)
-            expect(coordinatorResponsibilities.UICoordinator.length).toBeGreaterThan(3)
+            expect(coordinatorResponsibilities.SystemUICoordinator.length).toBeGreaterThan(3)
         })
 
         it('should show improvement from original complexity', () => {
@@ -70,12 +82,12 @@ describe('Coordinator Architecture Integration', () => {
             
             const newComplexity = {
                 fileLineCount: 467, // Reduced by 43%
-                coordinators: 3,
+                coordinators: 5, // Split into SceneCoordinator, WebXRCoordinator, SystemUICoordinator, SteamUICoordinator, WebXRUICoordinator
                 delegatedResponsibilities: 12
             }
             
             expect(newComplexity.fileLineCount).toBeLessThan(originalComplexity.fileLineCount * 0.6)
-            expect(newComplexity.coordinators).toBe(3)
+            expect(newComplexity.coordinators).toBe(5)
             expect(newComplexity.delegatedResponsibilities).toBeGreaterThan(10)
         })
     })
@@ -85,15 +97,12 @@ describe('Coordinator Architecture Integration', () => {
             // Test that our coordinator mocks are properly structured
             const { sceneCoordinatorMockFactory } = await import('../../mocks/scene/SceneCoordinator.mock')
             const { webxrCoordinatorMockFactory } = await import('../../mocks/webxr/WebXRCoordinator.mock')
-            const { uiCoordinatorMockFactory } = await import('../../mocks/ui/UICoordinator.mock')
             
             const sceneMock = await sceneCoordinatorMockFactory()
             const webxrMock = await webxrCoordinatorMockFactory()
-            const uiMock = await uiCoordinatorMockFactory()
             
             expect(sceneMock.SceneCoordinator).toBeDefined()
             expect(webxrMock.WebXRCoordinator).toBeDefined()
-            expect(uiMock.UICoordinator).toBeDefined()
         })
 
         it('should verify coordinator mocks have required async methods', async () => {

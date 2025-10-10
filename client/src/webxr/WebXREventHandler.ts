@@ -15,7 +15,7 @@
 
 import { EventManager } from '../core/EventManager'
 import { WebXRCoordinator } from './WebXRCoordinator'
-import { UICoordinator } from '../ui/UICoordinator'
+import { WebXRUICoordinator } from '../ui/coordinators'
 import { Logger } from '../utils/Logger'
 import { ToastManager } from '../ui/ToastManager'
 import { WebXREventTypes, InputEventTypes, UIEventTypes } from '../types/InteractionEvents'
@@ -36,16 +36,16 @@ export class WebXREventHandler {
     private static readonly logger = Logger.withContext(WebXREventHandler.name)
     private eventManager: EventManager
     private webxrCoordinator: WebXRCoordinator
-    private uiCoordinator: UICoordinator
+    private webxrUICoordinator: WebXRUICoordinator
     private boundHandlers: Record<string, EventListener>
 
     constructor(
         webxrCoordinator: WebXRCoordinator,
-        uiCoordinator: UICoordinator,
+        webxrUICoordinator: WebXRUICoordinator,
         eventManager?: EventManager
     ) {
         this.webxrCoordinator = webxrCoordinator
-        this.uiCoordinator = uiCoordinator
+        this.webxrUICoordinator = webxrUICoordinator
         this.eventManager = eventManager || EventManager.getInstance()
         
         this.boundHandlers = {
@@ -119,12 +119,12 @@ export class WebXREventHandler {
 
     private handleWebXRSessionStart(_event: WebXRSessionStartEvent): void {
         WebXREventHandler.logger.info('WebXR session started')
-        this.uiCoordinator.webxr.updateWebXRSessionState(true)
+        this.webxrUICoordinator.updateWebXRSessionState(true)
     }
 
     private handleWebXRSessionEnd(_event: WebXRSessionEndEvent): void {
         WebXREventHandler.logger.info('WebXR session ended')
-        this.uiCoordinator.webxr.updateWebXRSessionState(false)
+        this.webxrUICoordinator.updateWebXRSessionState(false)
     }
 
     private handleWebXRError(event: WebXRErrorEvent): void {
@@ -134,7 +134,7 @@ export class WebXREventHandler {
 
     private handleWebXRSupportChange(event: WebXRSupportChangeEvent): void {
         WebXREventHandler.logger.info('WebXR capabilities changed:', event.capabilities)
-        this.uiCoordinator.webxr.updateWebXRSupport(event.capabilities)
+        this.webxrUICoordinator.updateWebXRSupport(event.capabilities)
     }
 
     private handleInputPause(event: InputPauseEvent): void {

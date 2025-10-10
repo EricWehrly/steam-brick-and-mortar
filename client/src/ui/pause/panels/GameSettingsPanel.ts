@@ -56,10 +56,10 @@ export class GameSettingsPanel extends PauseMenuPanel {
 
     private onSettingsChanged?: (settings: Partial<SteamSettings>) => void
 
-    constructor(config: PauseMenuPanelConfig = {}) {
+    constructor(config: PauseMenuPanelConfig = {}, appSettings: AppSettings, eventManager: EventManager) {
         super(config)
-        this.appSettings = AppSettings.getInstance()
-        this.eventManager = EventManager.getInstance()
+        this.appSettings = appSettings
+        this.eventManager = eventManager
         this.loadSettings()
     }
 

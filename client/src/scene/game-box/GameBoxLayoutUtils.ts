@@ -8,7 +8,7 @@
  * - Layout spacing and configuration management
  */
 
-import type { GameData, SteamGameData } from './types/GameData'
+import type { SteamGameData } from './types/GameData'
 import type { GameBoxPosition, ShelfConfiguration } from './types/GameBoxOptions'
 
 export class GameBoxLayoutUtils {
@@ -23,7 +23,7 @@ export class GameBoxLayoutUtils {
     /**
      * Sort games by playtime (played games first by playtime, then unplayed alphabetically)
      */
-    public static sortAndLimitGames(games: (GameData | SteamGameData)[]): (GameData | SteamGameData)[] {
+    public static sortAndLimitGames(games: SteamGameData[]): SteamGameData[] {
         // Get games with recent playtime first, then alphabetical
         const playedGames = games
             .filter(game => GameBoxLayoutUtils.getGamePlaytime(game) > 0)
@@ -79,17 +79,17 @@ export class GameBoxLayoutUtils {
     }
 
     /**
-     * Get game playtime from different game data formats
+     * Get game playtime from Steam game data
      */
-    public static getGamePlaytime(game: GameData | SteamGameData): number {
-        return 'playtime' in game ? game.playtime : game.playtime_forever
+    public static getGamePlaytime(game: SteamGameData): number {
+        return game.playtime_forever
     }
 
     /**
-     * Get game ID from different game data formats
+     * Get game ID from Steam game data
      */
-    public static getGameId(game: GameData | SteamGameData): string | number {
-        return 'id' in game ? game.id : game.appid
+    public static getGameId(game: SteamGameData): string | number {
+        return game.appid
     }
 
     /**

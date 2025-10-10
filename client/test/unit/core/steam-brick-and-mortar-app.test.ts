@@ -100,15 +100,6 @@ vi.mock('../../../src/core/DebugStatsProvider', () => ({
     }))
 }))
 
-vi.mock('../../../src/steam-integration/SteamGameManager', () => ({
-    SteamGameManager: vi.fn().mockImplementation(() => ({
-        resetGameIndex: vi.fn(),
-        clearGameBoxes: vi.fn(),
-        getCurrentGameIndex: vi.fn().mockReturnValue(0),
-        addGameBoxToScene: vi.fn().mockResolvedValue(undefined)
-    }))
-}))
-
 describe('SteamBrickAndMortarApp Unit Tests', () => {
     let SteamBrickAndMortarApp: any
 

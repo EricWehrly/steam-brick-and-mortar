@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { TextureManager } from '../../src/utils/TextureManager'
+import { SharedMaterialManager } from '../../src/utils/SharedMaterialManager'
 
-describe('TextureManager API Integration Tests', () => {
-  let textureManager: TextureManager
+describe('SharedMaterialManager API Integration Tests', () => {
+  let materialManager: SharedMaterialManager
 
   beforeEach(() => {
     // Mock canvas for texture creation
@@ -38,20 +38,20 @@ describe('TextureManager API Integration Tests', () => {
       return document.createElement(tagName)
     })
 
-    textureManager = TextureManager.getInstance()
+    materialManager = SharedMaterialManager.getInstance()
   })
 
   describe('API Method Availability', () => {
     it('should have all methods that StoreLayout expects', () => {
-      expect(typeof textureManager.createCeilingMaterial).toBe('function')
-      expect(typeof textureManager.createWoodMaterial).toBe('function') 
-      expect(typeof textureManager.createCarpetMaterial).toBe('function')
+      expect(typeof materialManager.getCeilingMaterial).toBe('function')
+      expect(typeof materialManager.getWallWoodMaterial).toBe('function') 
+      expect(typeof materialManager.getCarpetMaterial).toBe('function')
     })
 
     it('should not throw is not a function errors', () => {
-      expect(() => textureManager.createCeilingMaterial).not.toThrow()
-      expect(() => textureManager.createWoodMaterial).not.toThrow()
-      expect(() => textureManager.createCarpetMaterial).not.toThrow()
+      expect(() => materialManager.getCeilingMaterial).not.toThrow()
+      expect(() => materialManager.getWallWoodMaterial).not.toThrow()
+      expect(() => materialManager.getCarpetMaterial).not.toThrow()
     })
   })
 })

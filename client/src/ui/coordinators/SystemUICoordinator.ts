@@ -20,6 +20,7 @@ import type { ImageCacheStats } from '../../steam/images/ImageManager'
 import type { SteamIntegration } from '../../steam-integration/SteamIntegration'
 import type { SteamWorkflowManager } from '../../steam-integration/SteamWorkflowManager'
 import type { UIManager } from '../UIManager'
+import { AppSettings } from '../../core/AppSettings'
 
 export class SystemUICoordinator {
     private pauseMenuManager: PauseMenuManager
@@ -31,10 +32,13 @@ export class SystemUICoordinator {
     private steamIntegration?: SteamIntegration
     private steamWorkflowManager?: SteamWorkflowManager
     private uiManager?: UIManager
+    private appSettings: AppSettings
 
     constructor(
         performanceMonitor: PerformanceMonitor,
         debugStatsProvider: DebugStatsProvider,
+        eventManager: EventManager,
+        appSettings: AppSettings,
         cacheStatsProvider?: () => Promise<ImageCacheStats>,
         steamIntegration?: SteamIntegration
     ) {
@@ -43,8 +47,9 @@ export class SystemUICoordinator {
         this.cacheStatsProvider = cacheStatsProvider
         this.steamIntegration = steamIntegration
         
-        this.eventManager = EventManager.getInstance()
-        this.pauseMenuManager = new PauseMenuManager()
+        this.eventManager = eventManager
+        this.appSettings = appSettings
+        this.pauseMenuManager = new PauseMenuManager({}, {}, undefined, this.eventManager, this.appSettings)
     }
 
     public setUIManager(uiManager: UIManager): void {
@@ -135,7 +140,7 @@ export class SystemUICoordinator {
 
     public initializeLightingControls(): void {
         if (!this.lightingControlsPanel) {
-            this.lightingControlsPanel = new LightingControlsPanel()
+            this.lightingControlsPanel = new LightingControlsPanel(this.eventManager, this.appSettings)
             // Show the integrated panel by default since the button is now part of it
             this.lightingControlsPanel.show()
         }
@@ -167,7 +172,7 @@ export class SystemUICoordinator {
         return this.performanceMonitor
     }
 
-    public updateRenderStats(renderer: THREE.WebGLRenderer): void {
+    public updateRenderStats(renderer: THREE.WebGLRenderer, scene?: THREE.Scene): void {
         this.performanceMonitor.updateRenderStats(renderer)
     }
 
