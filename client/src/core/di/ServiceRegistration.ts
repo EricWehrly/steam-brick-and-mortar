@@ -133,9 +133,7 @@ export class ServiceRegistration {
         
         return new GameBoxRenderer(
           config.performance?.gameBox?.dimensions,
-          config.performance?.gameBox?.shelf,
-          config.performance?.gameBox?.performance,
-          sceneManager // Pass SceneManager for consistent scene interaction
+          config.performance?.gameBox?.performance
         )
       },
       [ServiceKeys.SharedMaterialManager, ServiceKeys.SceneManager]

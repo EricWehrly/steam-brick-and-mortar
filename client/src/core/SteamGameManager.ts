@@ -86,7 +86,7 @@ export class SteamGameManager {
         this.resetGameIndex()
         
         // Create game boxes with Steam data (renderer handles generic conversion)
-        const gameBoxes = this.gameBoxRenderer.createGameBoxesFromSteamData(
+        const gameBoxes = this.gameBoxRenderer.createGameBoxesFromGameData(
             this.sceneManager.getScene(),
             games
         )

@@ -73,8 +73,9 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
             frustumCullingEnabled: true
         }
         
-        renderer = new GameBoxRenderer({}, {}, performanceConfig)
-        performanceManager = renderer.getPerformanceManager()
+    renderer = new GameBoxRenderer({}, performanceConfig)
+    // Access the internal performance manager for testing (was previously exposed)
+    performanceManager = (renderer as any).performanceManager
         textureManager = renderer.getTextureManager()
         scene = new THREE.Scene()
         camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
@@ -123,7 +124,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
         it('should update performance data for all game boxes', () => {
             // Create some game boxes positioned in front of camera
             const gameBoxes = mockGameData.slice(0, 5).map((game, index) => {
-                const box = renderer.createGameBox(scene, game, index)
+                const box = renderer.createGameBoxAtPosition(scene, game, new THREE.Vector3(0, 0, 0))
                 if (box) {
                     // Position boxes in front of camera (camera looks down -Z axis by default)
                     box.position.set(index * 2 - 4, 0, -5)
@@ -150,7 +151,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
         it('should track viewing distance correctly', () => {
             // Create a game box at a specific position
             const game = mockGameData[0]
-            const gameBox = renderer.createGameBox(scene, game, 0)
+            const gameBox = renderer.createGameBoxAtPosition(scene, game, new THREE.Vector3(0, 0, 0))
             expect(gameBox).toBeDefined()
             
             if (gameBox) {
@@ -168,7 +169,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
     describe('Lazy Loading', () => {
         it('should skip texture loading for off-screen objects when lazy loading enabled', async () => {
             const game = mockGameData[0]
-            const gameBox = renderer.createGameBox(scene, game, 0)
+            const gameBox = renderer.createGameBoxAtPosition(scene, game, new THREE.Vector3(0, 0, 0))
             expect(gameBox).toBeDefined()
             
             if (gameBox) {
@@ -194,7 +195,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
         
         it('should load textures for visible objects even with lazy loading', async () => {
             const game = mockGameData[0]
-            const gameBox = renderer.createGameBox(scene, game, 0)
+            const gameBox = renderer.createGameBoxAtPosition(scene, game, new THREE.Vector3(0, 0, 0))
             expect(gameBox).toBeDefined()
             
             if (gameBox) {
@@ -227,7 +228,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
             
             for (let i = 0; i < 15; i++) { // More than maxActiveTextures (10)
                 const game = mockGameData[i % mockGameData.length]
-                const gameBox = renderer.createGameBox(scene, game, i)
+                const gameBox = renderer.createGameBoxAtPosition(scene, game, new THREE.Vector3(0, 0, 0))
                 if (gameBox) {
                     gameBox.position.set(0, 0, -2) // All visible
                     gameBoxes.push({ box: gameBox, game })
@@ -259,7 +260,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
         
         it('should clean up off-screen textures', () => {
             const game = mockGameData[0]
-            const gameBox = renderer.createGameBox(scene, game, 0)
+            const gameBox = renderer.createGameBoxAtPosition(scene, game, new THREE.Vector3(0, 0, 0))
             expect(gameBox).toBeDefined()
             
             if (gameBox) {
@@ -291,7 +292,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
         it('should provide accurate performance statistics', () => {
             // Create some game boxes
             const gameBoxes = mockGameData.slice(0, 8).map((game, index) => {
-                const box = renderer.createGameBox(scene, game, index)
+                const box = renderer.createGameBoxAtPosition(scene, game, new THREE.Vector3(0, 0, 0))
                 if (box) {
                     box.position.set(index * 2, 0, -3) // Spread them out
                 }
@@ -333,7 +334,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
                     }
                 }
                 
-                const box = renderer.createGameBox(scene, game, i)
+                const box = renderer.createGameBoxAtPosition(scene, game, new THREE.Vector3(0, 0, 0))
                 if (box) {
                     createdBoxes.push(box)
                 }
@@ -352,7 +353,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
         
         it('should update performance data efficiently for large numbers of objects', () => {
             // Create a new renderer for this test with performance features enabled
-            const largeRenderer = new GameBoxRenderer({}, {}, {
+            const largeRenderer = new GameBoxRenderer({}, {
                 maxTextureSize: 1024,
                 nearDistance: 2.0,
                 farDistance: 10.0,
@@ -371,7 +372,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
                     playtime_forever: Math.random() * 1000
                 }
                 
-                const box = largeRenderer.createGameBox(scene, game, i)
+                const box = largeRenderer.createGameBoxAtPosition(scene, game, new THREE.Vector3(0, 0, 0))
                 if (box) {
                     // Spread them out in 3D space
                     box.position.set(

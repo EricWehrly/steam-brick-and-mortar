@@ -151,7 +151,7 @@ export class StorePropsRenderer {
         
         try {
             // Set up props in logical order
-            // NOTE: Static shelf setup removed - only dynamic generation via spawnDynamicShelvesWithGames()
+            // NOTE: Static shelf setup removed - dynamic generation happens via room:resized event
             // This eliminates duplicate environment creation
             
             if (this.config.enableSignage) {
@@ -188,7 +188,7 @@ export class StorePropsRenderer {
     }
 
     // REMOVED: setupShelves() method - was creating duplicate static environment
-    // Only dynamic generation via spawnDynamicShelvesWithGames() should be used
+    // Dynamic generation happens via room:resized event in onRoomResized() method
 
     private async setupTestObjects(): Promise<void> {
         console.debug('🧪 Adding test objects...')
@@ -293,40 +293,7 @@ export class StorePropsRenderer {
         }
     }
 
-    /**
-     * Spawn dynamic shelves based on game count and populate with loaded games
-     */
-    public async spawnDynamicShelvesWithGames(shelvesNeeded: number, gameCount: number, games: any[] = []): Promise<void> {
-        console.debug(`📚 Spawning ${shelvesNeeded} dynamic shelves for ${gameCount} games with ${games.length} game data objects`)
-        
-        try {
-            // Direct shelf spawning (for backward compatibility with tests and legacy callers)
-            // The event-driven flow should use: SceneCoordinator → room:resize → RoomManager → room:resized → onRoomResized
-            const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
-            const calculatedShelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
-            const actualShelvesNeeded = calculatedShelvesNeeded // Use calculated value for consistency
-            
-            console.debug(`📊 Calculation: ${gameCount} games ÷ (${GameLayoutConstants.GAMES_PER_SURFACE} games/surface × ${GameLayoutConstants.SURFACES_PER_SHELF} surfaces/shelf) = ${actualShelvesNeeded} shelves`)
-            
-            // Clear existing shelves first
-            this.clearExistingShelves()
-            
-            // Create shelf rows based on needed shelves
-            const maxShelvesPerRow = 4
-            const rows = Math.ceil(actualShelvesNeeded / maxShelvesPerRow)
-            
-            for (let row = 0; row < rows; row++) {
-                const shelvesInThisRow = Math.min(maxShelvesPerRow, actualShelvesNeeded - (row * maxShelvesPerRow))
-                await this.createShelfRow(row, shelvesInThisRow, games)
-            }
-            
-            console.debug(`✅ Dynamic shelves spawned directly: ${actualShelvesNeeded} shelves in ${rows} row(s)`)
-            
-        } catch (error) {
-            console.error('❌ Failed to spawn dynamic shelves:', error)
-            throw error
-        }
-    }
+
 
     /**
      * Clear ALL existing store environment from the scene
@@ -491,7 +458,7 @@ export class StorePropsRenderer {
     }
 
     /**
-     * Create game boxes with text materials showing game names
+     * Create game boxes on shelf surface (delegated to GameBoxRenderer)
      */
     private async createGameBoxesWithNames(
         surface: {topY: number, frontZ: number, backZ: number, centerX: number, width: number}, 
@@ -500,107 +467,44 @@ export class StorePropsRenderer {
         side: 'front' | 'back', 
         surfaceIndex: number
     ): Promise<void> {
-        // TODO: Extract these to easier configuration locations
-        const Z_OFFSET = 0.025;
-        const Y_OFFSET = 0.11;
-        const GAME_HEIGHT = 0.24;  // 1.2x larger: 0.2 * 1.2 = 0.24
-        const GAME_WIDTH = 0.18;   // 1.2x larger: 0.15 * 1.2 = 0.18
-        const GAME_DEPTH = 0.05;   // Keep Z the same
-        const GAME_SPACING = 0.3;
+        if (!this.gameBoxRenderer) {
+            console.warn('⚠️ GameBoxRenderer not available, cannot create game boxes')
+            return
+        }
+
+        // StorePropsRenderer now handles positioning and parenting
+        const Z_OFFSET = 0.1        // 10cm from shelf surface
+        const Y_OFFSET = 0.005      // 5mm above shelf surface  
+        const GAME_HEIGHT = 0.4     // 40cm height
+        const GAME_SPACING = 0.35   // 35cm spacing between games
         
         // Calculate positioning
-        const gameY = surface.topY + Y_OFFSET + GAME_HEIGHT / 2;
-        const gameZ = side === 'front' ? surface.frontZ + Z_OFFSET : surface.backZ - Z_OFFSET;
+        const gameY = surface.topY + Y_OFFSET + GAME_HEIGHT / 2
+        const gameZ = side === 'front' ? surface.frontZ + Z_OFFSET : surface.backZ - Z_OFFSET
         
         // Center the games on the shelf
-        const totalWidth = (games.length - 1) * GAME_SPACING;
-        const startX = surface.centerX - totalWidth / 2;
+        const totalWidth = (games.length - 1) * GAME_SPACING
+        const startX = surface.centerX - totalWidth / 2
         
+        let createdCount = 0
         for (let i = 0; i < games.length; i++) {
-            const game = games[i];
-            const gameX = startX + (i * GAME_SPACING);
+            const game = games[i]
+            const gameX = startX + (i * GAME_SPACING)
+            const position = new THREE.Vector3(gameX, gameY, gameZ)
+            const name = `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}-${side}-${i}`
             
-            // Create game box geometry
-            const gameGeometry = new THREE.BoxGeometry(GAME_WIDTH, GAME_HEIGHT, GAME_DEPTH);
-            
-            // Create material with game name
-            const gameMaterial = await this.createGameNameMaterial(game);
-            
-            // Create game box mesh
-            const gameBox = new THREE.Mesh(gameGeometry, gameMaterial);
-            gameBox.position.set(gameX, gameY, gameZ);
-            gameBox.name = `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}-${side}-${i}`;
-            
-            parentGroup.add(gameBox);
-            
-            console.debug(`📦 Created game box for "${game.name}" at position (${gameX.toFixed(2)}, ${gameY.toFixed(2)}, ${gameZ.toFixed(2)})`);
-        }
-    }
-
-    /**
-     * Create a material with the game name written on it
-     */
-    private async createGameNameMaterial(game: any): Promise<THREE.Material> {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        if (!ctx) {
-            // Fallback to basic material if canvas fails
-            return new THREE.MeshPhongMaterial({ color: 0x8B4513 }); // Brown color
-        }
-        
-        // Background (game box color)
-        ctx.fillStyle = '#2c3e50'; // Dark blue-gray
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Game name text - larger font and better contrast
-        ctx.fillStyle = '#f8f9fa';  // Almost pure white for better contrast
-        ctx.font = 'bold 48px Arial';  // Double the size: 24px * 2 = 48px
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Wrap text if it's too long
-        const gameName = game.name || 'Unknown Game';
-        const maxWidth = canvas.width - 20; // Leave some padding
-        const words = gameName.split(' ');
-        let lines: string[] = [];
-        let currentLine = '';
-        
-        for (const word of words) {
-            const testLine = currentLine ? `${currentLine} ${word}` : word;
-            const metrics = ctx.measureText(testLine);
-            
-            if (metrics.width > maxWidth && currentLine) {
-                lines.push(currentLine);
-                currentLine = word;
-            } else {
-                currentLine = testLine;
+            // Create game box at 0,0,0 then position and parent it ourselves
+            const gameBox = this.gameBoxRenderer.createGameBox(game, position, undefined, name)
+            if (gameBox) {
+                parentGroup.add(gameBox)  // Add directly to parent group (no scene involvement)
+                createdCount++
             }
         }
-        if (currentLine) lines.push(currentLine);
-        
-        // Limit to 3 lines max
-        lines = lines.slice(0, 3);
-        
-        // Draw the text lines - adjust line height for larger font
-        const lineHeight = 60;  // Double the line height for larger font
-        const startY = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
-        
-        lines.forEach((line, index) => {
-            ctx.fillText(line, canvas.width / 2, startY + (index * lineHeight));
-        });
-        
-        // Create texture and material
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.needsUpdate = true;
-        
-        return new THREE.MeshPhongMaterial({ 
-            map: texture,
-            transparent: false
-        });
+
+        console.debug(`✅ Created ${createdCount} game boxes on shelf surface via GameBoxRenderer`)
     }
+
+    // NOTE: createGameNameMaterial() method removed - GameBoxRenderer now handles all material creation
 
 
     // expandStoreEnvironment method removed - RoomManager now handles all room structure creation

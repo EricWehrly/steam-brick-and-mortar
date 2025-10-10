@@ -77,8 +77,11 @@ describe('GameBoxRenderer Texture Tests', () => {
         })
 
         it('should apply fallback color when no artwork is provided', async () => {
-            const gameBox = renderer.createGameBox(scene, mockGame, 0)
+            const gameBox = renderer.createGameBox(mockGame)
             expect(gameBox).toBeTruthy()
+            
+            // Caller needs to add to scene manually with new API
+            if (gameBox) scene.add(gameBox)
             
             // Should have a colored material based on game name
             const material = gameBox!.material as THREE.MeshStandardMaterial
@@ -87,8 +90,10 @@ describe('GameBoxRenderer Texture Tests', () => {
         })
 
         it('should handle texture application with missing blobs gracefully', async () => {
-            const gameBox = renderer.createGameBox(scene, mockGame, 0)
+            const gameBox = renderer.createGameBox(mockGame)
             expect(gameBox).toBeTruthy()
+            // Caller needs to add to scene manually with new API
+            if (gameBox) scene.add(gameBox)
 
             const textureOptions: GameBoxTextureOptions = {
                 artworkBlobs: {
@@ -105,8 +110,10 @@ describe('GameBoxRenderer Texture Tests', () => {
         })
 
         it('should successfully apply texture from blob', async () => {
-            const gameBox = renderer.createGameBox(scene, mockGame, 0)
+            const gameBox = renderer.createGameBox(mockGame)
             expect(gameBox).toBeTruthy()
+            // Caller needs to add to scene manually with new API
+            if (gameBox) scene.add(gameBox)
 
             const mockBlob = new Blob(['fake image data'], { type: 'image/jpeg' })
             const textureOptions: GameBoxTextureOptions = {
@@ -120,8 +127,10 @@ describe('GameBoxRenderer Texture Tests', () => {
         })
 
         it('should prioritize library artwork over other types', async () => {
-            const gameBox = renderer.createGameBox(scene, mockGame, 0)
+            const gameBox = renderer.createGameBox(mockGame)
             expect(gameBox).toBeTruthy()
+            // Caller needs to add to scene manually with new API
+            if (gameBox) scene.add(gameBox)
 
             const iconBlob = new Blob(['icon data'], { type: 'image/jpeg' })
             const libraryBlob = new Blob(['library data'], { type: 'image/jpeg' })
@@ -148,8 +157,10 @@ describe('GameBoxRenderer Texture Tests', () => {
         })
 
         it('should handle texture loading errors gracefully', async () => {
-            const gameBox = renderer.createGameBox(scene, mockGame, 0)
+            const gameBox = renderer.createGameBox(mockGame)
             expect(gameBox).toBeTruthy()
+            // Caller needs to add to scene manually with new API
+            if (gameBox) scene.add(gameBox)
 
             // Mock a blob that will cause texture loading to fail
             const invalidBlob = new Blob(['invalid'], { type: 'text/plain' })
@@ -167,8 +178,10 @@ describe('GameBoxRenderer Texture Tests', () => {
 
     describe('Resource Management', () => {
         it('should dispose of existing textures when applying new ones', async () => {
-            const gameBox = renderer.createGameBox(scene, mockGame, 0)
+            const gameBox = renderer.createGameBox(mockGame)
             expect(gameBox).toBeTruthy()
+            // Caller needs to add to scene manually with new API
+            if (gameBox) scene.add(gameBox)
 
             // Add a mock texture to userData
             const mockTexture = { dispose: vi.fn() }

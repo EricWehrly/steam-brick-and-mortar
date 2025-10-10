@@ -27,7 +27,6 @@ vi.mock('../../../src/scene/SceneManager', () => ({
 
 vi.mock('../../../src/scene/StorePropsRenderer', () => ({
     StorePropsRenderer: vi.fn().mockImplementation(() => ({
-        spawnDynamicShelvesWithGames: vi.fn().mockResolvedValue(undefined),
         setupProps: vi.fn().mockResolvedValue(undefined)
     }))
 }))
