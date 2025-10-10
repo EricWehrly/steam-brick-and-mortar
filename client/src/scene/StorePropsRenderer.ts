@@ -42,8 +42,6 @@ export interface PropsConfig {
     enableGameBoxes?: boolean
     /** Enable signage */
     enableSignage?: boolean
-    /** Enable test objects */
-    enableTestObjects?: boolean
     /** Performance configuration */
     performance?: {
         maxTextureSize?: number
@@ -66,10 +64,10 @@ export class StorePropsRenderer {
     private config: PropsConfig = {}
     private currentStoreGroup: THREE.Group | null = null // Track current store environment
 
-
-    constructor(scene: THREE.Scene, dataManager: DataManager) {
+    constructor(scene: THREE.Scene, dataManager: DataManager, gameBoxRenderer: GameBoxRenderer) {
         this.scene = scene
         this.dataManager = dataManager
+        this.gameBoxRenderer = gameBoxRenderer
 
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props'
@@ -97,7 +95,7 @@ export class StorePropsRenderer {
     private async generateShelvesAsync(): Promise<void> {
 
         const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
-            const gameCount = games.length
+        const gameCount = games.length
         try {
             
             // Calculate shelves needed based on game count
@@ -143,14 +141,6 @@ export class StorePropsRenderer {
             if (this.config.enableSignage) {
                 // this.signageRenderer.createStandardSigns(this.scene);
             }
-            
-            if (this.config.enableTestObjects) {
-                await this.setupTestObjects()
-            }
-            
-            // GameBoxRenderer will be injected via setGameBoxRenderer() method from DI container
-            
-            console.log('✅ Store props setup complete!')
         } catch (error) {
             console.error('❌ Failed to set up props:', error)
             // Continue with available props
@@ -162,7 +152,6 @@ export class StorePropsRenderer {
             enableShelves: true,
             enableGameBoxes: true,
             enableSignage: true,
-            enableTestObjects: false, // Disabled by default for production
             performance: {
                 maxTextureSize: 1024,
                 nearDistance: 2.0,
@@ -171,30 +160,6 @@ export class StorePropsRenderer {
                 frustumCullingEnabled: true
             }
         }
-    }
-
-    // REMOVED: setupShelves() method - was creating duplicate static environment
-    // Dynamic generation happens via room:resized event in onRoomResized() method
-
-    private async setupTestObjects(): Promise<void> {
-        console.debug('🧪 Adding test objects...')
-        
-        // Small test cube for reference
-        const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
-        const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 })
-        const cube = new THREE.Mesh(geometry, material)
-        cube.position.set(2, 0, -1) // Move to side so it doesn't interfere with shelf
-        cube.castShadow = true
-        cube.name = 'test-cube'
-        this.propsGroup.add(cube)
-        
-        console.debug('✅ Test objects added')
-    }
-
-
-    // TODO: are we sure this class needs gameBoxRenderer?
-    public setGameBoxRenderer(gameBoxRenderer: GameBoxRenderer): void {
-        this.gameBoxRenderer = gameBoxRenderer
     }
 
     // TODO: Try this
@@ -252,26 +217,6 @@ export class StorePropsRenderer {
 
     public getSignageRenderer(): SignageRenderer {
         return this.signageRenderer
-    }
-
-    public getPropsStats(): {
-        totalProps: number
-        shelvesGenerated: boolean
-        signageCount: number
-        testObjectsEnabled: boolean
-        gameBoxesEnabled: boolean
-        storeStats?: any
-    } {
-        return {
-            totalProps: this.propsGroup.children.length,
-            shelvesGenerated: this.storeLayout !== undefined,
-            signageCount: this.scene.children.filter(child => 
-                child.name?.includes('signage') || child.name?.includes('sign')
-            ).length,
-            testObjectsEnabled: this.config.enableTestObjects ?? false,
-            gameBoxesEnabled: this.config.enableGameBoxes ?? true,
-            storeStats: this.storeLayout?.getStoreStats()
-        }
     }
 
     /**
@@ -481,12 +426,6 @@ export class StorePropsRenderer {
 
         console.debug(`✅ Created ${createdCount} game boxes on shelf surface via GameBoxRenderer`)
     }
-
-    // NOTE: createGameNameMaterial() method removed - GameBoxRenderer now handles all material creation
-
-
-    // expandStoreEnvironment method removed - RoomManager now handles all room structure creation
-    // Shelf spawning happens via room:resized event in onRoomResized() method
 
     /**
      * Calculate optimal shelf spacing for VR comfort and navigation

@@ -40,6 +40,20 @@ export type {
 }
 
 export class GameBoxRenderer {
+
+    // TODO: readonly?
+    private static _instance: GameBoxRenderer;
+
+    // We don't really use this, but need it for resolutions in SceneCoordinator
+    // TODO: refactor SceneCoordinator to use DI properly
+    static get Instance(): GameBoxRenderer {
+        if(!this._instance) {
+            console.error("it happened");
+            this._instance = new GameBoxRenderer();
+        }
+        return this._instance;
+    }
+
     private static readonly DEFAULT_DIMENSIONS: GameBoxDimensions = {
         width: 0.3,   // 30cm width
         height: 0.4,  // 40cm height 
@@ -55,6 +69,7 @@ export class GameBoxRenderer {
     private materialManager: SharedMaterialManager
 
     constructor(
+        // TODO: Allow dimensions as optional per created game box, with a geometry pool
         dimensions: Partial<GameBoxDimensions> = {},
         performanceConfig: Partial<TexturePerformanceConfig> = {}
     ) {
@@ -76,6 +91,10 @@ export class GameBoxRenderer {
         }
         
         this.textureManager = new GameBoxTextureManager(this.performanceManager)
+
+        if(!GameBoxRenderer._instance) {
+            GameBoxRenderer._instance = this;
+        }
     }
 
     public createPlaceholderBoxes(count: number = 6, shelfConfig?: ShelfConfiguration): THREE.Mesh[] {

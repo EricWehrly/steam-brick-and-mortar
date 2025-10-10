@@ -30,6 +30,7 @@ import { GameEventTypes, CeilingEventTypes, SteamEventTypes, type CeilingToggleE
 import { AppSettings } from '../core/AppSettings'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
+import { GameBoxRenderer } from './GameBoxRenderer'
 
 export interface SceneCoordinatorConfig {
     environment?: {
@@ -60,6 +61,7 @@ export class SceneCoordinator {
         dataManager?: DataManager,
         eventManager?: EventManager
     ) {
+        // TODO: DI tho?
         this.sceneManager = sceneManager
         this.appSettings = appSettings || AppSettings.getInstance() // Fallback for backward compatibility
         this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
@@ -75,7 +77,7 @@ export class SceneCoordinator {
         this.roomManager = new RoomManager(this.sceneManager.getScene(), this.dataManager, this.eventManager)
         
         // Use DI-injected StorePropsRenderer or create one for backward compatibility
-        this.propsRenderer = storePropsRenderer || new StorePropsRenderer(this.sceneManager.getScene(), this.dataManager)
+        this.propsRenderer = storePropsRenderer || new StorePropsRenderer(this.sceneManager.getScene(), this.dataManager, GameBoxRenderer.Instance)
 
         // 🎬 EVENT-DRIVEN STARTUP: Setup scene and emit SceneReady when basic navigation is ready
         // This is a prerequisite for GameStart - scene must be navigable before game can start
@@ -108,12 +110,8 @@ export class SceneCoordinator {
             
             // 📡 EMIT SceneReady - this scene is now a satisfied prerequisite for GameStart
             this.emitSceneReadyEvent()
-            
-            // 🎯 BACKGROUND: Enhanced details (non-blocking - continues while game starts)
 
-            this.setupEnhancedScene(config).catch(error => {
-                console.error('❌ Background scene enhancement failed:', error)
-            })
+            this.setupEnhancedScene();
             
         } catch (error) {
             console.error('❌ Failed to set up scene prerequisite:', error)
@@ -139,10 +137,11 @@ export class SceneCoordinator {
         }
     }
 
-    private async setupEnhancedScene(config: SceneCoordinatorConfig): Promise<void> {
+    private async setupEnhancedScene(): Promise<void> {
         try {
-            await this.setupProps(config.props)
-            
+            await this.setupProps()
+
+            // TODO: lightingRenderer respond by itself to events
             await this.lightingRenderer.setupLighting()
             
             this.lightingRenderer.refreshShadows()
@@ -153,9 +152,8 @@ export class SceneCoordinator {
         }
     }
 
-    private async setupProps(config: SceneCoordinatorConfig['props'] = {}): Promise<void> {
+    private async setupProps(): Promise<void> {
         await this.propsRenderer.setupProps({
-            enableTestObjects: config.enableTestObjects ?? false,
             enableShelves: true,
             enableGameBoxes: true,
             enableSignage: true
@@ -172,13 +170,6 @@ export class SceneCoordinator {
 
     getPerformanceStats(): ReturnType<StorePropsRenderer['getPerformanceStats']> {
         return this.propsRenderer.getPerformanceStats()
-    }
-
-    /**
-     * Legacy compatibility - get game box renderer
-     */
-    getGameBoxRenderer() {
-        return this.propsRenderer.getGameBoxRenderer()
     }
 
     /**

@@ -149,8 +149,7 @@ export class ServiceRegistration {
         
         console.debug('🏪 Creating StorePropsRenderer with DI dependencies')
         
-        const storePropsRenderer = new StorePropsRenderer(sceneManager.getScene(), dataManager)
-        storePropsRenderer.setGameBoxRenderer(gameBoxRenderer) // Inject GameBoxRenderer
+        const storePropsRenderer = new StorePropsRenderer(sceneManager.getScene(), dataManager, gameBoxRenderer)
         
         return storePropsRenderer
       },
