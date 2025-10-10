@@ -24,7 +24,8 @@ import { EventManager } from '../core/EventManager'
 import { RoomEventTypes } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
-import { TestMode, getEnabledTests } from '../types/TestMode'
+import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
+import { SimpleInstancedTest } from './test/SimpleInstancedTest'
 
 // Configuration constants for game layout - made static and accessible
 // TODO: Make these user-configurable in game menus
@@ -68,6 +69,9 @@ export class StorePropsRenderer {
     private propsGroup: THREE.Group
     private config: PropsConfig = {}
     private currentStoreGroup: THREE.Group | null = null // Track current store environment
+    
+    // Test instances
+    private simpleInstancedTest?: SimpleInstancedTest
 
     constructor(scene: THREE.Scene, dataManager: DataManager, gameBoxRenderer: GameBoxRenderer) {
         this.scene = scene
@@ -143,6 +147,9 @@ export class StorePropsRenderer {
             const enabledTests = getEnabledTests(this.config.tests)
             if (enabledTests.length > 0) {
                 console.log('🧪 Enabled tests:', enabledTests)
+                
+                // Initialize test renderers based on enabled tests
+                this.initializeTests()
             } else {
                 console.debug('🧪 No tests enabled')
             }
@@ -160,6 +167,40 @@ export class StorePropsRenderer {
             console.error('❌ Failed to set up props:', error)
             // Continue with available props
         }
+    }
+    
+    /**
+     * Initialize test renderers based on enabled tests
+     */
+    private initializeTests(): void {
+        if (!this.config.tests) return
+        
+        // GPU Instanced Textures Test - Phase 1: Simple colored quads
+        if (isTestEnabled(this.config.tests, TestMode.GPU_INSTANCED_TEXTURES)) {
+            console.log('🧪 Initializing GPU_INSTANCED_TEXTURES test (Phase 1: Simple instancing)')
+            this.simpleInstancedTest = new SimpleInstancedTest(this.scene, 10)
+        }
+        
+        // Test Objects - Simple geometric test objects
+        if (isTestEnabled(this.config.tests, TestMode.SPAWN_TEST_OBJECTS)) {
+            console.log('🧪 Initializing SPAWN_TEST_OBJECTS test')
+            this.setupTestObjects()
+        }
+    }
+    
+    private async setupTestObjects(): Promise<void> {
+        console.debug('🧪 Adding test objects...')
+        
+        // Small test cube for reference
+        const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
+        const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 })
+        const cube = new THREE.Mesh(geometry, material)
+        cube.position.set(2, 0, -1) // Move to side so it doesn't interfere with shelf
+        cube.castShadow = true
+        cube.name = 'test-cube'
+        this.propsGroup.add(cube)
+        
+        console.debug('✅ Test objects added')
     }
 
     private getDefaultConfig(): PropsConfig {
@@ -520,6 +561,9 @@ export class StorePropsRenderer {
         this.signageRenderer?.dispose()
         this.storeLayout?.dispose()
         this.propRenderer?.dispose()
+        
+        // Clean up test instances
+        this.simpleInstancedTest?.dispose()
         
         // Clean up dynamic store environment
         if (this.currentStoreGroup) {
