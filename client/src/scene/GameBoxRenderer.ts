@@ -76,8 +76,6 @@ export class GameBoxRenderer {
     private instancedArtworkRenderer?: InstancedArtworkRenderer
     private labelInstanceIndex: number = 0 // Track next available label instance index
     private artworkInstanceIndex: number = 0 // Track next available artwork instance index
-    private labelMeshAddedToScene: boolean = false // Track if label InstancedMesh is in scene
-    private artworkMeshAddedToScene: boolean = false // Track if artwork InstancedMesh is in scene
     
     // Dependencies for lazy initialization
     private dataManager?: DataManager
@@ -131,37 +129,7 @@ export class GameBoxRenderer {
         return this.instancedLabelRenderer?.isReady() || false
     }
 
-    /**
-     * Get the InstancedMesh if it needs to be added to scene
-     * Returns mesh only once, then null on subsequent calls
-     */
-    public getInstancedLabelMeshForScene(): THREE.InstancedMesh | null {
-        if (!this.instancedLabelRenderer || this.labelMeshAddedToScene) {
-            return null
-        }
-        
-        const instancedMesh = this.instancedLabelRenderer.getInstancedMesh()
-        if (instancedMesh) {
-            this.labelMeshAddedToScene = true
-            return instancedMesh
-        }
-        
-        return null
-    }
 
-    public getInstancedArtworkMeshForScene(): THREE.InstancedMesh | null {
-        if (!this.instancedArtworkRenderer || this.artworkMeshAddedToScene) {
-            return null
-        }
-        
-        const instancedMesh = this.instancedArtworkRenderer.getInstancedMesh()
-        if (instancedMesh) {
-            this.artworkMeshAddedToScene = true
-            return instancedMesh
-        }
-        
-        return null
-    }
 
     public getInstancedLabelRenderer() {
         return this.instancedLabelRenderer;
@@ -199,9 +167,6 @@ export class GameBoxRenderer {
         this.instancedLabelRenderer.initializeWithGames(games)
             .then(() => {
                 this.labelInstanceIndex = 0 // Reset index counter
-                
-                // InstancedMesh will be added to scene by StorePropsRenderer when first accessed
-                this.labelMeshAddedToScene = false // Reset flag for proper scene addition
             })
             .catch((error) => {
                 console.error('❌ Failed to initialize instanced label renderer:', error)
@@ -211,7 +176,6 @@ export class GameBoxRenderer {
         // Initialize artwork renderer
         this.instancedArtworkRenderer.initialize()
         this.artworkInstanceIndex = 0
-        this.artworkMeshAddedToScene = false
     }
 
     public createPlaceholderBoxes(count: number = 6, shelfConfig?: ShelfConfiguration): THREE.Mesh[] {

@@ -22,6 +22,7 @@ import { LabelTextureArrayManager } from './LabelTextureArrayManager'
 import type { SteamGameData } from '../types/GameData'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
+import { DataManager } from '../../../core/data/DataManager'
 
 export interface InstancedLabelConfig {
     maxInstances?: number
@@ -35,7 +36,6 @@ export class InstancedLabelRenderer {
     private textureArrayManager: LabelTextureArrayManager
     private geometry: THREE.PlaneGeometry | null = null
     private material: THREE.ShaderMaterial | null = null
-    private scene: THREE.Scene
     
     // Configuration
     private readonly maxInstances: number
@@ -104,9 +104,10 @@ export class InstancedLabelRenderer {
             
             this.isInitialized = true
             
-            // Log stats
+            this.addToMainScene()
+            
             const stats = this.textureArrayManager.getStats()
-            console.log('📊 InstancedLabelRenderer Stats:', stats)
+            console.debug('📊 Stats:', stats)
             
         } catch (error) {
             console.error('❌ Failed to initialize InstancedLabelRenderer:', error)
@@ -275,28 +276,33 @@ export class InstancedLabelRenderer {
         )
     }
     
-    /**
-     * Check if renderer is ready for use
-     */
     public isReady(): boolean {
         return this.isInitialized && this.instancedMesh !== null
     }
     
-    /**
-     * Get the underlying THREE.InstancedMesh for advanced operations
-     */
-    public getInstancedMesh(): THREE.InstancedMesh | null {
-        return this.instancedMesh
+    private addToMainScene(): void {
+        if (!this.instancedMesh) {
+            console.warn('⚠️ Cannot add to scene: instancedMesh not initialized')
+            return
+        }
+        
+        const scene = DataManager.getInstance().get<any>('core.mainScene')
+        if (!scene) {
+            console.warn('⚠️ Cannot add to scene: main scene not available in DataManager')
+            return
+        }
+        
+        scene.add(this.instancedMesh)
     }
     
-    /**
-     * Clean up resources
-     */
     public dispose(): void {
         console.debug('🧹 Disposing InstancedLabelRenderer')
         
-        // Remove from scene
         if (this.instancedMesh) {
+            const scene = DataManager.getInstance().get<any>('core.mainScene')
+            if (scene) {
+                scene.remove(this.instancedMesh)
+            }
             this.instancedMesh = null
         }
         
