@@ -268,6 +268,9 @@ export class SteamIntegration {
             callbacks.onProgress?.(20, 100, `Loading ${cachedGames.game_count} games from cache...`)
             
             // Process cached games with progress feedback
+            // TODO: How are we getting the rest of the games? Cached from before?
+            // How is maxGames really getting applied here? Other classes are pulling from DataManager ...
+            // is it pulling from this.gameLibrary?
             const maxGames = Math.min(this.config.maxGames, cachedGames.games.length)
             const sortedGames = [...cachedGames.games]
                 .sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0))
@@ -307,8 +310,6 @@ export class SteamIntegration {
                 `✅ Loaded ${sortedGames.length} games from cache for ${cachedGames.vanity_url}!`, 
                 'success'
             )
-            
-            SteamIntegration.logger.info(`Cache loading complete for ${sortedGames.length} games`)
             
             return this.gameLibrary.getState()
             
