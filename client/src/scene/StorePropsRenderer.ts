@@ -492,13 +492,13 @@ export class StorePropsRenderer {
             if (shouldUseArtwork && game.artwork?.header) {
                 // Try to get or download artwork for featured games
                 try {
-                    console.log(`🎨 Attempting to load artwork for featured game: ${game.name} from URL: ${game.artwork.header}`)
+                    console.debug(`🎨 Attempting to load artwork for featured game: ${game.name} from URL: ${game.artwork.header}`)
                     
                     const imageBlob = await this.imageManager.downloadImage(game.artwork.header, {
                         timeout: 5000, // 5 second timeout for artwork loading
                         enableFallback: true,
                         onImageLoaded: (url, blob) => {
-                            console.log(`✅ Successfully loaded artwork for ${game.name} (${blob.size} bytes)`)
+                            console.debug(`✅ Successfully loaded artwork for ${game.name} (${blob.size} bytes)`)
                         },
                         onImageError: (url, error) => {
                             console.error(`❌ Failed to download artwork from ${url} for ${game.name}:`, error.message)
@@ -508,7 +508,7 @@ export class StorePropsRenderer {
                     if (imageBlob) {
                         // Convert blob to texture options for GameBoxRenderer
                         textureOptions = await this.createTextureOptionsFromBlob(imageBlob, game.name)
-                        console.log(`🎨 Successfully created texture for featured game: ${game.name}`)
+                        console.debug(`🎨 Successfully created texture for featured game: ${game.name}`)
                     } else {
                         console.warn(`⚠️ No artwork blob received for ${game.name} - falling back to text label`)
                     }
@@ -530,13 +530,13 @@ export class StorePropsRenderer {
                 const labelMesh = this.gameBoxRenderer.getInstancedLabelMeshForScene()
                 if (labelMesh) {
                     this.scene.add(labelMesh)
-                    console.log('📋 Added instanced label mesh to scene')
+                    console.debug('📋 Added instanced label mesh to scene')
                 }
                 
                 const artworkMesh = this.gameBoxRenderer.getInstancedArtworkMeshForScene()
                 if (artworkMesh) {
                     this.scene.add(artworkMesh)
-                    console.log('🎨 Added instanced artwork mesh to scene')
+                    console.debug('🎨 Added instanced artwork mesh to scene')
                 }
                 createdCount++
             }

@@ -140,16 +140,11 @@ export class SteamWorkflowManager {
         const { userInput } = event.detail
         
         try {
-            SteamWorkflowManager.logger.info(`Starting load from cache workflow for: ${userInput}`)
-            
             // Check if cached data is available
             if (!this.steamIntegration.hasCachedData(userInput)) {
                 SteamWorkflowManager.logger.warn('No cached data found. Please use "Load My Games" first.')
                 return
             }
-            
-            // Show loading UI - TODO: implement proper UI methods
-            SteamWorkflowManager.logger.info('Loading games from cache...')
             
             // Load games from cache with progress callbacks
             await this.steamIntegration.loadGamesFromCache(userInput, {

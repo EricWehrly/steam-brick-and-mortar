@@ -78,8 +78,6 @@ export class InstancedArtworkRenderer {
         }
         
         try {
-            console.log('🚀 Initializing InstancedArtworkRenderer')
-            
             // Create empty data array texture that we'll populate dynamically
             this.createEmptyTextureArray()
             
@@ -121,8 +119,6 @@ export class InstancedArtworkRenderer {
             this.setupInstanceAttributes()
             
             this.isInitialized = true
-            
-            console.log('✅ InstancedArtworkRenderer initialized')
             
         } catch (error) {
             console.error('❌ Failed to initialize InstancedArtworkRenderer:', error)

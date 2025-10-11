@@ -29,7 +29,7 @@ export class LabelTextureArrayManager {
 
     constructor(textureSize: number = 512) {
         this.TEXTURE_SIZE = textureSize
-        console.log(`📦 [LabelTextureArrayManager] Initialized with texture size: ${textureSize}x${textureSize}`)
+        console.debug(`📦 [LabelTextureArrayManager] Initialized with texture size: ${textureSize}x${textureSize}`)
     }
 
     /**
@@ -37,7 +37,7 @@ export class LabelTextureArrayManager {
      * Loads images asynchronously and packs them into a DataArrayTexture
      */
     public async buildTextureArrayFromImages(sources: TextureSource[]): Promise<THREE.DataArrayTexture> {
-        console.log(`📦 [LabelTextureArrayManager] Building texture array from ${sources.length} images`)
+        console.debug(`📦 [LabelTextureArrayManager] Building texture array from ${sources.length} images`)
         
         // Load all images in parallel
         const imagePromises = sources.map(source => this.loadImage(source))
@@ -81,7 +81,7 @@ export class LabelTextureArrayManager {
         this.textureArray.type = THREE.UnsignedByteType
         this.textureArray.needsUpdate = true
         
-        console.log(`✅ [LabelTextureArrayManager] Texture array created: ${size}×${size}×${count}`)
+        console.debug(`✅ [LabelTextureArrayManager] Texture array created: ${size}×${size}×${count}`)
         return this.textureArray
     }
 
@@ -89,7 +89,7 @@ export class LabelTextureArrayManager {
      * Build texture array from text labels (fallback or for custom labels)
      */
     public buildTextureArrayFromText(labels: string[]): THREE.DataArrayTexture {
-        console.log(`📦 [LabelTextureArrayManager] Building texture array from ${labels.length} text labels`)
+        console.debug(`📦 [LabelTextureArrayManager] Building texture array from ${labels.length} text labels`)
         
         const count = labels.length
         const size = this.TEXTURE_SIZE
@@ -120,7 +120,7 @@ export class LabelTextureArrayManager {
         this.textureArray.type = THREE.UnsignedByteType
         this.textureArray.needsUpdate = true
         
-        console.log(`✅ [LabelTextureArrayManager] Text texture array created: ${size}×${size}×${count}`)
+        console.debug(`✅ [LabelTextureArrayManager] Text texture array created: ${size}×${size}×${count}`)
         return this.textureArray
     }
 

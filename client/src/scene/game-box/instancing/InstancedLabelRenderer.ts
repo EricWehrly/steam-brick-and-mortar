@@ -66,20 +66,14 @@ export class InstancedLabelRenderer {
         }
         
         try {
-            console.log(`🚀 Initializing InstancedLabelRenderer with ${games.length} games`)
-            
-            // 1. Build game name to texture index mapping
             this.buildGameNameMapping(games)
             
-            // 2. Build texture array from game names
             const gameNames = games.map(g => g.name)
             const textureArray = this.textureArrayManager.buildTextureArrayFromText(gameNames)
             
-            // 3. Create material with texture array
             this.material = this.createLabelMaterial(textureArray)
             
-            // 4. Create geometry and instanced mesh
-            // TODO: get dimensions from where they're supposed to be
+            // TODO: get dimensions from config
             this.geometry = new THREE.BoxGeometry(0.3, 0.4, 0.1)
             this.instancedMesh = new THREE.InstancedMesh(
                 this.geometry,
@@ -112,8 +106,7 @@ export class InstancedLabelRenderer {
             
             // Log stats
             const stats = this.textureArrayManager.getStats()
-            console.log('✅ InstancedLabelRenderer initialized')
-            console.log('📊 Stats:', stats)
+            console.log('📊 InstancedLabelRenderer Stats:', stats)
             
         } catch (error) {
             console.error('❌ Failed to initialize InstancedLabelRenderer:', error)
