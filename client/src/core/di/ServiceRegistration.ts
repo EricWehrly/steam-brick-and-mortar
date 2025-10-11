@@ -123,22 +123,18 @@ export class ServiceRegistration {
       )
     }
 
-    // GameBoxRenderer (depends on SharedMaterialManager and SceneManager) 
-    // This is the critical singleton we need to ensure single instance
     container.registerSingleton(
       ServiceKeys.GameBoxRenderer,
       async (container) => {
-        const materialManager = await container.resolve(ServiceKeys.SharedMaterialManager)
-        const sceneManager = await container.resolve(ServiceKeys.SceneManager)
-        
-        console.debug('🎮 Creating singleton GameBoxRenderer with DI')
+        const dataManager = await container.resolve(ServiceKeys.DataManager) as DataManager
         
         return new GameBoxRenderer(
           config.performance?.gameBox?.dimensions,
-          config.performance?.gameBox?.performance
+          config.performance?.gameBox?.performance,
+          dataManager
         )
       },
-      [ServiceKeys.SharedMaterialManager, ServiceKeys.SceneManager]
+      [ServiceKeys.SharedMaterialManager, ServiceKeys.DataManager]
     )
 
     // StorePropsRenderer (depends on SceneManager, GameBoxRenderer, and DataManager)

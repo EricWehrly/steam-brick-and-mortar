@@ -20,6 +20,8 @@
 import * as THREE from 'three'
 import { LabelTextureArrayManager } from './LabelTextureArrayManager'
 import type { SteamGameData } from '../types/GameData'
+import { EventManager } from '../../../core/EventManager'
+import { GameEventTypes } from '../../../types/InteractionEvents'
 
 export interface InstancedLabelConfig {
     maxInstances?: number
@@ -37,19 +39,17 @@ export class InstancedLabelRenderer {
     
     // Configuration
     private readonly maxInstances: number
-    private readonly labelWidth: number
-    private readonly labelHeight: number
     
     // State tracking
     private currentCount: number = 0
     private isInitialized: boolean = false
     private gameNameToTextureIndex: Map<string, number> = new Map()
     
-    constructor(scene: THREE.Scene, config: InstancedLabelConfig = {}) {
-        this.scene = scene
+    // Constant quaternion for no rotation (performance optimization)
+    private static readonly DEFAULT_ROTATION = new THREE.Quaternion() // Identity quaternion (0,0,0,1)
+    
+    constructor(config: InstancedLabelConfig = {}) {
         this.maxInstances = config.maxInstances || 2000
-        this.labelWidth = config.labelWidth || 0.285  // Slightly smaller than game box
-        this.labelHeight = config.labelHeight || 0.38
         
         this.textureArrayManager = new LabelTextureArrayManager(config.textureSize || 512)
         
@@ -79,18 +79,34 @@ export class InstancedLabelRenderer {
             this.material = this.createLabelMaterial(textureArray)
             
             // 4. Create geometry and instanced mesh
-            this.geometry = new THREE.PlaneGeometry(this.labelWidth, this.labelHeight)
+            // TODO: get dimensions from where they're supposed to be
+            this.geometry = new THREE.BoxGeometry(0.3, 0.4, 0.1)
             this.instancedMesh = new THREE.InstancedMesh(
                 this.geometry,
                 this.material,
                 this.maxInstances
             )
             
-            // 5. Set up per-instance attributes
-            this.setupInstanceAttributes()
+            // Name the mesh for debugging
+            this.instancedMesh.name = 'gpu-instanced-game-boxes'
             
-            // 6. Add to scene
-            this.scene.add(this.instancedMesh)
+            // CRITICAL: Set count to 0 initially (will update as instances are added)
+            this.instancedMesh.count = 0
+            
+            // Enable shadows and visibility
+            this.instancedMesh.castShadow = true
+            this.instancedMesh.receiveShadow = true
+            this.instancedMesh.visible = true
+            
+            // Disable frustum culling to prevent disappearing when close
+            this.instancedMesh.frustumCulled = false
+            
+            // Ensure InstancedMesh is positioned at world origin (instances handle their own positions)
+            this.instancedMesh.position.set(0, 0, 0)
+            this.instancedMesh.rotation.set(0, 0, 0)
+            this.instancedMesh.scale.set(1, 1, 1)
+            
+            this.setupInstanceAttributes()
             
             this.isInitialized = true
             
@@ -108,10 +124,10 @@ export class InstancedLabelRenderer {
     /**
      * Set position, rotation and texture for a specific label instance
      */
+    // TODO: Why do callers need to know the index? If they're providing the game name, and we're tracking it internally, they shouldn't provide an index
     public setLabelInstance(
         index: number,
         position: THREE.Vector3,
-        rotation: THREE.Quaternion,
         gameName: string
     ): boolean {
         if (!this.isInitialized || !this.instancedMesh || !this.geometry) {
@@ -131,9 +147,9 @@ export class InstancedLabelRenderer {
             return false
         }
         
-        // Update matrix for this instance (position + rotation)
+        // Update matrix for this instance (position + default rotation)
         const matrix = new THREE.Matrix4()
-        matrix.compose(position, rotation, new THREE.Vector3(1, 1, 1))
+        matrix.compose(position, InstancedLabelRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
         this.instancedMesh.setMatrixAt(index, matrix)
         
         // Update texture index attribute
@@ -152,16 +168,14 @@ export class InstancedLabelRenderer {
      */
     public updateGPU(): void {
         if (!this.instancedMesh || !this.geometry) {
+            console.warn('❌ updateGPU called but instancedMesh or geometry is null')
             return
         }
         
-        // Update instance matrices
         this.instancedMesh.instanceMatrix.needsUpdate = true
         
-        // Update instance count (only render active instances)
         this.instancedMesh.count = this.currentCount
         
-        // Update texture index attribute
         const textureIndices = this.geometry.getAttribute('textureIndex')
         if (textureIndices) {
             textureIndices.needsUpdate = true
@@ -223,7 +237,8 @@ export class InstancedLabelRenderer {
                 
                 void main() {
                     vTextureIndex = textureIndex;
-                    vUv = uv;
+                    // Fix upside-down textures by flipping V coordinate
+                    vUv = vec2(uv.x, 1.0 - uv.y);
                     
                     // Use instanced matrix for positioning
                     gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
@@ -289,7 +304,6 @@ export class InstancedLabelRenderer {
         
         // Remove from scene
         if (this.instancedMesh) {
-            this.scene.remove(this.instancedMesh)
             this.instancedMesh = null
         }
         

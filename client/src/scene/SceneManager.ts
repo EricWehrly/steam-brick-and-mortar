@@ -132,13 +132,6 @@ export class SceneManager {
                 lastPerformanceUpdate = now
             }
             
-            // Rotate the test cube
-            const cube = this.scene.getObjectByName('cube') ?? this.scene.children.find(obj => obj instanceof THREE.Mesh)
-            if (cube) {
-                cube.rotation.x += 0.01
-                cube.rotation.y += 0.01
-            }
-            
             this.renderer.render(this.scene, this.camera)
         })
     }
