@@ -19,6 +19,7 @@ import { BlockbusterColors } from '../utils/Colors'
 import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
+import { DataManager } from '../core/data/DataManager'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -42,6 +43,11 @@ export class SceneManager {
         
         // Initialize Three.js components
         this.scene = new THREE.Scene()
+        
+        DataManager.getInstance().set('core.mainScene', this.scene, {
+            domain: 'Scene' as any
+        })
+        
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: options.antialias ?? true 
