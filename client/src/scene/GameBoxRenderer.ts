@@ -26,6 +26,7 @@ import { GameBoxPerformanceManager } from './game-box/GameBoxPerformanceManager'
 import { GameBoxTextureManager } from './game-box/GameBoxTextureManager'
 import { GameBoxLayoutUtils } from './game-box/GameBoxLayoutUtils'
 import { InstancedLabelRenderer } from './game-box/instancing/InstancedLabelRenderer'
+import { InstancedArtworkRenderer } from './game-box/instancing/InstancedArtworkRenderer'
 import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 import type { DataManager } from '../core/data/DataManager'
 
@@ -70,10 +71,13 @@ export class GameBoxRenderer {
     private textureManager: GameBoxTextureManager
     private materialManager: SharedMaterialManager
     
-    // GPU Instanced label rendering
+    // GPU Instanced rendering
     private instancedLabelRenderer?: InstancedLabelRenderer
+    private instancedArtworkRenderer?: InstancedArtworkRenderer
     private labelInstanceIndex: number = 0 // Track next available label instance index
-    private instancedMeshAddedToScene: boolean = false // Track if InstancedMesh is already in scene
+    private artworkInstanceIndex: number = 0 // Track next available artwork instance index
+    private labelMeshAddedToScene: boolean = false // Track if label InstancedMesh is in scene
+    private artworkMeshAddedToScene: boolean = false // Track if artwork InstancedMesh is in scene
     
     // Dependencies for lazy initialization
     private dataManager?: DataManager
@@ -131,14 +135,28 @@ export class GameBoxRenderer {
      * Get the InstancedMesh if it needs to be added to scene
      * Returns mesh only once, then null on subsequent calls
      */
-    public getInstancedMeshForScene(): THREE.InstancedMesh | null {
-        if (!this.instancedLabelRenderer || this.instancedMeshAddedToScene) {
+    public getInstancedLabelMeshForScene(): THREE.InstancedMesh | null {
+        if (!this.instancedLabelRenderer || this.labelMeshAddedToScene) {
             return null
         }
         
         const instancedMesh = this.instancedLabelRenderer.getInstancedMesh()
         if (instancedMesh) {
-            this.instancedMeshAddedToScene = true
+            this.labelMeshAddedToScene = true
+            return instancedMesh
+        }
+        
+        return null
+    }
+
+    public getInstancedArtworkMeshForScene(): THREE.InstancedMesh | null {
+        if (!this.instancedArtworkRenderer || this.artworkMeshAddedToScene) {
+            return null
+        }
+        
+        const instancedMesh = this.instancedArtworkRenderer.getInstancedMesh()
+        if (instancedMesh) {
+            this.artworkMeshAddedToScene = true
             return instancedMesh
         }
         
@@ -147,6 +165,10 @@ export class GameBoxRenderer {
 
     public getInstancedLabelRenderer() {
         return this.instancedLabelRenderer;
+    }
+
+    public getInstancedArtworkRenderer() {
+        return this.instancedArtworkRenderer;
     }
     
     /**
@@ -167,19 +189,29 @@ export class GameBoxRenderer {
         this.instancedLabelRenderer = new InstancedLabelRenderer({
             maxInstances: games.length + 1
         })
+
+        // Initialize artwork renderer for games with artwork
+        this.instancedArtworkRenderer = new InstancedArtworkRenderer({
+            maxInstances: games.length + 1 // Every 20th game + buffer
+        })
         
-        // Initialize asynchronously but don't await here to avoid blocking
+        // Initialize label renderer asynchronously
         this.instancedLabelRenderer.initializeWithGames(games)
             .then(() => {
                 this.labelInstanceIndex = 0 // Reset index counter
                 
                 // InstancedMesh will be added to scene by StorePropsRenderer when first accessed
-                this.instancedMeshAddedToScene = false // Reset flag for proper scene addition
+                this.labelMeshAddedToScene = false // Reset flag for proper scene addition
             })
             .catch((error) => {
                 console.error('❌ Failed to initialize instanced label renderer:', error)
                 this.instancedLabelRenderer = undefined
             })
+
+        // Initialize artwork renderer
+        this.instancedArtworkRenderer.initialize()
+        this.artworkInstanceIndex = 0
+        this.artworkMeshAddedToScene = false
     }
 
     public createPlaceholderBoxes(count: number = 6, shelfConfig?: ShelfConfiguration): THREE.Mesh[] {
@@ -224,9 +256,15 @@ export class GameBoxRenderer {
         textureOptions?: GameBoxTextureOptions,
         name?: string
     ): THREE.Mesh | null {
-        // Use instanced rendering if available for better performance
-        if (this.hasInstancedLabelRenderer()) {
-            return this.createInstancedGameBox(game, position, textureOptions, name)
+        // Determine if this game has artwork
+        const hasArtwork = textureOptions && textureOptions.artworkBlobs && Object.keys(textureOptions.artworkBlobs).length > 0
+        
+        if (hasArtwork && this.instancedArtworkRenderer?.isReady()) {
+            // Use instanced artwork renderer for games with artwork
+            return this.createInstancedArtworkBox(game, position, textureOptions!, name)
+        } else if (this.hasInstancedLabelRenderer()) {
+            // Use instanced label renderer for text-only games
+            return this.createInstancedLabelBox(game, position, name)
         }
         
         // Fallback to individual game box creation
@@ -242,18 +280,53 @@ export class GameBoxRenderer {
     }
 
     /**
-     * Create a game box using GPU instanced rendering for optimal performance
-     * This method adds the game box to the InstancedLabelRenderer instead of creating individual meshes
+     * Create a game box using GPU instanced artwork rendering
+     * This method adds the game box to the InstancedArtworkRenderer for games with Steam artwork
      * Always returns null since instanced rendering doesn't create individual meshes
      */
-    private createInstancedGameBox(
+    private createInstancedArtworkBox(
         game: SteamGameData,
         position: THREE.Vector3,
-        textureOptions?: GameBoxTextureOptions,
+        textureOptions: GameBoxTextureOptions,
+        name?: string
+    ): THREE.Mesh | null {
+        if (!this.instancedArtworkRenderer) {
+            console.warn('Instanced artwork renderer not available, falling back to individual mesh')
+            return this.createGameBoxCore(game, position, name)
+        }
+
+        // Use async method but don't await here to avoid blocking
+        this.instancedArtworkRenderer.setArtworkInstance(
+            this.artworkInstanceIndex,
+            position,
+            game.name,
+            textureOptions
+        ).then((success) => {
+            if (success) {
+                this.artworkInstanceIndex++
+                console.debug(`🎨 Added instanced artwork box for "${game.name}"`)
+            } else {
+                console.warn(`Failed to add instanced artwork box for "${game.name}"`)
+            }
+        }).catch((error) => {
+            console.error(`❌ Error adding instanced artwork for "${game.name}":`, error)
+        })
+        
+        return null
+    }
+
+    /**
+     * Create a game box using GPU instanced label rendering (text-only)
+     * This method adds the game box to the InstancedLabelRenderer for text labels
+     * Always returns null since instanced rendering doesn't create individual meshes
+     */
+    private createInstancedLabelBox(
+        game: SteamGameData,
+        position: THREE.Vector3,
         name?: string
     ): THREE.Mesh | null {
         if (!this.instancedLabelRenderer) {
-            console.warn('Instanced renderer not available, falling back to individual mesh')
+            console.warn('Instanced label renderer not available, falling back to individual mesh')
             return this.createGameBoxCore(game, position, name)
         }
 
@@ -264,13 +337,13 @@ export class GameBoxRenderer {
         )
         
         if (!success) {
-            console.warn(`Failed to add instanced game box for "${game.name}", falling back to individual mesh`)
+            console.warn(`Failed to add instanced label box for "${game.name}", falling back to individual mesh`)
             return this.createGameBoxCore(game, position, name)
         }
         
         this.labelInstanceIndex++
         
-        return null;
+        return null
     }
 
     // Core creation logic used by public factory methods
@@ -487,9 +560,12 @@ export class GameBoxRenderer {
     public dispose(): void {
         console.debug('🧹 Disposing GameBoxRenderer resources')
         
-        // Dispose instanced label renderer
+        // Dispose instanced renderers
         this.instancedLabelRenderer?.dispose()
         this.instancedLabelRenderer = undefined
+        
+        this.instancedArtworkRenderer?.dispose()
+        this.instancedArtworkRenderer = undefined
         
         // Dispose geometry
         this.gameBoxGeometry.dispose()
@@ -500,8 +576,9 @@ export class GameBoxRenderer {
         
         // Reset instance tracking
         this.labelInstanceIndex = 0
+        this.artworkInstanceIndex = 0
         
-        console.log('✅ GameBoxRenderer disposed including instanced labels')
+        console.log('✅ GameBoxRenderer disposed including instanced renderers')
     }
 
     // Performance features delegated to GameBoxPerformanceManager

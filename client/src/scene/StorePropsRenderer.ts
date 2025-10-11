@@ -24,8 +24,10 @@ import { EventManager, EventSource } from '../core/EventManager'
 import { RoomEventTypes, SteamEventTypes, GameEventTypes } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
+import type { GameBoxTextureOptions } from './game-box/types/GameBoxOptions'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import { LabelTextureArrayManager } from './game-box/instancing/LabelTextureArrayManager'
+import { ImageManager } from '../steam/images/ImageManager'
 
 // Configuration constants for game layout - made static and accessible
 // TODO: Make these user-configurable in game menus
@@ -71,6 +73,8 @@ export class StorePropsRenderer {
     private currentStoreGroup: THREE.Group | null = null // Track current store environment
 
     private labelTextureArrayManager?: LabelTextureArrayManager
+    private imageManager: ImageManager
+    private globalGameIndex: number = 0 // Track global game position for artwork selection
 
     constructor(scene: THREE.Scene, dataManager: DataManager, gameBoxRenderer: GameBoxRenderer) {
         this.scene = scene
@@ -80,6 +84,8 @@ export class StorePropsRenderer {
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props'
         this.scene.add(this.propsGroup)
+        
+        this.imageManager = new ImageManager()
         
         this.initializeRenderers()
         
@@ -111,6 +117,9 @@ export class StorePropsRenderer {
             const shelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
             
             console.debug(`📚 Starting async generation of ${shelvesNeeded} shelves for ${gameCount} games`)
+            
+            // Reset global game index for artwork assignment
+            this.globalGameIndex = 0
             
             // Clear existing shelves first
             this.clearExistingShelves()
@@ -360,8 +369,10 @@ export class StorePropsRenderer {
             console.error(`❌ Failed to create shelf unit:`, error)
         }
         
-        // update our shared texture instance after creating the shelf
+        // Update GPU for both instanced renderers after creating the shelf
         this.gameBoxRenderer.getInstancedLabelRenderer()?.updateGPU()
+        
+        this.gameBoxRenderer.getInstancedArtworkRenderer()?.updateGPU()
         
         return shelfGroup
     }
@@ -474,8 +485,40 @@ export class StorePropsRenderer {
             const worldPosition = localPosition.clone().add(parentGroup.position)
             const name = `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}-${side}-${i}`
             
+            // Use artwork for every 20th game (global index), text labels for others
+            const shouldUseArtwork = (this.globalGameIndex % 20) === 0
+            let textureOptions = undefined
+            
+            if (shouldUseArtwork && game.artwork?.header) {
+                // Try to get or download artwork for featured games
+                try {
+                    console.log(`🎨 Attempting to load artwork for featured game: ${game.name} from URL: ${game.artwork.header}`)
+                    
+                    const imageBlob = await this.imageManager.downloadImage(game.artwork.header, {
+                        timeout: 5000, // 5 second timeout for artwork loading
+                        enableFallback: true,
+                        onImageLoaded: (url, blob) => {
+                            console.log(`✅ Successfully loaded artwork for ${game.name} (${blob.size} bytes)`)
+                        },
+                        onImageError: (url, error) => {
+                            console.error(`❌ Failed to download artwork from ${url} for ${game.name}:`, error.message)
+                        }
+                    })
+                    
+                    if (imageBlob) {
+                        // Convert blob to texture options for GameBoxRenderer
+                        textureOptions = await this.createTextureOptionsFromBlob(imageBlob, game.name)
+                        console.log(`🎨 Successfully created texture for featured game: ${game.name}`)
+                    } else {
+                        console.warn(`⚠️ No artwork blob received for ${game.name} - falling back to text label`)
+                    }
+                } catch (error) {
+                    console.error(`❌ Exception while loading artwork for ${game.name}:`, error)
+                }
+            }
+            
             // Create game box at world position (required for InstancedMesh)
-            const gameBox = this.gameBoxRenderer.createGameBox(game, worldPosition, undefined, name)
+            const gameBox = this.gameBoxRenderer.createGameBox(game, worldPosition, textureOptions, name)
             if (gameBox) {
                 // Individual meshes use local position since they're parented to the group
                 gameBox.position.copy(localPosition)
@@ -483,17 +526,94 @@ export class StorePropsRenderer {
                 createdCount++
             } else {
                 // Instanced rendering returns null but still counts as created
-                // Check if we need to add the InstancedMesh to scene (happens once)
-                // TODO: Don't do this repeatedly unnecessarily
-                const instancedMesh = this.gameBoxRenderer.getInstancedMeshForScene()
-                if (instancedMesh) {
-                    this.scene.add(instancedMesh)
+                // Check if we need to add InstancedMeshes to scene (happens once per renderer type)
+                const labelMesh = this.gameBoxRenderer.getInstancedLabelMeshForScene()
+                if (labelMesh) {
+                    this.scene.add(labelMesh)
+                    console.log('📋 Added instanced label mesh to scene')
+                }
+                
+                const artworkMesh = this.gameBoxRenderer.getInstancedArtworkMeshForScene()
+                if (artworkMesh) {
+                    this.scene.add(artworkMesh)
+                    console.log('🎨 Added instanced artwork mesh to scene')
                 }
                 createdCount++
             }
+            
+            this.globalGameIndex++ // Increment global game counter
         }
 
         console.debug(`✅ Created ${createdCount} game boxes on shelf surface via GameBoxRenderer`)
+    }
+
+    /**
+     * Create texture options from an image blob for game box artwork
+     */
+    private async createTextureOptionsFromBlob(blob: Blob, gameName: string): Promise<GameBoxTextureOptions> {
+        return new Promise((resolve, reject) => {
+            console.debug(`🖼️ Creating texture from blob for ${gameName}: ${blob.size} bytes, type: ${blob.type}`)
+            
+            const img = new Image()
+            img.onload = () => {
+                try {
+                    console.debug(`📐 Image loaded for ${gameName}: ${img.width}x${img.height}`)
+                    
+                    // Create a canvas to convert the image to a texture
+                    const canvas = document.createElement('canvas')
+                    const ctx = canvas.getContext('2d')
+                    
+                    if (!ctx) {
+                        console.error(`❌ Could not create canvas context for ${gameName}`)
+                        reject(new Error('Could not create canvas context'))
+                        return
+                    }
+                    
+                    // Set canvas size to image dimensions (with reasonable limits for memory)
+                    const maxSize = 512 // Limit texture size for memory management
+                    const scale = Math.min(maxSize / img.width, maxSize / img.height, 1)
+                    canvas.width = Math.floor(img.width * scale)
+                    canvas.height = Math.floor(img.height * scale)
+                    
+                    console.debug(`🎨 Canvas size for ${gameName}: ${canvas.width}x${canvas.height} (scale: ${scale.toFixed(3)})`)
+                    
+                    // Draw the image onto the canvas
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+                    
+                    // Create texture from canvas
+                    const texture = new THREE.CanvasTexture(canvas)
+                    texture.needsUpdate = true
+                    
+                    console.debug(`✅ Successfully created THREE.js texture for ${gameName}`)
+                    
+                    // Return GameBoxTextureOptions with artwork blob
+                    resolve({
+                        artworkBlobs: {
+                            'header': blob
+                        },
+                        preferredArtworkType: 'header'
+                    })
+                    
+                    // Clean up
+                    URL.revokeObjectURL(img.src)
+                } catch (error) {
+                    console.error(`❌ Error processing image for ${gameName}:`, error)
+                    reject(error)
+                    URL.revokeObjectURL(img.src)
+                }
+            }
+            
+            img.onerror = (event) => {
+                console.error(`❌ Failed to load image for ${gameName}:`, event)
+                reject(new Error(`Failed to load image for ${gameName}`))
+                URL.revokeObjectURL(img.src)
+            }
+            
+            // Convert blob to object URL for image loading
+            const objectUrl = URL.createObjectURL(blob)
+            console.debug(`🔗 Created object URL for ${gameName}: ${objectUrl}`)
+            img.src = objectUrl
+        })
     }
 
     /**
