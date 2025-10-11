@@ -20,12 +20,11 @@ import { PropRenderer } from './PropRenderer'
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
 
 import { RoomConstants } from './RoomManager'
-import { EventManager } from '../core/EventManager'
-import { RoomEventTypes, SteamEventTypes } from '../types/InteractionEvents'
+import { EventManager, EventSource } from '../core/EventManager'
+import { RoomEventTypes, SteamEventTypes, GameEventTypes } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
-import { SimpleInstancedTest } from './test/SimpleInstancedTest'
 import { LabelTextureArrayManager } from './game-box/instancing/LabelTextureArrayManager'
 
 // Configuration constants for game layout - made static and accessible
@@ -70,9 +69,7 @@ export class StorePropsRenderer {
     private propsGroup: THREE.Group
     private config: PropsConfig = {}
     private currentStoreGroup: THREE.Group | null = null // Track current store environment
-    
-    // Test instances
-    private simpleInstancedTest?: SimpleInstancedTest
+
     private labelTextureArrayManager?: LabelTextureArrayManager
 
     constructor(scene: THREE.Scene, dataManager: DataManager, gameBoxRenderer: GameBoxRenderer) {
@@ -97,24 +94,6 @@ export class StorePropsRenderer {
 
     private setupEventListeners(): void {
         EventManager.getInstance().registerEventHandler(RoomEventTypes.Resized, this.generateShelvesAsync.bind(this))
-
-                EventManager.getInstance().registerEventHandler(SteamEventTypes.DataLoaded, async () => {
-            // Get game data for both tests and production features
-            const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
-            
-            if (games.length > 0) {
-                // Initialize GPU instanced label renderer for massive performance improvement
-                if (!this.gameBoxRenderer.hasInstancedLabelRenderer()) {
-                    console.log('🚀 Initializing GPU instanced label renderer for production...')
-                    await this.gameBoxRenderer.initializeInstancedLabelRenderer(this.scene, games)
-                }
-            }
-            
-            // Initialize GPU instancing test if enabled
-            if (this.config.tests && isTestEnabled(this.config.tests, TestMode.GPU_INSTANCED_TEXTURES)) {
-                this.initializeGPUInstancedTexturesTest()
-            }
-        });
     }
 
     /**
@@ -204,65 +183,7 @@ export class StorePropsRenderer {
             this.setupTestObjects()
         }
     }
-    
-    /**
-     * Initialize GPU instanced textures test with texture array
-     */
-    private initializeGPUInstancedTexturesTest(): void {
-        // Skip if already initialized
-        if (this.simpleInstancedTest) {
-            console.debug('🧪 GPU instancing test already initialized, skipping')
-            return
-        }
-        
-        try {
-            // Use games from event parameter if available
-            const gameData = this.dataManager.get<SteamGameData[]>('steam.games') || []
-            
-            // Use first 10 games if available, otherwise fall back to test labels
-            let labels: string[]
-            if (gameData.length > 0) {
-                labels = gameData.slice(0, 10).map(game => game.name)
-                console.log('🎮 Using real game names for texture array:', labels)
-            } else {
-                // Fallback test labels if no games loaded yet
-                labels = [
-                    'Half-Life 2',
-                    'Portal',
-                    'Team Fortress 2',
-                    'Left 4 Dead',
-                    'Counter-Strike',
-                    'Dota 2',
-                    'Skyrim',
-                    'Fallout 4',
-                    'Bioshock',
-                    'Dishonored'
-                ]
-                console.log('🧪 Using test labels (no games loaded yet)')
-            }
-            
-            // Create texture array manager
-            this.labelTextureArrayManager = new LabelTextureArrayManager(512)
-            const textureArray = this.labelTextureArrayManager.buildTextureArrayFromText(labels)
-            
-            // Create instanced test with texture array
-            this.simpleInstancedTest = new SimpleInstancedTest(this.scene, {
-                count: labels.length,
-                textureArray: textureArray,
-                labels: labels
-            })
-            
-            // Log stats
-            const stats = this.labelTextureArrayManager.getStats()
-            console.log('📊 Texture Array Stats:', stats)
-            
-        } catch (error) {
-            console.error('❌ Failed to initialize GPU instanced textures test:', error)
-            // Fallback to Phase 1 (colored quads)
-            console.log('⚠️ Falling back to Phase 1 (colored quads)')
-            this.simpleInstancedTest = new SimpleInstancedTest(this.scene, 10)
-        }
-    }
+
     
     private async setupTestObjects(): Promise<void> {
         console.debug('🧪 Adding test objects...')
@@ -439,6 +360,9 @@ export class StorePropsRenderer {
             console.error(`❌ Failed to create shelf unit:`, error)
         }
         
+        // update our shared texture instance after creating the shelf
+        this.gameBoxRenderer.getInstancedLabelRenderer()?.updateGPU()
+        
         return shelfGroup
     }
 
@@ -545,20 +469,28 @@ export class StorePropsRenderer {
         for (let i = 0; i < games.length; i++) {
             const game = games[i]
             const gameX = startX + (i * GAME_SPACING)
-            const position = new THREE.Vector3(gameX, gameY, gameZ)
+            const localPosition = new THREE.Vector3(gameX, gameY, gameZ)
+            // Convert local shelf position to world position by adding parent group's world position
+            const worldPosition = localPosition.clone().add(parentGroup.position)
             const name = `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}-${side}-${i}`
             
-            // Create game box at 0,0,0 then position and parent it ourselves
-            const gameBox = this.gameBoxRenderer.createGameBox(game, position, undefined, name)
+            // Create game box at world position (required for InstancedMesh)
+            const gameBox = this.gameBoxRenderer.createGameBox(game, worldPosition, undefined, name)
             if (gameBox) {
-                parentGroup.add(gameBox)  // Add directly to parent group (no scene involvement)
+                // Individual meshes use local position since they're parented to the group
+                gameBox.position.copy(localPosition)
+                parentGroup.add(gameBox)  // Add individual game box to parent group
+                createdCount++
+            } else {
+                // Instanced rendering returns null but still counts as created
+                // Check if we need to add the InstancedMesh to scene (happens once)
+                // TODO: Don't do this repeatedly unnecessarily
+                const instancedMesh = this.gameBoxRenderer.getInstancedMeshForScene()
+                if (instancedMesh) {
+                    this.scene.add(instancedMesh)
+                }
                 createdCount++
             }
-        }
-        
-        // Finalize instanced labels for this batch (if using GPU instanced rendering)
-        if (this.gameBoxRenderer.hasInstancedLabelRenderer()) {
-            this.gameBoxRenderer.finalizeInstancedLabels()
         }
 
         console.debug(`✅ Created ${createdCount} game boxes on shelf surface via GameBoxRenderer`)
@@ -644,7 +576,6 @@ export class StorePropsRenderer {
         this.propRenderer?.dispose()
         
         // Clean up test instances
-        this.simpleInstancedTest?.dispose()
         this.labelTextureArrayManager?.dispose()
         
         // Clean up dynamic store environment
