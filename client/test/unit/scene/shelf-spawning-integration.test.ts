@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
 import { StorePropsRenderer } from '../../../src/scene/StorePropsRenderer'
+import { GameBoxRenderer } from '../../../src/scene/GameBoxRenderer'
 import { DataManager, DataDomain } from '../../../src/core/data'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { RoomEventTypes } from '../../../src/types/InteractionEvents'
@@ -35,12 +36,11 @@ describe('Shelf Spawning Integration', () => {
         // Clear any existing data
         dataManager.clear()
         
-        // Initialize StorePropsRenderer with resolved DataManager
-        propsRenderer = new StorePropsRenderer(scene, dataManager)
+        // Resolve GameBoxRenderer from DI container
+        const gameBoxRenderer = await container.resolve(ServiceKeys.GameBoxRenderer) as GameBoxRenderer
         
-        // Inject GameBoxRenderer via DI  
-        const gameBoxRenderer = await container.resolve(ServiceKeys.GameBoxRenderer)
-        propsRenderer.setGameBoxRenderer(gameBoxRenderer)
+        // Initialize StorePropsRenderer with all required dependencies
+        propsRenderer = new StorePropsRenderer(scene, dataManager, gameBoxRenderer)
     })
 
     afterEach(async () => {

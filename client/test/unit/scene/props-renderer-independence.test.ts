@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
 import { StorePropsRenderer } from '../../../src/scene/StorePropsRenderer'
+import { GameBoxRenderer } from '../../../src/scene/GameBoxRenderer'
 import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
 import { ServiceKeys } from '../../../src/core/di/ServiceKeys'
 import { DataManager } from '../../../src/core/data/DataManager'
@@ -25,10 +26,11 @@ describe('StorePropsRenderer Independence', () => {
         
         scene = new THREE.Scene()
         
-        // Resolve DataManager from container
+        // Resolve dependencies from container
         const dataManager = await container.resolve(ServiceKeys.DataManager) as DataManager
+        const gameBoxRenderer = await container.resolve(ServiceKeys.GameBoxRenderer) as GameBoxRenderer
         
-        propsRenderer = new StorePropsRenderer(scene, dataManager)
+        propsRenderer = new StorePropsRenderer(scene, dataManager, gameBoxRenderer)
     })
 
     afterEach(async () => {
