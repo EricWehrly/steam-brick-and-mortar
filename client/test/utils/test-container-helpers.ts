@@ -18,6 +18,7 @@
  */
 
 import { vi } from 'vitest'
+import * as THREE from 'three'
 import { ServiceContainer } from '../../src/core/di/ServiceContainer'
 import { ServiceKeys, type ServiceKeyType } from '../../src/core/di/ServiceKeys'
 import { EventManager } from '../../src/core/EventManager'
@@ -162,6 +163,33 @@ export async function createSceneTestContainer(): Promise<ServiceContainer> {
         createMaterial: vi.fn(() => ({ name: 'MockMaterial', dispose: vi.fn() })),
         dispose: vi.fn()
     }))
+
+    // Register mock GameBoxRenderer for shelf spawning tests
+    container.registerSingleton(ServiceKeys.GameBoxRenderer, () => {
+        const createMockGameBox = (name: string) => {
+            const geometry = new THREE.BoxGeometry(0.3, 0.4, 0.1)
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+            const mesh = new THREE.Mesh(geometry, material)
+            mesh.name = name
+            return mesh
+        }
+
+        return {
+            name: 'MockGameBoxRenderer',
+            // Mock the simplified createGameBox method that StorePropsRenderer now uses
+            createGameBox: vi.fn((
+                game: any,
+                position?: any,
+                textureOptions?: any,
+                name?: string
+            ) => {
+                console.log(`✅ Created game box via mock GameBoxRenderer`)
+                const mockName = name || `mock-game-${game.name || 'unknown'}`
+                return createMockGameBox(mockName)
+            }),
+            dispose: vi.fn()
+        }
+    })
 
     await container.initialize()
     return container
