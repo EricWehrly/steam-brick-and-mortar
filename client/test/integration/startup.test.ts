@@ -147,7 +147,7 @@ describe('Application Startup Integration', () => {
     })
 
     it('should handle UICoordinator cache stats provider integration', async () => {
-        const { UICoordinator } = await import('../../src/ui/UICoordinator')
+        const { UICoordinatorMock: UICoordinator } = await import('../mocks/ui/UICoordinator.mock')
         const { PerformanceMonitor } = await import('../../src/ui/PerformanceMonitor')
         
         const mockPerformanceMonitor = new PerformanceMonitor({
