@@ -132,7 +132,7 @@ export class StorePropsRenderer {
                 const shelvesInThisRow = Math.min(maxShelvesPerRow, shelvesNeeded - (row * maxShelvesPerRow))
                 
                 // Yield to main thread between rows to keep app responsive
-                await new Promise(resolve => setTimeout(resolve, 10))
+                await new Promise(resolve => setTimeout(resolve, 150))
                 
                 await this.createShelfRow(row, shelvesInThisRow, games)
                 console.debug(`✅ Completed row ${row + 1}/${rows}`)
@@ -526,18 +526,7 @@ export class StorePropsRenderer {
                 createdCount++
             } else {
                 // Instanced rendering returns null but still counts as created
-                // Check if we need to add InstancedMeshes to scene (happens once per renderer type)
-                const labelMesh = this.gameBoxRenderer.getInstancedLabelMeshForScene()
-                if (labelMesh) {
-                    this.scene.add(labelMesh)
-                    console.debug('📋 Added instanced label mesh to scene')
-                }
-                
-                const artworkMesh = this.gameBoxRenderer.getInstancedArtworkMeshForScene()
-                if (artworkMesh) {
-                    this.scene.add(artworkMesh)
-                    console.debug('🎨 Added instanced artwork mesh to scene')
-                }
+                // Note: Instanced renderers automatically add themselves to scene via DataManager
                 createdCount++
             }
             
