@@ -340,7 +340,6 @@ export class StorePropsRenderer {
         }
         
         this.scene.add(rowGroup)
-        console.debug(`📚 Created shelf row ${rowIndex} with ${shelfCount} shelves`)
     }
 
     /**
@@ -381,7 +380,6 @@ export class StorePropsRenderer {
      * Spawn actual game boxes with game names on dynamically created shelves
      */
     private async spawnActualGamesOnShelf(shelfUnit: THREE.Group, parentGroup: THREE.Group, games: any[], rowIndex: number, shelfIndex: number): Promise<void> {
-        console.debug(`🎮 Spawning ${games.length} actual games on shelf ${rowIndex}-${shelfIndex}`);
         
         // Find shelf surfaces (same logic as StoreLayout but simplified for dynamic shelves)
         const shelfSurfaces = this.findDynamicShelfSurfaces(shelfUnit);
@@ -411,8 +409,6 @@ export class StorePropsRenderer {
                 gameIndex += backGames.length;
             }
         }
-        
-        console.debug(`✅ Spawned ${gameIndex} game boxes with names on dynamic shelf`);
     }
 
     /**
@@ -485,7 +481,7 @@ export class StorePropsRenderer {
             const worldPosition = localPosition.clone().add(parentGroup.position)
             const name = `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}-${side}-${i}`
             
-            // Use artwork for every 20th game (global index), text labels for others
+            // Use artwork for every 20th game to balance performance and visual interest
             const shouldUseArtwork = (this.globalGameIndex % 20) === 0
             let textureOptions = undefined
             
@@ -498,7 +494,7 @@ export class StorePropsRenderer {
                         timeout: 5000, // 5 second timeout for artwork loading
                         enableFallback: true,
                         onImageLoaded: (url, blob) => {
-                            console.debug(`✅ Successfully loaded artwork for ${game.name} (${blob.size} bytes)`)
+                            // console.debug(`✅ Successfully loaded artwork for ${game.name} (${blob.size} bytes)`)
                         },
                         onImageError: (url, error) => {
                             console.error(`❌ Failed to download artwork from ${url} for ${game.name}:`, error.message)
@@ -508,7 +504,6 @@ export class StorePropsRenderer {
                     if (imageBlob) {
                         // Convert blob to texture options for GameBoxRenderer
                         textureOptions = await this.createTextureOptionsFromBlob(imageBlob, game.name)
-                        console.debug(`🎨 Successfully created texture for featured game: ${game.name}`)
                     } else {
                         console.warn(`⚠️ No artwork blob received for ${game.name} - falling back to text label`)
                     }
@@ -532,8 +527,6 @@ export class StorePropsRenderer {
             
             this.globalGameIndex++ // Increment global game counter
         }
-
-        console.debug(`✅ Created ${createdCount} game boxes on shelf surface via GameBoxRenderer`)
     }
 
     /**
@@ -572,8 +565,6 @@ export class StorePropsRenderer {
                     // Create texture from canvas
                     const texture = new THREE.CanvasTexture(canvas)
                     texture.needsUpdate = true
-                    
-                    console.debug(`✅ Successfully created THREE.js texture for ${gameName}`)
                     
                     // Return GameBoxTextureOptions with artwork blob
                     resolve({
