@@ -14,13 +14,8 @@
 import * as THREE from 'three'
 import { WebXRManager, type WebXRCapabilities } from './WebXRManager'
 import { InputManager } from './InputManager'
-
-export interface WebXRCoordinatorCallbacks {
-    onSessionStart?: () => void
-    onSessionEnd?: () => void
-    onError?: (error: Error) => void
-    onSupportChange?: (capabilities: WebXRCapabilities) => void
-}
+import { EventManager, EventSource } from '../core/EventManager'
+import { WebXREventTypes } from '../types/InteractionEvents'
 
 export interface WebXRCoordinatorConfig {
     input?: {
@@ -35,13 +30,12 @@ export interface WebXRCoordinatorConfig {
 export class WebXRCoordinator {
     private webxrManager: WebXRManager
     private inputManager: InputManager
-    private callbacks: WebXRCoordinatorCallbacks
+    private eventManager: EventManager
     private pendingMouseDeltas: { deltaX: number, deltaY: number } | null = null
 
-    constructor(config: WebXRCoordinatorConfig = {}, callbacks: WebXRCoordinatorCallbacks = {}) {
-        this.callbacks = callbacks
+    constructor(config: WebXRCoordinatorConfig = {}) {
+        this.eventManager = EventManager.getInstance()
 
-        // Initialize WebXR manager with callbacks
         this.webxrManager = new WebXRManager({
             onSessionStart: () => this.handleSessionStart(),
             onSessionEnd: () => this.handleSessionEnd(),
@@ -142,20 +136,34 @@ export class WebXRCoordinator {
 
     private handleSessionStart(): void {
         console.log('✅ WebXR session started!')
-        this.callbacks.onSessionStart?.()
+        this.eventManager.emit(WebXREventTypes.SessionStart, {
+            timestamp: Date.now(),
+            source: EventSource.System
+        })
     }
 
     private handleSessionEnd(): void {
         console.log('🚪 WebXR session ended')
-        this.callbacks.onSessionEnd?.()
+        this.eventManager.emit('webxr:session-end', {
+            timestamp: Date.now(),
+            source: EventSource.System
+        })
     }
 
     private handleError(error: Error): void {
         console.error('❌ WebXR error:', error)
-        this.callbacks.onError?.(error)
+        this.eventManager.emit('webxr:error', {
+            error,
+            timestamp: Date.now(),
+            source: EventSource.System
+        })
     }
 
     private handleSupportChange(capabilities: WebXRCapabilities): void {
-        this.callbacks.onSupportChange?.(capabilities)
+        this.eventManager.emit('webxr:support-change', {
+            capabilities,
+            timestamp: Date.now(),
+            source: EventSource.System
+        })
     }
 }

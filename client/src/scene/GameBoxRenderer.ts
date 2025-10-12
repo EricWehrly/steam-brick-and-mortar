@@ -70,6 +70,7 @@ export class GameBoxRenderer {
     private performanceManager?: GameBoxPerformanceManager
     private textureManager: GameBoxTextureManager
     private materialManager: SharedMaterialManager
+    private materialManagerInitialized = false
     
     // GPU Instanced rendering
     private instancedLabelRenderer?: InstancedLabelRenderer
@@ -95,9 +96,9 @@ export class GameBoxRenderer {
             this.dimensions.depth
         )
         
-        // Initialize shared material manager
+        // Get shared material manager (defer initialization until needed)
         this.materialManager = SharedMaterialManager.getInstance()
-        this.materialManager.initialize()
+        // Note: materialManager.initialize() is deferred until first render call
         
         if (Object.keys(performanceConfig).length > 0) {
             this.performanceManager = new GameBoxPerformanceManager(performanceConfig)
@@ -112,6 +113,18 @@ export class GameBoxRenderer {
         }
         
         console.debug(`📦 GameBoxRenderer initialized with dimensions: ${this.dimensions.width}x${this.dimensions.height}x${this.dimensions.depth}`)
+    }
+
+    /**
+     * Ensure SharedMaterialManager is initialized (lazy initialization)
+     * Only initializes when materials are actually needed for rendering
+     */
+    private ensureMaterialManagerInitialized(): void {
+        if (!this.materialManagerInitialized) {
+            this.materialManager.initialize()
+            this.materialManagerInitialized = true
+            console.log('🎨 SharedMaterialManager initialized on-demand')
+        }
     }
     
     /**
@@ -315,6 +328,7 @@ export class GameBoxRenderer {
         position: THREE.Vector3,
         name?: string
     ): THREE.Mesh {
+        this.ensureMaterialManagerInitialized()
         const material = this.materialManager.getGameBoxMaterialFromName(game.name)
         
         const gameBox = new THREE.Mesh(this.gameBoxGeometry, material)
