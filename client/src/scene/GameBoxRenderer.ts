@@ -129,8 +129,6 @@ export class GameBoxRenderer {
         return this.instancedLabelRenderer?.isReady() || false
     }
 
-
-
     public getInstancedLabelRenderer() {
         return this.instancedLabelRenderer;
     }
@@ -259,21 +257,21 @@ export class GameBoxRenderer {
             return this.createGameBoxCore(game, position, name)
         }
 
+        // Reserve instance index immediately to prevent race conditions
+        const reservedInstanceIndex = this.artworkInstanceIndex++
+
         // Use async method but don't await here to avoid blocking
         this.instancedArtworkRenderer.setArtworkInstance(
-            this.artworkInstanceIndex,
+            reservedInstanceIndex,
             position,
             game.name,
             textureOptions
         ).then((success) => {
-            if (success) {
-                this.artworkInstanceIndex++
-                console.debug(`🎨 Added instanced artwork box for "${game.name}"`)
-            } else {
-                console.warn(`Failed to add instanced artwork box for "${game.name}"`)
+            if (!success) {
+                console.warn(`Failed to add instanced artwork box for "${game.name}" at index ${reservedInstanceIndex}`)
             }
         }).catch((error) => {
-            console.error(`❌ Error adding instanced artwork for "${game.name}":`, error)
+            console.error(`Error adding instanced artwork for "${game.name}":`, error)
         })
         
         return null
@@ -294,8 +292,11 @@ export class GameBoxRenderer {
             return this.createGameBoxCore(game, position, name)
         }
 
+        // Reserve instance index immediately to prevent race conditions
+        const reservedInstanceIndex = this.labelInstanceIndex++
+
         const success = this.instancedLabelRenderer.setLabelInstance(
-            this.labelInstanceIndex,
+            reservedInstanceIndex,
             position,
             game.name
         )
@@ -304,8 +305,6 @@ export class GameBoxRenderer {
             console.warn(`Failed to add instanced label box for "${game.name}", falling back to individual mesh`)
             return this.createGameBoxCore(game, position, name)
         }
-        
-        this.labelInstanceIndex++
         
         return null
     }
@@ -443,22 +442,21 @@ export class GameBoxRenderer {
         // Offset to front face of game box
         labelPosition.z += (this.dimensions.depth / 2) + 0.001
         
+        // Reserve instance index immediately to prevent race conditions
+        const reservedInstanceIndex = this.labelInstanceIndex++
+        
         const success = this.instancedLabelRenderer.setLabelInstance(
-            this.labelInstanceIndex,
+            reservedInstanceIndex,
             labelPosition,
             gameName
         )
         
         if (success) {
             // Store instance info for cleanup/updates
-            gameBox.userData.labelInstanceIndex = this.labelInstanceIndex
+            gameBox.userData.labelInstanceIndex = reservedInstanceIndex
             gameBox.userData.hasInstancedLabel = true
-            this.labelInstanceIndex++
-            
-            console.debug(`📋 Added instanced label for "${gameName}" at index ${this.labelInstanceIndex - 1}`)
         } else {
             console.warn(`Failed to add instanced label for "${gameName}"`)
-            // Could fallback to individual mesh here if needed
         }
     }
 
