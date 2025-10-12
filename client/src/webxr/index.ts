@@ -12,7 +12,6 @@ export {
 
 export {
     WebXRCoordinator,
-    type WebXRCoordinatorCallbacks,
     type WebXRCoordinatorConfig
 } from './WebXRCoordinator'
 

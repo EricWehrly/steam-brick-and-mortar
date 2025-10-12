@@ -80,17 +80,14 @@ export class SteamBrickAndMortarApp {
         // Initialize AppSettings first (needed for default values)
         this.appSettings = AppSettings.getInstance()
         
-        // Initialize core scene management first - this will be shared via DI
         this.sceneManager = new SceneManager({
             antialias: config.scene?.antialias ?? true,
             outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
         })
         
-        // Initialize DI Container and register existing instances
         this.container = new ServiceContainer()
         ServiceRegistration.configureServices(this.container, config, this.sceneManager, this.appSettings)
         
-        // Initialize Performance Monitor
         this.performanceMonitor = new PerformanceMonitor({
             position: 'top-right',
             showMemory: true,
@@ -99,55 +96,29 @@ export class SteamBrickAndMortarApp {
             precision: 1
         })
 
-        // Determine maxGames based on AppSettings developmentMode or config override
         const isDevelopmentMode = this.appSettings.getSetting('developmentMode')
         const defaultMaxGames = isDevelopmentMode ? 20 : 100
         const maxGames = config.steam?.maxGames ?? defaultMaxGames
 
-        // Initialize Steam integration
         this.steamIntegration = new SteamIntegration({
             apiBaseUrl: config.steam?.apiBaseUrl ?? BACKEND_URL,
             maxGames: maxGames
         })
 
-        // SceneCoordinator will be resolved from DI container in init() method
-
-        // Initialize WebXR coordinator (callbacks now handled by WebXREventHandler)
-        this.webxrCoordinator = new WebXRCoordinator(
-            {
-                input: {
-                    speed: config.input?.speed ?? 0.1,
-                    mouseSensitivity: config.input?.mouseSensitivity ?? 0.005
-                }
-            },
-            {
-                // Events will be emitted by WebXRCoordinator and handled by WebXREventHandler
-                onSessionStart: () => this.emitWebXRSessionStartEvent(),
-                onSessionEnd: () => this.emitWebXRSessionEndEvent(),
-                onError: (error: Error) => this.emitWebXRErrorEvent(error),
-                onSupportChange: (capabilities: WebXRCapabilities) => this.emitWebXRSupportChangeEvent(capabilities)
+        this.webxrCoordinator = new WebXRCoordinator({
+            input: {
+                speed: config.input?.speed ?? 0.1,
+                mouseSensitivity: config.input?.mouseSensitivity ?? 0.005
             }
-        )
+        })
 
-        // Initialize debug stats provider
         this.debugStatsProvider = new DebugStatsProvider(
             this.sceneManager,
             this.steamIntegration,
             this.performanceMonitor
         )
 
-        // Initialize UI Manager - completely self-sufficient, no dependencies
         this.uiManager = new UIManager()
-        
-        // UI coordinators will be resolved from DI container in init() method
-        // SystemUICoordinator requires runtime dependencies, so we'll register it manually
-
-        // EventManager will be resolved from DI container in init() method
-        // setupPrerequisiteEventListeners() will be called after EventManager is resolved
-
-        // SteamWorkflowManager will be initialized in init() method with DI-resolved dependencies
-
-        // WebXREventHandler will be initialized in init() method after UI coordinators are resolved
     }
 
     async init(): Promise<void> {
@@ -156,6 +127,7 @@ export class SteamBrickAndMortarApp {
         }
         
         try {
+            
             // Register SystemUICoordinator with runtime dependencies BEFORE initialization
             ServiceRegistration.registerSystemUICoordinator(
                 this.container,
@@ -201,40 +173,90 @@ export class SteamBrickAndMortarApp {
                 this.eventManager
             )
             
-            await this.initializeCoordinators()
             
-            // Mark UI as ready (coordinators initialized)
-            console.log('🎨 UI coordinators ready')
-            this.prerequisites.uiReady = true
-            this.checkGameStartPrerequisites()
+            // 🎯 PRIORITY 1: Get controls working ASAP - this enables user input immediately
+            await this.initializeControls()
             
+            console.log('🎮 Controls are ready - user can now move around!')
+            
+            // 🎯 PRIORITY 2: Basic UI and render loop (blocking for interaction)
+            await this.initializeCriticalUI()
             this.startRenderLoop()
             
-            // Mark render loop as ready
-            console.log('🔄 Render loop ready')
             this.prerequisites.renderLoopReady = true
             this.checkGameStartPrerequisites()
             
             this.isInitialized = true
             
-            // Auto-load first cached user if available
-            await this.tryAutoLoadCachedUser()
+            // 🚀 PRIORITY 3: Everything else happens async (non-blocking)
+            this.initializeNonEssentialSystemsAsync()
             
-            ToastManager.success('Steam Brick and Mortar is ready to explore!', { duration: 5000 })
         } catch (error) {
             console.error('Failed to initialize application:', error)
             throw error
         }
     }
 
-    private async initializeCoordinators(): Promise<void> {
-        // Setup UI with all components (replacing UICoordinator.setupUI())
-        this.uiManager.init()
-        await this.systemUICoordinator.init(this.sceneManager.getRenderer(), this.steamWorkflowManager)
-        this.uiManager.hideLoading()
-
-        // Setup WebXR capabilities
+    /**
+     * Initialize controls so user can move around while everything else loads
+     */
+    private async initializeControls(): Promise<void> {
+        
         await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
+        
+    }
+
+    /**
+     * Initialize critical UI components needed for interaction
+     */
+    private async initializeCriticalUI(): Promise<void> {
+        
+        // Setup UI with minimal components needed for interaction
+        this.uiManager.init()
+        this.uiManager.hideLoading() // Remove loading screen immediately
+        
+        
+        // Mark UI as ready (coordinators initialized)
+        console.log('🎨 Critical UI ready')
+        this.prerequisites.uiReady = true
+        this.checkGameStartPrerequisites()
+    }
+
+    /**
+     * Initialize all non-essential systems asynchronously (doesn't block user interaction)
+     */
+    private initializeNonEssentialSystemsAsync(): void {
+        // Don't await this - let it happen in the background
+        this.loadNonEssentialSystems().catch(error => {
+            console.error('⚠️ Non-essential systems failed to load:', error)
+            // Don't throw - app should still work
+        })
+    }
+
+    private async loadNonEssentialSystems(): Promise<void> {
+        try {
+            
+            // Initialize system UI coordinator (debug panels, etc.)
+            await this.systemUICoordinator.init(this.sceneManager.getRenderer(), this.steamWorkflowManager)
+            
+            
+            // Auto-load first cached user if available (this can happen later)
+            await this.tryAutoLoadCachedUser()
+            
+            
+            // Show success message once everything is fully loaded
+            ToastManager.success('Steam Brick and Mortar is fully loaded!', { duration: 3000 })
+            
+            
+        } catch (error) {
+            console.error('Failed to load non-essential systems:', error)
+            // Don't throw - these are nice-to-have features
+        }
+    }
+
+    private async initializeCoordinators(): Promise<void> {
+        // This method is now replaced by the new progressive loading approach
+        // Keeping for backward compatibility but content moved to specific methods
     }
 
     private async tryAutoLoadCachedUser(): Promise<void> {
@@ -291,36 +313,7 @@ export class SteamBrickAndMortarApp {
         console.log('✅ Application disposed')
     }
 
-    // WebXR event emission methods - bridge WebXRCoordinator callbacks to events
-    private emitWebXRSessionStartEvent(): void {
-        this.eventManager.emit(WebXREventTypes.SessionStart, {
-            timestamp: Date.now(),
-            source: EventSource.System
-        })
-    }
 
-    private emitWebXRSessionEndEvent(): void {
-        this.eventManager.emit('webxr:session-end', {
-            timestamp: Date.now(),
-            source: EventSource.System
-        })
-    }
-
-    private emitWebXRErrorEvent(error: Error): void {
-        this.eventManager.emit('webxr:error', {
-            error,
-            timestamp: Date.now(),
-            source: EventSource.System
-        })
-    }
-
-    private emitWebXRSupportChangeEvent(capabilities: WebXRCapabilities): void {
-        this.eventManager.emit('webxr:support-change', {
-            capabilities,
-            timestamp: Date.now(),
-            source: EventSource.System
-        })
-    }
 
     /**
      * Set up event listeners for GameStart prerequisites
