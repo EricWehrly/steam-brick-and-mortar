@@ -37,7 +37,6 @@ describe('RoomManager DataManager Integration Verification', () => {
     let roomManager: RoomManager
     let eventManager: EventManager
     let dataManager: DataManager
-    let consoleSpy: any
 
     beforeEach(async () => {
         // Create isolated DI container for this test
@@ -49,15 +48,13 @@ describe('RoomManager DataManager Integration Verification', () => {
         eventManager = await container.resolve(ServiceKeys.EventManager)
         dataManager = await container.resolve(ServiceKeys.DataManager)
 
-        // Set up console spy to capture logs
-        consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+        // Set up test environment without console spies
 
         roomManager = new RoomManager(scene)
     })
 
     afterEach(async () => {
         roomManager?.dispose()
-        consoleSpy?.mockRestore()
         
         // Dispose container to clean up all services
         await container.dispose()
