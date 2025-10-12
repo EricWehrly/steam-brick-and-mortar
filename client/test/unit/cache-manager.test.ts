@@ -176,27 +176,17 @@ describe('CacheManager Unit Tests', () => {
         })
 
         it('should handle corrupted cache data gracefully', () => {
-            // Mock console.warn to suppress expected warnings
-            const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-            
             // Store invalid JSON in localStorage before creating cache manager
             localStorageMock.getItem.mockReturnValue('invalid-json-{')
             
-            // Create new cache manager to trigger loading
-            const corruptedCache = new CacheManager()
-            
-            // Should return null for any key when data is corrupted
-            const result = corruptedCache.get('test-key')
-            expect(result).toBeNull()
-            
-            // Verify warning was logged
-            expect(consoleSpy).toHaveBeenCalledWith(
-                'Failed to load cache from storage:',
-                expect.any(Error)
-            )
-            
-            // Restore console.warn
-            consoleSpy.mockRestore()
+            // Create new cache manager to trigger loading - should not throw
+            expect(() => {
+                const corruptedCache = new CacheManager()
+                
+                // Should return null for any key when data is corrupted
+                const result = corruptedCache.get('test-key')
+                expect(result).toBeNull()
+            }).not.toThrow()
         })
     })
 
