@@ -481,11 +481,9 @@ export class StorePropsRenderer {
             const worldPosition = localPosition.clone().add(parentGroup.position)
             const name = `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}-${side}-${i}`
             
-            // Use artwork for every 20th game to balance performance and visual interest
-            const shouldUseArtwork = (this.globalGameIndex % 20) === 0
             let textureOptions = undefined
             
-            if (shouldUseArtwork && game.artwork?.header) {
+            if (game.artwork?.header) {
                 // Try to get or download artwork for featured games
                 try {
                     console.debug(`🎨 Attempting to load artwork for featured game: ${game.name} from URL: ${game.artwork.header}`)
