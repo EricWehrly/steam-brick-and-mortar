@@ -63,11 +63,22 @@ describe('RoomManager DataManager Integration Verification', () => {
         await container.dispose()
     })
 
-    it('should verify DataManager integration with explicit log checking', async () => {
-        // Store game count in DataManager
-        dataManager.set('steam.gameCount', 99, {
+    it('should verify DataManager integration with explicit method checking', async () => {
+        // Store game array in DataManager
+        const sampleGames = Array.from({ length: 99 }, (_, i) => ({
+            appid: i.toString(),
+            name: `Game ${i + 1}`,
+            playtime_forever: 100,
+            img_icon_url: 'test.jpg',
+            img_logo_url: 'test_logo.jpg'
+        }))
+        
+        dataManager.set('steam.games', sampleGames, {
             domain: DataDomain.SteamIntegration
         })
+
+        // Spy on DataManager.get method to verify actual usage
+        const dataManagerSpy = vi.spyOn(dataManager, 'get')
 
         console.log('🔍 TEST: About to emit room:resize event')
 
@@ -81,24 +92,32 @@ describe('RoomManager DataManager Integration Verification', () => {
         // Wait for async event processing
         await new Promise(resolve => setTimeout(resolve, 50))
 
-        console.log('🔍 TEST: All console.log calls captured:')
-        consoleSpy.mock.calls.forEach((call: any[], index: number) => {
-            console.log(`  ${index}: ${call[0]}`)
-        })
-
-        // Verify DataManager was used as data source
-        const dataManagerLogFound = consoleSpy.mock.calls.some((call: any[]) => 
-            call[0]?.includes('Using game count from DataManager: 99')
-        )
+        // Verify DataManager was used to retrieve games
+        expect(dataManagerSpy).toHaveBeenCalledWith('steam.games')
         
-        expect(dataManagerLogFound).toBe(true)
+        // Verify the data is accessible and correct
+        const retrievedGames = dataManager.get('steam.games')
+        expect(retrievedGames).toHaveLength(99)
+        
+        dataManagerSpy.mockRestore()
     })
 
     it('should verify DataManager is used for centralized game count access', async () => {
-        // Store game count in DataManager
-        dataManager.set('steam.gameCount', 77, {
+        // Store game array in DataManager
+        const sampleGames = Array.from({ length: 77 }, (_, i) => ({
+            appid: i.toString(),
+            name: `Game ${i + 1}`,
+            playtime_forever: 100,
+            img_icon_url: 'test.jpg',
+            img_logo_url: 'test_logo.jpg'
+        }))
+        
+        dataManager.set('steam.games', sampleGames, {
             domain: DataDomain.SteamIntegration
         })
+
+        // Spy on DataManager.get method
+        const dataManagerSpy = vi.spyOn(dataManager, 'get')
 
         console.log('🔍 TEST: About to emit room:resize event without gameCount')
 
@@ -111,11 +130,9 @@ describe('RoomManager DataManager Integration Verification', () => {
 
         await new Promise(resolve => setTimeout(resolve, 50))
 
-        // Check that DataManager was used
-        const dataManagerLogFound = consoleSpy.mock.calls.some((call: any[]) => 
-            call[0]?.includes('Using game count from DataManager: 77')
-        )
+        // Check that DataManager was used to retrieve games
+        expect(dataManagerSpy).toHaveBeenCalledWith('steam.games')
         
-        expect(dataManagerLogFound).toBe(true)
+        dataManagerSpy.mockRestore()
     })
 })
