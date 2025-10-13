@@ -6,6 +6,7 @@ import { getElementByIdSafe } from '../utils'
 import { renderTemplate } from '../utils/TemplateEngine'
 import { EventManager, EventSource } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
+import { SteamIntegration } from '../steam-integration/SteamIntegration'
 import steamCacheStatsTemplate from '../templates/steam-ui/cache-stats.html?raw'
 
 export class SteamUIPanel {
@@ -19,6 +20,7 @@ export class SteamUIPanel {
   private showCacheStatsButton: HTMLButtonElement | null
   private cacheInfoDiv: HTMLElement | null
   private steamStatus: HTMLElement | null
+  private cacheCheckDebounceTimeout: number | null = null
   
   constructor() {
     this.eventManager = EventManager.getInstance()
@@ -111,13 +113,35 @@ export class SteamUIPanel {
         }
       })
       
-      // Input change handler for cache availability
+      // Input change handler for cache availability with debouncing
       this.steamUserInput.addEventListener('input', () => {
         const userInput = this.steamUserInput?.value.trim() || ''
         
-        // Show/hide Load from Cache button based on input presence
-        // The actual cache availability will be handled by the workflow manager
-        this.checkCacheAvailability(userInput, Boolean(userInput))
+        // Clear any existing debounce timer
+        if (this.cacheCheckDebounceTimeout !== null) {
+          clearTimeout(this.cacheCheckDebounceTimeout)
+        }
+        
+        if (!userInput) {
+          // If no input, immediately hide the button (no debounce needed)
+          this.updateLoadFromCacheButtonVisibility(false)
+          return
+        }
+        
+        // Debounce cache check for 250ms to avoid excessive calls while typing
+        this.cacheCheckDebounceTimeout = setTimeout(() => {
+          const steamIntegration = SteamIntegration.getInstance()
+          
+          if (steamIntegration) {
+            const hasCache = steamIntegration.hasCachedData(userInput)
+            this.updateLoadFromCacheButtonVisibility(hasCache)
+          } else {
+            // No SteamIntegration instance, hide the button
+            this.updateLoadFromCacheButtonVisibility(false)
+          }
+          
+          this.cacheCheckDebounceTimeout = null
+        }, 250)
       })
     }
     
@@ -223,17 +247,21 @@ export class SteamUIPanel {
     }
   }
   
-  checkCacheAvailability(userInput: string, hasCache: boolean): void {
+  updateLoadFromCacheButtonVisibility(hasCache: boolean): void {
     if (!this.loadFromCacheButton) return
-    
-    if (!userInput || !hasCache) {
+
+    if (!hasCache) {
       this.loadFromCacheButton.classList.add('hidden')
       return
     }
     
-    // Show the Load from Cache button when cached data is available
     this.loadFromCacheButton.classList.remove('hidden')
   }
   
-
+  dispose(): void {
+    if (this.cacheCheckDebounceTimeout !== null) {
+      clearTimeout(this.cacheCheckDebounceTimeout)
+      this.cacheCheckDebounceTimeout = null
+    }
+  }
 }
