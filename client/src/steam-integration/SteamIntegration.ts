@@ -353,35 +353,8 @@ export class SteamIntegration {
         const cachedResolve = this.steamClient.getCached<SteamResolveResponse>(resolveKey)
         return cachedResolve?.steamid || null
     }
-
-    /**
-     * Get games as SteamGameData for scene rendering
-     */
-    getGamesForScene(): SteamGameData[] {
-        const state = this.gameLibrary.getState()
-        return state.userData?.games?.map(game => ({
-            appid: game.appid,
-            name: game.name,
-            playtime_forever: game.playtime_forever,
-            playtime_2weeks: game.playtime_2weeks,
-            img_icon_url: game.img_icon_url,
-            img_logo_url: game.img_logo_url,
-            artwork: game.artwork
-        })) ?? []
-    }
     
-    async downloadGameArtwork(game: SteamGame): Promise<Record<string, Blob | null>> {
-        return this.steamClient.downloadGameArtwork(game)
-    }
-
-    async downloadGameImage(url: string): Promise<Blob | null> {
-        return this.steamClient.downloadGameImage(url)
-    }
-
-    async getImageCacheStats() {
-        return this.steamClient.getImageCacheStats()
-    }
-
+    // TODO: These look unused. Delete?
     async clearImageCache(): Promise<void> {
         return this.steamClient.clearImageCache()
     }
@@ -397,10 +370,6 @@ export class SteamIntegration {
     updateMaxGames(maxGames: number): void {
         this.config.maxGames = maxGames
         SteamIntegration.logger.info(`Updated maxGames setting to: ${maxGames}`)
-    }
-
-    getMaxGames(): number {
-        return this.config.maxGames
     }
 
     // This is only for testing?

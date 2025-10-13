@@ -103,11 +103,6 @@ describe('SteamIntegration Unit Tests', () => {
             expect(state.isLoading).toBe(false)
             expect(state.error).toBeNull()
         })
-
-        test('should get games for scene rendering when no data', () => {
-            const games = steamIntegration.getGamesForScene()
-            expect(games).toEqual([])
-        })
     })
 
     describe('Refresh Data', () => {
