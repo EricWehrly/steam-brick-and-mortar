@@ -9,11 +9,10 @@
  */
 
 import * as THREE from 'three'
-import { ValidationUtils } from '../utils'
 import { MaterialUtils } from '../utils/MaterialUtils'
 
 // Import types from modular structure
-import type { GameData, SteamGameData } from './game-box/types/GameData'
+import type { SteamGameData } from './game-box/types/GameData'
 import type {
     GameBoxDimensions,
     GameBoxPosition,
@@ -22,14 +21,17 @@ import type {
     GameBoxCreationRequest,
     GameBoxBatchCreationRequest
 } from './game-box/types/GameBoxOptions'
-import type { TexturePerformanceConfig, GameBoxPerformanceData } from './game-box/types/PerformanceTypes'
+import type { TexturePerformanceConfig } from './game-box/types/PerformanceTypes'
 import { GameBoxPerformanceManager } from './game-box/GameBoxPerformanceManager'
 import { GameBoxTextureManager } from './game-box/GameBoxTextureManager'
 import { GameBoxLayoutUtils } from './game-box/GameBoxLayoutUtils'
+import { InstancedLabelRenderer } from './game-box/instancing/InstancedLabelRenderer'
+import { InstancedArtworkRenderer } from './game-box/instancing/InstancedArtworkRenderer'
+import { SharedMaterialManager } from '../utils/SharedMaterialManager'
+import type { DataManager } from '../core/data/DataManager'
 
 // Export types for backward compatibility
 export type {
-    GameData,
     SteamGameData,
     GameBoxDimensions,
     GameBoxPosition,
@@ -40,13 +42,25 @@ export type {
     TexturePerformanceConfig
 }
 
-
-
 export class GameBoxRenderer {
+
+    // TODO: readonly?
+    private static _instance: GameBoxRenderer;
+
+    // We don't really use this, but need it for resolutions in SceneCoordinator
+    // TODO: refactor SceneCoordinator to use DI properly
+    static get Instance(): GameBoxRenderer {
+        if(!this._instance) {
+            console.error("it happened");
+            this._instance = new GameBoxRenderer();
+        }
+        return this._instance;
+    }
+
     private static readonly DEFAULT_DIMENSIONS: GameBoxDimensions = {
-        width: 0.15,
-        height: 0.2,
-        depth: 0.02
+        width: 0.3,   // 30cm width
+        height: 0.4,  // 40cm height 
+        depth: 0.1    // 10cm depth
     }
 
     private dimensions: GameBoxDimensions
@@ -55,32 +69,113 @@ export class GameBoxRenderer {
     // Composition: Specialized managers for different concerns
     private performanceManager?: GameBoxPerformanceManager
     private textureManager: GameBoxTextureManager
+    private materialManager: SharedMaterialManager
+    
+    // GPU Instanced rendering
+    private instancedLabelRenderer?: InstancedLabelRenderer
+    private instancedArtworkRenderer?: InstancedArtworkRenderer
+    private labelInstanceIndex: number = 0 // Track next available label instance index
+    private artworkInstanceIndex: number = 0 // Track next available artwork instance index
+    
+    // Dependencies for lazy initialization
+    private dataManager?: DataManager
 
     constructor(
+        // TODO: Allow dimensions as optional per created game box, with a geometry pool
         dimensions: Partial<GameBoxDimensions> = {},
-        shelfConfig: Partial<ShelfConfiguration> = {},
         performanceConfig: Partial<TexturePerformanceConfig> = {},
-        private sceneManager?: any // Optional SceneManager for consistent scene interaction
+        dataManager?: DataManager
     ) {
         this.dimensions = { ...GameBoxRenderer.DEFAULT_DIMENSIONS, ...dimensions }
         
+        // Create geometry instance (TODO: Replace with InstancedMesh for batching)
         this.gameBoxGeometry = new THREE.BoxGeometry(
             this.dimensions.width,
             this.dimensions.height,
             this.dimensions.depth
         )
         
-        // Initialize managers with composition
+        // Initialize shared material manager
+        this.materialManager = SharedMaterialManager.getInstance()
+        this.materialManager.initialize()
+        
         if (Object.keys(performanceConfig).length > 0) {
             this.performanceManager = new GameBoxPerformanceManager(performanceConfig)
         }
         
         this.textureManager = new GameBoxTextureManager(this.performanceManager)
+        
+        this.dataManager = dataManager
+
+        if(!GameBoxRenderer._instance) {
+            GameBoxRenderer._instance = this;
+        }
+        
+        console.debug(`📦 GameBoxRenderer initialized with dimensions: ${this.dimensions.width}x${this.dimensions.height}x${this.dimensions.depth}`)
+    }
+    
+    /**
+     * Check if instanced label renderer is available and ready
+     * Triggers lazy initialization if dependencies are available
+     */
+    // TODO: If instancedLabelRenderer can resolve the datamanager on its own, we can remove ALL OF THIS
+    // (this method, and the methods it calls, and (I think) the methods that call it) and some of the internal tracking variables
+    public hasInstancedLabelRenderer(): boolean {
+        // Try lazy initialization if not yet initialized
+        if (!this.instancedLabelRenderer && this.dataManager) {
+            this.tryInitializeInstancedLabelRenderer()
+        }
+        
+        return this.instancedLabelRenderer?.isReady() || false
     }
 
+    public getInstancedLabelRenderer() {
+        return this.instancedLabelRenderer;
+    }
+
+    public getInstancedArtworkRenderer() {
+        return this.instancedArtworkRenderer;
+    }
+    
     /**
-     * Create placeholder game boxes
+     * Lazy initialization of InstancedLabelRenderer
+     * Bootstraps itself by pulling games from DataManager when available
      */
+    private tryInitializeInstancedLabelRenderer(): void {
+        if (this.instancedLabelRenderer || !this.dataManager) {
+            return // Already initialized or missing dependencies
+        }
+        
+        const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
+        if (games.length === 0) {
+            console.warn('⏳ No games available yet for instanced label renderer initialization')
+            return
+        }
+        
+        this.instancedLabelRenderer = new InstancedLabelRenderer({
+            maxInstances: games.length + 1
+        })
+
+        // Initialize artwork renderer for games with artwork
+        this.instancedArtworkRenderer = new InstancedArtworkRenderer({
+            maxInstances: games.length + 1 // Every 20th game + buffer
+        })
+        
+        // Initialize label renderer asynchronously
+        this.instancedLabelRenderer.initializeWithGames(games)
+            .then(() => {
+                this.labelInstanceIndex = 0 // Reset index counter
+            })
+            .catch((error) => {
+                console.error('❌ Failed to initialize instanced label renderer:', error)
+                this.instancedLabelRenderer = undefined
+            })
+
+        // Initialize artwork renderer
+        this.instancedArtworkRenderer.initialize()
+        this.artworkInstanceIndex = 0
+    }
+
     public createPlaceholderBoxes(count: number = 6, shelfConfig?: ShelfConfiguration): THREE.Mesh[] {
         
         const materials = this.createPlaceholderMaterials()
@@ -111,194 +206,307 @@ export class GameBoxRenderer {
             
             // Add subtle random rotation for natural look
             gameBox.rotation.y = (Math.random() - 0.5) * 0.1
-            
             boxes.push(gameBox)
         }
         
         return boxes
     }
 
-    /**
-     * Create a game box from generic game data
-     */
     public createGameBox(
-        scene: THREE.Scene, 
-        game: GameData | SteamGameData, 
-        index: number
+        game: SteamGameData,
+        position: THREE.Vector3 = new THREE.Vector3(0, 0, 0),
+        textureOptions?: GameBoxTextureOptions,
+        name?: string
     ): THREE.Mesh | null {
-        return this.createGameBoxWithTexture(scene, game, index)
-    }
-
-    /**
-     * Create a game box from game data with optional texture support
-     */
-    public createGameBoxWithTexture(
-        scene: THREE.Scene, 
-        game: GameData | SteamGameData, 
-        index: number,
-        textureOptions?: GameBoxTextureOptions
-    ): THREE.Mesh | null {
-        // Check if we're within display limits
-
-        // Create material - start with fallback color for immediate display
-        const colorHue = ValidationUtils.stringToHue(game.name)
-        const material = MaterialUtils.createGameBoxMaterialFromName(colorHue)
+        // Determine if this game has artwork
+        const hasArtwork = textureOptions && textureOptions.artworkBlobs && Object.keys(textureOptions.artworkBlobs).length > 0
         
-        const gameBox = new THREE.Mesh(this.gameBoxGeometry, material)
-        
-        // Mark as game box with game data
-        const gameId = this.getGameId(game)
-        const playtime = this.getGamePlaytime(game)
-        
-        gameBox.userData = { 
-            isGameBox: true, 
-            gameData: game,
-            gameId: gameId,
-            name: game.name,
-            playtime: playtime
+        if (hasArtwork && this.instancedArtworkRenderer?.isReady()) {
+            // Use instanced artwork renderer for games with artwork
+            return this.createInstancedArtworkBox(game, position, textureOptions!, name)
+        } else if (this.hasInstancedLabelRenderer()) {
+            // Use instanced label renderer for text-only games
+            return this.createInstancedLabelBox(game, position, name)
         }
         
-        // Position the box - individual boxes use simple index-based positioning
-        // Total layout centering will be handled by higher-level methods
-        const config = GameBoxLayoutUtils.DEFAULT_SHELF_CONFIG
-        const position = this.calculateBoxPosition(index, 0, config)
-        gameBox.position.set(position.x, position.y, position.z)
+        // Fallback to individual game box creation
+        const gameBox = this.createGameBoxCore(game, position, name)
         
-        // Enable shadows
-        gameBox.castShadow = true
-        gameBox.receiveShadow = true
-        
-        // Apply texture if provided (async operation)
+        // Apply texture if available
         if (textureOptions) {
-            this.textureManager.applyTexture(gameBox, game, textureOptions).then((success) => {
-                if (success) {
-                    console.log(`🖼️ Applied texture to game box: ${game.name}`)
-                }
-            }).catch((error) => {
-                console.warn(`⚠️ Failed to apply texture to ${game.name}:`, error)
-            })
+            this.textureManager.applyTexture(gameBox, textureOptions)
         }
         
-        // Add to scene using SceneManager if available, otherwise direct add
-        if (this.sceneManager) {
-            // Use SceneManager for consistent scene interaction
-            scene.add(gameBox)
-        } else {
-            scene.add(gameBox)
-        }
-        
-        console.log(`📦 Added game box ${index}: ${game.name}`)
+        console.debug(`📦 Created individual game box: ${gameBox.name} at position (${gameBox.position.x.toFixed(2)}, ${gameBox.position.y.toFixed(2)}, ${gameBox.position.z.toFixed(2)})`)
         return gameBox
     }
 
     /**
-     * Helper methods to handle different game data formats
+     * Create a game box using GPU instanced artwork rendering
+     * This method adds the game box to the InstancedArtworkRenderer for games with Steam artwork
+     * Always returns null since instanced rendering doesn't create individual meshes
      */
-    private getGameId(game: GameData | SteamGameData): string | number {
-        return GameBoxLayoutUtils.getGameId(game)
-    }
-    
-    private getGamePlaytime(game: GameData | SteamGameData): number {
-        return GameBoxLayoutUtils.getGamePlaytime(game)
-    }
-    
-    /**
-     * Create game boxes from batch request (clean interface)
-     */
-    public createGameBoxesFromBatch(
-        scene: THREE.Scene,
-        request: GameBoxBatchCreationRequest
-    ): THREE.Mesh[] {
-        const { games, enablePerformanceFeatures = false } = request
-        
-        console.log(`🎮 Creating game boxes from ${games.length} games...`)
-        
-        if (!games || games.length === 0) {
-            console.warn('⚠️ No games provided for game box creation')
-            return []
+    private createInstancedArtworkBox(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        textureOptions: GameBoxTextureOptions,
+        name?: string
+    ): THREE.Mesh | null {
+        if (!this.instancedArtworkRenderer) {
+            console.warn('Instanced artwork renderer not available, falling back to individual mesh')
+            return this.createGameBoxCore(game, position, name)
         }
 
-        // Sort games (no artificial limits - render all loaded games)
-        const sortedGames = GameBoxLayoutUtils.sortAndLimitGames(games)
-        const boxes: THREE.Mesh[] = []
-        
-        // Calculate centering for the entire set of boxes
-        const config = GameBoxLayoutUtils.DEFAULT_SHELF_CONFIG
-        const startX = GameBoxLayoutUtils.calculateStartX(sortedGames.length, config)
-        
-        // Create game boxes with proper centering
-        sortedGames.forEach((game, index) => {
-            const creationRequest: GameBoxCreationRequest = {
-                gameData: game,
-                index,
-                textureOptions: enablePerformanceFeatures ? {
-                    enableLazyLoading: true
-                } : undefined
+        // Reserve instance index immediately to prevent race conditions
+        const reservedInstanceIndex = this.artworkInstanceIndex++
+
+        // Use async method but don't await here to avoid blocking
+        this.instancedArtworkRenderer.setArtworkInstance(
+            reservedInstanceIndex,
+            position,
+            game.name,
+            textureOptions
+        ).then((success) => {
+            if (!success) {
+                console.warn(`Failed to add instanced artwork box for "${game.name}" at index ${reservedInstanceIndex}`)
             }
-            
-            const box = this.createGameBoxFromRequest(scene, creationRequest)
-            if (box) {
-                // Adjust position to center the entire set
-                const currentPos = box.position
-                box.position.set(currentPos.x + startX, currentPos.y, currentPos.z)
-                boxes.push(box)
-            }
+        }).catch((error) => {
+            console.error(`Error adding instanced artwork for "${game.name}":`, error)
         })
         
-        console.log(`✅ Created ${boxes.length} game boxes from game library`)
-        return boxes
-    }
-    
-    /**
-     * Create single game box from request (clean interface)
-     */
-    public createGameBoxFromRequest(
-        scene: THREE.Scene,
-        request: GameBoxCreationRequest
-    ): THREE.Mesh | null {
-        const { gameData, index, textureOptions } = request
-        return this.createGameBoxWithTexture(scene, gameData, index, textureOptions)
-    }
-    
-    /**
-     * Create game boxes from game library data
-     */
-    public createGameBoxesFromGameData(
-        scene: THREE.Scene, 
-        games: (GameData | SteamGameData)[]
-    ): THREE.Mesh[] {
-        return this.createGameBoxesFromBatch(scene, { games })
-    }
-    
-    /**
-     * Create game boxes from Steam library data (legacy method)
-     * TODO: Remove once SteamGameManager is refactored
-     */
-    public createGameBoxesFromSteamData(
-        scene: THREE.Scene, 
-        games: SteamGameData[]
-    ): THREE.Mesh[] {
-        return this.createGameBoxesFromGameData(scene, games)
+        return null
     }
 
     /**
-     * Clear all game boxes from the scene
+     * Create a game box using GPU instanced label rendering (text-only)
+     * This method adds the game box to the InstancedLabelRenderer for text labels
+     * Always returns null since instanced rendering doesn't create individual meshes
      */
+    private createInstancedLabelBox(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        name?: string
+    ): THREE.Mesh | null {
+        if (!this.instancedLabelRenderer) {
+            console.warn('Instanced label renderer not available, falling back to individual mesh')
+            return this.createGameBoxCore(game, position, name)
+        }
+
+        // Reserve instance index immediately to prevent race conditions
+        const reservedInstanceIndex = this.labelInstanceIndex++
+
+        const success = this.instancedLabelRenderer.setLabelInstance(
+            reservedInstanceIndex,
+            position,
+            game.name
+        )
+        
+        if (!success) {
+            console.warn(`Failed to add instanced label box for "${game.name}", falling back to individual mesh`)
+            return this.createGameBoxCore(game, position, name)
+        }
+        
+        return null
+    }
+
+    // Core creation logic used by public factory methods
+    private createGameBoxCore(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        name?: string
+    ): THREE.Mesh {
+        const material = this.materialManager.getGameBoxMaterialFromName(game.name)
+        
+        const gameBox = new THREE.Mesh(this.gameBoxGeometry, material)
+        gameBox.position.copy(position)
+        gameBox.name = name || `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}`
+        
+        gameBox.userData = {
+            isGameBox: true,
+            gameData: game,
+            gameId: GameBoxLayoutUtils.getGameId(game),
+            name: game.name,
+            playtime: GameBoxLayoutUtils.getGamePlaytime(game)
+        }
+        
+        gameBox.castShadow = true
+        gameBox.receiveShadow = true
+        
+        // Add game name text label to the front face
+        // Only use GPU instanced labels if renderer is initialized, otherwise skip labels
+        if (this.instancedLabelRenderer?.isReady()) {
+            this.addInstancedGameNameLabel(gameBox, game.name)
+        } else {
+            // Skip individual labels entirely - GPU instanced renderer will handle all labels
+            console.debug(`⏳ Skipping label for "${game.name}" - GPU instanced renderer not ready`)
+        }
+        
+        return gameBox
+    }
+
+    /**
+     * Create a text label with the game name and add it to the game box
+     * DEPRECATED: This method is only called as fallback when GPU instanced renderer isn't ready
+     */
+    private addGameNameLabel(gameBox: THREE.Mesh, gameName: string): void {
+        console.warn(`📋 Creating individual label for "${gameName}" - GPU instanced renderer not available`)
+        
+        // Legacy individual label creation (should rarely be used)
+        // Create canvas for text rendering
+        const canvas = document.createElement('canvas')
+        const context = canvas.getContext('2d')
+        if (!context) {
+            console.warn('Could not create canvas context for game name label')
+            return
+        }
+
+        // Set canvas size (higher resolution for better quality)
+        canvas.width = 512
+        canvas.height = 512
+
+        // Configure text rendering
+        context.fillStyle = '#000000' // Black background
+        context.fillRect(0, 0, canvas.width, canvas.height)
+        
+        context.fillStyle = '#ffffff' // White text
+        context.font = 'bold 48px Arial, sans-serif'
+        context.textAlign = 'center'
+        context.textBaseline = 'middle'
+        
+        // Word wrap the game name if it's too long
+        const maxWidth = canvas.width - 40 // 20px padding on each side
+        const words = gameName.split(' ')
+        const lines: string[] = []
+        let currentLine = words[0]
+        
+        for (let i = 1; i < words.length; i++) {
+            const testLine = currentLine + ' ' + words[i]
+            const metrics = context.measureText(testLine)
+            if (metrics.width > maxWidth) {
+                lines.push(currentLine)
+                currentLine = words[i]
+            } else {
+                currentLine = testLine
+            }
+        }
+        lines.push(currentLine)
+        
+        // Draw each line of text
+        const lineHeight = 60
+        const startY = (canvas.height - (lines.length * lineHeight)) / 2 + lineHeight / 2
+        lines.forEach((line, index) => {
+            context.fillText(line, canvas.width / 2, startY + (index * lineHeight))
+        })
+
+        // Create texture from canvas
+        const texture = new THREE.CanvasTexture(canvas)
+        texture.needsUpdate = true
+
+        // Create a plane for the label (slightly in front of the box)
+        const labelGeometry = new THREE.PlaneGeometry(this.dimensions.width * 0.95, this.dimensions.height * 0.95)
+        const labelMaterial = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide
+        })
+        
+        const label = new THREE.Mesh(labelGeometry, labelMaterial)
+        
+        // Position label slightly in front of the box (on the front face)
+        label.position.z = (this.dimensions.depth / 2) + 0.001
+        label.name = `${gameBox.name}-label`
+        
+        // Add label as child of game box so it moves with the box
+        gameBox.add(label)
+        
+        // Store texture reference for cleanup
+        gameBox.userData.labelTexture = texture
+        gameBox.userData.labelMesh = label
+    }
+    
+    /**
+     * Add game name label using GPU instanced rendering (high performance)
+     * This method uses the InstancedLabelRenderer for massive performance gains
+     */
+    private addInstancedGameNameLabel(gameBox: THREE.Mesh, gameName: string): void {
+        if (!this.instancedLabelRenderer) {
+            console.warn('Instanced label renderer not available')
+            return
+        }
+        
+        // Calculate label position in world space (front face of game box)
+        const labelPosition = new THREE.Vector3()
+        gameBox.getWorldPosition(labelPosition)
+        
+        // Offset to front face of game box
+        labelPosition.z += (this.dimensions.depth / 2) + 0.001
+        
+        // Reserve instance index immediately to prevent race conditions
+        const reservedInstanceIndex = this.labelInstanceIndex++
+        
+        const success = this.instancedLabelRenderer.setLabelInstance(
+            reservedInstanceIndex,
+            labelPosition,
+            gameName
+        )
+        
+        if (success) {
+            // Store instance info for cleanup/updates
+            gameBox.userData.labelInstanceIndex = reservedInstanceIndex
+            gameBox.userData.hasInstancedLabel = true
+        } else {
+            console.warn(`Failed to add instanced label for "${gameName}"`)
+        }
+    }
+
     public clearGameBoxes(scene: THREE.Scene): number {
         const existingBoxes = scene.children.filter(child => 
             child.userData?.isGameBox
         )
-        existingBoxes.forEach(box => scene.remove(box))
+        existingBoxes.forEach(box => {
+            this.disposeGameBox(box as THREE.Mesh)
+            scene.remove(box)
+        })
         console.log(`🗑️ Cleared ${existingBoxes.length} existing game boxes`)
         return existingBoxes.length
     }
 
-
     /**
-     * Update box dimensions (requires recreating geometry)
+     * Dispose of a single game box and its resources
      */
+    private disposeGameBox(gameBox: THREE.Mesh): void {
+        // Dispose custom materials and textures
+        if (gameBox.material instanceof THREE.Material) {
+            gameBox.material.dispose()
+        } else if (Array.isArray(gameBox.material)) {
+            gameBox.material.forEach(mat => mat.dispose())
+        }
+        
+        // Dispose geometry (shared geometry should not be disposed here)
+        // gameBox.geometry?.dispose() // Commented out to avoid disposing shared geometry
+        
+        // Handle instanced labels (no individual cleanup needed - managed by InstancedLabelRenderer)
+        if (gameBox.userData.hasInstancedLabel) {
+            console.debug(`🏷️ Game box had instanced label at index ${gameBox.userData.labelInstanceIndex}`)
+            // Note: Individual instances don't need cleanup - InstancedLabelRenderer manages the pool
+        } else {
+            // Dispose individual label resources if present (legacy method)
+            if (gameBox.userData.labelTexture) {
+                gameBox.userData.labelTexture.dispose()
+            }
+            if (gameBox.userData.labelMesh) {
+                gameBox.userData.labelMesh.geometry?.dispose()
+                if (gameBox.userData.labelMesh.material instanceof THREE.Material) {
+                    gameBox.userData.labelMesh.material.dispose()
+                }
+            }
+        }
+    }
+
     public updateDimensions(newDimensions: Partial<GameBoxDimensions>) {
         this.dimensions = { ...this.dimensions, ...newDimensions }
+        // Recreate geometry with new dimensions
         this.gameBoxGeometry.dispose()
         this.gameBoxGeometry = new THREE.BoxGeometry(
             this.dimensions.width,
@@ -311,39 +519,16 @@ export class GameBoxRenderer {
         return MaterialUtils.createGameBoxMaterials()
     }
 
-    private calculateStartX(numBoxes: number, config: ShelfConfiguration): number {
-        return -(numBoxes - 1) * config.spacing / 2
-    }
-
-    private calculateBoxPosition(index: number, startX: number, config: ShelfConfiguration): GameBoxPosition {
-        return {
-            x: config.centerX + startX + (index * config.spacing),
-            y: config.surfaceY, // Use exact Y position calculated by StoreLayout
-            z: config.centerZ    // Use exact Z position calculated by StoreLayout
-        }
-    }
-
-    private sortAndLimitGames(games: (GameData | SteamGameData)[]): (GameData | SteamGameData)[] {
-        // Get games with recent playtime first, then alphabetical
-        const playedGames = games
-            .filter(game => this.getGamePlaytime(game) > 0)
-            .sort((a, b) => this.getGamePlaytime(b) - this.getGamePlaytime(a))
-        
-        // Add unplayed games alphabetically
-        const unplayedGames = games
-            .filter(game => this.getGamePlaytime(game) === 0)
-            .sort((a, b) => a.name.localeCompare(b.name))
-        
-        playedGames.push(...unplayedGames)
-        
-        return playedGames
-    }
-
-    /**
-     * Dispose of all resources
-     * (Important - call this when cleaning up the renderer)
-     */
     public dispose(): void {
+        console.debug('🧹 Disposing GameBoxRenderer resources')
+        
+        // Dispose instanced renderers
+        this.instancedLabelRenderer?.dispose()
+        this.instancedLabelRenderer = undefined
+        
+        this.instancedArtworkRenderer?.dispose()
+        this.instancedArtworkRenderer = undefined
+        
         // Dispose geometry
         this.gameBoxGeometry.dispose()
         
@@ -351,14 +536,13 @@ export class GameBoxRenderer {
         this.textureManager.dispose()
         this.performanceManager?.dispose()
         
-        console.log('🧹 Disposed GameBoxRenderer and all managers')
+        // Reset instance tracking
+        this.labelInstanceIndex = 0
+        this.artworkInstanceIndex = 0
+        
+        console.log('✅ GameBoxRenderer disposed including instanced renderers')
     }
 
-    // Texture and fallback creation now handled by GameBoxTextureManager
-
-    // Texture creation and fallback methods now handled by GameBoxTextureManager
-
-    // ====================================================================
     // Performance features delegated to GameBoxPerformanceManager
     public updatePerformanceData(camera: THREE.Camera, scene: THREE.Scene): void {
         this.performanceManager?.updatePerformanceData(camera, scene)
@@ -382,9 +566,4 @@ export class GameBoxRenderer {
     public getTextureManager(): GameBoxTextureManager {
         return this.textureManager
     }
-
-    public getPerformanceManager(): GameBoxPerformanceManager | undefined {
-        return this.performanceManager
-    }
-
 }

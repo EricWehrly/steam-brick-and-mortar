@@ -11,6 +11,8 @@ import { CacheManagementPanel } from '../../../src/ui/pause/panels/CacheManageme
 import { HelpPanel } from '../../../src/ui/pause/panels/HelpPanel'
 import { ApplicationPanel } from '../../../src/ui/pause/panels/ApplicationPanel'
 import { DebugPanel } from '../../../src/ui/pause/panels/DebugPanel'
+import { EventManager } from '../../../src/core/EventManager'
+import { AppSettings } from '../../../src/core/AppSettings'
 
 describe('Pause Menu Tab Switching', () => {
     let pauseMenuManager: PauseMenuManager
@@ -18,6 +20,14 @@ describe('Pause Menu Tab Switching', () => {
     beforeEach(() => {
         // Set up minimal DOM - PauseMenuManager will create its own structure
         document.body.innerHTML = `<div id="app"></div>`
+
+        // Setup mock dependencies
+        const mockEventManager = EventManager.getInstance()
+        const mockAppSettings = AppSettings.getInstance()
+        const mockSystemDependencies = {
+            performanceMonitor: null as any,
+            renderer: null as any
+        }
 
         // Mock callbacks
         const mockCallbacks = {
@@ -27,7 +37,13 @@ describe('Pause Menu Tab Switching', () => {
             onMenuClose: vi.fn()
         }
 
-        pauseMenuManager = new PauseMenuManager({}, mockCallbacks)
+        pauseMenuManager = new PauseMenuManager(
+            {},
+            mockCallbacks,
+            mockSystemDependencies,
+            mockEventManager,
+            mockAppSettings
+        )
         pauseMenuManager.init()
 
         // Register all panels
@@ -40,11 +56,11 @@ describe('Pause Menu Tab Switching', () => {
         
         pauseMenuManager.registerPanel(new HelpPanel())
         
-        const applicationPanel = new ApplicationPanel()
+        const applicationPanel = new ApplicationPanel({}, mockAppSettings, mockEventManager)
         applicationPanel.initialize({ onSettingsChanged: vi.fn() })
         pauseMenuManager.registerPanel(applicationPanel)
         
-        pauseMenuManager.registerPanel(new GameSettingsPanel())
+        pauseMenuManager.registerPanel(new GameSettingsPanel({}, mockAppSettings, mockEventManager))
         
         const debugPanel = new DebugPanel()
         debugPanel.initialize({ onGetDebugStats: vi.fn().mockResolvedValue({

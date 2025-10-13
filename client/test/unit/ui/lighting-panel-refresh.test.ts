@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { LightingControlsPanel } from '../../../src/ui/LightingControlsPanel'
 import { LightingEventTypes } from '../../../src/types/InteractionEvents'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
+import { AppSettings } from '../../../src/core/AppSettings'
 
 describe('Lighting Panel Refresh Integration', () => {
     let panel: LightingControlsPanel
@@ -12,7 +13,8 @@ describe('Lighting Panel Refresh Integration', () => {
     beforeEach(() => {
         scene = new THREE.Scene()
         eventManager = EventManager.getInstance()
-        panel = new LightingControlsPanel()
+        const appSettings = AppSettings.getInstance()
+        panel = new LightingControlsPanel(eventManager, appSettings)
     })
 
     it('should refresh when lighting system ready event is emitted', () => {

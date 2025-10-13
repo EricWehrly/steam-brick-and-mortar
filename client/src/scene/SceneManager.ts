@@ -16,9 +16,10 @@
 import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { BlockbusterColors } from '../utils/Colors'
-import { TextureManager } from '../utils/TextureManager'
+import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
+import { DataManager } from '../core/data/DataManager'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -29,7 +30,7 @@ export class SceneManager {
     private scene: THREE.Scene
     private camera: THREE.PerspectiveCamera
     private renderer: THREE.WebGLRenderer
-    private textureManager: TextureManager
+    private materialManager: SharedMaterialManager
     private propRenderer: PropRenderer
     private skyboxManager: SkyboxManager
 
@@ -38,10 +39,15 @@ export class SceneManager {
         RectAreaLightUniformsLib.init()
         
         // Initialize texture manager
-        this.textureManager = TextureManager.getInstance()
+        this.materialManager = SharedMaterialManager.getInstance()
         
         // Initialize Three.js components
         this.scene = new THREE.Scene()
+        
+        DataManager.getInstance().set('core.mainScene', this.scene, {
+            domain: 'Scene' as any
+        })
+        
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: options.antialias ?? true 
@@ -132,13 +138,6 @@ export class SceneManager {
                 lastPerformanceUpdate = now
             }
             
-            // Rotate the test cube
-            const cube = this.scene.getObjectByName('cube') ?? this.scene.children.find(obj => obj instanceof THREE.Mesh)
-            if (cube) {
-                cube.rotation.x += 0.01
-                cube.rotation.y += 0.01
-            }
-            
             this.renderer.render(this.scene, this.camera)
         })
     }
@@ -185,26 +184,7 @@ export class SceneManager {
         return objects.length
     }
 
-    /**
-     * Create a ceiling plane with procedural texture
-     */
-    public createCeiling(size: number = 20, y: number = 4): THREE.Mesh {
-        const ceilingGeometry = new THREE.PlaneGeometry(size, size)
-        
-        // Use procedural ceiling material with popcorn texture
-        const ceilingMaterial = this.textureManager.createProceduralCeilingMaterial({
-            repeat: { x: size / 8, y: size / 8 }, // More repeats for ceiling texture detail
-            color: '#F5F5DC', // Beige ceiling color
-            bumpiness: 0.4,
-            roughness: 0.7
-        })
-        
-        const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
-        ceiling.rotation.x = Math.PI / 2 // Face down
-        ceiling.position.y = y
-        this.scene.add(ceiling)
-        return ceiling
-    }
+
 
     /**
      * Create fluorescent light fixtures using PropRenderer
@@ -229,11 +209,7 @@ export class SceneManager {
     public addEnhancedTextureDemo(): void {
         // Create floor with enhanced carpet texture
         const floorGeometry = new THREE.PlaneGeometry(20, 20)
-        const carpetMaterial = this.textureManager.createEnhancedProceduralCarpetMaterial({
-            color: '#8B0000',
-            fiberDensity: 0.5,
-            repeat: { x: 4, y: 4 }
-        })
+        const carpetMaterial = this.materialManager.getCarpetMaterial()
         const floor = new THREE.Mesh(floorGeometry, carpetMaterial)
         floor.rotation.x = -Math.PI / 2
         floor.receiveShadow = true
@@ -241,12 +217,7 @@ export class SceneManager {
 
         // Create ceiling with enhanced popcorn texture
         const ceilingGeometry = new THREE.PlaneGeometry(20, 20)
-        const ceilingMaterial = this.textureManager.createEnhancedProceduralCeilingMaterial({
-            color: '#F5F5DC',
-            bumpSize: 0.6,
-            density: 0.8,
-            repeat: { x: 3, y: 3 }
-        })
+        const ceilingMaterial = this.materialManager.getCeilingMaterial()
         const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
         ceiling.rotation.x = Math.PI / 2
         ceiling.position.y = 8
@@ -255,14 +226,7 @@ export class SceneManager {
         // Create wooden shelves with enhanced wood texture
         for (let i = 0; i < 3; i++) {
             const shelfGeometry = new THREE.BoxGeometry(6, 0.2, 1.5)
-            const woodMaterial = this.textureManager.createEnhancedProceduralWoodMaterial({
-                grainStrength: 0.5,
-                ringFrequency: 0.1,
-                color1: '#8B4513',
-                color2: '#A0522D',
-                color3: '#654321',
-                repeat: { x: 3, y: 1 }
-            })
+            const woodMaterial = this.materialManager.getWallWoodMaterial()
             const shelf = new THREE.Mesh(shelfGeometry, woodMaterial)
             shelf.position.set(-5, 2 + i * 2, 0)
             shelf.castShadow = true
@@ -272,9 +236,7 @@ export class SceneManager {
         // Create comparison objects with basic textures
         for (let i = 0; i < 3; i++) {
             const shelfGeometry = new THREE.BoxGeometry(6, 0.2, 1.5)
-            const basicWoodMaterial = this.textureManager.createProceduralWoodMaterial({
-                repeat: { x: 3, y: 1 }
-            })
+            const basicWoodMaterial = this.materialManager.getBasicWoodMaterial()
             const shelf = new THREE.Mesh(shelfGeometry, basicWoodMaterial)
             shelf.position.set(5, 2 + i * 2, 0)
             shelf.castShadow = true

@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SteamIntegration } from '../../src/steam-integration/SteamIntegration'
-import { UICoordinator } from '../../src/ui/UICoordinator'
+import { UICoordinatorMock as UICoordinator } from '../mocks/ui/UICoordinator.mock'
 import { PerformanceMonitor } from '../../src/ui/PerformanceMonitor'
 import { DebugStatsProvider } from '../../src/core/DebugStatsProvider'
 import { SceneManager } from '../../src/scene/SceneManager'
@@ -41,7 +41,7 @@ describe('Load from Cache Integration', () => {
   let steamIntegration: SteamIntegration
   let performanceMonitor: PerformanceMonitor
   let debugStatsProvider: DebugStatsProvider
-  let uiCoordinator: UICoordinator
+  let uiCoordinator: any
   let sceneManager: SceneManager
 
   beforeEach(() => {

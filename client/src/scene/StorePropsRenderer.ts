@@ -19,11 +19,25 @@ import { SignageRenderer } from './SignageRenderer'
 import { PropRenderer } from './PropRenderer'
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
 
-// Configuration constants for game layout
+import { RoomConstants } from './RoomManager'
+import { EventManager, EventSource } from '../core/EventManager'
+import { RoomEventTypes, SteamEventTypes, GameEventTypes } from '../types/InteractionEvents'
+import { DataManager } from '../core/data'
+import type { SteamGameData } from './game-box/types/GameData'
+import type { GameBoxTextureOptions } from './game-box/types/GameBoxOptions'
+import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
+import { LabelTextureArrayManager } from './game-box/instancing/LabelTextureArrayManager'
+import { ImageManager } from '../steam/images/ImageManager'
+
+// Configuration constants for game layout - made static and accessible
 // TODO: Make these user-configurable in game menus
-const GAMES_PER_SURFACE = 3 // Games per shelf surface (front/back of each shelf level)
-const SURFACES_PER_SHELF = 6 // 3 shelf levels × 2 sides (front/back) = 6 surfaces per shelf unit
-// TODO: Calculate SURFACES_PER_SHELF dynamically from shelf geometry in future
+export class GameLayoutConstants {
+    static readonly GAMES_PER_SURFACE = 3 // Games per shelf surface (front/back of each shelf level)
+    static readonly SURFACES_PER_SHELF = 6 // 3 shelf levels × 2 sides (front/back) = 6 surfaces per shelf unit
+    // TODO: Calculate SURFACES_PER_SHELF dynamically from shelf geometry in future
+}
+
+// All other constants moved to RoomManager.RoomConstants - use those instead
 
 export interface PropsConfig {
     /** Enable shelf generation */
@@ -42,67 +56,146 @@ export interface PropsConfig {
         maxActiveTextures?: number
         frustumCullingEnabled?: boolean
     }
+    /** Test modes - map of test name to string value */
+    tests?: Record<string, string>
 }
 
 export class StorePropsRenderer {
     private scene: THREE.Scene
+    private dataManager: DataManager
+
     private storeLayout: StoreLayout
     private gameBoxRenderer: GameBoxRenderer
     private signageRenderer: SignageRenderer
     private propRenderer: PropRenderer
     private propsGroup: THREE.Group
     private config: PropsConfig = {}
+    private currentStoreGroup: THREE.Group | null = null // Track current store environment
 
-    constructor(scene: THREE.Scene) {
+    private labelTextureArrayManager?: LabelTextureArrayManager
+    private imageManager: ImageManager
+    private globalGameIndex: number = 0 // Track global game position for artwork selection
+
+    constructor(scene: THREE.Scene, dataManager: DataManager, gameBoxRenderer: GameBoxRenderer) {
         this.scene = scene
-        this.propRenderer = new PropRenderer(scene)
-        
-        // Create group to hold all props
+        this.dataManager = dataManager
+        this.gameBoxRenderer = gameBoxRenderer
+
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props'
         this.scene.add(this.propsGroup)
         
-        // Initialize renderers
+        this.imageManager = new ImageManager()
+        
         this.initializeRenderers()
+        
+        this.setupEventListeners()
     }
 
     private initializeRenderers(): void {
-        // Initialize store layout for shelves
         this.storeLayout = new StoreLayout(this.scene)
         
-        // Initialize signage renderer
         this.signageRenderer = new SignageRenderer()
+    }
+
+    private setupEventListeners(): void {
+        EventManager.getInstance().registerEventHandler(RoomEventTypes.Resized, this.generateShelvesAsync.bind(this))
+    }
+
+    /**
+     * Generate shelves asynchronously without blocking the main thread
+     * Shelves will phase in gradually as they're created
+     */
+    private async generateShelvesAsync(): Promise<void> {
+
+        const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
+        const gameCount = games.length
+        try {
+            
+            // Calculate shelves needed based on game count
+            const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
+            const shelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
+            
+            // Reset global game index for artwork assignment
+            this.globalGameIndex = 0
+            
+            // Clear existing shelves first
+            this.clearExistingShelves()
+            
+            // Create shelf rows based on needed shelves  
+            const maxShelvesPerRow = 4
+            const rows = Math.ceil(shelvesNeeded / maxShelvesPerRow)
+            
+            for (let row = 0; row < rows; row++) {
+                const shelvesInThisRow = Math.min(maxShelvesPerRow, shelvesNeeded - (row * maxShelvesPerRow))
+                
+                // Yield to main thread between rows to keep app responsive
+                await new Promise(resolve => setTimeout(resolve, 150))
+                
+                try {
+                    await this.createShelfRow(row, shelvesInThisRow, games)
+                } catch (error) {
+                    console.error(`❌ Failed to create row ${row}:`, error)
+                    throw error
+                }
+            }
+        } catch (error) {
+            console.error('❌ Failed to generate shelves asynchronously:', error)
+            throw error
+        }
     }
 
     public async setupProps(config: PropsConfig = {}): Promise<void> {
         this.config = { ...this.getDefaultConfig(), ...config }
         
-        console.debug('🎁 Setting up store props...')
+        // Initialize enabled tests
+        if (this.config.tests) {
+            const enabledTests = getEnabledTests(this.config.tests)
+            if (enabledTests.length > 0) {
+                // Initialize test renderers based on enabled tests
+                this.initializeTests()
+            }
+        }
         
         try {
             // Set up props in logical order
-            if (this.config.enableShelves) {
-                await this.setupShelves()
-            }
+            // NOTE: Static shelf setup removed - dynamic generation happens via room:resized event
+            // This eliminates duplicate environment creation
             
             if (this.config.enableSignage) {
                 // this.signageRenderer.createStandardSigns(this.scene);
             }
-            
-            if (this.config.enableTestObjects) {
-                await this.setupTestObjects()
-            }
-            
-            // Initialize game box renderer (games are populated later via Steam API)
-            if (this.config.enableGameBoxes) {
-                this.initializeGameBoxRenderer()
-            }
-            
-            console.log('✅ Store props setup complete!')
         } catch (error) {
             console.error('❌ Failed to set up props:', error)
             // Continue with available props
         }
+    }
+    
+    /**
+     * Initialize test renderers based on enabled tests
+     */
+    private initializeTests(): void {
+        if (!this.config.tests) return
+        
+        // GPU Instanced Textures Test - Phase 2: Texture arrays
+        // NOTE: This test initializes in setupEventListeners() when games are loaded
+        
+        // Test Objects - Simple geometric test objects
+        if (isTestEnabled(this.config.tests, TestMode.SPAWN_TEST_OBJECTS)) {
+            this.setupTestObjects()
+        }
+    }
+
+    
+    private async setupTestObjects(): Promise<void> {
+        // Small test cube for reference
+        const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
+        const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 })
+        const cube = new THREE.Mesh(geometry, material)
+        cube.position.set(2, 0, -1) // Move to side so it doesn't interfere with shelf
+        cube.castShadow = true
+        cube.name = 'test-cube'
+        this.propsGroup.add(cube)
     }
 
     private getDefaultConfig(): PropsConfig {
@@ -110,7 +203,6 @@ export class StorePropsRenderer {
             enableShelves: true,
             enableGameBoxes: true,
             enableSignage: true,
-            enableTestObjects: false, // Disabled by default for production
             performance: {
                 maxTextureSize: 1024,
                 nearDistance: 2.0,
@@ -121,66 +213,12 @@ export class StorePropsRenderer {
         }
     }
 
-    /**
-     * Set up shelf systems with automatic best-method selection and fallback
-     */
-    private async setupShelves(): Promise<void> {
-        console.debug('📚 Generating shelves (auto: attempting GPU-optimized with fallbacks)...')
-        
-        let storeGroup: THREE.Group;
-        
-        try {
-            // Attempt GPU-optimized generation first (best performance)
-            storeGroup = await this.storeLayout.generateShelvesGPUOptimized()
-            console.log('✅ Shelves generated successfully (GPU-optimized)')
-        } catch (error) {
-            console.warn('❌ GPU-optimized generation failed, using basic generation...', error)
-            try {
-                // Fallback to basic generation 
-                storeGroup = await this.storeLayout.generateBasicRoom()
-                console.log('✅ Shelves generated successfully (basic fallback)')
-            } catch (basicError) {
-                console.error('❌ All shelf generation methods failed:', basicError)
-                throw basicError;
-            }
-        }
-
-        // CRITICAL: Add the returned storeGroup to the scene so shelves and game boxes are visible
-        this.scene.add(storeGroup);
-    }
-
-    private async setupTestObjects(): Promise<void> {
-        console.debug('🧪 Adding test objects...')
-        
-        // Small test cube for reference
-        const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
-        const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 })
-        const cube = new THREE.Mesh(geometry, material)
-        cube.position.set(2, 0, -1) // Move to side so it doesn't interfere with shelf
-        cube.castShadow = true
-        cube.name = 'test-cube'
-        this.propsGroup.add(cube)
-        
-        console.debug('✅ Test objects added')
-    }
-
-    private initializeGameBoxRenderer(): void {
-        console.debug('🎮 Initializing game box renderer...')
-        
-        this.gameBoxRenderer = new GameBoxRenderer(
-            undefined, // Use default dimensions
-            undefined  // Use default shelf configuration
-        )
-        
-        console.debug('✅ Game box renderer initialized')
-    }
-
+    // TODO: Try this
+    // and look for other unused (and unattempted) methods?
     /**
      * Add atmospheric props (wire racks, dividers, etc.)
      */
     public async addAtmosphericProps(): Promise<void> {
-        console.debug('🎪 Adding atmospheric props...')
-        
         try {
             // Create wire rack displays for snack/merchandise areas
             const wireRack1 = this.propRenderer.createWireRackDisplay(new THREE.Vector3(-9, 0, 2))
@@ -198,7 +236,6 @@ export class StorePropsRenderer {
             const floorMarkers = this.propRenderer.createFloorMarkers(22, 16)
             this.propsGroup.add(floorMarkers)
             
-            console.debug('✅ Atmospheric props added')
         } catch (error) {
             console.error('❌ Failed to add atmospheric props:', error)
         }
@@ -230,96 +267,43 @@ export class StorePropsRenderer {
         return this.signageRenderer
     }
 
-
-
     /**
-     * Get props statistics for debugging
-     */
-    public getPropsStats(): {
-        totalProps: number
-        shelvesGenerated: boolean
-        signageCount: number
-        testObjectsEnabled: boolean
-        gameBoxesEnabled: boolean
-        storeStats?: any
-    } {
-        return {
-            totalProps: this.propsGroup.children.length,
-            shelvesGenerated: this.storeLayout !== undefined,
-            signageCount: this.scene.children.filter(child => 
-                child.name?.includes('signage') || child.name?.includes('sign')
-            ).length,
-            testObjectsEnabled: this.config.enableTestObjects ?? false,
-            gameBoxesEnabled: this.config.enableGameBoxes ?? true,
-            storeStats: this.storeLayout?.getStoreStats()
-        }
-    }
-
-    /**
-     * Spawn dynamic shelves based on game count and populate with loaded games
-     */
-    public async spawnDynamicShelvesWithGames(shelvesNeeded: number, gameCount: number, games: any[] = []): Promise<void> {
-        // Calculate the actual shelves needed based on our configuration
-        // TODO: Remove shelvesNeeded parameter once all callers are updated to use internal calculation
-        const gamesPerShelf = GAMES_PER_SURFACE * SURFACES_PER_SHELF // 3 games × 6 surfaces = 18 games per shelf
-        const calculatedShelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
-        const actualShelvesNeeded = calculatedShelvesNeeded // Use calculated value instead of parameter
-        
-        console.debug(`📚 Spawning ${actualShelvesNeeded} dynamic shelves for ${gameCount} games with ${games.length} game data objects`)
-        console.debug(`📊 Calculation: ${gameCount} games ÷ (${GAMES_PER_SURFACE} games/surface × ${SURFACES_PER_SHELF} surfaces/shelf) = ${actualShelvesNeeded} shelves`)
-        
-        try {
-            // Clear existing shelves if any
-            this.clearExistingShelves()
-            
-            // Create shelf rows based on needed shelves
-            const maxShelvesPerRow = 4
-            const rows = Math.ceil(actualShelvesNeeded / maxShelvesPerRow)
-            
-            for (let row = 0; row < rows; row++) {
-                const shelvesInThisRow = Math.min(maxShelvesPerRow, actualShelvesNeeded - (row * maxShelvesPerRow))
-                await this.createShelfRow(row, shelvesInThisRow, games)
-            }
-            
-            console.debug(`✅ Dynamic shelves spawned: ${actualShelvesNeeded} shelves in ${rows} row(s)`)
-            
-        } catch (error) {
-            console.error('❌ Failed to spawn dynamic shelves:', error)
-            throw error
-        }
-    }
-
-    /**
-     * Clear existing shelves from the scene
+     * Clear ALL existing store environment from the scene
+     * Eliminates duplicate walls/ceiling/floors by removing everything
      */
     private clearExistingShelves(): void {
-        // Find and remove shelf-related objects
-        const shelfObjects = this.scene.children.filter(child => 
+        // Find and remove ONLY shelf/store objects - DON'T touch lighting or room structure
+        const storeObjects = this.scene.children.filter(child => 
             child.name?.includes('StoreLayout') || 
             child.name?.includes('shelf') ||
-            child.name?.includes('Shelf')
+            child.name?.includes('Shelf') ||
+            child.name?.includes('store-environment') ||
+            child.name?.includes('dynamic-store-environment') ||
+            // REMOVED room-structure filter - RoomManager owns room structure, not StorePropsRenderer
+            child.name?.includes('entrance') // Clear entrance areas
+            // NOTE: DO NOT clear lighting or room-structure - managed by other systems!
         )
         
-        shelfObjects.forEach(obj => {
+        storeObjects.forEach(obj => {
             this.scene.remove(obj)
             if (obj instanceof THREE.Group) {
                 obj.clear()
             }
         })
-        
-        console.debug(`🗑️ Cleared ${shelfObjects.length} existing shelf objects`)
     }
 
     /**
-     * Create a row of shelves
+     * Create a row of shelves with VR-optimized spacing and navigation
+     * Phase 4: Layout optimization for better VR experience
      */
-    private async createShelfRow(rowIndex: number, shelfCount: number, games: any[] = []): Promise<void> {
+    private async createShelfRow(rowIndex: number, shelfCount: number, games: SteamGameData[] = []): Promise<void> {
         const rowGroup = new THREE.Group()
         rowGroup.name = `shelf-row-${rowIndex}`
         
-        const shelfSpacing = 2.5 // Space between shelves
+        // VR-optimized spacing calculations
+        const shelfSpacing = this.calculateOptimalShelfSpacing(shelfCount)
         const startX = -(shelfCount - 1) * shelfSpacing / 2 // Center the row
-        const rowZ = -3 - (rowIndex * 3) // Each row further back
+        const rowZ = this.calculateOptimalRowPosition(rowIndex) // VR-friendly row positioning
         
         for (let i = 0; i < shelfCount; i++) {
             const shelfPosition = new THREE.Vector3(
@@ -329,7 +313,7 @@ export class StorePropsRenderer {
             )
             
             // Calculate which games belong to this shelf (18 games per shelf: 3 rows × 2 sides × 3 games)
-            const gamesPerShelf = GAMES_PER_SURFACE * SURFACES_PER_SHELF;
+            const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF;
             const shelfGlobalIndex = rowIndex * 4 + i // 4 shelves per row max
             const startGameIndex = shelfGlobalIndex * gamesPerShelf
             const shelfGames = games.slice(startGameIndex, startGameIndex + gamesPerShelf)
@@ -339,8 +323,7 @@ export class StorePropsRenderer {
             rowGroup.add(shelfGroup)
         }
         
-        this.scene.add(rowGroup)
-        console.debug(`📚 Created shelf row ${rowIndex} with ${shelfCount} shelves`)
+        this.propsGroup.add(rowGroup)
     }
 
     /**
@@ -360,14 +343,16 @@ export class StorePropsRenderer {
             // Create game boxes with actual game data if available
             if (games.length > 0) {
                 await this.spawnActualGamesOnShelf(shelfUnit, shelfGroup, games, rowIndex, shelfIndex)
-            } else {
-                console.debug(`📦 No game data available for shelf ${rowIndex}-${shelfIndex}, skipping game box creation`)
             }
             
-            console.debug(`📚 Created single shelf unit at position:`, position)
         } catch (error) {
             console.error(`❌ Failed to create shelf unit:`, error)
         }
+        
+        // Update GPU for both instanced renderers after creating the shelf
+        this.gameBoxRenderer.getInstancedLabelRenderer()?.updateGPU()
+        
+        this.gameBoxRenderer.getInstancedArtworkRenderer()?.updateGPU()
         
         return shelfGroup
     }
@@ -376,11 +361,9 @@ export class StorePropsRenderer {
      * Spawn actual game boxes with game names on dynamically created shelves
      */
     private async spawnActualGamesOnShelf(shelfUnit: THREE.Group, parentGroup: THREE.Group, games: any[], rowIndex: number, shelfIndex: number): Promise<void> {
-        console.debug(`🎮 Spawning ${games.length} actual games on shelf ${rowIndex}-${shelfIndex}`);
         
         // Find shelf surfaces (same logic as StoreLayout but simplified for dynamic shelves)
         const shelfSurfaces = this.findDynamicShelfSurfaces(shelfUnit);
-        console.debug(`📚 Found ${shelfSurfaces.length} surfaces on dynamic shelf`);
         
         if (shelfSurfaces.length === 0) {
             console.warn(`⚠️ No shelf surfaces found on dynamic shelf ${rowIndex}-${shelfIndex}`);
@@ -393,21 +376,19 @@ export class StorePropsRenderer {
             const surface = shelfSurfaces[surfaceIdx];
             
             // Spawn games on front side
-            const frontGames = games.slice(gameIndex, gameIndex + GAMES_PER_SURFACE);
+            const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE);
             if (frontGames.length > 0) {
                 await this.createGameBoxesWithNames(surface, parentGroup, frontGames, 'front', surfaceIdx);
                 gameIndex += frontGames.length;
             }
             
             // Spawn games on back side
-            const backGames = games.slice(gameIndex, gameIndex + GAMES_PER_SURFACE);
+            const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE);
             if (backGames.length > 0) {
                 await this.createGameBoxesWithNames(surface, parentGroup, backGames, 'back', surfaceIdx);
                 gameIndex += backGames.length;
             }
         }
-        
-        console.debug(`✅ Spawned ${gameIndex} game boxes with names on dynamic shelf`);
     }
 
     /**
@@ -443,7 +424,7 @@ export class StorePropsRenderer {
     }
 
     /**
-     * Create game boxes with text materials showing game names
+     * Create game boxes on shelf surface (delegated to GameBoxRenderer)
      */
     private async createGameBoxesWithNames(
         surface: {topY: number, frontZ: number, backZ: number, centerX: number, width: number}, 
@@ -452,105 +433,194 @@ export class StorePropsRenderer {
         side: 'front' | 'back', 
         surfaceIndex: number
     ): Promise<void> {
-        const Z_OFFSET = 0.025;
-        const Y_OFFSET = 0.11;
-        const GAME_HEIGHT = 0.24;  // 1.2x larger: 0.2 * 1.2 = 0.24
-        const GAME_WIDTH = 0.18;   // 1.2x larger: 0.15 * 1.2 = 0.18
-        const GAME_DEPTH = 0.05;   // Keep Z the same
-        const GAME_SPACING = 0.3;
+        if (!this.gameBoxRenderer) {
+            console.warn('⚠️ GameBoxRenderer not available, cannot create game boxes')
+            return
+        }
+
+        // StorePropsRenderer now handles positioning and parenting
+        const Z_OFFSET = 0.1        // 10cm from shelf surface
+        const Y_OFFSET = 0.005      // 5mm above shelf surface  
+        const GAME_HEIGHT = 0.4     // 40cm height
+        const GAME_SPACING = 0.35   // 35cm spacing between games
         
         // Calculate positioning
-        const gameY = surface.topY + Y_OFFSET + GAME_HEIGHT / 2;
-        const gameZ = side === 'front' ? surface.frontZ + Z_OFFSET : surface.backZ - Z_OFFSET;
+        const gameY = surface.topY + Y_OFFSET + GAME_HEIGHT / 2
+        const gameZ = side === 'front' ? surface.frontZ + Z_OFFSET : surface.backZ - Z_OFFSET
         
         // Center the games on the shelf
-        const totalWidth = (games.length - 1) * GAME_SPACING;
-        const startX = surface.centerX - totalWidth / 2;
+        const totalWidth = (games.length - 1) * GAME_SPACING
+        const startX = surface.centerX - totalWidth / 2
         
+        let createdCount = 0
         for (let i = 0; i < games.length; i++) {
-            const game = games[i];
-            const gameX = startX + (i * GAME_SPACING);
+            const game = games[i]
+            const gameX = startX + (i * GAME_SPACING)
+            const localPosition = new THREE.Vector3(gameX, gameY, gameZ)
+            // Convert local shelf position to world position by adding parent group's world position
+            const worldPosition = localPosition.clone().add(parentGroup.position)
+            const name = `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}-${side}-${i}`
+
+            // Use artwork for every 20th game to balance performance and visual interest
+            // TODO: fix failing calls to akamai CDN @ (maybe) mod 10
+            const shouldUseArtwork = (this.globalGameIndex % 20) === 0
+            let textureOptions = undefined
             
-            // Create game box geometry
-            const gameGeometry = new THREE.BoxGeometry(GAME_WIDTH, GAME_HEIGHT, GAME_DEPTH);
+            if (shouldUseArtwork && game.artwork?.header) {
+                // Try to get or download artwork for featured games
+                try {
+                    const imageBlob = await this.imageManager.downloadImage(game.artwork.header, {
+                        timeout: 5000, // 5 second timeout for artwork loading
+                        enableFallback: true,
+                        onImageLoaded: (url, blob) => {
+                            // Successfully loaded artwork
+                        },
+                        onImageError: (url, error) => {
+                            console.error(`❌ Failed to download artwork from ${url} for ${game.name}:`, error.message)
+                        }
+                    })
+                    
+                    if (imageBlob) {
+                        // Convert blob to texture options for GameBoxRenderer
+                        textureOptions = await this.createTextureOptionsFromBlob(imageBlob, game.name)
+                    } else {
+                        console.warn(`⚠️ No artwork blob received for ${game.name} - falling back to text label`)
+                    }
+                } catch (error) {
+                    console.error(`❌ Exception while loading artwork for ${game.name}:`, error)
+                }
+            }
             
-            // Create material with game name
-            const gameMaterial = await this.createGameNameMaterial(game);
+            // Create game box at world position (required for InstancedMesh)
+            const gameBox = this.gameBoxRenderer.createGameBox(game, worldPosition, textureOptions, name)
+            if (gameBox) {
+                // Individual meshes use local position since they're parented to the group
+                gameBox.position.copy(localPosition)
+                parentGroup.add(gameBox)  // Add individual game box to parent group
+                createdCount++
+            } else {
+                // Instanced rendering returns null but still counts as created
+                // Note: Instanced renderers automatically add themselves to scene via DataManager
+                createdCount++
+            }
             
-            // Create game box mesh
-            const gameBox = new THREE.Mesh(gameGeometry, gameMaterial);
-            gameBox.position.set(gameX, gameY, gameZ);
-            gameBox.name = `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}-${side}-${i}`;
-            
-            parentGroup.add(gameBox);
-            
-            console.debug(`📦 Created game box for "${game.name}" at position (${gameX.toFixed(2)}, ${gameY.toFixed(2)}, ${gameZ.toFixed(2)})`);
+            this.globalGameIndex++ // Increment global game counter
         }
     }
 
     /**
-     * Create a material with the game name written on it
+     * Create texture options from an image blob for game box artwork
      */
-    private async createGameNameMaterial(game: any): Promise<THREE.Material> {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        if (!ctx) {
-            // Fallback to basic material if canvas fails
-            return new THREE.MeshPhongMaterial({ color: 0x8B4513 }); // Brown color
-        }
-        
-        // Background (game box color)
-        ctx.fillStyle = '#2c3e50'; // Dark blue-gray
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Game name text - larger font and better contrast
-        ctx.fillStyle = '#f8f9fa';  // Almost pure white for better contrast
-        ctx.font = 'bold 48px Arial';  // Double the size: 24px * 2 = 48px
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Wrap text if it's too long
-        const gameName = game.name || 'Unknown Game';
-        const maxWidth = canvas.width - 20; // Leave some padding
-        const words = gameName.split(' ');
-        let lines: string[] = [];
-        let currentLine = '';
-        
-        for (const word of words) {
-            const testLine = currentLine ? `${currentLine} ${word}` : word;
-            const metrics = ctx.measureText(testLine);
-            
-            if (metrics.width > maxWidth && currentLine) {
-                lines.push(currentLine);
-                currentLine = word;
-            } else {
-                currentLine = testLine;
+    private async createTextureOptionsFromBlob(blob: Blob, gameName: string): Promise<GameBoxTextureOptions> {
+        return new Promise((resolve, reject) => {
+            const img = new Image()
+            img.onload = () => {
+                try {
+                    // Create a canvas to convert the image to a texture
+                    const canvas = document.createElement('canvas')
+                    const ctx = canvas.getContext('2d')
+                    
+                    if (!ctx) {
+                        console.error(`❌ Could not create canvas context for ${gameName}`)
+                        reject(new Error('Could not create canvas context'))
+                        return
+                    }
+                    
+                    // Set canvas size to image dimensions (with reasonable limits for memory)
+                    const maxSize = 512 // Limit texture size for memory management
+                    const scale = Math.min(maxSize / img.width, maxSize / img.height, 1)
+                    canvas.width = Math.floor(img.width * scale)
+                    canvas.height = Math.floor(img.height * scale)
+                    
+                    // Draw the image onto the canvas
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+                    
+                    // Create texture from canvas
+                    const texture = new THREE.CanvasTexture(canvas)
+                    texture.needsUpdate = true
+                    
+                    // Return GameBoxTextureOptions with artwork blob
+                    resolve({
+                        artworkBlobs: {
+                            'header': blob
+                        },
+                        preferredArtworkType: 'header'
+                    })
+                    
+                    // Clean up
+                    URL.revokeObjectURL(img.src)
+                } catch (error) {
+                    console.error(`❌ Error processing image for ${gameName}:`, error)
+                    reject(error)
+                    URL.revokeObjectURL(img.src)
+                }
             }
+            
+            img.onerror = (event) => {
+                console.error(`❌ Failed to load image for ${gameName}:`, event)
+                reject(new Error(`Failed to load image for ${gameName}`))
+                URL.revokeObjectURL(img.src)
+            }
+            
+            // Convert blob to object URL for image loading
+            const objectUrl = URL.createObjectURL(blob)
+            img.src = objectUrl
+        })
+    }
+
+    /**
+     * Calculate optimal shelf spacing for VR comfort and navigation
+     * Phase 4: VR-optimized layout calculations
+     */
+    private calculateOptimalShelfSpacing(shelfCount: number): number {
+        // Base spacing considerations for VR:
+        // - Minimum 2.2m for comfortable navigation (VR_ERGONOMICS.COMFORTABLE_AISLE_WIDTH)
+        // - Extra space for larger libraries to avoid crowding
+        // - Scale down slightly for very wide stores to fit in reasonable space
+        
+        const baseSpacing = RoomConstants.SHELF_SPACING_X // 2.5m default
+        const minSpacing = 2.0 // Minimum comfortable spacing
+        const maxSpacing = 3.5 // Maximum to avoid feeling empty
+        
+        // For more shelves, use base spacing
+        // For fewer shelves, can space them out more for better navigation
+        if (shelfCount <= 2) {
+            return Math.min(maxSpacing, baseSpacing * 1.2) // More spacious for small stores
+        } else if (shelfCount >= 6) {
+            return Math.max(minSpacing, baseSpacing * 0.9) // Tighter for large stores
+        } else {
+            return baseSpacing // Standard spacing for medium stores
         }
-        if (currentLine) lines.push(currentLine);
+    }
+
+    /**
+     * Calculate optimal row position for VR navigation and comfort
+     * Phase 4: VR depth positioning optimization - positions relative to entrance
+     */
+    private calculateOptimalRowPosition(rowIndex: number): number {
+        // VR depth positioning considerations:
+        // - Player starts at entrance (positive Z)
+        // - First row should be easily accessible from entrance
+        // - Progressive depth moving toward back of store (negative Z)
+        // - Avoid rows being too far back (VR discomfort)
         
-        // Limit to 3 lines max
-        lines = lines.slice(0, 3);
+        const entranceZPosition = 3 // Player/entrance is at positive Z
+        const firstRowOffset = -2 // First row is 2m into the store from entrance
+        const baseRowSpacing = RoomConstants.SHELF_SPACING_Z // 3m between rows
+        const maxDepth = -12 // Don't place shelves beyond this depth from entrance
         
-        // Draw the text lines - adjust line height for larger font
-        const lineHeight = 60;  // Double the line height for larger font
-        const startY = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
+        // Calculate position relative to entrance
+        let rowZ = entranceZPosition + firstRowOffset - (rowIndex * baseRowSpacing)
         
-        lines.forEach((line, index) => {
-            ctx.fillText(line, canvas.width / 2, startY + (index * lineHeight));
-        });
+        // For very deep stores, compress the spacing slightly to keep everything accessible
+        const absoluteMaxDepth = entranceZPosition + maxDepth
+        if (rowZ < absoluteMaxDepth) {
+            // Compress spacing for deep rows to keep them accessible
+            const compressionFactor = 0.8
+            rowZ = entranceZPosition + firstRowOffset - (rowIndex * baseRowSpacing * compressionFactor)
+        }
         
-        // Create texture and material
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.needsUpdate = true;
-        
-        return new THREE.MeshPhongMaterial({ 
-            map: texture,
-            transparent: false
-        });
+        return Math.max(rowZ, absoluteMaxDepth) // Never go deeper than maxDepth from entrance
     }
 
     public clearProps(): void {
@@ -576,6 +646,17 @@ export class StorePropsRenderer {
         this.signageRenderer?.dispose()
         this.storeLayout?.dispose()
         this.propRenderer?.dispose()
+        
+        // Clean up test instances
+        this.labelTextureArrayManager?.dispose()
+        
+        // Clean up dynamic store environment
+        if (this.currentStoreGroup) {
+            this.scene.remove(this.currentStoreGroup)
+            // TODO: Dispose materials and geometries properly
+            this.currentStoreGroup = null
+        }
+        
         // Note: GameBoxRenderer cleanup is handled by SteamGameManager
         this.scene.remove(this.propsGroup)
     }

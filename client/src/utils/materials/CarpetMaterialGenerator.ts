@@ -49,7 +49,7 @@ export class CarpetMaterialGenerator extends BaseMaterialGenerator {
       color = new THREE.Color(0x8B0000)
     } = options
 
-    const colorStr = color instanceof THREE.Color ? color.getHexString() : color
+    const colorStr = color instanceof THREE.Color ? `#${color.getHexString()}` : color
     const cacheKey = `carpet_${diffuseUrl || 'none'}_${normalUrl || 'none'}_${repeat.x}_${repeat.y}_${colorStr}`
     
     return this.getCachedMaterial(cacheKey, async () => {

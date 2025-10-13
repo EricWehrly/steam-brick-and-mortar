@@ -15,7 +15,6 @@ export { GameBoxLayoutUtils } from './GameBoxLayoutUtils'
 
 // Type definitions
 export type {
-    GameData,
     SteamGameData
 } from './types/GameData'
 

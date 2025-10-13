@@ -3,8 +3,16 @@
  * 
  * This coordinator orchestrates the complete visual system setup with
  * organized visual buckets loaded in
- * 1. Environment (skybox, room structure, spatial foundation)
- * 2. Lighting (illumination systems, shadows, atmosphere)  
+ * 1. Environment (skybox, room structure, spatial found            // Emit room:resize event to trigger proper event-driven room expansion
+            // RoomManager will calculate dimensions and handle room structure
+            // StorePropsRenderer will listen for room:resized and spawn shelves accordingly
+            console.debug(`🗂️ Requesting room resize for ${eventData.gameCount} games`)
+            EventManager.getInstance().emit('room:resize', {
+                gameCount: eventData.gameCount,
+                timestamp: Date.now(),
+                source: 'SceneCoordinator',
+                games: this.getGamesForShelfSpawning()
+            } as any)2. Lighting (illumination systems, shadows, atmosphere)  
  * 3. Props (shelves, games, signage, interactive objects)
  * 
  * This sequential loading creates a smooth transition for players as
@@ -13,13 +21,16 @@
 
 import * as THREE from 'three'
 import { SceneManager } from './SceneManager'
-import { EnvironmentRenderer } from './EnvironmentRenderer'
+import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { LightingRenderer } from './LightingRenderer'
 import { StorePropsRenderer } from './StorePropsRenderer'
+import { RoomManager } from './RoomManager'
 import { EventManager, EventSource } from '../core/EventManager'
 import { GameEventTypes, CeilingEventTypes, SteamEventTypes, type CeilingToggleEvent, type SceneReadyEvent, type SteamDataLoadedEvent } from '../types/InteractionEvents'
 import { AppSettings } from '../core/AppSettings'
-import { SteamIntegration } from '../steam-integration/SteamIntegration'
+import { DataManager } from '../core/data'
+import type { SteamGameData } from './game-box/types/GameData'
+import { GameBoxRenderer } from './GameBoxRenderer'
 
 export interface SceneCoordinatorConfig {
     environment?: {
@@ -30,28 +41,48 @@ export interface SceneCoordinatorConfig {
     props?: {
         enableTestObjects?: boolean
     }
+    tests?: Record<string, string>
 }
 
 export class SceneCoordinator {
     private sceneManager: SceneManager
-    private environmentRenderer: EnvironmentRenderer
+    private skyboxManager: SkyboxManager
     private lightingRenderer: LightingRenderer
     private propsRenderer: StorePropsRenderer
+    private roomManager: RoomManager
     private appSettings: AppSettings
-    private steamIntegration?: SteamIntegration
+    private dataManager: DataManager
+    private eventManager: EventManager
+    private config: SceneCoordinatorConfig
 
-    constructor(sceneManager: SceneManager, config: SceneCoordinatorConfig = {}, steamIntegration?: SteamIntegration) {
+    constructor(
+        sceneManager: SceneManager, 
+        config: SceneCoordinatorConfig = {}, 
+        storePropsRenderer?: StorePropsRenderer,
+        appSettings?: AppSettings,
+        dataManager?: DataManager,
+        eventManager?: EventManager
+    ) {
+        // Store config for later use
+        this.config = config
+        
+        // TODO: DI tho?
         this.sceneManager = sceneManager
-        this.appSettings = AppSettings.getInstance()
-        this.steamIntegration = steamIntegration
+        this.appSettings = appSettings || AppSettings.getInstance() // Fallback for backward compatibility
+        this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
+        this.eventManager = eventManager || EventManager.getInstance() // DI injection with fallback
         
         // Initialize visual system renderers
-        this.environmentRenderer = new EnvironmentRenderer(this.sceneManager.getScene(), this.appSettings)
+        this.skyboxManager = new SkyboxManager(this.sceneManager.getScene())
         this.lightingRenderer = new LightingRenderer(
             this.sceneManager.getScene(),
             this.sceneManager.getRenderer()
         )
-        this.propsRenderer = new StorePropsRenderer(this.sceneManager.getScene())
+        // Initialize room manager for event-driven room structure (no longer needs EnvironmentRenderer)
+        this.roomManager = new RoomManager(this.sceneManager.getScene(), this.dataManager, this.eventManager)
+        
+        // Use DI-injected StorePropsRenderer or create one for backward compatibility
+        this.propsRenderer = storePropsRenderer || new StorePropsRenderer(this.sceneManager.getScene(), this.dataManager, GameBoxRenderer.Instance)
 
         // 🎬 EVENT-DRIVEN STARTUP: Setup scene and emit SceneReady when basic navigation is ready
         // This is a prerequisite for GameStart - scene must be navigable before game can start
@@ -63,15 +94,15 @@ export class SceneCoordinator {
             this.emitSceneReadyEvent()
         })
 
-        // Register for ceiling toggle events
-        EventManager.getInstance().registerEventHandler(CeilingEventTypes.Toggle, (event: CustomEvent<CeilingToggleEvent>) => {
-            this.environmentRenderer.setCeilingVisibility(event.detail.visible)
+        // Register for Steam data loaded events to spawn dynamic shelves  
+        this.eventManager.registerEventHandler(SteamEventTypes.DataLoaded, (event: CustomEvent<SteamDataLoadedEvent>) => {
+            // this.analyzeTaxonomies();
         })
+        console.debug('✅ Steam data loaded event handler restored - games will spawn on shelves')
 
-        // Register for Steam data loaded events to spawn dynamic shelves
-        EventManager.getInstance().registerEventHandler(SteamEventTypes.DataLoaded, (event: CustomEvent<SteamDataLoadedEvent>) => {
-            this.onSteamDataLoaded(event.detail)
-        })
+        if(window) {
+            (window as any).debugListSceneObjects = this.debugListSceneObjects.bind(this);
+        }
     }
 
     async setupSceneAsPrerequisite(config: SceneCoordinatorConfig = {}): Promise<void> {
@@ -84,12 +115,8 @@ export class SceneCoordinator {
             
             // 📡 EMIT SceneReady - this scene is now a satisfied prerequisite for GameStart
             this.emitSceneReadyEvent()
-            
-            // 🎯 BACKGROUND: Enhanced details (non-blocking - continues while game starts)
 
-            this.setupEnhancedScene(config).catch(error => {
-                console.error('❌ Background scene enhancement failed:', error)
-            })
+            this.setupEnhancedScene();
             
         } catch (error) {
             console.error('❌ Failed to set up scene prerequisite:', error)
@@ -104,26 +131,22 @@ export class SceneCoordinator {
         console.log('🏗️ Starting basic environment setup...')
         
         try {
-            await this.environmentRenderer.setupEnvironment({
-                roomSize: {
-                    width: config.roomSize?.width ?? 22,
-                    depth: config.roomSize?.depth ?? 16,
-                    height: ceilingHeight
-                },
-                skyboxPreset: config.skyboxPreset ?? 'aurora',
-                proceduralTextures: config.proceduralTextures ?? true
-            })
-            console.log('✅ Basic environment setup completed successfully')
+            // Set up skybox first
+            const presetName = config.skyboxPreset ?? 'aurora'
+            const preset = (SkyboxPresets as any)[presetName] || SkyboxPresets.aurora
+            await this.skyboxManager.applySkybox(preset)
+
         } catch (error) {
             console.error('❌ Basic environment setup failed:', error)
             // Still allow SceneReady to be emitted - basic scene is functional even if enhanced setup fails
         }
     }
 
-    private async setupEnhancedScene(config: SceneCoordinatorConfig): Promise<void> {
+    private async setupEnhancedScene(): Promise<void> {
         try {
-            await this.setupProps(config.props)
-            
+            await this.setupProps()
+
+            // TODO: lightingRenderer respond by itself to events
             await this.lightingRenderer.setupLighting()
             
             this.lightingRenderer.refreshShadows()
@@ -134,12 +157,12 @@ export class SceneCoordinator {
         }
     }
 
-    private async setupProps(config: SceneCoordinatorConfig['props'] = {}): Promise<void> {
+    private async setupProps(): Promise<void> {
         await this.propsRenderer.setupProps({
-            enableTestObjects: config.enableTestObjects ?? false,
             enableShelves: true,
             enableGameBoxes: true,
-            enableSignage: true
+            enableSignage: true,
+            tests: this.config.tests
         })
     }
 
@@ -156,73 +179,45 @@ export class SceneCoordinator {
     }
 
     /**
-     * Legacy compatibility - get game box renderer
+     * Debug function to list all objects in the scene by name
+     * Useful for hunting down duplicate environment objects
      */
-    getGameBoxRenderer() {
-        return this.propsRenderer.getGameBoxRenderer()
+    public debugListSceneObjects(): void {
+        console.log('\n🔍 === SCENE OBJECT DEBUG LIST ===')
+        console.log(`📊 Total scene children: ${this.sceneManager.getScene().children.length}`)
+        
+        const listObjects = (obj: THREE.Object3D, indent: string = '') => {
+            const name = obj.name || `<unnamed-${obj.type}>`
+            const type = obj.type
+            const childCount = obj.children.length
+            const position = `(${obj.position.x.toFixed(2)}, ${obj.position.y.toFixed(2)}, ${obj.position.z.toFixed(2)})`
+            
+            console.log(`${indent}📦 ${name} [${type}] ${position} ${childCount > 0 ? `(${childCount} children)` : ''}`)
+            
+            if (obj.children.length > 0) {
+                obj.children.forEach(child => {
+                    listObjects(child, indent + '  ')
+                })
+            }
+        }
+        
+        this.sceneManager.getScene().children.forEach(obj => {
+            listObjects(obj)
+        })
+        
+        console.log('=== END SCENE OBJECT LIST ===\n')
     }
 
     dispose(): void {
-        this.environmentRenderer.dispose()
+        this.skyboxManager.dispose()
         this.lightingRenderer.dispose()
         this.propsRenderer.dispose()
+        this.roomManager.dispose()
     }
 
-    /**
-     * Handle Steam data loaded event by spawning dynamic shelves based on game count
-     */
-    private async onSteamDataLoaded(eventData: SteamDataLoadedEvent): Promise<void> {
-        console.log(`🎮 Steam data loaded: ${eventData.gameCount} games for user ${eventData.userInput}`)
-        
-        // Analyze all available taxonomies from the loaded games
-        this.analyzeTaxonomies(eventData)
-        
-        try {
-            await this.spawnDynamicShelves(eventData.gameCount)
-        } catch (error) {  
-            console.error('❌ Failed to spawn dynamic shelves:', error)
-        }
-    }
-
-    /**
-     * Analyze all available taxonomies from loaded Steam game data
-     */
-    private analyzeTaxonomies(eventData: SteamDataLoadedEvent): void {
-        console.log(`\n📊 === TAXONOMY ANALYSIS FOR ${eventData.gameCount} GAMES ===`)
-        
-        // Try to access actual game data from injected steamIntegration
-        let games: any[] = []
-        
-        if (this.steamIntegration) {
-            games = this.steamIntegration.getGamesForScene()
-            console.log(`✅ Retrieved ${games.length} games for detailed analysis`)
-        // }else {
-        //     // Fallback: try to access via global app instance
-        //     // @ts-ignore - accessing global for game data when direct reference not available
-        //     const globalApp = (window as any).steamBrickAndMortarApp
-        //     if (globalApp?.steamIntegration) {
-        //         games = globalApp.steamIntegration.getGamesForScene()
-        //         console.log(`✅ Retrieved ${games.length} games via global access`)
-        //     } else {
-        //         console.log(`⚠️ No SteamIntegration available - using event data only`)
-        //     }
-} else { console.log(`⚠️ No SteamIntegration available - using event data only`)
-        }
-        
-        if (games.length > 0) {
-            this.analyzeActualGameData(games, eventData)
-        } else {
-            this.analyzeStructuralTaxonomies(eventData)
-        }
-        
-        console.log(`=== END TAXONOMY ANALYSIS ===\n`)
-    }
-
-    /**
-     * Analyze taxonomies from actual loaded game data
-     */
-    private analyzeActualGameData(games: any[], eventData: SteamDataLoadedEvent): void {
-        console.log(`\n🎮 ANALYZING ${games.length} LOADED GAMES:`)
+    private analyzeTaxonomies(): void {
+        // Get game data from DataManager instead of event
+        const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
         
         // Playtime-based taxonomies
         const playtimeBuckets = {
@@ -232,7 +227,7 @@ export class SceneCoordinator {
             heavily: games.filter(g => g.playtime_forever >= 3000) // 50+ hours
         }
         
-        console.log(`� PLAYTIME CATEGORIES for your ${games.length} games:`)
+        console.log(`PLAYTIME CATEGORIES for your ${games.length} games:`)
         console.log(`   • Unplayed: ${playtimeBuckets.unplayed.length} games`)
         console.log(`   • Lightly Played (< 10h): ${playtimeBuckets.lightly.length} games`)
         console.log(`   • Moderately Played (10-50h): ${playtimeBuckets.moderately.length} games`)
@@ -240,36 +235,16 @@ export class SceneCoordinator {
         
         // Recent activity taxonomies
         const recentlyPlayed = games.filter(g => g.playtime_2weeks && g.playtime_2weeks > 0)
-        const notRecentlyPlayed = games.filter(g => !g.playtime_2weeks || g.playtime_2weeks === 0)
         
-        console.log(`\n⏰ RECENT ACTIVITY for your ${games.length} games:`)
         console.log(`   • Recently Played (last 2 weeks): ${recentlyPlayed.length} games`)
-        console.log(`   • Not Recently Played: ${notRecentlyPlayed.length} games`)
-        
-        // Name-based pattern analysis
-        const namePatterns = this.analyzeGameNames(games)
-        
-        console.log(`\n🏷️ NAME-BASED PATTERNS found in your ${games.length} games:`)
-        if (Object.keys(namePatterns.series).length > 0) {
-            console.log(`   • Detected Game Series:`)
-            Object.entries(namePatterns.series).forEach(([series, gameList]) => {
-                console.log(`     - ${series}: ${(gameList as any[]).length} games - [${(gameList as any[]).map(g => g.name).join(', ')}]`)
-            })
-        }
-        
-        if (namePatterns.keywords.length > 0) {
-            console.log(`   • Common Keywords: [${namePatterns.keywords.join(', ')}]`)
-        }
-        
+                
         // App ID ranges (can indicate release periods/publishers)
-        const appIds = games.map(g => parseInt(g.appid))
+        const appIds = games.map(g => typeof g.appid === 'number' ? g.appid : parseInt(g.appid))
         const minAppId = Math.min(...appIds)
         const maxAppId = Math.max(...appIds)
         
-        console.log(`\n🆔 APP ID RANGES for your ${games.length} games:`)
         console.log(`   • Oldest game (lowest ID): ${minAppId}`)
         console.log(`   • Newest game (highest ID): ${maxAppId}`)
-        console.log(`   • Could group by ID ranges to approximate release eras`)
         
         // List some example games for context
         console.log(`\n📋 SAMPLE GAMES (first 5):`)
@@ -280,133 +255,16 @@ export class SceneCoordinator {
         })
     }
 
-    /**
-     * Analyze structural taxonomies when no game data is available
-     */
-    private analyzeStructuralTaxonomies(eventData: SteamDataLoadedEvent): void {
-        console.log(`🔍 CURRENT DATA AVAILABLE:`)
-        console.log(`   • Game Count: ${eventData.gameCount} total games`)
-        console.log(`   • User Input: "${eventData.userInput}"`)
-        console.log(`   • Event Timestamp: ${new Date(eventData.timestamp).toISOString()}`)
-        
-        // console.log(`\n❌ MISSING TAXONOMY DATA (would require API expansion):`)
-        // console.log(`   • Steam Store Genres: Action, Adventure, RPG, Strategy, etc.`)
-        // console.log(`   • Steam Store Categories: Single-player, Multiplayer, Co-op, etc.`)
-        // console.log(`   • Community Tags: Horror, Atmospheric, Pixel Art, Roguelike, etc.`)
-        // console.log(`   • Release Date: For chronological categorization`)
-        // console.log(`   • Developer/Publisher: For studio-based organization`)
-        // console.log(`   • User Reviews: For quality/popularity-based sorting`)
-        
-        // console.log(`\n💡 RECOMMENDED IMPLEMENTATION:`)
-        // console.log(`   1. Expand Steam API lambda to include genres/categories`)
-        // console.log(`   2. Add Steam Store API calls for detailed metadata`)
-        // console.log(`   3. Implement community tag fetching`)
-        // console.log(`   4. Create fallback categorization from playtime data`)
-    }
-
-    /**
-     * Analyze game names for series and keyword patterns
-     */
-    private analyzeGameNames(games: any[]): { series: Record<string, any[]>, keywords: string[] } {
-        const series: Record<string, any[]> = {}
-        const keywords: string[] = []
-        const keywordCounts: Record<string, number> = {}
-        
-        // Common series patterns
-        const seriesPatterns = [
-            /^(Half-Life|Portal|Counter-Strike|Team Fortress|Left 4 Dead|Dota|The Elder Scrolls|Fallout|Call of Duty|Assassin's Creed|Grand Theft Auto|Civilization|Total War)/i,
-        ]
-        
-        // Common keyword patterns
-        const keywordPatterns = [
-            /Simulator/i, /Tycoon/i, /Racing/i, /RPG/i, /Strategy/i, /Adventure/i,
-            /Puzzle/i, /Action/i, /Indie/i, /Survival/i, /Horror/i, /Fantasy/i
-        ]
-        
-        games.forEach(game => {
-            const name = game.name
-            
-            // Check for series
-            seriesPatterns.forEach(pattern => {
-                const match = name.match(pattern)
-                if (match) {
-                    const seriesName = match[1]
-                    if (!series[seriesName]) series[seriesName] = []
-                    series[seriesName].push(game)
-                }
-            })
-            
-            // Check for keywords
-            keywordPatterns.forEach(pattern => {
-                const match = name.match(pattern)
-                if (match) {
-                    const keyword = match[0]
-                    keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1
-                }
-            })
-        })
-        
-        // Only include keywords that appear multiple times
-        const commonKeywords = Object.entries(keywordCounts)
-            .filter(([, count]) => count >= 2)
-            .map(([keyword]) => keyword)
-        
-        return { series, keywords: commonKeywords }
-    }
-
-    /**
-     * Spawn shelves dynamically based on game count
-     */
-    private async spawnDynamicShelves(gameCount: number): Promise<void> {
-        console.debug(`📚 Spawning dynamic shelves for ${gameCount} games`)
-        
-        // TODO: Move these constants to shared configuration or get from StorePropsRenderer
-        const gamesPerSurface = 3 // Should match GAMES_PER_SURFACE in StorePropsRenderer
-        const surfacesPerShelf = 6 // Should match SURFACES_PER_SHELF in StorePropsRenderer (3 levels × 2 sides)
-        const gamesPerShelf = gamesPerSurface * surfacesPerShelf // 3 × 6 = 18 games per shelf
-        const shelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
-        
-        console.debug(`📊 Calculated: Need ${shelvesNeeded} shelves for ${gameCount} games (${gamesPerShelf} games per shelf: ${gamesPerSurface} games/surface × ${surfacesPerShelf} surfaces/shelf)`)
-        
-        try {
-            // Get actual game data for shelf spawning
-            let games: any[] = []
-            
-            if (this.steamIntegration) {
-                games = this.steamIntegration.getGamesForScene()
-                console.log(`✅ Retrieved ${games.length} games for dynamic shelf spawning`)
-            } else {
-                // Fallback: try to access via global app instance
-                // @ts-ignore - accessing global for game data when direct reference not available
-                const globalApp = (window as any).steamBrickAndMortarApp
-                if (globalApp?.steamIntegration) {
-                    games = globalApp.steamIntegration.getGamesForScene()
-                    console.log(`✅ Retrieved ${games.length} games via global access`)
-                } else {
-                    console.log(`⚠️ No SteamIntegration available - using placeholder boxes`)
-                }
-            }
-            
-            // Call propsRenderer to create shelves and place games
-            await this.propsRenderer.spawnDynamicShelvesWithGames(shelvesNeeded, gameCount, games)
-            console.log(`✅ Dynamic shelf spawning completed successfully`)
-        } catch (error) {
-            console.error('❌ Failed to spawn dynamic shelves:', error)
-            // Don't throw - let the system continue without dynamic shelves
-        }
-    }
-
     private emitSceneReadyEvent(): void {
-        const envStats = this.environmentRenderer.getEnvironmentStats()
         const lightStats = this.lightingRenderer.getLightingStats()
         
         console.log('📡 Emitting SceneReady event - basic navigation is ready')
         
-        EventManager.getInstance().emit<SceneReadyEvent>(GameEventTypes.SceneReady, {
+        this.eventManager.emit<SceneReadyEvent>(GameEventTypes.SceneReady, {
             source: EventSource.System,
             timestamp: Date.now(),
             sceneStats: {
-                environmentObjectCount: envStats.objectCount,
+                environmentObjectCount: 0, // Environment stats no longer tracked
                 lightsReady: lightStats.lightCount > 0,
                 basicNavigationReady: true
             }

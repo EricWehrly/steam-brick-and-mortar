@@ -9,7 +9,7 @@
  */
 
 import * as THREE from 'three'
-import type { GameData, SteamGameData } from './types/GameData'
+import type { SteamGameData } from './types/GameData'
 import type { GameBoxTextureOptions } from './types/GameBoxOptions'
 import type { GameBoxPerformanceManager } from './GameBoxPerformanceManager'
 
@@ -35,8 +35,7 @@ export class GameBoxTextureManager {
      * Apply texture to a game box mesh
      */
     public async applyTexture(
-        mesh: THREE.Mesh, 
-        game: GameData | SteamGameData, 
+        mesh: THREE.Mesh,
         options: GameBoxTextureOptions = {}
     ): Promise<boolean> {
         // Dispose of existing texture
@@ -95,12 +94,12 @@ export class GameBoxTextureManager {
      */
     public async applyOptimizedTexture(
         mesh: THREE.Mesh, 
-        game: GameData | SteamGameData, 
+        game: SteamGameData, 
         options: GameBoxTextureOptions = {}
     ): Promise<boolean> {
         if (!this.performanceManager) {
             // Fall back to regular texture application if no performance manager
-            return this.applyTexture(mesh, game, options)
+            return this.applyTexture(mesh, options)
         }
 
         const gameId = this.getGameId(game).toString()
@@ -261,10 +260,10 @@ export class GameBoxTextureManager {
     }
 
     /**
-     * Helper method to get game ID from different game data formats
+     * Helper method to get game ID from Steam game data
      */
-    private getGameId(game: GameData | SteamGameData): string | number {
-        return 'id' in game ? game.id : game.appid
+    private getGameId(game: SteamGameData): string | number {
+        return game.appid
     }
 
     /**

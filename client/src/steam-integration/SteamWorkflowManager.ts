@@ -13,9 +13,11 @@ import { SteamEventTypes } from '../types/InteractionEvents'
 import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
 import type { SteamIntegration } from './SteamIntegration'
 import type { SceneCoordinator } from '../scene'
-import type { UICoordinator } from '../ui'
+import type { SteamUICoordinator } from '../ui/coordinators'
 import { Logger } from '../utils/Logger'
 import { SteamErrorMessages } from '../utils/SteamErrorMessages'
+import { DataManager, DataDomain } from '../core/data'
+import type { SteamGameData } from '../scene/game-box/types/GameData'
 
 export class SteamWorkflowManager {
     private static readonly logger = Logger.withContext(SteamWorkflowManager.name)
@@ -23,18 +25,21 @@ export class SteamWorkflowManager {
     private eventManager: EventManager
     private steamIntegration: SteamIntegration
     private sceneCoordinator: SceneCoordinator
-    private uiCoordinator: UICoordinator
+    private steamUICoordinator: SteamUICoordinator
+    private dataManager: DataManager
     
     constructor(
         eventManager: EventManager,
         steamIntegration: SteamIntegration,
         sceneCoordinator: SceneCoordinator,
-        uiCoordinator: UICoordinator
+        steamUICoordinator: SteamUICoordinator,
+        dataManager?: DataManager
     ) {
         this.eventManager = eventManager
         this.steamIntegration = steamIntegration
         this.sceneCoordinator = sceneCoordinator
-        this.uiCoordinator = uiCoordinator
+        this.steamUICoordinator = steamUICoordinator
+        this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
         
         // Register event handlers directly - no intermediate layers
         this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.onLoadGames.bind(this))
@@ -44,6 +49,39 @@ export class SteamWorkflowManager {
         this.eventManager.registerEventHandler(SteamEventTypes.CacheStats, this.onCacheStats.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.ImageCacheClear, this.onClearImageCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.DevModeToggle, this.onDevModeToggle.bind(this))
+    }
+    
+    /**
+     * CRITICAL ARCHITECTURAL PRINCIPLE: Data ownership and state precedence
+     * 
+     * Store Steam data in DataManager and emit SteamDataLoaded event.
+     * This ensures data is established in centralized state BEFORE any components
+     * react to the event. Data ownership stays close to source.
+     * 
+     * Principle: "Things that ARE supercede things that WILL BE"
+     * - State must be established before events that depend on that state
+     * - Data should be stored by the component closest to its source
+     */
+    private storeSteamDataAndEmitEvent(userInput: string): void {
+        const gameLibraryState = this.steamIntegration.getGameLibraryState()
+        const games: SteamGameData[] = gameLibraryState.userData?.games || []
+        
+        this.dataManager.set<SteamGameData[]>('steam.games', games, {
+            domain: DataDomain.SteamIntegration
+        })
+        
+        // TODO: Do we need this?
+        if (userInput) {
+            this.dataManager.set('steam.userInput', userInput, {
+                domain: DataDomain.SteamIntegration
+            })
+        }
+        
+        this.eventManager.emit(SteamEventTypes.DataLoaded, {
+            userInput,
+            timestamp: Date.now(),
+            source: EventSource.System
+        })
     }
     
     /**
@@ -61,7 +99,7 @@ export class SteamWorkflowManager {
             // Load games with progress callbacks
             await this.steamIntegration.loadGamesForUser(userInput, {
                 onProgress: (current: number, total: number, message: string) => {
-                    this.uiCoordinator.steam.updateProgress(current, total, message)
+                    this.steamUICoordinator.updateProgress(current, total, message)
                     SteamWorkflowManager.logger.debug(`Progress: ${current}/${total} - ${message}`)
                 },
                 onGameLoaded: (game) => {
@@ -69,7 +107,7 @@ export class SteamWorkflowManager {
                     SteamWorkflowManager.logger.debug(`Game loaded: ${game.name}`)
                 },
                 onStatusUpdate: (message: string, type) => {
-                    this.uiCoordinator.steam.showSteamStatus(message, type)
+                    this.steamUICoordinator.showSteamStatus(message, type)
                     SteamWorkflowManager.logger.info(`Status: ${message} (${type})`)
                     
                     // Handle error states by re-enabling UI for retry
@@ -83,15 +121,10 @@ export class SteamWorkflowManager {
             SteamWorkflowManager.logger.info(`Load games workflow completed successfully`)
             
             // Handle successful completion in UI
-            this.uiCoordinator.steam.showSteamStatus('Games loaded successfully!', 'success')
+            this.steamUICoordinator.showSteamStatus('Games loaded successfully!', 'success')
             
-            // Emit steam-data-loaded event for UI components that need to react
-            this.eventManager.emit(SteamEventTypes.DataLoaded, {
-                userInput,
-                gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
-                timestamp: Date.now(),
-                source: EventSource.System
-            })
+            // Store data in DataManager and emit event (data ownership principle)
+            this.storeSteamDataAndEmitEvent(userInput)
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Load games workflow failed:', error)
@@ -107,16 +140,11 @@ export class SteamWorkflowManager {
         const { userInput } = event.detail
         
         try {
-            SteamWorkflowManager.logger.info(`Starting load from cache workflow for: ${userInput}`)
-            
             // Check if cached data is available
             if (!this.steamIntegration.hasCachedData(userInput)) {
                 SteamWorkflowManager.logger.warn('No cached data found. Please use "Load My Games" first.')
                 return
             }
-            
-            // Show loading UI - TODO: implement proper UI methods
-            SteamWorkflowManager.logger.info('Loading games from cache...')
             
             // Load games from cache with progress callbacks
             await this.steamIntegration.loadGamesFromCache(userInput, {
@@ -133,13 +161,8 @@ export class SteamWorkflowManager {
             
             SteamWorkflowManager.logger.info(`Load from cache workflow completed successfully`)
             
-            // Emit steam-data-loaded event for UI components that need to react
-            this.eventManager.emit(SteamEventTypes.DataLoaded, {
-                userInput,
-                gameCount: this.steamIntegration.getGameLibraryState().userData?.games?.length || 0,
-                timestamp: Date.now(),
-                source: EventSource.System
-            })
+            // Store data in DataManager and emit event (data ownership principle)
+            this.storeSteamDataAndEmitEvent(userInput)
             
         } catch (error) {
             SteamWorkflowManager.logger.error('Load from cache workflow failed:', error)
@@ -177,15 +200,10 @@ export class SteamWorkflowManager {
             
             SteamWorkflowManager.logger.info('Cache refresh workflow completed successfully')
             
-            // Emit steam-data-loaded event for UI components that need to react
+            // Store data in DataManager and emit event (data ownership principle)
             const gameState = this.steamIntegration.getGameLibraryState()
             if (gameState.userData?.vanity_url) {
-                this.eventManager.emit(SteamEventTypes.DataLoaded, {
-                    userInput: gameState.userData.vanity_url,
-                    gameCount: gameState.userData.games?.length || 0,
-                    timestamp: Date.now(),
-                    source: EventSource.System
-                })
+                this.storeSteamDataAndEmitEvent(gameState.userData.vanity_url)
             }
             
         } catch (error) {
@@ -222,7 +240,7 @@ export class SteamWorkflowManager {
             const stats = this.steamIntegration.getCacheStats()
             if (stats) {
                 // Call steam UI coordinator directly instead of going through UIManager
-                this.uiCoordinator.steam.updateCacheStats(stats)
+                this.steamUICoordinator.updateCacheStats(stats)
                 SteamWorkflowManager.logger.info('Cache stats displayed successfully!')
             } else {
                 SteamWorkflowManager.logger.warn('No cache stats available.')

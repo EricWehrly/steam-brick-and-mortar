@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { TextureManager } from '../utils/TextureManager';
+
+import { SharedMaterialManager } from '../utils/SharedMaterialManager';
 
 /**
  * Default shelf configuration
@@ -19,40 +20,35 @@ const DEFAULT_SHELF_CONFIG = {
  * Creates a triangular shelf unit with angled boards and horizontal shelves
  */
 export class ProceduralShelfGenerator {
-  private get textureManager(): TextureManager {
-    return TextureManager.getInstance();
-  }
 
-  /**
-   * Create MDF veneer material for shelf external surfaces (Task 6.1.1.1)
-   */
-  private createMDFVeneerMaterial(): THREE.Material {
-    return this.textureManager.createMDFVeneerMaterial({
-      repeat: { x: 2, y: 1 }, // Wood grain runs along the length
-      veneerColor: '#E6D3B7', // Light oak veneer
-      glossiness: 0.4, // Semi-gloss finish
-      grainSubtlety: 0.2 // Subtle grain pattern
-    });
-  }
 
-  /**
-   * Create glossy white interior material for shelf compartments
-   */
-  private createShelfInteriorMaterial(): THREE.Material {
-    return this.textureManager.createShelfInteriorMaterial({
-      glossLevel: 0.8 // High gloss white
-    });
-  }
+    private get materialManager(): SharedMaterialManager {
+        return SharedMaterialManager.getInstance();
+    }
 
-  /**
-   * Create brand blue material for support posts and brackets
-   */
-  private createBrandAccentMaterial(): THREE.Material {
-    return this.textureManager.createBrandAccentMaterial({
-      brandColor: '#0066CC', // Consistent brand blue
-      glossLevel: 0.7 // Semi-gloss finish
-    });
-  }
+    /**
+     * Create MDF veneer material for shelf external surfaces (Task 6.1.1.1)
+     * Now uses shared material manager for performance optimization
+     */
+    private createMDFVeneerMaterial(): THREE.Material {
+        return this.materialManager.getShelfMaterial('mdfVeneer');
+    }
+
+    /**
+     * Create glossy white interior material for shelf compartments
+     * Now uses shared material manager for performance optimization
+     */
+    private createShelfInteriorMaterial(): THREE.Material {
+        return this.materialManager.getShelfMaterial('shelfInterior');
+    }
+
+    /**
+     * Create brand blue material for support posts and brackets
+     * Now uses shared material manager for performance optimization
+     */
+    private createBrandAccentMaterial(): THREE.Material {
+        return this.materialManager.getShelfMaterial('brandAccent');
+    }
 
   /**
    * Generate a triangular shelf unit with the specified design:
@@ -93,6 +89,7 @@ export class ProceduralShelfGenerator {
     const brandAccentMaterial = this.createBrandAccentMaterial(); // Support posts/brackets
     
     // Create the two angled boards (front and back) - MDF veneer exterior
+    // TODO: Replace with InstancedMesh for better draw call batching
     const angledBoardGeometry = new THREE.BoxGeometry(
       width,
       height,
@@ -112,6 +109,7 @@ export class ProceduralShelfGenerator {
     shelfGroup.add(backBoard);
 
     // Create the two side boards - Brand blue support posts
+    // TODO: Replace with InstancedMesh for better draw call batching
     const sideBoardGeometry = new THREE.BoxGeometry(
       boardThickness,
       height,
@@ -168,6 +166,7 @@ export class ProceduralShelfGenerator {
       const shelfDepth = depth - boardThickness * 2 + depthExtension; // Account for front/back board thickness + extension
       
       // Create shelf board with MDF veneer exterior
+      // TODO: Replace with InstancedMesh for better draw call batching
       const shelfGeometry = new THREE.BoxGeometry(
         widthAtHeight,
         boardThickness,
@@ -181,6 +180,7 @@ export class ProceduralShelfGenerator {
       parent.add(shelf);
 
       // Create white interior surface on top of shelf (compartment floor)
+      // TODO: Replace with InstancedMesh for better draw call batching
       const interiorGeometry = new THREE.BoxGeometry(
         widthAtHeight * 0.98, // Slightly smaller to sit on top
         boardThickness * 0.1, // Very thin interior surface

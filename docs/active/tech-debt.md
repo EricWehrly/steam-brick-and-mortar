@@ -5,6 +5,16 @@
 
 - make "UIEvent" a type of event and have all UI emissions use that event type with a sub-identifier for their specific UI Event.
 
+- make sure we've got todo-note-outlines for performance levers:
+             *     maxTextureSize: 1024,
+             *     nearDistance: 2.0,
+             *     farDistance: 10.0,
+             *     highResolutionSize: 512,
+             *     mediumResolutionSize: 256,
+             *     lowResolutionSize: 128,
+             *     maxActiveTextures: Math.min(50, maxGames / 2),
+             *     frustumCullingEnabled: true
+
 ### Graphics Settings Scene Reload Optimization
 **Priority**: Medium  
 **Effort**: 3-4 hours  
