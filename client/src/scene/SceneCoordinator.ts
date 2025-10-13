@@ -286,16 +286,12 @@ export class SceneCoordinator {
     }
 
     private emitSceneReadyEvent(): void {
-        const lightStats = this.lightingRenderer.getLightingStats()
-        
         console.log('📡 Emitting SceneReady event - basic navigation is ready')
         
         this.eventManager.emit<SceneReadyEvent>(GameEventTypes.SceneReady, {
             source: EventSource.System,
             timestamp: Date.now(),
             sceneStats: {
-                environmentObjectCount: 0, // Environment stats no longer tracked
-                lightsReady: lightStats.lightCount > 0,
                 basicNavigationReady: true
             }
         })
