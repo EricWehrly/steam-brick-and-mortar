@@ -10,6 +10,7 @@ import type { LightingQuality } from '../core/AppSettings'
 import * as THREE from 'three'
 import type { BaseInteractionEvent } from '../core/EventManager'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
+import type { SteamGame } from '../steam'
 
 // =============================================================================
 // STEAM EVENTS
@@ -47,6 +48,10 @@ export interface SteamDevModeToggleEvent extends BaseInteractionEvent {
 
 export interface SteamDataLoadedEvent extends BaseInteractionEvent {
     userInput: string
+}
+
+export interface SteamGameLoadedEvent extends BaseInteractionEvent {
+    game: Readonly<SteamGame>
 }
 
 // =============================================================================
@@ -197,7 +202,8 @@ export const SteamEventTypes = {
     CacheStats: 'steam:cache-stats',
     ImageCacheClear: 'steam:image-cache-clear',
     DevModeToggle: 'steam:dev-mode-toggle',
-    DataLoaded: 'steam:data-loaded'
+    DataLoaded: 'steam:data-loaded',
+    GameLoaded: 'steam:game-loaded'
 } as const
 
 export const RoomEventTypes = {
@@ -261,6 +267,7 @@ export interface InteractionEventMap {
     [SteamEventTypes.ImageCacheClear]: SteamImageCacheClearEvent
     [SteamEventTypes.DevModeToggle]: SteamDevModeToggleEvent
     [SteamEventTypes.DataLoaded]: SteamDataLoadedEvent
+    [SteamEventTypes.GameLoaded]: SteamGameLoadedEvent
     
     // WebXR events
     [WebXREventTypes.Toggle]: WebXRToggleEvent

@@ -5,6 +5,18 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { SteamIntegration } from '../../../src/steam-integration/SteamIntegration'
 
+// Mock the EventManager
+vi.mock('../../../src/core/EventManager', () => ({
+    EventManager: {
+        getInstance: vi.fn(() => ({
+            emit: vi.fn()
+        }))
+    },
+    EventSource: {
+        System: 'system'
+    }
+}))
+
 // Mock the SteamApiClient
 vi.mock('../../../src/steam', () => ({
     SteamApiClient: vi.fn().mockImplementation(() => ({
@@ -12,7 +24,8 @@ vi.mock('../../../src/steam', () => ({
         getUserGames: vi.fn(),
         loadGamesProgressively: vi.fn(),
         clearCache: vi.fn(),
-        getCacheStats: vi.fn()
+        getCacheStats: vi.fn(),
+        downloadGameArtwork: vi.fn().mockResolvedValue({})
     }))
 }))
 
@@ -21,6 +34,13 @@ vi.mock('../../../src/utils', () => ({
     ValidationUtils: {
         extractVanityFromInput: vi.fn((input: string) => input.toLowerCase()),
         parseSteamUserInput: vi.fn((input: string) => ({ type: 'customurl', value: input.toLowerCase() }))
+    }
+}))
+
+// Mock event types
+vi.mock('../../../src/types/InteractionEvents', () => ({
+    SteamEventTypes: {
+        GameLoaded: 'steam:game-loaded'
     }
 }))
 
@@ -138,7 +158,19 @@ describe('SteamIntegration Unit Tests', () => {
             // @ts-expect-error - Accessing private member for testing
             steamIntegration.steamClient.getUserGames = vi.fn().mockResolvedValue(mockUserGames)
             // @ts-expect-error - Accessing private member for testing
-            steamIntegration.steamClient.loadGamesProgressively = vi.fn().mockResolvedValue(undefined)
+            steamIntegration.steamClient.loadGamesProgressively = vi.fn().mockResolvedValue([{
+                appid: 440,
+                name: 'Team Fortress 2',
+                playtime_forever: 1000,
+                img_icon_url: 'icon',
+                img_logo_url: 'logo',
+                artwork: {
+                    icon: 'icon_url',
+                    logo: 'logo_url',
+                    header: 'header_url',
+                    library: 'library_url'
+                }
+            }])
             
             const callbacks = {
                 onProgress: vi.fn(),

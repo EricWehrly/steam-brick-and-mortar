@@ -10,7 +10,7 @@
 import type { EventManager } from '../core/EventManager'
 import { EventSource } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
-import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
+import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent, SteamGameLoadedEvent } from '../types/InteractionEvents'
 import type { SteamIntegration } from './SteamIntegration'
 import type { SceneCoordinator } from '../scene'
 import type { SteamUICoordinator } from '../ui/coordinators'
@@ -49,6 +49,7 @@ export class SteamWorkflowManager {
         this.eventManager.registerEventHandler(SteamEventTypes.CacheStats, this.onCacheStats.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.ImageCacheClear, this.onClearImageCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.DevModeToggle, this.onDevModeToggle.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.GameLoaded, this.onGameLoaded.bind(this))
     }
     
     /**
@@ -102,10 +103,6 @@ export class SteamWorkflowManager {
                     this.steamUICoordinator.updateProgress(current, total, message)
                     SteamWorkflowManager.logger.debug(`Progress: ${current}/${total} - ${message}`)
                 },
-                onGameLoaded: (game) => {
-                    // TODO: Add scene integration for game loading
-                    SteamWorkflowManager.logger.debug(`Game loaded: ${game.name}`)
-                },
                 onStatusUpdate: (message: string, type) => {
                     this.steamUICoordinator.showSteamStatus(message, type)
                     SteamWorkflowManager.logger.info(`Status: ${message} (${type})`)
@@ -151,9 +148,6 @@ export class SteamWorkflowManager {
                 onProgress: (current: number, total: number, message: string) => {
                     SteamWorkflowManager.logger.debug(`Progress: ${current}/${total} - ${message}`)
                 },
-                onGameLoaded: (game) => {
-                    SteamWorkflowManager.logger.debug(`Game loaded from cache: ${game.name}`)
-                },
                 onStatusUpdate: (message: string, type) => {
                     SteamWorkflowManager.logger.info(`Status: ${message} (${type})`)
                 }
@@ -184,9 +178,6 @@ export class SteamWorkflowManager {
             const result = await this.steamIntegration.refreshData({
                 onProgress: (current: number, total: number, message: string) => {
                     SteamWorkflowManager.logger.debug(`Progress: ${current}/${total} - ${message}`)
-                },
-                onGameLoaded: (game) => {
-                    SteamWorkflowManager.logger.debug(`Game refreshed: ${game.name}`)
                 },
                 onStatusUpdate: (message: string, type) => {
                     SteamWorkflowManager.logger.info(`Status: ${message} (${type})`)
@@ -269,6 +260,23 @@ export class SteamWorkflowManager {
         } catch (error) {
             SteamWorkflowManager.logger.error('Image cache clear workflow failed:', error)
             SteamWorkflowManager.logger.error('Failed to clear image cache.')
+        }
+    }
+
+    /**
+     * Game loaded event handler - replaces onGameLoaded callbacks
+     */
+    private async onGameLoaded(event: CustomEvent<SteamGameLoadedEvent>): Promise<void> {
+        const { game } = event.detail
+        
+        try {
+            SteamWorkflowManager.logger.debug(`Game loaded: ${game.name}`)
+            
+            // TODO: Add scene integration for game loading
+            // This is where we could trigger scene updates, UI updates, etc.
+            
+        } catch (error) {
+            SteamWorkflowManager.logger.error('Game loaded event handler failed:', error)
         }
     }
 

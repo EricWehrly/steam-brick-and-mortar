@@ -135,10 +135,6 @@ describe('Steam Data to Texture Integration', () => {
                         
                         const percentage = Math.round((gameLoadedCount / mockSteamUser.games.length) * 100)
                         callbacks.onProgress?.(percentage, 100, `Loaded ${gameLoadedCount}/${mockSteamUser.games.length} games`)
-                        
-                        if (callbacks.onGameLoaded) {
-                            await callbacks.onGameLoaded(game)
-                        }
                     }
                     
                     callbacks.onStatusUpdate?.('✅ Successfully loaded games!', 'success')
@@ -219,12 +215,7 @@ describe('Steam Data to Texture Integration', () => {
                         const message = `Loaded ${current}/${total} games`
                         callbacks.onProgress?.(percentage, 100, message)
                         progressUpdates.push({current: percentage, total: 100, message})
-                        
-                        // Simulate game loading
-                        if (callbacks.onGameLoaded) {
-                            gamesLoadedInOrder.push(game)
-                            await callbacks.onGameLoaded(game)
-                        }
+                        gamesLoadedInOrder.push(game)
                     }
                     
                     // Final status
@@ -284,10 +275,6 @@ describe('Steam Data to Texture Integration', () => {
                     currentState.error = null
                     
                     callbacks.onProgress?.(50, 100, 'Loaded 1/2 games')
-                    
-                    if (callbacks.onGameLoaded) {
-                        await callbacks.onGameLoaded(partialUser.games[0])
-                    }
                     
                     callbacks.onStatusUpdate?.('⚠️ Partially loaded games', 'success')
                     return currentState

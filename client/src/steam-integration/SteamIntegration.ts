@@ -14,22 +14,23 @@ import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
 import type { SteamGameData } from '../scene'
 import { SteamErrorMessages, type SteamErrorContext } from '../utils/SteamErrorMessages'
+import { EventManager, EventSource } from '../core/EventManager'
+import { SteamEventTypes } from '../types/InteractionEvents'
 
 export interface SteamIntegrationConfig {
     apiBaseUrl?: string
     maxGames?: number
+    eventManager?: EventManager
 }
 
 export interface ProgressCallbacks {
     onProgress?: (current: number, total: number, message: string) => void
-    onGameLoaded?: (game: SteamGame) => void
     onStatusUpdate?: (message: string, type: 'loading' | 'success' | 'error') => void
 }
 
 export interface LoadGamesOptions {
     maxGames?: number
     onProgress?: (current: number, total: number) => void
-    onGameLoaded?: (game: SteamGame) => void
 }
 
 /**
@@ -39,7 +40,11 @@ export class SteamIntegration {
     private static readonly logger = Logger.withContext(SteamIntegration.name)
     private steamClient: SteamApiClient
     private gameLibrary: GameLibraryManager
-    private config: Required<SteamIntegrationConfig>
+    private eventManager: EventManager
+    private config: {
+        apiBaseUrl: string
+        maxGames: number
+    }
 
     constructor(config: SteamIntegrationConfig = {}) {
         this.config = {
@@ -47,6 +52,7 @@ export class SteamIntegration {
             maxGames: config.maxGames || 10
         }
         
+        this.eventManager = config.eventManager || EventManager.getInstance()
         this.steamClient = new SteamApiClient(this.config.apiBaseUrl)
         this.gameLibrary = new GameLibraryManager()
     }
@@ -98,29 +104,37 @@ export class SteamIntegration {
                 onProgress: (current: number, total: number) => {
                     const percentage = Math.round((current / total) * 90) + 10 // Reserve 10% for initial fetch
                     callbacks.onProgress?.(percentage, 100, `Loaded ${current}/${total} games`)
-                },
-                onGameLoaded: async (game: SteamGame) => {
-                    // Update game library and notify caller
-                    this.gameLibrary.updateGameData(game)
-                    callbacks.onGameLoaded?.(game)
-                    
-                    // Download game artwork in the background
-                    try {
-                        // TODO: ROADMAP - Nice to have: Game-level cache awareness
-                        // Could add isGameArtworkCached(game) check here to skip downloading
-                        // if all artwork for this game is already cached. Currently each
-                        // individual image checks cache (which works well), but a game-level
-                        // check would prevent unnecessary cache lookups for fully cached games.
-                        await this.steamClient.downloadGameArtwork(game)
-                        SteamIntegration.logger.debug(`Downloaded artwork for ${game.name}`)
-                    } catch (error) {
-                        SteamIntegration.logger.warn(`Failed to download artwork for ${game.name}:`, error)
-                    }
                 }
             }
             
-            // Start progressive loading
-            await this.steamClient.loadGamesProgressively(userGames, progressOptions)
+            // Start progressive loading and handle each game
+            const loadedGames = await this.steamClient.loadGamesProgressively(userGames, progressOptions)
+            
+            // Process each loaded game
+            for (const game of loadedGames) {
+                // Update game library (internal state management)
+                this.gameLibrary.updateGameData(game)
+                
+                // Emit event for external subscribers
+                this.eventManager.emit(SteamEventTypes.GameLoaded, {
+                    game: (game as Readonly<SteamGame>),
+                    timestamp: Date.now(),
+                    source: EventSource.System
+                })
+                
+                // Download game artwork in the background
+                try {
+                    // TODO: ROADMAP - Nice to have: Game-level cache awareness
+                    // Could add isGameArtworkCached(game) check here to skip downloading
+                    // if all artwork for this game is already cached. Currently each
+                    // individual image checks cache (which works well), but a game-level
+                    // check would prevent unnecessary cache lookups for fully cached games.
+                    await this.steamClient.downloadGameArtwork(game)
+                    SteamIntegration.logger.debug(`Downloaded artwork for ${game.name}`)
+                } catch (error) {
+                    SteamIntegration.logger.warn(`Failed to download artwork for ${game.name}:`, error)
+                }
+            }
             
             // Complete loading
             const actualGamesLoaded = Math.min(this.config.maxGames, userGames.game_count)
@@ -167,6 +181,7 @@ export class SteamIntegration {
     async refreshData(callbacks: ProgressCallbacks = {}): Promise<GameLibraryState | null> {
         const currentState = this.gameLibrary.getState()
         
+        // TODO: Support refresh without vanity url
         if (!currentState.userData?.vanity_url) {
             callbacks.onStatusUpdate?.('No data to refresh', 'error')
             return null
@@ -296,9 +311,15 @@ export class SteamIntegration {
                     }
                 }
                 
-                // Update game library and notify caller
+                // Update game library (internal state management)
                 this.gameLibrary.updateGameData(enhancedGame)
-                callbacks.onGameLoaded?.(enhancedGame)
+                
+                // Emit event for external subscribers
+                this.eventManager.emit(SteamEventTypes.GameLoaded, {
+                    game: (game as Readonly<SteamGame>),
+                    timestamp: Date.now(),
+                    source: EventSource.System
+                })
                 
                 const percentage = Math.round(((i + 1) / sortedGames.length) * 80) + 20 // 20-100%
                 callbacks.onProgress?.(percentage, 100, `Loaded ${i + 1}/${sortedGames.length} games from cache`)
