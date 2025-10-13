@@ -161,7 +161,6 @@ export class SteamBrickAndMortarApp {
             this.steamWorkflowManager = new SteamWorkflowManager(
                 this.eventManager,
                 this.steamIntegration,
-                this.sceneCoordinator,
                 this.steamUICoordinator,
                 dataManager
             )
