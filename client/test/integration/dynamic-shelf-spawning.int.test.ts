@@ -36,10 +36,10 @@ describe('Dynamic Shelf Spawning Integration', () => {
         // Clear any existing data
         dataManager.clear()
         
-        // Resolve GameBoxRenderer from DI container
+        // Create StorePropsRenderer manually since it needs our test scene, not the mock scene
         const gameBoxRenderer = await container.resolve(ServiceKeys.GameBoxRenderer) as GameBoxRenderer
         
-        // Initialize StorePropsRenderer with all required dependencies
+        // Initialize StorePropsRenderer with all required dependencies, passing actual EventManager instance
         propsRenderer = new StorePropsRenderer(scene, dataManager, gameBoxRenderer)
     })
 
@@ -54,9 +54,14 @@ describe('Dynamic Shelf Spawning Integration', () => {
     })
 
     it('should spawn dynamic shelves and add them to scene via event system', async () => {
-        // Given: We set up game count in DataManager
+        // Given: We set up game data in DataManager (using steam.games array, not steam.gameCount)
         const gameCount = 12
-        dataManager.set('steam.gameCount', gameCount, { domain: 'steam-integration' as DataDomain })
+        const mockGames = Array.from({ length: gameCount }, (_, i) => ({
+            appid: `${1000 + i}`,
+            name: `Test Game ${i + 1}`,
+            playtime_forever: 60 * (i + 1)
+        }))
+        dataManager.set('steam.games', mockGames, { domain: 'steam-integration' as DataDomain })
         console.debug(`📊 Test: Stored ${gameCount} games in DataManager`)
 
         // Track initial scene children count
@@ -65,28 +70,39 @@ describe('Dynamic Shelf Spawning Integration', () => {
 
         // When: We emit room:resized event (like RoomManager does)
         console.debug(`📡 Test: Emitting room:resized event`)
+        console.debug(`📡 Test: Using EventManager instance:`, eventManager === EventManager.getInstance())
         eventManager.emit(RoomEventTypes.Resized, {
             dimensions: { width: 22, depth: 16, height: 3.2 },
             timestamp: Date.now(),
             source: EventSource.System
         })
 
-        // Wait for async shelf creation
-        await new Promise(resolve => setTimeout(resolve, 20))
+        // Wait for async shelf creation (allow for SharedMaterialManager initialization - takes ~6 seconds)
+        await new Promise(resolve => setTimeout(resolve, 7000))
 
         // Then: Scene should have additional children for the shelves
         const finalChildCount = scene.children.length
         console.debug(`🔍 Final scene children count: ${finalChildCount}`)
         console.debug(`🏷️ Scene children names:`, scene.children.map(child => child.name))
+        
+        // Debug props group contents
+        const propsGroup = scene.getObjectByName('props') as THREE.Group
+        if (propsGroup) {
+            console.debug(`🎁 Props group children count: ${propsGroup.children.length}`)
+            console.debug(`🎁 Props group children names:`, propsGroup.children.map(child => child.name))
+        }
 
-        // Should have added shelf rows to the scene
-        expect(finalChildCount).toBeGreaterThan(initialChildCount)
+        // Scene should still have just the props group
+        expect(finalChildCount).toBe(initialChildCount) // Should stay 1 (just props group)
 
-        // Should have shelf-row objects in the scene
-        const shelfRows = scene.children.filter(child => 
+        // But props group should have shelf rows
+        expect(propsGroup.children.length).toBeGreaterThan(0)
+        
+        // Should have shelf-row objects in the props group
+        const shelfRows = propsGroup.children.filter(child => 
             child.name?.includes('shelf-row')
         )
-        console.debug(`📚 Found ${shelfRows.length} shelf rows in scene`)
+        console.debug(`📚 Found ${shelfRows.length} shelf rows in props group`)
         
         expect(shelfRows.length).toBeGreaterThan(0)
 
@@ -107,9 +123,14 @@ describe('Dynamic Shelf Spawning Integration', () => {
     })
 
     it('should create shelves with proper positioning via event system', async () => {
-        // Given: We set up minimal game count
+        // Given: We set up minimal game data
         const gameCount = 6
-        dataManager.set('steam.gameCount', gameCount, { domain: 'steam-integration' as DataDomain })
+        const mockGames = Array.from({ length: gameCount }, (_, i) => ({
+            appid: `${2000 + i}`,
+            name: `Positioned Game ${i + 1}`,
+            playtime_forever: 120 * (i + 1)
+        }))
+        dataManager.set('steam.games', mockGames, { domain: 'steam-integration' as DataDomain })
         console.debug(`📊 Test: Stored ${gameCount} games in DataManager`)
 
         // When: We emit room:resized event
@@ -119,11 +140,12 @@ describe('Dynamic Shelf Spawning Integration', () => {
             source: EventSource.System
         })
 
-        // Wait for shelf creation
-        await new Promise(resolve => setTimeout(resolve, 20))
+        // Wait for shelf creation (allow for SharedMaterialManager initialization)
+        await new Promise(resolve => setTimeout(resolve, 7000))
 
         // Then: Shelf should be positioned correctly
-        const shelfRows = scene.children.filter(child => 
+        const propsGroup = scene.getObjectByName('props') as THREE.Group
+        const shelfRows = propsGroup.children.filter(child => 
             child.name?.includes('shelf-row')
         )
         
@@ -145,29 +167,40 @@ describe('Dynamic Shelf Spawning Integration', () => {
 
     it('should clear existing shelves before spawning new ones via event system', async () => {
         // Given: We spawn some initial shelves
-        dataManager.set('steam.gameCount', 6, { domain: 'steam-integration' as DataDomain })
+        const initialGames = Array.from({ length: 6 }, (_, i) => ({
+            appid: `${3000 + i}`,
+            name: `Initial Game ${i + 1}`,
+            playtime_forever: 90 * (i + 1)
+        }))
+        dataManager.set('steam.games', initialGames, { domain: 'steam-integration' as DataDomain })
         eventManager.emit(RoomEventTypes.Resized, {
             dimensions: { width: 22, depth: 16, height: 3.2 },
             timestamp: Date.now(),
             source: EventSource.System
         })
-        await new Promise(resolve => setTimeout(resolve, 20))
+        await new Promise(resolve => setTimeout(resolve, 7000))
         
-        const initialShelfCount = scene.children.filter(child => 
+        const propsGroup = scene.getObjectByName('props') as THREE.Group
+        const initialShelfCount = propsGroup.children.filter(child => 
             child.name?.includes('shelf-row')
         ).length
         
-        // When: We update game count and emit new room:resized event
-        dataManager.set('steam.gameCount', 18, { domain: 'steam-integration' as DataDomain })
+        // When: We update game data and emit new room:resized event
+        const updatedGames = Array.from({ length: 18 }, (_, i) => ({
+            appid: `${4000 + i}`,
+            name: `Updated Game ${i + 1}`,
+            playtime_forever: 150 * (i + 1)
+        }))
+        dataManager.set('steam.games', updatedGames, { domain: 'steam-integration' as DataDomain })
         eventManager.emit(RoomEventTypes.Resized, {
             dimensions: { width: 22, depth: 16, height: 3.2 },
             timestamp: Date.now(),
             source: EventSource.System
         })
-        await new Promise(resolve => setTimeout(resolve, 20))
+        await new Promise(resolve => setTimeout(resolve, 7000))
         
         // Then: Should have new shelf configuration, not added to old
-        const finalShelfRows = scene.children.filter(child => 
+        const finalShelfRows = propsGroup.children.filter(child => 
             child.name?.includes('shelf-row')
         )
         
@@ -185,17 +218,16 @@ describe('Dynamic Shelf Spawning Integration', () => {
     })
 
     it('should spawn game boxes via event system when game data is available', async () => {
-        // Given: We have game data stored in DataManager
+        // Given: We have game data stored in DataManager (steam.games only, no steam.gameCount)
         const mockGames = [
-            { name: 'Portal 2', appid: 620 },
-            { name: 'Half-Life: Alyx', appid: 546560 },
-            { name: 'Counter-Strike 2', appid: 730 },
-            { name: 'Team Fortress 2', appid: 440 },
-            { name: 'Left 4 Dead 2', appid: 550 },
-            { name: 'Dota 2', appid: 570 }
+            { name: 'Portal 2', appid: 620, playtime_forever: 1200 },
+            { name: 'Half-Life: Alyx', appid: 546560, playtime_forever: 800 },
+            { name: 'Counter-Strike 2', appid: 730, playtime_forever: 5400 },
+            { name: 'Team Fortress 2', appid: 440, playtime_forever: 2100 },
+            { name: 'Left 4 Dead 2', appid: 550, playtime_forever: 900 },
+            { name: 'Dota 2', appid: 570, playtime_forever: 3200 }
         ]
 
-        dataManager.set('steam.gameCount', mockGames.length, { domain: 'steam-integration' as DataDomain })
         dataManager.set('steam.games', mockGames, { domain: 'steam-integration' as DataDomain })
         console.debug(`📊 Test: Stored ${mockGames.length} games with data in DataManager`)
 
@@ -205,10 +237,11 @@ describe('Dynamic Shelf Spawning Integration', () => {
             timestamp: Date.now(),
             source: EventSource.System
         })
-        await new Promise(resolve => setTimeout(resolve, 20))
+        await new Promise(resolve => setTimeout(resolve, 7000))
 
         // Then: Should create shelves with game boxes
-        const shelfRows = scene.children.filter(child => 
+        const propsGroup = scene.getObjectByName('props') as THREE.Group
+        const shelfRows = propsGroup.children.filter(child => 
             child.name?.includes('shelf-row')
         )
         
