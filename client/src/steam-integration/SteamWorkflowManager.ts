@@ -12,10 +12,8 @@ import { EventSource } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
 import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamCacheStatsEvent, SteamImageCacheClearEvent, SteamDevModeToggleEvent, SteamGameLoadedEvent } from '../types/InteractionEvents'
 import type { SteamIntegration } from './SteamIntegration'
-import type { SceneCoordinator } from '../scene'
 import type { SteamUICoordinator } from '../ui/coordinators'
 import { Logger } from '../utils/Logger'
-import { SteamErrorMessages } from '../utils/SteamErrorMessages'
 import { DataManager, DataDomain } from '../core/data'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
 
@@ -24,20 +22,17 @@ export class SteamWorkflowManager {
     
     private eventManager: EventManager
     private steamIntegration: SteamIntegration
-    private sceneCoordinator: SceneCoordinator
     private steamUICoordinator: SteamUICoordinator
     private dataManager: DataManager
     
     constructor(
         eventManager: EventManager,
         steamIntegration: SteamIntegration,
-        sceneCoordinator: SceneCoordinator,
         steamUICoordinator: SteamUICoordinator,
         dataManager?: DataManager
     ) {
         this.eventManager = eventManager
         this.steamIntegration = steamIntegration
-        this.sceneCoordinator = sceneCoordinator
         this.steamUICoordinator = steamUICoordinator
         this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
         
@@ -49,7 +44,6 @@ export class SteamWorkflowManager {
         this.eventManager.registerEventHandler(SteamEventTypes.CacheStats, this.onCacheStats.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.ImageCacheClear, this.onClearImageCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.DevModeToggle, this.onDevModeToggle.bind(this))
-        this.eventManager.registerEventHandler(SteamEventTypes.GameLoaded, this.onGameLoaded.bind(this))
     }
     
     /**
@@ -260,23 +254,6 @@ export class SteamWorkflowManager {
         } catch (error) {
             SteamWorkflowManager.logger.error('Image cache clear workflow failed:', error)
             SteamWorkflowManager.logger.error('Failed to clear image cache.')
-        }
-    }
-
-    /**
-     * Game loaded event handler - replaces onGameLoaded callbacks
-     */
-    private async onGameLoaded(event: CustomEvent<SteamGameLoadedEvent>): Promise<void> {
-        const { game } = event.detail
-        
-        try {
-            SteamWorkflowManager.logger.debug(`Game loaded: ${game.name}`)
-            
-            // TODO: Add scene integration for game loading
-            // This is where we could trigger scene updates, UI updates, etc.
-            
-        } catch (error) {
-            SteamWorkflowManager.logger.error('Game loaded event handler failed:', error)
         }
     }
 

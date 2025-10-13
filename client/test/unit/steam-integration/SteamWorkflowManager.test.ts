@@ -38,7 +38,7 @@ const mockSteamIntegration = {
     getGameLibraryState: vi.fn()
 }
 
-const mockSceneCoordinator = {}
+
 
 const mockSteamUICoordinator = {
     updateProgress: vi.fn(),
@@ -63,7 +63,6 @@ describe('SteamWorkflowManager', () => {
         workflowManager = new SteamWorkflowManager(
             mockEventManager as any,
             mockSteamIntegration as any,
-            mockSceneCoordinator as any,
             mockSteamUICoordinator as any,
             mockDataManager as any
         )
@@ -113,8 +112,7 @@ describe('SteamWorkflowManager', () => {
             // Should not crash during setup
             expect(() => new SteamWorkflowManager(
                 mockEventManager as any,
-                mockSteamIntegration as any, 
-                mockSceneCoordinator as any,
+                mockSteamIntegration as any,
                 mockSteamUICoordinator as any,
                 mockDataManager as any
             )).not.toThrow()
@@ -629,7 +627,6 @@ describe('SteamWorkflowManager', () => {
             const temporaryManager = new SteamWorkflowManager(
                 mockEventManager as any,
                 mockSteamIntegration as any,
-                mockSceneCoordinator as any,
                 mockSteamUICoordinator as any,
                 mockDataManager as any
             )
