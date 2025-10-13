@@ -6,11 +6,15 @@
     <title>Steam Blockbuster Shelf - WebXR</title>
     <meta name="description" content="VR game launcher for your Steam library">
     
-    <!-- WebXR Polyfill for broader browser support -->
-    <script src="https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.js"></script>
+    <!-- TODO: Before showing to anyone, serve webxr shim internally -->
+    <!-- Performance hints -->
+    <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
     
     <!-- Main application styles -->
     <link rel="stylesheet" href="/src/styles/main.css">
+    
+    <!-- Preload main script to start download early -->
+    <link rel="modulepreload" href="/src/main.ts">
 </head>
 <body>
     <div id="loading">
@@ -58,6 +62,10 @@
     
     <button id="webxr-button" class="hidden">Enter VR</button>
     
+    <!-- WebXR Polyfill loaded in body (only needed when VR is used) -->
+    <script async src="https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.js"></script>
+    
+    <!-- Main script moved to body for non-blocking DOM parsing -->
     <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
