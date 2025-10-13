@@ -106,55 +106,85 @@ export class SceneCoordinator {
     }
 
     async setupSceneAsPrerequisite(config: SceneCoordinatorConfig = {}): Promise<void> {
-
         try {
-            // 🚀 PRIORITY: Basic navigable environment (prerequisite for GameStart)
-
-            await this.setupBasicEnvironment(config.environment)
-            console.log('✅ Basic environment ready - user can now move around!')
             
-            // 📡 EMIT SceneReady - this scene is now a satisfied prerequisite for GameStart
+            // 🚀 PRIORITY: Minimal navigable scene (just camera position - everything else can wait)
+            await this.setupMinimalScene(config.environment)
+            
+            console.log('✅ Minimal scene ready - user can now move around!')
+            
+            // 📡 EMIT SceneReady immediately - basic navigation works
             this.emitSceneReadyEvent()
 
-            this.setupEnhancedScene();
+            // 🎨 Everything else happens asynchronously (skybox, lighting, props)
+            this.setupEnhancedSceneAsync(config.environment)
             
         } catch (error) {
             console.error('❌ Failed to set up scene prerequisite:', error)
-            throw error
+            // Still emit SceneReady so controls work
+            this.emitSceneReadyEvent()
+        }
+    }
+
+    /**
+     * Setup absolutely minimal scene - just enough for navigation to work
+     * This should complete in <10ms to get controls working ASAP
+     */
+    private async setupMinimalScene(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
+        // Literally nothing - just camera position is handled by SceneManager
+        // User can move around in a void, which is fine temporarily
+        console.log('📦 Minimal scene ready - void navigation enabled')
+    }
+
+    /**
+     * Setup enhanced scene asynchronously - skybox, lighting, props
+     * This doesn't block user interaction
+     */
+    private setupEnhancedSceneAsync(config: SceneCoordinatorConfig['environment'] = {}): void {
+        // Don't await - let this happen in the background
+        this.loadEnhancedScene(config).catch(error => {
+            console.error('⚠️ Enhanced scene loading failed:', error)
+            // Don't throw - basic scene still works
+        })
+    }
+
+    private async loadEnhancedScene(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
+        try {
+            
+            // 🌌 STEP 1: Skybox (visual context)
+            const presetName = config.skyboxPreset ?? 'aurora'
+            const preset = (SkyboxPresets as any)[presetName] || SkyboxPresets.aurora
+            await this.skyboxManager.applySkybox(preset)
+            
+            console.log('🌌 Skybox loaded')
+
+            
+            // 💡 STEP 2: Lighting (makes everything visible)
+            await this.lightingRenderer.setupLighting()
+            this.lightingRenderer.refreshShadows()
+            
+            console.log('💡 Lighting ready')
+
+            
+            // 🏪 STEP 3: Props (room, shelves, games - the heavy stuff)
+            await this.setupProps()
+            
+            console.log('🏪 Props loaded - store environment complete!')
+
+        } catch (error) {
+            console.error('❌ Enhanced scene loading failed:', error)
+            // Don't throw - basic navigation still works
         }
     }
 
     private async setupBasicEnvironment(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
-        // Use ceiling height from settings if not explicitly provided
-        const ceilingHeight = config.roomSize?.height ?? this.appSettings.getSetting('ceilingHeight')
-        
-        console.log('🏗️ Starting basic environment setup...')
-        
-        try {
-            // Set up skybox first
-            const presetName = config.skyboxPreset ?? 'aurora'
-            const preset = (SkyboxPresets as any)[presetName] || SkyboxPresets.aurora
-            await this.skyboxManager.applySkybox(preset)
-
-        } catch (error) {
-            console.error('❌ Basic environment setup failed:', error)
-            // Still allow SceneReady to be emitted - basic scene is functional even if enhanced setup fails
-        }
+        // This method is now replaced by setupMinimalScene + loadEnhancedScene
+        // Keeping for backward compatibility
     }
 
     private async setupEnhancedScene(): Promise<void> {
-        try {
-            await this.setupProps()
-
-            // TODO: lightingRenderer respond by itself to events
-            await this.lightingRenderer.setupLighting()
-            
-            this.lightingRenderer.refreshShadows()
-
-        } catch (error) {
-            console.error('❌ Enhanced scene setup failed:', error)
-            // Don't throw - basic scene is still functional
-        }
+        // This method is now replaced by loadEnhancedScene  
+        // Keeping for backward compatibility
     }
 
     private async setupProps(): Promise<void> {

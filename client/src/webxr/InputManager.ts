@@ -75,6 +75,7 @@ export class InputManager {
             return
         }
 
+        
         this.setupMouseControls()
         this.setupKeyboardControls()
         this.isListeningToEvents = true
