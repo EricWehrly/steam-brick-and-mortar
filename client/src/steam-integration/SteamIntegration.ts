@@ -32,11 +32,10 @@ export interface LoadGamesOptions {
     onProgress?: (current: number, total: number) => void
 }
 
-/**
- * Manages high-level Steam integration workflow
- */
 export class SteamIntegration {
     private static readonly logger = Logger.withContext(SteamIntegration.name)
+    private static _instance: SteamIntegration | null = null
+    
     private steamClient: SteamApiClient
     private gameLibrary: GameLibraryManager
     private eventManager: EventManager
@@ -54,6 +53,12 @@ export class SteamIntegration {
         this.eventManager = EventManager.getInstance()
         this.steamClient = new SteamApiClient(this.config.apiBaseUrl)
         this.gameLibrary = new GameLibraryManager()
+        
+        SteamIntegration._instance = this
+    }
+
+    static getInstance(): SteamIntegration | null {
+        return SteamIntegration._instance
     }
 
     /**
@@ -174,9 +179,6 @@ export class SteamIntegration {
         }
     }
 
-    /**
-     * Refresh cached data for current user
-     */
     async refreshData(callbacks: ProgressCallbacks = {}): Promise<GameLibraryState | null> {
         const currentState = this.gameLibrary.getState()
         
@@ -392,24 +394,16 @@ export class SteamIntegration {
         return await this.steamClient.getCachedImageBlob(url)
     }
 
-    /**
-     * Update the maximum games setting for development mode
-     */
     updateMaxGames(maxGames: number): void {
         this.config.maxGames = maxGames
         SteamIntegration.logger.info(`Updated maxGames setting to: ${maxGames}`)
     }
 
-    /**
-     * Get current maxGames setting
-     */
     getMaxGames(): number {
         return this.config.maxGames
     }
 
-    /**
-     * Provide access to underlying Steam client (for advanced use)
-     */
+    // This is only for testing?
     getSteamClient() {
         return this.steamClient
     }
