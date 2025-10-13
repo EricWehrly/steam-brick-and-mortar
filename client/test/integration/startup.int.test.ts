@@ -4,6 +4,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { UIManager } from '../../src/ui/UIManager'
+import { SteamUICoordinator } from '../../src/ui/coordinators/SteamUICoordinator'
 
 // Mock window.performance before importing any modules that use it
 Object.defineProperty(window, 'performance', {
@@ -342,61 +344,45 @@ describe('Application Startup Integration', () => {
         }).not.toThrow()
     })
 
-    it('should create SteamBrickAndMortarApp without startup errors', async () => {
-        // Import the main app class
-        const { SteamBrickAndMortarApp } = await import('../../src/core/SteamBrickAndMortarApp')
+    it('should properly wire SteamUICoordinator with UIManager during startup', () => {
+        // Setup minimal DOM elements that the UI components require
+        const requiredElements = [
+            'steam-ui', 'steam-user-input', 'load-steam-games', 'load-from-cache',
+            'refresh-cache', 'clear-cache', 'show-cache-stats', 'cache-info', 'steam-status'
+        ]
         
-        // This should not throw any startup errors
-        expect(() => {
-            new SteamBrickAndMortarApp({
-                steam: {
-                    maxGames: 30,
-                    apiBaseUrl: 'https://steam-api-dev.wehrly.com'
-                }
-            })
-        }).not.toThrow()
-    })
-
-    it('should handle UICoordinator cache stats provider integration', async () => {
-        const { UICoordinatorMock: UICoordinator } = await import('../mocks/ui/UICoordinator.mock')
-        const { PerformanceMonitor } = await import('../../src/ui/PerformanceMonitor')
+        const createdElements: HTMLElement[] = []
         
-        const mockPerformanceMonitor = new PerformanceMonitor({
-            updateInterval: 1000,
-            showMemory: true
+        // Create all required elements
+        requiredElements.forEach(id => {
+            const element = document.createElement(id === 'steam-user-input' ? 'input' : 'div')
+            element.id = id
+            document.body.appendChild(element)
+            createdElements.push(element)
         })
         
-        const mockDebugStatsProvider = {
-            getDebugStats: vi.fn().mockResolvedValue({
-                sceneObjects: { total: 0, meshes: 0, lights: 0, cameras: 0, textures: 0, materials: 0, geometries: 0 },
-                performance: { fps: 60, frameTime: 16, memoryUsed: 1024000, memoryTotal: 2048000, triangles: 1000, drawCalls: 50 },
-                cache: { imageCount: 0, imageCacheSize: 0, gameDataCount: 0, gameDataSize: 0, quotaUsed: 0, quotaTotal: 0 },
-                system: { userAgent: 'test', webxrSupported: true, webglVersion: 'WebGL 2.0', maxTextureSize: 4096, vendor: 'test', renderer: 'test' }
-            })
-        } as any
+        const steamStatus = document.getElementById('steam-status')!
+
+        expect(() => {
+            // Create instances like the real application does
+            const uiManager = UIManager.getInstance()
+            const coordinator = new SteamUICoordinator()
+            
+            // Initialize like startup would - this creates the internal UI components
+            uiManager.init()
+            
+            // Now test the coordinator -> uiManager -> DOM pipeline
+            coordinator.showSteamStatus('Test message', 'success')
+        }).not.toThrow()
         
-        const mockCacheStatsProvider = vi.fn().mockResolvedValue({
-            totalImages: 10,
-            totalSize: 1024 * 1024,
-            oldestTimestamp: Date.now() - 1000,
-            newestTimestamp: Date.now()
+        // Verify the actual DOM integration pipeline worked
+        expect(steamStatus).toBeTruthy()
+        expect(steamStatus.textContent).toBeTruthy()
+        expect(steamStatus.textContent).toContain('Test message')
+        
+        // Cleanup all created elements
+        createdElements.forEach(element => {
+            element.remove()
         })
-
-        // UICoordinator should accept the cache stats provider
-        expect(() => {
-            new UICoordinator(
-                mockPerformanceMonitor,
-                mockDebugStatsProvider,
-                mockCacheStatsProvider
-            )
-        }).not.toThrow()
-
-        // UICoordinator should work without cache stats provider
-        expect(() => {
-            new UICoordinator(
-                mockPerformanceMonitor,
-                mockDebugStatsProvider
-            )
-        }).not.toThrow()
     })
 })
