@@ -12,13 +12,16 @@ import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { RoomEventTypes } from '../../../src/types/InteractionEvents'
 import type { SteamGameData } from '../../../src/scene/game-box/types/GameData'
 
-// Mock GameBoxRenderer completely to avoid SharedMaterialManager
-const mockGameBoxRenderer = {
+// Factory function to create fresh mock instances
+const createMockGameBoxRenderer = () => ({
     createGameBox: vi.fn().mockReturnValue(new THREE.Mesh()),
     getInstancedLabelRenderer: vi.fn().mockReturnValue({ updateGPU: vi.fn() }),
     getInstancedArtworkRenderer: vi.fn().mockReturnValue({ updateGPU: vi.fn() }),
     dispose: vi.fn()
-}
+})
+
+// Global mock instance - will be recreated in each test
+let mockGameBoxRenderer = createMockGameBoxRenderer()
 
 // Mock GameBoxRenderer class
 vi.mock('../../../src/scene/GameBoxRenderer', () => ({
@@ -44,6 +47,9 @@ describe('StorePropsRenderer Shelf Spawning', () => {
     let renderer: any
 
     beforeEach(async () => {
+        // Create fresh mock instance for each test
+        mockGameBoxRenderer = createMockGameBoxRenderer()
+        
         // Import after mocks are set up
         const module = await import('../../../src/scene/StorePropsRenderer')
         StorePropsRenderer = module.StorePropsRenderer
@@ -83,7 +89,7 @@ describe('StorePropsRenderer Shelf Spawning', () => {
         })
         
         // Wait for async shelf generation
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await new Promise(resolve => setTimeout(resolve, 200))
         
         // Verify observable behavior: GameBoxRenderer.createGameBox was called for each game
         expect(mockGameBoxRenderer.createGameBox).toHaveBeenCalledTimes(testGames.length)
@@ -93,7 +99,9 @@ describe('StorePropsRenderer Shelf Spawning', () => {
             expect(mockGameBoxRenderer.createGameBox).toHaveBeenNthCalledWith(
                 index + 1,
                 game,
-                expect.any(Object)
+                expect.any(Object), // position (Vector3)
+                undefined, // textureOptions
+                expect.any(String) // name
             )
         })
     })
@@ -109,7 +117,7 @@ describe('StorePropsRenderer Shelf Spawning', () => {
             source: EventSource.System
         })
         
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await new Promise(resolve => setTimeout(resolve, 200))
         
         // Should not crash and should not create any game boxes
         expect(mockGameBoxRenderer.createGameBox).not.toHaveBeenCalled()
@@ -140,7 +148,7 @@ describe('StorePropsRenderer Shelf Spawning', () => {
             source: EventSource.System
         })
         
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await new Promise(resolve => setTimeout(resolve, 200))
         
         // Should create game boxes for first layout
         expect(mockGameBoxRenderer.createGameBox).toHaveBeenCalledTimes(testGames.length)
@@ -155,7 +163,7 @@ describe('StorePropsRenderer Shelf Spawning', () => {
             source: EventSource.System
         })
         
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await new Promise(resolve => setTimeout(resolve, 200))
         
         // Should recreate game boxes for new layout
         expect(mockGameBoxRenderer.createGameBox).toHaveBeenCalledTimes(testGames.length)
@@ -169,6 +177,7 @@ describe('StorePropsRenderer Shelf Spawning', () => {
         
         dataManager.set('steam.games', initialGames, { domain: 'steam-integration' as any })
         
+        
         // First generation
         eventManager.emit(RoomEventTypes.Resized, {
             dimensions: { width: 20, height: 15, depth: 25 },
@@ -176,13 +185,15 @@ describe('StorePropsRenderer Shelf Spawning', () => {
             source: EventSource.System
         })
         
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await new Promise(resolve => setTimeout(resolve, 200))
         
         // Should create box for initial game
         expect(mockGameBoxRenderer.createGameBox).toHaveBeenCalledTimes(1)
         expect(mockGameBoxRenderer.createGameBox).toHaveBeenCalledWith(
             initialGames[0],
-            expect.any(Object)
+            expect.any(Object), // position (Vector3)
+            undefined, // textureOptions
+            expect.any(String) // name
         )
         
         // Clear mock calls
@@ -203,7 +214,7 @@ describe('StorePropsRenderer Shelf Spawning', () => {
             source: EventSource.System
         })
         
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await new Promise(resolve => setTimeout(resolve, 200))
         
         // Should create boxes for new games
         expect(mockGameBoxRenderer.createGameBox).toHaveBeenCalledTimes(updatedGames.length)
@@ -211,7 +222,9 @@ describe('StorePropsRenderer Shelf Spawning', () => {
             expect(mockGameBoxRenderer.createGameBox).toHaveBeenNthCalledWith(
                 index + 1,
                 game,
-                expect.any(Object)
+                expect.any(Object), // position (Vector3)
+                undefined, // textureOptions
+                expect.any(String) // name
             )
         })
     })
