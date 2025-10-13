@@ -141,8 +141,6 @@ export interface SceneReadyEvent extends BaseInteractionEvent {
     // Emitted when the basic scene is navigable and ready for user interaction
     // This is a prerequisite for GameStart - scene must be ready before game can start
     sceneStats: {
-        environmentObjectCount: number
-        lightsReady: boolean
         basicNavigationReady: boolean
     }
 }
