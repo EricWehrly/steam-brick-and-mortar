@@ -102,7 +102,8 @@ export class SteamBrickAndMortarApp {
 
         this.steamIntegration = new SteamIntegration({
             apiBaseUrl: config.steam?.apiBaseUrl ?? BACKEND_URL,
-            maxGames: maxGames
+            maxGames: maxGames,
+            eventManager: this.eventManager
         })
 
         this.webxrCoordinator = new WebXRCoordinator({
