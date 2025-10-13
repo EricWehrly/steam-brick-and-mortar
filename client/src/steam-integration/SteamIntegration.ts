@@ -20,7 +20,6 @@ import { SteamEventTypes } from '../types/InteractionEvents'
 export interface SteamIntegrationConfig {
     apiBaseUrl?: string
     maxGames?: number
-    eventManager?: EventManager
 }
 
 export interface ProgressCallbacks {
@@ -52,7 +51,7 @@ export class SteamIntegration {
             maxGames: config.maxGames || 10
         }
         
-        this.eventManager = config.eventManager || EventManager.getInstance()
+        this.eventManager = EventManager.getInstance()
         this.steamClient = new SteamApiClient(this.config.apiBaseUrl)
         this.gameLibrary = new GameLibraryManager()
     }
