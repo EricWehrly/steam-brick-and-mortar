@@ -116,8 +116,6 @@ export class StorePropsRenderer {
             const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
             const shelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
             
-            console.debug(`📚 Starting async generation of ${shelvesNeeded} shelves for ${gameCount} games`)
-            
             // Reset global game index for artwork assignment
             this.globalGameIndex = 0
             
@@ -134,11 +132,13 @@ export class StorePropsRenderer {
                 // Yield to main thread between rows to keep app responsive
                 await new Promise(resolve => setTimeout(resolve, 150))
                 
-                await this.createShelfRow(row, shelvesInThisRow, games)
-                console.debug(`✅ Completed row ${row + 1}/${rows}`)
+                try {
+                    await this.createShelfRow(row, shelvesInThisRow, games)
+                } catch (error) {
+                    console.error(`❌ Failed to create row ${row}:`, error)
+                    throw error
+                }
             }
-            
-            console.debug(`✅ Async shelf generation complete: ${shelvesNeeded} shelves in ${rows} row(s)`)
         } catch (error) {
             console.error('❌ Failed to generate shelves asynchronously:', error)
             throw error
@@ -148,18 +148,12 @@ export class StorePropsRenderer {
     public async setupProps(config: PropsConfig = {}): Promise<void> {
         this.config = { ...this.getDefaultConfig(), ...config }
         
-        console.debug('🎁 Setting up store props...')
-        
-        // Log enabled tests
+        // Initialize enabled tests
         if (this.config.tests) {
             const enabledTests = getEnabledTests(this.config.tests)
             if (enabledTests.length > 0) {
-                console.log('🧪 Enabled tests:', enabledTests)
-                
                 // Initialize test renderers based on enabled tests
                 this.initializeTests()
-            } else {
-                console.debug('🧪 No tests enabled')
             }
         }
         
@@ -188,15 +182,12 @@ export class StorePropsRenderer {
         
         // Test Objects - Simple geometric test objects
         if (isTestEnabled(this.config.tests, TestMode.SPAWN_TEST_OBJECTS)) {
-            console.log('🧪 Initializing SPAWN_TEST_OBJECTS test')
             this.setupTestObjects()
         }
     }
 
     
     private async setupTestObjects(): Promise<void> {
-        console.debug('🧪 Adding test objects...')
-        
         // Small test cube for reference
         const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
         const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 })
@@ -205,8 +196,6 @@ export class StorePropsRenderer {
         cube.castShadow = true
         cube.name = 'test-cube'
         this.propsGroup.add(cube)
-        
-        console.debug('✅ Test objects added')
     }
 
     private getDefaultConfig(): PropsConfig {
@@ -230,8 +219,6 @@ export class StorePropsRenderer {
      * Add atmospheric props (wire racks, dividers, etc.)
      */
     public async addAtmosphericProps(): Promise<void> {
-        console.debug('🎪 Adding atmospheric props...')
-        
         try {
             // Create wire rack displays for snack/merchandise areas
             const wireRack1 = this.propRenderer.createWireRackDisplay(new THREE.Vector3(-9, 0, 2))
@@ -249,7 +236,6 @@ export class StorePropsRenderer {
             const floorMarkers = this.propRenderer.createFloorMarkers(22, 16)
             this.propsGroup.add(floorMarkers)
             
-            console.debug('✅ Atmospheric props added')
         } catch (error) {
             console.error('❌ Failed to add atmospheric props:', error)
         }
@@ -304,8 +290,6 @@ export class StorePropsRenderer {
                 obj.clear()
             }
         })
-        
-        console.debug(`🗑️ Cleared ${storeObjects.length} existing store environment objects`)
     }
 
     /**
@@ -339,7 +323,7 @@ export class StorePropsRenderer {
             rowGroup.add(shelfGroup)
         }
         
-        this.scene.add(rowGroup)
+        this.propsGroup.add(rowGroup)
     }
 
     /**
@@ -359,11 +343,8 @@ export class StorePropsRenderer {
             // Create game boxes with actual game data if available
             if (games.length > 0) {
                 await this.spawnActualGamesOnShelf(shelfUnit, shelfGroup, games, rowIndex, shelfIndex)
-            } else {
-                console.debug(`📦 No game data available for shelf ${rowIndex}-${shelfIndex}, skipping game box creation`)
             }
             
-            console.debug(`📚 Created single shelf unit at position:`, position)
         } catch (error) {
             console.error(`❌ Failed to create shelf unit:`, error)
         }
@@ -383,7 +364,6 @@ export class StorePropsRenderer {
         
         // Find shelf surfaces (same logic as StoreLayout but simplified for dynamic shelves)
         const shelfSurfaces = this.findDynamicShelfSurfaces(shelfUnit);
-        console.debug(`📚 Found ${shelfSurfaces.length} surfaces on dynamic shelf`);
         
         if (shelfSurfaces.length === 0) {
             console.warn(`⚠️ No shelf surfaces found on dynamic shelf ${rowIndex}-${shelfIndex}`);
@@ -480,19 +460,20 @@ export class StorePropsRenderer {
             // Convert local shelf position to world position by adding parent group's world position
             const worldPosition = localPosition.clone().add(parentGroup.position)
             const name = `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}-${side}-${i}`
-            
+
+            // Use artwork for every 20th game to balance performance and visual interest
+            // TODO: fix failing calls to akamai CDN @ (maybe) mod 10
+            const shouldUseArtwork = (this.globalGameIndex % 20) === 0
             let textureOptions = undefined
             
-            if (game.artwork?.header) {
+            if (shouldUseArtwork && game.artwork?.header) {
                 // Try to get or download artwork for featured games
                 try {
-                    console.debug(`🎨 Attempting to load artwork for featured game: ${game.name} from URL: ${game.artwork.header}`)
-                    
                     const imageBlob = await this.imageManager.downloadImage(game.artwork.header, {
                         timeout: 5000, // 5 second timeout for artwork loading
                         enableFallback: true,
                         onImageLoaded: (url, blob) => {
-                            // console.debug(`✅ Successfully loaded artwork for ${game.name} (${blob.size} bytes)`)
+                            // Successfully loaded artwork
                         },
                         onImageError: (url, error) => {
                             console.error(`❌ Failed to download artwork from ${url} for ${game.name}:`, error.message)
@@ -532,13 +513,9 @@ export class StorePropsRenderer {
      */
     private async createTextureOptionsFromBlob(blob: Blob, gameName: string): Promise<GameBoxTextureOptions> {
         return new Promise((resolve, reject) => {
-            console.debug(`🖼️ Creating texture from blob for ${gameName}: ${blob.size} bytes, type: ${blob.type}`)
-            
             const img = new Image()
             img.onload = () => {
                 try {
-                    console.debug(`📐 Image loaded for ${gameName}: ${img.width}x${img.height}`)
-                    
                     // Create a canvas to convert the image to a texture
                     const canvas = document.createElement('canvas')
                     const ctx = canvas.getContext('2d')
@@ -554,8 +531,6 @@ export class StorePropsRenderer {
                     const scale = Math.min(maxSize / img.width, maxSize / img.height, 1)
                     canvas.width = Math.floor(img.width * scale)
                     canvas.height = Math.floor(img.height * scale)
-                    
-                    console.debug(`🎨 Canvas size for ${gameName}: ${canvas.width}x${canvas.height} (scale: ${scale.toFixed(3)})`)
                     
                     // Draw the image onto the canvas
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
@@ -589,7 +564,6 @@ export class StorePropsRenderer {
             
             // Convert blob to object URL for image loading
             const objectUrl = URL.createObjectURL(blob)
-            console.debug(`🔗 Created object URL for ${gameName}: ${objectUrl}`)
             img.src = objectUrl
         })
     }
