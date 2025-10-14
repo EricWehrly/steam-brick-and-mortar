@@ -2,6 +2,9 @@
  * SteamUIPanel - Manages Steam-specific UI controls and interactions
  */
 
+// Cross-platform timeout type that works in both Node.js and browser environments
+type TimeoutHandle = ReturnType<typeof setTimeout>
+
 import { getElementByIdSafe } from '../utils'
 import { renderTemplate } from '../utils/TemplateEngine'
 import { EventManager, EventSource } from '../core/EventManager'
@@ -20,7 +23,7 @@ export class SteamUIPanel {
   private showCacheStatsButton: HTMLButtonElement | null
   private cacheInfoDiv: HTMLElement | null
   private steamStatus: HTMLElement | null
-  private cacheCheckDebounceTimeout: number | null = null
+  private cacheCheckDebounceTimeout: TimeoutHandle | null = null
   
   constructor() {
     this.eventManager = EventManager.getInstance()

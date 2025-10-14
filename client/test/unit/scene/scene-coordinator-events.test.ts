@@ -11,8 +11,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 vi.mock('../../../src/core/EventManager', () => ({
     EventManager: {
         getInstance: vi.fn().mockReturnValue({
-            registerEventHandler: vi.fn()
+            registerEventHandler: vi.fn(),
+            emit: vi.fn()
         })
+    },
+    EventSource: {
+        UI: 'ui',
+        Keyboard: 'keyboard',
+        Mouse: 'mouse',
+        Gamepad: 'gamepad',
+        VRController: 'vr-controller',
+        System: 'system',
+        ManagedLight: 'managed-light'
     }
 }))
 

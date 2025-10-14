@@ -2,6 +2,9 @@
  * Generic caching layer that can wrap any method with caching functionality
  */
 
+// Cross-platform timeout type that works in both Node.js and browser environments
+type TimeoutHandle = ReturnType<typeof setTimeout>
+
 export interface CacheConfig {
     /** Cache duration in milliseconds (default: 1 hour) */
     cacheDuration: number
@@ -36,7 +39,7 @@ export class CacheManager {
     private cache: Map<string, CacheEntry<any>> = new Map()
     private readonly config: CacheConfig
     private pendingWrites: boolean = false
-    private writeTimeout: number | null = null
+    private writeTimeout: TimeoutHandle | null = null
     private readonly WRITE_DEBOUNCE_MS = 2000 // 2 seconds
 
     constructor(config: Partial<CacheConfig> = {}) {
