@@ -329,7 +329,7 @@ export class GameBoxRenderer {
         name?: string
     ): THREE.Mesh {
         this.ensureMaterialManagerInitialized()
-        const material = this.materialManager.getGameBoxMaterialFromName(game.name)
+        const material = this.materialManager.getGameBoxFallbackMaterial()
         
         const gameBox = new THREE.Mesh(this.gameBoxGeometry, material)
         gameBox.position.copy(position)
