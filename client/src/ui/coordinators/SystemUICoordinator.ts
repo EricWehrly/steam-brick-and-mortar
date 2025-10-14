@@ -12,14 +12,10 @@ import * as THREE from 'three'
 import { PauseMenuManager } from '../pause/PauseMenuManager'
 import { PerformanceMonitor } from '../PerformanceMonitor'
 import { LightingControlsPanel } from '../LightingControlsPanel'
-import { EventManager, EventSource } from '../../core/EventManager'
-import { InputEventTypes, UIEventTypes } from '../../types/InteractionEvents'
-import type { SteamLoadFromCacheEvent } from '../../types/InteractionEvents'
-import type { DebugStats, DebugStatsProvider } from '../../core/DebugStatsProvider'
-import { ImageManager, type ImageCacheStats } from '../../steam/images/ImageManager'
-import type { SteamIntegration } from '../../steam-integration/SteamIntegration'
-import type { UIManager } from '../UIManager'
+import { EventManager } from '../../core/EventManager'
+import type { DebugStatsProvider } from '../../core/DebugStatsProvider'
 import { AppSettings } from '../../core/AppSettings'
+import { UIEventTypes } from '../../types/InteractionEvents'
 
 export class SystemUICoordinator {
     private pauseMenuManager: PauseMenuManager
@@ -32,9 +28,7 @@ export class SystemUICoordinator {
         performanceMonitor: PerformanceMonitor,
         debugStatsProvider: DebugStatsProvider,
         eventManager: EventManager,
-        appSettings: AppSettings,
-        cacheStatsProvider?: () => Promise<ImageCacheStats>,
-        steamIntegration?: SteamIntegration
+        appSettings: AppSettings
     ) {
         this.performanceMonitor = performanceMonitor
         
