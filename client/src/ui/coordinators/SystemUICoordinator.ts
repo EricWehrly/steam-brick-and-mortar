@@ -26,10 +26,6 @@ export class SystemUICoordinator {
     private performanceMonitor: PerformanceMonitor
     private lightingControlsPanel?: LightingControlsPanel
     private eventManager: EventManager
-    private debugStatsProvider: DebugStatsProvider
-    private cacheStatsProvider?: () => Promise<ImageCacheStats>
-    private steamIntegration?: SteamIntegration
-    private uiManager?: UIManager
     private appSettings: AppSettings
 
     constructor(
@@ -41,17 +37,10 @@ export class SystemUICoordinator {
         steamIntegration?: SteamIntegration
     ) {
         this.performanceMonitor = performanceMonitor
-        this.debugStatsProvider = debugStatsProvider
-        this.cacheStatsProvider = cacheStatsProvider
-        this.steamIntegration = steamIntegration
         
         this.eventManager = eventManager
         this.appSettings = appSettings
-        this.pauseMenuManager = new PauseMenuManager({}, {}, undefined, this.eventManager, this.appSettings)
-    }
-
-    public setUIManager(uiManager: UIManager): void {
-        this.uiManager = uiManager
+        this.pauseMenuManager = new PauseMenuManager({}, {}, undefined, this.eventManager, this.appSettings, debugStatsProvider)
     }
 
     public async init(
@@ -68,29 +57,7 @@ export class SystemUICoordinator {
         })
         
         // Register all default panels with event emissions
-        this.pauseMenuManager.registerDefaultPanels({
-            onGetImageCacheStats: this.cacheStatsProvider || (() => Promise.resolve({ totalImages: 0, totalSize: 0, oldestTimestamp: 0, newestTimestamp: 0 })),
-            onClearImageCache: async () => this.emitClearImageCacheEvent(),
-            onGetCachedUsers: () => Promise.resolve(this.steamIntegration?.getCachedUsers() ?? []),
-            onLoadCachedUser: async (steamId: string) => {
-                // Emit event for SteamIntegration to handle directly
-                this.eventManager.emit<SteamLoadFromCacheEvent>('steam:load-from-cache', { 
-                    userInput: steamId,
-                    timestamp: Date.now(),
-                    source: EventSource.UI
-                })
-            },
-            onGetImageUrls: async () => {
-                const imageManager = ImageManager.getInstance()
-                const urls = await imageManager.getAllCachedImageUrls()
-                return urls
-            },
-            onGetCachedBlob: async (url: string) => {
-                const imageManager = ImageManager.getInstance()
-                const blob = await imageManager.getCachedImageBlob(url)
-                return blob
-            }
-        })
+        this.pauseMenuManager.registerDefaultPanels()
 
         // Setup event handlers
         this.registerEventHandlers()
@@ -149,13 +116,6 @@ export class SystemUICoordinator {
 
         this.eventManager.registerEventHandler(UIEventTypes.MenuClose, (event) => {
             this.pauseMenuManager.close()
-        })
-    }
-
-    private async emitClearImageCacheEvent(): Promise<void> {
-        this.eventManager.emit('steam:image-cache-clear', {
-            timestamp: Date.now(),
-            source: EventSource.UI
         })
     }
 

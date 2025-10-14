@@ -11,19 +11,18 @@ import pauseMenuStructureTemplate from '../../templates/pause-menu/main-structur
 import '../../styles/pause-menu/pause-menu-manager.css'
 
 // Panel imports for default registration
-import { CacheManagementPanel, type CachedUser } from './panels/CacheManagementPanel'
+import { CacheManagementPanel } from './panels/CacheManagementPanel'
 import { HelpPanel } from './panels/HelpPanel'
 import { ApplicationPanel } from './panels/ApplicationPanel'
 import { GameSettingsPanel } from './panels/GameSettingsPanel'
 import { GraphicsSettingsPanel } from './panels/GraphicsSettingsPanel'
-import { DebugPanel } from './panels/DebugPanel'
-import type { DebugStats } from '../../core'
-import type { ImageCacheStats } from '../../steam/images/ImageManager'
 import type { PerformanceMonitor } from '../PerformanceMonitor'
 import { EventManager, EventSource } from '../../core/EventManager'
 import { SteamEventTypes, LightingEventTypes } from '../../types/InteractionEvents'
 import type { SteamDataLoadedEvent, LightingToggleEvent, LightingDebugToggleEvent, LightingQualityChangedEvent } from '../../types/InteractionEvents'
 import { AppSettings, type ApplicationSettings } from '../../core/AppSettings'
+import type { DebugStatsProvider } from '../../core/DebugStatsProvider'
+import { DebugPanel } from './panels/DebugPanel'
 
 export interface PauseMenuState {
     isOpen: boolean
@@ -50,18 +49,6 @@ export interface SystemDependencies {
     renderer: THREE.WebGLRenderer
 }
 
-export interface DefaultPanelCallbacks {
-    // Cache management
-    onGetImageCacheStats?: () => Promise<ImageCacheStats>
-    onClearImageCache?: () => Promise<void>
-    onGetCachedUsers?: () => Promise<CachedUser[]>
-    onLoadCachedUser?: (steamId: string) => Promise<void>
-    onGetImageUrls?: () => Promise<string[]>
-    onGetCachedBlob?: (url: string) => Promise<Blob | null>
-    
-    // Debug stats
-    onGetDebugStats?: () => Promise<DebugStats>
-}
 
 export class PauseMenuManager {
     private state: PauseMenuState = {
@@ -81,13 +68,15 @@ export class PauseMenuManager {
     private applicationPanel: ApplicationPanel | null = null
     private eventManager: EventManager
     private appSettings: AppSettings
+    private debugStatsProvider?: DebugStatsProvider
 
     constructor(
         config: PauseMenuConfig = {}, 
         callbacks: PauseMenuCallbacks = {}, 
         systemDependencies: SystemDependencies | undefined,
         eventManager: EventManager,
-        appSettings: AppSettings
+        appSettings: AppSettings,
+        debugStatsProvider?: DebugStatsProvider
     ) {
         this.config = {
             containerId: 'pause-menu-overlay',
@@ -99,20 +88,15 @@ export class PauseMenuManager {
         this.systemDependencies = systemDependencies || null
         this.eventManager = eventManager
         this.appSettings = appSettings
+        this.debugStatsProvider = debugStatsProvider
     }
 
-    /**
-     * Initialize the pause menu system
-     */
     init(): void {
         this.createMenuStructure()
         this.setupKeyboardHandling()
         this.setupEventListeners()
     }
 
-    /**
-     * Setup event listeners for steam data loading
-     */
     private setupEventListeners(): void {
         this.eventManager.registerEventHandler(
             SteamEventTypes.DataLoaded, 
@@ -120,9 +104,6 @@ export class PauseMenuManager {
         )
     }
 
-    /**
-     * Handle steam data loaded event - refresh panels that depend on data
-     */
     private onSteamDataLoaded(event: CustomEvent<SteamDataLoadedEvent>): void {
         // Refresh cache management panel if it exists and is visible
         if (this.cacheManagementPanel) {
@@ -130,40 +111,21 @@ export class PauseMenuManager {
         }
     }
 
-    /**
-     * Set system dependencies for settings management
-     */
     setSystemDependencies(dependencies: SystemDependencies): void {
         this.systemDependencies = dependencies
     }
 
-    /**
-     * Register a panel with the pause menu
-     */
     registerPanel(panel: PauseMenuPanel): void {
         this.panels.set(panel.id, panel)
         panel.init()
         this.createPanelTab(panel)
     }
 
-    /**
-     * Register all default panels with their callbacks
-     */
-    registerDefaultPanels(callbacks: DefaultPanelCallbacks): void {
-        // Register cache management panel
-        if (callbacks.onGetImageCacheStats && callbacks.onClearImageCache) {
-            const cachePanel = new CacheManagementPanel()
-            cachePanel.initCacheFunctions(
-                callbacks.onGetImageCacheStats,
-                callbacks.onClearImageCache,
-                callbacks.onGetCachedUsers,
-                callbacks.onLoadCachedUser,
-                callbacks.onGetImageUrls,
-                callbacks.onGetCachedBlob
-            )
-            this.cacheManagementPanel = cachePanel
-            this.registerPanel(cachePanel)
-        }
+    registerDefaultPanels(): void {
+        // Register cache management panel - no longer needs callbacks
+        const cachePanel = new CacheManagementPanel()
+        this.cacheManagementPanel = cachePanel
+        this.registerPanel(cachePanel)
         
         // Register help panel
         this.registerPanel(new HelpPanel())
@@ -186,33 +148,21 @@ export class PauseMenuManager {
         })
         this.registerPanel(graphicsPanel)
         
-        // Register debug panel
-        if (callbacks.onGetDebugStats) {
-            const debugPanel = new DebugPanel()
-            debugPanel.initialize({
-                onGetDebugStats: callbacks.onGetDebugStats
-            })
+        // Register debug panel if debugStatsProvider is available
+        if (this.debugStatsProvider) {
+            const debugPanel = new DebugPanel({}, this.debugStatsProvider)
             this.registerPanel(debugPanel)
         }
     }
 
-    /**
-     * Get the cache management panel for external access
-     */
     getCacheManagementPanel(): CacheManagementPanel | null {
         return this.cacheManagementPanel
     }
 
-    /**
-     * Get the application panel for external access
-     */
     getApplicationPanel(): ApplicationPanel | null {
         return this.applicationPanel
     }
 
-    /**
-     * Toggle the pause menu open/closed
-     */
     toggle(): void {
         if (this.state.isOpen) {
             this.close()

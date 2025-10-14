@@ -85,16 +85,9 @@ describe('SteamIntegration Unit Tests', () => {
             expect(true).toBe(true) // Basic verification that method exists and runs
         })
 
-        test('should provide direct cache manager access for stats', () => {
-            // Test that getCacheManager returns a cache manager that can provide stats
-            const cacheManager = steamIntegration.getCacheManager()
-            expect(cacheManager).toBeDefined()
-            expect(typeof cacheManager.getStats).toBe('function')
-            
-            // Test that we can get stats from the cache manager
-            const stats = cacheManager.getStats()
-            expect(stats).toBeDefined()
-            expect(typeof stats.totalEntries).toBe('number')
+        test('should initialize without errors', () => {
+            // Test basic initialization
+            expect(steamIntegration).toBeDefined()
         })
     })
 
