@@ -494,6 +494,27 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 
 **Expected Deliverable**: Clean game placement system with proper shelf integration
 
+### Feature 6.2.1: Material Generation Performance Optimization 🔄 **MEDIUM PRIORITY**
+**Context**: Optimize procedural texture generation to eliminate main thread blocking
+
+#### Story 6.2.1.1: WebWorker Texture Generation 🔄
+- **Task 6.2.1.1.1**: Move procedural texture generation to WebWorkers
+  - Refactor WoodTextureGenerator, CarpetTextureGenerator, CeilingTextureGenerator for WebWorker execution
+  - Implement async texture creation with Promise-based interface
+  - Ensure texture transfer from worker to main thread maintains quality
+  - Add proper error handling and fallback mechanisms for WebWorker failures
+- **Task 6.2.1.1.2**: Implement texture loading feedback system
+  - Add loading indicators during texture generation
+  - Implement progress reporting for complex material creation
+  - Add user feedback for initial material loading delays
+  - Ensure smooth UX during background texture generation
+
+**Expected Deliverable**: Non-blocking texture generation that eliminates frame drops during material creation
+
+**Benefits**: Improved runtime performance, better user experience during material creation, eliminates 6+ second blocking behavior
+
+**Priority Rationale**: While lazy loading solved startup delay, texture generation still blocks main thread during material requests. This optimization improves the user experience significantly.
+
 ### Feature 6.3: Advanced Lighting and Graphics Settings 🔄 **FUTURE ENHANCEMENT**
 **Context**: Configurable lighting system with performance scaling options
 
