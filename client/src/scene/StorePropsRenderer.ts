@@ -248,10 +248,6 @@ export class StorePropsRenderer {
         }
     }
 
-    public getPerformanceStats(): any {
-        return this.gameBoxRenderer?.getPerformanceStats() ?? {}
-    }
-
     /**
      * Get access to specific renderers for external use
      */

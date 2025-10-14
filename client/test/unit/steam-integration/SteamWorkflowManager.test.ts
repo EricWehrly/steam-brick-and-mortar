@@ -33,7 +33,6 @@ const mockSteamIntegration = {
     refreshData: vi.fn(),
     clearCache: vi.fn(),
     getCacheStats: vi.fn(),
-    clearImageCache: vi.fn(),
     updateMaxGames: vi.fn(),
     getGameLibraryState: vi.fn()
 }
