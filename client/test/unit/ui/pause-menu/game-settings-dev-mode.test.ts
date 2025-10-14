@@ -7,8 +7,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { GameSettingsPanel } from '../../../../src/ui/pause/panels/GameSettingsPanel'
 import { EventManager } from '../../../../src/core/EventManager'
-import { SteamEventTypes } from '../../../../src/types/InteractionEvents'
 import { AppSettings } from '../../../../src/core/AppSettings'
+import { AppSettingsEventTypes } from '../../../../src/types/InteractionEvents'
 
 describe('GameSettingsPanel Development Mode', () => {
     let gameSettingsPanel: GameSettingsPanel
@@ -67,7 +67,7 @@ describe('GameSettingsPanel Development Mode', () => {
             expect(developmentMode).toBe(false)
         })
 
-        it('should emit DevModeToggle event when changed', () => {
+        it('should update AppSettings when dev mode is changed', () => {
             // Simulate the panel being rendered and attached
             document.body.innerHTML = gameSettingsPanel.render()
             gameSettingsPanel.attachEvents()
@@ -79,11 +79,12 @@ describe('GameSettingsPanel Development Mode', () => {
             devModeToggle.checked = false
             devModeToggle.dispatchEvent(new Event('change'))
 
-            // Verify event was emitted
+            // Verify AppSettings change event was emitted instead of DevModeToggle
             expect(emitSpy).toHaveBeenCalledWith(
-                SteamEventTypes.DevModeToggle,
+                AppSettingsEventTypes.Changed,
                 expect.objectContaining({
-                    isEnabled: false,
+                    key: 'developmentMode',
+                    value: false,
                     timestamp: expect.any(Number),
                     source: 'ui'
                 })

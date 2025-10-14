@@ -14,7 +14,6 @@ import gameSettingsPanelTemplate from '../../../templates/pause-menu/game-settin
 import '../../../styles/pause-menu/game-settings-panel.css'
 import { AppSettings } from '../../../core/AppSettings'
 import { EventManager, EventSource } from '../../../core/EventManager'
-import { SteamEventTypes } from '../../../types/InteractionEvents'
 
 export interface SteamSettings {
     // Steam Profile Settings (autoLoadProfile moved to AppSettings)
@@ -121,7 +120,6 @@ export class GameSettingsPanel extends PauseMenuPanel {
             devModeToggle.addEventListener('change', (e) => {
                 const checked = (e.target as HTMLInputElement).checked
                 this.appSettings.setSetting('developmentMode', checked, EventSource.UI)
-                this.handleDevelopmentModeChange(checked)
                 console.log(`🎮 App setting updated: developmentMode = ${checked}`)
             })
         }
@@ -201,14 +199,6 @@ export class GameSettingsPanel extends PauseMenuPanel {
         console.log(`🎮 Game setting updated: ${key} = ${value}`)
     }
 
-    private handleDevelopmentModeChange(isEnabled: boolean): void {
-        // Emit the dev mode toggle event for SteamWorkflowManager to handle
-        this.eventManager.emit(SteamEventTypes.DevModeToggle, {
-            isEnabled,
-            timestamp: Date.now(),
-            source: EventSource.UI
-        })
-    }
 
     private resetToDefaults(): void {
         // Reset local Steam settings to defaults

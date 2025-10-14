@@ -12,6 +12,7 @@
  */
 
 import { EventManager, EventSource } from './EventManager'
+import { AppSettingsEventTypes } from '../types/InteractionEvents'
 
 // Lighting Quality Constants
 export const LIGHTING_QUALITY = {
@@ -129,7 +130,7 @@ export class AppSettings {
         }
 
         // Emit change event
-        this.eventManager.emit<SettingChangedEvent>('app-settings:changed', {
+        this.eventManager.emit<SettingChangedEvent>(AppSettingsEventTypes.Changed, {
             key,
             value,
             previousValue,
@@ -171,7 +172,7 @@ export class AppSettings {
 
         // Emit change events for all changes
         changes.forEach(change => {
-            this.eventManager.emit<SettingChangedEvent>('app-settings:changed', change)
+            this.eventManager.emit<SettingChangedEvent>(AppSettingsEventTypes.Changed, change)
         })
     }
 
@@ -196,7 +197,7 @@ export class AppSettings {
             const previousValue = oldSettings[typedKey]
             
             if (previousValue !== value) {
-                this.eventManager.emit<SettingChangedEvent>('app-settings:changed', {
+                this.eventManager.emit<SettingChangedEvent>(AppSettingsEventTypes.Changed, {
                     key: typedKey,
                     value: value as ApplicationSettings[keyof ApplicationSettings],
                     previousValue,
