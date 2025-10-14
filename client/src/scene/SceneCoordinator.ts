@@ -195,6 +195,12 @@ export class SceneCoordinator {
         console.log('=== END SCENE OBJECT LIST ===\n')
     }
 
+    public updatePerformanceData(camera: THREE.Camera): void {
+        if (this.propsRenderer) {
+            this.propsRenderer.updatePerformanceData(camera)
+        }
+    }
+
     dispose(): void {
         this.skyboxManager.dispose()
         this.lightingRenderer.dispose()
