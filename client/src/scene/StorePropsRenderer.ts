@@ -18,6 +18,7 @@ import { GameBoxRenderer } from './GameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
 import { PropRenderer } from './PropRenderer'
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
+import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 
 import { RoomConstants } from './RoomManager'
 import { EventManager, EventSource } from '../core/EventManager'
@@ -69,6 +70,7 @@ export class StorePropsRenderer {
     private gameBoxRenderer: GameBoxRenderer
     private signageRenderer: SignageRenderer
     private propRenderer: PropRenderer
+    private instancedShelfRenderer: InstancedShelfRenderer
     private propsGroup: THREE.Group
     private config: PropsConfig = {}
     private currentStoreGroup: THREE.Group | null = null // Track current store environment
@@ -76,6 +78,7 @@ export class StorePropsRenderer {
     private labelTextureArrayManager?: LabelTextureArrayManager
     private imageManager: ImageManager
     private globalGameIndex: number = 0 // Track global game position for artwork selection
+    private useInstancedShelves: boolean = false // Toggle for gradual rollout
 
     constructor(scene: THREE.Scene, dataManager: DataManager, gameBoxRenderer: GameBoxRenderer) {
         this.scene = scene
@@ -97,6 +100,16 @@ export class StorePropsRenderer {
         this.storeLayout = new StoreLayout(this.scene)
         
         this.signageRenderer = new SignageRenderer()
+        
+        // Initialize instanced shelf renderer for GPU-optimized shelf rendering
+        this.instancedShelfRenderer = new InstancedShelfRenderer({
+            maxShelfUnits: 200,
+            enablePerformanceLogging: true,
+            debugName: 'StoreProps-Shelves'
+        })
+        
+        // TODO: Enable instanced shelves via configuration or A/B testing
+        this.useInstancedShelves = true // Enable by default for testing
     }
 
     private setupEventListeners(): void {
@@ -159,6 +172,12 @@ export class StorePropsRenderer {
         }
         
         try {
+            // Initialize instanced shelf renderer for better performance
+            if (this.useInstancedShelves) {
+                await this.instancedShelfRenderer.initialize()
+                console.log('✅ InstancedShelfRenderer initialized for GPU-optimized shelf rendering')
+            }
+            
             // Set up props in logical order
             // NOTE: Static shelf setup removed - dynamic generation happens via room:resized event
             // This eliminates duplicate environment creation
@@ -303,21 +322,41 @@ export class StorePropsRenderer {
 
     /**
      * Create a single shelf with game placement capability
+     * Supports both legacy ProceduralShelfGenerator and new InstancedShelfRenderer
      */
     private async createSingleShelfWithGames(position: THREE.Vector3, rowIndex: number, shelfIndex: number, games: any[] = []): Promise<THREE.Group> {
         const shelfGroup = new THREE.Group()
         shelfGroup.name = `dynamic-shelf-${rowIndex}-${shelfIndex}`
         shelfGroup.position.copy(position)
         
-        // Create a single shelf unit using ProceduralShelfGenerator directly
         try {
-            const shelfGenerator = new ProceduralShelfGenerator()
-            const shelfUnit = shelfGenerator.generateShelfUnit(new THREE.Vector3(0, 0, 0))
-            shelfGroup.add(shelfUnit)
-            
-            // Create game boxes with actual game data if available
-            if (games.length > 0) {
-                await this.spawnActualGamesOnShelf(shelfUnit, shelfGroup, games, rowIndex, shelfIndex)
+            if (this.useInstancedShelves && this.instancedShelfRenderer.isReady()) {
+                // Use GPU instanced rendering for better performance
+                const shelfUnitIndex = rowIndex * 10 + shelfIndex // Unique index per shelf
+                
+                const success = this.instancedShelfRenderer.setInstance(shelfUnitIndex, {
+                    position: position.clone(),
+                    // Can add custom shelf configuration here if needed
+                    // shelfConfig: { width: 2.0, height: 2.0, shelfCount: 3 }
+                })
+                
+                if (success) {
+                    console.debug(`🏪 Created instanced shelf ${shelfUnitIndex} at (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`)
+                    
+                    // Create game boxes with actual game data if available
+                    // Note: Game placement will need to be handled separately for instanced shelves
+                    if (games.length > 0) {
+                        await this.spawnGamesForInstancedShelf(position, games, rowIndex, shelfIndex)
+                    }
+                } else {
+                    console.warn(`⚠️ Failed to create instanced shelf ${shelfUnitIndex}, falling back to procedural generation`)
+                    // Fall back to procedural generation
+                    await this.createProceduralShelf(shelfGroup, position, games, rowIndex, shelfIndex)
+                }
+                
+            } else {
+                // Use legacy procedural generation
+                await this.createProceduralShelf(shelfGroup, position, games, rowIndex, shelfIndex)
             }
             
         } catch (error) {
@@ -335,6 +374,117 @@ export class StorePropsRenderer {
         )
         
         return shelfGroup
+    }
+    
+    /**
+     * Create shelf using legacy ProceduralShelfGenerator (fallback)
+     */
+    private async createProceduralShelf(
+        shelfGroup: THREE.Group, 
+        position: THREE.Vector3, 
+        games: any[], 
+        rowIndex: number, 
+        shelfIndex: number
+    ): Promise<void> {
+        const shelfGenerator = new ProceduralShelfGenerator()
+        const shelfUnit = shelfGenerator.generateShelfUnit(new THREE.Vector3(0, 0, 0))
+        shelfGroup.add(shelfUnit)
+        
+        // Create game boxes with actual game data if available
+        if (games.length > 0) {
+            await this.spawnActualGamesOnShelf(shelfUnit, shelfGroup, games, rowIndex, shelfIndex)
+        }
+    }
+    
+    /**
+     * Spawn games for instanced shelves (different approach than procedural shelves)
+     */
+    private async spawnGamesForInstancedShelf(
+        shelfPosition: THREE.Vector3, 
+        games: any[], 
+        rowIndex: number, 
+        shelfIndex: number
+    ): Promise<void> {
+        // For instanced shelves, we need to calculate game positions based on the shelf configuration
+        // This is more complex than the procedural approach since we don't have actual shelf surfaces
+        
+        const shelfConfig = this.instancedShelfRenderer['defaultShelfConfig'] // Access default config
+        const shelfSpacing = shelfConfig.height / (shelfConfig.shelfCount + 1)
+        
+        // Place games on each shelf level
+        for (let level = 1; level <= shelfConfig.shelfCount; level++) {
+            const shelfY = level * shelfSpacing
+            const levelGames = games.slice((level - 1) * 6, level * 6) // 6 games per shelf level (3 front + 3 back)
+            
+            for (let gameIndex = 0; gameIndex < levelGames.length; gameIndex++) {
+                const game = levelGames[gameIndex]
+                
+                // Determine if game is on front or back face
+                const isBackFace = gameIndex >= 3 // First 3 games on front, next 3 on back
+                const faceIndex = gameIndex % 3 // 0-2 index within the face (3 games per face)
+                
+                // Calculate face offset (front/back positioning) - using updated depth
+                const boardSeparation = shelfConfig.depth * 0.8 // Match the shelf board separation
+                const gameDepthOffset = isBackFace 
+                    ? -boardSeparation / 2 - 0.12  // Back face: closer to back board
+                    : boardSeparation / 2 + 0.12   // Front face: closer to front board
+                
+                // Improved game spacing - more evenly distributed across shelf width
+                const gameSpacing = (shelfConfig.width * 0.8) / 3 // Use 80% of shelf width for 3 games
+                const startX = -gameSpacing // Start position for even distribution
+                const gameX = startX + (faceIndex * gameSpacing)
+                
+                // Calculate game position on shelf face - bottom of game box sits on shelf surface
+                const gameBoxHeight = 0.4 // Game box height from GameBoxRenderer.DEFAULT_DIMENSIONS
+                const gamePosition = shelfPosition.clone().add(new THREE.Vector3(
+                    gameX, // More evenly distributed spacing
+                    shelfY + shelfConfig.boardThickness * 0.5 + gameBoxHeight * 0.5, // Bottom sits on shelf surface
+                    gameDepthOffset
+                ))
+                
+                // Handle artwork for featured games (same logic as procedural shelves)
+                const shouldUseArtwork = (this.globalGameIndex % 10) === 0
+                let textureOptions = undefined
+                
+                if (shouldUseArtwork && game.artwork?.header) {
+                    try {
+                        const imageBlob = await this.imageManager.downloadImage(game.artwork.header, {
+                            timeout: 5000,
+                            enableFallback: true,
+                            onImageError: (url, error) => {
+                                console.error(`❌ Artwork download failed for ${game.name}:`, error.message)
+                            }
+                        })
+                        
+                        if (imageBlob) {
+                            textureOptions = await this.createTextureOptionsFromBlob(imageBlob, game.name)
+                        }
+                    } catch (error) {
+                        console.error(`❌ Artwork loading failed for ${game.name}:`, error)
+                    }
+                }
+                
+                // Use existing game box renderer to place individual games
+                // Note: For instanced shelves, games are still created individually using the existing renderer
+                const faceName = isBackFace ? 'back' : 'front'
+                const gameBoxName = `instanced-shelf-${rowIndex}-${shelfIndex}-${level}-${faceName}-${faceIndex}`
+                const gameBox = this.gameBoxRenderer.createGameBox(game, gamePosition, textureOptions, gameBoxName)
+                
+                // Rotate games to face outward properly
+                // Note: Only individual meshes can be rotated (instanced labels use default orientation)
+                if (gameBox) {
+                    if (isBackFace) {
+                        gameBox.rotation.y = Math.PI // Back face: rotate 180 to face toward front
+                    } else {
+                        gameBox.rotation.y = 0 // Front face: default orientation faces front
+                    }
+                }
+                
+                this.globalGameIndex++ // Increment for artwork selection logic
+            }
+        }
+        
+        console.debug(`📦 Spawned ${games.length} games on instanced shelf ${rowIndex}-${shelfIndex}`)
     }
 
     /**
@@ -441,9 +591,9 @@ export class StorePropsRenderer {
             const worldPosition = localPosition.clone().add(parentGroup.position)
             const name = `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}-${side}-${i}`
 
-            // Use artwork for every 20th game to balance performance and visual interest
+            // Use artwork for every 10th game to balance performance and visual interest
             // TODO: fix failing calls to akamai CDN @ (maybe) mod 10
-            const shouldUseArtwork = (this.globalGameIndex % 20) === 0
+            const shouldUseArtwork = (this.globalGameIndex % 10) === 0
             let textureOptions = undefined
             
             if (shouldUseArtwork && game.artwork?.header) {
@@ -626,6 +776,9 @@ export class StorePropsRenderer {
         this.signageRenderer?.dispose()
         this.storeLayout?.dispose()
         this.propRenderer?.dispose()
+        
+        // Dispose instanced shelf renderer
+        this.instancedShelfRenderer?.dispose()
         
         // Clean up test instances
         this.labelTextureArrayManager?.dispose()
