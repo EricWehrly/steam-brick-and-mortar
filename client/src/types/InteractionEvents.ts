@@ -155,6 +155,12 @@ export interface GameStartEvent extends BaseInteractionEvent {
     }
 }
 
+export interface InstancedBatchCompleteEvent extends BaseInteractionEvent {
+    // Emitted when a batch of game boxes has been created and instanced renderers need GPU updates
+    batchType: 'shelf' | 'row' | 'custom'
+    gameCount: number
+}
+
 // =============================================================================
 // LIGHTING EVENTS
 // =============================================================================
@@ -232,7 +238,8 @@ export const UIEventTypes = {
 
 export const GameEventTypes = {
     SceneReady: 'game:scene-ready',
-    Start: 'game:start'
+    Start: 'game:start',
+    InstancedBatchComplete: 'game:instanced-batch-complete'
 } as const
 
 export const LightingEventTypes = {
@@ -290,6 +297,7 @@ export interface InteractionEventMap {
     // Game events
     [GameEventTypes.SceneReady]: SceneReadyEvent
     [GameEventTypes.Start]: GameStartEvent
+    [GameEventTypes.InstancedBatchComplete]: InstancedBatchCompleteEvent
     
     // Lighting events
     [LightingEventTypes.Toggle]: LightingToggleEvent

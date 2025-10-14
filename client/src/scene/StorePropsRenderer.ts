@@ -21,7 +21,7 @@ import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
 
 import { RoomConstants } from './RoomManager'
 import { EventManager, EventSource } from '../core/EventManager'
-import { RoomEventTypes, SteamEventTypes, GameEventTypes } from '../types/InteractionEvents'
+import { RoomEventTypes, SteamEventTypes, GameEventTypes, type InstancedBatchCompleteEvent } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
 import type { GameBoxTextureOptions } from './game-box/types/GameBoxOptions'
@@ -324,10 +324,15 @@ export class StorePropsRenderer {
             console.error(`❌ Failed to create shelf unit:`, error)
         }
         
-        // Update GPU for both instanced renderers after creating the shelf
-        this.gameBoxRenderer.getInstancedLabelRenderer()?.updateGPU()
-        
-        this.gameBoxRenderer.getInstancedArtworkRenderer()?.updateGPU()
+        // Emit event to trigger GPU updates for instanced renderers
+        EventManager.getInstance().emit<InstancedBatchCompleteEvent>(
+            GameEventTypes.InstancedBatchComplete,
+            {
+                batchType: 'shelf',
+                gameCount: games.length
+            } as InstancedBatchCompleteEvent,
+            EventSource.System
+        )
         
         return shelfGroup
     }

@@ -53,6 +53,8 @@ export class InstancedLabelRenderer {
         
         this.textureArrayManager = new LabelTextureArrayManager(config.textureSize || 512)
         
+        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, () => this.updateGPU())
+        
         console.debug(`📋 InstancedLabelRenderer created (max: ${this.maxInstances} labels)`)
     }
     
@@ -161,8 +163,7 @@ export class InstancedLabelRenderer {
      * Call this after setting multiple instances for efficiency
      */
     public updateGPU(): void {
-        if (!this.instancedMesh || !this.geometry) {
-            console.warn('❌ updateGPU called but instancedMesh or geometry is null')
+        if (!this.isInitialized || !this.instancedMesh || !this.geometry) {
             return
         }
         

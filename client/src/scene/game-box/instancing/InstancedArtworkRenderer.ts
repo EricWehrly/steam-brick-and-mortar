@@ -23,6 +23,8 @@ import * as THREE from 'three'
 import type { GameBoxTextureOptions } from '../types/GameBoxOptions'
 import { DataManager } from '../../../core/data/DataManager'
 import { TextureWorker } from './TextureWorker'
+import { EventManager } from '../../../core/EventManager'
+import { GameEventTypes } from '../../../types/InteractionEvents'
 
 export interface InstancedArtworkConfig {
     maxInstances?: number
@@ -84,6 +86,8 @@ export class InstancedArtworkRenderer {
             height: config.boxHeight || 0.4,
             depth: config.boxDepth || 0.1
         }
+        
+        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, () => this.updateGPU())
         
         // Pre-create shared canvas for artwork processing
         this.initializeSharedCanvas()
@@ -545,8 +549,7 @@ export class InstancedArtworkRenderer {
      * Apply all instance updates to GPU
      */
     public updateGPU(): void {
-        if (!this.instancedMesh || !this.geometry) {
-            console.warn('❌ updateGPU called but instancedMesh or geometry is null')
+        if (!this.isInitialized || !this.instancedMesh || !this.geometry) {
             return
         }
         
