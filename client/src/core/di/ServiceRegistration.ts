@@ -228,9 +228,7 @@ export class ServiceRegistration {
         performanceMonitor,
         debugStatsProvider,
         eventManager,
-        appSettings,
-        cacheStatsProvider,
-        steamIntegration
+        appSettings
       )
     )
     
