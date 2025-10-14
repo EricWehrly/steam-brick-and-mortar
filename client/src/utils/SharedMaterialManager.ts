@@ -10,6 +10,14 @@
  * - After: ~50 pooled material instances
  * - Memory Reduction: 95%+ for material data
  * - Draw Call Reduction: Enables batching of objects with same material
+ * 
+ * Lazy Loading Implementation:
+ * - Initialization: Near-instant (0ms vs previous 6+ seconds)  
+ * - Material Creation: On-demand when first requested
+ * - Texture Generation: Still blocks main thread during creation
+ * 
+ * TODO: Move procedural texture generation to WebWorkers to eliminate 
+ * main thread blocking during material creation. See tech-debt.md for details.
  */
 
 import * as THREE from 'three'
@@ -18,22 +26,21 @@ import { WoodMaterialGenerator } from './materials/WoodMaterialGenerator'
 import { CarpetMaterialGenerator } from './materials/CarpetMaterialGenerator'
 import { CeilingMaterialGenerator } from './materials/CeilingMaterialGenerator'
 
-export type ShelfMaterialType = 'mdfVeneer' | 'shelfInterior' | 'brandAccent'
+export enum MaterialType {
+    FallbackGameBox = 'fallbackGameBox',
+    MdfVeneer = 'mdfVeneer',
+    ShelfInterior = 'shelfInterior',
+    BrandAccent = 'brandAccent',
+    Carpet = 'carpet',
+    Ceiling = 'ceiling',
+    WallWood = 'wallWood',
+    BasicWood = 'basicWood'
+}
+
+export type ShelfMaterialType = MaterialType.MdfVeneer | MaterialType.ShelfInterior | MaterialType.BrandAccent
 
 export interface MaterialPool {
-    // Game box materials (hue-based pooling for color variety)
-    gameBoxMaterials: Map<number, THREE.MeshStandardMaterial>
-    
-    // Shelf materials (fully shared instances)
-    mdfVeneer: THREE.MeshStandardMaterial
-    shelfInterior: THREE.MeshStandardMaterial  
-    brandAccent: THREE.MeshStandardMaterial
-    
-    // Environment materials (shared room/building materials)
-    carpetMaterial: THREE.MeshStandardMaterial
-    ceilingMaterial: THREE.MeshStandardMaterial
-    wallWoodMaterial: THREE.MeshStandardMaterial
-    basicWoodMaterial: THREE.MeshStandardMaterial
+    materials: Map<MaterialType, THREE.MeshStandardMaterial>
 }
 
 export interface MaterialStats {
@@ -44,30 +51,13 @@ export interface MaterialStats {
     poolHitRate: number // 0-1, percentage of requests served from pool
 }
 
-/**
- * Configuration for game box material palette
- */
-export interface GameBoxMaterialConfig {
-    hueSteps: number // Number of distinct hues (12 = 30° steps)
-    saturation: number // 0-1
-    lightness: number // 0-1
-    roughness: number
-    metalness: number
-}
-
-/**
- * Singleton manager for shared material resources
- */
 export class SharedMaterialManager {
     private static instance: SharedMaterialManager
     private materialPool: MaterialPool | null = null
     
-    // Material generators
     private woodMaterialGenerator: WoodMaterialGenerator
     private carpetMaterialGenerator: CarpetMaterialGenerator
     private ceilingMaterialGenerator: CeilingMaterialGenerator
-    
-    // Pool statistics
     private poolRequests = 0
     private poolHits = 0
     private disposed = false
@@ -85,18 +75,7 @@ export class SharedMaterialManager {
         return SharedMaterialManager.instance
     }
 
-    /**
-     * Initialize material pool with optimized palette
-     */
-    public initialize(
-        gameBoxConfig: GameBoxMaterialConfig = {
-            hueSteps: 12, // 30° hue steps for good color variety
-            saturation: 0.7,
-            lightness: 0.5, 
-            roughness: 0.7,
-            metalness: 0.1
-        }
-    ): void {
+    public initialize(): void {
         if (this.disposed) {
             throw new Error('SharedMaterialManager has been disposed')
         }
@@ -108,168 +87,78 @@ export class SharedMaterialManager {
 
         const startTime = performance.now()
 
-        // Initialize material pool
         this.materialPool = {
-            gameBoxMaterials: new Map(),
-            mdfVeneer: this.createMDFVeneerMaterial(),
-            shelfInterior: this.createShelfInteriorMaterial(),
-            brandAccent: this.createBrandAccentMaterial(),
-            // Environment materials (shared across room/building)
-            carpetMaterial: this.createCarpetMaterial(),
-            ceilingMaterial: this.createCeilingMaterial(),
-            wallWoodMaterial: this.createWallWoodMaterial(),
-            basicWoodMaterial: this.createBasicWoodMaterial()
+            materials: new Map<MaterialType, THREE.MeshStandardMaterial>()
         }
-
-        // Create game box material palette
-        this.createGameBoxMaterialPalette(gameBoxConfig)
 
         const endTime = performance.now()
-        console.log(`✅ SharedMaterialManager initialized in ${(endTime - startTime).toFixed(2)}ms`)
-        console.log('🎨 Material Pool:', {
-            gameBoxMaterials: this.materialPool.gameBoxMaterials.size,
-            shelfMaterials: 3,
-            totalMaterials: this.materialPool.gameBoxMaterials.size + 3
-        })
+        console.debug(`✅ SharedMaterialManager initialized in ${(endTime - startTime).toFixed(2)}ms`)
     }
 
-    /**
-     * Create palette of game box materials with optimized hue distribution
-     */
-    private createGameBoxMaterialPalette(config: GameBoxMaterialConfig): void {
-        const { hueSteps, saturation, lightness, roughness, metalness } = config
-
-        for (let i = 0; i < hueSteps; i++) {
-            const hue = i / hueSteps // 0-1 range for THREE.Color.setHSL
-            const color = new THREE.Color().setHSL(hue, saturation, lightness)
-            
-            const material = MaterialUtils.createPBRMaterial({
-                color: color.getHex(),
-                roughness,
-                metalness
-            })
-
-            // Store by normalized hue (0-359 degrees)
-            const hueKey = Math.round(hue * 359)
-            this.materialPool!.gameBoxMaterials.set(hueKey, material)
-        }
-
-        console.log(`🎨 Created ${hueSteps} game box materials with ${360/hueSteps}° hue steps`)
-    }
-
-    /**
-     * Get game box material by hue (automatically maps to nearest palette color)
-     */
-    public getGameBoxMaterial(targetHue: number): THREE.MeshStandardMaterial {
+    private getMaterial(type: MaterialType): THREE.MeshStandardMaterial {
         if (!this.materialPool) {
             this.initialize()
         }
-
-        this.poolRequests++
-
-        // Normalize hue to 0-359 range
-        const normalizedHue = ((targetHue % 360) + 360) % 360
-
-        // Find nearest palette hue
-        const paletteHues = Array.from(this.materialPool!.gameBoxMaterials.keys())
-        const nearestHue = paletteHues.reduce((closest, hue) => {
-            const currentDistance = Math.min(
-                Math.abs(normalizedHue - hue),
-                360 - Math.abs(normalizedHue - hue) // Wrap-around distance
-            )
-            const closestDistance = Math.min(
-                Math.abs(normalizedHue - closest),
-                360 - Math.abs(normalizedHue - closest)
-            )
-            return currentDistance < closestDistance ? hue : closest
-        })
-
-        this.poolHits++
         
-        // Debug logging for material reuse tracking
-        const material = this.materialPool!.gameBoxMaterials.get(nearestHue)!
-        if (this.poolRequests <= 50) { // Log first 50 requests to see pattern
-            console.debug(`🎨 Material request ${this.poolRequests}: targetHue=${targetHue.toFixed(1)}° → nearestHue=${nearestHue}° (material.uuid=${material.uuid.substring(0,8)})`)
+        if (!this.materialPool!.materials.has(type)) {
+            const material = this.createMaterial(type)
+            this.materialPool!.materials.set(type, material)
         }
         
-        return material
+        this.poolRequests++
+        this.poolHits++
+        return this.materialPool!.materials.get(type)!
+    }
+    
+    private createMaterial(type: MaterialType): THREE.MeshStandardMaterial {
+        switch (type) {
+            case MaterialType.FallbackGameBox:
+                return this.createFallbackGameBoxMaterial()
+            case MaterialType.MdfVeneer:
+                return this.createMDFVeneerMaterial()
+            case MaterialType.ShelfInterior:
+                return this.createShelfInteriorMaterial()
+            case MaterialType.BrandAccent:
+                return this.createBrandAccentMaterial()
+            case MaterialType.Carpet:
+                return this.createCarpetMaterial()
+            case MaterialType.Ceiling:
+                return this.createCeilingMaterial()
+            case MaterialType.WallWood:
+                return this.createWallWoodMaterial()
+            case MaterialType.BasicWood:
+                return this.createBasicWoodMaterial()
+            default:
+                throw new Error(`Unknown material type: ${type}`)
+        }
     }
 
-    /**
-     * Get game box material by game name (convenience method)
-     */
     public getGameBoxMaterialFromName(gameName: string): THREE.MeshStandardMaterial {
-        // Use existing string-to-hue logic from ValidationUtils
-        const hue = this.stringToHue(gameName)
-        return this.getGameBoxMaterial(hue)
+        return this.getMaterial(MaterialType.FallbackGameBox)
     }
 
-    /**
-     * Get shelf material by type
-     */
     public getShelfMaterial(type: ShelfMaterialType): THREE.MeshStandardMaterial {
-        if (!this.materialPool) {
-            this.initialize()
-        }
-
-        this.poolRequests++
-        this.poolHits++
-
-        return this.materialPool![type]
+        return this.getMaterial(type)
     }
     
-    /**
-     * Get shared carpet material for floors
-     */
     public getCarpetMaterial(): THREE.MeshStandardMaterial {
-        if (!this.materialPool) {
-            this.initialize()
-        }
-        this.poolRequests++
-        this.poolHits++
-        return this.materialPool!.carpetMaterial
+        return this.getMaterial(MaterialType.Carpet)
     }
     
-    /**
-     * Get shared ceiling material
-     */
     public getCeilingMaterial(): THREE.MeshStandardMaterial {
-        if (!this.materialPool) {
-            this.initialize()
-        }
-        this.poolRequests++
-        this.poolHits++
-        return this.materialPool!.ceilingMaterial
+        return this.getMaterial(MaterialType.Ceiling)
     }
     
-    /**
-     * Get shared wall wood material
-     */
     public getWallWoodMaterial(): THREE.MeshStandardMaterial {
-        if (!this.materialPool) {
-            this.initialize()
-        }
-        this.poolRequests++
-        this.poolHits++
-        return this.materialPool!.wallWoodMaterial
+        return this.getMaterial(MaterialType.WallWood)
     }
     
-    /**
-     * Get shared basic wood material
-     */
     public getBasicWoodMaterial(): THREE.MeshStandardMaterial {
-        if (!this.materialPool) {
-            this.initialize()
-        }
-        this.poolRequests++
-        this.poolHits++
-        return this.materialPool!.basicWoodMaterial
+        return this.getMaterial(MaterialType.BasicWood)
     }
 
-    /**
-     * Create MDF veneer material for shelf external surfaces
-     * Enhanced for VR close-up viewing with detailed wood grain
-     */
+
+    // TODO: Move to WebWorker - blocks main thread during procedural texture generation
     private createMDFVeneerMaterial(): THREE.MeshStandardMaterial {
         return this.woodMaterialGenerator.createEnhancedProceduralMaterial({
             repeat: { x: 6, y: 4 }, // Higher repeat for detailed grain at close VR distance
@@ -283,9 +172,6 @@ export class SharedMaterialManager {
         })
     }
 
-    /**
-     * Create glossy white interior material for shelf compartments
-     */
     private createShelfInteriorMaterial(): THREE.MeshStandardMaterial {
         return MaterialUtils.createPBRMaterial({
             color: 0xf8f8f8, // Slightly off-white
@@ -294,9 +180,6 @@ export class SharedMaterialManager {
         })
     }
 
-    /**
-     * Create brand blue material for support posts and brackets
-     */
     private createBrandAccentMaterial(): THREE.MeshStandardMaterial {
         return MaterialUtils.createPBRMaterial({
             color: 0x0066cc, // Brand blue
@@ -305,9 +188,8 @@ export class SharedMaterialManager {
         })
     }
     
-    /**
-     * Create shared carpet material for floor
-     */
+
+    // TODO: Move to WebWorker - blocks main thread during procedural texture generation
     private createCarpetMaterial(): THREE.MeshStandardMaterial {
         return this.carpetMaterialGenerator.createEnhancedProceduralMaterial({
             color: '#8B0000',
@@ -316,9 +198,8 @@ export class SharedMaterialManager {
         })
     }
     
-    /**
-     * Create shared ceiling material
-     */
+
+    // TODO: Move to WebWorker - blocks main thread during procedural texture generation
     private createCeilingMaterial(): THREE.MeshStandardMaterial {
         return this.ceilingMaterialGenerator.createEnhancedProceduralMaterial({
             color: '#F5F5DC',
@@ -328,9 +209,7 @@ export class SharedMaterialManager {
         })
     }
     
-    /**
-     * Create enhanced wall wood material
-     */
+    // TODO: Move to WebWorker - blocks main thread during procedural texture generation
     private createWallWoodMaterial(): THREE.MeshStandardMaterial {
         return this.woodMaterialGenerator.createEnhancedProceduralMaterial({
             grainStrength: 0.5,
@@ -342,38 +221,26 @@ export class SharedMaterialManager {
         })
     }
     
-    /**
-     * Create basic wood material  
-     */
+    // TODO: Move to WebWorker - blocks main thread during procedural texture generation
     private createBasicWoodMaterial(): THREE.MeshStandardMaterial {
         return this.woodMaterialGenerator.createProceduralMaterial({
             repeat: { x: 3, y: 1 }
         })
     }
 
-    /**
-     * Simple string-to-hue conversion (copied from ValidationUtils)
-     */
-    private stringToHue(str: string): number {
-        let hash = 0
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i)
-            hash = ((hash << 5) - hash) + char
-            hash = hash & hash // Convert to 32bit integer
-        }
-        return Math.abs(hash) % 360
+    private createFallbackGameBoxMaterial(): THREE.MeshStandardMaterial {
+        return new THREE.MeshStandardMaterial({
+            color: 0xff00ff, // Bright magenta - unmistakable "error" color
+            roughness: 0.8,
+            metalness: 0.2,
+            name: 'fallback-gamebox-material'
+        })
     }
 
-    /**
-     * Check if material manager is initialized
-     */
     public isInitialized(): boolean {
         return this.materialPool !== null && !this.disposed
     }
 
-    /**
-     * Get material pool statistics
-     */
     public getStats(): MaterialStats {
         if (!this.materialPool) {
             return {
@@ -385,10 +252,14 @@ export class SharedMaterialManager {
             }
         }
 
-        const gameBoxCount = this.materialPool.gameBoxMaterials.size
-        const shelfCount = 3 // mdfVeneer, shelfInterior, brandAccent
-        const environmentCount = 4 // carpet, ceiling, wallWood, basicWood
-        const totalMaterials = gameBoxCount + shelfCount + environmentCount
+        const totalMaterials = this.materialPool.materials.size
+        
+        const gameBoxMaterialCount = this.materialPool.materials.has(MaterialType.FallbackGameBox) ? 1 : 0
+        
+        const shelfMaterials: MaterialType[] = [MaterialType.MdfVeneer, MaterialType.ShelfInterior, MaterialType.BrandAccent]
+        const shelfMaterialCount = shelfMaterials.filter(type => 
+            this.materialPool!.materials.has(type)
+        ).length
 
         // Rough memory estimate per material (uniforms + texture references)
         const estimatedBytesPerMaterial = 1024 // Conservative estimate
@@ -396,80 +267,18 @@ export class SharedMaterialManager {
 
         return {
             totalMaterials,
-            gameBoxMaterialCount: gameBoxCount,
-            shelfMaterialCount: shelfCount,
+            gameBoxMaterialCount,
+            shelfMaterialCount,
             memoryEstimate,
             poolHitRate: this.poolRequests > 0 ? this.poolHits / this.poolRequests : 0
         }
     }
 
-    /**
-     * Get list of all game box hues in palette
-     */
-    public getGameBoxPalette(): number[] {
-        if (!this.materialPool) {
-            this.initialize()
-        }
-        return Array.from(this.materialPool!.gameBoxMaterials.keys()).sort((a, b) => a - b)
-    }
-
-    /**
-     * Create debug scene showing material palette
-     */
-    public createDebugScene(): THREE.Group {
-        if (!this.materialPool) {
-            this.initialize()
-        }
-
-        const debugGroup = new THREE.Group()
-        debugGroup.name = 'MaterialPool-Debug'
-
-        const geometry = new THREE.SphereGeometry(0.1, 16, 16)
-        let xOffset = 0
-        const spacing = 0.25
-
-        // Show game box materials
-        this.materialPool!.gameBoxMaterials.forEach((material, hue) => {
-            const mesh = new THREE.Mesh(geometry, material)
-            mesh.position.set(xOffset, 0, 0)
-            mesh.name = `debug-gamebox-hue-${hue}`
-            debugGroup.add(mesh)
-            xOffset += spacing
-        })
-
-        // Show shelf materials
-        xOffset += spacing
-        const shelfMaterials = [
-            ['mdfVeneer', this.materialPool!.mdfVeneer],
-            ['shelfInterior', this.materialPool!.shelfInterior], 
-            ['brandAccent', this.materialPool!.brandAccent]
-        ] as const
-
-        shelfMaterials.forEach(([name, material]) => {
-            const mesh = new THREE.Mesh(geometry, material)
-            mesh.position.set(xOffset, 0.3, 0)
-            mesh.name = `debug-shelf-${name}`
-            debugGroup.add(mesh)
-            xOffset += spacing
-        })
-
-        return debugGroup
-    }
-
-    /**
-     * Dispose all material resources
-     */
     public dispose(): void {
         if (this.materialPool) {
-            // Dispose game box materials
-            this.materialPool.gameBoxMaterials.forEach(material => material.dispose())
-            this.materialPool.gameBoxMaterials.clear()
-
-            // Dispose shelf materials
-            this.materialPool.mdfVeneer.dispose()
-            this.materialPool.shelfInterior.dispose()
-            this.materialPool.brandAccent.dispose()
-
+            this.materialPool.materials.forEach(material => material.dispose())
+            this.materialPool.materials.clear()
+            
             this.materialPool = null
         }
 
@@ -479,9 +288,6 @@ export class SharedMaterialManager {
         console.log('🗑️ SharedMaterialManager disposed')
     }
 
-    /**
-     * Reset the singleton instance (for testing)
-     */
     public static reset(): void {
         if (SharedMaterialManager.instance) {
             SharedMaterialManager.instance.dispose()
