@@ -29,14 +29,9 @@ export const SceneManagerMock = vi.fn().mockImplementation(() => {
     
     return {
         getScene: vi.fn().mockReturnValue(mockScene),
-        getCamera: vi.fn().mockReturnValue(mockCamera),
         getRenderer: vi.fn().mockReturnValue(mockRenderer),
-        createFloor: vi.fn(),
-        createCeiling: vi.fn(),
-        createFluorescentFixtures: vi.fn(),
-        addToScene: vi.fn(),
-        clearObjectsByUserData: vi.fn().mockReturnValue(0),
         startRenderLoop: vi.fn(),
+        stopRenderLoop: vi.fn(),
         dispose: vi.fn()
     }
 })
