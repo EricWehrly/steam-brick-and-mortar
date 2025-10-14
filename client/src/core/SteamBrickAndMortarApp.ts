@@ -135,7 +135,10 @@ export class SteamBrickAndMortarApp {
                 this.debugStatsProvider,
                 EventManager.getInstance(), // Pass EventManager (not yet resolved from DI)
                 this.appSettings, // Pass AppSettings for panel DI
-                () => this.steamIntegration.getImageCacheStats(),
+                async () => {
+                    const { ImageManager } = await import('../steam/images/ImageManager')
+                    return ImageManager.getInstance().getStats()
+                },
                 this.steamIntegration
             )
             
