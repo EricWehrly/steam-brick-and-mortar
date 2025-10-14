@@ -26,7 +26,7 @@ import { LightingRenderer } from './LightingRenderer'
 import { StorePropsRenderer } from './StorePropsRenderer'
 import { RoomManager } from './RoomManager'
 import { EventManager, EventSource } from '../core/EventManager'
-import { GameEventTypes, CeilingEventTypes, SteamEventTypes, type CeilingToggleEvent, type SceneReadyEvent, type SteamDataLoadedEvent } from '../types/InteractionEvents'
+import { GameEventTypes, SteamEventTypes, type SceneReadyEvent, type SteamDataLoadedEvent } from '../types/InteractionEvents'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
@@ -50,7 +50,6 @@ export class SceneCoordinator {
     private lightingRenderer: LightingRenderer
     private propsRenderer: StorePropsRenderer
     private roomManager: RoomManager
-    private appSettings: AppSettings
     private dataManager: DataManager
     private eventManager: EventManager
     private config: SceneCoordinatorConfig
@@ -68,7 +67,6 @@ export class SceneCoordinator {
         
         // TODO: DI tho?
         this.sceneManager = sceneManager
-        this.appSettings = appSettings || AppSettings.getInstance() // Fallback for backward compatibility
         this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
         this.eventManager = eventManager || EventManager.getInstance() // DI injection with fallback
         
@@ -107,33 +105,14 @@ export class SceneCoordinator {
 
     async setupSceneAsPrerequisite(config: SceneCoordinatorConfig = {}): Promise<void> {
         try {
-            
-            // 🚀 PRIORITY: Minimal navigable scene (just camera position - everything else can wait)
-            await this.setupMinimalScene(config.environment)
-            
-            console.log('✅ Minimal scene ready - user can now move around!')
-            
-            // 📡 EMIT SceneReady immediately - basic navigation works
             this.emitSceneReadyEvent()
 
-            // 🎨 Everything else happens asynchronously (skybox, lighting, props)
             this.setupEnhancedSceneAsync(config.environment)
             
         } catch (error) {
             console.error('❌ Failed to set up scene prerequisite:', error)
-            // Still emit SceneReady so controls work
             this.emitSceneReadyEvent()
         }
-    }
-
-    /**
-     * Setup absolutely minimal scene - just enough for navigation to work
-     * This should complete in <10ms to get controls working ASAP
-     */
-    private async setupMinimalScene(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
-        // Literally nothing - just camera position is handled by SceneManager
-        // User can move around in a void, which is fine temporarily
-        console.log('📦 Minimal scene ready - void navigation enabled')
     }
 
     /**
@@ -177,16 +156,6 @@ export class SceneCoordinator {
         }
     }
 
-    private async setupBasicEnvironment(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
-        // This method is now replaced by setupMinimalScene + loadEnhancedScene
-        // Keeping for backward compatibility
-    }
-
-    private async setupEnhancedScene(): Promise<void> {
-        // This method is now replaced by loadEnhancedScene  
-        // Keeping for backward compatibility
-    }
-
     private async setupProps(): Promise<void> {
         await this.propsRenderer.setupProps({
             enableShelves: true,
@@ -194,14 +163,6 @@ export class SceneCoordinator {
             enableSignage: true,
             tests: this.config.tests
         })
-    }
-
-    public async addAtmosphericProps(): Promise<void> {
-        await this.propsRenderer.addAtmosphericProps()
-    }
-
-    updatePerformanceData(camera: THREE.Camera): void {
-        this.propsRenderer.updatePerformanceData(camera)
     }
 
     /**

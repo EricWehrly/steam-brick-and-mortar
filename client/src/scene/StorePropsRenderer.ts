@@ -57,6 +57,7 @@ export interface PropsConfig {
         frustumCullingEnabled?: boolean
     }
     /** Test modes - map of test name to string value */
+    // TODO: provide a better name, like ... ABTests?
     tests?: Record<string, string>
 }
 
@@ -171,14 +172,8 @@ export class StorePropsRenderer {
         }
     }
     
-    /**
-     * Initialize test renderers based on enabled tests
-     */
     private initializeTests(): void {
         if (!this.config.tests) return
-        
-        // GPU Instanced Textures Test - Phase 2: Texture arrays
-        // NOTE: This test initializes in setupEventListeners() when games are loaded
         
         // Test Objects - Simple geometric test objects
         if (isTestEnabled(this.config.tests, TestMode.SPAWN_TEST_OBJECTS)) {
@@ -186,7 +181,6 @@ export class StorePropsRenderer {
         }
     }
 
-    
     private async setupTestObjects(): Promise<void> {
         // Small test cube for reference
         const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
@@ -213,7 +207,7 @@ export class StorePropsRenderer {
         }
     }
 
-    // TODO: Try this
+    // TODO: Try doing this
     // and look for other unused (and unattempted) methods?
     /**
      * Add atmospheric props (wire racks, dividers, etc.)
@@ -246,21 +240,6 @@ export class StorePropsRenderer {
             this.gameBoxRenderer.updatePerformanceData(camera, this.scene)
             this.gameBoxRenderer.cleanupOffScreenTextures()
         }
-    }
-
-    /**
-     * Get access to specific renderers for external use
-     */
-    public getStoreLayout(): StoreLayout {
-        return this.storeLayout
-    }
-
-    public getGameBoxRenderer(): GameBoxRenderer {
-        return this.gameBoxRenderer
-    }
-
-    public getSignageRenderer(): SignageRenderer {
-        return this.signageRenderer
     }
 
     /**
