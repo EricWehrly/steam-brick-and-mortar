@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { SharedMaterialManager } from '../utils/SharedMaterialManager';
+import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager';
 
 /**
  * Default shelf configuration
@@ -31,7 +31,7 @@ export class ProceduralShelfGenerator {
      * Now uses shared material manager for performance optimization
      */
     private createMDFVeneerMaterial(): THREE.Material {
-        return this.materialManager.getShelfMaterial('mdfVeneer');
+        return this.materialManager.getShelfMaterial(MaterialType.MdfVeneer);
     }
 
     /**
@@ -39,7 +39,7 @@ export class ProceduralShelfGenerator {
      * Now uses shared material manager for performance optimization
      */
     private createShelfInteriorMaterial(): THREE.Material {
-        return this.materialManager.getShelfMaterial('shelfInterior');
+        return this.materialManager.getShelfMaterial(MaterialType.ShelfInterior);
     }
 
     /**
@@ -47,7 +47,7 @@ export class ProceduralShelfGenerator {
      * Now uses shared material manager for performance optimization
      */
     private createBrandAccentMaterial(): THREE.Material {
-        return this.materialManager.getShelfMaterial('brandAccent');
+        return this.materialManager.getShelfMaterial(MaterialType.BrandAccent);
     }
 
   /**

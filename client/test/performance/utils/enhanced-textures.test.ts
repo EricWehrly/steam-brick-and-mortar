@@ -220,8 +220,8 @@ describe('SharedMaterialManager Enhanced', () => {
     })
 
     it('should handle game box materials with simple fallback', () => {
-      const material1 = materialManager.getGameBoxMaterialFromName('Game A')
-      const material2 = materialManager.getGameBoxMaterialFromName('Game B')
+      const material1 = materialManager.getGameBoxFallbackMaterial()
+      const material2 = materialManager.getGameBoxFallbackMaterial()
       
       expect(material1).toBe(material2)  // Same fallback material
       expect(material1.color.getHex()).toBe(0xff00ff)  // Magenta fallback
@@ -285,7 +285,7 @@ describe('VR Performance Considerations', () => {
     
     // Create fallback material (all requests create same instance)
     for (let i = 0; i < 10; i++) {
-      materialManager.getGameBoxMaterialFromName(`Game ${i}`)
+      materialManager.getGameBoxFallbackMaterial()
     }
     
     const newStats = materialManager.getStats()

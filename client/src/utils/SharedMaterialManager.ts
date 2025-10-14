@@ -45,8 +45,6 @@ export interface MaterialPool {
 
 export interface MaterialStats {
     totalMaterials: number
-    gameBoxMaterialCount: number
-    shelfMaterialCount: number
     memoryEstimate: number // bytes
     poolHitRate: number // 0-1, percentage of requests served from pool
 }
@@ -133,7 +131,7 @@ export class SharedMaterialManager {
         }
     }
 
-    public getGameBoxMaterialFromName(gameName: string): THREE.MeshStandardMaterial {
+    public getGameBoxFallbackMaterial(): THREE.MeshStandardMaterial {
         return this.getMaterial(MaterialType.FallbackGameBox)
     }
 
@@ -245,21 +243,12 @@ export class SharedMaterialManager {
         if (!this.materialPool) {
             return {
                 totalMaterials: 0,
-                gameBoxMaterialCount: 0,
-                shelfMaterialCount: 0,
                 memoryEstimate: 0,
                 poolHitRate: 0
             }
         }
 
         const totalMaterials = this.materialPool.materials.size
-        
-        const gameBoxMaterialCount = this.materialPool.materials.has(MaterialType.FallbackGameBox) ? 1 : 0
-        
-        const shelfMaterials: MaterialType[] = [MaterialType.MdfVeneer, MaterialType.ShelfInterior, MaterialType.BrandAccent]
-        const shelfMaterialCount = shelfMaterials.filter(type => 
-            this.materialPool!.materials.has(type)
-        ).length
 
         // Rough memory estimate per material (uniforms + texture references)
         const estimatedBytesPerMaterial = 1024 // Conservative estimate
@@ -267,8 +256,6 @@ export class SharedMaterialManager {
 
         return {
             totalMaterials,
-            gameBoxMaterialCount,
-            shelfMaterialCount,
             memoryEstimate,
             poolHitRate: this.poolRequests > 0 ? this.poolHits / this.poolRequests : 0
         }
@@ -286,12 +273,5 @@ export class SharedMaterialManager {
         SharedMaterialManager.instance = null as any
 
         console.log('🗑️ SharedMaterialManager disposed')
-    }
-
-    public static reset(): void {
-        if (SharedMaterialManager.instance) {
-            SharedMaterialManager.instance.dispose()
-        }
-        SharedMaterialManager.instance = null as any
     }
 }
