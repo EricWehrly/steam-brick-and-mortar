@@ -239,9 +239,6 @@ export class SteamApiClient {
 
 
 
-    /**
-     * Cache management
-     */
     public async clearCache(): Promise<void> {
         this.cache.clear()
         await this.images.clearCache()
@@ -250,31 +247,23 @@ export class SteamApiClient {
     public getCacheStats() {
         return this.cache.getStats()
     }
+
+    public getCacheManager(): CacheManager {
+        return this.cache
+    }
     
-    /**
-     * Check if cache contains specific key
-     */
     public hasCached(key: string): boolean {
         return this.cache.get(key) !== null
     }
     
-    /**
-     * Get cached item (for internal use)
-     */
     public getCached<T>(key: string): T | null {
         return this.cache.get<T>(key)
     }
 
-    /**
-     * Get all cache keys (for inspection/management)
-     */
     public getAllCacheKeys(): string[] {
         return this.cache.getAllKeys()
     }
 
-    /**
-     * Get cached users efficiently (optimized implementation)
-     */
     public getCachedUsers(): Array<{ vanityUrl: string, displayName: string, gameCount: number, steamId: string }> {
         const cachedUsers: Array<{ vanityUrl: string, displayName: string, gameCount: number, steamId: string }> = []
         const userMap = new Map<string, { vanityUrl?: string, resolveData?: SteamResolveResponse, gamesData?: SteamUser }>()

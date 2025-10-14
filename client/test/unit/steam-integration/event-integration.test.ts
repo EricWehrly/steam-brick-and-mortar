@@ -15,7 +15,9 @@ describe('SteamIntegration Event Integration', () => {
     beforeEach(() => {
         // Create mock EventManager
         mockEventManager = {
-            emit: vi.fn()
+            emit: vi.fn(),
+            registerEventHandler: vi.fn(),
+            deregisterEventHandler: vi.fn()
         }
         
         // Mock EventManager.getInstance to return our mock

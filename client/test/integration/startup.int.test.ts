@@ -302,17 +302,17 @@ describe('Application Startup Integration', () => {
         vi.clearAllMocks()
     })
 
-    it('should create SteamWorkflowManager without binding errors', async () => {
+    it('should create SteamIntegration and SteamUICoordinator without binding errors', async () => {
         // Import classes for testing
-        const { SteamWorkflowManager } = await import('../../src/steam-integration/SteamWorkflowManager')
         const { SteamIntegration } = await import('../../src/steam-integration/SteamIntegration')
         const { SteamUICoordinator } = await import('../../src/ui/coordinators')
         const { SceneCoordinator } = await import('../../src/scene/SceneCoordinator')
         const { SceneManager } = await import('../../src/scene/SceneManager')
         const { PerformanceMonitor } = await import('../../src/ui/PerformanceMonitor')
-        const { EventManager } = await import('../../src/core/EventManager')        // Create mock dependencies
+        const { EventManager } = await import('../../src/core/EventManager')
+
+        // Create mock dependencies
         const mockEventManager = EventManager.getInstance()
-        const mockSteamIntegration = new SteamIntegration()
         
         const mockPerformanceMonitor = new PerformanceMonitor({
             updateInterval: 1000,
@@ -328,19 +328,15 @@ describe('Application Startup Integration', () => {
             })
         } as any
         
-        const mockSteamUICoordinator = new SteamUICoordinator()
-        
         // Create mock SceneCoordinator
         const mockSceneManager = new SceneManager()
         const mockSceneCoordinator = new SceneCoordinator(mockSceneManager)
 
-        // This should not throw the "Cannot read properties of undefined (reading 'bind')" error
+        // Test SteamIntegration and SteamUICoordinator can be created without binding errors
+        // (SteamWorkflowManager functionality now split between these classes)
         expect(() => {
-            new SteamWorkflowManager(
-                mockEventManager,
-                mockSteamIntegration,
-                mockSteamUICoordinator
-            )
+            const steamIntegration = new SteamIntegration()
+            const steamUICoordinator = new SteamUICoordinator()
         }).not.toThrow()
     })
 

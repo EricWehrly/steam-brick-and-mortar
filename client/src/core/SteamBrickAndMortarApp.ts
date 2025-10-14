@@ -18,7 +18,6 @@ import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../
 import { SceneManager, SceneCoordinator, GameBoxRenderer } from '../scene'
 import { DebugStatsProvider } from './DebugStatsProvider'
 import { SteamIntegration } from '../steam-integration'
-import { SteamWorkflowManager } from '../steam-integration/SteamWorkflowManager'
 import { DataManager } from './data'
 import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { WebXREventHandler } from '../webxr/WebXREventHandler'
@@ -59,7 +58,6 @@ export class SteamBrickAndMortarApp {
     private steamIntegration: SteamIntegration
     private debugStatsProvider: DebugStatsProvider
     private eventManager: EventManager
-    private steamWorkflowManager: SteamWorkflowManager
     private appSettings: AppSettings
 
     // State
@@ -159,15 +157,6 @@ export class SteamBrickAndMortarApp {
             this.webxrUICoordinator = await this.container.resolve(ServiceKeys.WebXRUICoordinator) as WebXRUICoordinator
             this.systemUICoordinator = await this.container.resolve(ServiceKeys.SystemUICoordinator) as SystemUICoordinator
             
-            // Initialize steam workflow manager with DI-resolved DataManager
-            const dataManager = await this.container.resolve(ServiceKeys.DataManager) as DataManager
-            this.steamWorkflowManager = new SteamWorkflowManager(
-                this.eventManager,
-                this.steamIntegration,
-                this.steamUICoordinator,
-                dataManager
-            )
-            
             // Initialize webxr event handler now that UI coordinators are available
             this.webxrEventHandler = new WebXREventHandler(
                 this.webxrCoordinator,
@@ -239,7 +228,7 @@ export class SteamBrickAndMortarApp {
         try {
             
             // Initialize system UI coordinator (debug panels, etc.)
-            await this.systemUICoordinator.init(this.sceneManager.getRenderer(), this.steamWorkflowManager)
+            await this.systemUICoordinator.init(this.sceneManager.getRenderer())
             
             
             // Auto-load first cached user if available (this can happen later)
@@ -292,7 +281,6 @@ export class SteamBrickAndMortarApp {
         this.performanceMonitor.stop()
         
         // Dispose workflow managers first
-        this.steamWorkflowManager.dispose()
         this.webxrEventHandler.dispose()
         this.eventManager.dispose()
         

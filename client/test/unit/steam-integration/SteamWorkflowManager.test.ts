@@ -33,6 +33,7 @@ const mockSteamIntegration = {
     refreshData: vi.fn(),
     clearCache: vi.fn(),
     getCacheStats: vi.fn(),
+    getCacheManager: vi.fn(),
     updateMaxGames: vi.fn(),
     getGameLibraryState: vi.fn()
 }
@@ -416,7 +417,10 @@ describe('SteamWorkflowManager', () => {
 
         it('should provide cache statistics to help users manage storage', async () => {
             const mockStats = { totalGames: 150, cacheSize: '25MB', lastUpdated: new Date().toISOString() }
-            mockSteamIntegration.getCacheStats.mockReturnValue(mockStats)
+            const mockCacheManager = {
+                getStats: vi.fn().mockReturnValue(mockStats)
+            }
+            mockSteamIntegration.getCacheManager.mockReturnValue(mockCacheManager)
             
             const cacheStatsHandler = mockEventManager.registerEventHandler.mock.calls
                 .find(call => call[0] === SteamEventTypes.CacheStats)?.[1]
