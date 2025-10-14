@@ -155,14 +155,6 @@ export class PauseMenuManager {
         }
     }
 
-    getCacheManagementPanel(): CacheManagementPanel | null {
-        return this.cacheManagementPanel
-    }
-
-    getApplicationPanel(): ApplicationPanel | null {
-        return this.applicationPanel
-    }
-
     toggle(): void {
         if (this.state.isOpen) {
             this.close()
@@ -171,9 +163,6 @@ export class PauseMenuManager {
         }
     }
 
-    /**
-     * Open the pause menu
-     */
     open(panelId?: string): void {
         if (this.state.isOpen) return
 
@@ -198,9 +187,6 @@ export class PauseMenuManager {
         this.callbacks.onMenuOpen?.()
     }
 
-    /**
-     * Close the pause menu
-     */
     close(): void {
         if (!this.state.isOpen) return
 
@@ -227,9 +213,6 @@ export class PauseMenuManager {
         this.callbacks.onMenuClose?.()
     }
 
-    /**
-     * Show a specific panel by ID
-     */
     showPanel(panelId: string): void {
         // Hide current panel
         if (this.state.activePanel) {
@@ -246,23 +229,14 @@ export class PauseMenuManager {
         }
     }
 
-    /**
-     * Get current menu state
-     */
     getState(): PauseMenuState {
         return { ...this.state }
     }
 
-    /**
-     * Check if menu is open
-     */
     isOpen(): boolean {
         return this.state.isOpen
     }
 
-    /**
-     * Pause input handling
-     */
     private pauseInput(): void {
         if (!this.state.inputPaused) {
             this.state.inputPaused = true
@@ -270,9 +244,6 @@ export class PauseMenuManager {
         }
     }
 
-    /**
-     * Resume input handling
-     */
     private resumeInput(): void {
         if (this.state.inputPaused) {
             this.state.inputPaused = false
@@ -280,9 +251,6 @@ export class PauseMenuManager {
         }
     }
 
-    /**
-     * Create the HTML structure for the pause menu
-     */
     private createMenuStructure(): void {
         // Check if pause menu structure already exists
         const existingOverlay = document.getElementById(this.config.containerId)
@@ -341,9 +309,6 @@ export class PauseMenuManager {
         })
     }
 
-    /**
-     * Create a tab for a panel in the menu
-     */
     private createPanelTab(panel: PauseMenuPanel): void {
         const tabsContainer = document.getElementById('pause-menu-tabs')
         if (!tabsContainer) {
@@ -368,9 +333,6 @@ export class PauseMenuManager {
         tabsContainer.appendChild(tab)
     }
 
-    /**
-     * Update the active tab styling
-     */
     private updateActiveTab(panelId: string): void {
         // Remove active class from all tabs
         document.querySelectorAll('.pause-menu-tab').forEach(tab => {
@@ -384,24 +346,15 @@ export class PauseMenuManager {
         }
     }
 
-    /**
-     * Hide all panels
-     */
     private hideAllPanels(): void {
         this.panels.forEach(panel => panel.hide())
         this.state.activePanel = null
     }
 
-    /**
-     * Get the first panel ID for default display
-     */
     private getFirstPanelId(): string | undefined {
         return this.panels.keys().next().value
     }
 
-    /**
-     * Setup keyboard event handling for the pause menu
-     */
     private setupKeyboardHandling(): void {
         document.addEventListener('keydown', (event) => {
             // Only handle escape if not in an input field
@@ -412,9 +365,6 @@ export class PauseMenuManager {
         })
     }
 
-    /**
-     * Check if an input element is currently focused
-     */
     private isInputFocused(): boolean {
         const activeElement = document.activeElement
         if (!activeElement) return false
@@ -424,9 +374,6 @@ export class PauseMenuManager {
                (activeElement as HTMLElement).contentEditable === 'true'
     }
 
-    /**
-     * Clean up resources
-     */
     dispose(): void {
         // Close menu if open
         if (this.state.isOpen) {
@@ -474,9 +421,6 @@ export class PauseMenuManager {
         }
     }
 
-    /**
-     * Handle application settings changes
-     */
     private handleSettingsChange(settings: Partial<ApplicationSettings>): void {
         console.log('⚙️ Settings changed:', settings)
 
@@ -519,9 +463,7 @@ export class PauseMenuManager {
         }
     }
 
-    /**
-     * Update graphics quality based on setting
-     */
+    // TODO: Quality enum
     private updateGraphicsQuality(quality: 'low' | 'medium' | 'high' | 'ultra'): void {
         if (!this.systemDependencies) {
             console.warn('⚠️ System dependencies not provided - cannot update graphics quality')
