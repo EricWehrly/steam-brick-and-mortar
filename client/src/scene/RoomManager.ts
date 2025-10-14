@@ -12,7 +12,7 @@
 
 import * as THREE from 'three'
 import { EventManager } from '../core/EventManager'
-import { SharedMaterialManager } from '../utils/SharedMaterialManager'
+import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
 import { RoomEventTypes, type RoomCreateEvent, type RoomResizeEvent } from '../types/InteractionEvents'
 import { SteamEventTypes, type SteamDataLoadedEvent, CeilingEventTypes, type CeilingToggleEvent } from '../types/InteractionEvents'
 
@@ -260,7 +260,7 @@ export class RoomManager {
         }
         
         const floorGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
-        const carpetMaterial = this.materialManager.getCarpetMaterial()
+        const carpetMaterial = this.materialManager.getMaterial(MaterialType.Carpet)
         
         this.floor = new THREE.Mesh(floorGeometry, carpetMaterial)
         this.floor.rotation.x = -Math.PI / 2
@@ -296,7 +296,7 @@ export class RoomManager {
         }
         
         const ceilingGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth)
-        const ceilingMaterial = this.materialManager.getCeilingMaterial()
+        const ceilingMaterial = this.materialManager.getMaterial(MaterialType.Ceiling)
         
         this.ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
         this.ceiling.rotation.x = Math.PI / 2
@@ -354,7 +354,7 @@ export class RoomManager {
     }
 
     private async createWalls(dimensions: RoomDimensions): Promise<void> {
-        const wallMaterial = this.materialManager.getWallWoodMaterial()
+        const wallMaterial = this.materialManager.getMaterial(MaterialType.WallWood)
         
         // Back wall
         this.walls.back = new THREE.Mesh(

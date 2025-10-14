@@ -16,7 +16,7 @@
 import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { BlockbusterColors } from '../utils/Colors'
-import { SharedMaterialManager } from '../utils/SharedMaterialManager'
+import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
 import { DataManager } from '../core/data/DataManager'
@@ -209,7 +209,7 @@ export class SceneManager {
     public addEnhancedTextureDemo(): void {
         // Create floor with enhanced carpet texture
         const floorGeometry = new THREE.PlaneGeometry(20, 20)
-        const carpetMaterial = this.materialManager.getCarpetMaterial()
+        const carpetMaterial = this.materialManager.getMaterial(MaterialType.Carpet)
         const floor = new THREE.Mesh(floorGeometry, carpetMaterial)
         floor.rotation.x = -Math.PI / 2
         floor.receiveShadow = true
@@ -217,7 +217,7 @@ export class SceneManager {
 
         // Create ceiling with enhanced popcorn texture
         const ceilingGeometry = new THREE.PlaneGeometry(20, 20)
-        const ceilingMaterial = this.materialManager.getCeilingMaterial()
+        const ceilingMaterial = this.materialManager.getMaterial(MaterialType.Ceiling)
         const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
         ceiling.rotation.x = Math.PI / 2
         ceiling.position.y = 8
@@ -226,7 +226,7 @@ export class SceneManager {
         // Create wooden shelves with enhanced wood texture
         for (let i = 0; i < 3; i++) {
             const shelfGeometry = new THREE.BoxGeometry(6, 0.2, 1.5)
-            const woodMaterial = this.materialManager.getWallWoodMaterial()
+            const woodMaterial = this.materialManager.getMaterial(MaterialType.WallWood)
             const shelf = new THREE.Mesh(shelfGeometry, woodMaterial)
             shelf.position.set(-5, 2 + i * 2, 0)
             shelf.castShadow = true
@@ -236,7 +236,7 @@ export class SceneManager {
         // Create comparison objects with basic textures
         for (let i = 0; i < 3; i++) {
             const shelfGeometry = new THREE.BoxGeometry(6, 0.2, 1.5)
-            const basicWoodMaterial = this.materialManager.getBasicWoodMaterial()
+            const basicWoodMaterial = this.materialManager.getMaterial(MaterialType.BasicWood)
             const shelf = new THREE.Mesh(shelfGeometry, basicWoodMaterial)
             shelf.position.set(5, 2 + i * 2, 0)
             shelf.castShadow = true

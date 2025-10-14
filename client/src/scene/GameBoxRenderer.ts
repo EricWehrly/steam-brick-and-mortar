@@ -27,7 +27,7 @@ import { GameBoxTextureManager } from './game-box/GameBoxTextureManager'
 import { GameBoxLayoutUtils } from './game-box/GameBoxLayoutUtils'
 import { InstancedLabelRenderer } from './game-box/instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './game-box/instancing/InstancedArtworkRenderer'
-import { SharedMaterialManager } from '../utils/SharedMaterialManager'
+import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
 import type { DataManager } from '../core/data/DataManager'
 
 // Export types for backward compatibility
@@ -329,7 +329,7 @@ export class GameBoxRenderer {
         name?: string
     ): THREE.Mesh {
         this.ensureMaterialManagerInitialized()
-        const material = this.materialManager.getGameBoxFallbackMaterial()
+        const material = this.materialManager.getMaterial(MaterialType.FallbackGameBox)
         
         const gameBox = new THREE.Mesh(this.gameBoxGeometry, material)
         gameBox.position.copy(position)
