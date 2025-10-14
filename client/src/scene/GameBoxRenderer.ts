@@ -140,14 +140,6 @@ export class GameBoxRenderer {
         
         return this.instancedLabelRenderer?.isReady() || false
     }
-
-    public getInstancedLabelRenderer() {
-        return this.instancedLabelRenderer;
-    }
-
-    public getInstancedArtworkRenderer() {
-        return this.instancedArtworkRenderer;
-    }
     
     /**
      * Lazy initialization of InstancedLabelRenderer
