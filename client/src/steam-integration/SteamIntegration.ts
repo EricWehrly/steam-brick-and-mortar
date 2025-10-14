@@ -16,6 +16,8 @@ import type { SteamGameData } from '../scene'
 import { SteamErrorMessages, type SteamErrorContext } from '../utils/SteamErrorMessages'
 import { EventManager, EventSource } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
+import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
+import { DataManager, DataDomain } from '../core/data'
 
 export interface SteamIntegrationConfig {
     apiBaseUrl?: string
@@ -55,6 +57,46 @@ export class SteamIntegration {
         this.gameLibrary = new GameLibraryManager()
         
         SteamIntegration._instance = this
+        
+        // Register event handlers directly - no workflow manager needed
+        this.registerEventHandlers()
+    }
+    
+    /**
+     * Register Steam event handlers directly in SteamIntegration
+     */
+    private registerEventHandlers(): void {
+        this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.handleLoadGames.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.LoadFromCache, this.handleLoadFromCache.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.handleRefreshCache.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.handleClearCache.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.DevModeToggle, this.handleDevModeToggle.bind(this))
+    }
+    
+    /**
+     * Store Steam data in DataManager and emit event
+     * CRITICAL: Data ownership - store data before emitting events that depend on it
+     */
+    private storeSteamDataAndEmitEvent(userInput: string): void {
+        const gameLibraryState = this.getGameLibraryState()
+        const games: SteamGameData[] = gameLibraryState.userData?.games || []
+        
+        const dataManager = DataManager.getInstance()
+        dataManager.set<SteamGameData[]>('steam.games', games, {
+            domain: DataDomain.SteamIntegration
+        })
+        
+        if (userInput) {
+            dataManager.set('steam.userInput', userInput, {
+                domain: DataDomain.SteamIntegration
+            })
+        }
+        
+        this.eventManager.emit(SteamEventTypes.DataLoaded, {
+            userInput,
+            timestamp: Date.now(),
+            source: EventSource.System
+        })
     }
 
     static getInstance(): SteamIntegration | null {
@@ -195,10 +237,6 @@ export class SteamIntegration {
     clearCache(): void {
         this.steamClient.clearCache()
         this.gameLibrary.clear()
-    }
-
-    getCacheStats() {
-        return this.steamClient.getCacheStats()
     }
 
     getGameLibraryState(): GameLibraryState {
@@ -364,5 +402,94 @@ export class SteamIntegration {
     // This is only for testing?
     getSteamClient() {
         return this.steamClient
+    }
+    
+    /**
+     * Event handlers - migrated from SteamWorkflowManager
+     * Eliminates unnecessary pass-through layer
+     */
+    
+    private async handleLoadGames(event: CustomEvent<SteamLoadGamesEvent>): Promise<void> {
+        const { userInput } = event.detail
+        
+        try {
+            SteamIntegration.logger.info(`Starting load games for: ${userInput}`)
+            
+            // Use existing loadGamesForUser method which already has progress handling
+            await this.loadGamesForUser(userInput)
+            
+            SteamIntegration.logger.info(`Load games completed successfully`)
+            this.storeSteamDataAndEmitEvent(userInput)
+            
+        } catch (error) {
+            SteamIntegration.logger.error('Load games failed:', error)
+        }
+    }
+    
+    private async handleLoadFromCache(event: CustomEvent<SteamLoadFromCacheEvent>): Promise<void> {
+        const { userInput } = event.detail
+        
+        try {
+            if (!this.hasCachedData(userInput)) {
+                SteamIntegration.logger.warn('No cached data found. Please use "Load My Games" first.')
+                return
+            }
+            
+            await this.loadGamesFromCache(userInput)
+            SteamIntegration.logger.info(`Load from cache completed successfully`)
+            this.storeSteamDataAndEmitEvent(userInput)
+            
+        } catch (error) {
+            SteamIntegration.logger.error('Load from cache failed:', error)
+        }
+    }
+
+    private async handleRefreshCache(event: CustomEvent<SteamCacheRefreshEvent>): Promise<void> {
+        try {
+            SteamIntegration.logger.info('Starting cache refresh')
+            
+            const result = await this.refreshData()
+            if (!result) {
+                SteamIntegration.logger.warn('No data to refresh.')
+                return
+            }
+            
+            SteamIntegration.logger.info('Cache refresh completed successfully')
+            
+            const gameState = this.getGameLibraryState()
+            if (gameState.userData?.vanity_url) {
+                this.storeSteamDataAndEmitEvent(gameState.userData.vanity_url)
+            }
+            
+        } catch (error) {
+            SteamIntegration.logger.error('Cache refresh failed:', error)
+        }
+    }
+
+    private async handleClearCache(event: CustomEvent<SteamCacheClearEvent>): Promise<void> {
+        try {
+            SteamIntegration.logger.info('Starting cache clear')
+            this.clearCache()
+            SteamIntegration.logger.info('Cache cleared successfully!')
+        } catch (error) {
+            SteamIntegration.logger.error('Cache clear failed:', error)
+        }
+    }
+
+    private async handleDevModeToggle(event: CustomEvent<SteamDevModeToggleEvent>): Promise<void> {
+        const { isEnabled } = event.detail
+        
+        try {
+            const maxGames = isEnabled ? 20 : 100
+            this.updateMaxGames(maxGames)
+            
+            const message = isEnabled 
+                ? `🔧 Development mode enabled (limiting to ${maxGames} games for faster testing)`
+                : `📚 Development mode disabled (showing up to ${maxGames} games)`
+            
+            SteamIntegration.logger.info(message)
+        } catch (error) {
+            SteamIntegration.logger.error('Dev mode toggle failed:', error)
+        }
     }
 }

@@ -9,7 +9,9 @@ import { SteamIntegration } from '../../../src/steam-integration/SteamIntegratio
 vi.mock('../../../src/core/EventManager', () => ({
     EventManager: {
         getInstance: vi.fn(() => ({
-            emit: vi.fn()
+            emit: vi.fn(),
+            registerEventHandler: vi.fn(),
+            deregisterEventHandler: vi.fn()
         }))
     },
     EventSource: {
@@ -25,6 +27,12 @@ vi.mock('../../../src/steam', () => ({
         loadGamesProgressively: vi.fn(),
         clearCache: vi.fn(),
         getCacheStats: vi.fn(),
+        getCacheManager: vi.fn().mockReturnValue({
+            getStats: vi.fn().mockReturnValue({
+                totalEntries: 0,
+                totalSize: 0
+            })
+        }),
         downloadGameArtwork: vi.fn().mockResolvedValue({})
     }))
 }))
@@ -77,20 +85,16 @@ describe('SteamIntegration Unit Tests', () => {
             expect(true).toBe(true) // Basic verification that method exists and runs
         })
 
-        test('should get cache stats', () => {
-            const mockStats = {
-                entries: 5,
-                size: '1.2MB',
-                maxAge: 3600000
-            }
+        test('should provide direct cache manager access for stats', () => {
+            // Test that getCacheManager returns a cache manager that can provide stats
+            const cacheManager = steamIntegration.getCacheManager()
+            expect(cacheManager).toBeDefined()
+            expect(typeof cacheManager.getStats).toBe('function')
             
-            // Mock the getCacheStats method
-            const mockGetCacheStats = vi.fn().mockReturnValue(mockStats)
-            // @ts-expect-error - Accessing private member for testing
-            steamIntegration.steamClient.getCacheStats = mockGetCacheStats
-            
-            steamIntegration.getCacheStats()
-            expect(mockGetCacheStats).toHaveBeenCalled()
+            // Test that we can get stats from the cache manager
+            const stats = cacheManager.getStats()
+            expect(stats).toBeDefined()
+            expect(typeof stats.totalEntries).toBe('number')
         })
     })
 
