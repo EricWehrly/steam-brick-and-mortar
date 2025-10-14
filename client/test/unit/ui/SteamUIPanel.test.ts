@@ -78,7 +78,7 @@ describe('SteamUIPanel Cache Availability Events', () => {
 
   it('should immediately hide button when input is cleared', () => {
     // Show button first
-    steamUIPanel.updateLoadFromCacheButtonVisibility('test', true)
+    steamUIPanel.updateLoadFromCacheButtonVisibility(true)
     expect(mockButton.classList.contains('hidden')).toBe(false)
 
     // Clear input
@@ -92,15 +92,15 @@ describe('SteamUIPanel Cache Availability Events', () => {
 
   it('should properly manage button visibility via updateLoadFromCacheButtonVisibility method', () => {
     // Test showing button
-    steamUIPanel.updateLoadFromCacheButtonVisibility('testuser', true)
+    steamUIPanel.updateLoadFromCacheButtonVisibility(true)
     expect(mockButton.classList.contains('hidden')).toBe(false)
 
     // Test hiding button
-    steamUIPanel.updateLoadFromCacheButtonVisibility('testuser', false)
+    steamUIPanel.updateLoadFromCacheButtonVisibility(false)
     expect(mockButton.classList.contains('hidden')).toBe(true)
 
-    // Test hiding button with empty input
-    steamUIPanel.updateLoadFromCacheButtonVisibility('', true)
-    expect(mockButton.classList.contains('hidden')).toBe(true)
+    // Test showing button again
+    steamUIPanel.updateLoadFromCacheButtonVisibility(true)
+    expect(mockButton.classList.contains('hidden')).toBe(false)
   })
 })
