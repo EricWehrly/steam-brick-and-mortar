@@ -48,7 +48,15 @@ vi.mock('../../../src/utils', () => ({
 // Mock event types
 vi.mock('../../../src/types/InteractionEvents', () => ({
     SteamEventTypes: {
-        GameLoaded: 'steam:game-loaded'
+        LoadGames: 'steam:load-games',
+        LoadFromCache: 'steam:load-from-cache',
+        CacheRefresh: 'steam:cache-refresh',
+        CacheClear: 'steam:cache-clear',
+        GameLoaded: 'steam:game-loaded',
+        DataLoaded: 'steam:data-loaded'
+    },
+    AppSettingsEventTypes: {
+        Changed: 'app-settings:changed'
     }
 }))
 
