@@ -168,6 +168,24 @@
 
 ### Performance & Architecture
 
+#### WebWorker-Based Texture Generation
+**Priority**: Medium  
+**Effort**: 6-8 hours  
+**Context**: Procedural texture generation currently blocks main thread during material creation. While lazy loading fixed startup delay, texture generation still causes frame drops when materials are first requested.
+
+**Tasks**:
+- Move procedural texture generation (WoodTextureGenerator, CarpetTextureGenerator, CeilingTextureGenerator) to WebWorkers
+- Implement async texture creation with Promises/callbacks
+- Add texture loading indicators for user feedback during generation
+- Ensure texture transfer from worker to main thread maintains quality
+- Test performance impact and thread utilization
+
+**Benefits**: Non-blocking texture generation, improved runtime performance, better user experience during material creation
+
+**Background**: Currently lazy-loaded materials generate textures on-demand but still block main thread. WebWorkers would eliminate this blocking behavior entirely.
+
+**TODO Source**: Identified during SharedMaterialManager lazy loading implementation (Oct 2025)
+
 ### UI Polish & Consistency
 
 #### Fix Pause Menu Double Scrollbars
