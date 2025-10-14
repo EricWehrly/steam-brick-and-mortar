@@ -8,6 +8,10 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import cacheManagementPanelTemplate from '../templates/cache-management-panel.html?raw'
 import type { ImageCacheStats } from '../../../steam/images/ImageManager'
+import { ImageManager } from '../../../steam/images/ImageManager'
+import { steamApi } from '../../../steam/SteamApiClient'
+import { EventManager, EventSource } from '../../../core/EventManager'
+import { SteamEventTypes } from '../../../types/InteractionEvents'
 import '../../../styles/pause-menu/cache-management-panel.css'
 
 export interface CacheStats {
@@ -36,37 +40,14 @@ export class CacheManagementPanel extends PauseMenuPanel {
     
     private cachedUsers: CachedUser[] = []
     private updateInterval: number | null = null
-    private onGetStats?: () => Promise<ImageCacheStats>
-    private onClearCache?: () => Promise<void>
-    private onGetCachedUsers?: () => Promise<CachedUser[]>
-    private onLoadCachedUser?: (vanityUrl: string) => Promise<void>
-    private onGetImageUrls?: () => Promise<string[]>
-    private onGetCachedBlob?: (url: string) => Promise<Blob | null>
     private imageUrls: string[] = []
     private currentImageIndex: number = 0
     private previewerInitialized: boolean = false
+    private eventManager: EventManager
 
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)
-    }
-    
-    /**
-     * Initialize with cache functions from Steam integration
-     */
-    initCacheFunctions(
-        getStats: () => Promise<ImageCacheStats>,
-        clearCache: () => Promise<void>,
-        getCachedUsers?: () => Promise<CachedUser[]>,
-        loadCachedUser?: (vanityUrl: string) => Promise<void>,
-        getImageUrls?: () => Promise<string[]>,
-        getCachedBlob?: (url: string) => Promise<Blob | null>
-    ): void {
-        this.onGetStats = getStats
-        this.onClearCache = clearCache
-        this.onGetCachedUsers = getCachedUsers
-        this.onLoadCachedUser = loadCachedUser
-        this.onGetImageUrls = getImageUrls
-        this.onGetCachedBlob = getCachedBlob
+        this.eventManager = EventManager.getInstance()
     }
     
     /**
@@ -110,9 +91,9 @@ export class CacheManagementPanel extends PauseMenuPanel {
             // Cached users dropdown
             cachedUsersOptions: cachedUsersOptions,
             
-            // Button states (initially disabled until functions are available)
-            refreshButtonDisabled: !this.onGetStats ? 'disabled' : '',
-            clearButtonDisabled: !this.onClearCache ? 'disabled' : '',
+            // Button states
+            refreshButtonDisabled: '',
+            clearButtonDisabled: '',
             downloadButtonDisabled: 'disabled', // No download function yet
             
             // Settings values from localStorage
@@ -258,8 +239,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
      * Call this when cache contents may have changed
      */
     refreshCachedUsers(): void {
-        // Only reload if panel is currently visible and function is available
-        if (this.isVisible && this.onGetCachedUsers) {
+        if (this.isVisible) {
             this.loadCachedUsers()
         }
     }
@@ -268,17 +248,13 @@ export class CacheManagementPanel extends PauseMenuPanel {
      * Load cached users for dropdown
      */
     private async loadCachedUsers(): Promise<void> {
-        if (this.onGetCachedUsers) {
-            try {
-                this.cachedUsers = await this.onGetCachedUsers()
-                // Refresh the dropdown immediately after loading
-                this.refreshCachedUsersDropdown()
-            } catch (error) {
-                console.error('Failed to load cached users:', error)
-                this.cachedUsers = []
-                // Still refresh to show empty state
-                this.refreshCachedUsersDropdown()
-            }
+        try {
+            this.cachedUsers = steamApi.getCachedUsers()
+            this.refreshCachedUsersDropdown()
+        } catch (error) {
+            console.error('Failed to load cached users:', error)
+            this.cachedUsers = []
+            this.refreshCachedUsersDropdown()
         }
     }
 
@@ -300,9 +276,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
                 .join('')
         } else {
             // Show appropriate message for empty state
-            options = this.onGetCachedUsers 
-                ? '<option value="" disabled>No cached users found</option>'
-                : '<option value="" disabled>Cache loading not available</option>'
+            options = '<option value="" disabled>No cached users found</option>'
         }
 
         // Update select options (preserve the default option)
@@ -367,21 +341,15 @@ export class CacheManagementPanel extends PauseMenuPanel {
      */
     private async updateCacheStats(): Promise<void> {
         try {
-            // Use Steam integration function if available, otherwise fallback to browser cache
-            if (this.onGetStats) {
-                try {
-                    const imageStats = await this.onGetStats()
-                    this.cacheStats = this.convertCacheStats(imageStats)
-                } catch (error) {
-                    console.warn('onGetStats failed, falling back to browser cache:', error)
-                    this.cacheStats = await this.getCacheInfo()
-                }
-            } else {
-                const cacheStats = await this.getCacheInfo()
-                this.cacheStats = cacheStats
+            try {
+                const imageManager = ImageManager.getInstance()
+                const imageStats = await imageManager.getStats()
+                this.cacheStats = this.convertCacheStats(imageStats)
+            } catch (error) {
+                console.warn('ImageManager.getStats failed, falling back to browser cache:', error)
+                this.cacheStats = await this.getCacheInfo()
             }
 
-            // Update UI
             this.updateStatsUI()
         } catch (error) {
             console.error('Failed to update cache stats:', error)
@@ -478,12 +446,10 @@ export class CacheManagementPanel extends PauseMenuPanel {
         btn.setAttribute('disabled', 'true')
 
         try {
-            // Update cache statistics by calling the stats function
-            if (this.onGetStats) {
-                const imageStats = await this.onGetStats()
-                this.cacheStats = this.convertCacheStats(imageStats)
-                this.updateStatsUI()
-            }
+            const imageManager = ImageManager.getInstance()
+            const imageStats = await imageManager.getStats()
+            this.cacheStats = this.convertCacheStats(imageStats)
+            this.updateStatsUI()
             
             this.showSuccess('Cache refreshed successfully')
         } catch (error) {
@@ -512,26 +478,12 @@ export class CacheManagementPanel extends PauseMenuPanel {
         btn.setAttribute('disabled', 'true')
 
         try {
-            // Use Steam integration clear function if available
-            if (this.onClearCache) {
-                await this.onClearCache()
-            } else {
-                // Fallback: Clear cache API caches
-                if ('caches' in window) {
-                    const cacheNames = await window.caches.keys()
-                    for (const cacheName of cacheNames) {
-                        if (cacheName.includes('steam') || cacheName.includes('image')) {
-                            await window.caches.delete(cacheName)
-                        }
-                    }
-                }
-
-                // Clear localStorage cache items
-                const keysToRemove = Object.keys(localStorage).filter(key => 
-                    key.includes('steam') || key.includes('cache') || key.includes('image')
-                )
-                keysToRemove.forEach(key => localStorage.removeItem(key))
-            }
+            // Clear ImageManager cache and Steam API cache
+            const imageManager = ImageManager.getInstance()
+            await imageManager.clearCache()
+            
+            // Also clear Steam API cache
+            steamApi.clearCache()
 
             this.showSuccess('Cache cleared successfully')
             this.updateCacheStats()
@@ -577,12 +529,14 @@ export class CacheManagementPanel extends PauseMenuPanel {
         loadBtn.disabled = true
 
         try {
-            if (this.onLoadCachedUser) {
-                await this.onLoadCachedUser(selectedVanityUrl)
-                this.showSuccess(`Loaded cached games for ${selectedVanityUrl}`)
-            } else {
-                this.showError('Load cached user function not available')
-            }
+            // Emit event to load cached user - this is a complex workflow
+            this.eventManager.emit(SteamEventTypes.LoadFromCache, {
+                userInput: selectedVanityUrl,
+                timestamp: Date.now(),
+                source: EventSource.UI
+            })
+            
+            this.showSuccess(`Loading cached games for ${selectedVanityUrl}...`)
         } catch (error) {
             console.error('Failed to load cached user:', error)
             this.showError('Failed to load cached user games')
@@ -718,13 +672,9 @@ export class CacheManagementPanel extends PauseMenuPanel {
      * Initialize the image previewer
      */
     private async initializePreviewer(): Promise<void> {
-        if (!this.onGetImageUrls) {
-            this.showError('Image URL getter not available')
-            return
-        }
-
         try {
-            this.imageUrls = await this.onGetImageUrls()
+            const imageManager = ImageManager.getInstance()
+            this.imageUrls = await imageManager.getAllCachedImageUrls()
             
             if (this.imageUrls.length === 0) {
                 this.showError('No cached images available')
@@ -814,25 +764,20 @@ export class CacheManagementPanel extends PauseMenuPanel {
             // For now, we'll need access to ImageManager to get the blob
             // This is a temporary approach - we need the actual blob retrieval
             
-            // Check if we have a way to get the cached blob
-            if (this.onGetCachedBlob) {
-                const blob = await this.onGetCachedBlob(currentUrl)
-                if (blob) {
-                    // Create a blob URL for display
-                    const blobUrl = URL.createObjectURL(blob)
-                    imageElement.src = blobUrl
-                    
-                    // Store the blob URL to clean it up later
-                    if (imageElement.dataset.blobUrl) {
-                        URL.revokeObjectURL(imageElement.dataset.blobUrl)
-                    }
-                    imageElement.dataset.blobUrl = blobUrl
-                } else {
-                    // Fallback to direct URL if blob not found
-                    imageElement.src = currentUrl
+            const imageManager = ImageManager.getInstance()
+            const blob = await imageManager.getCachedImageBlob(currentUrl)
+            if (blob) {
+                // Create a blob URL for display
+                const blobUrl = URL.createObjectURL(blob)
+                imageElement.src = blobUrl
+                
+                // Store the blob URL to clean it up later
+                if (imageElement.dataset.blobUrl) {
+                    URL.revokeObjectURL(imageElement.dataset.blobUrl)
                 }
+                imageElement.dataset.blobUrl = blobUrl
             } else {
-                // Fallback to direct URL if no blob getter available
+                // Fallback to direct URL if blob not found
                 imageElement.src = currentUrl
             }
         } catch (error) {

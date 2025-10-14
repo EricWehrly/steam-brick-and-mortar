@@ -368,7 +368,7 @@ describe('Application Startup Integration', () => {
             uiManager.init()
             
             // Now test the coordinator -> uiManager -> DOM pipeline
-            coordinator.showSteamStatus('Test message', 'success')
+            coordinator.loadFromCache('test-user-id')
         }).not.toThrow()
         
         // Verify the actual DOM integration pipeline worked
