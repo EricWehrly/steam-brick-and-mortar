@@ -5,7 +5,7 @@
  * Migration: Updated to use event system instead of direct method calls
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { StorePropsRenderer } from '../../src/scene/StorePropsRenderer'
 import { GameBoxRenderer } from '../../src/scene/GameBoxRenderer'
@@ -15,6 +15,32 @@ import { RoomEventTypes } from '../../src/types/InteractionEvents'
 import { ServiceContainer } from '../../src/core/di/ServiceContainer'
 import { ServiceKeys } from '../../src/core/di/ServiceKeys'
 import { createSceneTestContainer } from '../utils/test-container-helpers'
+
+// Mock ImageManager to prevent external network calls during integration tests
+// ROOT CAUSE: StorePropsRenderer.createGameBoxesWithNames() calls imageManager.downloadImage()
+// with 5-second timeout, causing tests to take 6+ seconds waiting for network timeouts
+vi.mock('../../src/utils/ImageManager', () => {
+    // Mock ImageManager to prevent external network calls during integration tests
+    // Uses fast mock response instead of 5-second timeout waiting for Steam API
+    const createMockImageBlob = () => {
+        // Create minimal valid JPEG (much faster than network calls)
+        const mockJpegData = new Uint8Array([
+            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
+            0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43,
+            0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07, 0x07, 0x07, 0x09,
+            0xFF, 0xD9 // End of Image marker
+        ])
+        return new Blob([mockJpegData], { type: 'image/jpeg' })
+    }
+    
+    return {
+        ImageManager: {
+            getInstance: () => ({
+                downloadImage: vi.fn().mockResolvedValue(createMockImageBlob())
+            })
+        }
+    }
+})
 
 describe('Dynamic Shelf Spawning Integration', () => {
     let container: ServiceContainer
@@ -77,8 +103,8 @@ describe('Dynamic Shelf Spawning Integration', () => {
             source: EventSource.System
         })
 
-        // Wait for async shelf creation (allow for SharedMaterialManager initialization - takes ~6 seconds)
-        await new Promise(resolve => setTimeout(resolve, 7000))
+        // Wait for async shelf creation (lazy loading is now fast)
+        await new Promise(resolve => setTimeout(resolve, 100))
 
         // Then: Scene should have additional children for the shelves
         const finalChildCount = scene.children.length
@@ -140,8 +166,8 @@ describe('Dynamic Shelf Spawning Integration', () => {
             source: EventSource.System
         })
 
-        // Wait for shelf creation (allow for SharedMaterialManager initialization)
-        await new Promise(resolve => setTimeout(resolve, 7000))
+        // Wait for shelf creation (lazy loading is now fast)
+        await new Promise(resolve => setTimeout(resolve, 100))
 
         // Then: Shelf should be positioned correctly
         const propsGroup = scene.getObjectByName('props') as THREE.Group
@@ -178,7 +204,7 @@ describe('Dynamic Shelf Spawning Integration', () => {
             timestamp: Date.now(),
             source: EventSource.System
         })
-        await new Promise(resolve => setTimeout(resolve, 7000))
+        await new Promise(resolve => setTimeout(resolve, 100)) // Fast with lazy loading
         
         const propsGroup = scene.getObjectByName('props') as THREE.Group
         const initialShelfCount = propsGroup.children.filter(child => 
@@ -197,7 +223,7 @@ describe('Dynamic Shelf Spawning Integration', () => {
             timestamp: Date.now(),
             source: EventSource.System
         })
-        await new Promise(resolve => setTimeout(resolve, 7000))
+        await new Promise(resolve => setTimeout(resolve, 100))
         
         // Then: Should have new shelf configuration, not added to old
         const finalShelfRows = propsGroup.children.filter(child => 
@@ -237,7 +263,7 @@ describe('Dynamic Shelf Spawning Integration', () => {
             timestamp: Date.now(),
             source: EventSource.System
         })
-        await new Promise(resolve => setTimeout(resolve, 7000))
+        await new Promise(resolve => setTimeout(resolve, 100))
 
         // Then: Should create shelves with game boxes
         const propsGroup = scene.getObjectByName('props') as THREE.Group
