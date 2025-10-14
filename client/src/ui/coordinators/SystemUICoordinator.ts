@@ -18,7 +18,6 @@ import type { SteamLoadFromCacheEvent } from '../../types/InteractionEvents'
 import type { DebugStats, DebugStatsProvider } from '../../core/DebugStatsProvider'
 import { ImageManager, type ImageCacheStats } from '../../steam/images/ImageManager'
 import type { SteamIntegration } from '../../steam-integration/SteamIntegration'
-import type { SteamWorkflowManager } from '../../steam-integration/SteamWorkflowManager'
 import type { UIManager } from '../UIManager'
 import { AppSettings } from '../../core/AppSettings'
 
@@ -30,7 +29,6 @@ export class SystemUICoordinator {
     private debugStatsProvider: DebugStatsProvider
     private cacheStatsProvider?: () => Promise<ImageCacheStats>
     private steamIntegration?: SteamIntegration
-    private steamWorkflowManager?: SteamWorkflowManager
     private uiManager?: UIManager
     private appSettings: AppSettings
 
@@ -57,10 +55,8 @@ export class SystemUICoordinator {
     }
 
     public async init(
-        renderer: THREE.WebGLRenderer,
-        steamWorkflowManager?: SteamWorkflowManager
+        renderer: THREE.WebGLRenderer
     ): Promise<void> {
-        this.steamWorkflowManager = steamWorkflowManager
         
         // Initialize pause menu system
         this.pauseMenuManager.init()
@@ -77,15 +73,12 @@ export class SystemUICoordinator {
             onClearImageCache: async () => this.emitClearImageCacheEvent(),
             onGetCachedUsers: () => Promise.resolve(this.steamIntegration?.getCachedUsers() ?? []),
             onLoadCachedUser: async (steamId: string) => {
-                if (this.steamWorkflowManager) {
-                    this.eventManager.emit<SteamLoadFromCacheEvent>('steam:load-from-cache', { 
-                        userInput: steamId,
-                        timestamp: Date.now(),
-                        source: EventSource.UI
-                    })
-                } else if (this.steamIntegration) {
-                    await this.steamIntegration.loadGamesFromCache(steamId)
-                }
+                // Emit event for SteamIntegration to handle directly
+                this.eventManager.emit<SteamLoadFromCacheEvent>('steam:load-from-cache', { 
+                    userInput: steamId,
+                    timestamp: Date.now(),
+                    source: EventSource.UI
+                })
             },
             onGetImageUrls: async () => {
                 const imageManager = ImageManager.getInstance()
