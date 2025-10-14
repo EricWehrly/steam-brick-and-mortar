@@ -15,8 +15,9 @@ import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
 import type { SteamGameData } from '../scene'
 import { SteamErrorMessages, type SteamErrorContext } from '../utils/SteamErrorMessages'
 import { EventManager, EventSource } from '../core/EventManager'
-import { SteamEventTypes } from '../types/InteractionEvents'
-import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamDevModeToggleEvent } from '../types/InteractionEvents'
+import { SteamEventTypes, AppSettingsEventTypes } from '../types/InteractionEvents'
+import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent } from '../types/InteractionEvents'
+import type { SettingChangedEvent } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
 
 export interface SteamIntegrationConfig {
@@ -70,7 +71,7 @@ export class SteamIntegration {
         this.eventManager.registerEventHandler(SteamEventTypes.LoadFromCache, this.handleLoadFromCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.handleRefreshCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.handleClearCache.bind(this))
-        this.eventManager.registerEventHandler(SteamEventTypes.DevModeToggle, this.handleDevModeToggle.bind(this))
+        this.eventManager.registerEventHandler(AppSettingsEventTypes.Changed, this.handleSettingsChange.bind(this))
     }
     
     /**
@@ -476,10 +477,16 @@ export class SteamIntegration {
         }
     }
 
-    private async handleDevModeToggle(event: CustomEvent<SteamDevModeToggleEvent>): Promise<void> {
-        const { isEnabled } = event.detail
+    private async handleSettingsChange(event: CustomEvent<SettingChangedEvent>): Promise<void> {
+        const { key, value } = event.detail
+        
+        // Only handle development mode changes
+        if (key !== 'developmentMode') {
+            return
+        }
         
         try {
+            const isEnabled = value as boolean
             const maxGames = isEnabled ? 20 : 100
             this.updateMaxGames(maxGames)
             
@@ -489,7 +496,7 @@ export class SteamIntegration {
             
             SteamIntegration.logger.info(message)
         } catch (error) {
-            SteamIntegration.logger.error('Dev mode toggle failed:', error)
+            SteamIntegration.logger.error('Development mode setting change failed:', error)
         }
     }
 }

@@ -247,6 +247,10 @@ export const CeilingEventTypes = {
     Toggle: 'ceiling:toggle'
 } as const
 
+export const AppSettingsEventTypes = {
+    Changed: 'app-settings:changed'
+} as const
+
 // =============================================================================
 // EVENT TYPE MAPPINGS
 // =============================================================================
