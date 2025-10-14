@@ -76,7 +76,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
     renderer = new GameBoxRenderer({}, performanceConfig)
     // Access the internal performance manager for testing (was previously exposed)
     performanceManager = (renderer as any).performanceManager
-        textureManager = renderer.getTextureManager()
+        textureManager = (renderer as any).textureManager
         scene = new THREE.Scene()
         camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
         camera.position.set(0, 0, 0)
@@ -142,7 +142,7 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
             // Check performance stats
             const stats = renderer.getPerformanceStats()
             expect(stats.totalGameBoxes).toBe(5)
-            expect(stats.visibleGameBoxes).toBeGreaterThan(0)
+            expect(stats?.visibleGameBoxes).toBeGreaterThan(0)
         })
         
         it('should track viewing distance correctly', () => {
@@ -255,14 +255,14 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
             
             // Get initial stats
             const initialStats = renderer.getPerformanceStats()
-            expect(initialStats.loadedTextures).toBe(15)
+            expect(initialStats?.loadedTextures).toBe(15)
             
             // Trigger cleanup (this should enforce memory limits)
             performanceManager?.enforceTextureMemoryLimit()
             
             // Check that textures were cleaned up
             const finalStats = renderer.getPerformanceStats()
-            expect(finalStats.activeTextures).toBeLessThanOrEqual(10)
+            expect(finalStats?.activeTextures).toBeLessThanOrEqual(10)
         })
         
         it('should clean up off-screen textures', () => {
@@ -322,10 +322,10 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
             const stats = renderer.getPerformanceStats()
             
             expect(stats.totalGameBoxes).toBe(8)
-            expect(stats.visibleGameBoxes).toBeGreaterThan(0)
-            expect(stats.averageDistance).toBeGreaterThan(0)
-            expect(typeof stats.loadedTextures).toBe('number')
-            expect(typeof stats.activeTextures).toBe('number')
+            expect(stats?.visibleGameBoxes).toBeGreaterThan(0)
+            expect(stats?.averageDistance).toBeGreaterThan(0)
+            expect(typeof stats?.loadedTextures).toBe('number')
+            expect(typeof stats?.activeTextures).toBe('number')
         })
     })
     

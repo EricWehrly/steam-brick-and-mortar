@@ -9,7 +9,6 @@
  */
 
 import * as THREE from 'three'
-import { MaterialUtils } from '../utils/MaterialUtils'
 
 // Import types from modular structure
 import type { SteamGameData } from './game-box/types/GameData'
@@ -189,41 +188,6 @@ export class GameBoxRenderer {
         this.artworkInstanceIndex = 0
     }
 
-    public createPlaceholderBoxes(count: number = 6, shelfConfig?: ShelfConfiguration): THREE.Mesh[] {
-        
-        const materials = this.createPlaceholderMaterials()
-        const boxes: THREE.Mesh[] = []
-        
-        const config = shelfConfig ?? GameBoxLayoutUtils.DEFAULT_SHELF_CONFIG
-        const startX = GameBoxLayoutUtils.calculateStartX(count, config)
-        
-        for (let i = 0; i < count; i++) {
-            const gameBox = new THREE.Mesh(
-                this.gameBoxGeometry, 
-                materials[i % materials.length]
-            )
-            
-            // Mark as placeholder game box
-            gameBox.userData = { 
-                isGameBox: true, 
-                isPlaceholder: true 
-            }
-            
-            // Position the box
-            const position = GameBoxLayoutUtils.calculateBoxPosition(i, startX, config)
-            gameBox.position.set(position.x, position.y, position.z)
-            
-            // Enable shadows
-            gameBox.castShadow = true
-            gameBox.receiveShadow = true
-            
-            // Add subtle random rotation for natural look
-            gameBox.rotation.y = (Math.random() - 0.5) * 0.1
-            boxes.push(gameBox)
-        }
-        
-        return boxes
-    }
 
     public createGameBox(
         game: SteamGameData,
@@ -357,87 +321,6 @@ export class GameBoxRenderer {
         
         return gameBox
     }
-
-    /**
-     * Create a text label with the game name and add it to the game box
-     * DEPRECATED: This method is only called as fallback when GPU instanced renderer isn't ready
-     */
-    private addGameNameLabel(gameBox: THREE.Mesh, gameName: string): void {
-        console.warn(`📋 Creating individual label for "${gameName}" - GPU instanced renderer not available`)
-        
-        // Legacy individual label creation (should rarely be used)
-        // Create canvas for text rendering
-        const canvas = document.createElement('canvas')
-        const context = canvas.getContext('2d')
-        if (!context) {
-            console.warn('Could not create canvas context for game name label')
-            return
-        }
-
-        // Set canvas size (higher resolution for better quality)
-        canvas.width = 512
-        canvas.height = 512
-
-        // Configure text rendering
-        context.fillStyle = '#000000' // Black background
-        context.fillRect(0, 0, canvas.width, canvas.height)
-        
-        context.fillStyle = '#ffffff' // White text
-        context.font = 'bold 48px Arial, sans-serif'
-        context.textAlign = 'center'
-        context.textBaseline = 'middle'
-        
-        // Word wrap the game name if it's too long
-        const maxWidth = canvas.width - 40 // 20px padding on each side
-        const words = gameName.split(' ')
-        const lines: string[] = []
-        let currentLine = words[0]
-        
-        for (let i = 1; i < words.length; i++) {
-            const testLine = currentLine + ' ' + words[i]
-            const metrics = context.measureText(testLine)
-            if (metrics.width > maxWidth) {
-                lines.push(currentLine)
-                currentLine = words[i]
-            } else {
-                currentLine = testLine
-            }
-        }
-        lines.push(currentLine)
-        
-        // Draw each line of text
-        const lineHeight = 60
-        const startY = (canvas.height - (lines.length * lineHeight)) / 2 + lineHeight / 2
-        lines.forEach((line, index) => {
-            context.fillText(line, canvas.width / 2, startY + (index * lineHeight))
-        })
-
-        // Create texture from canvas
-        const texture = new THREE.CanvasTexture(canvas)
-        texture.needsUpdate = true
-
-        // Create a plane for the label (slightly in front of the box)
-        const labelGeometry = new THREE.PlaneGeometry(this.dimensions.width * 0.95, this.dimensions.height * 0.95)
-        const labelMaterial = new THREE.MeshBasicMaterial({
-            map: texture,
-            transparent: true,
-            opacity: 0.9,
-            side: THREE.DoubleSide
-        })
-        
-        const label = new THREE.Mesh(labelGeometry, labelMaterial)
-        
-        // Position label slightly in front of the box (on the front face)
-        label.position.z = (this.dimensions.depth / 2) + 0.001
-        label.name = `${gameBox.name}-label`
-        
-        // Add label as child of game box so it moves with the box
-        gameBox.add(label)
-        
-        // Store texture reference for cleanup
-        gameBox.userData.labelTexture = texture
-        gameBox.userData.labelMesh = label
-    }
     
     /**
      * Add game name label using GPU instanced rendering (high performance)
@@ -518,20 +401,6 @@ export class GameBoxRenderer {
         }
     }
 
-    public updateDimensions(newDimensions: Partial<GameBoxDimensions>) {
-        this.dimensions = { ...this.dimensions, ...newDimensions }
-        // Recreate geometry with new dimensions
-        this.gameBoxGeometry.dispose()
-        this.gameBoxGeometry = new THREE.BoxGeometry(
-            this.dimensions.width,
-            this.dimensions.height,
-            this.dimensions.depth
-        )
-    }
-
-    private createPlaceholderMaterials(): THREE.MeshStandardMaterial[] {
-        return MaterialUtils.createGameBoxMaterials()
-    }
 
     public dispose(): void {
         console.debug('🧹 Disposing GameBoxRenderer resources')
@@ -574,10 +443,5 @@ export class GameBoxRenderer {
             activeTextures: 0,
             averageDistance: 0
         }
-    }
-
-    // Access to specialized managers for specific use cases
-    public getTextureManager(): GameBoxTextureManager {
-        return this.textureManager
     }
 }

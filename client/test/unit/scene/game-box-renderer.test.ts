@@ -45,7 +45,7 @@ describe('GameBoxRenderer Texture Tests', () => {
 
     beforeEach(() => {
         renderer = new GameBoxRenderer()
-        textureManager = renderer.getTextureManager()
+        textureManager = (renderer as any).textureManager
         scene = new THREE.Scene()
         mockGame = {
             appid: '123',
