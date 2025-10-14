@@ -12,6 +12,7 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import debugPanelTemplate from '../templates/debug-panel.html?raw'
 import '../../../styles/pause-menu/debug-panel.css'
+import { DebugStatsProvider } from '../../../core/DebugStatsProvider'
 
 export interface DebugStats {
     // Three.js Scene Stats
@@ -64,18 +65,12 @@ export class DebugPanel extends PauseMenuPanel {
     private updateInterval: number | null = null
     private stats: DebugStats = this.getInitialStats()
     private currentStats: DebugStats | null = null
-    private onGetDebugStats?: () => Promise<DebugStats>
+    private debugStatsProvider: DebugStatsProvider
     private consoleVisible = false
 
-    constructor(config: PauseMenuPanelConfig = {}) {
+    constructor(config: PauseMenuPanelConfig = {}, debugStatsProvider: DebugStatsProvider) {
         super(config)
-    }
-
-    /**
-     * Initialize the panel with callback for getting debug stats
-     */
-    initialize(callbacks: { onGetDebugStats?: () => Promise<DebugStats> }): void {
-        this.onGetDebugStats = callbacks.onGetDebugStats
+        this.debugStatsProvider = debugStatsProvider
     }
 
     render(): string {
@@ -149,15 +144,13 @@ export class DebugPanel extends PauseMenuPanel {
     }
 
     private async refreshStats(): Promise<void> {
-        if (this.onGetDebugStats) {
-            try {
-                this.stats = await this.onGetDebugStats()
-                this.currentStats = this.stats
-                this.refresh()
-                console.log('🔧 Debug stats refreshed')
-            } catch (error) {
-                console.error('Failed to refresh debug stats:', error)
-            }
+        try {
+            this.stats = await this.debugStatsProvider.getDebugStats()
+            this.currentStats = this.stats
+            this.refresh()
+            console.log('🔧 Debug stats refreshed')
+        } catch (error) {
+            console.error('Failed to refresh debug stats:', error)
         }
     }
 
@@ -444,6 +437,5 @@ export class DebugPanel extends PauseMenuPanel {
             window.clearInterval(this.updateInterval)
         }
         this.removeConsoleCapture()
-        this.onGetDebugStats = undefined
     }
 }

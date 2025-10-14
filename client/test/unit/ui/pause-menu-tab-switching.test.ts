@@ -48,10 +48,6 @@ describe('Pause Menu Tab Switching', () => {
 
         // Register all panels
         const cachePanel = new CacheManagementPanel()
-        cachePanel.initCacheFunctions(
-            vi.fn().mockResolvedValue({ totalImages: 0, totalSize: 0 }),
-            vi.fn().mockResolvedValue(undefined)
-        )
         pauseMenuManager.registerPanel(cachePanel)
         
         pauseMenuManager.registerPanel(new HelpPanel())
@@ -62,13 +58,15 @@ describe('Pause Menu Tab Switching', () => {
         
         pauseMenuManager.registerPanel(new GameSettingsPanel({}, mockAppSettings, mockEventManager))
         
-        const debugPanel = new DebugPanel()
-        debugPanel.initialize({ onGetDebugStats: vi.fn().mockResolvedValue({
-            sceneObjects: { total: 0, meshes: 0, lights: 0, cameras: 0, textures: 0, materials: 0, geometries: 0 },
-            performance: { fps: 60, frameTime: 16.67, memoryUsed: 0, memoryTotal: 0, triangles: 0, drawCalls: 0 },
-            cache: { imageCount: 0, imageCacheSize: 0, gameDataCount: 0, gameDataSize: 0, quotaUsed: 0, quotaTotal: 0 },
-            system: { userAgent: 'test', webxrSupported: false, webglVersion: 'WebGL 2.0', maxTextureSize: 4096, vendor: 'test', renderer: 'test' }
-        }) })
+        const mockDebugStatsProvider = {
+            getDebugStats: vi.fn().mockResolvedValue({
+                sceneObjects: { total: 0, meshes: 0, lights: 0, cameras: 0, textures: 0, materials: 0, geometries: 0 },
+                performance: { fps: 60, frameTime: 16.67, memoryUsed: 0, memoryTotal: 0, triangles: 0, drawCalls: 0 },
+                cache: { imageCount: 0, imageCacheSize: 0, gameDataCount: 0, gameDataSize: 0, quotaUsed: 0, quotaTotal: 0 },
+                system: { userAgent: 'test', webxrSupported: false, webglVersion: 'WebGL 2.0', maxTextureSize: 4096, vendor: 'test', renderer: 'test' }
+            })
+        }
+        const debugPanel = new DebugPanel({}, mockDebugStatsProvider as any)
         pauseMenuManager.registerPanel(debugPanel)
     })
 
