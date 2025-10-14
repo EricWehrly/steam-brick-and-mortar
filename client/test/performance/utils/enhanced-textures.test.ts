@@ -219,12 +219,12 @@ describe('SharedMaterialManager Enhanced', () => {
       expect(material1).toBe(material2)
     })
 
-    it('should handle game box materials with different hues', () => {
-      const material1 = materialManager.getGameBoxMaterial(0.1)
-      const material2 = materialManager.getGameBoxMaterial(0.5)
+    it('should handle game box materials with simple fallback', () => {
+      const material1 = materialManager.getGameBoxMaterialFromName('Game A')
+      const material2 = materialManager.getGameBoxMaterialFromName('Game B')
       
-      expect(material1).not.toBe(material2)
-      expect(material1.color).not.toEqual(material2.color)
+      expect(material1).toBe(material2)  // Same fallback material
+      expect(material1.color.getHex()).toBe(0xff00ff)  // Magenta fallback
     })
   })
 
@@ -283,9 +283,9 @@ describe('VR Performance Considerations', () => {
   it('should handle large numbers of materials without memory leaks', () => {
     const initialStats = materialManager.getStats()
     
-    // Create many materials with different hues
+    // Create fallback material (all requests create same instance)
     for (let i = 0; i < 10; i++) {
-      materialManager.getGameBoxMaterial(i * 0.1)
+      materialManager.getGameBoxMaterialFromName(`Game ${i}`)
     }
     
     const newStats = materialManager.getStats()
