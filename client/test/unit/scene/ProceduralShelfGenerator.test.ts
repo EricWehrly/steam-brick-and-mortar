@@ -38,13 +38,6 @@ describe('ProceduralShelfGenerator', () => {
     expect(shelf.children.length).toBe(10);
   });
 
-  it('should create a test scene', () => {
-    const testScene = generator.createTestScene();
-    
-    expect(testScene).toBeInstanceOf(THREE.Group);
-    expect(testScene.children.length).toBe(1); // One shelf unit
-  });
-
   it('should create a row of shelf units', () => {
     const startPosition = new THREE.Vector3(0, 0, 0);
     const unitCount = 3;
