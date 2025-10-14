@@ -29,9 +29,9 @@ describe('SharedMaterialManager Lazy Loading Integration', () => {
             const geometry = new THREE.BoxGeometry(1, 1, 1)
             
             // Get materials for different games (simplified fallback for all)
-            const material1 = manager.getGameBoxFallbackMaterial()
-            const material2 = manager.getGameBoxFallbackMaterial()
-            const material3 = manager.getGameBoxFallbackMaterial()
+            const material1 = manager.getMaterial(MaterialType.FallbackGameBox)
+            const material2 = manager.getMaterial(MaterialType.FallbackGameBox)
+            const material3 = manager.getMaterial(MaterialType.FallbackGameBox)
             
             const endTime = performance.now()
             const duration = endTime - startTime
@@ -67,15 +67,15 @@ describe('SharedMaterialManager Lazy Loading Integration', () => {
             const geometry = new THREE.BoxGeometry(1, 1, 1)
             
             // 1. Create shelf structure
-            const shelfMaterial = manager.getShelfMaterial(MaterialType.MdfVeneer)
-            const interiorMaterial = manager.getShelfMaterial(MaterialType.ShelfInterior)
+            const shelfMaterial = manager.getMaterial(MaterialType.MdfVeneer)
+            const interiorMaterial = manager.getMaterial(MaterialType.ShelfInterior)
             
             // 2. Add game boxes (fallback for all)
-            const gameBoxMaterial1 = manager.getGameBoxFallbackMaterial()
-            const gameBoxMaterial2 = manager.getGameBoxFallbackMaterial()
+            const gameBoxMaterial1 = manager.getMaterial(MaterialType.FallbackGameBox)
+            const gameBoxMaterial2 = manager.getMaterial(MaterialType.FallbackGameBox)
             
             // 3. Add environment elements
-            const carpetMaterial = manager.getCarpetMaterial()
+            const carpetMaterial = manager.getMaterial(MaterialType.Carpet)
             
             const endTime = performance.now()
             const duration = endTime - startTime
@@ -121,7 +121,7 @@ describe('SharedMaterialManager Lazy Loading Integration', () => {
             
             // Request fallback material for all
             gameNames.forEach(() => {
-                const material = manager.getGameBoxFallbackMaterial()
+                const material = manager.getMaterial(MaterialType.FallbackGameBox)
                 materials.push(material)
             })
             
@@ -152,7 +152,7 @@ describe('SharedMaterialManager Lazy Loading Integration', () => {
             
             // Create many meshes with shared materials
             for (let i = 0; i < 100; i++) {
-                const material = manager.getGameBoxFallbackMaterial()
+                const material = manager.getMaterial(MaterialType.FallbackGameBox)
                 const mesh = new THREE.Mesh(geometry, material)
                 meshes.push(mesh)
                 scene.add(mesh)
@@ -176,13 +176,13 @@ describe('SharedMaterialManager Lazy Loading Integration', () => {
     describe('Error Handling and Edge Cases', () => {
         it('should recover gracefully from initialization errors', () => {
             // Test auto-initialization fallback
-            const material1 = manager.getGameBoxFallbackMaterial()
+            const material1 = manager.getMaterial(MaterialType.FallbackGameBox)
             
             // Manual re-initialization should warn but not break
             manager.initialize() // No config needed for simple system
             
             // Should still work and use original configuration
-            const material2 = manager.getGameBoxFallbackMaterial()
+            const material2 = manager.getMaterial(MaterialType.FallbackGameBox)
             
             expect(material1).toBeInstanceOf(THREE.MeshStandardMaterial)
             expect(material2).toBeInstanceOf(THREE.MeshStandardMaterial)
@@ -191,8 +191,8 @@ describe('SharedMaterialManager Lazy Loading Integration', () => {
 
         it('should handle disposal and re-creation correctly', () => {
             // Load some materials
-            const material1 = manager.getGameBoxFallbackMaterial()
-            const shelfMaterial = manager.getShelfMaterial(MaterialType.MdfVeneer)
+            const material1 = manager.getMaterial(MaterialType.FallbackGameBox)
+            const shelfMaterial = manager.getMaterial(MaterialType.MdfVeneer)
             
             expect(material1).toBeInstanceOf(THREE.MeshStandardMaterial)
             expect(shelfMaterial).toBeInstanceOf(THREE.MeshStandardMaterial)
@@ -203,7 +203,7 @@ describe('SharedMaterialManager Lazy Loading Integration', () => {
             
             // Get new instance and verify it works
             const newManager = SharedMaterialManager.getInstance()
-            const newMaterial = newManager.getGameBoxFallbackMaterial()
+            const newMaterial = newManager.getMaterial(MaterialType.FallbackGameBox)
             
             expect(newMaterial).toBeInstanceOf(THREE.MeshStandardMaterial)
             expect(newManager.isInitialized()).toBe(true)

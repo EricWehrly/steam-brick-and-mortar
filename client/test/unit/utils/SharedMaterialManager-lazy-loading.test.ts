@@ -80,7 +80,7 @@ describe('SharedMaterialManager Lazy Loading', () => {
 
     describe('Game Box Material Lazy Loading', () => {
         it('should create fallback game box material on first request', () => {
-            const material = manager.getGameBoxFallbackMaterial()
+            const material = manager.getMaterial(MaterialType.FallbackGameBox)
             
             // Should create just the fallback material
             expect(manager.getStats().totalMaterials).toBe(1)
@@ -89,8 +89,8 @@ describe('SharedMaterialManager Lazy Loading', () => {
         })
 
         it('should return same material instance on subsequent requests', () => {
-            const material1 = manager.getGameBoxFallbackMaterial()
-            const material2 = manager.getGameBoxFallbackMaterial()
+            const material1 = manager.getMaterial(MaterialType.FallbackGameBox)
+            const material2 = manager.getMaterial(MaterialType.FallbackGameBox)
 
             // Should reuse same instance regardless of game name
             expect(material1).toBe(material2)
@@ -98,8 +98,8 @@ describe('SharedMaterialManager Lazy Loading', () => {
         })
 
         it('should return simple fallback material for game names', () => {
-            const material1 = manager.getGameBoxFallbackMaterial()
-            const material2 = manager.getGameBoxFallbackMaterial()
+            const material1 = manager.getMaterial(MaterialType.FallbackGameBox)
+            const material2 = manager.getMaterial(MaterialType.FallbackGameBox)
 
             expect(material1).toBeInstanceOf(THREE.MeshStandardMaterial)
             expect(material2).toBeInstanceOf(THREE.MeshStandardMaterial)
@@ -119,12 +119,12 @@ describe('SharedMaterialManager Lazy Loading', () => {
             expect(createSpy).not.toHaveBeenCalled()
 
             // Should create material on first request
-            const material = manager.getShelfMaterial(MaterialType.MdfVeneer)
+            const material = manager.getMaterial(MaterialType.MdfVeneer)
             expect(createSpy).toHaveBeenCalledTimes(1)
             expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
 
             // Should not create again on second request
-            const material2 = manager.getShelfMaterial(MaterialType.MdfVeneer)
+            const material2 = manager.getMaterial(MaterialType.MdfVeneer)
             expect(createSpy).toHaveBeenCalledTimes(1) // Still only called once
             expect(material2).toBe(material) // Same instance
 
@@ -138,7 +138,7 @@ describe('SharedMaterialManager Lazy Loading', () => {
 
             manager.initialize()
 
-            const material = manager.getShelfMaterial(MaterialType.ShelfInterior)
+            const material = manager.getMaterial(MaterialType.ShelfInterior)
             expect(createSpy).toHaveBeenCalledTimes(1)
             expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
 
@@ -152,7 +152,7 @@ describe('SharedMaterialManager Lazy Loading', () => {
 
             manager.initialize()
 
-            const material = manager.getShelfMaterial(MaterialType.BrandAccent)
+            const material = manager.getMaterial(MaterialType.BrandAccent)
             expect(createSpy).toHaveBeenCalledTimes(1)
             expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
 
@@ -163,7 +163,7 @@ describe('SharedMaterialManager Lazy Loading', () => {
             manager.initialize()
 
             expect(() => {
-                manager.getShelfMaterial('unknownType' as any)
+                manager.getMaterial('unknownType' as any)
             }).toThrow('Unknown material type: unknownType')
         })
     })
@@ -178,12 +178,12 @@ describe('SharedMaterialManager Lazy Loading', () => {
 
             expect(createSpy).not.toHaveBeenCalled()
 
-            const material = manager.getCarpetMaterial()
+            const material = manager.getMaterial(MaterialType.Carpet)
             expect(createSpy).toHaveBeenCalledTimes(1)
             expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
 
             // Second request should return cached material
-            const material2 = manager.getCarpetMaterial()
+            const material2 = manager.getMaterial(MaterialType.Carpet)
             expect(createSpy).toHaveBeenCalledTimes(1) // Still only called once
             expect(material2).toBe(material)
 
@@ -197,7 +197,7 @@ describe('SharedMaterialManager Lazy Loading', () => {
 
             manager.initialize()
 
-            const material = manager.getCeilingMaterial()
+            const material = manager.getMaterial(MaterialType.Ceiling)
             expect(createSpy).toHaveBeenCalledTimes(1)
             expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
 
@@ -211,7 +211,7 @@ describe('SharedMaterialManager Lazy Loading', () => {
 
             manager.initialize()
 
-            const material = manager.getWallWoodMaterial()
+            const material = manager.getMaterial(MaterialType.WallWood)
             expect(createSpy).toHaveBeenCalledTimes(1)
             expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
 
@@ -225,7 +225,7 @@ describe('SharedMaterialManager Lazy Loading', () => {
 
             manager.initialize()
 
-            const material = manager.getBasicWoodMaterial()
+            const material = manager.getMaterial(MaterialType.BasicWood)
             expect(createSpy).toHaveBeenCalledTimes(1)
             expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
 
@@ -235,16 +235,16 @@ describe('SharedMaterialManager Lazy Loading', () => {
 
     describe('Auto-Initialization Behavior', () => {
         it('should auto-initialize when getting materials without explicit init', () => {
-            const gameBoxMaterial = manager.getGameBoxFallbackMaterial()
-            const shelfMaterial = manager.getShelfMaterial(MaterialType.MdfVeneer)
+            const gameBoxMaterial = manager.getMaterial(MaterialType.FallbackGameBox)
+            const shelfMaterial = manager.getMaterial(MaterialType.MdfVeneer)
 
             expect(gameBoxMaterial).toBeInstanceOf(THREE.MeshStandardMaterial)
             expect(shelfMaterial).toBeInstanceOf(THREE.MeshStandardMaterial)
         })
 
         it('should auto-initialize with default config', () => {
-            const material1 = manager.getGameBoxFallbackMaterial()
-            const material2 = manager.getGameBoxFallbackMaterial()
+            const material1 = manager.getMaterial(MaterialType.FallbackGameBox)
+            const material2 = manager.getMaterial(MaterialType.FallbackGameBox)
             
             // Should use simple fallback material
             expect(manager.getStats().totalMaterials).toBe(1)
@@ -256,9 +256,9 @@ describe('SharedMaterialManager Lazy Loading', () => {
     describe('Statistics and Pool State', () => {
         it('should track pool statistics correctly with lazy loading', () => {
             // Request materials
-            const m1 = manager.getGameBoxFallbackMaterial()
-            const m2 = manager.getGameBoxFallbackMaterial()
-            const s1 = manager.getShelfMaterial(MaterialType.MdfVeneer)
+            const m1 = manager.getMaterial(MaterialType.FallbackGameBox)
+            const m2 = manager.getMaterial(MaterialType.FallbackGameBox)
+            const s1 = manager.getMaterial(MaterialType.MdfVeneer)
 
             const stats = manager.getStats()
             expect(stats.totalMaterials).toBe(2)
@@ -271,8 +271,8 @@ describe('SharedMaterialManager Lazy Loading', () => {
             manager.initialize()
 
             // Request same material multiple times
-            manager.getGameBoxFallbackMaterial()
-            manager.getGameBoxFallbackMaterial()
+            manager.getMaterial(MaterialType.FallbackGameBox)
+            manager.getMaterial(MaterialType.FallbackGameBox)
             
             const stats = manager.getStats()
             expect(stats.poolHitRate).toBe(1.0) // 100% hit rate for same material
@@ -284,8 +284,8 @@ describe('SharedMaterialManager Lazy Loading', () => {
             manager.initialize()
 
             // Load some materials but not others
-            const gameBoxMaterial = manager.getGameBoxFallbackMaterial()
-            const shelfMaterial = manager.getShelfMaterial(MaterialType.MdfVeneer)
+            const gameBoxMaterial = manager.getMaterial(MaterialType.FallbackGameBox)
+            const shelfMaterial = manager.getMaterial(MaterialType.MdfVeneer)
             // Don't load carpet material
 
             const gameBoxDisposeSpy = vi.spyOn(gameBoxMaterial, 'dispose')

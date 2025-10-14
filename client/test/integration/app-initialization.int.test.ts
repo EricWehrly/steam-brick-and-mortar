@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { SharedMaterialManager } from '../../src/utils/SharedMaterialManager'
+import { SharedMaterialManager, MaterialType } from '../../src/utils/SharedMaterialManager'
 
 describe('SharedMaterialManager API Integration Tests', () => {
   let materialManager: SharedMaterialManager
@@ -43,15 +43,13 @@ describe('SharedMaterialManager API Integration Tests', () => {
 
   describe('API Method Availability', () => {
     it('should have all methods that StoreLayout expects', () => {
-      expect(typeof materialManager.getCeilingMaterial).toBe('function')
-      expect(typeof materialManager.getWallWoodMaterial).toBe('function') 
-      expect(typeof materialManager.getCarpetMaterial).toBe('function')
+      expect(typeof materialManager.getMaterial).toBe('function')
     })
 
     it('should not throw is not a function errors', () => {
-      expect(() => materialManager.getCeilingMaterial).not.toThrow()
-      expect(() => materialManager.getWallWoodMaterial).not.toThrow()
-      expect(() => materialManager.getCarpetMaterial).not.toThrow()
+      expect(() => materialManager.getMaterial(MaterialType.Ceiling)).not.toThrow()
+      expect(() => materialManager.getMaterial(MaterialType.WallWood)).not.toThrow()
+      expect(() => materialManager.getMaterial(MaterialType.Carpet)).not.toThrow()
     })
   })
 })

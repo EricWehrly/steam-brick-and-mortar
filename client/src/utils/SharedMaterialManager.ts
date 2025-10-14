@@ -37,8 +37,6 @@ export enum MaterialType {
     BasicWood = 'basicWood'
 }
 
-export type ShelfMaterialType = MaterialType.MdfVeneer | MaterialType.ShelfInterior | MaterialType.BrandAccent
-
 export interface MaterialPool {
     materials: Map<MaterialType, THREE.MeshStandardMaterial>
 }
@@ -93,7 +91,7 @@ export class SharedMaterialManager {
         console.debug(`✅ SharedMaterialManager initialized in ${(endTime - startTime).toFixed(2)}ms`)
     }
 
-    private getMaterial(type: MaterialType): THREE.MeshStandardMaterial {
+    public getMaterial(type: MaterialType): THREE.MeshStandardMaterial {
         if (!this.materialPool) {
             this.initialize()
         }
@@ -130,31 +128,6 @@ export class SharedMaterialManager {
                 throw new Error(`Unknown material type: ${type}`)
         }
     }
-
-    public getGameBoxFallbackMaterial(): THREE.MeshStandardMaterial {
-        return this.getMaterial(MaterialType.FallbackGameBox)
-    }
-
-    public getShelfMaterial(type: ShelfMaterialType): THREE.MeshStandardMaterial {
-        return this.getMaterial(type)
-    }
-    
-    public getCarpetMaterial(): THREE.MeshStandardMaterial {
-        return this.getMaterial(MaterialType.Carpet)
-    }
-    
-    public getCeilingMaterial(): THREE.MeshStandardMaterial {
-        return this.getMaterial(MaterialType.Ceiling)
-    }
-    
-    public getWallWoodMaterial(): THREE.MeshStandardMaterial {
-        return this.getMaterial(MaterialType.WallWood)
-    }
-    
-    public getBasicWoodMaterial(): THREE.MeshStandardMaterial {
-        return this.getMaterial(MaterialType.BasicWood)
-    }
-
 
     // TODO: Move to WebWorker - blocks main thread during procedural texture generation
     private createMDFVeneerMaterial(): THREE.MeshStandardMaterial {
