@@ -159,7 +159,7 @@ describe('ImageManager Unit Tests', () => {
                 if (ms === 100) { // Our delay
                     callback()
                 }
-                return 1
+                return 1 as any
             })
             
             await imageManager.downloadGameArtwork(mockGame.artwork)

@@ -157,7 +157,7 @@ describe('Load from Cache Integration', () => {
 
   it('should immediately hide button when input is cleared', () => {
     // Show the button first
-    uiManager.steamUIPanel.updateLoadFromCacheButtonVisibility('test', true)
+    uiManager.steamUIPanel.updateLoadFromCacheButtonVisibility(true)
     expect(mockLoadFromCacheButton.classList.contains('hidden')).toBe(false)
     
     // Clear input should immediately hide button without waiting for events
