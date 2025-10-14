@@ -2,9 +2,6 @@ import * as THREE from 'three';
 
 import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager';
 
-/**
- * Default shelf configuration
- */
 const DEFAULT_SHELF_CONFIG = {
   width: 2.0,
   height: 2.0,
@@ -21,33 +18,8 @@ const DEFAULT_SHELF_CONFIG = {
  */
 export class ProceduralShelfGenerator {
 
-
     private get materialManager(): SharedMaterialManager {
         return SharedMaterialManager.getInstance();
-    }
-
-    /**
-     * Create MDF veneer material for shelf external surfaces (Task 6.1.1.1)
-     * Now uses shared material manager for performance optimization
-     */
-    private createMDFVeneerMaterial(): THREE.Material {
-        return this.materialManager.getShelfMaterial(MaterialType.MdfVeneer);
-    }
-
-    /**
-     * Create glossy white interior material for shelf compartments
-     * Now uses shared material manager for performance optimization
-     */
-    private createShelfInteriorMaterial(): THREE.Material {
-        return this.materialManager.getShelfMaterial(MaterialType.ShelfInterior);
-    }
-
-    /**
-     * Create brand blue material for support posts and brackets
-     * Now uses shared material manager for performance optimization
-     */
-    private createBrandAccentMaterial(): THREE.Material {
-        return this.materialManager.getShelfMaterial(MaterialType.BrandAccent);
     }
 
   /**
@@ -84,10 +56,10 @@ export class ProceduralShelfGenerator {
     // const topWidth = width - 2 * height * Math.tan(angleRad);
     
     // Get materials for different components (Task 6.1.1.1)
-    const mdfVeneerMaterial = this.createMDFVeneerMaterial(); // External surfaces
-    const shelfInteriorMaterial = this.createShelfInteriorMaterial(); // Interior compartments  
-    const brandAccentMaterial = this.createBrandAccentMaterial(); // Support posts/brackets
-    
+    const mdfVeneerMaterial = this.materialManager.getShelfMaterial(MaterialType.MdfVeneer);          // external surfaces
+    const shelfInteriorMaterial = this.materialManager.getShelfMaterial(MaterialType.ShelfInterior);  // interior compartments
+    const brandAccentMaterial = this.materialManager.getShelfMaterial(MaterialType.BrandAccent);      // support posts/brackets
+
     // Create the two angled boards (front and back) - MDF veneer exterior
     // TODO: Replace with InstancedMesh for better draw call batching
     const angledBoardGeometry = new THREE.BoxGeometry(
@@ -137,9 +109,6 @@ export class ProceduralShelfGenerator {
     return shelfGroup;
   }
 
-  /**
-   * Add horizontal shelves with MDF veneer exterior and white interior (Task 6.1.1.1)
-   */
   private addHorizontalShelvesWithMaterials(
     parent: THREE.Group,
     width: number,
@@ -194,42 +163,6 @@ export class ProceduralShelfGenerator {
     }
   }
 
-  /**
-   * @deprecated Legacy method - use addHorizontalShelvesWithMaterials instead
-   */
-  private addHorizontalShelves(
-    parent: THREE.Group,
-    width: number,
-    height: number,
-    depth: number,
-    shelfCount: number,
-    boardThickness: number,
-    angleRad: number,
-    woodMaterial: THREE.Material
-  ): void {
-    // Fallback to new method with same material for all surfaces
-    this.addHorizontalShelvesWithMaterials(parent, width, height, depth, shelfCount, boardThickness, angleRad, woodMaterial, woodMaterial, DEFAULT_SHELF_CONFIG.shelfExtensionPerLevel);
-  }
-
-  /**
-   * Create a simple test scene with one shelf unit
-   */
-  public createTestScene(): THREE.Group {
-    const testGroup = new THREE.Group();
-    
-    // Create a single shelf unit for testing using default configuration
-    const shelf = this.generateShelfUnit(
-      new THREE.Vector3(0, 0, 0)
-      // Uses DEFAULT_SHELF_CONFIG values
-    );
-
-    testGroup.add(shelf);
-    return testGroup;
-  }
-
-  /**
-   * Generate a row of shelf units for store layout
-   */
   public generateShelfRow(
     startPosition: THREE.Vector3,
     unitCount: number,
