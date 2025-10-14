@@ -443,6 +443,36 @@
 
 ---
 
+## Test Infrastructure Hardening
+
+### Feature 8.4: Test Network Isolation and Reliability 🔮
+**Context**: Prevent external network calls in tests for reliability and performance
+
+#### Story 8.4.1: Automatic Test Network Isolation
+- **Task 8.4.1.1**: Implement global network isolation for test environment
+  - Research and implement Vitest configuration for automatic network blocking
+  - Add global test setup that intercepts and blocks external network calls
+  - Create clear error messages indicating blocked calls and how to mock them
+  - Ensure compatibility with existing fetch mocking patterns
+- **Task 8.4.1.2**: Implement MSW (Mock Service Worker) for comprehensive network mocking
+  - Set up MSW to intercept network calls at the browser/Node level
+  - Create catch-all handler that fails unmocked network requests
+  - Add ability to selectively allow specific external calls when needed
+  - Integrate with existing test architecture and mocking patterns
+- **Task 8.4.1.3**: Performance and reliability improvements
+  - Eliminate 5+ second timeout delays caused by external network calls
+  - Prevent accidental hits to real CDNs or APIs during testing
+  - Ensure test suite reliability in CI/CD environments without internet
+  - Add performance benchmarking to detect slow tests
+
+**Expected Deliverable**: Automatic network isolation system preventing external calls in tests
+
+**Acceptance**: Test suite fails fast with clear errors for any external network attempts, eliminating timeout delays and improving reliability
+
+**Context**: **High Priority Late Phase 2** - Critical for infrastructure reliability as system scales to multi-user testing. Addresses current 5+ second test delays and prevents production API hits during development.
+
+---
+
 ## TBD: Features Under Consideration for Phase 2
 
 *These features were identified during Phase 1 development but deferred pending Phase 2 scope prioritization*
