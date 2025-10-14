@@ -16,7 +16,6 @@
 import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { BlockbusterColors } from '../utils/Colors'
-import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
 import { DataManager } from '../core/data/DataManager'
@@ -30,16 +29,12 @@ export class SceneManager {
     private scene: THREE.Scene
     private camera: THREE.PerspectiveCamera
     private renderer: THREE.WebGLRenderer
-    private materialManager: SharedMaterialManager
     private propRenderer: PropRenderer
     private skyboxManager: SkyboxManager
 
     constructor(options: SceneManagerOptions = {}) {
         // Initialize RectAreaLight uniforms (required for RectAreaLight to work)
         RectAreaLightUniformsLib.init()
-        
-        // Initialize texture manager
-        this.materialManager = SharedMaterialManager.getInstance()
         
         // Initialize Three.js components
         this.scene = new THREE.Scene()
@@ -105,9 +100,6 @@ export class SceneManager {
         })
     }
 
-    /**
-     * Start the render loop with integrated frame updates
-     */
     public startRenderLoop(dependencies?: {
         webxrCoordinator?: any,
         sceneCoordinator?: any,
@@ -142,186 +134,21 @@ export class SceneManager {
         })
     }
 
-    /**
-     * Stop the render loop
-     */
     public stopRenderLoop() {
         this.renderer.setAnimationLoop(null)
     }
 
-    /**
-     * Add an object to the scene
-     */
-    public addToScene(object: THREE.Object3D) {
-        this.scene.add(object)
-    }
-
-    /**
-     * Remove an object from the scene
-     */
-    public removeFromScene(object: THREE.Object3D) {
-        this.scene.remove(object)
-    }
-
-    /**
-     * Find objects in the scene by user data
-     */
-    public findObjectsByUserData(key: string, value?: unknown): THREE.Object3D[] {
-        return this.scene.children.filter(child => {
-            if (value !== undefined) {
-                return child.userData?.[key] === value
-            }
-            return child.userData?.[key] !== undefined
-        })
-    }
-
-    /**
-     * Clear objects from scene by user data
-     */
-    public clearObjectsByUserData(key: string, value?: unknown) {
-        const objects = this.findObjectsByUserData(key, value)
-        objects.forEach(obj => this.scene.remove(obj))
-        return objects.length
-    }
-
-
-
-    /**
-     * Create fluorescent light fixtures using PropRenderer
-     * Positioned just below the ceiling at the correct height
-     */
-    public createFluorescentFixtures(ceilingHeight: number = 3.2): THREE.Group {
-        // Use PropRenderer to create proper ceiling-mounted fixtures
-        return this.propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16, {
-            width: 4,
-            height: 0.15,
-            depth: 0.6,
-            emissiveIntensity: 0.8,
-            rows: 2,
-            fixturesPerRow: 4
-        })
-    }
-
-    /**
-     * Demonstration of enhanced procedural textures
-     * Creates sample objects with the new texture system
-     */
-    public addEnhancedTextureDemo(): void {
-        // Create floor with enhanced carpet texture
-        const floorGeometry = new THREE.PlaneGeometry(20, 20)
-        const carpetMaterial = this.materialManager.getMaterial(MaterialType.Carpet)
-        const floor = new THREE.Mesh(floorGeometry, carpetMaterial)
-        floor.rotation.x = -Math.PI / 2
-        floor.receiveShadow = true
-        this.scene.add(floor)
-
-        // Create ceiling with enhanced popcorn texture
-        const ceilingGeometry = new THREE.PlaneGeometry(20, 20)
-        const ceilingMaterial = this.materialManager.getMaterial(MaterialType.Ceiling)
-        const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
-        ceiling.rotation.x = Math.PI / 2
-        ceiling.position.y = 8
-        this.scene.add(ceiling)
-
-        // Create wooden shelves with enhanced wood texture
-        for (let i = 0; i < 3; i++) {
-            const shelfGeometry = new THREE.BoxGeometry(6, 0.2, 1.5)
-            const woodMaterial = this.materialManager.getMaterial(MaterialType.WallWood)
-            const shelf = new THREE.Mesh(shelfGeometry, woodMaterial)
-            shelf.position.set(-5, 2 + i * 2, 0)
-            shelf.castShadow = true
-            this.scene.add(shelf)
-        }
-
-        // Create comparison objects with basic textures
-        for (let i = 0; i < 3; i++) {
-            const shelfGeometry = new THREE.BoxGeometry(6, 0.2, 1.5)
-            const basicWoodMaterial = this.materialManager.getMaterial(MaterialType.BasicWood)
-            const shelf = new THREE.Mesh(shelfGeometry, basicWoodMaterial)
-            shelf.position.set(5, 2 + i * 2, 0)
-            shelf.castShadow = true
-            this.scene.add(shelf)
-        }
-
-        // Add labels to show the difference
-        this.addTextLabel('Enhanced Textures', new THREE.Vector3(-5, 0.5, 2))
-        this.addTextLabel('Basic Textures', new THREE.Vector3(5, 0.5, 2))
-    }
-
-    /**
-     * Add a simple text label to the scene
-     */
-    private addTextLabel(text: string, position: THREE.Vector3): void {
-        const canvas = document.createElement('canvas')
-        const context = canvas.getContext('2d')
-        if (!context) return
-
-        canvas.width = 512
-        canvas.height = 128
-        context.fillStyle = '#ffffff'
-        context.fillRect(0, 0, canvas.width, canvas.height)
-        context.fillStyle = '#000000'
-        context.font = '48px Arial'
-        context.textAlign = 'center'
-        context.fillText(text, canvas.width / 2, canvas.height / 2 + 16)
-
-        const texture = new THREE.CanvasTexture(canvas)
-        const material = new THREE.MeshBasicMaterial({ 
-            map: texture, 
-            transparent: true 
-        })
-        const geometry = new THREE.PlaneGeometry(4, 1)
-        const mesh = new THREE.Mesh(geometry, material)
-        mesh.position.copy(position)
-        this.scene.add(mesh)
-    }
-
     // Atmospheric Props Methods (Phase 2.4)
-
-    /**
-     * Create wire rack displays for snack/merchandise areas
-     */
-    public createWireRackDisplay(position: THREE.Vector3): THREE.Group {
-        return this.propRenderer.createWireRackDisplay(position)
-    }
-
-    /**
-     * Create category dividers between shelf sections
-     */
-    public createCategoryDivider(position: THREE.Vector3, height: number = 2.2): THREE.Group {
-        return this.propRenderer.createCategoryDivider(position, height)
-    }
-
-    /**
-     * Create subtle floor navigation markers
-     */
-    public createFloorMarkers(roomWidth: number = 22, roomDepth: number = 16): THREE.Group {
-        return this.propRenderer.createFloorMarkers(roomWidth, roomDepth)
-    }
-
-    /**
-     * Get the PropRenderer instance for advanced prop manipulation
-     */
-    public getPropRenderer(): PropRenderer {
-        return this.propRenderer
-    }
 
     // Getters for accessing Three.js components
     public getScene(): THREE.Scene {
         return this.scene
     }
 
-    public getCamera(): THREE.PerspectiveCamera {
-        return this.camera
-    }
-
     public getRenderer(): THREE.WebGLRenderer {
         return this.renderer
     }
 
-    /**
-     * Cleanup resources
-     */
     public dispose() {
         this.stopRenderLoop()
         this.skyboxManager.dispose()
