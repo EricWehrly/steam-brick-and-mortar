@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { NoiseGenerator } from '../../../src/utils/NoiseGenerator'
 import { ProceduralTextures } from '../../../src/utils/ProceduralTextures'
-import { SharedMaterialManager } from '../../../src/utils/SharedMaterialManager'
+import { SharedMaterialManager, MaterialType } from '../../../src/utils/SharedMaterialManager'
 import * as THREE from 'three'
 
 describe('NoiseGenerator', () => {
@@ -185,7 +185,7 @@ describe('SharedMaterialManager Enhanced', () => {
 
   describe('enhanced procedural materials', () => {
     it('should create enhanced wood material', () => {
-      const material = materialManager.getWallWoodMaterial()
+      const material = materialManager.getMaterial(MaterialType.WallWood)
       
       expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
       expect(material.map).toBeInstanceOf(THREE.Texture)
@@ -195,7 +195,7 @@ describe('SharedMaterialManager Enhanced', () => {
     })
 
     it('should create enhanced carpet material', () => {
-      const material = materialManager.getCarpetMaterial()
+      const material = materialManager.getMaterial(MaterialType.Carpet)
       
       expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
       expect(material.map).toBeInstanceOf(THREE.Texture)
@@ -204,7 +204,7 @@ describe('SharedMaterialManager Enhanced', () => {
     })
 
     it('should create enhanced ceiling material', () => {
-      const material = materialManager.getCeilingMaterial()
+      const material = materialManager.getMaterial(MaterialType.Ceiling)
       
       expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
       expect(material.map).toBeInstanceOf(THREE.Texture)
@@ -213,15 +213,15 @@ describe('SharedMaterialManager Enhanced', () => {
     })
 
     it('should cache materials with same parameters', () => {
-      const material1 = materialManager.getWallWoodMaterial()
-      const material2 = materialManager.getWallWoodMaterial()
+      const material1 = materialManager.getMaterial(MaterialType.WallWood)
+      const material2 = materialManager.getMaterial(MaterialType.WallWood)
       
       expect(material1).toBe(material2)
     })
 
     it('should handle game box materials with simple fallback', () => {
-      const material1 = materialManager.getGameBoxFallbackMaterial()
-      const material2 = materialManager.getGameBoxFallbackMaterial()
+      const material1 = materialManager.getMaterial(MaterialType.FallbackGameBox)
+      const material2 = materialManager.getMaterial(MaterialType.FallbackGameBox)
       
       expect(material1).toBe(material2)  // Same fallback material
       expect(material1.color.getHex()).toBe(0xff00ff)  // Magenta fallback
@@ -230,16 +230,16 @@ describe('SharedMaterialManager Enhanced', () => {
 
   describe('memory management', () => {
     it('should report memory usage', () => {
-      materialManager.getWallWoodMaterial()
-      materialManager.getCarpetMaterial()
+      materialManager.getMaterial(MaterialType.WallWood)
+      materialManager.getMaterial(MaterialType.Carpet)
       
       const stats = materialManager.getStats()
       expect(stats.totalMaterials).toBeGreaterThan(0)
     })
 
     it('should clear all caches on dispose', () => {
-      materialManager.getWallWoodMaterial()
-      materialManager.getCarpetMaterial()
+      materialManager.getMaterial(MaterialType.WallWood)
+      materialManager.getMaterial(MaterialType.Carpet)
       
       materialManager.dispose()
       
@@ -261,7 +261,7 @@ describe('VR Performance Considerations', () => {
   })
 
   it('should create textures with VR-optimized settings', () => {
-    const material = materialManager.getWallWoodMaterial()
+    const material = materialManager.getMaterial(MaterialType.WallWood)
     
     expect(material.map?.wrapS).toBe(THREE.RepeatWrapping)
     expect(material.map?.wrapT).toBe(THREE.RepeatWrapping)
@@ -285,7 +285,7 @@ describe('VR Performance Considerations', () => {
     
     // Create fallback material (all requests create same instance)
     for (let i = 0; i < 10; i++) {
-      materialManager.getGameBoxFallbackMaterial()
+      materialManager.getMaterial(MaterialType.FallbackGameBox)
     }
     
     const newStats = materialManager.getStats()

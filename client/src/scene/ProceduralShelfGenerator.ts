@@ -56,9 +56,9 @@ export class ProceduralShelfGenerator {
     // const topWidth = width - 2 * height * Math.tan(angleRad);
     
     // Get materials for different components (Task 6.1.1.1)
-    const mdfVeneerMaterial = this.materialManager.getShelfMaterial(MaterialType.MdfVeneer);          // external surfaces
-    const shelfInteriorMaterial = this.materialManager.getShelfMaterial(MaterialType.ShelfInterior);  // interior compartments
-    const brandAccentMaterial = this.materialManager.getShelfMaterial(MaterialType.BrandAccent);      // support posts/brackets
+    const mdfVeneerMaterial = this.materialManager.getMaterial(MaterialType.MdfVeneer);          // external surfaces
+    const shelfInteriorMaterial = this.materialManager.getMaterial(MaterialType.ShelfInterior);  // interior compartments
+    const brandAccentMaterial = this.materialManager.getMaterial(MaterialType.BrandAccent);      // support posts/brackets
 
     // Create the two angled boards (front and back) - MDF veneer exterior
     // TODO: Replace with InstancedMesh for better draw call batching
