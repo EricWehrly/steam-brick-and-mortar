@@ -58,7 +58,7 @@ export class SteamApiClient {
         this.http = new HttpClient({ baseUrl: apiBaseUrl })
         this.cache = new CacheManager({ cachePrefix: 'steam_api_' })
         this.rateLimiter = new RateLimiter({ requestsPerSecond: 4 })
-        this.images = new ImageManager()
+        this.images = ImageManager.getInstance()
     }
 
     /**
@@ -237,17 +237,7 @@ export class SteamApiClient {
         return this.images.getStats()
     }
 
-    public async clearImageCache(): Promise<void> {
-        return this.images.clearCache()
-    }
 
-    public async getAllCachedImageUrls(): Promise<string[]> {
-        return await this.images.getAllCachedImageUrls()
-    }
-
-    public async getCachedImageBlob(url: string): Promise<Blob | null> {
-        return await this.images.getCachedImageBlob(url)
-    }
 
     /**
      * Cache management

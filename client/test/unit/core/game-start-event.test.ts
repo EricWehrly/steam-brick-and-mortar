@@ -111,7 +111,6 @@ vi.mock('../../../src/steam-integration/SteamIntegration', () => ({
         clearCache: vi.fn(),
         getCacheStats: vi.fn().mockReturnValue({}),
         getImageCacheStats: vi.fn().mockReturnValue({}),
-        clearImageCache: vi.fn(),
         refreshData: vi.fn().mockResolvedValue(undefined),
         dispose: vi.fn()
     }))

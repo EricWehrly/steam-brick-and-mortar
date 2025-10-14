@@ -354,18 +354,7 @@ export class SteamIntegration {
         return cachedResolve?.steamid || null
     }
     
-    // TODO: These look unused. Delete?
-    async clearImageCache(): Promise<void> {
-        return this.steamClient.clearImageCache()
-    }
 
-    async getAllCachedImageUrls(): Promise<string[]> {
-        return await this.steamClient.getAllCachedImageUrls()
-    }
-
-    async getCachedImageBlob(url: string): Promise<Blob | null> {
-        return await this.steamClient.getCachedImageBlob(url)
-    }
 
     updateMaxGames(maxGames: number): void {
         this.config.maxGames = maxGames

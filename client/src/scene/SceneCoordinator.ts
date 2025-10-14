@@ -204,10 +204,6 @@ export class SceneCoordinator {
         this.propsRenderer.updatePerformanceData(camera)
     }
 
-    getPerformanceStats(): ReturnType<StorePropsRenderer['getPerformanceStats']> {
-        return this.propsRenderer.getPerformanceStats()
-    }
-
     /**
      * Debug function to list all objects in the scene by name
      * Useful for hunting down duplicate environment objects

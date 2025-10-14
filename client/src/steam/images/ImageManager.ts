@@ -37,6 +37,8 @@ export interface ImageCacheStats {
 }
 
 export class ImageManager {
+    private static _instance: ImageManager | null = null;
+    
     private db: IDBDatabase | null = null;
     private readonly dbName = 'SteamGameImages';
     private readonly dbVersion = 1;
@@ -46,6 +48,13 @@ export class ImageManager {
 
     constructor() {
         this.initializeDB();
+    }
+
+    public static getInstance(): ImageManager {
+        if (!ImageManager._instance) {
+            ImageManager._instance = new ImageManager();
+        }
+        return ImageManager._instance;
     }
 
     async downloadImage(url: string, options: Partial<ImageLoadOptions> = {}): Promise<Blob | null> {

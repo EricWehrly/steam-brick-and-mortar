@@ -76,7 +76,8 @@ export class DebugStatsProvider {
         const performanceStats = this.performanceMonitor.getStats()
         
         // Get cache stats
-        const imageCacheStats = await this.steamIntegration.getImageCacheStats()
+        const { ImageManager } = await import('../steam/images/ImageManager')
+        const imageCacheStats = await ImageManager.getInstance().getStats()
         
         // Get WebGL context info
         const gl = renderer.getContext()

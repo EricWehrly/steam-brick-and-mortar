@@ -16,7 +16,7 @@ import { EventManager, EventSource } from '../../core/EventManager'
 import { InputEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import type { SteamLoadFromCacheEvent } from '../../types/InteractionEvents'
 import type { DebugStats, DebugStatsProvider } from '../../core/DebugStatsProvider'
-import type { ImageCacheStats } from '../../steam/images/ImageManager'
+import { ImageManager, type ImageCacheStats } from '../../steam/images/ImageManager'
 import type { SteamIntegration } from '../../steam-integration/SteamIntegration'
 import type { SteamWorkflowManager } from '../../steam-integration/SteamWorkflowManager'
 import type { UIManager } from '../UIManager'
@@ -88,11 +88,13 @@ export class SystemUICoordinator {
                 }
             },
             onGetImageUrls: async () => {
-                const urls = await (this.steamIntegration?.getAllCachedImageUrls() ?? [])
+                const imageManager = ImageManager.getInstance()
+                const urls = await imageManager.getAllCachedImageUrls()
                 return urls
             },
             onGetCachedBlob: async (url: string) => {
-                const blob = await (this.steamIntegration?.getCachedImageBlob(url) ?? null)
+                const imageManager = ImageManager.getInstance()
+                const blob = await imageManager.getCachedImageBlob(url)
                 return blob
             }
         })
