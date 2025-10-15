@@ -87,8 +87,27 @@ When working with Terraform infrastructure:
 
 
 ## Current Status & Roadmap
-- The active roadmap is now tracked in `docs/current-roadmap.md` (single source of truth for priorities and next steps).
-- See `.github/terraform-progress.md` for detailed infrastructure development progress.
+- The active roadmap is now tracked in `docs/active/roadmap.md` (single source of truth for priorities and next steps).
+
+### Roadmap Navigation & Management
+When working with roadmap items, follow this structure and workflow:
+
+**📁 Roadmap File Organization**:
+- `docs/active/roadmap.md` - High-level overview and current status
+- `docs/roadmap-phase1-ready-for-me.md` - Detailed Phase 1 tasks and milestones
+- `docs/roadmap-phase2-ready-for-friends.md` - Detailed Phase 2 infrastructure and features  
+- `docs/roadmap-phase3-ready-for-everyone.md` - Detailed Phase 3 compliance and scaling
+- `docs/active/tech-debt.md` - Technical debt backlog with priority management
+
+**🎯 Adding New Features**:
+1. **Determine Phase**: Phase 1 (core functionality) → Phase 2 (infrastructure) → Phase 3 (compliance)
+2. **Choose Section**: High-priority infrastructure → Main features, Enhancement features → "TBD" section, Technical improvements → tech-debt.md
+3. **Use Standard Format**: Include Context, Tasks, Expected Deliverable, Acceptance, Priority, Timeline
+4. **Deferring**: Place in "TBD" with Deferral Reason, Dependencies, and Context
+
+**📍 Finding Current Work**: Check `docs/active/roadmap.md` for 🚧 CURRENT FOCUS markers and `docs/active/tech-debt.md` for immediate tasks
+
+**✅ Completion**: Move to "Archived/Completed" in tech-debt.md with achievement details
 
 ## Reference Files
 - **JavaScript/Node.js**: `.github/javascript-guidelines.md`
