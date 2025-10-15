@@ -483,6 +483,14 @@
 - **Design System**: Consistent UI components, theme/customization system, multi-language support
 - **Advanced Performance Options**: Hardware-specific graphics presets and auto-detection
 
+### Advanced Store Layout & Categorization
+- **Dynamic Shelf Arrangement System**: Organize shelves by game categories with multiple layout patterns
+  - **Context**: Arrange shelves as spokes per category, also as giant aisles running past - enhances store navigation and game organization
+  - **Priority**: Medium-Low - Enhances user experience after core infrastructure is solid
+  - **Dependencies**: Requires stable GPU instancing system, game categorization data from Steam API
+  - **Timeline**: Estimated 4-6 days for spoke/aisle layout algorithms after Phase 2 core infrastructure complete
+  - **Deferral Reason**: Should wait until after first batch of "Ready for Friends" infrastructure items are complete
+
 ### Visual Effects & Immersion
 - **Dissolve Animation System**: Implement smooth entrance animations for store geometry
   - **Context**: Eliminate jarring "pop" appearance when scene loads with immersive materialization effects

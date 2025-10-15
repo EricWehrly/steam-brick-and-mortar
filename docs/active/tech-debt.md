@@ -15,6 +15,43 @@
              *     maxActiveTextures: Math.min(50, maxGames / 2),
              *     frustumCullingEnabled: true
 
+### Update Failing StorePropsRenderer Tests
+**Priority**: High  
+**Effort**: 2-3 hours  
+**Context**: 3 tests are failing because they expect old internal behavior after StorePropsRenderer bifurcation
+
+**Tasks**:
+- Update tests to reflect new delegating architecture where createGameBox calls are handled by InstancedStorePropsRenderer
+- Verify test mocks work with bifurcated system
+- Ensure test coverage covers both Legacy and Instanced implementations
+- Update test expectations to match new component interfaces
+
+**Files to Modify**:
+- `client/test/unit/scene/` - StorePropsRenderer test files
+- Test mocks and setup files
+
+**Benefits**: Restored test suite stability, proper coverage of bifurcated architecture
+
+**Source**: GPU instancing implementation (Oct 2025) - tests became outdated after architecture split
+
+### Export Rendered Shelf as Model File
+**Priority**: Medium  
+**Effort**: 4-6 hours  
+**Context**: Performance optimization - can we export the rendered shelf as a model file to reduce draw calls even further?
+
+**Tasks**:
+- Investigate exporting GPU instanced shelf geometry as static model files
+- Evaluate draw call reduction potential vs current instancing approach
+- Research Three.js geometry export capabilities for instanced meshes
+- Consider runtime vs pre-processing trade-offs for model generation
+- Test performance impact comparison between instanced rendering and model file approach
+
+**Benefits**: Potential further draw call reduction, startup performance improvement
+
+**Background**: Current GPU instancing already provides significant performance gains, but static models could eliminate instance management overhead entirely
+
+**Source**: Performance optimization consideration (Oct 2025)
+
 ### Graphics Settings Scene Reload Optimization
 **Priority**: Medium  
 **Effort**: 3-4 hours  
@@ -93,6 +130,29 @@
 
 ### Architecture & Structure
 
+#### Refactor GameBoxRenderer Bifurcation
+**Priority**: High  
+**Effort**: 4-5 hours  
+**Context**: Split GameBoxRenderer into Legacy + Instanced versions following the same pattern as StorePropsRenderer. This is the next highest priority bifurcation point.
+
+**Tasks**:
+- Create LegacyGameBoxRenderer maintaining current behavior
+- Create InstancedGameBoxRenderer with GPU instancing optimizations
+- Create delegating GameBoxRenderer wrapper following StorePropsRenderer pattern
+- Update dependency injection and service registration
+- Ensure game box rendering integrates with instanced shelf system
+- Update tests to cover both implementations
+
+**Files to Modify**:
+- `client/src/scene/game-box/GameBoxRenderer.ts` - Split into multiple files
+- Service registration and dependency injection setup
+- Game rendering workflow integration
+- Related test files
+
+**Benefits**: Completes GPU instancing architecture, enables further rendering optimizations, maintains legacy compatibility
+
+**Source**: GPU instancing roadmap (Oct 2025) - next architectural milestone after StorePropsRenderer bifurcation
+
 #### Refactor Panel/Tab Naming and Architecture
 **Priority**: High  
 **Effort**: 3-4 hours  
@@ -115,6 +175,27 @@
 **Rationale**: Don't want to keep building on top of current misnaming - architectural foundation improvement
 
 ### Code Quality & Documentation
+
+#### Export Shader Code to Relevant Files
+**Priority**: High  
+**Effort**: 2-3 hours  
+**Context**: Low effort, good return on readability. Shader code currently embedded in component files should be extracted to dedicated shader files.
+
+**Tasks**:
+- Extract inline shader code from Three.js materials and components
+- Create dedicated `.glsl` or `.frag`/`.vert` files for shader programs
+- Update imports to reference external shader files
+- Organize shader files in logical directory structure
+- Add proper shader documentation and comments
+
+**Files to Modify**:
+- Components using custom shaders (materials, effects, etc.)
+- Create new `client/src/shaders/` directory structure
+- Build system to handle shader file imports
+
+**Benefits**: Improved code readability, better shader maintainability, syntax highlighting for shaders, easier shader reuse
+
+**Source**: Code organization todo (Oct 2025) - identified as quick win for code quality
 
 #### Remove Redundant Javadoc Comments
 **Priority**: High  
@@ -167,6 +248,28 @@
 **Status**: Deferred from Phase 1 - non-essential functionality
 
 ### Performance & Architecture
+
+#### Performance Testing Comparison (Legacy vs Instanced)
+**Priority**: Very low (kept as notes but not important for scope intended)  
+**Effort**: 3-4 hours  
+**Context**: Compare performance before/after instancing implementation. Need metrics to validate GPU instancing benefits and identify further optimizations.
+
+**Tasks**:
+- Measure draw call reduction between legacy and instanced systems
+- Monitor memory usage differences between implementations
+- Benchmark render performance for various game library sizes
+- Test frame rate impact during dynamic shelf generation
+- Create performance comparison dashboard or reports
+- Identify performance bottlenecks in current instanced system
+
+**Files to Modify**:
+- `client/test/performance/` - Add instancing performance tests
+- Performance monitoring utilities
+- Benchmark comparison scripts
+
+**Benefits**: Quantified performance improvements, data-driven optimization decisions, regression detection for future changes
+
+**Source**: GPU instancing validation (Oct 2025) - need empirical performance data
 
 #### WebWorker-Based Texture Generation
 **Priority**: Medium  
@@ -340,6 +443,33 @@
 ---
 
 ## Archived/Completed
+
+### StorePropsRenderer GPU Instancing Implementation
+**Status**: **Completed** ✅  
+**Original Effort**: 8-12 hours (actual: ~15 hours due to debugging)  
+**Context**: Successfully implemented GPU instanced rendering system with bifurcated architecture
+
+**Completed Tasks**:
+- ✅ Created InstancedShelfRenderer with 4 geometry types (AngledBoards, SideBoards, ShelfBoards, InteriorSurfaces)
+- ✅ Implemented InstancedMeshManager for GPU instance management
+- ✅ Built bifurcated StorePropsRenderer architecture (Legacy + Instanced + Delegating wrapper)
+- ✅ Fixed timing issues with InstancedBatchComplete events and scene integration
+- ✅ Added comprehensive unit test coverage (49 tests)
+- ✅ Cleaned up debugging code for production readiness
+
+**Results**:
+- System renders 794 games across 45 shelves using GPU instancing
+- Both games and shelves rendering correctly with optimal performance
+- Complete event-driven coordination system working
+- Full test coverage with 458/463 tests passing
+
+**Technical Achievements**:
+- Fixed missing event emission preventing GPU updates
+- Resolved shelf scene timing by moving addToMainScene to first shelf creation
+- Implemented proper validation system for scene integrity
+- Created production-ready logging while maintaining debugging capabilities
+
+**Source**: October 2025 GPU instancing implementation
 
 ### Feature 5.5.1: Dedicated Game List Cache
 **Status**: **Cancelled** - Data duplication outweighed performance benefits  
