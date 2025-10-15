@@ -152,6 +152,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             const shelfInteriorMaterial = materialManager.getMaterial(MaterialType.ShelfInterior)
             const brandAccentMaterial = materialManager.getMaterial(MaterialType.BrandAccent)
             
+            
             // Create geometry templates
             this.createGeometryTemplates()
             
@@ -194,14 +195,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             // Add custom instance attributes for dynamic sizing/positioning
             this.setupInstanceAttributes()
             
-            // Add all managers to scene
-            this.angledBoardManager.addToMainScene()
-            this.sideBoardManager.addToMainScene()
-            this.shelfBoardManager.addToMainScene()
-            this.interiorSurfaceManager.addToMainScene()
+            // NOTE: addToMainScene() moved to first shelf creation to avoid premature removal
             
             this.isInitialized = true
-            console.log('✅ InstancedShelfRenderer initialized')
             
         } catch (error) {
             console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
@@ -287,6 +283,14 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
         
         try {
+            // Add managers to scene on first shelf creation (avoids premature removal during initialization)
+            if (this.shelfUnits.size === 0) {
+                this.angledBoardManager.addToMainScene()
+                this.sideBoardManager.addToMainScene()
+                this.shelfBoardManager.addToMainScene()
+                this.interiorSurfaceManager.addToMainScene()
+            }
+            
             const shelfUnit = this.createShelfUnit(index, data.position, shelfConfig)
             this.shelfUnits.set(index, shelfUnit)
             
