@@ -112,8 +112,6 @@ export class InstancedStorePropsRenderer implements IStorePropsRenderer {
 
     private setupEventListeners(): void {
         EventManager.getInstance().registerEventHandler(RoomEventTypes.Resized, this.generateShelvesAsync.bind(this));
-        
-        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, this.handleInstancedBatchComplete.bind(this))
     }
 
     /**
@@ -595,16 +593,6 @@ export class InstancedStorePropsRenderer implements IStorePropsRenderer {
     }
 
     /**
-     * Handle instanced batch completion events
-     */
-    // TODO: remove after check in
-    private handleInstancedBatchComplete(event: InstancedBatchCompleteEvent): void {
-        console.debug(`Instanced ${event.batchType} batch completed: ${event.gameCount} items`)
-        
-        this.validateSceneSetup()
-    }
-
-    /**
      * Calculate optimal shelf spacing for VR comfort and navigation
      * Phase 4: VR-optimized layout calculations
      */
@@ -705,37 +693,5 @@ export class InstancedStorePropsRenderer implements IStorePropsRenderer {
         this.scene.remove(this.propsGroup)
         
         console.info('InstancedStorePropsRenderer disposed')
-    }
-    
-    /**
-     * Validate scene setup after shelf generation
-     */
-    private validateSceneSetup(): void {
-        if (!this.instancedShelfRenderer) return
-
-        // Check for expected shelf InstancedMesh objects in scene
-        const expectedShelfNames = [
-            'instanced-shelf-angled-boards',
-            'instanced-shelf-side-boards', 
-            'instanced-shelf-boards',
-            'instanced-shelf-interior-surfaces'
-        ]
-        
-        let foundShelfMeshes = 0
-        for (const expectedName of expectedShelfNames) {
-            const found = this.scene.getObjectByName(expectedName)
-            if (found && found instanceof THREE.InstancedMesh && found.count > 0) {
-                foundShelfMeshes++
-            }
-        }
-        
-        // Validate scene integrity 
-        if (foundShelfMeshes === 0) {
-            console.error('❌ No shelf InstancedMesh objects found in scene - shelves will not render')
-        } else if (foundShelfMeshes < 4) {
-            console.warn(`⚠️ Only ${foundShelfMeshes}/4 shelf mesh types found - some shelf components may be missing`)
-        } else {
-            console.info(`✅ All ${foundShelfMeshes} shelf mesh types successfully added to scene`)
-        }
     }
 }
