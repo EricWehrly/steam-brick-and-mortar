@@ -137,13 +137,7 @@ export interface ImageCacheStatsRequestEvent extends BaseInteractionEvent {
 // GAME EVENTS
 // =============================================================================
 
-export interface SceneReadyEvent extends BaseInteractionEvent {
-    // Emitted when the basic scene is navigable and ready for user interaction
-    // This is a prerequisite for GameStart - scene must be ready before game can start
-    sceneStats: {
-        basicNavigationReady: boolean
-    }
-}
+export interface SceneReadyEvent extends BaseInteractionEvent { }
 
 export interface GameStartEvent extends BaseInteractionEvent {
     // Emitted when ALL prerequisites are ready and the game can start
