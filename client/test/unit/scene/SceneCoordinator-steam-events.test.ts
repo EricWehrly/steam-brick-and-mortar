@@ -15,7 +15,7 @@ import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { SteamEventTypes, RoomEventTypes, type SteamDataLoadedEvent } from '../../../src/types/InteractionEvents'
 import { AppSettings } from '../../../src/core/AppSettings'
 import { DataManager } from '../../../src/core/data'
-import { StorePropsRenderer } from '../../../src/scene/StorePropsRenderer'
+import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
 import type { SteamGameData } from '../../../src/scene/game-box/types/GameData'
 
 // Mock Three.js Scene
@@ -76,7 +76,6 @@ describe('SceneCoordinator Steam Event Integration', () => {
         sceneCoordinator = new SceneCoordinator(
             mockSceneManager as any,
             {}, // config
-            mockStorePropsRenderer as any,
             mockAppSettings as any,
             mockDataManager as any,
             mockEventManager as any
@@ -100,8 +99,8 @@ describe('SceneCoordinator Steam Event Integration', () => {
 
         it('should register event handler along with other scene events', () => {
             // SceneCoordinator registers multiple event handlers including Steam data loaded
-            // Based on test results, it registers 4 event handlers total
-            expect(mockEventManager.registerEventHandler).toHaveBeenCalledTimes(4)
+            // Based on test results, it registers 3 event handlers total
+            expect(mockEventManager.registerEventHandler).toHaveBeenCalledTimes(3)
             
             // Verify the Steam event handler is registered correctly
             const calls = mockEventManager.registerEventHandler.mock.calls

@@ -23,14 +23,15 @@ import * as THREE from 'three'
 import { SceneManager } from './SceneManager'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { LightingRenderer } from './LightingRenderer'
-import { StorePropsRenderer } from './StorePropsRenderer'
 import { RoomManager } from './RoomManager'
-import { EventManager, EventSource } from '../core/EventManager'
-import { GameEventTypes, SteamEventTypes, type SceneReadyEvent, type SteamDataLoadedEvent } from '../types/InteractionEvents'
+import { EventManager } from '../core/EventManager'
+// No longer needed - handlers are self-registering
+import { GameEventTypes, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager } from '../core/data'
+// Initialize store props system (self-registering module with dedicated events)
+import { StorePropsEventTypes, type StorePropsSetupRequestEvent } from './props'
 import type { SteamGameData } from './game-box/types/GameData'
-import { GameBoxRenderer } from './GameBoxRenderer'
 
 export interface SceneCoordinatorConfig {
     environment?: {
@@ -48,16 +49,15 @@ export class SceneCoordinator {
     private sceneManager: SceneManager
     private skyboxManager: SkyboxManager
     private lightingRenderer: LightingRenderer
-    private propsRenderer: StorePropsRenderer
     private roomManager: RoomManager
     private dataManager: DataManager
     private eventManager: EventManager
+    // Enhanced functionality is added to eventManager via extensions
     private config: SceneCoordinatorConfig
 
     constructor(
         sceneManager: SceneManager, 
         config: SceneCoordinatorConfig = {}, 
-        storePropsRenderer?: StorePropsRenderer,
         appSettings?: AppSettings,
         dataManager?: DataManager,
         eventManager?: EventManager
@@ -70,6 +70,8 @@ export class SceneCoordinator {
         this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
         this.eventManager = eventManager || EventManager.getInstance() // DI injection with fallback
         
+        // Store props handlers are now self-registering via module import
+        
         // Initialize visual system renderers
         this.skyboxManager = new SkyboxManager(this.sceneManager.getScene())
         this.lightingRenderer = new LightingRenderer(
@@ -78,90 +80,49 @@ export class SceneCoordinator {
         )
         // Initialize room manager for event-driven room structure (no longer needs EnvironmentRenderer)
         this.roomManager = new RoomManager(this.sceneManager.getScene(), this.dataManager, this.eventManager)
-        
-        // Use DI-injected StorePropsRenderer or create one for backward compatibility
-        this.propsRenderer = storePropsRenderer || new StorePropsRenderer(this.sceneManager.getScene(), this.dataManager, GameBoxRenderer.Instance)
 
-        // 🎬 EVENT-DRIVEN STARTUP: Setup scene and emit SceneReady when basic navigation is ready
-        // This is a prerequisite for GameStart - scene must be navigable before game can start
-
-        this.setupSceneAsPrerequisite(config).catch(error => {
-            console.error('❌ Failed to set up scene prerequisite:', error)
-            // Emit SceneReady anyway so GameStart can proceed even if scene setup fails
-            console.log('⚠️ Emitting SceneReady despite setup failure to unblock GameStart')
-            this.emitSceneReadyEvent()
-        })
-
-        // Register for Steam data loaded events to spawn dynamic shelves  
-        this.eventManager.registerEventHandler(SteamEventTypes.DataLoaded, (event: CustomEvent<SteamDataLoadedEvent>) => {
-            // this.analyzeTaxonomies();
-        })
-        console.debug('✅ Steam data loaded event handler restored - games will spawn on shelves')
+        this.eventManager.emit<SceneReadyEvent>(GameEventTypes.SceneReady, {})
+        this.loadEnhancedScene(config.environment)
 
         if(window) {
             (window as any).debugListSceneObjects = this.debugListSceneObjects.bind(this);
         }
     }
 
-    async setupSceneAsPrerequisite(config: SceneCoordinatorConfig = {}): Promise<void> {
-        try {
-            this.emitSceneReadyEvent()
-
-            this.setupEnhancedSceneAsync(config.environment)
-            
-        } catch (error) {
-            console.error('❌ Failed to set up scene prerequisite:', error)
-            this.emitSceneReadyEvent()
-        }
-    }
-
-    /**
-     * Setup enhanced scene asynchronously - skybox, lighting, props
-     * This doesn't block user interaction
-     */
-    private setupEnhancedSceneAsync(config: SceneCoordinatorConfig['environment'] = {}): void {
-        // Don't await - let this happen in the background
-        this.loadEnhancedScene(config).catch(error => {
-            console.error('⚠️ Enhanced scene loading failed:', error)
-            // Don't throw - basic scene still works
-        })
-    }
-
     private async loadEnhancedScene(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
         try {
-            
-            // 🌌 STEP 1: Skybox (visual context)
+            // TODO: Skyboxmanager responds to ready event itself
             const presetName = config.skyboxPreset ?? 'aurora'
             const preset = (SkyboxPresets as any)[presetName] || SkyboxPresets.aurora
             await this.skyboxManager.applySkybox(preset)
-            
             console.log('🌌 Skybox loaded')
-
-            
-            // 💡 STEP 2: Lighting (makes everything visible)
-            await this.lightingRenderer.setupLighting()
-            this.lightingRenderer.refreshShadows()
-            
-            console.log('💡 Lighting ready')
-
-            
-            // 🏪 STEP 3: Props (room, shelves, games - the heavy stuff)
-            await this.setupProps()
-            
-            console.log('🏪 Props loaded - store environment complete!')
-
         } catch (error) {
-            console.error('❌ Enhanced scene loading failed:', error)
-            // Don't throw - basic navigation still works
+            console.warn('⚠️ Skybox loading failed:', error)
         }
+
+        try {
+            // TODO: lightingRenderer Own event registration
+            await this.lightingRenderer.setupLighting()
+            // TODO: move this to after props spawn event
+            this.lightingRenderer.refreshShadows()
+            console.log('💡 Lighting ready')
+        } catch (error) {
+            console.warn('⚠️ Lighting setup failed:', error)
+        }
+
+        // 🏪 STEP 3: Props (room, shelves, games - the heavy stuff)
+        this.requestPropsSetup()
+        console.log('🏪 Props setup requested - store environment loading!')
     }
 
-    private async setupProps(): Promise<void> {
-        await this.propsRenderer.setupProps({
-            enableShelves: true,
-            enableGameBoxes: true,
-            enableSignage: true,
-            tests: this.config.tests
+    private requestPropsSetup(): void {
+        // Simply emit the setup request - handlers will get dependencies themselves
+        this.eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, {
+            config: {
+                enableShelves: true,
+                enableGameBoxes: true,
+                enableSignage: true
+            }
         })
     }
 
@@ -195,16 +156,9 @@ export class SceneCoordinator {
         console.log('=== END SCENE OBJECT LIST ===\n')
     }
 
-    public updatePerformanceData(camera: THREE.Camera): void {
-        if (this.propsRenderer) {
-            this.propsRenderer.updatePerformanceData(camera)
-        }
-    }
-
     dispose(): void {
         this.skyboxManager.dispose()
         this.lightingRenderer.dispose()
-        this.propsRenderer.dispose()
         this.roomManager.dispose()
     }
 
@@ -245,18 +199,6 @@ export class SceneCoordinator {
             const hours = Math.round(game.playtime_forever / 60 * 10) / 10
             const recentHours = game.playtime_2weeks ? Math.round(game.playtime_2weeks / 60 * 10) / 10 : 0
             console.log(`   • "${game.name}" - ${hours}h total, ${recentHours}h recent (ID: ${game.appid})`)
-        })
-    }
-
-    private emitSceneReadyEvent(): void {
-        console.log('📡 Emitting SceneReady event - basic navigation is ready')
-        
-        this.eventManager.emit<SceneReadyEvent>(GameEventTypes.SceneReady, {
-            source: EventSource.System,
-            timestamp: Date.now(),
-            sceneStats: {
-                basicNavigationReady: true
-            }
         })
     }
 }

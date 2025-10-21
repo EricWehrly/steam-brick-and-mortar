@@ -12,10 +12,8 @@ export const ServiceKeys = {
   SharedMaterialManager: Symbol('SharedMaterialManager'),
   
   // Rendering services
-  GameBoxRenderer: Symbol('GameBoxRenderer'),
   RoomManager: Symbol('RoomManager'),
   StoreLayout: Symbol('StoreLayout'),
-  StorePropsRenderer: Symbol('StorePropsRenderer'),
   
   // WebXR services
   WebXRCoordinator: Symbol('WebXRCoordinator'),

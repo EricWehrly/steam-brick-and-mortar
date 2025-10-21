@@ -27,7 +27,7 @@ import { GameBoxLayoutUtils } from './game-box/GameBoxLayoutUtils'
 import { InstancedLabelRenderer } from './game-box/instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './game-box/instancing/InstancedArtworkRenderer'
 import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
-import type { DataManager } from '../core/data/DataManager'
+import { DataManager } from '../core/data/DataManager'
 
 // Export types for backward compatibility
 export type {
@@ -42,19 +42,6 @@ export type {
 }
 
 export class GameBoxRenderer {
-
-    // TODO: readonly?
-    private static _instance: GameBoxRenderer;
-
-    // We don't really use this, but need it for resolutions in SceneCoordinator
-    // TODO: refactor SceneCoordinator to use DI properly
-    static get Instance(): GameBoxRenderer {
-        if(!this._instance) {
-            console.error("it happened");
-            this._instance = new GameBoxRenderer();
-        }
-        return this._instance;
-    }
 
     private static readonly DEFAULT_DIMENSIONS: GameBoxDimensions = {
         width: 0.3,   // 30cm width
@@ -80,13 +67,8 @@ export class GameBoxRenderer {
     // Dependencies for lazy initialization
     private dataManager?: DataManager
 
-    constructor(
-        // TODO: Allow dimensions as optional per created game box, with a geometry pool
-        dimensions: Partial<GameBoxDimensions> = {},
-        performanceConfig: Partial<TexturePerformanceConfig> = {},
-        dataManager?: DataManager
-    ) {
-        this.dimensions = { ...GameBoxRenderer.DEFAULT_DIMENSIONS, ...dimensions }
+    constructor() {
+        this.dimensions = { ...GameBoxRenderer.DEFAULT_DIMENSIONS }
         
         // Create geometry instance (TODO: Replace with InstancedMesh for batching)
         this.gameBoxGeometry = new THREE.BoxGeometry(
@@ -99,17 +81,9 @@ export class GameBoxRenderer {
         this.materialManager = SharedMaterialManager.getInstance()
         // Note: materialManager.initialize() is deferred until first render call
         
-        if (Object.keys(performanceConfig).length > 0) {
-            this.performanceManager = new GameBoxPerformanceManager(performanceConfig)
-        }
-        
         this.textureManager = new GameBoxTextureManager(this.performanceManager)
         
-        this.dataManager = dataManager
-
-        if(!GameBoxRenderer._instance) {
-            GameBoxRenderer._instance = this;
-        }
+        // DataManager will be resolved lazily when needed
         
         console.debug(`📦 GameBoxRenderer initialized with dimensions: ${this.dimensions.width}x${this.dimensions.height}x${this.dimensions.depth}`)
     }
@@ -134,11 +108,26 @@ export class GameBoxRenderer {
     // (this method, and the methods it calls, and (I think) the methods that call it) and some of the internal tracking variables
     public hasInstancedLabelRenderer(): boolean {
         // Try lazy initialization if not yet initialized
-        if (!this.instancedLabelRenderer && this.dataManager) {
+        if (!this.instancedLabelRenderer && this.getDataManager()) {
             this.tryInitializeInstancedLabelRenderer()
         }
         
         return this.instancedLabelRenderer?.isReady() || false
+    }
+
+    /**
+     * Lazy resolver for DataManager instance
+     */
+    private getDataManager(): DataManager | undefined {
+        if (!this.dataManager) {
+            try {
+                this.dataManager = DataManager.getInstance()
+            } catch {
+                console.warn('⏳ DataManager not available yet for GameBoxRenderer')
+                return undefined
+            }
+        }
+        return this.dataManager
     }
     
     /**
@@ -146,11 +135,13 @@ export class GameBoxRenderer {
      * Bootstraps itself by pulling games from DataManager when available
      */
     private tryInitializeInstancedLabelRenderer(): void {
-        if (this.instancedLabelRenderer || !this.dataManager) {
+        const dataManager = this.getDataManager()
+        if (this.instancedLabelRenderer || !dataManager) {
             return // Already initialized or missing dependencies
         }
         
-        const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
+        // TODO: Use a key / enum for "steam.games"
+        const games = dataManager.get<SteamGameData[]>('steam.games') || []
         if (games.length === 0) {
             console.warn('⏳ No games available yet for instanced label renderer initialization')
             return

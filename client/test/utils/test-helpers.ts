@@ -146,12 +146,7 @@ export class TestServiceContainer {
             dispose: vi.fn()
         }))
 
-        // Mock GameBoxRenderer
-        this.mockSingleton(ServiceKeys.GameBoxRenderer, () => ({
-            name: 'MockGameBoxRenderer',
-            render: vi.fn(),
-            dispose: vi.fn()
-        }))
+        // Note: GameBoxRenderer removed from DI - now created via composition in renderers
 
         // Mock EventManager
         this.mockSingleton(ServiceKeys.EventManager, () => ({

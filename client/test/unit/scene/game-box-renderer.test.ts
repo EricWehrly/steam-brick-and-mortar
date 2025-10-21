@@ -5,7 +5,8 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { GameBoxRenderer, type SteamGameData, type GameBoxTextureOptions } from '../../../src/scene'
+import { GameBoxRenderer } from '../../../src/scene/GameBoxRenderer'
+import type { SteamGameData, GameBoxTextureOptions } from '../../../src/scene'
 
 // Mock URL.createObjectURL and revokeObjectURL for Node.js environment
 if (!globalThis.URL) {

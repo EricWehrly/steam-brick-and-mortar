@@ -1,12 +1,27 @@
 /**
  * Store Props Renderer Interface
  * 
- * Common interface for both legacy and instanced StorePropsRenderer implementations.
+ * Common interface for both legacy and GPU StorePropsRenderer implementations.
  * Provides consistent API for rendering interactive store objects and props.
  */
 
 import * as THREE from 'three'
-import type { PropsConfig } from './StorePropsRenderer'
+
+export interface PropsConfig {
+    enableShelves?: boolean
+    enableGameBoxes?: boolean
+    enableSignage?: boolean
+    /* TODO: If we're not supporting something (like frustumCullingEnabled),
+        we should warn if we find it in a non-default state */
+    performance?: {
+        maxTextureSize?: number
+        nearDistance?: number
+        farDistance?: number
+        maxActiveTextures?: number
+        frustumCullingEnabled?: boolean
+    }
+    tests?: Record<string, string>
+}
 
 export interface IStorePropsRenderer {
     /**

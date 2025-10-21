@@ -348,9 +348,10 @@ describe('InstancedShelfRenderer', () => {
             expect(mockMaterialManager.getMaterial).toHaveBeenCalled()
         })
 
-        it('should integrate with DataManager for scene access', () => {
-            // Verify scene integration occurs during initialization
-            expect(mockDataManager.get).toHaveBeenCalledWith('core.mainScene')
+        it('should be self-contained without requiring scene during initialization', () => {
+            // Verify InstancedShelfRenderer is independent and doesn't need scene access during init
+            // Scene integration happens at higher levels (props handlers) when needed
+            expect(mockDataManager.get).not.toHaveBeenCalledWith('core.mainScene')
         })
 
         it('should register with EventManager for GPU updates', () => {

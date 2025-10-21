@@ -28,8 +28,7 @@ import { GameBoxRenderer } from './GameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
 import { PropRenderer } from './PropRenderer'
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
-import type { IStorePropsRenderer } from './IStorePropsRenderer'
-import type { PropsConfig } from './StorePropsRenderer'
+import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 
 import { RoomConstants } from './RoomManager'
 import { EventManager, EventSource } from '../core/EventManager'
@@ -67,10 +66,12 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
     private imageManager: ImageManager
     private globalGameIndex: number = 0 // Track global game position for artwork selection
 
-    constructor(scene: THREE.Scene, dataManager: DataManager, gameBoxRenderer: GameBoxRenderer) {
+    constructor(scene: THREE.Scene, dataManager: DataManager) {
         this.scene = scene
         this.dataManager = dataManager
-        this.gameBoxRenderer = gameBoxRenderer
+
+        // Create our own GameBoxRenderer instance (composition, not injection)
+        this.gameBoxRenderer = new GameBoxRenderer()
 
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props-legacy'
