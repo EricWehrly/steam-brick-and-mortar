@@ -19,6 +19,7 @@ import { BlockbusterColors } from '../utils/Colors'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
 import { DataManager } from '../core/data/DataManager'
+import type { SceneCoordinator } from './SceneCoordinator'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -102,7 +103,6 @@ export class SceneManager {
 
     public startRenderLoop(dependencies?: {
         webxrCoordinator?: any,
-        sceneCoordinator?: any,
         systemUICoordinator?: any
     }) {
         let lastPerformanceUpdate = 0
@@ -117,11 +117,7 @@ export class SceneManager {
             }
             
             // Update performance data periodically
-            if (now - lastPerformanceUpdate > performanceUpdateInterval) {
-                if (dependencies?.sceneCoordinator) {
-                    dependencies.sceneCoordinator.updatePerformanceData(this.camera)
-                }
-                
+            if (now - lastPerformanceUpdate > performanceUpdateInterval) {                
                 // Update UI performance monitor with Three.js renderer stats
                 if (dependencies?.systemUICoordinator) {
                     dependencies.systemUICoordinator.updateRenderStats(this.renderer)

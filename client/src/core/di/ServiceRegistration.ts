@@ -8,9 +8,7 @@
 import { ServiceContainer } from './ServiceContainer'
 import { ServiceKeys } from './ServiceKeys'
 import { SceneManager } from '../../scene/SceneManager'
-import { GameBoxRenderer } from '../../scene/GameBoxRenderer'
 import { SharedMaterialManager } from '../../utils/SharedMaterialManager'
-import { StorePropsRenderer } from '../../scene/StorePropsRenderer'
 import { SceneCoordinator } from '../../scene/SceneCoordinator'
 import { DataManager } from '../data/DataManager'
 import { EventManager } from '../EventManager'
@@ -123,43 +121,13 @@ export class ServiceRegistration {
       )
     }
 
-    container.registerSingleton(
-      ServiceKeys.GameBoxRenderer,
-      async (container) => {
-        const dataManager = await container.resolve(ServiceKeys.DataManager) as DataManager
-        
-        return new GameBoxRenderer(
-          config.performance?.gameBox?.dimensions,
-          config.performance?.gameBox?.performance,
-          dataManager
-        )
-      },
-      [ServiceKeys.SharedMaterialManager, ServiceKeys.DataManager]
-    )
-
-    // StorePropsRenderer (depends on SceneManager, GameBoxRenderer, and DataManager)
-    container.registerSingleton(
-      ServiceKeys.StorePropsRenderer,
-      async (container) => {
-        const sceneManager = await container.resolve(ServiceKeys.SceneManager) as SceneManager
-        const gameBoxRenderer = await container.resolve(ServiceKeys.GameBoxRenderer) as GameBoxRenderer
-        const dataManager = await container.resolve(ServiceKeys.DataManager) as DataManager
-        
-        console.debug('🏪 Creating StorePropsRenderer with DI dependencies')
-        
-        const storePropsRenderer = new StorePropsRenderer(sceneManager.getScene(), dataManager, gameBoxRenderer)
-        
-        return storePropsRenderer
-      },
-      [ServiceKeys.SceneManager, ServiceKeys.GameBoxRenderer, ServiceKeys.DataManager]
-    )
-
-    // SceneCoordinator (depends on SceneManager, StorePropsRenderer, AppSettings, DataManager, and EventManager)
+    // SceneCoordinator (depends on SceneManager, AppSettings, DataManager, and EventManager)
+    // GameBoxRenderer removed - each props renderer creates its own instance (composition)
+    // StorePropsRenderer removed - handled by event-driven system now
     container.registerSingleton(
       ServiceKeys.SceneCoordinator,
       async (container) => {
         const sceneManager = await container.resolve(ServiceKeys.SceneManager) as SceneManager
-        const storePropsRenderer = await container.resolve(ServiceKeys.StorePropsRenderer) as StorePropsRenderer
         const appSettings = await container.resolve(ServiceKeys.AppSettings) as AppSettings
         const dataManager = await container.resolve(ServiceKeys.DataManager) as DataManager
         const eventManager = await container.resolve(ServiceKeys.EventManager) as EventManager
@@ -175,11 +143,11 @@ export class ServiceRegistration {
             skyboxPreset: 'aurora'
           },
           tests: config.tests
-        }, storePropsRenderer, appSettings, dataManager, eventManager) // Pass all DI dependencies
+        }, appSettings, dataManager, eventManager)
         
         return sceneCoordinator
       },
-      [ServiceKeys.SceneManager, ServiceKeys.StorePropsRenderer, ServiceKeys.AppSettings, ServiceKeys.DataManager, ServiceKeys.EventManager]
+      [ServiceKeys.SceneManager, ServiceKeys.AppSettings, ServiceKeys.DataManager, ServiceKeys.EventManager]
     )
 
     // UI Coordinators (direct registration, eliminating UICoordinator layer)

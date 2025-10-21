@@ -1,11 +1,11 @@
 /**
- * Store Props Renderer (Instanced) - Interactive Objects and Props  
+ * GPU Store Props Renderer - Interactive Objects and Props  
  * 
- * INSTANCED VERSION: Uses GPU instanced rendering via InstancedShelfRenderer for optimal performance.
+ * GPU-OPTIMIZED VERSION: Uses GPU instanced rendering via InstancedShelfRenderer for optimal performance.
  * 
  * TODO: This file contains the new GPU instanced generation approach.
  * TODO: Eventually integrate with new renderer selection system to choose between
- * TODO: LegacyStorePropsRenderer and this instanced version based on:
+ * TODO: LegacyStorePropsRenderer and this GPU version based on:
  * TODO: - Performance requirements
  * TODO: - Hardware capabilities  
  * TODO: - User preferences
@@ -28,8 +28,7 @@ import { GameBoxRenderer } from './GameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
 import { PropRenderer } from './PropRenderer'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
-import type { IStorePropsRenderer } from './IStorePropsRenderer'
-import type { PropsConfig } from './StorePropsRenderer'
+import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 
 import { RoomConstants } from './RoomManager'
 import { EventManager, EventSource } from '../core/EventManager'
@@ -49,7 +48,7 @@ export class GameLayoutConstants {
     // TODO: Calculate SURFACES_PER_SHELF dynamically from shelf geometry in future
 }
 
-export class InstancedStorePropsRenderer implements IStorePropsRenderer {
+export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private scene: THREE.Scene
     private dataManager: DataManager
 
@@ -66,10 +65,12 @@ export class InstancedStorePropsRenderer implements IStorePropsRenderer {
     private imageManager: ImageManager
     private globalGameIndex: number = 0 // Track global game position for artwork selection
 
-    constructor(scene: THREE.Scene, dataManager: DataManager, gameBoxRenderer: GameBoxRenderer) {
+    constructor(scene: THREE.Scene, dataManager: DataManager) {
         this.scene = scene
         this.dataManager = dataManager
-        this.gameBoxRenderer = gameBoxRenderer
+
+        // Create our own GameBoxRenderer instance (composition, not injection)
+        this.gameBoxRenderer = new GameBoxRenderer()
 
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props-instanced'
@@ -692,6 +693,6 @@ export class InstancedStorePropsRenderer implements IStorePropsRenderer {
         // Note: GameBoxRenderer cleanup is handled by SteamGameManager
         this.scene.remove(this.propsGroup)
         
-        console.info('InstancedStorePropsRenderer disposed')
+        console.info('GpuStorePropsRenderer disposed')
     }
 }

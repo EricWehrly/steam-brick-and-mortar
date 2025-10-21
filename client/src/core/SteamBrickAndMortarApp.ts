@@ -15,7 +15,7 @@
 import * as THREE from 'three'
 import { PerformanceMonitor, type PerformanceStats, ToastManager, UIManager } from '../ui'
 import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
-import { SceneManager, SceneCoordinator, GameBoxRenderer } from '../scene'
+import { SceneManager, SceneCoordinator } from '../scene'
 import { DebugStatsProvider } from './DebugStatsProvider'
 import { SteamIntegration } from '../steam-integration'
 import { DataManager } from './data'
@@ -358,7 +358,6 @@ export class SteamBrickAndMortarApp {
     private startRenderLoop(): void {
         this.sceneManager.startRenderLoop({
             webxrCoordinator: this.webxrCoordinator,
-            sceneCoordinator: this.sceneCoordinator,
             systemUICoordinator: this.systemUICoordinator
         })
         

@@ -39,20 +39,19 @@ vi.mock('../../../src/scene/game-box/SharedMaterialManager', () => ({
     }
 }))
 
-describe('StorePropsRenderer Shelf Spawning', () => {
+describe('Store Props Event System - Shelf Spawning', () => {
     let dataManager: DataManager
     let eventManager: EventManager
     let scene: THREE.Scene
-    let StorePropsRenderer: any
-    let renderer: any
+    let StorePropsEventTypes: any
 
     beforeEach(async () => {
         // Create fresh mock instance for each test
         mockGameBoxRenderer = createMockGameBoxRenderer()
         
-        // Import after mocks are set up
-        const module = await import('../../../src/scene/StorePropsRenderer')
-        StorePropsRenderer = module.StorePropsRenderer
+        // Import event types instead of deleted facade
+        const module = await import('../../../src/scene/props/PropsEvents')
+        StorePropsEventTypes = module.StorePropsEventTypes
         
         scene = new THREE.Scene()
         dataManager = DataManager.getInstance()
@@ -60,15 +59,11 @@ describe('StorePropsRenderer Shelf Spawning', () => {
         
         // Clear any existing data
         dataManager.clear()
-        
-        // Create renderer with mocked dependencies
-        renderer = new StorePropsRenderer(scene, dataManager, mockGameBoxRenderer)
     })
 
     afterEach(() => {
         vi.clearAllMocks()
         dataManager.clear()
-        renderer?.dispose()
     })
 
     it('should create game boxes when room:resized event is emitted with games data', async () => {

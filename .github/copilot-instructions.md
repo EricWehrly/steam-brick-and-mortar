@@ -48,14 +48,22 @@ steam-brick-and-mortar/
 - **Meaningful documentation**: Comments should provide context, gotchas, business logic, or non-obvious implementation details
 - **Avoid comment noise**: If a comment doesn't make the code significantly clearer, don't add it
 
+### 🎭 **Event-Driven Architecture Pattern**
+- **Zero Cross-Class Dependencies**: Classes communicate exclusively through typed events
+- **Capability-Based Handler Selection**: 
+  - Default handlers provide baseline functionality (e.g., Legacy renderers)
+  - Feature-rich handlers register as replacements when system supports them (e.g., Instanced renderers with WebGL2)
+  - Handlers self-check capabilities before registering
+  - Automatic fallback to defaults when replacements fail
+- **Readonly Event Data**: Events must exclusively emit readonly data to prevent mutation bugs
+- **Event-Driven Async**: Use event listeners instead of awaiting async calls between classes
+- **Handler Bootstrap**: Handlers instantiate themselves to get into execution path for self-registration
+
 ### ⚠️ **Critical Considerations**
 - **WebXR Types**: Custom definitions in `client/src/webxr.d.ts` require expert review
 - **VR Safety**: Incorrect spatial/timing assumptions can cause physical discomfort
 - **Secrets Management**: Use environment variables locally, AWS Secrets Manager in production
-- **Event System Scope**: Events are for user intents and workflows, NOT data queries
-  - ✅ **Use Events**: User actions (load games, enter VR), complex workflows, state changes
-  - ❌ **Don't Use Events**: Simple data queries, request-response patterns, synchronous operations
-  - **Rule**: If you need the return value immediately, use direct calls, not events
+- **Singleton Exceptions**: DataManager and EventManager remain singletons for now (migration TBD)
 
 ## Workflow Guidelines
 

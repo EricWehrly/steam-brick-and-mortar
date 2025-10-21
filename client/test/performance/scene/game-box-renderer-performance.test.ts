@@ -5,7 +5,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { GameBoxRenderer, type SteamGameData, type TexturePerformanceConfig } from '../../../src/scene'
+import { GameBoxRenderer } from '../../../src/scene/GameBoxRenderer'
+import type { SteamGameData } from '../../../src/scene'
 
 // Mock URL object methods
 Object.defineProperty(globalThis, 'URL', {
@@ -61,21 +62,10 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
     let performanceManager: any
     let textureManager: any
     
-    beforeEach(() => {
-        const performanceConfig: TexturePerformanceConfig = {
-            maxTextureSize: 1024,
-            nearDistance: 2.0,
-            farDistance: 10.0,
-            highResolutionSize: 512,
-            mediumResolutionSize: 256,
-            lowResolutionSize: 128,
-            maxActiveTextures: 10, // Low limit for testing
-            frustumCullingEnabled: true
-        }
-        
-    renderer = new GameBoxRenderer({}, performanceConfig)
-    // Access the internal performance manager for testing (was previously exposed)
-    performanceManager = (renderer as any).performanceManager
+    beforeEach(() => {        
+        renderer = new GameBoxRenderer()
+        // Access the internal performance manager for testing (was previously exposed)
+        performanceManager = (renderer as any).performanceManager
         textureManager = (renderer as any).textureManager
         scene = new THREE.Scene()
         camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
@@ -368,17 +358,8 @@ describe('GameBox Renderer Performance - Experimental Features', () => {
         })
         
         it('should update performance data efficiently for large numbers of objects', () => {
-            // Create a new renderer for this test with performance features enabled
-            const largeRenderer = new GameBoxRenderer({}, {
-                maxTextureSize: 1024,
-                nearDistance: 2.0,
-                farDistance: 10.0,
-                highResolutionSize: 512,
-                mediumResolutionSize: 256,
-                lowResolutionSize: 128,
-                maxActiveTextures: 50,
-                frustumCullingEnabled: true
-            })
+            // Create a new renderer for this test
+            const largeRenderer = new GameBoxRenderer()
             
             // Create 200 game boxes
             for (let i = 0; i < 200; i++) {

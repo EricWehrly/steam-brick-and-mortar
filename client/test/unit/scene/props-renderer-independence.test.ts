@@ -1,60 +1,85 @@
 /**
  * Props Renderer Independence Test
  * 
- * Verifies that StorePropsRenderer works independently without EnvironmentRenderer dependency.
+ * Verifies that store props renderers work independently via event system.
  * 
- * Migration: Updated to use createSceneTestContainer() for proper DI isolation
+ * Migration: Updated to use event system instead of deleted StorePropsRenderer facade
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { StorePropsRenderer } from '../../../src/scene/StorePropsRenderer'
-import { GameBoxRenderer } from '../../../src/scene/GameBoxRenderer'
-import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
-import { ServiceKeys } from '../../../src/core/di/ServiceKeys'
-import { DataManager } from '../../../src/core/data/DataManager'
-import { createSceneTestContainer } from '../../utils/test-container-helpers'
+import { EventManager, EventSource } from '../../../src/core/EventManager'
+import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
+import type { PropsConfig } from '../../../src/scene/IStorePropsRenderer'
+// Import handlers to ensure they register themselves
+import '../../../src/scene/GpuStorePropsRenderer'
+import '../../../src/scene/LegacyStorePropsRenderer'
 
-describe('StorePropsRenderer Independence', () => {
-    let container: ServiceContainer
+describe('Store Props Renderer Independence - Event System', () => {
     let scene: THREE.Scene
-    let propsRenderer: StorePropsRenderer
+    let eventManager: EventManager
+    let mockEventHandler: ReturnType<typeof vi.fn>
 
-    beforeEach(async () => {
-        // Create isolated test container
-        container = await createSceneTestContainer()
-        
+    beforeEach(() => {
         scene = new THREE.Scene()
+        eventManager = EventManager.getInstance()
         
-        // Resolve dependencies from container
-        const dataManager = await container.resolve(ServiceKeys.DataManager) as DataManager
-        const gameBoxRenderer = await container.resolve(ServiceKeys.GameBoxRenderer) as GameBoxRenderer
+        // Mock event handler to track events
+        mockEventHandler = vi.fn()
         
-        propsRenderer = new StorePropsRenderer(scene, dataManager, gameBoxRenderer)
+        // Register mock handler for store props events
+        eventManager.registerEventHandler(StorePropsEventTypes.SetupCompleted, mockEventHandler)
     })
 
-    afterEach(async () => {
-        // Dispose container to clean up all services
-        await container.dispose()
+    afterEach(() => {
+        // Clean up event handlers
+        eventManager.deregisterEventHandler(StorePropsEventTypes.SetupCompleted, mockEventHandler)
     })
 
-    describe('Constructor Independence', () => {
-        it('should initialize without external dependencies', () => {
-            expect(propsRenderer).toBeDefined()
-            // Verifies that StorePropsRenderer no longer depends on EnvironmentRenderer
+    describe('Event Handler Independence', () => {
+        it('should initialize event handlers without external dependencies', async () => {
+            // Given: Event system is set up
+            expect(eventManager).toBeDefined()
+            
+            // When: We request store props setup
+            const config: PropsConfig = {
+                enableShelves: true,
+                enableGameBoxes: false,
+                enableSignage: false
+            }
+            
+            eventManager.emit(StorePropsEventTypes.SetupRequest, {
+                config,
+                source: EventSource.System,
+                timestamp: Date.now()
+            })
+            
+            // Then: Event should be processed (no dependency errors)
+            expect(() => eventManager.emit(StorePropsEventTypes.ClearRequest, {
+                source: EventSource.System,
+                timestamp: Date.now()
+            })).not.toThrow()
         })
     })
 
-    describe('Cleanup Independence', () => {
-        it('should handle cleanup independently', () => {
-            // Clear props
-            propsRenderer.clearProps()
+    describe('Event Cleanup Independence', () => {
+        it('should handle event cleanup independently', () => {
+            // Given: Mock handler for clear events
+            const clearHandler = vi.fn()
+            eventManager.registerEventHandler(StorePropsEventTypes.ClearRequest, clearHandler)
             
-            // Dispose props renderer
-            propsRenderer.dispose()
+            // When: We emit clear request
+            eventManager.emit(StorePropsEventTypes.ClearRequest, {
+                source: EventSource.System,
+                timestamp: Date.now()
+            })
             
-            // Should not throw any errors since it's independent
-            expect(() => propsRenderer.dispose()).not.toThrow()
+            // Then: Should not throw any errors
+            expect(clearHandler).toHaveBeenCalled()
+            
+            // Cleanup
+            eventManager.deregisterEventHandler(StorePropsEventTypes.ClearRequest, clearHandler)
+            expect(() => eventManager.deregisterEventHandler(StorePropsEventTypes.ClearRequest, clearHandler)).not.toThrow()
         })
     })
 })
