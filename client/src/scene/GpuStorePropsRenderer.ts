@@ -153,7 +153,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             console.debug(`Instanced shelf generation completed: ${shelvesNeeded} shelves for ${gameCount} games`)
             
             // Emit InstancedBatchComplete event to trigger GPU updates
-            EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete, null)
+            EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
             
             // NOTE: Scene validation moved to handleInstancedBatchComplete to happen AFTER GPU updates
         } catch (error) {
