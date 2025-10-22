@@ -30,7 +30,7 @@ import { GameEventTypes, type SceneReadyEvent } from '../types/InteractionEvents
 import { AppSettings } from '../core/AppSettings'
 import { DataManager } from '../core/data'
 // Initialize store props system (self-registering module with dedicated events)
-import { StorePropsEventTypes, type StorePropsSetupRequestEvent } from './props'
+import { StorePropsEventTypes, type StorePropsSetupRequestEvent, type StorePropsSetupCompletedEvent } from './props'
 import type { SteamGameData } from './game-box/types/GameData'
 
 export interface SceneCoordinatorConfig {
@@ -81,7 +81,16 @@ export class SceneCoordinator {
         // Initialize room manager for event-driven room structure (no longer needs EnvironmentRenderer)
         this.roomManager = new RoomManager(this.sceneManager.getScene(), this.dataManager, this.eventManager)
 
-        this.eventManager.emit<SceneReadyEvent>(GameEventTypes.SceneReady, {})
+        // Listen for props setup completion to emit SceneReady at the right time
+        this.eventManager.registerEventHandler<StorePropsSetupCompletedEvent>(
+            StorePropsEventTypes.SetupCompleted,
+            () => {
+                console.log('🎬 Scene fully ready - emitting SceneReady event')
+                this.eventManager.emit<SceneReadyEvent>(GameEventTypes.SceneReady, {})
+            }
+        )
+
+        // Don't emit SceneReady yet - wait until after loadEnhancedScene completes
         this.loadEnhancedScene(config.environment)
 
         if(window) {

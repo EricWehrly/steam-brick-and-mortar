@@ -18,12 +18,10 @@ import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../
 import { SceneManager, SceneCoordinator } from '../scene'
 import { DebugStatsProvider } from './DebugStatsProvider'
 import { SteamIntegration } from '../steam-integration'
-import { DataManager } from './data'
 import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { WebXREventHandler } from '../webxr/WebXREventHandler'
-import { type WebXRCapabilities } from '../webxr/WebXRManager'
 import { EventManager, EventSource } from './EventManager'
-import { GameEventTypes, WebXREventTypes, type GameStartEvent, type SceneReadyEvent } from '../types/InteractionEvents'
+import { GameEventTypes, type GameStartEvent, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from './AppSettings'
 import { ServiceContainer } from './di/ServiceContainer'
 import { ServiceRegistration } from './di/ServiceRegistration'
@@ -231,10 +229,7 @@ export class SteamBrickAndMortarApp {
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())
             
             
-            // Auto-load first cached user if available (this can happen later)
-            await this.tryAutoLoadCachedUser()
-            
-            
+        // Auto-load will happen after GameStart event is emitted            
             // Show success message once everything is fully loaded
             ToastManager.success('Steam Brick and Mortar is fully loaded!', { duration: 3000 })
             
@@ -245,12 +240,8 @@ export class SteamBrickAndMortarApp {
         }
     }
 
-    private async initializeCoordinators(): Promise<void> {
-        // This method is now replaced by the new progressive loading approach
-        // Keeping for backward compatibility but content moved to specific methods
-    }
-
     private async tryAutoLoadCachedUser(): Promise<void> {
+        console.log('try load cached user')
         try {
             // Check if auto-load is enabled in settings
             if (!this.appSettings.getSetting('autoLoadProfile')) {
@@ -312,10 +303,17 @@ export class SteamBrickAndMortarApp {
         // Listen for SceneReady event
         this.eventManager.registerEventHandler<SceneReadyEvent>(
             GameEventTypes.SceneReady,
-            (event) => {
-                
+            () => {
                 this.prerequisites.sceneReady = true
                 this.checkGameStartPrerequisites()
+            }
+        )
+
+        // Listen for GameStart event to trigger auto-load
+        this.eventManager.registerEventHandler<GameStartEvent>(
+            GameEventTypes.Start,
+            async () => {
+                await this.tryAutoLoadCachedUser()
             }
         )
     }
