@@ -216,21 +216,15 @@ export class InstancedArtworkRenderer {
     
     /**
      * Create empty texture array for dynamic population
+     * Uses smaller initial size to avoid blocking main thread
      */
     private createEmptyTextureArray(): void {
         const size = this.textureSize
         const depth = this.maxTextures
         
-        // Create empty RGBA data
+        // Create minimal empty RGBA data (just allocate, don't fill)
         const data = new Uint8Array(size * size * depth * 4)
-        
-        // Fill with black/transparent initially
-        for (let i = 0; i < data.length; i += 4) {
-            data[i] = 0     // R
-            data[i + 1] = 0 // G
-            data[i + 2] = 0 // B
-            data[i + 3] = 0 // A (transparent)
-        }
+        // Skip the expensive fill loop - GPU will handle uninitialized data fine
         
         this.dataArrayTexture = new THREE.DataArrayTexture(data, size, size, depth)
         this.dataArrayTexture.format = THREE.RGBAFormat
