@@ -30,5 +30,3 @@ import './GpuStorePropsEventHandler'
 
 // Export events and types for external use
 export * from './PropsEvents'
-// export { LegacyStorePropsHandler } from './LegacyStorePropsHandler'
-// export { GpuStorePropsEventHandler } from './GpuStorePropsEventHandler'

@@ -11,9 +11,9 @@ import * as THREE from 'three'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
 import type { PropsConfig } from '../../../src/scene/IStorePropsRenderer'
-// Import handlers to ensure they register themselves
-import '../../../src/scene/GpuStorePropsRenderer'
-import '../../../src/scene/LegacyStorePropsRenderer'
+
+// Import props module to ensure handlers register themselves
+import '../../../src/scene/props'
 
 describe('Store Props Renderer Independence - Event System', () => {
     let scene: THREE.Scene
