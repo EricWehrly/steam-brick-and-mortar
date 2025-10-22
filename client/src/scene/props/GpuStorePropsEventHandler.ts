@@ -16,6 +16,8 @@ import { StorePropsEventTypes, type StorePropsSetupRequestEvent, type StoreProps
 import { EventSource } from '../../core/EventManager'
 import { hasWebGL2, hasInstancedArrays, hasHardwareRenderer, supportsLargeTextures } from '../../utils/SystemCapabilities'
 
+// TODO: I think this can just be merged down into the gpu renderer class.
+// This is an added layer, separating out the event handling, but could be slim enough to sit inside the class proper
 export class GpuStorePropsEventHandler {
     private static readonly logger = Logger.withContext(GpuStorePropsEventHandler.name)
     private eventManager: EventManager
@@ -140,6 +142,7 @@ export class GpuStorePropsEventHandler {
         }
     }
     
+    // TODO: This wrapping is unnecessary
     private async handleClearRequest(event: CustomEvent<StorePropsClearRequestEvent>): Promise<void> {
         try {
             if (this.renderer) {
