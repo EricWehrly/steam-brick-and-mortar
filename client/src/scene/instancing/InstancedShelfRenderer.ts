@@ -112,11 +112,11 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.defaultShelfConfig = {
             width: 2.0,
             height: 2.0,
-            depth: 0.6, // Increased depth for better face-to-face dimension (1.5x original)
+            depth: 0.34, // Increased depth so horizontal shelves extend beyond angled faces
             angle: 3, // degrees
             shelfCount: 3,
             boardThickness: 0.05,
-            shelfExtensionPerLevel: 0.1
+            shelfExtensionPerLevel: 0.25  // Increased extension for more pronounced shelf depth
         }
         
         // Apply user overrides to defaults
@@ -371,8 +371,12 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             
             // Calculate shelf dimensions based on angled sides
             const widthAtHeight = config.width - 2 * (config.height - shelfY) * Math.tan(angleRad)
-            const shelfFromBottom = config.shelfCount - i + 1
-            const depthExtension = (shelfFromBottom - 1) * config.shelfExtensionPerLevel
+            
+            // Fix shelf extension logic: top shelves (higher i) should extend more
+            // i=1 (bottom): no extension
+            // i=2 (middle): 1x extension  
+            // i=3 (top): 2x extension
+            const depthExtension = (i - 1) * config.shelfExtensionPerLevel
             const shelfDepth = config.depth - config.boardThickness * 2 + depthExtension
             
             // Calculate scaling factors

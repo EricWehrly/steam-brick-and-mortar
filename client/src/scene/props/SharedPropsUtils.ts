@@ -22,7 +22,7 @@ export class GameLayoutConstants {
  * Game placement constants for consistent positioning across renderers
  */
 export class GamePlacementConstants {
-    static readonly Z_OFFSET = 0.1        // 10cm from shelf surface
+    static readonly Z_OFFSET = 0.15       // 15cm from shelf surface (10cm game depth + 5cm clearance)
     static readonly Y_OFFSET = 0.005      // 5mm above shelf surface  
     static readonly GAME_HEIGHT = 0.4     // 40cm height
     static readonly GAME_SPACING = 0.35   // 35cm spacing between games
@@ -174,31 +174,35 @@ export class ShelfSurfaceUtils {
      * GPU version uses hardcoded standard shelf dimensions
      * Legacy version traverses geometry but should match the same structure
      */
-    static findShelfSurfaces(shelfUnit: THREE.Group | null, useHardcodedSurfaces: boolean = false): ShelfSurface[] {
+    static findShelfSurfaces(shelfUnit: THREE.Group | null, useHardcodedSurfaces: boolean = false, shelfPosition?: THREE.Vector3): ShelfSurface[] {
         if (useHardcodedSurfaces || !shelfUnit) {
             // GPU renderer path: use standard shelf dimensions
             return ShelfSurfaceUtils.getStandardShelfSurfaces()
         }
         
         // Legacy renderer path: traverse geometry to find surfaces
-        return ShelfSurfaceUtils.findDynamicShelfSurfaces(shelfUnit)
+        return ShelfSurfaceUtils.findDynamicShelfSurfaces(shelfUnit, shelfPosition)
     }
     
     /**
      * Get standard shelf surface configuration (used by GPU renderer)
+     * These values must match the actual shelf positioning in InstancedShelfRenderer.setInstance()
+     * Default config: height=2.0, shelfCount=3, boardThickness=0.05
+     * shelfSpacing = height / (shelfCount + 1) = 2.0 / 4 = 0.5
+     * Interior surface Y = shelfY + boardThickness * 0.55
      */
     private static getStandardShelfSurfaces(): ShelfSurface[] {
         return [
-            { topY: 0.4, frontZ: -0.5, backZ: 0.5, centerX: 0, width: 2.0 },  // Bottom shelf
-            { topY: 1.2, frontZ: -0.5, backZ: 0.5, centerX: 0, width: 2.0 },  // Middle shelf  
-            { topY: 2.0, frontZ: -0.5, backZ: 0.5, centerX: 0, width: 2.0 }   // Top shelf
+            { topY: 0.5275, frontZ: -0.5, backZ: 0.5, centerX: 0, width: 2.0 },  // Bottom shelf: 0.5 + 0.05*0.55
+            { topY: 1.0275, frontZ: -0.5, backZ: 0.5, centerX: 0, width: 2.0 },  // Middle shelf: 1.0 + 0.05*0.55  
+            { topY: 1.5275, frontZ: -0.5, backZ: 0.5, centerX: 0, width: 2.0 }   // Top shelf: 1.5 + 0.05*0.55
         ]
     }
     
     /**
      * Find shelf surfaces by traversing geometry (used by Legacy renderer)
      */
-    private static findDynamicShelfSurfaces(shelfUnit: THREE.Group): ShelfSurface[] {
+    private static findDynamicShelfSurfaces(shelfUnit: THREE.Group, shelfPosition?: THREE.Vector3): ShelfSurface[] {
         const surfaces: ShelfSurface[] = []
         
         shelfUnit.traverse((child) => {
@@ -208,8 +212,11 @@ export class ShelfSurfaceUtils {
                 
                 // Look for horizontal surfaces (wide, thin, reasonable depth)
                 if (size.x > 1.5 && size.y < 0.1 && size.z > 0.3) {
+                    // Make topY relative to shelf position if provided
+                    const relativeTopY = shelfPosition ? box.max.y - shelfPosition.y : box.max.y
+                    
                     surfaces.push({
-                        topY: box.max.y,
+                        topY: relativeTopY,
                         frontZ: box.min.z,
                         backZ: box.max.z,
                         centerX: (box.min.x + box.max.x) / 2,
@@ -264,6 +271,7 @@ export class GameBoxUtils {
         const positions: THREE.Vector3[] = []
         
         // Calculate positioning relative to shelf position
+        // surface.topY should be relative to shelf position, not absolute
         const gameY = shelfPosition.y + surface.topY + GamePlacementConstants.Y_OFFSET + GamePlacementConstants.GAME_HEIGHT / 2
         const gameZ = shelfPosition.z + (side === 'front' 
             ? surface.frontZ + GamePlacementConstants.Z_OFFSET 
