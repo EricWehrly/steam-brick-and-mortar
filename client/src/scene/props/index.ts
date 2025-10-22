@@ -30,3 +30,14 @@ import './GpuStorePropsEventHandler'
 
 // Export events and types for external use
 export * from './PropsEvents'
+
+// Export shared utilities for renderers that need them
+export { 
+    GameLayoutConstants, 
+    ArtworkUtils, 
+    VRLayoutUtils, 
+    GamePlacementConstants, 
+    GameBoxUtils,
+    ShelfSurfaceUtils,
+    type ShelfSurface
+} from './SharedPropsUtils'

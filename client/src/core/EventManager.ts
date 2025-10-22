@@ -55,18 +55,18 @@ export class EventManager extends EventTarget {
      */
     public emit<T extends BaseInteractionEvent>(
         eventType: string, 
-        detail: T,
+        detail?: T,
         source: T['source'] = EventSource.System as T['source']
     ): boolean {
-        const event = new CustomEvent(eventType, {
-            detail: {
-                ...detail,
-                timestamp: Date.now(),
-                source: detail.source || source
-            }
-        })
+        const eventDetail = {
+            ...(detail || {}),
+            timestamp: Date.now(),
+            source: detail?.source || source
+        }
         
-        EventManager.logger.debug(`Emitting event: ${eventType}`, { detail })
+        const event = new CustomEvent(eventType, { detail: eventDetail })
+        
+        EventManager.logger.debug(`Emitting event: ${eventType}`, { detail: eventDetail })
         return this.dispatchEvent(event)
     }
     
