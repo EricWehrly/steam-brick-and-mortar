@@ -269,7 +269,8 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
 
     private async spawnActualGamesOnShelf(shelfUnit: THREE.Group, parentGroup: THREE.Group, games: SteamGameData[], rowIndex: number, shelfIndex: number): Promise<void> {
         // Find shelf surfaces using shared utility (Legacy path: traverse geometry)
-        const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(shelfUnit, false)
+        // Pass parent group position to ensure surfaces use correct coordinate system
+        const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(shelfUnit, false, parentGroup.position)
         
         if (shelfSurfaces.length === 0) {
             console.warn(`⚠️ No shelf surfaces found on legacy shelf ${rowIndex}-${shelfIndex}`)
@@ -305,7 +306,8 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
         games: SteamGameData[], 
         side: 'front' | 'back'
     ): Promise<void> {
-        const gamePositions = GameBoxUtils.calculateGamePositions(new THREE.Vector3(0, 0, 0), surface, games, side)
+        // Use parent group position as shelf position for correct game positioning
+        const gamePositions = GameBoxUtils.calculateGamePositions(parentGroup.position, surface, games, side)
         
         for (let i = 0; i < games.length; i++) {
             await this.createSingleGameBox(games[i], gamePositions[i], parentGroup, side, i)

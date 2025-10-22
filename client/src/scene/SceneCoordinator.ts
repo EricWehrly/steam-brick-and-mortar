@@ -25,7 +25,6 @@ import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { LightingRenderer } from './LightingRenderer'
 import { RoomManager } from './RoomManager'
 import { EventManager } from '../core/EventManager'
-// No longer needed - handlers are self-registering
 import { GameEventTypes, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager } from '../core/data'
@@ -82,13 +81,10 @@ export class SceneCoordinator {
         this.roomManager = new RoomManager(this.sceneManager.getScene(), this.dataManager, this.eventManager)
 
         // Listen for props setup completion to emit SceneReady at the right time
-        this.eventManager.registerEventHandler<StorePropsSetupCompletedEvent>(
-            StorePropsEventTypes.SetupCompleted,
-            () => {
-                console.log('🎬 Scene fully ready - emitting SceneReady event')
-                this.eventManager.emit<SceneReadyEvent>(GameEventTypes.SceneReady, {})
-            }
-        )
+        this.eventManager.registerEventHandler(StorePropsEventTypes.SetupCompleted, () => {
+            console.log('🎬 Scene fully ready - emitting SceneReady event')
+            this.eventManager.emit(GameEventTypes.SceneReady, {})
+        })
 
         // Don't emit SceneReady yet - wait until after loadEnhancedScene completes
         this.loadEnhancedScene(config.environment)
