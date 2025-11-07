@@ -22,7 +22,7 @@ export class GameLayoutConstants {
  * Game placement constants for consistent positioning across renderers
  */
 export class GamePlacementConstants {
-    static readonly Z_OFFSET = 0.15       // 15cm from shelf surface (10cm game depth + 5cm clearance)
+    static readonly Z_OFFSET = 0.03       // 3cm from shelf surface (game depth 10cm, so front/back faces sit close to shelf edge)
     static readonly Y_OFFSET = 0.005      // 5mm above shelf surface  
     static readonly GAME_HEIGHT = 0.4     // 40cm height
     static readonly GAME_SPACING = 0.35   // 35cm spacing between games
@@ -258,10 +258,7 @@ export class GameBoxUtils {
         const safeName = game.name?.replace(/[^a-zA-Z0-9]/g, '-') ?? 'unknown'
         return `${rendererType}-game-${safeName}-${side}-${index}`
     }
-    
-    /**
-     * Calculate game positioning for a surface
-     */
+
     static calculateGamePositions(
         shelfPosition: THREE.Vector3,
         surface: ShelfSurface,
@@ -270,13 +267,27 @@ export class GameBoxUtils {
     ): THREE.Vector3[] {
         const positions: THREE.Vector3[] = []
         
-        // Calculate positioning relative to shelf position
-        // surface.topY should be relative to shelf position, not absolute
-        const gameY = shelfPosition.y + surface.topY + GamePlacementConstants.Y_OFFSET + GamePlacementConstants.GAME_HEIGHT / 2
-        const gameZ = shelfPosition.z + (side === 'front' 
-            ? surface.frontZ + GamePlacementConstants.Z_OFFSET 
-            : surface.backZ - GamePlacementConstants.Z_OFFSET)
+        const gameY = shelfPosition.y + surface.topY + GamePlacementConstants.GAME_HEIGHT / 2
         
+        // Calculate Z position to follow the angled face of the shelf
+        // Shelf has 3-degree angle, so games should follow the angled face
+        const shelfAngleDegrees = 6
+        const shelfAngleRad = (shelfAngleDegrees * Math.PI) / 180
+        
+        // Calculate how far along the angled face this shelf level is
+        // Higher shelves (larger surface.topY) should be further inward due to the taper
+        const heightFromBottom = surface.topY
+        const angleOffset = heightFromBottom * Math.tan(shelfAngleRad)
+        
+        const gameHalfDepth = 0.05  // Half of game depth (0.1) - TRY: 0.03, 0.07, 0.1
+        
+        const baseZ = shelfPosition.z + (side === 'front' 
+            ? surface.frontZ + (gameHalfDepth * 3)  // Front: surface.frontZ = -0.5
+            : surface.backZ - (gameHalfDepth * 3) )  // Back: surface.backZ = +0.5
+        
+        // Apply angle offset: front games move inward as they go up, back games move inward as they go up
+        const gameZ = baseZ + (side === 'front' ? angleOffset : -angleOffset)
+                
         // Center the games on the shelf
         const totalWidth = (games.length - 1) * GamePlacementConstants.GAME_SPACING
         const startX = shelfPosition.x + surface.centerX - totalWidth / 2

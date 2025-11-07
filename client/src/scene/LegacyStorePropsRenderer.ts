@@ -327,6 +327,7 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
         
         const gameBox = this.gameBoxRenderer.createGameBox(game, worldPosition, textureOptions, name)
         if (gameBox) {
+            // Use localPosition for positioning within parent group (Y offsets are already in localPosition)
             gameBox.position.copy(localPosition)
             parentGroup.add(gameBox)
         }
