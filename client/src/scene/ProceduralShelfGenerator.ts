@@ -6,7 +6,7 @@ const DEFAULT_SHELF_CONFIG = {
   width: 2.0,
   height: 2.0,
   depth: 0.4,
-  angle: 3, // 6 degrees from vertical (reduced for less steep angles)
+  angle: 6, // 6 degrees from vertical (reduced for less steep angles)
   shelfCount: 3,
   boardThickness: 0.05,
   shelfExtensionPerLevel: 0.1 // How much each lower shelf extends forward
