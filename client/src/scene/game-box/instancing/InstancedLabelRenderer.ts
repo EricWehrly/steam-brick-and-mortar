@@ -24,6 +24,8 @@ import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
 import { DataManager } from '../../../core/data/DataManager'
 import { ShelfSide } from '../../props/SharedPropsUtils'
+import vertexShader from './shaders/instanced-label.vert?raw'
+import fragmentShader from './shaders/instanced-label.frag?raw'
 
 export interface InstancedLabelConfig {
     maxInstances?: number
@@ -225,47 +227,14 @@ export class InstancedLabelRenderer {
 
     /**
      * Create shader material for instanced labels with texture array support
-     * 
-     * TODO: Extract shaders to separate .vert and .frag files for better maintainability
      */
     private createLabelMaterial(textureArray: THREE.DataArrayTexture): THREE.ShaderMaterial {
         return new THREE.ShaderMaterial({
             uniforms: {
                 textureArray: { value: textureArray }
             },
-            vertexShader: `
-                attribute float textureIndex;
-                varying float vTextureIndex;
-                varying vec2 vUv;
-                
-                void main() {
-                    vTextureIndex = textureIndex;
-                    // UV coordinate permutations (rotation handles front/back orientation):
-                    // Option 1: vUv = uv;                         (standard)
-                    // Option 2: vUv = vec2(uv.x, 1.0 - uv.y);     (flip Y)
-                    // Option 3: vUv = vec2(1.0 - uv.x, uv.y);     (flip X)
-                    // Option 4: vUv = vec2(1.0 - uv.x, 1.0 - uv.y); (flip both)
-                    vUv = vec2(uv.x, 1.0 - uv.y);     // (flip Y)
-                    
-                    // Use instanced matrix for positioning
-                    gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
-                }
-            `,
-            fragmentShader: `
-                uniform sampler2DArray textureArray;
-                varying float vTextureIndex;
-                varying vec2 vUv;
-                
-                void main() {
-                    // Sample from texture array at specific layer
-                    vec4 texColor = texture(textureArray, vec3(vUv, vTextureIndex));
-                    
-                    // Discard fully transparent pixels (optional optimization)
-                    if (texColor.a < 0.01) discard;
-                    
-                    gl_FragColor = texColor;
-                }
-            `,
+            vertexShader,
+            fragmentShader,
             transparent: true,
             side: THREE.DoubleSide,
             depthWrite: false,  // Avoid depth fighting with game boxes
