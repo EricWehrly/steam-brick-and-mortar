@@ -26,6 +26,7 @@ import { GameBoxTextureManager } from './game-box/GameBoxTextureManager'
 import { GameBoxLayoutUtils } from './game-box/GameBoxLayoutUtils'
 import { InstancedLabelRenderer } from './game-box/instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './game-box/instancing/InstancedArtworkRenderer'
+import { ShelfSide } from './props/SharedPropsUtils'
 import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
 import { DataManager } from '../core/data/DataManager'
 
@@ -46,7 +47,7 @@ export class GameBoxRenderer {
     private static readonly DEFAULT_DIMENSIONS: GameBoxDimensions = {
         width: 0.3,   // 30cm width
         height: 0.4,  // 40cm height 
-        depth: 0.1    // 10cm depth
+        depth: 0.08    // 8cm depth
     }
 
     private dimensions: GameBoxDimensions
@@ -176,17 +177,16 @@ export class GameBoxRenderer {
         game: SteamGameData,
         position: THREE.Vector3 = new THREE.Vector3(0, 0, 0),
         textureOptions?: GameBoxTextureOptions,
-        name?: string
+        name?: string,
+        side: ShelfSide = ShelfSide.Front
     ): THREE.Mesh | null {
         // Determine if this game has artwork
         const hasArtwork = textureOptions && textureOptions.artworkBlobs && Object.keys(textureOptions.artworkBlobs).length > 0
         
         if (hasArtwork && this.instancedArtworkRenderer?.isReady()) {
-            // Use instanced artwork renderer for games with artwork
             return this.createInstancedArtworkBox(game, position, textureOptions!, name)
         } else if (this.hasInstancedLabelRenderer()) {
-            // Use instanced label renderer for text-only games
-            return this.createInstancedLabelBox(game, position, name)
+            return this.createInstancedLabelBox(game, position, name, side)
         }
         
         // Fallback to individual game box creation
@@ -245,7 +245,8 @@ export class GameBoxRenderer {
     private createInstancedLabelBox(
         game: SteamGameData,
         position: THREE.Vector3,
-        name?: string
+        name?: string,
+        side: ShelfSide = ShelfSide.Front
     ): THREE.Mesh | null {
         if (!this.instancedLabelRenderer) {
             console.warn('Instanced label renderer not available, falling back to individual mesh')
@@ -258,7 +259,8 @@ export class GameBoxRenderer {
         const success = this.instancedLabelRenderer.setLabelInstance(
             reservedInstanceIndex,
             position,
-            game.name
+            game.name,
+            side
         )
         
         if (!success) {
@@ -294,15 +296,65 @@ export class GameBoxRenderer {
         gameBox.receiveShadow = true
         
         // Add game name text label to the front face
-        // Only use GPU instanced labels if renderer is initialized, otherwise skip labels
+        // Use GPU instanced labels if available, otherwise create individual canvas-based labels
         if (this.instancedLabelRenderer?.isReady()) {
             this.addInstancedGameNameLabel(gameBox, game.name)
         } else {
-            // Skip individual labels entirely - GPU instanced renderer will handle all labels
-            console.debug(`⏳ Skipping label for "${game.name}" - GPU instanced renderer not ready`)
+            this.addIndividualTextLabel(gameBox, game.name)
         }
         
         return gameBox
+    }
+    
+    private addIndividualTextLabel(gameBox: THREE.Mesh, gameName: string): void {
+        // Create canvas for text rendering
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+            console.warn('Could not get 2D canvas context for text label')
+            return
+        }
+        
+        // Set canvas size
+        const textureSize = 512
+        canvas.width = textureSize
+        canvas.height = textureSize
+        
+        // Set up text style
+        ctx.fillStyle = '#ffffff'
+        ctx.font = 'bold 48px Arial, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        
+        // Fill background (optional, for visibility)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        
+        // Draw text
+        ctx.fillStyle = '#ffffff'
+        ctx.fillText(gameName, canvas.width / 2, canvas.height / 2)
+        
+        // Create texture from canvas
+        const texture = new THREE.CanvasTexture(canvas)
+        texture.needsUpdate = true
+        
+        // Create text plane geometry and material
+        const textGeometry = new THREE.PlaneGeometry(0.25, 0.25)
+        const textMaterial = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            side: THREE.DoubleSide
+        })
+        
+        // Create text mesh
+        const textMesh = new THREE.Mesh(textGeometry, textMaterial)
+        
+        // Position text on front face of game box
+        textMesh.position.set(0, 0, 0.051) // Slightly in front of the game box
+        textMesh.name = `${gameBox.name}-label`
+        
+        // Add text to game box
+        gameBox.add(textMesh)
     }
     
     /**

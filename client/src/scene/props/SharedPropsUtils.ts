@@ -11,6 +11,14 @@ import type { SteamGameData } from '../game-box/types/GameData'
 import { RoomConstants } from '../RoomManager'
 
 /**
+ * Shelf side identifier for front/back differentiation
+ */
+export enum ShelfSide {
+    Front = 'front',
+    Back = 'back'
+}
+
+/**
  * Configuration constants for game layout - shared between renderers
  */
 export class GameLayoutConstants {
@@ -254,7 +262,7 @@ export class GameBoxUtils {
     /**
      * Generate consistent game box name across renderers
      */
-    static generateGameBoxName(game: SteamGameData, side: 'front' | 'back', index: number, rendererType: 'gpu' | 'legacy'): string {
+    static generateGameBoxName(game: SteamGameData, side: ShelfSide, index: number, rendererType: 'gpu' | 'legacy'): string {
         const safeName = game.name?.replace(/[^a-zA-Z0-9]/g, '-') ?? 'unknown'
         return `${rendererType}-game-${safeName}-${side}-${index}`
     }
@@ -263,7 +271,7 @@ export class GameBoxUtils {
         shelfPosition: THREE.Vector3,
         surface: ShelfSurface,
         games: SteamGameData[],
-        side: 'front' | 'back'
+        side: ShelfSide
     ): THREE.Vector3[] {
         const positions: THREE.Vector3[] = []
         
@@ -281,12 +289,12 @@ export class GameBoxUtils {
         
         const gameHalfDepth = 0.05  // Half of game depth (0.1) - TRY: 0.03, 0.07, 0.1
         
-        const baseZ = shelfPosition.z + (side === 'front' 
+        const baseZ = shelfPosition.z + (side === ShelfSide.Front 
             ? surface.frontZ + (gameHalfDepth * 3)  // Front: surface.frontZ = -0.5
             : surface.backZ - (gameHalfDepth * 3) )  // Back: surface.backZ = +0.5
         
         // Apply angle offset: front games move inward as they go up, back games move inward as they go up
-        const gameZ = baseZ + (side === 'front' ? angleOffset : -angleOffset)
+        const gameZ = baseZ + (side === ShelfSide.Front ? angleOffset : -angleOffset)
                 
         // Center the games on the shelf
         const totalWidth = (games.length - 1) * GamePlacementConstants.GAME_SPACING

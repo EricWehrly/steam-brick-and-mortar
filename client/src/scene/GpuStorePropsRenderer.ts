@@ -27,6 +27,7 @@ import { StoreLayout } from './StoreLayout'
 import { GameBoxRenderer } from './GameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
+import { ShelfSide } from './props/SharedPropsUtils'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 import { GameLayoutConstants, VRLayoutUtils, GameBoxUtils, ShelfSurfaceUtils, type ShelfSurface } from './props/SharedPropsUtils'
 
@@ -299,8 +300,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             // Add shelf instance at position
             const globalShelfIndex = rowIndex * 4 + shelfIndex
             this.instancedShelfRenderer.setInstance(globalShelfIndex, {
-                position: position,
-                shelfConfig: {}
+                position: position
             })
             
             // Create game boxes with actual game data if available
@@ -331,7 +331,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             // Spawn games on front side
             const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
             if (frontGames.length > 0) {
-                await this.createInstancedGameBoxes(shelfPosition, surface, frontGames, 'front')
+                await this.createInstancedGameBoxes(shelfPosition, surface, frontGames, ShelfSide.Front)
                 gameIndex += frontGames.length
             }
             
@@ -339,7 +339,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             if (gameIndex < games.length) {
                 const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
                 if (backGames.length > 0) {
-                    await this.createInstancedGameBoxes(shelfPosition, surface, backGames, 'back')
+                    await this.createInstancedGameBoxes(shelfPosition, surface, backGames, ShelfSide.Back)
                     gameIndex += backGames.length
                 }
             }
@@ -350,7 +350,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         shelfPosition: THREE.Vector3,
         surface: ShelfSurface, 
         games: SteamGameData[], 
-        side: 'front' | 'back'
+        side: ShelfSide
     ): Promise<void> {
         const gamePositions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, games, side)
         
@@ -362,13 +362,13 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private async createSingleInstancedGameBox(
         game: SteamGameData, 
         worldPosition: THREE.Vector3, 
-        side: 'front' | 'back',
+        side: ShelfSide,
         index: number
     ): Promise<void> {
         const name = GameBoxUtils.generateGameBoxName(game, side, index, 'gpu')
         const textureOptions = await GameBoxUtils.loadArtworkIfNeeded(game, this.globalGameIndex, this.imageManager)
         
-        const gameBox = this.gameBoxRenderer.createGameBox(game, worldPosition, textureOptions, name)
+        const gameBox = this.gameBoxRenderer.createGameBox(game, worldPosition, textureOptions, name, side)
         if (gameBox) {
             this.scene.add(gameBox)
             this.createdGameBoxes.push(gameBox) // Track for cleanup
