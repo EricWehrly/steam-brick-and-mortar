@@ -27,6 +27,7 @@ import { StoreLayout } from './StoreLayout'
 import { GameBoxRenderer } from './GameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
+import { ShelfSide } from './props/SharedPropsUtils'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 import { GameLayoutConstants, VRLayoutUtils, GameBoxUtils, ShelfSurfaceUtils, type ShelfSurface } from './props/SharedPropsUtils'
 
@@ -285,7 +286,7 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
             // Spawn games on front side
             const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
             if (frontGames.length > 0) {
-                await this.createGameBoxesWithNames(surface, parentGroup, frontGames, 'front')
+                await this.createGameBoxesWithNames(surface, parentGroup, frontGames, ShelfSide.Front)
                 gameIndex += frontGames.length
             }
             
@@ -293,7 +294,7 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
             if (gameIndex < games.length) {
                 const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
                 if (backGames.length > 0) {
-                    await this.createGameBoxesWithNames(surface, parentGroup, backGames, 'back')
+                    await this.createGameBoxesWithNames(surface, parentGroup, backGames, ShelfSide.Back)
                     gameIndex += backGames.length
                 }
             }
@@ -304,7 +305,7 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
         surface: ShelfSurface, 
         parentGroup: THREE.Group, 
         games: SteamGameData[], 
-        side: 'front' | 'back'
+        side: ShelfSide
     ): Promise<void> {
         // Use parent group position as shelf position for correct game positioning
         const gamePositions = GameBoxUtils.calculateGamePositions(parentGroup.position, surface, games, side)
@@ -318,7 +319,7 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
         game: SteamGameData, 
         localPosition: THREE.Vector3, 
         parentGroup: THREE.Group,
-        side: 'front' | 'back',
+        side: ShelfSide,
         index: number
     ): Promise<void> {
         const worldPosition = localPosition.clone().add(parentGroup.position)

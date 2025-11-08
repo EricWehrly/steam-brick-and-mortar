@@ -23,6 +23,7 @@ import type { SteamGameData } from '../types/GameData'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
 import { DataManager } from '../../../core/data/DataManager'
+import { ShelfSide } from '../../props/SharedPropsUtils'
 
 export interface InstancedLabelConfig {
     maxInstances?: number
@@ -124,7 +125,8 @@ export class InstancedLabelRenderer {
     public setLabelInstance(
         index: number,
         position: THREE.Vector3,
-        gameName: string
+        gameName: string,
+        side: ShelfSide = ShelfSide.Front
     ): boolean {
         if (!this.isInitialized || !this.instancedMesh || !this.geometry) {
             console.warn('InstancedLabelRenderer not initialized')
@@ -143,9 +145,13 @@ export class InstancedLabelRenderer {
             return false
         }
         
-        // Update matrix for this instance (position + default rotation)
+        // Update matrix for this instance (position + rotation based on side)
+        const rotation = side === ShelfSide.Back 
+            ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI) // 180° Y rotation for back side
+            : InstancedLabelRenderer.DEFAULT_ROTATION // No rotation for front side
+            
         const matrix = new THREE.Matrix4()
-        matrix.compose(position, InstancedLabelRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
+        matrix.compose(position, rotation, new THREE.Vector3(1, 1, 1))
         this.instancedMesh.setMatrixAt(index, matrix)
         
         // Update texture index attribute
@@ -216,9 +222,11 @@ export class InstancedLabelRenderer {
         })
         console.debug(`📝 Built game name mapping for ${games.length} games`)
     }
-    
+
     /**
      * Create shader material for instanced labels with texture array support
+     * 
+     * TODO: Extract shaders to separate .vert and .frag files for better maintainability
      */
     private createLabelMaterial(textureArray: THREE.DataArrayTexture): THREE.ShaderMaterial {
         return new THREE.ShaderMaterial({
@@ -232,8 +240,12 @@ export class InstancedLabelRenderer {
                 
                 void main() {
                     vTextureIndex = textureIndex;
-                    // Fix upside-down textures by flipping V coordinate
-                    vUv = vec2(uv.x, 1.0 - uv.y);
+                    // UV coordinate permutations (rotation handles front/back orientation):
+                    // Option 1: vUv = uv;                         (standard)
+                    // Option 2: vUv = vec2(uv.x, 1.0 - uv.y);     (flip Y)
+                    // Option 3: vUv = vec2(1.0 - uv.x, uv.y);     (flip X)
+                    // Option 4: vUv = vec2(1.0 - uv.x, 1.0 - uv.y); (flip both)
+                    vUv = vec2(uv.x, 1.0 - uv.y);     // (flip Y)
                     
                     // Use instanced matrix for positioning
                     gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
