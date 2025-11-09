@@ -1,29 +1,6 @@
-/**
- * Instanced Shelf Renderer - GPU Instancing for Procedural Shelves
- * 
- * Replaces ProceduralShelfGenerator with GPU instancing for better performance.
- * Each shelf unit consists of multiple geometry types with different materials:
- * 
- * Components per shelf unit:
- * - 2x Angled boards (front/back) - MDF veneer material
- * - 2x Side boards (left/right) - Brand accent material  
- * - Nx Shelf boards - MDF veneer material
- * - Nx Interior surfaces - Shelf interior material
- * 
- * Performance Impact:
- * - Before: N shelf units = ~(6+shelfCount*2) * N draw calls
- * - After: N shelf units = 4 draw calls total (one per geometry/material type)
- * 
- * Architecture:
- * - Multiple InstancedMeshManager instances (one per geometry type)
- * - Shared geometry templates with material assignment
- * - Shelf unit grouping for coordinated positioning
- */
-
 import * as THREE from 'three'
 import { InstancedMeshManager } from './InstancedMeshManager'
 import { SharedMaterialManager, MaterialType } from '../../utils/SharedMaterialManager'
-import { DataManager } from '../../core/data/DataManager'
 import { EventManager } from '../../core/EventManager'
 import { GameEventTypes } from '../../types/InteractionEvents'
 import type { IInstancedRenderer, InstancedRendererConfig, InstancedRendererStats, InstanceData } from './IInstancedRenderer'
@@ -32,60 +9,66 @@ export interface ShelfConfig {
     width?: number
     height?: number
     depth?: number
-    angle?: number // Angle of slanted boards in degrees
+    angle?: number
     shelfCount?: number
     boardThickness?: number
     shelfExtensionPerLevel?: number
 }
 
+const DEFAULT_SHELF_CONFIG: Required<ShelfConfig> = {
+    width: 2.0,
+    height: 2.0,
+    depth: 0.34,
+    angle: 3,
+    shelfCount: 3,
+    boardThickness: 0.05,
+    shelfExtensionPerLevel: 0.25
+}
+
 export interface InstancedShelfConfig extends InstancedRendererConfig {
-    /** Default shelf configuration */
     defaultShelfConfig?: ShelfConfig
-    /** Maximum shelf units that can be rendered */
     maxShelfUnits?: number
 }
 
+const DEFAULT_INSTANCED_RENDERER_CONFIG: InstancedRendererConfig = {
+    maxInstances: 500
+}
+
+const DEFAULT_INSTANCED_SHELF_CONFIG = {
+    ...DEFAULT_INSTANCED_RENDERER_CONFIG,
+    maxShelfUnits: 100,
+    defaultShelfConfig: DEFAULT_SHELF_CONFIG
+} as const
+
 export interface ShelfInstanceData extends InstanceData {
-    /** Configuration for this specific shelf unit */
     shelfConfig?: ShelfConfig
 }
 
-/**
- * Geometry types used in shelf construction
- */
 enum ShelfGeometryType {
-    AngledBoard = 'angledBoard',    // Front and back angled boards
-    SideBoard = 'sideBoard',        // Left and right support posts
-    ShelfBoard = 'shelfBoard',      // Horizontal shelf surfaces
-    InteriorSurface = 'interior'    // White interior shelf surfaces
+    AngledBoard = 'angledBoard',
+    SideBoard = 'sideBoard',
+    ShelfBoard = 'shelfBoard',
+    InteriorSurface = 'interior'
 }
 
-/**
- * Represents a group of related instances forming one shelf unit
- */
 interface ShelfUnitInstance {
-    /** Position of the shelf unit */
     position: THREE.Vector3
-    /** Configuration for this unit */
     config: ShelfConfig
-    /** Instance indices for each geometry type */
     instanceIndices: {
-        angledBoards: number[]      // Front and back board indices
-        sideBoards: number[]        // Left and right board indices  
-        shelfBoards: number[]       // Shelf board indices
-        interiorSurfaces: number[]  // Interior surface indices
+        angledBoards: number[]
+        sideBoards: number[]
+        shelfBoards: number[]
+        interiorSurfaces: number[]
     }
 }
 
 export class InstancedShelfRenderer implements IInstancedRenderer {
-    // Instanced mesh managers for each geometry type
     private angledBoardManager: InstancedMeshManager
     private sideBoardManager: InstancedMeshManager
     private shelfBoardManager: InstancedMeshManager
     private interiorSurfaceManager: InstancedMeshManager
     
-    // Configuration and state
-    private readonly config: InstancedShelfConfig
+    private readonly maxShelfUnits: number
     private readonly defaultShelfConfig: Required<ShelfConfig>
     private isInitialized: boolean = false
     private shelfUnits: Map<number, ShelfUnitInstance> = new Map()
@@ -96,33 +79,15 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         interior: 0
     }
     
-    // Geometry templates (shared across instances)
     private geometryTemplates: { [K in ShelfGeometryType]?: THREE.BufferGeometry } = {}
     
     constructor(config: InstancedShelfConfig = {}) {
-        this.config = {
-            maxInstances: config.maxInstances || 500,
-            maxShelfUnits: config.maxShelfUnits || 100,
-            enablePerformanceLogging: config.enablePerformanceLogging ?? false,
-            debugName: config.debugName || 'InstancedShelfRenderer',
-            ...config
-        }
+        this.maxShelfUnits = config.maxShelfUnits ?? DEFAULT_INSTANCED_SHELF_CONFIG.maxShelfUnits
         
-        // Default shelf configuration
         this.defaultShelfConfig = {
-            width: 2.0,
-            height: 2.0,
-            depth: 0.34, // Increased depth so horizontal shelves extend beyond angled faces
-            angle: 3, // degrees
-            shelfCount: 3,
-            boardThickness: 0.05,
-            shelfExtensionPerLevel: 0.25  // Increased extension for more pronounced shelf depth
-        }
-        
-        // Apply user overrides to defaults
-        if (config.defaultShelfConfig) {
-            Object.assign(this.defaultShelfConfig, config.defaultShelfConfig)
-        }
+            ...DEFAULT_INSTANCED_SHELF_CONFIG.defaultShelfConfig,
+            ...config.defaultShelfConfig
+        } as Required<ShelfConfig>
         
         // Initialize managers
         this.angledBoardManager = new InstancedMeshManager('InstancedShelf-AngledBoards')
@@ -133,12 +98,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         // Subscribe to GPU update events
         EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, () => this.updateGPU())
         
-        console.debug(`🏪 InstancedShelfRenderer created (max units: ${this.config.maxShelfUnits})`)
+        console.debug(`🏪 InstancedShelfRenderer created (max units: ${this.maxShelfUnits})`)
     }
     
-    /**
-     * Initialize all instanced mesh managers with geometry and materials
-     */
     public async initialize(): Promise<void> {
         if (this.isInitialized) {
             console.warn('InstancedShelfRenderer already initialized')
@@ -146,56 +108,53 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
         
         try {
-            // Get materials from SharedMaterialManager
             const materialManager = SharedMaterialManager.getInstance()
             const mdfVeneerMaterial = materialManager.getMaterial(MaterialType.MdfVeneer)
             const shelfInteriorMaterial = materialManager.getMaterial(MaterialType.ShelfInterior)
             const brandAccentMaterial = materialManager.getMaterial(MaterialType.BrandAccent)
             
-            
-            // Create geometry templates
             this.createGeometryTemplates()
             
-            // Calculate max instances needed per geometry type
-            const maxShelfUnits = this.config.maxShelfUnits!
-            const maxShelvesPerUnit = 5 // Conservative estimate for shelf count
+            const maxShelvesPerUnit = 5
+            const angledBoardGeometry = this.geometryTemplates[ShelfGeometryType.AngledBoard]
+            const sideBoardGeometry = this.geometryTemplates[ShelfGeometryType.SideBoard]
+            const shelfBoardGeometry = this.geometryTemplates[ShelfGeometryType.ShelfBoard]
+            const interiorSurfaceGeometry = this.geometryTemplates[ShelfGeometryType.InteriorSurface]
             
-            // Initialize angled board manager (2 boards per shelf unit)
+            if (!angledBoardGeometry || !sideBoardGeometry || !shelfBoardGeometry || !interiorSurfaceGeometry) {
+                throw new Error('Failed to create geometry templates')
+            }
+            
             this.angledBoardManager.initialize({
-                geometry: this.geometryTemplates[ShelfGeometryType.AngledBoard]!,
+                geometry: angledBoardGeometry,
                 material: mdfVeneerMaterial,
-                maxInstances: maxShelfUnits * 2,
+                maxInstances: this.maxShelfUnits * 2,
                 name: 'instanced-shelf-angled-boards'
             })
             
-            // Initialize side board manager (2 boards per shelf unit)
             this.sideBoardManager.initialize({
-                geometry: this.geometryTemplates[ShelfGeometryType.SideBoard]!,
+                geometry: sideBoardGeometry,
                 material: brandAccentMaterial,
-                maxInstances: maxShelfUnits * 2,
+                maxInstances: this.maxShelfUnits * 2,
                 name: 'instanced-shelf-side-boards'
             })
             
-            // Initialize shelf board manager (variable count per unit)
             this.shelfBoardManager.initialize({
-                geometry: this.geometryTemplates[ShelfGeometryType.ShelfBoard]!,
+                geometry: shelfBoardGeometry,
                 material: mdfVeneerMaterial,
-                maxInstances: maxShelfUnits * maxShelvesPerUnit,
+                maxInstances: this.maxShelfUnits * maxShelvesPerUnit,
                 name: 'instanced-shelf-boards'
             })
             
-            // Initialize interior surface manager (variable count per unit)
             this.interiorSurfaceManager.initialize({
-                geometry: this.geometryTemplates[ShelfGeometryType.InteriorSurface]!,
+                geometry: interiorSurfaceGeometry,
                 material: shelfInteriorMaterial,
-                maxInstances: maxShelfUnits * maxShelvesPerUnit,
+                maxInstances: this.maxShelfUnits * maxShelvesPerUnit,
                 name: 'instanced-shelf-interior-surfaces'
             })
             
             // Add custom instance attributes for dynamic sizing/positioning
             this.setupInstanceAttributes()
-            
-            // NOTE: addToMainScene() moved to first shelf creation to avoid premature removal
             
             this.isInitialized = true
             
@@ -205,34 +164,27 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
     }
     
-    /**
-     * Create geometry templates for each shelf component type
-     */
     private createGeometryTemplates(): void {
         const { width, height, depth, boardThickness } = this.defaultShelfConfig
         
-        // Angled board geometry (front and back boards)
         this.geometryTemplates[ShelfGeometryType.AngledBoard] = new THREE.BoxGeometry(
             width,
             height,
             boardThickness
         )
         
-        // Side board geometry (left and right support posts)
         this.geometryTemplates[ShelfGeometryType.SideBoard] = new THREE.BoxGeometry(
             boardThickness,
             height,
             depth
         )
         
-        // Shelf board geometry (horizontal surfaces) - uses default size, scaled per instance
         this.geometryTemplates[ShelfGeometryType.ShelfBoard] = new THREE.BoxGeometry(
-            width, // Will be dynamically scaled
+            width,
             boardThickness,
-            depth // Will be dynamically scaled
+            depth
         )
         
-        // Interior surface geometry (white surfaces on top of shelves)
         this.geometryTemplates[ShelfGeometryType.InteriorSurface] = new THREE.BoxGeometry(
             width * 0.98,
             boardThickness * 0.1,
@@ -242,37 +194,28 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         console.debug('📐 Created shelf geometry templates')
     }
     
-    /**
-     * Setup custom instance attributes for dynamic shelf parameters
-     */
     private setupInstanceAttributes(): void {
-        // For angled boards: rotation angle attribute
         this.angledBoardManager.addInstanceAttributes([
             { name: 'rotationAngle', itemSize: 1, defaultValue: 0 }
         ])
         
-        // For shelf boards: width and depth scaling
         this.shelfBoardManager.addInstanceAttributes([
-            { name: 'shelfScale', itemSize: 2, defaultValue: [1, 1] } // [widthScale, depthScale]
+            { name: 'shelfScale', itemSize: 2, defaultValue: [1, 1] }
         ])
         
-        // For interior surfaces: matching scaling
         this.interiorSurfaceManager.addInstanceAttributes([
-            { name: 'surfaceScale', itemSize: 2, defaultValue: [1, 1] } // [widthScale, depthScale]
+            { name: 'surfaceScale', itemSize: 2, defaultValue: [1, 1] }
         ])
     }
     
-    /**
-     * Set a complete shelf unit at the specified position
-     */
     public setInstance(index: number, data: ShelfInstanceData): boolean {
         if (!this.isInitialized) {
             console.warn('InstancedShelfRenderer not initialized')
             return false
         }
         
-        if (index >= this.config.maxShelfUnits!) {
-            console.warn(`Shelf unit index ${index} exceeds max ${this.config.maxShelfUnits}`)
+        if (index >= this.maxShelfUnits) {
+            console.warn(`Shelf unit index ${index} exceeds max ${this.maxShelfUnits}`)
             return false
         }
         
@@ -291,7 +234,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                 this.interiorSurfaceManager.addToMainScene()
             }
             
-            const shelfUnit = this.createShelfUnit(index, data.position, shelfConfig)
+            const shelfUnit = this.createShelfUnit(data.position, shelfConfig)
             this.shelfUnits.set(index, shelfUnit)
             
             console.debug(`🏪 Set shelf unit ${index} at position (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
@@ -303,11 +246,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
     }
     
-    /**
-     * Create all instances for a complete shelf unit
-     */
     private createShelfUnit(
-        unitIndex: number,
         position: THREE.Vector3,
         config: Required<ShelfConfig>
     ): ShelfUnitInstance {
@@ -318,89 +257,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             interiorSurfaces: [] as number[]
         }
         
-        const angleRad = (config.angle * Math.PI) / 180
-        
-        // Create angled boards (front and back)
-        const frontBoardIndex = this.nextInstanceIndex.angledBoard++
-        const backBoardIndex = this.nextInstanceIndex.angledBoard++
-        
-        // Reduce gap between front and back boards for better visual appeal  
-        const boardSeparation = config.depth * 0.8 // Move angled faces closer together
-        
-        // Front angled board
-        const frontPos = position.clone().add(new THREE.Vector3(0, config.height / 2, boardSeparation / 2))
-        const frontRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(-angleRad, 0, 0))
-        this.angledBoardManager.setInstanceMatrix(frontBoardIndex, frontPos, frontRotation)
-        this.angledBoardManager.setInstanceAttribute('rotationAngle', frontBoardIndex, -config.angle)
-        instanceIndices.angledBoards.push(frontBoardIndex)
-        
-        // Back angled board
-        const backPos = position.clone().add(new THREE.Vector3(0, config.height / 2, -boardSeparation / 2))
-        const backRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(angleRad, 0, 0))
-        this.angledBoardManager.setInstanceMatrix(backBoardIndex, backPos, backRotation)
-        this.angledBoardManager.setInstanceAttribute('rotationAngle', backBoardIndex, config.angle)
-        instanceIndices.angledBoards.push(backBoardIndex)
-        
-        // Create side boards (left and right)
-        const leftBoardIndex = this.nextInstanceIndex.sideBoard++
-        const rightBoardIndex = this.nextInstanceIndex.sideBoard++
-        
-        // Left side board
-        const leftPos = position.clone().add(new THREE.Vector3(
-            -config.width / 2 - config.boardThickness * 0.5,
-            config.height / 2,
-            0
-        ))
-        this.sideBoardManager.setInstanceMatrix(leftBoardIndex, leftPos)
-        instanceIndices.sideBoards.push(leftBoardIndex)
-        
-        // Right side board
-        const rightPos = position.clone().add(new THREE.Vector3(
-            config.width / 2 + config.boardThickness * 0.5,
-            config.height / 2,
-            0
-        ))
-        this.sideBoardManager.setInstanceMatrix(rightBoardIndex, rightPos)
-        instanceIndices.sideBoards.push(rightBoardIndex)
-        
-        // Create horizontal shelves
-        const shelfSpacing = config.height / (config.shelfCount + 1)
-        
-        for (let i = 1; i <= config.shelfCount; i++) {
-            const shelfY = i * shelfSpacing
-            
-            // Calculate shelf dimensions based on angled sides
-            const widthAtHeight = config.width - 2 * (config.height - shelfY) * Math.tan(angleRad)
-            
-            // Fix shelf extension logic: top shelves (higher i) should extend more
-            // i=1 (bottom): no extension
-            // i=2 (middle): 1x extension  
-            // i=3 (top): 2x extension
-            const depthExtension = (i - 1) * config.shelfExtensionPerLevel
-            const shelfDepth = config.depth - config.boardThickness * 2 + depthExtension
-            
-            // Calculate scaling factors
-            const widthScale = widthAtHeight / config.width
-            const depthScale = shelfDepth / config.depth
-            
-            // Create shelf board
-            const shelfBoardIndex = this.nextInstanceIndex.shelfBoard++
-            const shelfPos = position.clone().add(new THREE.Vector3(0, shelfY, 0))
-            const shelfScale = new THREE.Vector3(widthScale, 1, depthScale)
-            
-            this.shelfBoardManager.setInstanceMatrix(shelfBoardIndex, shelfPos, undefined, shelfScale)
-            this.shelfBoardManager.setInstanceAttribute('shelfScale', shelfBoardIndex, [widthScale, depthScale])
-            instanceIndices.shelfBoards.push(shelfBoardIndex)
-            
-            // Create interior surface
-            const interiorSurfaceIndex = this.nextInstanceIndex.interior++
-            const interiorPos = position.clone().add(new THREE.Vector3(0, shelfY + config.boardThickness * 0.55, 0))
-            const interiorScale = new THREE.Vector3(widthScale, 1, depthScale)
-            
-            this.interiorSurfaceManager.setInstanceMatrix(interiorSurfaceIndex, interiorPos, undefined, interiorScale)
-            this.interiorSurfaceManager.setInstanceAttribute('surfaceScale', interiorSurfaceIndex, [widthScale, depthScale])
-            instanceIndices.interiorSurfaces.push(interiorSurfaceIndex)
-        }
+        this.createAngledBoards(position, config, instanceIndices.angledBoards)
+        this.createSideBoards(position, config, instanceIndices.sideBoards)
+        this.createHorizontalShelves(position, config, instanceIndices)
         
         return {
             position: position.clone(),
@@ -409,9 +268,99 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
     }
     
-    /**
-     * Apply all pending updates to GPU across all managers
-     */
+    private createAngledBoards(position: THREE.Vector3, config: Required<ShelfConfig>, indices: number[]): void {
+        const angleRad = (config.angle * Math.PI) / 180
+        const boardSeparation = config.depth * 0.8
+        
+        const frontBoardIndex = this.nextInstanceIndex.angledBoard++
+        const frontPos = position.clone().add(new THREE.Vector3(0, config.height / 2, boardSeparation / 2))
+        const frontRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(-angleRad, 0, 0))
+        this.angledBoardManager.setInstanceMatrix(frontBoardIndex, frontPos, frontRotation)
+        this.angledBoardManager.setInstanceAttribute('rotationAngle', frontBoardIndex, -config.angle)
+        indices.push(frontBoardIndex)
+        
+        const backBoardIndex = this.nextInstanceIndex.angledBoard++
+        const backPos = position.clone().add(new THREE.Vector3(0, config.height / 2, -boardSeparation / 2))
+        const backRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(angleRad, 0, 0))
+        this.angledBoardManager.setInstanceMatrix(backBoardIndex, backPos, backRotation)
+        this.angledBoardManager.setInstanceAttribute('rotationAngle', backBoardIndex, config.angle)
+        indices.push(backBoardIndex)
+    }
+    
+    private createSideBoards(position: THREE.Vector3, config: Required<ShelfConfig>, indices: number[]): void {
+        const leftBoardIndex = this.nextInstanceIndex.sideBoard++
+        const leftPos = position.clone().add(new THREE.Vector3(
+            -config.width / 2 - config.boardThickness * 0.5,
+            config.height / 2,
+            0
+        ))
+        this.sideBoardManager.setInstanceMatrix(leftBoardIndex, leftPos)
+        indices.push(leftBoardIndex)
+        
+        const rightBoardIndex = this.nextInstanceIndex.sideBoard++
+        const rightPos = position.clone().add(new THREE.Vector3(
+            config.width / 2 + config.boardThickness * 0.5,
+            config.height / 2,
+            0
+        ))
+        this.sideBoardManager.setInstanceMatrix(rightBoardIndex, rightPos)
+        indices.push(rightBoardIndex)
+    }
+    
+    private createHorizontalShelves(
+        position: THREE.Vector3,
+        config: Required<ShelfConfig>,
+        instanceIndices: ShelfUnitInstance['instanceIndices']
+    ): void {
+        const angleRad = (config.angle * Math.PI) / 180
+        const shelfSpacing = config.height / (config.shelfCount + 1)
+        
+        for (let i = 1; i <= config.shelfCount; i++) {
+            const shelfY = i * shelfSpacing
+            const widthAtHeight = config.width - 2 * (config.height - shelfY) * Math.tan(angleRad)
+            const depthExtension = (i - 1) * config.shelfExtensionPerLevel
+            const shelfDepth = config.depth - config.boardThickness * 2 + depthExtension
+            const widthScale = widthAtHeight / config.width
+            const depthScale = shelfDepth / config.depth
+            
+            this.createShelfBoard(position, shelfY, widthScale, depthScale, instanceIndices.shelfBoards)
+            this.createInteriorSurface(position, shelfY, config.boardThickness, widthScale, depthScale, instanceIndices.interiorSurfaces)
+        }
+    }
+    
+    private createShelfBoard(
+        position: THREE.Vector3,
+        shelfY: number,
+        widthScale: number,
+        depthScale: number,
+        indices: number[]
+    ): void {
+        const shelfBoardIndex = this.nextInstanceIndex.shelfBoard++
+        const shelfPos = position.clone().add(new THREE.Vector3(0, shelfY, 0))
+        const shelfScale = new THREE.Vector3(widthScale, 1, depthScale)
+        
+        this.shelfBoardManager.setInstanceMatrix(shelfBoardIndex, shelfPos, undefined, shelfScale)
+        this.shelfBoardManager.setInstanceAttribute('shelfScale', shelfBoardIndex, [widthScale, depthScale])
+        indices.push(shelfBoardIndex)
+    }
+    
+    private createInteriorSurface(
+        position: THREE.Vector3,
+        shelfY: number,
+        boardThickness: number,
+        widthScale: number,
+        depthScale: number,
+        indices: number[]
+    ): void {
+        const interiorSurfaceIndex = this.nextInstanceIndex.interior++
+        const interiorPos = position.clone().add(new THREE.Vector3(0, shelfY + boardThickness * 0.55, 0))
+        const interiorScale = new THREE.Vector3(widthScale, 1, depthScale)
+        
+        this.interiorSurfaceManager.setInstanceMatrix(interiorSurfaceIndex, interiorPos, undefined, interiorScale)
+        this.interiorSurfaceManager.setInstanceAttribute('surfaceScale', interiorSurfaceIndex, [widthScale, depthScale])
+        indices.push(interiorSurfaceIndex)
+    }
+    
     public updateGPU(): void {
         if (!this.isInitialized) {
             return
@@ -425,9 +374,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         console.debug(`🔄 InstancedShelfRenderer GPU updated: ${this.shelfUnits.size} shelf units`)
     }
     
-    /**
-     * Reset all shelf instances
-     */
     public reset(): void {
         this.angledBoardManager.reset()
         this.sideBoardManager.reset()
@@ -445,9 +391,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         console.debug('🔄 InstancedShelfRenderer reset')
     }
     
-    /**
-     * Check if renderer is ready for use
-     */
     public isReady(): boolean {
         return this.isInitialized &&
                this.angledBoardManager.isReady() &&
@@ -456,9 +399,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                this.interiorSurfaceManager.isReady()
     }
     
-    /**
-     * Get comprehensive statistics
-     */
     public getStats(): InstancedRendererStats {
         const angledStats = this.angledBoardManager.getStats()
         const sideStats = this.sideBoardManager.getStats()
@@ -477,7 +417,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         return {
             isInitialized: this.isInitialized,
             activeInstances: this.shelfUnits.size,
-            maxInstances: this.config.maxShelfUnits!,
+            maxInstances: this.maxShelfUnits,
             shelfUnits: this.shelfUnits.size,
             geometryStats: {
                 angledBoards: angledStats,
@@ -490,9 +430,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
     }
     
-    /**
-     * Dispose of all resources
-     */
     public dispose(): void {
         console.debug('🧹 Disposing InstancedShelfRenderer')
         

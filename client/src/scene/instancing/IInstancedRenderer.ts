@@ -17,8 +17,6 @@ export interface InstancedRendererConfig {
     maxInstances?: number
     /** Enable performance logging */
     enablePerformanceLogging?: boolean
-    /** Custom name for debugging */
-    debugName?: string
 }
 
 /**
