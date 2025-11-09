@@ -81,9 +81,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         // Initialize GPU instanced shelf renderer
         this.instancedShelfRenderer = new InstancedShelfRenderer({
-            maxShelfUnits: 50, // Allow up to 50 shelf units
-            enablePerformanceLogging: true,
-            debugName: 'StorePropsRenderer'
+            maxShelfUnits: 50 // Allow up to 50 shelf units
         })
         
         // Initialize the instanced renderer asynchronously
