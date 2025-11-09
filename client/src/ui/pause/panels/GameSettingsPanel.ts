@@ -36,7 +36,7 @@ export interface SteamSettings {
 
 export class GameSettingsPanel extends PauseMenuPanel {
     readonly id = 'game-settings'
-    readonly title = 'Game Settings'
+    readonly title = 'Game'
     readonly icon = '🎮'
 
     private appSettings: AppSettings

@@ -9,8 +9,8 @@ import '../../../styles/pause-menu/help-panel.css'
 
 export class HelpPanel extends PauseMenuPanel {
     readonly id = 'help'
-    readonly title = 'Help & Controls'
-    readonly icon = '❓'
+    readonly title = 'Controls'
+    readonly icon = '🎮'
 
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)

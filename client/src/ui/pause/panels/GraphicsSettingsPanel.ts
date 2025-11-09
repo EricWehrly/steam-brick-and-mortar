@@ -18,7 +18,7 @@ import { CeilingEventTypes, type CeilingToggleEvent } from '../../../types/Inter
 
 export class GraphicsSettingsPanel extends PauseMenuPanel {
     readonly id = 'graphics-settings'
-    readonly title = 'Graphics Settings'
+    readonly title = 'Graphics'
     readonly icon = '🎨'
 
     private appSettings: AppSettings

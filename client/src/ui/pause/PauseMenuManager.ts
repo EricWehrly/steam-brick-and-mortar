@@ -32,6 +32,7 @@ export interface PauseMenuState {
 }
 
 export interface PauseMenuConfig {
+    displayName?: string
     containerId?: string
     overlayClass?: string
     menuClass?: string
@@ -79,6 +80,7 @@ export class PauseMenuManager {
         debugStatsProvider?: DebugStatsProvider
     ) {
         this.config = {
+            displayName: 'Settings',
             containerId: 'pause-menu-overlay',
             overlayClass: 'pause-menu-overlay',
             menuClass: 'pause-menu',
@@ -267,6 +269,7 @@ export class PauseMenuManager {
             } else {
                 // Setup event handlers for existing structure
                 this.setupEventHandlers()
+                this.setupTabsScrolling()
             }
             return
         }
@@ -284,12 +287,15 @@ export class PauseMenuManager {
         // Create menu container
         this.menuContainer = document.createElement('div')
         this.menuContainer.className = this.config.menuClass
-        this.menuContainer.innerHTML = renderTemplate(pauseMenuStructureTemplate, {})
+        this.menuContainer.innerHTML = renderTemplate(pauseMenuStructureTemplate, {
+            displayName: this.config.displayName
+        })
 
         this.overlay.appendChild(this.menuContainer)
         document.body.appendChild(this.overlay)
 
         this.setupEventHandlers()
+        this.setupTabsScrolling()
     }
 
     private setupEventHandlers(): void {
@@ -307,6 +313,22 @@ export class PauseMenuManager {
                 this.close()
             }
         })
+    }
+
+    private setupTabsScrolling(): void {
+        const tabsContainer = document.getElementById('pause-menu-tabs')
+        if (!tabsContainer) return
+
+        // Mousewheel horizontal scrolling
+        tabsContainer.addEventListener('wheel', (e) => {
+            if (e.deltaY !== 0) {
+                e.preventDefault()
+                tabsContainer.scrollLeft += e.deltaY
+            }
+        }, { passive: false })
+
+        // Touch horizontal scrolling (already handled by native touch events on overflow-x)
+        // No additional code needed - CSS overflow-x: auto handles touch scrolling natively
     }
 
     private createPanelTab(panel: PauseMenuPanel): void {
