@@ -9,19 +9,50 @@
 
 import * as THREE from 'three'
 
-/**
- * Configuration interface for instanced renderers
- */
 export interface InstancedRendererConfig {
-    /** Maximum number of instances this renderer can handle */
     maxInstances?: number
-    /** Enable performance logging */
     enablePerformanceLogging?: boolean
 }
 
-/**
- * Statistics returned by instanced renderers
- */
+export const DEFAULT_INSTANCED_RENDERER_CONFIG: InstancedRendererConfig = {
+    maxInstances: 500
+}
+
+export interface ShelfConfig {
+    width?: number
+    height?: number
+    depth?: number
+    angle?: number
+    shelfCount?: number
+    boardThickness?: number
+    shelfExtensionPerLevel?: number
+}
+
+export const DEFAULT_SHELF_CONFIG: Required<ShelfConfig> = {
+    width: 2.0,
+    height: 2.0,
+    depth: 0.34,
+    angle: 3,
+    shelfCount: 3,
+    boardThickness: 0.05,
+    shelfExtensionPerLevel: 0.25
+}
+
+export interface InstancedShelfConfig extends InstancedRendererConfig {
+    defaultShelfConfig?: ShelfConfig
+    maxShelfUnits?: number
+}
+
+export const DEFAULT_INSTANCED_SHELF_CONFIG = {
+    ...DEFAULT_INSTANCED_RENDERER_CONFIG,
+    maxShelfUnits: 100,
+    defaultShelfConfig: DEFAULT_SHELF_CONFIG
+} as const
+
+export interface ShelfInstanceData extends InstanceData {
+    shelfConfig?: ShelfConfig
+}
+
 export interface InstancedRendererStats {
     /** Whether the renderer has been initialized */
     isInitialized: boolean
@@ -33,9 +64,6 @@ export interface InstancedRendererStats {
     [key: string]: any
 }
 
-/**
- * Instance data for setting individual instances
- */
 export interface InstanceData {
     /** World position for this instance */
     position: THREE.Vector3
@@ -47,9 +75,6 @@ export interface InstanceData {
     [key: string]: any
 }
 
-/**
- * Common interface for all instanced renderers
- */
 export interface IInstancedRenderer {
     /**
      * Initialize the renderer - creates geometry, materials, and instanced meshes
@@ -64,36 +89,17 @@ export interface IInstancedRenderer {
      */
     setInstance(index: number, data: InstanceData): Promise<boolean> | boolean
     
-    /**
-     * Apply all pending instance updates to GPU
-     * Call after setting multiple instances for efficiency
-     */
     updateGPU(): void
     
-    /**
-     * Reset all instances (clears positions and count)
-     */
     reset(): void
     
-    /**
-     * Check if renderer is ready for use
-     */
     isReady(): boolean
     
-    /**
-     * Get current statistics and status
-     */
     getStats(): InstancedRendererStats
     
-    /**
-     * Dispose of all resources and cleanup
-     */
     dispose(): void
 }
 
-/**
- * Base configuration for instanced mesh components
- */
 export interface InstancedMeshConfig {
     /** Geometry for the instanced mesh */
     geometry: THREE.BufferGeometry
@@ -105,9 +111,6 @@ export interface InstancedMeshConfig {
     name?: string
 }
 
-/**
- * Instance attribute configuration
- */
 export interface InstanceAttribute {
     /** Attribute name */
     name: string
