@@ -15,6 +15,7 @@ import '../../../styles/pause-menu/graphics-settings-panel.css'
 import { AppSettings, LIGHTING_QUALITY, type ApplicationSettings } from '../../../core/AppSettings'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import { CeilingEventTypes, type CeilingToggleEvent } from '../../../types/InteractionEvents'
+import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 
 export class GraphicsSettingsPanel extends PauseMenuPanel {
     readonly id = 'graphics-settings'
@@ -63,83 +64,60 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     }
 
     private attachSelectEvents(): void {
-        const lightingQualitySelect = document.getElementById('lighting-quality') as HTMLSelectElement
-        if (lightingQualitySelect) {
-            lightingQualitySelect.addEventListener('change', () => {
-                const quality = lightingQualitySelect.value as ApplicationSettings['lightingQuality']
-                this.updateSetting('lightingQuality', quality)
-            })
-        }
+        UIComponentUtils.setupSelect<ApplicationSettings['lightingQuality']>(document.body, {
+            selectId: 'lighting-quality',
+            onChange: (quality) => this.updateSetting('lightingQuality', quality)
+        })
     }
 
     private attachCheckboxEvents(): void {
-        // Shadow quality is now handled by slider in attachSliderEvents()
-
-        const lightingCheckbox = document.getElementById('enable-lighting') as HTMLInputElement
-        if (lightingCheckbox) {
-            lightingCheckbox.addEventListener('change', () => {
-                this.updateSetting('enableLighting', lightingCheckbox.checked)
-            })
-        }
-
-        const debugCheckbox = document.getElementById('show-lighting-debug') as HTMLInputElement
-        if (debugCheckbox) {
-            debugCheckbox.addEventListener('change', () => {
-                this.updateSetting('showLightingDebug', debugCheckbox.checked)
-            })
-        }
-
-        const ceilingCheckbox = document.getElementById('show-ceiling') as HTMLInputElement
-        if (ceilingCheckbox) {
-            ceilingCheckbox.addEventListener('change', () => {
-                this.updateSetting('showCeiling', ceilingCheckbox.checked)
-                
-                // Emit ceiling toggle event
-                const ceilingEvent: CeilingToggleEvent = {
-                    visible: ceilingCheckbox.checked,
-                    timestamp: Date.now(),
-                    source: EventSource.UI
+        UIComponentUtils.setupToggles(document.body, [
+            {
+                toggleId: 'enable-lighting',
+                onChange: (checked) => this.updateSetting('enableLighting', checked)
+            },
+            {
+                toggleId: 'show-lighting-debug',
+                onChange: (checked) => this.updateSetting('showLightingDebug', checked)
+            },
+            {
+                toggleId: 'show-ceiling',
+                onChange: (checked) => {
+                    this.updateSetting('showCeiling', checked)
+                    
+                    const ceilingEvent: CeilingToggleEvent = {
+                        visible: checked,
+                        timestamp: Date.now(),
+                        source: EventSource.UI
+                    }
+                    EventManager.getInstance().emit(CeilingEventTypes.Toggle, ceilingEvent)
                 }
-                EventManager.getInstance().emit(CeilingEventTypes.Toggle, ceilingEvent)
-            })
-        }
+            }
+        ])
     }
 
     private attachSliderEvents(): void {
-        // Shadow quality slider
-        const shadowQualitySlider = document.getElementById('shadow-quality') as HTMLInputElement
-        const shadowQualityValue = document.getElementById('shadow-quality-value') as HTMLElement
-        if (shadowQualitySlider && shadowQualityValue) {
-            shadowQualitySlider.addEventListener('input', () => {
-                const quality = parseInt(shadowQualitySlider.value)
-                shadowQualityValue.textContent = this.getShadowQualityLabel(quality)
-                this.updateSetting('shadowQuality', quality)
-            })
-        }
-
-        // Ceiling height slider
-        const ceilingHeightSlider = document.getElementById('ceiling-height') as HTMLInputElement
-        const ceilingHeightValue = document.getElementById('ceiling-height-value') as HTMLSpanElement
-
-        if (ceilingHeightSlider && ceilingHeightValue) {
-            // Update display value as user drags
-            ceilingHeightSlider.addEventListener('input', () => {
-                ceilingHeightValue.textContent = `${ceilingHeightSlider.value}m`
-            })
-
-            // Apply setting when user finishes dragging
-            ceilingHeightSlider.addEventListener('change', () => {
-                const height = parseFloat(ceilingHeightSlider.value)
-                this.updateSetting('ceilingHeight', height)
-            })
-        }
+        UIComponentUtils.setupSliders(document.body, [
+            {
+                sliderId: 'shadow-quality',
+                valueDisplayId: 'shadow-quality-value',
+                formatDisplay: (v) => this.getShadowQualityLabel(v),
+                onInput: (value) => this.updateSetting('shadowQuality', value)
+            },
+            {
+                sliderId: 'ceiling-height',
+                valueDisplayId: 'ceiling-height-value',
+                formatDisplay: (v) => `${v}m`,
+                onChange: (value) => this.updateSetting('ceilingHeight', value)
+            }
+        ])
     }
 
     private attachButtonEvents(): void {
-        const resetButton = document.getElementById('reset-graphics-settings')
-        if (resetButton) {
-            resetButton.addEventListener('click', () => this.resetToDefaults())
-        }
+        UIComponentUtils.setupButton(document.body, {
+            buttonId: 'reset-graphics-settings',
+            onClick: this.resetToDefaults.bind(this)
+        })
     }
 
     private getShadowQualityLabel(quality: number): string {

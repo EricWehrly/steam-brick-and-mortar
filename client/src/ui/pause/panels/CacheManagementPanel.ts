@@ -13,6 +13,7 @@ import { steamApi } from '../../../steam/SteamApiClient'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import { SteamEventTypes } from '../../../types/InteractionEvents'
 import '../../../styles/pause-menu/cache-management-panel.css'
+import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 
 export interface CacheStats {
     imageCount: number
@@ -134,82 +135,51 @@ export class CacheManagementPanel extends PauseMenuPanel {
     }
 
     attachEvents(): void {
-        // Cache action buttons
         const panel = this.getPanelElement()
         if (!panel) return
 
-        const refreshBtn = panel.querySelector('#refresh-cache-btn')
-        const clearBtn = panel.querySelector('#clear-cache-btn')
-        const downloadBtn = panel.querySelector('#download-missing-btn')
-        
-        // Cached users controls
-        const cachedUsersSelect = panel.querySelector('#cached-users-select') as HTMLSelectElement
-        const loadCachedUserBtn = panel.querySelector('#load-cached-user-btn')
+        UIComponentUtils.setupButtons(panel, [
+            { buttonId: 'refresh-cache-btn', onClick: this.refreshCache.bind(this) },
+            { buttonId: 'clear-cache-btn', onClick: this.clearCache.bind(this) },
+            { buttonId: 'download-missing-btn', onClick: this.downloadMissing.bind(this) },
+            { buttonId: 'load-cached-user-btn', onClick: this.loadSelectedCachedUser.bind(this) },
+            { buttonId: 'initialize-previewer-btn', onClick: this.initializePreviewer.bind(this) },
+            { buttonId: 'prev-image-btn', onClick: this.previousImage.bind(this) },
+            { buttonId: 'next-image-btn', onClick: this.nextImage.bind(this) }
+        ])
 
-        if (refreshBtn) this.addEventListener(refreshBtn as HTMLElement, 'click', () => this.refreshCache())
-        if (clearBtn) this.addEventListener(clearBtn as HTMLElement, 'click', () => this.clearCache())
-        if (downloadBtn) this.addEventListener(downloadBtn as HTMLElement, 'click', () => this.downloadMissing())
-        
-        if (cachedUsersSelect) {
-            this.addEventListener(cachedUsersSelect, 'change', () => this.onCachedUserSelectionChange())
-        }
-        
-        if (loadCachedUserBtn) {
-            this.addEventListener(loadCachedUserBtn as HTMLElement, 'click', () => this.loadSelectedCachedUser())
-        }
+        UIComponentUtils.setupSelect(panel, {
+            selectId: 'cached-users-select',
+            onChange: () => this.onCachedUserSelectionChange()
+        })
 
-        // Settings
-        const autoDownloadToggle = panel.querySelector('#auto-download-toggle') as HTMLInputElement
-        const cacheLimitInput = panel.querySelector('#cache-limit-input') as HTMLInputElement
-        const preloadToggle = panel.querySelector('#preload-toggle') as HTMLInputElement
+        UIComponentUtils.setupToggles(panel, [
+            {
+                toggleId: 'auto-download-toggle',
+                onChange: (checked) => this.setSetting('autoDownload', checked)
+            },
+            {
+                toggleId: 'preload-toggle',
+                onChange: (checked) => this.setSetting('preload', checked)
+            }
+        ])
 
-        if (autoDownloadToggle) {
-            this.addEventListener(autoDownloadToggle, 'change', (e) => {
-                const target = e.target as HTMLInputElement
-                this.setSetting('autoDownload', target.checked)
-            })
-        }
+        UIComponentUtils.setupInput<number>(panel, {
+            inputId: 'cache-limit-input',
+            parseValue: (v) => parseInt(v, 10),
+            onChange: (value) => this.setSetting('cacheLimit', value)
+        })
 
-        if (cacheLimitInput) {
-            this.addEventListener(cacheLimitInput, 'change', (e) => {
-                const target = e.target as HTMLInputElement
-                this.setSetting('cacheLimit', parseInt(target.value))
-            })
-        }
-
-        if (preloadToggle) {
-            this.addEventListener(preloadToggle, 'change', (e) => {
-                const target = e.target as HTMLInputElement
-                this.setSetting('preload', target.checked)
-            })
-        }
-
-        // Image previewer event listeners
-        const initPreviewBtn = panel.querySelector('#initialize-previewer-btn')
-        const prevBtn = panel.querySelector('#prev-image-btn')
-        const nextBtn = panel.querySelector('#next-image-btn')
-        const indexInput = panel.querySelector('#image-index-input') as HTMLInputElement
-
-        if (initPreviewBtn) {
-            this.addEventListener(initPreviewBtn as HTMLElement, 'click', () => this.initializePreviewer())
-        }
-        if (prevBtn) {
-            this.addEventListener(prevBtn as HTMLElement, 'click', () => this.previousImage())
-        }
-        if (nextBtn) {
-            this.addEventListener(nextBtn as HTMLElement, 'click', () => this.nextImage())
-        }
-        if (indexInput) {
-            this.addEventListener(indexInput, 'change', (e) => {
-                const target = e.target as HTMLInputElement
-                const index = parseInt(target.value, 10)
+        UIComponentUtils.setupInput<number>(panel, {
+            inputId: 'image-index-input',
+            parseValue: (v) => parseInt(v, 10),
+            onChange: (index) => {
                 if (!isNaN(index)) {
                     this.goToImage(index)
                 }
-            })
-        }
+            }
+        })
 
-        // Keyboard navigation for image previewer
         document.addEventListener('keydown', (e) => {
             if (!this.previewerInitialized) return
             

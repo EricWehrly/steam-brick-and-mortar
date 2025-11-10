@@ -14,6 +14,7 @@ import cameraSettingsPanelTemplate from '../../../templates/pause-menu/camera-se
 import '../../../styles/pause-menu/camera-settings-panel.css'
 import { AppSettings } from '../../../core/AppSettings'
 import { DataManager } from '../../../core/data'
+import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 import type * as THREE from 'three'
 
 export interface CameraPreset {
@@ -147,98 +148,80 @@ export class CameraSettingsPanel extends PauseMenuPanel {
     }
 
     private attachCameraNavigationEvents(): void {
-        const prevButton = this.container?.querySelector('#camera-prev-btn') as HTMLButtonElement
-        const nextButton = this.container?.querySelector('#camera-next-btn') as HTMLButtonElement
-        
-        if (prevButton) {
-            prevButton.addEventListener('click', () => {
-                if (this.currentCameraIndex > 0) {
-                    this.currentCameraIndex--
-                    this.updateCameraDisplay()
+        UIComponentUtils.setupButtons(this.container, [
+            {
+                buttonId: 'camera-prev-btn',
+                onClick: () => {
+                    if (this.currentCameraIndex > 0) {
+                        this.currentCameraIndex--
+                        this.updateCameraDisplay()
+                    }
                 }
-            })
-        }
-        
-        if (nextButton) {
-            nextButton.addEventListener('click', () => {
-                if (this.currentCameraIndex < this.cameras.length - 1) {
-                    this.currentCameraIndex++
-                    this.updateCameraDisplay()
+            },
+            {
+                buttonId: 'camera-next-btn',
+                onClick: () => {
+                    if (this.currentCameraIndex < this.cameras.length - 1) {
+                        this.currentCameraIndex++
+                        this.updateCameraDisplay()
+                    }
                 }
-            })
-        }
+            }
+        ])
     }
 
     private attachPresetEvents(): void {
-        const presetButtons = this.container?.querySelectorAll('[data-camera-preset]')
-        
-        presetButtons?.forEach(button => {
-            button.addEventListener('click', (e) => {
-                const presetKey = (e.target as HTMLElement).dataset.cameraPreset
-                if (presetKey && CAMERA_PRESETS[presetKey]) {
+        UIComponentUtils.setupDataButtons(
+            this.container,
+            '[data-camera-preset]',
+            'cameraPreset',
+            (presetKey: string) => {
+                if (CAMERA_PRESETS[presetKey]) {
                     this.applyPreset(CAMERA_PRESETS[presetKey])
                 }
-            })
-        })
+            }
+        )
     }
 
     private attachSliderEvents(): void {
-        // FOV slider
-        const fovSlider = this.container?.querySelector('#camera-fov') as HTMLInputElement
-        const fovValue = this.container?.querySelector('#camera-fov-value') as HTMLSpanElement
-        
-        if (fovSlider && fovValue) {
-            fovSlider.addEventListener('input', (e) => {
-                const value = (e.target as HTMLInputElement).value
-                fovValue.textContent = value + '°'
-            })
-            
-            fovSlider.addEventListener('change', (e) => {
-                const camera = this.getCurrentCamera()
-                if (camera) {
-                    camera.fov = parseFloat((e.target as HTMLInputElement).value)
-                    camera.updateProjectionMatrix()
+        UIComponentUtils.setupSliders(this.container, [
+            {
+                sliderId: 'camera-fov',
+                valueDisplayId: 'camera-fov-value',
+                formatDisplay: (v) => v.toFixed(0) + '°',
+                onChange: (value) => {
+                    const camera = this.getCurrentCamera()
+                    if (camera) {
+                        camera.fov = value
+                        camera.updateProjectionMatrix()
+                    }
                 }
-            })
-        }
-        
-        // Near clipping plane slider
-        const nearSlider = this.container?.querySelector('#camera-near') as HTMLInputElement
-        const nearValue = this.container?.querySelector('#camera-near-value') as HTMLSpanElement
-        
-        if (nearSlider && nearValue) {
-            nearSlider.addEventListener('input', (e) => {
-                const value = parseFloat((e.target as HTMLInputElement).value).toFixed(2)
-                nearValue.textContent = value
-            })
-            
-            nearSlider.addEventListener('change', (e) => {
-                const camera = this.getCurrentCamera()
-                if (camera) {
-                    camera.near = parseFloat((e.target as HTMLInputElement).value)
-                    camera.updateProjectionMatrix()
+            },
+            {
+                sliderId: 'camera-near',
+                valueDisplayId: 'camera-near-value',
+                formatDisplay: (v) => v.toFixed(2),
+                onChange: (value) => {
+                    const camera = this.getCurrentCamera()
+                    if (camera) {
+                        camera.near = value
+                        camera.updateProjectionMatrix()
+                    }
                 }
-            })
-        }
-        
-        // Far clipping plane slider
-        const farSlider = this.container?.querySelector('#camera-far') as HTMLInputElement
-        const farValue = this.container?.querySelector('#camera-far-value') as HTMLSpanElement
-        
-        if (farSlider && farValue) {
-            farSlider.addEventListener('input', (e) => {
-                const value = (e.target as HTMLInputElement).value
-                farValue.textContent = value
-            })
-            
-            farSlider.addEventListener('change', (e) => {
-                const camera = this.getCurrentCamera()
-                if (camera) {
-                    camera.far = parseFloat((e.target as HTMLInputElement).value)
-                    camera.updateProjectionMatrix()
+            },
+            {
+                sliderId: 'camera-far',
+                valueDisplayId: 'camera-far-value',
+                formatDisplay: (v) => v.toFixed(0),
+                onChange: (value) => {
+                    const camera = this.getCurrentCamera()
+                    if (camera) {
+                        camera.far = value
+                        camera.updateProjectionMatrix()
+                    }
                 }
-            })
-        }
+            }
+        ])
     }
 
     private applyPreset(preset: CameraPreset): void {
@@ -263,26 +246,29 @@ export class CameraSettingsPanel extends PauseMenuPanel {
             indexDisplay.textContent = `${this.currentCameraIndex + 1}`
         }
         
-        // Update slider values
-        const fovSlider = this.container?.querySelector('#camera-fov') as HTMLInputElement
-        const fovValue = this.container?.querySelector('#camera-fov-value') as HTMLSpanElement
-        if (fovSlider && fovValue) {
-            fovSlider.value = camera.fov.toString()
-            fovValue.textContent = camera.fov.toFixed(0) + '°'
-        }
+        // Update all slider values
+        UIComponentUtils.updateSliderValue(
+            this.container,
+            'camera-fov',
+            'camera-fov-value',
+            camera.fov,
+            (v) => v.toFixed(0) + '°'
+        )
         
-        const nearSlider = this.container?.querySelector('#camera-near') as HTMLInputElement
-        const nearValue = this.container?.querySelector('#camera-near-value') as HTMLSpanElement
-        if (nearSlider && nearValue) {
-            nearSlider.value = camera.near.toString()
-            nearValue.textContent = camera.near.toFixed(2)
-        }
+        UIComponentUtils.updateSliderValue(
+            this.container,
+            'camera-near',
+            'camera-near-value',
+            camera.near,
+            (v) => v.toFixed(2)
+        )
         
-        const farSlider = this.container?.querySelector('#camera-far') as HTMLInputElement
-        const farValue = this.container?.querySelector('#camera-far-value') as HTMLSpanElement
-        if (farSlider && farValue) {
-            farSlider.value = camera.far.toString()
-            farValue.textContent = camera.far.toFixed(0)
-        }
+        UIComponentUtils.updateSliderValue(
+            this.container,
+            'camera-far',
+            'camera-far-value',
+            camera.far,
+            (v) => v.toFixed(0)
+        )
     }
 }

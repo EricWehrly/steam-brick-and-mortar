@@ -13,7 +13,8 @@ import { renderTemplate } from '../../../utils/TemplateEngine'
 import gameSettingsPanelTemplate from '../../../templates/pause-menu/game-settings-panel.html?raw'
 import '../../../styles/pause-menu/game-settings-panel.css'
 import { AppSettings } from '../../../core/AppSettings'
-import { EventManager, EventSource } from '../../../core/EventManager'
+import { EventSource } from '../../../core/EventManager'
+import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 
 export interface SteamSettings {
     // Steam Profile Settings (autoLoadProfile moved to AppSettings)
@@ -40,7 +41,6 @@ export class GameSettingsPanel extends PauseMenuPanel {
     readonly icon = '🎮'
 
     private appSettings: AppSettings
-    private eventManager: EventManager
     private settings: SteamSettings = {
         saveProfileHistory: true,
         defaultSortOrder: 'playtime',
@@ -55,10 +55,9 @@ export class GameSettingsPanel extends PauseMenuPanel {
 
     private onSettingsChanged?: (settings: Partial<SteamSettings>) => void
 
-    constructor(config: PauseMenuPanelConfig = {}, appSettings: AppSettings, eventManager: EventManager) {
+    constructor(config: PauseMenuPanelConfig = {}, appSettings: AppSettings) {
         super(config)
         this.appSettings = appSettings
-        this.eventManager = eventManager
         this.loadSettings()
     }
 
@@ -104,87 +103,85 @@ export class GameSettingsPanel extends PauseMenuPanel {
     }
 
     private attachCheckboxEvents(): void {
-        // Auto-load profile is managed by AppSettings
-        const autoLoadToggle = document.getElementById('auto-load-profile') as HTMLInputElement
-        if (autoLoadToggle) {
-            autoLoadToggle.addEventListener('change', (e) => {
-                const checked = (e.target as HTMLInputElement).checked
-                this.appSettings.setSetting('autoLoadProfile', checked, EventSource.UI)
-                console.log(`🎮 App setting updated: autoLoadProfile = ${checked}`)
-            })
-        }
-        
-        // Development mode is managed by AppSettings
-        const devModeToggle = document.getElementById('dev-mode-toggle') as HTMLInputElement
-        if (devModeToggle) {
-            devModeToggle.addEventListener('change', (e) => {
-                const checked = (e.target as HTMLInputElement).checked
-                this.appSettings.setSetting('developmentMode', checked, EventSource.UI)
-                console.log(`🎮 App setting updated: developmentMode = ${checked}`)
-            })
-        }
-        
-        // Other checkboxes use local settings
-        const localCheckboxes = [
-            { id: 'save-profile-history', setting: 'saveProfileHistory' as keyof SteamSettings },
-            { id: 'show-unplayed', setting: 'showUnplayedGames' as keyof SteamSettings },
-            { id: 'show-hidden', setting: 'showHiddenGames' as keyof SteamSettings },
-            { id: 'load-artwork-auto', setting: 'loadArtworkAutomatically' as keyof SteamSettings },
-            { id: 'cache-game-data', setting: 'cacheGameData' as keyof SteamSettings }
-        ]
-
-        localCheckboxes.forEach(({ id, setting }) => {
-            const element = document.getElementById(id) as HTMLInputElement
-            if (element) {
-                element.addEventListener('change', () => {
-                    this.updateSetting(setting, element.checked)
-                })
+        UIComponentUtils.setupToggles(document.body, [
+            {
+                toggleId: 'auto-load-profile',
+                onChange: (checked) => {
+                    this.appSettings.setSetting('autoLoadProfile', checked, EventSource.UI)
+                    console.log(`🎮 App setting updated: autoLoadProfile = ${checked}`)
+                }
+            },
+            {
+                toggleId: 'dev-mode-toggle',
+                onChange: (checked) => {
+                    this.appSettings.setSetting('developmentMode', checked, EventSource.UI)
+                    console.log(`🎮 App setting updated: developmentMode = ${checked}`)
+                }
+            },
+            {
+                toggleId: 'save-profile-history',
+                onChange: (checked) => this.updateSetting('saveProfileHistory', checked)
+            },
+            {
+                toggleId: 'show-unplayed',
+                onChange: (checked) => this.updateSetting('showUnplayedGames', checked)
+            },
+            {
+                toggleId: 'show-hidden',
+                onChange: (checked) => this.updateSetting('showHiddenGames', checked)
+            },
+            {
+                toggleId: 'load-artwork-auto',
+                onChange: (checked) => this.updateSetting('loadArtworkAutomatically', checked)
+            },
+            {
+                toggleId: 'cache-game-data',
+                onChange: (checked) => this.updateSetting('cacheGameData', checked)
             }
-        })
+        ])
     }
 
     private attachSelectEvents(): void {
-        const defaultSortElement = document.getElementById('default-sort-order') as HTMLSelectElement
-        if (defaultSortElement) {
-            defaultSortElement.addEventListener('change', () => {
-                this.updateSetting('defaultSortOrder', defaultSortElement.value as SteamSettings['defaultSortOrder'])
-            })
-        }
-
-        const artworkQualityElement = document.getElementById('artwork-quality') as HTMLSelectElement
-        if (artworkQualityElement) {
-            artworkQualityElement.addEventListener('change', () => {
-                this.updateSetting('artworkQuality', artworkQualityElement.value as SteamSettings['artworkQuality'])
-            })
-        }
+        UIComponentUtils.setupSelects(document.body, [
+            {
+                selectId: 'default-sort-order',
+                onChange: (value: SteamSettings['defaultSortOrder']) => 
+                    this.updateSetting('defaultSortOrder', value)
+            },
+            {
+                selectId: 'artwork-quality',
+                onChange: (value: SteamSettings['artworkQuality']) => 
+                    this.updateSetting('artworkQuality', value)
+            }
+        ])
     }
 
     private attachInputEvents(): void {
-        const minimumPlaytimeElement = document.getElementById('minimum-playtime') as HTMLInputElement
-        if (minimumPlaytimeElement) {
-            minimumPlaytimeElement.addEventListener('change', () => {
-                this.updateSetting('minimumPlaytime', parseInt(minimumPlaytimeElement.value, 10))
-            })
-        }
-
-        const maxConcurrentElement = document.getElementById('max-concurrent-loads') as HTMLInputElement
-        if (maxConcurrentElement) {
-            maxConcurrentElement.addEventListener('change', () => {
-                this.updateSetting('maxConcurrentLoads', parseInt(maxConcurrentElement.value, 10))
-            })
-        }
+        UIComponentUtils.setupInputs(document.body, [
+            {
+                inputId: 'minimum-playtime',
+                parseValue: (v) => parseInt(v, 10),
+                onChange: (value) => this.updateSetting('minimumPlaytime', value)
+            },
+            {
+                inputId: 'max-concurrent-loads',
+                parseValue: (v) => parseInt(v, 10),
+                onChange: (value) => this.updateSetting('maxConcurrentLoads', value)
+            }
+        ])
     }
 
     private attachButtonEvents(): void {
-        const resetButton = document.getElementById('reset-game-settings')
-        if (resetButton) {
-            resetButton.addEventListener('click', () => this.resetToDefaults())
-        }
-
-        const exportButton = document.getElementById('export-game-settings')
-        if (exportButton) {
-            exportButton.addEventListener('click', () => this.exportSettings())
-        }
+        UIComponentUtils.setupButtons(document.body, [
+            {
+                buttonId: 'reset-game-settings',
+                onClick: this.resetToDefaults.bind(this)
+            },
+            {
+                buttonId: 'export-game-settings',
+                onClick: this.exportSettings.bind(this)
+            }
+        ])
     }
 
     private updateSetting<K extends keyof SteamSettings>(key: K, value: SteamSettings[K]): void {

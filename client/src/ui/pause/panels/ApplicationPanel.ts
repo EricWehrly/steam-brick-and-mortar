@@ -19,7 +19,9 @@ import { renderTemplate } from '../../../utils/TemplateEngine'
 import applicationPanelTemplate from '../../../templates/pause-menu/application-panel.html?raw'
 import { ToastManager } from '../../ToastManager'
 import { AppSettings, type ApplicationSettings } from '../../../core/AppSettings'
-import { EventManager, EventSource } from '../../../core/EventManager'
+import { EventSource } from '../../../core/EventManager'
+import { UIComponentUtils } from '../../../utils/UIComponentUtils'
+import type { EventManager } from '../../../core/EventManager'
 
 export class ApplicationPanel extends PauseMenuPanel {
     public readonly id = 'application'
@@ -27,13 +29,11 @@ export class ApplicationPanel extends PauseMenuPanel {
     public readonly icon = '⚙️'
     
     private appSettings: AppSettings
-    private eventManager: EventManager
     private onSettingsChanged?: (settings: Partial<ApplicationSettings>) => void
 
-    constructor(config: PauseMenuPanelConfig = {}, appSettings: AppSettings, eventManager: EventManager) {
+    constructor(config: PauseMenuPanelConfig = {}, appSettings: AppSettings, _eventManager: EventManager) {
         super(config)
         this.appSettings = appSettings
-        this.eventManager = eventManager
     }
 
     /**
@@ -65,66 +65,46 @@ export class ApplicationPanel extends PauseMenuPanel {
     }
 
     public attachEvents(): void {
-        // Application control buttons
-        const resumeBtn = this.container?.querySelector('#app-resume-btn')
-        const fullscreenBtn = this.container?.querySelector('#app-fullscreen-btn')
-        
-        resumeBtn?.addEventListener('click', () => this.resume())
-        fullscreenBtn?.addEventListener('click', () => this.toggleFullscreen())
+        UIComponentUtils.setupButtons(this.container, [
+            { buttonId: 'app-resume-btn', onClick: this.resume.bind(this) },
+            { buttonId: 'app-fullscreen-btn', onClick: this.toggleFullscreen.bind(this) },
+            { buttonId: 'export-logs-btn', onClick: this.exportLogs.bind(this) },
+            { buttonId: 'reset-settings-btn', onClick: this.resetSettings.bind(this) },
+            { buttonId: 'export-settings-btn', onClick: this.exportSettings.bind(this) },
+            { buttonId: 'import-settings-btn', onClick: this.importSettings.bind(this) }
+        ])
 
-        // Performance settings
-        const qualitySelect = this.container?.querySelector('#quality-select') as HTMLSelectElement
-        qualitySelect?.addEventListener('change', (e) => {
-            this.updateSetting('qualityLevel', (e.target as HTMLSelectElement).value as ApplicationSettings['qualityLevel'])
+        UIComponentUtils.setupSelect<ApplicationSettings['qualityLevel']>(this.container, {
+            selectId: 'quality-select',
+            onChange: (value) => this.updateSetting('qualityLevel', value)
         })
 
-        // Interface settings
-        const showFpsToggle = this.container?.querySelector('#show-fps-toggle') as HTMLInputElement
-        const showPerfToggle = this.container?.querySelector('#show-perf-toggle') as HTMLInputElement
-        const hideUiVrToggle = this.container?.querySelector('#hide-ui-vr-toggle') as HTMLInputElement
-
-        showFpsToggle?.addEventListener('change', (e) => {
-            this.updateSetting('showFPS', (e.target as HTMLInputElement).checked)
-        })
-
-        showPerfToggle?.addEventListener('change', (e) => {
-            this.updateSetting('showPerformanceStats', (e.target as HTMLInputElement).checked)
-        })
-
-        hideUiVrToggle?.addEventListener('change', (e) => {
-            this.updateSetting('hideUIInVR', (e.target as HTMLInputElement).checked)
-        })
-
-        // Debug settings
-        const verboseLoggingToggle = this.container?.querySelector('#verbose-logging-toggle') as HTMLInputElement
-        const showDebugToggle = this.container?.querySelector('#show-debug-toggle') as HTMLInputElement
-
-        verboseLoggingToggle?.addEventListener('change', (e) => {
-            this.updateSetting('verboseLogging', (e.target as HTMLInputElement).checked)
-        })
-
-        showDebugToggle?.addEventListener('change', (e) => {
-            this.updateSetting('showDebugInfo', (e.target as HTMLInputElement).checked)
-        })
-
-        // General settings
-        const autoSaveToggle = this.container?.querySelector('#auto-save-toggle') as HTMLInputElement
-        autoSaveToggle?.addEventListener('change', (e) => {
-            this.updateSetting('autoSave', (e.target as HTMLInputElement).checked)
-        })
-
-        // Debug action buttons
-        const exportLogsBtn = this.container?.querySelector('#export-logs-btn')
-        exportLogsBtn?.addEventListener('click', () => this.exportLogs())
-
-        // General action buttons
-        const resetSettingsBtn = this.container?.querySelector('#reset-settings-btn')
-        const exportSettingsBtn = this.container?.querySelector('#export-settings-btn')
-        const importSettingsBtn = this.container?.querySelector('#import-settings-btn')
-
-        resetSettingsBtn?.addEventListener('click', () => this.resetSettings())
-        exportSettingsBtn?.addEventListener('click', () => this.exportSettings())
-        importSettingsBtn?.addEventListener('click', () => this.importSettings())
+        UIComponentUtils.setupToggles(this.container, [
+            {
+                toggleId: 'show-fps-toggle',
+                onChange: (checked) => this.updateSetting('showFPS', checked)
+            },
+            {
+                toggleId: 'show-perf-toggle',
+                onChange: (checked) => this.updateSetting('showPerformanceStats', checked)
+            },
+            {
+                toggleId: 'hide-ui-vr-toggle',
+                onChange: (checked) => this.updateSetting('hideUIInVR', checked)
+            },
+            {
+                toggleId: 'verbose-logging-toggle',
+                onChange: (checked) => this.updateSetting('verboseLogging', checked)
+            },
+            {
+                toggleId: 'show-debug-toggle',
+                onChange: (checked) => this.updateSetting('showDebugInfo', checked)
+            },
+            {
+                toggleId: 'auto-save-toggle',
+                onChange: (checked) => this.updateSetting('autoSave', checked)
+            }
+        ])
     }
 
     public onShow(): void {
