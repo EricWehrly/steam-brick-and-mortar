@@ -24,7 +24,7 @@
 
 import * as THREE from 'three'
 import { StoreLayout } from './StoreLayout'
-import { GameBoxRenderer } from './GameBoxRenderer'
+import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 import { ShelfSide } from './props/SharedPropsUtils'
@@ -43,7 +43,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private dataManager: DataManager
 
     private storeLayout: StoreLayout
-    private gameBoxRenderer: GameBoxRenderer
+    private gameBoxRenderer: GpuGameBoxRenderer
     private signageRenderer: SignageRenderer
     private propsGroup: THREE.Group
     private config: PropsConfig = {}
@@ -61,8 +61,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.scene = scene
         this.dataManager = dataManager
 
-        // Create our own GameBoxRenderer instance (composition, not injection)
-        this.gameBoxRenderer = new GameBoxRenderer()
+        // Create our own GpuGameBoxRenderer instance with generous max instances
+        // Will be re-initialized with actual game count when games are loaded
+        this.gameBoxRenderer = new GpuGameBoxRenderer(2000)
 
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props-instanced'
@@ -99,6 +100,19 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private async generateShelvesAsync(): Promise<void> {
         const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
         const gameCount = games.length
+        
+        // Recreate GpuGameBoxRenderer with correct game count if needed
+        if (games.length > 0) {
+            // Dispose old renderer and create new one sized for actual game count
+            this.gameBoxRenderer.dispose()
+            this.gameBoxRenderer = new GpuGameBoxRenderer(gameCount + 100) // Add buffer
+            
+            try {
+                await this.gameBoxRenderer.initializeWithGames(games)
+            } catch (error) {
+                console.error('❌ Failed to initialize GpuGameBoxRenderer:', error)
+            }
+        }
         
         if (!this.instancedShelfRenderer) {
             console.error('❌ InstancedShelfRenderer not available - cannot generate instanced shelves')
@@ -209,9 +223,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         console.warn('⚠️ addAtmosphericProps not implemented - PropRenderer not instantiated')
     }
 
-    public updatePerformanceData(camera: THREE.Camera): void {
-        this.gameBoxRenderer.updatePerformanceData(camera, this.scene)
-        this.gameBoxRenderer.cleanupOffScreenTextures()
+    public updatePerformanceData(_camera: THREE.Camera): void {
+        // GPU renderer performance managed by instanced renderers
+        // Performance methods removed with GameBoxRenderer bifurcation
         
         // Update instanced renderer performance
         if (this.instancedShelfRenderer?.isReady()) {
