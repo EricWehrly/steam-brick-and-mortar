@@ -24,7 +24,7 @@
 
 import * as THREE from 'three'
 import { StoreLayout } from './StoreLayout'
-import { GameBoxRenderer } from './GameBoxRenderer'
+import { LegacyGameBoxRenderer } from './game-box/LegacyGameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator'
 import { ShelfSide } from './props/SharedPropsUtils'
@@ -45,7 +45,7 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
     private dataManager: DataManager
 
     private storeLayout: StoreLayout
-    private gameBoxRenderer: GameBoxRenderer
+    private gameBoxRenderer: LegacyGameBoxRenderer
     private signageRenderer: SignageRenderer
     private propsGroup: THREE.Group
     private config: PropsConfig = {}
@@ -58,8 +58,8 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
         this.scene = scene
         this.dataManager = dataManager
 
-        // Create our own GameBoxRenderer instance (composition, not injection)
-        this.gameBoxRenderer = new GameBoxRenderer()
+        // Create our own LegacyGameBoxRenderer instance (composition, not injection)
+        this.gameBoxRenderer = new LegacyGameBoxRenderer()
 
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props-legacy'
@@ -178,9 +178,9 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
         console.warn('⚠️ addAtmosphericProps not implemented - PropRenderer not instantiated')
     }
 
-    public updatePerformanceData(camera: THREE.Camera): void {
-        this.gameBoxRenderer.updatePerformanceData(camera, this.scene)
-        this.gameBoxRenderer.cleanupOffScreenTextures()
+    public updatePerformanceData(_camera: THREE.Camera): void {
+        // Legacy renderer doesn't have performance optimization features
+        // Performance methods removed with GameBoxRenderer bifurcation
     }
 
     /**
