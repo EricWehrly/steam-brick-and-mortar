@@ -6,6 +6,8 @@
  * - Wire rack displays
  * - Category dividers and shelf separators
  * - Navigation markers and floor patterns
+ * 
+ * Note: Planned to be merged into legacy/GPU system bifurcation (see tech-debt.md)
  */
 
 import * as THREE from 'three'
@@ -32,7 +34,7 @@ export interface WireRackOptions {
 export class PropRenderer {
   private scene: THREE.Scene
   private propsGroup: THREE.Group
-  private lightFactory: any
+  private lightFactory: LightFactory
 
   constructor(scene: THREE.Scene) {
   this.scene = scene
