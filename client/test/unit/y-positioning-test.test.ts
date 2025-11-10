@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import { GameBoxUtils } from '../../src/scene/props/SharedPropsUtils'
+import { GameBoxUtils, ShelfSide } from '../../src/scene/props/SharedPropsUtils'
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData'
 
 describe('Y-Axis Positioning Changes', () => {
@@ -42,9 +42,9 @@ describe('Y-Axis Positioning Changes', () => {
             width: 2.0
         }
         
-        const bottomPositions = GameBoxUtils.calculateGamePositions(shelfPosition, bottomSurface, mockGames, 'front')
-        const middlePositions = GameBoxUtils.calculateGamePositions(shelfPosition, middleSurface, mockGames, 'front')
-        const topPositions = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, 'front')
+        const bottomPositions = GameBoxUtils.calculateGamePositions(shelfPosition, bottomSurface, mockGames, ShelfSide.Front)
+        const middlePositions = GameBoxUtils.calculateGamePositions(shelfPosition, middleSurface, mockGames, ShelfSide.Front)
+        const topPositions = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, ShelfSide.Front)
         
         // Check that Y positions are different due to different offsets
         expect(bottomPositions[0].y).not.toBeCloseTo(middlePositions[0].y, 2)

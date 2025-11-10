@@ -11,7 +11,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { InstancedShelfRenderer, type ShelfConfig, type InstancedShelfConfig } from '../../../../src/scene/instancing/InstancedShelfRenderer'
+import { InstancedShelfRenderer } from '../../../../src/scene/instancing/InstancedShelfRenderer'
+import type { ShelfConfig, InstancedShelfConfig } from '../../../../src/scene/instancing/IInstancedRenderer'
 import { SharedMaterialManager } from '../../../../src/utils/SharedMaterialManager'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { EventManager } from '../../../../src/core/EventManager'
@@ -75,7 +76,6 @@ describe('InstancedShelfRenderer', () => {
             const customConfig: InstancedShelfConfig = {
                 maxShelfUnits: 500,
                 maxInstances: 1000,
-                debugName: 'TestShelfRenderer',
                 defaultShelfConfig: {
                     width: 3.0,
                     height: 2.5,
