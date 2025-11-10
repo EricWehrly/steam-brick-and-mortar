@@ -19,7 +19,7 @@ import { BlockbusterColors } from '../utils/Colors'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
 import { DataManager } from '../core/data/DataManager'
-import type { SceneCoordinator } from './SceneCoordinator'
+import { DataDomain } from '../core/data/DataTypes'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -41,14 +41,33 @@ export class SceneManager {
         this.scene = new THREE.Scene()
         
         DataManager.getInstance().set('core.mainScene', this.scene, {
-            domain: 'Scene' as any
+            domain: DataDomain.Scene
         })
         
-        const CAMERA_FOV = 90;  // was 75
+        // Camera Configuration
+        // FOV (Field of View): Vertical angle in degrees
+        //   - Narrow (45-60°): Telephoto effect, less distortion, focused view
+        //   - Normal (60-75°): Standard perspective, natural look
+        //   - Wide (75-90°): Wider view, more peripheral vision (better for VR)
+        //   - Ultra-wide (90-120°): Fisheye effect, maximum awareness but distortion
+        // Aspect Ratio: Width/height ratio (auto-calculated from window)
+        // Near Clipping Plane: Closest visible distance (smaller = can see closer objects)
+        //   - Too small (<0.01): Z-fighting and precision issues
+        //   - Too large (>1): Nearby objects disappear
+        // Far Clipping Plane: Furthest visible distance
+        //   - Too small: Objects pop out of view too soon
+        //   - Too large (>10000): Reduces depth buffer precision
+        const CAMERA_FOV = 90;  // was 75 - wider FOV for VR comfort
         const CAMERA_ASPECT = window.innerWidth / window.innerHeight;
         const CAMERA_NEAR_DIST = 0.1;
         const CAMERA_FAR_DIST = 1000;
         this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, CAMERA_ASPECT, CAMERA_NEAR_DIST, CAMERA_FAR_DIST)
+        
+        // Store camera in DataManager for access by other systems (e.g., camera settings panel)
+        DataManager.getInstance().set('core.mainCamera', this.camera, {
+            domain: DataDomain.Scene
+        })
+        
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: options.antialias ?? true 
         })
@@ -143,6 +162,10 @@ export class SceneManager {
     // Getters for accessing Three.js components
     public getScene(): THREE.Scene {
         return this.scene
+    }
+
+    public getCamera(): THREE.PerspectiveCamera {
+        return this.camera
     }
 
     public getRenderer(): THREE.WebGLRenderer {
