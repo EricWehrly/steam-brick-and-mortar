@@ -56,7 +56,7 @@ describe('Pause Menu Tab Switching', () => {
         applicationPanel.initialize({ onSettingsChanged: vi.fn() })
         pauseMenuManager.registerPanel(applicationPanel)
         
-        pauseMenuManager.registerPanel(new GameSettingsPanel({}, mockAppSettings, mockEventManager))
+        pauseMenuManager.registerPanel(new GameSettingsPanel({}, mockAppSettings))
         
         const mockDebugStatsProvider = {
             getDebugStats: vi.fn().mockResolvedValue({
