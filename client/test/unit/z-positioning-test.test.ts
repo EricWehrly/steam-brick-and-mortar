@@ -51,12 +51,12 @@ describe('Z-Axis Positioning Changes', () => {
         console.log('Middle shelf Z:', middlePositions[0].z);
         console.log('Top shelf Z:', topPositions[0].z);
 
-        // Bottom shelf should have largest Z offset (0.3) - closer to camera (less negative)
-        // Middle shelf should have medium Z offset (0.2) 
-        // Top shelf should have smallest Z offset (0.1) - further from camera (more negative)
+        // Bottom shelf protrudes most (most negative) - easier to reach at eye level
+        // Middle shelf protrudes moderately
+        // Top shelf protrudes least (least negative) - harder to reach
         // For front side, games should be positioned in front of shelf (negative Z)
-        expect(bottomPositions[0].z).toBeGreaterThan(middlePositions[0].z);
-        expect(middlePositions[0].z).toBeGreaterThan(topPositions[0].z);
+        expect(bottomPositions[0].z).toBeLessThan(middlePositions[0].z);
+        expect(middlePositions[0].z).toBeLessThan(topPositions[0].z);
         
         // All should be negative for front side (in front of shelf)
         expect(bottomPositions[0].z).toBeLessThan(0);
@@ -107,9 +107,9 @@ describe('Z-Axis Positioning Changes', () => {
         const frontTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, ShelfSide.Front);
         const backTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, ShelfSide.Back);
 
-        // Bottom shelf should have smaller magnitude than top shelf (closer to user) for both sides
-        expect(Math.abs(frontBottom[0].z)).toBeLessThan(Math.abs(frontTop[0].z));
-        expect(Math.abs(backBottom[0].z)).toBeLessThan(Math.abs(backTop[0].z));
+        // Bottom shelf protrudes more (larger magnitude) than top shelf for both sides
+        expect(Math.abs(frontBottom[0].z)).toBeGreaterThan(Math.abs(frontTop[0].z));
+        expect(Math.abs(backBottom[0].z)).toBeGreaterThan(Math.abs(backTop[0].z));
         
         // Front/back pairs should have equal magnitudes
         expect(Math.abs(frontBottom[0].z)).toBeCloseTo(Math.abs(backBottom[0].z), 3);
