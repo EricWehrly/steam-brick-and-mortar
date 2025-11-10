@@ -29,7 +29,7 @@ import { EventManager, EventSource } from '../../src/core/EventManager'
 import { RoomEventTypes } from '../../src/types/InteractionEvents'
 import { LegacyStorePropsRenderer } from '../../src/scene/LegacyStorePropsRenderer'
 import { GameBoxRenderer } from '../../src/scene/GameBoxRenderer'
-import { GameBoxUtils, GamePlacementConstants, ShelfSurfaceUtils, type ShelfSurface } from '../../src/scene/props/SharedPropsUtils'
+import { GameBoxUtils, GamePlacementConstants, ShelfSurfaceUtils, ShelfSide, type ShelfSurface } from '../../src/scene/props/SharedPropsUtils'
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData'
 
 describe('Game Box Positioning Integration', () => {
@@ -74,7 +74,7 @@ describe('Game Box Positioning Integration', () => {
             const shelfPosition = new THREE.Vector3(10, 3, 5)
             
             // Get standard shelf surfaces
-            const surfaces = ShelfSurfaceUtils.getSurfacesForShelfUnit()
+            const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             expect(surfaces.length).toBeGreaterThan(0)
             
             // Calculate game positions using the actual positioning logic
@@ -82,7 +82,7 @@ describe('Game Box Positioning Integration', () => {
                 shelfPosition, 
                 surfaces[0], // Use first surface
                 mockGames, 
-                'front'
+                ShelfSide.Front
             )
             
             expect(positions.length).toBe(mockGames.length)
@@ -102,11 +102,11 @@ describe('Game Box Positioning Integration', () => {
 
         it('should create game boxes at calculated positions', () => {
             const shelfPosition = new THREE.Vector3(0, 0, 0)
-            const surfaces = ShelfSurfaceUtils.getSurfacesForShelfUnit()
+            const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             
             // Calculate positions
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surfaces[0], mockGames, 'front'
+                shelfPosition, surfaces[0], mockGames, ShelfSide.Front
             )
             
             // Create game boxes using GameBoxRenderer
@@ -139,10 +139,10 @@ describe('Game Box Positioning Integration', () => {
 
         it('should maintain consistent spacing between games', () => {
             const shelfPosition = new THREE.Vector3(5, 2, -3)
-            const surfaces = ShelfSurfaceUtils.getSurfacesForShelfUnit()
+            const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surfaces[0], mockGames, 'front'
+                shelfPosition, surfaces[0], mockGames, ShelfSide.Front
             )
             
             // Check spacing between adjacent games
@@ -154,11 +154,11 @@ describe('Game Box Positioning Integration', () => {
 
         it('should position games flush against shelf face (no gap)', () => {
             const shelfPosition = new THREE.Vector3(0, 0, 0)
-            const surfaces = ShelfSurfaceUtils.getSurfacesForShelfUnit()
+            const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             const surface = surfaces[0]
             
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, [mockGames[0]], 'front'
+                shelfPosition, surface, [mockGames[0]], ShelfSide.Front
             )
             
             const gameBox = gameBoxRenderer.createGameBox(mockGames[0], positions[0])
@@ -180,14 +180,14 @@ describe('Game Box Positioning Integration', () => {
 
         it('should handle different surface sides correctly', () => {
             const shelfPosition = new THREE.Vector3(0, 0, 0)
-            const surfaces = ShelfSurfaceUtils.getSurfacesForShelfUnit()
+            const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             const surface = surfaces[0]
             
             const frontPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, [mockGames[0]], 'front'
+                shelfPosition, surface, [mockGames[0]], ShelfSide.Front
             )
             const backPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, [mockGames[0]], 'back'
+                shelfPosition, surface, [mockGames[0]], ShelfSide.Back
             )
             
             // Front and back should have different Z positions
@@ -246,15 +246,15 @@ describe('Game Box Positioning Integration', () => {
 
         it('should handle back-facing games correctly', async () => {
             const shelfPosition = new THREE.Vector3(0, 0, 0)
-            const surfaces = GameBoxUtils.getStandardShelfSurfaces()
+            const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             const surface = surfaces[0]
             
             // Calculate positions for front and back sides
             const frontPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, [mockGames[0]], 'front'
+                shelfPosition, surface, [mockGames[0]], ShelfSide.Front
             )
             const backPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, [mockGames[0]], 'back'
+                shelfPosition, surface, [mockGames[0]], ShelfSide.Back
             )
             
             // Create game boxes
@@ -281,10 +281,10 @@ describe('Game Box Positioning Integration', () => {
     describe('Text Orientation Validation', () => {
         it('should create game boxes with readable text labels', async () => {
             const shelfPosition = new THREE.Vector3(0, 0, 0)
-            const surfaces = GameBoxUtils.getStandardShelfSurfaces()
+            const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surfaces[0], mockGames, 'front'
+                shelfPosition, surfaces[0], mockGames, ShelfSide.Front
             )
             
             // Create game boxes
@@ -324,10 +324,10 @@ describe('Game Box Positioning Integration', () => {
         it('should handle shelves at non-zero positions correctly', async () => {
             // Test with shelf at unusual position to catch origin bugs
             const unusualPosition = new THREE.Vector3(25, 8, -15)
-            const surfaces = GameBoxUtils.getStandardShelfSurfaces()
+            const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             
             const positions = GameBoxUtils.calculateGamePositions(
-                unusualPosition, surfaces[0], [mockGames[0]], 'front'
+                unusualPosition, surfaces[0], [mockGames[0]], ShelfSide.Front
             )
             
             const gameBox = gameBoxRenderer.createGameBox(mockGames[0], positions[0])
@@ -344,11 +344,11 @@ describe('Game Box Positioning Integration', () => {
 
         it('should handle single game placement correctly', async () => {
             const shelfPosition = new THREE.Vector3(0, 0, 0)
-            const surfaces = GameBoxUtils.getStandardShelfSurfaces()
+            const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             
             // Single game should be centered
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surfaces[0], [mockGames[0]], 'front'
+                shelfPosition, surfaces[0], [mockGames[0]], ShelfSide.Front
             )
             
             expect(positions.length).toBe(1)
@@ -382,7 +382,7 @@ describe('Game Box Positioning Integration', () => {
             }
             
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, wideSurface, manyGames, 'front'
+                shelfPosition, wideSurface, manyGames, ShelfSide.Front
             )
             
             expect(positions.length).toBe(manyGames.length)

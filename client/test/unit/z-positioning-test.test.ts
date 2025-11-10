@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GameBoxUtils, ShelfSurfaceUtils } from '../../src/scene/props/SharedPropsUtils';
+import { GameBoxUtils, ShelfSurfaceUtils, ShelfSide } from '../../src/scene/props/SharedPropsUtils';
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData';
 import * as THREE from 'three';
 
@@ -30,21 +30,21 @@ describe('Z-Axis Positioning Changes', () => {
             shelfPosition,
             bottomSurface,
             mockGames,
-            'front'
+            ShelfSide.Front
         );
 
         const middlePositions = GameBoxUtils.calculateGamePositions(
             shelfPosition,
             middleSurface,
             mockGames,
-            'front'
+            ShelfSide.Front
         );
 
         const topPositions = GameBoxUtils.calculateGamePositions(
             shelfPosition,
             topSurface,
             mockGames,
-            'front'
+            ShelfSide.Front
         );
 
         console.log('Bottom shelf Z:', bottomPositions[0].z);
@@ -73,14 +73,14 @@ describe('Z-Axis Positioning Changes', () => {
             shelfPosition,
             middleSurface,
             mockGames,
-            'front'
+            ShelfSide.Front
         );
 
         const backPositions = GameBoxUtils.calculateGamePositions(
             shelfPosition,
             middleSurface,
             mockGames,
-            'back'
+            ShelfSide.Back
         );
 
         console.log('Front side Z:', frontPositions[0].z);
@@ -101,11 +101,11 @@ describe('Z-Axis Positioning Changes', () => {
         const topSurface = surfaces[2]; // top
         
         // Test that shelf-specific offsets work for both sides
-        const frontBottom = GameBoxUtils.calculateGamePositions(shelfPosition, bottomSurface, mockGames, 'front');
-        const backBottom = GameBoxUtils.calculateGamePositions(shelfPosition, bottomSurface, mockGames, 'back');
+        const frontBottom = GameBoxUtils.calculateGamePositions(shelfPosition, bottomSurface, mockGames, ShelfSide.Front);
+        const backBottom = GameBoxUtils.calculateGamePositions(shelfPosition, bottomSurface, mockGames, ShelfSide.Back);
         
-        const frontTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, 'front');
-        const backTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, 'back');
+        const frontTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, ShelfSide.Front);
+        const backTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, ShelfSide.Back);
 
         // Bottom shelf should have smaller magnitude than top shelf (closer to user) for both sides
         expect(Math.abs(frontBottom[0].z)).toBeLessThan(Math.abs(frontTop[0].z));

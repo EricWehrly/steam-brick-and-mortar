@@ -29,7 +29,7 @@ import { EventManager, EventSource } from '../../src/core/EventManager'
 import { RoomEventTypes } from '../../src/types/InteractionEvents'
 import { LegacyStorePropsRenderer } from '../../src/scene/LegacyStorePropsRenderer'
 import { GameBoxRenderer } from '../../src/scene/GameBoxRenderer'
-import { GameBoxUtils, GamePlacementConstants } from '../../src/scene/props/SharedPropsUtils'
+import { GameBoxUtils, GamePlacementConstants, ShelfSide } from '../../src/scene/props/SharedPropsUtils'
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData'
 import { createGameBoxTestAdapter, GameBoxTestUtils, type GameBoxTestAdapter } from '../utils/GameBoxTestAdapter'
 
@@ -93,7 +93,7 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
                 shelfPosition, 
                 mockSurface,
                 mockGames, 
-                'front'
+                ShelfSide.Front
             )
             
             // Create game boxes using the adapter
@@ -130,7 +130,7 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
             
             // Calculate positions
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, mockSurface, mockGames, 'front'
+                shelfPosition, mockSurface, mockGames, ShelfSide.Front
             )
             
             // Create game boxes using the adapter
@@ -159,7 +159,7 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
             }
             
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, mockSurface, mockGames, 'front'
+                shelfPosition, mockSurface, mockGames, ShelfSide.Front
             )
             
             // Create game boxes
@@ -192,10 +192,10 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
             }
             
             const frontPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, mockSurface, [mockGames[0]], 'front'
+                shelfPosition, mockSurface, [mockGames[0]], ShelfSide.Front
             )
             const backPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, mockSurface, [mockGames[0]], 'back'
+                shelfPosition, mockSurface, [mockGames[0]], ShelfSide.Back
             )
             
             // Create separate adapters for front and back to avoid conflicts
