@@ -142,14 +142,16 @@
 - Update dependency injection and service registration
 - Ensure game box rendering integrates with instanced shelf system
 - Update tests to cover both implementations
+- Merge PropRenderer into the legacy/GPU system (see TODO in PropRenderer.ts)
 
 **Files to Modify**:
 - `client/src/scene/game-box/GameBoxRenderer.ts` - Split into multiple files
+- `client/src/scene/PropRenderer.ts` - Merge atmospheric props into legacy/GPU paths
 - Service registration and dependency injection setup
 - Game rendering workflow integration
 - Related test files
 
-**Benefits**: Completes GPU instancing architecture, enables further rendering optimizations, maintains legacy compatibility
+**Benefits**: Completes GPU instancing architecture, enables further rendering optimizations, maintains legacy compatibility, consolidates prop rendering
 
 **Source**: GPU instancing roadmap (Oct 2025) - next architectural milestone after StorePropsRenderer bifurcation
 
