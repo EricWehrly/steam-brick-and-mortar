@@ -142,7 +142,7 @@ export class PauseMenuManager {
         this.registerPanel(applicationPanel)
         
         // Register game settings panel
-        this.registerPanel(new GameSettingsPanel({}, this.appSettings, this.eventManager))
+        this.registerPanel(new GameSettingsPanel({}, this.appSettings))
         
         // Register graphics settings panel
         const graphicsPanel = new GraphicsSettingsPanel({}, this.appSettings)
