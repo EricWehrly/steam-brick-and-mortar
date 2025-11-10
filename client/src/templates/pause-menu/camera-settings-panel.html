@@ -1,0 +1,96 @@
+<div class="camera-settings-panel">
+    <!-- Camera Selector (for future multi-camera support) -->
+    <div class="camera-selector">
+        <h4>📷 Camera Selection</h4>
+        <div class="camera-navigation">
+            <button id="camera-prev-btn" class="camera-nav-btn" {{#unless hasPrevCamera}}disabled{{/unless}}>◀</button>
+            <span class="camera-index">Camera <span id="camera-index-display">{{currentCameraIndex}}</span> / {{cameraCount}}</span>
+            <button id="camera-next-btn" class="camera-nav-btn" {{#unless hasNextCamera}}disabled{{/unless}}>▶</button>
+        </div>
+        <p class="hint">Future: Switch between different cameras in the scene</p>
+    </div>
+
+    <!-- Camera Presets -->
+    <div class="preset-section">
+        <h4>🎯 Camera Presets</h4>
+        <div class="preset-buttons">
+            <button data-camera-preset="CINEMATIC" class="preset-btn {{#if presetCinematic}}active{{/if}}">
+                <strong>Cinematic</strong>
+                <span class="preset-desc">Narrow FOV (60°), focused view</span>
+            </button>
+            <button data-camera-preset="NORMAL" class="preset-btn {{#if presetNormal}}active{{/if}}">
+                <strong>Normal</strong>
+                <span class="preset-desc">Standard perspective (75°)</span>
+            </button>
+            <button data-camera-preset="WIDE" class="preset-btn {{#if presetWide}}active{{/if}}">
+                <strong>Wide</strong>
+                <span class="preset-desc">Better for VR (90°) - Default</span>
+            </button>
+            <button data-camera-preset="ULTRA_WIDE" class="preset-btn {{#if presetUltraWide}}active{{/if}}">
+                <strong>Ultra Wide</strong>
+                <span class="preset-desc">Maximum awareness (110°)</span>
+            </button>
+            <button data-camera-preset="TELEPHOTO" class="preset-btn {{#if presetTelephoto}}active{{/if}}">
+                <strong>Telephoto</strong>
+                <span class="preset-desc">Very narrow (45°), compressed</span>
+            </button>
+        </div>
+        {{#if presetCustom}}
+        <p class="custom-notice">✨ Custom settings detected</p>
+        {{/if}}
+    </div>
+
+    <!-- Manual Controls -->
+    <div class="manual-controls">
+        <h4>🎛️ Manual Adjustments</h4>
+        
+        <!-- Field of View -->
+        <div class="control-group">
+            <label for="camera-fov">
+                Field of View (FOV)
+                <span class="control-hint">Wider = more peripheral vision</span>
+            </label>
+            <div class="slider-with-value">
+                <input type="range" id="camera-fov" min="30" max="120" step="1" value="{{fov}}" />
+                <span id="camera-fov-value" class="value-display">{{fov}}°</span>
+            </div>
+        </div>
+
+        <!-- Near Clipping Plane -->
+        <div class="control-group">
+            <label for="camera-near">
+                Near Clipping Plane
+                <span class="control-hint">Minimum visible distance</span>
+            </label>
+            <div class="slider-with-value">
+                <input type="range" id="camera-near" min="0.01" max="5" step="0.01" value="{{near}}" />
+                <span id="camera-near-value" class="value-display">{{near}}</span>
+            </div>
+            <p class="warning">⚠️ Too small (<0.01) causes Z-fighting</p>
+        </div>
+
+        <!-- Far Clipping Plane -->
+        <div class="control-group">
+            <label for="camera-far">
+                Far Clipping Plane
+                <span class="control-hint">Maximum visible distance</span>
+            </label>
+            <div class="slider-with-value">
+                <input type="range" id="camera-far" min="100" max="5000" step="10" value="{{far}}" />
+                <span id="camera-far-value" class="value-display">{{far}}</span>
+            </div>
+            <p class="warning">⚠️ Too large (>5000) reduces depth precision</p>
+        </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel">
+        <h4>ℹ️ Camera Tips</h4>
+        <ul>
+            <li><strong>FOV:</strong> 90° is optimal for VR to match human peripheral vision</li>
+            <li><strong>Near Plane:</strong> Keep at 0.1 unless you need to see very close objects</li>
+            <li><strong>Far Plane:</strong> 1000 is sufficient for most indoor environments</li>
+            <li><strong>VR Comfort:</strong> Sudden FOV changes can cause discomfort - adjust gradually</li>
+        </ul>
+    </div>
+</div>

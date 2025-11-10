@@ -16,6 +16,7 @@ import { HelpPanel } from './panels/HelpPanel'
 import { ApplicationPanel } from './panels/ApplicationPanel'
 import { GameSettingsPanel } from './panels/GameSettingsPanel'
 import { GraphicsSettingsPanel } from './panels/GraphicsSettingsPanel'
+import { CameraSettingsPanel } from './panels/CameraSettingsPanel'
 import type { PerformanceMonitor } from '../PerformanceMonitor'
 import { EventManager, EventSource } from '../../core/EventManager'
 import { SteamEventTypes, LightingEventTypes } from '../../types/InteractionEvents'
@@ -149,6 +150,10 @@ export class PauseMenuManager {
             onSettingsChanged: (settings) => this.handleSettingsChange(settings)
         })
         this.registerPanel(graphicsPanel)
+        
+        // Register camera settings panel
+        const cameraPanel = new CameraSettingsPanel({}, this.appSettings)
+        this.registerPanel(cameraPanel)
         
         // Register debug panel if debugStatsProvider is available
         if (this.debugStatsProvider) {
