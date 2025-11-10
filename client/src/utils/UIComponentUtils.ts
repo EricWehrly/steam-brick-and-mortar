@@ -1,6 +1,29 @@
 /**
- * UI Component utilities for common interactive patterns
- * Reduces boilerplate for sliders, toggles, and other form controls
+ * Declarative UI component configuration utilities
+ * 
+ * Reduces 30-60 lines of repetitive DOM event handling per panel to ~10-20 lines
+ * of type-safe configuration objects.
+ * 
+ * Pattern: Use .bind(this) for direct method references, arrow functions for logic blocks.
+ * 
+ * @example Basic slider with live value display
+ * UIComponentUtils.setupSlider(container, {
+ *   sliderId: 'fov',
+ *   valueDisplayId: 'fov-value',
+ *   formatDisplay: (v) => v + '°',
+ *   onChange: (v) => { camera.fov = v; camera.updateProjectionMatrix() }
+ * })
+ * 
+ * @example Button with bound method (preferred for simple calls)
+ * UIComponentUtils.setupButton(container, {
+ *   buttonId: 'reset-btn',
+ *   onClick: this.resetToDefaults.bind(this)
+ * })
+ * 
+ * @example Preset buttons using data attributes
+ * UIComponentUtils.setupDataButtons(container, '[data-preset]', 'preset',
+ *   (key: string) => this.applyPreset(PRESETS[key])
+ * )
  */
 
 export interface SliderConfig {
@@ -34,15 +57,6 @@ export interface InputConfig<T = string> {
 }
 
 export class UIComponentUtils {
-    /**
-     * @example
-     * setupSlider(container, {
-     *   sliderId: 'fov-slider',
-     *   valueDisplayId: 'fov-value',
-     *   formatDisplay: (v) => v + '°',
-     *   onChange: (v) => camera.fov = v
-     * })
-     */
     static setupSlider(
         container: HTMLElement | null,
         config: SliderConfig
@@ -134,9 +148,7 @@ export class UIComponentUtils {
         configs.forEach(config => this.setupButton(container, config))
     }
 
-    /**
-     * Buttons with data attributes selector pattern (e.g., [data-preset="NORMAL"])
-     */
+    /** Configure buttons using data attributes (useful for presets/dynamic groups) */
     static setupDataButtons<T = string>(
         container: HTMLElement | null,
         selector: string,
