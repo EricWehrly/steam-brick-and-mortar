@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { GameBoxRenderer } from '../../../src/scene/GameBoxRenderer'
+import { LegacyGameBoxRenderer } from '../../../src/scene/game-box/LegacyGameBoxRenderer'
 import type { SteamGameData, GameBoxTextureOptions } from '../../../src/scene'
 
 // Mock URL.createObjectURL and revokeObjectURL for Node.js environment
@@ -38,14 +38,14 @@ vi.mock('three', async () => {
     }
 })
 
-describe('GameBoxRenderer Texture Tests', () => {
-    let renderer: GameBoxRenderer
+describe('LegacyGameBoxRenderer Texture Tests', () => {
+    let renderer: LegacyGameBoxRenderer
     let scene: THREE.Scene
     let mockGame: SteamGameData
     let textureManager: any
 
     beforeEach(() => {
-        renderer = new GameBoxRenderer()
+        renderer = new LegacyGameBoxRenderer()
         textureManager = (renderer as any).textureManager
         scene = new THREE.Scene()
         mockGame = {

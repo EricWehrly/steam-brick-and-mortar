@@ -15,22 +15,22 @@ vi.mock('../../src/utils/TextureManager', async () => {
   }
 })
 
-import { GameBoxRenderer } from '../../src/scene/GameBoxRenderer'
+import { LegacyGameBoxRenderer } from '../../src/scene/game-box/LegacyGameBoxRenderer'
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData'
 
 describe('Individual Text Label Creation', () => {
-    let gameBoxRenderer: GameBoxRenderer
+    let gameBoxRenderer: LegacyGameBoxRenderer
     let scene: THREE.Scene
 
     const mockGame: SteamGameData = {
-        appid: '1',
+        appid: 12345,
         name: 'Test Game',
         playtime_forever: 120
     }
 
     beforeEach(() => {
         scene = new THREE.Scene()
-        gameBoxRenderer = new GameBoxRenderer()
+        gameBoxRenderer = new LegacyGameBoxRenderer()
     })
 
     afterEach(() => {

@@ -28,7 +28,7 @@ import { DataManager } from '../../src/core/data'
 import { EventManager, EventSource } from '../../src/core/EventManager'
 import { RoomEventTypes } from '../../src/types/InteractionEvents'
 import { LegacyStorePropsRenderer } from '../../src/scene/LegacyStorePropsRenderer'
-import { GameBoxRenderer } from '../../src/scene/GameBoxRenderer'
+import { LegacyGameBoxRenderer } from '../../src/scene/game-box/LegacyGameBoxRenderer'
 import { GameBoxUtils, GamePlacementConstants, ShelfSide } from '../../src/scene/props/SharedPropsUtils'
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData'
 import { createGameBoxTestAdapter, GameBoxTestUtils, type GameBoxTestAdapter } from '../utils/GameBoxTestAdapter'
@@ -38,7 +38,7 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
     let dataManager: DataManager
     let eventManager: EventManager
     let storePropsRenderer: LegacyStorePropsRenderer
-    let gameBoxRenderer: GameBoxRenderer
+    let gameBoxRenderer: LegacyGameBoxRenderer
     let testAdapter: GameBoxTestAdapter
 
     const mockGames: SteamGameData[] = [
@@ -56,7 +56,7 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
         dataManager.clear()
         
         // Create real components for integration testing
-        gameBoxRenderer = new GameBoxRenderer()
+        gameBoxRenderer = new LegacyGameBoxRenderer()
         storePropsRenderer = new LegacyStorePropsRenderer(scene, dataManager)
         
         // Create renderer-agnostic test adapter
@@ -199,8 +199,8 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
             )
             
             // Create separate adapters for front and back to avoid conflicts
-            const frontAdapter = createGameBoxTestAdapter(new GameBoxRenderer(), scene)
-            const backAdapter = createGameBoxTestAdapter(new GameBoxRenderer(), scene)
+            const frontAdapter = createGameBoxTestAdapter(new LegacyGameBoxRenderer(), scene)
+            const backAdapter = createGameBoxTestAdapter(new LegacyGameBoxRenderer(), scene)
             
             frontAdapter.createGameBox(mockGames[0], frontPositions[0])
             backAdapter.createGameBox(mockGames[0], backPositions[0])

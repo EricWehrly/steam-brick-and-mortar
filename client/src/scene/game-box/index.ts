@@ -5,8 +5,10 @@
  * with separated concerns for performance, textures, and layout.
  */
 
-// Core renderer (located in parent scene directory)
-export { GameBoxRenderer } from '../GameBoxRenderer'
+// Bifurcated renderers - Legacy and GPU implementations
+export { LegacyGameBoxRenderer } from './LegacyGameBoxRenderer'
+export { GpuGameBoxRenderer } from './GpuGameBoxRenderer'
+export type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
 // Specialized managers
 export { GameBoxPerformanceManager } from './GameBoxPerformanceManager'
