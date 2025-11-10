@@ -44,7 +44,11 @@ export class SceneManager {
             domain: 'Scene' as any
         })
         
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+        const CAMERA_FOV = 90;  // was 75
+        const CAMERA_ASPECT = window.innerWidth / window.innerHeight;
+        const CAMERA_NEAR_DIST = 0.1;
+        const CAMERA_FAR_DIST = 1000;
+        this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, CAMERA_ASPECT, CAMERA_NEAR_DIST, CAMERA_FAR_DIST)
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: options.antialias ?? true 
         })

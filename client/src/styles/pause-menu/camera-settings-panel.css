@@ -1,0 +1,237 @@
+/* Camera Settings Panel Styles */
+
+.camera-settings-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Camera Selector */
+.camera-selector {
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.camera-navigation {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.camera-nav-btn {
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+}
+
+.camera-nav-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.camera-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.camera-index {
+    font-size: 1.1rem;
+    font-weight: bold;
+    min-width: 150px;
+    text-align: center;
+}
+
+/* Preset Buttons */
+.preset-section {
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+}
+
+.preset-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.preset-btn {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.preset-btn strong {
+    font-size: 1rem;
+}
+
+.preset-desc {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.preset-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+}
+
+.preset-btn.active {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.6);
+}
+
+.custom-notice {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background: rgba(245, 158, 11, 0.2);
+    border-left: 3px solid rgba(245, 158, 11, 0.8);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+/* Manual Controls */
+.manual-controls {
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+}
+
+.control-group {
+    margin-bottom: 1.5rem;
+}
+
+.control-group label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.control-hint {
+    font-size: 0.85rem;
+    font-weight: normal;
+    opacity: 0.7;
+}
+
+.slider-with-value {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.slider-with-value input[type="range"] {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    outline: none;
+}
+
+.slider-with-value input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: rgba(59, 130, 246, 0.8);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.slider-with-value input[type="range"]::-webkit-slider-thumb:hover {
+    background: rgba(59, 130, 246, 1);
+    transform: scale(1.2);
+}
+
+.slider-with-value input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: rgba(59, 130, 246, 0.8);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.slider-with-value input[type="range"]::-moz-range-thumb:hover {
+    background: rgba(59, 130, 246, 1);
+    transform: scale(1.2);
+}
+
+.value-display {
+    min-width: 60px;
+    text-align: right;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    color: rgba(59, 130, 246, 1);
+}
+
+.control-group .warning {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: rgba(245, 158, 11, 0.9);
+}
+
+/* Info Panel */
+.info-panel {
+    padding: 1rem;
+    background: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid rgba(59, 130, 246, 0.5);
+    border-radius: 4px;
+}
+
+.info-panel h4 {
+    margin-bottom: 0.75rem;
+}
+
+.info-panel ul {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.info-panel li {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.info-panel li strong {
+    color: rgba(59, 130, 246, 1);
+}
+
+.hint {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    opacity: 0.6;
+    font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .preset-buttons {
+        grid-template-columns: 1fr;
+    }
+    
+    .camera-navigation {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
