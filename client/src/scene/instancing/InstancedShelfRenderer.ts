@@ -3,16 +3,27 @@ import { InstancedMeshManager } from './InstancedMeshManager'
 import { SharedMaterialManager, MaterialType } from '../../utils/SharedMaterialManager'
 import { EventManager } from '../../core/EventManager'
 import { GameEventTypes } from '../../types/InteractionEvents'
+import { DEFAULT_SHELF_CONFIG, type ShelfConfig } from '../props/SharedPropsUtils'
+import { DEFAULT_INSTANCED_RENDERER_CONFIG, type InstancedRendererConfig, type InstanceData } from './IInstancedRenderer'
 import type { 
     IInstancedRenderer, 
-    InstancedRendererStats, 
-    ShelfConfig,
-    InstancedShelfConfig,
-    ShelfInstanceData
+    InstancedRendererStats
 } from './IInstancedRenderer'
-import {
-    DEFAULT_INSTANCED_SHELF_CONFIG
-} from './IInstancedRenderer'
+
+export interface InstancedShelfConfig extends InstancedRendererConfig {
+    defaultShelfConfig?: ShelfConfig
+    maxShelfUnits?: number
+}
+
+export const DEFAULT_INSTANCED_SHELF_CONFIG = {
+    ...DEFAULT_INSTANCED_RENDERER_CONFIG,
+    maxShelfUnits: 100,
+    defaultShelfConfig: DEFAULT_SHELF_CONFIG
+} as const
+
+export interface ShelfInstanceData extends InstanceData {
+    shelfConfig?: ShelfConfig
+}
 
 enum ShelfGeometryType {
     AngledBoard = 'angledBoard',
@@ -178,6 +189,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         ])
     }
     
+    // TODO: Is this definitely how we want to write this?
     public setInstance(index: number, data: ShelfInstanceData): boolean {
         if (!this.isInitialized) {
             console.warn('InstancedShelfRenderer not initialized')

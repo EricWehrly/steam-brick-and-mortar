@@ -18,41 +18,6 @@ export const DEFAULT_INSTANCED_RENDERER_CONFIG: InstancedRendererConfig = {
     maxInstances: 500
 }
 
-export interface ShelfConfig {
-    width?: number
-    height?: number
-    depth?: number
-    angle?: number
-    shelfCount?: number
-    boardThickness?: number
-    shelfExtensionPerLevel?: number
-}
-
-export const DEFAULT_SHELF_CONFIG: Required<ShelfConfig> = {
-    width: 2.0,
-    height: 2.0,
-    depth: 0.34,
-    angle: 3,
-    shelfCount: 3,
-    boardThickness: 0.05,
-    shelfExtensionPerLevel: 0.25
-}
-
-export interface InstancedShelfConfig extends InstancedRendererConfig {
-    defaultShelfConfig?: ShelfConfig
-    maxShelfUnits?: number
-}
-
-export const DEFAULT_INSTANCED_SHELF_CONFIG = {
-    ...DEFAULT_INSTANCED_RENDERER_CONFIG,
-    maxShelfUnits: 100,
-    defaultShelfConfig: DEFAULT_SHELF_CONFIG
-} as const
-
-export interface ShelfInstanceData extends InstanceData {
-    shelfConfig?: ShelfConfig
-}
-
 export interface InstancedRendererStats {
     /** Whether the renderer has been initialized */
     isInitialized: boolean

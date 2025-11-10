@@ -19,6 +19,37 @@ export enum ShelfSide {
 }
 
 /**
+ * Shelf configuration for both procedural and instanced rendering
+ */
+export interface ShelfConfig {
+    width?: number
+    height?: number
+    depth?: number
+    angle?: number
+    shelfCount?: number
+    boardThickness?: number
+    shelfExtensionPerLevel?: number
+}
+
+/**
+ * Default shelf configuration shared across all shelf rendering systems
+ * 
+ * Note: Values tuned for optimal VR viewing and physical realism:
+ * - angle: Small angle (3-6°) prevents steep/unrealistic shelves
+ * - depth: ~34-40cm provides game box stability
+ * - shelfExtensionPerLevel: Lower shelves extend forward for better visibility
+ */
+export const DEFAULT_SHELF_CONFIG: Required<ShelfConfig> = {
+    width: 2.0,
+    height: 2.0,
+    depth: 0.34,
+    angle: 3,
+    shelfCount: 3,
+    boardThickness: 0.05,
+    shelfExtensionPerLevel: 0.25
+} as const
+
+/**
  * Configuration constants for game layout - shared between renderers
  */
 export class GameLayoutConstants {
