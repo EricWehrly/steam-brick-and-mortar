@@ -9,11 +9,11 @@
  * - Integration boundaries and error handling
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
-import { InstancedShelfRenderer } from '../../../../src/scene/instancing/InstancedShelfRenderer'
-import type { ShelfConfig, InstancedShelfConfig } from '../../../../src/scene/instancing/IInstancedRenderer'
-import { SharedMaterialManager } from '../../../../src/utils/SharedMaterialManager'
+import { InstancedShelfRenderer, type InstancedShelfConfig } from '../../../../src/scene/instancing/InstancedShelfRenderer'
+import type { ShelfConfig } from '../../../../src/scene/props/SharedPropsUtils'
+import { SharedMaterialManager, MaterialType } from '../../../../src/utils/SharedMaterialManager'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { EventManager } from '../../../../src/core/EventManager'
 

@@ -1,16 +1,7 @@
 import * as THREE from 'three';
 
 import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager';
-
-const DEFAULT_SHELF_CONFIG = {
-  width: 2.0,
-  height: 2.0,
-  depth: 0.4,
-  angle: 6, // 6 degrees from vertical (reduced for less steep angles)
-  shelfCount: 3,
-  boardThickness: 0.05,
-  shelfExtensionPerLevel: 0.1 // How much each lower shelf extends forward
-} as const;
+import { DEFAULT_SHELF_CONFIG } from './props/SharedPropsUtils';
 
 /**
  * Procedural shelf generator for Phase 2 research
