@@ -22,7 +22,7 @@ import { DataManager } from '../../src/core/data'
 import { EventManager, EventSource } from '../../src/core/EventManager'
 import { RoomEventTypes } from '../../src/types/InteractionEvents'
 import { LegacyStorePropsRenderer } from '../../src/scene/LegacyStorePropsRenderer'
-import { GameBoxRenderer } from '../../src/scene/GameBoxRenderer'
+import { LegacyGameBoxRenderer } from '../../src/scene/game-box/LegacyGameBoxRenderer'
 import { GameBoxUtils, GamePlacementConstants, ShelfSide } from '../../src/scene/props/SharedPropsUtils'
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData'
 
@@ -31,7 +31,7 @@ describe('Game Box Positioning - Regression Test', () => {
     let dataManager: DataManager
     let eventManager: EventManager
     let storePropsRenderer: LegacyStorePropsRenderer
-    let gameBoxRenderer: GameBoxRenderer
+    let gameBoxRenderer: LegacyGameBoxRenderer
 
     const mockGames: SteamGameData[] = [
         { appid: '1', name: 'Test Game 1', playtime_forever: 120 },
@@ -48,7 +48,7 @@ describe('Game Box Positioning - Regression Test', () => {
         dataManager.clear()
         
         // Create real components for integration testing
-        gameBoxRenderer = new GameBoxRenderer()
+        gameBoxRenderer = new LegacyGameBoxRenderer()
         storePropsRenderer = new LegacyStorePropsRenderer(scene, dataManager)
         
         // Set up test games

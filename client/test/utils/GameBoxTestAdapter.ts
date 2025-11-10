@@ -4,14 +4,15 @@
  * Provides a unified testing interface for game box functionality across
  * different rendering approaches (Legacy individual meshes vs GPU instanced rendering).
  * 
- * This solves the test issue where GameBoxRenderer.createGameBox() returns:
+ * This solves the test issue where createGameBox() returns:
  * - Legacy: THREE.Object3D (individual mesh)
- * - Instanced: null (data stored in instance manager)
+ * - GPU Instanced: null (data stored in instance manager)
  */
 
 import * as THREE from 'three'
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData'
-import type { GameBoxRenderer } from '../../src/scene/GameBoxRenderer'
+import type { LegacyGameBoxRenderer } from '../../src/scene/game-box/LegacyGameBoxRenderer'
+import type { GpuGameBoxRenderer } from '../../src/scene/game-box/GpuGameBoxRenderer'
 
 export interface GameBoxTestResult {
     /** Position where the game box is rendered */
@@ -47,19 +48,18 @@ export interface GameBoxTestAdapter {
  * Adapter for Legacy Rendering (individual THREE.Object3D meshes)
  */
 export class LegacyGameBoxTestAdapter implements GameBoxTestAdapter {
-    private gameBoxRenderer: GameBoxRenderer
+    private gameBoxRenderer: LegacyGameBoxRenderer
     private scene: THREE.Scene
     private createdGameBoxes: THREE.Object3D[] = []
 
-    constructor(gameBoxRenderer: GameBoxRenderer, scene: THREE.Scene) {
+    constructor(gameBoxRenderer: LegacyGameBoxRenderer, scene: THREE.Scene) {
         this.gameBoxRenderer = gameBoxRenderer
         this.scene = scene
     }
 
     createGameBox(game: SteamGameData, position: THREE.Vector3): GameBoxTestResult | null {
-        // Force non-instanced rendering for legacy adapter by calling createGameBoxCore directly
-        // This bypasses the instanced rendering check in createGameBox()
-        const mesh = (this.gameBoxRenderer as any).createGameBoxCore(game, position, `test-${game.appid}`)
+        // LegacyGameBoxRenderer always creates individual meshes
+        const mesh = this.gameBoxRenderer.createGameBox(game, position, undefined, `test-${game.appid}`)
         
         if (!mesh) {
             return null
@@ -115,7 +115,7 @@ export class LegacyGameBoxTestAdapter implements GameBoxTestAdapter {
  * Adapter for GPU Instanced Rendering
  */
 export class InstancedGameBoxTestAdapter implements GameBoxTestAdapter {
-    private gameBoxRenderer: GameBoxRenderer
+    private gameBoxRenderer: GpuGameBoxRenderer
     private scene: THREE.Scene
     private createdInstances: Array<{
         game: SteamGameData,
@@ -123,13 +123,13 @@ export class InstancedGameBoxTestAdapter implements GameBoxTestAdapter {
         instanceIndex: number
     }> = []
 
-    constructor(gameBoxRenderer: GameBoxRenderer, scene: THREE.Scene) {
+    constructor(gameBoxRenderer: GpuGameBoxRenderer, scene: THREE.Scene) {
         this.gameBoxRenderer = gameBoxRenderer
         this.scene = scene
     }
 
     createGameBox(game: SteamGameData, position: THREE.Vector3): GameBoxTestResult | null {
-        // For instanced rendering, createGameBox might return null but still create the instance
+        // For GPU instanced rendering, createGameBox returns null but creates the instance internally
         const mesh = this.gameBoxRenderer.createGameBox(game, position)
         
         // Track the instance even if no individual mesh is returned
@@ -180,21 +180,17 @@ export class InstancedGameBoxTestAdapter implements GameBoxTestAdapter {
 }
 
 /**
- * Factory function to create appropriate adapter based on rendering approach
+ * Factory function to create appropriate adapter based on renderer type
  */
 export function createGameBoxTestAdapter(
-    gameBoxRenderer: GameBoxRenderer, 
-    scene: THREE.Scene,
-    preferInstanced: boolean = false
+    gameBoxRenderer: LegacyGameBoxRenderer | GpuGameBoxRenderer, 
+    scene: THREE.Scene
 ): GameBoxTestAdapter {
-    // Try to detect if instanced rendering is being used
-    // This is a heuristic - you might need to adjust based on actual implementation
-    const hasInstancedRenderers = !!(gameBoxRenderer as any).getInstancedLabelRenderer?.()
-    
-    if (preferInstanced || hasInstancedRenderers) {
-        return new InstancedGameBoxTestAdapter(gameBoxRenderer, scene)
+    // Check if it's a GpuGameBoxRenderer by checking for hasInstancedLabelRenderer method
+    if ('hasInstancedLabelRenderer' in gameBoxRenderer && typeof gameBoxRenderer.hasInstancedLabelRenderer === 'function') {
+        return new InstancedGameBoxTestAdapter(gameBoxRenderer as GpuGameBoxRenderer, scene)
     } else {
-        return new LegacyGameBoxTestAdapter(gameBoxRenderer, scene)
+        return new LegacyGameBoxTestAdapter(gameBoxRenderer as LegacyGameBoxRenderer, scene)
     }
 }
 
