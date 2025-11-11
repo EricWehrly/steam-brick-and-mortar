@@ -16,6 +16,7 @@ import { EventManager } from '../../core/EventManager'
 import type { DebugStatsProvider } from '../../core/DebugStatsProvider'
 import { AppSettings } from '../../core/AppSettings'
 import { UIEventTypes } from '../../types/InteractionEvents'
+import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 
 export class SystemUICoordinator {
     private pauseMenuManager: PauseMenuManager
@@ -23,6 +24,10 @@ export class SystemUICoordinator {
     private lightingControlsPanel?: LightingControlsPanel
     private eventManager: EventManager
     private appSettings: AppSettings
+    private renderLoopRegistry: RenderLoopRegistry
+    private renderer?: THREE.WebGLRenderer
+    private lastPerformanceUpdate = 0
+    private readonly performanceUpdateInterval = 1000 // Update every second
 
     constructor(
         performanceMonitor: PerformanceMonitor,
@@ -31,6 +36,7 @@ export class SystemUICoordinator {
         appSettings: AppSettings
     ) {
         this.performanceMonitor = performanceMonitor
+        this.renderLoopRegistry = RenderLoopRegistry.getInstance()
         
         this.eventManager = eventManager
         this.appSettings = appSettings
@@ -40,6 +46,7 @@ export class SystemUICoordinator {
     public async init(
         renderer: THREE.WebGLRenderer
     ): Promise<void> {
+        this.renderer = renderer
         
         // Initialize pause menu system
         this.pauseMenuManager.init()
@@ -64,6 +71,16 @@ export class SystemUICoordinator {
         
         // Initialize integrated lighting controls panel
         this.initializeLightingControls()
+        
+        // Register update method with render loop
+        this.renderLoopRegistry.register(this.constructor.name, this.updatePerformanceStats.bind(this))
+    }
+
+    private updatePerformanceStats(now: number, _deltaTime: number): void {
+        if (now - this.lastPerformanceUpdate > this.performanceUpdateInterval && this.renderer) {
+            this.updateRenderStats(this.renderer)
+            this.lastPerformanceUpdate = now
+        }
     }
 
     private setupSettingsButton(): void {
@@ -126,6 +143,7 @@ export class SystemUICoordinator {
     }
 
     public dispose(): void {
+        this.renderLoopRegistry.unregister(this.constructor.name)
         this.pauseMenuManager?.dispose()
         this.performanceMonitor?.dispose()
         this.lightingControlsPanel?.dispose()

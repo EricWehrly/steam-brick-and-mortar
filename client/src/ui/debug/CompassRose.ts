@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import { AppSettings, type SettingChangedEvent } from '../../core/AppSettings'
 import { EventManager } from '../../core/EventManager'
 import { AppSettingsEventTypes } from '../../types/InteractionEvents'
+import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 
 export class CompassRose {
     private container: HTMLDivElement
@@ -14,14 +15,19 @@ export class CompassRose {
     private isVisible: boolean = true
     private appSettings: AppSettings
     private eventManager: EventManager
+    private renderLoopRegistry: RenderLoopRegistry
 
     constructor(camera: THREE.Camera) {
         this.camera = camera
         this.appSettings = AppSettings.getInstance()
         this.eventManager = EventManager.getInstance()
+        this.renderLoopRegistry = RenderLoopRegistry.getInstance()
         
         this.container = this.createCompassElement()
         document.body.appendChild(this.container)
+        
+        // Register update method with render loop
+        this.renderLoopRegistry.register(this.constructor.name, this.update.bind(this))
         
         // Set initial visibility from settings (default: off)
         this.setVisible(this.appSettings.getSetting('showCompassRose'))
@@ -100,7 +106,7 @@ export class CompassRose {
         return compass
     }
 
-    public update(): void {
+    public update(_now: number, _deltaTime: number): void {
         if (!this.isVisible) return
 
         // Get camera rotation
@@ -120,6 +126,9 @@ export class CompassRose {
     }
 
     public dispose(): void {
+        // Unregister from render loop
+        this.renderLoopRegistry.unregister(this.constructor.name)
+        
         if (this.container.parentElement) {
             this.container.parentElement.removeChild(this.container)
         }

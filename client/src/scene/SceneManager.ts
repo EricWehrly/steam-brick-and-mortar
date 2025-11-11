@@ -20,6 +20,7 @@ import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
 import { DataManager } from '../core/data/DataManager'
 import { DataDomain } from '../core/data/DataTypes'
+import { RenderLoopRegistry } from './RenderLoopRegistry'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -32,6 +33,7 @@ export class SceneManager {
     private renderer: THREE.WebGLRenderer
     private propRenderer: PropRenderer
     private skyboxManager: SkyboxManager
+    private renderLoopRegistry: RenderLoopRegistry
 
     constructor(options: SceneManagerOptions = {}) {
         // Initialize RectAreaLight uniforms (required for RectAreaLight to work)
@@ -77,6 +79,9 @@ export class SceneManager {
 
         // Initialize skybox manager
         this.skyboxManager = new SkyboxManager(this.scene)
+        
+        // Initialize render loop registry
+        this.renderLoopRegistry = RenderLoopRegistry.getInstance()
 
         this.setupRenderer(options)
         this.setupCamera()
@@ -124,37 +129,18 @@ export class SceneManager {
         })
     }
 
-    public startRenderLoop(dependencies?: {
-        webxrCoordinator?: any,
-        systemUICoordinator?: any,
-        compassRose?: any
-    }) {
-        let lastPerformanceUpdate = 0
-        const performanceUpdateInterval = 1000 // Update performance data every second
+    public startRenderLoop() {
+        let lastTime = performance.now()
         
         this.renderer.setAnimationLoop(() => {
-            const now = Date.now()
+            const now = performance.now()
+            const deltaTime = now - lastTime
+            lastTime = now
             
-            // Update camera movement via WebXR coordinator
-            if (dependencies?.webxrCoordinator) {
-                dependencies.webxrCoordinator.updateCameraMovement(this.camera)
-            }
+            // Execute all registered render loop callbacks
+            this.renderLoopRegistry.executeAll(now, deltaTime)
             
-            // Update compass rose orientation
-            if (dependencies?.compassRose) {
-                dependencies.compassRose.update()
-            }
-            
-            // Update performance data periodically
-            if (now - lastPerformanceUpdate > performanceUpdateInterval) {                
-                // Update UI performance monitor with Three.js renderer stats
-                if (dependencies?.systemUICoordinator) {
-                    dependencies.systemUICoordinator.updateRenderStats(this.renderer)
-                }
-                
-                lastPerformanceUpdate = now
-            }
-            
+            // Render the scene
             this.renderer.render(this.scene, this.camera)
         })
     }

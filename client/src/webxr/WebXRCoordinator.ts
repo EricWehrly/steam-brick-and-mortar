@@ -16,8 +16,10 @@ import { WebXRManager, type WebXRCapabilities } from './WebXRManager'
 import { InputManager } from './InputManager'
 import { EventManager, EventSource } from '../core/EventManager'
 import { WebXREventTypes } from '../types/InteractionEvents'
+import { RenderLoopRegistry } from '../scene/RenderLoopRegistry'
 
 export interface WebXRCoordinatorConfig {
+    camera: THREE.Camera
     input?: {
         speed?: number
         mouseSensitivity?: number
@@ -31,10 +33,14 @@ export class WebXRCoordinator {
     private webxrManager: WebXRManager
     private inputManager: InputManager
     private eventManager: EventManager
+    private renderLoopRegistry: RenderLoopRegistry
+    private camera: THREE.Camera
     private pendingMouseDeltas: { deltaX: number, deltaY: number } | null = null
 
-    constructor(config: WebXRCoordinatorConfig = {}) {
+    constructor(config: WebXRCoordinatorConfig) {
+        this.camera = config.camera
         this.eventManager = EventManager.getInstance()
+        this.renderLoopRegistry = RenderLoopRegistry.getInstance()
 
         this.webxrManager = new WebXRManager({
             onSessionStart: () => this.handleSessionStart(),
@@ -71,6 +77,16 @@ export class WebXRCoordinator {
         
         // Start input listening
         this.inputManager.startListening()
+        
+        // Register update method with render loop
+        this.renderLoopRegistry.register(this.constructor.name, this.updateCamera.bind(this))
+    }
+
+    /**
+     * Update camera movement - called every frame by render loop registry
+     */
+    private updateCamera(_now: number, _deltaTime: number): void {
+        this.updateCameraMovement(this.camera)
     }
 
     /**
@@ -125,9 +141,10 @@ export class WebXRCoordinator {
     }
 
     /**
-     * Clean up resources
+     * Dispose of resources
      */
     dispose(): void {
+        this.renderLoopRegistry.unregister(this.constructor.name)
         this.inputManager.dispose()
         this.webxrManager.dispose()
     }

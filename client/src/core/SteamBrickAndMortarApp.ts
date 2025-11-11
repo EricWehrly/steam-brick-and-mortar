@@ -104,6 +104,7 @@ export class SteamBrickAndMortarApp {
         })
 
         this.webxrCoordinator = new WebXRCoordinator({
+            camera: this.sceneManager.getCamera(),
             input: {
                 speed: config.input?.speed ?? 0.1,
                 mouseSensitivity: config.input?.mouseSensitivity ?? 0.005
@@ -356,14 +357,12 @@ export class SteamBrickAndMortarApp {
     }
 
     private startRenderLoop(): void {
-        // Initialize compass rose (handles its own visibility via AppSettings)
+        // Initialize compass rose (self-registers with render loop)
+        // TODO: This probably shouldn't go here, but where does it go?
         this.compassRose = new CompassRose(this.sceneManager.getCamera())
         
-        this.sceneManager.startRenderLoop({
-            webxrCoordinator: this.webxrCoordinator,
-            systemUICoordinator: this.systemUICoordinator,
-            compassRose: this.compassRose
-        })
+        // Start the render loop (all updates happen via registry)
+        this.sceneManager.startRenderLoop()
         
         this.performanceMonitor.start()
     }
