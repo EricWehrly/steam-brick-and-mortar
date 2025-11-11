@@ -17,6 +17,7 @@ import { PerformanceMonitor, type PerformanceStats, ToastManager, UIManager } fr
 import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { DebugStatsProvider } from './DebugStatsProvider'
+import { CompassRose } from '../ui/debug/CompassRose'
 import { SteamIntegration } from '../steam-integration'
 import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { WebXREventHandler } from '../webxr/WebXREventHandler'
@@ -57,6 +58,7 @@ export class SteamBrickAndMortarApp {
     private debugStatsProvider: DebugStatsProvider
     private eventManager: EventManager
     private appSettings: AppSettings
+    private compassRose?: CompassRose
 
     // State
     private isInitialized: boolean = false
@@ -354,9 +356,13 @@ export class SteamBrickAndMortarApp {
     }
 
     private startRenderLoop(): void {
+        // Initialize compass rose (handles its own visibility via AppSettings)
+        this.compassRose = new CompassRose(this.sceneManager.getCamera())
+        
         this.sceneManager.startRenderLoop({
             webxrCoordinator: this.webxrCoordinator,
-            systemUICoordinator: this.systemUICoordinator
+            systemUICoordinator: this.systemUICoordinator,
+            compassRose: this.compassRose
         })
         
         this.performanceMonitor.start()

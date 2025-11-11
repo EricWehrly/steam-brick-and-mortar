@@ -91,7 +91,10 @@ export class GameSettingsPanel extends PauseMenuPanel {
             maxConcurrentLoads: this.settings.maxConcurrentLoads,
             
             // Privacy & Data
-            cacheGameData: this.settings.cacheGameData
+            cacheGameData: this.settings.cacheGameData,
+            
+            // Debug Tools
+            showCompassRose: this.appSettings.getSetting('showCompassRose')
         })
     }
 
@@ -137,6 +140,13 @@ export class GameSettingsPanel extends PauseMenuPanel {
             {
                 toggleId: 'cache-game-data',
                 onChange: (checked) => this.updateSetting('cacheGameData', checked)
+            },
+            {
+                toggleId: 'show-compass-rose',
+                onChange: (checked) => {
+                    this.appSettings.setSetting('showCompassRose', checked, EventSource.UI)
+                    console.log(`🎮 App setting updated: showCompassRose = ${checked}`)
+                }
             }
         ])
     }

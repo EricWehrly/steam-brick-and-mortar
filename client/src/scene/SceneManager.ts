@@ -126,7 +126,8 @@ export class SceneManager {
 
     public startRenderLoop(dependencies?: {
         webxrCoordinator?: any,
-        systemUICoordinator?: any
+        systemUICoordinator?: any,
+        compassRose?: any
     }) {
         let lastPerformanceUpdate = 0
         const performanceUpdateInterval = 1000 // Update performance data every second
@@ -137,6 +138,11 @@ export class SceneManager {
             // Update camera movement via WebXR coordinator
             if (dependencies?.webxrCoordinator) {
                 dependencies.webxrCoordinator.updateCameraMovement(this.camera)
+            }
+            
+            // Update compass rose orientation
+            if (dependencies?.compassRose) {
+                dependencies.compassRose.update()
             }
             
             // Update performance data periodically

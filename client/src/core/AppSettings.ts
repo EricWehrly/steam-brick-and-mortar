@@ -44,6 +44,7 @@ export interface ApplicationSettings {
     // Debug Settings
     verboseLogging: boolean
     showDebugInfo: boolean
+    showCompassRose: boolean
     
     // General Settings
     autoSave: boolean
@@ -279,6 +280,7 @@ export class AppSettings {
             // Debug Settings
             verboseLogging: false,
             showDebugInfo: false,
+            showCompassRose: false,
             
             // General Settings
             autoSave: true,
@@ -300,7 +302,7 @@ export class AppSettings {
         }
         
         // Validate boolean fields
-        const booleanFields = ['showFPS', 'showPerformanceStats', 'hideUIInVR', 'verboseLogging', 'showDebugInfo', 'autoSave', 'autoLoadProfile', 'developmentMode']
+        const booleanFields = ['showFPS', 'showPerformanceStats', 'hideUIInVR', 'verboseLogging', 'showDebugInfo', 'showCompassRose', 'autoSave', 'autoLoadProfile', 'developmentMode']
         for (const field of booleanFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'boolean') {
                 return false
