@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager';
-import { DEFAULT_SHELF_CONFIG } from './props/SharedPropsUtils';
+import { DEFAULT_SHELF_CONFIG, ShelfCalculationUtils } from './props/SharedPropsUtils';
 
 /**
  * Procedural shelf generator for Phase 2 research
@@ -120,20 +120,13 @@ export class ProceduralShelfGenerator {
       // Calculate shelf width at this height due to angled sides
       const widthAtHeight = width - 2 * (height - shelfY) * Math.tan(angleRad);
       
-      // Adjust extension: middle shelf should be baseline with moderate extension
-      // BOTTOM shelves extend MORE (lower = deeper), top extends LESS
-      // Formula: All shelves get base extension, then graduated adjustment per level
-      const middleShelf = (shelfCount + 1) / 2;
-      const baseExtension = shelfExtensionPerLevel; // Middle shelf baseline
-      const graduatedExtension = (middleShelf - i) * (shelfExtensionPerLevel * 0.64); // Bottom extends more, top less
-      const totalExtension = baseExtension + graduatedExtension;
-      
-      // Shelves span BOTH north and south faces, so total depth is 2x the unit depth + extension
-      // This makes shelves extend from both angled boards
-      const shelfDepth = (depth * 2) - boardThickness * 2 + totalExtension;
-      
-      // Shelves are centered at Z=0, no offset needed (BoxGeometry centers naturally)
-      const forwardOffset = 0;
+      // Use shared calculation for shelf depth and positioning
+      const { shelfDepth, forwardOffset } = ShelfCalculationUtils.calculateShelfDepthAndOffset(i, {
+        depth,
+        boardThickness,
+        shelfCount,
+        shelfExtensionPerLevel
+      });
       
       // Create shelf board with MDF veneer exterior
       // TODO: Replace with InstancedMesh for better draw call batching

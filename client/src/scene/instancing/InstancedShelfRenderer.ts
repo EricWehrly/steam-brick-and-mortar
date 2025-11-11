@@ -3,7 +3,7 @@ import { InstancedMeshManager } from './InstancedMeshManager'
 import { SharedMaterialManager, MaterialType } from '../../utils/SharedMaterialManager'
 import { EventManager } from '../../core/EventManager'
 import { GameEventTypes } from '../../types/InteractionEvents'
-import { DEFAULT_SHELF_CONFIG, type ShelfConfig } from '../props/SharedPropsUtils'
+import { DEFAULT_SHELF_CONFIG, ShelfCalculationUtils, type ShelfConfig } from '../props/SharedPropsUtils'
 import { DEFAULT_INSTANCED_RENDERER_CONFIG, type InstancedRendererConfig, type InstanceData } from './IInstancedRenderer'
 import type { 
     IInstancedRenderer, 
@@ -300,22 +300,17 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         for (let i = 1; i <= config.shelfCount; i++) {
             const shelfY = i * shelfSpacing
             const widthAtHeight = config.width - 2 * (config.height - shelfY) * Math.tan(angleRad)
-            // Adjust extension: middle shelf (i=2 of 3) should be baseline with moderate extension
-            // BOTTOM shelves extend MORE (lower = deeper), top extends LESS
-            // Formula: All shelves get base extension, then graduated adjustment per level
-            const middleShelf = (config.shelfCount + 1) / 2
-            const baseExtension = config.shelfExtensionPerLevel // Middle shelf baseline
-            const graduatedExtension = (middleShelf - i) * (config.shelfExtensionPerLevel * 0.64) // Bottom extends more, top less
-            const totalExtension = baseExtension + graduatedExtension
             
-            // Shelves span BOTH north and south faces, so total depth is 2x the unit depth + extension
-            // This makes shelves extend from both angled boards
-            const shelfDepth = (config.depth * 2) - config.boardThickness * 2 + totalExtension
+            // Use shared calculation for shelf depth and positioning
+            const { shelfDepth, forwardOffset } = ShelfCalculationUtils.calculateShelfDepthAndOffset(i, {
+                depth: config.depth,
+                boardThickness: config.boardThickness,
+                shelfCount: config.shelfCount,
+                shelfExtensionPerLevel: config.shelfExtensionPerLevel
+            })
+            
             const widthScale = widthAtHeight / config.width
             const depthScale = shelfDepth / config.depth
-            
-            // Shelves are centered at Z=0, no offset needed (BoxGeometry centers naturally)
-            const forwardOffset = 0
             
             this.createShelfBoard(position, shelfY, forwardOffset, widthScale, depthScale, instanceIndices.shelfBoards)
             this.createInteriorSurface(position, shelfY, forwardOffset, config.boardThickness, widthScale, depthScale, instanceIndices.interiorSurfaces)

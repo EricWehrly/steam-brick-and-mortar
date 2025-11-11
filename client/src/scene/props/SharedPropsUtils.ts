@@ -68,6 +68,41 @@ export class GamePlacementConstants {
 }
 
 /**
+ * Shelf calculation utilities shared between procedural and instanced renderers
+ */
+export class ShelfCalculationUtils {
+    /**
+     * Calculate shelf depth and position offset for a given shelf level
+     * Uses graduated extension formula: bottom shelves deepest, top shallowest
+     * 
+     * @param shelfLevel - Shelf index (1-based: 1=bottom, shelfCount=top)
+     * @param config - Shelf configuration with depth, boardThickness, shelfCount, shelfExtensionPerLevel
+     * @returns Object with shelfDepth and forwardOffset for positioning
+     */
+    static calculateShelfDepthAndOffset(
+        shelfLevel: number,
+        config: {
+            depth: number
+            boardThickness: number
+            shelfCount: number
+            shelfExtensionPerLevel: number
+        }
+    ): { shelfDepth: number; forwardOffset: number } {
+        // Calculate graduated extension: middle shelf baseline, bottom extends more, top extends less
+        const middleShelf = (config.shelfCount + 1) / 2
+        const baseExtension = config.shelfExtensionPerLevel // Middle shelf baseline
+        const graduatedExtension = (middleShelf - shelfLevel) * (config.shelfExtensionPerLevel * 0.64)
+        const totalExtension = baseExtension + graduatedExtension
+        
+        // Shelves span BOTH north and south faces, centered at Z=0
+        const shelfDepth = (config.depth * 2) - config.boardThickness * 2 + totalExtension
+        const forwardOffset = 0 // Centered, no offset needed
+        
+        return { shelfDepth, forwardOffset }
+    }
+}
+
+/**
  * Artwork and texture processing utilities
  */
 export class ArtworkUtils {
