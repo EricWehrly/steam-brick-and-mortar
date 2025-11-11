@@ -62,6 +62,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     
     private geometryTemplates: { [K in ShelfGeometryType]?: THREE.BufferGeometry } = {}
     
+    // Pre-calculated shelf data (computed ONCE since all shelves are identical)
+    private readonly shelfYPositions: number[]
+    private readonly shelfDepthsAndOffsets: Array<{ shelfDepth: number; forwardOffset: number }>
+    
     constructor(config: InstancedShelfConfig = {}) {
         this.maxShelfUnits = config.maxShelfUnits ?? DEFAULT_INSTANCED_SHELF_CONFIG.maxShelfUnits
         
@@ -69,6 +73,26 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             ...DEFAULT_INSTANCED_SHELF_CONFIG.defaultShelfConfig,
             ...config.defaultShelfConfig
         } as Required<ShelfConfig>
+        
+        // PRE-CALCULATE shelf positions once (all shelf units are identical)
+        this.shelfYPositions = ShelfCalculationUtils.calculateAllShelfYPositions({
+            height: this.defaultShelfConfig.height,
+            shelfCount: this.defaultShelfConfig.shelfCount,
+            shelfVerticalOffset: this.defaultShelfConfig.shelfVerticalOffset
+        })
+        
+        // PRE-CALCULATE shelf depths once (all shelf units are identical)
+        this.shelfDepthsAndOffsets = []
+        for (let i = 1; i <= this.defaultShelfConfig.shelfCount; i++) {
+            this.shelfDepthsAndOffsets.push(
+                ShelfCalculationUtils.calculateShelfDepthAndOffset(i, {
+                    depth: this.defaultShelfConfig.depth,
+                    boardThickness: this.defaultShelfConfig.boardThickness,
+                    shelfCount: this.defaultShelfConfig.shelfCount,
+                    shelfExtensionPerLevel: this.defaultShelfConfig.shelfExtensionPerLevel
+                })
+            )
+        }
         
         // Initialize managers
         this.angledBoardManager = new InstancedMeshManager('InstancedShelf-AngledBoards')
@@ -295,19 +319,14 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         instanceIndices: ShelfUnitInstance['instanceIndices']
     ): void {
         const angleRad = (config.angle * Math.PI) / 180
-        const shelfSpacing = config.height / (config.shelfCount + 1)
         
-        for (let i = 1; i <= config.shelfCount; i++) {
-            const shelfY = i * shelfSpacing
+        // Use PRE-CALCULATED positions (computed once in constructor, not per shelf unit)
+        for (let i = 0; i < config.shelfCount; i++) {
+            const shelfY = this.shelfYPositions[i]
             const widthAtHeight = config.width - 2 * (config.height - shelfY) * Math.tan(angleRad)
             
-            // Use shared calculation for shelf depth and positioning
-            const { shelfDepth, forwardOffset } = ShelfCalculationUtils.calculateShelfDepthAndOffset(i, {
-                depth: config.depth,
-                boardThickness: config.boardThickness,
-                shelfCount: config.shelfCount,
-                shelfExtensionPerLevel: config.shelfExtensionPerLevel
-            })
+            // Use PRE-CALCULATED depths (computed once in constructor)
+            const { shelfDepth, forwardOffset } = this.shelfDepthsAndOffsets[i]
             
             const widthScale = widthAtHeight / config.width
             const depthScale = shelfDepth / config.depth

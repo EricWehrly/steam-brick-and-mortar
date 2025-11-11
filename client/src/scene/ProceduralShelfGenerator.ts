@@ -110,12 +110,18 @@ export class ProceduralShelfGenerator {
     angleRad: number,
     exteriorMaterial: THREE.Material,
     interiorMaterial: THREE.Material,
-    shelfExtensionPerLevel: number
+    shelfExtensionPerLevel: number,
+    shelfVerticalOffset: number = 0
   ): void {
-    const shelfSpacing = height / (shelfCount + 1);
+    // Calculate all shelf Y positions once per unit (not per shelf)
+    const shelfYPositions = ShelfCalculationUtils.calculateAllShelfYPositions({
+      height,
+      shelfCount,
+      shelfVerticalOffset
+    })
 
-    for (let i = 1; i <= shelfCount; i++) {
-      const shelfY = i * shelfSpacing;
+    for (let i = 0; i < shelfCount; i++) {
+      const shelfY = shelfYPositions[i]
       
       // Calculate shelf width at this height due to angled sides
       const widthAtHeight = width - 2 * (height - shelfY) * Math.tan(angleRad);

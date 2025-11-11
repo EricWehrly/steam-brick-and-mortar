@@ -29,6 +29,7 @@ export interface ShelfConfig {
     shelfCount?: number
     boardThickness?: number
     shelfExtensionPerLevel?: number
+    shelfVerticalOffset?: number // Offset to move shelves down from default centered position
 }
 
 /**
@@ -46,7 +47,8 @@ export const DEFAULT_SHELF_CONFIG: Required<ShelfConfig> = {
     angle: 3,
     shelfCount: 3,
     boardThickness: 0.05,
-    shelfExtensionPerLevel: 0.25
+    shelfExtensionPerLevel: 0.25,
+    shelfVerticalOffset: -0.15  // Move shelves down 15cm from centered position
 } as const
 
 /**
@@ -71,6 +73,49 @@ export class GamePlacementConstants {
  * Shelf calculation utilities shared between procedural and instanced renderers
  */
 export class ShelfCalculationUtils {
+    /**
+     * Calculate shelf Y position for a given level (SINGLE SOURCE OF TRUTH for shelf heights)
+     * This is the calculation done once per unit that applies to all shelves of that unit
+     * 
+     * @param shelfLevel - Shelf index (1-based: 1=bottom, shelfCount=top)
+     * @param height - Total shelf unit height
+     * @param shelfCount - Number of shelves in unit
+     * @param verticalOffset - Offset to move shelves down from default centered position
+     * @returns Y position for the shelf board
+     */
+    static calculateShelfY(
+        shelfLevel: number,
+        height: number,
+        shelfCount: number,
+        verticalOffset: number = 0
+    ): number {
+        const shelfSpacing = height / (shelfCount + 1)
+        return shelfLevel * shelfSpacing + verticalOffset
+    }
+    
+    /**
+     * Calculate all shelf Y positions for a unit (optimization: do once per unit, not per shelf)
+     * 
+     * @param config - Shelf configuration with height, shelfCount, shelfVerticalOffset
+     * @returns Array of Y positions for all shelves [bottom, middle, top]
+     */
+    static calculateAllShelfYPositions(config: {
+        height: number
+        shelfCount: number
+        shelfVerticalOffset?: number
+    }): number[] {
+        const positions: number[] = []
+        for (let i = 1; i <= config.shelfCount; i++) {
+            positions.push(ShelfCalculationUtils.calculateShelfY(
+                i,
+                config.height,
+                config.shelfCount,
+                config.shelfVerticalOffset ?? 0
+            ))
+        }
+        return positions
+    }
+    
     /**
      * Calculate shelf depth and position offset for a given shelf level
      * Uses graduated extension formula: bottom shelves deepest, top shallowest
@@ -261,16 +306,31 @@ export class ShelfSurfaceUtils {
     /**
      * Get standard shelf surface configuration (used by GPU renderer)
      * These values must match the actual shelf positioning in InstancedShelfRenderer.setInstance()
-     * Default config: height=2.0, shelfCount=3, boardThickness=0.05
-     * shelfSpacing = height / (shelfCount + 1) = 2.0 / 4 = 0.5
-     * Interior surface Y = shelfY + boardThickness * 0.55
+     * Uses shared calculation to ensure game placement matches actual shelf positions
      */
     private static getStandardShelfSurfaces(): ShelfSurface[] {
-        return [
-            { topY: 0.5275, frontZ: -0.5, backZ: 0.5, centerX: 0, width: 2.0 },  // Bottom shelf: 0.5 + 0.05*0.55
-            { topY: 1.0275, frontZ: -0.5, backZ: 0.5, centerX: 0, width: 2.0 },  // Middle shelf: 1.0 + 0.05*0.55  
-            { topY: 1.5275, frontZ: -0.5, backZ: 0.5, centerX: 0, width: 2.0 }   // Top shelf: 1.5 + 0.05*0.55
-        ]
+        const config = DEFAULT_SHELF_CONFIG
+        const surfaces: ShelfSurface[] = []
+        
+        // Calculate all shelf Y positions once (optimization: per-unit calculation, not per-shelf)
+        const shelfYPositions = ShelfCalculationUtils.calculateAllShelfYPositions({
+            height: config.height,
+            shelfCount: config.shelfCount,
+            shelfVerticalOffset: config.shelfVerticalOffset
+        })
+        
+        // Create surface for each shelf (interior surface is slightly above shelf board)
+        shelfYPositions.forEach(shelfY => {
+            surfaces.push({
+                topY: shelfY + config.boardThickness * 0.55,  // Interior surface offset
+                frontZ: -0.5,
+                backZ: 0.5,
+                centerX: 0,
+                width: config.width
+            })
+        })
+        
+        return surfaces
     }
     
     /**
