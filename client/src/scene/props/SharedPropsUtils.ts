@@ -64,7 +64,7 @@ export class GamePlacementConstants {
     static readonly Z_OFFSET = 0.03       // 3cm from shelf surface (game depth 10cm, so front/back faces sit close to shelf edge)
     static readonly Y_OFFSET = 0.005      // 5mm above shelf surface  
     static readonly GAME_HEIGHT = 0.4     // 40cm height
-    static readonly GAME_SPACING = 0.35   // 35cm spacing between games
+    static readonly GAME_SPACING = 0.55   // 35cm spacing between games
 }
 
 /**

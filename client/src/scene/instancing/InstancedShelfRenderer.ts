@@ -300,25 +300,38 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         for (let i = 1; i <= config.shelfCount; i++) {
             const shelfY = i * shelfSpacing
             const widthAtHeight = config.width - 2 * (config.height - shelfY) * Math.tan(angleRad)
-            const depthExtension = (i - 1) * config.shelfExtensionPerLevel
-            const shelfDepth = config.depth - config.boardThickness * 2 + depthExtension
+            // Adjust extension: middle shelf (i=2 of 3) should be baseline with moderate extension
+            // BOTTOM shelves extend MORE (lower = deeper), top extends LESS
+            // Formula: All shelves get base extension, then graduated adjustment per level
+            const middleShelf = (config.shelfCount + 1) / 2
+            const baseExtension = config.shelfExtensionPerLevel // Middle shelf baseline
+            const graduatedExtension = (middleShelf - i) * (config.shelfExtensionPerLevel * 0.64) // Bottom extends more, top less
+            const totalExtension = baseExtension + graduatedExtension
+            
+            // Shelves span BOTH north and south faces, so total depth is 2x the unit depth + extension
+            // This makes shelves extend from both angled boards
+            const shelfDepth = (config.depth * 2) - config.boardThickness * 2 + totalExtension
             const widthScale = widthAtHeight / config.width
             const depthScale = shelfDepth / config.depth
             
-            this.createShelfBoard(position, shelfY, widthScale, depthScale, instanceIndices.shelfBoards)
-            this.createInteriorSurface(position, shelfY, config.boardThickness, widthScale, depthScale, instanceIndices.interiorSurfaces)
+            // Shelves are centered at Z=0, no offset needed (BoxGeometry centers naturally)
+            const forwardOffset = 0
+            
+            this.createShelfBoard(position, shelfY, forwardOffset, widthScale, depthScale, instanceIndices.shelfBoards)
+            this.createInteriorSurface(position, shelfY, forwardOffset, config.boardThickness, widthScale, depthScale, instanceIndices.interiorSurfaces)
         }
     }
     
     private createShelfBoard(
         position: THREE.Vector3,
         shelfY: number,
+        forwardOffset: number,
         widthScale: number,
         depthScale: number,
         indices: number[]
     ): void {
         const shelfBoardIndex = this.nextInstanceIndex.shelfBoard++
-        const shelfPos = position.clone().add(new THREE.Vector3(0, shelfY, 0))
+        const shelfPos = position.clone().add(new THREE.Vector3(0, shelfY, forwardOffset))
         const shelfScale = new THREE.Vector3(widthScale, 1, depthScale)
         
         this.shelfBoardManager.setInstanceMatrix(shelfBoardIndex, shelfPos, undefined, shelfScale)
@@ -329,13 +342,14 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     private createInteriorSurface(
         position: THREE.Vector3,
         shelfY: number,
+        forwardOffset: number,
         boardThickness: number,
         widthScale: number,
         depthScale: number,
         indices: number[]
     ): void {
         const interiorSurfaceIndex = this.nextInstanceIndex.interior++
-        const interiorPos = position.clone().add(new THREE.Vector3(0, shelfY + boardThickness * 0.55, 0))
+        const interiorPos = position.clone().add(new THREE.Vector3(0, shelfY + boardThickness * 0.55, forwardOffset))
         const interiorScale = new THREE.Vector3(widthScale, 1, depthScale)
         
         this.interiorSurfaceManager.setInstanceMatrix(interiorSurfaceIndex, interiorPos, undefined, interiorScale)

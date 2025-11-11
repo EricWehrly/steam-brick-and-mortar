@@ -120,10 +120,20 @@ export class ProceduralShelfGenerator {
       // Calculate shelf width at this height due to angled sides
       const widthAtHeight = width - 2 * (height - shelfY) * Math.tan(angleRad);
       
-      // Make lower shelves progressively extend forward (depth direction)
-      const shelfFromBottom = shelfCount - i + 1; // 1 for top shelf, shelfCount for bottom
-      const depthExtension = (shelfFromBottom - 1) * shelfExtensionPerLevel; // Each lower shelf extends forward
-      const shelfDepth = depth - boardThickness * 2 + depthExtension; // Account for front/back board thickness + extension
+      // Adjust extension: middle shelf should be baseline with moderate extension
+      // BOTTOM shelves extend MORE (lower = deeper), top extends LESS
+      // Formula: All shelves get base extension, then graduated adjustment per level
+      const middleShelf = (shelfCount + 1) / 2;
+      const baseExtension = shelfExtensionPerLevel; // Middle shelf baseline
+      const graduatedExtension = (middleShelf - i) * (shelfExtensionPerLevel * 0.64); // Bottom extends more, top less
+      const totalExtension = baseExtension + graduatedExtension;
+      
+      // Shelves span BOTH north and south faces, so total depth is 2x the unit depth + extension
+      // This makes shelves extend from both angled boards
+      const shelfDepth = (depth * 2) - boardThickness * 2 + totalExtension;
+      
+      // Shelves are centered at Z=0, no offset needed (BoxGeometry centers naturally)
+      const forwardOffset = 0;
       
       // Create shelf board with MDF veneer exterior
       // TODO: Replace with InstancedMesh for better draw call batching
@@ -134,7 +144,7 @@ export class ProceduralShelfGenerator {
       );
 
       const shelf = new THREE.Mesh(shelfGeometry, exteriorMaterial);
-      shelf.position.set(0, shelfY, 0);
+      shelf.position.set(0, shelfY, forwardOffset);
       shelf.castShadow = true;
       shelf.receiveShadow = true;
       parent.add(shelf);
@@ -148,7 +158,7 @@ export class ProceduralShelfGenerator {
       );
 
       const interiorSurface = new THREE.Mesh(interiorGeometry, interiorMaterial);
-      interiorSurface.position.set(0, shelfY + boardThickness * 0.55, 0); // Slightly above shelf
+      interiorSurface.position.set(0, shelfY + boardThickness * 0.55, forwardOffset); // Slightly above shelf, matches shelf Z position
       interiorSurface.receiveShadow = true;
       parent.add(interiorSurface);
     }
