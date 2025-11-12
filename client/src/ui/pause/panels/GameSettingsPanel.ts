@@ -13,6 +13,7 @@ import { renderTemplate } from '../../../utils/TemplateEngine'
 import gameSettingsPanelTemplate from '../../../templates/pause-menu/game-settings-panel.html?raw'
 import '../../../styles/pause-menu/game-settings-panel.css'
 import { AppSettings } from '../../../core/AppSettings'
+import { EventManager } from '../../../core/EventManager'
 import { EventSource } from '../../../core/EventManager'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 
@@ -94,7 +95,8 @@ export class GameSettingsPanel extends PauseMenuPanel {
             cacheGameData: this.settings.cacheGameData,
             
             // Debug Tools
-            showCompassRose: this.appSettings.getSetting('showCompassRose')
+            showCompassRose: this.appSettings.getSetting('showCompassRose'),
+            showShelfIndices: false  // Default off, controlled via event system
         })
     }
 
@@ -146,6 +148,13 @@ export class GameSettingsPanel extends PauseMenuPanel {
                 onChange: (checked) => {
                     this.appSettings.setSetting('showCompassRose', checked, EventSource.UI)
                     console.log(`🎮 App setting updated: showCompassRose = ${checked}`)
+                }
+            },
+            {
+                toggleId: 'show-shelf-indices',
+                onChange: (checked) => {
+                    EventManager.getInstance().emit('store-props:toggle-shelf-indices', {})
+                    console.log(`🔍 Shelf unit indices ${checked ? 'enabled' : 'disabled'}`)
                 }
             }
         ])

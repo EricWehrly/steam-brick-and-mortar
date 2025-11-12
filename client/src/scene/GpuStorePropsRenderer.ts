@@ -91,6 +91,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private setupEventListeners(): void {
         EventManager.getInstance().registerEventHandler(RoomEventTypes.Resized, this.generateShelvesAsync.bind(this));
+        EventManager.getInstance().registerEventHandler('store-props:toggle-shelf-indices' as any, this.toggleShelfIndices.bind(this));
     }
 
     /**
@@ -408,6 +409,27 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 }
             }
         }
+    }
+
+    /**
+     * Enable shelf unit index display (using sticker system)
+     */
+    public enableShelfIndices(): void {
+        this.instancedShelfRenderer?.enableShelfIndices()
+    }
+    
+    /**
+     * Disable shelf unit index display
+     */
+    public disableShelfIndices(): void {
+        this.instancedShelfRenderer?.disableShelfIndices()
+    }
+    
+    /**
+     * Toggle shelf unit index display on/off
+     */
+    public toggleShelfIndices(): void {
+        this.instancedShelfRenderer?.toggleShelfIndices()
     }
 
     public dispose(): void {

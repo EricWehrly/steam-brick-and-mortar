@@ -91,7 +91,18 @@ export class SceneCoordinator {
 
         if(window) {
             (window as any).debugListSceneObjects = this.debugListSceneObjects.bind(this);
+            (window as any).toggleShelfIndices = this.toggleShelfIndices.bind(this);
         }
+    }
+    
+    /**
+     * Toggle shelf unit index display
+     * Call from console: toggleShelfIndices()
+     */
+    public toggleShelfIndices(): void {
+        // Emit event to toggle shelf unit indices
+        this.eventManager.emit('store-props:toggle-shelf-indices', {})
+        console.log('🔍 Shelf unit indices toggled')
     }
 
     private async loadEnhancedScene(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
