@@ -9,10 +9,14 @@ import type {
     IInstancedRenderer, 
     InstancedRendererStats
 } from './IInstancedRenderer'
+import { StickerManager } from '../stickers/StickerManager'
+import { ShelfStickerIntegration } from '../stickers/ShelfStickerIntegration'
+import { ShelfUnitIndexSystem } from '../stickers/ShelfUnitIndexSystem'
 
 export interface InstancedShelfConfig extends InstancedRendererConfig {
     defaultShelfConfig?: ShelfConfig
     maxShelfUnits?: number
+    maxStickersPerSideboard?: number
 }
 
 export const DEFAULT_INSTANCED_SHELF_CONFIG = {
@@ -66,7 +70,17 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     private readonly shelfYPositions: number[]
     private readonly shelfDepthsAndOffsets: Array<{ shelfDepth: number; forwardOffset: number }>
     
+    // Sticker system
+    private stickerManager: StickerManager
+    private stickerIntegration: ShelfStickerIntegration
+    private indexSystem: ShelfUnitIndexSystem
+    private readonly maxStickersPerSideboard: number
+    
     constructor(config: InstancedShelfConfig = {}) {
+        // Reduced to 3 to stay within WebGL attribute limits
+        // 3 stickers * 2 vec4 attributes = 6 custom attributes
+        // Combined with Three.js MeshStandardMaterial built-ins (~10 attributes) = 16 total
+        this.maxStickersPerSideboard = config.maxStickersPerSideboard ?? 3
         this.maxShelfUnits = config.maxShelfUnits ?? DEFAULT_INSTANCED_SHELF_CONFIG.maxShelfUnits
         
         this.defaultShelfConfig = {
@@ -100,8 +114,19 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.shelfBoardManager = new InstancedMeshManager('InstancedShelf-ShelfBoards')
         this.interiorSurfaceManager = new InstancedMeshManager('InstancedShelf-InteriorSurfaces')
         
+        // Initialize sticker system
+        this.stickerManager = new StickerManager()
+        this.stickerIntegration = new ShelfStickerIntegration({
+            stickerManager: this.stickerManager,
+            maxStickersPerSurface: this.maxStickersPerSideboard
+        })
+        this.indexSystem = new ShelfUnitIndexSystem(this.stickerManager)
+        
         // Subscribe to GPU update events
-        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, () => this.updateGPU())
+        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, () => {
+            this.updateGPU()
+            this.populateStickersAfterGeneration()
+        })
         
         console.debug(`🏪 InstancedShelfRenderer created (max units: ${this.maxShelfUnits})`)
     }
@@ -137,9 +162,13 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                 name: 'instanced-shelf-angled-boards'
             })
             
+            // Clone and modify side board material to support stickers
+            const stickerEnabledMaterial = brandAccentMaterial.clone()
+            this.stickerIntegration.setupStickerMaterial(stickerEnabledMaterial)
+            
             this.sideBoardManager.initialize({
                 geometry: sideBoardGeometry,
-                material: brandAccentMaterial,
+                material: stickerEnabledMaterial,
                 maxInstances: this.maxShelfUnits * 2,
                 name: 'instanced-shelf-side-boards'
             })
@@ -211,6 +240,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.interiorSurfaceManager.addInstanceAttributes([
             { name: 'surfaceScale', itemSize: 2, defaultValue: [1, 1] }
         ])
+        
+        // Add sticker attributes to side boards (left board gets stickers)
+        this.stickerIntegration.setupInstanceAttributes(this.sideBoardManager)
     }
     
     // TODO: Is this definitely how we want to write this?
@@ -240,7 +272,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                 this.interiorSurfaceManager.addToMainScene()
             }
             
-            const shelfUnit = this.createShelfUnit(data.position, shelfConfig)
+            const shelfUnit = this.createShelfUnit(index, data.position, shelfConfig)
             this.shelfUnits.set(index, shelfUnit)
             
             console.debug(`🏪 Set shelf unit ${index} at position (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
@@ -253,6 +285,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     }
     
     private createShelfUnit(
+        shelfUnitIndex: number,
         position: THREE.Vector3,
         config: Required<ShelfConfig>
     ): ShelfUnitInstance {
@@ -264,8 +297,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
         
         this.createAngledBoards(position, config, instanceIndices.angledBoards)
-        this.createSideBoards(position, config, instanceIndices.sideBoards)
-        this.createHorizontalShelves(position, config, instanceIndices)
+        this.createSideBoards(shelfUnitIndex, position, config, instanceIndices.sideBoards)
+        this.createHorizontalShelves(shelfUnitIndex, position, config, instanceIndices)
         
         return {
             position: position.clone(),
@@ -293,7 +326,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         indices.push(backBoardIndex)
     }
     
-    private createSideBoards(position: THREE.Vector3, config: Required<ShelfConfig>, indices: number[]): void {
+    private createSideBoards(shelfUnitIndex: number, position: THREE.Vector3, config: Required<ShelfConfig>, indices: number[]): void {
         const leftBoardIndex = this.nextInstanceIndex.sideBoard++
         const leftPos = position.clone().add(new THREE.Vector3(
             -config.width / 2 - config.boardThickness * 0.5,
@@ -301,6 +334,18 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             0
         ))
         this.sideBoardManager.setInstanceMatrix(leftBoardIndex, leftPos)
+        
+        // Initialize sticker data for left side board (which will receive stickers)
+        const leftSurfaceId = shelfUnitIndex * 1000  // Unique ID for left sideboard
+        this.stickerIntegration.updateSurfaceStickers(this.sideBoardManager, leftBoardIndex, leftSurfaceId)
+        
+        // Add shelf unit index if index system is enabled
+        if (this.indexSystem.isEnabled()) {
+            this.indexSystem.addIndexToSideboard(shelfUnitIndex, leftSurfaceId)
+            // Refresh sticker attributes after adding index
+            this.stickerIntegration.updateSurfaceStickers(this.sideBoardManager, leftBoardIndex, leftSurfaceId)
+        }
+        
         indices.push(leftBoardIndex)
         
         const rightBoardIndex = this.nextInstanceIndex.sideBoard++
@@ -310,10 +355,16 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             0
         ))
         this.sideBoardManager.setInstanceMatrix(rightBoardIndex, rightPos)
+        
+        // Initialize sticker data for right side board (empty, no stickers)
+        const rightSurfaceId = shelfUnitIndex * 1000 + 1
+        this.stickerIntegration.updateSurfaceStickers(this.sideBoardManager, rightBoardIndex, rightSurfaceId)
+        
         indices.push(rightBoardIndex)
     }
     
     private createHorizontalShelves(
+        shelfUnitIndex: number,
         position: THREE.Vector3,
         config: Required<ShelfConfig>,
         instanceIndices: ShelfUnitInstance['instanceIndices']
@@ -332,7 +383,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             const depthScale = shelfDepth / config.depth
             
             this.createShelfBoard(position, shelfY, forwardOffset, widthScale, depthScale, instanceIndices.shelfBoards)
-            this.createInteriorSurface(position, shelfY, forwardOffset, config.boardThickness, widthScale, depthScale, instanceIndices.interiorSurfaces)
+            this.createInteriorSurface(shelfUnitIndex, i, position, shelfY, forwardOffset, config.boardThickness, widthScale, depthScale, instanceIndices.interiorSurfaces)
         }
     }
     
@@ -354,6 +405,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     }
     
     private createInteriorSurface(
+        shelfUnitIndex: number,
+        shelfLevel: number,
         position: THREE.Vector3,
         shelfY: number,
         forwardOffset: number,
@@ -368,6 +421,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         
         this.interiorSurfaceManager.setInstanceMatrix(interiorSurfaceIndex, interiorPos, undefined, interiorScale)
         this.interiorSurfaceManager.setInstanceAttribute('surfaceScale', interiorSurfaceIndex, [widthScale, depthScale])
+        
         indices.push(interiorSurfaceIndex)
     }
     
@@ -438,6 +492,225 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             // Number of active geometry/material combinations - should correspond to draw calls
             activeGeometryMaterialCombinations: activeGeometryTypes
         }
+    }
+    
+    /**
+     * Get the sticker manager for runtime sticker operations
+     */
+    public getStickerManager(): StickerManager {
+        return this.stickerManager
+    }
+    
+    /**
+     * Populate stickers after shelf generation completes
+     * Called via event handler after GPU update
+     */
+    private populateStickersAfterGeneration(): void {
+        // Count left side boards (one per shelf unit)
+        const totalLeftSideboards = this.shelfUnits.size
+        
+        console.log(`🎨 [STICKER DEBUG] populateStickersAfterGeneration: shelfUnits.size=${this.shelfUnits.size}, totalLeftSideboards=${totalLeftSideboards}`)
+        
+        // Populate with random stickers on left side boards (30% density)
+        this.stickerIntegration.populateAndRefresh(
+            this.sideBoardManager,
+            totalLeftSideboards,
+            (index: number) => index * 1000,  // Left sideboard surface IDs: 0, 1000, 2000, etc.
+            0.3
+        )
+        
+        console.log(`🎨 [STICKER DEBUG] Updated GPU with sticker data`)
+    }
+    
+    /**
+     * Enable shelf unit index display (using sticker system)
+     */
+    public enableShelfIndices(): void {
+        this.indexSystem.enable()
+        // Re-populate side boards to add indices
+        this.refreshSideboardIndices()
+        console.debug('🔍 Shelf unit indices enabled')
+    }
+    
+    /**
+     * Disable shelf unit index display
+     */
+    public disableShelfIndices(): void {
+        this.indexSystem.disable()
+        // Clear indices from side boards
+        this.refreshSideboardIndices()
+        console.debug('🔍 Shelf unit indices disabled')
+    }
+    
+    /**
+     * Toggle shelf unit index display
+     */
+    public toggleShelfIndices(): void {
+        this.indexSystem.toggle()
+        this.refreshSideboardIndices()
+    }
+    
+    /**
+     * Refresh side board indices for all shelf units
+     */
+    private refreshSideboardIndices(): void {
+        let sideboardIndex = 0
+        this.shelfUnits.forEach((_unit, shelfUnitIndex) => {
+            const leftBoardIndex = sideboardIndex
+            const leftSurfaceId = shelfUnitIndex * 1000
+            
+            // Clear and re-add stickers (including index if enabled)
+            if (this.indexSystem.isEnabled()) {
+                this.indexSystem.addIndexToSideboard(shelfUnitIndex, leftSurfaceId)
+            }
+            this.stickerIntegration.updateSurfaceStickers(this.sideBoardManager, leftBoardIndex, leftSurfaceId)
+            
+            sideboardIndex += 2  // Skip right board
+        })
+        
+        this.sideBoardManager.updateGPU()
+        console.debug(`🔍 Refreshed indices for ${this.shelfUnits.size} shelf units`)
+    }
+    
+    /**
+     * Old method removed - now handled by ShelfStickerIntegration
+     */
+    private setupStickerMaterial(material: THREE.MeshStandardMaterial): void {
+        const stickerTexture = this.stickerManager.getEmojiAtlas().getTexture()
+        const atlasInfo = this.stickerManager.getAtlasInfo()
+        const emojiUVSize = atlasInfo.uvScale  // Size of one emoji in UV space
+        
+        console.log(`🎨 [SHADER DEBUG] Setting up sticker material with atlas:`, {
+            atlasSize: atlasInfo.atlasSize,
+            totalEmojis: atlasInfo.totalEmojis,
+            uvScale: emojiUVSize,
+            texture: stickerTexture,
+            textureImage: stickerTexture.image
+        })
+        
+        material.onBeforeCompile = (shader) => {
+            console.log(`🎨 [SHADER DEBUG] onBeforeCompile called`)
+            
+            // Add uniforms
+            shader.uniforms.stickerAtlas = { value: stickerTexture }
+            shader.uniforms.emojiUVSize = { value: emojiUVSize }
+            
+            console.log(`🎨 [SHADER DEBUG] Added uniforms:`, {
+                stickerAtlas: shader.uniforms.stickerAtlas,
+                emojiUVSize: shader.uniforms.emojiUVSize
+            })
+            
+            // Add packed attributes and varyings for 3 stickers
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <common>',
+                `
+                #include <common>
+                // Packed sticker attributes (vec4s)
+                attribute vec4 sticker0Data1;  // uvOffset.xy, position.xy
+                attribute vec4 sticker0Data2;  // rotation, scale, enabled, padding
+                attribute vec4 sticker1Data1;
+                attribute vec4 sticker1Data2;
+                attribute vec4 sticker2Data1;
+                attribute vec4 sticker2Data2;
+                
+                varying vec2 vUV;
+                varying vec4 vSticker0Data1;
+                varying vec4 vSticker0Data2;
+                varying vec4 vSticker1Data1;
+                varying vec4 vSticker1Data2;
+                varying vec4 vSticker2Data1;
+                varying vec4 vSticker2Data2;
+                `
+            )
+            
+            // Pass sticker data to fragment shader
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <begin_vertex>',
+                `
+                #include <begin_vertex>
+                vUV = uv;
+                vSticker0Data1 = sticker0Data1;
+                vSticker0Data2 = sticker0Data2;
+                vSticker1Data1 = sticker1Data1;
+                vSticker1Data2 = sticker1Data2;
+                vSticker2Data1 = sticker2Data1;
+                vSticker2Data2 = sticker2Data2;
+                `
+            )
+            
+            // Add sticker blending in fragment shader
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <common>',
+                `
+                #include <common>
+                uniform sampler2D stickerAtlas;
+                uniform float emojiUVSize;
+                varying vec2 vUV;
+                varying vec4 vSticker0Data1;
+                varying vec4 vSticker0Data2;
+                varying vec4 vSticker1Data1;
+                varying vec4 vSticker1Data2;
+                varying vec4 vSticker2Data1;
+                varying vec4 vSticker2Data2;
+                
+                vec4 getStickerColor(vec4 data1, vec4 data2) {
+                    vec2 uvOffset = data1.xy;
+                    vec2 stickerPos = data1.zw;
+                    float rotation = data2.x;
+                    float scale = data2.y;
+                    float enabled = data2.z;
+                    
+                    if (enabled < 0.5) return vec4(0.0);
+                    
+                    // Transform UV to sticker-local space
+                    vec2 localUV = vUV - stickerPos;
+                    
+                    // Apply rotation
+                    float rad = radians(rotation);
+                    float cosA = cos(rad);
+                    float sinA = sin(rad);
+                    vec2 rotatedUV = vec2(
+                        localUV.x * cosA - localUV.y * sinA,
+                        localUV.x * sinA + localUV.y * cosA
+                    );
+                    
+                    // Apply scale and center
+                    rotatedUV /= (scale * 0.15);  // Scale factor for reasonable size
+                    rotatedUV += vec2(0.5);  // Center in 0-1 range
+                    
+                    // Check if UV is within sticker bounds
+                    if (rotatedUV.x < 0.0 || rotatedUV.x > 1.0 || rotatedUV.y < 0.0 || rotatedUV.y > 1.0) {
+                        return vec4(0.0);
+                    }
+                    
+                    // Sample from atlas
+                    vec2 atlasUV = uvOffset + rotatedUV * emojiUVSize;
+                    return texture2D(stickerAtlas, atlasUV);
+                }
+                `
+            )
+            
+            // Blend all stickers onto base color
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <color_fragment>',
+                `
+                #include <color_fragment>
+                
+                // Get sticker colors
+                vec4 sticker0 = getStickerColor(vSticker0Data1, vSticker0Data2);
+                vec4 sticker1 = getStickerColor(vSticker1Data1, vSticker1Data2);
+                vec4 sticker2 = getStickerColor(vSticker2Data1, vSticker2Data2);
+                
+                // Blend stickers onto base color (back to front)
+                diffuseColor.rgb = mix(diffuseColor.rgb, sticker0.rgb, sticker0.a);
+                diffuseColor.rgb = mix(diffuseColor.rgb, sticker1.rgb, sticker1.a);
+                diffuseColor.rgb = mix(diffuseColor.rgb, sticker2.rgb, sticker2.a);
+                `
+            )
+        }
+        
+        material.needsUpdate = true
+        console.debug('🎨 [DEPRECATED] Old setupStickerMaterial called - this should not happen')
     }
     
     public dispose(): void {
