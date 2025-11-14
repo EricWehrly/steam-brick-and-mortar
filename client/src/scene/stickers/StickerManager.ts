@@ -244,6 +244,47 @@ export class StickerManager {
     }
 
     /**
+     * Populate random stickers using specific surface IDs (for macro texture with non-sequential IDs)
+     */
+    public populateRandomStickersWithIds(surfaceIds: number[], density: number = 0.3): void {
+        console.log(`🎨 [STICKER DEBUG] populateRandomStickersWithIds called with ${surfaceIds.length} surfaces, density=${density}`)
+        const emojis = [...DEFAULT_SHELF_EMOJIS]
+
+        for (const surfaceId of surfaceIds) {
+            // Random chance to add stickers
+            if (Math.random() > density) continue
+
+            // Add 1-2 stickers per shelf
+            const stickerCount = Math.random() > 0.5 ? 1 : 2
+
+            for (let i = 0; i < stickerCount; i++) {
+                const emoji = emojis[Math.floor(Math.random() * emojis.length)]
+                
+                // Random position (with some margin from edges)
+                const position: [number, number] = [
+                    0.2 + Math.random() * 0.6,  // u: 0.2 to 0.8
+                    0.2 + Math.random() * 0.6   // v: 0.2 to 0.8
+                ]
+                
+                // Random rotation
+                const rotation = Math.random() * 360
+                
+                // Random scale (0.8 to 1.2)
+                const scale = 0.8 + Math.random() * 0.4
+                
+                const added = this.addSticker(surfaceId, emoji, position, rotation, scale)
+                if (added) {
+                    console.log(`🎨 [STICKER DEBUG] Added ${emoji} to surface ${surfaceId} at [${position[0].toFixed(2)}, ${position[1].toFixed(2)}] rotation=${rotation.toFixed(0)}° scale=${scale.toFixed(2)}`)
+                }
+            }
+        }
+
+        const totalStickers = Array.from(this.placements.values()).reduce((sum, stickers) => sum + stickers.length, 0)
+        console.log(`🎨 [STICKER DEBUG] FINAL: Populated ${totalStickers} random stickers across ${this.placements.size} surfaces (${surfaceIds.length} total surfaces, ${(density * 100).toFixed(0)}% density)`)
+        console.log(`🎨 [STICKER DEBUG] Surface IDs used:`, surfaceIds)
+    }
+
+    /**
      * Get the emoji texture atlas for shader rendering
      */
     public getEmojiAtlas(): EmojiTextureAtlas {
