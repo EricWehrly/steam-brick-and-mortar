@@ -234,7 +234,7 @@ export class ShelfStickerIntegration {
         meshManager: InstancedMeshManager,
         surfaceCount: number,
         getSurfaceId: (index: number) => number,
-        density: number = 0.3
+        density: number = 0.8
     ): void {
         console.log(`🎨 Populating ${surfaceCount} surfaces with ${density * 100}% sticker density`)
         

@@ -56,23 +56,35 @@ export class ShelfUnitIndexSystem {
     public addIndexToSideboard(shelfUnitIndex: number, sideboardSurfaceId: number): void {
         if (!this.enabled) return
         
-        // For now, only support single-digit indices (0-9)
-        if (shelfUnitIndex > 9) {
-            console.warn(`Shelf unit index ${shelfUnitIndex} > 9, skipping label`)
+        // Support up to 3-digit indices (0-999)
+        if (shelfUnitIndex > 999) {
+            console.warn(`Shelf unit index ${shelfUnitIndex} > 999, skipping label`)
             return
         }
         
-        const emoji = this.digitEmojis[shelfUnitIndex]
+        // Convert number to string and get individual digits
+        const digits = shelfUnitIndex.toString().split('')
+        const digitCount = digits.length
+        
+        // Calculate spacing between digits (closer together for multi-digit numbers)
+        const digitSpacing = 0.15 // UV units between digit centers
+        const totalWidth = (digitCount - 1) * digitSpacing
+        const startX = 0.5 - totalWidth / 2 // Center the whole number
         
         // Place at top-center of sideboard
         // Note: After Y-flip in shader, lower V values are at the top
-        this.stickerManager.addSticker(
-            sideboardSurfaceId,
-            emoji,
-            [0.5, 0.1],  // Top-center (low V = top after Y-flip)
-            0,           // No rotation
-            1.5          // Larger scale for visibility
-        )
+        digits.forEach((digit, index) => {
+            const digitEmoji = this.digitEmojis[parseInt(digit)]
+            const xPos = startX + index * digitSpacing
+            
+            this.stickerManager.addSticker(
+                sideboardSurfaceId,
+                digitEmoji,
+                [xPos, 0.1],  // Top-center (low V = top after Y-flip)
+                0,           // No rotation
+                1.5          // Larger scale for visibility
+            )
+        })
     }
     
     public isEnabled(): boolean {
