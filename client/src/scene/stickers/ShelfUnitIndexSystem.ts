@@ -9,6 +9,9 @@
 
 import type { StickerManager } from './StickerManager'
 
+// Toggle verbose sticker-system debug logging in this module
+const STICKERS_DEBUG = false
+
 export class ShelfUnitIndexSystem {
     private stickerManager: StickerManager
     private enabled: boolean = false // Default to disabled (enable via UI toggle)
@@ -24,8 +27,8 @@ export class ShelfUnitIndexSystem {
      * Enable index display on shelf units
      */
     public enable(): void {
-        this.enabled = true
-        console.debug('🔍 Shelf unit indices enabled')
+    this.enabled = true
+    if (STICKERS_DEBUG) console.debug('🔍 Shelf unit indices enabled')
     }
     
     /**
@@ -33,8 +36,8 @@ export class ShelfUnitIndexSystem {
      * Note: Caller must call refreshAllIndices() after this to update the display
      */
     public disable(): void {
-        this.enabled = false
-        console.debug('🔍 Shelf unit indices disabled')
+    this.enabled = false
+    if (STICKERS_DEBUG) console.debug('🔍 Shelf unit indices disabled')
     }
     
     /**
