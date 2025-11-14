@@ -69,7 +69,7 @@ export class ShelfStickerHandler {
     public populateRandomStickers(
         meshManager: InstancedMeshManager,
         totalShelfUnits: number,
-        density: number = 0.3
+        density: number = 0.8
     ): void {
         console.log(`🎨 populateRandomStickers: ${totalShelfUnits} shelf units at ${density * 100}% density`)
         

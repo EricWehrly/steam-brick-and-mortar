@@ -27,7 +27,7 @@ export interface StickerData {
 export class StickerManager {
     private atlas: EmojiTextureAtlas
     private placements: Map<number, StickerPlacement[]>  // shelfId -> stickers
-    private readonly maxStickersPerShelf: number = 3
+    private readonly maxStickersPerShelf: number = 10 // Macro texture has no attribute limits!
 
     constructor() {
         // Initialize emoji atlas with default set
@@ -204,17 +204,17 @@ export class StickerManager {
     /**
      * Populate random stickers for testing with arbitrary positioning
      */
-    public populateRandomStickers(shelfCount: number, density: number = 0.3): void {
+    public populateRandomStickers(shelfCount: number, density: number = 0.8): void {
         console.log(`🎨 [STICKER DEBUG] populateRandomStickers called with shelfCount=${shelfCount}, density=${density}`)
         const emojis = [...DEFAULT_SHELF_EMOJIS]
         console.log(`🎨 [STICKER DEBUG] Available emojis:`, emojis)
 
         for (let shelfId = 0; shelfId < shelfCount; shelfId++) {
-            // Random chance to add stickers
+            // Random chance to add stickers (80% by default)
             if (Math.random() > density) continue
 
-            // Add 1-2 stickers per shelf
-            const stickerCount = Math.random() > 0.5 ? 1 : 2
+            // Add 2-5 stickers per shelf (varied for visual interest)
+            const stickerCount = Math.floor(Math.random() * 4) + 2 // 2, 3, 4, or 5 stickers
 
             for (let i = 0; i < stickerCount; i++) {
                 const emoji = emojis[Math.floor(Math.random() * emojis.length)]
@@ -246,16 +246,16 @@ export class StickerManager {
     /**
      * Populate random stickers using specific surface IDs (for macro texture with non-sequential IDs)
      */
-    public populateRandomStickersWithIds(surfaceIds: number[], density: number = 0.3): void {
+    public populateRandomStickersWithIds(surfaceIds: number[], density: number = 0.8): void {
         console.log(`🎨 [STICKER DEBUG] populateRandomStickersWithIds called with ${surfaceIds.length} surfaces, density=${density}`)
         const emojis = [...DEFAULT_SHELF_EMOJIS]
 
         for (const surfaceId of surfaceIds) {
-            // Random chance to add stickers
+            // Random chance to add stickers (80% by default)
             if (Math.random() > density) continue
 
-            // Add 1-2 stickers per shelf
-            const stickerCount = Math.random() > 0.5 ? 1 : 2
+            // Add 2-5 stickers per shelf (varied for visual interest)
+            const stickerCount = Math.floor(Math.random() * 4) + 2 // 2, 3, 4, or 5 stickers
 
             for (let i = 0; i < stickerCount; i++) {
                 const emoji = emojis[Math.floor(Math.random() * emojis.length)]
