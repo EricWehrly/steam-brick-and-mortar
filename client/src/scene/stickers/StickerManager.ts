@@ -7,6 +7,9 @@
 
 import { EmojiTextureAtlas, DEFAULT_SHELF_EMOJIS } from '../../utils/EmojiTextureAtlas'
 
+// Toggle verbose sticker-system debug logging in this module
+const STICKERS_DEBUG = false
+
 export interface StickerPlacement {
     shelfId: number          // Which shelf instance
     emoji: string            // Emoji character
@@ -40,7 +43,7 @@ export class StickerManager {
 
         this.placements = new Map()
 
-        console.debug('🎨 StickerManager initialized with emoji atlas')
+    if (STICKERS_DEBUG) console.debug('🎨 StickerManager initialized with emoji atlas')
     }
 
     /**
@@ -80,7 +83,6 @@ export class StickerManager {
         currentStickers.push(sticker)
         this.placements.set(shelfId, currentStickers)
 
-        console.debug(`Added sticker ${emoji} to shelf ${shelfId} at [${position[0].toFixed(2)}, ${position[1].toFixed(2)}]`)
         return true
     }
 
@@ -101,7 +103,6 @@ export class StickerManager {
             this.placements.set(shelfId, currentStickers)
         }
 
-        console.debug(`Removed sticker ${index} from shelf ${shelfId}`)
         return true
     }
 
@@ -176,8 +177,8 @@ export class StickerManager {
      * Clear all stickers
      */
     public clearAll(): void {
-        this.placements.clear()
-        console.debug('Cleared all stickers')
+    this.placements.clear()
+    if (STICKERS_DEBUG) console.debug('Cleared all stickers')
     }
 
     /**
@@ -205,9 +206,7 @@ export class StickerManager {
      * Populate random stickers for testing with arbitrary positioning
      */
     public populateRandomStickers(shelfCount: number, density: number = 0.8): void {
-        console.log(`🎨 [STICKER DEBUG] populateRandomStickers called with shelfCount=${shelfCount}, density=${density}`)
         const emojis = [...DEFAULT_SHELF_EMOJIS]
-        console.log(`🎨 [STICKER DEBUG] Available emojis:`, emojis)
 
         for (let shelfId = 0; shelfId < shelfCount; shelfId++) {
             // Random chance to add stickers (80% by default)
@@ -231,23 +230,18 @@ export class StickerManager {
                 // Random scale (0.8 to 1.2)
                 const scale = 0.8 + Math.random() * 0.4
                 
-                const added = this.addSticker(shelfId, emoji, position, rotation, scale)
-                if (added) {
-                    console.log(`🎨 [STICKER DEBUG] Added ${emoji} to shelf ${shelfId} at [${position[0].toFixed(2)}, ${position[1].toFixed(2)}] rotation=${rotation.toFixed(0)}° scale=${scale.toFixed(2)}`)
-                }
+                this.addSticker(shelfId, emoji, position, rotation, scale)
             }
         }
 
-        const totalStickers = Array.from(this.placements.values()).reduce((sum, stickers) => sum + stickers.length, 0)
-        console.log(`🎨 [STICKER DEBUG] FINAL: Populated ${totalStickers} random stickers across ${this.placements.size} shelves (${shelfCount} total surfaces, ${(density * 100).toFixed(0)}% density)`)
-        console.log(`🎨 [STICKER DEBUG] Placements map:`, Array.from(this.placements.entries()))
+    const totalStickers = Array.from(this.placements.values()).reduce((sum, stickers) => sum + stickers.length, 0)
+    if (STICKERS_DEBUG) console.debug(`🎨 Populated ${totalStickers} random stickers across ${this.placements.size} shelves (${shelfCount} total, ${Math.round(density * 100)}% density)`)
     }
 
     /**
      * Populate random stickers using specific surface IDs (for macro texture with non-sequential IDs)
      */
     public populateRandomStickersWithIds(surfaceIds: number[], density: number = 0.8): void {
-        console.log(`🎨 [STICKER DEBUG] populateRandomStickersWithIds called with ${surfaceIds.length} surfaces, density=${density}`)
         const emojis = [...DEFAULT_SHELF_EMOJIS]
 
         for (const surfaceId of surfaceIds) {
@@ -272,16 +266,12 @@ export class StickerManager {
                 // Random scale (0.8 to 1.2)
                 const scale = 0.8 + Math.random() * 0.4
                 
-                const added = this.addSticker(surfaceId, emoji, position, rotation, scale)
-                if (added) {
-                    console.log(`🎨 [STICKER DEBUG] Added ${emoji} to surface ${surfaceId} at [${position[0].toFixed(2)}, ${position[1].toFixed(2)}] rotation=${rotation.toFixed(0)}° scale=${scale.toFixed(2)}`)
-                }
+                this.addSticker(surfaceId, emoji, position, rotation, scale)
             }
         }
 
-        const totalStickers = Array.from(this.placements.values()).reduce((sum, stickers) => sum + stickers.length, 0)
-        console.log(`🎨 [STICKER DEBUG] FINAL: Populated ${totalStickers} random stickers across ${this.placements.size} surfaces (${surfaceIds.length} total surfaces, ${(density * 100).toFixed(0)}% density)`)
-        console.log(`🎨 [STICKER DEBUG] Surface IDs used:`, surfaceIds)
+    const totalStickers = Array.from(this.placements.values()).reduce((sum, stickers) => sum + stickers.length, 0)
+    if (STICKERS_DEBUG) console.debug(`🎨 Populated ${totalStickers} random stickers across ${this.placements.size} surfaces (${surfaceIds.length} total, ${Math.round(density * 100)}% density)`)
     }
 
     /**

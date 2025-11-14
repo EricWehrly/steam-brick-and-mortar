@@ -17,6 +17,9 @@ import { StickerManager } from './StickerManager'
 import { ShelfStickerTextureAtlas } from './ShelfStickerTextureAtlas'
 import type { InstancedMeshManager } from '../instancing/InstancedMeshManager'
 
+// Toggle verbose sticker-system debug logging and runtime exposures in this module
+const STICKERS_DEBUG = false
+
 export interface StickerIntegrationConfig {
     stickerManager: StickerManager
 }
@@ -38,12 +41,11 @@ export class ShelfStickerIntegration {
             }
         )
         
-        console.debug('🎨 ShelfStickerIntegration: Using macro texture approach (no attribute limits)')
+        if (STICKERS_DEBUG) console.debug('🎨 ShelfStickerIntegration: Using macro texture approach (no attribute limits)')
         
-        // Expose for debugging
-        if (typeof window !== 'undefined') {
+        // Optionally expose integration for debugging at runtime
+        if (STICKERS_DEBUG && typeof window !== 'undefined') {
             (window as { stickerIntegration?: ShelfStickerIntegration }).stickerIntegration = this
-            console.log('🎨 [DEBUG] Integration exposed as window.stickerIntegration')
         }
     }
     
@@ -55,7 +57,7 @@ export class ShelfStickerIntegration {
         meshManager.addInstanceAttributes([
             { name: 'shelfId', itemSize: 1, defaultValue: 0 }
         ])
-        console.debug('🎨 Added shelfId attribute for macro texture stickers')
+    if (STICKERS_DEBUG) console.debug('🎨 Added shelfId attribute for macro texture stickers')
     }
     
     /**
@@ -65,37 +67,12 @@ export class ShelfStickerIntegration {
     public setupStickerMaterial(material: THREE.MeshStandardMaterial): void {
         const macroTextureInfo = this.macroTexture.getAtlasInfo()
         
-        console.log(`🎨 Setting up macro texture sticker material:`, macroTextureInfo)
-        console.log(`🎨 [DEBUG] Material before setup:`, {
-            type: material.type,
-            name: material.name,
-            map: material.map,
-            hasOnBeforeCompile: !!material.onBeforeCompile
-        })
+    if (STICKERS_DEBUG) console.debug(`🎨 Setting up macro texture sticker material (${macroTextureInfo.tilesPerRow}x${macroTextureInfo.tilesPerRow} tiles)`)
         
         material.onBeforeCompile = (shader) => {
-            console.log('🎨 [SHADER] onBeforeCompile called! Setting up uniforms...')
-            
             // Add uniforms
             shader.uniforms.stickerMacroTexture = { value: this.macroTexture.getTexture() }
             shader.uniforms.tilesPerRow = { value: macroTextureInfo.tilesPerRow }
-            
-            const textureValue = this.macroTexture.getTexture()
-            console.log('🎨 [SHADER DEBUG] Uniforms set:', {
-                tilesPerRow: macroTextureInfo.tilesPerRow,
-                textureSize: textureValue.image?.width ?? 'NO IMAGE',
-                textureType: textureValue.constructor.name,
-                hasImage: !!textureValue.image,
-                hasTexture: !!textureValue,
-                needsUpdate: textureValue.needsUpdate
-            })
-            
-            console.log('🎨 [SHADER DEBUG] Texture details:', textureValue)
-            console.log('🎨 [SHADER DEBUG] Shader object:', {
-                vertexShaderLength: shader.vertexShader.length,
-                fragmentShaderLength: shader.fragmentShader.length,
-                uniformsKeys: Object.keys(shader.uniforms)
-            })
             
             // Vertex shader: pass shelfId, UV, and world normal to fragment
             shader.vertexShader = shader.vertexShader.replace(
@@ -187,12 +164,7 @@ export class ShelfStickerIntegration {
         // Force material recompilation
         material.needsUpdate = true
         
-        console.debug('🎨 Sticker material shader modified (macro texture mode)')
-        console.log('🎨 [DEBUG] Material after setup:', {
-            needsUpdate: material.needsUpdate,
-            hasOnBeforeCompile: !!material.onBeforeCompile,
-            uuid: material.uuid
-        })
+    if (STICKERS_DEBUG) console.debug('🎨 Sticker material shader modified (macro texture mode)')
     }
     
     /**
@@ -236,15 +208,11 @@ export class ShelfStickerIntegration {
         getSurfaceId: (index: number) => number,
         density: number = 0.8
     ): void {
-        console.log(`🎨 Populating ${surfaceCount} surfaces with ${density * 100}% sticker density`)
-        
         // Generate surface IDs for all surfaces
         const surfaceIds: number[] = []
         for (let i = 0; i < surfaceCount; i++) {
             surfaceIds.push(getSurfaceId(i))
         }
-        
-        console.log(`🎨 [DEBUG] Surface IDs:`, surfaceIds.slice(0, 10), '...') // First 10 for brevity
         
         // Populate sticker data in manager using actual surface IDs
         this.stickerManager.populateRandomStickersWithIds(surfaceIds, density)
@@ -260,22 +228,13 @@ export class ShelfStickerIntegration {
             }
         }
         
-        console.log(`🎨 [DEBUG] Rendered ${stickersRendered} stickers to macro texture`)
-        
         // Update macro texture with all rendered stickers
         this.macroTexture.updateTexture()
-        
-        const atlasInfo = this.macroTexture.getAtlasInfo()
-        console.log(`🎨 [DEBUG] Macro texture atlas info:`, atlasInfo)
-        console.log(`🎨 [DEBUG] Macro texture needsUpdate:`, this.macroTexture.getTexture().needsUpdate)
-        
-        // DEBUG: Export canvas to visually inspect (uncomment to debug)
-        // this.macroTexture.debugExportCanvas()
         
         // Update GPU with new instance attributes
         meshManager.updateGPU()
         
-        console.log(`🎨 Macro texture updated with stickers for ${surfaceCount} surfaces`)
+    if (STICKERS_DEBUG) console.debug(`🎨 Populated ${stickersRendered} stickers across ${surfaceCount} surfaces (${Math.round(density * 100)}% density)`)
     }
     
     /**

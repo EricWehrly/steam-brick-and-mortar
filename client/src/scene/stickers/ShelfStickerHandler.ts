@@ -15,6 +15,9 @@ import type { ShelfStickerIntegration } from './ShelfStickerIntegration'
 import type { ShelfUnitIndexSystem } from './ShelfUnitIndexSystem'
 import type { InstancedMeshManager } from '../instancing/InstancedMeshManager'
 
+// Toggle verbose sticker-system debug logging in this module
+const STICKERS_DEBUG = false
+
 export interface ShelfStickerHandlerConfig {
     stickerManager: StickerManager
     stickerIntegration: ShelfStickerIntegration
@@ -71,8 +74,6 @@ export class ShelfStickerHandler {
         totalShelfUnits: number,
         density: number = 0.8
     ): void {
-        console.log(`🎨 populateRandomStickers: ${totalShelfUnits} shelf units at ${density * 100}% density`)
-        
         // Populate with random stickers on left side boards only
         // Left boards are at even indices: 0, 2, 4, 6, ... (boardIndex = shelfUnitIndex * 2)
         this.stickerIntegration.populateAndRefresh(
@@ -81,8 +82,6 @@ export class ShelfStickerHandler {
             (shelfUnitIndex: number) => shelfUnitIndex * 2,  // Left sideboard tile IDs: 0, 2, 4, 6, ...
             density
         )
-        
-        console.log(`🎨 [STICKER DEBUG] Updated GPU with sticker data`)
     }
     
     /**
@@ -92,9 +91,9 @@ export class ShelfStickerHandler {
         meshManager: InstancedMeshManager,
         shelfUnits: Map<number, unknown>
     ): void {
-        this.indexSystem.enable()
-        this.refreshAllIndices(meshManager, shelfUnits)
-        console.debug('🔍 Shelf unit indices enabled')
+    this.indexSystem.enable()
+    this.refreshAllIndices(meshManager, shelfUnits)
+    if (STICKERS_DEBUG) console.debug('🔍 Shelf unit indices enabled')
     }
     
     /**
@@ -104,9 +103,9 @@ export class ShelfStickerHandler {
         meshManager: InstancedMeshManager,
         shelfUnits: Map<number, unknown>
     ): void {
-        this.indexSystem.disable()
-        this.refreshAllIndices(meshManager, shelfUnits)
-        console.debug('🔍 Shelf unit indices disabled')
+    this.indexSystem.disable()
+    this.refreshAllIndices(meshManager, shelfUnits)
+    if (STICKERS_DEBUG) console.debug('🔍 Shelf unit indices disabled')
     }
     
     /**
@@ -150,8 +149,8 @@ export class ShelfStickerHandler {
         // Update macro texture with all changes
         this.stickerIntegration.getMacroTexture().updateTexture()
         
-        meshManager.updateGPU()
-        console.debug(`🔍 Refreshed indices for ${shelfUnits.size} shelf units`)
+    meshManager.updateGPU()
+    if (STICKERS_DEBUG) console.debug(`🔍 Refreshed indices for ${shelfUnits.size} shelf units`)
     }
     
     /**

@@ -16,6 +16,9 @@
 import * as THREE from 'three'
 import type { EmojiTextureAtlas } from '../../utils/EmojiTextureAtlas'
 
+// Toggle verbose sticker-system debug logging in this module
+const STICKERS_DEBUG = false
+
 export interface ShelfStickerTextureAtlasConfig {
     tileSize?: number       // Pixels per shelf tile (default: 256)
     tilesPerRow?: number    // Tiles in each row/column (default: 16 = 256 shelves max)
@@ -73,13 +76,7 @@ export class ShelfStickerTextureAtlas {
         // But let's be explicit about it
         this.texture.flipY = false
         
-        console.debug(`🎨 Created ShelfStickerTextureAtlas: ${this.atlasSize}x${this.atlasSize} (${this.tilesPerRow}x${this.tilesPerRow} tiles, ${this.tileSize}px each)`)
-        console.log(`🎨 [DEBUG] Texture created:`, {
-            width: this.canvas.width,
-            height: this.canvas.height,
-            flipY: this.texture.flipY,
-            type: this.texture.constructor.name
-        })
+    if (STICKERS_DEBUG) console.debug(`🎨 Created ShelfStickerTextureAtlas: ${this.atlasSize}x${this.atlasSize} (${this.tilesPerRow}x${this.tilesPerRow} tiles, ${this.tileSize}px each)`)
     }
     
     /**
@@ -122,11 +119,11 @@ export class ShelfStickerTextureAtlas {
      * Clear all stickers from all shelves
      */
     public clearAll(): void {
-        this.stickerPlacements.clear()
-        this.context.clearRect(0, 0, this.atlasSize, this.atlasSize)
-        this.texture.needsUpdate = true
-        this.dirtyTiles.clear()
-        console.debug('🎨 Cleared all shelf stickers')
+    this.stickerPlacements.clear()
+    this.context.clearRect(0, 0, this.atlasSize, this.atlasSize)
+    this.texture.needsUpdate = true
+    this.dirtyTiles.clear()
+    if (STICKERS_DEBUG) console.debug('🎨 Cleared all shelf stickers')
     }
     
     /**
@@ -159,12 +156,9 @@ export class ShelfStickerTextureAtlas {
         const stickers = this.stickerPlacements.get(shelfId)
         if (!stickers || stickers.length === 0) return
         
-        console.log(`🎨 [RENDER] Rendering ${stickers.length} stickers for shelf ${shelfId} at tile (${col}, ${row}) = canvas (${tileX}, ${tileY})`)
-        
         // Render each sticker
-        stickers.forEach((sticker, idx) => {
+        stickers.forEach((sticker) => {
             this.renderSticker(tileX, tileY, sticker)
-            console.log(`🎨 [RENDER]   Sticker ${idx}: ${sticker.emoji} at [${sticker.position[0].toFixed(2)}, ${sticker.position[1].toFixed(2)}]`)
         })
     }
     
@@ -218,7 +212,6 @@ export class ShelfStickerTextureAtlas {
      */
     public debugExportCanvas(): void {
         const dataUrl = this.canvas.toDataURL()
-        console.log('🎨 [DEBUG] Creating fullscreen canvas overlay (click to dismiss)')
         
         // Create fullscreen overlay
         const overlay = document.createElement('div')
@@ -257,7 +250,6 @@ export class ShelfStickerTextureAtlas {
         // Click to dismiss
         overlay.addEventListener('click', () => {
             document.body.removeChild(overlay)
-            console.log('🎨 [DEBUG] Overlay dismissed')
         })
         
         document.body.appendChild(overlay)
