@@ -208,54 +208,6 @@ export class ShelfStickerTextureAtlas {
     }
     
     /**
-     * DEBUG: Export canvas as fullscreen overlay to visually inspect
-     */
-    public debugExportCanvas(): void {
-        const dataUrl = this.canvas.toDataURL()
-        
-        // Create fullscreen overlay
-        const overlay = document.createElement('div')
-        overlay.style.position = 'fixed'
-        overlay.style.top = '0'
-        overlay.style.left = '0'
-        overlay.style.width = '100vw'
-        overlay.style.height = '100vh'
-        overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.9)'
-        overlay.style.zIndex = '99999'
-        overlay.style.display = 'flex'
-        overlay.style.alignItems = 'center'
-        overlay.style.justifyContent = 'center'
-        overlay.style.cursor = 'pointer'
-        
-        // Create image
-        const img = document.createElement('img')
-        img.src = dataUrl
-        img.style.maxWidth = '90vw'
-        img.style.maxHeight = '90vh'
-        img.style.border = '2px solid red'
-        img.style.imageRendering = 'pixelated'
-        
-        // Add label
-        const label = document.createElement('div')
-        label.textContent = 'Macro Texture Atlas (4096x4096) - Click anywhere to dismiss'
-        label.style.position = 'absolute'
-        label.style.top = '20px'
-        label.style.color = 'white'
-        label.style.fontSize = '20px'
-        label.style.fontFamily = 'monospace'
-        
-        overlay.appendChild(img)
-        overlay.appendChild(label)
-        
-        // Click to dismiss
-        overlay.addEventListener('click', () => {
-            document.body.removeChild(overlay)
-        })
-        
-        document.body.appendChild(overlay)
-    }
-    
-    /**
      * Get atlas configuration info
      */
     public getAtlasInfo() {
