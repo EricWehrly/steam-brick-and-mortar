@@ -42,11 +42,6 @@ export class ShelfStickerIntegration {
         )
         
         if (STICKERS_DEBUG) console.debug('🎨 ShelfStickerIntegration: Using macro texture approach (no attribute limits)')
-        
-        // Optionally expose integration for debugging at runtime
-        if (STICKERS_DEBUG && typeof window !== 'undefined') {
-            (window as { stickerIntegration?: ShelfStickerIntegration }).stickerIntegration = this
-        }
     }
     
     /**
@@ -115,29 +110,7 @@ export class ShelfStickerIntegration {
                 `
                 #include <map_fragment>
                 
-                // DEBUG MODE: Enable one at a time by uncommenting
-                
-                // DEBUG 1: Show all X-facing faces in RED (should light up the outer sideboard faces)
-                // if (abs(vWorldNormal.x) > 0.9) {
-                //     diffuseColor.rgb = vec3(1.0, 0.0, 0.0);
-                // }
-                
-                // DEBUG 2: Show shelfId as gradient (should see different colors per shelf)
-                // if (abs(vWorldNormal.x) > 0.9) {
-                //     float idNormalized = vShelfId / 90.0; // Assuming max ~90 shelves
-                //     diffuseColor.rgb = vec3(idNormalized, 0.0, 1.0 - idNormalized);
-                // }
-                
-                // DEBUG 3: Show UVs as colors (should see red-green gradient on each face)
-                // diffuseColor.rgb = vec3(vUV.x, vUV.y, 0.0);
-                
-                // DEBUG 4: Show texture atlas directly (sample entire atlas, no tiling)
-                // vec4 atlasColor = texture2D(stickerMacroTexture, vUV);
-                // if (atlasColor.a > 0.1) {
-                //     diffuseColor.rgb = vec3(0.0, 1.0, 0.0); // Green if any texture is sampled
-                // }
-                
-                // PRODUCTION: Show tile region sample with alpha blend
+                // Sample sticker from macro texture and blend with base color
                 if (abs(vWorldNormal.x) > 0.9) {
                     float row = floor(vShelfId / tilesPerRow);
                     float col = mod(vShelfId, tilesPerRow);
