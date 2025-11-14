@@ -277,4 +277,11 @@ export class ShelfStickerIntegration {
         
         console.log(`🎨 Macro texture updated with stickers for ${surfaceCount} surfaces`)
     }
+    
+    /**
+     * Get the macro texture atlas for direct manipulation
+     */
+    public getMacroTexture(): ShelfStickerTextureAtlas {
+        return this.macroTexture
+    }
 }

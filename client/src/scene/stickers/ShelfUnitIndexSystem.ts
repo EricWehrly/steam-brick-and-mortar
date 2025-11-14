@@ -11,7 +11,7 @@ import type { StickerManager } from './StickerManager'
 
 export class ShelfUnitIndexSystem {
     private stickerManager: StickerManager
-    private enabled: boolean = false
+    private enabled: boolean = false // Default to disabled (enable via UI toggle)
     
     // Map digit to emoji in atlas (0-9 use number emojis if available)
     private readonly digitEmojis = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣']
@@ -30,10 +30,10 @@ export class ShelfUnitIndexSystem {
     
     /**
      * Disable index display
+     * Note: Caller must call refreshAllIndices() after this to update the display
      */
     public disable(): void {
         this.enabled = false
-        // TODO: Remove indices from sticker manager
         console.debug('🔍 Shelf unit indices disabled')
     }
     
@@ -65,10 +65,11 @@ export class ShelfUnitIndexSystem {
         const emoji = this.digitEmojis[shelfUnitIndex]
         
         // Place at top-center of sideboard
+        // Note: After Y-flip in shader, lower V values are at the top
         this.stickerManager.addSticker(
             sideboardSurfaceId,
             emoji,
-            [0.5, 0.9],  // Top-center
+            [0.5, 0.1],  // Top-center (low V = top after Y-flip)
             0,           // No rotation
             1.5          // Larger scale for visibility
         )
