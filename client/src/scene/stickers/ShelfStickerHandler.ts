@@ -133,14 +133,22 @@ export class ShelfStickerHandler {
             const leftBoardIndex = sideboardIndex
             const leftTileId = leftBoardIndex  // Use boardIndex directly as tile ID
             
-            // Clear and re-add stickers (including index if enabled)
+            // Clear existing stickers for this shelf (including indices)
+            this.stickerManager.clearShelf(leftTileId)
+            
+            // Re-add indices if enabled
             if (this.indexSystem.isEnabled()) {
                 this.indexSystem.addIndexToSideboard(shelfUnitIndex, leftTileId)
             }
+            
+            // Update surface (will re-render whatever stickers are in the manager)
             this.stickerIntegration.updateSurfaceStickers(meshManager, leftBoardIndex, leftTileId)
             
             sideboardIndex += 2  // Skip right board
         })
+        
+        // Update macro texture with all changes
+        this.stickerIntegration.getMacroTexture().updateTexture()
         
         meshManager.updateGPU()
         console.debug(`🔍 Refreshed indices for ${shelfUnits.size} shelf units`)
