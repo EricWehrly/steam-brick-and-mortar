@@ -1,0 +1,71 @@
+#startup-progress-container {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    padding: 12px 24px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    min-width: 300px;
+    max-width: 400px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    opacity: 1;
+    transition: opacity 0.5s ease-out;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.startup-phase-text {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.startup-detail-text {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 11px;
+    font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: none;
+}
+
+.startup-text-column {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.startup-bar-container {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.startup-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #4a9eff 0%, #67b5ff 100%);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s ease-out;
+    box-shadow: 0 0 8px rgba(74, 158, 255, 0.4);
+}
+
+.startup-error {
+    border-color: rgba(255, 100, 100, 0.5);
+}
+
+.startup-error .startup-progress-bar {
+    background: linear-gradient(90deg, #ff4a4a 0%, #ff6767 100%);
+}
+
+.startup-error .startup-detail-text {
+    color: #ff8888;
+}
