@@ -33,6 +33,7 @@ import { GameLayoutConstants, VRLayoutUtils, GameBoxUtils, ShelfSurfaceUtils, ty
 
 import { EventManager, EventSource } from '../core/EventManager'
 import { RoomEventTypes, GameEventTypes, type InstancedBatchCompleteEvent } from '../types/InteractionEvents'
+import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
@@ -148,10 +149,20 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             // Create shelf rows based on needed shelves  
             const maxShelvesPerRow = 4
             const rows = Math.ceil(shelvesNeeded / maxShelvesPerRow)
-            console.log(`🏗️ Creating ${rows} rows with max ${maxShelvesPerRow} shelves per row`)
+            console.debug(`🏗️ Creating ${rows} rows with max ${maxShelvesPerRow} shelves per row`)
             
             for (let row = 0; row < rows; row++) {
                 const shelvesInThisRow = Math.min(maxShelvesPerRow, shelvesNeeded - (row * maxShelvesPerRow))
+                
+                // Emit progress update for startup UI
+                EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
+                    step: 'shelves',
+                    current: row + 1,
+                    total: rows,
+                    detail: `Creating shelf row ${row + 1}/${rows}`,
+                    timestamp: Date.now(),
+                    source: EventSource.System
+                })
                 
                 // Yield to main thread between rows to keep app responsive
                 await new Promise(resolve => setTimeout(resolve, 50)) // Faster than legacy since GPU handles bulk work

@@ -189,6 +189,29 @@ export interface LightingSystemReadyEvent extends BaseInteractionEvent {
 }
 
 // =============================================================================
+// STORE PROPS EVENTS
+// =============================================================================
+
+export interface StorePropsProgressEvent extends BaseInteractionEvent {
+    step: 'room' | 'shelves' | 'games'
+    current?: number
+    total?: number
+    detail: string
+}
+
+export interface StorePropsSetupRequestEvent extends BaseInteractionEvent {
+    config?: {
+        enableShelves?: boolean
+        enableGameBoxes?: boolean
+        enableSignage?: boolean
+    }
+}
+
+export interface StorePropsSetupCompletedEvent extends BaseInteractionEvent {
+    // No additional data needed
+}
+
+// =============================================================================
 // EVENT TYPE CONSTANTS
 // =============================================================================
 
@@ -250,6 +273,12 @@ export const CeilingEventTypes = {
 
 export const AppSettingsEventTypes = {
     Changed: 'app-settings:changed'
+} as const
+
+export const StorePropsEventTypes = {
+    Progress: 'store-props:progress',
+    SetupRequest: 'store-props:setup-request',
+    SetupCompleted: 'store-props:setup-completed'
 } as const
 
 // =============================================================================

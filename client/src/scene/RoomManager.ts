@@ -11,10 +11,11 @@
  */
 
 import * as THREE from 'three'
-import { EventManager } from '../core/EventManager'
+import { EventManager, EventSource } from '../core/EventManager'
 import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
 import { RoomEventTypes, type RoomCreateEvent, type RoomResizeEvent } from '../types/InteractionEvents'
 import { SteamEventTypes, type SteamDataLoadedEvent, CeilingEventTypes, type CeilingToggleEvent } from '../types/InteractionEvents'
+import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 
 import type { StoreLayoutConfig } from './StoreLayoutConfig'
 import { PropRenderer } from './PropRenderer'
@@ -223,12 +224,38 @@ export class RoomManager {
             console.debug('🏠 Created room group')
             
             // TODO: move to props
+            this.eventManager.emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
+                step: 'room',
+                detail: 'Creating entrance mat',
+                timestamp: Date.now(),
+                source: EventSource.System
+            })
             await this.createEntranceMat(dimensions)
         }
 
         // Let resize methods handle their own prerequisites (create if needed, then resize)
+        this.eventManager.emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
+            step: 'room',
+            detail: 'Building floor',
+            timestamp: Date.now(),
+            source: EventSource.System
+        })
         await this.resizeFloor(dimensions)
+        
+        this.eventManager.emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
+            step: 'room',
+            detail: 'Building ceiling',
+            timestamp: Date.now(),
+            source: EventSource.System
+        })
         await this.resizeCeiling(dimensions)
+        
+        this.eventManager.emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
+            step: 'room',
+            detail: 'Building walls',
+            timestamp: Date.now(),
+            source: EventSource.System
+        })
         await this.resizeWalls(dimensions)
 
         this.currentDimensions = { ...dimensions }

@@ -78,10 +78,10 @@ export class StartupEventTracker {
         if (typeof window !== 'undefined' && windowWithStartTime.__APP_START_TIME !== undefined) {
             this.startTime = windowWithStartTime.__APP_START_TIME
             const elapsed = getPerformanceNow() - this.startTime
-            console.log(`📊 [+${elapsed.toFixed(0)}ms] Startup Event Tracker initialized (from T+0ms page load)`)
+            console.debug(`📊 [+${elapsed.toFixed(0)}ms] Startup Event Tracker initialized (from T+0ms page load)`)
         } else {
             this.startTime = getPerformanceNow()
-            console.log('📊 Startup Event Tracker initialized')
+            console.debug('📊 Startup Event Tracker initialized')
         }
     }
     
@@ -97,6 +97,29 @@ export class StartupEventTracker {
      */
     public setProgressUI(ui: StartupProgressUI): void {
         this.progressUI = ui
+        this.setupProgressListeners()
+    }
+    
+    /**
+     * Set up event listeners for detailed progress updates
+     */
+    private setupProgressListeners(): void {
+        // Listen for props progress events to show detail
+        const eventManager = (async () => {
+            const { EventManager } = await import('../core/EventManager')
+            const { StorePropsEventTypes } = await import('../types/InteractionEvents')
+            return { em: EventManager.getInstance(), types: StorePropsEventTypes }
+        })()
+        
+        eventManager.then(({ em, types }) => {
+            em.registerEventHandler(types.Progress, (event: CustomEvent<any>) => {
+                if (this.progressUI && event.detail.detail) {
+                    this.progressUI.updateDetail(event.detail.detail)
+                }
+            })
+        }).catch(err => {
+            console.warn('Failed to set up progress listeners:', err)
+        })
     }
     
     /**
@@ -114,23 +137,13 @@ export class StartupEventTracker {
         })
         
         const desc = description || `Starting ${phase}`
-        // Only log significant phases to reduce noise
-        const isSignificantPhase = [
-            StartupPhase.AppConstruction,
-            StartupPhase.SceneConstruction,
-            StartupPhase.GameStart,
-            StartupPhase.FullyLoaded
-        ].includes(phase)
-        
-        if (isSignificantPhase) {
-            console.log(`🚀 [+${elapsed.toFixed(0)}ms] ${desc}`)
-        }
+        console.debug(`🚀 [+${elapsed.toFixed(0)}ms] ${desc}`)
         
         this.logEvent(phase, desc)
         
         // Update progress UI
         if (this.progressUI) {
-            this.progressUI.updatePhase(phase, desc)
+            this.progressUI.updatePhase(phase)
         }
     }
     
@@ -216,7 +229,7 @@ export class StartupEventTracker {
         const timestamp = getPerformanceNow()
         const elapsed = timestamp - this.startTime
         
-        console.log(`🎯 [+${elapsed.toFixed(0)}ms] ${description}`)
+        console.debug(`🎯 [+${elapsed.toFixed(0)}ms] ${description}`)
         this.logEvent(phase, `MILESTONE: ${description}`, metadata)
         
         // Update progress UI with milestone description
@@ -258,23 +271,26 @@ export class StartupEventTracker {
     public printSummary(): void {
         const summary = this.getSummary()
         
-        console.log('\n═══════════════════════════════════════════════════════════')
-        console.log('📊 STARTUP SUMMARY')
-        console.log('═══════════════════════════════════════════════════════════')
-        console.log(`Total startup time: ${summary.totalTime.toFixed(0)}ms\n`)
+        console.log(`\n📊 Startup complete: ${summary.totalTime.toFixed(0)}ms`)
         
-        console.log('Phase breakdown:')
+        // Detailed breakdown only in debug mode
+        console.debug('\n═══════════════════════════════════════════════════════════')
+        console.debug('📊 STARTUP SUMMARY')
+        console.debug('═══════════════════════════════════════════════════════════')
+        console.debug(`Total startup time: ${summary.totalTime.toFixed(0)}ms\n`)
+        
+        console.debug('Phase breakdown:')
         summary.phases.forEach(phase => {
-            console.log(`  ${phase.phase}: ${phase.duration.toFixed(0)}ms (${phase.eventCount} events)`)
+            console.debug(`  ${phase.phase}: ${phase.duration.toFixed(0)}ms (${phase.eventCount} events)`)
         })
         
-        console.log('\nEvent timeline:')
+        console.debug('\nEvent timeline:')
         this.events.forEach(event => {
             const elapsed = event.timestamp - this.startTime
-            console.log(`  [+${elapsed.toFixed(0)}ms] ${event.phase}: ${event.description}`)
+            console.debug(`  [+${elapsed.toFixed(0)}ms] ${event.phase}: ${event.description}`)
         })
         
-        console.log('═══════════════════════════════════════════════════════════\n')
+        console.debug('═══════════════════════════════════════════════════════════\n')
         
         // Complete the progress UI
         if (this.progressUI) {
