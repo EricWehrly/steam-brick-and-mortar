@@ -65,9 +65,8 @@ export class EmojiTextureAtlas {
         this.texture.minFilter = THREE.LinearFilter
         this.texture.magFilter = THREE.LinearFilter
 
-        console.log(`🎨 [ATLAS DEBUG] Created emoji atlas with ${emojis.length} emojis (${this.emojisPerRow}x${Math.ceil(emojis.length / this.emojisPerRow)})`)
-        console.log(`🎨 [ATLAS DEBUG] Atlas size: ${atlasSize}x${atlasSize}, Emoji size: ${this.emojiSize}px, Padding: ${this.padding}px`)
-        console.log(`🎨 [ATLAS DEBUG] Texture:`, this.texture)
+        console.debug(`🎨 Created emoji atlas with ${emojis.length} emojis (${this.emojisPerRow}x${Math.ceil(emojis.length / this.emojisPerRow)})`)
+        console.debug(`🎨 Atlas size: ${atlasSize}x${atlasSize}, Emoji size: ${this.emojiSize}px, Padding: ${this.padding}px`)
     }
 
     private generateAtlas(emojis: string[]): void {

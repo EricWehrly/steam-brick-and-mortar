@@ -77,11 +77,8 @@ export class StartupEventTracker {
         const windowWithStartTime = window as Window & { __APP_START_TIME?: number }
         if (typeof window !== 'undefined' && windowWithStartTime.__APP_START_TIME !== undefined) {
             this.startTime = windowWithStartTime.__APP_START_TIME
-            const elapsed = getPerformanceNow() - this.startTime
-            console.debug(`📊 [+${elapsed.toFixed(0)}ms] Startup Event Tracker initialized (from T+0ms page load)`)
         } else {
             this.startTime = getPerformanceNow()
-            console.debug('📊 Startup Event Tracker initialized')
         }
     }
     
@@ -92,17 +89,11 @@ export class StartupEventTracker {
         return StartupEventTracker.instance
     }
     
-    /**
-     * Attach a progress UI to visualize startup phases
-     */
     public setProgressUI(ui: StartupProgressUI): void {
         this.progressUI = ui
         this.setupProgressListeners()
     }
     
-    /**
-     * Set up event listeners for detailed progress updates
-     */
     private setupProgressListeners(): void {
         // Listen for props progress events to show detail
         const eventManager = (async () => {
@@ -122,14 +113,10 @@ export class StartupEventTracker {
         })
     }
     
-    /**
-     * Mark the start of a phase
-     */
     public phaseStart(phase: StartupPhase, description?: string): void {
         if (!this.enabled) return
         
         const timestamp = getPerformanceNow()
-        const elapsed = timestamp - this.startTime
         
         this.phases.set(phase, {
             startTime: timestamp,
@@ -137,8 +124,6 @@ export class StartupEventTracker {
         })
         
         const desc = description || `Starting ${phase}`
-        console.debug(`🚀 [+${elapsed.toFixed(0)}ms] ${desc}`)
-        
         this.logEvent(phase, desc)
         
         // Update progress UI
@@ -147,9 +132,6 @@ export class StartupEventTracker {
         }
     }
     
-    /**
-     * Mark the end of a phase
-     */
     public phaseEnd(phase: StartupPhase, description?: string): void {
         if (!this.enabled) return
         
@@ -171,9 +153,6 @@ export class StartupEventTracker {
         }
     }
     
-    /**
-     * Log a general event (not tied to phase boundaries)
-     */
     public logEvent(phase: StartupPhase, description: string, metadata?: Record<string, unknown>): void {
         if (!this.enabled) return
         
@@ -196,9 +175,6 @@ export class StartupEventTracker {
         // No console logging for regular events - reduces noise
     }
     
-    /**
-     * Log an async operation that will complete later
-     */
     public logAsyncStart(phase: StartupPhase, operation: string): number {
         if (!this.enabled) return 0
         
@@ -208,9 +184,6 @@ export class StartupEventTracker {
         return timestamp
     }
     
-    /**
-     * Log when an async operation completes
-     */
     public logAsyncEnd(phase: StartupPhase, operation: string, startTimestamp: number): void {
         if (!this.enabled) return
         
@@ -220,16 +193,9 @@ export class StartupEventTracker {
         this.logEvent(phase, `${operation} (completed)`, { duration })
     }
     
-    /**
-     * Log a milestone (significant event)
-     */
     public milestone(phase: StartupPhase, description: string, metadata?: Record<string, unknown>): void {
         if (!this.enabled) return
         
-        const timestamp = getPerformanceNow()
-        const elapsed = timestamp - this.startTime
-        
-        console.debug(`🎯 [+${elapsed.toFixed(0)}ms] ${description}`)
         this.logEvent(phase, `MILESTONE: ${description}`, metadata)
         
         // Update progress UI with milestone description
@@ -238,9 +204,6 @@ export class StartupEventTracker {
         }
     }
     
-    /**
-     * Get summary of all startup metrics
-     */
     public getSummary(): {
         totalTime: number
         phases: Array<{
@@ -265,32 +228,10 @@ export class StartupEventTracker {
         }
     }
     
-    /**
-     * Print a formatted summary to console
-     */
     public printSummary(): void {
         const summary = this.getSummary()
         
         console.log(`\n📊 Startup complete: ${summary.totalTime.toFixed(0)}ms`)
-        
-        // Detailed breakdown only in debug mode
-        console.debug('\n═══════════════════════════════════════════════════════════')
-        console.debug('📊 STARTUP SUMMARY')
-        console.debug('═══════════════════════════════════════════════════════════')
-        console.debug(`Total startup time: ${summary.totalTime.toFixed(0)}ms\n`)
-        
-        console.debug('Phase breakdown:')
-        summary.phases.forEach(phase => {
-            console.debug(`  ${phase.phase}: ${phase.duration.toFixed(0)}ms (${phase.eventCount} events)`)
-        })
-        
-        console.debug('\nEvent timeline:')
-        this.events.forEach(event => {
-            const elapsed = event.timestamp - this.startTime
-            console.debug(`  [+${elapsed.toFixed(0)}ms] ${event.phase}: ${event.description}`)
-        })
-        
-        console.debug('═══════════════════════════════════════════════════════════\n')
         
         // Complete the progress UI
         if (this.progressUI) {
@@ -298,16 +239,10 @@ export class StartupEventTracker {
         }
     }
     
-    /**
-     * Disable tracking (for production)
-     */
     public disable(): void {
         this.enabled = false
     }
     
-    /**
-     * Enable tracking
-     */
     public enable(): void {
         this.enabled = true
     }
