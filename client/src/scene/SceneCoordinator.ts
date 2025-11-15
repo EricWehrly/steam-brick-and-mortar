@@ -117,7 +117,7 @@ export class SceneCoordinator {
         
         try {
             // TODO: Skyboxmanager responds to ready event itself
-            tracker.milestone(StartupPhase.SceneConstruction, 'Loading skybox...')
+            tracker.milestone(StartupPhase.SceneConstruction, 'Creating sky')
             const presetName = config.skyboxPreset ?? 'aurora'
             const preset = (SkyboxPresets as any)[presetName] || SkyboxPresets.aurora
             await this.skyboxManager.applySkybox(preset)
@@ -128,7 +128,7 @@ export class SceneCoordinator {
 
         try {
             // TODO: lightingRenderer Own event registration
-            tracker.milestone(StartupPhase.SceneConstruction, 'Setting up lighting...')
+            tracker.milestone(StartupPhase.SceneConstruction, 'Adding lights')
             await this.lightingRenderer.setupLighting()
             // TODO: move this to after props spawn event
             this.lightingRenderer.refreshShadows()
@@ -138,7 +138,7 @@ export class SceneCoordinator {
         }
 
         // 🏪 STEP 3: Props (room, shelves, games - the heavy stuff)
-        tracker.milestone(StartupPhase.SceneConstruction, 'Loading store props...')
+        tracker.milestone(StartupPhase.SceneConstruction, 'Building store')
         this.requestPropsSetup()
         console.log('🏪 Props setup requested - store environment loading!')
     }

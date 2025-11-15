@@ -208,17 +208,20 @@ export class SteamBrickAndMortarApp {
             
             // 🎯 PRIORITY 1: Get controls working ASAP - this enables user input immediately
             this.startupTracker.phaseStart(StartupPhase.ControlsInit, 'Controls initialization')
+            this.startupTracker.milestone(StartupPhase.ControlsInit, 'Setting up controls')
             await this.initializeControls()
             this.startupTracker.phaseEnd(StartupPhase.ControlsInit)
             
-            this.startupTracker.milestone(StartupPhase.ControlsInit, 'Controls ready - user can move around')
+            this.startupTracker.milestone(StartupPhase.ControlsInit, 'Player can move')
             
             // 🎯 PRIORITY 2: Basic UI and render loop (blocking for interaction)
             this.startupTracker.phaseStart(StartupPhase.CriticalUIInit, 'Critical UI initialization')
+            this.startupTracker.milestone(StartupPhase.CriticalUIInit, 'Initializing UI')
             await this.initializeCriticalUI()
             this.startupTracker.phaseEnd(StartupPhase.CriticalUIInit)
             
             this.startupTracker.phaseStart(StartupPhase.RenderLoopStart, 'Starting render loop')
+            this.startupTracker.milestone(StartupPhase.RenderLoopStart, 'Starting render engine')
             this.startRenderLoop()
             this.startupTracker.phaseEnd(StartupPhase.RenderLoopStart)
             
@@ -226,7 +229,7 @@ export class SteamBrickAndMortarApp {
             this.checkGameStartPrerequisites()
             
             this.isInitialized = true
-            this.startupTracker.milestone(StartupPhase.RenderLoopStart, 'Core initialization complete')
+            this.startupTracker.milestone(StartupPhase.RenderLoopStart, 'Waiting for world to spawn')
             
             // 🚀 PRIORITY 3: Everything else happens async (non-blocking)
             this.initializeNonEssentialSystemsAsync()
@@ -258,7 +261,7 @@ export class SteamBrickAndMortarApp {
         
         
         // Mark UI as ready (coordinators initialized)
-        console.log('🎨 Critical UI ready')
+        console.debug('🎨 Critical UI ready')
         this.prerequisites.uiReady = true
         this.checkGameStartPrerequisites()
     }
@@ -294,7 +297,7 @@ export class SteamBrickAndMortarApp {
             this.startupTracker.phaseEnd(StartupPhase.FullyLoaded)
             
             this.startupTracker.logAsyncEnd(StartupPhase.NonEssentialSystemsStart, 'Non-essential systems loaded', asyncStartTime)
-            this.startupTracker.printSummary()
+            // Summary will be printed after Steam auto-load completes
             
         } catch (error) {
             console.error('Failed to load non-essential systems:', error)
@@ -304,18 +307,18 @@ export class SteamBrickAndMortarApp {
     }
 
     private async tryAutoLoadCachedUser(): Promise<void> {
-        console.log('try load cached user')
+        console.debug('Attempting auto-load of cached user')
         try {
             // Check if auto-load is enabled in settings
             if (!this.appSettings.getSetting('autoLoadProfile')) {
-                console.log('Auto-load cached user is disabled in settings')
+                console.debug('Auto-load cached user is disabled in settings')
                 return
             }
             
             const cachedUsers = this.steamIntegration.getCachedUsers()
             if (cachedUsers.length > 0) {
                 const firstUser = cachedUsers[0]
-                console.log(`Auto-loading cached user: ${firstUser.displayName} (${firstUser.vanityUrl})`)
+                console.debug(`Auto-loading cached user: ${firstUser.displayName} (${firstUser.vanityUrl})`)
                 
                 // Load from cache using the established workflow
                 this.steamUICoordinator.loadFromCache(firstUser.vanityUrl)
@@ -354,7 +357,7 @@ export class SteamBrickAndMortarApp {
         )
         
         this.isInitialized = false
-        console.log('✅ Application disposed')
+        console.debug('✅ Application disposed')
     }
 
 
@@ -367,7 +370,7 @@ export class SteamBrickAndMortarApp {
         this.eventManager.registerEventHandler<SceneReadyEvent>(
             GameEventTypes.SceneReady,
             () => {
-                this.startupTracker.milestone(StartupPhase.GameStart, 'Scene ready prerequisite met')
+                this.startupTracker.milestone(StartupPhase.GameStart, 'World has spawned')
                 this.prerequisites.sceneReady = true
                 this.checkGameStartPrerequisites()
             }
@@ -378,8 +381,12 @@ export class SteamBrickAndMortarApp {
             GameEventTypes.Start,
             async () => {
                 this.startupTracker.phaseStart(StartupPhase.SteamAutoLoad, 'Attempting Steam auto-load')
+                this.startupTracker.milestone(StartupPhase.SteamAutoLoad, 'Loading game library')
                 await this.tryAutoLoadCachedUser()
                 this.startupTracker.phaseEnd(StartupPhase.SteamAutoLoad)
+                
+                // Now that everything is truly loaded, print summary and complete UI
+                this.startupTracker.printSummary()
             }
         )
     }
@@ -390,7 +397,7 @@ export class SteamBrickAndMortarApp {
     private checkGameStartPrerequisites(): void {
         // Idempotency guard - exit early if already emitted
         if (this.gameStartEmitted) {
-            console.log('✅ GameStart already emitted - maintaining idempotency')
+            console.debug('✅ GameStart already emitted - maintaining idempotency')
             return
         }
 
@@ -407,13 +414,14 @@ export class SteamBrickAndMortarApp {
             this.emitGameStartEvent()
             this.gameStartEmitted = true
         } else {
-            console.log('⏳ Waiting for remaining prerequisites...')
+            console.debug('⏳ Waiting for remaining prerequisites...', { sceneReady, renderLoopReady, uiReady })
         }
     }
 
     private emitGameStartEvent(): void {
         this.startupTracker.phaseStart(StartupPhase.GameStart, 'Emitting GameStart event')
-        console.log('🎮 GameStart event emitted')
+        this.startupTracker.milestone(StartupPhase.GameStart, 'World ready')
+        console.debug('🎮 GameStart event emitted')
         this.eventManager.emit<GameStartEvent>(GameEventTypes.Start, {
             timestamp: Date.now(),
             source: EventSource.System,
@@ -424,7 +432,6 @@ export class SteamBrickAndMortarApp {
             }
         })
         this.startupTracker.phaseEnd(StartupPhase.GameStart)
-        this.startupTracker.milestone(StartupPhase.GameStart, 'Game is ready to start')
     }
 
     private startRenderLoop(): void {
