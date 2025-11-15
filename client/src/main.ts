@@ -8,6 +8,7 @@
 
 import './styles/main.css'
 import { SteamBrickAndMortarApp } from './core'
+import { StartupEventTracker, StartupPhase } from './utils/StartupEventTracker'
 
 // Track if initialization is already in progress or completed
 let isInitializing = false
@@ -26,6 +27,10 @@ export async function initializeApp(): Promise<void> {
     isInitializing = true
     
     try {
+        // Mark page load completion
+        const tracker = StartupEventTracker.getInstance()
+        tracker.phaseEnd(StartupPhase.PageLoad)
+        
         console.log('🚀 Starting Steam Brick and Mortar...')
         
         const app = new SteamBrickAndMortarApp({
