@@ -92,6 +92,12 @@ describe('PerformanceMonitor', () => {
         it('should create performance monitor with default config', () => {
             monitor = new PerformanceMonitor()
             
+            // UI creation is deferred until first use (start/show)
+            expect(mockDocument.createElement).not.toHaveBeenCalled()
+            
+            // Start the monitor to trigger UI creation
+            monitor.start()
+            
             expect(mockDocument.createElement).toHaveBeenCalledWith('div')
             expect(mockDocument.body.appendChild).toHaveBeenCalled()
         })

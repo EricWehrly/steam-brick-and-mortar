@@ -31,7 +31,7 @@ export class SceneManager {
     private scene: THREE.Scene
     private camera: THREE.PerspectiveCamera
     private renderer: THREE.WebGLRenderer
-    private propRenderer: PropRenderer
+    private propRenderer: PropRenderer | null = null
     private skyboxManager: SkyboxManager
     private renderLoopRegistry: RenderLoopRegistry
 
@@ -74,8 +74,8 @@ export class SceneManager {
             antialias: options.antialias ?? true 
         })
 
-        // Initialize prop renderer for atmospheric elements
-        this.propRenderer = new PropRenderer(this.scene)
+        // PropRenderer creation deferred to avoid blocking startup
+        // Will be created on first use by LightingRenderer
 
         // Initialize skybox manager
         this.skyboxManager = new SkyboxManager(this.scene)
@@ -164,10 +164,22 @@ export class SceneManager {
         return this.renderer
     }
 
+    /**
+     * Get PropRenderer (creates it if needed)
+     */
+    public getPropRenderer(): PropRenderer {
+        if (!this.propRenderer) {
+            this.propRenderer = new PropRenderer(this.scene)
+        }
+        return this.propRenderer
+    }
+
     public dispose() {
         this.stopRenderLoop()
         this.skyboxManager.dispose()
-        this.propRenderer.dispose()
+        if (this.propRenderer) {
+            this.propRenderer.dispose()
+        }
         this.renderer.dispose()
         document.body.removeChild(this.renderer.domElement)
     }

@@ -289,6 +289,10 @@ export class SteamBrickAndMortarApp {
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())
             this.startupTracker.phaseEnd(StartupPhase.DebugSystemsInit)
             
+            // Initialize emoji texture atlas now (deferred from startup)
+            // The handler will initialize it when first needed, but doing it now
+            // ensures any texture data is ready before user needs it
+            this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, 'Emoji atlas initialization deferred to first use')
             
         // Auto-load will happen after GameStart event is emitted            
             // Show success message once everything is fully loaded

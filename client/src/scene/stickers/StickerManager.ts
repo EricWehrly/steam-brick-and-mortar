@@ -28,12 +28,24 @@ export interface StickerData {
 }
 
 export class StickerManager {
-    private atlas: EmojiTextureAtlas
+    private atlas: EmojiTextureAtlas | null = null
     private placements: Map<number, StickerPlacement[]>  // shelfId -> stickers
     private readonly maxStickersPerShelf: number = 10 // Macro texture has no attribute limits!
 
     constructor() {
-        // Initialize emoji atlas with default set
+        // Atlas creation deferred to initializeAtlas() to avoid blocking startup
+        this.placements = new Map()
+
+        if (STICKERS_DEBUG) console.debug('🎨 StickerManager created (atlas deferred)')
+    }
+
+    /**
+     * Initialize the emoji texture atlas (deferred from constructor to avoid blocking startup)
+     * Call this during non-essential systems phase or before first sticker use
+     */
+    public initializeAtlas(): void {
+        if (this.atlas) return // Already initialized
+
         this.atlas = new EmojiTextureAtlas({
             emojis: [...DEFAULT_SHELF_EMOJIS],
             emojiSize: 128,
@@ -41,9 +53,7 @@ export class StickerManager {
             atlasSize: 512
         })
 
-        this.placements = new Map()
-
-    if (STICKERS_DEBUG) console.debug('🎨 StickerManager initialized with emoji atlas')
+        if (STICKERS_DEBUG) console.debug('🎨 EmojiTextureAtlas initialized')
     }
 
     /**
@@ -59,6 +69,11 @@ export class StickerManager {
         rotation: number = 0,
         scale: number = 1.0
     ): boolean {
+        if (!this.atlas) {
+            console.warn('Atlas not initialized - call initializeAtlas() first')
+            return false
+        }
+        
         if (!this.atlas.hasEmoji(emoji)) {
             console.warn(`Emoji "${emoji}" not in atlas`)
             return false
@@ -123,12 +138,12 @@ export class StickerManager {
         }
 
         const sticker = stickers[index]
-        if (!sticker?.enabled) {
+        if (!sticker?.enabled || !this.atlas) {
             return { 
                 uvOffset: [0, 0], 
-                position: sticker.position,
-                rotation: sticker.rotation,
-                scale: sticker.scale,
+                position: sticker?.position ?? [0.5, 0.5],
+                rotation: sticker?.rotation ?? 0,
+                scale: sticker?.scale ?? 1.0,
                 enabled: 0 
             }
         }
@@ -189,17 +204,25 @@ export class StickerManager {
     }
 
     /**
-     * Get the emoji texture atlas
+     * Get the emoji texture atlas (initializes if needed)
      */
     public getAtlas(): EmojiTextureAtlas {
-        return this.atlas
+        if (!this.atlas) {
+            this.initializeAtlas()
+        }
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        return this.atlas!
     }
 
     /**
      * Get atlas info for shader configuration
      */
     public getAtlasInfo() {
-        return this.atlas.getAtlasInfo()
+        if (!this.atlas) {
+            this.initializeAtlas()
+        }
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        return this.atlas!.getAtlasInfo()
     }
 
     /**

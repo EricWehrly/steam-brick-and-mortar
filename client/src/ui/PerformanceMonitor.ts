@@ -36,9 +36,9 @@ interface PerformanceWithMemory extends Performance {
 }
 
 export class PerformanceMonitor {
-    private container: HTMLElement
-    private fpsDisplay: HTMLElement
-    private frameTimeDisplay: HTMLElement
+    private container: HTMLElement | null = null
+    private fpsDisplay: HTMLElement | null = null
+    private frameTimeDisplay: HTMLElement | null = null
     private memoryDisplay: HTMLElement | null = null
     private drawCallsDisplay: HTMLElement | null = null
     
@@ -47,6 +47,7 @@ export class PerformanceMonitor {
     private lastFpsUpdate = window.performance.now()
     private frameTimeHistory: number[] = []
     private animationId: number | null = null
+    private uiInitialized = false
     
     private config: Required<PerformanceConfig>
     
@@ -58,6 +59,16 @@ export class PerformanceMonitor {
             showDrawCalls: config.showDrawCalls ?? false,
             position: config.position ?? 'top-left'
         }
+        
+        // Don't create UI elements yet - defer until first use
+        // This avoids blocking startup with DOM manipulation
+    }
+    
+    /**
+     * Initialize UI elements (deferred from constructor to avoid blocking startup)
+     */
+    private ensureUIInitialized(): void {
+        if (this.uiInitialized) return
         
         this.container = this.createContainer()
         this.fpsDisplay = this.createDisplay('FPS', '0')
@@ -73,6 +84,7 @@ export class PerformanceMonitor {
         
         this.setupStyles()
         document.body.appendChild(this.container)
+        this.uiInitialized = true
     }
     
     private createContainer(): HTMLElement {
@@ -130,10 +142,12 @@ export class PerformanceMonitor {
     }
     
     /**
-     * Start monitoring performance
+     * Start monitoring performance (creates UI if needed)
      */
     public start(): void {
         if (this.animationId !== null) return
+        
+        this.ensureUIInitialized()
         
         this.lastTime = window.performance.now()
         this.lastFpsUpdate = window.performance.now()
@@ -182,6 +196,8 @@ export class PerformanceMonitor {
     }
     
     private updateDisplays(now: number): void {
+        if (!this.fpsDisplay || !this.frameTimeDisplay) return // UI not initialized yet
+        
         const deltaTime = now - this.lastFpsUpdate
         
         // Calculate FPS
@@ -264,20 +280,26 @@ export class PerformanceMonitor {
      * Hide the performance monitor
      */
     public hide(): void {
+        if (!this.container) return
         this.container.style.display = 'none'
     }
     
     /**
-     * Show the performance monitor
+     * Show the performance monitor (creates UI if needed)
      */
     public show(): void {
+        this.ensureUIInitialized()
+        if (!this.container) return
         this.container.style.display = 'block'
     }
     
     /**
-     * Toggle visibility of the performance monitor
+     * Toggle visibility of the performance monitor (creates UI if needed)
      */
     public toggle(): void {
+        this.ensureUIInitialized()
+        if (!this.container) return
+        
         const isVisible = this.container.style.display !== 'none'
         if (isVisible) {
             this.hide()
@@ -291,6 +313,8 @@ export class PerformanceMonitor {
      */
     public dispose(): void {
         this.stop()
-        this.container?.parentNode?.removeChild(this.container)
+        if (this.container?.parentNode) {
+            this.container.parentNode.removeChild(this.container)
+        }
     }
 }

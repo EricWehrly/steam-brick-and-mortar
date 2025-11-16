@@ -66,7 +66,7 @@ export interface LightingConfig {
 export class LightingRenderer {
     private scene: THREE.Scene
     private renderer: THREE.WebGLRenderer
-    private propRenderer: PropRenderer
+    private propRenderer: PropRenderer | null = null
     private lightingGroup: THREE.Group
     private debugHelper: LightingDebugHelper
     private config: LightingConfig = {}
@@ -76,7 +76,7 @@ export class LightingRenderer {
     constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
         this.scene = scene
         this.renderer = renderer
-        this.propRenderer = new PropRenderer(scene)
+        // PropRenderer creation deferred to first use
         this.debugHelper = new LightingDebugHelper(scene)
         this.eventManager = EventManager.getInstance()
         
@@ -291,6 +291,10 @@ export class LightingRenderer {
     }
 
     private async setupFluorescentFixtures(): Promise<void> {
+        if (!this.propRenderer) {
+            this.propRenderer = new PropRenderer(this.scene)
+        }
+        
         const fixtures = this.propRenderer.createCeilingLightFixtures(
             this.config.ceilingHeight!,
             CURRENT_ROOM_DIMENSIONS.WIDTH,
@@ -515,7 +519,9 @@ export class LightingRenderer {
     public dispose(): void {
         this.clearLights()
         this.debugHelper.dispose()
-        this.propRenderer.dispose()
+        if (this.propRenderer) {
+            this.propRenderer.dispose()
+        }
         this.scene.remove(this.lightingGroup)
     }
 }
