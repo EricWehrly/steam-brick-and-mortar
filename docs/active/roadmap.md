@@ -1,3 +1,19 @@
+
+random unsorted idea:
+
+- (this should actually be easy:)
+  rotate shelves alternatingly to make it easier to weave between them
+  Angle them at like 15 degrees, and make the opening between them 30 degrees, to make it easier to navigate in
+  Rotate every other shelf negative rather than positive?
+- did we already mention somewhere we wanted the ability to add a little smoke to the atmosphere?
+- light switch with settings for "dingy", "classy", "corporate"
+- pixellate obscuring shader
+at distance
+dynamic to attempt to maintain framerate
+- At some point, I'd like to support a "Museum" mode,
+  where you can build out your own game museum to share (via url code) with your friends
+  You can group games however you like, say what you want about them, and showcase videos or screenshots
+
 # Steam Brick and Mortar - Roadmap Overview
 
 ## Documentation Hierarchy

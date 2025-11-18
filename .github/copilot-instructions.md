@@ -1,5 +1,8 @@
 # Copilot Instructions for Steam Brick and Mortar Project
 
+** COULD NOT BE MORE IMPORTANT **
+** NEVER EVER EVER EVER USE `npx`. THE PROJECT USES `yarn` AND NPX USES A COMPLETELY DIFFERENT SET OF RESOURCES AND WILL BREAK OUR BUILD **
+
 ## Project Overview
 You are working on a **WebXR-first** "Steam Brick and Mortar" environment that dynamically displays and launches Steam games. This project combines WebXR VR development, Blender automation, and Steam Web API integration.
 
@@ -47,6 +50,12 @@ steam-brick-and-mortar/
 - **Comments should add value**: Only add comments when they explain WHY something is done, not WHAT is being done (the code shows what)
 - **Meaningful documentation**: Comments should provide context, gotchas, business logic, or non-obvious implementation details
 - **Avoid comment noise**: If a comment doesn't make the code significantly clearer, don't add it
+
+### 🎨 **UI Development**
+- **Use UIComponentUtils for form controls**: Declarative configs reduce boilerplate by 50-70%
+- **Prefer .bind(this) for simple method calls**: Use arrow functions only when wrapping conditional logic
+- **Pattern for event handlers**: `onClick: this.methodName.bind(this)` vs `onClick: () => { if (condition) this.method() }`
+- **See**: `client/src/utils/UIComponentUtils.ts` for examples and patterns
 
 ### 🎭 **Event-Driven Architecture Pattern**
 - **Zero Cross-Class Dependencies**: Classes communicate exclusively through typed events

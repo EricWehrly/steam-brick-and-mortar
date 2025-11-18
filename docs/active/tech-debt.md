@@ -3,6 +3,86 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
+### LOD System for Lighting & Shadows
+**Priority**: Medium  
+**Effort**: 8-12 hours  
+**Context**: Currently all lights and shadows render at full quality regardless of distance or performance impact. Need LOD (Level of Detail) system to dynamically adjust lighting complexity based on distance from viewer and performance budget.
+
+**Tasks**:
+- Implement distance-based light culling (disable lights beyond certain distance)
+- Add shadow quality LOD (high/medium/low/off based on distance and performance)
+- Dynamic fixture count adjustment based on scene complexity
+- Fixture emissive intensity scaling based on distance
+- Shadow map resolution adjustment per light based on importance
+- Performance budget system (target frame time, reduce quality if exceeded)
+- Smooth transitions between LOD levels to avoid popping
+- Add debug overlay showing active lights and shadow maps
+
+**LOD Levels**:
+- **Level 0** (Close): Full shadows, all lights active, high shadow map resolution (2048)
+- **Level 1** (Medium): Reduced shadows, some lights culled, medium resolution (1024)
+- **Level 2** (Far): Minimal shadows, most lights culled, low resolution (512)
+- **Level 3** (Very Far): No shadows, only key lights, ambient approximation
+
+**Performance Targets**:
+- Maintain 90fps in VR (11ms frame budget)
+- Reduce GPU load by 20-40% in large scenes
+- Automatic quality scaling based on device capabilities
+
+**Benefits**: Better VR performance, smoother frame rates, support for larger stores, battery life improvement on standalone VR devices
+
+**Source**: User request (Nov 2025) - "Can we add a todo in our tech debt to LOD our lighting & shadows?"
+
+### Development-Mode Instance Lifecycle Watchdog
+**Priority**: Medium  
+**Effort**: 4-6 hours  
+**Context**: Multiple instances of classes intended to be singletons can cause hard-to-debug issues (e.g., shader uniforms stored in wrong instance). Need development-mode tooling to catch these automatically.
+
+**Tasks**:
+- Create `InstanceTracker` utility for development builds only
+- Track constructor calls for registered singleton classes
+- Detect multiple instances of same class type
+- Detect orphaned instances (created but never used/referenced)
+- Detect instance reference breaking (stored refs becoming undefined)
+- Add console warnings with stack traces when issues detected
+- Add visual overlay in dev mode showing active instances
+- Register key classes: ShelfStickerIntegration, DataManager, EventManager
+
+**Benefits**: Catch instance lifecycle bugs early, reduce debugging time for "worked in one context but not another" issues
+
+**Background**: Discovered during data texture implementation when 3 ShelfStickerIntegration instances were created, causing shader uniforms to be stored in one instance while data population happened in another.
+
+**Source**: Sticker data texture debugging session (Nov 2025)
+
+### Three.js Scene Resource Leak Detector
+**Priority**: Medium  
+**Effort**: 6-8 hours  
+**Context**: Need development-mode tooling to detect unused meshes, textures, geometries, and materials in Three.js scene. Unlike instance tracking, this needs context awareness (e.g., skybox is background so shouldn't be flagged).
+
+**Tasks**:
+- Create `SceneResourceMonitor` for development builds
+- Track all Three.js resources: meshes, geometries, materials, textures
+- Detect resources created but never added to scene
+- Detect resources added to scene but never visible (zero render count after N frames)
+- Add whitelist system for intentionally background/hidden resources
+- Track texture memory usage and warn on excessive allocation
+- Detect geometry/material instances that could be shared but aren't
+- Add visual overlay showing resource counts and memory usage
+- Monitor draw calls and instance counts per frame
+- Provide "snapshot comparison" to detect resource leaks over time
+
+**Whitelist Categories**:
+- Background elements (skybox, ambient lighting)
+- Pooled resources (pre-created for performance)
+- Dynamically shown/hidden UI elements
+- LOD meshes (only some visible at a time)
+
+**Benefits**: Catch performance issues early, detect memory leaks, optimize resource usage, validate instancing effectiveness
+
+**Background**: Complex scenes with instanced rendering, texture atlases, and dynamic content make it easy to accidentally create unused resources. Need automated detection with context awareness.
+
+**Source**: Sticker data texture debugging + general performance optimization awareness (Nov 2025)
+
 - make "UIEvent" a type of event and have all UI emissions use that event type with a sub-identifier for their specific UI Event.
 
 - make sure we've got todo-note-outlines for performance levers:
