@@ -105,15 +105,18 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
             // Create shelf rows based on needed shelves  
             const maxShelvesPerRow = 4
             const rows = Math.ceil(shelvesNeeded / maxShelvesPerRow)
+            const partialRowCount = shelvesNeeded % maxShelvesPerRow
             
             for (let row = 0; row < rows; row++) {
-                const shelvesInThisRow = Math.min(maxShelvesPerRow, shelvesNeeded - (row * maxShelvesPerRow))
+                // Put partial row at the back (row 0), full rows toward front
+                const isPartialRow = partialRowCount > 0 && row === 0
+                const shelvesInThisRow = isPartialRow ? partialRowCount : maxShelvesPerRow
                 
                 // Yield to main thread between rows to keep app responsive
                 await new Promise(resolve => setTimeout(resolve, 150))
                 
                 try {
-                    await this.createShelfRow(row, shelvesInThisRow, games)
+                    await this.createShelfRow(row, shelvesInThisRow, rows, games)
                 } catch (error) {
                     console.error(`❌ Failed to create legacy shelf row ${row}:`, error)
                     throw error
@@ -210,14 +213,14 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
      * Create a row of shelves with VR-optimized spacing and navigation
      * LEGACY VERSION: Uses ProceduralShelfGenerator only
      */
-    private async createShelfRow(rowIndex: number, shelfCount: number, games: SteamGameData[] = []): Promise<void> {
+    private async createShelfRow(rowIndex: number, shelfCount: number, totalRows: number, games: SteamGameData[] = []): Promise<void> {
         const rowGroup = new THREE.Group()
         rowGroup.name = `legacy-shelf-row-${rowIndex}`
         
         // VR-optimized spacing calculations
         const shelfSpacing = VRLayoutUtils.calculateOptimalShelfSpacing(shelfCount)
         const startX = -(shelfCount - 1) * shelfSpacing / 2 // Center the row
-        const rowZ = VRLayoutUtils.calculateOptimalRowPosition(rowIndex) // VR-friendly row positioning
+        const rowZ = VRLayoutUtils.calculateOptimalRowPosition(rowIndex, totalRows) // VR-friendly row positioning centered around origin
         
         for (let i = 0; i < shelfCount; i++) {
             const shelfPosition = new THREE.Vector3(

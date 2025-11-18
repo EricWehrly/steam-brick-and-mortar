@@ -15,6 +15,8 @@ import { Logger } from '../../utils/Logger'
 import { StorePropsEventTypes, type StorePropsSetupRequestEvent, type StorePropsSetupStartedEvent, type StorePropsSetupCompletedEvent, type StorePropsClearRequestEvent, type StorePropsAtmosphericRequestEvent } from './PropsEvents'
 import { EventSource } from '../../core/EventManager'
 import { hasWebGL2, hasInstancedArrays, hasHardwareRenderer, supportsLargeTextures } from '../../utils/SystemCapabilities'
+import { RoomEventTypes, type RoomResizedEvent } from '../../types/InteractionEvents'
+import { PropRenderer } from '../PropRenderer'
 
 // TODO: I think this can just be merged down into the gpu renderer class.
 // This is an added layer, separating out the event handling, but could be slim enough to sit inside the class proper
@@ -23,6 +25,8 @@ export class GpuStorePropsEventHandler {
     private eventManager: EventManager
     private renderer: GpuStorePropsRenderer | null = null
     private isCapable: boolean
+    private entranceMat: THREE.Group | null = null
+    private scene: THREE.Scene | null = null
     
     static {
         new GpuStorePropsEventHandler();
@@ -39,6 +43,9 @@ export class GpuStorePropsEventHandler {
         } else {
             GpuStorePropsEventHandler.logger.info('GpuStorePropsEventHandler not registered - system lacks required capabilities')
         }
+        
+        // Listen for room resize events to reposition entrance mat
+        this.eventManager.registerEventHandler(RoomEventTypes.Resized, this.handleRoomResized.bind(this))
     }
     
     private checkCapabilities(): boolean {
@@ -168,11 +175,52 @@ export class GpuStorePropsEventHandler {
     }
 
     
+    private async handleRoomResized(event: CustomEvent<RoomResizedEvent>): Promise<void> {
+        const { dimensions } = event.detail
+        
+        // Get scene reference if we don't have it yet
+        if (!this.scene && this.renderer) {
+            const { DataManager } = await import('../../core/data')
+            const dataManager = DataManager.getInstance()
+            this.scene = dataManager.get<THREE.Scene>('core.mainScene')
+        }
+        
+        if (!this.scene) {
+            GpuStorePropsEventHandler.logger.warn('Cannot create entrance mat - no scene reference')
+            return
+        }
+        
+        // Remove old entrance mat if it exists
+        if (this.entranceMat) {
+            this.scene.remove(this.entranceMat)
+            this.entranceMat = null
+        }
+        
+        // Create new entrance mat at front wall (positive Z)
+        const propRenderer = new PropRenderer(this.scene)
+        this.entranceMat = propRenderer.createEntranceFloorMat(dimensions.width, dimensions.depth)
+        
+        // Position at front of store - aligned close to the glass wall
+        // Front wall is at depth/2, mat is 0.3m inside for better alignment
+        const frontWallZ = dimensions.depth / 2
+        const matZ = frontWallZ - 0.3 // Just inside the front glass wall
+        this.entranceMat.position.set(0, 0, matZ)
+        
+        this.scene.add(this.entranceMat)
+        GpuStorePropsEventHandler.logger.debug(`🚪 Entrance mat positioned at Z=${matZ.toFixed(1)} (front wall at Z=${frontWallZ.toFixed(1)})`)
+    }
+    
     public dispose(): void {
         if (this.renderer) {
             this.renderer.dispose()
             this.renderer = null
         }
+        
+        if (this.entranceMat && this.scene) {
+            this.scene.remove(this.entranceMat)
+            this.entranceMat = null
+        }
+        
         GpuStorePropsEventHandler.logger.info('GpuStorePropsEventHandler disposed')
     }
 }

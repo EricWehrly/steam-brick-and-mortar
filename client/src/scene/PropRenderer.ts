@@ -114,40 +114,35 @@ export class PropRenderer {
       }
     }
 
-    // Performance optimization: Use only 2 wide RectAreaLights for the two rows
-    // This provides good lighting coverage while maintaining VR performance
-    
-    // Front row lighting (covers 4 fixtures) - optimized intensity
-    const frontRowLight = this.lightFactory.createRectAreaLight(
-      BlockbusterColors.fluorescentCool,
-      4, // Reduced from 8 to 4 for better balance
-      roomWidth * 0.8,
-      depth * 0.9,
-      {
-        name: 'ceiling-front-row-light',
-        parent: fixturesGroup
+    // Create one RectAreaLight per shelf row for proper coverage
+    // Each light is positioned to match its corresponding row of fixtures
+    for (let row = 0; row < rows; row++) {
+      // Calculate Z position for this row (matches fixture positioning)
+      const rowZ = -roomDepth / 2 + (row + 1) * fixtureSpacingZ
+      
+      const rowLight = this.lightFactory.createRectAreaLight(
+        BlockbusterColors.fluorescentCool,
+        4, // Balanced intensity per row
+        roomWidth * 0.8,
+        depth * 0.9,
+        {
+          name: `ceiling-row-${row}-light`,
+          parent: fixturesGroup
+        }
+      )
+      // Position the light just below the mesh panels for this row
+      rowLight.position.set(0, fixtureY - 0.12, rowZ)
+      rowLight.rotation.x = -Math.PI / 2
+      
+      rowLight.userData = {
+        isShelfLight: true,
+        rowIndex: row,
+        fixtureCount: fixturesPerRow
       }
-    )
-    // Position the RectAreaLight just below the mesh panels
-    frontRowLight.position.set(0, fixtureY - 0.12, -roomDepth * 0.25)
-    frontRowLight.rotation.x = -Math.PI / 2
-    
-    // Back row lighting (covers 4 fixtures) - optimized intensity
-    const backRowLight = this.lightFactory.createRectAreaLight(
-      BlockbusterColors.fluorescentCool,
-      4, // Reduced from 8 to 4 for better balance
-      roomWidth * 0.8,
-      depth * 0.9,
-      {
-        name: 'ceiling-back-row-light',
-        parent: fixturesGroup
-      }
-    )
-    backRowLight.position.set(0, fixtureY - 0.12, roomDepth * 0.25)
-    backRowLight.rotation.x = -Math.PI / 2
+    }
 
     this.propsGroup.add(fixturesGroup)
-    console.log(`💡 Created ${rows * fixturesPerRow} ceiling-mounted fluorescent fixtures at height ${fixtureY.toFixed(2)}m with optimized lighting`)
+    console.log(`💡 Created ${rows * fixturesPerRow} ceiling fixtures with ${rows} RectAreaLights at height ${fixtureY.toFixed(2)}m`)
     
     return fixturesGroup
   }
@@ -256,11 +251,11 @@ export class PropRenderer {
   /**
    * Create entrance floor mat for visual entrance indication
    */
-  public createEntranceFloorMat(roomWidth: number, roomDepth: number): THREE.Group {
+  public createEntranceFloorMat(roomWidth: number, _roomDepth: number): THREE.Group {
     const entranceGroup = new THREE.Group()
     entranceGroup.name = 'entrance-floor-mat'
     
-    // Create entrance mat geometry (positioned at front of store)
+    // Create entrance mat geometry (will be positioned by caller)
     const matWidth = Math.min(6, roomWidth * 0.4) // 40% of room width, max 6m
     const matDepth = 1.5 // 1.5m deep entrance mat
     const matGeometry = new THREE.PlaneGeometry(matWidth, matDepth)
@@ -274,7 +269,7 @@ export class PropRenderer {
     
     const mat = new THREE.Mesh(matGeometry, matMaterial)
     mat.rotation.x = -Math.PI / 2
-    mat.position.set(0, 0.01, roomDepth / 3) // Just above floor, closer to entrance area
+    mat.position.set(0, 0.01, 0) // Just above floor, no Z offset (positioned by caller)
     mat.name = 'entrance-mat'
     
     entranceGroup.add(mat)

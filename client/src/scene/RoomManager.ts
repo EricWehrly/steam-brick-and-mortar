@@ -18,7 +18,6 @@ import { SteamEventTypes, type SteamDataLoadedEvent, CeilingEventTypes, type Cei
 import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 
 import type { StoreLayoutConfig } from './StoreLayoutConfig'
-import { PropRenderer } from './PropRenderer'
 import { DataManager, DataDomain } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
 
@@ -97,7 +96,25 @@ export class RoomManager {
         
         this.eventManager.registerEventHandler(CeilingEventTypes.Toggle, this.onCeilingToggle.bind(this))
         
+        // Create initial room immediately so user has something to look at
+        this.createInitialRoom()
+        
         console.debug('🏠 RoomManager initialized with event-driven architecture')
+    }
+    
+    /**
+     * Create initial room with default dimensions immediately
+     * Room will resize later when shelves are spawned
+     */
+    private async createInitialRoom(): Promise<void> {
+        const dimensions = {
+            width: RoomConstants.DEFAULT_ROOM_WIDTH,
+            depth: RoomConstants.DEFAULT_ROOM_DEPTH,
+            height: RoomConstants.DEFAULT_ROOM_HEIGHT
+        }
+        
+        console.debug('🏠 Creating initial room with default dimensions')
+        await this.createOrUpdateRoom(dimensions)
     }
 
     /**
@@ -157,22 +174,24 @@ export class RoomManager {
         
         console.log(`🏠 Room resize requested (reason: ${reason})`)
         
-        // RoomManager's responsibility: Get games from centralized DataManager
-        const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
-        const gameCount = games.length
-        
-        // Calculate appropriate dimensions (uses defaults if gameCount is 0)
-        const dimensions = RoomManager.calculateDimensionsForGameCount(gameCount)
-        console.debug(`🏠 Target room dimensions for ${gameCount} games: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
-        
-        // Queue the room update to prevent concurrent operations
-        await this.queueRoomOperation(dimensions)
+        // Check if dimensions are provided in event
+        if (eventData.dimensions) {
+            // Use provided dimensions (from shelf bounds calculation)
+            await this.queueRoomOperation(eventData.dimensions)
+        } else {
+            // Calculate dimensions from game count (legacy path)
+            const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
+            const gameCount = games.length
+            const dimensions = RoomManager.calculateDimensionsForGameCount(gameCount)
+            console.debug(`🏠 Target room dimensions for ${gameCount} games: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
+            await this.queueRoomOperation(dimensions)
+        }
         
         // TODO: Shouldn't above emit the event? 
         // and does it need to be awaited?
         // Emit room resized event with calculated dimensions
         this.eventManager.emit(RoomEventTypes.Resized, { 
-            dimensions,
+            dimensions: eventData.dimensions || this.currentDimensions,
             timestamp: Date.now(), 
             source: 'room-manager' 
         } as any)
@@ -183,6 +202,13 @@ export class RoomManager {
      * Implements async mutex pattern to handle rapid-fire events
      */
     private async queueRoomOperation(dimensions: RoomDimensions): Promise<void> {
+        return this.queueRoomOperationWithOffset(dimensions, undefined)
+    }
+    
+    /**
+     * Queue room operations with optional center offset
+     */
+    private async queueRoomOperationWithOffset(dimensions: RoomDimensions, _centerOffset?: { x: number, y: number, z: number }): Promise<void> {
         if (!this.isProcessingResize) {
             // No operation in progress, process immediately
             this.isProcessingResize = true
@@ -222,16 +248,9 @@ export class RoomManager {
             this.roomGroup.name = 'room-structure'
             this.scene.add(this.roomGroup)
             console.debug('🏠 Created room group')
-            
-            // TODO: move to props
-            this.eventManager.emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
-                step: 'room',
-                detail: 'Creating entrance mat',
-                timestamp: Date.now(),
-                source: EventSource.System
-            })
-            await this.createEntranceMat(dimensions)
         }
+        
+        // Room group stays at origin - shelves are now centered around origin too
 
         // Let resize methods handle their own prerequisites (create if needed, then resize)
         this.eventManager.emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
@@ -336,16 +355,6 @@ export class RoomManager {
         console.debug(`🏗️ Created room ceiling at height ${dimensions.height}`)
     }
 
-    /**
-     * Create entrance mat at the front of the store
-     */
-    private async createEntranceMat(dimensions: RoomDimensions): Promise<void> {
-        const propRenderer = new PropRenderer(this.scene)
-        const entranceMat = propRenderer.createEntranceFloorMat(dimensions.width, dimensions.depth)
-        this.roomGroup?.add(entranceMat)
-        console.debug('🚪 Entrance mat created')
-    }
-
     private async resizeWalls(dimensions: RoomDimensions): Promise<void> {
         // Check if walls exist before resizing
         if (!this.walls.back || !this.walls.front || !this.walls.left || !this.walls.right) {
@@ -382,6 +391,7 @@ export class RoomManager {
 
     private async createWalls(dimensions: RoomDimensions): Promise<void> {
         const wallMaterial = this.materialManager.getMaterial(MaterialType.WallWood)
+        const glassMaterial = this.materialManager.getMaterial(MaterialType.Glass)
         
         // Back wall
         this.walls.back = new THREE.Mesh(
@@ -399,14 +409,14 @@ export class RoomManager {
         
         this.roomGroup.add(this.walls.back)
         
-        // Front wall
+        // Front wall (glass storefront)
         this.walls.front = new THREE.Mesh(
             new THREE.PlaneGeometry(dimensions.width, dimensions.height),
-            wallMaterial
+            glassMaterial
         )
         this.walls.front.position.set(0, dimensions.height / 2, dimensions.depth / 2)
         this.walls.front.rotation.y = Math.PI
-        this.walls.front.name = 'room-front-wall'
+        this.walls.front.name = 'room-front-wall-glass'
         this.roomGroup!.add(this.walls.front)
         
         // Left wall

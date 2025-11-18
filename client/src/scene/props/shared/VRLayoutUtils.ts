@@ -15,20 +15,15 @@ export class VRLayoutUtils {
         }
     }
 
-    static calculateOptimalRowPosition(rowIndex: number): number {
-        const entranceZPosition = 3
-        const firstRowOffset = -2
+    static calculateOptimalRowPosition(rowIndex: number, totalRows: number): number {
         const baseRowSpacing = RoomConstants.SHELF_SPACING_Z
-        const maxDepth = -12
         
-        let rowZ = entranceZPosition + firstRowOffset - (rowIndex * baseRowSpacing)
+        // Center shelves around origin (Z=0)
+        // Calculate total depth and offset so middle of shelf area is at Z=0
+        const totalDepth = (totalRows - 1) * baseRowSpacing
+        const startZ = -totalDepth / 2
+        const rowZ = startZ + (rowIndex * baseRowSpacing)
         
-        const absoluteMaxDepth = entranceZPosition + maxDepth
-        if (rowZ < absoluteMaxDepth) {
-            const compressionFactor = 0.8
-            rowZ = entranceZPosition + firstRowOffset - (rowIndex * baseRowSpacing * compressionFactor)
-        }
-        
-        return Math.max(rowZ, absoluteMaxDepth)
+        return rowZ
     }
 }

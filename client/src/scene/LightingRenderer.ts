@@ -115,16 +115,50 @@ export class LightingRenderer {
         })
         
         this.eventManager.registerEventHandler(RoomEventTypes.Resized, (event: CustomEvent<RoomResizedEvent>) => {
-            this.updateRoomDimensions(event.detail.dimensions) 
+            this.updateRoomDimensions(event.detail.dimensions, event.detail.shelfLayout) 
         })
     }
 
-    public async setupLighting(): Promise<void> {
+    /**
+     * Setup basic lighting fast - just ambient + directional
+     * This lets the scene become visible quickly without expensive fixtures
+     */
+    public async setupBasicLighting(): Promise<void> {
+        const startTime = window.performance.now()
         this.config = this.getCurrentConfig()
         
-        console.debug(`💡 Setting up ${this.config.quality} lighting...`)
+        console.debug(`💡 Setting up BASIC lighting (fast pass)...`)
         
         try {
+            // No shadows for fast startup
+            this.renderer.shadowMap.enabled = false
+            
+            await this.setupSimpleLighting()
+            
+            const duration = window.performance.now() - startTime
+            console.log(`✅ Basic lighting ready in ${duration.toFixed(1)}ms (advanced lighting will load in background)`)
+        } catch (error) {
+            console.error('❌ Failed to set up basic lighting:', error)
+            // Absolute fallback - just ambient
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+            this.lightingGroup.add(ambientLight)
+        }
+    }
+
+    /**
+     * Upgrade to full lighting system - called asynchronously after scene is visible
+     */
+    public async upgradeLighting(): Promise<void> {
+        const startTime = window.performance.now()
+        this.config = this.getCurrentConfig()
+        
+        console.debug(`💡 Upgrading to ${this.config.quality} lighting...`)
+        
+        try {
+            // Clear basic lighting
+            this.clearLights()
+            
+            // Now do full setup with shadows and fixtures
             this.configureShadows()
             await this.setupLightsByQuality()
             
@@ -140,7 +174,8 @@ export class LightingRenderer {
             const lightingEnabled = appSettings.getSetting('enableLighting')
             this.toggleLighting(lightingEnabled)
             
-            console.log('✅ Lighting setup complete!')
+            const duration = window.performance.now() - startTime
+            console.log(`✅ Advanced lighting setup complete in ${duration.toFixed(1)}ms!`)
             
             // Emit system ready event for UI components
             this.eventManager.emit(LightingEventTypes.SystemReady, {
@@ -150,9 +185,8 @@ export class LightingRenderer {
                 source: EventSource.System
             })
         } catch (error) {
-            console.error('❌ Failed to set up lighting:', error)
-            // Fallback to simple lighting
-            await this.setupSimpleLighting()
+            console.error('❌ Failed to upgrade lighting:', error)
+            // Keep basic lighting - better than nothing
         }
     }
 
@@ -290,10 +324,15 @@ export class LightingRenderer {
         console.debug(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
 
-    private async setupFluorescentFixtures(): Promise<void> {
+    private async setupFluorescentFixtures(shelfLayout?: { rows: number; shelvesPerRow: number }): Promise<void> {
         if (!this.propRenderer) {
             this.propRenderer = new PropRenderer(this.scene)
         }
+        
+        // Calculate fixture rows based on shelf layout or fall back to defaults
+        // Place fixtures along shelf rows for even coverage
+        const fixtureRows = shelfLayout?.rows ?? 2
+        const fixturesPerRow = shelfLayout?.shelvesPerRow ?? 4
         
         const fixtures = this.propRenderer.createCeilingLightFixtures(
             this.config.ceilingHeight!,
@@ -304,13 +343,15 @@ export class LightingRenderer {
                 height: 0.15,
                 depth: 0.6,
                 emissiveIntensity: 0.6, // Reduced from 0.8 for comfort
-                rows: 2,
-                fixturesPerRow: 4
+                rows: fixtureRows,
+                fixturesPerRow: fixturesPerRow
             }
         )
         
         fixtures.name = LIGHT_NAMES.FLUORESCENT_FIXTURES
         this.lightingGroup.add(fixtures)
+        
+        console.debug(`💡 Created ${fixtureRows * fixturesPerRow} ceiling fixtures (${fixtureRows} rows x ${fixturesPerRow} per row)`)
     }
 
     private addPointLights(): void {
@@ -383,7 +424,10 @@ export class LightingRenderer {
         })
     }
 
-    private updateRoomDimensions(dimensions: { width: number; depth: number; height: number }): void {
+    private updateRoomDimensions(
+        dimensions: { width: number; depth: number; height: number },
+        shelfLayout?: { rows: number; shelvesPerRow: number }
+    ): void {
         console.debug(`💡 Updating lighting for room dimensions: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
         
         // Update current room dimensions for fluorescent fixture positioning
@@ -395,12 +439,17 @@ export class LightingRenderer {
             this.config.ceilingHeight = dimensions.height
         }
         
+        // No offset needed - room and shelves are both centered at origin
+        
         // Recreate fluorescent fixtures with new dimensions if they exist
         const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
         if (existingFixtures) {
             console.debug('💡 Recreating ceiling fixtures for new room size...')
+            if (shelfLayout) {
+                console.debug(`💡 Using shelf layout: ${shelfLayout.rows} rows x ${shelfLayout.shelvesPerRow} shelves per row`)
+            }
             this.lightingGroup.remove(existingFixtures)
-            this.setupFluorescentFixtures()
+            this.setupFluorescentFixtures(shelfLayout)
         }
     }
 

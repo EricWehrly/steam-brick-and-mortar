@@ -34,7 +34,8 @@ export enum MaterialType {
     Carpet = 'carpet',
     Ceiling = 'ceiling',
     WallWood = 'wallWood',
-    BasicWood = 'basicWood'
+    BasicWood = 'basicWood',
+    Glass = 'glass'
 }
 
 export interface MaterialPool {
@@ -124,6 +125,8 @@ export class SharedMaterialManager {
                 return this.createWallWoodMaterial()
             case MaterialType.BasicWood:
                 return this.createBasicWoodMaterial()
+            case MaterialType.Glass:
+                return this.createGlassMaterial()
             default:
                 throw new Error(`Unknown material type: ${type}`)
         }
@@ -196,6 +199,17 @@ export class SharedMaterialManager {
     private createBasicWoodMaterial(): THREE.MeshStandardMaterial {
         return this.woodMaterialGenerator.createProceduralMaterial({
             repeat: { x: 3, y: 1 }
+        })
+    }
+    
+    private createGlassMaterial(): THREE.MeshStandardMaterial {
+        return new THREE.MeshStandardMaterial({
+            color: 0xCCF5FF, // Slight blue tint like real glass
+            roughness: 0.1,   // Very smooth/reflective
+            metalness: 0.0,
+            transparent: true,
+            opacity: 0.3,      // 30% opacity for storefront window effect
+            side: THREE.DoubleSide // Visible from both sides
         })
     }
 

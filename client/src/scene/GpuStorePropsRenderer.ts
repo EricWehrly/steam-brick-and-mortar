@@ -32,7 +32,7 @@ import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 import { GameLayoutConstants, VRLayoutUtils, GameBoxUtils, ShelfSurfaceUtils, type ShelfSurface } from './props/SharedPropsUtils'
 
 import { EventManager, EventSource } from '../core/EventManager'
-import { RoomEventTypes, GameEventTypes, type InstancedBatchCompleteEvent } from '../types/InteractionEvents'
+import { RoomEventTypes, GameEventTypes, SteamEventTypes, type InstancedBatchCompleteEvent } from '../types/InteractionEvents'
 import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
@@ -57,6 +57,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     // Track objects we create for proper cleanup
     private createdGameBoxes: THREE.Object3D[] = []
     private createdStoreObjects: THREE.Object3D[] = []
+    
+    // Track actual shelf bounds for room sizing
+    private shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
+    
+    // Track shelf layout for lighting fixture positioning
+    private shelfLayout: { rows: number; shelvesPerRow: number } = { rows: 0, shelvesPerRow: 0 }
 
     constructor(scene: THREE.Scene, dataManager: DataManager) {
         this.scene = scene
@@ -91,7 +97,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private setupEventListeners(): void {
-        EventManager.getInstance().registerEventHandler(RoomEventTypes.Resized, this.generateShelvesAsync.bind(this));
+        // Listen for Steam data loaded to spawn shelves (not room resize - that would create a loop)
+        EventManager.getInstance().registerEventHandler(SteamEventTypes.DataLoaded, this.generateShelvesAsync.bind(this));
         EventManager.getInstance().registerEventHandler('store-props:toggle-shelf-indices' as any, this.toggleShelfIndices.bind(this));
     }
 
@@ -143,16 +150,26 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             // Reset global game index for artwork assignment
             this.globalGameIndex = 0
             
+            // Reset shelf bounds tracking
+            this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
+            
             // Clear existing shelves first
             this.clearExistingShelves()
             
             // Create shelf rows based on needed shelves  
             const maxShelvesPerRow = 4
             const rows = Math.ceil(shelvesNeeded / maxShelvesPerRow)
-            console.debug(`🏗️ Creating ${rows} rows with max ${maxShelvesPerRow} shelves per row`)
+            const fullRows = Math.floor(shelvesNeeded / maxShelvesPerRow)
+            const partialRowCount = shelvesNeeded % maxShelvesPerRow
+            console.debug(`🏗️ Creating ${rows} rows: ${fullRows} full rows + ${partialRowCount > 0 ? '1 partial' : '0 partial'}`)
+            
+            // Store for use in room resize event
+            this.shelfLayout = { rows, shelvesPerRow: maxShelvesPerRow }
             
             for (let row = 0; row < rows; row++) {
-                const shelvesInThisRow = Math.min(maxShelvesPerRow, shelvesNeeded - (row * maxShelvesPerRow))
+                // Put partial row at the back (row 0), full rows toward front
+                const isPartialRow = partialRowCount > 0 && row === 0
+                const shelvesInThisRow = isPartialRow ? partialRowCount : maxShelvesPerRow
                 
                 // Emit progress update for startup UI
                 EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
@@ -168,7 +185,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 await new Promise(resolve => setTimeout(resolve, 50)) // Faster than legacy since GPU handles bulk work
                 
                 try {
-                    await this.createInstancedShelfRow(row, shelvesInThisRow, games)
+                    await this.createInstancedShelfRow(row, shelvesInThisRow, rows, games)
                 } catch (error) {
                     console.error(`❌ Failed to create instanced shelf row ${row}:`, error)
                     throw error
@@ -179,6 +196,32 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             
             // Emit InstancedBatchComplete event to trigger GPU updates
             EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
+            
+            // Calculate room dimensions based on actual shelf bounds + clearances
+            if (this.shelfBounds.minX !== Infinity) {
+                const { RoomConstants } = await import('./RoomManager')
+                const roomWidth = (this.shelfBounds.maxX - this.shelfBounds.minX) + (RoomConstants.STORE_WALL_CLEARANCE * 2)
+                const roomDepth = (this.shelfBounds.maxZ - this.shelfBounds.minZ) + RoomConstants.STORE_ENTRANCE_CLEARANCE + RoomConstants.STORE_BACK_CLEARANCE
+                const roomHeight = RoomConstants.STORE_CEILING_HEIGHT
+                
+                console.debug(`📐 Shelf bounds: X[${this.shelfBounds.minX.toFixed(1)}, ${this.shelfBounds.maxX.toFixed(1)}], Z[${this.shelfBounds.minZ.toFixed(1)}, ${this.shelfBounds.maxZ.toFixed(1)}]`)
+                console.debug(`🏠 Calculated room: ${roomWidth.toFixed(1)}x${roomDepth.toFixed(1)}x${roomHeight.toFixed(1)}`)
+                console.debug(`💡 Shelf layout: ${this.shelfLayout.rows} rows x ${this.shelfLayout.shelvesPerRow} shelves per row`)
+                
+                // Emit room resize event so room encapsulates shelves
+                // No centerOffset needed - shelves are now positioned centered around origin
+                EventManager.getInstance().emit(RoomEventTypes.Resize, {
+                    dimensions: {
+                        width: roomWidth,
+                        depth: roomDepth,
+                        height: roomHeight
+                    },
+                    shelfLayout: this.shelfLayout,
+                    reason: 'shelves-spawned',
+                    timestamp: Date.now(),
+                    source: EventSource.System
+                })
+            }
             
             // NOTE: Scene validation moved to handleInstancedBatchComplete to happen AFTER GPU updates
         } catch (error) {
@@ -283,7 +326,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
      * Create a row of shelves with VR-optimized spacing and navigation
      * INSTANCED VERSION: Uses InstancedShelfRenderer for GPU performance
      */
-    private async createInstancedShelfRow(rowIndex: number, shelfCount: number, games: SteamGameData[] = []): Promise<void> {
+    private async createInstancedShelfRow(rowIndex: number, shelfCount: number, totalRows: number, games: SteamGameData[] = []): Promise<void> {
         // Create instanced shelf row with GPU optimized rendering
         
         if (!this.instancedShelfRenderer?.isReady()) {
@@ -294,7 +337,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // VR-optimized spacing calculations
         const shelfSpacing = VRLayoutUtils.calculateOptimalShelfSpacing(shelfCount)
         const startX = -(shelfCount - 1) * shelfSpacing / 2 // Center the row
-        const rowZ = VRLayoutUtils.calculateOptimalRowPosition(rowIndex) // VR-friendly row positioning
+        const rowZ = VRLayoutUtils.calculateOptimalRowPosition(rowIndex, totalRows) // VR-friendly row positioning centered around origin
         
         for (let i = 0; i < shelfCount; i++) {
             const shelfPosition = new THREE.Vector3(
@@ -302,6 +345,14 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 0,
                 rowZ
             )
+            
+            // Track shelf bounds for room sizing (approximate shelf width is ~2m)
+            const shelfWidth = 2.0
+            const shelfDepth = 1.0
+            this.shelfBounds.minX = Math.min(this.shelfBounds.minX, shelfPosition.x - shelfWidth / 2)
+            this.shelfBounds.maxX = Math.max(this.shelfBounds.maxX, shelfPosition.x + shelfWidth / 2)
+            this.shelfBounds.minZ = Math.min(this.shelfBounds.minZ, shelfPosition.z - shelfDepth / 2)
+            this.shelfBounds.maxZ = Math.max(this.shelfBounds.maxZ, shelfPosition.z + shelfDepth / 2)
             
             // Calculate which games belong to this shelf (18 games per shelf: 3 rows × 2 sides × 3 games)
             const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF;
