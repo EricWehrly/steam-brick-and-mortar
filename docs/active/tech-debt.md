@@ -3,6 +3,37 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
+### Distance-Based Dynamic Lighting Activation
+**Priority**: Medium  
+**Effort**: 4-6 hours  
+**Context**: Currently all ceiling fixtures are active regardless of player distance. Need distance-based activation to reduce compute for distant lights while maintaining ambient lighting.
+
+**Tasks**:
+- Use less compute-intensive ambient lighting for distant store areas
+- Dynamically activate ceiling fixtures as player approaches
+- Define activation radius (e.g., 15m for RectAreaLights)
+- Keep base lighting (ambient, directional, fill) always active
+- Smoothly fade fixtures on/off to avoid popping
+- Consider distance from camera/player position for activation
+- Add hysteresis (lights stay on slightly longer when moving away)
+- Debug overlay showing active vs inactive fixture zones
+
+**Implementation Approach**:
+- Store fixture world positions during creation
+- Each frame, check distance from camera to each fixture group
+- Activate fixtures within radius, deactivate beyond
+- Use fixture.visible = true/false for instant performance gains
+- Consider intensity fade for smoother transitions
+
+**Performance Impact**:
+- Current: All ~6 RectAreaLights active (12 shelf rows → 6 fixtures)
+- Optimized: Only 2-3 fixtures active near player
+- Expected savings: 30-50% reduction in light computation
+
+**Benefits**: Better frame rates in large stores, improved VR performance, battery savings on standalone headsets, scalable to much larger environments
+
+**Source**: User request (Nov 2025) - "tech debt todo for us to use less compute intense ambient light for distant areas, and turn on dynamic lights as we get closer"
+
 ### LOD System for Lighting & Shadows
 **Priority**: Medium  
 **Effort**: 8-12 hours  
