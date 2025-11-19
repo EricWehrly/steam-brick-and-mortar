@@ -32,7 +32,7 @@ import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 import { GameLayoutConstants, VRLayoutUtils, GameBoxUtils, ShelfSurfaceUtils, type ShelfSurface } from './props/SharedPropsUtils'
 
 import { EventManager, EventSource } from '../core/EventManager'
-import { RoomEventTypes, GameEventTypes, SteamEventTypes, type InstancedBatchCompleteEvent } from '../types/InteractionEvents'
+import { RoomEventTypes, GameEventTypes, SteamEventTypes } from '../types/InteractionEvents'
 import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
@@ -100,9 +100,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private setupEventListeners(): void {
-        // Listen for Steam data loaded to spawn shelves (not room resize - that would create a loop)
         EventManager.getInstance().registerEventHandler(SteamEventTypes.DataLoaded, this.generateShelvesAsync.bind(this));
-        EventManager.getInstance().registerEventHandler('store-props:toggle-shelf-indices' as any, this.toggleShelfIndices.bind(this));
     }
 
     /**
@@ -487,27 +485,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 }
             }
         }
-    }
-
-    /**
-     * Enable shelf unit index display (using sticker system)
-     */
-    public enableShelfIndices(): void {
-        this.instancedShelfRenderer?.enableShelfIndices()
-    }
-    
-    /**
-     * Disable shelf unit index display
-     */
-    public disableShelfIndices(): void {
-        this.instancedShelfRenderer?.disableShelfIndices()
-    }
-    
-    /**
-     * Toggle shelf unit index display on/off
-     */
-    public toggleShelfIndices(): void {
-        this.instancedShelfRenderer?.toggleShelfIndices()
     }
 
     public dispose(): void {

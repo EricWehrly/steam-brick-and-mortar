@@ -1,18 +1,15 @@
 import * as THREE from 'three'
 import { InstancedMeshManager } from './InstancedMeshManager'
 import { SharedMaterialManager, MaterialType } from '../../utils/SharedMaterialManager'
-import { EventManager } from '../../core/EventManager'
-import { GameEventTypes } from '../../types/InteractionEvents'
 import { DEFAULT_SHELF_CONFIG, ShelfCalculationUtils, type ShelfConfig } from '../props/SharedPropsUtils'
 import { DEFAULT_INSTANCED_RENDERER_CONFIG, type InstancedRendererConfig, type InstanceData } from './IInstancedRenderer'
 import type { 
     IInstancedRenderer, 
     InstancedRendererStats
 } from './IInstancedRenderer'
-import { StickerManager } from '../stickers/StickerManager'
-import { ShelfStickerIntegration } from '../stickers/ShelfStickerIntegration'
-import { ShelfUnitIndexSystem } from '../stickers/ShelfUnitIndexSystem'
-import { ShelfStickerHandler } from '../stickers/ShelfStickerHandler'
+import { InstancedShelfStickerAdapter } from './InstancedShelfStickerAdapter'
+import { EventManager } from '../../core/EventManager'
+import { GameEventTypes } from '../../types/InteractionEvents'
 
 export interface InstancedShelfConfig extends InstancedRendererConfig {
     defaultShelfConfig?: ShelfConfig
@@ -71,16 +68,14 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     private readonly shelfYPositions: number[]
     private readonly shelfDepthsAndOffsets: Array<{ shelfDepth: number; forwardOffset: number }>
     
-    // Sticker system
-    private stickerHandler: ShelfStickerHandler
-    private readonly maxStickersPerSideboard: number
+    private readonly stickerAdapter: InstancedShelfStickerAdapter
     
     constructor(config: InstancedShelfConfig = {}) {
-        // Reduced to 3 to stay within WebGL attribute limits
-        // 3 stickers * 2 vec4 attributes = 6 custom attributes
-        // Combined with Three.js MeshStandardMaterial built-ins (~10 attributes) = 16 total
-        this.maxStickersPerSideboard = config.maxStickersPerSideboard ?? 3
         this.maxShelfUnits = config.maxShelfUnits ?? DEFAULT_INSTANCED_SHELF_CONFIG.maxShelfUnits
+        
+        this.stickerAdapter = new InstancedShelfStickerAdapter({
+            maxStickersPerSideboard: config.maxStickersPerSideboard
+        })
         
         this.defaultShelfConfig = {
             ...DEFAULT_INSTANCED_SHELF_CONFIG.defaultShelfConfig,
@@ -113,24 +108,11 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.shelfBoardManager = new InstancedMeshManager('InstancedShelf-ShelfBoards')
         this.interiorSurfaceManager = new InstancedMeshManager('InstancedShelf-InteriorSurfaces')
         
-        // Initialize sticker system (macro texture mode - no sticker limits)
-        const stickerManager = new StickerManager()
-        const stickerIntegration = new ShelfStickerIntegration({
-            stickerManager
-        })
-        const indexSystem = new ShelfUnitIndexSystem(stickerManager)
-        
-        this.stickerHandler = new ShelfStickerHandler({
-            stickerManager,
-            stickerIntegration,
-            indexSystem
-        })
-        
-        // Subscribe to GPU update events
-        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, () => {
-            this.updateGPU()
-            this.populateStickersAfterGeneration()
-        })
+        // Register event listener for GPU updates after batch completes
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.InstancedBatchComplete,
+            this.updateGPU.bind(this)
+        )
         
         console.debug(`🏪 InstancedShelfRenderer created (max units: ${this.maxShelfUnits})`)
     }
@@ -149,7 +131,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             
             this.createGeometryTemplates()
             
-            const maxShelvesPerUnit = 5
             const angledBoardGeometry = this.geometryTemplates[ShelfGeometryType.AngledBoard]
             const sideBoardGeometry = this.geometryTemplates[ShelfGeometryType.SideBoard]
             const shelfBoardGeometry = this.geometryTemplates[ShelfGeometryType.ShelfBoard]
@@ -168,8 +149,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             
             // Clone and modify side board material to support stickers (macro texture mode)
             const stickerEnabledMaterial = brandAccentMaterial.clone()
-            // Reuse the existing integration instance (important for macro texture consistency)
-            this.stickerHandler.getStickerIntegration().setupStickerMaterial(stickerEnabledMaterial)
+            this.stickerAdapter.setupMaterial(stickerEnabledMaterial)
             
             this.sideBoardManager.initialize({
                 geometry: sideBoardGeometry,
@@ -181,14 +161,14 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             this.shelfBoardManager.initialize({
                 geometry: shelfBoardGeometry,
                 material: mdfVeneerMaterial,
-                maxInstances: this.maxShelfUnits * maxShelvesPerUnit,
+                maxInstances: this.maxShelfUnits * 5,
                 name: 'instanced-shelf-boards'
             })
             
             this.interiorSurfaceManager.initialize({
                 geometry: interiorSurfaceGeometry,
                 material: shelfInteriorMaterial,
-                maxInstances: this.maxShelfUnits * maxShelvesPerUnit,
+                maxInstances: this.maxShelfUnits * 5,
                 name: 'instanced-shelf-interior-surfaces'
             })
             
@@ -246,8 +226,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             { name: 'surfaceScale', itemSize: 2, defaultValue: [1, 1] }
         ])
         
-        // Add sticker attributes to side boards (macro texture mode - just needs shelfId)
-        this.stickerHandler.getStickerIntegration().setupInstanceAttributes(this.sideBoardManager)
+        this.stickerAdapter.setupInstanceAttributes(this.sideBoardManager)
+        this.stickerAdapter.setManagers(this.sideBoardManager, this.shelfUnits)
     }
     
     // TODO: Is this definitely how we want to write this?
@@ -339,13 +319,11 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             0
         ))
         this.sideBoardManager.setInstanceMatrix(leftBoardIndex, leftPos)
-        
-        // Initialize sticker data for left side board (which will receive stickers)
-        this.stickerHandler.initializeSideboardStickers(
+        this.stickerAdapter.initializeSideboardStickers(
             this.sideBoardManager,
             leftBoardIndex,
             shelfUnitIndex,
-            true  // isLeftBoard
+            true
         )
         
         indices.push(leftBoardIndex)
@@ -357,9 +335,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             0
         ))
         this.sideBoardManager.setInstanceMatrix(rightBoardIndex, rightPos)
-        
-        // Initialize sticker data for right side board (empty, no stickers)
-        this.stickerHandler.initializeSideboardStickers(
+        this.stickerAdapter.initializeSideboardStickers(
             this.sideBoardManager,
             rightBoardIndex,
             shelfUnitIndex,
@@ -500,49 +476,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
     }
 
-    // TODO: Get the stickermanager, allll the sticker stuff
-    // extracted out
-    /**
-     * Get the sticker manager for runtime sticker operations
-     */
-    public getStickerManager(): StickerManager {
-        return this.stickerHandler.getStickerManager()
-    }
-    
-    /**
-     * Populate stickers after shelf generation completes
-     * Called via event handler after GPU update
-     */
-    private populateStickersAfterGeneration(): void {
-        this.stickerHandler.populateRandomStickers(
-            this.sideBoardManager,
-            this.shelfUnits.size,
-            0.3
-        )
-    }
-    
-    /**
-     * Enable shelf unit index display (using sticker system)
-     */
-    public enableShelfIndices(): void {
-        this.stickerHandler.enableIndices(this.sideBoardManager, this.shelfUnits)
-    }
-    
-    /**
-     * Disable shelf unit index display
-     */
-    public disableShelfIndices(): void {
-        this.stickerHandler.disableIndices(this.sideBoardManager, this.shelfUnits)
-    }
-    
-    /**
-     * Toggle shelf unit index display
-     */
-    public toggleShelfIndices(): void {
-        this.stickerHandler.toggleIndices(this.sideBoardManager, this.shelfUnits)
-    }
-    
-
     public dispose(): void {
         console.debug('🧹 Disposing InstancedShelfRenderer')
         
@@ -558,7 +491,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         })
         this.geometryTemplates = {}
         
-        // Clear state
         this.shelfUnits.clear()
         this.isInitialized = false
         

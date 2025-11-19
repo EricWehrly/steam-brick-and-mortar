@@ -10,6 +10,8 @@
  * Extracted from InstancedShelfRenderer to separate concerns and reduce class complexity.
  */
 
+import { EventManager } from '../../core/EventManager'
+import { StorePropsEventTypes } from '../../types/InteractionEvents'
 import type { StickerManager } from './StickerManager'
 import type { ShelfStickerIntegration } from './ShelfStickerIntegration'
 import type { ShelfUnitIndexSystem } from './ShelfUnitIndexSystem'
@@ -24,15 +26,48 @@ export interface ShelfStickerHandlerConfig {
     indexSystem: ShelfUnitIndexSystem
 }
 
+interface ShelfUnitInstance {
+    position: unknown
+    config: unknown
+    instanceIndices: unknown
+}
+
 export class ShelfStickerHandler {
     private stickerManager: StickerManager
     private stickerIntegration: ShelfStickerIntegration
     private indexSystem: ShelfUnitIndexSystem
+    private sideBoardManager?: InstancedMeshManager
+    private shelfUnits?: Map<number, ShelfUnitInstance>
     
     constructor(config: ShelfStickerHandlerConfig) {
         this.stickerManager = config.stickerManager
         this.stickerIntegration = config.stickerIntegration
         this.indexSystem = config.indexSystem
+        this.registerEventListeners()
+    }
+    
+    public setManagers(sideBoardManager: InstancedMeshManager, shelfUnits: Map<number, ShelfUnitInstance>): void {
+        this.sideBoardManager = sideBoardManager
+        this.shelfUnits = shelfUnits
+    }
+    
+    private registerEventListeners(): void {
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.EnableShelfIndices,
+            () => {
+                if (this.sideBoardManager && this.shelfUnits) {
+                    this.enableIndices(this.sideBoardManager, this.shelfUnits)
+                }
+            }
+        )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.DisableShelfIndices,
+            () => {
+                if (this.sideBoardManager && this.shelfUnits) {
+                    this.disableIndices(this.sideBoardManager, this.shelfUnits)
+                }
+            }
+        )
     }
     
     /**
@@ -60,6 +95,15 @@ export class ShelfStickerHandler {
             // Refresh after adding index
             this.stickerIntegration.updateSurfaceStickers(meshManager, boardIndex, tileId)
         }
+    }
+    
+    /**
+     * Populate stickers after shelf generation completes
+     * Called via event handler after GPU update
+     */
+    public populateStickersAfterGeneration(): void {
+        if (!this.sideBoardManager || !this.shelfUnits) return
+        this.populateRandomStickers(this.sideBoardManager, this.shelfUnits.size, 0.3)
     }
     
     /**

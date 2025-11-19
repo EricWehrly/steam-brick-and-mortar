@@ -87,7 +87,7 @@ export class InstancedArtworkRenderer {
             depth: config.boxDepth || 0.1
         }
         
-        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, () => this.updateGPU())
+        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, this.updateGPU.bind(this))
         
         // Pre-create shared canvas for artwork processing
         this.initializeSharedCanvas()

@@ -16,6 +16,7 @@ import { AppSettings } from '../../../core/AppSettings'
 import { EventManager } from '../../../core/EventManager'
 import { EventSource } from '../../../core/EventManager'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
+import { StorePropsEventTypes } from '../../../types/InteractionEvents'
 
 export interface SteamSettings {
     // Steam Profile Settings (autoLoadProfile moved to AppSettings)
@@ -153,7 +154,8 @@ export class GameSettingsPanel extends PauseMenuPanel {
             {
                 toggleId: 'show-shelf-indices',
                 onChange: (checked) => {
-                    EventManager.getInstance().emit('store-props:toggle-shelf-indices', {})
+                    const event = checked ? StorePropsEventTypes.EnableShelfIndices : StorePropsEventTypes.DisableShelfIndices
+                    EventManager.getInstance().emit(event, {})
                     console.log(`🔍 Shelf unit indices ${checked ? 'enabled' : 'disabled'}`)
                 }
             }

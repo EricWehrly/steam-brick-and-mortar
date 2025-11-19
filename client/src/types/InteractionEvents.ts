@@ -280,7 +280,9 @@ export const AppSettingsEventTypes = {
 export const StorePropsEventTypes = {
     Progress: 'store-props:progress',
     SetupRequest: 'store-props:setup-request',
-    SetupCompleted: 'store-props:setup-completed'
+    SetupCompleted: 'store-props:setup-completed',
+    EnableShelfIndices: 'store-props:enable-shelf-indices',
+    DisableShelfIndices: 'store-props:disable-shelf-indices'
 } as const
 
 // =============================================================================

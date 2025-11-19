@@ -56,7 +56,7 @@ export class InstancedLabelRenderer {
         
         this.textureArrayManager = new LabelTextureArrayManager(config.textureSize || 512)
         
-        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, () => this.updateGPU())
+        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, this.updateGPU.bind(this))
         
         console.debug(`📋 InstancedLabelRenderer created (max: ${this.maxInstances} labels)`)
     }
