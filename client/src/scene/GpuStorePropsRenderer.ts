@@ -201,21 +201,28 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             if (this.shelfBounds.minX !== Infinity) {
                 const { RoomConstants } = await import('./RoomManager')
                 const roomWidth = (this.shelfBounds.maxX - this.shelfBounds.minX) + (RoomConstants.STORE_WALL_CLEARANCE * 2)
-                const roomDepth = (this.shelfBounds.maxZ - this.shelfBounds.minZ) + RoomConstants.STORE_ENTRANCE_CLEARANCE + RoomConstants.STORE_BACK_CLEARANCE
+                // Room extends from origin (front wall/entrance) to back of shelves + back clearance
+                const roomDepth = Math.abs(this.shelfBounds.minZ) + RoomConstants.STORE_BACK_CLEARANCE
                 const roomHeight = RoomConstants.STORE_CEILING_HEIGHT
                 
+                // Calculate room center to position it around shelves
+                // Front wall at origin (Z=0) where player and entrance mat are
+                // Back wall at shelfMinZ - BACK_CLEARANCE (furthest negative Z)
+                // Center is halfway between: 0 and (shelfMinZ - BACK_CLEARANCE)
+                const roomCenterZ = (this.shelfBounds.minZ - RoomConstants.STORE_BACK_CLEARANCE) / 2
+                
                 console.debug(`📐 Shelf bounds: X[${this.shelfBounds.minX.toFixed(1)}, ${this.shelfBounds.maxX.toFixed(1)}], Z[${this.shelfBounds.minZ.toFixed(1)}, ${this.shelfBounds.maxZ.toFixed(1)}]`)
-                console.debug(`🏠 Calculated room: ${roomWidth.toFixed(1)}x${roomDepth.toFixed(1)}x${roomHeight.toFixed(1)}`)
+                console.debug(`🏠 Calculated room: ${roomWidth.toFixed(1)}x${roomDepth.toFixed(1)}x${roomHeight.toFixed(1)}, center Z: ${roomCenterZ.toFixed(1)}`)
                 console.debug(`💡 Shelf layout: ${this.shelfLayout.rows} rows x ${this.shelfLayout.shelvesPerRow} shelves per row`)
                 
-                // Emit room resize event so room encapsulates shelves
-                // No centerOffset needed - shelves are now positioned centered around origin
+                // Emit room resize event so room encapsulates shelves with player/entrance at origin
                 EventManager.getInstance().emit(RoomEventTypes.Resize, {
                     dimensions: {
                         width: roomWidth,
                         depth: roomDepth,
                         height: roomHeight
                     },
+                    centerOffset: { x: 0, y: 0, z: roomCenterZ },
                     shelfLayout: this.shelfLayout,
                     reason: 'shelves-spawned',
                     timestamp: Date.now(),

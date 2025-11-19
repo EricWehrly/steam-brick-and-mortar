@@ -115,7 +115,7 @@ export class LightingRenderer {
         })
         
         this.eventManager.registerEventHandler(RoomEventTypes.Resized, (event: CustomEvent<RoomResizedEvent>) => {
-            this.updateRoomDimensions(event.detail.dimensions, event.detail.shelfLayout) 
+            this.updateRoomDimensions(event.detail.dimensions, event.detail.shelfLayout, event.detail.centerOffset) 
         })
     }
 
@@ -426,7 +426,8 @@ export class LightingRenderer {
 
     private updateRoomDimensions(
         dimensions: { width: number; depth: number; height: number },
-        shelfLayout?: { rows: number; shelvesPerRow: number }
+        shelfLayout?: { rows: number; shelvesPerRow: number },
+        centerOffset?: { x: number; y: number; z: number }
     ): void {
         console.debug(`💡 Updating lighting for room dimensions: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
         
@@ -439,7 +440,11 @@ export class LightingRenderer {
             this.config.ceilingHeight = dimensions.height
         }
         
-        // No offset needed - room and shelves are both centered at origin
+        // Position lighting group to match room offset so lights align with shelves
+        if (centerOffset) {
+            this.lightingGroup.position.set(centerOffset.x, centerOffset.y, centerOffset.z)
+            console.debug(`💡 Lighting group positioned at: (${centerOffset.x}, ${centerOffset.y}, ${centerOffset.z.toFixed(1)})`)
+        }
         
         // Recreate fluorescent fixtures with new dimensions if they exist
         const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)

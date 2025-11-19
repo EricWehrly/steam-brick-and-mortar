@@ -174,10 +174,10 @@ export class RoomManager {
         
         console.log(`🏠 Room resize requested (reason: ${reason})`)
         
-        // Check if dimensions are provided in event
+        // Check if dimensions and centerOffset are provided in event
         if (eventData.dimensions) {
-            // Use provided dimensions (from shelf bounds calculation)
-            await this.queueRoomOperation(eventData.dimensions)
+            // Use provided dimensions and center offset (from shelf bounds calculation)
+            await this.queueRoomOperation(eventData.dimensions, eventData.centerOffset)
         } else {
             // Calculate dimensions from game count (legacy path)
             const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
@@ -201,19 +201,12 @@ export class RoomManager {
      * Queue room operations to prevent concurrent modifications
      * Implements async mutex pattern to handle rapid-fire events
      */
-    private async queueRoomOperation(dimensions: RoomDimensions): Promise<void> {
-        return this.queueRoomOperationWithOffset(dimensions, undefined)
-    }
-    
-    /**
-     * Queue room operations with optional center offset
-     */
-    private async queueRoomOperationWithOffset(dimensions: RoomDimensions, _centerOffset?: { x: number, y: number, z: number }): Promise<void> {
+    private async queueRoomOperation(dimensions: RoomDimensions, centerOffset?: { x: number, y: number, z: number }): Promise<void> {
         if (!this.isProcessingResize) {
             // No operation in progress, process immediately
             this.isProcessingResize = true
             try {
-                await this.createOrUpdateRoom(dimensions)
+                await this.createOrUpdateRoom(dimensions, centerOffset)
                 
                 // Process any queued operations with the latest dimensions
                 while (this.pendingResizeQueue.length > 0) {
@@ -241,7 +234,7 @@ export class RoomManager {
      * Create or update room (single method that never creates duplicates)
      * Either creates walls if none exist OR updates existing walls - never both
      */
-    private async createOrUpdateRoom(dimensions: RoomDimensions): Promise<void> {
+    private async createOrUpdateRoom(dimensions: RoomDimensions, centerOffset?: { x: number, y: number, z: number }): Promise<void> {
         // Ensure room group exists
         if (!this.roomGroup) {
             this.roomGroup = new THREE.Group()
@@ -250,7 +243,11 @@ export class RoomManager {
             console.debug('🏠 Created room group')
         }
         
-        // Room group stays at origin - shelves are now centered around origin too
+        // Position room group to encapsulate shelves while keeping player/entrance at origin
+        if (centerOffset) {
+            this.roomGroup.position.set(centerOffset.x, centerOffset.y, centerOffset.z)
+            console.debug(`🏠 Room positioned at center offset: (${centerOffset.x}, ${centerOffset.y}, ${centerOffset.z.toFixed(1)})`)
+        }
 
         // Let resize methods handle their own prerequisites (create if needed, then resize)
         this.eventManager.emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {

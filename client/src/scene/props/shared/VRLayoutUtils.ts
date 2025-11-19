@@ -15,14 +15,14 @@ export class VRLayoutUtils {
         }
     }
 
-    static calculateOptimalRowPosition(rowIndex: number, totalRows: number): number {
+    static calculateOptimalRowPosition(rowIndex: number, _totalRows: number): number {
         const baseRowSpacing = RoomConstants.SHELF_SPACING_Z
         
-        // Center shelves around origin (Z=0)
-        // Calculate total depth and offset so middle of shelf area is at Z=0
-        const totalDepth = (totalRows - 1) * baseRowSpacing
-        const startZ = -totalDepth / 2
-        const rowZ = startZ + (rowIndex * baseRowSpacing)
+        // Position shelves starting behind player (negative Z) going further back
+        // Player and entrance mat are at origin, shelves start at -ENTRANCE_CLEARANCE
+        const entranceClearance = RoomConstants.STORE_ENTRANCE_CLEARANCE
+        const startZ = -entranceClearance - baseRowSpacing // First shelf row behind entrance area
+        const rowZ = startZ - (rowIndex * baseRowSpacing) // Each row goes further back
         
         return rowZ
     }

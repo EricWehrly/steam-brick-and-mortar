@@ -66,7 +66,10 @@ export class EventManager extends EventTarget {
         
         const event = new CustomEvent(eventType, { detail: eventDetail })
         
-        EventManager.logger.debug(`Emitting event: ${eventType}`, { detail: eventDetail })
+        // Only log non-noisy events (skip high-frequency events like game-loaded)
+        if (!eventType.includes('game-loaded') && !eventType.includes(':progress')) {
+            EventManager.logger.debug(`Emitting event: ${eventType}`, { detail: eventDetail })
+        }
         return this.dispatchEvent(event)
     }
     
@@ -104,8 +107,11 @@ export class EventManager extends EventTarget {
         this.addEventListener(eventType, handler as EventListener, options)
         this.addToHandlerMap(this.registeredHandlers, eventType, typedHandler)
         
-        const handlerType = options?.isDefault ? 'default' : options?.isOverride ? 'override' : 'normal'
-        EventManager.logger.debug(`Registered ${handlerType} handler for: ${eventType}`)
+        // Only log registration for important/infrequent events
+        if (!eventType.includes(':progress') && !eventType.includes('game-loaded')) {
+            const handlerType = options?.isDefault ? 'default' : options?.isOverride ? 'override' : 'normal'
+            EventManager.logger.debug(`Registered ${handlerType} handler for: ${eventType}`)
+        }
     }
     
     private addToHandlerMap(map: Map<string, Set<HandlerFunction>>, eventType: string, handler: HandlerFunction): void {

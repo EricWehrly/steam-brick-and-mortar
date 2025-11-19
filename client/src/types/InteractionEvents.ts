@@ -79,6 +79,7 @@ export interface RoomCreatedEvent extends BaseInteractionEvent {
 
 export interface RoomResizedEvent extends BaseInteractionEvent {
     dimensions: { width: number; depth: number; height: number }
+    centerOffset?: { x: number; y: number; z: number }
     shelfLayout?: { rows: number; shelvesPerRow: number }
 }
 
