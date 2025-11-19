@@ -69,12 +69,10 @@ export class StickerManager {
         rotation: number = 0,
         scale: number = 1.0
     ): boolean {
-        if (!this.atlas) {
-            console.warn('Atlas not initialized - call initializeAtlas() first')
-            return false
-        }
+        // Auto-initialize atlas if needed
+        const atlas = this.getAtlas()
         
-        if (!this.atlas.hasEmoji(emoji)) {
+        if (!atlas.hasEmoji(emoji)) {
             console.warn(`Emoji "${emoji}" not in atlas`)
             return false
         }

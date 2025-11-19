@@ -113,11 +113,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.shelfBoardManager = new InstancedMeshManager('InstancedShelf-ShelfBoards')
         this.interiorSurfaceManager = new InstancedMeshManager('InstancedShelf-InteriorSurfaces')
         
-        // Initialize sticker system
+        // Initialize sticker system (macro texture mode - no sticker limits)
         const stickerManager = new StickerManager()
         const stickerIntegration = new ShelfStickerIntegration({
-            stickerManager,
-            maxStickersPerSurface: this.maxStickersPerSideboard
+            stickerManager
         })
         const indexSystem = new ShelfUnitIndexSystem(stickerManager)
         
@@ -167,14 +166,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                 name: 'instanced-shelf-angled-boards'
             })
             
-            // Clone and modify side board material to support stickers
+            // Clone and modify side board material to support stickers (macro texture mode)
             const stickerEnabledMaterial = brandAccentMaterial.clone()
-            // Access integration through handler's internal manager
-            const stickerIntegration = new ShelfStickerIntegration({
-                stickerManager: this.stickerHandler.getStickerManager(),
-                maxStickersPerSurface: this.maxStickersPerSideboard
-            })
-            stickerIntegration.setupStickerMaterial(stickerEnabledMaterial)
+            // Reuse the existing integration instance (important for macro texture consistency)
+            this.stickerHandler.getStickerIntegration().setupStickerMaterial(stickerEnabledMaterial)
             
             this.sideBoardManager.initialize({
                 geometry: sideBoardGeometry,
@@ -251,12 +246,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             { name: 'surfaceScale', itemSize: 2, defaultValue: [1, 1] }
         ])
         
-        // Add sticker attributes to side boards (left board gets stickers)
-        const stickerIntegration = new ShelfStickerIntegration({
-            stickerManager: this.stickerHandler.getStickerManager(),
-            maxStickersPerSurface: this.maxStickersPerSideboard
-        })
-        stickerIntegration.setupInstanceAttributes(this.sideBoardManager)
+        // Add sticker attributes to side boards (macro texture mode - just needs shelfId)
+        this.stickerHandler.getStickerIntegration().setupInstanceAttributes(this.sideBoardManager)
     }
     
     // TODO: Is this definitely how we want to write this?
