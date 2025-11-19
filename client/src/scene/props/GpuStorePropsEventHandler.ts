@@ -200,13 +200,12 @@ export class GpuStorePropsEventHandler {
         const propRenderer = new PropRenderer(this.scene)
         this.entranceMat = propRenderer.createEntranceFloorMat(dimensions.width, dimensions.depth)
         
-        // Position inside the store (negative Z) so player spawns inside glass wall, not in/outside it
-        // Front wall is at Z≈0, shelves extend into negative Z, so mat goes negative too
-        const entranceOffset = -1.0 // 1m inside the front wall (toward shelves)
-        this.entranceMat.position.set(0, 0, entranceOffset)
+    // Position at origin - keep entrance mat/player spawn fixed at (0,0,0)
+    // Room/front wall will be offset instead to encapsulate the mat
+    this.entranceMat.position.set(0, 0, 0)
         
-        this.scene.add(this.entranceMat)
-        GpuStorePropsEventHandler.logger.debug(`🚪 Entrance mat positioned at Z=${entranceOffset} (player spawn inside store)`)
+    this.scene.add(this.entranceMat)
+    GpuStorePropsEventHandler.logger.debug(`🚪 Entrance mat positioned at origin (0,0,0) - player spawn`) 
     }
     
     public dispose(): void {
