@@ -63,6 +63,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     
     // Track shelf layout for lighting fixture positioning
     private shelfLayout: { rows: number; shelvesPerRow: number } = { rows: 0, shelvesPerRow: 0 }
+    
+    // Track cumulative shelf count across rows (for correct game assignment)
+    private cumulativeShelfCount: number = 0
 
     constructor(scene: THREE.Scene, dataManager: DataManager) {
         this.scene = scene
@@ -152,6 +155,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             
             // Reset shelf bounds tracking
             this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
+            
+            // Reset cumulative shelf count
+            this.cumulativeShelfCount = 0
             
             // Clear existing shelves first
             this.clearExistingShelves()
@@ -363,13 +369,16 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             
             // Calculate which games belong to this shelf (18 games per shelf: 3 rows × 2 sides × 3 games)
             const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF;
-            const shelfGlobalIndex = rowIndex * 4 + i // 4 shelves per row max
+            const shelfGlobalIndex = this.cumulativeShelfCount + i // Use cumulative count, not rowIndex * 4
             const startGameIndex = shelfGlobalIndex * gamesPerShelf
             const shelfGames = games.slice(startGameIndex, startGameIndex + gamesPerShelf)
             
             // Create shelf using INSTANCED InstancedShelfRenderer ONLY
             await this.createInstancedShelf(shelfPosition, shelfGames, rowIndex, i)
         }
+        
+        // Update cumulative count after processing this row
+        this.cumulativeShelfCount += shelfCount
     }
 
     private async createInstancedShelf(
