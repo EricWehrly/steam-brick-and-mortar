@@ -13,7 +13,7 @@
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../core/EventManager'
 import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
-import { RoomEventTypes, type RoomCreateEvent, type RoomResizeEvent } from '../types/InteractionEvents'
+import { RoomEventTypes, type RoomCreateEvent, type RoomResizeEvent, type RoomResizedEvent } from '../types/InteractionEvents'
 import { SteamEventTypes, type SteamDataLoadedEvent, CeilingEventTypes, type CeilingToggleEvent } from '../types/InteractionEvents'
 import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 
@@ -38,6 +38,8 @@ export class RoomConstants {
     static readonly STORE_ENTRANCE_CLEARANCE = 6  // Front clearance for entrance/navigation (Z-axis)
     static readonly STORE_WALL_CLEARANCE = 2      // Side clearance for walls (X-axis)  
     static readonly STORE_BACK_CLEARANCE = 2      // Back clearance behind shelves (Z-axis)
+    // Small forward offset applied to front wall so entrance mat at origin is inside the store
+    static readonly STORE_FRONT_OFFSET = 1.0
     static readonly STORE_CEILING_HEIGHT = 3.2    // Store ceiling height
 
     // Default room dimensions
@@ -189,12 +191,14 @@ export class RoomManager {
         
         // TODO: Shouldn't above emit the event? 
         // and does it need to be awaited?
-        // Emit room resized event with calculated dimensions
-        this.eventManager.emit(RoomEventTypes.Resized, { 
+        // Emit room resized event with calculated dimensions and pass through shelf layout
+        this.eventManager.emit<RoomResizedEvent>(RoomEventTypes.Resized, { 
             dimensions: eventData.dimensions || this.currentDimensions,
+            shelfLayout: eventData.shelfLayout, // Pass through shelf layout for lighting system
+            centerOffset: eventData.centerOffset, // Pass through center offset for positioning
             timestamp: Date.now(), 
-            source: 'room-manager' 
-        } as any)
+            source: EventSource.System
+        })
     }
 
     /**
@@ -245,8 +249,12 @@ export class RoomManager {
         
         // Position room group to encapsulate shelves while keeping player/entrance at origin
         if (centerOffset) {
-            this.roomGroup.position.set(centerOffset.x, centerOffset.y, centerOffset.z)
-            console.debug(`🏠 Room positioned at center offset: (${centerOffset.x}, ${centerOffset.y}, ${centerOffset.z.toFixed(1)})`)
+            // Apply a small forward/front offset so the front wall sits slightly forward
+            // of the origin. This keeps the entrance mat/player at (0,0,0) while
+            // the room encapsulates that point.
+            const appliedZ = centerOffset.z + RoomConstants.STORE_FRONT_OFFSET
+            this.roomGroup.position.set(centerOffset.x, centerOffset.y, appliedZ)
+            console.debug(`🏠 Room positioned at center offset: (${centerOffset.x}, ${centerOffset.y}, ${appliedZ.toFixed(1)}) [applied front offset=${RoomConstants.STORE_FRONT_OFFSET}]`)
         }
 
         // Let resize methods handle their own prerequisites (create if needed, then resize)

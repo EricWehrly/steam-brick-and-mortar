@@ -72,6 +72,7 @@ export class LightingRenderer {
     private config: LightingConfig = {}
     private eventManager: EventManager
     private lightFactory: LightFactory
+    private currentShelfLayout?: { rows: number; shelvesPerRow: number }
 
     constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
         this.scene = scene
@@ -284,26 +285,29 @@ export class LightingRenderer {
         
         // Window fill light: simulates natural light from storefront
         // Positioned from front-left at angle to create depth
+        const fillLightHeight = (this.config.ceilingHeight ?? 3.2) - 1
         this.lightFactory.createDirectionalLight(0xFFF5E6, this.config.fillLightIntensity, {
             name: LIGHT_NAMES.FILL,
             parent: this.lightingGroup,
-            position: [-8, this.config.ceilingHeight! - 1, 8]
+            position: [-8, fillLightHeight, 8]
         })
         
         // Subtle rim light: defines edges, prevents flat lighting
         // Cool temperature, very low intensity, non-shadow casting
+        const rimLightHeight = (this.config.ceilingHeight ?? 3.2) + 1
         const rimLight = this.lightFactory.createDirectionalLight(BlockbusterColors.fluorescentCool, 0.08, {
             name: 'rim-light',
             parent: this.lightingGroup,
-            position: [3, this.config.ceilingHeight! + 1, -5]
+            position: [3, rimLightHeight, -5]
         })
         // Rim light doesn't cast shadows for performance
         rimLight.castShadow = false
         
         // Primary illumination: RectAreaLights from ceiling fixtures
-        await this.setupFluorescentFixtures()
+        // NOTE: Fixtures are added later when shelf layout is known (via updateRoomDimensions)
+        // This keeps initial room lit with base lighting before shelves spawn
         
-        console.debug(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient disabled by default)`)
+        console.debug(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient disabled by default, ceiling fixtures added when shelves spawn)`)
     }
 
     private async setupAdvancedLighting(): Promise<void> {
@@ -329,13 +333,16 @@ export class LightingRenderer {
             this.propRenderer = new PropRenderer(this.scene)
         }
         
-        // Calculate fixture rows based on shelf layout or fall back to defaults
-        // Place fixtures along shelf rows for even coverage
-        const fixtureRows = shelfLayout?.rows ?? 2
-        const fixturesPerRow = shelfLayout?.shelvesPerRow ?? 4
+        // Use provided layout, stored layout, or fall back to defaults
+        // Place fixtures for every OTHER shelf row for better lighting coverage and performance
+        const layout = shelfLayout ?? this.currentShelfLayout
+        const shelfRows = layout?.rows ?? 2
+        const fixtureRows = Math.max(1, Math.ceil(shelfRows / 2)) // One light per 2 shelf rows
+        const fixturesPerRow = layout?.shelvesPerRow ?? 4
+        const ceilingHeight = this.config.ceilingHeight ?? 3.2
         
         const fixtures = this.propRenderer.createCeilingLightFixtures(
-            this.config.ceilingHeight!,
+            ceilingHeight,
             CURRENT_ROOM_DIMENSIONS.WIDTH,
             CURRENT_ROOM_DIMENSIONS.DEPTH,
             {
@@ -351,7 +358,7 @@ export class LightingRenderer {
         fixtures.name = LIGHT_NAMES.FLUORESCENT_FIXTURES
         this.lightingGroup.add(fixtures)
         
-        console.debug(`💡 Created ${fixtureRows * fixturesPerRow} ceiling fixtures (${fixtureRows} rows x ${fixturesPerRow} per row)`)
+        console.debug(`💡 Created ${fixtureRows * fixturesPerRow} ceiling fixtures (${fixtureRows} rows x ${fixturesPerRow} per row) for ${shelfRows} shelf rows`)
     }
 
     private addPointLights(): void {
@@ -440,20 +447,28 @@ export class LightingRenderer {
             this.config.ceilingHeight = dimensions.height
         }
         
+        // Store shelf layout for use during lighting upgrades
+        if (shelfLayout) {
+            this.currentShelfLayout = shelfLayout
+            console.debug(`💡 Stored shelf layout: ${shelfLayout.rows} rows x ${shelfLayout.shelvesPerRow} shelves per row`)
+        }
+        
         // Position lighting group to match room offset so lights align with shelves
         if (centerOffset) {
             this.lightingGroup.position.set(centerOffset.x, centerOffset.y, centerOffset.z)
             console.debug(`💡 Lighting group positioned at: (${centerOffset.x}, ${centerOffset.y}, ${centerOffset.z.toFixed(1)})`)
         }
         
-        // Recreate fluorescent fixtures with new dimensions if they exist
-        const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
-        if (existingFixtures) {
-            console.debug('💡 Recreating ceiling fixtures for new room size...')
-            if (shelfLayout) {
-                console.debug(`💡 Using shelf layout: ${shelfLayout.rows} rows x ${shelfLayout.shelvesPerRow} shelves per row`)
+        // Add or update ceiling fixtures based on shelf layout
+        // Only add fixtures if we have shelf layout data and don't already have them
+        if (shelfLayout) {
+            const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
+            if (existingFixtures) {
+                console.debug('💡 Updating existing ceiling fixtures for new shelf layout...')
+                this.lightingGroup.remove(existingFixtures)
+            } else {
+                console.debug('💡 Adding ceiling fixtures for shelf layout...')
             }
-            this.lightingGroup.remove(existingFixtures)
             this.setupFluorescentFixtures(shelfLayout)
         }
     }
@@ -558,7 +573,13 @@ export class LightingRenderer {
     }
 
     public clearLights(): void {
-        // Remove all children from lighting group
+        // Preserve ceiling fixtures if they exist (added when shelves spawn)
+        const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
+        if (existingFixtures) {
+            this.lightingGroup.remove(existingFixtures)
+        }
+        
+        // Remove all other children from lighting group
         while (this.lightingGroup.children.length > 0) {
             const child = this.lightingGroup.children[0]
             this.lightingGroup.remove(child)
@@ -567,6 +588,12 @@ export class LightingRenderer {
             if (child instanceof THREE.Light && child.shadow) {
                 child.shadow.dispose()
             }
+        }
+        
+        // Re-add preserved fixtures
+        if (existingFixtures) {
+            this.lightingGroup.add(existingFixtures)
+            console.debug('💡 Preserved ceiling fixtures during lighting upgrade')
         }
     }
 

@@ -344,7 +344,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // VR-optimized spacing calculations
         const shelfSpacing = VRLayoutUtils.calculateOptimalShelfSpacing(shelfCount)
         const startX = -(shelfCount - 1) * shelfSpacing / 2 // Center the row
-        const rowZ = VRLayoutUtils.calculateOptimalRowPosition(rowIndex, totalRows) // VR-friendly row positioning centered around origin
+        const rowZ = VRLayoutUtils.calculateOptimalRowPosition(rowIndex) // VR-friendly row positioning
         
         for (let i = 0; i < shelfCount; i++) {
             const shelfPosition = new THREE.Vector3(

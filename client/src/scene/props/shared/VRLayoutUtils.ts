@@ -15,7 +15,7 @@ export class VRLayoutUtils {
         }
     }
 
-    static calculateOptimalRowPosition(rowIndex: number, _totalRows: number): number {
+    static calculateOptimalRowPosition(rowIndex: number): number {
         const baseRowSpacing = RoomConstants.SHELF_SPACING_Z
         
         // Position shelves starting behind player (negative Z) going further back
