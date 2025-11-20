@@ -59,6 +59,7 @@ export class GameBoxUtils {
         globalGameIndex: number, 
         imageManager: ImageDownloader
     ): Promise<GameBoxTextureOptions | undefined> {
+        // TODO: More than 10 %
         const shouldUseArtwork = (globalGameIndex % 10) === 0
         if (!shouldUseArtwork || !game.artwork?.header) {
             return undefined

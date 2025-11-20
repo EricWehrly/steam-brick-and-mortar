@@ -11,20 +11,14 @@
  */
 
 import { EventManager } from '../../core/EventManager'
-import { StorePropsEventTypes } from '../../types/InteractionEvents'
-import type { StickerManager } from './StickerManager'
-import type { ShelfStickerIntegration } from './ShelfStickerIntegration'
-import type { ShelfUnitIndexSystem } from './ShelfUnitIndexSystem'
+import { StorePropsEventTypes, GameEventTypes } from '../../types/InteractionEvents'
+import { StickerManager } from './StickerManager'
+import { ShelfStickerIntegration } from './ShelfStickerIntegration'
+import { ShelfUnitIndexSystem } from './ShelfUnitIndexSystem'
 import type { InstancedMeshManager } from '../instancing/InstancedMeshManager'
 
 // Toggle verbose sticker-system debug logging in this module
 const STICKERS_DEBUG = false
-
-export interface ShelfStickerHandlerConfig {
-    stickerManager: StickerManager
-    stickerIntegration: ShelfStickerIntegration
-    indexSystem: ShelfUnitIndexSystem
-}
 
 interface ShelfUnitInstance {
     position: unknown
@@ -39,10 +33,13 @@ export class ShelfStickerHandler {
     private sideBoardManager?: InstancedMeshManager
     private shelfUnits?: Map<number, ShelfUnitInstance>
     
-    constructor(config: ShelfStickerHandlerConfig) {
-        this.stickerManager = config.stickerManager
-        this.stickerIntegration = config.stickerIntegration
-        this.indexSystem = config.indexSystem
+    constructor() {
+        // Initialize sticker system (macro texture mode - no sticker limits)
+        this.stickerManager = new StickerManager()
+        this.stickerIntegration = new ShelfStickerIntegration({
+            stickerManager: this.stickerManager
+        })
+        this.indexSystem = new ShelfUnitIndexSystem(this.stickerManager)
         this.registerEventListeners()
     }
     
@@ -52,6 +49,13 @@ export class ShelfStickerHandler {
     }
     
     private registerEventListeners(): void {
+        // Populate stickers after GPU batch completes
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.InstancedBatchComplete,
+            this.populateStickersAfterGeneration.bind(this)
+        )
+        
+        // Handle shelf index visibility toggles
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.EnableShelfIndices,
             () => {

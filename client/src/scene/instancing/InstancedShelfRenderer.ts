@@ -7,14 +7,13 @@ import type {
     IInstancedRenderer, 
     InstancedRendererStats
 } from './IInstancedRenderer'
-import { InstancedShelfStickerAdapter } from './InstancedShelfStickerAdapter'
+import { ShelfStickerHandler } from '../stickers/ShelfStickerHandler'
 import { EventManager } from '../../core/EventManager'
 import { GameEventTypes } from '../../types/InteractionEvents'
 
 export interface InstancedShelfConfig extends InstancedRendererConfig {
     defaultShelfConfig?: ShelfConfig
     maxShelfUnits?: number
-    maxStickersPerSideboard?: number
 }
 
 export const DEFAULT_INSTANCED_SHELF_CONFIG = {
@@ -68,14 +67,14 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     private readonly shelfYPositions: number[]
     private readonly shelfDepthsAndOffsets: Array<{ shelfDepth: number; forwardOffset: number }>
     
-    private readonly stickerAdapter: InstancedShelfStickerAdapter
+    // TODO: Consider making sticker system fully pluggable (dependency injection or optional feature)
+    private readonly stickerHandler: ShelfStickerHandler
     
     constructor(config: InstancedShelfConfig = {}) {
         this.maxShelfUnits = config.maxShelfUnits ?? DEFAULT_INSTANCED_SHELF_CONFIG.maxShelfUnits
         
-        this.stickerAdapter = new InstancedShelfStickerAdapter({
-            maxStickersPerSideboard: config.maxStickersPerSideboard
-        })
+        // TODO: Make sticker system optional/pluggable to reduce coupling
+        this.stickerHandler = new ShelfStickerHandler()
         
         this.defaultShelfConfig = {
             ...DEFAULT_INSTANCED_SHELF_CONFIG.defaultShelfConfig,
@@ -148,9 +147,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                 name: 'instanced-shelf-angled-boards'
             })
             
+            // TODO: Consider material decoration pattern to avoid direct material modification here
             // Clone and modify side board material to support stickers (macro texture mode)
             const stickerEnabledMaterial = brandAccentMaterial.clone()
-            this.stickerAdapter.setupMaterial(stickerEnabledMaterial)
+            this.stickerHandler.getStickerIntegration().setupStickerMaterial(stickerEnabledMaterial)
             
             this.sideBoardManager.initialize({
                 geometry: sideBoardGeometry,
@@ -227,8 +227,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             { name: 'surfaceScale', itemSize: 2, defaultValue: [1, 1] }
         ])
         
-        this.stickerAdapter.setupInstanceAttributes(this.sideBoardManager)
-        this.stickerAdapter.setManagers(this.sideBoardManager, this.shelfUnits)
+        // TODO: Move this setup into stickerHandler.initialize() to reduce coupling
+        this.stickerHandler.getStickerIntegration().setupInstanceAttributes(this.sideBoardManager)
+        this.stickerHandler.setManagers(this.sideBoardManager, this.shelfUnits)
     }
     
     // TODO: Is this definitely how we want to write this?
@@ -284,7 +285,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         
         this.createAngledBoards(position, config, instanceIndices.angledBoards)
         this.createSideBoards(shelfUnitIndex, position, config, instanceIndices.sideBoards)
-        this.createHorizontalShelves(shelfUnitIndex, position, config, instanceIndices)
+        this.createHorizontalShelves(position, config, instanceIndices)
         
         return {
             position: position.clone(),
@@ -320,7 +321,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             0
         ))
         this.sideBoardManager.setInstanceMatrix(leftBoardIndex, leftPos)
-        this.stickerAdapter.initializeSideboardStickers(
+        // TODO: Consider event-based approach: emit "sideboard-created" event instead of direct call
+        this.stickerHandler.initializeSideboardStickers(
             this.sideBoardManager,
             leftBoardIndex,
             shelfUnitIndex,
@@ -336,7 +338,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             0
         ))
         this.sideBoardManager.setInstanceMatrix(rightBoardIndex, rightPos)
-        this.stickerAdapter.initializeSideboardStickers(
+        // TODO: Consider event-based approach: emit "sideboard-created" event instead of direct call
+        this.stickerHandler.initializeSideboardStickers(
             this.sideBoardManager,
             rightBoardIndex,
             shelfUnitIndex,
@@ -347,7 +350,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     }
     
     private createHorizontalShelves(
-        shelfUnitIndex: number,
         position: THREE.Vector3,
         config: Required<ShelfConfig>,
         instanceIndices: ShelfUnitInstance['instanceIndices']
@@ -366,7 +368,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             const depthScale = shelfDepth / config.depth
             
             this.createShelfBoard(position, shelfY, forwardOffset, widthScale, depthScale, instanceIndices.shelfBoards)
-            this.createInteriorSurface(shelfUnitIndex, i, position, shelfY, forwardOffset, config.boardThickness, widthScale, depthScale, instanceIndices.interiorSurfaces)
+            this.createInteriorSurface(position, shelfY, forwardOffset, config.boardThickness, widthScale, depthScale, instanceIndices.interiorSurfaces)
         }
     }
     
@@ -388,8 +390,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     }
     
     private createInteriorSurface(
-        shelfUnitIndex: number,
-        shelfLevel: number,
         position: THREE.Vector3,
         shelfY: number,
         forwardOffset: number,
