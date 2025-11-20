@@ -203,12 +203,15 @@ export class SharedMaterialManager {
     }
     
     private createGlassMaterial(): THREE.MeshStandardMaterial {
+        // Glass with emissive glow to simulate exterior lighting through storefront
         return new THREE.MeshStandardMaterial({
             color: 0xCCF5FF, // Slight blue tint like real glass
-            roughness: 0.1,   // Very smooth/reflective
+            emissive: 0xFFE4B5, // Warm moccasin glow simulating exterior street/store lighting
+            emissiveIntensity: 0.375, // Reduced by 25% from 0.5 for subtler nighttime ambiance
+            roughness: 0.1, // Very smooth/reflective
             metalness: 0.0,
             transparent: true,
-            opacity: 0.3,      // 30% opacity for storefront window effect
+            opacity: 0.35, // Slightly increased from 0.3 to make emissive effect more visible
             side: THREE.DoubleSide // Visible from both sides
         })
     }

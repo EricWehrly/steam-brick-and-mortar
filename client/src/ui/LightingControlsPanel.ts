@@ -59,7 +59,7 @@ export class LightingControlsPanel {
             <div class="panel-content collapsed" id="lighting-panel-content">
                 <div class="master-controls">
                     <label class="control-item">
-                        <input type="checkbox" id="all-lights-toggle" checked>
+                        <input type="checkbox" id="all-lights-toggle">
                         <span class="control-label">All Lights</span>
                     </label>
                     <label class="control-item">
@@ -174,14 +174,14 @@ export class LightingControlsPanel {
             this.lightGroups.set(lightType, {
                 type: lightType,
                 lights: [],
-                enabled: true
+                enabled: light.visible // Initialize based on first light's actual visibility
             })
         }
         
         const group = this.lightGroups.get(lightType)!
         group.lights.push(light)
         
-        // Update enabled state based on light visibility
+        // Recalculate group enabled state: true if ANY light in group is visible
         const enabledCount = group.lights.filter(l => l.visible).length
         group.enabled = enabledCount > 0
     }
