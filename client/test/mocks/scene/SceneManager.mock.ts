@@ -29,6 +29,7 @@ export const SceneManagerMock = vi.fn().mockImplementation(() => {
     
     return {
         getScene: vi.fn().mockReturnValue(mockScene),
+        getCamera: vi.fn().mockReturnValue(mockCamera),
         getRenderer: vi.fn().mockReturnValue(mockRenderer),
         startRenderLoop: vi.fn(),
         stopRenderLoop: vi.fn(),
