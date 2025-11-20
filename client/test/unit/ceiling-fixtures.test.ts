@@ -76,9 +76,14 @@ describe('Phase 2.4 - Ceiling Fixtures', () => {
       }
     })
 
-    // Should have 8 light fixtures (2 rows × 4 fixtures) but 2 optimized RectAreaLights
-    expect(lightFixtures).toBe(8)
-    expect(housings).toBe(8)
+    // Now using InstancedMesh for GPU optimization - check for instanced meshes instead
+    const lightPanelInstanced = fixturesGroup.children.find(c => c instanceof THREE.InstancedMesh && c.name === 'CeilingLightPanels') as THREE.InstancedMesh
+    const housingInstanced = fixturesGroup.children.find(c => c instanceof THREE.InstancedMesh && c.name === 'CeilingFixtureHousings') as THREE.InstancedMesh
+    
+    expect(lightPanelInstanced).toBeDefined()
+    expect(lightPanelInstanced.count).toBe(8) // 2 rows × 4 fixtures
+    expect(housingInstanced).toBeDefined()
+    expect(housingInstanced.count).toBe(8)
     expect(rectLights).toBe(2) // Performance optimization: 2 wide RectAreaLights instead of 8
   })
 
@@ -87,20 +92,17 @@ describe('Phase 2.4 - Ceiling Fixtures', () => {
       emissiveIntensity: 0.8
     })
 
-    let emissiveFixturesFound = 0
+    const lightPanelInstanced = fixturesGroup.children.find(c => 
+      c instanceof THREE.InstancedMesh && c.userData.isLightFixture
+    ) as THREE.InstancedMesh
     
-    fixturesGroup.traverse((child) => {
-      if (child instanceof THREE.Mesh && child.userData.isLightFixture) {
-        const material = child.material as THREE.MeshStandardMaterial
-        expect(material.emissive.getHex()).toBeGreaterThan(0) // Should have emissive color
-        expect(material.emissiveIntensity).toBeCloseTo(1.6, 2) // Enhanced brightness (2.0 * 0.8 base = 1.6)
-        expect(material.transparent).toBe(true)
-        expect(material.opacity).toBeCloseTo(0.98, 2) // Slightly more opaque for better visibility
-        emissiveFixturesFound++
-      }
-    })
-
-    expect(emissiveFixturesFound).toBe(8) // Should find all 8 fixtures
+    expect(lightPanelInstanced).toBeDefined()
+    const material = lightPanelInstanced.material as THREE.MeshStandardMaterial
+    expect(material.emissive.getHex()).toBeGreaterThan(0) // Should have emissive color
+    expect(material.emissiveIntensity).toBeCloseTo(1.6, 2) // Enhanced brightness (2.0 * 0.8 base = 1.6)
+    expect(material.transparent).toBe(true)
+    expect(material.opacity).toBeCloseTo(0.98, 2) // Slightly more opaque for better visibility
+    expect(lightPanelInstanced.count).toBe(8) // Should have 8 instances
   })
 
   test('PropRenderer can be properly disposed', () => {
@@ -120,16 +122,13 @@ describe('Phase 2.4 - Ceiling Fixtures', () => {
   test('fixtures have proper userData for identification', () => {
     const fixturesGroup = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
 
-    let fixtureIndex = 0
+    const lightPanelInstanced = fixturesGroup.children.find(c => 
+      c instanceof THREE.InstancedMesh && c.userData.isLightFixture
+    ) as THREE.InstancedMesh
     
-    fixturesGroup.traverse((child) => {
-      if (child instanceof THREE.Mesh && child.userData.isLightFixture) {
-        expect(child.userData.fixtureIndex).toBe(fixtureIndex)
-        expect(child.userData.type).toBe('ceiling-fluorescent')
-        fixtureIndex++
-      }
-    })
-
-    expect(fixtureIndex).toBe(8) // Should have processed all 8 fixtures
+    expect(lightPanelInstanced).toBeDefined()
+    expect(lightPanelInstanced.userData.type).toBe('ceiling-fluorescent')
+    expect(lightPanelInstanced.userData.instanceCount).toBe(8)
+    expect(lightPanelInstanced.count).toBe(8) // Should have 8 instances
   })
 })

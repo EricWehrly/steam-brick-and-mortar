@@ -34,20 +34,26 @@ describe('SceneManager Lighting Integration', () => {
       expect(fixtures).toBeInstanceOf(THREE.Group)
       expect(fixtures.name).toBe('CeilingLightFixtures')
       
-      // Find all light fixtures in the group  
-      const lightPanels = fixtures.children.filter(child => 
-        child.userData?.isLightFixture && child.userData?.type === 'ceiling-fluorescent'
-      )
+      // Find the instanced mesh for light panels
+      const lightPanelInstanced = fixtures.children.find(child => 
+        child instanceof THREE.InstancedMesh && child.userData?.isLightFixture && child.userData?.type === 'ceiling-fluorescent'
+      ) as THREE.InstancedMesh
       
-      expect(lightPanels.length).toBe(8) // 2 rows × 4 fixtures
+      expect(lightPanelInstanced).toBeDefined()
+      expect(lightPanelInstanced.count).toBe(8) // 2 rows × 4 fixtures
       
       // CRITICAL FIX: All fixtures must be BELOW the ceiling
-      lightPanels.forEach(panel => {
-        expect(panel.position.y).toBeLessThan(ceilingHeight)
-        expect(panel.position.y).toBeCloseTo(3.105, 2) // 3.2 - 0.075 - 0.02
+      // Check instance positions via matrix (instances positioned individually via instanceMatrix)
+      const matrix = new THREE.Matrix4()
+      const position = new THREE.Vector3()
+      for (let i = 0; i < lightPanelInstanced.count; i++) {
+        lightPanelInstanced.getMatrixAt(i, matrix)
+        position.setFromMatrixPosition(matrix)
+        expect(position.y).toBeLessThan(ceilingHeight)
+        expect(position.y).toBeCloseTo(3.105, 2) // 3.2 - 0.075 - 0.02
         // Old broken positioning was y=3.5 (30cm above ceiling!)
-        expect(panel.position.y).not.toBeCloseTo(3.5, 1)
-      })
+        expect(position.y).not.toBeCloseTo(3.5, 1)
+      }
     })
 
     it('should adapt positioning to different ceiling heights', () => {
@@ -55,14 +61,20 @@ describe('SceneManager Lighting Integration', () => {
       const customCeilingHeight = 2.8
       const fixtures = propRenderer.createCeilingLightFixtures(customCeilingHeight, 22, 16)
       
-      const lightPanels = fixtures.children.filter(child => 
-        child.userData?.isLightFixture
-      )
+      const lightPanelInstanced = fixtures.children.find(child => 
+        child instanceof THREE.InstancedMesh && child.userData?.isLightFixture
+      ) as THREE.InstancedMesh
       
-      lightPanels.forEach(panel => {
-        expect(panel.position.y).toBeLessThan(customCeilingHeight)
-        expect(panel.position.y).toBeCloseTo(2.705, 2) // 2.8 - 0.075 - 0.02
-      })
+      expect(lightPanelInstanced).toBeDefined()
+      // Check instance positions via matrix
+      const matrix = new THREE.Matrix4()
+      const position = new THREE.Vector3()
+      for (let i = 0; i < lightPanelInstanced.count; i++) {
+        lightPanelInstanced.getMatrixAt(i, matrix)
+        position.setFromMatrixPosition(matrix)
+        expect(position.y).toBeLessThan(customCeilingHeight)
+        expect(position.y).toBeCloseTo(2.705, 2) // 2.8 - 0.075 - 0.02
+      }
     })
   })
 
@@ -77,11 +89,12 @@ describe('SceneManager Lighting Integration', () => {
       
       expect(fixtures.name).toBe('CeilingLightFixtures')
       
-      // Should create proper housing for realistic appearance
-      const housingMeshes = fixtures.children.filter(child => 
-        child instanceof THREE.Mesh && !child.userData?.isLightFixture
-      )
-      expect(housingMeshes.length).toBe(8) // Housing around each light panel
+      // Should create proper housing for realistic appearance (now as instanced mesh)
+      const housingInstanced = fixtures.children.find(child => 
+        child instanceof THREE.InstancedMesh && child.name === 'CeilingFixtureHousings'
+      ) as THREE.InstancedMesh
+      expect(housingInstanced).toBeDefined()
+      expect(housingInstanced.count).toBe(8) // Housing around each light panel
     })
 
     it('should integrate with other atmospheric props', () => {

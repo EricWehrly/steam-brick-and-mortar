@@ -89,30 +89,48 @@ export class PropRenderer {
     const fixtureSpacingX = roomWidth / (fixturesPerRow + 1)
     const fixtureSpacingZ = roomDepth / (rows + 1)
     const fixtureY = ceilingHeight - height / 2 - 0.02 // Just below ceiling surface
+    
+    const totalFixtures = rows * fixturesPerRow
+
+    // Create instanced meshes for housing and light panels (reduces draw calls!)
+    const housingGeometry = new THREE.BoxGeometry(width + 0.1, height + 0.05, depth + 0.1)
+    const housingInstanced = new THREE.InstancedMesh(housingGeometry, housingMaterial, totalFixtures)
+    housingInstanced.name = 'CeilingFixtureHousings'
+    
+    const lightPanelInstanced = new THREE.InstancedMesh(fixtureGeometry, fixtureMaterial, totalFixtures)
+    lightPanelInstanced.name = 'CeilingLightPanels'
+    lightPanelInstanced.userData = { 
+      isLightFixture: true,
+      type: 'ceiling-fluorescent',
+      instanceCount: totalFixtures
+    }
+
+    const matrix = new THREE.Matrix4()
+    let instanceIndex = 0
 
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < fixturesPerRow; col++) {
         const fixtureX = -roomWidth / 2 + (col + 1) * fixtureSpacingX
         const fixtureZ = -roomDepth / 2 + (row + 1) * fixtureSpacingZ
 
-        // Create fixture housing
-        const housingGeometry = new THREE.BoxGeometry(width + 0.1, height + 0.05, depth + 0.1)
-        const housing = new THREE.Mesh(housingGeometry, housingMaterial)
-        housing.position.set(fixtureX, fixtureY + 0.05, fixtureZ)
+        // Set housing instance matrix
+        matrix.makeTranslation(fixtureX, fixtureY + 0.05, fixtureZ)
+        housingInstanced.setMatrixAt(instanceIndex, matrix)
 
-        // Create light panel
-        const lightPanel = new THREE.Mesh(fixtureGeometry, fixtureMaterial)
-        lightPanel.position.set(fixtureX, fixtureY, fixtureZ)
-        lightPanel.userData = { 
-          isLightFixture: true,
-          fixtureIndex: row * fixturesPerRow + col,
-          type: 'ceiling-fluorescent'
-        }
+        // Set light panel instance matrix
+        matrix.makeTranslation(fixtureX, fixtureY, fixtureZ)
+        lightPanelInstanced.setMatrixAt(instanceIndex, matrix)
 
-        fixturesGroup.add(housing)
-        fixturesGroup.add(lightPanel)
+        instanceIndex++
       }
     }
+
+    // Update instance matrices
+    housingInstanced.instanceMatrix.needsUpdate = true
+    lightPanelInstanced.instanceMatrix.needsUpdate = true
+
+    fixturesGroup.add(housingInstanced)
+    fixturesGroup.add(lightPanelInstanced)
 
     // Create one RectAreaLight per shelf row for proper coverage
     // Each light is positioned to match its corresponding row of fixtures

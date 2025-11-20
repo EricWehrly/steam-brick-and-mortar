@@ -90,8 +90,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         })
         
         // PRE-CALCULATE shelf depths once (all shelf units are identical)
+        // Use 0-indexed loop to match createHorizontalShelves access pattern
         this.shelfDepthsAndOffsets = []
-        for (let i = 1; i <= this.defaultShelfConfig.shelfCount; i++) {
+        for (let i = 0; i < this.defaultShelfConfig.shelfCount; i++) {
             this.shelfDepthsAndOffsets.push(
                 ShelfCalculationUtils.calculateShelfDepthAndOffset(i, {
                     depth: this.defaultShelfConfig.depth,
