@@ -86,10 +86,13 @@ export class SceneCoordinator {
         tracker.phaseStart(StartupPhase.SceneConstruction, 'Building 3D environment')
         
         // Listen for props setup completion to end scene construction and emit SceneReady
-        this.eventManager.registerEventHandler(StorePropsEventTypes.SetupCompleted, () => {
-            console.log('🎬 Scene fully ready - emitting SceneReady event')
+        this.eventManager.registerEventHandler(StorePropsEventTypes.SetupCompleted, async () => {
             tracker.phaseEnd(StartupPhase.SceneConstruction)
             tracker.milestone(StartupPhase.SceneConstruction, 'Scene fully constructed')
+            
+            // Upgrade to full lighting now that scene is complete
+            await this.lightingRenderer.upgradeLighting()
+            
             this.eventManager.emit(GameEventTypes.SceneReady, {})
         })
 
@@ -129,7 +132,7 @@ export class SceneCoordinator {
         try {
             // TODO: lightingRenderer Own event registration
             tracker.milestone(StartupPhase.SceneConstruction, 'Adding lights')
-            await this.lightingRenderer.setupLighting()
+            await this.lightingRenderer.setupBasicLighting()
             // TODO: move this to after props spawn event
             this.lightingRenderer.refreshShadows()
             console.log('💡 Lighting ready')
