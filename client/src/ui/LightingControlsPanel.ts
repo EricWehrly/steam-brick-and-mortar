@@ -18,6 +18,7 @@ interface LightGroupInfo {
     type: string
     lights: THREE.Light[]
     enabled: boolean
+    collapsed: boolean
 }
 
 export class LightingControlsPanel {
@@ -31,6 +32,7 @@ export class LightingControlsPanel {
     private appSettings: AppSettings
     private debugIndicatorEnabled: boolean
     private panelCollapsed: boolean = true
+    private horizontallyCollapsed: boolean = true
 
     constructor(eventManager: EventManager, appSettings: AppSettings) {
         this.eventManager = eventManager
@@ -39,6 +41,7 @@ export class LightingControlsPanel {
         this.appSettings = appSettings
         this.debugIndicatorEnabled = this.appSettings.getSetting('showLightingDebug') ?? false
         this.panelCollapsed = true
+        this.horizontallyCollapsed = true
         this.container = this.createPanel()
         this.setupEventListeners()
         // No initial scan - we'll scan when we get the first light event or system ready event
@@ -47,10 +50,10 @@ export class LightingControlsPanel {
     private createPanel(): HTMLElement {
         const panel = document.createElement('div')
         panel.id = 'lighting-controls-panel'
-        panel.className = 'lighting-controls-panel'
+        panel.className = 'lighting-controls-panel horizontally-collapsed'
         panel.innerHTML = `
             <div class="panel-header clickable-header" id="lighting-panel-header">
-                <h3>💡 Lighting Controls</h3>
+                <h3><span class="panel-icon">💡</span><span class="panel-title"> Lighting Controls</span></h3>
                 <div class="header-controls">
                     <button class="refresh-button" id="refresh-lights">🔄</button>
                     <span class="toggle-indicator" id="toggle-indicator">▶</span>
@@ -68,16 +71,10 @@ export class LightingControlsPanel {
                     </label>
                 </div>
                 <div class="light-groups" id="light-groups-container">
-                    <!-- Light groups will be populated here -->
-                </div>
-                <div class="individual-lights" id="individual-lights-container">
-                    <!-- Individual lights will be populated here -->
+                    <!-- Light groups with nested individual lights will be populated here -->
                 </div>
             </div>
         `
-
-        // Apply CSS class for styling
-        panel.className = 'lighting-controls-panel'
 
         // Hide the separate lighting controls button since we're integrating it into the panel
         const separateButton = document.getElementById('lighting-controls-button')
@@ -174,7 +171,8 @@ export class LightingControlsPanel {
             this.lightGroups.set(lightType, {
                 type: lightType,
                 lights: [],
-                enabled: light.visible // Initialize based on first light's actual visibility
+                enabled: light.visible, // Initialize based on first light's actual visibility
+                collapsed: true // Start collapsed
             })
         }
         
@@ -213,7 +211,8 @@ export class LightingControlsPanel {
                     newGroups.set(lightType, {
                         type: lightType,
                         lights: [],
-                        enabled: true
+                        enabled: true,
+                        collapsed: true // Start collapsed
                     })
                 }
                 
@@ -245,29 +244,35 @@ export class LightingControlsPanel {
         this.lightGroups.forEach((group, type) => {
             const groupElement = document.createElement('div')
             groupElement.className = 'light-group'
-            groupElement.innerHTML = `
-                <label class="control-item group-control">
-                    <input type="checkbox" class="group-toggle" data-type="${type}" ${group.enabled ? 'checked' : ''}>
-                    <span class="control-label">${type} (${group.lights.length})</span>
-                </label>
+            
+            // Create group header with separate click regions
+            const groupHeader = document.createElement('div')
+            groupHeader.className = 'group-header'
+            
+            // Checkbox area (label + checkbox)
+            const checkboxArea = document.createElement('div')
+            checkboxArea.className = 'group-checkbox-area'
+            checkboxArea.innerHTML = `
+                <input type="checkbox" class="group-toggle" data-type="${type}" ${group.enabled ? 'checked' : ''}>
+                <span class="control-label">${type} (${group.lights.length})</span>
             `
-
-            const checkbox = groupElement.querySelector('.group-toggle') as HTMLInputElement
-            checkbox.addEventListener('change', () => {
-                this.toggleLightGroup(type, checkbox.checked)
-            })
-
-            container.appendChild(groupElement)
-        })
-    }
-
-    private updateIndividualLights(): void {
-        const container = document.getElementById('individual-lights-container')
-        if (!container) return
-
-        container.innerHTML = '<h4>Individual Lights</h4>'
-
-        this.lightGroups.forEach((group, type) => {
+            
+            // Expander arrow
+            const expander = document.createElement('span')
+            expander.className = `group-expander${group.collapsed ? ' collapsed' : ''}`
+            expander.textContent = '▼'
+            expander.dataset.type = type
+            
+            groupHeader.appendChild(checkboxArea)
+            groupHeader.appendChild(expander)
+            groupElement.appendChild(groupHeader)
+            
+            // Create lights container
+            const lightsContainer = document.createElement('div')
+            lightsContainer.className = `group-lights-container${group.collapsed ? ' collapsed' : ''}`
+            lightsContainer.dataset.type = type
+            
+            // Add individual lights to this group
             group.lights.forEach((light, index) => {
                 const lightElement = document.createElement('div')
                 lightElement.className = 'individual-light'
@@ -280,15 +285,43 @@ export class LightingControlsPanel {
                         <span class="light-info">${this.getLightInfo(light)}</span>
                     </label>
                 `
-
-                const checkbox = lightElement.querySelector('.light-toggle') as HTMLInputElement
-                checkbox.addEventListener('change', () => {
-                    this.toggleIndividualLight(light, checkbox.checked)
+                
+                const lightCheckbox = lightElement.querySelector('.light-toggle') as HTMLInputElement
+                lightCheckbox.addEventListener('change', () => {
+                    this.toggleIndividualLight(light, lightCheckbox.checked)
                 })
-
-                container.appendChild(lightElement)
+                
+                lightsContainer.appendChild(lightElement)
             })
+            
+            groupElement.appendChild(lightsContainer)
+            
+            // Event listeners
+            const checkbox = checkboxArea.querySelector('.group-toggle') as HTMLInputElement
+            checkboxArea.addEventListener('click', (e) => {
+                // Only toggle checkbox if clicking the area, not the checkbox itself
+                if (e.target !== checkbox) {
+                    checkbox.checked = !checkbox.checked
+                    this.toggleLightGroup(type, checkbox.checked)
+                }
+            })
+            
+            checkbox.addEventListener('change', () => {
+                this.toggleLightGroup(type, checkbox.checked)
+            })
+            
+            expander.addEventListener('click', () => {
+                this.toggleGroupExpansion(type)
+            })
+
+            container.appendChild(groupElement)
         })
+    }
+
+    private updateIndividualLights(): void {
+        // Individual lights are now nested within their groups
+        // This method is kept for backwards compatibility but does nothing
+        // The lights are rendered in updateLightGroups()
     }
 
     private updateMasterToggle(): void {
@@ -367,6 +400,33 @@ export class LightingControlsPanel {
         this.updateUI()
     }
 
+    private toggleGroupExpansion(type: string): void {
+        const group = this.lightGroups.get(type)
+        if (!group) return
+
+        group.collapsed = !group.collapsed
+
+        // Update the UI elements
+        const expander = document.querySelector(`.group-expander[data-type="${type}"]`)
+        const lightsContainer = document.querySelector(`.group-lights-container[data-type="${type}"]`)
+        
+        if (expander) {
+            if (group.collapsed) {
+                expander.classList.add('collapsed')
+            } else {
+                expander.classList.remove('collapsed')
+            }
+        }
+        
+        if (lightsContainer) {
+            if (group.collapsed) {
+                lightsContainer.classList.add('collapsed')
+            } else {
+                lightsContainer.classList.remove('collapsed')
+            }
+        }
+    }
+
     public show(): void {
         this.container.style.display = 'flex'
         
@@ -397,6 +457,7 @@ export class LightingControlsPanel {
     private togglePanelContent(): void {
         const content = document.getElementById('lighting-panel-content')
         const indicator = document.getElementById('toggle-indicator')
+        const panel = this.container
         
         if (!content || !indicator) return
 
@@ -404,15 +465,19 @@ export class LightingControlsPanel {
         this.panelCollapsed = !isCollapsed // Will be the new state after toggle
         
         if (isCollapsed) {
-            // Expand: remove collapsed class
+            // Expand: remove collapsed classes
             content.classList.remove('collapsed')
+            panel.classList.remove('horizontally-collapsed')
             indicator.textContent = '▼'
+            this.horizontallyCollapsed = false
             this.scanLights()
             this.updateUI()
         } else {
-            // Collapse: add collapsed class
+            // Collapse: add collapsed classes
             content.classList.add('collapsed')
+            panel.classList.add('horizontally-collapsed')
             indicator.textContent = '▶'
+            this.horizontallyCollapsed = true
         }
     }
 

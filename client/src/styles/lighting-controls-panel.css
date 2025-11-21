@@ -2,6 +2,11 @@
  * Lighting Controls Panel Styles
  */
 
+:root {
+    /* TODO: Apply this transition time to #steam-ui fade out */
+    --menu-transition-time: 1.3s;
+}
+
 .lighting-controls-panel {
     position: absolute;
     top: 50%;
@@ -18,6 +23,19 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    transition: width var(--menu-transition-time) ease;
+}
+
+.lighting-controls-panel.horizontally-collapsed {
+    width: 60px;
+}
+
+.lighting-controls-panel.horizontally-collapsed .panel-title {
+    display: none;
+}
+
+.lighting-controls-panel.horizontally-collapsed .refresh-button {
+    display: none;
 }
 
 .lighting-controls-panel .clickable-header {
@@ -51,7 +69,12 @@
     font-size: 12px;
     color: #aaa;
     user-select: none;
-    transition: transform 0.2s ease;
+    transition: transform var(--menu-transition-time) ease;
+    display: inline-block;
+}
+
+.lighting-controls-panel.horizontally-collapsed .toggle-indicator {
+    transform: rotate(-90deg);
 }
 
 .lighting-controls-panel .refresh-button {
@@ -74,11 +97,18 @@
     padding: 12px;
     overflow-y: auto;
     flex: 1;
-    display: block;
+    max-height: 60vh;
+    opacity: 1;
+    transition: max-height var(--menu-transition-time) ease, min-height var(--menu-transition-time) ease, opacity var(--menu-transition-time) ease, padding var(--menu-transition-time) ease, flex var(--menu-transition-time) ease;
 }
 
 .lighting-controls-panel .panel-content.collapsed {
-    display: none;
+    flex: 0;
+    max-height: 0;
+    min-height: 0;  /* overwrite .panel-content min-height from pause-menu-manager.css */
+    opacity: 0;
+    padding: 0;
+    overflow: hidden;
 }
 
 .lighting-controls-panel .master-controls {
@@ -111,10 +141,67 @@
 
 .lighting-controls-panel .light-group {
     margin-bottom: 8px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.lighting-controls-panel .group-header {
+    display: flex;
+    align-items: center;
+    background: rgba(30, 30, 30, 0.8);
+    padding: 6px 8px;
+    gap: 8px;
+}
+
+.lighting-controls-panel .group-checkbox-area {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+.lighting-controls-panel .group-checkbox-area:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.lighting-controls-panel .group-expander {
+    padding: 4px 8px;
+    cursor: pointer;
+    color: #aaa;
+    font-size: 12px;
+    border-radius: 3px;
+    transition: background-color 0.2s ease, transform var(--menu-transition-time) ease;
+    user-select: none;
+    display: inline-block;
+}
+
+.lighting-controls-panel .group-expander:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.lighting-controls-panel .group-expander.collapsed {
+    transform: rotate(-90deg);
 }
 
 .lighting-controls-panel .group-control .control-label {
     font-weight: bold;
+}
+
+.lighting-controls-panel .group-lights-container {
+    max-height: 500px;
+    opacity: 1;
+    transition: max-height var(--menu-transition-time) ease, opacity var(--menu-transition-time) ease;
+    overflow: hidden;
+}
+
+.lighting-controls-panel .group-lights-container.collapsed {
+    max-height: 0;
+    opacity: 0;
 }
 
 .lighting-controls-panel .individual-lights h4 {
@@ -126,8 +213,14 @@
 }
 
 .lighting-controls-panel .light-control {
-    padding-left: 12px;
+    padding: 4px 12px;
     font-size: 12px;
+    background: rgba(20, 20, 20, 0.5);
+    transition: background-color 0.2s ease;
+}
+
+.lighting-controls-panel .light-control:hover {
+    background: rgba(40, 40, 40, 0.7);
 }
 
 .lighting-controls-panel .light-control .control-label {
