@@ -16,6 +16,8 @@ import * as THREE from 'three'
 import { StickerManager } from './StickerManager'
 import { ShelfStickerTextureAtlas } from './ShelfStickerTextureAtlas'
 import type { InstancedMeshManager } from '../instancing/InstancedMeshManager'
+import vertexShader from './shaders/sticker-macro-texture.vert.glsl?raw'
+import fragmentShader from './shaders/sticker-macro-texture.frag.glsl?raw'
 
 // Toggle verbose sticker-system debug logging and runtime exposures in this module
 const STICKERS_DEBUG = false
@@ -69,68 +71,52 @@ export class ShelfStickerIntegration {
             shader.uniforms.stickerMacroTexture = { value: this.macroTexture.getTexture() }
             shader.uniforms.tilesPerRow = { value: macroTextureInfo.tilesPerRow }
             
-            // Vertex shader: pass shelfId, UV, and world normal to fragment
+            // Split vertex shader into declarations and implementation
+            const vertexLines = vertexShader.trim().split('\n')
+            const vertexDeclarations: string[] = []
+            const vertexImpl: string[] = []
+            
+            for (const line of vertexLines) {
+                if (line.includes('attribute') || line.includes('varying') || line.startsWith('//')) {
+                    vertexDeclarations.push(line)
+                } else if (line.trim()) {
+                    vertexImpl.push(line)
+                }
+            }
+            
+            // Split fragment shader into declarations and implementation
+            const fragmentLines = fragmentShader.trim().split('\n')
+            const fragmentDeclarations: string[] = []
+            const fragmentImpl: string[] = []
+            
+            for (const line of fragmentLines) {
+                if (line.includes('uniform') || line.includes('varying') || line.startsWith('//')) {
+                    fragmentDeclarations.push(line)
+                } else if (line.trim()) {
+                    fragmentImpl.push(line)
+                }
+            }
+            
+            // Inject vertex shader declarations and logic
             shader.vertexShader = shader.vertexShader.replace(
                 '#include <common>',
-                `
-                #include <common>
-                attribute float shelfId;
-                varying float vShelfId;
-                varying vec2 vUV;
-                varying vec3 vWorldNormal;
-                `
-            )
-            
-            // Fragment shader: sample from shelf's tile region and blend
-            shader.fragmentShader = shader.fragmentShader.replace(
-                '#include <common>',
-                `
-                #include <common>
-                uniform sampler2D stickerMacroTexture;
-                uniform float tilesPerRow;
-                varying float vShelfId;
-                varying vec2 vUV;
-                varying vec3 vWorldNormal;
-                `
+                '#include <common>\n' + vertexDeclarations.join('\n')
             )
             
             shader.vertexShader = shader.vertexShader.replace(
                 '#include <begin_vertex>',
-                `
-                #include <begin_vertex>
-                vShelfId = shelfId;
-                vUV = uv;
-                // Transform normal to world space (not view space like vNormal)
-                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
-                `
+                '#include <begin_vertex>\n' + vertexImpl.join('\n')
+            )
+            
+            // Inject fragment shader declarations and logic
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <common>',
+                '#include <common>\n' + fragmentDeclarations.join('\n')
             )
             
             shader.fragmentShader = shader.fragmentShader.replace(
                 '#include <map_fragment>',
-                `
-                #include <map_fragment>
-                
-                // Sample sticker from macro texture and blend with base color
-                if (abs(vWorldNormal.x) > 0.9) {
-                    float row = floor(vShelfId / tilesPerRow);
-                    float col = mod(vShelfId, tilesPerRow);
-                    vec2 tileOffset = vec2(col, row) / tilesPerRow;
-                    
-                    // Fix aspect ratio: sideboard is taller than wide, so scale U to maintain square aspect
-                    // Assuming sideboard is roughly 2:1 height:width ratio
-                    vec2 correctedUV = vUV;
-                    correctedUV.x = correctedUV.x * 0.5 + 0.25; // Center horizontally and scale to 50% width
-                    
-                    // Flip V coordinate (canvas Y goes down, UV V goes up)
-                    correctedUV.y = 1.0 - correctedUV.y;
-                    
-                    vec2 tileUV = tileOffset + (correctedUV / tilesPerRow);
-                    vec4 stickerColor = texture2D(stickerMacroTexture, tileUV);
-                    
-                    // Blend stickers on top of base color using alpha
-                    diffuseColor.rgb = mix(diffuseColor.rgb, stickerColor.rgb, stickerColor.a);
-                }
-                `
+                '#include <map_fragment>\n' + fragmentImpl.join('\n')
             )
         }
         
