@@ -625,6 +625,7 @@ export class InstancedArtworkRenderer {
         
         if (!hasNonZeroPixels) {
             console.warn(`⚠️ Game "${gameName}" appears to have empty/black texture at index ${textureIndex}`)
+            console.warn(`💡 This usually means cached artwork is corrupted. Consider clearing image cache or running cache validation.`)
         }
         
         // Check if instance matrix is valid (not at origin unless intended)

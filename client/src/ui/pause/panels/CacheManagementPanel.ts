@@ -94,6 +94,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
             
             // Button states
             refreshButtonDisabled: '',
+            validateButtonDisabled: '',
             clearButtonDisabled: '',
             downloadButtonDisabled: 'disabled', // No download function yet
             
@@ -140,6 +141,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
 
         UIComponentUtils.setupButtons(panel, [
             { buttonId: 'refresh-cache-btn', onClick: this.refreshCache.bind(this) },
+            { buttonId: 'validate-cache-btn', onClick: this.validateCache.bind(this) },
             { buttonId: 'clear-cache-btn', onClick: this.clearCache.bind(this) },
             { buttonId: 'download-missing-btn', onClick: this.downloadMissing.bind(this) },
             { buttonId: 'load-cached-user-btn', onClick: this.loadSelectedCachedUser.bind(this) },
@@ -427,6 +429,42 @@ export class CacheManagementPanel extends PauseMenuPanel {
             this.showError('Failed to refresh cache')
         } finally {
             btn.textContent = '🔄 Refresh Cache'
+            btn.removeAttribute('disabled')
+        }
+    }
+
+    /**
+     * Validate cache and remove corrupted/empty images
+     */
+    private async validateCache(): Promise<void> {
+        const confirmed = window.confirm('This will scan all cached images and remove any that are corrupted or empty. This may take a while. Continue?')
+        if (!confirmed) return
+
+        const panel = this.getPanelElement()
+        if (!panel) return
+
+        const btn = panel.querySelector('#validate-cache-btn')
+        if (!btn) return
+
+        btn.textContent = '🔍 Validating...'
+        btn.setAttribute('disabled', 'true')
+
+        try {
+            const imageManager = ImageManager.getInstance()
+            const removedCount = await imageManager.validateAndCleanCache()
+            
+            if (removedCount > 0) {
+                this.showSuccess(`Cache validation complete. Removed ${removedCount} invalid image(s).`)
+            } else {
+                this.showSuccess('Cache validation complete. All images are valid.')
+            }
+            
+            this.updateCacheStats()
+        } catch (error) {
+            console.error('Cache validation failed:', error)
+            this.showError('Failed to validate cache')
+        } finally {
+            btn.textContent = '🔍 Validate Cache'
             btn.removeAttribute('disabled')
         }
     }

@@ -76,6 +76,16 @@
     border-color: #0066aa;
 }
 
+.cache-btn-warning {
+    background: #ff9800;
+    border-color: #f57c00;
+}
+
+.cache-btn-warning:hover:not([disabled]) {
+    background: #f57c00;
+    border-color: #e65100;
+}
+
 /* Cache settings layout */
 .cache-settings {
     display: grid;

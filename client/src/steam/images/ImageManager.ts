@@ -68,8 +68,16 @@ export class ImageManager {
             // Check cache first
             const cached = await this.getFromCache(url);
             if (cached?.blob) {
-                opts.onImageLoaded?.(url, cached.blob);
-                return cached.blob;
+                // Validate cached blob to ensure it's not corrupted
+                const isValid = await this.validateImageBlob(cached.blob, url);
+                if (!isValid) {
+                    console.warn(`⚠️ [ImageManager] Cached image is invalid, removing from cache: ${url}`);
+                    await this.removeFromCache(url);
+                    // Continue to re-download
+                } else {
+                    opts.onImageLoaded?.(url, cached.blob);
+                    return cached.blob;
+                }
             }
 
             // Download with timeout
@@ -228,6 +236,51 @@ export class ImageManager {
         return cacheEntry?.blob || null;
     }
 
+    /**
+     * Validate and clean up existing cache entries
+     * Removes any cached images that are invalid or empty/black
+     * @returns Number of invalid entries removed
+     */
+    async validateAndCleanCache(): Promise<number> {
+        if (!this.db) return 0;
+
+        console.log('🔍 [ImageManager] Starting cache validation...');
+        
+        return new Promise(async (resolve) => {
+            if (!this.db) {
+                resolve(0);
+                return;
+            }
+            
+            const transaction = this.db.transaction([this.storeName], 'readonly');
+            const store = transaction.objectStore(this.storeName);
+            const request = store.getAll();
+            
+            request.onsuccess = async () => {
+                const entries = request.result as ImageCacheEntry[];
+                console.log(`📊 [ImageManager] Validating ${entries.length} cached images...`);
+                
+                let removedCount = 0;
+                for (const entry of entries) {
+                    const isValid = await this.validateImageBlob(entry.blob, entry.url);
+                    if (!isValid) {
+                        await this.removeFromCache(entry.url);
+                        removedCount++;
+                        console.log(`🗑️ [ImageManager] Removed invalid cache entry: ${entry.url}`);
+                    }
+                }
+                
+                console.log(`✅ [ImageManager] Cache validation complete. Removed ${removedCount} invalid entries.`);
+                resolve(removedCount);
+            };
+            
+            request.onerror = () => {
+                console.error('❌ [ImageManager] Failed to validate cache:', request.error);
+                resolve(0);
+            };
+        });
+    }
+
     private async initializeDB(): Promise<void> {
         return new Promise((resolve) => {
             if (typeof indexedDB === 'undefined') {
@@ -255,8 +308,105 @@ export class ImageManager {
         });
     }
 
+    /**
+     * Validate blob contains actual image data (not empty/black)
+     * Returns true if image appears valid, false otherwise
+     */
+    private async validateImageBlob(blob: Blob, url: string): Promise<boolean> {
+        // Check basic blob properties
+        if (blob.size === 0) {
+            console.warn(`⚠️ [ImageManager] Zero-byte blob for ${url}`);
+            return false;
+        }
+        
+        if (blob.size < 100) {
+            console.warn(`⚠️ [ImageManager] Suspiciously small blob for ${url}: ${blob.size} bytes`);
+            return false;
+        }
+        
+        if (!blob.type.startsWith('image/')) {
+            console.warn(`⚠️ [ImageManager] Invalid content type for ${url}: ${blob.type}`);
+            return false;
+        }
+        
+        // Load image to validate it can be decoded and has content
+        return new Promise((resolve) => {
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(blob);
+            
+            img.onload = () => {
+                URL.revokeObjectURL(objectUrl);
+                
+                // Check dimensions
+                if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+                    console.warn(`⚠️ [ImageManager] Invalid dimensions for ${url}: ${img.naturalWidth}x${img.naturalHeight}`);
+                    resolve(false);
+                    return;
+                }
+                
+                // Sample pixels to check if image is all black/empty
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.min(img.naturalWidth, 64);
+                    canvas.height = Math.min(img.naturalHeight, 64);
+                    const ctx = canvas.getContext('2d');
+                    
+                    if (!ctx) {
+                        console.warn(`⚠️ [ImageManager] Could not create canvas context for validation`);
+                        resolve(true); // Can't validate, but at least image loaded
+                        return;
+                    }
+                    
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    // Check if any pixels are non-black
+                    let hasNonBlackPixels = false;
+                    for (let i = 0; i < imageData.data.length; i += 4) {
+                        const r = imageData.data[i];
+                        const g = imageData.data[i + 1];
+                        const b = imageData.data[i + 2];
+                        const a = imageData.data[i + 3];
+                        
+                        // Consider pixel non-black if it has color or is not fully transparent
+                        if ((r > 10 || g > 10 || b > 10) && a > 10) {
+                            hasNonBlackPixels = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!hasNonBlackPixels) {
+                        console.warn(`⚠️ [ImageManager] Image appears to be empty/black for ${url}`);
+                        resolve(false);
+                        return;
+                    }
+                    
+                    resolve(true);
+                } catch (error) {
+                    console.warn(`⚠️ [ImageManager] Error validating image content for ${url}:`, error);
+                    resolve(true); // Can't validate, but at least image loaded
+                }
+            };
+            
+            img.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                console.warn(`⚠️ [ImageManager] Image failed to load for validation: ${url}`);
+                resolve(false);
+            };
+            
+            img.src = objectUrl;
+        });
+    }
+
     private async cacheImage(url: string, blob: Blob): Promise<void> {
         if (!this.db) return;
+        
+        // Validate blob before caching
+        const isValid = await this.validateImageBlob(blob, url);
+        if (!isValid) {
+            console.warn(`❌ [ImageManager] Refusing to cache invalid/empty image: ${url}`);
+            return;
+        }
 
         return new Promise((resolve) => {
             if (!this.db) {
@@ -275,7 +425,10 @@ export class ImageManager {
             };
             
             const request = store.put(entry);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                console.debug(`✅ [ImageManager] Cached validated image: ${url} (${blob.size} bytes)`);
+                resolve();
+            };
             request.onerror = () => resolve(); // Don't fail on cache errors
         });
     }
