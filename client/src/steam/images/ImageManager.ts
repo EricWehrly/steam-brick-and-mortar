@@ -8,6 +8,9 @@ export interface ImageCacheEntry {
     url: string;
     timestamp: number;
     size: number;
+    artworkType?: string;        // Optional: tracks which artwork type this is (header, library, etc)
+    originalType?: string;        // Optional: if fallback used, what was the original requested type
+    isFallback?: boolean;         // Optional: true if this was loaded from a fallback URL
 }
 
 export interface ImageLoadOptions {
@@ -45,6 +48,9 @@ export class ImageManager {
     private readonly storeName = 'gameImages';
     private readonly QUOTA_WARNING_THRESHOLD = 0.8; // 80%
     private readonly QUOTA_CRITICAL_THRESHOLD = 0.95; // 95%
+    
+    // Artwork type priority for fallbacks (best quality to lowest)
+    private readonly ARTWORK_PRIORITY = ['library', 'header', 'logo', 'icon'] as const;
 
     constructor() {
         this.initializeDB();
@@ -121,18 +127,82 @@ export class ImageManager {
 
         for (const [type, url] of Object.entries(artworkUrls)) {
             if (url && url.trim() !== '') {
-                results[type] = await this.downloadImage(url, options);
+                const blob = await this.downloadImage(url, options);
+                
+                // If download succeeded, validate it
+                if (blob) {
+                    const isValid = await this.validateImageBlob(blob, url);
+                    if (isValid) {
+                        results[type] = blob;
+                    } else {
+                        console.warn(`⚠️ [ImageManager] Downloaded image for ${type} failed validation from ${url}`);
+                        // Try fallback URLs for this type
+                        const fallbackBlob = await this.tryFallbackArtwork(type, artworkUrls, url, options);
+                        results[type] = fallbackBlob;
+                    }
+                } else {
+                    console.warn(`⚠️ [ImageManager] Failed to download ${type} from ${url}`);
+                    // Try fallback URLs for this type
+                    const fallbackBlob = await this.tryFallbackArtwork(type, artworkUrls, url, options);
+                    results[type] = fallbackBlob;
+                }
+                
                 // Small delay between downloads
                 await new Promise(resolve => setTimeout(resolve, 100));
             } else {
-                // TODO: try something different
                 console.warn(`Skipping empty or invalid URL for ${type}`);
-                // Skip empty or invalid URLs
                 results[type] = null;
             }
         }
 
         return results;
+    }
+    
+    /**
+     * Try alternative artwork URLs when primary URL fails
+     * Uses priority ordering: library > header > logo > icon
+     */
+    private async tryFallbackArtwork(
+        failedType: string,
+        artworkUrls: Record<string, string>,
+        failedUrl: string,
+        options: Partial<ImageLoadOptions>
+    ): Promise<Blob | null> {
+        console.log(`🔄 [ImageManager] Attempting fallback for ${failedType}...`);
+        
+        // Get priority-ordered list of artwork types, excluding the failed one
+        const fallbackTypes = this.ARTWORK_PRIORITY.filter(type => 
+            type !== failedType && 
+            artworkUrls[type] && 
+            artworkUrls[type].trim() !== '' &&
+            artworkUrls[type] !== failedUrl // Don't retry same URL
+        );
+        
+        for (const fallbackType of fallbackTypes) {
+            const fallbackUrl = artworkUrls[fallbackType];
+            console.log(`🔄 [ImageManager] Trying ${fallbackType} as fallback for ${failedType}: ${fallbackUrl}`);
+            
+            try {
+                const blob = await this.downloadImage(fallbackUrl, options);
+                if (blob) {
+                    const isValid = await this.validateImageBlob(blob, fallbackUrl);
+                    if (isValid) {
+                        console.log(`✅ [ImageManager] Fallback successful: using ${fallbackType} for ${failedType}`);
+                        return blob;
+                    } else {
+                        console.warn(`⚠️ [ImageManager] Fallback ${fallbackType} also failed validation`);
+                    }
+                }
+            } catch (error) {
+                console.warn(`⚠️ [ImageManager] Fallback ${fallbackType} failed:`, error);
+            }
+            
+            // Small delay between fallback attempts
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        console.warn(`❌ [ImageManager] All fallback attempts failed for ${failedType}`);
+        return null;
     }
 
     async getStats(): Promise<ImageCacheStats> {
@@ -360,23 +430,26 @@ export class ImageManager {
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     
-                    // Check if any pixels are non-black
-                    let hasNonBlackPixels = false;
-                    for (let i = 0; i < imageData.data.length; i += 4) {
+                    // Check if any pixels are non-zero (matches renderer logic)
+                    // Sample more pixels for better detection - check first 256 pixels (64 iterations * 4 bytes)
+                    const samplesToCheck = Math.min(256, imageData.data.length / 4);
+                    let hasNonZeroPixels = false;
+                    
+                    for (let pixelIdx = 0; pixelIdx < samplesToCheck; pixelIdx++) {
+                        const i = pixelIdx * 4;
                         const r = imageData.data[i];
                         const g = imageData.data[i + 1];
                         const b = imageData.data[i + 2];
-                        const a = imageData.data[i + 3];
                         
-                        // Consider pixel non-black if it has color or is not fully transparent
-                        if ((r > 10 || g > 10 || b > 10) && a > 10) {
-                            hasNonBlackPixels = true;
+                        // Match renderer's exact logic: any non-zero RGB value
+                        if (r !== 0 || g !== 0 || b !== 0) {
+                            hasNonZeroPixels = true;
                             break;
                         }
                     }
                     
-                    if (!hasNonBlackPixels) {
-                        console.warn(`⚠️ [ImageManager] Image appears to be empty/black for ${url}`);
+                    if (!hasNonZeroPixels) {
+                        console.warn(`⚠️ [ImageManager] Image appears to be empty/black for ${url} (all ${samplesToCheck} sampled pixels are 0,0,0)`);
                         resolve(false);
                         return;
                     }
