@@ -19,7 +19,7 @@ import { BlockbusterColors } from '../utils/Colors'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
 import { DataManager } from '../core/data/DataManager'
-import { DataDomain } from '../core/data/DataTypes'
+import { DataDomain, DataKey } from '../core/data/DataTypes'
 import { RenderLoopRegistry } from './RenderLoopRegistry'
 
 export interface SceneManagerOptions {
@@ -66,7 +66,7 @@ export class SceneManager {
         this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, CAMERA_ASPECT, CAMERA_NEAR_DIST, CAMERA_FAR_DIST)
         
         // Store camera in DataManager for access by other systems (e.g., camera settings panel)
-        DataManager.getInstance().set('core.mainCamera', this.camera, {
+        DataManager.getInstance().set(DataKey.MainCamera, this.camera, {
             domain: DataDomain.Scene
         })
         

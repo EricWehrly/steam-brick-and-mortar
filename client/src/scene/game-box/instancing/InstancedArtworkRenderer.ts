@@ -22,9 +22,13 @@
 import * as THREE from 'three'
 import type { GameBoxTextureOptions } from '../types/GameBoxOptions'
 import { DataManager } from '../../../core/data/DataManager'
+import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { TextureWorker } from './TextureWorker'
+import type { InstanceMetadata } from '../../../debug/GameFinder'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
+import vertexShader from './shaders/instanced-artwork.vert?raw'
+import fragmentShader from './shaders/instanced-artwork.frag?raw'
 
 export interface InstancedArtworkConfig {
     maxInstances?: number
@@ -35,6 +39,8 @@ export interface InstancedArtworkConfig {
     enablePerformanceLogging?: boolean
 }
 
+export const INSTANCED_ARTWORK_MESH_NAME = 'gpu-instanced-artwork-boxes' as const
+
 export class InstancedArtworkRenderer {
     private instancedMesh: THREE.InstancedMesh | null = null
     private geometry: THREE.BoxGeometry | null = null
@@ -44,6 +50,9 @@ export class InstancedArtworkRenderer {
     private dataArrayTexture: THREE.DataArrayTexture | null = null
     private textureSlots: Map<string, number> = new Map() // gameName -> texture array index
     private nextTextureIndex: number = 0
+    
+    // Instance metadata (for game finding/debugging)
+    private _instanceMetadata: Map<number, InstanceMetadata> = new Map()
     
     // Configuration
     private readonly maxInstances: number
@@ -98,9 +107,6 @@ export class InstancedArtworkRenderer {
         console.debug(`🎨 InstancedArtworkRenderer created (max: ${this.maxInstances} artwork instances)`)
     }
     
-    /**
-     * Initialize shared canvas for artwork processing (performance optimization)
-     */
     private initializeSharedCanvas(): void {
         this.sharedCanvas = document.createElement('canvas')
         this.sharedCanvas.width = this.textureSize
@@ -114,9 +120,6 @@ export class InstancedArtworkRenderer {
         }
     }
     
-    /**
-     * Initialize texture worker if OffscreenCanvas is supported
-     */
     private initializeTextureWorker(): void {
         // Re-enable Web Worker with better error handling
         if (TextureWorker.isSupported()) {
@@ -135,9 +138,6 @@ export class InstancedArtworkRenderer {
         }
     }
     
-    /**
-     * Performance logging helper
-     */
     private logPerformance(operation: string, duration: number): void {
         if (!this.enablePerfLogging) return
         
@@ -151,9 +151,6 @@ export class InstancedArtworkRenderer {
         }
     }
     
-    /**
-     * Initialize the renderer - creates geometry, material, and empty texture array
-     */
     public initialize(): void {
         if (this.isInitialized) {
             console.warn('InstancedArtworkRenderer already initialized')
@@ -181,7 +178,7 @@ export class InstancedArtworkRenderer {
             )
             
             // Name the mesh for debugging
-            this.instancedMesh.name = 'gpu-instanced-artwork-boxes'
+            this.instancedMesh.name = INSTANCED_ARTWORK_MESH_NAME
             
             // CRITICAL: Set count to 0 initially
             this.instancedMesh.count = 0
@@ -236,43 +233,13 @@ export class InstancedArtworkRenderer {
         this.dataArrayTexture.needsUpdate = true
     }
     
-    /**
-     * Create shader material for artwork rendering
-     */
     private createArtworkMaterial(): THREE.ShaderMaterial {
         return new THREE.ShaderMaterial({
             uniforms: {
                 textureArray: { value: this.dataArrayTexture }
             },
-            vertexShader: `
-                attribute float textureIndex;
-                varying vec2 vUv;
-                varying float vTextureIndex;
-                
-                void main() {
-                    // Fix texture orientation by flipping V coordinate
-                    vUv = vec2(uv.x, 1.0 - uv.y);
-                    vTextureIndex = textureIndex;
-                    
-                    vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
-                    gl_Position = projectionMatrix * mvPosition;
-                }
-            `,
-            fragmentShader: `
-                uniform sampler2DArray textureArray;
-                varying vec2 vUv;
-                varying float vTextureIndex;
-                
-                void main() {
-                    vec3 texCoord = vec3(vUv, vTextureIndex);
-                    vec4 texColor = texture(textureArray, texCoord);
-                    
-                    // Handle transparency
-                    if (texColor.a < 0.1) discard;
-                    
-                    gl_FragColor = texColor;
-                }
-            `,
+            vertexShader,
+            fragmentShader,
             transparent: true,
             side: THREE.FrontSide
         })
@@ -461,9 +428,6 @@ export class InstancedArtworkRenderer {
         img.src = URL.createObjectURL(blob)
     }
     
-    /**
-     * Set position and artwork for a specific instance
-     */
     public async setArtworkInstance(
         index: number,
         position: THREE.Vector3,
@@ -523,6 +487,20 @@ export class InstancedArtworkRenderer {
             this.currentCount = Math.max(this.currentCount, index + 1)
             console.debug(`📊 [Renderer] Updated currentCount: ${previousCount} → ${this.currentCount} (${gameName})`)
             
+            // Store instance metadata for game finding
+            this.instanceMetadata.set(index, {
+                name: gameName,
+                appid: textureOptions.appid,
+                position: position.clone()
+            })
+            
+            // Publish metadata to DataManager for other systems to access
+            DataManager.getInstance().set(
+                DataKey.InstancedArtworkMetadata, 
+                this.instanceMetadata,
+                { domain: DataDomain.Renderer, description: 'Instanced artwork instance metadata' }
+            )
+            
             // Validate geometry visibility after update
             this.validateInstanceVisibility(index, gameName, textureIndex)
             
@@ -539,9 +517,6 @@ export class InstancedArtworkRenderer {
         }
     }
     
-    /**
-     * Apply all instance updates to GPU
-     */
     public updateGPU(): void {
         if (!this.isInitialized || !this.instancedMesh || !this.geometry) {
             return
@@ -560,11 +535,13 @@ export class InstancedArtworkRenderer {
         console.debug(`🔄 GPU updated: ${this.currentCount} active artwork instances`)
     }
     
-    /**
-     * Reset all instances
-     */
+    public get instanceMetadata(): Map<number, InstanceMetadata> {
+        return this._instanceMetadata
+    }
+    
     public reset(): void {
         this.currentCount = 0
+        this._instanceMetadata.clear()
         if (this.instancedMesh) {
             this.instancedMesh.count = 0
         }

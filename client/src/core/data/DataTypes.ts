@@ -16,7 +16,17 @@ export enum DataDomain {
     SystemConfig = 'system-config',
     Cache = 'cache',
     Lighting = 'lighting',
-    Scene = 'scene'
+    Scene = 'scene',
+    Renderer = 'renderer'
+}
+
+/**
+ * Data keys for type-safe DataManager access
+ */
+export enum DataKey {
+    MainScene = 'core.mainScene',
+    MainCamera = 'core.mainCamera',
+    InstancedArtworkMetadata = 'renderer.instancedArtworkMetadata'
 }
 
 /**

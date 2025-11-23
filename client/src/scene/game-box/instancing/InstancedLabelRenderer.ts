@@ -34,6 +34,9 @@ export interface InstancedLabelConfig {
     labelHeight?: number
 }
 
+// Exported constant for identifying the instanced mesh in the scene
+export const INSTANCED_LABEL_MESH_NAME = 'gpu-instanced-game-boxes' as const
+
 export class InstancedLabelRenderer {
     private instancedMesh: THREE.InstancedMesh | null = null
     private textureArrayManager: LabelTextureArrayManager
@@ -87,7 +90,7 @@ export class InstancedLabelRenderer {
             )
             
             // Name the mesh for debugging
-            this.instancedMesh.name = 'gpu-instanced-game-boxes'
+            this.instancedMesh.name = INSTANCED_LABEL_MESH_NAME
             
             // CRITICAL: Set count to 0 initially (will update as instances are added)
             this.instancedMesh.count = 0
