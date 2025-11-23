@@ -365,13 +365,75 @@ export class InstancedArtworkRenderer {
             return
         }
         
-        // Sample first few pixels to check if texture has actual data
+        // Progressive sampling to check if texture has actual data
+        // Start with safe center location, then expand search if needed
+        // This avoids false positives from black borders while keeping checks fast
+        
+        const checkPixel = (x: number, y: number): boolean => {
+            if (x < 0 || y < 0 || x >= this.textureSize || y >= this.textureSize) return false
+            const pixelIndex = y * this.textureSize + x
+            const i = offset + pixelIndex * 4
+            if (i + 2 >= offset + sliceSize) return false // Bounds check
+            return arrayData[i] !== 0 || arrayData[i + 1] !== 0 || arrayData[i + 2] !== 0
+        }
+        
+        const center = Math.floor(this.textureSize / 2)
+        const quarter = Math.floor(this.textureSize / 4)
+        const threeQuarter = Math.floor(this.textureSize * 3 / 4)
         let hasNonZeroPixels = false
-        for (let i = offset; i < offset + Math.min(64, sliceSize); i += 4) {
-            if (arrayData[i] !== 0 || arrayData[i + 1] !== 0 || arrayData[i + 2] !== 0) {
-                hasNonZeroPixels = true
-                break
-            }
+        
+        // Level 1: Check center and immediate vicinity (5 pixels)
+        if (
+            checkPixel(center, center) ||
+            checkPixel(center + 2, center) ||
+            checkPixel(center - 2, center) ||
+            checkPixel(center, center + 2) ||
+            checkPixel(center, center - 2)
+        ) {
+            hasNonZeroPixels = true
+        }
+        // Level 2: Check 8 pixels in a wider cross and diagonal pattern (10-15px from center)
+        else if (
+            checkPixel(center + 10, center) ||
+            checkPixel(center - 10, center) ||
+            checkPixel(center, center + 10) ||
+            checkPixel(center, center - 10) ||
+            checkPixel(center + 10, center + 10) ||
+            checkPixel(center - 10, center - 10) ||
+            checkPixel(center + 10, center - 10) ||
+            checkPixel(center - 10, center + 10)
+        ) {
+            hasNonZeroPixels = true
+        }
+        // Level 3: Check quarter points and midpoints (12 pixels covering more area)
+        else if (
+            checkPixel(quarter, quarter) ||
+            checkPixel(quarter, center) ||
+            checkPixel(quarter, threeQuarter) ||
+            checkPixel(center, quarter) ||
+            checkPixel(center, threeQuarter) ||
+            checkPixel(threeQuarter, quarter) ||
+            checkPixel(threeQuarter, center) ||
+            checkPixel(threeQuarter, threeQuarter) ||
+            checkPixel(quarter, 10) ||
+            checkPixel(threeQuarter, 10) ||
+            checkPixel(quarter, this.textureSize - 10) ||
+            checkPixel(threeQuarter, this.textureSize - 10)
+        ) {
+            hasNonZeroPixels = true
+        }
+        // Level 4: Check areas near edges but not corners (8 pixels)
+        else if (
+            checkPixel(center, 15) ||
+            checkPixel(center, this.textureSize - 15) ||
+            checkPixel(15, center) ||
+            checkPixel(this.textureSize - 15, center) ||
+            checkPixel(quarter, 15) ||
+            checkPixel(threeQuarter, 15) ||
+            checkPixel(quarter, this.textureSize - 15) ||
+            checkPixel(threeQuarter, this.textureSize - 15)
+        ) {
+            hasNonZeroPixels = true
         }
         
         if (!hasNonZeroPixels) {
