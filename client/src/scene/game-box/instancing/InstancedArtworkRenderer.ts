@@ -23,7 +23,7 @@ import * as THREE from 'three'
 import type { GameBoxTextureOptions } from '../types/GameBoxOptions'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
-import { TextureWorker } from './TextureWorker'
+import { TextureProcessor } from './TextureProcessor'
 import type { InstanceMetadata } from '../../../debug/GameFinder'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
@@ -48,8 +48,7 @@ export class InstancedArtworkRenderer {
     
     // Texture management
     private dataArrayTexture: THREE.DataArrayTexture | null = null
-    private textureSlots: Map<string, number> = new Map() // gameName -> texture array index
-    private nextTextureIndex: number = 0
+    private textureProcessor: TextureProcessor
     
     // Instance metadata (for game finding/debugging)
     private _instanceMetadata: Map<number, InstanceMetadata> = new Map()
@@ -69,26 +68,9 @@ export class InstancedArtworkRenderer {
     // Box dimensions
     private readonly dimensions: { width: number, height: number, depth: number }
     
-    // Performance optimization - reusable canvas and context
-    private sharedCanvas: HTMLCanvasElement | null = null
-    private sharedContext: CanvasRenderingContext2D | null = null
-    
-    // Web Worker for offscreen texture processing
-    private textureWorker: TextureWorker | null = null
-    private useWebWorker: boolean = false
-    
-    // Performance monitoring
-    private readonly enablePerfLogging: boolean
-    private perfStats = {
-        textureProcessingTime: 0,
-        totalTextures: 0,
-        averageProcessingTime: 0
-    }
-    
     constructor(config: InstancedArtworkConfig = {}) {
         this.maxInstances = config.maxInstances || 1000
         this.textureSize = config.textureSize || 512
-        this.enablePerfLogging = config.enablePerformanceLogging ?? false
         
         this.dimensions = {
             width: config.boxWidth || 0.3,
@@ -96,59 +78,16 @@ export class InstancedArtworkRenderer {
             depth: config.boxDepth || 0.1
         }
         
+        // Initialize texture processor
+        this.textureProcessor = new TextureProcessor({
+            textureSize: this.textureSize,
+            maxTextures: this.maxTextures,
+            enablePerformanceLogging: config.enablePerformanceLogging
+        })
+        
         EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, this.updateGPU.bind(this))
         
-        // Pre-create shared canvas for artwork processing
-        this.initializeSharedCanvas()
-        
-        // Initialize texture worker if supported
-        this.initializeTextureWorker()
-        
         console.debug(`🎨 InstancedArtworkRenderer created (max: ${this.maxInstances} artwork instances)`)
-    }
-    
-    private initializeSharedCanvas(): void {
-        this.sharedCanvas = document.createElement('canvas')
-        this.sharedCanvas.width = this.textureSize
-        this.sharedCanvas.height = this.textureSize
-        this.sharedContext = this.sharedCanvas.getContext('2d')
-        
-        if (!this.sharedContext) {
-            console.warn('⚠️ Failed to create shared canvas context for artwork processing')
-        } else {
-            console.debug(`🎨 Shared canvas initialized (${this.textureSize}x${this.textureSize})`)
-        }
-    }
-    
-    private initializeTextureWorker(): void {
-        // Re-enable Web Worker with better error handling
-        if (TextureWorker.isSupported()) {
-            try {
-                this.textureWorker = new TextureWorker()
-                this.useWebWorker = true
-                console.debug('🔧 TextureWorker enabled - texture processing will be offloaded from main thread')
-            } catch (error) {
-                console.warn('⚠️ Failed to initialize TextureWorker, falling back to main thread processing:', error)
-                this.useWebWorker = false
-                this.textureWorker = null
-            }
-        } else {
-            console.debug('💡 OffscreenCanvas not supported, using main thread texture processing')
-            this.useWebWorker = false
-        }
-    }
-    
-    private logPerformance(operation: string, duration: number): void {
-        if (!this.enablePerfLogging) return
-        
-        console.debug(`⚡ ${operation}: ${duration.toFixed(2)}ms`)
-        
-        // Update running averages for texture processing
-        if (operation.includes('texture processing')) {
-            this.perfStats.textureProcessingTime += duration
-            this.perfStats.totalTextures++
-            this.perfStats.averageProcessingTime = this.perfStats.textureProcessingTime / this.perfStats.totalTextures
-        }
     }
     
     public initialize(): void {
@@ -262,172 +201,6 @@ export class InstancedArtworkRenderer {
         this.geometry.setAttribute('textureIndex', textureIndexAttribute)
     }
     
-    /**
-     * Add artwork texture to the texture array and return its index
-     */
-    private addArtworkToTextureArray(blob: Blob, gameName: string): Promise<number> {        
-        return new Promise((resolve, reject) => {
-            if (this.nextTextureIndex >= this.maxTextures) {
-                console.error(`🚫 Maximum textures reached (${this.maxTextures}), rejecting "${gameName}"`)
-                reject(new Error('Maximum textures reached'))
-                return
-            }
-            
-            // Check if we already have this texture
-            const existingIndex = this.textureSlots.get(gameName)
-            if (existingIndex !== undefined) {
-                // Debug removed to reduce log noise
-                resolve(existingIndex)
-                return
-            }
-            
-            // Critical validation checks
-            if (blob.size === 0) {
-                console.warn(`⚠️ Zero-byte blob for "${gameName}" - cached artwork may be corrupted`)
-                reject(new Error(`Zero-byte blob for "${gameName}"`))
-                return
-            }
-            
-            if (blob.size < 100) {
-                console.warn(`⚠️ Suspiciously small blob for "${gameName}": ${blob.size} bytes`)
-            }
-            
-            // Use Web Worker if available, otherwise fall back to main thread
-            if (this.useWebWorker && this.textureWorker) {
-                this.processTextureWithWorker(blob, gameName, resolve, reject)
-            } else {
-                this.processTextureOnMainThread(blob, gameName, resolve, reject)
-            }
-        })
-    }
-    
-    /**
-     * Process texture using Web Worker (offscreen)
-     */
-    private async processTextureWithWorker(
-        blob: Blob, 
-        gameName: string, 
-        resolve: (value: number) => void, 
-        reject: (error: Error) => void
-    ): Promise<void> {
-        const startTime = performance.now()
-        
-        try {
-            if (!this.textureWorker || !this.dataArrayTexture) {
-                reject(new Error('TextureWorker or texture array not available'))
-                return
-            }
-            
-            // Reserve texture index immediately to prevent race conditions
-            const reservedTextureIndex = this.nextTextureIndex++
-            
-            // Process texture in web worker
-            const imageData = await this.textureWorker.processTexture(blob, this.textureSize, reservedTextureIndex)
-            
-            // Calculate offset for this texture slot in the array
-            const sliceSize = this.textureSize * this.textureSize * 4
-            const offset = reservedTextureIndex * sliceSize
-            
-            // Copy data to texture array (this happens on main thread but is fast)
-            const arrayData = this.dataArrayTexture.image.data as Uint8Array
-            arrayData.set(imageData, offset)
-            
-            // Mark texture as needing update
-            this.dataArrayTexture.needsUpdate = true
-            
-            // Store mapping with reserved index
-            this.textureSlots.set(gameName, reservedTextureIndex)
-            
-            
-            // Performance logging
-            const endTime = performance.now()
-            this.logPerformance(`texture processing for "${gameName}" (Web Worker)`, endTime - startTime)
-            
-            resolve(reservedTextureIndex)
-            
-        } catch (error) {
-            console.error(`Web Worker texture processing failed for "${gameName}":`, error)
-            reject(error instanceof Error ? error : new Error(String(error)))
-        }
-    }
-    
-    /**
-     * Process texture on main thread (fallback)
-     */
-    private processTextureOnMainThread(
-        blob: Blob, 
-        gameName: string, 
-        resolve: (value: number) => void, 
-        reject: (error: Error) => void
-    ): void {
-        const img = new Image()
-        img.onload = () => {
-            const startTime = performance.now()
-            
-            try {
-                if (!this.sharedContext || !this.dataArrayTexture) {
-                    reject(new Error('Shared context or texture array not available'))
-                    return
-                }
-                
-                this.sharedContext.clearRect(0, 0, this.textureSize, this.textureSize)
-                
-                // Validate image dimensions
-                if (img.naturalWidth === 0 || img.naturalHeight === 0) {
-                    console.error(`🔥 Invalid image dimensions for "${gameName}": ${img.naturalWidth}x${img.naturalHeight}`)
-                    reject(new Error(`Invalid image dimensions: ${img.naturalWidth}x${img.naturalHeight}`))
-                    return
-                }
-                
-                // Draw and scale image to texture size
-                this.sharedContext.drawImage(img, 0, 0, this.textureSize, this.textureSize)
-                
-                // Extract image data
-                const imageData = this.sharedContext.getImageData(0, 0, this.textureSize, this.textureSize)
-                
-                // Validate extracted data
-                if (!imageData || imageData.data.length === 0) {
-                    console.error(`Failed to extract image data for "${gameName}"`)
-                    reject(new Error(`Failed to extract image data`))
-                    return
-                }
-                
-                // Reserve texture index immediately to prevent race conditions
-                const reservedTextureIndex = this.nextTextureIndex++
-                const sliceSize = this.textureSize * this.textureSize * 4
-                const offset = reservedTextureIndex * sliceSize
-                
-                // Copy data to texture array
-                const arrayData = this.dataArrayTexture.image.data as Uint8Array
-                arrayData.set(imageData.data, offset)
-                
-                // Mark texture as needing update
-                this.dataArrayTexture.needsUpdate = true
-                
-                // Store mapping with reserved index
-                this.textureSlots.set(gameName, reservedTextureIndex)
-                
-                console.debug(`🎨 Added artwork for "${gameName}" at RESERVED texture index ${reservedTextureIndex} (Main Thread)`)
-                
-                // Performance logging
-                const endTime = performance.now()
-                this.logPerformance(`texture processing for "${gameName}" (Main Thread)`, endTime - startTime)
-                
-                resolve(reservedTextureIndex)
-                
-            } catch (error) {
-                console.error(`Main thread texture processing failed for "${gameName}":`, error)
-                reject(error instanceof Error ? error : new Error(String(error)))
-            }
-        }
-        
-        img.onerror = () => {
-            console.error(`Image failed to load for "${gameName}"`)
-            reject(new Error(`Failed to load image for "${gameName}"`))
-        }
-        img.src = URL.createObjectURL(blob)
-    }
-    
     public async setArtworkInstance(
         index: number,
         position: THREE.Vector3,
@@ -462,7 +235,7 @@ export class InstancedArtworkRenderer {
             
             // Add texture to array and get index
             console.debug(`🎨 [Renderer] Processing texture for "${gameName}"...`)
-            const textureIndex = await this.addArtworkToTextureArray(blob, gameName)
+            const textureIndex = await this.textureProcessor.processTexture(blob, gameName, this.dataArrayTexture)
             console.debug(`🎨 [Renderer] Texture processed for "${gameName}" → textureIndex=${textureIndex}`)
             
             // Check for suspicious positions
@@ -557,7 +330,7 @@ export class InstancedArtworkRenderer {
             return
         }
         
-        const scene = DataManager.getInstance().get<any>('core.mainScene')
+        const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
         if (!scene) {
             console.warn('⚠️ Cannot add to scene: main scene not available in DataManager')
             return
@@ -634,12 +407,14 @@ export class InstancedArtworkRenderer {
      * Get current stats
      */
     public getStats() {
+        const processorStats = this.textureProcessor.getStats()
         return {
             currentCount: this.currentCount,
             maxInstances: this.maxInstances,
-            texturesUsed: this.nextTextureIndex,
+            texturesUsed: processorStats.nextTextureIndex,
             maxTextures: this.maxTextures,
-            isInitialized: this.isInitialized
+            isInitialized: this.isInitialized,
+            textureProcessing: processorStats
         }
     }
     
@@ -652,14 +427,16 @@ export class InstancedArtworkRenderer {
             return
         }
         
+        const processorStats = this.textureProcessor.getStats()
+        
         console.log(`🔍 [DEBUG] Exporting texture array for inspection...`)
-        console.log(`🔍 [DEBUG] Array info: ${this.textureSize}x${this.textureSize}x${this.nextTextureIndex} textures`)
+        console.log(`🔍 [DEBUG] Array info: ${this.textureSize}x${this.textureSize}x${processorStats.nextTextureIndex} textures`)
         
         try {
             // Create a large canvas to show all textures in a grid
-            const texturesPerRow = Math.ceil(Math.sqrt(this.nextTextureIndex))
+            const texturesPerRow = Math.ceil(Math.sqrt(processorStats.nextTextureIndex))
             const canvasWidth = texturesPerRow * this.textureSize
-            const canvasHeight = Math.ceil(this.nextTextureIndex / texturesPerRow) * this.textureSize
+            const canvasHeight = Math.ceil(processorStats.nextTextureIndex / texturesPerRow) * this.textureSize
             
             const debugCanvas = document.createElement('canvas')
             debugCanvas.width = canvasWidth
@@ -685,7 +462,7 @@ export class InstancedArtworkRenderer {
             const sliceSize = this.textureSize * this.textureSize * 4
             
             // Draw each texture in the grid
-            for (let i = 0; i < this.nextTextureIndex; i++) {
+            for (let i = 0; i < processorStats.nextTextureIndex; i++) {
                 const offset = i * sliceSize
                 const imageData = new ImageData(
                     new Uint8ClampedArray(arrayData.slice(offset, offset + sliceSize)),
@@ -720,7 +497,7 @@ export class InstancedArtworkRenderer {
                 document.body.removeChild(link)
                 URL.revokeObjectURL(url)
                 
-                console.log(`✅ [DEBUG] Texture array exported: ${this.nextTextureIndex} textures, ${canvasWidth}x${canvasHeight}px`)
+                console.log(`✅ [DEBUG] Texture array exported: ${processorStats.nextTextureIndex} textures, ${canvasWidth}x${canvasHeight}px`)
             }, 'image/png')
             
         } catch (error) {
@@ -732,18 +509,15 @@ export class InstancedArtworkRenderer {
      * 🎯 SHOTGUN DEBUG: Log detailed texture array state
      */
     public debugLogTextureArrayState(): void {
+        const processorStats = this.textureProcessor.getStats()
+        
         console.log(`🔍 [DEBUG] ===== TEXTURE ARRAY STATE =====`)
         console.log(`🔍 [DEBUG] Initialized: ${this.isInitialized}`)
         console.log(`🔍 [DEBUG] Texture Array: ${this.dataArrayTexture ? 'EXISTS' : 'NULL'}`)
         console.log(`🔍 [DEBUG] Size: ${this.textureSize}x${this.textureSize}`)
-        console.log(`🔍 [DEBUG] Used Slots: ${this.nextTextureIndex}/${this.maxTextures}`)
+        console.log(`🔍 [DEBUG] Used Slots: ${processorStats.nextTextureIndex}/${this.maxTextures}`)
         console.log(`🔍 [DEBUG] Active Instances: ${this.currentCount}/${this.maxInstances}`)
-        console.log(`🔍 [DEBUG] Texture Mappings: ${this.textureSlots.size}`)
-        
-        console.log(`🔍 [DEBUG] Texture Slot Mappings:`)
-        for (const [gameName, textureIndex] of this.textureSlots) {
-            console.log(`🔍 [DEBUG]   "${gameName}" → ${textureIndex}`)
-        }
+        console.log(`🔍 [DEBUG] Texture Mappings: ${processorStats.textureSlots}`)
         
         if (this.dataArrayTexture) {
             const arrayData = this.dataArrayTexture.image.data as Uint8Array
@@ -762,7 +536,7 @@ export class InstancedArtworkRenderer {
         
         // Remove from main scene
         if (this.instancedMesh) {
-            const scene = DataManager.getInstance().get<any>('core.mainScene')
+            const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
             if (scene) {
                 scene.remove(this.instancedMesh)
                 console.debug('🎨 Removed instanced artwork mesh from scene')
@@ -781,22 +555,11 @@ export class InstancedArtworkRenderer {
         this.dataArrayTexture?.dispose()
         this.dataArrayTexture = null
         
-        // Clean up shared canvas
-        this.sharedCanvas = null
-        this.sharedContext = null
-        
-        // Clean up texture worker
-        if (this.textureWorker) {
-            this.textureWorker.dispose()
-            this.textureWorker = null
-        }
-        
-        // Clear mappings
-        this.textureSlots.clear()
+        // Dispose texture processor
+        this.textureProcessor.dispose()
         
         // Reset state
         this.currentCount = 0
-        this.nextTextureIndex = 0
         this.isInitialized = false
         this.instancedMesh = null
         
