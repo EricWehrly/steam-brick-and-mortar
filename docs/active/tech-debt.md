@@ -64,6 +64,39 @@
 
 **Source**: User request (Nov 2025) - "Can we add a todo in our tech debt to LOD our lighting & shadows?"
 
+### Background-Tab Low-Resource Startup Mode
+**Priority**: Low  
+**Effort**: 6-10 hours  
+**Context**: When client starts without window focus (background tab), it should defer heavy initialization work to avoid blocking the browser/system. Need smart resource management that chunks work and yields to keep the browser responsive.
+
+**Tasks**:
+- Detect if window has focus on startup (document.hasFocus())
+- Implement "chunked loading" mode that breaks initialization into small work units
+- Use requestIdleCallback or setTimeout(0) to yield between chunks
+- Defer non-critical initialization (debug tools, analytics, etc.)
+- Reduce animation frame rate in background (e.g., 10fps vs 90fps)
+- Pause texture loading or reduce concurrent texture processing
+- Add visual indicator when switching from background to foreground mode
+- Resume full initialization when window gains focus
+- Consider using Web Workers for heavy processing to keep main thread free
+
+**Implementation Considerations**:
+- Need to define "critical" vs "deferrable" initialization steps
+- Balance between slower startup and browser responsiveness
+- May need cooperative scheduling between different initialization systems
+- Consider Page Visibility API for detecting tab visibility changes
+- Performance monitoring to measure actual impact on system resources
+
+**Challenges**:
+- Hard to self-police resource usage without browser APIs
+- Different browsers handle background tabs differently
+- May need heuristics rather than direct measurement
+- Risk of over-complicating startup sequence
+
+**Benefits**: Better browser responsiveness when app starts in background, reduced system impact during multi-tab workflows, improved user experience on resource-constrained devices
+
+**Source**: User request (Nov 2025) - "If our client is not in focus when it starts up, it should switch into a 'low resource' bootup"
+
 ### Development-Mode Instance Lifecycle Watchdog
 **Priority**: Medium  
 **Effort**: 4-6 hours  

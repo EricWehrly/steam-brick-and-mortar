@@ -271,20 +271,28 @@
 **Context**: Create unified UI design language that works across desktop and VR
 
 #### Story 7.5.1: Base UI Optimization and Standardization
-- **Task 7.5.1.1**: Steam profile input design refinement
+- **Task 7.5.1.1**: In-scene game search/omnibar
+  - Omnibar-like search interface that appears in place of the Steam profile UI, once there are games to search
+  - Design 3D box element with hourglass icon and omnibar appearance
+  - Implement game search functionality using GameFinder utility
+  - Enable spotlight highlighting of search results in scene
+  - Support search by game name or Steam appid
+  - Provide visual feedback for found/not-found games
+  - Make recognizable and accessible in 3D space
+- **Task 7.5.1.2**: Steam profile input design refinement
   - Reduce default width footprint for better screen utilization
   - Enhanced expand-on-interaction behavior for better UX
   - Consistent styling with other UI components
-- **Task 7.5.1.2**: Convert 2D signage to 3D elements
+- **Task 7.5.1.3**: Convert 2D signage to 3D elements
   - Replace signs as planes with 3d rectangular cubes with some 'depth' to them in the world. They mainly should stop getting "backface culled".
   - Enhance visual depth and spatial integration in the scene
   - Improve readability and immersion with proper 3D typography
   - Maintain performance while adding dimensional detail
-- **Task 7.5.1.3**: UI component standardization
+- **Task 7.5.1.4**: UI component standardization
   - Establish consistent color scheme, typography, and spacing
   - Standardize button sizes, input fields, and panel layouts
   - Create reusable UI component library
-- **Task 7.5.1.4**: VR-ready UI architecture planning
+- **Task 7.5.1.5**: VR-ready UI architecture planning
   - Design UI components that can adapt to 3D spatial layout
   - Plan transition strategy from 2D overlay to 3D spatial UI
   - Consider interaction patterns for touch/controller input
@@ -498,6 +506,28 @@
   - **Priority**: Medium - Enhances user experience but not critical for core functionality
   - **Dependencies**: Requires resolution of THREE.js material sharing issues and animation coordination
   - **Timeline**: Estimated 5-7 days for complete implementation after material system refactoring
+
+- **Atmospheric Dust Mote System**: Add floating dust particles throughout store environment
+  - **Context**: Enhance immersion and sense of space with subtle animated particles
+  - **Tasks**:
+    - Implement particle system for dust motes visible in light beams
+    - Add dancing particles within diagnostic spotlight columns
+    - Create ambient dust throughout store (not just in light)
+    - Optimize particle count for VR performance
+  - **Priority**: Low - Visual polish/"juice" for later phases
+  - **Dependencies**: None - standalone enhancement
+  - **Timeline**: 1-2 days for basic implementation
+
+- **Animated Spotlight Effects**: Enhance diagnostic spotlight visual quality with shader effects
+  - **Context**: Improve spotlight beam aesthetics from "aging lampshade" to "enchantment"
+  - **Status**: Basic improvements completed (narrower beam, warm white color, better falloff)
+  - **Future Tasks**:
+    - Add animated feathering/edge shimmer to light column (shader-based)
+    - Implement subtle pulsing or breathing effect for magical quality
+    - Add volumetric light ray rendering for visible beam column
+  - **Priority**: Low - Visual enhancement for immersion
+  - **Dependencies**: Dust mote system for enhanced light beam visibility
+  - **Timeline**: 2-3 days for shader implementation
 
 ### Developer Experience & Extensibility
 - **Plugin/Extension System**: Community additions and modular panel architecture
