@@ -9,6 +9,8 @@
 import './styles/main.css'
 import { SteamBrickAndMortarApp } from './core'
 import { StartupEventTracker, StartupPhase } from './utils/StartupEventTracker'
+import './debug/DiagnosticSpotlight'  // Self-executing on GameStart
+import './debug/GameFinder'  // Self-executing on GameStart
 
 // Track if initialization is already in progress or completed
 let isInitializing = false
