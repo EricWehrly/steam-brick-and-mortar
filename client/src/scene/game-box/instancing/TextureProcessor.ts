@@ -20,6 +20,14 @@ export interface TextureProcessingResult {
     processingTime: number
 }
 
+export interface TextureProcessorStats {
+    texturesProcessed: number
+    averageProcessingTime: number
+    totalProcessingTime: number
+    textureSlots: number
+    nextTextureIndex: number
+}
+
 export class TextureProcessor {
     private readonly textureSize: number
     private readonly maxTextures: number
@@ -249,7 +257,7 @@ export class TextureProcessor {
     /**
      * Get performance statistics
      */
-    public getStats() {
+    public getStats(): TextureProcessorStats {
         return {
             texturesProcessed: this.perfStats.totalTextures,
             averageProcessingTime: this.perfStats.averageProcessingTime,

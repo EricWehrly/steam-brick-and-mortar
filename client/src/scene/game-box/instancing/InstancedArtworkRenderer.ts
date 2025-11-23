@@ -25,6 +25,7 @@ import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { TextureProcessor } from './TextureProcessor'
 import type { InstanceMetadata } from '../../../debug/GameFinder'
+import { InstancedArtworkDebugger } from './InstancedArtworkDebugger'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
 import vertexShader from './shaders/instanced-artwork.vert?raw'
@@ -389,23 +390,14 @@ export class InstancedArtworkRenderer {
         }
     }
 
-    /**
-     * Get the InstancedMesh for adding to scene
-     */
     public getInstancedMesh(): THREE.InstancedMesh | null {
         return this.instancedMesh
     }
     
-    /**
-     * Check if renderer is ready for use
-     */
     public isReady(): boolean {
         return this.isInitialized && this.instancedMesh !== null
     }
     
-    /**
-     * Get current stats
-     */
     public getStats() {
         const processorStats = this.textureProcessor.getStats()
         return {
@@ -419,113 +411,33 @@ export class InstancedArtworkRenderer {
     }
     
     /**
-     * 🎯 SHOTGUN DEBUG: Export texture array as viewable image for inspection
+     * Export texture array as viewable image for inspection
      */
     public debugExportTextureArray(): void {
-        if (!this.dataArrayTexture) {
-            console.error('🔍 Cannot export texture array - not initialized')
-            return
-        }
-        
-        const processorStats = this.textureProcessor.getStats()
-        
-        console.log(`🔍 [DEBUG] Exporting texture array for inspection...`)
-        console.log(`🔍 [DEBUG] Array info: ${this.textureSize}x${this.textureSize}x${processorStats.nextTextureIndex} textures`)
-        
-        try {
-            // Create a large canvas to show all textures in a grid
-            const texturesPerRow = Math.ceil(Math.sqrt(processorStats.nextTextureIndex))
-            const canvasWidth = texturesPerRow * this.textureSize
-            const canvasHeight = Math.ceil(processorStats.nextTextureIndex / texturesPerRow) * this.textureSize
-            
-            const debugCanvas = document.createElement('canvas')
-            debugCanvas.width = canvasWidth
-            debugCanvas.height = canvasHeight
-            const debugCtx = debugCanvas.getContext('2d')
-            
-            if (!debugCtx) {
-                console.error('🔥 Failed to create debug canvas context')
-                return
-            }
-            
-            // Fill background with checkered pattern to show transparency
-            const checkerSize = 8
-            for (let x = 0; x < canvasWidth; x += checkerSize) {
-                for (let y = 0; y < canvasHeight; y += checkerSize) {
-                    const isEven = (Math.floor(x / checkerSize) + Math.floor(y / checkerSize)) % 2 === 0
-                    debugCtx.fillStyle = isEven ? '#ddd' : '#bbb'
-                    debugCtx.fillRect(x, y, checkerSize, checkerSize)
-                }
-            }
-            
-            const arrayData = this.dataArrayTexture.image.data as Uint8Array
-            const sliceSize = this.textureSize * this.textureSize * 4
-            
-            // Draw each texture in the grid
-            for (let i = 0; i < processorStats.nextTextureIndex; i++) {
-                const offset = i * sliceSize
-                const imageData = new ImageData(
-                    new Uint8ClampedArray(arrayData.slice(offset, offset + sliceSize)),
-                    this.textureSize,
-                    this.textureSize
-                )
-                
-                const x = (i % texturesPerRow) * this.textureSize
-                const y = Math.floor(i / texturesPerRow) * this.textureSize
-                
-                debugCtx.putImageData(imageData, x, y)
-                
-                // Add texture index label
-                debugCtx.fillStyle = 'red'
-                debugCtx.font = '16px monospace'
-                debugCtx.fillText(`${i}`, x + 5, y + 20)
-            }
-            
-            // Convert to blob and trigger download
-            debugCanvas.toBlob((blob) => {
-                if (!blob) {
-                    console.error('🔥 Failed to create blob from debug canvas')
-                    return
-                }
-                
-                const url = URL.createObjectURL(blob)
-                const link = document.createElement('a')
-                link.href = url
-                link.download = `texture-array-debug-${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.png`
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-                URL.revokeObjectURL(url)
-                
-                console.log(`✅ [DEBUG] Texture array exported: ${processorStats.nextTextureIndex} textures, ${canvasWidth}x${canvasHeight}px`)
-            }, 'image/png')
-            
-        } catch (error) {
-            console.error('🔥 [DEBUG] Failed to export texture array:', error)
-        }
+        InstancedArtworkDebugger.exportTextureArray({
+            dataArrayTexture: this.dataArrayTexture,
+            textureSize: this.textureSize,
+            maxTextures: this.maxTextures,
+            maxInstances: this.maxInstances,
+            currentCount: this.currentCount,
+            isInitialized: this.isInitialized,
+            getProcessorStats: () => this.textureProcessor.getStats()
+        })
     }
     
     /**
-     * 🎯 SHOTGUN DEBUG: Log detailed texture array state
+     * Log detailed texture array state
      */
     public debugLogTextureArrayState(): void {
-        const processorStats = this.textureProcessor.getStats()
-        
-        console.log(`🔍 [DEBUG] ===== TEXTURE ARRAY STATE =====`)
-        console.log(`🔍 [DEBUG] Initialized: ${this.isInitialized}`)
-        console.log(`🔍 [DEBUG] Texture Array: ${this.dataArrayTexture ? 'EXISTS' : 'NULL'}`)
-        console.log(`🔍 [DEBUG] Size: ${this.textureSize}x${this.textureSize}`)
-        console.log(`🔍 [DEBUG] Used Slots: ${processorStats.nextTextureIndex}/${this.maxTextures}`)
-        console.log(`🔍 [DEBUG] Active Instances: ${this.currentCount}/${this.maxInstances}`)
-        console.log(`🔍 [DEBUG] Texture Mappings: ${processorStats.textureSlots}`)
-        
-        if (this.dataArrayTexture) {
-            const arrayData = this.dataArrayTexture.image.data as Uint8Array
-            console.log(`🔍 [DEBUG] Array Data Length: ${arrayData.length} bytes`)
-            console.log(`🔍 [DEBUG] Expected Length: ${this.textureSize * this.textureSize * this.maxTextures * 4} bytes`)
-        }
-        
-        console.log(`🔍 [DEBUG] ===============================`)
+        InstancedArtworkDebugger.logTextureArrayState({
+            dataArrayTexture: this.dataArrayTexture,
+            textureSize: this.textureSize,
+            maxTextures: this.maxTextures,
+            maxInstances: this.maxInstances,
+            currentCount: this.currentCount,
+            isInitialized: this.isInitialized,
+            getProcessorStats: () => this.textureProcessor.getStats()
+        })
     }
     
     /**
