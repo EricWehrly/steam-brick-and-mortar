@@ -31,6 +31,7 @@ export interface GameBoxTextureOptions {
     preferredArtworkType?: 'library' | 'header' | 'logo' | 'icon'
     fallbackColor?: number
     enableFallbackTexture?: boolean
+    appid?: number | string  // For game finding/debugging
     // Performance optimization options (experimental - enable when working with many textures)
     targetResolution?: number
     enableLazyLoading?: boolean
