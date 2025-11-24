@@ -381,6 +381,104 @@ async function resolveVanityUrl(vanityUrl) {
 }
 
 /**
+ * Get app details from Steam Store API
+ * 
+ * Proxies the unofficial Steam Store API to retrieve detailed game information
+ * including artwork URLs, descriptions, screenshots, and metadata.
+ * 
+ * IMPORTANT: This endpoint is UNOFFICIAL and undocumented.
+ * Rate limits: ~200 requests per 5 minutes (aggressive caching recommended)
+ * 
+ * Steam Store API (unofficial):
+ * https://store.steampowered.com/api/appdetails
+ * 
+ * Documentation references:
+ * - https://wiki.teamfortress.com/wiki/User:RJackson/StorefrontAPI
+ * - https://steamapi.xpaw.me/
+ * 
+ * Parameters:
+ * @param {string|number} appid - Steam application ID
+ * 
+ * Returns:
+ * @returns {Promise<Object>} App details containing:
+ *   - success: boolean indicating if app was found
+ *   - data: (if success=true) Object with:
+ *     - name: Game title
+ *     - header_image: Large header image URL
+ *     - capsule_image: Store capsule image URL
+ *     - capsule_imagev5: Version 5 capsule URL
+ *     - screenshots: Array of screenshot objects with path_full/path_thumbnail
+ *     - (many other fields: price_overview, platforms, genres, etc.)
+ *   - retrieved_at: ISO timestamp
+ * 
+ * Throws:
+ * - Error if appid is invalid
+ * - Error if Steam Store API fails
+ * - Error if app doesn't exist (success=false in response)
+ */
+async function getAppDetails(appid) {
+  if (!appid) {
+    throw new Error('App ID is required');
+  }
+
+  // Validate appid is numeric
+  const numericAppid = parseInt(appid, 10);
+  if (isNaN(numericAppid) || numericAppid <= 0) {
+    throw new Error('Invalid App ID format');
+  }
+
+  try {
+    // Call Steam Store API (no auth required)
+    const response = await axios.get(`https://store.steampowered.com/api/appdetails`, {
+      params: {
+        appids: numericAppid
+      },
+      timeout: 15000
+    });
+
+    // Response format: { "[appid]": { success: true/false, data: {...} } }
+    const appData = response.data[numericAppid];
+
+    if (!appData) {
+      throw new Error('No data returned from Steam Store API');
+    }
+
+    if (!appData.success) {
+      throw new Error('App not found or data unavailable');
+    }
+
+    // Extract useful artwork URLs for easier client consumption
+    const artworkUrls = {
+      header: appData.data.header_image || null,
+      capsule: appData.data.capsule_image || null,
+      capsule_v5: appData.data.capsule_imagev5 || null,
+      background: appData.data.background || null,
+      background_raw: appData.data.background_raw || null
+    };
+
+    return {
+      success: true,
+      appid: numericAppid,
+      data: {
+        name: appData.data.name,
+        type: appData.data.type,
+        is_free: appData.data.is_free,
+        short_description: appData.data.short_description,
+        artwork: artworkUrls,
+        full_data: appData.data  // Include everything for flexibility
+      },
+      retrieved_at: new Date().toISOString()
+    };
+  } catch (error) {
+    // Preserve error details for debugging
+    if (error.response?.status === 429) {
+      throw new Error('Steam Store API rate limit exceeded (HTTP 429)');
+    }
+    throw new Error(`Steam Store API error: ${error.message}`);
+  }
+}
+
+/**
  * Main AWS Lambda handler for Steam API proxy
  * 
  * Handles HTTP requests routed through AWS API Gateway with Lambda Proxy Integration.
@@ -449,11 +547,17 @@ exports.handler = async (event, context) => {
       return createResponse(200, result, origin);
     }
     
+    if (path.startsWith('/appdetails/')) {
+      const appid = path.split('/')[2];
+      const result = await getAppDetails(appid);
+      return createResponse(200, result, origin);
+    }
+    
     // Route not found
     return createResponse(404, { 
       error: 'Not Found',
       message: 'The requested endpoint does not exist',
-      available_endpoints: ['/health', '/test', '/games/{steamid}', '/resolve/{vanityurl}']
+      available_endpoints: ['/health', '/test', '/games/{steamid}', '/resolve/{vanityurl}', '/appdetails/{appid}']
     }, origin);
     
   } catch (error) {
