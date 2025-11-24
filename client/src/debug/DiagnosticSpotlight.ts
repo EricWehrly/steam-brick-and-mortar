@@ -34,6 +34,7 @@ export class DiagnosticSpotlight {
     private scene: THREE.Scene | null = null
     private readonly DIM_FACTOR = 0.2 // Dim to 20% of original intensity
     private camera: THREE.Camera | null = null
+    private cachedRectAreaLights: THREE.RectAreaLight[] | null = null
     private animationFrameId: number | null = null
     private baseIntensities: Map<THREE.SpotLight, number> = new Map()
     // Shared geometry and material for all light beams to reduce GPU memory usage
@@ -116,14 +117,24 @@ export class DiagnosticSpotlight {
     private aimSpotlightAtTarget(target: SpotlightTarget, spotlight: THREE.SpotLight) {
         if (target.position) {
             // Position spotlight above target
+            const spotlightHeight = target.position.y + 2 // 2m above game
             spotlight.position.set(
                 target.position.x,
-                target.position.y + 2, // 2m above
+                spotlightHeight,
                 target.position.z
             )
 
-            // Aim at target
-            spotlight.target.position.copy(target.position)
+            // Aim at bottom of game for full coverage
+            const gameBottomY = target.position.y - 0.2 // Bottom of standard game box
+            spotlight.target.position.set(
+                target.position.x,
+                gameBottomY,
+                target.position.z
+            )
+
+            // Update beam height to extend from spotlight to game bottom
+            const beamHeight = spotlightHeight - gameBottomY
+            this.updateBeamHeight(spotlight, beamHeight)
 
             spotlight.visible = true
             spotlight.target.visible = true
@@ -223,6 +234,21 @@ export class DiagnosticSpotlight {
         spotlight.add(beamMesh)
     }
 
+    /**
+     * Update beam height to match distance from spotlight to game bottom
+     */
+    private updateBeamHeight(spotlight: THREE.SpotLight, newHeight: number): void {
+        const beam = spotlight.children.find(child => child.name === 'spotlight-beam') as THREE.Mesh
+        if (beam?.geometry) {
+            // Reposition beam center
+            beam.position.y = -newHeight / 2
+            
+            // Scale geometry to new height (geometry is created at fixed height)
+            const originalHeight = 2.0
+            beam.scale.y = newHeight / originalHeight
+        }
+    }
+
     public clear(): void {
         console.debug(`🔦 [Spotlight] Clearing ${this.spotlights.length} spotlight(s)...`)
         
@@ -241,27 +267,56 @@ export class DiagnosticSpotlight {
     }
 
     /**
+     * Collect RectAreaLights from scene (cached after first call)
+     * Cache is invalidated when lights are added/removed from scene
+     */
+    private getRectAreaLights(): THREE.RectAreaLight[] {
+        if (this.cachedRectAreaLights) {
+            return this.cachedRectAreaLights
+        }
+
+        if (!this.scene) return []
+
+        const lights: THREE.RectAreaLight[] = []
+        this.scene.traverse((object) => {
+            if (object instanceof THREE.RectAreaLight) {
+                lights.push(object)
+            }
+        })
+
+        this.cachedRectAreaLights = lights
+        console.debug(`🔦 [Spotlight] Cached ${lights.length} RectAreaLights (avoids scene traversal on every toggle)`)
+        return lights
+    }
+
+    /**
+     * Invalidate the RectAreaLight cache (call this if lights are added/removed from scene)
+     */
+    public invalidateLightCache(): void {
+        this.cachedRectAreaLights = null
+        console.debug('🔦 [Spotlight] Light cache invalidated')
+    }
+
+    /**
      * Dim store/prop lights (RectAreaLights) to make spotlights more visible
      * Leaves ambient and directional lights at full intensity
      */
     private dimStoreLights(): void {
-        if (!this.scene) return
+        const lights = this.getRectAreaLights()
 
-        this.scene.traverse((object) => {
-            if (object instanceof THREE.RectAreaLight) {
-                // Store original intensity if not already stored
-                if (!this.originalLightIntensities.has(object)) {
-                    this.originalLightIntensities.set(object, object.intensity)
-                }
-                // Dim to 20% of original
-                const originalIntensity = this.originalLightIntensities.get(object)
-                if (originalIntensity !== undefined) {
-                    object.intensity = originalIntensity * this.DIM_FACTOR
-                }
+        for (const light of lights) {
+            // Store original intensity if not already stored
+            if (!this.originalLightIntensities.has(light)) {
+                this.originalLightIntensities.set(light, light.intensity)
             }
-        })
+            // Dim to 20% of original
+            const originalIntensity = this.originalLightIntensities.get(light)
+            if (originalIntensity !== undefined) {
+                light.intensity = originalIntensity * this.DIM_FACTOR
+            }
+        }
 
-        console.debug(`🔦 [Spotlight] Dimmed ${this.originalLightIntensities.size} store lights to ${this.DIM_FACTOR * 100}%`)
+        console.debug(`🔦 [Spotlight] Dimmed ${lights.length} store lights to ${this.DIM_FACTOR * 100}%`)
     }
 
     /**
