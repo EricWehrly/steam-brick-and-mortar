@@ -1,0 +1,314 @@
+/**
+ * Game Artwork Inspector Modal Styles
+ * Debug tool for inspecting game artwork and cache status
+ */
+
+.game-artwork-inspector-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.game-artwork-inspector-modal .modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+}
+
+.game-artwork-inspector-modal .modal-content {
+    position: relative;
+    background: #1a1a1a;
+    border: 2px solid #333;
+    border-radius: 8px;
+    max-width: 900px;
+    max-height: 90vh;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    color: #fff;
+}
+
+.game-artwork-inspector-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #333;
+    background: #222;
+}
+
+.game-artwork-inspector-modal .modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #fff;
+}
+
+.game-artwork-inspector-modal .close-btn {
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.game-artwork-inspector-modal .close-btn:hover {
+    background: #333;
+    color: #fff;
+}
+
+.game-artwork-inspector-modal .modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.game-artwork-inspector-modal .game-info {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #333;
+}
+
+.game-artwork-inspector-modal .game-info h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+    color: #fff;
+}
+
+.game-artwork-inspector-modal .game-meta {
+    margin: 0;
+    color: #888;
+    font-size: 0.9rem;
+}
+
+.game-artwork-inspector-modal .artwork-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+}
+
+.game-artwork-inspector-modal .artwork-item {
+    background: #252525;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 1rem;
+    transition: all 0.2s;
+}
+
+.game-artwork-inspector-modal .artwork-item.cached {
+    border-color: #4caf50;
+}
+
+.game-artwork-inspector-modal .artwork-item.not-cached {
+    border-color: #666;
+}
+
+.game-artwork-inspector-modal .artwork-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.game-artwork-inspector-modal .artwork-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.game-artwork-inspector-modal .artwork-header h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: #fff;
+}
+
+.game-artwork-inspector-modal .badges {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.game-artwork-inspector-modal .badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.game-artwork-inspector-modal .badge-primary {
+    background: #2196f3;
+    color: #fff;
+}
+
+.game-artwork-inspector-modal .badge-success {
+    background: #4caf50;
+    color: #fff;
+}
+
+.game-artwork-inspector-modal .badge-error {
+    background: #666;
+    color: #fff;
+}
+
+.game-artwork-inspector-modal .badge-warning {
+    background: #ff9800;
+    color: #000;
+}
+
+.game-artwork-inspector-modal .artwork-preview {
+    width: 100%;
+    height: 150px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.game-artwork-inspector-modal .artwork-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.game-artwork-inspector-modal .artwork-preview.no-preview {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.game-artwork-inspector-modal .artwork-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.game-artwork-inspector-modal .url-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: #1a1a1a;
+    border-radius: 4px;
+}
+
+.game-artwork-inspector-modal .url-display strong {
+    color: #999;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.game-artwork-inspector-modal .url-code {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: #4caf50;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.game-artwork-inspector-modal .btn-copy {
+    background: #333;
+    border: none;
+    color: #fff;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+.game-artwork-inspector-modal .btn-copy:hover {
+    background: #444;
+}
+
+.game-artwork-inspector-modal .cache-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    background: #1a1a1a;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.game-artwork-inspector-modal .cache-metadata span {
+    color: #888;
+}
+
+.game-artwork-inspector-modal .text-muted {
+    color: #666;
+    font-style: italic;
+}
+
+.game-artwork-inspector-modal .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #333;
+    background: #222;
+}
+
+.game-artwork-inspector-modal .btn-secondary {
+    background: #444;
+    border: none;
+    color: #fff;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.game-artwork-inspector-modal .btn-secondary:hover {
+    background: #555;
+}
+
+/* Error modal variant */
+.game-artwork-inspector-modal.error-modal .modal-content {
+    max-width: 500px;
+}
+
+.game-artwork-inspector-modal.error-modal .modal-body {
+    text-align: center;
+    padding: 2rem;
+}
+
+.game-artwork-inspector-modal.error-modal .modal-body p {
+    color: #ff5252;
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .game-artwork-inspector-modal .artwork-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .game-artwork-inspector-modal .modal-content {
+        width: 95%;
+        max-height: 95vh;
+    }
+}

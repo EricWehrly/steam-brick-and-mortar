@@ -506,7 +506,7 @@ export class ImageManager {
         });
     }
 
-    private async getFromCache(url: string): Promise<ImageCacheEntry | null> {
+    async getFromCache(url: string): Promise<ImageCacheEntry | null> {
         if (!this.db) return null;
 
         return new Promise((resolve) => {

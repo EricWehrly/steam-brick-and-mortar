@@ -2,6 +2,7 @@
 @import './components/toast.css';
 @import './components/steam-ui.css';
 @import './components/lighting-controls.css';
+@import './components/game-artwork-inspector.css';
 
 body {
     margin: 0;
