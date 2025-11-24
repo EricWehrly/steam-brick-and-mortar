@@ -40,26 +40,25 @@ export class GameArtworkInspector {
     }
 
     async inspect(identifier: string | number): Promise<void> {
-        const game = this.gameFinder.find(identifier)
+        // First try to find in scene
+        const sceneGame = this.gameFinder.find(identifier)
         
-        if (!game) {
-            console.error(`❌ [GameArtworkInspector] Game not found: ${identifier}`)
-            this.showError(`Game not found: ${identifier}`)
-            return
-        }
-
-        console.log(`🎨 [GameArtworkInspector] Inspecting artwork for: ${game.name}`)
-
-        const steamGame = await this.findSteamGameData(game.appid ?? game.name)
+        // Then look up Steam game data (works for both scene and non-scene games)
+        const steamGame = await this.findSteamGameData(
+            sceneGame?.appid ?? sceneGame?.name ?? identifier
+        )
         
         if (!steamGame) {
-            console.warn(`⚠️ [GameArtworkInspector] Steam game data not found for: ${game.name}`)
-            this.showError(`Steam game data not found for: ${game.name}`)
+            console.error(`❌ [GameArtworkInspector] Game not found in Steam library: ${identifier}`)
+            this.showError(`Game not found in Steam library: ${identifier}`)
             return
         }
 
-        const artworkInfo = await this.gatherArtworkInfo(steamGame, game.name)
-        this.showModal(steamGame, artworkInfo)
+        console.log(`🎨 [GameArtworkInspector] Inspecting artwork for: ${steamGame.name}`)
+        console.log(`   Scene Status: ${sceneGame ? `✅ In scene (${sceneGame.rendererType})` : '❌ Not in scene'}`)
+
+        const artworkInfo = await this.gatherArtworkInfo(steamGame, sceneGame?.name)
+        this.showModal(steamGame, artworkInfo, !!sceneGame)
     }
 
     private async findSteamGameData(identifier: string | number | undefined): Promise<SteamGame | null> {
@@ -132,22 +131,25 @@ export class GameArtworkInspector {
         return false
     }
 
-    private showModal(steamGame: SteamGame, artworkInfo: ArtworkInfo[]): void {
+    private showModal(steamGame: SteamGame, artworkInfo: ArtworkInfo[], inScene: boolean): void {
         if (this.modalElement) {
             this.close()
         }
 
         this.modalElement = document.createElement('div')
         this.modalElement.className = 'game-artwork-inspector-modal'
-        this.modalElement.innerHTML = this.buildModalHTML(steamGame, artworkInfo)
+        this.modalElement.innerHTML = this.buildModalHTML(steamGame, artworkInfo, inScene)
 
         document.body.appendChild(this.modalElement)
 
         this.attachEventListeners()
     }
 
-    private buildModalHTML(steamGame: SteamGame, artworkInfo: ArtworkInfo[]): string {
+    private buildModalHTML(steamGame: SteamGame, artworkInfo: ArtworkInfo[], inScene: boolean): string {
         const artworkHTML = artworkInfo.map(info => this.buildArtworkItemHTML(info)).join('')
+        const sceneStatus = inScene 
+            ? '<span class="badge badge-success">IN SCENE</span>' 
+            : '<span class="badge badge-warning">NOT IN SCENE</span>'
 
         return `
             <div class="modal-backdrop" data-action="close"></div>
@@ -158,7 +160,10 @@ export class GameArtworkInspector {
                 </div>
                 <div class="modal-body">
                     <div class="game-info">
-                        <h3>${this.escapeHtml(steamGame.name)}</h3>
+                        <div class="game-info-header">
+                            <h3>${this.escapeHtml(steamGame.name)}</h3>
+                            ${sceneStatus}
+                        </div>
                         <p class="game-meta">AppID: ${steamGame.appid} | Playtime: ${this.formatPlaytime(steamGame.playtime_forever)}</p>
                     </div>
                     <div class="artwork-list">
