@@ -15,6 +15,8 @@ import * as THREE from 'three'
 import { GameFinder } from './GameFinder'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
+import vertexShader from './shaders/spotlight-beam.vert?raw'
+import fragmentShader from './shaders/spotlight-beam.frag?raw'
 
 export interface SpotlightTarget {
     name?: string
@@ -37,9 +39,9 @@ export class DiagnosticSpotlight {
     private cachedRectAreaLights: THREE.RectAreaLight[] | null = null
     private animationFrameId: number | null = null
     private baseIntensities: Map<THREE.SpotLight, number> = new Map()
-    // Shared geometry and material for all light beams to reduce GPU memory usage
+    private beamsBySpotlight: Map<THREE.SpotLight, THREE.Mesh> = new Map()
     private static sharedBeamGeometry: THREE.CylinderGeometry | null = null
-    private static sharedBeamMaterial: THREE.MeshBasicMaterial | null = null
+    private static sharedBeamMaterial: THREE.ShaderMaterial | null = null
 
     constructor() {
         this.spotlightGroup = new THREE.Group()
@@ -124,7 +126,6 @@ export class DiagnosticSpotlight {
                 target.position.z
             )
 
-            // Aim at bottom of game for full coverage
             const gameBottomY = target.position.y - 0.2 // Bottom of standard game box
             spotlight.target.position.set(
                 target.position.x,
@@ -132,9 +133,7 @@ export class DiagnosticSpotlight {
                 target.position.z
             )
 
-            // Update beam height to extend from spotlight to game bottom
-            const beamHeight = spotlightHeight - gameBottomY
-            this.updateBeamHeight(spotlight, beamHeight)
+            this.updateBeamHeight(spotlight)
 
             spotlight.visible = true
             spotlight.target.visible = true
@@ -159,6 +158,11 @@ export class DiagnosticSpotlight {
     private removeSpotlight(): void {
         const spotlight = this.spotlights.pop()
         if (spotlight) {
+            const beam = this.beamsBySpotlight.get(spotlight)
+            if (beam) {
+                this.spotlightGroup.remove(beam)
+                this.beamsBySpotlight.delete(spotlight)
+            }
             this.spotlightGroup.remove(spotlight)
             this.spotlightGroup.remove(spotlight.target)
             spotlight.dispose()
@@ -166,14 +170,13 @@ export class DiagnosticSpotlight {
     }
 
     private createSpotlight(): THREE.SpotLight {
-        // Enchanting spotlight: white core with warm golden edges
         const spotlight = new THREE.SpotLight(
-            0xfff8e7,      // Soft warm white (not harsh yellow)
-            3.0,           // Higher intensity for better visibility
-            6,             // Distance
-            Math.PI / 10,  // Narrower angle (18 degrees) - more focused beam
-            0.5,           // Higher penumbra for softer, feathered edges
-            2              // More decay for dramatic falloff
+            0xfff8e7,      // color: soft warm white
+            3.0,           // intensity: higher for visibility
+            6,             // distance: 6m range
+            Math.PI / 10,  // angle: ~18 degrees for focused beam
+            0.5,           // penumbra: 0-1, higher = softer edges
+            2              // decay: 2 = physically accurate falloff
         )
         
         spotlight.castShadow = false // Don't interfere with scene lighting
@@ -185,38 +188,37 @@ export class DiagnosticSpotlight {
         return spotlight
     }
 
-    /**
-     * Create a visible light beam column for the spotlight
-     * Semi-transparent cylinder that makes the light visible in 3D space
-     */
     private createLightBeam(spotlight: THREE.SpotLight): void {
-        // Calculate beam geometry based on spotlight angle and distance
-        const height = 2.0 // Height from spotlight to target (matches spotlight positioning)
-        const angle = spotlight.angle
-        const radiusTop = 0.05 // Very narrow at top (near light source)
-        const radiusBottom = height * Math.tan(angle) // Wider at bottom based on cone angle
+        // TODO: Coordinate with RoomManager ceiling height instead of hardcoding
+        const height = 3.5 // Standard room height (currently hardcoded, could be taller for outdoor scenes)
+        const radiusTop = 0.08
+        const radiusBottom = 0.12
         
-        // Create shared geometry once for all light beams to prevent OOM with multiple spotlights
         if (!DiagnosticSpotlight.sharedBeamGeometry) {
             DiagnosticSpotlight.sharedBeamGeometry = new THREE.CylinderGeometry(
                 radiusTop,
                 radiusBottom,
                 height,
-                16, // radial segments
-                1,  // height segments
-                true // open ended
+                24,   // radialSegments - higher = smoother cylinder
+                1,    // heightSegments - 1 is sufficient for straight cylinder
+                true  // openEnded - no caps for better performance
             )
         }
         
-        // Create shared material once for all light beams
         if (!DiagnosticSpotlight.sharedBeamMaterial) {
-            DiagnosticSpotlight.sharedBeamMaterial = new THREE.MeshBasicMaterial({
-                color: 0xfff8e7, // Match spotlight color
+            DiagnosticSpotlight.sharedBeamMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    color: { value: new THREE.Color(0xfff8e7) },
+                    opacity: { value: 0.2 }, // Low opacity for subtle effect
+                    gameBottomY: { value: 0.0 }, // Updated per spotlight - where to start fade
+                    beamBottomY: { value: 0.0 }  // Floor level (0) - where fade ends
+                },
+                vertexShader,
+                fragmentShader,
                 transparent: true,
-                opacity: 0.15, // Very subtle - just enough to see the column
                 side: THREE.DoubleSide,
-                blending: THREE.AdditiveBlending, // Makes it glow/accumulate with other lights
-                depthWrite: false // Don't interfere with depth sorting
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
             })
         }
         
@@ -225,51 +227,40 @@ export class DiagnosticSpotlight {
             DiagnosticSpotlight.sharedBeamMaterial
         )
         beamMesh.name = 'spotlight-beam'
+        beamMesh.position.set(0, 0, 0)
         
-        // Position beam to extend downward from spotlight
-        beamMesh.position.set(0, -height / 2, 0)
-        beamMesh.rotation.x = 0 // Starts vertical, will be aimed with spotlight
-        
-        // Attach beam to spotlight so it moves/rotates with it
-        spotlight.add(beamMesh)
+        this.spotlightGroup.add(beamMesh)
+        this.beamsBySpotlight.set(spotlight, beamMesh)
     }
 
-    /**
-     * Update beam height to match distance from spotlight to game bottom
-     */
-    private updateBeamHeight(spotlight: THREE.SpotLight, newHeight: number): void {
-        const beam = spotlight.children.find(child => child.name === 'spotlight-beam') as THREE.Mesh
-        if (beam?.geometry) {
-            // Reposition beam center
-            beam.position.y = -newHeight / 2
-            
-            // Scale geometry to new height (geometry is created at fixed height)
-            const originalHeight = 2.0
-            beam.scale.y = newHeight / originalHeight
+    private updateBeamHeight(spotlight: THREE.SpotLight): void {
+        const beam = this.beamsBySpotlight.get(spotlight)
+        if (!beam) return
+        
+        beam.position.copy(spotlight.position)
+        beam.position.y = 1.75 // Mid-height (3.5m / 2)
+        
+        const material = beam.material as THREE.ShaderMaterial
+        if (material?.uniforms) {
+            material.uniforms.gameBottomY.value = spotlight.target.position.y
+            material.uniforms.beamBottomY.value = 0.0
         }
     }
 
     public clear(): void {
         console.debug(`🔦 [Spotlight] Clearing ${this.spotlights.length} spotlight(s)...`)
         
-        // Stop animation
         this.stopAnimation()
         
         while (this.spotlights.length > 0) {
             this.removeSpotlight()
         }
         
-        // Clear base intensities
         this.baseIntensities.clear()
-        
-        // Restore original light intensities
+        this.beamsBySpotlight.clear()
         this.restoreStoreLights()
     }
 
-    /**
-     * Collect RectAreaLights from scene (cached after first call)
-     * Cache is invalidated when lights are added/removed from scene
-     */
     private getRectAreaLights(): THREE.RectAreaLight[] {
         if (this.cachedRectAreaLights) {
             return this.cachedRectAreaLights
@@ -289,18 +280,11 @@ export class DiagnosticSpotlight {
         return lights
     }
 
-    /**
-     * Invalidate the RectAreaLight cache (call this if lights are added/removed from scene)
-     */
     public invalidateLightCache(): void {
         this.cachedRectAreaLights = null
         console.debug('🔦 [Spotlight] Light cache invalidated')
     }
 
-    /**
-     * Dim store/prop lights (RectAreaLights) to make spotlights more visible
-     * Leaves ambient and directional lights at full intensity
-     */
     private dimStoreLights(): void {
         const lights = this.getRectAreaLights()
 
@@ -319,9 +303,6 @@ export class DiagnosticSpotlight {
         console.debug(`🔦 [Spotlight] Dimmed ${lights.length} store lights to ${this.DIM_FACTOR * 100}%`)
     }
 
-    /**
-     * Restore store/prop lights to original intensity
-     */
     private restoreStoreLights(): void {
         if (!this.scene) return
 
@@ -333,9 +314,6 @@ export class DiagnosticSpotlight {
         this.originalLightIntensities.clear()
     }
 
-    /**
-     * Start the animation loop for distance-based intensity and pulsing
-     */
     private startAnimation(): void {
         if (this.animationFrameId !== null) return // Already running
 
@@ -347,9 +325,6 @@ export class DiagnosticSpotlight {
         animate()
     }
 
-    /**
-     * Stop the animation loop
-     */
     private stopAnimation(): void {
         if (this.animationFrameId !== null) {
             cancelAnimationFrame(this.animationFrameId)
@@ -357,9 +332,6 @@ export class DiagnosticSpotlight {
         }
     }
 
-    /**
-     * Update spotlight intensity based on distance and add gentle pulsing
-     */
     private updateSpotlightEffects(): void {
         if (!this.camera || this.spotlights.length === 0) return
 
@@ -394,10 +366,6 @@ export class DiagnosticSpotlight {
         }
     }
 
-    /**
-     * Dispose of shared resources. Call when DiagnosticSpotlight is no longer needed.
-     * This is a static method because resources are shared across all instances.
-     */
     public static disposeSharedResources(): void {
         if (DiagnosticSpotlight.sharedBeamGeometry) {
             DiagnosticSpotlight.sharedBeamGeometry.dispose()
@@ -411,8 +379,7 @@ export class DiagnosticSpotlight {
     }
 }
 
-// Initialize diagnostic spotlight after game start using a named handler
-export function initializeDiagnosticSpotlightOnStart(_event?: CustomEvent): void {
+export function initializeDiagnosticSpotlightOnStart(): void {
     const spotlight = new DiagnosticSpotlight()
 
     // @ts-ignore - Intentionally adding to window for debugging
