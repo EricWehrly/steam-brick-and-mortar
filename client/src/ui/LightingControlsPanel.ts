@@ -33,6 +33,7 @@ export class LightingControlsPanel {
     private debugIndicatorEnabled: boolean
     private panelCollapsed: boolean = true
     private horizontallyCollapsed: boolean = true
+    private checkboxUpdatePending: number | null = null
 
     constructor(eventManager: EventManager, appSettings: AppSettings) {
         this.eventManager = eventManager
@@ -188,6 +189,8 @@ export class LightingControlsPanel {
         // Initial scan to catch any existing lights
         this.scanLights()
         this.updateUI()
+        // Force immediate checkbox update on initial load (don't defer)
+        this.doUpdateCheckboxStates()
     }
 
 
@@ -335,6 +338,52 @@ export class LightingControlsPanel {
         masterToggle.indeterminate = enabledLights.length > 0 && enabledLights.length < allLights.length
     }
 
+    /**
+     * Schedule deferred checkbox update to avoid redundant work during rapid toggles
+     * Coalesces multiple update requests into a single execution
+     */
+    private updateCheckboxStates(): void {
+        // Cancel pending update if exists
+        if (this.checkboxUpdatePending !== null) {
+            cancelAnimationFrame(this.checkboxUpdatePending)
+        }
+        
+        // Schedule update for next animation frame (deferred execution)
+        this.checkboxUpdatePending = requestAnimationFrame(this.doUpdateCheckboxStates.bind(this))
+    }
+
+    /**
+     * Actually update checkbox states without rebuilding DOM (fast)
+     * Called via deferred execution to avoid redundant work
+     */
+    private doUpdateCheckboxStates(): void {
+        // Clear pending flag first
+        this.checkboxUpdatePending = null
+        
+        // Update master toggle
+        this.updateMasterToggle()
+        
+        // Update group checkboxes
+        this.lightGroups.forEach((group, type) => {
+            const checkbox = document.querySelector(`.group-toggle[data-type="${type}"]`) as HTMLInputElement
+            if (checkbox) {
+                const enabledCount = group.lights.filter(light => light.visible).length
+                checkbox.checked = enabledCount > 0
+                checkbox.indeterminate = enabledCount > 0 && enabledCount < group.lights.length
+            }
+        })
+        
+        // Update individual light checkboxes
+        this.lightGroups.forEach((group) => {
+            group.lights.forEach(light => {
+                const checkbox = document.querySelector(`.light-toggle[data-light-id="${light.id}"]`) as HTMLInputElement
+                if (checkbox) {
+                    checkbox.checked = light.visible
+                }
+            })
+        })
+    }
+
     private getLightInfo(light: THREE.Light): string {
         const info: string[] = []
         
@@ -370,7 +419,8 @@ export class LightingControlsPanel {
             source: EventSource.UI
         })
         
-        this.updateUI()
+        // Only update checkbox states, not full UI rebuild
+        this.updateCheckboxStates()
     }
 
     private toggleLightGroup(type: string, enabled: boolean): void {
@@ -385,7 +435,8 @@ export class LightingControlsPanel {
         group.enabled = enabled
 
         console.log(`💡 ${enabled ? 'Enabled' : 'Disabled'} ${type} lights (${group.lights.length} lights)`)
-        this.updateUI()
+        // Only update checkbox states, not full UI rebuild
+        this.updateCheckboxStates()
     }
 
     private toggleIndividualLight(light: THREE.Light, enabled: boolean): void {
@@ -397,7 +448,8 @@ export class LightingControlsPanel {
         const lightName = light.name || `${light.constructor.name}-${light.id}`
         console.log(`💡 ${enabled ? 'Enabled' : 'Disabled'} light: ${lightName}`)
         
-        this.updateUI()
+        // Only update checkbox states, not full UI rebuild
+        this.updateCheckboxStates()
     }
 
     private toggleGroupExpansion(type: string): void {
