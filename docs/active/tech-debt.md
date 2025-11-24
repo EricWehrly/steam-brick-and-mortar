@@ -3,6 +3,110 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
+### Performance: Scene Traversal Optimization Audit
+**Priority**: High  
+**Effort**: 4-6 hours  
+**Context**: Multiple systems traverse the entire scene graph on every operation (e.g., `scene.traverse()` calls). This becomes expensive with hundreds of game boxes. Need systematic audit and caching strategy.
+
+**Tasks**:
+- Audit all `scene.traverse()` calls across codebase
+- Identify which traversals happen on hot paths (every frame, every toggle, etc.)
+- Implement caching for static/semi-static scene queries:
+  - Light collections (RectAreaLights, DirectionalLights, etc.)
+  - Game box collections
+  - Prop/fixture collections
+- Add cache invalidation hooks when scene structure changes
+- Pattern: Traverse once on scene ready, cache results, invalidate on add/remove
+- Document pattern for future scene queries
+
+**Current Known Issues**:
+- ✅ **FIXED**: DiagnosticSpotlight cached RectAreaLights (was traversing on every toggle)
+- ✅ **FIXED**: LightingControlsPanel deferred checkbox updates (was rebuilding DOM on every toggle)
+- **TODO**: Audit remaining traverse calls in renderers, managers, coordinators
+
+**Performance Impact**:
+- Typical scene: 500-1000 objects (game boxes, shelves, props)
+- Uncached traverse: O(n) every call
+- Cached: O(1) lookup after initial O(n) build
+
+**Benefits**: Faster light toggles, faster game spotlighting, faster UI updates, reduced GC pressure
+
+**Source**: Nov 2025 - Observed multi-second freeze on light toggle with large game library
+
+---
+
+### Performance: Deferred Update Pattern for Rapid Operations
+**Priority**: Medium  
+**Effort**: 2-4 hours  
+**Context**: Some operations get called repeatedly in rapid succession (e.g., toggling multiple lights, batch game box updates). Need pattern to defer/coalesce updates to avoid redundant work.
+
+**Tasks**:
+- Document requestAnimationFrame deferral pattern (already used in LightingControlsPanel)
+- Identify other systems that could benefit:
+  - Game box texture updates during batch loads
+  - UI panel refreshes during rapid data changes
+  - Debug overlay updates
+  - Statistics panel updates
+- Create utility helper: `DeferredExecutor` class
+  - `schedule(callback)`: Schedule callback for next frame
+  - `cancel()`: Cancel pending execution
+  - `flush()`: Execute immediately
+- Apply to identified hot paths
+- Add performance metrics to verify improvements
+
+**Example Pattern**:
+```typescript
+private pendingUpdate: number | null = null
+
+scheduleUpdate(): void {
+    if (this.pendingUpdate) cancelAnimationFrame(this.pendingUpdate)
+    this.pendingUpdate = requestAnimationFrame(() => {
+        this.doActualUpdate()
+        this.pendingUpdate = null
+    })
+}
+```
+
+**Benefits**: Reduced redundant work, smoother UI updates, better frame pacing, fewer GC allocations
+
+**Source**: Nov 2025 - Implemented for checkbox updates, should be systematic pattern
+
+---
+
+### Performance: GPU Instancing Audit
+**Priority**: Medium  
+**Effort**: 6-8 hours  
+**Context**: Recent instancing work (InstancedArtworkRenderer, InstancedLabelRenderer) showed 10-100x performance gains. Need audit of remaining non-instanced geometry.
+
+**Tasks**:
+- Audit all mesh creation for instancing opportunities:
+  - ✅ **DONE**: Game box artwork (InstancedArtworkRenderer)
+  - ✅ **DONE**: Game box labels (InstancedLabelRenderer)
+  - ✅ **DONE**: Diagnostic spotlight beams (shared geometry)
+  - **TODO**: Shelf geometry (shelves use same dimensions)
+  - **TODO**: Ceiling fixture housings (identical geometry)
+  - **TODO**: Prop objects if they repeat
+  - **TODO**: Debug visualization objects (arrows, boxes, spheres)
+- Measure memory and draw call reduction for each
+- Document instancing pattern and when to use it
+- Consider InstancedMesh for identical static geometry
+- Consider batching for similar but different geometry
+
+**Current Wins**:
+- Artwork: 500 draw calls → 1 draw call
+- Labels: 500 draw calls → 1 draw call  
+- Spotlight beams: 10 geometries → 1 shared geometry
+
+**Remaining Opportunities**:
+- Shelves: Estimate 50-100 shelves, all identical → 1 instanced mesh
+- Fixtures: Estimate 6-12 fixtures, identical housing → 1 instanced mesh
+
+**Benefits**: Fewer draw calls, reduced GPU memory, better frame rates, scales to larger stores
+
+**Source**: Nov 2025 - Recent instancing successes, ongoing optimization effort
+
+---
+
 ### Distance-Based Dynamic Lighting Activation
 **Priority**: Medium  
 **Effort**: 4-6 hours  
