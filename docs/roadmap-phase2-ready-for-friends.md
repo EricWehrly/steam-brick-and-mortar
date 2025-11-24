@@ -61,16 +61,72 @@
 
 ---
 
-## Feature 5.4: Steam API Rate Limiting Infrastructure 🔮
-**Context**: Robust handling of 20 req/min per IP Steam API constraints
+## Feature 5.4: Network Request Management & Rate Limiting Infrastructure 🔮 **PRE-FRIENDS RELEASE**
+**Context**: Comprehensive network traffic optimization and rate limiting before any multi-user testing
 
-### Story 5.4.1: Rate Limiting Analysis and Infrastructure Hardening
-- **Task 5.4.1.1**: Analyze AWS Lambda IP allocation and sharing risks
+### Story 5.4.1: Network Traffic Audit and Optimization Analysis
+- **Task 5.4.1.1**: Audit all network calls and patterns
+  - Document every API endpoint called (Steam Web API, Steam Store API, Steam CDN)
+  - Measure request volumes per game/library load cycle
+  - Identify parallelization bottlenecks and opportunities for batching
+  - Analyze cache hit/miss patterns and effectiveness
+  - Document current network behavior under various scenarios (small/large libraries, cache states)
+- **Task 5.4.1.2**: Design batching and parallelization strategy
+  - Plan artwork download batching to avoid slamming CDN
+  - Design intelligent request queuing with priority levels
+  - Create request deduplication system for concurrent requests
+  - Plan progressive loading strategy (e.g., visible games first, background loading for rest)
+  - Design request cancellation for games scrolled out of view
+
+**Expected Deliverable**: `docs/network-traffic-audit.md` with comprehensive analysis and optimization plan
+
+**Acceptance**: Complete understanding of network patterns with concrete batching/parallelization improvements identified
+
+**Context**: **CRITICAL - MUST COMPLETE BEFORE FRIENDS RELEASE** - Current behavior acceptable for single-user testing but unsuitable for multi-user scenarios
+
+### Story 5.4.2: Client-Side Rate Limiting Implementation  
+- **Task 5.4.2.1**: Implement universal rate limiter for all client network calls
+  - Create RateLimiter utility class with configurable limits per endpoint type
+  - Add rate limiting for Steam CDN artwork downloads (~50 concurrent max)
+  - Add rate limiting for Steam Store API appdetails calls (~200 per 5 min)
+  - Implement request queue with priority system (user-visible content prioritized)
+  - Add exponential backoff for rate limit responses (HTTP 429)
+- **Task 5.4.2.2**: Implement batched artwork loading
+  - Replace parallel artwork loading with batched sequential approach
+  - Load artwork in chunks (e.g., 10 games at a time) with delays between batches
+  - Prioritize visible games based on camera position and viewport
+  - Add progress reporting for long-running batch operations
+  - Implement cancellable batch operations for user navigation changes
+
+**Expected Deliverable**: Production-ready client-side rate limiting across all network calls
+
+**Acceptance**: No more than 50 concurrent CDN requests, Steam Store API respects 200/5min limit, smooth loading experience with batching
+
+### Story 5.4.3: Lambda Inbound Rate Limiting (Planning Phase)
+- **Task 5.4.3.1**: Research AWS API Gateway rate limiting options
+  - Document AWS API Gateway throttling capabilities and limits
+  - Research usage plans and API keys for per-client rate limiting
+  - Investigate AWS WAF for advanced rate limiting rules
+  - Compare cost/complexity of different rate limiting approaches
+- **Task 5.4.3.2**: Design Lambda rate limiting strategy
+  - Plan rate limit tiers (per-IP, per-user, global)
+  - Design rate limit response patterns and error messages
+  - Plan monitoring and alerting for rate limit breaches
+  - Document instrumentation requirements (deferred to later phase)
+
+**Expected Deliverable**: `docs/lambda-rate-limiting-plan.md` with implementation strategy
+
+**Acceptance**: Complete plan for Lambda-side rate limiting ready for implementation in later phase
+
+**Context**: Planning only at this phase - implementation deferred until instrumentation phase
+
+### Story 5.4.4: Steam API Rate Limiting Infrastructure Hardening
+- **Task 5.4.4.1**: Analyze AWS Lambda IP allocation and sharing risks
   - Research AWS Lambda IP pool behavior and potential sharing
   - Document risks of shared IP rate limiting with other API users
   - Investigate reserved IP options or NAT Gateway solutions
   - Plan fallback strategies for rate limit exhaustion
-- **Task 5.4.1.2**: Implement robust rate limiting and retry logic
+- **Task 5.4.4.2**: Implement robust rate limiting and retry logic
   - Add exponential backoff with jitter for rate limit responses
   - Implement circuit breaker pattern for API failures
   - Add intelligent request queuing and prioritization
@@ -81,6 +137,8 @@
 **Acceptance**: Can reliably load large game libraries (800+ games) over 40+ minute periods
 
 **Context**: **Critical for "Ready for Friends"** - 800 games × 3 requests/game ÷ 20 req/min = 120+ minutes without caching
+
+**IMPORTANT**: Stories 5.4.1 and 5.4.2 are **BLOCKERS** for any friends/family release. Current network behavior is acceptable for solo testing but will cause problems with multiple concurrent users or larger libraries.
 
 ---
 
