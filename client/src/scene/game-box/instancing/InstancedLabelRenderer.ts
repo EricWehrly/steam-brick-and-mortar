@@ -23,6 +23,7 @@ import type { SteamGameData } from '../types/GameData'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
 import { DataManager } from '../../../core/data/DataManager'
+import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { ShelfSide } from '../../props/SharedPropsUtils'
 import vertexShader from './shaders/instanced-label.vert?raw'
 import fragmentShader from './shaders/instanced-label.frag?raw'
@@ -163,10 +164,25 @@ export class InstancedLabelRenderer {
         const textureIndices = this.geometry.getAttribute('textureIndex') as THREE.InstancedBufferAttribute
         textureIndices.setX(index, textureIndex)
         
-        // Track highest index used
         this.currentCount = Math.max(this.currentCount, index + 1)
         
+        this.storeLabelMetadata(index, gameName, position)
+        
         return true
+    }
+    
+    private storeLabelMetadata(index: number, gameName: string, position: THREE.Vector3): void {
+        const dataManager = DataManager.getInstance()
+        let metadata = dataManager.get<Map<number, { name: string; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
+        
+        if (!metadata) {
+            metadata = new Map()
+            dataManager.set(DataKey.InstancedLabelMetadata, metadata, {
+                domain: DataDomain.Renderer
+            })
+        }
+        
+        metadata.set(index, { name: gameName, position: position.clone() })
     }
     
     /**

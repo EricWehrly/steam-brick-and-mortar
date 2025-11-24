@@ -26,7 +26,8 @@ export enum DataDomain {
 export enum DataKey {
     MainScene = 'core.mainScene',
     MainCamera = 'core.mainCamera',
-    InstancedArtworkMetadata = 'renderer.instancedArtworkMetadata'
+    InstancedArtworkMetadata = 'renderer.instancedArtworkMetadata',
+    InstancedLabelMetadata = 'renderer.instancedLabelMetadata'
 }
 
 /**

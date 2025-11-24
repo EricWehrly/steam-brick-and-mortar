@@ -31,7 +31,7 @@ export interface GameSceneObject {
     position: THREE.Vector3
     mesh: THREE.Object3D
     instanceIndex?: number  // For instanced meshes
-    rendererType: 'gpu' | 'legacy'
+    rendererType: 'gpu' | 'legacy' | 'label'
 }
 
 export class GameFinder {
@@ -114,13 +114,21 @@ export class GameFinder {
         return games
     }
 
+    public listAllGameNames(): string[] {
+        const games = this.findAll()
+        const names = games.map(g => g.name || 'unnamed').sort()
+        console.log(`📋 [GameFinder] All games in scene (${names.length}):`, names)
+        return names
+    }
+
     private findInstancedGames(): GameSceneObject[] {
         const games: GameSceneObject[] = []
         
         try {
-            const metadata = DataManager.getInstance().get<Map<number, InstanceMetadata>>(DataKey.InstancedArtworkMetadata)
-            if (metadata) {
-                for (const [instanceIndex, data] of metadata.entries()) {
+            const artworkMetadata = DataManager.getInstance().get<Map<number, InstanceMetadata>>(DataKey.InstancedArtworkMetadata)
+            if (artworkMetadata) {
+                console.debug(`🔍 [GameFinder] Instanced artwork metadata contains ${artworkMetadata.size} game(s)`)
+                for (const [instanceIndex, data] of artworkMetadata.entries()) {
                     games.push({
                         name: data.name,
                         appid: data.appid,
@@ -130,6 +138,24 @@ export class GameFinder {
                         rendererType: 'gpu'
                     })
                 }
+            }
+            
+            const labelMetadata = DataManager.getInstance().get<Map<number, { name: string; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
+            if (labelMetadata) {
+                console.debug(`🔍 [GameFinder] Instanced label metadata contains ${labelMetadata.size} game(s)`)
+                for (const [instanceIndex, data] of labelMetadata.entries()) {
+                    games.push({
+                        name: data.name,
+                        position: data.position.clone(),
+                        mesh: this.scene,
+                        instanceIndex,
+                        rendererType: 'label'
+                    })
+                }
+            }
+            
+            if (!artworkMetadata && !labelMetadata) {
+                console.debug(`🔍 [GameFinder] No instanced metadata available`)
             }
         } catch (error) {
             // Metadata not available or not initialized yet
@@ -183,6 +209,7 @@ export class GameFinder {
             }
         }
         
+        // Check for legacy game meshes (artwork boxes)
         if (child.name?.includes('game-')) {
             return {
                 name: child.userData?.name ?? child.name,
@@ -190,6 +217,17 @@ export class GameFinder {
                 position: child.position.clone(),
                 mesh: child,
                 rendererType: 'legacy'
+            }
+        }
+        
+        // Check for label meshes (fallback games without artwork)
+        if (child.userData?.isLabel && child.userData?.name) {
+            return {
+                name: child.userData.name,
+                appid: child.userData.appid,
+                position: child.position.clone(),
+                mesh: child,
+                rendererType: 'label'
             }
         }
         
@@ -213,6 +251,11 @@ export function initializeGameFinderOnStart(): void {
     // @ts-ignore - Intentionally adding to window for debugging
     window.findAllGames = () => {
         return finder.findAll()
+    }
+
+    // @ts-ignore - Intentionally adding to window for debugging
+    window.nameAllGames = () => {
+        return finder.listAllGameNames()
     }
     
     console.debug('🔍 [GameFinder] Game finder functions exposed to window:')
