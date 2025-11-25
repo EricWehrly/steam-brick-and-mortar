@@ -45,6 +45,34 @@ resource "aws_iam_role_policy" "lambda_secrets_policy" {
   })
 }
 
+# Custom policy for S3 cache access
+resource "aws_iam_role_policy" "lambda_s3_policy" {
+  name = "${var.project_name}-${var.environment}-lambda-s3-policy"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "${var.cache_bucket_arn}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket"
+        ]
+        Resource = var.cache_bucket_arn
+      }
+    ]
+  })
+}
+
 # Secrets Manager secret for Steam API key
 resource "aws_secretsmanager_secret" "steam_api_key" {
   name        = "${var.project_name}-${var.environment}-steam-api-key"
@@ -92,6 +120,7 @@ resource "aws_lambda_function" "steam_proxy" {
       SECRETS_MANAGER_SECRET_NAME = aws_secretsmanager_secret.steam_api_key.name
       ENVIRONMENT                 = var.environment
       ALLOWED_ORIGINS            = jsonencode(var.allowed_origins)
+      CACHE_BUCKET_NAME          = var.cache_bucket_name
     }
   }
 

@@ -17,6 +17,18 @@ provider "aws" {
   region = var.aws_region
 }
 
+# S3 cache module - Phase 2.5: Storage for game data caching
+module "s3_cache" {
+  source = "./modules/s3-cache"
+
+  project_name           = var.project_name
+  environment            = var.environment
+  cache_expiration_days  = 90
+  enable_expiration      = false  # Keep cache indefinitely for now
+
+  tags = local.common_tags
+}
+
 # Lambda module - Phase 2: Lambda function
 module "lambda" {
   source = "./modules/lambda"
@@ -30,8 +42,12 @@ module "lambda" {
   lambda_source_dir   = "${path.module}/lambda-src"
   allowed_origins     = var.allowed_origins
   enable_function_url = false  # We'll use API Gateway instead
+  cache_bucket_name   = module.s3_cache.bucket_name
+  cache_bucket_arn    = module.s3_cache.bucket_arn
 
   tags = local.common_tags
+
+  depends_on = [module.s3_cache]
 }
 
 # API Gateway module - Phase 3: API Gateway integration

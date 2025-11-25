@@ -51,8 +51,20 @@ variable "enable_function_url" {
   default     = false
 }
 
+variable "cache_bucket_name" {
+  description = "Name of S3 bucket for game data caching"
+  type        = string
+  default     = ""
+}
+
+variable "cache_bucket_arn" {
+  description = "ARN of S3 bucket for game data caching"
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
-  description = "Tags to apply to resources"
+  description = "Tags to apply to all resources"
   type        = map(string)
   default     = {}
 }

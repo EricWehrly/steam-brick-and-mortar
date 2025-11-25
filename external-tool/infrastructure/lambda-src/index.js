@@ -6,21 +6,28 @@
  */
 
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
+const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { gunzipSync, gzipSync } = require('zlib');
 const axios = require('axios');
 
 // Initialize AWS clients
 const secretsManager = new SecretsManagerClient({});
+const s3Client = new S3Client({});
 
 // Environment variables
 const SECRETS_MANAGER_SECRET_NAME = process.env.SECRETS_MANAGER_SECRET_NAME;
 const ENVIRONMENT = process.env.ENVIRONMENT || 'dev';
 const ALLOWED_ORIGINS = JSON.parse(process.env.ALLOWED_ORIGINS || '[]');
+const CACHE_BUCKET_NAME = process.env.CACHE_BUCKET_NAME;
 
 // Steam API constants
 const STEAM_API_BASE_URL = 'https://api.steampowered.com';
 
 // Cache for Steam API key (in-memory for Lambda container reuse)
 let steamApiKey = null;
+
+// In-memory cache for game data (L1 cache - lasts for Lambda container lifetime)
+const memoryCache = new Map();
 
 /**
  * Get Steam API key from environment or AWS Secrets Manager
@@ -381,9 +388,106 @@ async function resolveVanityUrl(vanityUrl) {
 }
 
 /**
+ * Get game data from S3 cache
+ * 
+ * @param {string|number} appid - Steam application ID
+ * @returns {Promise<Object|null>} Cached game data or null if not found
+ */
+async function getFromCache(appid) {
+  // L1: Check memory cache
+  if (memoryCache.has(appid)) {
+    console.log(`Memory cache HIT for appid ${appid}`);
+    return memoryCache.get(appid);
+  }
+
+  // L2: Check S3 cache
+  if (!CACHE_BUCKET_NAME) {
+    console.log('No cache bucket configured, skipping S3 cache');
+    return null;
+  }
+
+  try {
+    const command = new GetObjectCommand({
+      Bucket: CACHE_BUCKET_NAME,
+      Key: `appdetails/${appid}.json.gz`
+    });
+
+    const response = await s3Client.send(command);
+    const compressed = await streamToBuffer(response.Body);
+    const decompressed = gunzipSync(compressed);
+    const data = JSON.parse(decompressed.toString('utf-8'));
+    
+    // Populate memory cache
+    memoryCache.set(appid, data);
+    console.log(`S3 cache HIT for appid ${appid}`);
+    
+    return data;
+  } catch (error) {
+    if (error.name === 'NoSuchKey') {
+      console.log(`Cache MISS for appid ${appid}`);
+    } else {
+      console.error(`S3 cache error for appid ${appid}:`, error.message);
+    }
+    return null;
+  }
+}
+
+/**
+ * Save game data to S3 cache
+ * 
+ * @param {string|number} appid - Steam application ID
+ * @param {Object} data - Game data to cache
+ */
+async function saveToCache(appid, data) {
+  if (!CACHE_BUCKET_NAME) {
+    return;
+  }
+
+  try {
+    const jsonString = JSON.stringify(data);
+    const compressed = gzipSync(jsonString);
+    
+    const command = new PutObjectCommand({
+      Bucket: CACHE_BUCKET_NAME,
+      Key: `appdetails/${appid}.json.gz`,
+      Body: compressed,
+      ContentType: 'application/json',
+      ContentEncoding: 'gzip',
+      Metadata: {
+        'cached-at': new Date().toISOString(),
+        'appid': String(appid)
+      }
+    });
+
+    await s3Client.send(command);
+    
+    // Also populate memory cache
+    memoryCache.set(appid, data);
+    console.log(`Cached appid ${appid} to S3`);
+  } catch (error) {
+    console.error(`Failed to cache appid ${appid}:`, error.message);
+    // Don't throw - caching failure shouldn't break the response
+  }
+}
+
+/**
+ * Convert stream to buffer
+ * 
+ * @param {ReadableStream} stream - Readable stream
+ * @returns {Promise<Buffer>} Buffer containing stream data
+ */
+async function streamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+/**
  * Get app details from Steam Store API
  * 
- * Proxies the unofficial Steam Store API to retrieve detailed game information
+ * Queries the unofficial Steam Store API for detailed game information.
  * including artwork URLs, descriptions, screenshots, and metadata.
  * 
  * IMPORTANT: This endpoint is UNOFFICIAL and undocumented.
@@ -427,6 +531,12 @@ async function getAppDetails(appid) {
     throw new Error('Invalid App ID format');
   }
 
+  // Check cache first
+  const cached = await getFromCache(numericAppid);
+  if (cached) {
+    return cached;
+  }
+
   try {
     // Call Steam Store API (no auth required)
     const response = await axios.get(`https://store.steampowered.com/api/appdetails`, {
@@ -456,19 +566,27 @@ async function getAppDetails(appid) {
       background_raw: appData.data.background_raw || null
     };
 
-    return {
+    // Exclude heavy fields to reduce payload size
+    const { detailed_description, about_the_game, ...cleanData } = appData.data;
+
+    const result = {
       success: true,
       appid: numericAppid,
       data: {
-        name: appData.data.name,
-        type: appData.data.type,
-        is_free: appData.data.is_free,
-        short_description: appData.data.short_description,
+        name: cleanData.name,
+        type: cleanData.type,
+        is_free: cleanData.is_free,
+        short_description: cleanData.short_description,
         artwork: artworkUrls,
-        full_data: appData.data  // Include everything for flexibility
+        full_data: cleanData  // Include everything except detailed_description and about_the_game
       },
       retrieved_at: new Date().toISOString()
     };
+
+    // Cache the result
+    await saveToCache(numericAppid, result);
+
+    return result;
   } catch (error) {
     // Preserve error details for debugging
     if (error.response?.status === 429) {
@@ -476,6 +594,70 @@ async function getAppDetails(appid) {
     }
     throw new Error(`Steam Store API error: ${error.message}`);
   }
+}
+
+/**
+ * Handle batch app details request
+ * 
+ * Accepts an array of appids and returns details for each.
+ * Supports both query parameter (?appids=1,2,3) and JSON body.
+ * 
+ * @param {Object} event - API Gateway event
+ * @returns {Promise<Object>} Batch results with cached and fetched data
+ */
+async function handleBatchAppDetails(event) {
+  let appids = [];
+
+  // Try to get appids from query parameters first
+  if (event.queryStringParameters?.appids) {
+    const appidsParam = event.queryStringParameters.appids;
+    appids = appidsParam.split(',').map(id => id.trim()).filter(id => id);
+  }
+  // If not in query params, try JSON body
+  else if (event.body) {
+    try {
+      const body = JSON.parse(event.body);
+      appids = body.appids || [];
+    } catch (error) {
+      throw new Error('Invalid JSON body');
+    }
+  }
+
+  if (!appids || appids.length === 0) {
+    throw new Error('appids parameter is required (comma-separated list or JSON array)');
+  }
+
+  // Process all appids in parallel (no batch size limit - client handles batching)
+  const results = await Promise.allSettled(
+    appids.map(appid => getAppDetails(appid))
+  );
+
+  // Separate successful and failed results
+  const successful = [];
+  const failed = [];
+
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      // Remove from_cache flag before returning
+      const { from_cache, ...cleanResult } = result.value;
+      successful.push(cleanResult);
+    } else {
+      failed.push({
+        appid: appids[index],
+        error: result.reason.message
+      });
+    }
+  });
+
+  return {
+    success: true,
+    total_requested: appids.length,
+    total_successful: successful.length,
+    total_failed: failed.length,
+    results: successful,
+    failed: failed.length > 0 ? failed : undefined,
+    timestamp: new Date().toISOString()
+  };
 }
 
 /**
@@ -553,11 +735,23 @@ exports.handler = async (event, context) => {
       return createResponse(200, result, origin);
     }
     
+    if (path === '/batch-appdetails' || path === '/appdetails') {
+      const result = await handleBatchAppDetails(event);
+      return createResponse(200, result, origin);
+    }
+    
     // Route not found
     return createResponse(404, { 
       error: 'Not Found',
       message: 'The requested endpoint does not exist',
-      available_endpoints: ['/health', '/test', '/games/{steamid}', '/resolve/{vanityurl}', '/appdetails/{appid}']
+      available_endpoints: [
+        '/health',
+        '/test',
+        '/games/{steamid}',
+        '/resolve/{vanityurl}',
+        '/appdetails/{appid}',
+        '/batch-appdetails?appids=1,2,3 or POST /appdetails with {"appids": [1,2,3]}'
+      ]
     }, origin);
     
   } catch (error) {
