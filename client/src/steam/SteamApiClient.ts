@@ -6,6 +6,9 @@ import { HttpClient } from './http/HttpClient'
 import { CacheManager } from './cache/SimpleCacheManager'
 import { RateLimiter } from './rate-limit/RateLimiter'
 import { ImageManager } from './images/ImageManager'
+import { BatchAppDetailsClient } from './batch/BatchAppDetailsClient'
+import { AppDetailsCache } from './cache/AppDetailsCache'
+import type { AppDetailsData } from './batch/BatchAppDetailsClient'
 
 export interface SteamGame {
     appid: number
@@ -52,13 +55,23 @@ export class SteamApiClient {
     private cache: CacheManager
     private rateLimiter: RateLimiter
     private images: ImageManager
+    private batchClient: BatchAppDetailsClient
+    private appDetailsCache: AppDetailsCache
 
+    // TODO: Tear this out of history, and resolve the value from terraform outputs
     constructor(apiBaseUrl = 'https://steam-api-dev.wehrly.com') {
         // Initialize all layers
         this.http = new HttpClient({ baseUrl: apiBaseUrl })
         this.cache = new CacheManager({ cachePrefix: 'steam_api_' })
         this.rateLimiter = new RateLimiter({ requestsPerSecond: 4 })
         this.images = ImageManager.getInstance()
+        this.batchClient = new BatchAppDetailsClient(apiBaseUrl)
+        this.appDetailsCache = new AppDetailsCache()
+        
+        // Initialize app details cache
+        this.appDetailsCache.init().catch(error => {
+            console.warn('⚠️ [SteamApiClient] Failed to initialize app details cache:', error)
+        })
     }
 
     /**
@@ -203,18 +216,73 @@ export class SteamApiClient {
 
         const results: SteamGame[] = []
         
-        for (let i = 0; i < sortedGames.length; i++) {
-            const game = sortedGames[i]
-            
+        // Extract app IDs for batch fetching
+        const appids = sortedGames.map(g => g.appid)
+        
+        console.log(`🔄 [SteamApiClient] Loading ${appids.length} games with batch API`)
+        
+        // Check client-side cache and fetch missing details
+        const cachedAppDetails = await this.appDetailsCache.getMany(appids)
+        const uncachedAppids = appids.filter(id => !cachedAppDetails.has(id))
+        let fetchedAppDetails = new Map<number, AppDetailsData>()
+        
+        if (uncachedAppids.length > 0) {
             try {
-                const enhancedGame = await this.getGameDetails(game)
-                results.push(enhancedGame)
-                onGameLoaded?.(enhancedGame)
-                onProgress?.(i + 1, sortedGames.length)
+                const batchResponses = await this.batchClient.fetchBatch(uncachedAppids, {
+                    batchSize: 50,
+                    onProgress: (fetched, total) => {
+                        const totalProcessed = cachedAppDetails.size + fetched
+                        onProgress?.(totalProcessed, appids.length)
+                    }
+                })
+                
+                // Extract and cache the newly fetched app details
+                for (const [appid, response] of batchResponses.entries()) {
+                    fetchedAppDetails.set(appid, response.data)
+                }
+                
+                if (fetchedAppDetails.size > 0) {
+                    await this.appDetailsCache.setMany(fetchedAppDetails)
+                }
             } catch (error) {
-                console.warn(`Failed to load game ${game.name}:`, error)
+                console.error('❌ [SteamApiClient] Batch fetch failed:', error)
             }
         }
+        
+        // Combine cached and fetched app details
+        const allAppDetails = new Map<number, AppDetailsData>([...cachedAppDetails, ...fetchedAppDetails])
+        
+        // Process games with available app details
+        for (const game of sortedGames) {
+            const appDetails = allAppDetails.get(game.appid)
+            
+            // Use batch artwork if available (priority: header → capsule_v5 → capsule)
+            const headerUrl = appDetails?.artwork?.header 
+                || appDetails?.artwork?.capsule_v5 
+                || appDetails?.artwork?.capsule
+                || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
+            
+            const enhancedGame: SteamGame = {
+                ...game,
+                artwork: {
+                    icon: game.img_icon_url 
+                        ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
+                        : '',
+                    logo: game.img_logo_url 
+                        ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`
+                        : '',
+                    header: headerUrl,
+                    library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
+                }
+            }
+            
+            this.cache.set(`game_${game.appid}`, enhancedGame)
+            
+            results.push(enhancedGame)
+            onGameLoaded?.(enhancedGame)
+        }
+        
+        console.log(`✅ [SteamApiClient] Loaded ${results.length}/${sortedGames.length} games (${cachedAppDetails.size} from cache, ${fetchedAppDetails.size} from API)`)
         
         return results
     }
@@ -231,17 +299,31 @@ export class SteamApiClient {
     }
 
     /**
+     * App details methods (for categories, genres, etc.)
+     */
+    public async getAppDetails(appid: number): Promise<AppDetailsData | null> {
+        return this.appDetailsCache.get(appid)
+    }
+
+    public async getAppDetailsMany(appids: number[]): Promise<Map<number, AppDetailsData>> {
+        return this.appDetailsCache.getMany(appids)
+    }
+
+    /**
      * Image cache management
      */
     public async getImageCacheStats() {
         return this.images.getStats()
     }
 
-
+    public async getAppDetailsCacheStats() {
+        return this.appDetailsCache.getStats()
+    }
 
     public async clearCache(): Promise<void> {
         this.cache.clear()
         await this.images.clearCache()
+        await this.appDetailsCache.clear()
     }
 
     public getCacheStats() {

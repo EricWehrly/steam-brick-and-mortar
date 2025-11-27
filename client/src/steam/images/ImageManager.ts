@@ -3,6 +3,8 @@
  * Handles IndexedDB storage and image processing
  */
 
+import { AppDetailsCache } from '../cache/AppDetailsCache'
+
 export interface ImageCacheEntry {
     blob: Blob;
     url: string;
@@ -51,9 +53,15 @@ export class ImageManager {
     
     // Artwork type priority for fallbacks (best quality to lowest)
     private readonly ARTWORK_PRIORITY = ['library', 'header', 'logo', 'icon'] as const;
+    
+    private appDetailsCache: AppDetailsCache;
 
     constructor() {
         this.initializeDB();
+        this.appDetailsCache = new AppDetailsCache();
+        this.appDetailsCache.init().catch(error => {
+            console.warn('⚠️ [ImageManager] Failed to initialize app details cache:', error);
+        });
     }
 
     public static getInstance(): ImageManager {
@@ -201,8 +209,115 @@ export class ImageManager {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         
+        // Try Steam Store API appdetails as final fallback
+        // Deployed to: https://steam-api-dev.wehrly.com/appdetails/{appid}
+        console.log(`🔄 [ImageManager] Attempting Steam Store API fallback for ${failedType}...`);
+        const appdetailsBlob = await this.tryAppDetailsFallback(failedUrl, options);
+        if (appdetailsBlob) {
+            return appdetailsBlob;
+        }
+        
         console.warn(`❌ [ImageManager] All fallback attempts failed for ${failedType}`);
         return null;
+    }
+    
+    /**
+     * Try to get artwork from Steam Store API appdetails endpoint
+     * 
+     * IMPORTANT: This is a FINAL fallback only when all CDN URLs fail.
+     * Uses unofficial Steam Store API with aggressive rate limiting.
+     * 
+     * Priority: header_image > capsule_imagev5 > capsule_image
+     * (explicitly excluding screenshots per requirements)
+     * 
+     * @param failedUrl - The original CDN URL that failed (used to extract appid)
+     * @param options - Image load options
+     * @returns Blob if successful, null otherwise
+     */
+    private async tryAppDetailsFallback(
+        failedUrl: string,
+        options: Partial<ImageLoadOptions>
+    ): Promise<Blob | null> {
+        try {
+            // Extract appid from failed URL (e.g., "steam/apps/123456/header.jpg")
+            const appidMatch = failedUrl.match(/\/apps\/(\d+)\//);
+            if (!appidMatch) {
+                console.warn(`⚠️ [ImageManager] Could not extract appid from URL: ${failedUrl}`);
+                return null;
+            }
+            
+            const appid = parseInt(appidMatch[1], 10);
+            console.log(`🔍 [ImageManager] Checking app details for appid ${appid}...`);
+            
+            // Step 1: Check client-side cache first (much faster)
+            let artworkData = await this.appDetailsCache.get(appid);
+            
+            // Step 2: If not in cache, fetch from Lambda
+            if (!artworkData) {
+                console.log(`🔄 [ImageManager] Fetching app details from API for appid ${appid}...`);
+                
+                const apiBaseUrl = 'https://steam-api-dev.wehrly.com';
+                const response = await fetch(`${apiBaseUrl}/appdetails/${appid}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    console.warn(`⚠️ [ImageManager] Steam Store API returned ${response.status} for appid ${appid}`);
+                    return null;
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success || !data.data) {
+                    console.warn(`⚠️ [ImageManager] No data in Steam Store API response for appid ${appid}`);
+                    return null;
+                }
+                
+                artworkData = data.data;
+                
+                // Cache it for future use
+                await this.appDetailsCache.set(appid, artworkData);
+                console.log(`✅ [ImageManager] Cached app details for appid ${appid}`);
+            } else {
+                console.log(`📋 [ImageManager] Using cached app details for appid ${appid}`);
+            }
+            
+            if (!artworkData?.artwork) {
+                console.warn(`⚠️ [ImageManager] No artwork data in app details for appid ${appid}`);
+                return null;
+            }
+            
+            // Try artwork URLs in priority order: header > capsule_v5 > capsule
+            const artworkPriority = [
+                artworkData.artwork.header,
+                artworkData.artwork.capsule_v5,
+                artworkData.artwork.capsule
+            ];
+            
+            for (const artworkUrl of artworkPriority) {
+                if (!artworkUrl) continue;
+                
+                console.log(`🔄 [ImageManager] Trying appdetails artwork: ${artworkUrl}`);
+                const blob = await this.downloadImage(artworkUrl, options);
+                if (blob) {
+                    const isValid = await this.validateImageBlob(blob, artworkUrl);
+                    if (isValid) {
+                        console.log(`✅ [ImageManager] App details fallback successful!`);
+                        return blob;
+                    }
+                }
+            }
+            
+            console.warn(`❌ [ImageManager] All app details artwork URLs failed for appid ${appid}`);
+            return null;
+            
+        } catch (error) {
+            console.error(`❌ [ImageManager] App details fallback error:`, error);
+            return null;
+        }
     }
 
     async getStats(): Promise<ImageCacheStats> {
