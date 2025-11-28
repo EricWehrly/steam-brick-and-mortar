@@ -13,7 +13,7 @@
  */
 
 import * as THREE from 'three'
-import { PerformanceMonitor, type PerformanceStats, ToastManager, UIManager, StartupProgressUI } from '../ui'
+import { PerformanceMonitor, type PerformanceStats, ToastManager, UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
 import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { DebugStatsProvider } from './DebugStatsProvider'
@@ -60,6 +60,7 @@ export class SteamBrickAndMortarApp {
     private eventManager: EventManager
     private appSettings: AppSettings
     private compassRose?: CompassRose
+    private gameLibraryBinder?: GameLibraryBinderUI
     
     // Startup tracking
     private startupTracker: StartupEventTracker
@@ -297,6 +298,11 @@ export class SteamBrickAndMortarApp {
             // The handler will initialize it when first needed, but doing it now
             // ensures any texture data is ready before user needs it
             this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, 'Emoji atlas initialization deferred to first use')
+            
+            // Initialize Game Library Binder UI (nostalgic CD/DVD binder interface)
+            this.gameLibraryBinder = GameLibraryBinderUI.getInstance()
+            this.gameLibraryBinder.init()
+            this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, 'Game Library Binder UI initialized')
             
         // Auto-load will happen after GameStart event is emitted            
             // Show success message once everything is fully loaded

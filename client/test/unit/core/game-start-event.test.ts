@@ -31,6 +31,7 @@ vi.mock('../../../src/scene/SceneCoordinator', () => ({
     SceneCoordinator: vi.fn().mockImplementation(() => ({
         setupCompleteScene: vi.fn().mockResolvedValue(undefined),
         setupSceneAsPrerequisite: vi.fn().mockResolvedValue(undefined),
+        startSceneSetup: vi.fn(),
         updatePerformanceData: vi.fn(),
         getPerformanceStats: vi.fn().mockReturnValue({}),
         getGameBoxRenderer: vi.fn().mockReturnValue({

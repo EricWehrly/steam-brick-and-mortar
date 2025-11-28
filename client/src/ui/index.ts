@@ -9,5 +9,6 @@ export { WebXRUIPanel } from './WebXRUIPanel'
 export { PerformanceMonitor } from './PerformanceMonitor'
 export { ToastManager } from './ToastManager'
 export { StartupProgressUI } from './startup/StartupProgressUI'
+export { GameLibraryBinderUI } from './binder'
 
 export type { PerformanceStats, PerformanceConfig } from './PerformanceMonitor'
