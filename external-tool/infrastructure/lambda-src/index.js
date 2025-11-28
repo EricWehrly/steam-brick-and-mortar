@@ -3,695 +3,34 @@
  * 
  * This function serves as a CORS-enabled proxy for the Steam Web API,
  * enabling browser-based applications to access Steam data.
+ * 
+ * Architecture:
+ * - Modular structure with separation of concerns
+ * - Two-tier caching (memory + S3) for performance
+ * - Rate limiting for Steam API calls
+ * - CORS support for browser clients
  */
 
-const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
-const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
-const { gunzipSync, gzipSync } = require('zlib');
-const axios = require('axios');
-
-// Initialize AWS clients
-const secretsManager = new SecretsManagerClient({});
-const s3Client = new S3Client({});
-
-// Environment variables
-const SECRETS_MANAGER_SECRET_NAME = process.env.SECRETS_MANAGER_SECRET_NAME;
-const ENVIRONMENT = process.env.ENVIRONMENT || 'dev';
-const ALLOWED_ORIGINS = JSON.parse(process.env.ALLOWED_ORIGINS || '[]');
-const CACHE_BUCKET_NAME = process.env.CACHE_BUCKET_NAME;
-
-// Steam API constants
-const STEAM_API_BASE_URL = 'https://api.steampowered.com';
-
-// Cache for Steam API key (in-memory for Lambda container reuse)
-let steamApiKey = null;
-
-// In-memory cache for game data (L1 cache - lasts for Lambda container lifetime)
-const memoryCache = new Map();
+const { createResponse } = require('./services/http-utils');
+const {
+  handleHealth,
+  handleTest,
+  handleResolveVanityUrl,
+  handleGetOwnedGames,
+  handleBatchAppDetails
+} = require('./handlers');
 
 /**
- * Get Steam API key from environment or AWS Secrets Manager
- * 
- * For local development, reads from STEAM_API_KEY environment variable.
- * For AWS deployment, retrieves from AWS Secrets Manager using the configured secret name.
- * 
- * Uses in-memory caching to avoid repeated API calls within the same Lambda container lifecycle.
- * 
- * AWS Secrets Manager documentation:
- * https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html
- * 
- * Parameters: None
- * 
- * Returns:
- * @returns {Promise<string>} The Steam Web API key
- * 
- * Throws:
- * - Error if STEAM_API_KEY environment variable is missing in local environment
- * - Error if unable to retrieve secret from AWS Secrets Manager
- */
-async function getSteamApiKey() {
-  if (steamApiKey) {
-    return steamApiKey;
-  }
-
-  // Check if we're running locally (ENVIRONMENT=local)
-  if (ENVIRONMENT === 'local' || process.env.ENVIRONMENT === 'local') {
-    console.log('Local environment detected, using environment variable for Steam API key');
-    steamApiKey = process.env.STEAM_API_KEY;
-    
-    if (!steamApiKey) {
-      throw new Error('STEAM_API_KEY environment variable is not set for local development');
-    }
-    
-    return steamApiKey;
-  }
-
-  // AWS environment - use Secrets Manager
-  try {
-    const command = new GetSecretValueCommand({
-      SecretId: SECRETS_MANAGER_SECRET_NAME
-    });
-    
-    const response = await secretsManager.send(command);
-    const secret = JSON.parse(response.SecretString);
-    steamApiKey = secret.steam_api_key;
-    
-    return steamApiKey;
-  } catch (error) {
-    console.error('Failed to retrieve Steam API key from Secrets Manager:', error);
-    throw new Error('Unable to retrieve Steam API key');
-  }
-}
-
-/**
- * Generate CORS headers for cross-origin requests
- * 
- * Enables browser-based applications to access the Lambda API from different domains.
- * Validates the origin against the ALLOWED_ORIGINS environment variable.
- * 
- * CORS specification:
- * https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
- * 
- * Parameters:
- * @param {string} origin - The origin header from the incoming request
- * 
- * Returns:
- * @returns {Object} CORS headers object containing:
- *   - Access-Control-Allow-Origin: Allowed origin or fallback
- *   - Access-Control-Allow-Headers: Permitted request headers
- *   - Access-Control-Allow-Methods: Allowed HTTP methods
- *   - Access-Control-Max-Age: Preflight cache duration (300 seconds)
- */
-function getCorsHeaders(origin) {
-  const isAllowedOrigin = ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*');
-  
-  return {
-    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : ALLOWED_ORIGINS[0] || '*',
-    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Max-Age': '300'
-  };
-}
-
-/**
- * Create standardized HTTP response for Lambda API Gateway integration
- * 
- * Formats responses according to AWS Lambda Proxy Integration requirements.
- * Automatically includes CORS headers and JSON content-type.
- * 
- * AWS Lambda Proxy Integration:
- * https://docs.aws.amazon.com/apigateway/latest/developerguide/lambda-proxy-integration.html
- * 
- * Parameters:
- * @param {number} statusCode - HTTP status code (200, 404, 500, etc.)
- * @param {Object} body - Response body object (will be JSON.stringify'd)
- * @param {string|null} origin - Origin for CORS headers (optional)
- * @param {Object} headers - Additional headers to include (optional)
- * 
- * Returns:
- * @returns {Object} Lambda proxy response object with:
- *   - statusCode: HTTP status code
- *   - headers: Combined CORS and custom headers
- *   - body: JSON stringified response body
- */
-function createResponse(statusCode, body, origin = null, headers = {}) {
-  return {
-    statusCode,
-    headers: {
-      'Content-Type': 'application/json',
-      ...getCorsHeaders(origin),
-      ...headers
-    },
-    body: JSON.stringify(body)
-  };
-}
-
-/**
- * Validate Steam ID format (64-bit Steam ID)
- * 
- * Steam uses 64-bit integers for user identification. These are always 17-digit numbers
- * that start with 76561... for individual accounts.
- * 
- * Steam ID documentation:
- * https://developer.valvesoftware.com/wiki/SteamID
- * https://steamapi.xpaw.me/#steamid
- * 
- * Parameters:
- * @param {string} steamId - The Steam ID to validate
- * 
- * Returns:
- * @returns {boolean} True if the Steam ID is a valid 17-digit number, false otherwise
- * 
- * Examples:
- * - Valid: "76561197960287930" (Gabe Newell's public profile)
- * - Invalid: "12345" (too short)
- * - Invalid: "abcd1234567890123" (contains letters)
- */
-function isValidSteamId(steamId) {
-  return /^\d{17}$/.test(steamId);
-}
-
-/**
- * Handle health check endpoint (/health)
- * 
- * Provides basic service health information for monitoring and load balancers.
- * Does not test Steam API connectivity - use /test endpoint for that.
- * 
- * Health check best practices:
- * https://docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-health-checks.html
- * 
- * Parameters: None
- * 
- * Returns:
- * @returns {Promise<Object>} Health status object containing:
- *   - status: "healthy" (always)
- *   - environment: Current deployment environment (dev/prod/local)
- *   - timestamp: ISO timestamp of the check
- *   - version: API version number
- */
-async function handleHealth() {
-  return {
-    status: 'healthy',
-    environment: ENVIRONMENT,
-    timestamp: new Date().toISOString(),
-    version: '1.0.0'
-  };
-}
-
-/**
- * Handle test endpoint (/test) with known public profile
- * 
- * Tests Steam API connectivity using Gabe Newell's public Steam profile.
- * This profile is guaranteed to be public and have games, making it ideal for testing.
- * 
- * Uses the same GetOwnedGames API call as the main /games/{steamid} endpoint
- * to validate end-to-end functionality.
- * 
- * Parameters: None
- * 
- * Returns:
- * @returns {Promise<Object>} Test result object containing:
- *   - status: "test_successful" or "test_failed"
- *   - steam_api_connected: Boolean indicating Steam API reachability
- *   - test_profile: Steam ID used for testing (76561197960287930)
- *   - games_count: Number of games found (on success)
- *   - error: Error message (on failure)
- *   - timestamp: ISO timestamp of the test
- */
-async function handleTest() {
-  try {
-    const apiKey = await getSteamApiKey();
-    
-    // Use Gabe Newell's public Steam profile for testing
-    const testSteamId = '76561197960287930';
-    
-    const response = await axios.get(`${STEAM_API_BASE_URL}/IPlayerService/GetOwnedGames/v0001/`, {
-      params: {
-        key: apiKey,
-        steamid: testSteamId,
-        format: 'json',
-        include_appinfo: true,
-        include_played_free_games: true
-      },
-      timeout: 10000
-    });
-
-    return {
-      status: 'test_successful',
-      steam_api_connected: true,
-      test_profile: testSteamId,
-      games_count: response.data.response?.game_count || 0,
-      timestamp: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error('Test failed:', error.message);
-    return {
-      status: 'test_failed',
-      steam_api_connected: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    };
-  }
-}
-
-/**
- * Get owned games for a Steam user
- * 
- * Retrieves the complete game library for a Steam user using the GetOwnedGames API.
- * Enhances the response with artwork URLs for game covers and icons.
- * 
- * Steam Web API - GetOwnedGames:
- * https://steamapi.xpaw.me/#IPlayerService/GetOwnedGames
- * https://wiki.teamfortress.com/wiki/WebAPI/GetOwnedGames
- * 
- * API endpoint: https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/
- * 
- * Parameters:
- * @param {string} steamId - 64-bit Steam ID (17-digit number)
- * 
- * API Parameters sent to Steam:
- * - key: Steam Web API key
- * - steamid: 64-bit Steam ID
- * - format: "json" (response format)
- * - include_appinfo: true (include game names and other app info)
- * - include_played_free_games: true (include free-to-play games)
- * 
- * Returns:
- * @returns {Promise<Object>} Enhanced games object containing:
- *   - steamid: The requested Steam ID
- *   - game_count: Total number of games owned
- *   - games: Array of game objects with enhanced artwork URLs
- *   - retrieved_at: ISO timestamp when data was fetched
- * 
- * Each game object includes:
- *   - appid: Steam application ID
- *   - name: Game title
- *   - playtime_forever: Total minutes played
- *   - artwork: Object with URLs for icon, logo, header, and library images
- * 
- * Throws:
- * - Error if Steam ID format is invalid
- * - Error if Steam profile is private or doesn't exist (403)
- * - Error for other Steam API failures
- */
-async function getOwnedGames(steamId) {
-  if (!isValidSteamId(steamId)) {
-    throw new Error('Invalid Steam ID format');
-  }
-
-  const apiKey = await getSteamApiKey();
-  
-  try {
-    const response = await axios.get(`${STEAM_API_BASE_URL}/IPlayerService/GetOwnedGames/v0001/`, {
-      params: {
-        key: apiKey,
-        steamid: steamId,
-        format: 'json',
-        include_appinfo: true,
-        include_played_free_games: true
-      },
-      timeout: 15000
-    });
-
-    const games = response.data.response?.games || [];
-    
-    // Enhance games with artwork URLs
-    const enhancedGames = games.map(game => ({
-      ...game,
-      artwork: {
-        icon: `https://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`,
-        logo: `https://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`,
-        header: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`,
-        library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
-      }
-    }));
-
-    return {
-      steamid: steamId,
-      game_count: response.data.response?.game_count || 0,
-      games: enhancedGames,
-      retrieved_at: new Date().toISOString()
-    };
-  } catch (error) {
-    if (error.response?.status === 403) {
-      throw new Error('Steam profile is private or does not exist');
-    }
-    throw new Error(`Steam API error: ${error.message}`);
-  }
-}
-
-/**
- * Resolve Steam vanity URL to Steam ID
- * https://steamapi.xpaw.me/#ISteamUser/ResolveVanityURL
- * (from https://wiki.teamfortress.com/wiki/WebAPI/ResolveVanityURL)
- * (via https://stackoverflow.com/a/62142205)
- * 
- * https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/
- * 
- * vanityurl (string) - The vanity URL to get a SteamID for
- * url_type (int) - The type of vanity URL being resolved. Currently, the only supported value is 1, which indicates a Steam Community profile URL.
- * 
- * Response:
- * {
- *   "response": {
- *     "success": 1,
- *     "steamid": "76561197960287930"
- *   }
- */
-async function resolveVanityUrl(vanityUrl) {
-  const apiKey = await getSteamApiKey();
-  
-  try {
-    const response = await axios.get(`${STEAM_API_BASE_URL}/ISteamUser/ResolveVanityURL/v0001/`, {
-      params: {
-        key: apiKey,
-        vanityurl: vanityUrl,
-        format: 'json'
-      },
-      timeout: 10000
-    });
-
-    const result = response.data.response;
-    
-    if (result.success === 1) {
-      return {
-        vanity_url: vanityUrl,
-        steamid: result.steamid,
-        resolved_at: new Date().toISOString()
-      };
-    } else {
-      throw new Error('Vanity URL not found');
-    }
-  } catch (error) {
-    throw new Error(`Failed to resolve vanity URL: ${error.message}`);
-  }
-}
-
-/**
- * Get game data from S3 cache
- * 
- * @param {string|number} appid - Steam application ID
- * @returns {Promise<Object|null>} Cached game data or null if not found
- */
-async function getFromCache(appid) {
-  // L1: Check memory cache
-  if (memoryCache.has(appid)) {
-    console.log(`Memory cache HIT for appid ${appid}`);
-    return memoryCache.get(appid);
-  }
-
-  // L2: Check S3 cache
-  if (!CACHE_BUCKET_NAME) {
-    console.log('No cache bucket configured, skipping S3 cache');
-    return null;
-  }
-
-  try {
-    const command = new GetObjectCommand({
-      Bucket: CACHE_BUCKET_NAME,
-      Key: `appdetails/${appid}.json.gz`
-    });
-
-    const response = await s3Client.send(command);
-    const compressed = await streamToBuffer(response.Body);
-    const decompressed = gunzipSync(compressed);
-    const data = JSON.parse(decompressed.toString('utf-8'));
-    
-    // Populate memory cache
-    memoryCache.set(appid, data);
-    console.log(`S3 cache HIT for appid ${appid}`);
-    
-    return data;
-  } catch (error) {
-    if (error.name === 'NoSuchKey') {
-      console.log(`Cache MISS for appid ${appid}`);
-    } else {
-      console.error(`S3 cache error for appid ${appid}:`, error.message);
-    }
-    return null;
-  }
-}
-
-/**
- * Save game data to S3 cache
- * 
- * @param {string|number} appid - Steam application ID
- * @param {Object} data - Game data to cache
- */
-async function saveToCache(appid, data) {
-  if (!CACHE_BUCKET_NAME) {
-    return;
-  }
-
-  try {
-    const jsonString = JSON.stringify(data);
-    const compressed = gzipSync(jsonString);
-    
-    const command = new PutObjectCommand({
-      Bucket: CACHE_BUCKET_NAME,
-      Key: `appdetails/${appid}.json.gz`,
-      Body: compressed,
-      ContentType: 'application/json',
-      ContentEncoding: 'gzip',
-      Metadata: {
-        'cached-at': new Date().toISOString(),
-        'appid': String(appid)
-      }
-    });
-
-    await s3Client.send(command);
-    
-    // Also populate memory cache
-    memoryCache.set(appid, data);
-    console.log(`Cached appid ${appid} to S3`);
-  } catch (error) {
-    console.error(`Failed to cache appid ${appid}:`, error.message);
-    // Don't throw - caching failure shouldn't break the response
-  }
-}
-
-/**
- * Convert stream to buffer
- * 
- * @param {ReadableStream} stream - Readable stream
- * @returns {Promise<Buffer>} Buffer containing stream data
- */
-async function streamToBuffer(stream) {
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
-
-/**
- * Get app details from Steam Store API
- * 
- * Queries the unofficial Steam Store API for detailed game information.
- * including artwork URLs, descriptions, screenshots, and metadata.
- * 
- * IMPORTANT: This endpoint is UNOFFICIAL and undocumented.
- * Rate limits: ~200 requests per 5 minutes (aggressive caching recommended)
- * 
- * Steam Store API (unofficial):
- * https://store.steampowered.com/api/appdetails
- * 
- * Documentation references:
- * - https://wiki.teamfortress.com/wiki/User:RJackson/StorefrontAPI
- * - https://steamapi.xpaw.me/
- * 
- * Parameters:
- * @param {string|number} appid - Steam application ID
- * 
- * Returns:
- * @returns {Promise<Object>} App details containing:
- *   - success: boolean indicating if app was found
- *   - data: (if success=true) Object with:
- *     - name: Game title
- *     - header_image: Large header image URL
- *     - capsule_image: Store capsule image URL
- *     - capsule_imagev5: Version 5 capsule URL
- *     - screenshots: Array of screenshot objects with path_full/path_thumbnail
- *     - (many other fields: price_overview, platforms, genres, etc.)
- *   - retrieved_at: ISO timestamp
- * 
- * Throws:
- * - Error if appid is invalid
- * - Error if Steam Store API fails
- * - Error if app doesn't exist (success=false in response)
- */
-async function getAppDetails(appid) {
-  if (!appid) {
-    throw new Error('App ID is required');
-  }
-
-  // Validate appid is numeric
-  const numericAppid = parseInt(appid, 10);
-  if (isNaN(numericAppid) || numericAppid <= 0) {
-    throw new Error('Invalid App ID format');
-  }
-
-  // Check cache first
-  const cached = await getFromCache(numericAppid);
-  if (cached) {
-    return cached;
-  }
-
-  try {
-    // Call Steam Store API (no auth required)
-    const response = await axios.get(`https://store.steampowered.com/api/appdetails`, {
-      params: {
-        appids: numericAppid
-      },
-      timeout: 15000
-    });
-
-    // Response format: { "[appid]": { success: true/false, data: {...} } }
-    const appData = response.data[numericAppid];
-
-    if (!appData) {
-      throw new Error('No data returned from Steam Store API');
-    }
-
-    if (!appData.success) {
-      throw new Error('App not found or data unavailable');
-    }
-
-    // Extract useful artwork URLs for easier client consumption
-    const artworkUrls = {
-      header: appData.data.header_image || null,
-      capsule: appData.data.capsule_image || null,
-      capsule_v5: appData.data.capsule_imagev5 || null,
-      background: appData.data.background || null,
-      background_raw: appData.data.background_raw || null
-    };
-
-    // Exclude heavy fields to reduce payload size
-    const { detailed_description, about_the_game, ...cleanData } = appData.data;
-
-    const result = {
-      success: true,
-      appid: numericAppid,
-      data: {
-        name: cleanData.name,
-        type: cleanData.type,
-        is_free: cleanData.is_free,
-        short_description: cleanData.short_description,
-        artwork: artworkUrls,
-        full_data: cleanData  // Include everything except detailed_description and about_the_game
-      },
-      retrieved_at: new Date().toISOString()
-    };
-
-    // Cache the result
-    await saveToCache(numericAppid, result);
-
-    return result;
-  } catch (error) {
-    // Preserve error details for debugging
-    if (error.response?.status === 429) {
-      throw new Error('Steam Store API rate limit exceeded (HTTP 429)');
-    }
-    throw new Error(`Steam Store API error: ${error.message}`);
-  }
-}
-
-/**
- * Handle batch app details request
- * 
- * Accepts an array of appids and returns details for each.
- * Supports both query parameter (?appids=1,2,3) and JSON body.
- * 
- * @param {Object} event - API Gateway event
- * @returns {Promise<Object>} Batch results with cached and fetched data
- */
-async function handleBatchAppDetails(event) {
-  let appids = [];
-
-  // Try to get appids from query parameters first
-  if (event.queryStringParameters?.appids) {
-    const appidsParam = event.queryStringParameters.appids;
-    appids = appidsParam.split(',').map(id => id.trim()).filter(id => id);
-  }
-  // If not in query params, try JSON body
-  else if (event.body) {
-    try {
-      const body = JSON.parse(event.body);
-      appids = body.appids || [];
-    } catch (error) {
-      throw new Error('Invalid JSON body');
-    }
-  }
-
-  if (!appids || appids.length === 0) {
-    throw new Error('appids parameter is required (comma-separated list or JSON array)');
-  }
-
-  // Process all appids in parallel (no batch size limit - client handles batching)
-  const results = await Promise.allSettled(
-    appids.map(appid => getAppDetails(appid))
-  );
-
-  // Separate successful and failed results
-  const successful = [];
-  const failed = [];
-
-  results.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      // Remove from_cache flag before returning
-      const { from_cache, ...cleanResult } = result.value;
-      successful.push(cleanResult);
-    } else {
-      failed.push({
-        appid: appids[index],
-        error: result.reason.message
-      });
-    }
-  });
-
-  return {
-    success: true,
-    total_requested: appids.length,
-    total_successful: successful.length,
-    total_failed: failed.length,
-    results: successful,
-    failed: failed.length > 0 ? failed : undefined,
-    timestamp: new Date().toISOString()
-  };
-}
-
-/**
- * Main AWS Lambda handler for Steam API proxy
- * 
- * Handles HTTP requests routed through AWS API Gateway with Lambda Proxy Integration.
- * Supports CORS preflight requests and routes to appropriate handler functions.
- * 
- * AWS Lambda documentation:
- * https://docs.aws.amazon.com/lambda/latest/dg/nodejs-handler.html
- * 
- * API Gateway Lambda Proxy Integration:
- * https://docs.aws.amazon.com/apigateway/latest/developerguide/lambda-proxy-integration.html
+ * Main AWS Lambda handler
  * 
  * Supported endpoints:
  * - GET /health - Service health check
  * - GET /test - Steam API connectivity test
  * - GET /games/{steamid} - Get owned games for Steam user
  * - GET /resolve/{vanityurl} - Resolve vanity URL to Steam ID
+ * - GET /batch-appdetails?appids=1,2,3 - Batch fetch app details
+ * - POST /batch-appdetails with {"appids": [1,2,3]} - Batch fetch app details
  * - OPTIONS * - CORS preflight handling
- * 
- * Parameters:
- * @param {Object} event - API Gateway Lambda Proxy event object containing:
- *   - headers: HTTP headers including origin for CORS
- *   - requestContext.http.method: HTTP method (GET, POST, OPTIONS)
- *   - requestContext.http.path: Request path for routing
- *   - (additional API Gateway event properties)
- * @param {Object} context - Lambda context object (unused but required)
- * 
- * Returns:
- * @returns {Promise<Object>} Lambda Proxy response object with:
- *   - statusCode: HTTP status code
- *   - headers: Response headers including CORS
- *   - body: JSON stringified response body
  */
 exports.handler = async (event, context) => {
   console.log('Event:', JSON.stringify(event, null, 2));
@@ -699,66 +38,63 @@ exports.handler = async (event, context) => {
   const origin = event.headers?.origin;
   const httpMethod = event.requestContext?.http?.method || event.httpMethod;
   const path = event.requestContext?.http?.path || event.path;
-  
+
   // Handle CORS preflight
   if (httpMethod === 'OPTIONS') {
     return createResponse(200, { message: 'CORS preflight successful' }, origin);
   }
 
   try {
-    // Route handling
+    let result;
+
+    // Route to appropriate handler
     if (path === '/health') {
-      const result = await handleHealth();
+      result = await handleHealth();
       return createResponse(200, result, origin);
     }
-    
+
     if (path === '/test') {
-      const result = await handleTest();
+      result = await handleTest();
       return createResponse(200, result, origin);
     }
-    
-    if (path.startsWith('/games/')) {
-      const steamId = path.split('/')[2];
-      const result = await getOwnedGames(steamId);
-      return createResponse(200, result, origin);
-    }
-    
+
+    // Resolve vanity URL
     if (path.startsWith('/resolve/')) {
       const vanityUrl = path.split('/')[2];
-      const result = await resolveVanityUrl(vanityUrl);
+      result = await handleResolveVanityUrl(vanityUrl);
       return createResponse(200, result, origin);
     }
-    
-    if (path.startsWith('/appdetails/')) {
-      const appid = path.split('/')[2];
-      const result = await getAppDetails(appid);
+
+    // Get owned games
+    if (path.startsWith('/games/')) {
+      const steamId = path.split('/')[2];
+      result = await handleGetOwnedGames(steamId);
       return createResponse(200, result, origin);
     }
-    
+
+    // Batch app details
     if (path === '/batch-appdetails' || path === '/appdetails') {
-      const result = await handleBatchAppDetails(event);
+      result = await handleBatchAppDetails(event);
       return createResponse(200, result, origin);
     }
-    
-    // Route not found
-    return createResponse(404, { 
-      error: 'Not Found',
-      message: 'The requested endpoint does not exist',
+
+    // Unknown endpoint
+    return createResponse(404, {
+      error: 'Endpoint not found',
       available_endpoints: [
-        '/health',
-        '/test',
-        '/games/{steamid}',
-        '/resolve/{vanityurl}',
-        '/appdetails/{appid}',
-        '/batch-appdetails?appids=1,2,3 or POST /appdetails with {"appids": [1,2,3]}'
+        'GET /health',
+        'GET /test',
+        'GET /games/{steamid}',
+        'GET /resolve/{vanityurl}',
+        'GET /batch-appdetails?appids=1,2,3 or POST /appdetails with {"appids": [1,2,3]}'
       ]
     }, origin);
-    
+
   } catch (error) {
     console.error('Handler error:', error);
     
     return createResponse(500, {
-      error: 'Internal Server Error',
+      error: 'Internal server error',
       message: error.message,
       timestamp: new Date().toISOString()
     }, origin);
