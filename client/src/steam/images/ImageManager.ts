@@ -563,8 +563,25 @@ export class ImageManager {
                         }
                     }
                     
+                    // Final pass: sample every pixel across the horizontal middle of the image
+                    // This catches images that are black on top but have content in the middle
                     if (!hasNonZeroPixels) {
-                        console.warn(`⚠️ [ImageManager] Image appears to be empty/black for ${url} (all ${samplesToCheck} sampled pixels are 0,0,0)`);
+                        const middleY = Math.floor(canvas.height / 2);
+                        for (let x = 0; x < canvas.width; x++) {
+                            const i = (middleY * canvas.width + x) * 4;
+                            const r = imageData.data[i];
+                            const g = imageData.data[i + 1];
+                            const b = imageData.data[i + 2];
+                            
+                            if (r !== 0 || g !== 0 || b !== 0) {
+                                hasNonZeroPixels = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (!hasNonZeroPixels) {
+                        console.warn(`⚠️ [ImageManager] Image appears to be empty/black for ${url} (all ${samplesToCheck} sampled pixels + middle row are 0,0,0)`);
                         resolve(false);
                         return;
                     }
