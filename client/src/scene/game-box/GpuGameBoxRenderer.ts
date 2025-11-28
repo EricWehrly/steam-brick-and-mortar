@@ -48,10 +48,12 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     /**
      * Initialize instanced renderers with game data
      * Must be called before creating game boxes
+     * Note: InstancedArtworkRenderer now initializes lazily on first artwork add
      */
     public async initializeWithGames(games: SteamGameData[]): Promise<void> {
         await this.instancedLabelRenderer.initializeWithGames(games)
-        await this.instancedArtworkRenderer.initialize()
+        // InstancedArtworkRenderer is now lazy-initialized on first setArtworkInstance call
+        // This avoids blocking startup with texture array allocation
         this.labelInstanceIndex = 0
         this.artworkInstanceIndex = 0
     }
@@ -65,7 +67,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     ): THREE.Mesh | null {
         const hasArtwork = textureOptions?.artworkBlobs && Object.keys(textureOptions.artworkBlobs).length > 0
         
-        if (hasArtwork && this.instancedArtworkRenderer.isReady() && textureOptions) {
+        // Artwork renderer lazy-initializes on first use, so don't check isReady() here
+        if (hasArtwork && textureOptions) {
             return this.createInstancedArtworkBox(game, position, textureOptions, name)
         } else if (this.instancedLabelRenderer.isReady()) {
             return this.createInstancedLabelBox(game, position, name, side)

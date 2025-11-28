@@ -208,8 +208,13 @@ export class InstancedArtworkRenderer {
         gameName: string,
         textureOptions: GameBoxTextureOptions
     ): Promise<boolean> {
-        if (!this.isInitialized || !this.instancedMesh || !this.geometry) {
-            console.warn('InstancedArtworkRenderer not initialized')
+        // Lazy initialization - initialize on first use to avoid blocking startup
+        if (!this.isInitialized) {
+            this.initialize()
+        }
+        
+        if (!this.instancedMesh || !this.geometry) {
+            console.warn('InstancedArtworkRenderer failed to initialize')
             return false
         }
         
@@ -235,7 +240,6 @@ export class InstancedArtworkRenderer {
             console.debug(`📦 [Renderer] Found blob for "${gameName}": ${blob.size}b (${preferredType})`)
             
             // Add texture to array and get index
-            console.debug(`🎨 [Renderer] Processing texture for "${gameName}"...`)
             const textureIndex = await this.textureProcessor.processTexture(blob, gameName, this.dataArrayTexture)
             console.debug(`🎨 [Renderer] Texture processed for "${gameName}" → textureIndex=${textureIndex}`)
             
@@ -249,17 +253,14 @@ export class InstancedArtworkRenderer {
             const matrix = new THREE.Matrix4()
             matrix.compose(position, InstancedArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
             this.instancedMesh.setMatrixAt(index, matrix)
-            console.debug(`🔧 [Renderer] Set matrix for "${gameName}" at instance ${index}`)
             
             // Update texture index attribute
             const textureIndices = this.geometry.getAttribute('textureIndex') as THREE.InstancedBufferAttribute
             textureIndices.setX(index, textureIndex)
-            console.debug(`🔧 [Renderer] Set textureIndex=${textureIndex} for "${gameName}" at instance ${index}`)
             
             // Track highest index used
             const previousCount = this.currentCount
             this.currentCount = Math.max(this.currentCount, index + 1)
-            console.debug(`📊 [Renderer] Updated currentCount: ${previousCount} → ${this.currentCount} (${gameName})`)
             
             // Store instance metadata for game finding
             this.instanceMetadata.set(index, {
@@ -281,8 +282,6 @@ export class InstancedArtworkRenderer {
             if (position.y < 0.1) {
                 console.warn(`⚠️ Game "${gameName}" has low Y position: ${position.y.toFixed(2)} - might be on floor`)
             }
-            
-            console.debug(`✅ [Renderer] Successfully set artwork instance for "${gameName}": index=${index}, textureIndex=${textureIndex}, currentCount=${this.currentCount}`)
             return true
             
         } catch (error) {

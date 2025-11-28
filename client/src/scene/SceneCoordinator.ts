@@ -96,8 +96,8 @@ export class SceneCoordinator {
             this.eventManager.emit(GameEventTypes.SceneReady, {})
         })
 
-        // Don't emit SceneReady yet - wait until after loadEnhancedScene completes
-        this.loadEnhancedScene(config.environment)
+        // NOTE: Scene setup is now DEFERRED - call startSceneSetup() explicitly after controls are ready
+        // This allows the user to move around while the world builds in the background
 
         if(window) {
             (window as any).debugListSceneObjects = this.debugListSceneObjects.bind(this);
@@ -113,6 +113,18 @@ export class SceneCoordinator {
         // Emit event to toggle shelf unit indices
         this.eventManager.emit('store-props:toggle-shelf-indices', {})
         console.log('🔍 Shelf unit indices toggled')
+    }
+
+    /**
+     * Start scene setup asynchronously - call this AFTER controls are ready
+     * This allows the user to move around while the world builds in the background
+     */
+    public startSceneSetup(): void {
+        // Use setTimeout(0) to yield to main thread before starting heavy work
+        // This ensures the render loop has started and user can see/interact
+        setTimeout(() => {
+            this.loadEnhancedScene(this.config.environment)
+        }, 0)
     }
 
     private async loadEnhancedScene(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {

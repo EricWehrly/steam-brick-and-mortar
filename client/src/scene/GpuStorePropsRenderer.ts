@@ -90,13 +90,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.storeLayout = new StoreLayout(this.scene)
         this.signageRenderer = new SignageRenderer()
         
-        // Initialize GPU instanced shelf renderer
+        // Create GPU instanced shelf renderer (lazy initialization - deferred until first use)
         this.instancedShelfRenderer = new InstancedShelfRenderer({
             maxShelfUnits: 50 // Allow up to 50 shelf units
         })
-        
-        // Initialize the instanced renderer asynchronously
-        this.instancedShelfRenderer.initialize()
+        // NOTE: Initialization is deferred to generateShelvesAsync() when shelves are actually needed
+        // This avoids blocking startup with GPU resource allocation
     }
 
     private setupEventListeners(): void {

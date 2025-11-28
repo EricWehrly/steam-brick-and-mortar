@@ -229,7 +229,11 @@ export class SteamBrickAndMortarApp {
             this.checkGameStartPrerequisites()
             
             this.isInitialized = true
-            this.startupTracker.milestone(StartupPhase.RenderLoopStart, 'Waiting for world to spawn')
+            this.startupTracker.milestone(StartupPhase.RenderLoopStart, 'User can move - starting world build')
+            
+            // 🎬 PRIORITY 2.5: Start scene building AFTER render loop is running
+            // This yields to main thread so user sees something and can move immediately
+            this.sceneCoordinator.startSceneSetup()
             
             // 🚀 PRIORITY 3: Everything else happens async (non-blocking)
             this.initializeNonEssentialSystemsAsync()
