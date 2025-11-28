@@ -7,6 +7,7 @@ import { CacheManager } from './cache/SimpleCacheManager'
 import { RateLimiter } from './rate-limit/RateLimiter'
 import { ImageManager } from './images/ImageManager'
 import { BatchAppDetailsClient } from './batch/BatchAppDetailsClient'
+import { Logger } from '../utils/Logger'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import type { AppDetailsData } from './batch/BatchAppDetailsClient'
 
@@ -51,6 +52,7 @@ export interface SteamApiError {
  * All public methods include explicit caching logic for transparency and easier debugging.
  */
 export class SteamApiClient {
+    private static readonly logger = Logger.withContext(SteamApiClient.name)
     private http: HttpClient
     private cache: CacheManager
     private rateLimiter: RateLimiter
@@ -91,17 +93,17 @@ export class SteamApiClient {
         // Check cache first
         const cached = this.cache.get<SteamResolveResponse>(cacheKey)
         if (cached) {
-            console.log(`📋 Using cached vanity URL resolution for: ${cleanVanityUrl}`)
+            SteamApiClient.logger.debug(`Using cached vanity URL resolution for: ${cleanVanityUrl}`)
             return cached
         }
         
         // Make API request
         const endpoint = `/resolve/${encodeURIComponent(cleanVanityUrl)}`
-        console.log(`🔍 Resolving vanity URL: "${vanityUrl}" -> "${cleanVanityUrl}" -> endpoint: ${endpoint}`)
+        SteamApiClient.logger.debug(`Resolving vanity URL: "${vanityUrl}" -> "${cleanVanityUrl}"`)
         
         try {
             const response = await this.http.makeRequest<SteamResolveResponse>(endpoint)
-            console.log('✅ Vanity URL resolved successfully:', response)
+            SteamApiClient.logger.info(`Vanity URL resolved: ${response.vanity_url || cleanVanityUrl}`)
             
             // Cache the result
             this.cache.set(cacheKey, response)
@@ -129,20 +131,20 @@ export class SteamApiClient {
         // Check cache first
         const cached = this.cache.get<SteamUser>(cacheKey)
         if (cached) {
-            console.log(`📋 Using cached games data for Steam ID: ${steamId}`)
+            SteamApiClient.logger.debug(`Using cached games data for Steam ID: ${steamId}`)
             return cached
         }
         
         // Make API request
         const endpoint = `/games/${encodeURIComponent(steamId)}`
-        console.log(`🎮 Fetching games for Steam ID: ${steamId}`)
+        SteamApiClient.logger.debug(`Fetching games for Steam ID: ${steamId}`)
         
         try {
             const response = await this.http.makeRequest<SteamUser>(endpoint)
-            console.log(`✅ Fetched ${response.game_count} games for user ${response.vanity_url || steamId}`)
+            SteamApiClient.logger.info(`Fetched ${response.game_count} games for ${response.vanity_url || steamId}`)
             
             if (response.game_count === 0) {
-                console.warn('⚠️ User has 0 games - this might indicate privacy settings or an empty library')
+                SteamApiClient.logger.warn('User has 0 games - this might indicate privacy settings or an empty library')
             }
             
             // Cache the result
@@ -150,7 +152,7 @@ export class SteamApiClient {
             
             return response
         } catch (error) {
-            console.error('❌ Failed to fetch user games:', error)
+            SteamApiClient.logger.error('Failed to fetch user games:', error)
             throw error
         }
     }
@@ -199,6 +201,111 @@ export class SteamApiClient {
     /**
      * Public utility methods
      */
+    
+    /**
+     * Update game artwork URLs from cached batch metadata
+     * Modifies games in-place to use new CDN URLs from batch API cache
+     * 
+     * @param steamUser - Steam user with games to update
+     */
+    public async updateGameArtworkFromCache(steamUser: SteamUser): Promise<void> {
+        const appids = steamUser.games.map(g => g.appid)
+        const cachedAppDetails = await this.appDetailsCache.getMany(appids)
+        
+        let updatedCount = 0
+        for (const game of steamUser.games) {
+            const appDetails = cachedAppDetails.get(game.appid)
+            if (!appDetails?.artwork) continue
+            
+            // Update header URL if we have valid batch API artwork
+            const newHeaderUrl = appDetails.artwork.header 
+                || appDetails.artwork.capsule_v5 
+                || appDetails.artwork.capsule
+            
+            if (newHeaderUrl && !newHeaderUrl.includes('cdn.akamai.steamstatic.com')) {
+                if (!game.artwork) {
+                    game.artwork = {
+                        icon: '',
+                        logo: '',
+                        header: '',
+                        library: ''
+                    }
+                }
+                game.artwork.header = newHeaderUrl
+                updatedCount++
+            }
+        }
+        
+        SteamApiClient.logger.info(`Updated artwork URLs for ${updatedCount}/${steamUser.games.length} games from cache`)
+    }
+    
+    /**
+     * Hydrate batch metadata (categories/genres/artwork) for ALL games in cache
+     * This ensures IndexedDB has complete data for all games without display limits
+     * 
+     * @param steamUser - Steam user data containing games list
+     * @param options - Optional progress callback
+     */
+    public async hydrateAllGamesMetadata(
+        steamUser: SteamUser,
+        options: { onProgress?: (current: number, total: number) => void } = {}
+    ): Promise<void> {
+        const { onProgress } = options
+        const appids = steamUser.games.map(g => g.appid)
+        
+        SteamApiClient.logger.debug(`Checking batch metadata for ${appids.length} games`)
+        
+        // Check which games need batch data
+        const cachedAppDetails = await this.appDetailsCache.getMany(appids)
+        const uncachedAppids = appids.filter(id => {
+            const cached = cachedAppDetails.get(id)
+            if (!cached) return true
+            
+            // Check if we have usable metadata - accept if we have categories, genres, OR valid artwork
+            const hasCategories = cached.categories && Array.isArray(cached.categories) && cached.categories.length > 0
+            const hasGenres = cached.genres && Array.isArray(cached.genres) && cached.genres.length > 0
+            const hasArtwork = cached.artwork?.header && !cached.artwork.header.includes('cdn.akamai.steamstatic.com')
+            
+            // Need at least one of these to consider it cached
+            const isValid = hasCategories || hasGenres || hasArtwork
+            
+            return !isValid
+        })
+        
+        if (uncachedAppids.length === 0) {
+            SteamApiClient.logger.debug(`All ${appids.length} games already have complete metadata`)
+            onProgress?.(appids.length, appids.length)
+            return
+        }
+        
+        SteamApiClient.logger.info(`Fetching batch metadata for ${uncachedAppids.length} games (${appids.length - uncachedAppids.length} already cached)`)
+        
+        // Fetch missing batch data
+        try {
+            const batchResponses = await this.batchClient.fetchBatch(uncachedAppids, {
+                batchSize: 25, // Reduced to 25 to stay under Lambda 30s timeout (10 at a time internally = ~20-25s)
+                onProgress: (fetched, total) => {
+                    // Progress: already cached + newly fetched out of total needed
+                    const totalProcessed = (appids.length - uncachedAppids.length) + fetched
+                    onProgress?.(totalProcessed, appids.length)
+                }
+            })
+            
+            // Save to IndexedDB
+            const fetchedAppDetails = new Map<number, AppDetailsData>()
+            for (const [appid, response] of batchResponses.entries()) {
+                fetchedAppDetails.set(appid, response.data)
+            }
+            
+            if (fetchedAppDetails.size > 0) {
+                await this.appDetailsCache.setMany(fetchedAppDetails)
+                SteamApiClient.logger.info(`Saved ${fetchedAppDetails.size} game metadata entries to IndexedDB`)
+            }
+        } catch (error) {
+            SteamApiClient.logger.error('Batch metadata hydration failed:', error)
+        }
+    }
+    
     public async loadGamesProgressively(
         steamUser: SteamUser,
         options: {
@@ -219,14 +326,39 @@ export class SteamApiClient {
         // Extract app IDs for batch fetching
         const appids = sortedGames.map(g => g.appid)
         
-        console.log(`🔄 [SteamApiClient] Loading ${appids.length} games with batch API`)
+        SteamApiClient.logger.debug(`Loading ${appids.length} games with batch API`)
         
-        // Check client-side cache and fetch missing details
+        // Check client-side cache and fetch missing/incomplete details
         const cachedAppDetails = await this.appDetailsCache.getMany(appids)
-        const uncachedAppids = appids.filter(id => !cachedAppDetails.has(id))
+        
+        // Filter for appids that need (re)fetching:
+        // 1. Not in cache at all, OR
+        // 2. In cache but missing critical metadata (categories/genres from batch API)
+        const uncachedAppids = appids.filter(id => {
+            const cached = cachedAppDetails.get(id)
+            if (!cached) return true // Not cached at all
+            
+            // Check if cached data has the metadata we need from batch API
+            const hasCategories = cached.categories && Array.isArray(cached.categories) && cached.categories.length > 0
+            const hasGenres = cached.genres && Array.isArray(cached.genres) && cached.genres.length > 0
+            
+            // If missing both categories and genres, we need to fetch from batch API
+            return !hasCategories && !hasGenres
+        })
+        
         let fetchedAppDetails = new Map<number, AppDetailsData>()
         
+        const cacheHits = appids.length - uncachedAppids.length
+        if (cacheHits > 0 && uncachedAppids.length > 0) {
+            SteamApiClient.logger.debug(`${cacheHits} games have complete metadata, fetching batch data for ${uncachedAppids.length} games`)
+        } else if (uncachedAppids.length === appids.length) {
+            SteamApiClient.logger.debug(`No complete metadata cached, fetching batch data for all ${uncachedAppids.length} games`)
+        } else if (uncachedAppids.length === 0) {
+            SteamApiClient.logger.debug(`All ${appids.length} games have complete metadata in cache`)
+        }
+        
         if (uncachedAppids.length > 0) {
+            
             try {
                 const batchResponses = await this.batchClient.fetchBatch(uncachedAppids, {
                     batchSize: 50,
@@ -249,18 +381,33 @@ export class SteamApiClient {
             }
         }
         
-        // Combine cached and fetched app details
+        // Combine cached and fetched app details (fetchedAppDetails overrides cachedAppDetails)
         const allAppDetails = new Map<number, AppDetailsData>([...cachedAppDetails, ...fetchedAppDetails])
+        
+        // Debug: Log what we're actually using
+        if (fetchedAppDetails.size > 0) {
+                const sample = Array.from(fetchedAppDetails.entries())[0]
+            SteamApiClient.logger.debug(`Sample fetched data for ${sample[0]}: header=${sample[1].artwork?.header}`)
+        }
         
         // Process games with available app details
         for (const game of sortedGames) {
             const appDetails = allAppDetails.get(game.appid)
+            
+            // Log first game to trace artwork URL selection
+            if (game.appid === sortedGames[0].appid) {
+                SteamApiClient.logger.debug(`Processing first game ${game.name} (${game.appid}) - hasDetails=${!!appDetails}`)
+            }
             
             // Use batch artwork if available (priority: header → capsule_v5 → capsule)
             const headerUrl = appDetails?.artwork?.header 
                 || appDetails?.artwork?.capsule_v5 
                 || appDetails?.artwork?.capsule
                 || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
+            
+            if (game.appid === sortedGames[0].appid) {
+                SteamApiClient.logger.debug(`Selected header for ${game.name}: ${headerUrl}`)
+            }
             
             const enhancedGame: SteamGame = {
                 ...game,
@@ -276,13 +423,17 @@ export class SteamApiClient {
                 }
             }
             
+            if (game.appid === sortedGames[0].appid) {
+                SteamApiClient.logger.debug(`Enhanced game created for ${game.name} - header=${enhancedGame.artwork.header}`)
+            }
+            
             this.cache.set(`game_${game.appid}`, enhancedGame)
             
             results.push(enhancedGame)
             onGameLoaded?.(enhancedGame)
         }
         
-        console.log(`✅ [SteamApiClient] Loaded ${results.length}/${sortedGames.length} games (${cachedAppDetails.size} from cache, ${fetchedAppDetails.size} from API)`)
+        SteamApiClient.logger.info(`Loaded ${results.length}/${sortedGames.length} games (${cachedAppDetails.size} from cache, ${fetchedAppDetails.size} from API)`)
         
         return results
     }

@@ -82,6 +82,11 @@ export class SteamIntegration {
         const gameLibraryState = this.getGameLibraryState()
         const games: SteamGameData[] = gameLibraryState.userData?.games || []
         
+        SteamIntegration.logger.debug(`Storing ${games.length} games in DataManager`)
+        if (games.length > 0) {
+            SteamIntegration.logger.debug(`First game: ${games[0].name} - artwork:${games[0].artwork?.header ? 'yes' : 'no'}`)
+        }
+        
         const dataManager = DataManager.getInstance()
         dataManager.set<SteamGameData[]>('steam.games', games, {
             domain: DataDomain.SteamIntegration
@@ -320,39 +325,44 @@ export class SteamIntegration {
             // Update game library state with cached data
             this.gameLibrary.setUserData(cachedGames)
             
-            callbacks.onProgress?.(20, 100, `Loading ${cachedGames.game_count} games from cache...`)
+            callbacks.onProgress?.(10, 100, `Found ${cachedGames.game_count} games in cache. Loading details...`)
             
-            // Process cached games with progress feedback
-            // TODO: How are we getting the rest of the games? Cached from before?
-            // How is maxGames really getting applied here? Other classes are pulling from DataManager ...
-            // is it pulling from this.gameLibrary?
-            const maxGames = Math.min(this.config.maxGames, cachedGames.games.length)
-            const sortedGames = [...cachedGames.games]
-                .sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0))
-                .slice(0, maxGames)
-
-            for (let i = 0; i < sortedGames.length; i++) {
-                const game = sortedGames[i]
-                
-                // Get cached game details or create basic details
-                const gameKey = `game_${game.appid}`
-                let enhancedGame = this.steamClient.getCached<SteamGame>(gameKey)
-                
-                if (!enhancedGame) {
-                    // Create basic artwork URLs if not cached
-                    enhancedGame = {
-                        ...game,
-                        artwork: {
-                            icon: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`,
-                            logo: `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`,
-                            header: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`,
-                            library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
-                        }
-                    }
+            // Hydrate batch metadata for ALL games (no maxGames limit for cache hydration)
+            SteamIntegration.logger.info(`Hydrating batch metadata for ${cachedGames.game_count} cached games`)
+            await this.steamClient.hydrateAllGamesMetadata(cachedGames, {
+                onProgress: (current: number, total: number) => {
+                    const percentage = Math.round((current / total) * 50) + 10 // 10-60%
+                    callbacks.onProgress?.(percentage, 100, `Checking metadata ${current}/${total} games`)
                 }
-                
+            })
+            
+            // Update artwork URLs for ALL games from cached batch metadata
+            SteamIntegration.logger.debug(`Updating artwork URLs for ${cachedGames.game_count} cached games`) 
+            await this.steamClient.updateGameArtworkFromCache(cachedGames)
+            
+            // Now load games progressively for display (respects maxGames)
+            const progressOptions: LoadGamesOptions = {
+                maxGames: this.config.maxGames,
+                onProgress: (current: number, total: number) => {
+                    const percentage = Math.round((current / total) * 30) + 60 // 60-90%
+                    callbacks.onProgress?.(percentage, 100, `Loading ${current}/${total} games`)
+                }
+            }
+            
+            SteamIntegration.logger.info(`Loading first ${this.config.maxGames} games for display`)
+            const loadedGames = await this.steamClient.loadGamesProgressively(cachedGames, progressOptions)
+            SteamIntegration.logger.info(`Loaded ${loadedGames.length} games for display`)
+            
+            // Log first game to see what artwork URLs we got
+            if (loadedGames.length > 0) {
+                const firstGame = loadedGames[0]
+                SteamIntegration.logger.debug(`First loaded game ${firstGame.name} (${firstGame.appid}) - header:${firstGame.artwork.header ? 'yes' : 'no'}`)
+            }
+            
+            // Process each loaded game
+            for (const game of loadedGames) {
                 // Update game library (internal state management)
-                this.gameLibrary.updateGameData(enhancedGame)
+                this.gameLibrary.updateGameData(game)
                 
                 // Emit event for external subscribers
                 this.eventManager.emit(SteamEventTypes.GameLoaded, {
@@ -360,17 +370,17 @@ export class SteamIntegration {
                     timestamp: Date.now(),
                     source: EventSource.System
                 })
-                
-                const percentage = Math.round(((i + 1) / sortedGames.length) * 80) + 20 // 20-100%
-                callbacks.onProgress?.(percentage, 100, `Loaded ${i + 1}/${sortedGames.length} games from cache`)
             }
             
             // Complete loading
             callbacks.onProgress?.(100, 100, 'Cache loading complete!')
             callbacks.onStatusUpdate?.(
-                `✅ Loaded ${sortedGames.length} games from cache for ${cachedGames.vanity_url}!`, 
+                `✅ Loaded ${loadedGames.length} games from cache for ${cachedGames.vanity_url}!`, 
                 'success'
             )
+            
+            // NOTE: Don't call storeSteamDataAndEmitEvent here - let the caller handle it
+            // to avoid double-triggering shelf generation (maintains consistency with loadGamesForUser)
             
             return this.gameLibrary.getState()
             
