@@ -296,23 +296,26 @@ export class GameLibraryBinderUI {
                 <div class="binder-ring" style="bottom: 120px;"></div>
                 <div class="binder-ring" style="bottom: 40px;"></div>
                 
+                <!-- Left nav button -->
+                <button id="binder-prev" class="binder-nav-btn side-nav left ${canGoPrev ? '' : 'disabled'}">◄</button>
+                
                 ${this.renderPage(leftPage, leftPageNum)}
                 <div class="binder-gutter"></div>
                 ${this.renderPage(rightPage, rightPageNum)}
+                
+                <!-- Right nav button -->
+                <button id="binder-next" class="binder-nav-btn side-nav right ${canGoNext ? '' : 'disabled'}">►</button>
             </div>
             
-            <div class="binder-nav">
-                <button id="binder-prev" class="binder-nav-btn ${canGoPrev ? '' : 'disabled'}">◄ Prev</button>
+            <div class="binder-footer">
                 <span class="binder-page-info">
-                    Pages ${leftPageNum + 1}-${rightPageNum + 1} / ${totalSpreads * 2}
+                    ${totalSpreads * 2} pages total
                 </span>
-                <button id="binder-next" class="binder-nav-btn ${canGoNext ? '' : 'disabled'}">Next ►</button>
-            </div>
-            
-            <div class="binder-keyboard-hints">
-                Press <kbd>B</kbd> to close • 
-                <kbd>←</kbd>
-                <kbd>→</kbd> to navigate
+                <div class="binder-keyboard-hints">
+                    Press <kbd>B</kbd> to close • 
+                    <kbd>←</kbd>
+                    <kbd>→</kbd> to navigate
+                </div>
             </div>
         `
         
@@ -323,7 +326,7 @@ export class GameLibraryBinderUI {
     /**
      * Render a single page with 4 game slots
      */
-    private renderPage(games: SteamGameData[], _pageNum: number): string {
+    private renderPage(games: SteamGameData[], pageNum: number): string {
         const slots = []
         
         for (let i = 0; i < GAMES_PER_PAGE; i++) {
@@ -335,6 +338,7 @@ export class GameLibraryBinderUI {
             <div class="binder-page">
                 <div class="binder-page-shine"></div>
                 ${slots.join('')}
+                <div class="binder-page-number">Page ${pageNum + 1}</div>
             </div>
         `
     }
@@ -461,6 +465,9 @@ export class GameLibraryBinderUI {
         const playtimeHours = Math.round((game.playtime_forever || 0) / 60)
         const playtime2Weeks = Math.round((game.playtime_2weeks || 0) / 60)
         
+        // Create a sanitized JSON blob for display
+        const jsonBlob = JSON.stringify(game, null, 2)
+        
         const panel = document.createElement('div')
         panel.id = 'binder-detail-panel'
         panel.className = 'detail-panel'
@@ -506,7 +513,13 @@ export class GameLibraryBinderUI {
                 
                 <div class="detail-actions">
                     <a href="steam://run/${game.appid}" class="detail-btn play">▶ Play</a>
+                    <button id="detail-spotlight-btn" class="detail-btn spotlight">🔦 Spotlight</button>
                     <a href="https://store.steampowered.com/app/${game.appid}" target="_blank" class="detail-btn store">Store Page</a>
+                </div>
+                
+                <div class="detail-json">
+                    <div class="detail-section-label">Cache Entry (JSON)</div>
+                    <pre class="detail-json-content">${this.escapeHtml(jsonBlob)}</pre>
                 </div>
             </div>
         `
