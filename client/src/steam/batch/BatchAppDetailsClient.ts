@@ -5,11 +5,12 @@
  * from the Lambda-cached Steam Store API data.
  */
 
-export interface AppDetailsData {
+import type { SteamGameMetadata } from '../types/SteamMetadata'
+
+export interface AppDetailsData extends SteamGameMetadata {
     name: string;
     type: string;
     is_free: boolean;
-    short_description: string;
     artwork: {
         header: string | null;
         capsule: string | null;
@@ -17,7 +18,8 @@ export interface AppDetailsData {
         background: string | null;
         background_raw: string | null;
     };
-    // Additional fields from Steam Store API (except detailed_description/about_the_game)
+    // Additional fields from Steam Store API
+    full_data?: Record<string, unknown>;
     [key: string]: unknown;
 }
 

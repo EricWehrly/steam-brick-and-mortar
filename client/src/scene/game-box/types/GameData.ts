@@ -5,8 +5,9 @@
  * Since we only work with Steam games, this is the single source of truth for game data.
  */
 
-// Steam interface for Steam API responses
-export interface SteamGameData {
+import type { SteamGameMetadata } from '../../../steam/types/SteamMetadata'
+
+export interface SteamGameData extends SteamGameMetadata {
     appid: string | number
     name: string
     playtime_forever: number

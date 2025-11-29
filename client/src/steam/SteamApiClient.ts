@@ -10,8 +10,9 @@ import { BatchAppDetailsClient } from './batch/BatchAppDetailsClient'
 import { Logger } from '../utils/Logger'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import type { AppDetailsData } from './batch/BatchAppDetailsClient'
+import type { SteamGameMetadata } from './types/SteamMetadata'
 
-export interface SteamGame {
+export interface SteamGame extends SteamGameMetadata {
     appid: number
     name: string
     playtime_forever: number
@@ -257,19 +258,24 @@ export class SteamApiClient {
         
         // Check which games need batch data
         const cachedAppDetails = await this.appDetailsCache.getMany(appids)
+        
+        // Log cache status for first game to help debug
+        if (appids.length > 0) {
+            const firstAppId = appids[0]
+            const firstCached = cachedAppDetails.get(firstAppId)
+            SteamApiClient.logger.info(`Cache check for first game (${firstAppId}): cached=${!!firstCached}, categories=${firstCached?.categories?.length || 0}, genres=${firstCached?.genres?.length || 0}`)
+        }
+        
         const uncachedAppids = appids.filter(id => {
             const cached = cachedAppDetails.get(id)
             if (!cached) return true
             
-            // Check if we have usable metadata - accept if we have categories, genres, OR valid artwork
+            // Check if we have the metadata we need - REQUIRE categories or genres
             const hasCategories = cached.categories && Array.isArray(cached.categories) && cached.categories.length > 0
             const hasGenres = cached.genres && Array.isArray(cached.genres) && cached.genres.length > 0
-            const hasArtwork = cached.artwork?.header && !cached.artwork.header.includes('cdn.akamai.steamstatic.com')
             
-            // Need at least one of these to consider it cached
-            const isValid = hasCategories || hasGenres || hasArtwork
-            
-            return !isValid
+            // Must have categories OR genres to be considered complete
+            return !hasCategories && !hasGenres
         })
         
         if (uncachedAppids.length === 0) {
@@ -284,17 +290,39 @@ export class SteamApiClient {
         try {
             const batchResponses = await this.batchClient.fetchBatch(uncachedAppids, {
                 batchSize: 25, // Reduced to 25 to stay under Lambda 30s timeout (10 at a time internally = ~20-25s)
-                onProgress: (fetched, total) => {
+                onProgress: (fetched, _total) => {
                     // Progress: already cached + newly fetched out of total needed
                     const totalProcessed = (appids.length - uncachedAppids.length) + fetched
                     onProgress?.(totalProcessed, appids.length)
                 }
             })
             
-            // Save to IndexedDB
+            // Log first response to debug categories issue
+            if (batchResponses.size > 0) {
+                const firstEntry = Array.from(batchResponses.entries())[0]
+                const [firstAppId, firstResponse] = firstEntry
+                const fullData = firstResponse.data?.full_data as Record<string, unknown> | undefined
+                SteamApiClient.logger.info(`First batch response (${firstAppId}): top-level categories=${firstResponse.data?.categories?.length || 0}, full_data.categories=${(fullData?.categories as unknown[])?.length || 0}`)
+            }
+            
+            // Save to IndexedDB - normalize data by lifting categories/genres from full_data if not at top level
             const fetchedAppDetails = new Map<number, AppDetailsData>()
             for (const [appid, response] of batchResponses.entries()) {
-                fetchedAppDetails.set(appid, response.data)
+                const data = response.data
+                const fullData = data?.full_data as Record<string, unknown> | undefined
+                
+                // Normalize: lift categories/genres from full_data if not present at top level
+                const normalizedData: AppDetailsData = {
+                    ...data,
+                    categories: data.categories || (fullData?.categories as AppDetailsData['categories']),
+                    genres: data.genres || (fullData?.genres as AppDetailsData['genres']),
+                    developers: data.developers || (fullData?.developers as string[]),
+                    publishers: data.publishers || (fullData?.publishers as string[]),
+                    release_date: data.release_date || (fullData?.release_date as AppDetailsData['release_date']),
+                    metacritic: data.metacritic || (fullData?.metacritic as AppDetailsData['metacritic']),
+                }
+                
+                fetchedAppDetails.set(appid, normalizedData)
             }
             
             if (fetchedAppDetails.size > 0) {
@@ -346,7 +374,7 @@ export class SteamApiClient {
             return !hasCategories && !hasGenres
         })
         
-        let fetchedAppDetails = new Map<number, AppDetailsData>()
+        const fetchedAppDetails = new Map<number, AppDetailsData>()
         
         const cacheHits = appids.length - uncachedAppids.length
         if (cacheHits > 0 && uncachedAppids.length > 0) {
@@ -362,7 +390,7 @@ export class SteamApiClient {
             try {
                 const batchResponses = await this.batchClient.fetchBatch(uncachedAppids, {
                     batchSize: 50,
-                    onProgress: (fetched, total) => {
+                    onProgress: (fetched, _total) => {
                         const totalProcessed = cachedAppDetails.size + fetched
                         onProgress?.(totalProcessed, appids.length)
                     }
@@ -420,7 +448,15 @@ export class SteamApiClient {
                         : '',
                     header: headerUrl,
                     library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
-                }
+                },
+                // Include metadata from batch endpoint
+                categories: appDetails?.categories,
+                genres: appDetails?.genres,
+                developers: appDetails?.developers,
+                publishers: appDetails?.publishers,
+                release_date: appDetails?.release_date,
+                metacritic: appDetails?.metacritic,
+                short_description: appDetails?.short_description
             }
             
             if (game.appid === sortedGames[0].appid) {

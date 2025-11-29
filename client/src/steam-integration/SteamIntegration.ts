@@ -240,8 +240,8 @@ export class SteamIntegration {
         return this.loadGamesForUser(currentState.userData.vanity_url, callbacks)
     }
 
-    clearCache(): void {
-        this.steamClient.clearCache()
+    async clearCache(): Promise<void> {
+        await this.steamClient.clearCache()
         this.gameLibrary.clear()
     }
 
@@ -480,7 +480,7 @@ export class SteamIntegration {
     private async handleClearCache(event: CustomEvent<SteamCacheClearEvent>): Promise<void> {
         try {
             SteamIntegration.logger.info('Starting cache clear')
-            this.clearCache()
+            await this.clearCache()
             SteamIntegration.logger.info('Cache cleared successfully!')
         } catch (error) {
             SteamIntegration.logger.error('Cache clear failed:', error)

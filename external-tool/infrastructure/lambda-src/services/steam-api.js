@@ -67,6 +67,7 @@ async function getAppDetails(appid, retryCount = 0, maxRetries = 3) {
     // Exclude heavy fields to reduce payload size
     const { detailed_description, about_the_game, ...cleanData } = appData.data;
 
+    // Flatten key fields to top level for easier client access
     const result = {
       success: true,
       appid: numericAppid,
@@ -76,7 +77,15 @@ async function getAppDetails(appid, retryCount = 0, maxRetries = 3) {
         is_free: cleanData.is_free,
         short_description: cleanData.short_description,
         artwork: artworkUrls,
-        full_data: cleanData  // Include everything except detailed_description and about_the_game
+        // Lift commonly-used fields to top level
+        categories: cleanData.categories || [],
+        genres: cleanData.genres || [],
+        developers: cleanData.developers || [],
+        publishers: cleanData.publishers || [],
+        release_date: cleanData.release_date || null,
+        metacritic: cleanData.metacritic || null,
+        // Keep full_data for anything else clients might need
+        full_data: cleanData
       },
       retrieved_at: new Date().toISOString()
     };
