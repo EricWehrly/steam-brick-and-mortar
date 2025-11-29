@@ -355,26 +355,49 @@ scheduleUpdate(): void {
 
 ### User Experience
 
-#### Fix Input Focus Management Conflicts
+#### Centralized Input Management System
 **Priority**: High  
-**Effort**: 2-3 hours  
-**Context**: Critical UX issue - typing in input fields triggers camera movement, menu interactions conflict with game controls
+**Effort**: 6-8 hours  
+**Context**: Critical UX issue - typing in input fields triggers camera movement, menu interactions conflict with game controls. Need centralized input management that handles focus states, supports future input device mappings, and provides clean enable/disable for control groups.
+
+**Current Problems**:
+- Typing in search/input fields triggers WASD camera movement
+- Menu focus doesn't disable scene controls
+- No centralized way to disable controls when UI is active
+- Game Library Binder, Steam UI Panel, and Pause Menu all need focus handling
+- No foundation for future input remapping or VR controller support
 
 **Tasks**:
-- Disable WASD/mouse controls when Steam vanity input field has focus
-- Disable game controls when pause menu or other UI elements are active
-- Implement focus event management in WebXRCoordinator
-- Add input field focus detection in SteamUIPanel
-- Ensure controls re-enable when focus returns to game area
+- Create centralized `InputManager` class that:
+  - Tracks which UI elements currently have focus
+  - Routes keyboard/mouse input to appropriate handlers
+  - Provides `disableSceneControls()` / `enableSceneControls()` API
+  - Supports input context stacking (menu on top of game controls)
+- Implement focus tracking for all UI elements:
+  - Input fields (search bars, text inputs)
+  - Modal menus (Game Library Binder, Pause Menu)
+  - Passive panels (Steam UI Panel when interacting)
+- Add `onFocus` / `onBlur` hooks for menu panels
+- Disable WASD/mouse controls when any UI has focus
+- Re-enable controls when focus returns to game area
+- Design for future extensibility:
+  - Input action mapping (configurable key bindings)
+  - VR controller input routing
+  - Gamepad support
+
+**Files to Create**:
+- `client/src/core/InputManager.ts` - Centralized input management
+- `client/src/core/InputContext.ts` - Input context definitions (game, menu, text-entry)
 
 **Files to Modify**:
-- `client/src/webxr/WebXRCoordinator.ts` - Add input focus state management
-- `client/src/ui/SteamUIPanel.ts` - Track input field focus states
-- `client/src/ui/pause/PauseMenuManager.ts` - Communicate menu focus to input system
+- `client/src/webxr/WebXRCoordinator.ts` - Use InputManager for control state
+- `client/src/ui/SteamUIPanel.ts` - Register focus events with InputManager
+- `client/src/ui/binder/GameLibraryBinderUI.ts` - Register as modal context
+- `client/src/ui/pause/PauseMenuManager.ts` - Register as modal context
 
-**Benefits**: Eliminates control conflicts, prevents accidental camera movement while typing, improved user experience
+**Benefits**: Eliminates control conflicts, prevents accidental camera movement while typing, foundation for input remapping and VR controller support, improved user experience
 
-**Source**: Feature 5.5.4 - marked as critical UX issue during Feature 5.5 implementation
+**Source**: Game Library Binder implementation (Nov 2025) - identified need for centralized input handling when adding search functionality
 
 ### Architecture & Structure
 

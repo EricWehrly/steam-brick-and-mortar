@@ -7,9 +7,10 @@
  */
 
 import { EventManager } from '../../core/EventManager'
-import { DataManager, DataDomain } from '../../core/data'
+import { DataManager } from '../../core/data'
 import type { SteamGameData } from '../../scene/game-box/types/GameData'
 import { Logger } from '../../utils/Logger'
+import './binder.css'
 
 const GAMES_PER_PAGE = 4
 const PAGES_PER_SPREAD = 2
@@ -74,41 +75,6 @@ export class GameLibraryBinderUI {
         this.toggleButton.title = 'Open Game Binder (B)'
         this.toggleButton.addEventListener('click', () => this.toggle())
         
-        // Add styles inline for now (can move to CSS file later)
-        this.toggleButton.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
-            border: 2px solid #444;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            transition: transform 0.2s, box-shadow 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `
-        
-        this.toggleButton.addEventListener('mouseenter', () => {
-            if (this.toggleButton) {
-                this.toggleButton.style.transform = 'scale(1.1)'
-                this.toggleButton.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.5)'
-            }
-        })
-        
-        this.toggleButton.addEventListener('mouseleave', () => {
-            if (this.toggleButton) {
-                this.toggleButton.style.transform = 'scale(1)'
-                this.toggleButton.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.4)'
-            }
-        })
-        
         document.body.appendChild(this.toggleButton)
     }
     
@@ -119,20 +85,6 @@ export class GameLibraryBinderUI {
         this.container = document.createElement('div')
         this.container.id = 'game-library-binder'
         this.container.className = 'binder-container'
-        this.container.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 999;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        `
         
         document.body.appendChild(this.container)
     }
@@ -312,84 +264,55 @@ export class GameLibraryBinderUI {
         const leftPageNum = this.state.currentSpreadIndex * 2
         const rightPageNum = leftPageNum + 1
         
+        const canGoPrev = this.state.currentSpreadIndex > 0
+        const canGoNext = this.state.currentSpreadIndex < totalSpreads - 1
+        
         this.container.innerHTML = `
-            <div class="binder-header" style="
-                width: 100%;
-                max-width: 1200px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 20px;
-                color: white;
-            ">
-                <h1 style="margin: 0; font-size: 24px;">📚 Steam Library Binder</h1>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <input 
-                        type="text" 
-                        id="binder-search" 
-                        placeholder="🔍 Search games..." 
-                        value="${this.escapeHtml(this.state.searchQuery)}"
-                        style="
-                            padding: 8px 16px;
-                            border-radius: 20px;
-                            border: 1px solid #444;
-                            background: #222;
-                            color: white;
-                            font-size: 14px;
-                            width: 200px;
-                        "
-                    >
-                    <span style="color: #888; font-size: 14px;">${totalGames} games</span>
+            <div class="binder-header">
+                <h1 class="binder-title">📚 Steam Library Binder</h1>
+                <div class="binder-header-controls">
+                    <div class="binder-search-wrapper">
+                        <input 
+                            type="text" 
+                            id="binder-search" 
+                            class="binder-search"
+                            placeholder="🔍 Search games..." 
+                            value="${this.escapeHtml(this.state.searchQuery)}"
+                        >
+                        <button 
+                            id="binder-search-clear"
+                            class="binder-search-clear ${this.state.searchQuery ? '' : 'hidden'}"
+                            title="Clear search"
+                        >✕</button>
+                    </div>
+                    <span class="binder-game-count">${totalGames} games</span>
                 </div>
             </div>
             
-            <div class="binder-spread" style="
-                display: flex;
-                gap: 20px;
-                padding: 20px;
-                background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
-                border-radius: 8px;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-            ">
+            <div class="binder-spread">
+                <div class="binder-spine"></div>
+                <div class="binder-ring" style="top: 40px;"></div>
+                <div class="binder-ring" style="top: 120px;"></div>
+                <div class="binder-ring" style="bottom: 120px;"></div>
+                <div class="binder-ring" style="bottom: 40px;"></div>
+                
                 ${this.renderPage(leftPage, leftPageNum)}
-                <div style="width: 2px; background: #333;"></div>
+                <div class="binder-gutter"></div>
                 ${this.renderPage(rightPage, rightPageNum)}
             </div>
             
-            <div class="binder-navigation" style="
-                display: flex;
-                gap: 20px;
-                align-items: center;
-                padding: 20px;
-                color: white;
-            ">
-                <button id="binder-prev" style="
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    border: 1px solid #444;
-                    background: ${this.state.currentSpreadIndex > 0 ? '#333' : '#222'};
-                    color: ${this.state.currentSpreadIndex > 0 ? 'white' : '#666'};
-                    cursor: ${this.state.currentSpreadIndex > 0 ? 'pointer' : 'not-allowed'};
-                    font-size: 14px;
-                ">◄ Prev</button>
-                <span style="font-size: 14px;">
+            <div class="binder-nav">
+                <button id="binder-prev" class="binder-nav-btn ${canGoPrev ? '' : 'disabled'}">◄ Prev</button>
+                <span class="binder-page-info">
                     Pages ${leftPageNum + 1}-${rightPageNum + 1} / ${totalSpreads * 2}
                 </span>
-                <button id="binder-next" style="
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    border: 1px solid #444;
-                    background: ${this.state.currentSpreadIndex < totalSpreads - 1 ? '#333' : '#222'};
-                    color: ${this.state.currentSpreadIndex < totalSpreads - 1 ? 'white' : '#666'};
-                    cursor: ${this.state.currentSpreadIndex < totalSpreads - 1 ? 'pointer' : 'not-allowed'};
-                    font-size: 14px;
-                ">Next ►</button>
+                <button id="binder-next" class="binder-nav-btn ${canGoNext ? '' : 'disabled'}">Next ►</button>
             </div>
             
-            <div style="color: #666; font-size: 12px; margin-top: 10px;">
-                Press <kbd style="background: #333; padding: 2px 6px; border-radius: 4px;">B</kbd> to close • 
-                <kbd style="background: #333; padding: 2px 6px; border-radius: 4px;">←</kbd>
-                <kbd style="background: #333; padding: 2px 6px; border-radius: 4px;">→</kbd> to navigate
+            <div class="binder-keyboard-hints">
+                Press <kbd>B</kbd> to close • 
+                <kbd>←</kbd>
+                <kbd>→</kbd> to navigate
             </div>
         `
         
@@ -400,7 +323,7 @@ export class GameLibraryBinderUI {
     /**
      * Render a single page with 4 game slots
      */
-    private renderPage(games: SteamGameData[], pageNum: number): string {
+    private renderPage(games: SteamGameData[], _pageNum: number): string {
         const slots = []
         
         for (let i = 0; i < GAMES_PER_PAGE; i++) {
@@ -409,15 +332,8 @@ export class GameLibraryBinderUI {
         }
         
         return `
-            <div class="binder-page" style="
-                width: 280px;
-                padding: 15px;
-                background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
-                border-radius: 4px;
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 10px;
-            ">
+            <div class="binder-page">
+                <div class="binder-page-shine"></div>
                 ${slots.join('')}
             </div>
         `
@@ -426,50 +342,20 @@ export class GameLibraryBinderUI {
     /**
      * Render a single game slot
      */
-    private renderGameSlot(game: SteamGameData | undefined, slotIndex: number): string {
+    private renderGameSlot(game: SteamGameData | undefined, _slotIndex: number): string {
         if (!game) {
-            return `
-                <div class="game-slot empty" style="
-                    aspect-ratio: 460 / 215;
-                    background: rgba(0, 0, 0, 0.3);
-                    border-radius: 4px;
-                    border: 1px dashed #333;
-                "></div>
-            `
+            return `<div class="game-slot empty"></div>`
         }
         
         const headerUrl = game.artwork?.header || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
         const playtimeHours = Math.round((game.playtime_forever || 0) / 60)
         
         return `
-            <div class="game-slot" data-appid="${game.appid}" style="
-                aspect-ratio: 460 / 215;
-                background: url('${headerUrl}') center/cover no-repeat;
-                background-color: #222;
-                border-radius: 4px;
-                cursor: pointer;
-                position: relative;
-                overflow: hidden;
-                transition: transform 0.2s, box-shadow 0.2s;
-            " onmouseenter="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 16px rgba(0,0,0,0.5)'"
-               onmouseleave="this.style.transform='scale(1)'; this.style.boxShadow='none'">
-                <div style="
-                    position: absolute;
-                    bottom: 0;
-                    left: 0;
-                    right: 0;
-                    padding: 6px 8px;
-                    background: linear-gradient(transparent, rgba(0,0,0,0.9));
-                ">
-                    <div style="
-                        font-size: 10px;
-                        color: white;
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        font-weight: 500;
-                    ">${this.escapeHtml(game.name)}</div>
-                    <div style="font-size: 9px; color: #aaa;">${playtimeHours}h played</div>
+            <div class="game-slot" data-appid="${game.appid}" style="background-image: url('${headerUrl}');">
+                <div class="game-slot-shine"></div>
+                <div class="game-info">
+                    <div class="game-name">${this.escapeHtml(game.name)}</div>
+                    <div class="game-playtime">${playtimeHours}h played</div>
                 </div>
             </div>
         `
@@ -479,11 +365,39 @@ export class GameLibraryBinderUI {
      * Attach event listeners after render
      */
     private attachEventListeners(): void {
-        // Search input
+        // Search input with focus preservation
         const searchInput = document.getElementById('binder-search') as HTMLInputElement
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
-                this.filterGames((e.target as HTMLInputElement).value)
+                const input = e.target as HTMLInputElement
+                const pos = input.selectionStart || 0
+                this.filterGames(input.value)
+                // Restore focus after re-render
+                window.requestAnimationFrame(() => {
+                    const newInput = document.getElementById('binder-search') as HTMLInputElement
+                    if (newInput) {
+                        newInput.focus()
+                        newInput.setSelectionRange(pos, pos)
+                    }
+                })
+            })
+            
+            // Prevent keyboard shortcuts while typing in search
+            searchInput.addEventListener('keydown', (e) => {
+                e.stopPropagation()
+            })
+        }
+        
+        // Search clear button
+        const clearBtn = document.getElementById('binder-search-clear')
+        if (clearBtn && this.state.searchQuery) {
+            clearBtn.addEventListener('click', () => {
+                this.filterGames('')
+                // Focus the search input after clearing
+                window.requestAnimationFrame(() => {
+                    const input = document.getElementById('binder-search') as HTMLInputElement
+                    if (input) input.focus()
+                })
             })
         }
         
@@ -517,10 +431,109 @@ export class GameLibraryBinderUI {
     private selectGame(game: SteamGameData): void {
         this.state.selectedGame = game
         GameLibraryBinderUI.logger.debug(`Selected game: ${game.name}`)
+        this.renderDetailPanel()
+    }
+    
+    /**
+     * Close the detail panel
+     */
+    private closeDetailPanel(): void {
+        this.state.selectedGame = null
+        const panel = document.getElementById('binder-detail-panel')
+        if (panel) {
+            panel.remove()
+        }
+    }
+    
+    /**
+     * Render the game detail panel
+     */
+    private renderDetailPanel(): void {
+        const game = this.state.selectedGame
+        if (!game || !this.container) return
         
-        // TODO: Show detail panel
-        // For now, just log it
-        console.log('Selected game:', game)
+        // Remove existing panel if any
+        const existing = document.getElementById('binder-detail-panel')
+        if (existing) existing.remove()
+        
+        const headerUrl = game.artwork?.header || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
+        const libraryUrl = game.artwork?.library || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
+        const playtimeHours = Math.round((game.playtime_forever || 0) / 60)
+        const playtime2Weeks = Math.round((game.playtime_2weeks || 0) / 60)
+        
+        const panel = document.createElement('div')
+        panel.id = 'binder-detail-panel'
+        panel.className = 'detail-panel'
+        
+        panel.innerHTML = `
+            <div class="detail-header" style="background-image: url('${headerUrl}');">
+                <div class="detail-header-gradient"></div>
+                <button id="detail-close-btn" class="detail-close-btn">✕</button>
+                <h2 class="detail-title">${this.escapeHtml(game.name)}</h2>
+            </div>
+            
+            <div class="detail-content">
+                <div class="detail-stats">
+                    <div class="detail-stat">
+                        <div class="detail-stat-label">Total Playtime</div>
+                        <div class="detail-stat-value playtime">${playtimeHours} hours</div>
+                    </div>
+                    ${playtime2Weeks > 0 ? `
+                    <div class="detail-stat">
+                        <div class="detail-stat-label">Last 2 Weeks</div>
+                        <div class="detail-stat-value recent">${playtime2Weeks} hours</div>
+                    </div>
+                    ` : ''}
+                    <div class="detail-stat">
+                        <div class="detail-stat-label">App ID</div>
+                        <div class="detail-stat-value">${game.appid}</div>
+                    </div>
+                </div>
+                
+                <div class="detail-artwork">
+                    <div class="detail-section-label">Artwork</div>
+                    <div class="detail-artwork-grid">
+                        <div class="detail-artwork-item">
+                            <div class="detail-artwork-label">Header</div>
+                            <img src="${headerUrl}" class="detail-artwork-img" onerror="this.style.display='none'">
+                        </div>
+                        <div class="detail-artwork-item library">
+                            <div class="detail-artwork-label">Library</div>
+                            <img src="${libraryUrl}" class="detail-artwork-img" onerror="this.src=''; this.style.background='#333'; this.style.aspectRatio='2/3';">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="detail-actions">
+                    <a href="steam://run/${game.appid}" class="detail-btn play">▶ Play</a>
+                    <a href="https://store.steampowered.com/app/${game.appid}" target="_blank" class="detail-btn store">Store Page</a>
+                </div>
+            </div>
+        `
+        
+        this.container.appendChild(panel)
+        
+        // Add close button listener
+        const closeBtn = document.getElementById('detail-close-btn')
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.closeDetailPanel())
+        }
+        
+        // Close on ESC
+        const escHandler = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                this.closeDetailPanel()
+                document.removeEventListener('keydown', escHandler)
+            }
+        }
+        document.addEventListener('keydown', escHandler)
+        
+        // Close when clicking outside
+        panel.addEventListener('click', (e) => {
+            if (e.target === panel) {
+                this.closeDetailPanel()
+            }
+        })
     }
     
     /**
