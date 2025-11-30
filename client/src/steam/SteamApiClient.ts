@@ -289,7 +289,7 @@ export class SteamApiClient {
         // Fetch missing batch data
         try {
             const batchResponses = await this.batchClient.fetchBatch(uncachedAppids, {
-                batchSize: 25, // Reduced to 25 to stay under Lambda 30s timeout (10 at a time internally = ~20-25s)
+                batchSize: 100, // Large batches - Lambda handles cached instantly, adaptive delays handle uncached
                 onProgress: (fetched, _total) => {
                     // Progress: already cached + newly fetched out of total needed
                     const totalProcessed = (appids.length - uncachedAppids.length) + fetched

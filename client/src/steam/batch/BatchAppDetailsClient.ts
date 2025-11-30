@@ -84,7 +84,7 @@ export class BatchAppDetailsClient {
         options: BatchAppDetailsOptions = {}
     ): Promise<Map<number, AppDetailsResponse>> {
         const {
-            batchSize = 50, // Lambda handles cached games instantly, only rate-limits uncached API calls
+            batchSize = 100, // Increased: Lambda handles cached games instantly
             onProgress,
             onGameData
         } = options;
@@ -103,7 +103,9 @@ export class BatchAppDetailsClient {
 
         let totalFetched = 0;
         let consecutiveFailures = 0;
+        let lastBatchDuration = 0; // Track response time for adaptive delays
         const MAX_CONSECUTIVE_FAILURES = 3; // Circuit breaker threshold
+        const FAST_RESPONSE_THRESHOLD = 2000; // If batch returns in <2s, it's mostly cached
 
         // Process batches sequentially to respect rate limits
         for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
@@ -114,9 +116,11 @@ export class BatchAppDetailsClient {
             }
             
             const batch = batches[batchIndex];
+            const batchStartTime = performance.now();
             
             try {
                 const batchResult = await this.fetchSingleBatch(batch);
+                lastBatchDuration = performance.now() - batchStartTime;
                 
                 // Process successful results
                 for (const game of batchResult.results) {
@@ -130,7 +134,7 @@ export class BatchAppDetailsClient {
                 // Log cache performance
                 if (batchResult.cache_hits !== undefined && batchResult.cache_misses !== undefined) {
                     const cacheHitRate = batchResult.cache_hits / (batchResult.cache_hits + batchResult.cache_misses) * 100;
-                    BatchAppDetailsClient.logger.debug(`Batch ${batchIndex + 1} cache: ${batchResult.cache_hits} hits, ${batchResult.cache_misses} misses (${cacheHitRate.toFixed(1)}% hit rate)`)
+                    BatchAppDetailsClient.logger.debug(`Batch ${batchIndex + 1} cache: ${batchResult.cache_hits} hits, ${batchResult.cache_misses} misses (${cacheHitRate.toFixed(1)}% hit rate) in ${lastBatchDuration.toFixed(0)}ms`)
                 }
 
                 if (batchResult.failed && batchResult.failed.length > 0) {
@@ -139,11 +143,17 @@ export class BatchAppDetailsClient {
 
                 consecutiveFailures = 0; // Reset on success
 
-                // Dynamic delay between batches (increases if we've had failures)
+                // Adaptive delay: skip delay if responses are fast (cached), add delay if slow (uncached)
                 if (batchIndex < batches.length - 1) {
-                    const baseDelay = 300; // Increased from 200ms
-                    const backoffDelay = Math.min(baseDelay * Math.pow(1.5, consecutiveFailures), 2000);
-                    await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                    if (lastBatchDuration < FAST_RESPONSE_THRESHOLD) {
+                        // Fast response = mostly cached, minimal delay needed
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    } else {
+                        // Slow response = uncached API calls, add backoff delay
+                        const baseDelay = 200;
+                        const backoffDelay = Math.min(baseDelay * Math.pow(1.5, consecutiveFailures), 2000);
+                        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                    }
                 }
 
             } catch (error) {
