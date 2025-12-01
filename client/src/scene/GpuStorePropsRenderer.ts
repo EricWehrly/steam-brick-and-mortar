@@ -368,14 +368,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Recreate GpuGameBoxRenderer with correct game count if needed
         if (games.length > 0) {
             // Dispose old renderer and create new one sized for actual game count
+            // Lazy initialization happens when createGameBox() is called
             this.gameBoxRenderer.dispose()
             this.gameBoxRenderer = new GpuGameBoxRenderer(gameCount + 100) // Add buffer
-            
-            try {
-                await this.gameBoxRenderer.initializeWithGames(games)
-            } catch (error) {
-                console.error('❌ Failed to initialize GpuGameBoxRenderer:', error)
-            }
         }
         
         if (!this.instancedShelfRenderer) {

@@ -126,66 +126,6 @@ export class InstancedLabelRenderer {
     }
     
     /**
-     * Initialize with actual game data - builds texture array and creates instanced mesh
-     * @deprecated Use initialize() + setLabelInstance() for progressive loading
-     */
-    public async initializeWithGames(games: SteamGameData[]): Promise<void> {
-        if (this.isInitialized) {
-            console.warn('InstancedLabelRenderer already initialized')
-            return
-        }
-        
-        try {
-            this.buildGameNameMapping(games)
-            
-            const gameNames = games.map(g => g.name)
-            const textureArray = this.textureArrayManager.buildTextureArrayFromText(gameNames)
-            
-            this.material = this.createLabelMaterial(textureArray)
-            
-            // TODO: get dimensions from config
-            this.geometry = new THREE.BoxGeometry(0.3, 0.4, 0.1)
-            this.instancedMesh = new THREE.InstancedMesh(
-                this.geometry,
-                this.material,
-                this.maxInstances
-            )
-            
-            // Name the mesh for debugging
-            this.instancedMesh.name = INSTANCED_LABEL_MESH_NAME
-            
-            // CRITICAL: Set count to 0 initially (will update as instances are added)
-            this.instancedMesh.count = 0
-            
-            // Enable shadows and visibility
-            this.instancedMesh.castShadow = true
-            this.instancedMesh.receiveShadow = true
-            this.instancedMesh.visible = true
-            
-            // Disable frustum culling to prevent disappearing when close
-            this.instancedMesh.frustumCulled = false
-            
-            // Ensure InstancedMesh is positioned at world origin (instances handle their own positions)
-            this.instancedMesh.position.set(0, 0, 0)
-            this.instancedMesh.rotation.set(0, 0, 0)
-            this.instancedMesh.scale.set(1, 1, 1)
-            
-            this.setupInstanceAttributes()
-            
-            this.isInitialized = true
-            
-            this.addToMainScene()
-            
-            const stats = this.textureArrayManager.getStats()
-            console.debug('📊 Stats:', stats)
-            
-        } catch (error) {
-            console.error('❌ Failed to initialize InstancedLabelRenderer:', error)
-            throw error
-        }
-    }
-    
-    /**
      * Set position, rotation and texture for a specific label instance
      * Dynamically adds texture for game if not already in mapping (supports progressive loading)
      */
@@ -303,17 +243,6 @@ export class InstancedLabelRenderer {
             maxInstances: this.maxInstances,
             textureArrayStats: this.textureArrayManager.getStats()
         }
-    }
-    
-    /**
-     * Build mapping from game names to texture array indices
-     */
-    private buildGameNameMapping(games: SteamGameData[]): void {
-        this.gameNameToTextureIndex.clear()
-        games.forEach((game, index) => {
-            this.gameNameToTextureIndex.set(game.name, index)
-        })
-        console.debug(`📝 Built game name mapping for ${games.length} games`)
     }
 
     /**

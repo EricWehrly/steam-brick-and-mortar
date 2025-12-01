@@ -167,45 +167,6 @@ export class LabelTextureArrayManager {
     }
 
     /**
-     * Build texture array from text labels (fallback or for custom labels)
-     */
-    public buildTextureArrayFromText(labels: string[]): THREE.DataArrayTexture {
-        console.debug(`📦 [LabelTextureArrayManager] Building texture array from ${labels.length} text labels`)
-        
-        const count = labels.length
-        const size = this.TEXTURE_SIZE
-        const data = new Uint8Array(size * size * count * 4)
-        
-        // Create canvas for text rendering
-        const canvas = document.createElement('canvas')
-        canvas.width = size
-        canvas.height = size
-        const ctx = canvas.getContext('2d')!
-        
-        for (let i = 0; i < count; i++) {
-            // Clear and render text
-            ctx.clearRect(0, 0, size, size)
-            this.drawTextLabel(ctx, labels[i], size)
-            
-            // Copy to texture array
-            const imageData = ctx.getImageData(0, 0, size, size)
-            const offset = i * size * size * 4
-            data.set(imageData.data, offset)
-            
-            this.canvases.push(canvas.cloneNode(true) as HTMLCanvasElement)
-        }
-        
-        // Create DataArrayTexture
-        this.textureArray = new THREE.DataArrayTexture(data, size, size, count)
-        this.textureArray.format = THREE.RGBAFormat
-        this.textureArray.type = THREE.UnsignedByteType
-        this.textureArray.needsUpdate = true
-        
-        console.debug(`✅ [LabelTextureArrayManager] Text texture array created: ${size}×${size}×${count}`)
-        return this.textureArray
-    }
-
-    /**
      * Load a single image from URL or create text fallback
      */
     private async loadImage(source: TextureSource): Promise<HTMLImageElement | null> {

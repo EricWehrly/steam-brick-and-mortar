@@ -1,12 +1,16 @@
 /**
  * Web Worker manager for texture processing using OffscreenCanvas
- * Offloads expensive getImageData operations from the main thread
+ * Offloads expensive image operations from the main thread:
+ * - Network fetch of image URLs
+ * - Blob to ImageBitmap conversion
+ * - getImageData extraction
  * 
  * Uses Vite's worker import syntax to load the worker from a separate file.
  */
 
 import type { 
-    TextureProcessingMessage, 
+    TextureProcessingMessage,
+    TextureFetchMessage,
     TextureProcessingResult, 
     TextureProcessingError 
 } from './texture-processing.worker'
@@ -14,11 +18,18 @@ import type {
 // Vite worker import - creates a new worker from the file
 import TextureProcessingWorker from './texture-processing.worker?worker'
 
+export interface FetchAndProcessResult {
+    imageData: Uint8ClampedArray
+    blob?: Blob
+    processingTime: number
+}
+
 export class TextureWorker {
     private worker: Worker
     private pendingMessages = new Map<string, {
-        resolve: (data: Uint8ClampedArray) => void
+        resolve: (data: unknown) => void
         reject: (error: Error) => void
+        includeBlob?: boolean
     }>()
     
     constructor() {
@@ -48,7 +59,7 @@ export class TextureWorker {
     }
     
     /**
-     * Process texture in web worker
+     * Process texture from blob in web worker (legacy mode)
      */
     public async processTexture(blob: Blob, textureSize: number, textureIndex: number): Promise<Uint8ClampedArray> {
         return new Promise((resolve, reject) => {
@@ -68,6 +79,40 @@ export class TextureWorker {
         })
     }
     
+    /**
+     * Fetch image from URL and process in web worker
+     * Returns both the processed image data and optionally the blob for caching
+     */
+    public async fetchAndProcess(
+        url: string, 
+        textureSize: number, 
+        textureIndex: number,
+        gameName: string,
+        timeout: number = 10000
+    ): Promise<FetchAndProcessResult> {
+        return new Promise((resolve, reject) => {
+            const messageId = `fetch_${textureIndex}_${Date.now()}_${Math.random()}`
+            
+            this.pendingMessages.set(messageId, { 
+                resolve, 
+                reject,
+                includeBlob: true
+            })
+            
+            const message: TextureFetchMessage = {
+                type: 'FETCH_AND_PROCESS',
+                url,
+                textureSize,
+                textureIndex,
+                messageId,
+                gameName,
+                timeout
+            }
+            
+            this.worker.postMessage(message)
+        })
+    }
+    
     private handleWorkerMessage(data: TextureProcessingResult | TextureProcessingError): void {
         const { messageId } = data
         const pending = this.pendingMessages.get(messageId)
@@ -80,33 +125,22 @@ export class TextureWorker {
         this.pendingMessages.delete(messageId)
         
         if (data.type === 'TEXTURE_PROCESSED') {
-            pending.resolve(data.imageData)
+            if (pending.includeBlob) {
+                // Return full result with blob for caching
+                pending.resolve({
+                    imageData: data.imageData,
+                    blob: data.blob,
+                    processingTime: data.processingTime
+                })
+            } else {
+                // Legacy mode - just return imageData
+                pending.resolve(data.imageData)
+            }
         } else if (data.type === 'TEXTURE_ERROR') {
             pending.reject(new Error(data.error))
         }
     }
     
-    /**
-     * Check if OffscreenCanvas is supported
-     */
-    public static isSupported(): boolean {
-        const hasOffscreenCanvas = typeof OffscreenCanvas !== 'undefined'
-        const hasCreateImageBitmap = 'createImageBitmap' in window
-        const hasWorker = typeof Worker !== 'undefined'
-        
-        console.debug('🔍 Web Worker support check:', {
-            hasOffscreenCanvas,
-            hasCreateImageBitmap,
-            hasWorker,
-            supported: hasOffscreenCanvas && hasCreateImageBitmap && hasWorker
-        })
-        
-        return hasOffscreenCanvas && hasCreateImageBitmap && hasWorker
-    }
-    
-    /**
-     * Clean up worker resources
-     */
     public dispose(): void {
         // Reject any pending messages
         for (const [, pending] of this.pendingMessages) {
