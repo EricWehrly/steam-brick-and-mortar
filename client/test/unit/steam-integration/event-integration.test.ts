@@ -1,5 +1,5 @@
 /**
- * Test to verify SteamIntegration emits GameLoaded events
+ * Test to verify SteamIntegration emits game batch events
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -69,7 +69,7 @@ describe('SteamIntegration Event Integration', () => {
         vi.restoreAllMocks()
     })
 
-    it('should emit GameLoaded event when a game is loaded', async () => {
+    it('should emit GamesBatchReady event when games are loaded', async () => {
         // Mock the ValidationUtils
         const mockValidationUtils = await import('../../../src/utils')
         vi.spyOn(mockValidationUtils.ValidationUtils, 'parseSteamUserInput').mockReturnValue({
@@ -80,21 +80,26 @@ describe('SteamIntegration Event Integration', () => {
         // Load games for user
         await steamIntegration.loadGamesForUser('testuser', {})
         
-        // Verify that GameLoaded event was emitted
+        // Verify that GamesBatchReady event was emitted (batch-based loading)
         expect(mockEventManager.emit).toHaveBeenCalledWith(
-            SteamEventTypes.GameLoaded,
+            SteamEventTypes.GamesBatchReady,
             expect.objectContaining({
-                game: expect.objectContaining({
-                    appid: 730,
-                    name: 'Counter-Strike 2'
-                }),
+                games: expect.arrayContaining([
+                    expect.objectContaining({
+                        appid: 730,
+                        name: 'Counter-Strike 2'
+                    })
+                ]),
+                batchIndex: 0,
+                totalBatches: 1,
+                isLastBatch: true,
                 timestamp: expect.any(Number),
                 source: 'system'
             })
         )
     })
     
-    it('should emit GameLoaded event when loading from cache', async () => {
+    it('should emit GamesBatchReady event when loading from cache', async () => {
         // Mock the ValidationUtils
         const mockValidationUtils = await import('../../../src/utils')
         vi.spyOn(mockValidationUtils.ValidationUtils, 'parseSteamUserInput').mockReturnValue({
@@ -132,14 +137,19 @@ describe('SteamIntegration Event Integration', () => {
         // Load games from cache
         await steamIntegration.loadGamesFromCache('testuser', {})
         
-        // Verify that GameLoaded event was emitted
+        // Verify that GamesBatchReady event was emitted
         expect(mockEventManager.emit).toHaveBeenCalledWith(
-            SteamEventTypes.GameLoaded,
+            SteamEventTypes.GamesBatchReady,
             expect.objectContaining({
-                game: expect.objectContaining({
-                    appid: 730,
-                    name: 'Counter-Strike 2'
-                }),
+                games: expect.arrayContaining([
+                    expect.objectContaining({
+                        appid: 730,
+                        name: 'Counter-Strike 2'
+                    })
+                ]),
+                batchIndex: 0,
+                totalBatches: 1,
+                isLastBatch: true,
                 timestamp: expect.any(Number),
                 source: 'system'
             })
