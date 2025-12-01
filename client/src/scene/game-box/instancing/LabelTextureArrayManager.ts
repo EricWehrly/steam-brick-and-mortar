@@ -107,8 +107,7 @@ export class LabelTextureArrayManager {
         const arrayData = this.textureArray.image.data as Uint8Array
         arrayData.set(imageData.data, offset)
         
-        // Mark texture as needing update
-        this.textureArray.needsUpdate = true
+        // NOTE: needsUpdate deferred to markDirty() for batch efficiency
         
         return textureIndex
     }
@@ -263,6 +262,16 @@ export class LabelTextureArrayManager {
      */
     public getTextureArray(): THREE.DataArrayTexture | null {
         return this.textureArray
+    }
+    
+    /**
+     * Mark texture array as needing GPU update
+     * Call once after adding multiple labels for batch efficiency
+     */
+    public markDirty(): void {
+        if (this.textureArray) {
+            this.textureArray.needsUpdate = true
+        }
     }
 
     /**

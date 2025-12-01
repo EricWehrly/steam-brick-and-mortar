@@ -206,6 +206,9 @@ export class InstancedLabelRenderer {
             return
         }
         
+        // Batch update: mark texture array dirty (uploads to GPU)
+        this.textureArrayManager.markDirty()
+        
         this.instancedMesh.instanceMatrix.needsUpdate = true
         
         this.instancedMesh.count = this.currentCount

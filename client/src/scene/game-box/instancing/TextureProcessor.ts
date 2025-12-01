@@ -112,8 +112,7 @@ export class TextureProcessor {
         const arrayData = dataArrayTexture.image.data as Uint8Array
         arrayData.set(imageData, offset)
         
-        // Mark texture as needing update
-        dataArrayTexture.needsUpdate = true
+        // NOTE: needsUpdate deferred to batch update for efficiency
         
         // Store mapping with reserved index
         this.textureSlots.set(gameName, reservedTextureIndex)
@@ -175,8 +174,7 @@ export class TextureProcessor {
         const arrayData = dataArrayTexture.image.data as Uint8Array
         arrayData.set(result.imageData, offset)
         
-        // Mark texture as needing update
-        dataArrayTexture.needsUpdate = true
+        // NOTE: needsUpdate deferred to batch update for efficiency
         
         // Store mapping with reserved index
         this.textureSlots.set(gameName, reservedTextureIndex)

@@ -365,6 +365,10 @@ export class InstancedArtworkRenderer {
             return
         }
         
+        // Batch update: mark texture array dirty (uploads to GPU)
+        if (this.dataArrayTexture) {
+            this.dataArrayTexture.needsUpdate = true
+        }
         
         this.instancedMesh.instanceMatrix.needsUpdate = true
         this.instancedMesh.count = this.currentCount
@@ -372,7 +376,6 @@ export class InstancedArtworkRenderer {
         const textureIndices = this.geometry.getAttribute('textureIndex')
         if (textureIndices) {
             textureIndices.needsUpdate = true
-            console.debug(`🚀 [GPU Update] Texture indices updated: ${textureIndices.count} entries`)
         }
         
         console.debug(`🔄 GPU updated: ${this.currentCount} active artwork instances`)
