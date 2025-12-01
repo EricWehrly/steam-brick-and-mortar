@@ -36,6 +36,7 @@ export class TextureProcessor {
     
     private textureSlots: Map<string, number> = new Map()
     private nextTextureIndex: number = 0
+    private hasLoggedMaxWarning: boolean = false
     
     private textureWorker: TextureWorker
     
@@ -66,6 +67,46 @@ export class TextureProcessor {
     }
     
     /**
+     * Check if we can accept another texture, throwing if at capacity
+     */
+    private ensureCapacity(): void {
+        if (this.nextTextureIndex >= this.maxTextures) {
+            if (!this.hasLoggedMaxWarning) {
+                console.warn(`⚠️ Maximum artwork textures reached (${this.maxTextures}). Additional games will use labels.`)
+                this.hasLoggedMaxWarning = true
+            }
+            throw new Error('Maximum textures reached')
+        }
+    }
+    
+    /**
+     * Reserve a texture slot and return the index
+     * Returns existing index if game already has a texture
+     */
+    private reserveSlot(gameName: string): { index: number; isExisting: boolean } {
+        const existingIndex = this.textureSlots.get(gameName)
+        if (existingIndex !== undefined) {
+            return { index: existingIndex, isExisting: true }
+        }
+        return { index: this.nextTextureIndex++, isExisting: false }
+    }
+    
+    /**
+     * Copy processed image data to texture array at the reserved slot
+     */
+    private copyToTextureArray(
+        imageData: Uint8ClampedArray | Uint8Array,
+        textureIndex: number,
+        dataArrayTexture: THREE.DataArrayTexture
+    ): void {
+        const sliceSize = this.textureSize * this.textureSize * 4
+        const offset = textureIndex * sliceSize
+        const arrayData = dataArrayTexture.image.data as Uint8Array
+        arrayData.set(imageData, offset)
+        // NOTE: needsUpdate deferred to batch update for efficiency
+    }
+    
+    /**
      * Process a texture blob and add it to the texture array
      * Returns the texture index in the array
      */
@@ -74,16 +115,11 @@ export class TextureProcessor {
         gameName: string,
         dataArrayTexture: THREE.DataArrayTexture
     ): Promise<number> {
-        // Check if we've reached max textures
-        if (this.nextTextureIndex >= this.maxTextures) {
-            console.error(`🚫 Maximum textures reached (${this.maxTextures}), rejecting "${gameName}"`)
-            throw new Error('Maximum textures reached')
-        }
+        this.ensureCapacity()
         
-        // Check if we already have this texture
-        const existingIndex = this.textureSlots.get(gameName)
-        if (existingIndex !== undefined) {
-            return existingIndex
+        const { index: reservedIndex, isExisting } = this.reserveSlot(gameName)
+        if (isExisting) {
+            return reservedIndex
         }
         
         // Validate blob
@@ -98,30 +134,15 @@ export class TextureProcessor {
         
         const startTime = performance.now()
         
-        // Reserve texture index immediately to prevent race conditions
-        const reservedTextureIndex = this.nextTextureIndex++
-        
         // Process texture in web worker
-        const imageData = await this.textureWorker.processTexture(blob, this.textureSize, reservedTextureIndex)
+        const imageData = await this.textureWorker.processTexture(blob, this.textureSize, reservedIndex)
         
-        // Calculate offset for this texture slot in the array
-        const sliceSize = this.textureSize * this.textureSize * 4
-        const offset = reservedTextureIndex * sliceSize
+        this.copyToTextureArray(imageData, reservedIndex, dataArrayTexture)
+        this.textureSlots.set(gameName, reservedIndex)
         
-        // Copy data to texture array (happens on main thread but is fast)
-        const arrayData = dataArrayTexture.image.data as Uint8Array
-        arrayData.set(imageData, offset)
+        this.logPerformance(`texture processing for "${gameName}"`, performance.now() - startTime)
         
-        // NOTE: needsUpdate deferred to batch update for efficiency
-        
-        // Store mapping with reserved index
-        this.textureSlots.set(gameName, reservedTextureIndex)
-        
-        // Performance logging
-        const endTime = performance.now()
-        this.logPerformance(`texture processing for "${gameName}"`, endTime - startTime)
-        
-        return reservedTextureIndex
+        return reservedIndex
     }
     
     /**
@@ -140,52 +161,32 @@ export class TextureProcessor {
         dataArrayTexture: THREE.DataArrayTexture,
         timeout: number = 10000
     ): Promise<TextureProcessingResult> {
-        // Check if we've reached max textures
-        if (this.nextTextureIndex >= this.maxTextures) {
-            console.error(`🚫 Maximum textures reached (${this.maxTextures}), rejecting "${gameName}"`)
-            throw new Error('Maximum textures reached')
-        }
+        this.ensureCapacity()
         
-        // Check if we already have this texture
-        const existingIndex = this.textureSlots.get(gameName)
-        if (existingIndex !== undefined) {
-            return { textureIndex: existingIndex, processingTime: 0 }
+        const { index: reservedIndex, isExisting } = this.reserveSlot(gameName)
+        if (isExisting) {
+            return { textureIndex: reservedIndex, processingTime: 0 }
         }
         
         const startTime = performance.now()
-        
-        // Reserve texture index immediately to prevent race conditions
-        const reservedTextureIndex = this.nextTextureIndex++
         
         // Fetch and process texture entirely in web worker
         const result = await this.textureWorker.fetchAndProcess(
             url,
             this.textureSize,
-            reservedTextureIndex,
+            reservedIndex,
             gameName,
             timeout
         )
         
-        // Calculate offset for this texture slot in the array
-        const sliceSize = this.textureSize * this.textureSize * 4
-        const offset = reservedTextureIndex * sliceSize
+        this.copyToTextureArray(result.imageData, reservedIndex, dataArrayTexture)
+        this.textureSlots.set(gameName, reservedIndex)
         
-        // Copy data to texture array (fast - just array copy)
-        const arrayData = dataArrayTexture.image.data as Uint8Array
-        arrayData.set(result.imageData, offset)
-        
-        // NOTE: needsUpdate deferred to batch update for efficiency
-        
-        // Store mapping with reserved index
-        this.textureSlots.set(gameName, reservedTextureIndex)
-        
-        // Performance logging
-        const endTime = performance.now()
-        const totalTime = endTime - startTime
+        const totalTime = performance.now() - startTime
         this.logPerformance(`fetch+process for "${gameName}"`, totalTime)
         
         return { 
-            textureIndex: reservedTextureIndex, 
+            textureIndex: reservedIndex, 
             processingTime: totalTime,
             blob: result.blob
         }
