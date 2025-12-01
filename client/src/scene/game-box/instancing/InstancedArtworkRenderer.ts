@@ -140,6 +140,13 @@ export class InstancedArtworkRenderer {
             
             this.isInitialized = true
             
+            // Register metadata Map in DataManager once (will be mutated directly, not re-set)
+            DataManager.getInstance().set(
+                DataKey.InstancedArtworkMetadata, 
+                this._instanceMetadata,
+                { domain: DataDomain.Renderer, description: 'Instanced artwork instance metadata' }
+            )
+            
             // Automatically add to main scene if available
             this.addToMainScene()
             
@@ -259,22 +266,14 @@ export class InstancedArtworkRenderer {
             textureIndices.setX(index, textureIndex)
             
             // Track highest index used
-            const previousCount = this.currentCount
             this.currentCount = Math.max(this.currentCount, index + 1)
             
-            // Store instance metadata for game finding
+            // Store instance metadata for game finding (mutates the Map already registered in DataManager)
             this.instanceMetadata.set(index, {
                 name: gameName,
                 appid: textureOptions.appid,
                 position: position.clone()
             })
-            
-            // Publish metadata to DataManager for other systems to access
-            DataManager.getInstance().set(
-                DataKey.InstancedArtworkMetadata, 
-                this.instanceMetadata,
-                { domain: DataDomain.Renderer, description: 'Instanced artwork instance metadata' }
-            )
             
             // Validate geometry visibility after update
             this.validateInstanceVisibility(index, gameName, textureIndex)
