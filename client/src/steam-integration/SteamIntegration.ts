@@ -337,59 +337,32 @@ export class SteamIntegration {
             // Update game library state with cached data
             this.gameLibrary.setUserData(cachedGames)
             
-            callbacks.onProgress?.(10, 100, `Found ${cachedGames.game_count} games in cache. Loading details...`)
+            callbacks.onProgress?.(10, 100, `Found ${cachedGames.game_count} games in cache. Loading...`)
             
-            // Hydrate batch metadata for ALL games (no maxGames limit for cache hydration)
-            SteamIntegration.logger.info(`Hydrating batch metadata for ${cachedGames.game_count} cached games`)
-            await this.steamClient.hydrateAllGamesMetadata(cachedGames, {
+            // Single-pass load: checks cache, fetches missing, builds enhanced games
+            const loadedGames = await this.steamClient.loadGamesProgressively(cachedGames, {
+                maxGames: cachedGames.game_count,
                 onProgress: (current: number, total: number) => {
-                    const percentage = Math.round((current / total) * 50) + 10 // 10-60%
-                    callbacks.onProgress?.(percentage, 100, `Checking metadata ${current}/${total} games`)
+                    const percentage = Math.round((current / total) * 80) + 10 // 10-90%
+                    callbacks.onProgress?.(percentage, 100, `Loading ${current}/${total} games`)
                 }
             })
             
-            // Update artwork URLs for ALL games from cached batch metadata
-            SteamIntegration.logger.debug(`Updating artwork URLs for ${cachedGames.game_count} cached games`) 
-            await this.steamClient.updateGameArtworkFromCache(cachedGames)
+            SteamIntegration.logger.info(`Loaded ${loadedGames.length} games`)
             
-            // Load ALL cached games for display (maxGames only limits network calls, not cache)
-            const progressOptions: LoadGamesOptions = {
-                maxGames: cachedGames.game_count, // Use all cached games, not config limit
-                onProgress: (current: number, total: number) => {
-                    const percentage = Math.round((current / total) * 30) + 60 // 60-90%
-                    callbacks.onProgress?.(percentage, 100, `Loading ${current}/${total} games`)
-                }
-            }
-            
-            SteamIntegration.logger.info(`Loading all ${cachedGames.game_count} cached games for display`)
-            const loadedGames = await this.steamClient.loadGamesProgressively(cachedGames, progressOptions)
-            SteamIntegration.logger.info(`Loaded ${loadedGames.length} games for display`)
-            
-            // Log first game to see what artwork URLs we got
-            if (loadedGames.length > 0) {
-                const firstGame = loadedGames[0]
-                SteamIntegration.logger.debug(`First loaded game ${firstGame.name} (${firstGame.appid}) - header:${firstGame.artwork.header ? 'yes' : 'no'}`)
-            }
-            
-            // Process games in batches for progressive rendering
-            const BATCH_SIZE = 18 // One shelf's worth of games (3 rows × 2 sides × 3 games)
+            // Emit batches for progressive shelf rendering
+            const BATCH_SIZE = 18
             const totalBatches = Math.ceil(loadedGames.length / BATCH_SIZE)
             
-            console.log(`📦 [STEAM-CACHE] Starting batch emission: ${loadedGames.length} games in ${totalBatches} batches`)
-            const batchLoopStart = performance.now()
-            
             for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-                const batchEmitStart = performance.now()
                 const startIdx = batchIndex * BATCH_SIZE
                 const batchGames = loadedGames.slice(startIdx, startIdx + BATCH_SIZE)
                 const isLastBatch = batchIndex === totalBatches - 1
                 
-                // Update game library (internal state management)
                 for (const game of batchGames) {
                     this.gameLibrary.updateGameData(game)
                 }
                 
-                // Emit batch event for progressive shelf rendering
                 this.eventManager.emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
                     games: batchGames as ReadonlyArray<Readonly<SteamGame>>,
                     batchIndex,
@@ -399,18 +372,12 @@ export class SteamIntegration {
                     source: EventSource.System
                 })
                 
-                console.log(`📦 [STEAM-CACHE] Batch ${batchIndex + 1}/${totalBatches} emitted in ${(performance.now() - batchEmitStart).toFixed(0)}ms`)
-                
-                // Yield to main thread between batches
                 if (!isLastBatch) {
                     await new Promise(resolve => setTimeout(resolve, 0))
                 }
             }
             
-            console.log(`📦 [STEAM-CACHE] All batches emitted in ${(performance.now() - batchLoopStart).toFixed(0)}ms`)
-            
-            // Complete loading
-            callbacks.onProgress?.(100, 100, 'Cache loading complete!')
+            callbacks.onProgress?.(100, 100, 'Loading complete!')
             callbacks.onStatusUpdate?.(
                 `✅ Loaded ${loadedGames.length} games from cache for ${cachedGames.vanity_url}!`, 
                 'success'
