@@ -24,12 +24,93 @@ export interface TextureSource {
 export class LabelTextureArrayManager {
     private textureArray: THREE.DataArrayTexture | null = null
     private readonly TEXTURE_SIZE: number
+    private readonly maxTextures: number
     private loadedImages: Map<string | number, HTMLImageElement> = new Map()
     private canvases: HTMLCanvasElement[] = []
+    private nextTextureIndex: number = 0
+    
+    // Shared canvas for dynamic text rendering
+    private sharedCanvas: HTMLCanvasElement | null = null
+    private sharedContext: CanvasRenderingContext2D | null = null
 
-    constructor(textureSize: number = 512) {
+    constructor(textureSize: number = 512, maxTextures: number = 256) {
         this.TEXTURE_SIZE = textureSize
-        console.debug(`📦 [LabelTextureArrayManager] Initialized with texture size: ${textureSize}x${textureSize}`)
+        this.maxTextures = maxTextures
+        console.debug(`📦 [LabelTextureArrayManager] Initialized with texture size: ${textureSize}x${textureSize}, max: ${maxTextures}`)
+    }
+    
+    /**
+     * Initialize empty pre-allocated texture array for dynamic population
+     * Call this for progressive/batch loading workflow
+     */
+    public initializeEmptyTextureArray(): THREE.DataArrayTexture {
+        if (this.textureArray) {
+            console.warn('📦 [LabelTextureArrayManager] Texture array already initialized')
+            return this.textureArray
+        }
+        
+        const size = this.TEXTURE_SIZE
+        const depth = this.maxTextures
+        
+        // Pre-allocate buffer (GPU will handle uninitialized data)
+        const data = new Uint8Array(size * size * depth * 4)
+        
+        this.textureArray = new THREE.DataArrayTexture(data, size, size, depth)
+        this.textureArray.format = THREE.RGBAFormat
+        this.textureArray.type = THREE.UnsignedByteType
+        this.textureArray.minFilter = THREE.LinearFilter
+        this.textureArray.magFilter = THREE.LinearFilter
+        this.textureArray.wrapS = THREE.ClampToEdgeWrapping
+        this.textureArray.wrapT = THREE.ClampToEdgeWrapping
+        this.textureArray.needsUpdate = true
+        
+        // Initialize shared canvas for dynamic text rendering
+        this.sharedCanvas = document.createElement('canvas')
+        this.sharedCanvas.width = size
+        this.sharedCanvas.height = size
+        this.sharedContext = this.sharedCanvas.getContext('2d')
+        
+        console.debug(`📦 [LabelTextureArrayManager] Empty texture array created: ${size}×${size}×${depth}`)
+        return this.textureArray
+    }
+    
+    /**
+     * Dynamically add a text label to the texture array
+     * Returns the texture index for this label
+     */
+    public addTextLabel(label: string): number {
+        if (!this.textureArray) {
+            throw new Error('Texture array not initialized. Call initializeEmptyTextureArray() first.')
+        }
+        
+        if (this.nextTextureIndex >= this.maxTextures) {
+            console.error(`🚫 [LabelTextureArrayManager] Maximum textures reached (${this.maxTextures})`)
+            throw new Error('Maximum label textures reached')
+        }
+        
+        if (!this.sharedContext) {
+            throw new Error('Shared canvas context not available')
+        }
+        
+        const size = this.TEXTURE_SIZE
+        const textureIndex = this.nextTextureIndex++
+        
+        // Clear and render text
+        this.sharedContext.clearRect(0, 0, size, size)
+        this.drawTextLabel(this.sharedContext, label, size)
+        
+        // Copy to texture array at the correct offset
+        const imageData = this.sharedContext.getImageData(0, 0, size, size)
+        const sliceSize = size * size * 4
+        const offset = textureIndex * sliceSize
+        
+        const arrayData = this.textureArray.image.data as Uint8Array
+        arrayData.set(imageData.data, offset)
+        
+        // Mark texture as needing update
+        this.textureArray.needsUpdate = true
+        
+        return textureIndex
     }
 
     /**
@@ -228,19 +309,23 @@ export class LabelTextureArrayManager {
      */
     public getStats(): {
         textureSize: number
-        layerCount: number
+        allocatedLayers: number
+        usedLayers: number
         loadedImagesCount: number
         memoryEstimate: string
     } {
-        const layerCount = this.textureArray?.image.depth || 0
+        const allocatedLayers = this.textureArray?.image.depth || 0
+        const usedLayers = this.nextTextureIndex
         const bytesPerTexel = 4 // RGBA
-        const totalTexels = this.TEXTURE_SIZE * this.TEXTURE_SIZE * layerCount
+        // Report memory based on allocated (actual GPU memory usage)
+        const totalTexels = this.TEXTURE_SIZE * this.TEXTURE_SIZE * allocatedLayers
         const totalBytes = totalTexels * bytesPerTexel
         const megabytes = (totalBytes / (1024 * 1024)).toFixed(2)
         
         return {
             textureSize: this.TEXTURE_SIZE,
-            layerCount,
+            allocatedLayers,
+            usedLayers,
             loadedImagesCount: this.loadedImages.size,
             memoryEstimate: `${megabytes} MB`
         }

@@ -54,6 +54,13 @@ export interface SteamGameLoadedEvent extends BaseInteractionEvent {
     game: Readonly<SteamGame>
 }
 
+export interface SteamGamesBatchEvent extends BaseInteractionEvent {
+    games: ReadonlyArray<Readonly<SteamGame>>
+    batchIndex: number
+    totalBatches: number
+    isLastBatch: boolean
+}
+
 // =============================================================================
 // ROOM EVENTS
 // =============================================================================
@@ -226,7 +233,8 @@ export const SteamEventTypes = {
     ImageCacheClear: 'steam:image-cache-clear',
     DevModeToggle: 'steam:dev-mode-toggle',
     DataLoaded: 'steam:data-loaded',
-    GameLoaded: 'steam:game-loaded'
+    GameLoaded: 'steam:game-loaded',
+    GamesBatchReady: 'steam:games-batch-ready'
 } as const
 
 export const RoomEventTypes = {
@@ -304,6 +312,7 @@ export interface InteractionEventMap {
     [SteamEventTypes.DevModeToggle]: SteamDevModeToggleEvent
     [SteamEventTypes.DataLoaded]: SteamDataLoadedEvent
     [SteamEventTypes.GameLoaded]: SteamGameLoadedEvent
+    [SteamEventTypes.GamesBatchReady]: SteamGamesBatchEvent
     
     // WebXR events
     [WebXREventTypes.Toggle]: WebXRToggleEvent
