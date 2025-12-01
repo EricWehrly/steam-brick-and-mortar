@@ -1,130 +1,29 @@
 /**
- * Web Worker for texture processing using OffscreenCanvas
+ * Web Worker manager for texture processing using OffscreenCanvas
  * Offloads expensive getImageData operations from the main thread
+ * 
+ * Uses Vite's worker import syntax to load the worker from a separate file.
  */
 
-interface TextureProcessingMessage {
-    type: 'PROCESS_TEXTURE'
-    blob: Blob
-    textureSize: number
-    textureIndex: number
-    messageId: string
-}
+import type { 
+    TextureProcessingMessage, 
+    TextureProcessingResult, 
+    TextureProcessingError 
+} from './texture-processing.worker'
 
-interface TextureProcessingResult {
-    type: 'TEXTURE_PROCESSED'
-    imageData: Uint8Array
-    textureIndex: number
-    messageId: string
-    processingTime: number
-}
-
-interface TextureProcessingError {
-    type: 'TEXTURE_ERROR'
-    error: string
-    messageId: string
-}
-
-// TODO: Extract this to a file that can properly render it (like a .worker.ts file loaded with a bundler or a .js file) 
-// Worker script (plain JavaScript for browser compatibility)
-const workerScript = `
-let offscreenCanvas = null;
-let offscreenContext = null;
-
-// Global error handler for the worker
-self.onerror = function(message, filename, lineno, colno, error) {
-    console.error('Worker script error:', { message, filename, lineno, colno, error });
-    self.postMessage({
-        type: 'TEXTURE_ERROR',
-        error: 'Worker script error: ' + message,
-        messageId: 'global-error'
-    });
-    return true;
-};
-
-self.onmessage = async function(event) {
-    try {
-        // console.debug('Worker received message:', event.data);
-        const { type, blob, textureSize, textureIndex, messageId } = event.data;
-        
-        if (type !== 'PROCESS_TEXTURE') {
-            console.log('Worker ignoring message type:', type);
-            return;
-        }
-        
-        console.debug('Worker processing texture:', { textureSize, textureIndex, blobSize: blob.size });
-        const startTime = performance.now();
-        
-        try {
-        // Initialize offscreen canvas if needed
-        if (!offscreenCanvas || offscreenCanvas.width !== textureSize) {
-            offscreenCanvas = new OffscreenCanvas(textureSize, textureSize);
-            offscreenContext = offscreenCanvas.getContext('2d');
-            
-            if (!offscreenContext) {
-                throw new Error('Failed to create OffscreenCanvas context');
-            }
-        }
-        
-        // Create image bitmap from blob
-        const imageBitmap = await createImageBitmap(blob);
-        
-        // Clear and draw
-        offscreenContext.clearRect(0, 0, textureSize, textureSize);
-        offscreenContext.drawImage(imageBitmap, 0, 0, textureSize, textureSize);
-        
-        // Extract image data (this is the expensive operation)
-        const imageData = offscreenContext.getImageData(0, 0, textureSize, textureSize);
-        
-        // Clean up
-        imageBitmap.close();
-        
-        const processingTime = performance.now() - startTime;
-        
-        // Send back the processed data
-        const result = {
-            type: 'TEXTURE_PROCESSED',
-            imageData: imageData.data,
-            textureIndex: textureIndex,
-            messageId: messageId,
-            processingTime: processingTime
-        };
-        
-        // Transfer the ArrayBuffer to avoid copying
-        self.postMessage(result, [imageData.data.buffer]);
-        
-    } catch (error) {
-        const errorResult = {
-            type: 'TEXTURE_ERROR',
-            error: error instanceof Error ? error.message : String(error),
-            messageId: messageId
-        };
-        
-        self.postMessage(errorResult);
-    }
-    } catch (outerError) {
-        console.error('Worker message handler error:', outerError);
-        const errorResult = {
-            type: 'TEXTURE_ERROR',
-            error: 'Worker message handler error: ' + outerError.message,
-            messageId: event.data ? event.data.messageId : 'unknown'
-        };
-        self.postMessage(errorResult);
-    }
-};
-`
+// Vite worker import - creates a new worker from the file
+import TextureProcessingWorker from './texture-processing.worker?worker'
 
 export class TextureWorker {
     private worker: Worker
     private pendingMessages = new Map<string, {
-        resolve: (data: Uint8Array) => void
+        resolve: (data: Uint8ClampedArray) => void
         reject: (error: Error) => void
     }>()
     
     constructor() {
-        // Create worker from script string
-        const workerBlob = new Blob([workerScript], { type: 'application/javascript' })
-        this.worker = new Worker(URL.createObjectURL(workerBlob))
+        // Create worker using Vite's worker constructor
+        this.worker = new TextureProcessingWorker()
         
         this.worker.onmessage = (event: MessageEvent) => {
             this.handleWorkerMessage(event.data)
@@ -151,7 +50,7 @@ export class TextureWorker {
     /**
      * Process texture in web worker
      */
-    public async processTexture(blob: Blob, textureSize: number, textureIndex: number): Promise<Uint8Array> {
+    public async processTexture(blob: Blob, textureSize: number, textureIndex: number): Promise<Uint8ClampedArray> {
         return new Promise((resolve, reject) => {
             const messageId = `texture_${textureIndex}_${Date.now()}_${Math.random()}`
             
@@ -210,7 +109,7 @@ export class TextureWorker {
      */
     public dispose(): void {
         // Reject any pending messages
-        for (const [messageId, pending] of this.pendingMessages) {
+        for (const [, pending] of this.pendingMessages) {
             pending.reject(new Error('Worker disposed'))
         }
         this.pendingMessages.clear()
