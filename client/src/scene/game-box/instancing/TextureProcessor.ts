@@ -17,6 +17,8 @@ export interface TextureProcessorConfig {
 export interface TextureProcessingResult {
     textureIndex: number
     processingTime: number
+    /** Blob returned from worker for optional caching */
+    blob?: Blob
 }
 
 export interface TextureProcessorStats {
@@ -121,6 +123,74 @@ export class TextureProcessor {
         this.logPerformance(`texture processing for "${gameName}"`, endTime - startTime)
         
         return reservedTextureIndex
+    }
+    
+    /**
+     * Fetch image from URL and process entirely in web worker
+     * This is the preferred path - keeps network + canvas operations off main thread
+     * 
+     * @param url - URL to fetch image from
+     * @param gameName - Game name for mapping and logging
+     * @param dataArrayTexture - Target texture array to write to
+     * @param timeout - Network timeout in ms (default 10000)
+     * @returns Texture index and optional blob for caching
+     */
+    public async fetchAndProcessTexture(
+        url: string,
+        gameName: string,
+        dataArrayTexture: THREE.DataArrayTexture,
+        timeout: number = 10000
+    ): Promise<TextureProcessingResult> {
+        // Check if we've reached max textures
+        if (this.nextTextureIndex >= this.maxTextures) {
+            console.error(`🚫 Maximum textures reached (${this.maxTextures}), rejecting "${gameName}"`)
+            throw new Error('Maximum textures reached')
+        }
+        
+        // Check if we already have this texture
+        const existingIndex = this.textureSlots.get(gameName)
+        if (existingIndex !== undefined) {
+            return { textureIndex: existingIndex, processingTime: 0 }
+        }
+        
+        const startTime = performance.now()
+        
+        // Reserve texture index immediately to prevent race conditions
+        const reservedTextureIndex = this.nextTextureIndex++
+        
+        // Fetch and process texture entirely in web worker
+        const result = await this.textureWorker.fetchAndProcess(
+            url,
+            this.textureSize,
+            reservedTextureIndex,
+            gameName,
+            timeout
+        )
+        
+        // Calculate offset for this texture slot in the array
+        const sliceSize = this.textureSize * this.textureSize * 4
+        const offset = reservedTextureIndex * sliceSize
+        
+        // Copy data to texture array (fast - just array copy)
+        const arrayData = dataArrayTexture.image.data as Uint8Array
+        arrayData.set(result.imageData, offset)
+        
+        // Mark texture as needing update
+        dataArrayTexture.needsUpdate = true
+        
+        // Store mapping with reserved index
+        this.textureSlots.set(gameName, reservedTextureIndex)
+        
+        // Performance logging
+        const endTime = performance.now()
+        const totalTime = endTime - startTime
+        this.logPerformance(`fetch+process for "${gameName}"`, totalTime)
+        
+        return { 
+            textureIndex: reservedTextureIndex, 
+            processingTime: totalTime,
+            blob: result.blob
+        }
     }
     
     public getStats(): TextureProcessorStats {

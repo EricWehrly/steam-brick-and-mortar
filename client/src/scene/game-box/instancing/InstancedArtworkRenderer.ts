@@ -289,6 +289,77 @@ export class InstancedArtworkRenderer {
         }
     }
     
+    /**
+     * Set artwork instance by fetching from URL - entire pipeline runs in worker
+     * This is the preferred path for new code - keeps main thread free
+     * 
+     * @param index - Instance index in the instanced mesh
+     * @param position - World position
+     * @param gameName - Game name for mapping
+     * @param artworkUrl - URL to fetch artwork from
+     * @param appid - Steam app ID for metadata
+     * @returns true if instance was set successfully
+     */
+    public async setArtworkInstanceFromUrl(
+        index: number,
+        position: THREE.Vector3,
+        gameName: string,
+        artworkUrl: string,
+        appid?: number
+    ): Promise<boolean> {
+        // Lazy initialization
+        if (!this.isInitialized) {
+            this.initialize()
+        }
+        
+        if (!this.instancedMesh || !this.geometry || !this.dataArrayTexture) {
+            console.warn('InstancedArtworkRenderer failed to initialize')
+            return false
+        }
+        
+        if (index >= this.maxInstances) {
+            console.warn(`Instance index ${index} exceeds max ${this.maxInstances}`)
+            return false
+        }
+        
+        try {
+            // Fetch and process entirely in worker
+            const result = await this.textureProcessor.fetchAndProcessTexture(
+                artworkUrl,
+                gameName,
+                this.dataArrayTexture
+            )
+            
+            const textureIndex = result.textureIndex
+            console.debug(`🎨 [Renderer] Texture fetched+processed for "${gameName}" → textureIndex=${textureIndex}`)
+            
+            // Update matrix for this instance
+            const matrix = new THREE.Matrix4()
+            matrix.compose(position, InstancedArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
+            this.instancedMesh.setMatrixAt(index, matrix)
+            
+            // Update texture index attribute
+            const textureIndices = this.geometry.getAttribute('textureIndex') as THREE.InstancedBufferAttribute
+            textureIndices.setX(index, textureIndex)
+            
+            // Track highest index used
+            this.currentCount = Math.max(this.currentCount, index + 1)
+            
+            // Store instance metadata
+            this.instanceMetadata.set(index, {
+                name: gameName,
+                appid: appid,
+                position: position.clone()
+            })
+            
+            return true
+            
+        } catch (error) {
+            console.error(`❌ [Renderer] Failed to fetch/set artwork for "${gameName}":`, error)
+            return false
+        }
+    }
+
     public updateGPU(): void {
         if (!this.isInitialized || !this.instancedMesh || !this.geometry) {
             return

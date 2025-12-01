@@ -45,6 +45,10 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         console.debug(`📦 GpuGameBoxRenderer initialized with max ${maxGames} instances`)
     }
 
+    /**
+     * Create game box - routes to artwork or label renderer based on textureOptions
+     * @deprecated for artwork - use createGameBoxFromUrl() to keep entire pipeline off main thread
+     */
     public createGameBox(
         game: SteamGameData,
         position: THREE.Vector3 = new THREE.Vector3(0, 0, 0),
@@ -61,6 +65,48 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             // Label renderer will lazy-initialize on first call to setLabelInstance
             return this.createInstancedLabelBox(game, position, name, side)
         }
+    }
+    
+    /**
+     * Create game box with artwork by URL - entire fetch+process happens in worker
+     * This is the preferred path - keeps main thread completely free
+     */
+    public createGameBoxFromUrl(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        artworkUrl: string,
+        side: ShelfSide = ShelfSide.Front
+    ): void {
+        const reservedInstanceIndex = this.artworkInstanceIndex++
+        
+        this.instancedArtworkRenderer.setArtworkInstanceFromUrl(
+            reservedInstanceIndex,
+            position,
+            game.name,
+            artworkUrl,
+            typeof game.appid === 'number' ? game.appid : undefined
+        ).then((success) => {
+            if (!success) {
+                // Fall back to label if artwork fails
+                console.debug(`Artwork failed for "${game.name}", falling back to label`)
+                this.createInstancedLabelBox(game, position, undefined, side)
+            }
+        }).catch((error) => {
+            console.error(`Error fetching artwork for "${game.name}":`, error)
+            // Fall back to label on error
+            this.createInstancedLabelBox(game, position, undefined, side)
+        })
+    }
+    
+    /**
+     * Create game box with just a label (no artwork)
+     */
+    public createLabelGameBox(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        side: ShelfSide = ShelfSide.Front
+    ): void {
+        this.createInstancedLabelBox(game, position, undefined, side)
     }
 
     private createInstancedArtworkBox(

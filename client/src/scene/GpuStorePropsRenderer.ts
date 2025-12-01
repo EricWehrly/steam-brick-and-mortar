@@ -297,12 +297,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             source: EventSource.System
         })
         
-        // Create the shelf
-        console.log(`🏪 [SHELF ${batchIndex}] Creating at row ${row}, col ${shelfInRow}, pos (${shelfPosition.x.toFixed(1)}, ${shelfPosition.z.toFixed(1)}) with ${games.length} games`)
-        await this.createInstancedShelf(shelfPosition, games, row, shelfInRow)
+        // Create the shelf (fire-and-forget - game boxes spawn async in worker)
+        this.createInstancedShelf(shelfPosition, games, row, shelfInRow)
         this.cumulativeShelfCount++
-        
-        console.log(`🏪 [SHELF ${batchIndex}] Complete. Total shelves: ${this.cumulativeShelfCount}`)
     }
     
     /**
@@ -620,48 +617,38 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             const startGameIndex = shelfGlobalIndex * gamesPerShelf
             const shelfGames = games.slice(startGameIndex, startGameIndex + gamesPerShelf)
             
-            // Create shelf using INSTANCED InstancedShelfRenderer ONLY
-            await this.createInstancedShelf(shelfPosition, shelfGames, rowIndex, i)
+            // Create shelf (fire-and-forget - game box worker calls run async)
+            this.createInstancedShelf(shelfPosition, shelfGames, rowIndex, i)
         }
         
         // Update cumulative count after processing this row
         this.cumulativeShelfCount += shelfCount
     }
 
-    private async createInstancedShelf(
+    private createInstancedShelf(
         position: THREE.Vector3, 
         games: SteamGameData[], 
         rowIndex: number, 
         shelfIndex: number
-    ): Promise<void> {
-        try {
-            // Add shelf instance at position
-            const globalShelfIndex = rowIndex * 4 + shelfIndex
-            console.log(`🏪 [SHELF-CREATE] Adding shelf instance ${globalShelfIndex} at (${position.x.toFixed(1)}, ${position.z.toFixed(1)}) with ${games.length} games`)
-            
-            this.instancedShelfRenderer.setInstance(globalShelfIndex, {
-                position: position
-            })
-            
-            // Create game boxes with actual game data if available
-            if (games.length > 0) {
-                const gamesStartTime = performance.now()
-                await this.spawnInstancedGamesOnShelf(position, games, rowIndex, shelfIndex)
-                console.log(`🏪 [SHELF-CREATE] Games spawned in ${(performance.now() - gamesStartTime).toFixed(0)}ms`)
-            }
-            
-            console.debug(`🏪 Created instanced shelf ${rowIndex}-${shelfIndex} at position`, position)
-        } catch (error) {
-            console.error(`❌ Failed to create instanced shelf unit:`, error)
+    ): void {
+        // Add shelf instance at position
+        const globalShelfIndex = rowIndex * 4 + shelfIndex
+        
+        this.instancedShelfRenderer.setInstance(globalShelfIndex, {
+            position: position
+        })
+        
+        // Create game boxes - fire-and-forget, worker handles async work
+        if (games.length > 0) {
+            this.spawnInstancedGamesOnShelf(position, games, rowIndex, shelfIndex)
         }
     }
 
-    private async spawnInstancedGamesOnShelf(shelfPosition: THREE.Vector3, games: SteamGameData[], rowIndex: number, shelfIndex: number): Promise<void> {
+    private spawnInstancedGamesOnShelf(shelfPosition: THREE.Vector3, games: SteamGameData[], _rowIndex: number, _shelfIndex: number): void {
         // Get shelf surface configuration using shared utility (GPU path: hardcoded surfaces)
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         
         if (shelfSurfaces.length === 0) {
-            console.warn(`⚠️ No shelf surfaces found for instanced shelf ${rowIndex}-${shelfIndex}`)
             return
         }
         
@@ -670,55 +657,57 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         for (const surface of shelfSurfaces) {
             if (gameIndex >= games.length) break
             
-            // Spawn games on front side
+            // Spawn games on front side (fire-and-forget)
             const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
             if (frontGames.length > 0) {
-                await this.createInstancedGameBoxes(shelfPosition, surface, frontGames, ShelfSide.Front)
+                this.createInstancedGameBoxes(shelfPosition, surface, frontGames, ShelfSide.Front)
                 gameIndex += frontGames.length
             }
             
-            // Spawn games on back side  
+            // Spawn games on back side (fire-and-forget)
             if (gameIndex < games.length) {
                 const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
                 if (backGames.length > 0) {
-                    await this.createInstancedGameBoxes(shelfPosition, surface, backGames, ShelfSide.Back)
+                    this.createInstancedGameBoxes(shelfPosition, surface, backGames, ShelfSide.Back)
                     gameIndex += backGames.length
                 }
             }
         }
     }
 
-    private async createInstancedGameBoxes(
+    private createInstancedGameBoxes(
         shelfPosition: THREE.Vector3,
         surface: ShelfSurface, 
         games: SteamGameData[], 
         side: ShelfSide
-    ): Promise<void> {
+    ): void {
         const gamePositions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, games, side)
         
+        // Fire-and-forget - worker handles these in parallel
+        // GPU update happens via InstancedBatchComplete event
         for (let i = 0; i < games.length; i++) {
-            await this.createSingleInstancedGameBox(games[i], gamePositions[i], side, i)
+            this.createSingleInstancedGameBox(games[i], gamePositions[i], side, i)
         }
     }
 
-    private async createSingleInstancedGameBox(
+    private createSingleInstancedGameBox(
         game: SteamGameData, 
         worldPosition: THREE.Vector3, 
         side: ShelfSide,
-        index: number
-    ): Promise<void> {
-        const name = GameBoxUtils.generateGameBoxName(game, side, index, 'gpu')
-        const artworkStartTime = performance.now()
-        const textureOptions = await GameBoxUtils.loadArtworkIfNeeded(game, this.globalGameIndex, this.imageManager)
-        const artworkTime = performance.now() - artworkStartTime
+        _index: number
+    ): void {
+        // Check if this game should use artwork (every 5th game for now)
+        // TODO: Increase artwork percentage once performance is validated
+        const shouldUseArtwork = (this.globalGameIndex % 5) === 0
+        const artworkUrl = shouldUseArtwork ? game.artwork?.header : undefined
         
-        if (artworkTime > 100) {
-            console.log(`🎮 [GAME] Slow artwork load for "${game.name}": ${artworkTime.toFixed(0)}ms`)
+        if (artworkUrl) {
+            // Fire-and-forget - worker handles fetch+process off main thread
+            this.gameBoxRenderer.createGameBoxFromUrl(game, worldPosition, artworkUrl, side)
+        } else {
+            // Label rendering is synchronous (just sets instance data)
+            this.gameBoxRenderer.createLabelGameBox(game, worldPosition, side)
         }
-        
-        // Note: createGameBox returns null for instanced rendering (expected)
-        // The actual rendering happens via the instanced renderers (artwork/label)
-        this.gameBoxRenderer.createGameBox(game, worldPosition, textureOptions, name, side)
         
         this.globalGameIndex++
     }
