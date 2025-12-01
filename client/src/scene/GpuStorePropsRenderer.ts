@@ -3,6 +3,12 @@
  * 
  * Uses InstancedShelfRenderer and GpuGameBoxRenderer for minimal draw calls.
  * Handles progressive batch loading of Steam games.
+ * 
+ * TODO: Eventually integrate with renderer selection system to choose between
+ * LegacyStorePropsRenderer and this GPU version based on:
+ * - Hardware capabilities (WebGL2 support)
+ * - User preferences
+ * - Performance requirements
  */
 
 import * as THREE from 'three'
@@ -36,7 +42,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private instancedShelfRenderer?: InstancedShelfRenderer
     private imageManager: ImageManager
-    private globalGameIndex: number = 0 // Track global game position for artwork selection
 
     // Track objects we create for proper cleanup
     private createdGameBoxes: THREE.Object3D[] = []
@@ -202,7 +207,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             }
         }
         
-        this.globalGameIndex = 0
+        this.gameBoxRenderer.resetGameIndex()
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
         this.clearExistingShelves()
@@ -336,8 +341,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 return
             }
             
-            // Reset global game index for artwork assignment
-            this.globalGameIndex = 0
+            // Reset game index for artwork assignment
+            this.gameBoxRenderer.resetGameIndex()
             
             // Reset shelf bounds tracking
             this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
@@ -625,18 +630,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         side: ShelfSide,
         _index: number
     ): void {
-        const shouldUseArtwork = (this.globalGameIndex % 2) === 0 // 50% artwork
-        const artworkUrl = shouldUseArtwork ? game.artwork?.header : undefined
-        
-        if (artworkUrl) {
-            // Fire-and-forget - worker handles fetch+process off main thread
-            this.gameBoxRenderer.createGameBoxFromUrl(game, worldPosition, artworkUrl, side)
-        } else {
-            // Label rendering is synchronous (just sets instance data)
-            this.gameBoxRenderer.createLabelGameBox(game, worldPosition, side)
-        }
-        
-        this.globalGameIndex++
+        // Delegate to renderer - it handles artwork percentage decision internally
+        this.gameBoxRenderer.createGameBoxAuto(game, worldPosition, side)
     }
 
     public clearProps(): void {
@@ -670,6 +665,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         if (this.currentStoreGroup) {
             this.scene.remove(this.currentStoreGroup)
+            // TODO: Dispose materials and geometries properly
             this.currentStoreGroup = null
         }
         

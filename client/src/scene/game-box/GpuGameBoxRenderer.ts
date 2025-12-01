@@ -14,7 +14,7 @@ import type {
 } from './types/GameBoxOptions'
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
-import { ShelfSide } from '../props/SharedPropsUtils'
+import { ShelfSide, ARTWORK_CONFIG } from '../props/SharedPropsUtils'
 import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
 export class GpuGameBoxRenderer implements IGameBoxRenderer {
@@ -30,6 +30,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private instancedArtworkRenderer: InstancedArtworkRenderer
     private labelInstanceIndex: number = 0
     private artworkInstanceIndex: number = 0
+    private globalGameIndex: number = 0  // Tracks artwork percentage decisions
 
     constructor(maxGames: number = 2000) {
         this.dimensions = { ...GpuGameBoxRenderer.DEFAULT_DIMENSIONS }
@@ -87,12 +88,14 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             typeof game.appid === 'number' ? game.appid : undefined
         ).then((success) => {
             if (!success) {
-                // Fall back to label if artwork fails
-                console.debug(`Artwork failed for "${game.name}", falling back to label`)
+                // Fall back to label if artwork fails (expected when max textures reached)
                 this.createInstancedLabelBox(game, position, undefined, side)
             }
         }).catch((error) => {
-            console.error(`Error fetching artwork for "${game.name}":`, error)
+            // Don't log "Maximum textures reached" - that's expected once we hit the limit
+            if (!(error instanceof Error && error.message === 'Maximum textures reached')) {
+                console.error(`Error fetching artwork for "${game.name}":`, error)
+            }
             // Fall back to label on error
             this.createInstancedLabelBox(game, position, undefined, side)
         })
@@ -107,6 +110,35 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         side: ShelfSide = ShelfSide.Front
     ): void {
         this.createInstancedLabelBox(game, position, undefined, side)
+    }
+    
+    /**
+     * Create game box with automatic artwork/label decision
+     * Uses ARTWORK_CONFIG to determine whether to use artwork based on global index
+     * This is the preferred entry point - consolidates artwork percentage logic here
+     */
+    public createGameBoxAuto(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        side: ShelfSide = ShelfSide.Front
+    ): void {
+        const shouldUseArtwork = ARTWORK_CONFIG.shouldUseArtwork(this.globalGameIndex)
+        const artworkUrl = shouldUseArtwork ? game.artwork?.header : undefined
+        
+        if (artworkUrl) {
+            this.createGameBoxFromUrl(game, position, artworkUrl, side)
+        } else {
+            this.createLabelGameBox(game, position, side)
+        }
+        
+        this.globalGameIndex++
+    }
+    
+    /**
+     * Reset global game index (call when starting a new load)
+     */
+    public resetGameIndex(): void {
+        this.globalGameIndex = 0
     }
 
     private createInstancedArtworkBox(
@@ -185,6 +217,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         this.labelInstanceIndex = 0
         this.artworkInstanceIndex = 0
+        this.globalGameIndex = 0
         
         console.log('✅ GpuGameBoxRenderer disposed')
     }

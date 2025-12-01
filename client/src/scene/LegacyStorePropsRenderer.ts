@@ -36,7 +36,6 @@ import { RoomEventTypes } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
-import { ImageManager } from '../steam/images/ImageManager'
 
 // All other constants moved to RoomManager.RoomConstants - use those instead
 
@@ -51,9 +50,6 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
     private config: PropsConfig = {}
     private currentStoreGroup: THREE.Group | null = null // Track current store environment
 
-    private imageManager: ImageManager
-    private globalGameIndex: number = 0 // Track global game position for artwork selection
-
     constructor(scene: THREE.Scene, dataManager: DataManager) {
         this.scene = scene
         this.dataManager = dataManager
@@ -64,8 +60,6 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props-legacy'
         this.scene.add(this.propsGroup)
-        
-        this.imageManager = new ImageManager()
         
         this.initializeRenderers()
         
@@ -95,9 +89,6 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
             // Calculate shelves needed based on game count
             const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
             const shelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
-            
-            // Reset global game index for artwork assignment
-            this.globalGameIndex = 0
             
             // Clear existing shelves first
             this.clearExistingShelves()
@@ -327,16 +318,14 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
     ): Promise<void> {
         const worldPosition = localPosition.clone().add(parentGroup.position)
         const name = GameBoxUtils.generateGameBoxName(game, side, index, 'legacy')
-        const textureOptions = await GameBoxUtils.loadArtworkIfNeeded(game, this.globalGameIndex, this.imageManager)
         
-        const gameBox = this.gameBoxRenderer.createGameBox(game, worldPosition, textureOptions, name)
+        // Legacy renderer creates simple label-only boxes (no artwork support)
+        const gameBox = this.gameBoxRenderer.createGameBox(game, worldPosition, undefined, name)
         if (gameBox) {
             // Use localPosition for positioning within parent group (Y offsets are already in localPosition)
             gameBox.position.copy(localPosition)
             parentGroup.add(gameBox)
         }
-        
-        this.globalGameIndex++
     }
 
     public clearProps(): void {
