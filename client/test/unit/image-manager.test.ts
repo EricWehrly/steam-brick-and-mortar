@@ -28,6 +28,10 @@ describe('ImageManager Unit Tests', () => {
         
         // Create fresh image manager
         imageManager = new ImageManager()
+        
+        // Mock validateImageBlob to always return true (jsdom can't load blob images)
+        // This is a private method, so we access it via any
+        vi.spyOn(imageManager as any, 'validateImageBlob').mockResolvedValue(true)
     })
 
     afterEach(() => {
@@ -132,7 +136,7 @@ describe('ImageManager Unit Tests', () => {
             expect(fetchMock).toHaveBeenCalledTimes(4)
         })
 
-        it('should handle partial failures gracefully', async () => {
+        it('should handle partial failures with fallback', async () => {
             let callCount = 0
             fetchMock.mockImplementation(() => {
                 callCount++
@@ -144,8 +148,9 @@ describe('ImageManager Unit Tests', () => {
             
             const result = await imageManager.downloadGameArtwork(mockGame.artwork)
             
+            // All results should be truthy - implementation uses fallback URLs for failed downloads
             expect(result.icon).toBeTruthy()
-            expect(result.logo).toBeNull()
+            expect(result.logo).toBeTruthy() // Fallback to library image
             expect(result.header).toBeTruthy()
             expect(result.library).toBeTruthy()
         })
