@@ -82,11 +82,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     ): void {
         const reservedInstanceIndex = this.artworkInstanceIndex++
         
-        // Diagnostic logging for first few artwork requests
-        if (reservedInstanceIndex < 5) {
-            console.debug(`🖼️ [ArtworkFromUrl] Reserving slot #${reservedInstanceIndex} for "${game.name}" from ${artworkUrl.substring(0, 50)}...`)
-        }
-        
         this.instancedArtworkRenderer.setArtworkInstanceFromUrl(
             reservedInstanceIndex,
             position,
@@ -94,9 +89,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             artworkUrl,
             typeof game.appid === 'number' ? game.appid : undefined
         ).then((success) => {
-            if (reservedInstanceIndex < 5) {
-                console.debug(`✅ [ArtworkFromUrl] Slot #${reservedInstanceIndex} "${game.name}" completed: success=${success}`)
-            }
             if (!success) {
                 // Fall back to label if artwork fails (expected when max textures reached)
                 this.createInstancedLabelBox(game, position, undefined, side)
@@ -133,7 +125,18 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         side: ShelfSide = ShelfSide.Front
     ): void {
         const shouldUseArtwork = Math.random() < ARTWORK_PROBABILITY
-        const artworkUrl = shouldUseArtwork ? game.artwork?.header : undefined
+        
+        // Use artwork URL from game data - should always be populated by buildEnhancedGame()
+        // Fallback to appid URL is a safety net, not expected in normal operation
+        const primaryUrl = game.artwork?.header
+        const fallbackUrl = game.appid ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg` : undefined
+        
+        if (shouldUseArtwork && !primaryUrl && fallbackUrl) {
+            // This indicates a bug in the data pipeline - games should have artwork.header
+            console.warn(`[GpuGameBoxRenderer] Missing artwork.header for "${game.name}" (appid: ${game.appid}) - using fallback URL`)
+        }
+        
+        const artworkUrl = shouldUseArtwork ? (primaryUrl || fallbackUrl) : undefined
         
         if (artworkUrl) {
             this.createGameBoxFromUrl(game, position, artworkUrl, side)
