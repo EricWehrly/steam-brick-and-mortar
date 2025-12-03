@@ -175,13 +175,10 @@ export class SteamIntegration {
                 for (const game of batchGames) {
                     this.gameLibrary.updateGameData(game)
                     
-                    // Download game artwork in the background
-                    try {
-                        await this.steamClient.downloadGameArtwork(game)
-                        SteamIntegration.logger.debug(`Downloaded artwork for ${game.name}`)
-                    } catch (error) {
+                    // Fire-and-forget artwork download to warm cache (don't await - render path fetches independently)
+                    this.steamClient.downloadGameArtwork(game).catch(error => {
                         SteamIntegration.logger.warn(`Failed to download artwork for ${game.name}:`, error)
-                    }
+                    })
                 }
                 
                 // Emit batch event for progressive shelf rendering
