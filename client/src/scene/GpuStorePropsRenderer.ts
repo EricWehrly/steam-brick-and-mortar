@@ -207,7 +207,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             }
         }
         
-        this.gameBoxRenderer.resetGameIndex()
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
         this.clearExistingShelves()
@@ -340,9 +339,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 console.warn('No shelves needed - no games found')
                 return
             }
-            
-            // Reset game index for artwork assignment
-            this.gameBoxRenderer.resetGameIndex()
             
             // Reset shelf bounds tracking
             this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
