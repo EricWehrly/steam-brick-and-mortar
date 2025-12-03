@@ -29,6 +29,7 @@ import { ServiceRegistration } from './di/ServiceRegistration'
 import { ServiceKeys } from './di/ServiceKeys'
 import type { AppConfig as DIAppConfig } from './di'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
+import { RenderLoopDiagnostics } from '../debug/RenderLoopDiagnostics'
 
 export interface AppConfig extends DIAppConfig {
     steam?: {
@@ -452,6 +453,17 @@ export class SteamBrickAndMortarApp {
         // Initialize compass rose (self-registers with render loop)
         // TODO: This probably shouldn't go here, but where does it go?
         this.compassRose = new CompassRose(this.sceneManager.getCamera())
+        
+        // Initialize render loop diagnostics if enabled via URL param (?diagnostics=1)
+        // This MUST happen before startRenderLoop() - decision is made once, zero per-frame overhead when disabled
+        const urlParams = new URLSearchParams(window.location.search)
+        const diagnosticsEnabled = urlParams.get('diagnostics') === '1'
+        RenderLoopDiagnostics.initialize({ 
+            enabled: diagnosticsEnabled,
+            logInterval: 60,  // Log every ~1 second at 60fps
+            frameTimeWarnThreshold: 16.67,  // Warn if frame exceeds 60fps budget
+            callbackTimeWarnThreshold: 5  // Warn if any callback > 5ms
+        })
         
         // Start the render loop (all updates happen via registry)
         this.sceneManager.startRenderLoop()

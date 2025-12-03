@@ -3,20 +3,6 @@ import type { SteamGameData } from '../../game-box/types/GameData'
 import { GamePlacementConstants } from './GameLayoutConstants'
 import { ShelfSide, type ShelfSurface } from './SharedPropsTypes'
 
-/**
- * Artwork display configuration - single source of truth for artwork percentage
- * TODO: Make this configurable via settings once performance is validated at higher percentages
- */
-export const ARTWORK_CONFIG = {
-    /** Show artwork on every Nth game (2 = 50%, 5 = 20%, 10 = 10%) */
-    ARTWORK_EVERY_N_GAMES: 2,
-    
-    /** Check if a game at the given index should display artwork */
-    shouldUseArtwork: (globalGameIndex: number): boolean => {
-        return (globalGameIndex % ARTWORK_CONFIG.ARTWORK_EVERY_N_GAMES) === 0
-    }
-} as const
-
 export class GameBoxUtils {
     static generateGameBoxName(game: SteamGameData, side: ShelfSide, index: number, rendererType: 'gpu' | 'legacy'): string {
         const safeName = game.name?.replace(/[^a-zA-Z0-9]/g, '-') ?? 'unknown'

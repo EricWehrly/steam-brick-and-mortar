@@ -46,6 +46,15 @@ declare global {
   interface Navigator {
     xr?: XRSystem
   }
+  
+  interface Window {
+    spotlightGame?: (target: string | number | Array<string | number>) => void
+    clearSpotlights?: () => void
+    findGame?: (identifier: string | number) => unknown
+    findAllGames?: () => unknown[]
+    debugGames?: () => void
+    debugScene?: () => void
+  }
 
   interface XRSystem {
     isSessionSupported(mode: XRSessionMode): Promise<boolean>

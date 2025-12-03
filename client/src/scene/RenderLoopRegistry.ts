@@ -10,9 +10,28 @@ export interface RenderLoopCallback {
     (now: number, deltaTime: number): void
 }
 
+/**
+ * Instrumentation hooks for diagnostics
+ * All hooks are optional - only set what you need
+ */
+export interface InstrumentationHooks {
+    /** Called before executing any callbacks */
+    onBeforeFrame?: () => void
+    /** Called after all callbacks have executed */
+    onAfterFrame?: () => void
+    /** Wraps each callback execution for individual timing */
+    wrapCallback?: (
+        id: string,
+        callback: RenderLoopCallback,
+        now: number,
+        deltaTime: number
+    ) => void
+}
+
 export class RenderLoopRegistry {
     private static instance: RenderLoopRegistry | null = null
     private callbacks: Map<string, RenderLoopCallback> = new Map()
+    private instrumentation: InstrumentationHooks | null = null
 
     private constructor() {}
 
@@ -44,18 +63,40 @@ export class RenderLoopRegistry {
     }
 
     /**
+     * Set instrumentation hooks for diagnostics
+     * Pass null to remove instrumentation and return to zero-overhead mode
+     */
+    public setInstrumentation(hooks: InstrumentationHooks | null): void {
+        this.instrumentation = hooks
+    }
+
+    /**
      * Execute all registered callbacks (called by SceneManager)
      * @param now Current time in milliseconds (from performance.now())
      * @param deltaTime Time elapsed since last frame in milliseconds
      */
     public executeAll(now: number, deltaTime: number): void {
-        for (const callback of this.callbacks.values()) {
-            try {
-                callback(now, deltaTime)
-            } catch (error) {
-                console.error('RenderLoopRegistry: Error executing callback:', error)
+        // Call frame begin hook if set
+        this.instrumentation?.onBeforeFrame?.()
+        
+        if (this.instrumentation?.wrapCallback) {
+            // Instrumented path - wrapper handles execution and timing
+            for (const [id, callback] of this.callbacks.entries()) {
+                this.instrumentation.wrapCallback(id, callback, now, deltaTime)
+            }
+        } else {
+            // Fast path - direct execution
+            for (const callback of this.callbacks.values()) {
+                try {
+                    callback(now, deltaTime)
+                } catch (error) {
+                    console.error('RenderLoopRegistry: Error executing callback:', error)
+                }
             }
         }
+        
+        // Call frame end hook if set
+        this.instrumentation?.onAfterFrame?.()
     }
 
     /**

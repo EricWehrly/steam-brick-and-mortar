@@ -14,7 +14,10 @@ import type {
 } from './types/GameBoxOptions'
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
-import { ShelfSide, ARTWORK_CONFIG } from '../props/SharedPropsUtils'
+import { ShelfSide } from '../props/SharedPropsUtils'
+
+/** 67% probability of showing artwork vs label-only */
+const ARTWORK_PROBABILITY = 0.67
 import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
 export class GpuGameBoxRenderer implements IGameBoxRenderer {
@@ -30,7 +33,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private instancedArtworkRenderer: InstancedArtworkRenderer
     private labelInstanceIndex: number = 0
     private artworkInstanceIndex: number = 0
-    private globalGameIndex: number = 0  // Tracks artwork percentage decisions
 
     constructor(maxGames: number = 2000) {
         this.dimensions = { ...GpuGameBoxRenderer.DEFAULT_DIMENSIONS }
@@ -80,6 +82,11 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     ): void {
         const reservedInstanceIndex = this.artworkInstanceIndex++
         
+        // Diagnostic logging for first few artwork requests
+        if (reservedInstanceIndex < 5) {
+            console.debug(`🖼️ [ArtworkFromUrl] Reserving slot #${reservedInstanceIndex} for "${game.name}" from ${artworkUrl.substring(0, 50)}...`)
+        }
+        
         this.instancedArtworkRenderer.setArtworkInstanceFromUrl(
             reservedInstanceIndex,
             position,
@@ -87,6 +94,9 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             artworkUrl,
             typeof game.appid === 'number' ? game.appid : undefined
         ).then((success) => {
+            if (reservedInstanceIndex < 5) {
+                console.debug(`✅ [ArtworkFromUrl] Slot #${reservedInstanceIndex} "${game.name}" completed: success=${success}`)
+            }
             if (!success) {
                 // Fall back to label if artwork fails (expected when max textures reached)
                 this.createInstancedLabelBox(game, position, undefined, side)
@@ -114,15 +124,15 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     
     /**
      * Create game box with automatic artwork/label decision
-     * Uses ARTWORK_CONFIG to determine whether to use artwork based on global index
-     * This is the preferred entry point - consolidates artwork percentage logic here
+     * Uses random coin toss (~67% artwork probability)
+     * This is the preferred entry point - consolidates artwork decision here
      */
     public createGameBoxAuto(
         game: SteamGameData,
         position: THREE.Vector3,
         side: ShelfSide = ShelfSide.Front
     ): void {
-        const shouldUseArtwork = ARTWORK_CONFIG.shouldUseArtwork(this.globalGameIndex)
+        const shouldUseArtwork = Math.random() < ARTWORK_PROBABILITY
         const artworkUrl = shouldUseArtwork ? game.artwork?.header : undefined
         
         if (artworkUrl) {
@@ -130,15 +140,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         } else {
             this.createLabelGameBox(game, position, side)
         }
-        
-        this.globalGameIndex++
-    }
-    
-    /**
-     * Reset global game index (call when starting a new load)
-     */
-    public resetGameIndex(): void {
-        this.globalGameIndex = 0
     }
 
     private createInstancedArtworkBox(
@@ -217,7 +218,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         this.labelInstanceIndex = 0
         this.artworkInstanceIndex = 0
-        this.globalGameIndex = 0
         
         console.log('✅ GpuGameBoxRenderer disposed')
     }
