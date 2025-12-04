@@ -8,6 +8,7 @@
  */
 
 import * as THREE from 'three'
+import { Logger } from '../utils/Logger'
 
 export interface InputState {
     keys: {
@@ -42,6 +43,8 @@ export interface InputCallbacks {
  * Manages input for desktop and VR modes
  */
 export class InputManager {
+    private static readonly logger = Logger.withContext(InputManager.name)
+    
     private inputState: InputState = {
         keys: { w: false, a: false, s: false, d: false, q: false, e: false, space: false, c: false },
         mouse: { down: false, x: 0, y: 0 }
@@ -71,7 +74,7 @@ export class InputManager {
      */
     startListening(): void {
         if (this.isListeningToEvents) {
-            console.warn('⚠️ InputManager already listening to events')
+            InputManager.logger.warn('InputManager already listening to events')
             return
         }
 
@@ -80,7 +83,7 @@ export class InputManager {
         this.setupKeyboardControls()
         this.isListeningToEvents = true
         
-        console.log('🎮 Input controls activated')
+        InputManager.logger.debug('Input controls activated')
     }
 
     /**
@@ -94,7 +97,7 @@ export class InputManager {
         this.removeEventListeners()
         this.isListeningToEvents = false
         
-        console.log('🎮 Input controls deactivated')
+        InputManager.logger.debug('Input controls deactivated')
     }
 
     /**
