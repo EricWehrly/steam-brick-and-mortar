@@ -77,8 +77,8 @@ export class SceneManager {
         // PropRenderer creation deferred to avoid blocking startup
         // Will be created on first use by LightingRenderer
 
-        // Initialize skybox manager
-        this.skyboxManager = new SkyboxManager(this.scene)
+        // Initialize skybox manager (retrieves scene from DataManager)
+        this.skyboxManager = new SkyboxManager()
         
         // Initialize render loop registry
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()

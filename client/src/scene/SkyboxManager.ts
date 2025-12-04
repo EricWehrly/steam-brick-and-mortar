@@ -6,6 +6,8 @@
  */
 
 import * as THREE from 'three'
+import { DataManager } from '../core/data/DataManager'
+import { DataKey } from '../core/data/DataTypes'
 
 export interface SkyboxConfig {
     /** Path to the skybox image (relative to public folder) */
@@ -18,7 +20,11 @@ export class SkyboxManager {
     private scene: THREE.Scene
     private textureLoader: THREE.TextureLoader
 
-    constructor(scene: THREE.Scene) {
+    constructor() {
+        const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
+        if (!scene) {
+            throw new Error('SkyboxManager requires scene to be registered in DataManager')
+        }
         this.scene = scene
         this.textureLoader = new THREE.TextureLoader()
     }

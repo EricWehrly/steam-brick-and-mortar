@@ -5,28 +5,10 @@
  * using the correct event type constant.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-
-// Mock EventManager 
-vi.mock('../../../src/core/EventManager', () => ({
-    EventManager: {
-        getInstance: vi.fn().mockReturnValue({
-            registerEventHandler: vi.fn(),
-            registerDefaultHandler: vi.fn(),
-            registerOverrideHandler: vi.fn(),
-            emit: vi.fn()
-        })
-    },
-    EventSource: {
-        UI: 'ui',
-        Keyboard: 'keyboard',
-        Mouse: 'mouse',
-        Gamepad: 'gamepad',
-        VRController: 'vr-controller',
-        System: 'system',
-        ManagedLight: 'managed-light'
-    }
-}))
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import * as THREE from 'three'
+import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
+import { createSceneTestContainer } from '../../utils/test-container-helpers'
 
 // Mock other dependencies
 vi.mock('../../../src/scene/SceneManager', () => ({
@@ -46,12 +28,19 @@ vi.mock('../../../src/scene/GameBoxRenderer', () => ({
 }))
 
 import { SceneCoordinator } from '../../../src/scene/SceneCoordinator'
-import { EventManager } from '../../../src/core/EventManager'
 import { GameEventTypes } from '../../../src/types/InteractionEvents'
 
 describe('Scene Coordinator Event Registration', () => {
-    beforeEach(() => {
+    let container: ServiceContainer
+
+    beforeEach(async () => {
         vi.clearAllMocks()
+        // Create test container which registers scene in DataManager
+        container = await createSceneTestContainer()
+    })
+
+    afterEach(async () => {
+        await container.dispose()
     })
 
     it('should emit SceneReady event when basic environment is set up', () => {

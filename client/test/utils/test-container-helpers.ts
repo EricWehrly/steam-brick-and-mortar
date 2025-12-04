@@ -23,6 +23,7 @@ import { ServiceContainer } from '../../src/core/di/ServiceContainer'
 import { ServiceKeys, type ServiceKeyType } from '../../src/core/di/ServiceKeys'
 import { EventManager } from '../../src/core/EventManager'
 import { DataManager } from '../../src/core/data/DataManager'
+import { DataDomain, DataKey } from '../../src/core/data/DataTypes'
 import { AppSettings } from '../../src/core/AppSettings'
 
 /**
@@ -143,6 +144,12 @@ export async function createSceneTestContainer(): Promise<ServiceContainer> {
 
     container.registerSingleton(ServiceKeys.AppSettings, () => {
         return AppSettings.getInstance()
+    })
+
+    // Create and register mock scene in DataManager for components that retrieve it
+    const mockScene = new THREE.Scene()
+    DataManager.getInstance().set(DataKey.MainScene, mockScene, {
+        domain: DataDomain.Scene
     })
 
     // Register mock scene services (no WebGL dependencies)

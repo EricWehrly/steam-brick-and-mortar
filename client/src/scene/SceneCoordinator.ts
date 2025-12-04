@@ -73,13 +73,13 @@ export class SceneCoordinator {
         // Store props handlers are now self-registering via module import
         
         // Initialize visual system renderers
-        this.skyboxManager = new SkyboxManager(this.sceneManager.getScene())
+        this.skyboxManager = new SkyboxManager()
         this.lightingRenderer = new LightingRenderer(
             this.sceneManager.getScene(),
             this.sceneManager.getRenderer()
         )
-        // Initialize room manager for event-driven room structure (no longer needs EnvironmentRenderer)
-        this.roomManager = new RoomManager(this.sceneManager.getScene(), this.dataManager, this.eventManager)
+        // Initialize room manager for event-driven room structure (retrieves scene from DataManager)
+        this.roomManager = new RoomManager()
 
         // Track scene construction phase - will remain open until props complete
         const tracker = StartupEventTracker.getInstance()

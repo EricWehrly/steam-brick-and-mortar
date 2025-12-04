@@ -33,7 +33,7 @@ describe('RoomManager Ceiling Visibility System', () => {
     let eventManager: EventManager
 
     beforeEach(async () => {
-        // Create isolated test container
+        // Create isolated test container (also registers scene in DataManager)
         container = await createSceneTestContainer()
         
         mockScene = new THREE.Scene()
@@ -41,7 +41,7 @@ describe('RoomManager Ceiling Visibility System', () => {
         // Resolve EventManager from container
         eventManager = await container.resolve(ServiceKeys.EventManager)
         
-        roomManager = new RoomManager(mockScene)
+        roomManager = new RoomManager()
     })
 
     afterEach(async () => {
