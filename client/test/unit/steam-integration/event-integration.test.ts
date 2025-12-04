@@ -42,7 +42,9 @@ describe('SteamIntegration Event Integration', () => {
             vanity_url: 'testuser'
         })
         
-        mockSteamClient.loadGamesProgressively = vi.fn().mockResolvedValue([{
+        // Mock loadGamesProgressively to invoke the onBatchReady callback
+        // This simulates the cache-first batch emission pattern
+        const mockGame = {
             appid: 730,
             name: 'Counter-Strike 2',
             artwork: {
@@ -51,7 +53,14 @@ describe('SteamIntegration Event Integration', () => {
                 header: 'header-url',
                 library: 'library-url'
             }
-        }])
+        }
+        mockSteamClient.loadGamesProgressively = vi.fn().mockImplementation(async (_steamUser, options) => {
+            // Invoke the callback if provided (new cache-first pattern)
+            if (options?.onBatchReady) {
+                options.onBatchReady([mockGame], 0, 1)
+            }
+            return [mockGame]
+        })
         
         mockSteamClient.downloadGameArtwork = vi.fn().mockResolvedValue({})
         
@@ -91,10 +100,7 @@ describe('SteamIntegration Event Integration', () => {
                     })
                 ]),
                 batchIndex: 0,
-                totalBatches: 1,
-                isLastBatch: true,
-                timestamp: expect.any(Number),
-                source: 'system'
+                totalBatches: 1
             })
         )
     })
@@ -148,10 +154,7 @@ describe('SteamIntegration Event Integration', () => {
                     })
                 ]),
                 batchIndex: 0,
-                totalBatches: 1,
-                isLastBatch: true,
-                timestamp: expect.any(Number),
-                source: 'system'
+                totalBatches: 1
             })
         )
     })

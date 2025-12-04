@@ -265,7 +265,7 @@ export class SteamApiClient {
      * 3. Build enhanced game objects directly
      * 
      * @param steamUser - Steam user data with games list
-     * @param options - maxGames limits display, onProgress for UI updates
+     * @param options - maxGames limits display, onProgress for UI updates, onBatchReady for progressive batches
      */
     public async loadGamesProgressively(
         steamUser: SteamUser,
@@ -273,9 +273,12 @@ export class SteamApiClient {
             maxGames?: number
             onProgress?: (current: number, total: number) => void
             onGameLoaded?: (game: SteamGame) => void
+            /** Called for each batch of games ready to render. Enables cache-first display. */
+            onBatchReady?: (games: SteamGame[], batchIndex: number, totalBatches: number) => void
         } = {}
     ): Promise<SteamGame[]> {
-        const { maxGames = 10, onProgress, onGameLoaded } = options
+        const { maxGames = 10, onProgress, onGameLoaded, onBatchReady } = options
+        const BATCH_SIZE = 18 // One shelf's worth
         
         // Sort by playtime and limit
         const sortedGames = [...steamUser.games]
@@ -287,27 +290,62 @@ export class SteamApiClient {
         // Single cache read for all games
         const cachedAppDetails = await this.appDetailsCache.getMany(appids)
         
-        // Find games needing fetch (missing or incomplete metadata)
+        // Partition into cached vs uncached
+        const cachedAppids = appids.filter(id => this.isMetadataComplete(cachedAppDetails.get(id)))
         const uncachedAppids = appids.filter(id => !this.isMetadataComplete(cachedAppDetails.get(id)))
-        const cacheHits = appids.length - uncachedAppids.length
         
         if (uncachedAppids.length === 0) {
             SteamApiClient.logger.debug(`All ${appids.length} games have complete metadata in cache`)
         } else {
-            SteamApiClient.logger.info(`Loading ${appids.length} games: ${cacheHits} cached, ${uncachedAppids.length} to fetch`)
+            SteamApiClient.logger.info(`Loading ${appids.length} games: ${cachedAppids.length} cached, ${uncachedAppids.length} to fetch`)
         }
         
-        // Fetch missing games (only if needed)
-        const fetchedAppDetails = new Map<number, AppDetailsData>()
+        const results: SteamGame[] = []
+        
+        // PHASE 1: Emit cached games immediately (cache-first for fast startup)
+        if (cachedAppids.length > 0 && onBatchReady) {
+            const cachedGames = sortedGames.filter(g => cachedAppids.includes(g.appid))
+            const cachedEnhanced: SteamGame[] = []
+            
+            for (const game of cachedGames) {
+                const enhancedGame = this.buildEnhancedGame(game, cachedAppDetails.get(game.appid))
+                this.cache.set(`game_${game.appid}`, enhancedGame)
+                cachedEnhanced.push(enhancedGame)
+                results.push(enhancedGame)
+                onGameLoaded?.(enhancedGame)
+            }
+            
+            // Emit cached games in batches with yielding
+            const cachedBatches = Math.ceil(cachedEnhanced.length / BATCH_SIZE)
+            const totalEstimatedBatches = Math.ceil(sortedGames.length / BATCH_SIZE)
+            
+            for (let i = 0; i < cachedBatches; i++) {
+                const batchGames = cachedEnhanced.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
+                const isLastCachedBatch = i === cachedBatches - 1
+                
+                onBatchReady(batchGames, i, totalEstimatedBatches)
+                
+                // Yield to main thread between batches
+                if (!isLastCachedBatch) {
+                    await new Promise(resolve => setTimeout(resolve, 0))
+                }
+            }
+            
+            SteamApiClient.logger.info(`Emitted ${cachedEnhanced.length} cached games in ${cachedBatches} batches`)
+            onProgress?.(cachedAppids.length, appids.length)
+        }
+        
+        // PHASE 2: Fetch uncached games in background (supplemental batches)
         if (uncachedAppids.length > 0) {
             try {
                 const batchResponses = await this.batchClient.fetchBatch(uncachedAppids, {
                     batchSize: 100,
                     onProgress: (fetched, _total) => {
-                        onProgress?.(cacheHits + fetched, appids.length)
+                        onProgress?.(cachedAppids.length + fetched, appids.length)
                     }
                 })
                 
+                const fetchedAppDetails = new Map<number, AppDetailsData>()
                 for (const [appid, response] of batchResponses.entries()) {
                     fetchedAppDetails.set(appid, this.normalizeBatchData(response.data))
                 }
@@ -315,23 +353,58 @@ export class SteamApiClient {
                 if (fetchedAppDetails.size > 0) {
                     await this.appDetailsCache.setMany(fetchedAppDetails)
                 }
+                
+                // Build and emit fetched games as supplemental batches
+                const uncachedGames = sortedGames.filter(g => uncachedAppids.includes(g.appid))
+                const uncachedEnhanced: SteamGame[] = []
+                
+                for (const game of uncachedGames) {
+                    const enhancedGame = this.buildEnhancedGame(game, fetchedAppDetails.get(game.appid))
+                    this.cache.set(`game_${game.appid}`, enhancedGame)
+                    uncachedEnhanced.push(enhancedGame)
+                    results.push(enhancedGame)
+                    onGameLoaded?.(enhancedGame)
+                }
+                
+                // Emit fetched games as supplemental batches
+                if (onBatchReady && uncachedEnhanced.length > 0) {
+                    const uncachedBatches = Math.ceil(uncachedEnhanced.length / BATCH_SIZE)
+                    const startBatchIndex = Math.ceil(cachedAppids.length / BATCH_SIZE)
+                    const totalBatches = startBatchIndex + uncachedBatches
+                    
+                    for (let i = 0; i < uncachedBatches; i++) {
+                        const batchGames = uncachedEnhanced.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
+                        const isLastUncachedBatch = i === uncachedBatches - 1
+                        
+                        onBatchReady(batchGames, startBatchIndex + i, totalBatches)
+                        
+                        // Yield to main thread between batches
+                        if (!isLastUncachedBatch) {
+                            await new Promise(resolve => setTimeout(resolve, 0))
+                        }
+                    }
+                    
+                    SteamApiClient.logger.info(`Emitted ${uncachedEnhanced.length} fetched games in ${uncachedBatches} supplemental batches`)
+                }
             } catch (error) {
                 SteamApiClient.logger.error('Batch fetch failed:', error)
             }
         }
         
-        // Build enhanced games from cache + fetched data
-        const allAppDetails = new Map([...cachedAppDetails, ...fetchedAppDetails])
-        const results: SteamGame[] = []
-        
-        for (const game of sortedGames) {
-            const enhancedGame = this.buildEnhancedGame(game, allAppDetails.get(game.appid))
-            this.cache.set(`game_${game.appid}`, enhancedGame)
-            results.push(enhancedGame)
-            onGameLoaded?.(enhancedGame)
+        // If no onBatchReady callback, build all games at once (legacy behavior)
+        if (!onBatchReady) {
+            const allAppDetails = new Map([...cachedAppDetails])
+            for (const game of sortedGames) {
+                if (!results.find(r => r.appid === game.appid)) {
+                    const enhancedGame = this.buildEnhancedGame(game, allAppDetails.get(game.appid))
+                    this.cache.set(`game_${game.appid}`, enhancedGame)
+                    results.push(enhancedGame)
+                    onGameLoaded?.(enhancedGame)
+                }
+            }
         }
         
-        SteamApiClient.logger.info(`Loaded ${results.length} games (${cacheHits} cached, ${fetchedAppDetails.size} fetched)`)
+        SteamApiClient.logger.info(`Loaded ${results.length} games (${cachedAppids.length} cached, ${uncachedAppids.length} fetched)`)
         return results
     }
 

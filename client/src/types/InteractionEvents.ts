@@ -3,6 +3,9 @@
  * 
  * Type definitions for all interaction events in the application.
  * Events are namespaced by system for clarity and organization.
+ * 
+ * TODO: Review all event interfaces for unnecessary properties (timestamp/source default,
+ * many events may have cruft that's passed but never consumed). Tech debt backlog item.
  */
 
 // I really don't like that we let this get imported ... YOLO
@@ -58,7 +61,6 @@ export interface SteamGamesBatchEvent extends BaseInteractionEvent {
     games: ReadonlyArray<Readonly<SteamGame>>
     batchIndex: number
     totalBatches: number
-    isLastBatch: boolean
 }
 
 // =============================================================================
