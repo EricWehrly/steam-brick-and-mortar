@@ -34,7 +34,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private dataManager: DataManager
 
     private storeLayout: StoreLayout
-    private gameBoxRenderer: GpuGameBoxRenderer
+    private gameBoxRenderer: GpuGameBoxRenderer | null = null
     private signageRenderer: SignageRenderer
     private propsGroup: THREE.Group
     private config: PropsConfig = {}
@@ -70,9 +70,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.scene = scene
         this.dataManager = dataManager
 
-        // Create our own GpuGameBoxRenderer instance with generous max instances
-        // Will be re-initialized with actual game count when games are loaded
-        this.gameBoxRenderer = new GpuGameBoxRenderer(2000)
+        // GpuGameBoxRenderer allocation deferred until we know actual game count
+        // Texture arrays are expensive - don't allocate VRAM until needed
 
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props-instanced'
@@ -193,7 +192,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private async initializeForProgressiveLoading(totalBatches: number): Promise<void> {
         const estimatedGames = totalBatches * 18 // BATCH_SIZE from SteamIntegration
         
-        this.gameBoxRenderer.dispose()
+        this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = new GpuGameBoxRenderer(estimatedGames + 100)
         
         if (this.instancedShelfRenderer && !this.instancedShelfRenderer.isReady()) {
@@ -312,7 +311,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const gameCount = games.length
         
         if (games.length > 0) {
-            this.gameBoxRenderer.dispose()
+            this.gameBoxRenderer?.dispose()
             this.gameBoxRenderer = new GpuGameBoxRenderer(gameCount + 100)
         }
         
@@ -626,7 +625,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         side: ShelfSide,
         _index: number
     ): void {
-        // Delegate to renderer - it handles artwork percentage decision internally
+        if (!this.gameBoxRenderer) {
+            console.warn('⚠️ GpuGameBoxRenderer not initialized - cannot create game box')
+            return
+        }
         this.gameBoxRenderer.createGameBoxAuto(game, worldPosition, side)
     }
 
