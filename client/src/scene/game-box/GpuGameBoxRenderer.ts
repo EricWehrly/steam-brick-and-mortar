@@ -19,6 +19,7 @@ import type {
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
 import { MultiAtlasArtworkRenderer } from './instancing/MultiAtlasArtworkRenderer'
+import { LodArtworkRenderer, type LodLevel } from './instancing/LodArtworkRenderer'
 import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
 
@@ -38,12 +39,15 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private instancedLabelRenderer: InstancedLabelRenderer
     private instancedArtworkRenderer: InstancedArtworkRenderer | null = null
     private multiAtlasRenderer: MultiAtlasArtworkRenderer | null = null
+    private lodArtworkRenderer: LodArtworkRenderer | null = null
     private labelInstanceIndex: number = 0
     private artworkInstanceIndex: number = 0
     private readonly useMultiAtlas: boolean
+    private readonly useLodAtlas: boolean
 
     constructor(maxGames: number = 2000) {
         this.dimensions = { ...GpuGameBoxRenderer.DEFAULT_DIMENSIONS }
+        this.useLodAtlas = AppSettings.get(Setting.UseLodAtlas)
         this.useMultiAtlas = AppSettings.get(Setting.UseMultiAtlas)
         
         // Create label renderer (always needed for fallback)
@@ -51,8 +55,13 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             maxInstances: maxGames
         })
         
-        // Create artwork renderer based on setting
-        if (this.useMultiAtlas) {
+        // Create artwork renderer based on settings (priority: LOD > MultiAtlas > Single)
+        if (this.useLodAtlas) {
+            this.lodArtworkRenderer = new LodArtworkRenderer({
+                maxTextures: maxGames
+            })
+            console.debug(`📦 GpuGameBoxRenderer using LOD atlas system (max ${maxGames} instances)`)
+        } else if (this.useMultiAtlas) {
             this.multiAtlasRenderer = new MultiAtlasArtworkRenderer()
             console.debug(`📦 GpuGameBoxRenderer using multi-atlas system (max ${maxGames} instances)`)
         } else {
@@ -95,7 +104,9 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         artworkUrl: string,
         side: ShelfSide = ShelfSide.Front
     ): void {
-        if (this.useMultiAtlas && this.multiAtlasRenderer) {
+        if (this.useLodAtlas && this.lodArtworkRenderer) {
+            this.createGameBoxFromUrlLodAtlas(game, position, artworkUrl, side)
+        } else if (this.useMultiAtlas && this.multiAtlasRenderer) {
             this.createGameBoxFromUrlMultiAtlas(game, position, artworkUrl, side)
         } else {
             this.createGameBoxFromUrlSingleAtlas(game, position, artworkUrl, side)
@@ -108,6 +119,33 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
      */
     public setBatchIndex(batchIndex: number): void {
         this.multiAtlasRenderer?.setBatchIndex(batchIndex)
+    }
+    
+    private createGameBoxFromUrlLodAtlas(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        artworkUrl: string,
+        side: ShelfSide
+    ): void {
+        if (!this.lodArtworkRenderer) return
+        
+        this.lodArtworkRenderer.setArtworkInstanceFromUrl(
+            position,
+            game.name,
+            artworkUrl,
+            typeof game.appid === 'number' ? game.appid : undefined
+        ).then((result) => {
+            if (!result.success && AppSettings.get(Setting.EnableLabels)) {
+                this.createInstancedLabelBox(game, position, undefined, side)
+            }
+        }).catch((error) => {
+            if (!(error instanceof Error && error.message.includes('Maximum'))) {
+                console.error(`Error fetching artwork for "${game.name}":`, error)
+            }
+            if (AppSettings.get(Setting.EnableLabels)) {
+                this.createInstancedLabelBox(game, position, undefined, side)
+            }
+        })
     }
     
     private createGameBoxFromUrlMultiAtlas(
@@ -143,9 +181,11 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         artworkUrl: string,
         side: ShelfSide
     ): void {
+        if (!this.instancedArtworkRenderer) return
+        
         const reservedInstanceIndex = this.artworkInstanceIndex++
         
-        this.instancedArtworkRenderer!.setArtworkInstanceFromUrl(
+        this.instancedArtworkRenderer.setArtworkInstanceFromUrl(
             reservedInstanceIndex,
             position,
             game.name,
@@ -290,10 +330,51 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         this.instancedLabelRenderer.dispose()
         this.instancedArtworkRenderer?.dispose()
         this.multiAtlasRenderer?.dispose()
+        this.lodArtworkRenderer?.dispose()
         
         this.labelInstanceIndex = 0
         this.artworkInstanceIndex = 0
         
         console.log('✅ GpuGameBoxRenderer disposed')
+    }
+    
+    /**
+     * Set global LOD level for all artwork instances (only with LOD atlas)
+     */
+    public setGlobalLod(lodLevel: LodLevel): void {
+        this.lodArtworkRenderer?.setGlobalLod(lodLevel)
+    }
+    
+    /**
+     * Get the LOD renderer for advanced control (null if not using LOD atlas)
+     */
+    public getLodRenderer(): LodArtworkRenderer | null {
+        return this.lodArtworkRenderer
+    }
+    
+    /**
+     * Get memory stats (available with multi-atlas or LOD atlas)
+     */
+    public getMemoryStats() {
+        if (this.lodArtworkRenderer) {
+            return this.lodArtworkRenderer.getMemoryStats()
+        }
+        if (this.multiAtlasRenderer) {
+            return this.multiAtlasRenderer.getMemoryStats()
+        }
+        return null
+    }
+    
+    /**
+     * Log memory stats to console
+     */
+    public logMemoryStats(): void {
+        if (this.lodArtworkRenderer) {
+            this.lodArtworkRenderer.logMemoryStats()
+        } else if (this.multiAtlasRenderer) {
+            this.multiAtlasRenderer.logMemoryStats()
+        } else {
+            console.log('Memory stats only available with multi-atlas or LOD renderer')
+        }
     }
 }

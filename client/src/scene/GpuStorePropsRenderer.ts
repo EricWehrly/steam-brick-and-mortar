@@ -28,6 +28,8 @@ import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import { ImageManager } from '../steam/images/ImageManager'
 import type { SteamGame } from '../steam'
+import { LodControlsPanel } from '../ui/LodControlsPanel'
+import { AppSettings, Setting } from '../core/AppSettings'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private scene: THREE.Scene
@@ -42,6 +44,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private instancedShelfRenderer?: InstancedShelfRenderer
     private imageManager: ImageManager
+    private lodControlsPanel?: LodControlsPanel
 
     // Track objects we create for proper cleanup
     private createdGameBoxes: THREE.Object3D[] = []
@@ -198,6 +201,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = new GpuGameBoxRenderer(estimatedGames + 100)
         
+        // Initialize LOD controls panel if using LOD atlas
+        if (AppSettings.get(Setting.UseLodAtlas) && this.gameBoxRenderer.getLodRenderer()) {
+            this.initializeLodControls()
+        }
+        
         if (this.instancedShelfRenderer && !this.instancedShelfRenderer.isReady()) {
             const waitStart = Date.now()
             while (!this.instancedShelfRenderer.isReady()) {
@@ -212,6 +220,31 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
         this.clearExistingShelves()
+    }
+    
+    private initializeLodControls(): void {
+        if (this.lodControlsPanel) return
+        
+        this.lodControlsPanel = new LodControlsPanel(EventManager.getInstance(), {
+            onLodChange: (level) => {
+                this.gameBoxRenderer?.setGlobalLod(level)
+                
+                // Update stats display (LOD renderer stats)
+                const lodRenderer = this.gameBoxRenderer?.getLodRenderer()
+                if (lodRenderer && this.lodControlsPanel) {
+                    const stats = lodRenderer.getMemoryStats()
+                    this.lodControlsPanel.updateStats({
+                        textureCount: stats.textureCount,
+                        instanceCount: stats.instanceCount,
+                        totalMB: stats.totalAllocated / (1024 * 1024)
+                    })
+                }
+            }
+        })
+        
+        // Show the panel
+        this.lodControlsPanel.show()
+        console.debug('🎨 LOD controls panel initialized')
     }
     
     private async createShelfForBatch(games: SteamGameData[], batchIndex: number): Promise<void> {
@@ -265,6 +298,15 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     
     private async finalizeProgressiveLoading(): Promise<void> {
         console.debug(`✅ Progressive loading complete: ${this.allBatchGames.length} games on ${this.cumulativeShelfCount} shelves`)
+        
+        // Log LOD atlas stats if using LOD renderer
+        const lodRenderer = this.gameBoxRenderer?.getLodRenderer()
+        if (lodRenderer) {
+            lodRenderer.logMemoryStats()
+        } else {
+            // Log multi-atlas stats if using that instead
+            this.gameBoxRenderer?.logMemoryStats()
+        }
         
         // Calculate and emit final room dimensions
         if (this.shelfBounds.minX !== Infinity) {
@@ -673,5 +715,19 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.scene.remove(this.propsGroup)
         
         console.info('GpuStorePropsRenderer disposed')
+    }
+    
+    /**
+     * Get memory stats from the game box renderer (multi-atlas only)
+     */
+    public getArtworkMemoryStats() {
+        return this.gameBoxRenderer?.getMemoryStats() ?? null
+    }
+    
+    /**
+     * Log memory stats to console
+     */
+    public logMemoryStats(): void {
+        this.gameBoxRenderer?.logMemoryStats()
     }
 }

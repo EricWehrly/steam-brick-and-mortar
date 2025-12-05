@@ -84,9 +84,6 @@ export class LodArtworkRenderer {
     private instanceMetadata: Map<number, InstanceMetadata & { lodLevel: LodLevel }> = new Map()
     private lodLevels: Float32Array | null = null
     
-    // Source image dimension tracking (for diagnostics)
-    private sourceDimensions: { width: number; height: number }[] = []
-    
     private textureWorker: TextureWorker
     private readonly maxTextures: number
     private readonly dimensions: { width: number; height: number; depth: number }
@@ -148,7 +145,7 @@ export class LodArtworkRenderer {
         if (this.instancedMesh) return
         
         // Create all LOD texture arrays
-        for (const [level, state] of this.lodTextures) {
+        for (const [_level, state] of this.lodTextures) {
             const size = state.config.textureSize
             const data = new Uint8Array(size * size * this.maxTextures * 4)
             state.dataArrayTexture = new THREE.DataArrayTexture(data, size, size, this.maxTextures)
@@ -256,7 +253,6 @@ export class LodArtworkRenderer {
         }
         
         const textureIndex = this.nextTextureIndex++
-        let isFirstLod = true
         
         try {
             // Process LOD levels SEQUENTIALLY - the worker shares a canvas
@@ -269,15 +265,6 @@ export class LodArtworkRenderer {
                     gameName,
                     10000
                 )
-                
-                // Track source dimensions from first LOD (all same source)
-                if (isFirstLod && result.sourceWidth && result.sourceHeight) {
-                    this.sourceDimensions.push({
-                        width: result.sourceWidth,
-                        height: result.sourceHeight
-                    })
-                    isFirstLod = false
-                }
                 
                 // Copy to texture array
                 if (!state.dataArrayTexture) {
@@ -449,26 +436,6 @@ export class LodArtworkRenderer {
         }
         console.log(`Total: ${(stats.totalAllocated / (1024 * 1024)).toFixed(1)}MB`)
         console.log(`Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}`)
-        
-        // Source image dimension analysis
-        if (this.sourceDimensions.length > 0) {
-            const widths = this.sourceDimensions.map(d => d.width)
-            const heights = this.sourceDimensions.map(d => d.height)
-            const avgWidth = widths.reduce((a, b) => a + b, 0) / widths.length
-            const avgHeight = heights.reduce((a, b) => a + b, 0) / heights.length
-            const maxWidth = Math.max(...widths)
-            const maxHeight = Math.max(...heights)
-            const minWidth = Math.min(...widths)
-            const minHeight = Math.min(...heights)
-            
-            console.group('📐 Source Image Dimensions (Steam headers)')
-            console.log(`Samples: ${this.sourceDimensions.length}`)
-            console.log(`Average: ${avgWidth.toFixed(0)}×${avgHeight.toFixed(0)}`)
-            console.log(`Range: ${minWidth}×${minHeight} to ${maxWidth}×${maxHeight}`)
-            console.log(`Recommendation: HIGH LOD could be ${Math.ceil(maxWidth / 64) * 64}×${Math.ceil(maxHeight / 64) * 64} or smaller`)
-            console.groupEnd()
-        }
-        
         console.groupEnd()
     }
     
