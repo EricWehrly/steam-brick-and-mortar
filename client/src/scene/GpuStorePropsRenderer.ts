@@ -163,6 +163,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             await this.initializeForProgressiveLoading(totalBatches)
         }
         
+        // Tell multi-atlas renderer which batch we're processing (for tier assignment)
+        this.gameBoxRenderer?.setBatchIndex(batchIndex)
+        
         await this.createShelfForBatch(batchGames, batchIndex)
         
         // Emit GPU update after each batch

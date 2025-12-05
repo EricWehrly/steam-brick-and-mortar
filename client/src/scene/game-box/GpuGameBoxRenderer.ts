@@ -4,6 +4,10 @@
  * GPU-optimized rendering using InstancedMesh for massive performance gains.
  * Requires WebGL2 and instanced arrays support.
  * Uses InstancedLabelRenderer and InstancedArtworkRenderer for batch rendering.
+ * 
+ * Supports two rendering modes for artwork:
+ * - Single atlas: Original 1024-layer texture array (~1GB VRAM)
+ * - Multi atlas: 3-tier system with primary/secondary/uncached (~270MB VRAM)
  */
 
 import * as THREE from 'three'
@@ -14,6 +18,7 @@ import type {
 } from './types/GameBoxOptions'
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
+import { MultiAtlasArtworkRenderer } from './instancing/MultiAtlasArtworkRenderer'
 import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
 
@@ -31,22 +36,31 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
 
     private dimensions: GameBoxDimensions
     private instancedLabelRenderer: InstancedLabelRenderer
-    private instancedArtworkRenderer: InstancedArtworkRenderer
+    private instancedArtworkRenderer: InstancedArtworkRenderer | null = null
+    private multiAtlasRenderer: MultiAtlasArtworkRenderer | null = null
     private labelInstanceIndex: number = 0
     private artworkInstanceIndex: number = 0
+    private readonly useMultiAtlas: boolean
 
     constructor(maxGames: number = 2000) {
         this.dimensions = { ...GpuGameBoxRenderer.DEFAULT_DIMENSIONS }
+        this.useMultiAtlas = AppSettings.get(Setting.UseMultiAtlas)
         
-        // Create and own instanced renderers with generous buffer
+        // Create label renderer (always needed for fallback)
         this.instancedLabelRenderer = new InstancedLabelRenderer({
             maxInstances: maxGames
         })
-        this.instancedArtworkRenderer = new InstancedArtworkRenderer({
-            maxInstances: maxGames
-        })
         
-        console.debug(`📦 GpuGameBoxRenderer initialized with max ${maxGames} instances`)
+        // Create artwork renderer based on setting
+        if (this.useMultiAtlas) {
+            this.multiAtlasRenderer = new MultiAtlasArtworkRenderer()
+            console.debug(`📦 GpuGameBoxRenderer using multi-atlas system (max ${maxGames} instances)`)
+        } else {
+            this.instancedArtworkRenderer = new InstancedArtworkRenderer({
+                maxInstances: maxGames
+            })
+            console.debug(`📦 GpuGameBoxRenderer using single atlas (max ${maxGames} instances)`)
+        }
     }
 
     /**
@@ -81,9 +95,57 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         artworkUrl: string,
         side: ShelfSide = ShelfSide.Front
     ): void {
+        if (this.useMultiAtlas && this.multiAtlasRenderer) {
+            this.createGameBoxFromUrlMultiAtlas(game, position, artworkUrl, side)
+        } else {
+            this.createGameBoxFromUrlSingleAtlas(game, position, artworkUrl, side)
+        }
+    }
+    
+    /**
+     * Set the current batch index for multi-atlas tier assignment
+     * Should be called before processing each batch
+     */
+    public setBatchIndex(batchIndex: number): void {
+        this.multiAtlasRenderer?.setBatchIndex(batchIndex)
+    }
+    
+    private createGameBoxFromUrlMultiAtlas(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        artworkUrl: string,
+        side: ShelfSide
+    ): void {
+        if (!this.multiAtlasRenderer) return
+        
+        this.multiAtlasRenderer.setArtworkInstanceFromUrl(
+            position,
+            game.name,
+            artworkUrl,
+            typeof game.appid === 'number' ? game.appid : undefined
+        ).then((result) => {
+            if (!result.success && AppSettings.get(Setting.EnableLabels)) {
+                this.createInstancedLabelBox(game, position, undefined, side)
+            }
+        }).catch((error) => {
+            if (!(error instanceof Error && error.message.includes('Maximum'))) {
+                console.error(`Error fetching artwork for "${game.name}":`, error)
+            }
+            if (AppSettings.get(Setting.EnableLabels)) {
+                this.createInstancedLabelBox(game, position, undefined, side)
+            }
+        })
+    }
+    
+    private createGameBoxFromUrlSingleAtlas(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        artworkUrl: string,
+        side: ShelfSide
+    ): void {
         const reservedInstanceIndex = this.artworkInstanceIndex++
         
-        this.instancedArtworkRenderer.setArtworkInstanceFromUrl(
+        this.instancedArtworkRenderer!.setArtworkInstanceFromUrl(
             reservedInstanceIndex,
             position,
             game.name,
@@ -155,6 +217,11 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         textureOptions: GameBoxTextureOptions,
         _name?: string
     ): THREE.Mesh | null {
+        if (!this.instancedArtworkRenderer) {
+            console.warn('createInstancedArtworkBox called but single-atlas renderer not available')
+            return null
+        }
+        
         const reservedInstanceIndex = this.artworkInstanceIndex++
 
         this.instancedArtworkRenderer.setArtworkInstance(
@@ -221,7 +288,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         console.debug('🧹 Disposing GpuGameBoxRenderer resources')
         
         this.instancedLabelRenderer.dispose()
-        this.instancedArtworkRenderer.dispose()
+        this.instancedArtworkRenderer?.dispose()
+        this.multiAtlasRenderer?.dispose()
         
         this.labelInstanceIndex = 0
         this.artworkInstanceIndex = 0

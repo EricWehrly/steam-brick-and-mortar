@@ -39,6 +39,7 @@ export const Setting = {
     EnableLabels: 'enableLabels',
     EnableStickers: 'enableStickers',
     EnableArtwork: 'enableArtwork',
+    UseMultiAtlas: 'useMultiAtlas',
     // Interface
     ShowFPS: 'showFPS',
     ShowPerformanceStats: 'showPerformanceStats',
@@ -70,6 +71,7 @@ export interface ApplicationSettings {
     enableLabels: boolean      // Game box text labels (GPU intensive)
     enableStickers: boolean    // Shelf stickers/decals (GPU intensive)
     enableArtwork: boolean     // Game box artwork textures
+    useMultiAtlas: boolean     // Use 3-tier texture atlas system (reduces VRAM)
     
     // Interface Settings
     showFPS: boolean
@@ -323,6 +325,7 @@ export class AppSettings {
             enableLabels: !isDev,
             enableStickers: !isDev,
             enableArtwork: true, // Always on - this is the core feature
+            useMultiAtlas: true, // Use 3-tier atlas for better VRAM efficiency
             
             // Interface Settings
             showFPS: false,
@@ -358,7 +361,7 @@ export class AppSettings {
             'showFPS', 'showPerformanceStats', 'hideUIInVR', 
             'verboseLogging', 'showDebugInfo', 'showCompassRose', 
             'autoSave', 'autoLoadProfile', 'developmentMode',
-            'enableLabels', 'enableStickers', 'enableArtwork',
+            'enableLabels', 'enableStickers', 'enableArtwork', 'useMultiAtlas',
             'enableLighting', 'showLightingDebug', 'showCeiling'
         ]
         for (const field of booleanFields) {
