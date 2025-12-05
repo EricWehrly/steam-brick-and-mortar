@@ -20,6 +20,13 @@ import { ShelfSide } from '../props/SharedPropsUtils'
 const ARTWORK_PROBABILITY = 0.67
 import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
+/**
+ * Feature flag: Enable label rendering for game boxes
+ * Default OFF for dev mode to reduce startup time and measure GPU impact
+ * Label boxes are text-only boxes that show when artwork is not available
+ */
+const LABELS_ENABLED = false
+
 export class GpuGameBoxRenderer implements IGameBoxRenderer {
 
     private static readonly DEFAULT_DIMENSIONS: GameBoxDimensions = {
@@ -89,7 +96,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             artworkUrl,
             typeof game.appid === 'number' ? game.appid : undefined
         ).then((success) => {
-            if (!success) {
+            if (!success && LABELS_ENABLED) {
                 // Fall back to label if artwork fails (expected when max textures reached)
                 this.createInstancedLabelBox(game, position, undefined, side)
             }
@@ -98,8 +105,10 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             if (!(error instanceof Error && error.message === 'Maximum textures reached')) {
                 console.error(`Error fetching artwork for "${game.name}":`, error)
             }
-            // Fall back to label on error
-            this.createInstancedLabelBox(game, position, undefined, side)
+            // Fall back to label on error (if labels enabled)
+            if (LABELS_ENABLED) {
+                this.createInstancedLabelBox(game, position, undefined, side)
+            }
         })
     }
     
@@ -140,9 +149,10 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         if (artworkUrl) {
             this.createGameBoxFromUrl(game, position, artworkUrl, side)
-        } else {
+        } else if (LABELS_ENABLED) {
             this.createLabelGameBox(game, position, side)
         }
+        // When labels disabled and no artwork, skip creating box entirely
     }
 
     private createInstancedArtworkBox(

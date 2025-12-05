@@ -150,7 +150,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             // TODO: Consider material decoration pattern to avoid direct material modification here
             // Clone and modify side board material to support stickers (macro texture mode)
             const stickerEnabledMaterial = brandAccentMaterial.clone()
-            this.stickerHandler.getStickerIntegration().setupStickerMaterial(stickerEnabledMaterial)
+            const stickerIntegration = this.stickerHandler.getStickerIntegration()
+            if (stickerIntegration) {
+                stickerIntegration.setupStickerMaterial(stickerEnabledMaterial)
+            }
             
             this.sideBoardManager.initialize({
                 geometry: sideBoardGeometry,
@@ -228,7 +231,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         ])
         
         // TODO: Move this setup into stickerHandler.initialize() to reduce coupling
-        this.stickerHandler.getStickerIntegration().setupInstanceAttributes(this.sideBoardManager)
+        const stickerIntegration = this.stickerHandler.getStickerIntegration()
+        if (stickerIntegration) {
+            stickerIntegration.setupInstanceAttributes(this.sideBoardManager)
+        }
         this.stickerHandler.setManagers(this.sideBoardManager, this.shelfUnits)
     }
     
