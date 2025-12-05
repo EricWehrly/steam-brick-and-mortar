@@ -95,6 +95,11 @@ export class GameSettingsPanel extends PauseMenuPanel {
             // Privacy & Data
             cacheGameData: this.settings.cacheGameData,
             
+            // Performance Feature Flags (from AppSettings)
+            enableLabels: this.appSettings.getSetting('enableLabels'),
+            enableStickers: this.appSettings.getSetting('enableStickers'),
+            enableArtwork: this.appSettings.getSetting('enableArtwork'),
+            
             // Debug Tools
             showCompassRose: this.appSettings.getSetting('showCompassRose'),
             showShelfIndices: false  // Default off, controlled via event system
@@ -144,6 +149,29 @@ export class GameSettingsPanel extends PauseMenuPanel {
                 toggleId: 'cache-game-data',
                 onChange: (checked) => this.updateSetting('cacheGameData', checked)
             },
+            // Performance Feature Flags
+            {
+                toggleId: 'enable-labels',
+                onChange: (checked) => {
+                    this.appSettings.setSetting('enableLabels', checked, EventSource.UI)
+                    console.log(`⚡ Feature flag updated: enableLabels = ${checked} (restart required)`)
+                }
+            },
+            {
+                toggleId: 'enable-stickers',
+                onChange: (checked) => {
+                    this.appSettings.setSetting('enableStickers', checked, EventSource.UI)
+                    console.log(`⚡ Feature flag updated: enableStickers = ${checked} (restart required)`)
+                }
+            },
+            {
+                toggleId: 'enable-artwork',
+                onChange: (checked) => {
+                    this.appSettings.setSetting('enableArtwork', checked, EventSource.UI)
+                    console.log(`⚡ Feature flag updated: enableArtwork = ${checked} (restart required)`)
+                }
+            },
+            // Debug Tools
             {
                 toggleId: 'show-compass-rose',
                 onChange: (checked) => {
@@ -311,6 +339,21 @@ export class GameSettingsPanel extends PauseMenuPanel {
         if (devModeElement) {
             devModeElement.checked = this.appSettings.getSetting('developmentMode')
         }
+        
+        // Update feature flags from AppSettings
+        const featureFlagCheckboxes = [
+            { id: 'enable-labels', setting: 'enableLabels' as const },
+            { id: 'enable-stickers', setting: 'enableStickers' as const },
+            { id: 'enable-artwork', setting: 'enableArtwork' as const },
+            { id: 'show-compass-rose', setting: 'showCompassRose' as const }
+        ]
+        
+        featureFlagCheckboxes.forEach(({ id, setting }) => {
+            const element = document.getElementById(id) as HTMLInputElement
+            if (element) {
+                element.checked = this.appSettings.getSetting(setting)
+            }
+        })
         
         // Update other checkboxes from local settings
         const localCheckboxes = [

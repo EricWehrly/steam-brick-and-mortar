@@ -15,16 +15,11 @@ import { StorePropsEventTypes, GameEventTypes } from '../../types/InteractionEve
 import { StickerManager } from './StickerManager'
 import { ShelfStickerIntegration } from './ShelfStickerIntegration'
 import { ShelfUnitIndexSystem } from './ShelfUnitIndexSystem'
+import { AppSettings, Setting } from '../../core/AppSettings'
 import type { InstancedMeshManager } from '../instancing/InstancedMeshManager'
 
 // Toggle verbose sticker-system debug logging in this module
 const STICKERS_DEBUG = false
-
-/**
- * Feature flag: Enable sticker rendering on shelf sideboards
- * Default OFF for dev mode to reduce startup time and measure GPU impact
- */
-const STICKERS_ENABLED = false
 
 interface ShelfUnitInstance {
     position: unknown
@@ -39,8 +34,12 @@ export class ShelfStickerHandler {
     private sideBoardManager?: InstancedMeshManager
     private shelfUnits?: Map<number, ShelfUnitInstance>
     
+    private isStickersEnabled(): boolean {
+        return AppSettings.get(Setting.EnableStickers)
+    }
+    
     constructor() {
-        if (!STICKERS_ENABLED) {
+        if (!this.isStickersEnabled()) {
             if (STICKERS_DEBUG) console.debug('🎨 Stickers DISABLED - skipping initialization')
             return
         }
@@ -98,7 +97,7 @@ export class ShelfStickerHandler {
         shelfUnitIndex: number,
         isLeftBoard: boolean
     ): void {
-        if (!STICKERS_ENABLED || !this.stickerIntegration || !this.indexSystem) return
+        if (!this.isStickersEnabled() || !this.stickerIntegration || !this.indexSystem) return
         
         // Use boardIndex directly - it's already sequential (0, 1, 2, 3, ...)
         // Each sideboard gets its own tile in the macro texture
@@ -119,7 +118,7 @@ export class ShelfStickerHandler {
      * Called via event handler after GPU update
      */
     public populateStickersAfterGeneration(): void {
-        if (!STICKERS_ENABLED) return
+        if (!this.isStickersEnabled()) return
         if (!this.sideBoardManager || !this.shelfUnits) return
         this.populateRandomStickers(this.sideBoardManager, this.shelfUnits.size, 0.3)
     }
@@ -136,7 +135,7 @@ export class ShelfStickerHandler {
         totalShelfUnits: number,
         density: number = 0.8
     ): void {
-        if (!STICKERS_ENABLED || !this.stickerIntegration) return
+        if (!this.isStickersEnabled() || !this.stickerIntegration) return
         
         // Populate with random stickers on left side boards only
         // Left boards are at even indices: 0, 2, 4, 6, ... (boardIndex = shelfUnitIndex * 2)
@@ -155,7 +154,7 @@ export class ShelfStickerHandler {
         meshManager: InstancedMeshManager,
         shelfUnits: Map<number, unknown>
     ): void {
-        if (!STICKERS_ENABLED || !this.indexSystem) return
+        if (!this.isStickersEnabled() || !this.indexSystem) return
         this.indexSystem.enable()
         this.refreshAllIndices(meshManager, shelfUnits)
         if (STICKERS_DEBUG) console.debug('🔍 Shelf unit indices enabled')
@@ -168,7 +167,7 @@ export class ShelfStickerHandler {
         meshManager: InstancedMeshManager,
         shelfUnits: Map<number, unknown>
     ): void {
-        if (!STICKERS_ENABLED || !this.indexSystem) return
+        if (!this.isStickersEnabled() || !this.indexSystem) return
         this.indexSystem.disable()
         this.refreshAllIndices(meshManager, shelfUnits)
         if (STICKERS_DEBUG) console.debug('🔍 Shelf unit indices disabled')
@@ -181,7 +180,7 @@ export class ShelfStickerHandler {
         meshManager: InstancedMeshManager,
         shelfUnits: Map<number, unknown>
     ): void {
-        if (!STICKERS_ENABLED || !this.indexSystem) return
+        if (!this.isStickersEnabled() || !this.indexSystem) return
         this.indexSystem.toggle()
         this.refreshAllIndices(meshManager, shelfUnits)
     }

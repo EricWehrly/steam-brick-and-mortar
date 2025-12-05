@@ -107,6 +107,35 @@
     </div>
 
     <div class="settings-section">
+        <h4>⚡ Performance Features</h4>
+        <p class="section-description">Toggle GPU-intensive features to measure performance impact</p>
+        <div class="setting-item">
+            <label class="setting-label">
+                <input type="checkbox" id="enable-labels" {{#enableLabels}}checked{{/enableLabels}}>
+                <span class="checkmark"></span>
+                Enable text labels
+            </label>
+            <p class="setting-description">Show text labels on game boxes (GPU intensive)</p>
+        </div>
+        <div class="setting-item">
+            <label class="setting-label">
+                <input type="checkbox" id="enable-stickers" {{#enableStickers}}checked{{/enableStickers}}>
+                <span class="checkmark"></span>
+                Enable shelf stickers
+            </label>
+            <p class="setting-description">Show decorative stickers on shelf sideboards (GPU intensive)</p>
+        </div>
+        <div class="setting-item">
+            <label class="setting-label">
+                <input type="checkbox" id="enable-artwork" {{#enableArtwork}}checked{{/enableArtwork}}>
+                <span class="checkmark"></span>
+                Enable game artwork
+            </label>
+            <p class="setting-description">Show game artwork textures on boxes (core feature)</p>
+        </div>
+    </div>
+
+    <div class="settings-section">
         <h4>🐛 Debug Tools</h4>
         <div class="setting-item">
             <label class="setting-label">

@@ -15,17 +15,11 @@ import type {
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
 import { ShelfSide } from '../props/SharedPropsUtils'
+import { AppSettings, Setting } from '../../core/AppSettings'
 
 /** 67% probability of showing artwork vs label-only */
 const ARTWORK_PROBABILITY = 0.67
 import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
-
-/**
- * Feature flag: Enable label rendering for game boxes
- * Default OFF for dev mode to reduce startup time and measure GPU impact
- * Label boxes are text-only boxes that show when artwork is not available
- */
-const LABELS_ENABLED = false
 
 export class GpuGameBoxRenderer implements IGameBoxRenderer {
 
@@ -96,7 +90,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             artworkUrl,
             typeof game.appid === 'number' ? game.appid : undefined
         ).then((success) => {
-            if (!success && LABELS_ENABLED) {
+            if (!success && AppSettings.get(Setting.EnableLabels)) {
                 // Fall back to label if artwork fails (expected when max textures reached)
                 this.createInstancedLabelBox(game, position, undefined, side)
             }
@@ -106,7 +100,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
                 console.error(`Error fetching artwork for "${game.name}":`, error)
             }
             // Fall back to label on error (if labels enabled)
-            if (LABELS_ENABLED) {
+            if (AppSettings.get(Setting.EnableLabels)) {
                 this.createInstancedLabelBox(game, position, undefined, side)
             }
         })
@@ -149,7 +143,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         if (artworkUrl) {
             this.createGameBoxFromUrl(game, position, artworkUrl, side)
-        } else if (LABELS_ENABLED) {
+        } else if (AppSettings.get(Setting.EnableLabels)) {
             this.createLabelGameBox(game, position, side)
         }
         // When labels disabled and no artwork, skip creating box entirely

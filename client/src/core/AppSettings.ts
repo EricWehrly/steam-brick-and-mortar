@@ -24,6 +24,36 @@ export const LIGHTING_QUALITY = {
 
 export type LightingQuality = typeof LIGHTING_QUALITY[keyof typeof LIGHTING_QUALITY]
 
+/** Setting keys as const for type-safe, refactorable access */
+export const Setting = {
+    // Performance
+    QualityLevel: 'qualityLevel',
+    // Graphics
+    LightingQuality: 'lightingQuality',
+    ShadowQuality: 'shadowQuality',
+    CeilingHeight: 'ceilingHeight',
+    EnableLighting: 'enableLighting',
+    ShowLightingDebug: 'showLightingDebug',
+    ShowCeiling: 'showCeiling',
+    // Feature Flags
+    EnableLabels: 'enableLabels',
+    EnableStickers: 'enableStickers',
+    EnableArtwork: 'enableArtwork',
+    // Interface
+    ShowFPS: 'showFPS',
+    ShowPerformanceStats: 'showPerformanceStats',
+    HideUIInVR: 'hideUIInVR',
+    // Debug
+    VerboseLogging: 'verboseLogging',
+    ShowDebugInfo: 'showDebugInfo',
+    ShowCompassRose: 'showCompassRose',
+    // General
+    AutoSave: 'autoSave',
+    // Steam
+    AutoLoadProfile: 'autoLoadProfile',
+    DevelopmentMode: 'developmentMode',
+} as const
+
 export interface ApplicationSettings {
     // Performance Settings
     qualityLevel: 'low' | 'medium' | 'high' | 'ultra'
@@ -35,6 +65,11 @@ export interface ApplicationSettings {
     enableLighting: boolean
     showLightingDebug: boolean
     showCeiling: boolean
+    
+    // Feature Flags (GPU/Performance tuning)
+    enableLabels: boolean      // Game box text labels (GPU intensive)
+    enableStickers: boolean    // Shelf stickers/decals (GPU intensive)
+    enableArtwork: boolean     // Game box artwork textures
     
     // Interface Settings
     showFPS: boolean
@@ -85,6 +120,14 @@ export class AppSettings {
             AppSettings.instance = new AppSettings()
         }
         return AppSettings.instance
+    }
+
+    /**
+     * Static shorthand for getting a setting value
+     * Usage: AppSettings.get('enableLabels') instead of AppSettings.getInstance().getSetting('enableLabels')
+     */
+    public static get<K extends keyof ApplicationSettings>(key: K): ApplicationSettings[K] {
+        return AppSettings.getInstance().settings[key]
     }
 
     /**
@@ -260,6 +303,10 @@ export class AppSettings {
     }
 
     private getDefaultSettings(): ApplicationSettings {
+        // In development mode, disable GPU-intensive features by default for faster startup
+        const isDev = typeof window !== 'undefined' && 
+            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        
         return {
             // Performance Settings
             qualityLevel: 'high',
@@ -271,6 +318,11 @@ export class AppSettings {
             enableLighting: true,
             showLightingDebug: false,
             showCeiling: true,
+            
+            // Feature Flags - disabled in dev mode for faster startup measurement
+            enableLabels: !isDev,
+            enableStickers: !isDev,
+            enableArtwork: true, // Always on - this is the core feature
             
             // Interface Settings
             showFPS: false,
@@ -287,7 +339,7 @@ export class AppSettings {
             
             // Steam Settings  
             autoLoadProfile: false,
-            developmentMode: true // Default to enabled for safer testing
+            developmentMode: isDev // Default based on environment
         }
     }
 
@@ -302,7 +354,13 @@ export class AppSettings {
         }
         
         // Validate boolean fields
-        const booleanFields = ['showFPS', 'showPerformanceStats', 'hideUIInVR', 'verboseLogging', 'showDebugInfo', 'showCompassRose', 'autoSave', 'autoLoadProfile', 'developmentMode']
+        const booleanFields = [
+            'showFPS', 'showPerformanceStats', 'hideUIInVR', 
+            'verboseLogging', 'showDebugInfo', 'showCompassRose', 
+            'autoSave', 'autoLoadProfile', 'developmentMode',
+            'enableLabels', 'enableStickers', 'enableArtwork',
+            'enableLighting', 'showLightingDebug', 'showCeiling'
+        ]
         for (const field of booleanFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'boolean') {
                 return false

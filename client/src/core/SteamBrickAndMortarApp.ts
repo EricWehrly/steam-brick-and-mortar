@@ -454,6 +454,9 @@ export class SteamBrickAndMortarApp {
         // TODO: This probably shouldn't go here, but where does it go?
         this.compassRose = new CompassRose(this.sceneManager.getCamera())
         
+        // TODO: Normalize configuration inputs
+        // and don't require so many lines in the main files
+
         // Initialize render loop diagnostics if enabled via URL param (?diagnostics=1)
         // This MUST happen before startRenderLoop() - decision is made once, zero per-frame overhead when disabled
         const urlParams = new URLSearchParams(window.location.search)
