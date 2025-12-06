@@ -24,6 +24,9 @@ import { GameEventTypes } from '../../../types/InteractionEvents'
 import vertexShader from './shaders/instanced-artwork-lod.vert?raw'
 import fragmentShader from './shaders/instanced-artwork-lod.frag?raw'
 import { TextureWorker } from './TextureWorker'
+import { Logger } from '../../../utils/Logger'
+
+const log = Logger.withContext('LodArtworkRenderer')
 
 /** LOD level constants */
 export const LOD_LEVEL = {
@@ -131,11 +134,7 @@ export class LodArtworkRenderer {
             lodInfo.push(`${lodConfig.name} (${lodConfig.textureSize}×${lodConfig.textureSize}): ${(vram / (1024 * 1024)).toFixed(1)}MB`)
         }
         
-        console.debug(`🎨 LodArtworkRenderer configured:`)
-        console.debug(`   Max textures: ${this.maxTextures}`)
-        console.debug(`   Default LOD: ${this.defaultLod}`)
-        lodInfo.forEach(info => console.debug(`   ${info}`))
-        console.debug(`   Total estimated VRAM: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
+        log.lifecycle(`Configured: Max ${this.maxTextures} textures, Default LOD ${this.defaultLod}, Est. VRAM: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
     }
     
     /**
@@ -157,7 +156,7 @@ export class LodArtworkRenderer {
             state.dataArrayTexture.wrapT = THREE.ClampToEdgeWrapping
             state.dataArrayTexture.needsUpdate = true
             
-            console.debug(`🎨 Created ${state.config.name} LOD texture array: ${size}×${size}×${this.maxTextures}`)
+            log.debug(`Created ${state.config.name} LOD texture array: ${size}×${size}×${this.maxTextures}`)
         }
         
         // Create material with all three texture arrays
@@ -214,7 +213,7 @@ export class LodArtworkRenderer {
         const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
         if (scene) {
             scene.add(this.instancedMesh)
-            console.debug('🎨 LodArtworkRenderer initialized and added to scene')
+            log.lifecycle('Initialized and added to scene')
         }
         
         // Register metadata with DataManager
@@ -242,7 +241,7 @@ export class LodArtworkRenderer {
         
         // Check capacity
         if (this.nextTextureIndex >= this.maxTextures) {
-            console.debug(`⚠️ LOD atlas full (${this.maxTextures} textures)`)
+            log.warn(`Atlas full (${this.maxTextures} textures)`)
             return { success: false, instanceIndex: -1 }
         }
         
@@ -276,7 +275,7 @@ export class LodArtworkRenderer {
                 
                 // Verify image data size matches expected
                 if (result.imageData.length !== sliceSize) {
-                    console.error(`🎨 Size mismatch for "${gameName}" LOD ${level}: expected ${sliceSize}, got ${result.imageData.length}`)
+                    log.error(`Size mismatch for "${gameName}" LOD ${level}: expected ${sliceSize}, got ${result.imageData.length}`)
                 }
                 
                 arrayData.set(result.imageData, offset)
@@ -317,7 +316,7 @@ export class LodArtworkRenderer {
             this.nextTextureIndex--
             
             const msg = error instanceof Error ? error.message : String(error)
-            console.debug(`Failed to add artwork for "${gameName}": ${msg}`)
+            log.debug(`Failed to add artwork for "${gameName}": ${msg}`)
             return { success: false, instanceIndex: -1 }
         }
     }
@@ -327,7 +326,7 @@ export class LodArtworkRenderer {
      */
     public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {
         if (!this.geometry || instanceIndex < 0 || instanceIndex >= this.currentInstanceCount) {
-            console.warn(`🎨 setInstanceLod failed: invalid index ${instanceIndex} (count: ${this.currentInstanceCount})`)
+            log.warn(`setInstanceLod failed: invalid index ${instanceIndex} (count: ${this.currentInstanceCount})`)
             return false
         }
         
@@ -346,7 +345,7 @@ export class LodArtworkRenderer {
         // Debug: Log LOD changes with game name
         if (prevLod !== lodLevel) {
             const lodNames = ['HIGH', 'MID', 'LOW']
-            console.debug(`🎨 LOD ${instanceIndex} "${metadata?.name?.slice(0, 20) ?? '?'}": ${lodNames[prevLod ?? 0]} → ${lodNames[lodLevel]}`)
+            log.runtime(`LOD ${instanceIndex} "${metadata?.name?.slice(0, 20) ?? '?'}": ${lodNames[prevLod ?? 0]} → ${lodNames[lodLevel]}`)
         }
         
         return true
@@ -370,7 +369,7 @@ export class LodArtworkRenderer {
         }
         
         lodLevelAttr.needsUpdate = true
-        console.debug(`🎨 Set global LOD to ${lodLevel} for ${this.currentInstanceCount} instances`)
+        log.debug(`Set global LOD to ${lodLevel} for ${this.currentInstanceCount} instances`)
     }
     
     /**
@@ -443,19 +442,20 @@ export class LodArtworkRenderer {
     }
     
     /**
-     * Log memory stats to console
+     * Log memory stats to console (uses console.group for formatting)
      */
     public logMemoryStats(): void {
         const stats = this.getMemoryStats()
         
-        console.group('🎨 LOD Artwork Memory Stats')
+        const lines: string[] = []
         for (const [name, lodStats] of Object.entries(stats.lods)) {
             const allocMB = (lodStats.allocated / (1024 * 1024)).toFixed(1)
-            console.log(`${name} (${lodStats.textureSize}px): ${allocMB}MB`)
+            lines.push(`  ${name} (${lodStats.textureSize}px): ${allocMB}MB`)
         }
-        console.log(`Total: ${(stats.totalAllocated / (1024 * 1024)).toFixed(1)}MB`)
-        console.log(`Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}`)
-        console.groupEnd()
+        lines.push(`  Total: ${(stats.totalAllocated / (1024 * 1024)).toFixed(1)}MB`)
+        lines.push(`  Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}`)
+        
+        log.info(`🎨 LOD Artwork Memory Stats\n${lines.join('\n')}`)
     }
     
     public isReady(): boolean {
@@ -488,6 +488,6 @@ export class LodArtworkRenderer {
         this.instanceMetadata.clear()
         this.textureWorker.dispose()
         
-        console.debug('🧹 LodArtworkRenderer disposed')
+        log.lifecycle('Disposed')
     }
 }

@@ -16,6 +16,9 @@ import { LodArtworkRenderer, LOD_LEVEL, type LodLevel } from './LodArtworkRender
 import { RenderLoopRegistry } from '../../RenderLoopRegistry'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey } from '../../../core/data/DataTypes'
+import { Logger } from '../../../utils/Logger'
+
+const log = Logger.withContext('LodDistanceManager')
 
 export interface LodDistanceConfig {
     /** Distance threshold: closer than this = HIGH LOD */
@@ -98,9 +101,7 @@ export class LodDistanceManager {
         this.highDistSqWithHysteresis = highWithHyst * highWithHyst
         this.midDistSqWithHysteresis = midWithHyst * midWithHyst
         
-        console.debug(`🎯 LodDistanceManager initialized:`)
-        console.debug(`   HIGH < ${this.config.highDistance}m, MID < ${this.config.midDistance}m`)
-        console.debug(`   Hysteresis: ${this.config.hysteresis}m, Update every ${this.config.updateFrequency} frames`)
+        log.lifecycle(`Initialized: HIGH < ${this.config.highDistance}m, MID < ${this.config.midDistance}m, Hysteresis: ${this.config.hysteresis}m, Update every ${this.config.updateFrequency} frames`)
     }
     
     /**
@@ -112,7 +113,7 @@ export class LodDistanceManager {
         
         this.renderLoopRegistry.register('LodDistanceManager', this.onRenderFrame.bind(this))
         this.isRegistered = true
-        console.debug('🎯 LodDistanceManager registered with render loop')
+        log.lifecycle('Registered with render loop')
     }
     
     /**
@@ -123,7 +124,7 @@ export class LodDistanceManager {
         
         this.renderLoopRegistry.unregister('LodDistanceManager')
         this.isRegistered = false
-        console.debug('🎯 LodDistanceManager unregistered from render loop')
+        log.lifecycle('Unregistered from render loop')
     }
     
     /**
@@ -153,7 +154,7 @@ export class LodDistanceManager {
             })
         }
         
-        console.debug(`🎯 LodDistanceManager synced ${this.instanceStates.size} instances`)
+        log.lifecycle(`Synced ${this.instanceStates.size} instances`)
     }
 
     /**
@@ -275,8 +276,8 @@ export class LodDistanceManager {
         
         const lodCounts = this.countLodLevels()
         
-        console.debug(
-            `🎯 LOD Stats | ` +
+        log.runtime(
+            `Stats | ` +
             `Update: ${avgUpdateTime.toFixed(2)}ms avg | ` +
             `Frame: ${avgFrameTime.toFixed(1)}ms avg | ` +
             `Changes: ${this.diagnostics.lodChanges} | ` +
@@ -312,6 +313,6 @@ export class LodDistanceManager {
     public dispose(): void {
         this.stopAutoUpdate()
         this.instanceStates.clear()
-        console.debug('🧹 LodDistanceManager disposed')
+        log.lifecycle('Disposed')
     }
 }

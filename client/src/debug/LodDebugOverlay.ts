@@ -17,6 +17,9 @@ import { RenderLoopRegistry } from '../scene/RenderLoopRegistry'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
 import { LOD_LEVEL, type LodLevel } from '../scene/game-box/instancing/LodArtworkRenderer'
+import { Logger } from '../utils/Logger'
+
+const log = Logger.withContext('LodDebugOverlay')
 
 interface LodInstanceData {
     position: THREE.Vector3
@@ -164,7 +167,7 @@ export class LodDebugOverlay {
      */
     public setDataSource(getter: () => ReadonlyMap<number, LodInstanceData>): void {
         this.getInstanceData = getter
-        console.debug('🎯 LOD Debug overlay data source connected')
+        log.lifecycle('Data source connected')
     }
     
     /**
@@ -178,7 +181,7 @@ export class LodDebugOverlay {
     public setVisible(visible: boolean): void {
         this.isVisible = visible
         this.container.style.display = visible ? 'block' : 'none'
-        console.debug(`🎯 LOD Debug overlay visibility: ${visible}`)
+        log.lifecycle(`Visibility: ${visible}`)
         
         if (visible && !this.isRegistered()) {
             this.renderLoopRegistry.register('LodDebugOverlay', this.update.bind(this))
