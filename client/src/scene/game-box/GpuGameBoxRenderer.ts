@@ -20,6 +20,8 @@ import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
 import { MultiAtlasArtworkRenderer } from './instancing/MultiAtlasArtworkRenderer'
 import { LodArtworkRenderer, type LodLevel } from './instancing/LodArtworkRenderer'
+import { LodDistanceManager } from './instancing/LodDistanceManager'
+import { LodDebugOverlay } from '../../debug/LodDebugOverlay'
 import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
 
@@ -40,6 +42,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private instancedArtworkRenderer: InstancedArtworkRenderer | null = null
     private multiAtlasRenderer: MultiAtlasArtworkRenderer | null = null
     private lodArtworkRenderer: LodArtworkRenderer | null = null
+    private lodDistanceManager: LodDistanceManager | null = null
+    private lodDebugOverlay: LodDebugOverlay | null = null
     private labelInstanceIndex: number = 0
     private artworkInstanceIndex: number = 0
     private readonly useMultiAtlas: boolean
@@ -60,6 +64,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             this.lodArtworkRenderer = new LodArtworkRenderer({
                 maxTextures: maxGames
             })
+            // Create distance manager for automatic LOD switching
+            this.lodDistanceManager = new LodDistanceManager(this.lodArtworkRenderer)
             console.debug(`📦 GpuGameBoxRenderer using LOD atlas system (max ${maxGames} instances)`)
         } else if (this.useMultiAtlas) {
             this.multiAtlasRenderer = new MultiAtlasArtworkRenderer()
@@ -327,6 +333,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     public dispose(): void {
         console.debug('🧹 Disposing GpuGameBoxRenderer resources')
         
+        this.lodDebugOverlay?.dispose()
+        this.lodDistanceManager?.dispose()
         this.instancedLabelRenderer.dispose()
         this.instancedArtworkRenderer?.dispose()
         this.multiAtlasRenderer?.dispose()
@@ -350,6 +358,36 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
      */
     public getLodRenderer(): LodArtworkRenderer | null {
         return this.lodArtworkRenderer
+    }
+    
+    /**
+     * Start automatic LOD distance management
+     * Call after all games are loaded
+     */
+    public startLodDistanceManager(): void {
+        if (this.lodDistanceManager && this.lodArtworkRenderer) {
+            this.lodDistanceManager.syncInstances()
+            this.lodDistanceManager.startAutoUpdate()
+            
+            // Create debug overlay if not exists
+            if (!this.lodDebugOverlay) {
+                this.lodDebugOverlay = new LodDebugOverlay({
+                    highDistance: 3.0,
+                    midDistance: 8.0,
+                    maxDistance: 15.0
+                })
+                // Connect debug overlay to LOD data source
+                const renderer = this.lodArtworkRenderer
+                this.lodDebugOverlay.setDataSource(() => renderer.getInstanceData())
+            }
+        }
+    }
+    
+    /**
+     * Stop automatic LOD distance management
+     */
+    public stopLodDistanceManager(): void {
+        this.lodDistanceManager?.stopAutoUpdate()
     }
     
     /**

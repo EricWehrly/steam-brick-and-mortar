@@ -303,6 +303,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const lodRenderer = this.gameBoxRenderer?.getLodRenderer()
         if (lodRenderer) {
             lodRenderer.logMemoryStats()
+            // Start automatic LOD distance management
+            this.gameBoxRenderer?.startLodDistanceManager()
         } else {
             // Log multi-atlas stats if using that instead
             this.gameBoxRenderer?.logMemoryStats()

@@ -257,7 +257,7 @@ export class LodArtworkRenderer {
         try {
             // Process LOD levels SEQUENTIALLY - the worker shares a canvas
             // and concurrent requests with different sizes cause data corruption
-            for (const [_level, state] of this.lodTextures) {
+            for (const [level, state] of this.lodTextures) {
                 const result = await this.textureWorker.fetchAndProcess(
                     artworkUrl,
                     state.config.textureSize,
@@ -273,6 +273,12 @@ export class LodArtworkRenderer {
                 const sliceSize = state.config.textureSize * state.config.textureSize * 4
                 const offset = textureIndex * sliceSize
                 const arrayData = state.dataArrayTexture.image.data as Uint8Array
+                
+                // Verify image data size matches expected
+                if (result.imageData.length !== sliceSize) {
+                    console.error(`🎨 Size mismatch for "${gameName}" LOD ${level}: expected ${sliceSize}, got ${result.imageData.length}`)
+                }
+                
                 arrayData.set(result.imageData, offset)
                 state.pendingUpdates.add(textureIndex)
             }
@@ -300,6 +306,10 @@ export class LodArtworkRenderer {
                 lodLevel: this.defaultLod
             })
             
+            // Update GPU immediately - the instance is ready to render
+            // This is needed because InstancedBatchComplete fires before async texture loads complete
+            this.updateGPU()
+            
             return { success: true, instanceIndex }
             
         } catch (error) {
@@ -317,17 +327,26 @@ export class LodArtworkRenderer {
      */
     public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {
         if (!this.geometry || instanceIndex < 0 || instanceIndex >= this.currentInstanceCount) {
+            console.warn(`🎨 setInstanceLod failed: invalid index ${instanceIndex} (count: ${this.currentInstanceCount})`)
             return false
         }
+        
+        const metadata = this.instanceMetadata.get(instanceIndex)
+        const prevLod = metadata?.lodLevel
         
         const lodLevelAttr = this.geometry.getAttribute('lodLevel') as THREE.InstancedBufferAttribute
         lodLevelAttr.setX(instanceIndex, lodLevel)
         lodLevelAttr.needsUpdate = true
         
         // Update metadata
-        const metadata = this.instanceMetadata.get(instanceIndex)
         if (metadata) {
             metadata.lodLevel = lodLevel
+        }
+        
+        // Debug: Log LOD changes with game name
+        if (prevLod !== lodLevel) {
+            const lodNames = ['HIGH', 'MID', 'LOW']
+            console.debug(`🎨 LOD ${instanceIndex} "${metadata?.name?.slice(0, 20) ?? '?'}": ${lodNames[prevLod ?? 0]} → ${lodNames[lodLevel]}`)
         }
         
         return true
@@ -445,6 +464,14 @@ export class LodArtworkRenderer {
     
     public getInstanceCount(): number {
         return this.currentInstanceCount
+    }
+    
+    /**
+     * Get instance data for LOD distance management
+     * Returns readonly view of positions and LOD levels
+     */
+    public getInstanceData(): ReadonlyMap<number, { position: THREE.Vector3; lodLevel: LodLevel }> {
+        return this.instanceMetadata
     }
     
     public dispose(): void {
