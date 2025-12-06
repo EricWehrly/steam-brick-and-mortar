@@ -49,6 +49,7 @@ export const Setting = {
     VerboseLogging: 'verboseLogging',
     ShowDebugInfo: 'showDebugInfo',
     ShowCompassRose: 'showCompassRose',
+    ShowLodDebug: 'showLodDebug',
     // General
     AutoSave: 'autoSave',
     // Steam
@@ -84,6 +85,7 @@ export interface ApplicationSettings {
     verboseLogging: boolean
     showDebugInfo: boolean
     showCompassRose: boolean
+    showLodDebug: boolean
     
     // General Settings
     autoSave: boolean
@@ -339,6 +341,7 @@ export class AppSettings {
             verboseLogging: false,
             showDebugInfo: false,
             showCompassRose: false,
+            showLodDebug: false,
             
             // General Settings
             autoSave: true,
@@ -362,7 +365,7 @@ export class AppSettings {
         // Validate boolean fields
         const booleanFields = [
             'showFPS', 'showPerformanceStats', 'hideUIInVR', 
-            'verboseLogging', 'showDebugInfo', 'showCompassRose', 
+            'verboseLogging', 'showDebugInfo', 'showCompassRose', 'showLodDebug',
             'autoSave', 'autoLoadProfile', 'developmentMode',
             'enableLabels', 'enableStickers', 'enableArtwork', 'useMultiAtlas', 'useLodAtlas',
             'enableLighting', 'showLightingDebug', 'showCeiling'
@@ -386,4 +389,9 @@ export class AppSettings {
             AppSettings.instance = null
         }
     }
+}
+
+if(window) {
+    // @ts-ignore
+    window.AppSettings = AppSettings;
 }
