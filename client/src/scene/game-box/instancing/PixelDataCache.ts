@@ -49,6 +49,8 @@ export interface PixelCacheStats {
     misses: number
     stores: number
     errors: number
+    pendingWrites: number
+    batchFlushes: number
 }
 
 export interface CachedPixelResult {
@@ -73,8 +75,22 @@ export class PixelDataCache {
         hits: 0,
         misses: 0,
         stores: 0,
-        errors: 0
+        errors: 0,
+        pendingWrites: 0,
+        batchFlushes: 0
     }
+    
+    /** Queue of pending writes to batch into single transaction */
+    private writeQueue: CachedPixelData[] = []
+    
+    /** Timer for periodic flush */
+    private flushTimer: ReturnType<typeof setTimeout> | null = null
+    
+    /** Flush interval in ms */
+    private readonly FLUSH_INTERVAL_MS = 500
+    
+    /** Max items before forcing a flush */
+    private readonly MAX_QUEUE_SIZE = 10
     
     private constructor(config: PixelDataCacheConfig = {}) {
         this.dbName = config.dbName ?? 'SteamTexturePixels'
@@ -189,7 +205,8 @@ export class PixelDataCache {
     }
     
     /**
-     * Store pixel data in cache
+     * Queue pixel data for batched write to cache
+     * Writes are batched to reduce main thread blocking from multiple IndexedDB transactions
      */
     public async put(
         url: string,
@@ -202,8 +219,6 @@ export class PixelDataCache {
             if (!this.db) return
         }
         
-        const db = this.db // Capture for closure
-        
         const entry: CachedPixelData = {
             url,
             pixels,
@@ -213,24 +228,70 @@ export class PixelDataCache {
             version: this.version
         }
         
-        return new Promise((resolve) => {
-            const transaction = db.transaction(this.storeName, 'readwrite')
-            const store = transaction.objectStore(this.storeName)
-            const request = store.put(entry)
-            
-            request.onerror = () => {
-                log.debug(`Cache write error for ${url}:`, request.error)
-                this.stats.errors++
-                resolve()
-            }
-            
-            request.onsuccess = () => {
-                this.stats.stores++
-                resolve()
-            }
-        })
+        // Add to queue instead of writing immediately
+        this.writeQueue.push(entry)
+        this.stats.pendingWrites = this.writeQueue.length
+        
+        // Force flush if queue is full
+        if (this.writeQueue.length >= this.MAX_QUEUE_SIZE) {
+            this.flushWriteQueue()
+            return
+        }
+        
+        // Schedule flush if not already scheduled
+        if (!this.flushTimer) {
+            this.flushTimer = setTimeout(() => {
+                this.flushWriteQueue()
+            }, this.FLUSH_INTERVAL_MS)
+        }
     }
     
+    /**
+     * Flush all pending writes in a single IndexedDB transaction
+     * This batches multiple writes to reduce main thread blocking
+     */
+    private flushWriteQueue(): void {
+        if (this.flushTimer) {
+            clearTimeout(this.flushTimer)
+            this.flushTimer = null
+        }
+        
+        if (this.writeQueue.length === 0 || !this.db) {
+            return
+        }
+        
+        const itemsToWrite = this.writeQueue.splice(0)
+        this.stats.pendingWrites = 0
+        
+        const db = this.db
+        const transaction = db.transaction(this.storeName, 'readwrite')
+        const store = transaction.objectStore(this.storeName)
+        
+        let successCount = 0
+        let errorCount = 0
+        
+        for (const entry of itemsToWrite) {
+            const request = store.put(entry)
+            request.onsuccess = () => { successCount++ }
+            request.onerror = () => { 
+                errorCount++
+                log.debug(`Batch write error for ${entry.url}:`, request.error)
+            }
+        }
+        
+        transaction.oncomplete = () => {
+            this.stats.stores += successCount
+            this.stats.errors += errorCount
+            this.stats.batchFlushes++
+            log.debug(`Batch flush: ${successCount} writes, ${errorCount} errors`)
+        }
+        
+        transaction.onerror = () => {
+            this.stats.errors += itemsToWrite.length
+            log.debug('Batch transaction failed:', transaction.error)
+        }
+    }
+
     /**
      * Remove a specific entry from cache
      */
@@ -269,7 +330,7 @@ export class PixelDataCache {
             
             request.onsuccess = () => {
                 log.lifecycle('Cleared all cached pixel data')
-                this.stats = { hits: 0, misses: 0, stores: 0, errors: 0 }
+                this.stats = { hits: 0, misses: 0, stores: 0, errors: 0, pendingWrites: 0, batchFlushes: 0 }
                 resolve()
             }
         })
@@ -325,11 +386,20 @@ export class PixelDataCache {
         console.group('📦 PixelDataCache Stats')
         console.log(`Hits: ${stats.hits}, Misses: ${stats.misses}, Hit Rate: ${stats.hitRate}`)
         console.log(`Stores: ${stats.stores}, Errors: ${stats.errors}`)
+        console.log(`Pending writes: ${stats.pendingWrites}, Batch flushes: ${stats.batchFlushes}`)
         console.log(`Cached entries: ${storage.count}, Estimated size: ${storage.estimatedMB.toFixed(1)}MB`)
         console.groupEnd()
     }
     
     public dispose(): void {
+        // Flush any pending writes before closing
+        this.flushWriteQueue()
+        
+        if (this.flushTimer) {
+            clearTimeout(this.flushTimer)
+            this.flushTimer = null
+        }
+        
         this.db?.close()
         this.db = null
         this.initPromise = null
