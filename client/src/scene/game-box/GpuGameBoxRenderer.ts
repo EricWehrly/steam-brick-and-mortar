@@ -181,6 +181,17 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
                 }
                 cache.clearTimingSamples()
             }
+            ;(window as any).diagnosePixelCache = async () => {
+                const { PixelDataCache } = await import('./instancing/PixelDataCache')
+                const cache = PixelDataCache.getInstance()
+                await cache.diagnose()
+            }
+            ;(window as any).clearPixelCache = async () => {
+                const { PixelDataCache } = await import('./instancing/PixelDataCache')
+                const cache = PixelDataCache.getInstance()
+                await cache.clear()
+                console.log('✅ Pixel cache cleared')
+            }
             /* eslint-enable @typescript-eslint/no-explicit-any */
         } else if (this.useMultiAtlas) {
             this.multiAtlasRenderer = new MultiAtlasArtworkRenderer()
