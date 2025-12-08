@@ -25,8 +25,5 @@ void main() {
     // Blend: use HIGH when available and at HIGH LOD, otherwise MID
     texColor = highColor * useHigh + midColor * (1.0 - useHigh);
     
-    // Handle transparency
-    if (texColor.a < 0.1) discard;
-    
     gl_FragColor = texColor;
 }

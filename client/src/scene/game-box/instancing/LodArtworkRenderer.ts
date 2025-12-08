@@ -21,6 +21,7 @@ import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import type { InstanceMetadata } from '../../../debug/GameFinder'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
+import { RenderLoopRegistry } from '../../RenderLoopRegistry'
 import vertexShader from './shaders/instanced-artwork-lod.vert?raw'
 import fragmentShader from './shaders/instanced-artwork-lod.frag?raw'
 import { TextureWorker } from './TextureWorker'
@@ -117,6 +118,11 @@ export class LodArtworkRenderer {
     
     // Track artwork URLs for lazy loading
     private artworkUrls: Map<number, string> = new Map()  // textureIndex -> url
+    
+    // GPU update throttling
+    private gpuUpdateFrameCounter: number = 0
+    private readonly gpuUpdateInterval: number = 10  // Flush to GPU every N frames
+    private isRegisteredForRenderLoop: boolean = false
     
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion()
 
@@ -279,6 +285,15 @@ export class LodArtworkRenderer {
         if (scene) {
             scene.add(this.instancedMesh)
             log.lifecycle('Initialized and added to scene')
+        }
+        
+        // Register for render loop to handle periodic GPU updates
+        if (!this.isRegisteredForRenderLoop) {
+            RenderLoopRegistry.getInstance().register(
+                'LodArtworkRenderer',
+                this.onFrame.bind(this)
+            )
+            this.isRegisteredForRenderLoop = true
         }
         
         // Register metadata with DataManager
@@ -526,17 +541,41 @@ export class LodArtworkRenderer {
     }
 
     /**
+     * Render loop callback - handles periodic GPU updates
+     * Throttles needsUpdate to every N frames to batch multiple texture loads
+     */
+    private onFrame(_now: number, _deltaTime: number): void {
+        this.gpuUpdateFrameCounter++
+        
+        // Only flush to GPU every N frames (batches texture uploads)
+        if (this.gpuUpdateFrameCounter >= this.gpuUpdateInterval) {
+            this.gpuUpdateFrameCounter = 0
+            
+            // Check if HIGH texture cache has pending updates
+            if (this.highTextureCache?.needsGpuUpdate()) {
+                this.highTextureCache.flushToGpu()
+            }
+        }
+    }
+
+    /**
      * Update GPU resources
+     * Called periodically from render loop - batches texture updates
      */
     public updateGPU(): void {
         if (!this.instancedMesh || !this.geometry) return
         
-        // Update all LOD texture arrays
+        // Update all LOD texture arrays (MID textures)
         for (const state of this.lodTextures.values()) {
             if (state.dataArrayTexture && state.pendingUpdates.size > 0) {
                 state.dataArrayTexture.needsUpdate = true
                 state.pendingUpdates.clear()
             }
+        }
+        
+        // Flush HIGH texture cache if dirty (batches multiple texture loads)
+        if (this.highTextureCache) {
+            this.highTextureCache.flushToGpu()
         }
         
         this.instancedMesh.instanceMatrix.needsUpdate = true

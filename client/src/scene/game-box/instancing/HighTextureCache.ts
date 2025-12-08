@@ -86,6 +86,9 @@ export class HighTextureCache {
     /** The GPU texture array (reference - owned by LodArtworkRenderer) */
     private dataArrayTexture: THREE.DataArrayTexture | null = null
     
+    /** Dirty flag: texture data changed, needs GPU upload */
+    private isDirty: boolean = false
+    
     /** Game entries by game index */
     private games: Map<number, GameEntry> = new Map()
     
@@ -136,6 +139,29 @@ export class HighTextureCache {
     public setTextureArray(texture: THREE.DataArrayTexture): void {
         this.dataArrayTexture = texture
         log.lifecycle('Texture array reference set')
+    }
+    
+    /**
+     * Check if texture data has changed and needs GPU upload
+     */
+    public needsGpuUpdate(): boolean {
+        return this.isDirty
+    }
+    
+    /**
+     * Flush dirty texture data to GPU
+     * Call this periodically (e.g., every N frames) instead of on every texture load
+     * Returns true if an update was performed
+     */
+    public flushToGpu(): boolean {
+        if (!this.isDirty || !this.dataArrayTexture) {
+            return false
+        }
+        
+        this.dataArrayTexture.needsUpdate = true
+        this.isDirty = false
+        log.runtime('Flushed HIGH texture array to GPU')
+        return true
     }
     
     /**
@@ -329,7 +355,7 @@ export class HighTextureCache {
         const loadStart = window.performance.now()
         
         try {
-            log.runtime(`Loading HIGH texture ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" (active: ${this.loadingPromises.size}/${this.config.maxConcurrentLoads})`)
+            log.runtime(`START HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | in-flight: ${this.loadingPromises.size}/${this.config.maxConcurrentLoads}, queue: ${this.loadQueue.length}`)
             
             const result = await this.textureWorker.fetchAndProcess(
                 entry.artworkUrl,
@@ -348,14 +374,12 @@ export class HighTextureCache {
             }
             
             // Copy to texture array at the assigned SLOT (not gameIndex!)
-            const copyStart = window.performance.now()
             const offset = entry.highSlot * expectedSize
             const arrayData = this.dataArrayTexture.image.data as Uint8Array
             arrayData.set(result.imageData, offset)
-            const copyTime = window.performance.now() - copyStart
             
-            // Flag for GPU upload
-            this.dataArrayTexture.needsUpdate = true
+            // Mark dirty - caller should call flushToGpu() periodically
+            this.isDirty = true
             
             entry.state = HighTextureState.LOADED
             entry.lastAccessTime = window.performance.now()
@@ -366,7 +390,8 @@ export class HighTextureCache {
             }
             
             const totalTime = window.performance.now() - loadStart
-            log.runtime(`HIGH texture ${entry.gameIndex} → slot ${entry.highSlot} | fetch: ${result.processingTime.toFixed(0)}ms, copy: ${copyTime.toFixed(1)}ms, total: ${totalTime.toFixed(0)}ms, queue: ${this.loadQueue.length}`)
+            const inFlight = this.loadingPromises.size - 1  // -1 because this one is about to complete
+            log.runtime(`COMPLETE HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | ${totalTime.toFixed(0)}ms (fetch: ${result.processingTime.toFixed(0)}ms) | in-flight: ${inFlight}, queue: ${this.loadQueue.length}`)
             return true
             
         } catch (error) {
