@@ -24,15 +24,16 @@ import { GameEventTypes } from '../../../types/InteractionEvents'
 import vertexShader from './shaders/instanced-artwork-lod.vert?raw'
 import fragmentShader from './shaders/instanced-artwork-lod.frag?raw'
 import { TextureWorker } from './TextureWorker'
+import { HighTextureCache, HighTextureState } from './HighTextureCache'
+import { SpatialPrewarmingManager, type PrewarmingConfig } from './SpatialPrewarmingManager'
 import { Logger } from '../../../utils/Logger'
 
 const log = Logger.withContext('LodArtworkRenderer')
 
-/** LOD level constants */
+/** LOD level constants - Only HIGH and MID, no LOW */
 export const LOD_LEVEL = {
     HIGH: 0,
-    MID: 1,
-    LOW: 2
+    MID: 1
 } as const
 
 export type LodLevel = typeof LOD_LEVEL[keyof typeof LOD_LEVEL]
@@ -42,13 +43,18 @@ export interface LodConfig {
     level: LodLevel
     textureSize: number
     name: string
+    /** Max texture array depth for this LOD (defaults to maxTextures if not set) */
+    maxDepth?: number
 }
 
-/** Default LOD configurations */
+/** 
+ * Default LOD configurations - Two-tier system
+ * HIGH: Small array (64 slots = 48MB with RGB) - dynamically loaded/evicted for nearby games
+ * MID: Full array (all slots) - covers all games at reasonable quality
+ */
 export const DEFAULT_LOD_CONFIGS: LodConfig[] = [
-    { level: LOD_LEVEL.HIGH, textureSize: 512, name: 'high' },
-    { level: LOD_LEVEL.MID, textureSize: 128, name: 'mid' },
-    { level: LOD_LEVEL.LOW, textureSize: 16, name: 'low' }
+    { level: LOD_LEVEL.HIGH, textureSize: 512, name: 'high', maxDepth: 64 },
+    { level: LOD_LEVEL.MID, textureSize: 128, name: 'mid' }  // Uses maxTextures for full coverage
 ]
 
 export interface LodArtworkConfig {
@@ -62,12 +68,20 @@ export interface LodArtworkConfig {
     boxDepth?: number
     /** Default LOD level for new instances */
     defaultLod?: LodLevel
+    /** Enable lazy HIGH texture loading (memory optimization) */
+    lazyHighTextures?: boolean
+    /** Max HIGH textures to cache when lazy loading */
+    maxHighTextureCache?: number
+    /** Spatial pre-warming configuration (only used with lazyHighTextures) */
+    prewarmingConfig?: Partial<PrewarmingConfig>
 }
 
 interface LodTextureState {
     config: LodConfig
     dataArrayTexture: THREE.DataArrayTexture | null
     pendingUpdates: Set<number>  // Texture indices that need GPU update
+    /** Actual depth of this texture array (may differ from maxTextures) */
+    arrayDepth: number
 }
 
 export class LodArtworkRenderer {
@@ -80,18 +94,29 @@ export class LodArtworkRenderer {
     
     // Shared texture index tracking (same index across all LOD levels)
     private textureSlots: Map<string, number> = new Map()  // gameName -> textureIndex
+    private textureIndexToInstance: Map<number, number> = new Map()  // textureIndex -> instanceIndex
     private nextTextureIndex: number = 0
     private currentInstanceCount: number = 0
     
     // Per-instance data
     private instanceMetadata: Map<number, InstanceMetadata & { lodLevel: LodLevel }> = new Map()
     private lodLevels: Float32Array | null = null
+    private highTextureSlots: Float32Array | null = null  // Maps instanceIndex -> slot in HIGH array (-1 if not loaded)
     
     private textureWorker: TextureWorker
     private readonly maxTextures: number
     private readonly dimensions: { width: number; height: number; depth: number }
     private readonly defaultLod: LodLevel
     private readonly lodConfigs: LodConfig[]
+    
+    // Lazy HIGH texture loading (memory optimization)
+    private readonly lazyHighTextures: boolean
+    private highTextureCache: HighTextureCache | null = null
+    private spatialPrewarming: SpatialPrewarmingManager | null = null
+    private readonly prewarmingConfig: Partial<PrewarmingConfig>
+    
+    // Track artwork URLs for lazy loading
+    private artworkUrls: Map<number, string> = new Map()  // textureIndex -> url
     
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion()
 
@@ -102,17 +127,44 @@ export class LodArtworkRenderer {
             height: config.boxHeight ?? 0.4,
             depth: config.boxDepth ?? 0.1
         }
-        this.defaultLod = config.defaultLod ?? LOD_LEVEL.HIGH
+        // With lazy loading, default to MID since HIGH may not be loaded yet
+        this.lazyHighTextures = config.lazyHighTextures ?? false
+        this.defaultLod = this.lazyHighTextures ? LOD_LEVEL.MID : (config.defaultLod ?? LOD_LEVEL.HIGH)
         this.lodConfigs = config.lodConfigs ?? DEFAULT_LOD_CONFIGS
+        this.prewarmingConfig = config.prewarmingConfig ?? {}
         
         this.textureWorker = new TextureWorker()
         
-        // Initialize LOD texture states
+        // Initialize lazy HIGH texture cache if enabled
+        if (this.lazyHighTextures) {
+            const highConfig = this.lodConfigs.find(c => c.level === LOD_LEVEL.HIGH)
+            // HIGH array depth determines how many slots we have for dynamic loading
+            const highArrayDepth = highConfig?.maxDepth ?? this.maxTextures
+            this.highTextureCache = new HighTextureCache({
+                totalSlots: highArrayDepth,
+                textureSize: highConfig?.textureSize ?? 512,
+                maxConcurrentLoads: 2
+            })
+            
+            // Set callback so cache can notify us when slot assignments change
+            this.highTextureCache.setSlotChangeCallback(this.onHighSlotChange.bind(this))
+            
+            // Initialize spatial pre-warming manager
+            this.spatialPrewarming = new SpatialPrewarmingManager(
+                this.highTextureCache,
+                this.prewarmingConfig
+            )
+        }
+        
+        // Initialize LOD texture states with per-LOD array depths
         for (const lodConfig of this.lodConfigs) {
+            // Use config's maxDepth if set, otherwise fall back to maxTextures
+            const arrayDepth = lodConfig.maxDepth ?? this.maxTextures
             this.lodTextures.set(lodConfig.level, {
                 config: lodConfig,
                 dataArrayTexture: null,
-                pendingUpdates: new Set()
+                pendingUpdates: new Set(),
+                arrayDepth
             })
         }
         
@@ -128,13 +180,14 @@ export class LodArtworkRenderer {
         let totalVRAM = 0
         const lodInfo: string[] = []
         
-        for (const lodConfig of this.lodConfigs) {
-            const vram = lodConfig.textureSize * lodConfig.textureSize * this.maxTextures * 4
+        for (const [_level, state] of this.lodTextures) {
+            const depth = state.arrayDepth
+            const vram = state.config.textureSize * state.config.textureSize * depth * 4
             totalVRAM += vram
-            lodInfo.push(`${lodConfig.name} (${lodConfig.textureSize}×${lodConfig.textureSize}): ${(vram / (1024 * 1024)).toFixed(1)}MB`)
+            lodInfo.push(`${state.config.name}: ${depth} slots × ${state.config.textureSize}px = ${(vram / (1024 * 1024)).toFixed(1)}MB`)
         }
         
-        log.lifecycle(`Configured: Max ${this.maxTextures} textures, Default LOD ${this.defaultLod}, Est. VRAM: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
+        log.lifecycle(`LOD VRAM: ${lodInfo.join(', ')} | Total: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
     }
     
     /**
@@ -143,11 +196,12 @@ export class LodArtworkRenderer {
     private initialize(): void {
         if (this.instancedMesh) return
         
-        // Create all LOD texture arrays
+        // Create all LOD texture arrays with per-LOD depths
         for (const [_level, state] of this.lodTextures) {
             const size = state.config.textureSize
-            const data = new Uint8Array(size * size * this.maxTextures * 4)
-            state.dataArrayTexture = new THREE.DataArrayTexture(data, size, size, this.maxTextures)
+            const depth = state.arrayDepth
+            const data = new Uint8Array(size * size * depth * 4)
+            state.dataArrayTexture = new THREE.DataArrayTexture(data, size, size, depth)
             state.dataArrayTexture.format = THREE.RGBAFormat
             state.dataArrayTexture.type = THREE.UnsignedByteType
             state.dataArrayTexture.minFilter = THREE.LinearFilter
@@ -156,19 +210,25 @@ export class LodArtworkRenderer {
             state.dataArrayTexture.wrapT = THREE.ClampToEdgeWrapping
             state.dataArrayTexture.needsUpdate = true
             
-            log.debug(`Created ${state.config.name} LOD texture array: ${size}×${size}×${this.maxTextures}`)
+            log.debug(`Created ${state.config.name} LOD texture array: ${size}×${size}×${depth}`)
         }
         
-        // Create material with all three texture arrays
+        // Give HIGH texture array reference to cache if lazy loading
+        if (this.lazyHighTextures && this.highTextureCache) {
+            const highState = this.lodTextures.get(LOD_LEVEL.HIGH)
+            if (highState?.dataArrayTexture) {
+                this.highTextureCache.setTextureArray(highState.dataArrayTexture)
+            }
+        }
+        
+        // Create material with HIGH and MID texture arrays (no LOW)
         const highState = this.lodTextures.get(LOD_LEVEL.HIGH)
         const midState = this.lodTextures.get(LOD_LEVEL.MID)
-        const lowState = this.lodTextures.get(LOD_LEVEL.LOW)
         
         this.material = new THREE.ShaderMaterial({
             uniforms: {
                 textureArrayHigh: { value: highState?.dataArrayTexture },
-                textureArrayMid: { value: midState?.dataArrayTexture },
-                textureArrayLow: { value: lowState?.dataArrayTexture }
+                textureArrayMid: { value: midState?.dataArrayTexture }
             },
             vertexShader,
             fragmentShader,
@@ -198,16 +258,21 @@ export class LodArtworkRenderer {
         // Setup per-instance attributes
         const textureIndices = new Float32Array(this.maxTextures)
         this.lodLevels = new Float32Array(this.maxTextures)
+        this.highTextureSlots = new Float32Array(this.maxTextures)
         textureIndices.fill(0)
         this.lodLevels.fill(this.defaultLod)
+        this.highTextureSlots.fill(-1)  // -1 means "not loaded in HIGH array"
         
         const textureIndexAttr = new THREE.InstancedBufferAttribute(textureIndices, 1)
         const lodLevelAttr = new THREE.InstancedBufferAttribute(this.lodLevels, 1)
+        const highTextureSlotAttr = new THREE.InstancedBufferAttribute(this.highTextureSlots, 1)
         textureIndexAttr.setUsage(THREE.DynamicDrawUsage)
         lodLevelAttr.setUsage(THREE.DynamicDrawUsage)
+        highTextureSlotAttr.setUsage(THREE.DynamicDrawUsage)
         
         this.geometry.setAttribute('textureIndex', textureIndexAttr)
         this.geometry.setAttribute('lodLevel', lodLevelAttr)
+        this.geometry.setAttribute('highTextureSlot', highTextureSlotAttr)
         
         // Add to scene
         const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
@@ -226,7 +291,8 @@ export class LodArtworkRenderer {
     
     /**
      * Add artwork instance by URL
-     * Loads texture at all LOD levels for dynamic switching
+     * With lazyHighTextures: loads MID/LOW immediately, HIGH on-demand
+     * Without: loads all LOD levels immediately
      */
     public async setArtworkInstanceFromUrl(
         position: THREE.Vector3,
@@ -253,10 +319,20 @@ export class LodArtworkRenderer {
         
         const textureIndex = this.nextTextureIndex++
         
+        // Store URL for lazy HIGH texture loading
+        this.artworkUrls.set(textureIndex, artworkUrl)
+        
         try {
             // Process LOD levels SEQUENTIALLY - the worker shares a canvas
             // and concurrent requests with different sizes cause data corruption
             for (const [level, state] of this.lodTextures) {
+                // Skip HIGH texture if lazy loading is enabled - will be loaded on demand
+                if (this.lazyHighTextures && level === LOD_LEVEL.HIGH) {
+                    // Register game with cache for later loading
+                    this.highTextureCache?.registerGame(textureIndex, gameName, artworkUrl)
+                    continue
+                }
+                
                 const result = await this.textureWorker.fetchAndProcess(
                     artworkUrl,
                     state.config.textureSize,
@@ -286,6 +362,10 @@ export class LodArtworkRenderer {
             
             // Add instance
             const instanceIndex = this.currentInstanceCount++
+            
+            // Track the reverse mapping: textureIndex -> instanceIndex
+            this.textureIndexToInstance.set(textureIndex, instanceIndex)
+            
             const matrix = new THREE.Matrix4()
             matrix.compose(position, LodArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
             this.instancedMesh!.setMatrixAt(instanceIndex, matrix)
@@ -305,6 +385,9 @@ export class LodArtworkRenderer {
                 lodLevel: this.defaultLod
             })
             
+            // Register with spatial prewarming for proactive HIGH texture loading
+            this.spatialPrewarming?.registerGamePosition(textureIndex, gameName, position)
+            
             // Update GPU immediately - the instance is ready to render
             // This is needed because InstancedBatchComplete fires before async texture loads complete
             this.updateGPU()
@@ -323,6 +406,8 @@ export class LodArtworkRenderer {
     
     /**
      * Set LOD level for a specific instance
+     * With lazyHighTextures: if HIGH is requested but not loaded, triggers async load
+     * and keeps instance at MID until HIGH is ready
      */
     public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {
         if (!this.geometry || instanceIndex < 0 || instanceIndex >= this.currentInstanceCount) {
@@ -333,22 +418,39 @@ export class LodArtworkRenderer {
         const metadata = this.instanceMetadata.get(instanceIndex)
         const prevLod = metadata?.lodLevel
         
+        // If lazy HIGH textures enabled and requesting HIGH, check if texture is loaded
+        let effectiveLod = lodLevel
+        if (this.lazyHighTextures && lodLevel === LOD_LEVEL.HIGH && this.highTextureCache) {
+            // Get texture index for this instance
+            const textureIndexAttr = this.geometry.getAttribute('textureIndex') as THREE.InstancedBufferAttribute
+            const textureIndex = Math.floor(textureIndexAttr.getX(instanceIndex))
+            
+            // Request HIGH texture - returns slot (0-63) if loaded, -1 if not
+            const highSlot = this.highTextureCache.requestHighTexture(textureIndex)
+            
+            if (highSlot < 0) {
+                // HIGH texture not ready yet - stay at MID for now
+                // onHighSlotChange callback will update when texture loads
+                effectiveLod = LOD_LEVEL.MID
+            }
+        }
+        
         const lodLevelAttr = this.geometry.getAttribute('lodLevel') as THREE.InstancedBufferAttribute
-        lodLevelAttr.setX(instanceIndex, lodLevel)
+        lodLevelAttr.setX(instanceIndex, effectiveLod)
         lodLevelAttr.needsUpdate = true
         
         // Update metadata
         if (metadata) {
-            metadata.lodLevel = lodLevel
+            metadata.lodLevel = effectiveLod
         }
         
         // Debug: Log LOD changes with game name
-        if (prevLod !== lodLevel) {
+        if (prevLod !== effectiveLod) {
             const lodNames = ['HIGH', 'MID', 'LOW']
-            log.runtime(`LOD ${instanceIndex} "${metadata?.name?.slice(0, 20) ?? '?'}": ${lodNames[prevLod ?? 0]} → ${lodNames[lodLevel]}`)
+            log.runtime(`LOD ${instanceIndex} "${metadata?.name?.slice(0, 20) ?? '?'}": ${lodNames[prevLod ?? 0]} → ${lodNames[effectiveLod]}`)
         }
         
-        return true
+        return effectiveLod === lodLevel  // Return false if we had to downgrade
     }
     
     /**
@@ -381,6 +483,49 @@ export class LodArtworkRenderer {
     }
     
     /**
+     * Callback from HighTextureCache when a game's slot assignment changes
+     * Updates the highTextureSlot attribute AND LOD level for the affected instance
+     */
+    private onHighSlotChange(gameIndex: number, slot: number): void {
+        if (!this.geometry || !this.highTextureSlots) return
+        
+        // gameIndex from HighTextureCache is actually textureIndex
+        // Look up the corresponding instanceIndex
+        const instanceIndex = this.textureIndexToInstance.get(gameIndex)
+        if (instanceIndex === undefined) {
+            log.runtime(`HIGH slot change for unknown textureIndex ${gameIndex} - no instance mapping found`)
+            return
+        }
+        
+        if (instanceIndex >= 0 && instanceIndex < this.highTextureSlots.length) {
+            this.highTextureSlots[instanceIndex] = slot
+            
+            const highSlotAttr = this.geometry.getAttribute('highTextureSlot') as THREE.InstancedBufferAttribute
+            if (highSlotAttr) {
+                highSlotAttr.setX(instanceIndex, slot)
+                highSlotAttr.needsUpdate = true
+            }
+            
+            // Also update LOD level to HIGH now that the texture is ready
+            if (slot >= 0) {
+                const lodLevelAttr = this.geometry.getAttribute('lodLevel') as THREE.InstancedBufferAttribute
+                if (lodLevelAttr && this.lodLevels) {
+                    this.lodLevels[instanceIndex] = LOD_LEVEL.HIGH
+                    lodLevelAttr.setX(instanceIndex, LOD_LEVEL.HIGH)
+                    lodLevelAttr.needsUpdate = true
+                }
+                
+                const metadata = this.instanceMetadata.get(instanceIndex)
+                if (metadata) {
+                    metadata.lodLevel = LOD_LEVEL.HIGH
+                }
+                
+                log.runtime(`HIGH texture ready: textureIndex ${gameIndex} → instance ${instanceIndex} → slot ${slot}, LOD upgraded to HIGH`)
+            }
+        }
+    }
+
+    /**
      * Update GPU resources
      */
     public updateGPU(): void {
@@ -412,23 +557,25 @@ export class LodArtworkRenderer {
      * Get memory usage stats
      */
     public getMemoryStats(): {
-        lods: Record<string, { allocated: number; textureSize: number }>
+        lods: Record<string, { allocated: number; textureSize: number; arrayDepth: number }>
         totalAllocated: number
         textureCount: number
         instanceCount: number
     } {
-        const lods: Record<string, { allocated: number; textureSize: number }> = {}
+        const lods: Record<string, { allocated: number; textureSize: number; arrayDepth: number }> = {}
         let totalAllocated = 0
         
         for (const [_level, state] of this.lodTextures) {
             const size = state.config.textureSize
+            const depth = state.arrayDepth
             const allocated = state.dataArrayTexture 
-                ? size * size * this.maxTextures * 4
+                ? size * size * depth * 4  // Use actual array depth, not maxTextures
                 : 0
             
             lods[state.config.name] = {
                 allocated,
-                textureSize: size
+                textureSize: size,
+                arrayDepth: depth
             }
             totalAllocated += allocated
         }
@@ -450,7 +597,7 @@ export class LodArtworkRenderer {
         const lines: string[] = []
         for (const [name, lodStats] of Object.entries(stats.lods)) {
             const allocMB = (lodStats.allocated / (1024 * 1024)).toFixed(1)
-            lines.push(`  ${name} (${lodStats.textureSize}px): ${allocMB}MB`)
+            lines.push(`  ${name} (${lodStats.textureSize}px × ${lodStats.arrayDepth} slots): ${allocMB}MB`)
         }
         lines.push(`  Total: ${(stats.totalAllocated / (1024 * 1024)).toFixed(1)}MB`)
         lines.push(`  Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}`)
@@ -474,6 +621,64 @@ export class LodArtworkRenderer {
         return this.instanceMetadata
     }
     
+    /**
+     * Check if HIGH texture is loaded for an instance
+     * Only relevant when lazyHighTextures is enabled
+     */
+    public isHighTextureLoaded(instanceIndex: number): boolean {
+        if (!this.lazyHighTextures || !this.highTextureCache) {
+            return true // Not using lazy loading, so HIGH is always loaded
+        }
+        
+        const textureIndexAttr = this.geometry?.getAttribute('textureIndex') as THREE.InstancedBufferAttribute | undefined
+        if (!textureIndexAttr) return false
+        
+        const textureIndex = Math.floor(textureIndexAttr.getX(instanceIndex))
+        return this.highTextureCache.isLoaded(textureIndex)
+    }
+    
+    /**
+     * Get HIGH texture cache stats (for debugging)
+     */
+    public getHighTextureCacheStats() {
+        return this.highTextureCache?.getStats() ?? null
+    }
+    
+    /**
+     * Log HIGH texture cache stats
+     */
+    public logHighTextureCacheStats(): void {
+        this.highTextureCache?.logStats()
+    }
+    
+    /**
+     * Run diagnostic to measure texture operation costs
+     */
+    public measureTextureCosts(): void {
+        this.highTextureCache?.measureOperationCosts()
+    }
+    
+    /**
+     * Start spatial pre-warming (call after games are loaded)
+     */
+    public startPrewarming(): void {
+        this.spatialPrewarming?.start()
+    }
+    
+    /**
+     * Stop spatial pre-warming
+     */
+    public stopPrewarming(): void {
+        this.spatialPrewarming?.stop()
+    }
+    
+    /**
+     * Get spatial pre-warming stats
+     */
+    public getPrewarmingStats() {
+        return this.spatialPrewarming?.getStats() ?? null
+    }
+    
     public dispose(): void {
         this.instancedMesh?.removeFromParent()
         this.geometry?.dispose()
@@ -485,8 +690,12 @@ export class LodArtworkRenderer {
         }
         
         this.textureSlots.clear()
+        this.textureIndexToInstance.clear()
         this.instanceMetadata.clear()
+        this.artworkUrls.clear()
         this.textureWorker.dispose()
+        this.spatialPrewarming?.dispose()
+        this.highTextureCache?.dispose()
         
         log.lifecycle('Disposed')
     }

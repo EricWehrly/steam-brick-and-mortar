@@ -24,6 +24,9 @@ import { LodDistanceManager } from './instancing/LodDistanceManager'
 import { LodDebugOverlay } from '../../debug/LodDebugOverlay'
 import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
+import { Logger } from '../../utils/Logger'
+
+const log = Logger.withContext('GpuGameBoxRenderer')
 
 /** 67% probability of showing artwork vs label-only */
 const ARTWORK_PROBABILITY = 0.67
@@ -62,19 +65,113 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         // Create artwork renderer based on settings (priority: LOD > MultiAtlas > Single)
         if (this.useLodAtlas) {
             this.lodArtworkRenderer = new LodArtworkRenderer({
-                maxTextures: maxGames
+                maxTextures: maxGames,
+                lazyHighTextures: true,  // Memory optimization: load HIGH textures on demand
+                maxHighTextureCache: 100  // Keep ~100 HIGH textures cached (~100MB)
             })
             // Create distance manager for automatic LOD switching
             this.lodDistanceManager = new LodDistanceManager(this.lodArtworkRenderer)
-            console.debug(`📦 GpuGameBoxRenderer using LOD atlas system (max ${maxGames} instances)`)
+            log.lifecycle(`Using LOD atlas (max ${maxGames}, lazy HIGH enabled)`)
+            
+            // TODO: Remove all these debug functions. all of them
+            // Expose diagnostic on window for debugging
+            /* eslint-disable @typescript-eslint/no-explicit-any */
+            ;(window as any).measureTextureCosts = () => {
+                this.lodArtworkRenderer?.measureTextureCosts()
+            }
+            ;(window as any).lodCacheStats = () => {
+                this.lodArtworkRenderer?.logHighTextureCacheStats()
+            }
+            ;(window as any).lodDistribution = () => {
+                const dist = this.lodDistanceManager?.getLodDistribution()
+                if (dist) {
+                    console.group('📊 LOD Distribution (Two-Tier System)')
+                    console.log(`HIGH: ${dist.counts.high} games (within ${this.lodDistanceManager?.['config']?.highDistance ?? '?'}m)`)
+                    console.log(`MID:  ${dist.counts.mid} games (everything else)`)
+                    console.log(`Total: ${dist.counts.total} instances`)
+                    console.log(`---`)
+                    console.log(`Current VRAM: ${dist.estimatedVRAM.current}`)
+                    console.log(`Optimal VRAM: ${dist.estimatedVRAM.optimal}`)
+                    console.groupEnd()
+                }
+                return dist
+            }
+            ;(window as any).experimentLoadingStrategies = (count = 9) => {
+                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
+                if (!cache) {
+                    console.log('❌ No HIGH texture cache available')
+                    return
+                }
+                // Get the first N game indices that aren't already loaded
+                const gameIndices: number[] = []
+                for (let i = 0; i < maxGames && gameIndices.length < count; i++) {
+                    if (cache.getState(i) !== 'loaded') {
+                        gameIndices.push(i)
+                    }
+                }
+                console.log(`Testing with game indices: ${gameIndices.join(', ')}`)
+                cache.experimentLoadingStrategies(gameIndices)
+            }
+            ;(window as any).preloadNearestGames = (count = 20) => {
+                this.lodDistanceManager?.preloadNearestGames(count)
+            }
+            // Short aliases for console use
+            ;(window as any).preloadNearest = (count = 20) => {
+                this.lodDistanceManager?.preloadNearestGames(count)
+            }
+            ;(window as any).experimentBatch = (count = 9) => {
+                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
+                if (!cache) {
+                    console.log('❌ No HIGH texture cache available')
+                    return
+                }
+                cache.experimentBatchLoading?.(count)
+            }
+            // Diagnostic functions
+            ;(window as any).diagnoseIndexes = (centerIndex = 64, radius = 3) => {
+                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
+                if (!cache) {
+                    console.log('❌ No HIGH texture cache available')
+                    return
+                }
+                cache.diagnoseIndexCluster(centerIndex, radius)
+            }
+            ;(window as any).diagnoseMismatches = () => {
+                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
+                if (!cache) {
+                    console.log('❌ No HIGH texture cache available')
+                    return
+                }
+                return cache.diagnoseIndexMismatches()
+            }
+            ;(window as any).diagnoseLoadState = () => {
+                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
+                if (!cache) {
+                    console.log('❌ No HIGH texture cache available')
+                    return
+                }
+                cache.diagnoseLoadState()
+            }
+            ;(window as any).diagnoseNearest = (count = 30) => {
+                this.lodDistanceManager?.diagnoseNearestGames(count)
+            }
+            ;(window as any).dumpIndexMapping = (count = 50) => {
+                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
+                if (!cache) {
+                    console.log('❌ No HIGH texture cache available')
+                    return
+                }
+                cache.dumpIndexMapping(count)
+            }
+            /* eslint-enable @typescript-eslint/no-explicit-any */
         } else if (this.useMultiAtlas) {
             this.multiAtlasRenderer = new MultiAtlasArtworkRenderer()
-            console.debug(`📦 GpuGameBoxRenderer using multi-atlas system (max ${maxGames} instances)`)
+            log.lifecycle(`Using multi-atlas system (max ${maxGames})`)
         } else {
             this.instancedArtworkRenderer = new InstancedArtworkRenderer({
                 maxInstances: maxGames
             })
-            console.debug(`📦 GpuGameBoxRenderer using single atlas (max ${maxGames} instances)`)
+            log.lifecycle(`Using single atlas (max ${maxGames})`)
         }
     }
 
@@ -146,7 +243,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             }
         }).catch((error) => {
             if (!(error instanceof Error && error.message.includes('Maximum'))) {
-                console.error(`Error fetching artwork for "${game.name}":`, error)
+                log.debug(`Artwork fetch failed for "${game.name}": ${error}`)
             }
             if (AppSettings.get(Setting.EnableLabels)) {
                 this.createInstancedLabelBox(game, position, undefined, side)
@@ -173,7 +270,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             }
         }).catch((error) => {
             if (!(error instanceof Error && error.message.includes('Maximum'))) {
-                console.error(`Error fetching artwork for "${game.name}":`, error)
+                log.debug(`Artwork fetch failed for "${game.name}": ${error}`)
             }
             if (AppSettings.get(Setting.EnableLabels)) {
                 this.createInstancedLabelBox(game, position, undefined, side)
@@ -205,7 +302,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         }).catch((error) => {
             // Don't log "Maximum textures reached" - that's expected once we hit the limit
             if (!(error instanceof Error && error.message === 'Maximum textures reached')) {
-                console.error(`Error fetching artwork for "${game.name}":`, error)
+                log.debug(`Artwork fetch failed for "${game.name}": ${error}`)
             }
             // Fall back to label on error (if labels enabled)
             if (AppSettings.get(Setting.EnableLabels)) {
@@ -244,7 +341,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         if (shouldUseArtwork && !primaryUrl && fallbackUrl) {
             // This indicates a bug in the data pipeline - games should have artwork.header
-            console.warn(`[GpuGameBoxRenderer] Missing artwork.header for "${game.name}" (appid: ${game.appid}) - using fallback URL`)
+            log.warn(`Missing artwork.header for "${game.name}" (appid: ${game.appid}) - using fallback URL`)
         }
         
         const artworkUrl = shouldUseArtwork ? (primaryUrl || fallbackUrl) : undefined
@@ -264,7 +361,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         _name?: string
     ): THREE.Mesh | null {
         if (!this.instancedArtworkRenderer) {
-            console.warn('createInstancedArtworkBox called but single-atlas renderer not available')
+            log.warn('createInstancedArtworkBox called but single-atlas renderer not available')
             return null
         }
         
@@ -277,10 +374,10 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             textureOptions
         ).then((success) => {
             if (!success) {
-                console.warn(`Failed to add instanced artwork box for "${game.name}" at index ${reservedInstanceIndex}`)
+                log.debug(`Failed to add instanced artwork box for "${game.name}" at index ${reservedInstanceIndex}`)
             }
         }).catch((error) => {
-            console.error(`Error adding instanced artwork for "${game.name}":`, error)
+            log.debug(`Error adding instanced artwork for "${game.name}": ${error}`)
         })
         
         return null
@@ -302,7 +399,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         )
         
         if (!success) {
-            console.warn(`Failed to add instanced label box for "${game.name}"`)
+            log.debug(`Failed to add instanced label box for "${game.name}"`)
         }
         
         return null
@@ -331,7 +428,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     }
 
     public dispose(): void {
-        console.debug('🧹 Disposing GpuGameBoxRenderer resources')
+        log.lifecycle('Disposing')
         
         this.lodDebugOverlay?.dispose()
         this.lodDistanceManager?.dispose()
@@ -343,7 +440,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         this.labelInstanceIndex = 0
         this.artworkInstanceIndex = 0
         
-        console.log('✅ GpuGameBoxRenderer disposed')
+        log.lifecycle('Disposed')
     }
     
     /**
@@ -412,7 +509,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         } else if (this.multiAtlasRenderer) {
             this.multiAtlasRenderer.logMemoryStats()
         } else {
-            console.log('Memory stats only available with multi-atlas or LOD renderer')
+            log.info('Memory stats only available with multi-atlas or LOD renderer')
         }
     }
 }

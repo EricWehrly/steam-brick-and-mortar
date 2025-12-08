@@ -156,8 +156,6 @@ ctx.onmessage = async (event: MessageEvent<WorkerMessage>): Promise<void> => {
             // Legacy mode: process blob directly
             const { blob, textureSize, textureIndex } = event.data as TextureProcessingMessage
             
-            console.debug('Worker processing blob:', { textureSize, textureIndex, blobSize: blob.size })
-            
             const imageData = await processBlob(blob, textureSize)
             const processingTime = performance.now() - startTime
             
@@ -175,8 +173,6 @@ ctx.onmessage = async (event: MessageEvent<WorkerMessage>): Promise<void> => {
         } else if (type === 'FETCH_AND_PROCESS') {
             // New mode: fetch URL and process
             const { url, textureSize, textureIndex, gameName, timeout } = event.data as TextureFetchMessage
-            
-            console.debug('Worker fetching and processing:', { url, textureSize, textureIndex, gameName })
             
             // Fetch image from network
             const blob = await fetchImage(url, timeout || 10000)

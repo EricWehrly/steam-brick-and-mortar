@@ -14,9 +14,12 @@ import type {
     TextureProcessingResult, 
     TextureProcessingError 
 } from './texture-processing.worker'
+import { Logger } from '../../../utils/Logger'
 
 // Vite worker import - creates a new worker from the file
 import TextureProcessingWorker from './texture-processing.worker?worker'
+
+const log = Logger.withContext('TextureWorker')
 
 export interface FetchAndProcessResult {
     imageData: Uint8ClampedArray
@@ -55,7 +58,7 @@ export class TextureWorker {
             console.error('🔥 TextureWorker message error:', error)
         }
         
-        console.debug('🔧 TextureWorker initialized with OffscreenCanvas support')
+        log.lifecycle('Initialized')
     }
     
     /**
@@ -149,6 +152,6 @@ export class TextureWorker {
         this.pendingMessages.clear()
         
         this.worker.terminate()
-        console.debug('🔧 TextureWorker disposed')
+        log.lifecycle('Disposed')
     }
 }

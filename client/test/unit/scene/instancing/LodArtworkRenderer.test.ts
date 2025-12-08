@@ -105,8 +105,9 @@ describe('LodArtworkRenderer', () => {
             expect(LOD_LEVEL.MID).toBe(1)
         })
 
-        it('should define LOW as 2', () => {
-            expect(LOD_LEVEL.LOW).toBe(2)
+        it('should have only two LOD levels (no LOW)', () => {
+            expect(Object.keys(LOD_LEVEL)).toHaveLength(2)
+            expect(LOD_LEVEL).not.toHaveProperty('LOW')
         })
     })
 
@@ -125,15 +126,8 @@ describe('LodArtworkRenderer', () => {
             expect(midConfig!.name).toBe('mid')
         })
 
-        it('should define low LOD with 16x16 textures', () => {
-            const lowConfig = DEFAULT_LOD_CONFIGS.find(c => c.level === LOD_LEVEL.LOW)
-            expect(lowConfig).toBeDefined()
-            expect(lowConfig!.textureSize).toBe(16)
-            expect(lowConfig!.name).toBe('low')
-        })
-
-        it('should have 3 LOD levels configured', () => {
-            expect(DEFAULT_LOD_CONFIGS).toHaveLength(3)
+        it('should have 2 LOD levels configured (two-tier system)', () => {
+            expect(DEFAULT_LOD_CONFIGS).toHaveLength(2)
         })
     })
 
@@ -146,7 +140,7 @@ describe('LodArtworkRenderer', () => {
             expect(stats.lods).toBeDefined()
             expect(stats.lods.high).toBeDefined()
             expect(stats.lods.mid).toBeDefined()
-            expect(stats.lods.low).toBeDefined()
+            // No LOW in two-tier system
         })
 
         it('should include texture count in stats', () => {
@@ -177,20 +171,25 @@ describe('LodArtworkRenderer', () => {
         })
 
         it('should calculate reasonable VRAM budget for default config', () => {
-            // Calculate expected VRAM for 512 max textures
-            // High: 512×512×512×4 = 512MB
-            // Mid: 128×128×512×4 = 32MB
-            // Low: 16×16×512×4 = 0.5MB
-            // Total: ~544.5MB
+            // Calculate expected VRAM for two-tier system
+            // High: 512×512×64×4 = 64MB (dynamic array, small)
+            // Mid: 128×128×512×4 = 32MB (full array for all games)
+            // Total: ~96MB
             
-            let totalBytes = 0
-            for (const config of DEFAULT_LOD_CONFIGS) {
-                totalBytes += config.textureSize * config.textureSize * 512 * 4
-            }
-            const totalMB = totalBytes / (1024 * 1024)
+            const highConfig = DEFAULT_LOD_CONFIGS.find(c => c.level === LOD_LEVEL.HIGH)
             
-            expect(totalMB).toBeGreaterThan(500)
-            expect(totalMB).toBeLessThan(600)
+            // HIGH uses maxDepth (64), MID uses maxTextures (512)
+            const highDepth = highConfig!.maxDepth ?? 512
+            const midDepth = 512  // MID covers all games
+            
+            const highBytes = 512 * 512 * highDepth * 4
+            const midBytes = 128 * 128 * midDepth * 4
+            const totalMB = (highBytes + midBytes) / (1024 * 1024)
+            
+            // With HIGH=64 slots and MID=512 slots:
+            // 512*512*64*4 = 67MB + 128*128*512*4 = 32MB = ~99MB
+            expect(totalMB).toBeGreaterThan(50)
+            expect(totalMB).toBeLessThan(150)
         })
     })
 
@@ -220,7 +219,7 @@ describe('LodArtworkRenderer', () => {
         it('should not throw when setting global LOD before initialization', () => {
             renderer = new LodArtworkRenderer()
             
-            expect(() => renderer.setGlobalLod(LOD_LEVEL.LOW)).not.toThrow()
+            expect(() => renderer.setGlobalLod(LOD_LEVEL.MID)).not.toThrow()
         })
 
         it('should have setInstanceLod method', () => {
@@ -321,30 +320,19 @@ describe('LodArtworkRenderer LOD Selection Logic', () => {
         renderer.dispose()
     })
 
-    it('should allow configuring default LOD to LOW', () => {
-        const config: LodArtworkConfig = {
-            defaultLod: LOD_LEVEL.LOW
-        }
-        
-        const renderer = new LodArtworkRenderer(config)
-        expect(renderer).toBeDefined()
-        
-        renderer.dispose()
-    })
+    // Two-tier system: no LOW LOD
 })
 
 describe('LodArtworkRenderer Type Safety', () => {
-    it('should enforce LodLevel type', () => {
+    it('should enforce LodLevel type with two tiers', () => {
         // This test validates TypeScript type constraints
         const validLevels: LodLevel[] = [
             LOD_LEVEL.HIGH,
-            LOD_LEVEL.MID,
-            LOD_LEVEL.LOW
+            LOD_LEVEL.MID
         ]
         
-        expect(validLevels).toHaveLength(3)
+        expect(validLevels).toHaveLength(2)
         expect(validLevels).toContain(0)  // HIGH
         expect(validLevels).toContain(1)  // MID
-        expect(validLevels).toContain(2)  // LOW
     })
 })

@@ -227,41 +227,25 @@ export class LodDistanceManager {
 
     /**
      * Determine ideal LOD based on squared distance with hysteresis
+     * Two-tier system: HIGH (nearby) or MID (everything else)
      */
     private determineIdealLod(distSq: number, currentLod: LodLevel): LodLevel {
         // Use hysteresis: different thresholds for upgrading vs downgrading
         // This prevents thrashing when player is at a boundary
         
         if (currentLod === LOD_LEVEL.HIGH) {
-            // Currently HIGH - need to go beyond threshold + hysteresis to downgrade
+            // Currently HIGH - need to go beyond threshold + hysteresis to downgrade to MID
             if (distSq > this.highDistSqWithHysteresis) {
-                if (distSq > this.midDistSqWithHysteresis) {
-                    return LOD_LEVEL.LOW
-                }
                 return LOD_LEVEL.MID
             }
             return LOD_LEVEL.HIGH
         }
         
-        if (currentLod === LOD_LEVEL.MID) {
-            // Currently MID
-            if (distSq < this.highDistSq) {
-                return LOD_LEVEL.HIGH  // Upgrade to HIGH
-            }
-            if (distSq > this.midDistSqWithHysteresis) {
-                return LOD_LEVEL.LOW   // Downgrade to LOW
-            }
-            return LOD_LEVEL.MID
-        }
-        
-        // Currently LOW
+        // Currently MID - upgrade to HIGH if within high distance threshold
         if (distSq < this.highDistSq) {
             return LOD_LEVEL.HIGH
         }
-        if (distSq < this.midDistSq) {
-            return LOD_LEVEL.MID
-        }
-        return LOD_LEVEL.LOW
+        return LOD_LEVEL.MID
     }
 
     // TEMPORARY: Diagnostic logging
@@ -281,7 +265,7 @@ export class LodDistanceManager {
             `Update: ${avgUpdateTime.toFixed(2)}ms avg | ` +
             `Frame: ${avgFrameTime.toFixed(1)}ms avg | ` +
             `Changes: ${this.diagnostics.lodChanges} | ` +
-            `HIGH: ${lodCounts.high}, MID: ${lodCounts.mid}, LOW: ${lodCounts.low}`
+            `HIGH: ${lodCounts.high}, MID: ${lodCounts.mid}`
         )
         
         // Reset counters (keep frame samples for rolling average)
@@ -290,14 +274,130 @@ export class LodDistanceManager {
         this.diagnostics.lodChanges = 0
     }
 
-    private countLodLevels(): { high: number; mid: number; low: number } {
-        let high = 0, mid = 0, low = 0
+    private countLodLevels(): { high: number; mid: number } {
+        let high = 0, mid = 0
         for (const state of this.instanceStates.values()) {
             if (state.currentLod === LOD_LEVEL.HIGH) high++
-            else if (state.currentLod === LOD_LEVEL.MID) mid++
-            else low++
+            else mid++  // Everything else is MID in two-tier system
         }
-        return { high, mid, low }
+        return { high, mid }
+    }
+
+    // TODO: Remove debug functions
+    /**
+     * Get current LOD distribution - useful for tuning texture array sizes
+     * Two-tier system: HIGH (nearby) + MID (everything else)
+     */
+    public getLodDistribution(): {
+        counts: { high: number; mid: number; total: number }
+        estimatedVRAM: { current: string; optimal: string }
+    } {
+        const counts = this.countLodLevels()
+        const total = counts.high + counts.mid
+        
+        // Current: HIGH at 64 depth, MID at full (maxTextures)
+        // Assumes maxTextures = 512 for estimation
+        const maxTextures = 512
+        const currentVRAM = (512 * 512 * 64 * 4) + (128 * 128 * maxTextures * 4)
+        
+        // Optimal: Size each array to actual usage + buffer
+        const highBuffer = Math.max(counts.high * 2, 50) // 2x current or min 50
+        const midBuffer = total // MID covers everything
+        
+        const optimalVRAM = 
+            (512 * 512 * highBuffer * 4) + 
+            (128 * 128 * midBuffer * 4)
+        
+        return {
+            counts: { ...counts, total },
+            estimatedVRAM: {
+                current: `${(currentVRAM / 1024 / 1024).toFixed(0)}MB`,
+                optimal: `${(optimalVRAM / 1024 / 1024).toFixed(0)}MB (${highBuffer} HIGH, ${midBuffer} MID slots)`
+            }
+        }
+    }
+
+    /**
+     * Preload HIGH textures for the N nearest games
+     * Useful for proactive loading before player moves closer
+     */
+    public preloadNearestGames(count: number = 20): void {
+        const camera = this.dataManager.get<THREE.Camera>(DataKey.MainCamera)
+        if (!camera) {
+            log.runtime('Cannot preload: no camera')
+            return
+        }
+
+        if (this.instanceStates.size === 0) {
+            log.runtime('Cannot preload: no instances')
+            return
+        }
+
+        const cameraPos = camera.position
+
+        // Calculate distances for all instances
+        const distances: Array<{ index: number; distSq: number }> = []
+        for (const [index, state] of this.instanceStates) {
+            this.tmpVec.copy(state.position).sub(cameraPos)
+            distances.push({ index, distSq: this.tmpVec.lengthSq() })
+        }
+
+        // Sort by distance (nearest first)
+        distances.sort((a, b) => a.distSq - b.distSq)
+
+        // Request HIGH for nearest N games
+        const toPreload = distances.slice(0, count)
+        let requested = 0
+        for (const { index } of toPreload) {
+            // setInstanceLod to HIGH will trigger the HIGH texture request
+            const state = this.instanceStates.get(index)
+            if (state && state.currentLod !== LOD_LEVEL.HIGH) {
+                this.renderer.setInstanceLod(index, LOD_LEVEL.HIGH)
+                state.currentLod = LOD_LEVEL.HIGH
+                requested++
+            }
+        }
+
+        log.runtime(`Preloaded ${requested} nearest games to HIGH (${count} requested, ${toPreload.length} in range)`)
+    }
+
+    /**
+     * Diagnostic: Show nearest N games with their indices, distances, and LOD states
+     */
+    public diagnoseNearestGames(count: number = 30): void {
+        const camera = this.dataManager.get<THREE.Camera>(DataKey.MainCamera)
+        if (!camera) {
+            console.log('❌ Cannot diagnose: no camera')
+            return
+        }
+
+        const cameraPos = camera.position
+        console.group(`📍 Nearest ${count} games (camera at ${cameraPos.x.toFixed(1)}, ${cameraPos.y.toFixed(1)}, ${cameraPos.z.toFixed(1)})`)
+
+        // Calculate distances for all instances
+        const distances: Array<{ index: number; dist: number; state: InstanceLodState }> = []
+        for (const [index, state] of this.instanceStates) {
+            this.tmpVec.copy(state.position).sub(cameraPos)
+            distances.push({ index, dist: this.tmpVec.length(), state })
+        }
+
+        // Sort by distance (nearest first)
+        distances.sort((a, b) => a.dist - b.dist)
+
+        const nearest = distances.slice(0, count)
+        const lodNames = ['HIGH', 'MID', 'LOW']
+        
+        console.log('Index | Distance | LOD  | Position')
+        console.log('------|----------|------|----------')
+        for (const { index, dist, state } of nearest) {
+            const lod = lodNames[state.currentLod] ?? '?'
+            const pos = `(${state.position.x.toFixed(1)}, ${state.position.y.toFixed(1)}, ${state.position.z.toFixed(1)})`
+            const inRange = dist <= this.config.highDistance ? '✓' : ''
+            console.log(`${String(index).padStart(5)} | ${dist.toFixed(2).padStart(8)}m | ${lod.padEnd(4)} | ${pos} ${inRange}`)
+        }
+
+        console.log(`\nHIGH distance threshold: ${this.config.highDistance}m`)
+        console.groupEnd()
     }
 
     /**
