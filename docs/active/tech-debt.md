@@ -3,6 +3,149 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
+### Architecture: Unified Popup/Panel Menu System
+**Priority**: Medium  
+**Effort**: 8-12 hours  
+**Context**: Multiple popup-like UI elements (LOD controls, lighting panel, binder, etc.) each have their own toggle mechanisms (on-screen buttons, keyboard shortcuts). They lack coordination and can overlap each other.
+
+**Requirements**:
+- Generic system for declaring and managing popup panels
+- Multiple activation methods per panel (button, keyboard, VR controller)
+- Dynamic screen-space arrangement to prevent overlap
+- Panels should arrange themselves around available screen space
+- Consider z-ordering and focus management
+
+**Current Examples**:
+- `LodControlsPanel` - LOD switching UI
+- Lighting controls (if exists)
+- Debug panels
+- Future: Game info popups, settings, etc.
+
+**Proposed Pattern**:
+- `PopupRegistry` or `PanelManager` singleton
+- Panels register with metadata (preferred position, size, trigger keys)
+- Manager handles positioning, prevents overlap, manages visibility
+- Trigger system maps inputs to panel toggles
+
+**Source**: Dec 2025 - LOD controls panel implementation revealed need for unified approach
+
+---
+
+### Code Quality: Review InteractionEvents for Unnecessary Properties
+**Priority**: Low  
+**Effort**: 1-2 hours  
+**Context**: Many event interfaces in `InteractionEvents.ts` may have properties that are passed through but never consumed by handlers. Examples: `timestamp` and `source` default in `BaseInteractionEvent`, so explicit passing is redundant.
+
+**Tasks**:
+- Audit each event interface in `InteractionEvents.ts`
+- For each property, grep to see if it's actually read by any handler
+- Remove properties that are only passed but never consumed (YAGNI)
+- Consider if some events even need their own interface type
+
+**Example**: `SteamGamesBatchEvent` originally had `isLastBatch` and `isSupplementalBatch` that were passed but never read.
+
+**Source**: Dec 2025 - Cache-first loading refactor revealed unused event properties
+
+---
+
+### Architecture: Event-Driven Room Resizing
+**Priority**: Medium  
+**Effort**: 4-6 hours  
+**Context**: Currently RoomManager creates walls synchronously (~1.5s) which blocks startup. Room sizing is coupled to knowing the game count upfront.
+
+**Proposed Pattern**:
+- Room spawns with default/minimum size
+- Room listens for game count events
+- Room resizes dynamically when needed (or when all games are known)
+- Separation of concerns: create assets first, position/resize later
+
+**Benefits**:
+- Faster initial load (walls created asynchronously)  
+- Room can start rendering before game count is known
+- Cleaner separation between asset creation and layout
+
+**Source**: Dec 2025 - Startup optimization discussion
+
+---
+
+### Performance: Framerate-Based Deferral System
+**Priority**: Medium  
+**Effort**: 6-8 hours  
+**Context**: Heavy operations (geometry creation, texture loading) can cause frame drops. Rather than fixed timeouts/batching, defer work based on actual frame budget.
+
+**Proposed Pattern**:
+- Maintain minimum target framerate (e.g., 60fps for VR, 30fps for desktop)
+- Measure frame time each frame
+- When frame budget allows (< 16ms spent), process deferred work
+- When frame time exceeds budget, pause deferred queue until headroom returns
+
+**Benefits**:
+- Adapts to actual hardware capability
+- Smooth user experience even during heavy loading
+- Works well with VR comfort requirements
+
+**Implementation Ideas**:
+- `DeferralManager` singleton with work queue
+- `requestAnimationFrame` loop checks frame timing
+- Prioritized queue: critical > normal > low priority
+
+**Source**: Dec 2025 - Startup optimization discussion
+
+---
+
+### Performance: Profile InstancedShelfRenderer.initialize()
+**Priority**: High  
+**Effort**: 2-4 hours  
+**Context**: `InstancedShelfRenderer.initialize()` takes ~3 seconds. Need to identify the actual bottleneck.
+
+**Tasks**:
+- Add detailed timing inside `initialize()`:
+  - Time geometry creation (createGeometryTemplates)
+  - Time material setup
+  - Time InstancedMesh creation
+  - Time GPU upload (if applicable)
+- Identify which step is slow
+- Implement appropriate fix based on findings
+
+**Potential Fixes**:
+- If geometry: Cache serialized BufferGeometry in IndexedDB
+- If material: Ensure SharedMaterialManager reuse
+- If GPU: Consider deferred upload or WebGL warm-up
+
+**Source**: Dec 2025 - Startup optimization analysis shows 3s delay
+
+---
+
+### Performance: Main Thread Activity Tracker for Startup UI
+**Priority**: Low (nice-to-have)  
+**Effort**: 4-6 hours  
+**Context**: During startup and game loading, users see a progress bar but no indication of what's actually happening. A "main thread activity tracker" could show which class/method is currently executing (e.g., `SteamIntegration.loadGamesFromCache()`).
+
+**Initial Attempt (Nov 2025)**: 
+- Created `MainThreadActivityTracker` singleton with `enter(className, methodName)` / exit pattern
+- Added tracking calls to key methods (GpuStorePropsEventHandler, SteamIntegration, GpuStorePropsRenderer, RoomManager)
+- Connected to `StartupProgressUI` with activity text display
+- Issues encountered:
+  - Event timing problems - `DataLoaded` event triggers `transitionToGameLoading()`, but `complete()` immediately hides activity
+  - Async event registration race conditions
+  - Manual instrumentation is tedious and error-prone
+
+**Better Approach Ideas**:
+- Use decorators instead of manual enter/exit calls
+- Consider browser Performance API (`performance.mark/measure`) instead of custom tracking
+- Possibly use Web Workers for heavy loading to keep main thread responsive
+- Consider simpler approach: just show current "phase" name without method-level detail
+
+**Tasks** (if revisited):
+- Research decorator-based approach for cleaner instrumentation
+- Fix event timing issues between startup phases and game loading mode
+- Add `isGameLoadingMode` flag to prevent `complete()` from hiding activity during game loading
+- Consider whether method-level granularity is worth the complexity
+
+**Deferred**: Implementation abandoned due to timing complexity. Current progress bar is sufficient for MVP.
+
+---
+
 ### Performance: Scene Traversal Optimization Audit
 **Priority**: High  
 **Effort**: 4-6 hours  
