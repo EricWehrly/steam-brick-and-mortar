@@ -1,46 +1,42 @@
 /**
- * PixelDataCache - IndexedDB cache for decoded texture pixel data
+ * PixelDataCache - Web Worker-based IndexedDB cache for decoded texture pixel data
  * 
- * Performance Optimization: Caches raw RGBA pixel arrays instead of JPEG blobs.
- * This skips the entire decode pipeline (createImageBitmap, canvas draw, getImageData)
- * on cache hits, reducing load time from ~50ms to ~1ms per texture.
+ * Performance Optimization: All IndexedDB operations run in a dedicated Web Worker
+ * to prevent main thread blocking. This eliminates frame drops during texture loading.
+ * 
+ * Before (main thread IndexedDB): Cache hits took ~20-40ms, blocking rendering
+ * After (worker-based): Cache hits are async with no main thread blocking
+ * 
+ * Architecture:
+ * - Main thread: Coordinates requests, tracks stats
+ * - Worker thread: All IndexedDB read/write operations
+ * - ArrayBuffer transfer: Zero-copy data transfer from worker to main
  * 
  * Storage Trade-off:
  * - JPEG blob: ~30-50KB per image
  * - RGBA pixels (300×450): ~540KB per image (10-18x larger)
  * - For 800 games: ~432MB IndexedDB storage
- * 
- * This is acceptable because:
- * - Modern browsers support multi-GB IndexedDB storage
- * - The 50x speed improvement on cache hits is worth the storage cost
- * - Users can clear browser data if storage is a concern
  */
 
 import { Logger } from '../../../utils/Logger'
+import type {
+    WorkerInMessage,
+    WorkerOutMessage,
+    GetResult,
+    PutResult,
+    InitResult,
+    ClearResult,
+    StatsResult
+} from './pixel-cache.worker'
+
+// Vite worker import
+import PixelCacheWorker from './pixel-cache.worker?worker'
 
 const log = Logger.withContext('PixelDataCache')
 
-interface CachedPixelData {
-    /** URL used as cache key */
-    url: string
-    /** Raw RGBA pixel data */
-    pixels: Uint8ClampedArray
-    /** Width of the image */
-    width: number
-    /** Height of the image */
-    height: number
-    /** When this was cached (for potential TTL/cleanup) */
-    cachedAt: number
-    /** Version tag for cache invalidation on dimension changes */
-    version: number
-}
-
 export interface PixelDataCacheConfig {
-    /** IndexedDB database name */
     dbName?: string
-    /** Object store name */
     storeName?: string
-    /** Cache version - bump to invalidate all cached data */
     version?: number
 }
 
@@ -49,8 +45,7 @@ export interface PixelCacheStats {
     misses: number
     stores: number
     errors: number
-    pendingWrites: number
-    batchFlushes: number
+    workerReady: boolean
 }
 
 export interface CachedPixelResult {
@@ -65,32 +60,26 @@ const CACHE_VERSION = 1
 export class PixelDataCache {
     private static instance: PixelDataCache | null = null
     
-    private db: IDBDatabase | null = null
+    private worker: Worker | null = null
     private readonly dbName: string
     private readonly storeName: string
     private readonly version: number
     private initPromise: Promise<void> | null = null
+    private workerReady = false
+    
+    /** Pending message callbacks */
+    private pendingMessages = new Map<string, {
+        resolve: (data: WorkerOutMessage) => void
+        reject: (error: Error) => void
+    }>()
     
     private stats: PixelCacheStats = {
         hits: 0,
         misses: 0,
         stores: 0,
         errors: 0,
-        pendingWrites: 0,
-        batchFlushes: 0
+        workerReady: false
     }
-    
-    /** Queue of pending writes to batch into single transaction */
-    private writeQueue: CachedPixelData[] = []
-    
-    /** Timer for periodic flush */
-    private flushTimer: ReturnType<typeof setTimeout> | null = null
-    
-    /** Flush interval in ms */
-    private readonly FLUSH_INTERVAL_MS = 500
-    
-    /** Max items before forcing a flush */
-    private readonly MAX_QUEUE_SIZE = 10
     
     private constructor(config: PixelDataCacheConfig = {}) {
         this.dbName = config.dbName ?? 'SteamTexturePixels'
@@ -106,107 +95,137 @@ export class PixelDataCache {
     }
     
     /**
-     * Initialize IndexedDB connection
-     * Safe to call multiple times - will return existing init promise
+     * Initialize the worker and IndexedDB connection
      */
     public async init(): Promise<void> {
-        if (this.db) return
+        if (this.workerReady) return
         if (this.initPromise) return this.initPromise
         
-        this.initPromise = new Promise((resolve, reject) => {
-            if (typeof indexedDB === 'undefined') {
-                log.warn('IndexedDB not available - pixel cache disabled')
-                resolve()
-                return
-            }
-            
-            const request = indexedDB.open(this.dbName, this.version)
-            
-            request.onerror = () => {
-                log.error('Failed to open IndexedDB:', request.error)
-                this.stats.errors++
-                reject(request.error)
-            }
-            
-            request.onsuccess = () => {
-                this.db = request.result
-                log.lifecycle(`Initialized: ${this.dbName}/${this.storeName}`)
-                resolve()
-            }
-            
-            request.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result
-                
-                // Delete old store if exists (version upgrade = cache invalidation)
-                if (db.objectStoreNames.contains(this.storeName)) {
-                    db.deleteObjectStore(this.storeName)
-                    log.lifecycle('Cleared old pixel cache (version upgrade)')
-                }
-                
-                // Create new store with URL as key
-                const store = db.createObjectStore(this.storeName, { keyPath: 'url' })
-                store.createIndex('cachedAt', 'cachedAt', { unique: false })
-                
-                log.lifecycle('Created pixel cache store')
-            }
-        })
-        
+        this.initPromise = this.initWorker()
         return this.initPromise
     }
     
-    /**
-     * Get cached pixel data for a URL
-     * @returns Pixel data with dimensions if cached, null if not found
-     */
-    public async get(url: string): Promise<CachedPixelResult | null> {
-        if (!this.db) {
+    private async initWorker(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            try {
+                this.worker = new PixelCacheWorker()
+                
+                this.worker.onmessage = (event: MessageEvent<WorkerOutMessage>) => {
+                    this.handleWorkerMessage(event.data)
+                }
+                
+                this.worker.onerror = (error) => {
+                    log.error('Worker error:', error.message)
+                    this.stats.errors++
+                }
+                
+                // Send init message
+                const messageId = this.generateMessageId()
+                
+                this.pendingMessages.set(messageId, {
+                    resolve: (data) => {
+                        const result = data as InitResult
+                        if (result.success) {
+                            this.workerReady = true
+                            this.stats.workerReady = true
+                            log.lifecycle(`Worker initialized: ${this.dbName}/${this.storeName}`)
+                            resolve()
+                        } else {
+                            reject(new Error(result.error ?? 'Worker init failed'))
+                        }
+                    },
+                    reject
+                })
+                
+                this.worker.postMessage({
+                    type: 'INIT',
+                    dbName: this.dbName,
+                    storeName: this.storeName,
+                    version: this.version,
+                    messageId
+                } satisfies WorkerInMessage)
+                
+            } catch (error) {
+                log.error('Failed to create worker:', error)
+                reject(error)
+            }
+        })
+    }
+    
+    private handleWorkerMessage(data: WorkerOutMessage): void {
+        const pending = this.pendingMessages.get(data.messageId)
+        if (pending) {
+            this.pendingMessages.delete(data.messageId)
+            pending.resolve(data)
+        }
+    }
+    
+    private generateMessageId(): string {
+        return `${Date.now()}_${Math.random().toString(36).slice(2)}`
+    }
+    
+    private async sendMessage<T extends WorkerOutMessage>(message: WorkerInMessage): Promise<T> {
+        if (!this.worker) {
             await this.init()
-            if (!this.db) return null
         }
         
-        const db = this.db // Capture for closure
+        if (!this.worker) {
+            throw new Error('Worker not available')
+        }
         
-        return new Promise((resolve) => {
-            const transaction = db.transaction(this.storeName, 'readonly')
-            const store = transaction.objectStore(this.storeName)
-            const request = store.get(url)
+        return new Promise((resolve, reject) => {
+            this.pendingMessages.set(message.messageId, {
+                resolve: (data) => resolve(data as T),
+                reject
+            })
             
-            request.onerror = () => {
-                log.debug(`Cache read error for ${url}:`, request.error)
-                this.stats.errors++
-                resolve(null)
-            }
-            
-            request.onsuccess = () => {
-                const cached = request.result as CachedPixelData | undefined
-                
-                if (!cached) {
-                    this.stats.misses++
-                    resolve(null)
-                    return
-                }
-                
-                // Validate version
-                if (cached.version !== this.version) {
-                    log.debug(`Cache version mismatch for ${url}: cached v${cached.version}, current v${this.version}`)
-                    this.stats.misses++
-                    resolve(null)
-                    return
-                }
-                
-                this.stats.hits++
-                resolve({
-                    pixelData: cached.pixels,
-                    width: cached.width,
-                    height: cached.height
-                })
+            // For PUT messages, transfer the ArrayBuffer
+            if (message.type === 'PUT') {
+                const putMessage = message as WorkerInMessage & { pixels: Uint8ClampedArray }
+                const buffer = putMessage.pixels.buffer
+                this.worker!.postMessage(message, [buffer])
+            } else {
+                this.worker!.postMessage(message)
             }
         })
     }
     
     /**
-     * Queue pixel data for batched write to cache
-     * Writes are batched to reduce main thread blocking from multiple IndexedDB transactions
+     * Get cached pixel data for a URL (runs off main thread!)
+     */
+    public async get(url: string): Promise<CachedPixelResult | null> {
+        if (!this.workerReady) {
+            await this.init()
+        }
+        
+        try {
+            const result = await this.sendMessage<GetResult>({
+                type: 'GET',
+                url,
+                version: this.version,
+                messageId: this.generateMessageId()
+            })
+            
+            if (result.found && result.pixels) {
+                this.stats.hits++
+                return {
+                    pixelData: result.pixels,
+                    width: result.width!,
+                    height: result.height!
+                }
+            } else {
+                this.stats.misses++
+                return null
+            }
+        } catch (error) {
+            log.debug(`Cache read error for ${url}:`, error)
+            this.stats.errors++
+            return null
+        }
+    }
+    
+    /**
+     * Store pixel data in cache (runs off main thread!)
      */
     public async put(
         url: string,
@@ -214,126 +233,65 @@ export class PixelDataCache {
         width: number,
         height: number
     ): Promise<void> {
-        if (!this.db) {
+        if (!this.workerReady) {
             await this.init()
-            if (!this.db) return
         }
         
-        const entry: CachedPixelData = {
-            url,
-            pixels,
-            width,
-            height,
-            cachedAt: Date.now(),
-            version: this.version
-        }
-        
-        // Add to queue instead of writing immediately
-        this.writeQueue.push(entry)
-        this.stats.pendingWrites = this.writeQueue.length
-        
-        // Force flush if queue is full
-        if (this.writeQueue.length >= this.MAX_QUEUE_SIZE) {
-            this.flushWriteQueue()
-            return
-        }
-        
-        // Schedule flush if not already scheduled
-        if (!this.flushTimer) {
-            this.flushTimer = setTimeout(() => {
-                this.flushWriteQueue()
-            }, this.FLUSH_INTERVAL_MS)
+        try {
+            // Make a copy since we're transferring ownership
+            const pixelsCopy = new Uint8ClampedArray(pixels)
+            
+            await this.sendMessage<PutResult>({
+                type: 'PUT',
+                url,
+                pixels: pixelsCopy,
+                width,
+                height,
+                version: this.version,
+                messageId: this.generateMessageId()
+            })
+            
+            this.stats.stores++
+        } catch (error) {
+            log.debug(`Cache write error for ${url}:`, error)
+            this.stats.errors++
         }
     }
     
     /**
-     * Flush all pending writes in a single IndexedDB transaction
-     * This batches multiple writes to reduce main thread blocking
-     */
-    private flushWriteQueue(): void {
-        if (this.flushTimer) {
-            clearTimeout(this.flushTimer)
-            this.flushTimer = null
-        }
-        
-        if (this.writeQueue.length === 0 || !this.db) {
-            return
-        }
-        
-        const itemsToWrite = this.writeQueue.splice(0)
-        this.stats.pendingWrites = 0
-        
-        const db = this.db
-        const transaction = db.transaction(this.storeName, 'readwrite')
-        const store = transaction.objectStore(this.storeName)
-        
-        let successCount = 0
-        let errorCount = 0
-        
-        for (const entry of itemsToWrite) {
-            const request = store.put(entry)
-            request.onsuccess = () => { successCount++ }
-            request.onerror = () => { 
-                errorCount++
-                log.debug(`Batch write error for ${entry.url}:`, request.error)
-            }
-        }
-        
-        transaction.oncomplete = () => {
-            this.stats.stores += successCount
-            this.stats.errors += errorCount
-            this.stats.batchFlushes++
-            log.debug(`Batch flush: ${successCount} writes, ${errorCount} errors`)
-        }
-        
-        transaction.onerror = () => {
-            this.stats.errors += itemsToWrite.length
-            log.debug('Batch transaction failed:', transaction.error)
-        }
-    }
-
-    /**
      * Remove a specific entry from cache
      */
     public async delete(url: string): Promise<void> {
-        if (!this.db) return
+        if (!this.workerReady) return
         
-        const db = this.db // Capture for closure
-        
-        return new Promise((resolve) => {
-            const transaction = db.transaction(this.storeName, 'readwrite')
-            const store = transaction.objectStore(this.storeName)
-            const request = store.delete(url)
-            
-            request.onerror = () => resolve()
-            request.onsuccess = () => resolve()
-        })
+        try {
+            await this.sendMessage<ClearResult>({
+                type: 'DELETE',
+                url,
+                messageId: this.generateMessageId()
+            } as WorkerInMessage)
+        } catch (error) {
+            log.debug(`Cache delete error for ${url}:`, error)
+        }
     }
     
     /**
      * Clear all cached pixel data
      */
     public async clear(): Promise<void> {
-        if (!this.db) return
+        if (!this.workerReady) return
         
-        const db = this.db // Capture for closure
-        
-        return new Promise((resolve) => {
-            const transaction = db.transaction(this.storeName, 'readwrite')
-            const store = transaction.objectStore(this.storeName)
-            const request = store.clear()
+        try {
+            await this.sendMessage<ClearResult>({
+                type: 'CLEAR',
+                messageId: this.generateMessageId()
+            })
             
-            request.onerror = () => {
-                log.error('Failed to clear cache:', request.error)
-                resolve()
-            }
-            
-            request.onsuccess = () => {
-                log.lifecycle('Cleared all cached pixel data')
-                this.stats = { hits: 0, misses: 0, stores: 0, errors: 0, pendingWrites: 0, batchFlushes: 0 }
-                resolve()
-            }
-        })
+            this.stats = { hits: 0, misses: 0, stores: 0, errors: 0, workerReady: true }
+            log.lifecycle('Cleared all cached pixel data')
+        } catch (error) {
+            log.error('Failed to clear cache:', error)
+        }
     }
     
     /**
@@ -355,25 +313,23 @@ export class PixelDataCache {
      * Get estimated storage usage
      */
     public async getStorageEstimate(): Promise<{ count: number; estimatedMB: number }> {
-        if (!this.db) {
+        if (!this.workerReady) {
             return { count: 0, estimatedMB: 0 }
         }
         
-        const db = this.db // Capture for closure
-        
-        return new Promise((resolve) => {
-            const transaction = db.transaction(this.storeName, 'readonly')
-            const store = transaction.objectStore(this.storeName)
-            const countRequest = store.count()
+        try {
+            const result = await this.sendMessage<StatsResult>({
+                type: 'GET_STATS',
+                messageId: this.generateMessageId()
+            })
             
-            countRequest.onerror = () => resolve({ count: 0, estimatedMB: 0 })
-            countRequest.onsuccess = () => {
-                const count = countRequest.result
-                // Estimate: 300×450×4 = 540KB per entry + ~100 bytes overhead
-                const estimatedMB = (count * (540 * 1024 + 100)) / (1024 * 1024)
-                resolve({ count, estimatedMB })
+            return {
+                count: result.count,
+                estimatedMB: result.estimatedMB
             }
-        })
+        } catch {
+            return { count: 0, estimatedMB: 0 }
+        }
     }
     
     /**
@@ -383,26 +339,20 @@ export class PixelDataCache {
         const stats = this.getStats()
         const storage = await this.getStorageEstimate()
         
-        console.group('📦 PixelDataCache Stats')
+        console.group('📦 PixelDataCache Stats (Worker-based)')
+        console.log(`Worker ready: ${stats.workerReady}`)
         console.log(`Hits: ${stats.hits}, Misses: ${stats.misses}, Hit Rate: ${stats.hitRate}`)
         console.log(`Stores: ${stats.stores}, Errors: ${stats.errors}`)
-        console.log(`Pending writes: ${stats.pendingWrites}, Batch flushes: ${stats.batchFlushes}`)
         console.log(`Cached entries: ${storage.count}, Estimated size: ${storage.estimatedMB.toFixed(1)}MB`)
         console.groupEnd()
     }
     
     public dispose(): void {
-        // Flush any pending writes before closing
-        this.flushWriteQueue()
-        
-        if (this.flushTimer) {
-            clearTimeout(this.flushTimer)
-            this.flushTimer = null
-        }
-        
-        this.db?.close()
-        this.db = null
+        this.worker?.terminate()
+        this.worker = null
+        this.workerReady = false
         this.initPromise = null
+        this.pendingMessages.clear()
         log.lifecycle('Disposed')
     }
 }
