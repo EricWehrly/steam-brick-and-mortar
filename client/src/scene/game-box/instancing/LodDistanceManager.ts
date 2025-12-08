@@ -295,17 +295,17 @@ export class LodDistanceManager {
         const counts = this.countLodLevels()
         const total = counts.high + counts.mid
         
-        // Current: HIGH at 64 depth, MID at full (maxTextures)
+        // Current: HIGH at 64 depth (native 600x900 portrait), MID at full (maxTextures, 128x128)
         // Assumes maxTextures = 512 for estimation
         const maxTextures = 512
-        const currentVRAM = (512 * 512 * 64 * 4) + (128 * 128 * maxTextures * 4)
+        const currentVRAM = (600 * 900 * 64 * 4) + (128 * 128 * maxTextures * 4)
         
         // Optimal: Size each array to actual usage + buffer
         const highBuffer = Math.max(counts.high * 2, 50) // 2x current or min 50
         const midBuffer = total // MID covers everything
         
         const optimalVRAM = 
-            (512 * 512 * highBuffer * 4) + 
+            (600 * 900 * highBuffer * 4) + 
             (128 * 128 * midBuffer * 4)
         
         return {

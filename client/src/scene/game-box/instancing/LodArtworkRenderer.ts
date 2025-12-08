@@ -31,6 +31,19 @@ import { Logger } from '../../../utils/Logger'
 
 const log = Logger.withContext('LodArtworkRenderer')
 
+/** Steam library capsule (portrait) native dimensions - like physical game boxes */
+/** 
+ * Steam library capsule dimensions
+ * Note: While Steam advertises 600×900, their CDN often serves 300×450 (exactly half)
+ * We use the actual served dimensions to enable native-size loading without resize
+ */
+export const STEAM_CAPSULE_WIDTH = 300
+export const STEAM_CAPSULE_HEIGHT = 450
+
+/** Game box dimensions matching Steam library capsule aspect ratio (300:450 = 2:3) */
+export const DEFAULT_BOX_WIDTH = 0.2   // Width in meters
+export const DEFAULT_BOX_HEIGHT = 0.3  // Height matches 2:3 aspect ratio (portrait)
+
 /** LOD level constants - Only HIGH and MID, no LOW */
 export const LOD_LEVEL = {
     HIGH: 0,
@@ -42,7 +55,11 @@ export type LodLevel = typeof LOD_LEVEL[keyof typeof LOD_LEVEL]
 /** LOD configuration */
 export interface LodConfig {
     level: LodLevel
-    textureSize: number
+    /** For square textures (MID tier) */
+    textureSize?: number
+    /** For non-square textures (HIGH tier - native Steam headers) */
+    textureWidth?: number
+    textureHeight?: number
     name: string
     /** Max texture array depth for this LOD (defaults to maxTextures if not set) */
     maxDepth?: number
@@ -50,11 +67,11 @@ export interface LodConfig {
 
 /** 
  * Default LOD configurations - Two-tier system
- * HIGH: Small array (64 slots = 48MB with RGB) - dynamically loaded/evicted for nearby games
- * MID: Full array (all slots) - covers all games at reasonable quality
+ * HIGH: Native resolution (600x900) portrait capsules - dynamically loaded/evicted for nearby games
+ * MID: Square thumbnails (128x128) - covers all games at reasonable quality
  */
 export const DEFAULT_LOD_CONFIGS: LodConfig[] = [
-    { level: LOD_LEVEL.HIGH, textureSize: 512, name: 'high', maxDepth: 64 },
+    { level: LOD_LEVEL.HIGH, textureWidth: STEAM_CAPSULE_WIDTH, textureHeight: STEAM_CAPSULE_HEIGHT, name: 'high', maxDepth: 128 },
     { level: LOD_LEVEL.MID, textureSize: 128, name: 'mid' }  // Uses maxTextures for full coverage
 ]
 
@@ -124,13 +141,17 @@ export class LodArtworkRenderer {
     private readonly gpuUpdateInterval: number = 10  // Flush to GPU every N frames
     private isRegisteredForRenderLoop: boolean = false
     
+    // Games waiting for GPU flush before LOD promotion to HIGH
+    // This prevents the "flash" where LOD switches to HIGH before texture data is on GPU
+    private pendingHighPromotion: Map<number, number> = new Map()  // textureIndex → highSlot
+    
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion()
 
     constructor(config: LodArtworkConfig = {}) {
         this.maxTextures = config.maxTextures ?? 512
         this.dimensions = {
-            width: config.boxWidth ?? 0.3,
-            height: config.boxHeight ?? 0.4,
+            width: config.boxWidth ?? DEFAULT_BOX_WIDTH,
+            height: config.boxHeight ?? DEFAULT_BOX_HEIGHT,
             depth: config.boxDepth ?? 0.1
         }
         // With lazy loading, default to MID since HIGH may not be loaded yet
@@ -148,7 +169,8 @@ export class LodArtworkRenderer {
             const highArrayDepth = highConfig?.maxDepth ?? this.maxTextures
             this.highTextureCache = new HighTextureCache({
                 totalSlots: highArrayDepth,
-                textureSize: highConfig?.textureSize ?? 512,
+                textureWidth: highConfig?.textureWidth ?? STEAM_CAPSULE_WIDTH,
+                textureHeight: highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT,
                 maxConcurrentLoads: 2
             })
             
@@ -188,9 +210,11 @@ export class LodArtworkRenderer {
         
         for (const [_level, state] of this.lodTextures) {
             const depth = state.arrayDepth
-            const vram = state.config.textureSize * state.config.textureSize * depth * 4
+            const width = state.config.textureWidth ?? state.config.textureSize ?? 128
+            const height = state.config.textureHeight ?? state.config.textureSize ?? 128
+            const vram = width * height * depth * 4
             totalVRAM += vram
-            lodInfo.push(`${state.config.name}: ${depth} slots × ${state.config.textureSize}px = ${(vram / (1024 * 1024)).toFixed(1)}MB`)
+            lodInfo.push(`${state.config.name}: ${depth} slots × ${width}×${height}px = ${(vram / (1024 * 1024)).toFixed(1)}MB`)
         }
         
         log.lifecycle(`LOD VRAM: ${lodInfo.join(', ')} | Total: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
@@ -204,10 +228,12 @@ export class LodArtworkRenderer {
         
         // Create all LOD texture arrays with per-LOD depths
         for (const [_level, state] of this.lodTextures) {
-            const size = state.config.textureSize
+            // Support both square (textureSize) and non-square (textureWidth/Height) configs
+            const width = state.config.textureWidth ?? state.config.textureSize ?? 128
+            const height = state.config.textureHeight ?? state.config.textureSize ?? 128
             const depth = state.arrayDepth
-            const data = new Uint8Array(size * size * depth * 4)
-            state.dataArrayTexture = new THREE.DataArrayTexture(data, size, size, depth)
+            const data = new Uint8Array(width * height * depth * 4)
+            state.dataArrayTexture = new THREE.DataArrayTexture(data, width, height, depth)
             state.dataArrayTexture.format = THREE.RGBAFormat
             state.dataArrayTexture.type = THREE.UnsignedByteType
             state.dataArrayTexture.minFilter = THREE.LinearFilter
@@ -216,7 +242,7 @@ export class LodArtworkRenderer {
             state.dataArrayTexture.wrapT = THREE.ClampToEdgeWrapping
             state.dataArrayTexture.needsUpdate = true
             
-            log.debug(`Created ${state.config.name} LOD texture array: ${size}×${size}×${depth}`)
+            log.debug(`Created ${state.config.name} LOD texture array: ${width}×${height}×${depth}`)
         }
         
         // Give HIGH texture array reference to cache if lazy loading
@@ -348,9 +374,13 @@ export class LodArtworkRenderer {
                     continue
                 }
                 
+                // Get texture dimensions (support both square and non-square)
+                const width = state.config.textureWidth ?? state.config.textureSize ?? 128
+                const height = state.config.textureHeight ?? state.config.textureSize ?? 128
+                
                 const result = await this.textureWorker.fetchAndProcess(
                     artworkUrl,
-                    state.config.textureSize,
+                    width,  // Use width as textureSize for MID (square)
                     textureIndex,
                     gameName,
                     10000
@@ -360,7 +390,7 @@ export class LodArtworkRenderer {
                 if (!state.dataArrayTexture) {
                     throw new Error(`${state.config.name} texture array not initialized`)
                 }
-                const sliceSize = state.config.textureSize * state.config.textureSize * 4
+                const sliceSize = width * height * 4
                 const offset = textureIndex * sliceSize
                 const arrayData = state.dataArrayTexture.image.data as Uint8Array
                 
@@ -422,7 +452,7 @@ export class LodArtworkRenderer {
     /**
      * Set LOD level for a specific instance
      * With lazyHighTextures: if HIGH is requested but not loaded, triggers async load
-     * and keeps instance at MID until HIGH is ready
+     * and keeps instance at MID until HIGH is ready AND flushed to GPU
      */
     public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {
         if (!this.geometry || instanceIndex < 0 || instanceIndex >= this.currentInstanceCount) {
@@ -431,22 +461,26 @@ export class LodArtworkRenderer {
         }
         
         const metadata = this.instanceMetadata.get(instanceIndex)
-        const prevLod = metadata?.lodLevel
         
-        // If lazy HIGH textures enabled and requesting HIGH, check if texture is loaded
+        // If lazy HIGH textures enabled and requesting HIGH, check if texture is loaded AND flushed
         let effectiveLod = lodLevel
         if (this.lazyHighTextures && lodLevel === LOD_LEVEL.HIGH && this.highTextureCache) {
-            // Get texture index for this instance
             const textureIndexAttr = this.geometry.getAttribute('textureIndex') as THREE.InstancedBufferAttribute
             const textureIndex = Math.floor(textureIndexAttr.getX(instanceIndex))
             
-            // Request HIGH texture - returns slot (0-63) if loaded, -1 if not
-            const highSlot = this.highTextureCache.requestHighTexture(textureIndex)
-            
-            if (highSlot < 0) {
-                // HIGH texture not ready yet - stay at MID for now
-                // onHighSlotChange callback will update when texture loads
+            // Check if texture is pending GPU flush (queued for promotion)
+            if (this.pendingHighPromotion.has(textureIndex)) {
+                // Texture loaded but not yet flushed to GPU - stay at MID
                 effectiveLod = LOD_LEVEL.MID
+            } else {
+                // Request HIGH texture - returns slot (0-63) if loaded, -1 if not
+                const highSlot = this.highTextureCache.requestHighTexture(textureIndex)
+                
+                if (highSlot < 0) {
+                    // HIGH texture not ready yet - stay at MID for now
+                    // onHighSlotChange callback will queue for promotion when texture loads
+                    effectiveLod = LOD_LEVEL.MID
+                }
             }
         }
         
@@ -457,12 +491,6 @@ export class LodArtworkRenderer {
         // Update metadata
         if (metadata) {
             metadata.lodLevel = effectiveLod
-        }
-        
-        // Debug: Log LOD changes with game name
-        if (prevLod !== effectiveLod) {
-            const lodNames = ['HIGH', 'MID', 'LOW']
-            log.runtime(`LOD ${instanceIndex} "${metadata?.name?.slice(0, 20) ?? '?'}": ${lodNames[prevLod ?? 0]} → ${lodNames[effectiveLod]}`)
         }
         
         return effectiveLod === lodLevel  // Return false if we had to downgrade
@@ -499,13 +527,13 @@ export class LodArtworkRenderer {
     
     /**
      * Callback from HighTextureCache when a game's slot assignment changes
-     * Updates the highTextureSlot attribute AND LOD level for the affected instance
+     * Updates the highTextureSlot attribute but DEFERS LOD promotion until after GPU flush
+     * This prevents the "flash" where shader renders HIGH before texture data is uploaded
      */
     private onHighSlotChange(gameIndex: number, slot: number): void {
         if (!this.geometry || !this.highTextureSlots) return
         
         // gameIndex from HighTextureCache is actually textureIndex
-        // Look up the corresponding instanceIndex
         const instanceIndex = this.textureIndexToInstance.get(gameIndex)
         if (instanceIndex === undefined) {
             log.runtime(`HIGH slot change for unknown textureIndex ${gameIndex} - no instance mapping found`)
@@ -513,6 +541,7 @@ export class LodArtworkRenderer {
         }
         
         if (instanceIndex >= 0 && instanceIndex < this.highTextureSlots.length) {
+            // Update slot attribute immediately (shader will still use MID until LOD changes)
             this.highTextureSlots[instanceIndex] = slot
             
             const highSlotAttr = this.geometry.getAttribute('highTextureSlot') as THREE.InstancedBufferAttribute
@@ -521,23 +550,54 @@ export class LodArtworkRenderer {
                 highSlotAttr.needsUpdate = true
             }
             
-            // Also update LOD level to HIGH now that the texture is ready
             if (slot >= 0) {
+                // Queue for HIGH promotion AFTER GPU flush (prevents flash)
+                this.pendingHighPromotion.set(gameIndex, slot)
+            } else {
+                // Eviction: immediately downgrade to MID
+                this.pendingHighPromotion.delete(gameIndex)
                 const lodLevelAttr = this.geometry.getAttribute('lodLevel') as THREE.InstancedBufferAttribute
                 if (lodLevelAttr && this.lodLevels) {
-                    this.lodLevels[instanceIndex] = LOD_LEVEL.HIGH
-                    lodLevelAttr.setX(instanceIndex, LOD_LEVEL.HIGH)
+                    this.lodLevels[instanceIndex] = LOD_LEVEL.MID
+                    lodLevelAttr.setX(instanceIndex, LOD_LEVEL.MID)
                     lodLevelAttr.needsUpdate = true
                 }
-                
                 const metadata = this.instanceMetadata.get(instanceIndex)
-                if (metadata) {
-                    metadata.lodLevel = LOD_LEVEL.HIGH
-                }
-                
-                log.runtime(`HIGH texture ready: textureIndex ${gameIndex} → instance ${instanceIndex} → slot ${slot}, LOD upgraded to HIGH`)
+                if (metadata) metadata.lodLevel = LOD_LEVEL.MID
             }
         }
+    }
+    
+    /**
+     * Promote pending games to HIGH LOD after GPU flush
+     * Called after flushToGpu() to ensure texture data is on GPU before shader reads it
+     */
+    private promotePendingHighTextures(): void {
+        if (this.pendingHighPromotion.size === 0 || !this.geometry || !this.lodLevels) return
+        
+        const lodLevelAttr = this.geometry.getAttribute('lodLevel') as THREE.InstancedBufferAttribute
+        if (!lodLevelAttr) return
+        
+        let promotedCount = 0
+        for (const [textureIndex, _slot] of this.pendingHighPromotion) {
+            const instanceIndex = this.textureIndexToInstance.get(textureIndex)
+            if (instanceIndex === undefined) continue
+            
+            this.lodLevels[instanceIndex] = LOD_LEVEL.HIGH
+            lodLevelAttr.setX(instanceIndex, LOD_LEVEL.HIGH)
+            
+            const metadata = this.instanceMetadata.get(instanceIndex)
+            if (metadata) metadata.lodLevel = LOD_LEVEL.HIGH
+            
+            promotedCount++
+        }
+        
+        if (promotedCount > 0) {
+            lodLevelAttr.needsUpdate = true
+            log.runtime(`Promoted ${promotedCount} games to HIGH LOD (after GPU flush)`)
+        }
+        
+        this.pendingHighPromotion.clear()
     }
 
     /**
@@ -551,9 +611,13 @@ export class LodArtworkRenderer {
         if (this.gpuUpdateFrameCounter >= this.gpuUpdateInterval) {
             this.gpuUpdateFrameCounter = 0
             
-            // Check if HIGH texture cache has pending updates
-            if (this.highTextureCache?.needsGpuUpdate()) {
-                this.highTextureCache.flushToGpu()
+            // Flush HIGH texture cache to GPU if dirty
+            const didFlush = this.highTextureCache?.flushToGpu() ?? false
+            
+            // AFTER GPU flush, promote pending games to HIGH LOD
+            // This ensures texture data is on GPU before shader tries to read it
+            if (didFlush || this.pendingHighPromotion.size > 0) {
+                this.promotePendingHighTextures()
             }
         }
     }
@@ -695,6 +759,45 @@ export class LodArtworkRenderer {
      */
     public measureTextureCosts(): void {
         this.highTextureCache?.measureOperationCosts()
+    }
+    
+    /**
+     * Get pending HIGH promotion info (textures loaded but waiting for GPU flush)
+     */
+    public getPendingPromotions(): { textureIndex: number; slot: number; gameName?: string }[] {
+        const result: { textureIndex: number; slot: number; gameName?: string }[] = []
+        for (const [textureIndex, slot] of this.pendingHighPromotion) {
+            const instanceIndex = this.textureIndexToInstance.get(textureIndex)
+            const gameName = instanceIndex !== undefined 
+                ? this.instanceMetadata.get(instanceIndex)?.name 
+                : undefined
+            result.push({ textureIndex, slot, gameName })
+        }
+        return result
+    }
+    
+    /**
+     * Diagnostic: Log pending promotion state
+     */
+    public diagnosePendingState(): void {
+        const pending = this.getPendingPromotions()
+        const stats = this.highTextureCache?.getStats()
+        
+        console.group('🔄 Pending HIGH Promotions')
+        console.log(`GPU flush interval: every ${this.gpuUpdateInterval} frames`)
+        console.log(`Frame counter: ${this.gpuUpdateFrameCounter}/${this.gpuUpdateInterval}`)
+        console.log(`Pending promotions: ${pending.length}`)
+        
+        if (pending.length > 0) {
+            for (const p of pending) {
+                console.log(`  textureIndex ${p.textureIndex} → slot ${p.slot} "${p.gameName?.slice(0, 25) ?? '?'}"`)
+            }
+        }
+        
+        if (stats) {
+            console.log(`\nCache: ${stats.loading} loading, ${stats.queueLength} queued`)
+        }
+        console.groupEnd()
     }
     
     /**

@@ -39,8 +39,10 @@ export enum HighTextureState {
 export interface HighTextureCacheConfig {
     /** Total slots in the HIGH texture array (e.g., 64) */
     totalSlots: number
-    /** Size of HIGH textures */
-    textureSize: number
+    /** Width of HIGH textures (native Steam header = 460) */
+    textureWidth: number
+    /** Height of HIGH textures (native Steam header = 215) */
+    textureHeight: number
     /** Maximum concurrent texture loads (throttling) */
     maxConcurrentLoads: number
 }
@@ -111,10 +113,23 @@ export class HighTextureCache {
         cacheMisses: 0
     }
     
+    /** Timing samples for diagnostics (circular buffer, most recent 100 loads) */
+    private timingSamples: Array<{
+        gameIndex: number
+        gameName: string
+        fetchTime: number
+        processTime: number
+        copyTime: number
+        totalTime: number
+        timestamp: number
+    }> = []
+    private readonly MAX_TIMING_SAMPLES = 100
+    
     constructor(config: Partial<HighTextureCacheConfig> = {}) {
         this.config = {
             totalSlots: config.totalSlots ?? 64,
-            textureSize: config.textureSize ?? 512,
+            textureWidth: config.textureWidth ?? 600,
+            textureHeight: config.textureHeight ?? 900,
             maxConcurrentLoads: config.maxConcurrentLoads ?? 2
         }
         
@@ -160,7 +175,6 @@ export class HighTextureCache {
         
         this.dataArrayTexture.needsUpdate = true
         this.isDirty = false
-        log.runtime('Flushed HIGH texture array to GPU')
         return true
     }
     
@@ -301,7 +315,6 @@ export class HighTextureCache {
         for (let slot = 0; slot < this.config.totalSlots; slot++) {
             if (this.slotToGame[slot] === -1) {
                 this.slotToGame[slot] = gameIndex
-                log.runtime(`Allocated slot ${slot} to game ${gameIndex}`)
                 return slot
             }
         }
@@ -310,7 +323,6 @@ export class HighTextureCache {
         const evictedSlot = this.evictLru()
         if (evictedSlot >= 0) {
             this.slotToGame[evictedSlot] = gameIndex
-            log.runtime(`Allocated slot ${evictedSlot} to game ${gameIndex} (after eviction)`)
             return evictedSlot
         }
         
@@ -355,28 +367,39 @@ export class HighTextureCache {
         const loadStart = window.performance.now()
         
         try {
-            log.runtime(`START HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | in-flight: ${this.loadingPromises.size}/${this.config.maxConcurrentLoads}, queue: ${this.loadQueue.length}`)
+            log.debug(`START HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | in-flight: ${this.loadingPromises.size}/${this.config.maxConcurrentLoads}, queue: ${this.loadQueue.length}`)
             
-            const result = await this.textureWorker.fetchAndProcess(
+            const fetchStart = window.performance.now()
+            const result = await this.textureWorker.fetchAndProcessWithOptions(
                 entry.artworkUrl,
-                this.config.textureSize,
                 entry.gameIndex, // Still pass gameIndex for logging
                 entry.gameName,
-                15000 // Generous timeout for HIGH textures
+                {
+                    useNativeSize: true, // Skip resize - use native Steam header dimensions
+                    timeout: 15000 // Generous timeout for HIGH textures
+                }
             )
+            const fetchTime = window.performance.now() - fetchStart
             
-            // Verify size
-            const expectedSize = this.config.textureSize * this.config.textureSize * 4
+            // Verify size (native Steam headers are 460x215)
+            const expectedSize = this.config.textureWidth * this.config.textureHeight * 4
             if (result.imageData.length !== expectedSize) {
-                log.error(`HIGH texture size mismatch for "${entry.gameName}": expected ${expectedSize}, got ${result.imageData.length}`)
-                entry.state = HighTextureState.FAILED
-                return false
+                // Image might have different dimensions - log actual vs expected
+                log.warn(`HIGH texture size mismatch for "${entry.gameName}": expected ${expectedSize} (${this.config.textureWidth}×${this.config.textureHeight}), got ${result.imageData.length} (${result.width}×${result.height})`)
+                // Still allow if dimensions match config (might be slightly different native sizes)
+                if (result.width !== this.config.textureWidth || result.height !== this.config.textureHeight) {
+                    entry.state = HighTextureState.FAILED
+                    return false
+                }
             }
             
             // Copy to texture array at the assigned SLOT (not gameIndex!)
-            const offset = entry.highSlot * expectedSize
+            const copyStart = window.performance.now()
+            const sliceSize = this.config.textureWidth * this.config.textureHeight * 4
+            const offset = entry.highSlot * sliceSize
             const arrayData = this.dataArrayTexture.image.data as Uint8Array
             arrayData.set(result.imageData, offset)
+            const copyTime = window.performance.now() - copyStart
             
             // Mark dirty - caller should call flushToGpu() periodically
             this.isDirty = true
@@ -391,7 +414,19 @@ export class HighTextureCache {
             
             const totalTime = window.performance.now() - loadStart
             const inFlight = this.loadingPromises.size - 1  // -1 because this one is about to complete
-            log.runtime(`COMPLETE HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | ${totalTime.toFixed(0)}ms (fetch: ${result.processingTime.toFixed(0)}ms) | in-flight: ${inFlight}, queue: ${this.loadQueue.length}`)
+            log.debug(`COMPLETE HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | total: ${totalTime.toFixed(0)}ms (fetch: ${fetchTime.toFixed(0)}ms, process: ${result.processingTime.toFixed(0)}ms, copy: ${copyTime.toFixed(1)}ms) | in-flight: ${inFlight}, queue: ${this.loadQueue.length}`)
+            
+            // Record timing sample for diagnostics
+            this.recordTimingSample({
+                gameIndex: entry.gameIndex,
+                gameName: entry.gameName,
+                fetchTime,
+                processTime: result.processingTime,
+                copyTime,
+                totalTime,
+                timestamp: window.performance.now()
+            })
+            
             return true
             
         } catch (error) {
@@ -419,7 +454,7 @@ export class HighTextureCache {
         
         // Set access time to 0 so it's evicted first
         entry.lastAccessTime = 0
-        log.runtime(`Marked for eviction: game ${gameIndex} slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}"`)
+        log.debug(`Marked for eviction: game ${gameIndex} slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}"`)
     }
     
     /**
@@ -471,7 +506,7 @@ export class HighTextureCache {
      * Estimate memory usage in MB
      */
     private estimateMemoryMB(): number {
-        const bytesPerTexture = this.config.textureSize * this.config.textureSize * 4
+        const bytesPerTexture = this.config.textureWidth * this.config.textureHeight * 4
         return (this.config.totalSlots * bytesPerTexture) / (1024 * 1024)
     }
     
@@ -635,12 +670,13 @@ export class HighTextureCache {
             return
         }
         
-        const size = this.config.textureSize
-        const sliceBytes = size * size * 4
+        const width = this.config.textureWidth
+        const height = this.config.textureHeight
+        const sliceBytes = width * height * 4
         const totalBytes = sliceBytes * this.config.totalSlots
         
         console.group('🔬 HIGH Texture Cache Operation Costs')
-        console.log(`Texture array: ${size}×${size}×${this.config.totalSlots} = ${(totalBytes / 1024 / 1024).toFixed(1)}MB`)
+        console.log(`Texture array: ${width}×${height}×${this.config.totalSlots} = ${(totalBytes / 1024 / 1024).toFixed(1)}MB`)
         
         // Test 1: CPU array copy (single slice)
         const testData = new Uint8Array(sliceBytes)
@@ -844,5 +880,89 @@ export class HighTextureCache {
         }
         
         console.groupEnd()
+    }
+    
+    private recordTimingSample(sample: {
+        gameIndex: number
+        gameName: string
+        fetchTime: number
+        processTime: number
+        copyTime: number
+        totalTime: number
+        timestamp: number
+    }): void {
+        this.timingSamples.push(sample)
+        // Keep circular buffer at max size
+        if (this.timingSamples.length > this.MAX_TIMING_SAMPLES) {
+            this.timingSamples.shift()
+        }
+    }
+    
+    public diagnoseTimings(): void {
+        console.group('⏱️ HIGH Texture Load Timing Statistics')
+        
+        if (this.timingSamples.length === 0) {
+            console.log('No timing samples recorded yet.')
+            console.groupEnd()
+            return
+        }
+        
+        const count = this.timingSamples.length
+        
+        // Calculate averages
+        const avgFetch = this.timingSamples.reduce((sum, s) => sum + s.fetchTime, 0) / count
+        const avgProcess = this.timingSamples.reduce((sum, s) => sum + s.processTime, 0) / count
+        const avgCopy = this.timingSamples.reduce((sum, s) => sum + s.copyTime, 0) / count
+        const avgTotal = this.timingSamples.reduce((sum, s) => sum + s.totalTime, 0) / count
+        
+        // Calculate min/max
+        const minTotal = Math.min(...this.timingSamples.map(s => s.totalTime))
+        const maxTotal = Math.max(...this.timingSamples.map(s => s.totalTime))
+        
+        // Calculate percentiles (p50, p90, p99)
+        const sorted = [...this.timingSamples].sort((a, b) => a.totalTime - b.totalTime)
+        const p50 = sorted[Math.floor(count * 0.5)]?.totalTime ?? 0
+        const p90 = sorted[Math.floor(count * 0.9)]?.totalTime ?? 0
+        const p99 = sorted[Math.floor(count * 0.99)]?.totalTime ?? 0
+        
+        console.log(`Samples: ${count} (max ${this.MAX_TIMING_SAMPLES})`)
+        console.log('')
+        console.log('--- Average Breakdown ---')
+        console.log(`  Fetch (network):  ${avgFetch.toFixed(1)}ms`)
+        console.log(`  Process (resize): ${avgProcess.toFixed(1)}ms`)
+        console.log(`  Copy (to array):  ${avgCopy.toFixed(2)}ms`)
+        console.log(`  TOTAL:            ${avgTotal.toFixed(1)}ms`)
+        console.log('')
+        console.log('--- Distribution (total time) ---')
+        console.log(`  Min:  ${minTotal.toFixed(0)}ms`)
+        console.log(`  P50:  ${p50.toFixed(0)}ms`)
+        console.log(`  P90:  ${p90.toFixed(0)}ms`)
+        console.log(`  P99:  ${p99.toFixed(0)}ms`)
+        console.log(`  Max:  ${maxTotal.toFixed(0)}ms`)
+        
+        // Show slowest 5 loads
+        console.log('')
+        console.log('--- Slowest 5 Loads ---')
+        const slowest = [...this.timingSamples]
+            .sort((a, b) => b.totalTime - a.totalTime)
+            .slice(0, 5)
+        slowest.forEach((s, i) => {
+            console.log(`  ${i + 1}. ${s.totalTime.toFixed(0)}ms - "${s.gameName.slice(0, 25)}" (fetch: ${s.fetchTime.toFixed(0)}ms)`)
+        })
+        
+        // Show most recent 5 loads
+        console.log('')
+        console.log('--- Most Recent 5 Loads ---')
+        const recent = [...this.timingSamples].slice(-5).reverse()
+        recent.forEach((s, i) => {
+            console.log(`  ${i + 1}. ${s.totalTime.toFixed(0)}ms - "${s.gameName.slice(0, 25)}" (game ${s.gameIndex})`)
+        })
+        
+        console.groupEnd()
+    }
+    
+    public clearTimingSamples(): void {
+        this.timingSamples = []
+        console.log('Timing samples cleared.')
     }
 }

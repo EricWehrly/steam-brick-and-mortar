@@ -112,10 +112,12 @@ describe('LodArtworkRenderer', () => {
     })
 
     describe('Default LOD Configurations', () => {
-        it('should define high LOD with 512x512 textures', () => {
+        it('should define high LOD with actual Steam CDN capsule dimensions (300x450)', () => {
+            // Note: Steam advertises 600x900 but CDN serves 300x450 (half size)
             const highConfig = DEFAULT_LOD_CONFIGS.find(c => c.level === LOD_LEVEL.HIGH)
             expect(highConfig).toBeDefined()
-            expect(highConfig!.textureSize).toBe(512)
+            expect(highConfig!.textureWidth).toBe(300)
+            expect(highConfig!.textureHeight).toBe(450)
             expect(highConfig!.name).toBe('high')
         })
 
@@ -177,17 +179,23 @@ describe('LodArtworkRenderer', () => {
             // Total: ~96MB
             
             const highConfig = DEFAULT_LOD_CONFIGS.find(c => c.level === LOD_LEVEL.HIGH)
+            const midConfig = DEFAULT_LOD_CONFIGS.find(c => c.level === LOD_LEVEL.MID)
             
-            // HIGH uses maxDepth (64), MID uses maxTextures (512)
+            // HIGH uses maxDepth (128), MID uses maxTextures (512)
             const highDepth = highConfig!.maxDepth ?? 512
             const midDepth = 512  // MID covers all games
             
-            const highBytes = 512 * 512 * highDepth * 4
-            const midBytes = 128 * 128 * midDepth * 4
+            // HIGH uses 300x450 portrait capsules (what Steam CDN actually serves), MID uses 128x128 squares
+            const highWidth = highConfig!.textureWidth ?? 300
+            const highHeight = highConfig!.textureHeight ?? 450
+            const midSize = midConfig!.textureSize ?? 128
+            
+            const highBytes = highWidth * highHeight * highDepth * 4
+            const midBytes = midSize * midSize * midDepth * 4
             const totalMB = (highBytes + midBytes) / (1024 * 1024)
             
-            // With HIGH=64 slots and MID=512 slots:
-            // 512*512*64*4 = 67MB + 128*128*512*4 = 32MB = ~99MB
+            // With HIGH=128 slots at 300x450 and MID=512 slots at 128x128:
+            // 300*450*128*4 = ~65.9MB + 128*128*512*4 = ~32MB = ~98MB
             expect(totalMB).toBeGreaterThan(50)
             expect(totalMB).toBeLessThan(150)
         })

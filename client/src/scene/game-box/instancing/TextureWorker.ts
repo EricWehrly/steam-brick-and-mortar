@@ -25,6 +25,21 @@ export interface FetchAndProcessResult {
     imageData: Uint8ClampedArray
     blob?: Blob
     processingTime: number
+    /** Actual width of returned image data */
+    width: number
+    /** Actual height of returned image data */
+    height: number
+}
+
+export interface FetchAndProcessOptions {
+    /** For square textures (legacy) */
+    textureSize?: number
+    /** For non-square textures */
+    textureWidth?: number
+    textureHeight?: number
+    /** If true, use native image dimensions (skip resize entirely) */
+    useNativeSize?: boolean
+    timeout?: number
 }
 
 export class TextureWorker {
@@ -83,7 +98,7 @@ export class TextureWorker {
     }
     
     /**
-     * Fetch image from URL and process in web worker
+     * Fetch image from URL and process in web worker (legacy square textures)
      * Returns both the processed image data and optionally the blob for caching
      */
     public async fetchAndProcess(
@@ -92,6 +107,22 @@ export class TextureWorker {
         textureIndex: number,
         gameName: string,
         timeout: number = 10000
+    ): Promise<FetchAndProcessResult> {
+        return this.fetchAndProcessWithOptions(url, textureIndex, gameName, {
+            textureSize,
+            timeout
+        })
+    }
+    
+    /**
+     * Fetch image from URL and process in web worker with flexible options
+     * Supports native resolution (no resize), width/height, or legacy square textures
+     */
+    public async fetchAndProcessWithOptions(
+        url: string,
+        textureIndex: number,
+        gameName: string,
+        options: FetchAndProcessOptions = {}
     ): Promise<FetchAndProcessResult> {
         return new Promise((resolve, reject) => {
             const messageId = `fetch_${textureIndex}_${Date.now()}_${Math.random()}`
@@ -105,11 +136,14 @@ export class TextureWorker {
             const message: TextureFetchMessage = {
                 type: 'FETCH_AND_PROCESS',
                 url,
-                textureSize,
+                textureSize: options.textureSize,
+                textureWidth: options.textureWidth,
+                textureHeight: options.textureHeight,
+                useNativeSize: options.useNativeSize,
                 textureIndex,
                 messageId,
                 gameName,
-                timeout
+                timeout: options.timeout ?? 10000
             }
             
             this.worker.postMessage(message)
@@ -133,7 +167,9 @@ export class TextureWorker {
                 pending.resolve({
                     imageData: data.imageData,
                     blob: data.blob,
-                    processingTime: data.processingTime
+                    processingTime: data.processingTime,
+                    width: data.width,
+                    height: data.height
                 })
             } else {
                 // Legacy mode - just return imageData

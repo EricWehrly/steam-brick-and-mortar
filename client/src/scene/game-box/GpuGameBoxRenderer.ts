@@ -66,8 +66,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         if (this.useLodAtlas) {
             this.lodArtworkRenderer = new LodArtworkRenderer({
                 maxTextures: maxGames,
-                lazyHighTextures: true,  // Memory optimization: load HIGH textures on demand
-                maxHighTextureCache: 100  // Keep ~100 HIGH textures cached (~100MB)
+                lazyHighTextures: true  // Memory optimization: load HIGH textures on demand
             })
             // Create distance manager for automatic LOD switching
             this.lodDistanceManager = new LodDistanceManager(this.lodArtworkRenderer)
@@ -162,6 +161,25 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
                     return
                 }
                 cache.dumpIndexMapping(count)
+            }
+            ;(window as any).diagnosePending = () => {
+                this.lodArtworkRenderer?.diagnosePendingState()
+            }
+            ;(window as any).diagnoseTimings = () => {
+                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
+                if (!cache) {
+                    console.log('❌ No HIGH texture cache available')
+                    return
+                }
+                cache.diagnoseTimings()
+            }
+            ;(window as any).clearTimings = () => {
+                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
+                if (!cache) {
+                    console.log('❌ No HIGH texture cache available')
+                    return
+                }
+                cache.clearTimingSamples()
             }
             /* eslint-enable @typescript-eslint/no-explicit-any */
         } else if (this.useMultiAtlas) {
@@ -334,14 +352,13 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     ): void {
         const shouldUseArtwork = Math.random() < ARTWORK_PROBABILITY
         
-        // Use artwork URL from game data - should always be populated by buildEnhancedGame()
-        // Fallback to appid URL is a safety net, not expected in normal operation
-        const primaryUrl = game.artwork?.header
-        const fallbackUrl = game.appid ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg` : undefined
+        // Use library_600x900 portrait artwork (2:3 aspect ratio) for game boxes
+        // This matches the physical game case aesthetic and enables native-resolution rendering
+        const primaryUrl = game.artwork?.library
+        const fallbackUrl = game.appid ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg` : undefined
         
         if (shouldUseArtwork && !primaryUrl && fallbackUrl) {
-            // This indicates a bug in the data pipeline - games should have artwork.header
-            log.warn(`Missing artwork.header for "${game.name}" (appid: ${game.appid}) - using fallback URL`)
+            log.warn(`Missing artwork.library for "${game.name}" (appid: ${game.appid}) - using fallback URL`)
         }
         
         const artworkUrl = shouldUseArtwork ? (primaryUrl || fallbackUrl) : undefined

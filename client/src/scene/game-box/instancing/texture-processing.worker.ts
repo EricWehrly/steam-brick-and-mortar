@@ -33,7 +33,13 @@ export interface TextureProcessingMessage {
 export interface TextureFetchMessage {
     type: 'FETCH_AND_PROCESS'
     url: string
-    textureSize: number
+    /** For square textures (legacy) */
+    textureSize?: number
+    /** For non-square textures (native resolution) */
+    textureWidth?: number
+    textureHeight?: number
+    /** If true, use native image dimensions (skip resize entirely) */
+    useNativeSize?: boolean
     textureIndex: number
     messageId: string
     gameName: string
@@ -46,6 +52,9 @@ export interface TextureProcessingResult {
     textureIndex: number
     messageId: string
     processingTime: number
+    /** Actual dimensions of returned image data */
+    width: number
+    height: number
     gameName?: string
     /** Original blob for caching on main thread */
     blob?: Blob
@@ -64,6 +73,8 @@ export type WorkerResponse = TextureProcessingResult | TextureProcessingError
 // Worker state
 let offscreenCanvas: OffscreenCanvas | null = null
 let offscreenContext: OffscreenCanvasRenderingContext2D | null = null
+let canvasWidth = 0
+let canvasHeight = 0
 
 // Global error handler
 ctx.onerror = (event: ErrorEvent): boolean => {
@@ -77,12 +88,14 @@ ctx.onerror = (event: ErrorEvent): boolean => {
 }
 
 /**
- * Initialize or reuse offscreen canvas for the given texture size
+ * Initialize or reuse offscreen canvas for the given dimensions
  */
-function ensureCanvas(textureSize: number): void {
-    if (!offscreenCanvas || offscreenCanvas.width !== textureSize) {
-        offscreenCanvas = new OffscreenCanvas(textureSize, textureSize)
+function ensureCanvas(width: number, height: number): void {
+    if (!offscreenCanvas || canvasWidth !== width || canvasHeight !== height) {
+        offscreenCanvas = new OffscreenCanvas(width, height)
         offscreenContext = offscreenCanvas.getContext('2d')
+        canvasWidth = width
+        canvasHeight = height
         
         if (!offscreenContext) {
             throw new Error('Failed to create OffscreenCanvas context')
@@ -91,13 +104,13 @@ function ensureCanvas(textureSize: number): void {
 }
 
 /**
- * Process a blob into texture pixel data
+ * Process a blob into texture pixel data (legacy square mode)
  */
 async function processBlob(
     blob: Blob, 
     textureSize: number
 ): Promise<Uint8ClampedArray> {
-    ensureCanvas(textureSize)
+    ensureCanvas(textureSize, textureSize)
     
     // Create image bitmap from blob
     const imageBitmap = await createImageBitmap(blob)
@@ -113,6 +126,62 @@ async function processBlob(
     imageBitmap.close()
     
     return imageData.data
+}
+
+interface ProcessBlobResult {
+    imageData: Uint8ClampedArray
+    width: number
+    height: number
+}
+
+/**
+ * Process a blob into texture pixel data with flexible dimensions
+ * @param useNativeSize If true, use image's native dimensions (no resize)
+ */
+async function processBlobWithDimensions(
+    blob: Blob,
+    targetWidth?: number,
+    targetHeight?: number,
+    useNativeSize?: boolean
+): Promise<ProcessBlobResult> {
+    // Create image bitmap from blob
+    const imageBitmap = await createImageBitmap(blob)
+    
+    // Determine output dimensions
+    let width: number
+    let height: number
+    
+    if (useNativeSize) {
+        // Use native image dimensions
+        width = imageBitmap.width
+        height = imageBitmap.height
+    } else if (targetWidth && targetHeight) {
+        // Use specified dimensions
+        width = targetWidth
+        height = targetHeight
+    } else {
+        // Fallback: use native
+        width = imageBitmap.width
+        height = imageBitmap.height
+    }
+    
+    ensureCanvas(width, height)
+    
+    // Clear and draw (scaled if dimensions differ from native)
+    offscreenContext!.clearRect(0, 0, width, height)
+    offscreenContext!.drawImage(imageBitmap, 0, 0, width, height)
+    
+    // Extract image data
+    const imageData = offscreenContext!.getImageData(0, 0, width, height)
+    
+    // Clean up bitmap
+    imageBitmap.close()
+    
+    return {
+        imageData: imageData.data,
+        width,
+        height
+    }
 }
 
 /**
@@ -153,7 +222,7 @@ ctx.onmessage = async (event: MessageEvent<WorkerMessage>): Promise<void> => {
     
     try {
         if (type === 'PROCESS_TEXTURE') {
-            // Legacy mode: process blob directly
+            // Legacy mode: process blob directly (square textures)
             const { blob, textureSize, textureIndex } = event.data as TextureProcessingMessage
             
             const imageData = await processBlob(blob, textureSize)
@@ -164,35 +233,52 @@ ctx.onmessage = async (event: MessageEvent<WorkerMessage>): Promise<void> => {
                 imageData: imageData,
                 textureIndex: textureIndex,
                 messageId: messageId,
-                processingTime: processingTime
+                processingTime: processingTime,
+                width: textureSize,
+                height: textureSize
             }
             
             // Transfer the ArrayBuffer to avoid copying
             ctx.postMessage(result, [imageData.buffer])
             
         } else if (type === 'FETCH_AND_PROCESS') {
-            // New mode: fetch URL and process
-            const { url, textureSize, textureIndex, gameName, timeout } = event.data as TextureFetchMessage
+            // New mode: fetch URL and process with flexible dimensions
+            const { url, textureSize, textureWidth, textureHeight, useNativeSize, textureIndex, gameName, timeout } = event.data as TextureFetchMessage
             
             // Fetch image from network
             const blob = await fetchImage(url, timeout || 10000)
             
-            // Process the blob
-            const imageData = await processBlob(blob, textureSize)
+            // Process the blob with appropriate dimensions
+            let processed: ProcessBlobResult
+            
+            if (useNativeSize || (textureWidth && textureHeight)) {
+                // Use new flexible processing
+                processed = await processBlobWithDimensions(blob, textureWidth, textureHeight, useNativeSize)
+            } else if (textureSize) {
+                // Legacy square mode
+                const imageData = await processBlob(blob, textureSize)
+                processed = { imageData, width: textureSize, height: textureSize }
+            } else {
+                // Default to native size if nothing specified
+                processed = await processBlobWithDimensions(blob, undefined, undefined, true)
+            }
+            
             const processingTime = performance.now() - startTime
             
             const result: TextureProcessingResult = {
                 type: 'TEXTURE_PROCESSED',
-                imageData: imageData,
+                imageData: processed.imageData,
                 textureIndex: textureIndex,
                 messageId: messageId,
                 processingTime: processingTime,
+                width: processed.width,
+                height: processed.height,
                 gameName: gameName,
                 blob: blob // Return blob for main thread caching
             }
             
             // Transfer the ArrayBuffer to avoid copying
-            ctx.postMessage(result, [imageData.buffer])
+            ctx.postMessage(result, [processed.imageData.buffer])
             
         } else {
             console.log('Worker ignoring unknown message type:', type)
