@@ -181,6 +181,48 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
                 }
                 cache.clearTimingSamples()
             }
+            // Profiling functions for detailed bottleneck analysis
+            ;(window as any).runProfilingTest = (count = 10) => {
+                const cache = this.lodArtworkRenderer?.getHighTextureCache()
+                if (!cache) {
+                    console.log('❌ No HIGH texture cache available')
+                    return
+                }
+                cache.runProfilingTest(count)
+            }
+            ;(window as any).enableProfiling = () => {
+                const cache = this.lodArtworkRenderer?.getHighTextureCache()
+                if (!cache) {
+                    console.log('❌ No HIGH texture cache available')
+                    return
+                }
+                cache.enableProfiling()
+            }
+            ;(window as any).diagnoseProfile = () => {
+                const cache = this.lodArtworkRenderer?.getHighTextureCache()
+                if (!cache) {
+                    console.log('❌ No HIGH texture cache available')
+                    return
+                }
+                cache.diagnoseProfile()
+            }
+            ;(window as any).diagnoseScheduler = async () => {
+                const { FrameBudgetScheduler } = await import('../../utils/FrameBudgetScheduler')
+                const scheduler = FrameBudgetScheduler.getInstance()
+                scheduler.diagnose()
+            }
+            ;(window as any).schedulerStats = async () => {
+                const { FrameBudgetScheduler } = await import('../../utils/FrameBudgetScheduler')
+                const scheduler = FrameBudgetScheduler.getInstance()
+                console.log('📊 Scheduler Stats:', scheduler.getStats())
+                return scheduler.getStats()
+            }
+            ;(window as any).schedulerTune = async (maxTasksPerFrame: number) => {
+                const { FrameBudgetScheduler } = await import('../../utils/FrameBudgetScheduler')
+                const scheduler = FrameBudgetScheduler.getInstance()
+                scheduler.setMaxTasksPerFrame(maxTasksPerFrame)
+                console.log(`✅ Scheduler max tasks per frame set to ${maxTasksPerFrame}`)
+            }
             ;(window as any).diagnosePixelCache = async () => {
                 const { PixelDataCache } = await import('./instancing/PixelDataCache')
                 const cache = PixelDataCache.getInstance()

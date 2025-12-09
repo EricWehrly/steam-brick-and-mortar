@@ -22,6 +22,7 @@ import * as THREE from 'three'
 import { Logger } from '../../../utils/Logger'
 import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
+import { FrameBudgetScheduler } from '../../../utils/FrameBudgetScheduler'
 
 const log = Logger.withContext('HighTextureCache')
 
@@ -99,6 +100,9 @@ export class HighTextureCache {
     /** Dirty flag: texture data changed, needs GPU upload */
     private isDirty: boolean = false
     
+    /** Track which specific slots (layers) need GPU upload - enables partial updates */
+    private dirtySlots: Set<number> = new Set()
+    
     /** Game entries by game index */
     private games: Map<number, GameEntry> = new Map()
     
@@ -139,6 +143,24 @@ export class HighTextureCache {
     }> = []
     private readonly MAX_TIMING_SAMPLES = 100
     
+    /** Detailed profiling samples (optional, for deep analysis) */
+    private profilingSamples: Array<{
+        gameIndex: number
+        gameName: string
+        workerRoundTrip: number
+        arrayBufferCopy: number
+        textureArrayCopy: number
+        callbackTime: number
+        totalMainThread: number
+        pixelCacheHit: boolean
+        timestamp: number
+    }> = []
+    private profilingEnabled = false
+    private readonly MAX_PROFILING_SAMPLES = 50
+    
+    /** Frame budget scheduler for deferring texture copies */
+    private readonly scheduler: FrameBudgetScheduler
+    
     constructor(config: Partial<HighTextureCacheConfig> = {}) {
         this.config = {
             totalSlots: config.totalSlots ?? 64,
@@ -152,6 +174,7 @@ export class HighTextureCache {
         
         this.textureWorker = new TextureWorker()
         this.pixelCache = PixelDataCache.getInstance()
+        this.scheduler = FrameBudgetScheduler.getInstance()
         
         log.lifecycle(`Initialized: ${this.config.totalSlots} slots, ${this.config.maxConcurrentLoads} concurrent loads (${this.estimateMemoryMB()}MB)`)
     }
@@ -179,16 +202,28 @@ export class HighTextureCache {
     }
     
     /**
-     * Flush dirty texture data to GPU
+     * Flush dirty texture data to GPU using PARTIAL layer updates
+     * Instead of uploading all 64 slots (~34MB), only uploads changed slots (~540KB each)
      * Call this periodically (e.g., every N frames) instead of on every texture load
      * Returns true if an update was performed
      */
     public flushToGpu(): boolean {
-        if (!this.isDirty || !this.dataArrayTexture) {
+        if (!this.isDirty || !this.dataArrayTexture || this.dirtySlots.size === 0) {
             return false
         }
         
+        // Use partial layer updates instead of full texture upload
+        // This is MUCH faster: ~540KB per slot vs ~34MB for all 64 slots
+        for (const slot of this.dirtySlots) {
+            this.dataArrayTexture.addLayerUpdate(slot)
+        }
+        
+        // needsUpdate triggers the actual upload, but now only marked layers are sent
         this.dataArrayTexture.needsUpdate = true
+        
+        log.debug(`GPU flush: ${this.dirtySlots.size} slot(s) → ~${(this.dirtySlots.size * 540).toFixed(0)}KB upload`)
+        
+        this.dirtySlots.clear()
         this.isDirty = false
         return true
     }
@@ -440,6 +475,8 @@ export class HighTextureCache {
         }
         
         const loadStart = window.performance.now()
+        let workerRoundTrip = 0
+        let arrayBufferCopyTime = 0
         
         try {
             log.debug(`START HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | in-flight: ${this.loadingPromises.size}/${this.config.maxConcurrentLoads}, queue: ${this.loadQueue.length}`)
@@ -447,16 +484,25 @@ export class HighTextureCache {
             // First, check the pixel cache for decoded RGBA data
             const fetchStart = window.performance.now()
             const cachedPixels = await this.pixelCache.get(entry.artworkUrl)
+            workerRoundTrip = window.performance.now() - fetchStart
             
             let imageData: Uint8ClampedArray
             let processTime = 0
             let pixelCacheHit = false
             
             if (cachedPixels) {
-                // Pixel cache HIT - use cached decoded data directly (skip decode)
+                // Pixel cache HIT - schedule the processing to avoid frame spikes
+                // when multiple worker responses arrive in the same frame
                 this.stats.pixelCacheHits++
                 pixelCacheHit = true
+                
+                // Measure time to access the transferred ArrayBuffer data
+                const bufferAccessStart = window.performance.now()
                 imageData = cachedPixels.pixelData
+                // Force array access to measure actual time (not just reference assignment)
+                const _len = imageData.length
+                arrayBufferCopyTime = window.performance.now() - bufferAccessStart
+                
                 processTime = 0 // No decode needed
                 log.debug(`PIXEL CACHE HIT ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${cachedPixels.width}×${cachedPixels.height})`)
             } else {
@@ -489,37 +535,73 @@ export class HighTextureCache {
                 return false
             }
             
-            // Copy to texture array at the assigned SLOT (not gameIndex!)
-            const copyStart = window.performance.now()
+            // Schedule the texture copy to run when we have frame budget
+            // This is the main optimization - spreads work across frames when
+            // multiple worker responses arrive simultaneously
             const sliceSize = this.config.textureWidth * this.config.textureHeight * 4
             const offset = entry.highSlot * sliceSize
             const arrayData = this.dataArrayTexture.image.data as Uint8Array
-            arrayData.set(imageData, offset)
-            const copyTime = window.performance.now() - copyStart
+            const capturedGameIndex = entry.gameIndex
+            const capturedSlot = entry.highSlot
+            const capturedGameName = entry.gameName
             
-            // Mark dirty - caller should call flushToGpu() periodically
-            this.isDirty = true
-            
-            entry.state = HighTextureState.LOADED
-            entry.lastAccessTime = window.performance.now()
-            
-            // Notify callback so renderer can update highTextureSlot attribute
-            if (this.onSlotChange) {
-                this.onSlotChange(entry.gameIndex, entry.highSlot)
+            // Schedule entire completion: copy + state update + callback
+            // This ensures we don't flood the main thread when many textures complete at once
+            const doTextureCompletion = () => {
+                const copyStart = window.performance.now()
+                arrayData.set(imageData, offset)
+                const copyTime = window.performance.now() - copyStart
+                
+                // Mark this specific slot as dirty for partial GPU upload
+                // This enables uploading just ~540KB per slot instead of ~34MB for all slots
+                this.isDirty = true
+                this.dirtySlots.add(capturedSlot)
+                
+                // State updates happen in the scheduled task
+                entry.state = HighTextureState.LOADED
+                entry.lastAccessTime = window.performance.now()
+                
+                // Notify callback so renderer can update highTextureSlot attribute
+                if (this.onSlotChange) {
+                    this.onSlotChange(capturedGameIndex, capturedSlot)
+                }
+                
+                // Record profiling if enabled
+                if (this.profilingEnabled) {
+                    this.recordProfilingSample({
+                        gameIndex: capturedGameIndex,
+                        gameName: capturedGameName,
+                        workerRoundTrip,
+                        arrayBufferCopy: arrayBufferCopyTime,
+                        textureArrayCopy: copyTime,
+                        callbackTime: 0,
+                        totalMainThread: arrayBufferCopyTime + copyTime,
+                        pixelCacheHit,
+                        timestamp: window.performance.now()
+                    })
+                }
             }
+            
+            // Use tryExecuteOrSchedule: runs immediately if we have budget, otherwise schedules
+            const executedImmediately = this.scheduler.tryExecuteOrSchedule(doTextureCompletion, {
+                estimatedMs: 0.5,  // Based on profiling: avg 0.2ms, max 1ms
+                priority: 'normal',
+                maxDeferMs: 500   // Don't wait more than 500ms (30 frames at 60fps)
+            })
             
             const totalTime = window.performance.now() - loadStart
             const inFlight = this.loadingPromises.size - 1  // -1 because this one is about to complete
             const cacheStatus = pixelCacheHit ? '🟢 PIXEL HIT' : '🔴 PIXEL MISS'
-            log.debug(`COMPLETE HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | ${cacheStatus} | total: ${totalTime.toFixed(0)}ms (fetch: ${fetchTime.toFixed(0)}ms, process: ${processTime.toFixed(0)}ms, copy: ${copyTime.toFixed(1)}ms) | in-flight: ${inFlight}, queue: ${this.loadQueue.length}`)
+            const scheduled = executedImmediately ? 'immediate' : 'scheduled'
+            log.debug(`COMPLETE HIGH ${entry.gameIndex} → slot ${capturedSlot} "${capturedGameName.slice(0, 20)}" | ${cacheStatus} | total: ${totalTime.toFixed(0)}ms (fetch: ${fetchTime.toFixed(0)}ms, copy: ${scheduled}) | in-flight: ${inFlight}, queue: ${this.loadQueue.length}`)
             
-            // Record timing sample for diagnostics
+            // Record timing sample for diagnostics (copyTime tracked separately in scheduler callback)
             this.recordTimingSample({
                 gameIndex: entry.gameIndex,
                 gameName: entry.gameName,
                 fetchTime,
                 processTime,
-                copyTime,
+                copyTime: 0,  // Now measured in scheduler callback
                 totalTime,
                 timestamp: window.performance.now(),
                 pixelCacheHit
@@ -736,6 +818,119 @@ export class HighTextureCache {
         
         console.log('\n📈 SUMMARY:')
         console.table(results)
+        console.groupEnd()
+    }
+
+    /**
+     * Run a quick profiling test: evict N textures, then reload them while measuring frame times
+     * Call from console: window.highTextureCache.runProfilingTest(10)
+     * 
+     * This helps identify if the remaining frame dips are from:
+     * - Worker message passing
+     * - ArrayBuffer copying
+     * - Texture array .set() operations
+     * - GPU flush operations
+     */
+    public async runProfilingTest(count: number = 10): Promise<void> {
+        console.group(`🔬 Running Profiling Test (${count} textures)`)
+        
+        // Get loaded games that we can evict and reload
+        const loadedGames: number[] = []
+        for (const [gameIndex, entry] of this.games) {
+            if (entry.state === HighTextureState.LOADED && loadedGames.length < count) {
+                loadedGames.push(gameIndex)
+            }
+        }
+        
+        if (loadedGames.length < count) {
+            console.warn(`Only ${loadedGames.length} loaded games available (requested ${count})`)
+        }
+        
+        if (loadedGames.length === 0) {
+            console.log('No loaded games to test with.')
+            console.groupEnd()
+            return
+        }
+        
+        // Enable profiling
+        this.enableProfiling()
+        
+        // Track frame times
+        const frameTimeSamples: { time: number; phase: string }[] = []
+        let lastFrameTime = window.performance.now()
+        let currentPhase = 'idle'
+        let trackingActive = true
+        
+        const frameTracker = (): void => {
+            if (!trackingActive) return
+            const now = window.performance.now()
+            frameTimeSamples.push({ time: now - lastFrameTime, phase: currentPhase })
+            lastFrameTime = now
+            window.requestAnimationFrame(frameTracker)
+        }
+        window.requestAnimationFrame(frameTracker)
+        
+        // Phase 1: Evict all test games
+        currentPhase = 'evict'
+        console.log(`\n1️⃣ Evicting ${loadedGames.length} textures...`)
+        for (const gameIndex of loadedGames) {
+            this.evictGame(gameIndex)
+        }
+        await new Promise(r => setTimeout(r, 100)) // Let frames settle
+        
+        // Phase 2: Request all games (triggers reload from pixel cache)
+        currentPhase = 'reload'
+        console.log(`2️⃣ Reloading ${loadedGames.length} textures (should hit pixel cache)...`)
+        const reloadStart = window.performance.now()
+        
+        for (const gameIndex of loadedGames) {
+            this.requestHighTexture(gameIndex)
+        }
+        
+        // Wait for loads to complete
+        while (this.loadingPromises.size > 0 || this.loadQueue.length > 0) {
+            await new Promise(r => setTimeout(r, 16))
+        }
+        
+        const reloadTime = window.performance.now() - reloadStart
+        
+        // Phase 3: Let frames settle
+        currentPhase = 'settle'
+        await new Promise(r => setTimeout(r, 200))
+        
+        trackingActive = false
+        
+        // Analyze results
+        console.log(`\n3️⃣ Analysis:`)
+        console.log(`   Reload time: ${reloadTime.toFixed(0)}ms total`)
+        
+        // Frame time analysis by phase
+        const reloadFrames = frameTimeSamples.filter(f => f.phase === 'reload')
+        if (reloadFrames.length > 0) {
+            const avgFrame = reloadFrames.reduce((sum, f) => sum + f.time, 0) / reloadFrames.length
+            const maxFrame = Math.max(...reloadFrames.map(f => f.time))
+            const slowFrames = reloadFrames.filter(f => f.time > 16.67)
+            const verySlowFrames = reloadFrames.filter(f => f.time > 33.33)
+            
+            console.log(`\n   Frame Analysis (during reload):`)
+            console.log(`     Frames:     ${reloadFrames.length}`)
+            console.log(`     Average:    ${avgFrame.toFixed(1)}ms`)
+            console.log(`     Maximum:    ${maxFrame.toFixed(1)}ms`)
+            console.log(`     >16.67ms:   ${slowFrames.length} (dropped 60fps)`)
+            console.log(`     >33.33ms:   ${verySlowFrames.length} (dropped 30fps)`)
+            
+            if (maxFrame > 16.67) {
+                console.log(`\n   ⚠️ Frame dips detected! Max frame: ${maxFrame.toFixed(1)}ms`)
+            } else {
+                console.log(`\n   ✅ No significant frame dips during reload`)
+            }
+        }
+        
+        // Show detailed profiling
+        console.log('')
+        this.diagnoseProfile()
+        
+        this.disableProfiling()
         console.groupEnd()
     }
 
@@ -1000,6 +1195,117 @@ export class HighTextureCache {
         }
     }
     
+    private recordProfilingSample(sample: {
+        gameIndex: number
+        gameName: string
+        workerRoundTrip: number
+        arrayBufferCopy: number
+        textureArrayCopy: number
+        callbackTime: number
+        totalMainThread: number
+        pixelCacheHit: boolean
+        timestamp: number
+    }): void {
+        this.profilingSamples.push(sample)
+        if (this.profilingSamples.length > this.MAX_PROFILING_SAMPLES) {
+            this.profilingSamples.shift()
+        }
+    }
+    
+    /**
+     * Enable detailed profiling (captures more timing data per load)
+     */
+    public enableProfiling(): void {
+        this.profilingEnabled = true
+        this.profilingSamples = []
+        console.log('🔬 Profiling enabled - load some textures then call diagnoseProfile()')
+    }
+    
+    /**
+     * Disable profiling
+     */
+    public disableProfiling(): void {
+        this.profilingEnabled = false
+        console.log('🔬 Profiling disabled')
+    }
+    
+    /**
+     * Analyze detailed profiling data to identify bottlenecks
+     */
+    public diagnoseProfile(): void {
+        console.group('🔬 Detailed Profiling Analysis (Main Thread Impact)')
+        
+        if (!this.profilingEnabled) {
+            console.log('⚠️ Profiling not enabled. Call enableProfiling() first.')
+            console.groupEnd()
+            return
+        }
+        
+        if (this.profilingSamples.length === 0) {
+            console.log('No profiling samples recorded. Load some textures first.')
+            console.groupEnd()
+            return
+        }
+        
+        const samples = this.profilingSamples.filter(s => s.pixelCacheHit) // Only analyze cache hits
+        if (samples.length === 0) {
+            console.log('No pixel cache HIT samples. All loads are cache misses (backgrounded).')
+            console.groupEnd()
+            return
+        }
+        
+        const count = samples.length
+        
+        // Calculate averages
+        const avgWorkerRT = samples.reduce((sum, s) => sum + s.workerRoundTrip, 0) / count
+        const avgBufferCopy = samples.reduce((sum, s) => sum + s.arrayBufferCopy, 0) / count
+        const avgTextureCopy = samples.reduce((sum, s) => sum + s.textureArrayCopy, 0) / count
+        const avgCallback = samples.reduce((sum, s) => sum + s.callbackTime, 0) / count
+        const avgMainThread = samples.reduce((sum, s) => sum + s.totalMainThread, 0) / count
+        
+        // Calculate max values
+        const maxWorkerRT = Math.max(...samples.map(s => s.workerRoundTrip))
+        const maxTextureCopy = Math.max(...samples.map(s => s.textureArrayCopy))
+        const maxMainThread = Math.max(...samples.map(s => s.totalMainThread))
+        
+        console.log(`Samples: ${count} (pixel cache HITs only)`)
+        console.log('')
+        console.log('--- Average Breakdown (ms) ---')
+        console.log(`  Worker round-trip (async): ${avgWorkerRT.toFixed(2)}ms`)
+        console.log(`  ArrayBuffer access:       ${avgBufferCopy.toFixed(3)}ms`)
+        console.log(`  Texture array .set():     ${avgTextureCopy.toFixed(2)}ms  ← likely culprit if >1ms`)
+        console.log(`  Slot callback:            ${avgCallback.toFixed(3)}ms`)
+        console.log(`  ─────────────────────────`)
+        console.log(`  MAIN THREAD BLOCKING:     ${avgMainThread.toFixed(2)}ms`)
+        console.log('')
+        console.log('--- Maximum Values (worst case) ---')
+        console.log(`  Worker round-trip: ${maxWorkerRT.toFixed(1)}ms`)
+        console.log(`  Texture copy:      ${maxTextureCopy.toFixed(1)}ms`)
+        console.log(`  Main thread:       ${maxMainThread.toFixed(1)}ms`)
+        console.log('')
+        
+        // Identify bottleneck
+        if (avgTextureCopy > avgMainThread * 0.7) {
+            console.log('🎯 BOTTLENECK: Texture array copy (.set()) dominates main thread time')
+            console.log('   Mitigation: Consider chunked copying or requestIdleCallback')
+        } else if (avgWorkerRT > 5) {
+            console.log('🎯 BOTTLENECK: Worker round-trip is slow (>5ms)')
+            console.log('   This includes message serialization and IndexedDB read')
+        } else {
+            console.log('✅ No clear bottleneck - times look reasonable')
+        }
+        
+        // Show worst samples
+        console.log('')
+        console.log('--- Slowest 5 Loads (by main thread time) ---')
+        const slowest = [...samples].sort((a, b) => b.totalMainThread - a.totalMainThread).slice(0, 5)
+        slowest.forEach((s, i) => {
+            console.log(`  ${i + 1}. ${s.totalMainThread.toFixed(1)}ms main thread - "${s.gameName.slice(0, 20)}" (copy: ${s.textureArrayCopy.toFixed(1)}ms)`)
+        })
+        
+        console.groupEnd()
+    }
+
     public diagnoseTimings(): void {
         console.group('⏱️ HIGH Texture Load Timing Statistics')
         

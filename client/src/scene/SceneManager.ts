@@ -21,6 +21,7 @@ import { PropRenderer } from './PropRenderer'
 import { DataManager } from '../core/data/DataManager'
 import { DataDomain, DataKey } from '../core/data/DataTypes'
 import { RenderLoopRegistry } from './RenderLoopRegistry'
+import { FrameBudgetScheduler } from '../utils/FrameBudgetScheduler'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -131,11 +132,15 @@ export class SceneManager {
 
     public startRenderLoop() {
         let lastTime = performance.now()
+        const scheduler = FrameBudgetScheduler.getInstance()
         
         this.renderer.setAnimationLoop(() => {
             const now = performance.now()
             const deltaTime = now - lastTime
             lastTime = now
+            
+            // Update frame budget scheduler (tracks frame times, processes pending tasks)
+            scheduler.onFrameStart(now)
             
             // Execute all registered render loop callbacks
             this.renderLoopRegistry.executeAll(now, deltaTime)
