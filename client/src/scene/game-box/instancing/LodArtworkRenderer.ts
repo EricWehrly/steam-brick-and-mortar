@@ -629,9 +629,14 @@ export class LodArtworkRenderer {
     public updateGPU(): void {
         if (!this.instancedMesh || !this.geometry) return
         
-        // Update all LOD texture arrays (MID textures)
+        // Update all LOD texture arrays (MID textures) using PARTIAL layer updates
+        // Instead of uploading entire array, only upload changed layers
         for (const state of this.lodTextures.values()) {
             if (state.dataArrayTexture && state.pendingUpdates.size > 0) {
+                // Mark only changed layers for upload (massive GPU bandwidth savings)
+                for (const textureIndex of state.pendingUpdates) {
+                    state.dataArrayTexture.addLayerUpdate(textureIndex)
+                }
                 state.dataArrayTexture.needsUpdate = true
                 state.pendingUpdates.clear()
             }
@@ -738,6 +743,14 @@ export class LodArtworkRenderer {
         
         const textureIndex = Math.floor(textureIndexAttr.getX(instanceIndex))
         return this.highTextureCache.isLoaded(textureIndex)
+    }
+    
+    /**
+     * Get the HighTextureCache instance for profiling/debugging
+     * Access profiling from console: renderer.getHighTextureCache().runProfilingTest(10)
+     */
+    public getHighTextureCache() {
+        return this.highTextureCache
     }
     
     /**
