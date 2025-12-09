@@ -118,6 +118,43 @@
       </div>
     </section>
 
+    <!-- LOD (Level of Detail) Settings Section -->
+    <section class="setting-section">
+      <div class="setting-group">
+        <label class="setting-label">
+          🎨 Texture Level of Detail
+        </label>
+        <p class="setting-description">
+          Control when game box artwork switches between high and medium quality based on viewing distance.
+        </p>
+        <div class="setting-control">
+          <label class="setting-label" for="lod-high-distance" style="font-weight: normal; font-size: 0.9rem;">
+            HIGH quality within: <span id="lod-high-distance-value">{{lodHighDistance}}m</span>
+          </label>
+          <input 
+            type="range" 
+            id="lod-high-distance" 
+            class="setting-slider"
+            min="1" 
+            max="10" 
+            step="0.5" 
+            value="{{lodHighDistance}}"
+          >
+          <div class="slider-labels">
+            <span>1m</span>
+            <span>10m</span>
+          </div>
+        </div>
+        <div class="setting-control" style="margin-top: 1rem;">
+          <label class="checkbox-container">
+            <input type="checkbox" id="show-lod-debug" {{#showLodDebug}}checked{{/showLodDebug}}>
+            <span class="checkbox-checkmark"></span>
+            Show LOD Debug Overlay (displays texture quality status)
+          </label>
+        </div>
+      </div>
+    </section>
+
   </div>
 
   <!-- Panel Footer -->

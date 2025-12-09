@@ -52,7 +52,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             // Debug & Testing
             enableLighting: this.appSettings.getSetting('enableLighting'),
             showLightingDebug: this.appSettings.getSetting('showLightingDebug'),
-            showCeiling: this.appSettings.getSetting('showCeiling')
+            showCeiling: this.appSettings.getSetting('showCeiling'),
+            
+            // LOD Settings
+            lodHighDistance: this.appSettings.getSetting('lodHighDistance'),
+            showLodDebug: this.appSettings.getSetting('showLodDebug')
         })
     }
 
@@ -92,6 +96,10 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
                     }
                     EventManager.getInstance().emit(CeilingEventTypes.Toggle, ceilingEvent)
                 }
+            },
+            {
+                toggleId: 'show-lod-debug',
+                onChange: (checked) => this.updateSetting('showLodDebug', checked)
             }
         ])
     }
@@ -109,6 +117,12 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
                 valueDisplayId: 'ceiling-height-value',
                 formatDisplay: (v) => `${v}m`,
                 onChange: (value) => this.updateSetting('ceilingHeight', value)
+            },
+            {
+                sliderId: 'lod-high-distance',
+                valueDisplayId: 'lod-high-distance-value',
+                formatDisplay: (v) => `${v}m`,
+                onInput: (value) => this.updateSetting('lodHighDistance', value)
             }
         ])
     }
@@ -149,6 +163,8 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         this.appSettings.setSetting('enableLighting', true, EventSource.UI)
         this.appSettings.setSetting('showLightingDebug', false, EventSource.UI)
         this.appSettings.setSetting('showCeiling', true, EventSource.UI)
+        this.appSettings.setSetting('lodHighDistance', 3.0, EventSource.UI)
+        this.appSettings.setSetting('showLodDebug', false, EventSource.UI)
         
         this.refreshSettingsDisplay()
         
@@ -159,7 +175,9 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             ceilingHeight: 3.2,
             enableLighting: true,
             showLightingDebug: false,
-            showCeiling: true
+            showCeiling: true,
+            lodHighDistance: 3.0,
+            showLodDebug: false
         })
         
         console.log('🎨 Graphics settings reset to defaults')
@@ -216,6 +234,21 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         const ceilingCheckbox = document.getElementById('show-ceiling') as HTMLInputElement
         if (ceilingCheckbox) {
             ceilingCheckbox.checked = this.appSettings.getSetting('showCeiling')
+        }
+        
+        // Update LOD high distance slider
+        const lodHighDistanceSlider = document.getElementById('lod-high-distance') as HTMLInputElement
+        const lodHighDistanceValue = document.getElementById('lod-high-distance-value') as HTMLSpanElement
+        if (lodHighDistanceSlider && lodHighDistanceValue) {
+            const distance = this.appSettings.getSetting('lodHighDistance')
+            lodHighDistanceSlider.value = distance.toString()
+            lodHighDistanceValue.textContent = `${distance}m`
+        }
+        
+        // Update LOD debug checkbox
+        const lodDebugCheckbox = document.getElementById('show-lod-debug') as HTMLInputElement
+        if (lodDebugCheckbox) {
+            lodDebugCheckbox.checked = this.appSettings.getSetting('showLodDebug')
         }
     }
 

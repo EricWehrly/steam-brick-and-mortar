@@ -41,6 +41,9 @@ export const Setting = {
     EnableArtwork: 'enableArtwork',
     UseMultiAtlas: 'useMultiAtlas',
     UseLodAtlas: 'useLodAtlas',
+    // LOD Settings
+    LodHighDistance: 'lodHighDistance',
+    LodMidDistance: 'lodMidDistance',
     // Interface
     ShowFPS: 'showFPS',
     ShowPerformanceStats: 'showPerformanceStats',
@@ -75,6 +78,10 @@ export interface ApplicationSettings {
     enableArtwork: boolean     // Game box artwork textures
     useMultiAtlas: boolean     // Use 3-tier texture atlas system (reduces VRAM)
     useLodAtlas: boolean       // Use LOD texture atlas with per-instance detail levels
+    
+    // LOD Settings
+    lodHighDistance: number    // Distance threshold for HIGH texture quality (meters)
+    lodMidDistance: number     // Distance threshold for MID texture quality (meters)
     
     // Interface Settings
     showFPS: boolean
@@ -331,6 +338,10 @@ export class AppSettings {
             enableArtwork: true, // Always on - this is the core feature
             useMultiAtlas: false, // Use 3-tier atlas for better VRAM efficiency
             useLodAtlas: true, // Use LOD atlas with switchable detail levels (experimental)
+            
+            // LOD Settings - distances in meters for texture quality switching
+            lodHighDistance: 3.0,  // Within 3m = HIGH quality textures
+            lodMidDistance: 8.0,   // Within 8m = MID quality, beyond = LOW
             
             // Interface Settings
             showFPS: false,

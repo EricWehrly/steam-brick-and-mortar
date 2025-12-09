@@ -16,6 +16,9 @@ import { LodArtworkRenderer, LOD_LEVEL, type LodLevel } from './LodArtworkRender
 import { RenderLoopRegistry } from '../../RenderLoopRegistry'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey } from '../../../core/data/DataTypes'
+import { AppSettings, Setting, type SettingChangedEvent } from '../../../core/AppSettings'
+import { EventManager } from '../../../core/EventManager'
+import { AppSettingsEventTypes } from '../../../types/InteractionEvents'
 import { Logger } from '../../../utils/Logger'
 
 const log = Logger.withContext('LodDistanceManager')
@@ -54,16 +57,16 @@ interface DiagnosticStats {
 
 export class LodDistanceManager {
     private readonly renderer: LodArtworkRenderer
-    private readonly config: LodDistanceConfig
+    private config: LodDistanceConfig
     private readonly renderLoopRegistry: RenderLoopRegistry
     private readonly dataManager: DataManager
     private isRegistered: boolean = false
     
     // Pre-computed squared distances for comparison (avoids sqrt)
-    private readonly highDistSq: number
-    private readonly midDistSq: number
-    private readonly highDistSqWithHysteresis: number
-    private readonly midDistSqWithHysteresis: number
+    private highDistSq: number = 0
+    private midDistSq: number = 0
+    private highDistSqWithHysteresis: number = 0
+    private midDistSqWithHysteresis: number = 0
     
     // Instance tracking
     private instanceStates: Map<number, InstanceLodState> = new Map()
@@ -86,11 +89,46 @@ export class LodDistanceManager {
 
     constructor(renderer: LodArtworkRenderer, config: Partial<LodDistanceConfig> = {}) {
         this.renderer = renderer
-        this.config = { ...DEFAULT_CONFIG, ...config }
+        
+        // Initialize config from AppSettings with fallback to provided config/defaults
+        const savedHighDistance = AppSettings.get(Setting.LodHighDistance)
+        const savedMidDistance = AppSettings.get(Setting.LodMidDistance)
+        
+        this.config = { 
+            ...DEFAULT_CONFIG, 
+            ...config,
+            highDistance: savedHighDistance ?? config.highDistance ?? DEFAULT_CONFIG.highDistance,
+            midDistance: savedMidDistance ?? config.midDistance ?? DEFAULT_CONFIG.midDistance
+        }
+        
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
         this.dataManager = DataManager.getInstance()
         
         // Pre-compute squared distances
+        this.updateSquaredDistances()
+        
+        // Subscribe to settings changes via EventManager
+        EventManager.getInstance().registerEventHandler(
+            AppSettingsEventTypes.Changed,
+            this.onSettingChanged.bind(this)
+        )
+        
+        log.lifecycle(`Initialized: HIGH < ${this.config.highDistance}m, MID < ${this.config.midDistance}m, Hysteresis: ${this.config.hysteresis}m, Update every ${this.config.updateFrequency} frames`)
+    }
+    
+    private onSettingChanged(event: SettingChangedEvent): void {
+        if (event.key === 'lodHighDistance' && typeof event.value === 'number') {
+            this.config.highDistance = event.value
+            this.updateSquaredDistances()
+            log.info(`HIGH distance updated to ${event.value}m`)
+        } else if (event.key === 'lodMidDistance' && typeof event.value === 'number') {
+            this.config.midDistance = event.value
+            this.updateSquaredDistances()
+            log.info(`MID distance updated to ${event.value}m`)
+        }
+    }
+    
+    private updateSquaredDistances(): void {
         this.highDistSq = this.config.highDistance * this.config.highDistance
         this.midDistSq = this.config.midDistance * this.config.midDistance
         
@@ -100,8 +138,6 @@ export class LodDistanceManager {
         const midWithHyst = this.config.midDistance + this.config.hysteresis
         this.highDistSqWithHysteresis = highWithHyst * highWithHyst
         this.midDistSqWithHysteresis = midWithHyst * midWithHyst
-        
-        log.lifecycle(`Initialized: HIGH < ${this.config.highDistance}m, MID < ${this.config.midDistance}m, Hysteresis: ${this.config.hysteresis}m, Update every ${this.config.updateFrequency} frames`)
     }
     
     /**
