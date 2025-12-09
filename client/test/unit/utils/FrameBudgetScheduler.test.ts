@@ -128,9 +128,13 @@ describe('FrameBudgetScheduler', () => {
             scheduler.schedule(() => {})
             scheduler.schedule(() => {})
             
+            // With maxTasksPerFrame=1, only 1 task executes per frame
             scheduler.onFrameStart(1000)
             
-            expect(scheduler.getStats().tasksExecutedLastFrame).toBe(3)
+            // Last frame executed 1 task (constrained by maxTasksPerFrame)
+            expect(scheduler.getStats().tasksExecutedLastFrame).toBe(1)
+            // 2 tasks remain pending
+            expect(scheduler.getStats().pendingTasks).toBe(2)
         })
     })
 
@@ -153,7 +157,9 @@ describe('FrameBudgetScheduler', () => {
             scheduler.schedule(() => order.push('low'), { priority: 'low' })
             scheduler.schedule(() => order.push('normal'), { priority: 'normal' })
             
-            scheduler.onFrameStart(1000)
+            // With maxTasksPerFrame=1, need two frames
+            scheduler.onFrameStart(1000)  // executes 'normal' (higher priority)
+            scheduler.onFrameStart(1016)  // executes 'low'
             
             expect(order[0]).toBe('normal')
             expect(order[1]).toBe('low')
