@@ -1,7 +1,16 @@
 import * as THREE from 'three'
 import type { SteamGameData } from '../../game-box/types/GameData'
-import { GamePlacementConstants } from './GameLayoutConstants'
+import type { GameBoxDimensions } from '../../game-box/types/GameBoxOptions'
 import { ShelfSide, type ShelfSurface } from './SharedPropsTypes'
+
+export class GameLayoutConstants {
+    static readonly GAMES_PER_SURFACE = 3
+    static readonly SURFACES_PER_SHELF = 6
+    static readonly GAME_SPACING = 0.55
+}
+
+/** Shelf construction constant - 6° backward tilt for stability */
+const SHELF_ANGLE_DEGREES = 6
 
 export class GameBoxUtils {
     static generateGameBoxName(game: SteamGameData, side: ShelfSide, index: number, rendererType: 'gpu' | 'legacy'): string {
@@ -13,19 +22,19 @@ export class GameBoxUtils {
         shelfPosition: THREE.Vector3,
         surface: ShelfSurface,
         games: SteamGameData[],
-        side: ShelfSide
+        side: ShelfSide,
+        boxDimensions: GameBoxDimensions
     ): THREE.Vector3[] {
         const positions: THREE.Vector3[] = []
         
-        const gameY = shelfPosition.y + surface.topY + GamePlacementConstants.GAME_HEIGHT / 2
+        const gameY = shelfPosition.y + surface.topY + boxDimensions.height / 2
         
-        const shelfAngleDegrees = 6
-        const shelfAngleRad = (shelfAngleDegrees * Math.PI) / 180
+        const shelfAngleRad = (SHELF_ANGLE_DEGREES * Math.PI) / 180
         
         const heightFromBottom = surface.topY
         const angleOffset = heightFromBottom * Math.tan(shelfAngleRad)
         
-        const gameHalfDepth = 0.05
+        const gameHalfDepth = boxDimensions.depth / 2
         
         const baseZ = shelfPosition.z + (side === ShelfSide.Front 
             ? surface.frontZ + (gameHalfDepth * 3)
@@ -33,11 +42,11 @@ export class GameBoxUtils {
         
         const gameZ = baseZ + (side === ShelfSide.Front ? angleOffset : -angleOffset)
                 
-        const totalWidth = (games.length - 1) * GamePlacementConstants.GAME_SPACING
+        const totalWidth = (games.length - 1) * GameLayoutConstants.GAME_SPACING
         const startX = shelfPosition.x + surface.centerX - totalWidth / 2
         
         for (let i = 0; i < games.length; i++) {
-            const gameX = startX + (i * GamePlacementConstants.GAME_SPACING)
+            const gameX = startX + (i * GameLayoutConstants.GAME_SPACING)
             positions.push(new THREE.Vector3(gameX, gameY, gameZ))
         }
         

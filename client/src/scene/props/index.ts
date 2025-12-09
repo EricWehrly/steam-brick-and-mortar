@@ -36,7 +36,6 @@ export {
     GameLayoutConstants, 
     ArtworkUtils, 
     VRLayoutUtils, 
-    GamePlacementConstants, 
     GameBoxUtils,
     ShelfSurfaceUtils,
     type ShelfSurface

@@ -1,6 +1,5 @@
 export * from './shared/SharedPropsTypes'
 export * from './shared/ShelfCalculations'
-export * from './shared/GameLayoutConstants'
 export * from './shared/ShelfSurfaceUtils'
 export * from './shared/GameBoxUtils'
 export * from './shared/VRLayoutUtils'
