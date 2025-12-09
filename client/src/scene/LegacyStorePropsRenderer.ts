@@ -302,7 +302,8 @@ export class LegacyStorePropsRenderer implements IStorePropsRenderer {
         side: ShelfSide
     ): Promise<void> {
         // Use parent group position as shelf position for correct game positioning
-        const gamePositions = GameBoxUtils.calculateGamePositions(parentGroup.position, surface, games, side)
+        const boxDimensions = this.gameBoxRenderer.getDimensions()
+        const gamePositions = GameBoxUtils.calculateGamePositions(parentGroup.position, surface, games, side, boxDimensions)
         
         for (let i = 0; i < games.length; i++) {
             await this.createSingleGameBox(games[i], gamePositions[i], parentGroup, side, i)

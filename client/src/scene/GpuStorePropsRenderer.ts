@@ -657,7 +657,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         games: SteamGameData[], 
         side: ShelfSide
     ): void {
-        const gamePositions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, games, side)
+        const boxDimensions = this.gameBoxRenderer?.getDimensions()
+        const gamePositions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, games, side, boxDimensions)
         
         // Fire-and-forget - worker handles these in parallel
         // GPU update happens via InstancedBatchComplete event

@@ -66,7 +66,10 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         if (this.useLodAtlas) {
             this.lodArtworkRenderer = new LodArtworkRenderer({
                 maxTextures: maxGames,
-                lazyHighTextures: true  // Memory optimization: load HIGH textures on demand
+                lazyHighTextures: true,  // Memory optimization: load HIGH textures on demand
+                boxWidth: this.dimensions.width,
+                boxHeight: this.dimensions.height,
+                boxDepth: this.dimensions.depth
             })
             // Create distance manager for automatic LOD switching
             this.lodDistanceManager = new LodDistanceManager(this.lodArtworkRenderer)
@@ -236,11 +239,17 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             }
             /* eslint-enable @typescript-eslint/no-explicit-any */
         } else if (this.useMultiAtlas) {
-            this.multiAtlasRenderer = new MultiAtlasArtworkRenderer()
+            this.multiAtlasRenderer = new MultiAtlasArtworkRenderer({
+                boxWidth: this.dimensions.width,
+                boxHeight: this.dimensions.height
+            })
             log.lifecycle(`Using multi-atlas system (max ${maxGames})`)
         } else {
             this.instancedArtworkRenderer = new InstancedArtworkRenderer({
-                maxInstances: maxGames
+                maxInstances: maxGames,
+                boxWidth: this.dimensions.width,
+                boxHeight: this.dimensions.height,
+                boxDepth: this.dimensions.depth
             })
             log.lifecycle(`Using single atlas (max ${maxGames})`)
         }
