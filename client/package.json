@@ -10,6 +10,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:summary": "vitest run && node scripts/test-summary.cjs",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:performance": "vitest run --config vitest.performance.config.ts",

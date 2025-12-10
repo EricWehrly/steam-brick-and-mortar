@@ -8,7 +8,9 @@ export default defineConfig({
     watch: false,
     // Reduce output verbosity
     silent: false,
-    reporters: ['basic'],
+    // Output both console and JSON for easy parsing
+    reporters: ['basic', 'json'],
+    outputFile: './test-results/test-results.json',
     // Default config excludes live tests, performance tests, and integration tests
     exclude: [
       '**/node_modules/**',
