@@ -29,9 +29,12 @@ import { EventManager, EventSource } from '../../src/core/EventManager'
 import { RoomEventTypes } from '../../src/types/InteractionEvents'
 import { LegacyStorePropsRenderer } from '../../src/scene/LegacyStorePropsRenderer'
 import { LegacyGameBoxRenderer } from '../../src/scene/game-box/LegacyGameBoxRenderer'
-import { GameBoxUtils, GamePlacementConstants, ShelfSide } from '../../src/scene/props/SharedPropsUtils'
+import { GameBoxUtils, GameLayoutConstants, ShelfSide } from '../../src/scene/props/SharedPropsUtils'
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData'
+import type { GameBoxDimensions } from '../../src/scene/game-box/types/GameBoxOptions'
 import { createGameBoxTestAdapter, GameBoxTestUtils, type GameBoxTestAdapter } from '../utils/GameBoxTestAdapter'
+
+const TEST_BOX_DIMENSIONS: GameBoxDimensions = { width: 0.3, height: 0.4, depth: 0.08 }
 
 describe('Game Box Positioning - Renderer Agnostic', () => {
     let scene: THREE.Scene
@@ -93,7 +96,8 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
                 shelfPosition, 
                 mockSurface,
                 mockGames, 
-                ShelfSide.Front
+                ShelfSide.Front,
+                TEST_BOX_DIMENSIONS
             )
             
             // Create game boxes using the adapter
@@ -130,7 +134,7 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
             
             // Calculate positions
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, mockSurface, mockGames, ShelfSide.Front
+                shelfPosition, mockSurface, mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             
             // Create game boxes using the adapter
@@ -159,7 +163,7 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
             }
             
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, mockSurface, mockGames, ShelfSide.Front
+                shelfPosition, mockSurface, mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             
             // Create game boxes
@@ -177,7 +181,7 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
                 const currentBox = allGameBoxes[i]
                 const spacing = currentBox.position.x - prevBox.position.x
                 
-                expect(spacing).toBeCloseTo(GamePlacementConstants.GAME_SPACING, 3)
+                expect(spacing).toBeCloseTo(GameLayoutConstants.GAME_SPACING, 3)
             }
         })
 
@@ -192,10 +196,10 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
             }
             
             const frontPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, mockSurface, [mockGames[0]], ShelfSide.Front
+                shelfPosition, mockSurface, [mockGames[0]], ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             const backPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, mockSurface, [mockGames[0]], ShelfSide.Back
+                shelfPosition, mockSurface, [mockGames[0]], ShelfSide.Back, TEST_BOX_DIMENSIONS
             )
             
             // Create separate adapters for front and back to avoid conflicts
@@ -250,19 +254,4 @@ describe('Game Box Positioning - Renderer Agnostic', () => {
         })
     })
 
-    describe('Constants and Configuration', () => {
-        it('should have correct game placement constants after positioning fixes', () => {
-            // Verify the constants we use for positioning are defined and correct
-            expect(GamePlacementConstants.Z_OFFSET).toBeDefined()
-            expect(GamePlacementConstants.Y_OFFSET).toBeDefined()
-            expect(GamePlacementConstants.GAME_HEIGHT).toBeDefined()
-            expect(GamePlacementConstants.GAME_SPACING).toBeDefined()
-            
-            // These should be the corrected values after our fixes
-            expect(GamePlacementConstants.Z_OFFSET).toBe(0.03) // Reduced for flush positioning
-            expect(GamePlacementConstants.Y_OFFSET).toBe(0.005) // Small offset above shelf
-            expect(GamePlacementConstants.GAME_HEIGHT).toBe(0.4) // 40cm height
-            expect(GamePlacementConstants.GAME_SPACING).toBe(0.35) // 35cm spacing
-        })
-    })
 })

@@ -29,8 +29,11 @@ import { EventManager, EventSource } from '../../src/core/EventManager'
 import { RoomEventTypes } from '../../src/types/InteractionEvents'
 import { LegacyStorePropsRenderer } from '../../src/scene/LegacyStorePropsRenderer'
 import { LegacyGameBoxRenderer } from '../../src/scene/game-box/LegacyGameBoxRenderer'
-import { GameBoxUtils, GamePlacementConstants, ShelfSurfaceUtils, ShelfSide, type ShelfSurface } from '../../src/scene/props/SharedPropsUtils'
+import { GameBoxUtils, GameLayoutConstants, ShelfSurfaceUtils, ShelfSide, type ShelfSurface } from '../../src/scene/props/SharedPropsUtils'
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData'
+import type { GameBoxDimensions } from '../../src/scene/game-box/types/GameBoxOptions'
+
+const TEST_BOX_DIMENSIONS: GameBoxDimensions = { width: 0.3, height: 0.4, depth: 0.08 }
 
 describe('Game Box Positioning Integration', () => {
     let scene: THREE.Scene
@@ -82,7 +85,8 @@ describe('Game Box Positioning Integration', () => {
                 shelfPosition, 
                 surfaces[0], // Use first surface
                 mockGames, 
-                ShelfSide.Front
+                ShelfSide.Front,
+                TEST_BOX_DIMENSIONS
             )
             
             expect(positions.length).toBe(mockGames.length)
@@ -106,7 +110,7 @@ describe('Game Box Positioning Integration', () => {
             
             // Calculate positions
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surfaces[0], mockGames, ShelfSide.Front
+                shelfPosition, surfaces[0], mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             
             // Create game boxes using GameBoxRenderer
@@ -142,13 +146,13 @@ describe('Game Box Positioning Integration', () => {
             const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surfaces[0], mockGames, ShelfSide.Front
+                shelfPosition, surfaces[0], mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             
             // Check spacing between adjacent games
             for (let i = 1; i < positions.length; i++) {
                 const spacing = positions[i].x - positions[i-1].x
-                expect(spacing).toBeCloseTo(GamePlacementConstants.GAME_SPACING, 3)
+                expect(spacing).toBeCloseTo(GameLayoutConstants.GAME_SPACING, 3)
             }
         })
 
@@ -158,7 +162,7 @@ describe('Game Box Positioning Integration', () => {
             const surface = surfaces[0]
             
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, [mockGames[0]], ShelfSide.Front
+                shelfPosition, surface, [mockGames[0]], ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             
             const gameBox = gameBoxRenderer.createGameBox(mockGames[0], positions[0])
@@ -184,10 +188,10 @@ describe('Game Box Positioning Integration', () => {
             const surface = surfaces[0]
             
             const frontPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, [mockGames[0]], ShelfSide.Front
+                shelfPosition, surface, [mockGames[0]], ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             const backPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, [mockGames[0]], ShelfSide.Back
+                shelfPosition, surface, [mockGames[0]], ShelfSide.Back, TEST_BOX_DIMENSIONS
             )
             
             // Front and back should have different Z positions
@@ -251,10 +255,10 @@ describe('Game Box Positioning Integration', () => {
             
             // Calculate positions for front and back sides
             const frontPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, [mockGames[0]], ShelfSide.Front
+                shelfPosition, surface, [mockGames[0]], ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             const backPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, [mockGames[0]], ShelfSide.Back
+                shelfPosition, surface, [mockGames[0]], ShelfSide.Back, TEST_BOX_DIMENSIONS
             )
             
             // Create game boxes
@@ -284,7 +288,7 @@ describe('Game Box Positioning Integration', () => {
             const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surfaces[0], mockGames, ShelfSide.Front
+                shelfPosition, surfaces[0], mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             
             // Create game boxes
@@ -327,7 +331,7 @@ describe('Game Box Positioning Integration', () => {
             const surfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
             
             const positions = GameBoxUtils.calculateGamePositions(
-                unusualPosition, surfaces[0], [mockGames[0]], ShelfSide.Front
+                unusualPosition, surfaces[0], [mockGames[0]], ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             
             const gameBox = gameBoxRenderer.createGameBox(mockGames[0], positions[0])
@@ -348,7 +352,7 @@ describe('Game Box Positioning Integration', () => {
             
             // Single game should be centered
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surfaces[0], [mockGames[0]], ShelfSide.Front
+                shelfPosition, surfaces[0], [mockGames[0]], ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             
             expect(positions.length).toBe(1)
@@ -382,13 +386,13 @@ describe('Game Box Positioning Integration', () => {
             }
             
             const positions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, wideSurface, manyGames, ShelfSide.Front
+                shelfPosition, wideSurface, manyGames, ShelfSide.Front, TEST_BOX_DIMENSIONS
             )
             
             expect(positions.length).toBe(manyGames.length)
             
             // All games should fit within shelf width
-            const totalGameWidth = (manyGames.length - 1) * GamePlacementConstants.GAME_SPACING
+            const totalGameWidth = (manyGames.length - 1) * GameLayoutConstants.GAME_SPACING
             expect(totalGameWidth).toBeLessThan(wideSurface.width)
             
             // Games should be centered
