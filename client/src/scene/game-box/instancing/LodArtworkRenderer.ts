@@ -761,30 +761,62 @@ export class LodArtworkRenderer {
      * Call from console: window.lodArtworkRenderer?.getFailureDiagnostics()
      */
     public getFailureDiagnostics(): {
-        summary: { total: number; byReason: Record<string, number> }
-        failures: Array<{ game: string; reason: string; url: string; timestamp: number }>
+        summary: { 
+            total: number
+            byReason: Record<string, number>
+            byUrlPattern: Record<string, number>
+            uniqueAppIds: number
+        }
+        failures: Array<{ game: string; reason: string; url: string; appid: string | null; timestamp: number }>
     } {
         const byReason: Record<string, number> = {}
-        const failures: Array<{ game: string; reason: string; url: string; timestamp: number }> = []
+        const byUrlPattern: Record<string, number> = {}
+        const appIds = new Set<string>()
+        const failures: Array<{ game: string; reason: string; url: string; appid: string | null; timestamp: number }> = []
         
         for (const [gameName, failure] of this.failedArtwork) {
             byReason[failure.reason] = (byReason[failure.reason] || 0) + 1
+            
+            // Extract URL pattern (e.g., "library_600x900.jpg", "header.jpg")
+            const urlPattern = this.extractUrlPattern(failure.url)
+            byUrlPattern[urlPattern] = (byUrlPattern[urlPattern] || 0) + 1
+            
+            // Extract appid from URL
+            const appidMatch = failure.url.match(/\/apps\/(\d+)\//)
+            const appid = appidMatch ? appidMatch[1] : null
+            if (appid) appIds.add(appid)
+            
             failures.push({
                 game: gameName,
                 reason: failure.reason,
                 url: failure.url,
+                appid,
                 timestamp: failure.timestamp
             })
         }
         
         return {
-            summary: { total: this.failedArtwork.size, byReason },
+            summary: { 
+                total: this.failedArtwork.size, 
+                byReason,
+                byUrlPattern,
+                uniqueAppIds: appIds.size
+            },
             failures
         }
     }
     
     /**
-     * Log failure diagnostics to console
+     * Extract the URL pattern from a full URL for grouping
+     */
+    private extractUrlPattern(url: string): string {
+        // Extract filename like "library_600x900.jpg" or "header.jpg"
+        const match = url.match(/\/([^/]+\.(?:jpg|png|webp))(?:\?|$)/i)
+        return match ? match[1] : 'unknown'
+    }
+    
+    /**
+     * Log failure diagnostics to console - concise summary with actionable info
      */
     public logFailureDiagnostics(): void {
         const diag = this.getFailureDiagnostics()
@@ -794,28 +826,81 @@ export class LodArtworkRenderer {
             return
         }
         
-        const lines: string[] = [
-            `🎨 Artwork Failures: ${diag.summary.total} total`,
-            '  By reason:'
-        ]
+        // Group failures by reason for cleaner output
+        const byReasonWithExamples: Record<string, { count: number; examples: Array<{ game: string; appid: string | null; url: string }> }> = {}
         
-        for (const [reason, count] of Object.entries(diag.summary.byReason)) {
-            lines.push(`    ${reason}: ${count}`)
+        for (const f of diag.failures) {
+            if (!byReasonWithExamples[f.reason]) {
+                byReasonWithExamples[f.reason] = { count: 0, examples: [] }
+            }
+            byReasonWithExamples[f.reason].count++
+            if (byReasonWithExamples[f.reason].examples.length < 2) {
+                byReasonWithExamples[f.reason].examples.push({ game: f.game, appid: f.appid, url: f.url })
+            }
         }
         
-        // Show first few failures as examples
-        const examples = diag.failures.slice(0, 5)
-        if (examples.length > 0) {
-            lines.push('  Examples:')
-            for (const f of examples) {
-                lines.push(`    "${f.game}" → ${f.reason}`)
+        const lines: string[] = [
+            ``,
+            `🎨 ARTWORK FAILURES: ${diag.summary.total} games`,
+            `${'─'.repeat(50)}`
+        ]
+        
+        // Show each category with examples
+        for (const [reason, data] of Object.entries(byReasonWithExamples)) {
+            const pct = ((data.count / diag.summary.total) * 100).toFixed(0)
+            lines.push(``)
+            lines.push(`${this.getReasonEmoji(reason)} ${reason}: ${data.count} (${pct}%)`)
+            
+            // Add explanation for reason
+            lines.push(`   ${this.getReasonExplanation(reason)}`)
+            
+            // Show 1-2 examples
+            for (const ex of data.examples) {
+                lines.push(`   • "${ex.game}" (${ex.appid || '?'})`)
             }
-            if (diag.failures.length > 5) {
-                lines.push(`    ... and ${diag.failures.length - 5} more`)
+            if (data.count > 2) {
+                lines.push(`   ... +${data.count - 2} more`)
             }
+        }
+        
+        // Show URL patterns tried
+        lines.push(``)
+        lines.push(`URL patterns attempted: ${Object.keys(diag.summary.byUrlPattern).join(', ')}`)
+        
+        // Actionable next steps
+        lines.push(``)
+        lines.push(`💡 Next steps:`)
+        if (byReasonWithExamples['CORS']?.count > 0) {
+            lines.push(`   • CORS failures suggest proxy/CDN issue - check Lambda/CloudFront config`)
+        }
+        if (byReasonWithExamples['404']?.count > 0) {
+            lines.push(`   • 404s are often delisted/region-locked games - try header.jpg fallback`)
+        }
+        if (byReasonWithExamples['UNKNOWN']?.count > 0) {
+            lines.push(`   • Check browser Network tab for actual error responses`)
         }
         
         log.info(lines.join('\n'))
+    }
+    
+    private getReasonEmoji(reason: string): string {
+        switch (reason) {
+            case 'CORS': return '🚫'
+            case '404': return '❓'
+            case 'TIMEOUT': return '⏱️'
+            case 'INVALID_CONTENT': return '🔨'
+            default: return '❌'
+        }
+    }
+    
+    private getReasonExplanation(reason: string): string {
+        switch (reason) {
+            case 'CORS': return 'Request blocked by browser (cross-origin policy)'
+            case '404': return 'Image not found - may be delisted or region-locked'
+            case 'TIMEOUT': return 'Request took too long - network/CDN issue'
+            case 'INVALID_CONTENT': return 'Response was not a valid image'
+            default: return 'Unknown error - check Network tab'
+        }
     }
     
     public isReady(): boolean {
