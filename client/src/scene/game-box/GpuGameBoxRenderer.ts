@@ -21,7 +21,6 @@ import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
 import { MultiAtlasArtworkRenderer } from './instancing/MultiAtlasArtworkRenderer'
 import { LodArtworkRenderer, type LodLevel } from './instancing/LodArtworkRenderer'
 import { LodDistanceManager } from './instancing/LodDistanceManager'
-import { LodDebugOverlay } from '../../debug/LodDebugOverlay'
 import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { Logger } from '../../utils/Logger'
@@ -46,7 +45,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private multiAtlasRenderer: MultiAtlasArtworkRenderer | null = null
     private lodArtworkRenderer: LodArtworkRenderer | null = null
     private lodDistanceManager: LodDistanceManager | null = null
-    private lodDebugOverlay: LodDebugOverlay | null = null
     private labelInstanceIndex: number = 0
     private artworkInstanceIndex: number = 0
     private readonly useMultiAtlas: boolean
@@ -509,7 +507,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     public dispose(): void {
         log.lifecycle('Disposing')
         
-        this.lodDebugOverlay?.dispose()
         this.lodDistanceManager?.dispose()
         this.instancedLabelRenderer.dispose()
         this.instancedArtworkRenderer?.dispose()
@@ -544,18 +541,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         if (this.lodDistanceManager && this.lodArtworkRenderer) {
             this.lodDistanceManager.syncInstances()
             this.lodDistanceManager.startAutoUpdate()
-            
-            // Create debug overlay if not exists
-            if (!this.lodDebugOverlay) {
-                this.lodDebugOverlay = new LodDebugOverlay({
-                    highDistance: 3.0,
-                    midDistance: 8.0,
-                    maxDistance: 15.0
-                })
-                // Connect debug overlay to LOD data source
-                const renderer = this.lodArtworkRenderer
-                this.lodDebugOverlay.setDataSource(() => renderer.getInstanceData())
-            }
         }
     }
     

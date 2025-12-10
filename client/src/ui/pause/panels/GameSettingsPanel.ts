@@ -102,7 +102,6 @@ export class GameSettingsPanel extends PauseMenuPanel {
             
             // Debug Tools
             showCompassRose: this.appSettings.getSetting('showCompassRose'),
-            showLodDebug: this.appSettings.getSetting('showLodDebug'),
             showShelfIndices: false  // Default off, controlled via event system
         })
     }
@@ -178,13 +177,6 @@ export class GameSettingsPanel extends PauseMenuPanel {
                 onChange: (checked) => {
                     this.appSettings.setSetting('showCompassRose', checked, EventSource.UI)
                     console.log(`🎮 App setting updated: showCompassRose = ${checked}`)
-                }
-            },
-            {
-                toggleId: 'show-lod-debug',
-                onChange: (checked) => {
-                    this.appSettings.setSetting('showLodDebug', checked, EventSource.UI)
-                    console.log(`🎮 App setting updated: showLodDebug = ${checked}`)
                 }
             },
             {
@@ -353,8 +345,7 @@ export class GameSettingsPanel extends PauseMenuPanel {
             { id: 'enable-labels', setting: 'enableLabels' as const },
             { id: 'enable-stickers', setting: 'enableStickers' as const },
             { id: 'enable-artwork', setting: 'enableArtwork' as const },
-            { id: 'show-compass-rose', setting: 'showCompassRose' as const },
-            { id: 'show-lod-debug', setting: 'showLodDebug' as const }
+            { id: 'show-compass-rose', setting: 'showCompassRose' as const }
         ]
         
         featureFlagCheckboxes.forEach(({ id, setting }) => {

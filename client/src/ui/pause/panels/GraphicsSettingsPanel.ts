@@ -55,8 +55,7 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             showCeiling: this.appSettings.getSetting('showCeiling'),
             
             // LOD Settings
-            lodHighDistance: this.appSettings.getSetting('lodHighDistance'),
-            showLodDebug: this.appSettings.getSetting('showLodDebug')
+            lodHighDistance: this.appSettings.getSetting('lodHighDistance')
         })
     }
 
@@ -96,10 +95,6 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
                     }
                     EventManager.getInstance().emit(CeilingEventTypes.Toggle, ceilingEvent)
                 }
-            },
-            {
-                toggleId: 'show-lod-debug',
-                onChange: (checked) => this.updateSetting('showLodDebug', checked)
             }
         ])
     }
@@ -164,7 +159,6 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         this.appSettings.setSetting('showLightingDebug', false, EventSource.UI)
         this.appSettings.setSetting('showCeiling', true, EventSource.UI)
         this.appSettings.setSetting('lodHighDistance', 3.0, EventSource.UI)
-        this.appSettings.setSetting('showLodDebug', false, EventSource.UI)
         
         this.refreshSettingsDisplay()
         
@@ -176,8 +170,7 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             enableLighting: true,
             showLightingDebug: false,
             showCeiling: true,
-            lodHighDistance: 3.0,
-            showLodDebug: false
+            lodHighDistance: 3.0
         })
         
         console.log('🎨 Graphics settings reset to defaults')
@@ -243,12 +236,6 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             const distance = this.appSettings.getSetting('lodHighDistance')
             lodHighDistanceSlider.value = distance.toString()
             lodHighDistanceValue.textContent = `${distance}m`
-        }
-        
-        // Update LOD debug checkbox
-        const lodDebugCheckbox = document.getElementById('show-lod-debug') as HTMLInputElement
-        if (lodDebugCheckbox) {
-            lodDebugCheckbox.checked = this.appSettings.getSetting('showLodDebug')
         }
     }
 
