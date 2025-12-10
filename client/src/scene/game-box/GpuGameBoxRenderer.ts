@@ -235,6 +235,14 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
                 await cache.clear()
                 console.log('✅ Pixel cache cleared')
             }
+            ;(window as any).diagnoseArtworkFailures = () => {
+                if (!this.lodArtworkRenderer) {
+                    console.log('❌ No LOD artwork renderer available')
+                    return null
+                }
+                this.lodArtworkRenderer.logFailureDiagnostics()
+                return this.lodArtworkRenderer.getFailureDiagnostics()
+            }
             /* eslint-enable @typescript-eslint/no-explicit-any */
         } else if (this.useMultiAtlas) {
             this.multiAtlasRenderer = new MultiAtlasArtworkRenderer({

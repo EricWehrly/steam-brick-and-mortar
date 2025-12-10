@@ -113,6 +113,7 @@ export class LodArtworkRenderer {
     // Shared texture index tracking (same index across all LOD levels)
     private textureSlots: Map<string, number> = new Map()  // gameName -> textureIndex
     private textureIndexToInstance: Map<number, number> = new Map()  // textureIndex -> instanceIndex
+    private failedArtwork: Map<string, { reason: string; url: string; timestamp: number }> = new Map()
     private nextTextureIndex: number = 0
     private currentInstanceCount: number = 0
     
@@ -346,6 +347,13 @@ export class LodArtworkRenderer {
             this.initialize()
         }
         
+        // Check if artwork previously failed (CORS, 404, etc) - don't retry
+        if (this.failedArtwork.has(gameName)) {
+            const failure = this.failedArtwork.get(gameName)
+            log.debug(`Skipping "${gameName}": previously failed (${failure?.reason})`)
+            return { success: false, instanceIndex: -1 }
+        }
+        
         // Check capacity
         if (this.nextTextureIndex >= this.maxTextures) {
             log.warn(`Atlas full (${this.maxTextures} textures)`)
@@ -368,9 +376,9 @@ export class LodArtworkRenderer {
             // and concurrent requests with different sizes cause data corruption
             for (const [level, state] of this.lodTextures) {
                 // Skip HIGH texture if lazy loading is enabled - will be loaded on demand
+                // NOTE: We register with HighTextureCache AFTER MID succeeds to avoid
+                // registering games whose artwork is inaccessible (CORS, 404, etc)
                 if (this.lazyHighTextures && level === LOD_LEVEL.HIGH) {
-                    // Register game with cache for later loading
-                    this.highTextureCache?.registerGame(textureIndex, gameName, artworkUrl)
                     continue
                 }
                 
@@ -401,6 +409,12 @@ export class LodArtworkRenderer {
                 
                 arrayData.set(result.imageData, offset)
                 state.pendingUpdates.add(textureIndex)
+            }
+            
+            // MID loading succeeded - now register with HighTextureCache for lazy HIGH loading
+            // This is done AFTER MID succeeds to avoid registering games with inaccessible artwork
+            if (this.lazyHighTextures) {
+                this.highTextureCache?.registerGame(textureIndex, gameName, artworkUrl)
             }
             
             this.textureSlots.set(gameName, textureIndex)
@@ -442,11 +456,36 @@ export class LodArtworkRenderer {
         } catch (error) {
             // Rollback texture index on failure
             this.nextTextureIndex--
+            this.artworkUrls.delete(textureIndex)
             
             const msg = error instanceof Error ? error.message : String(error)
-            log.debug(`Failed to add artwork for "${gameName}": ${msg}`)
+            
+            // Track this game as failed with categorized reason
+            const reason = this.categorizeFailure(msg)
+            this.failedArtwork.set(gameName, { reason, url: artworkUrl, timestamp: Date.now() })
+            log.debug(`Artwork failed for "${gameName}": ${reason} (${msg})`)
             return { success: false, instanceIndex: -1 }
         }
+    }
+    
+    /**
+     * Categorize failure reason from error message for better diagnostics
+     */
+    private categorizeFailure(errorMsg: string): string {
+        const lowerMsg = errorMsg.toLowerCase()
+        if (lowerMsg.includes('cors') || lowerMsg.includes('networkerror')) {
+            return 'CORS'
+        }
+        if (lowerMsg.includes('404') || lowerMsg.includes('not found')) {
+            return '404'
+        }
+        if (lowerMsg.includes('timeout') || lowerMsg.includes('abort')) {
+            return 'TIMEOUT'
+        }
+        if (lowerMsg.includes('invalid content')) {
+            return 'INVALID_CONTENT'
+        }
+        return 'UNKNOWN'
     }
     
     /**
@@ -669,6 +708,8 @@ export class LodArtworkRenderer {
         totalAllocated: number
         textureCount: number
         instanceCount: number
+        failedArtworkCount: number
+        failedArtwork: Map<string, { reason: string; url: string; timestamp: number }>
     } {
         const lods: Record<string, { allocated: number; textureSize: number; arrayDepth: number }> = {}
         let totalAllocated = 0
@@ -692,7 +733,9 @@ export class LodArtworkRenderer {
             lods,
             totalAllocated,
             textureCount: this.nextTextureIndex,
-            instanceCount: this.currentInstanceCount
+            instanceCount: this.currentInstanceCount,
+            failedArtworkCount: this.failedArtwork.size,
+            failedArtwork: this.failedArtwork
         }
     }
     
@@ -708,9 +751,71 @@ export class LodArtworkRenderer {
             lines.push(`  ${name} (${lodStats.textureSize}px × ${lodStats.arrayDepth} slots): ${allocMB}MB`)
         }
         lines.push(`  Total: ${(stats.totalAllocated / (1024 * 1024)).toFixed(1)}MB`)
-        lines.push(`  Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}`)
+        lines.push(`  Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}, Failed: ${stats.failedArtworkCount}`)
         
         log.info(`🎨 LOD Artwork Memory Stats\n${lines.join('\n')}`)
+    }
+    
+    /**
+     * Get detailed failure diagnostics - useful for debugging artwork loading issues
+     * Call from console: window.lodArtworkRenderer?.getFailureDiagnostics()
+     */
+    public getFailureDiagnostics(): {
+        summary: { total: number; byReason: Record<string, number> }
+        failures: Array<{ game: string; reason: string; url: string; timestamp: number }>
+    } {
+        const byReason: Record<string, number> = {}
+        const failures: Array<{ game: string; reason: string; url: string; timestamp: number }> = []
+        
+        for (const [gameName, failure] of this.failedArtwork) {
+            byReason[failure.reason] = (byReason[failure.reason] || 0) + 1
+            failures.push({
+                game: gameName,
+                reason: failure.reason,
+                url: failure.url,
+                timestamp: failure.timestamp
+            })
+        }
+        
+        return {
+            summary: { total: this.failedArtwork.size, byReason },
+            failures
+        }
+    }
+    
+    /**
+     * Log failure diagnostics to console
+     */
+    public logFailureDiagnostics(): void {
+        const diag = this.getFailureDiagnostics()
+        
+        if (diag.summary.total === 0) {
+            log.info('🎨 No artwork failures recorded')
+            return
+        }
+        
+        const lines: string[] = [
+            `🎨 Artwork Failures: ${diag.summary.total} total`,
+            '  By reason:'
+        ]
+        
+        for (const [reason, count] of Object.entries(diag.summary.byReason)) {
+            lines.push(`    ${reason}: ${count}`)
+        }
+        
+        // Show first few failures as examples
+        const examples = diag.failures.slice(0, 5)
+        if (examples.length > 0) {
+            lines.push('  Examples:')
+            for (const f of examples) {
+                lines.push(`    "${f.game}" → ${f.reason}`)
+            }
+            if (diag.failures.length > 5) {
+                lines.push(`    ... and ${diag.failures.length - 5} more`)
+            }
+        }
+        
+        log.info(lines.join('\n'))
     }
     
     public isReady(): boolean {

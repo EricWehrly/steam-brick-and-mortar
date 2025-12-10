@@ -36,8 +36,10 @@ export enum HighTextureState {
     LOADING = 'loading',
     /** HIGH texture is loaded and ready */
     LOADED = 'loaded',
-    /** Loading failed - will retry on next request */
-    FAILED = 'failed'
+    /** Loading failed - will retry on next request (up to maxLoadAttempts) */
+    FAILED = 'failed',
+    /** Permanently failed - will never retry (CORS, 404, etc) */
+    PERMANENT_FAILURE = 'permanent_failure'
 }
 
 export interface HighTextureCacheConfig {
@@ -49,6 +51,8 @@ export interface HighTextureCacheConfig {
     textureHeight: number
     /** Maximum concurrent texture loads (throttling) */
     maxConcurrentLoads: number
+    /** Maximum load attempts before permanent failure (default: 2) */
+    maxLoadAttempts?: number
 }
 
 /** Callback when a game's HIGH slot assignment changes */
@@ -76,6 +80,7 @@ export interface HighTextureCacheStats {
     loading: number
     caching: number
     failed: number
+    permanentFailures: number
     empty: number
     totalSlots: number
     usedSlots: number
@@ -249,6 +254,25 @@ export class HighTextureCache {
     }
     
     /**
+     * Mark a game as permanently failed (e.g., CORS error during MID loading)
+     * This prevents wasting network requests on artwork we know doesn't exist or isn't accessible
+     */
+    public markAsPermanentlyFailed(gameIndex: number, reason?: string): void {
+        const entry = this.games.get(gameIndex)
+        if (entry) {
+            entry.state = HighTextureState.PERMANENT_FAILURE
+            log.info(`Game "${entry.gameName}" marked as permanent failure${reason ? `: ${reason}` : ''}`)
+        }
+    }
+    
+    /**
+     * Unregister a game (e.g., when MID loading fails and we rollback)
+     */
+    public unregisterGame(gameIndex: number): void {
+        this.games.delete(gameIndex)
+    }
+    
+    /**
      * Request HIGH texture for a game
      * Returns the HIGH slot if loaded, otherwise triggers async load and returns -1
      * @returns HIGH slot (0-63) if ready, -1 if loading or unavailable
@@ -289,8 +313,25 @@ export class HighTextureCache {
                 this.triggerLoad(entry)
                 return -1
                 
-            case HighTextureState.EMPTY:
+            case HighTextureState.PERMANENT_FAILURE:
+                // Permanently failed (CORS, 404, etc) - never retry
+                log.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → PERMANENT FAILURE (skipped)`)
+                return -1
+                
             case HighTextureState.FAILED:
+                // Check retry limit
+                if (entry.loadAttempts >= (this.config.maxLoadAttempts ?? 2)) {
+                    entry.state = HighTextureState.PERMANENT_FAILURE
+                    log.info(`Game "${entry.gameName}" exceeded max load attempts (${entry.loadAttempts}), marking as permanent failure`)
+                    return -1
+                }
+                // Retry load - fall through to EMPTY handling
+                this.stats.cacheMisses++
+                log.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → RETRY (attempt ${entry.loadAttempts + 1})`)
+                this.triggerLoad(entry)
+                return -1
+                
+            case HighTextureState.EMPTY:
                 // Need to load - trigger async load
                 this.stats.cacheMisses++
                 log.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → MISS (triggering load)`)
@@ -694,7 +735,7 @@ export class HighTextureCache {
      * Get cache statistics
      */
     public getStats(): HighTextureCacheStats {
-        let loaded = 0, loading = 0, failed = 0, empty = 0, caching = 0
+        let loaded = 0, loading = 0, failed = 0, empty = 0, caching = 0, permanentFailures = 0
         
         for (const entry of this.games.values()) {
             switch (entry.state) {
@@ -703,6 +744,7 @@ export class HighTextureCache {
                 case HighTextureState.FAILED: failed++; break
                 case HighTextureState.EMPTY: empty++; break
                 case HighTextureState.CACHING: caching++; break
+                case HighTextureState.PERMANENT_FAILURE: permanentFailures++; break
             }
         }
         
@@ -712,6 +754,7 @@ export class HighTextureCache {
             failed,
             empty,
             caching,
+            permanentFailures,
             backgroundCacheQueue: this.backgroundCachingGames.size,
             totalSlots: this.config.totalSlots,
             usedSlots: this.getUsedSlotCount(),
