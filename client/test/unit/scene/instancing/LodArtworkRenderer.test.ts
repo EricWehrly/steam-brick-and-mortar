@@ -31,7 +31,12 @@ vi.mock('../../../../src/scene/game-box/instancing/TextureWorker')
 describe('LodArtworkRenderer', () => {
     let renderer: LodArtworkRenderer
     let mockScene: THREE.Scene
-    let mockDataManager: ReturnType<typeof vi.fn> & { get: ReturnType<typeof vi.fn>, set: ReturnType<typeof vi.fn> }
+    let mockDataManager: ReturnType<typeof vi.fn> & { 
+        get: ReturnType<typeof vi.fn>, 
+        set: ReturnType<typeof vi.fn>,
+        addMemoryConsumption: ReturnType<typeof vi.fn>,
+        removeMemoryConsumption: ReturnType<typeof vi.fn>
+    }
     let mockEventManager: ReturnType<typeof vi.fn> & { registerEventHandler: ReturnType<typeof vi.fn>, emit: ReturnType<typeof vi.fn> }
 
     beforeEach(() => {
@@ -41,7 +46,9 @@ describe('LodArtworkRenderer', () => {
 
         mockDataManager = {
             get: vi.fn().mockReturnValue(mockScene),
-            set: vi.fn()
+            set: vi.fn(),
+            addMemoryConsumption: vi.fn(),
+            removeMemoryConsumption: vi.fn()
         } as unknown as typeof mockDataManager
         vi.mocked(DataManager.getInstance).mockReturnValue(mockDataManager as unknown as DataManager)
 

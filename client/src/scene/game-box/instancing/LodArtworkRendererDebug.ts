@@ -26,26 +26,29 @@ export class LodArtworkRendererDebug extends LodArtworkRenderer {
     }
 
     public getMemoryStats(): {
-        lods: Record<string, { allocated: number; textureSize: number; arrayDepth: number }>
+        lods: Record<string, { allocated: number; textureWidth: number; textureHeight: number; arrayDepth: number }>
         totalAllocated: number
         textureCount: number
         instanceCount: number
         failedArtworkCount: number
         failedArtwork: Map<string, { reason: string; url: string; timestamp: number }>
     } {
-        const lods: Record<string, { allocated: number; textureSize: number; arrayDepth: number }> = {}
+        const lods: Record<string, { allocated: number; textureWidth: number; textureHeight: number; arrayDepth: number }> = {}
         let totalAllocated = 0
         
         for (const [_level, state] of this.getLodTextures()) {
-            const size = state.config.textureSize
+            // Support both square (textureSize) and non-square (textureWidth/Height) configs
+            const width = state.config.textureWidth ?? state.config.textureSize ?? 128
+            const height = state.config.textureHeight ?? state.config.textureSize ?? 128
             const depth = state.arrayDepth
             const allocated = state.dataArrayTexture 
-                ? size * size * depth * 4
+                ? width * height * depth * 4
                 : 0
             
             lods[state.config.name] = {
                 allocated,
-                textureSize: size,
+                textureWidth: width,
+                textureHeight: height,
                 arrayDepth: depth
             }
             totalAllocated += allocated
@@ -71,7 +74,10 @@ export class LodArtworkRendererDebug extends LodArtworkRenderer {
         const lines: string[] = []
         for (const [name, lodStats] of Object.entries(stats.lods)) {
             const allocMB = (lodStats.allocated / (1024 * 1024)).toFixed(1)
-            lines.push(`  ${name} (${lodStats.textureSize}px × ${lodStats.arrayDepth} slots): ${allocMB}MB`)
+            const dims = lodStats.textureWidth === lodStats.textureHeight 
+                ? `${lodStats.textureWidth}px` 
+                : `${lodStats.textureWidth}×${lodStats.textureHeight}px`
+            lines.push(`  ${name} (${dims} × ${lodStats.arrayDepth} slots): ${allocMB}MB`)
         }
         lines.push(`  Total: ${(stats.totalAllocated / (1024 * 1024)).toFixed(1)}MB`)
         lines.push(`  Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}, Failed: ${stats.failedArtworkCount}`)

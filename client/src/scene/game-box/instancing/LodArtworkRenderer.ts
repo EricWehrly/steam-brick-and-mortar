@@ -217,6 +217,7 @@ export class LodArtworkRenderer {
     private logConfig(): void {
         let totalVRAM = 0
         const lodInfo: string[] = []
+        const dataManager = DataManager.getInstance()
         
         for (const [_level, state] of this.lodTextures) {
             const depth = state.arrayDepth
@@ -225,6 +226,10 @@ export class LodArtworkRenderer {
             const vram = width * height * depth * 4
             totalVRAM += vram
             lodInfo.push(`${state.config.name}: ${depth} slots × ${width}×${height}px = ${(vram / (1024 * 1024)).toFixed(1)}MB`)
+            
+            // Register each LOD tier's memory consumption
+            const vramMB = Math.round(vram / (1024 * 1024))
+            dataManager.addMemoryConsumption(`LOD/${state.config.name}`, vramMB)
         }
         
         log.lifecycle(`LOD VRAM: ${lodInfo.join(', ')} | Total: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
@@ -952,9 +957,12 @@ export class LodArtworkRenderer {
         this.geometry?.dispose()
         this.material?.dispose()
         
+        const dataManager = DataManager.getInstance()
         for (const state of this.lodTextures.values()) {
             state.dataArrayTexture?.dispose()
             state.pendingUpdates.clear()
+            // Unregister memory consumption
+            dataManager.removeMemoryConsumption(`LOD/${state.config.name}`)
         }
         
         this.textureSlots.clear()
