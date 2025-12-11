@@ -30,6 +30,8 @@ import { ServiceKeys } from './di/ServiceKeys'
 import type { AppConfig as DIAppConfig } from './di'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { RenderLoopDiagnostics } from '../debug/RenderLoopDiagnostics'
+// Side-effect import: registers GpuMemoryEstimator to window for console debugging
+import '../debug/GpuMemoryEstimator'
 
 export interface AppConfig extends DIAppConfig {
     steam?: {
