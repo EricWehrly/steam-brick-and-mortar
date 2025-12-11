@@ -19,7 +19,8 @@ import type {
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
 import { MultiAtlasArtworkRenderer } from './instancing/MultiAtlasArtworkRenderer'
-import { LodArtworkRenderer, type LodLevel } from './instancing/LodArtworkRenderer'
+import { type LodLevel } from './instancing/LodArtworkRenderer'
+import { LodArtworkRendererDebug } from './instancing/LodArtworkRendererDebug'
 import { LodDistanceManager } from './instancing/LodDistanceManager'
 import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
@@ -43,7 +44,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private instancedLabelRenderer: InstancedLabelRenderer
     private instancedArtworkRenderer: InstancedArtworkRenderer | null = null
     private multiAtlasRenderer: MultiAtlasArtworkRenderer | null = null
-    private lodArtworkRenderer: LodArtworkRenderer | null = null
+    // TODO: Use base LodArtworkRenderer in production, debug class only for development
+    private lodArtworkRenderer: LodArtworkRendererDebug | null = null
     private lodDistanceManager: LodDistanceManager | null = null
     private labelInstanceIndex: number = 0
     private artworkInstanceIndex: number = 0
@@ -62,7 +64,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         // Create artwork renderer based on settings (priority: LOD > MultiAtlas > Single)
         if (this.useLodAtlas) {
-            this.lodArtworkRenderer = new LodArtworkRenderer({
+            this.lodArtworkRenderer = new LodArtworkRendererDebug({
                 maxTextures: maxGames,
                 lazyHighTextures: true,  // Memory optimization: load HIGH textures on demand
                 boxWidth: this.dimensions.width,
@@ -243,6 +245,23 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
                 this.lodArtworkRenderer.logFailureDiagnostics()
                 return this.lodArtworkRenderer.getFailureDiagnostics()
             }
+            ;(window as any).clearArtworkFailures = () => {
+                if (!this.lodArtworkRenderer) {
+                    console.log('❌ No LOD artwork renderer available')
+                    return
+                }
+                this.lodArtworkRenderer.clearFailureCache()
+                console.log('✅ Artwork failure cache cleared - failures will be retried on next load')
+            }
+            ;(window as any).auditArtworkFailures = () => {
+                if (!this.lodArtworkRenderer) {
+                    console.log('❌ No LOD artwork renderer available')
+                    return
+                }
+                this.lodArtworkRenderer.auditFailedArtwork()
+            }
+            // Expose the instance for console inspection in development
+            ;(window as any).lodArtworkRenderer = this.lodArtworkRenderer
             /* eslint-enable @typescript-eslint/no-explicit-any */
         } else if (this.useMultiAtlas) {
             this.multiAtlasRenderer = new MultiAtlasArtworkRenderer({
@@ -420,16 +439,11 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     ): void {
         const shouldUseArtwork = Math.random() < ARTWORK_PROBABILITY
         
-        // Use library_600x900 portrait artwork (2:3 aspect ratio) for game boxes
-        // This matches the physical game case aesthetic and enables native-resolution rendering
-        const primaryUrl = game.artwork?.library
-        const fallbackUrl = game.appid ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg` : undefined
-        
-        if (shouldUseArtwork && !primaryUrl && fallbackUrl) {
-            log.warn(`Missing artwork.library for "${game.name}" (appid: ${game.appid}) - using fallback URL`)
-        }
-        
-        const artworkUrl = shouldUseArtwork ? (primaryUrl || fallbackUrl) : undefined
+        // Get best artwork URL from metadata - priority order:
+        // 1. header (most reliable, works on new shared.akamai CDN)
+        // 2. library (portrait format, ideal for game boxes but less reliable)
+        // Note: We pass the full artwork object so LodArtworkRenderer can try multiple URLs
+        const artworkUrl = shouldUseArtwork ? this.selectBestArtworkUrl(game) : undefined
         
         if (artworkUrl) {
             this.createGameBoxFromUrl(game, position, artworkUrl, side)
@@ -437,6 +451,30 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             this.createLabelGameBox(game, position, side)
         }
         // When labels disabled and no artwork, skip creating box entirely
+    }
+    
+    /**
+     * Select best artwork URL from game metadata
+     * Prioritizes actual metadata URLs over constructed fallbacks
+     */
+    private selectBestArtworkUrl(game: SteamGameData): string | undefined {
+        // Priority 1: Use header URL from metadata (works on new shared.akamai CDN)
+        if (game.artwork?.header) {
+            return game.artwork.header
+        }
+        
+        // Priority 2: Use library URL from metadata (portrait format)
+        if (game.artwork?.library) {
+            return game.artwork.library
+        }
+        
+        // Priority 3: Construct URL as last resort (may fail for newer games)
+        if (game.appid) {
+            log.debug(`No artwork URLs in metadata for "${game.name}" - using constructed URL`)
+            return `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
+        }
+        
+        return undefined
     }
 
     private createInstancedArtworkBox(
@@ -520,6 +558,9 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         this.instancedArtworkRenderer?.dispose()
         this.multiAtlasRenderer?.dispose()
         this.lodArtworkRenderer?.dispose()
+        // Remove global reference if present
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(window as any).lodArtworkRenderer = null
         
         this.labelInstanceIndex = 0
         this.artworkInstanceIndex = 0
@@ -537,7 +578,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     /**
      * Get the LOD renderer for advanced control (null if not using LOD atlas)
      */
-    public getLodRenderer(): LodArtworkRenderer | null {
+    public getLodRenderer(): LodArtworkRendererDebug | null {
         return this.lodArtworkRenderer
     }
     
