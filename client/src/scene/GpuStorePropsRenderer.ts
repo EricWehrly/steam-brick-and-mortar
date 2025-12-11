@@ -1,7 +1,7 @@
 /**
  * GPU Store Props Renderer - GPU-instanced shelves and game boxes
  * 
- * Uses GroupShelfRenderer and GpuGameBoxRenderer for minimal draw calls.
+ * Uses InstancedShelfRenderer and GpuGameBoxRenderer for minimal draw calls.
  * Handles progressive batch loading of Steam games.
  * 
  * TODO: Eventually integrate with renderer selection system to choose between
@@ -15,7 +15,7 @@ import * as THREE from 'three'
 import { StoreLayout } from './StoreLayout'
 import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
-import { GroupShelfRenderer } from './instancing/GroupShelfRenderer'
+import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 import { ShelfSide } from './props/SharedPropsUtils'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 import { GameLayoutConstants, VRLayoutUtils, GameBoxUtils, ShelfSurfaceUtils, type ShelfSurface } from './props/SharedPropsUtils'
@@ -42,7 +42,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private config: PropsConfig = {}
     private currentStoreGroup: THREE.Group | null = null // Track current store environment
 
-    private instancedShelfRenderer?: GroupShelfRenderer
+    private instancedShelfRenderer?: InstancedShelfRenderer
     private imageManager: ImageManager
     private lodControlsPanel?: LodControlsPanel
 
@@ -91,14 +91,14 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.storeLayout = new StoreLayout(this.scene)
         this.signageRenderer = new SignageRenderer()
         
-        // Create GPU instanced shelf renderer (Group-based for simplicity)
-        this.instancedShelfRenderer = new GroupShelfRenderer({
+        // Create GPU instanced shelf renderer
+        this.instancedShelfRenderer = new InstancedShelfRenderer({
             maxShelfUnits: 50 // Allow up to 50 shelf units
         })
         
         // Initialize shelf renderer eagerly to avoid blocking when batches arrive
         this.instancedShelfRenderer.initialize().catch(error => {
-            console.error('❌ Failed to initialize GroupShelfRenderer:', error)
+            console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
         })
     }
 
@@ -248,7 +248,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     
     private async createShelfForBatch(games: SteamGameData[], batchIndex: number): Promise<void> {
         if (!this.instancedShelfRenderer?.isReady()) {
-            console.error('❌ GroupShelfRenderer not ready')
+            console.error('❌ InstancedShelfRenderer not ready')
             return
         }
         
@@ -362,7 +362,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         }
         
         if (!this.instancedShelfRenderer) {
-            console.error('❌ GroupShelfRenderer not available - cannot generate instanced shelves')
+            console.error('❌ InstancedShelfRenderer not available - cannot generate instanced shelves')
             return
         }
 
@@ -371,7 +371,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             try {
                 await this.instancedShelfRenderer.initialize()
             } catch (error) {
-                console.error('❌ Failed to initialize GroupShelfRenderer on-demand:', error)
+                console.error('❌ Failed to initialize InstancedShelfRenderer on-demand:', error)
                 return
             }
         }
@@ -562,7 +562,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private async createInstancedShelfRow(rowIndex: number, shelfCount: number, _totalRows: number, games: SteamGameData[] = []): Promise<void> {
         if (!this.instancedShelfRenderer?.isReady()) {
-            console.error('❌ GroupShelfRenderer not ready - cannot create instanced shelf row')
+            console.error('❌ InstancedShelfRenderer not ready - cannot create instanced shelf row')
             return
         }
 
