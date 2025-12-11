@@ -92,8 +92,8 @@ export class FrameBudgetScheduler {
         this.targetFps = config.targetFps ?? 60
         this.targetFrameTime = 1000 / this.targetFps
         this.budgetThreshold = config.budgetThreshold ?? 0.8
-        this.maxTasksPerFrame = config.maxTasksPerFrame ?? 3  // Ultra-conservative: 1 texture per frame
-        this.defaultMaxDeferMs = config.defaultMaxDeferMs ?? 16666  // ~1000 frames at 60fps
+        this.maxTasksPerFrame = config.maxTasksPerFrame ?? 1  // take longer, ride smoother
+        this.defaultMaxDeferMs = config.defaultMaxDeferMs ?? 400
         
         const ringSize = config.ringBufferSize ?? 60
         this.frameTimeRing = new Float32Array(ringSize)
@@ -135,9 +135,6 @@ export class FrameBudgetScheduler {
         // For now, we only process at frame start for simplicity
     }
     
-    /**
-     * Update rolling frame time average - O(1) operation
-     */
     private updateFrameTime(delta: number): void {
         // Subtract old value from sum, add new value
         this.rollingSum -= this.frameTimeRing[this.ringIndex]
@@ -153,26 +150,16 @@ export class FrameBudgetScheduler {
         }
     }
     
-    /**
-     * Get current rolling average frame time
-     */
     public getRollingAvgFrameTime(): number {
         if (this.frameCount === 0) return this.targetFrameTime
         return this.rollingSum / this.frameCount
     }
     
-    /**
-     * Get current estimated FPS
-     */
     public getCurrentFps(): number {
         const avgFrameTime = this.getRollingAvgFrameTime()
         return avgFrameTime > 0 ? 1000 / avgFrameTime : this.targetFps
     }
     
-    /**
-     * Check if we have budget for a task of estimated duration
-     * Call this when you need to make an inline decision
-     */
     public hasBudget(estimatedMs: number = 1): boolean {
         const elapsed = performance.now() - this.frameStartTime
         const remaining = this.targetFrameTime - elapsed
@@ -181,17 +168,11 @@ export class FrameBudgetScheduler {
         return usableBudget >= estimatedMs
     }
     
-    /**
-     * Get remaining frame budget in ms
-     */
     public getRemainingBudget(): number {
         const elapsed = performance.now() - this.frameStartTime
         return Math.max(0, (this.targetFrameTime - elapsed) * this.budgetThreshold)
     }
     
-    /**
-     * Schedule a task to run when frame budget allows
-     */
     public schedule(task: () => void, options: TaskOptions = {}): void {
         const priority = PRIORITY_MAP[options.priority ?? 'normal']
         
@@ -213,9 +194,6 @@ export class FrameBudgetScheduler {
         this.totalTasksDeferred++
     }
     
-    /**
-     * Schedule an async task - returns a promise that resolves when task executes
-     */
     public scheduleAsync<T>(task: () => T, options: TaskOptions = {}): Promise<T> {
         return new Promise((resolve, reject) => {
             this.schedule(() => {
@@ -228,9 +206,6 @@ export class FrameBudgetScheduler {
         })
     }
     
-    /**
-     * Process pending tasks within budget
-     */
     private processPendingTasks(now: number): void {
         if (this.pendingTasks.length === 0) return
         
@@ -273,10 +248,6 @@ export class FrameBudgetScheduler {
         this.tasksExecutedLastFrame = tasksExecuted
     }
     
-    /**
-     * Execute a task immediately if we have budget, otherwise schedule it
-     * Returns true if executed immediately
-     */
     public tryExecuteOrSchedule(task: () => void, options: TaskOptions = {}): boolean {
         if (this.hasBudget(options.estimatedMs ?? 1)) {
             task()
@@ -286,9 +257,6 @@ export class FrameBudgetScheduler {
         return false
     }
     
-    /**
-     * Get scheduler statistics
-     */
     public getStats(): SchedulerStats {
         return {
             currentFps: this.getCurrentFps(),
@@ -302,34 +270,22 @@ export class FrameBudgetScheduler {
         }
     }
     
-    /**
-     * Set target FPS
-     */
     public setTargetFps(fps: number): void {
         this.targetFps = fps
         this.targetFrameTime = 1000 / fps
         log.lifecycle(`Target FPS changed to ${fps}`)
     }
     
-    /**
-     * Set budget threshold (0-1)
-     */
     public setBudgetThreshold(threshold: number): void {
         this.budgetThreshold = Math.max(0.1, Math.min(1.0, threshold))
         log.lifecycle(`Budget threshold changed to ${(this.budgetThreshold * 100).toFixed(0)}%`)
     }
     
-    /**
-     * Set max tasks per frame (controls how much work we batch)
-     */
     public setMaxTasksPerFrame(max: number): void {
         this.maxTasksPerFrame = Math.max(1, Math.min(20, max))
         log.lifecycle(`Max tasks per frame changed to ${this.maxTasksPerFrame}`)
     }
     
-    /**
-     * Clear all pending tasks
-     */
     public clearPendingTasks(): void {
         const count = this.pendingTasks.length
         this.pendingTasks = []
@@ -338,9 +294,6 @@ export class FrameBudgetScheduler {
         }
     }
     
-    /**
-     * Diagnostic: Log current state
-     */
     public diagnose(): void {
         const stats = this.getStats()
         console.group('📊 FrameBudgetScheduler Stats')
@@ -355,18 +308,12 @@ export class FrameBudgetScheduler {
         console.groupEnd()
     }
     
-    /**
-     * Reset statistics (for testing)
-     */
     public resetStats(): void {
         this.totalTasksDeferred = 0
         this.totalTasksForced = 0
         this.tasksExecutedLastFrame = 0
     }
     
-    /**
-     * Dispose and reset singleton
-     */
     public dispose(): void {
         this.clearPendingTasks()
         FrameBudgetScheduler.instance = null
