@@ -19,6 +19,7 @@ import {
     type LodArtworkConfig,
     type LodLevel
 } from '../../../../src/scene/game-box/instancing/LodArtworkRenderer'
+import { LodArtworkRendererDebug } from '../../../../src/scene/game-box/instancing/LodArtworkRendererDebug'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { EventManager } from '../../../../src/core/EventManager'
 
@@ -133,11 +134,18 @@ describe('LodArtworkRenderer', () => {
         })
     })
 
-    describe('Memory Statistics', () => {
+    describe('Memory Statistics (Debug)', () => {
+        // These tests use LodArtworkRendererDebug since stats are debug-only
+        let debugRenderer: LodArtworkRendererDebug
+        
+        afterEach(() => {
+            debugRenderer?.dispose()
+        })
+        
         it('should report memory stats for all LOD levels', () => {
-            renderer = new LodArtworkRenderer()
+            debugRenderer = new LodArtworkRendererDebug()
             
-            const stats = renderer.getMemoryStats()
+            const stats = debugRenderer.getMemoryStats()
             
             expect(stats.lods).toBeDefined()
             expect(stats.lods.high).toBeDefined()
@@ -146,27 +154,27 @@ describe('LodArtworkRenderer', () => {
         })
 
         it('should include texture count in stats', () => {
-            renderer = new LodArtworkRenderer()
+            debugRenderer = new LodArtworkRendererDebug()
             
-            const stats = renderer.getMemoryStats()
+            const stats = debugRenderer.getMemoryStats()
             
             expect(typeof stats.textureCount).toBe('number')
             expect(stats.textureCount).toBe(0)  // No textures loaded yet
         })
 
         it('should include instance count in stats', () => {
-            renderer = new LodArtworkRenderer()
+            debugRenderer = new LodArtworkRendererDebug()
             
-            const stats = renderer.getMemoryStats()
+            const stats = debugRenderer.getMemoryStats()
             
             expect(typeof stats.instanceCount).toBe('number')
             expect(stats.instanceCount).toBe(0)  // No instances yet
         })
 
         it('should include totalAllocated in stats', () => {
-            renderer = new LodArtworkRenderer()
+            debugRenderer = new LodArtworkRendererDebug()
             
-            const stats = renderer.getMemoryStats()
+            const stats = debugRenderer.getMemoryStats()
             
             // totalAllocated is 0 until initialize() is called
             expect(typeof stats.totalAllocated).toBe('number')
@@ -288,17 +296,24 @@ describe('LodArtworkRenderer', () => {
         })
     })
 
-    describe('Log Methods', () => {
+    describe('Log Methods (Debug)', () => {
+        // These tests use LodArtworkRendererDebug since logging is debug-only
+        let debugRenderer: LodArtworkRendererDebug
+        
+        afterEach(() => {
+            debugRenderer?.dispose()
+        })
+        
         it('should have logMemoryStats method', () => {
-            renderer = new LodArtworkRenderer()
+            debugRenderer = new LodArtworkRendererDebug()
             
-            expect(typeof renderer.logMemoryStats).toBe('function')
+            expect(typeof debugRenderer.logMemoryStats).toBe('function')
         })
 
         it('should not throw when logging stats', () => {
-            renderer = new LodArtworkRenderer()
+            debugRenderer = new LodArtworkRendererDebug()
             
-            expect(() => renderer.logMemoryStats()).not.toThrow()
+            expect(() => debugRenderer.logMemoryStats()).not.toThrow()
         })
     })
 })

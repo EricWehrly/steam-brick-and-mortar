@@ -92,7 +92,7 @@ export class FrameBudgetScheduler {
         this.targetFps = config.targetFps ?? 60
         this.targetFrameTime = 1000 / this.targetFps
         this.budgetThreshold = config.budgetThreshold ?? 0.8
-        this.maxTasksPerFrame = config.maxTasksPerFrame ?? 3  // Conservative: spread work over more frames
+        this.maxTasksPerFrame = config.maxTasksPerFrame ?? 3  // Ultra-conservative: 1 texture per frame
         this.defaultMaxDeferMs = config.defaultMaxDeferMs ?? 16666  // ~1000 frames at 60fps
         
         const ringSize = config.ringBufferSize ?? 60
