@@ -3,6 +3,42 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
+### Feature: User Settings for Texture Quality and LOD Mode
+**Priority**: Low  
+**Effort**: 4-6 hours  
+**Context**: Users may want control over texture quality vs storage/memory tradeoffs. Currently the LOD system uses fixed settings.
+
+**Settings to Expose**:
+1. **LOD Mode** (most important):
+   - "Dynamic" (default): HIGH for nearby games, MID for distant
+   - "Always HIGH": Maximum quality, higher VRAM usage
+   - "Always MID": Lower quality, saves memory and bandwidth
+   
+2. **Texture Cache Size** (future):
+   - "Minimal": Cache only JPEGs, decode on each load (~50KB/game)
+   - "Balanced" (default): Cache decoded pixels (~540KB/game @ 300×450)
+   - "Maximum": Cache full resolution if available
+
+3. **HIGH Texture Slots** (advanced):
+   - Current default: 128 slots (~66MB VRAM)
+   - Allow users to increase/decrease based on GPU capability
+
+**Implementation Notes**:
+- Add to existing GameSettingsPanel (has artworkQuality dropdown already)
+- LOD mode could reuse/extend the artworkQuality setting
+- Store in AppSettings for persistence
+- Consider WebGL capability detection for recommended defaults
+
+**Texture Format Considerations** (for future cache optimization):
+- RGBA: 4 bytes/pixel, universal support (current)
+- RGB: 3 bytes/pixel, but WebGL often pads to 4 anyway
+- Compressed (DXT/S3TC): 0.5-1 bytes/pixel, requires extension + pre-compression
+- RGBA4444/RGB565: 2 bytes/pixel, reduced color depth
+
+**Source**: Dec 2025 - Pixel cache implementation discussion
+
+---
+
 ### Architecture: Unified Popup/Panel Menu System
 **Priority**: Medium  
 **Effort**: 8-12 hours  
