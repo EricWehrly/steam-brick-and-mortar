@@ -94,7 +94,7 @@ export interface LodArtworkConfig {
     prewarmingConfig?: Partial<PrewarmingConfig>
 }
 
-interface LodTextureState {
+export interface LodTextureState {
     config: LodConfig
     dataArrayTexture: THREE.DataArrayTexture | null
     pendingUpdates: Set<number>  // Texture indices that need GPU update
@@ -113,9 +113,15 @@ export class LodArtworkRenderer {
     // Shared texture index tracking (same index across all LOD levels)
     private textureSlots: Map<string, number> = new Map()  // gameName -> textureIndex
     private textureIndexToInstance: Map<number, number> = new Map()  // textureIndex -> instanceIndex
-    private failedArtwork: Map<string, { reason: string; url: string; timestamp: number }> = new Map()
+    private failedArtwork: Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> = new Map()
+    private fallbackSuccesses: Map<string, { originalUrl: string; fallbackUrl: string; fallbackType: string }> = new Map()
     private nextTextureIndex: number = 0
     private currentInstanceCount: number = 0
+    
+    // Persistent cache keys and TTL (24 hours)
+    private static readonly FAILURE_CACHE_KEY = 'steam-artwork-failures'
+    private static readonly SUCCESS_CACHE_KEY = 'steam-artwork-successes'
+    private static readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000
     
     // Per-instance data
     private instanceMetadata: Map<number, InstanceMetadata & { lodLevel: LodLevel }> = new Map()
@@ -162,6 +168,9 @@ export class LodArtworkRenderer {
         this.prewarmingConfig = config.prewarmingConfig ?? {}
         
         this.textureWorker = new TextureWorker()
+        
+        // Load persistent caches to skip known-bad URLs and use known-good fallbacks
+        this.loadPersistentCaches()
         
         // Initialize lazy HIGH texture cache if enabled
         if (this.lazyHighTextures) {
@@ -221,9 +230,6 @@ export class LodArtworkRenderer {
         log.lifecycle(`LOD VRAM: ${lodInfo.join(', ')} | Total: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
     }
     
-    /**
-     * Initialize GPU resources (called lazily on first game)
-     */
     private initialize(): void {
         if (this.instancedMesh) return
         
@@ -331,11 +337,6 @@ export class LodArtworkRenderer {
         )
     }
     
-    /**
-     * Add artwork instance by URL
-     * With lazyHighTextures: loads MID/LOW immediately, HIGH on-demand
-     * Without: loads all LOD levels immediately
-     */
     public async setArtworkInstanceFromUrl(
         position: THREE.Vector3,
         gameName: string,
@@ -371,50 +372,138 @@ export class LodArtworkRenderer {
         // Store URL for lazy HIGH texture loading
         this.artworkUrls.set(textureIndex, artworkUrl)
         
-        try {
-            // Process LOD levels SEQUENTIALLY - the worker shares a canvas
-            // and concurrent requests with different sizes cause data corruption
-            for (const [level, state] of this.lodTextures) {
-                // Skip HIGH texture if lazy loading is enabled - will be loaded on demand
-                // NOTE: We register with HighTextureCache AFTER MID succeeds to avoid
-                // registering games whose artwork is inaccessible (CORS, 404, etc)
-                if (this.lazyHighTextures && level === LOD_LEVEL.HIGH) {
-                    continue
-                }
-                
-                // Get texture dimensions (support both square and non-square)
-                const width = state.config.textureWidth ?? state.config.textureSize ?? 128
-                const height = state.config.textureHeight ?? state.config.textureSize ?? 128
-                
-                const result = await this.textureWorker.fetchAndProcess(
-                    artworkUrl,
-                    width,  // Use width as textureSize for MID (square)
-                    textureIndex,
-                    gameName,
-                    10000
-                )
-                
-                // Copy to texture array
-                if (!state.dataArrayTexture) {
-                    throw new Error(`${state.config.name} texture array not initialized`)
-                }
-                const sliceSize = width * height * 4
-                const offset = textureIndex * sliceSize
-                const arrayData = state.dataArrayTexture.image.data as Uint8Array
-                
-                // Verify image data size matches expected
-                if (result.imageData.length !== sliceSize) {
-                    log.error(`Size mismatch for "${gameName}" LOD ${level}: expected ${sliceSize}, got ${result.imageData.length}`)
-                }
-                
-                arrayData.set(result.imageData, offset)
-                state.pendingUpdates.add(textureIndex)
+        // Check if we have a cached successful fallback URL for this game
+        const cachedSuccess = this.fallbackSuccesses.get(gameName)
+        
+        // Try primary URL first, then fallbacks if needed
+        const triedUrls = new Set<string>()
+        let successUrl = artworkUrl
+        let usedFallback = false
+        
+        // Build list of URLs to try
+        // If we have a cached success, use that URL first (skip known-bad primary)
+        const urlsToTry: Array<{ url: string; type: string }> = []
+        const extractedAppid = appid ?? this.extractAppidFromUrl(artworkUrl)
+        
+        // Check if primary URL is from new CDN (shared.akamai) - if so, constructed fallbacks won't work
+        const isNewCdnUrl = artworkUrl.includes('shared.akamai.steamstatic.com') || 
+                           artworkUrl.includes('store_item_assets')
+        
+        if (cachedSuccess) {
+            // Use cached working URL first
+            urlsToTry.push({ url: cachedSuccess.fallbackUrl, type: `cached-${cachedSuccess.fallbackType}` })
+            // Add other fallbacks in case cached one stopped working (only if old CDN)
+            if (extractedAppid && !isNewCdnUrl) {
+                urlsToTry.push(...this.generateFallbackUrls(extractedAppid, new Set([cachedSuccess.fallbackUrl])))
             }
+        } else {
+            // Normal flow: try primary first, then fallbacks
+            urlsToTry.push({ url: artworkUrl, type: 'primary' })
+            // Only generate constructed fallbacks if using old CDN URL pattern
+            // New CDN URLs (shared.akamai) won't have fallbacks at cdn.akamai
+            if (extractedAppid && !isNewCdnUrl) {
+                urlsToTry.push(...this.generateFallbackUrls(extractedAppid, new Set([artworkUrl])))
+            }
+        }
+        
+        let lastError: Error | null = null
+        
+        for (const { url: currentUrl, type: urlType } of urlsToTry) {
+            triedUrls.add(currentUrl)
             
+            try {
+                // Process LOD levels SEQUENTIALLY - the worker shares a canvas
+                // and concurrent requests with different sizes cause data corruption
+                for (const [level, state] of this.lodTextures) {
+                    // Skip HIGH texture if lazy loading is enabled - will be loaded on demand
+                    // NOTE: We register with HighTextureCache AFTER MID succeeds to avoid
+                    // registering games whose artwork is inaccessible (CORS, 404, etc)
+                    if (this.lazyHighTextures && level === LOD_LEVEL.HIGH) {
+                        continue
+                    }
+                    
+                    // Get texture dimensions (support both square and non-square)
+                    const width = state.config.textureWidth ?? state.config.textureSize ?? 128
+                    const height = state.config.textureHeight ?? state.config.textureSize ?? 128
+                    
+                    const result = await this.textureWorker.fetchAndProcess(
+                        currentUrl,
+                        width,  // Use width as textureSize for MID (square)
+                        textureIndex,
+                        gameName,
+                        10000
+                    )
+                    
+                    // Copy to texture array
+                    if (!state.dataArrayTexture) {
+                        throw new Error(`${state.config.name} texture array not initialized`)
+                    }
+                    const sliceSize = width * height * 4
+                    const offset = textureIndex * sliceSize
+                    const arrayData = state.dataArrayTexture.image.data as Uint8Array
+                    
+                    // Verify image data size matches expected
+                    if (result.imageData.length !== sliceSize) {
+                        log.error(`Size mismatch for "${gameName}" LOD ${level}: expected ${sliceSize}, got ${result.imageData.length}`)
+                    }
+                    
+                    arrayData.set(result.imageData, offset)
+                    state.pendingUpdates.add(textureIndex)
+                }
+                
+                // Success! Track if we used a fallback (non-primary or cached fallback)
+                successUrl = currentUrl
+                usedFallback = urlType !== 'primary' && !urlType.startsWith('cached-')
+                const usedCachedFallback = urlType.startsWith('cached-')
+                
+                if (usedFallback) {
+                    // New fallback discovery - save it for future loads
+                    log.info(`Fallback success for "${gameName}": ${urlType} (${currentUrl})`)
+                    this.fallbackSuccesses.set(gameName, { 
+                        originalUrl: artworkUrl, 
+                        fallbackUrl: currentUrl, 
+                        fallbackType: urlType 
+                    })
+                    // Persist so we skip the failed primary URL on next load
+                    this.savePersistentSuccesses()
+                } else if (usedCachedFallback) {
+                    // Cached fallback still works - no need to log or re-save
+                    log.debug(`Used cached fallback for "${gameName}": ${currentUrl}`)
+                }
+                lastError = null
+                break // Success - exit URL loop
+                
+            } catch (error) {
+                lastError = error instanceof Error ? error : new Error(String(error))
+                log.debug(`URL failed for "${gameName}" (${urlType}): ${lastError.message}`)
+                // Continue to next fallback URL
+            }
+        }
+        
+        // If all URLs failed, record failure and bail
+        if (lastError) {
+            this.nextTextureIndex--
+            this.artworkUrls.delete(textureIndex)
+            
+            const reason = this.categorizeFailure(lastError.message)
+            this.failedArtwork.set(gameName, { 
+                reason, 
+                url: artworkUrl, 
+                urlsTried: Array.from(triedUrls),
+                timestamp: Date.now() 
+            })
+            // Persist failures so we don't retry them after page refresh
+            this.savePersistentFailures()
+            log.debug(`All URLs failed for "${gameName}": ${reason} (tried ${triedUrls.size} URLs)`)
+            return { success: false, instanceIndex: -1 }
+        }
+        
+        try {
             // MID loading succeeded - now register with HighTextureCache for lazy HIGH loading
             // This is done AFTER MID succeeds to avoid registering games with inaccessible artwork
+            // Use the successful URL (may be fallback) for HIGH texture loading
             if (this.lazyHighTextures) {
-                this.highTextureCache?.registerGame(textureIndex, gameName, artworkUrl)
+                this.highTextureCache?.registerGame(textureIndex, gameName, successUrl)
             }
             
             this.textureSlots.set(gameName, textureIndex)
@@ -454,26 +543,128 @@ export class LodArtworkRenderer {
             return { success: true, instanceIndex }
             
         } catch (error) {
-            // Rollback texture index on failure
+            // This catch is for errors AFTER texture loading succeeded (instance setup)
+            // Texture loading failures are handled in the URL loop above
             this.nextTextureIndex--
             this.artworkUrls.delete(textureIndex)
             
             const msg = error instanceof Error ? error.message : String(error)
-            
-            // Track this game as failed with categorized reason
-            const reason = this.categorizeFailure(msg)
-            this.failedArtwork.set(gameName, { reason, url: artworkUrl, timestamp: Date.now() })
-            log.debug(`Artwork failed for "${gameName}": ${reason} (${msg})`)
+            log.error(`Instance setup failed for "${gameName}": ${msg}`)
             return { success: false, instanceIndex: -1 }
         }
     }
     
     /**
-     * Categorize failure reason from error message for better diagnostics
+     * Steam CDN fallback URL patterns - ONLY used when metadata URLs fail
+     * These are constructed URLs that work for MOST games on the old CDN
+     * but may fail for newer games on shared.akamai.steamstatic.com
+     * 
+     * Note: Primary artwork URLs should come from Steam API metadata (artwork.header, artwork.library)
+     * which can point to either CDN correctly. These fallbacks are a last resort.
      */
+    private static readonly FALLBACK_PATTERNS = [
+        { pattern: 'header.jpg', name: 'constructed-header' },
+        { pattern: 'library_600x900.jpg', name: 'constructed-library' },
+        { pattern: 'capsule_616x353.jpg', name: 'constructed-capsule' }
+    ] as const
+    
+    private loadPersistentCaches(): void {
+        const now = Date.now()
+        
+        // Load failures
+        try {
+            const cached = localStorage.getItem(LodArtworkRenderer.FAILURE_CACHE_KEY)
+            if (cached) {
+                const data = JSON.parse(cached) as Record<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }>
+                let loadedCount = 0
+                
+                for (const [gameName, failure] of Object.entries(data)) {
+                    if (now - failure.timestamp > LodArtworkRenderer.CACHE_TTL_MS) continue
+                    this.failedArtwork.set(gameName, failure)
+                    loadedCount++
+                }
+                
+                if (loadedCount > 0) {
+                    log.info(`Loaded ${loadedCount} cached artwork failures (skipping retries)`)
+                }
+            }
+        } catch (error) {
+            log.debug('Could not load failure cache:', error)
+        }
+        
+        // Load fallback successes - these tell us which URL to use directly
+        try {
+            const cached = localStorage.getItem(LodArtworkRenderer.SUCCESS_CACHE_KEY)
+            if (cached) {
+                const data = JSON.parse(cached) as Record<string, { originalUrl: string; fallbackUrl: string; fallbackType: string; timestamp: number }>
+                let loadedCount = 0
+                
+                for (const [gameName, success] of Object.entries(data)) {
+                    if (now - success.timestamp > LodArtworkRenderer.CACHE_TTL_MS) continue
+                    this.fallbackSuccesses.set(gameName, success)
+                    loadedCount++
+                }
+                
+                if (loadedCount > 0) {
+                    log.info(`Loaded ${loadedCount} cached fallback URLs (skipping primary attempts)`)
+                }
+            }
+        } catch (error) {
+            log.debug('Could not load success cache:', error)
+        }
+    }
+    
+    private savePersistentFailures(): void {
+        try {
+            const data: Record<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> = {}
+            for (const [gameName, failure] of this.failedArtwork) {
+                data[gameName] = failure
+            }
+            localStorage.setItem(LodArtworkRenderer.FAILURE_CACHE_KEY, JSON.stringify(data))
+        } catch (error) {
+            log.debug('Could not save failure cache:', error)
+        }
+    }
+    
+    private savePersistentSuccesses(): void {
+        try {
+            const data: Record<string, { originalUrl: string; fallbackUrl: string; fallbackType: string; timestamp: number }> = {}
+            for (const [gameName, success] of this.fallbackSuccesses) {
+                data[gameName] = { ...success, timestamp: Date.now() }
+            }
+            localStorage.setItem(LodArtworkRenderer.SUCCESS_CACHE_KEY, JSON.stringify(data))
+        } catch (error) {
+            log.debug('Could not save success cache:', error)
+        }
+    }
+    
+    public clearFailureCache(): void {
+        this.failedArtwork.clear()
+        this.fallbackSuccesses.clear()
+        try {
+            localStorage.removeItem(LodArtworkRenderer.FAILURE_CACHE_KEY)
+            localStorage.removeItem(LodArtworkRenderer.SUCCESS_CACHE_KEY)
+            log.info('Cleared artwork caches - all URLs will be retried on next load')
+        } catch (error) {
+            log.debug('Could not clear caches:', error)
+        }
+    }
+    
+    private generateFallbackUrls(appid: number, triedUrls: Set<string>): Array<{ url: string; type: string }> {
+        const baseUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appid}`
+        return LodArtworkRenderer.FALLBACK_PATTERNS
+            .map(p => ({ url: `${baseUrl}/${p.pattern}`, type: p.name }))
+            .filter(f => !triedUrls.has(f.url))
+    }
+    
+    private extractAppidFromUrl(url: string): number | null {
+        const match = url.match(/\/apps\/(\d+)\//)
+        return match ? parseInt(match[1], 10) : null
+    }
+    
     private categorizeFailure(errorMsg: string): string {
         const lowerMsg = errorMsg.toLowerCase()
-        if (lowerMsg.includes('cors') || lowerMsg.includes('networkerror')) {
+        if (lowerMsg.includes('cors blocked')) {
             return 'CORS'
         }
         if (lowerMsg.includes('404') || lowerMsg.includes('not found')) {
@@ -485,14 +676,13 @@ export class LodArtworkRenderer {
         if (lowerMsg.includes('invalid content')) {
             return 'INVALID_CONTENT'
         }
+        // Default network errors are likely 404s with bad CORS headers
+        if (lowerMsg.includes('network') || lowerMsg.includes('failed to fetch')) {
+            return 'NETWORK'
+        }
         return 'UNKNOWN'
     }
     
-    /**
-     * Set LOD level for a specific instance
-     * With lazyHighTextures: if HIGH is requested but not loaded, triggers async load
-     * and keeps instance at MID until HIGH is ready AND flushed to GPU
-     */
     public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {
         if (!this.geometry || instanceIndex < 0 || instanceIndex >= this.currentInstanceCount) {
             log.warn(`setInstanceLod failed: invalid index ${instanceIndex} (count: ${this.currentInstanceCount})`)
@@ -535,9 +725,6 @@ export class LodArtworkRenderer {
         return effectiveLod === lodLevel  // Return false if we had to downgrade
     }
     
-    /**
-     * Set LOD level for ALL instances at once
-     */
     public setGlobalLod(lodLevel: LodLevel): void {
         if (!this.geometry || !this.lodLevels) return
         
@@ -556,19 +743,11 @@ export class LodArtworkRenderer {
         log.debug(`Set global LOD to ${lodLevel} for ${this.currentInstanceCount} instances`)
     }
     
-    /**
-     * Get current LOD level for an instance
-     */
     public getInstanceLod(instanceIndex: number): LodLevel | null {
         const metadata = this.instanceMetadata.get(instanceIndex)
         return metadata?.lodLevel ?? null
     }
     
-    /**
-     * Callback from HighTextureCache when a game's slot assignment changes
-     * Updates the highTextureSlot attribute but DEFERS LOD promotion until after GPU flush
-     * This prevents the "flash" where shader renders HIGH before texture data is uploaded
-     */
     private onHighSlotChange(gameIndex: number, slot: number): void {
         if (!this.geometry || !this.highTextureSlots) return
         
@@ -607,10 +786,6 @@ export class LodArtworkRenderer {
         }
     }
     
-    /**
-     * Promote pending games to HIGH LOD after GPU flush
-     * Called after flushToGpu() to ensure texture data is on GPU before shader reads it
-     */
     private promotePendingHighTextures(): void {
         if (this.pendingHighPromotion.size === 0 || !this.geometry || !this.lodLevels) return
         
@@ -639,10 +814,6 @@ export class LodArtworkRenderer {
         this.pendingHighPromotion.clear()
     }
 
-    /**
-     * Render loop callback - handles periodic GPU updates
-     * Throttles needsUpdate to every N frames to batch multiple texture loads
-     */
     private onFrame(_now: number, _deltaTime: number): void {
         this.gpuUpdateFrameCounter++
         
@@ -661,10 +832,6 @@ export class LodArtworkRenderer {
         }
     }
 
-    /**
-     * Update GPU resources
-     * Called periodically from render loop - batches texture updates
-     */
     public updateGPU(): void {
         if (!this.instancedMesh || !this.geometry) return
         
@@ -700,209 +867,6 @@ export class LodArtworkRenderer {
         }
     }
     
-    /**
-     * Get memory usage stats
-     */
-    public getMemoryStats(): {
-        lods: Record<string, { allocated: number; textureSize: number; arrayDepth: number }>
-        totalAllocated: number
-        textureCount: number
-        instanceCount: number
-        failedArtworkCount: number
-        failedArtwork: Map<string, { reason: string; url: string; timestamp: number }>
-    } {
-        const lods: Record<string, { allocated: number; textureSize: number; arrayDepth: number }> = {}
-        let totalAllocated = 0
-        
-        for (const [_level, state] of this.lodTextures) {
-            const size = state.config.textureSize
-            const depth = state.arrayDepth
-            const allocated = state.dataArrayTexture 
-                ? size * size * depth * 4  // Use actual array depth, not maxTextures
-                : 0
-            
-            lods[state.config.name] = {
-                allocated,
-                textureSize: size,
-                arrayDepth: depth
-            }
-            totalAllocated += allocated
-        }
-        
-        return {
-            lods,
-            totalAllocated,
-            textureCount: this.nextTextureIndex,
-            instanceCount: this.currentInstanceCount,
-            failedArtworkCount: this.failedArtwork.size,
-            failedArtwork: this.failedArtwork
-        }
-    }
-    
-    /**
-     * Log memory stats to console (uses console.group for formatting)
-     */
-    public logMemoryStats(): void {
-        const stats = this.getMemoryStats()
-        
-        const lines: string[] = []
-        for (const [name, lodStats] of Object.entries(stats.lods)) {
-            const allocMB = (lodStats.allocated / (1024 * 1024)).toFixed(1)
-            lines.push(`  ${name} (${lodStats.textureSize}px × ${lodStats.arrayDepth} slots): ${allocMB}MB`)
-        }
-        lines.push(`  Total: ${(stats.totalAllocated / (1024 * 1024)).toFixed(1)}MB`)
-        lines.push(`  Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}, Failed: ${stats.failedArtworkCount}`)
-        
-        log.info(`🎨 LOD Artwork Memory Stats\n${lines.join('\n')}`)
-    }
-    
-    /**
-     * Get detailed failure diagnostics - useful for debugging artwork loading issues
-     * Call from console: window.lodArtworkRenderer?.getFailureDiagnostics()
-     */
-    public getFailureDiagnostics(): {
-        summary: { 
-            total: number
-            byReason: Record<string, number>
-            byUrlPattern: Record<string, number>
-            uniqueAppIds: number
-        }
-        failures: Array<{ game: string; reason: string; url: string; appid: string | null; timestamp: number }>
-    } {
-        const byReason: Record<string, number> = {}
-        const byUrlPattern: Record<string, number> = {}
-        const appIds = new Set<string>()
-        const failures: Array<{ game: string; reason: string; url: string; appid: string | null; timestamp: number }> = []
-        
-        for (const [gameName, failure] of this.failedArtwork) {
-            byReason[failure.reason] = (byReason[failure.reason] || 0) + 1
-            
-            // Extract URL pattern (e.g., "library_600x900.jpg", "header.jpg")
-            const urlPattern = this.extractUrlPattern(failure.url)
-            byUrlPattern[urlPattern] = (byUrlPattern[urlPattern] || 0) + 1
-            
-            // Extract appid from URL
-            const appidMatch = failure.url.match(/\/apps\/(\d+)\//)
-            const appid = appidMatch ? appidMatch[1] : null
-            if (appid) appIds.add(appid)
-            
-            failures.push({
-                game: gameName,
-                reason: failure.reason,
-                url: failure.url,
-                appid,
-                timestamp: failure.timestamp
-            })
-        }
-        
-        return {
-            summary: { 
-                total: this.failedArtwork.size, 
-                byReason,
-                byUrlPattern,
-                uniqueAppIds: appIds.size
-            },
-            failures
-        }
-    }
-    
-    /**
-     * Extract the URL pattern from a full URL for grouping
-     */
-    private extractUrlPattern(url: string): string {
-        // Extract filename like "library_600x900.jpg" or "header.jpg"
-        const match = url.match(/\/([^/]+\.(?:jpg|png|webp))(?:\?|$)/i)
-        return match ? match[1] : 'unknown'
-    }
-    
-    /**
-     * Log failure diagnostics to console - concise summary with actionable info
-     */
-    public logFailureDiagnostics(): void {
-        const diag = this.getFailureDiagnostics()
-        
-        if (diag.summary.total === 0) {
-            log.info('🎨 No artwork failures recorded')
-            return
-        }
-        
-        // Group failures by reason for cleaner output
-        const byReasonWithExamples: Record<string, { count: number; examples: Array<{ game: string; appid: string | null; url: string }> }> = {}
-        
-        for (const f of diag.failures) {
-            if (!byReasonWithExamples[f.reason]) {
-                byReasonWithExamples[f.reason] = { count: 0, examples: [] }
-            }
-            byReasonWithExamples[f.reason].count++
-            if (byReasonWithExamples[f.reason].examples.length < 2) {
-                byReasonWithExamples[f.reason].examples.push({ game: f.game, appid: f.appid, url: f.url })
-            }
-        }
-        
-        const lines: string[] = [
-            ``,
-            `🎨 ARTWORK FAILURES: ${diag.summary.total} games`,
-            `${'─'.repeat(50)}`
-        ]
-        
-        // Show each category with examples
-        for (const [reason, data] of Object.entries(byReasonWithExamples)) {
-            const pct = ((data.count / diag.summary.total) * 100).toFixed(0)
-            lines.push(``)
-            lines.push(`${this.getReasonEmoji(reason)} ${reason}: ${data.count} (${pct}%)`)
-            
-            // Add explanation for reason
-            lines.push(`   ${this.getReasonExplanation(reason)}`)
-            
-            // Show 1-2 examples
-            for (const ex of data.examples) {
-                lines.push(`   • "${ex.game}" (${ex.appid || '?'})`)
-            }
-            if (data.count > 2) {
-                lines.push(`   ... +${data.count - 2} more`)
-            }
-        }
-        
-        // Show URL patterns tried
-        lines.push(``)
-        lines.push(`URL patterns attempted: ${Object.keys(diag.summary.byUrlPattern).join(', ')}`)
-        
-        // Actionable next steps
-        lines.push(``)
-        lines.push(`💡 Next steps:`)
-        if (byReasonWithExamples['CORS']?.count > 0) {
-            lines.push(`   • CORS failures suggest proxy/CDN issue - check Lambda/CloudFront config`)
-        }
-        if (byReasonWithExamples['404']?.count > 0) {
-            lines.push(`   • 404s are often delisted/region-locked games - try header.jpg fallback`)
-        }
-        if (byReasonWithExamples['UNKNOWN']?.count > 0) {
-            lines.push(`   • Check browser Network tab for actual error responses`)
-        }
-        
-        log.info(lines.join('\n'))
-    }
-    
-    private getReasonEmoji(reason: string): string {
-        switch (reason) {
-            case 'CORS': return '🚫'
-            case '404': return '❓'
-            case 'TIMEOUT': return '⏱️'
-            case 'INVALID_CONTENT': return '🔨'
-            default: return '❌'
-        }
-    }
-    
-    private getReasonExplanation(reason: string): string {
-        switch (reason) {
-            case 'CORS': return 'Request blocked by browser (cross-origin policy)'
-            case '404': return 'Image not found - may be delisted or region-locked'
-            case 'TIMEOUT': return 'Request took too long - network/CDN issue'
-            case 'INVALID_CONTENT': return 'Response was not a valid image'
-            default: return 'Unknown error - check Network tab'
-        }
-    }
-    
     public isReady(): boolean {
         return this.instancedMesh !== null
     }
@@ -911,18 +875,10 @@ export class LodArtworkRenderer {
         return this.currentInstanceCount
     }
     
-    /**
-     * Get instance data for LOD distance management
-     * Returns readonly view of positions and LOD levels
-     */
     public getInstanceData(): ReadonlyMap<number, { position: THREE.Vector3; lodLevel: LodLevel }> {
         return this.instanceMetadata
     }
     
-    /**
-     * Check if HIGH texture is loaded for an instance
-     * Only relevant when lazyHighTextures is enabled
-     */
     public isHighTextureLoaded(instanceIndex: number): boolean {
         if (!this.lazyHighTextures || !this.highTextureCache) {
             return true // Not using lazy loading, so HIGH is always loaded
@@ -935,93 +891,60 @@ export class LodArtworkRenderer {
         return this.highTextureCache.isLoaded(textureIndex)
     }
     
-    /**
-     * Get the HighTextureCache instance for profiling/debugging
-     * Access profiling from console: renderer.getHighTextureCache().runProfilingTest(10)
-     */
     public getHighTextureCache() {
         return this.highTextureCache
     }
     
-    /**
-     * Get HIGH texture cache stats (for debugging)
-     */
-    public getHighTextureCacheStats() {
-        return this.highTextureCache?.getStats() ?? null
-    }
-    
-    /**
-     * Log HIGH texture cache stats
-     */
-    public logHighTextureCacheStats(): void {
-        this.highTextureCache?.logStats()
-    }
-    
-    /**
-     * Run diagnostic to measure texture operation costs
-     */
-    public measureTextureCosts(): void {
-        this.highTextureCache?.measureOperationCosts()
-    }
-    
-    /**
-     * Get pending HIGH promotion info (textures loaded but waiting for GPU flush)
-     */
-    public getPendingPromotions(): { textureIndex: number; slot: number; gameName?: string }[] {
-        const result: { textureIndex: number; slot: number; gameName?: string }[] = []
-        for (const [textureIndex, slot] of this.pendingHighPromotion) {
-            const instanceIndex = this.textureIndexToInstance.get(textureIndex)
-            const gameName = instanceIndex !== undefined 
-                ? this.instanceMetadata.get(instanceIndex)?.name 
-                : undefined
-            result.push({ textureIndex, slot, gameName })
-        }
-        return result
-    }
-    
-    /**
-     * Diagnostic: Log pending promotion state
-     */
-    public diagnosePendingState(): void {
-        const pending = this.getPendingPromotions()
-        const stats = this.highTextureCache?.getStats()
-        
-        console.group('🔄 Pending HIGH Promotions')
-        console.log(`GPU flush interval: every ${this.gpuUpdateInterval} frames`)
-        console.log(`Frame counter: ${this.gpuUpdateFrameCounter}/${this.gpuUpdateInterval}`)
-        console.log(`Pending promotions: ${pending.length}`)
-        
-        if (pending.length > 0) {
-            for (const p of pending) {
-                console.log(`  textureIndex ${p.textureIndex} → slot ${p.slot} "${p.gameName?.slice(0, 25) ?? '?'}"`)
-            }
-        }
-        
-        if (stats) {
-            console.log(`\nCache: ${stats.loading} loading, ${stats.queueLength} queued`)
-        }
-        console.groupEnd()
-    }
-    
-    /**
-     * Start spatial pre-warming (call after games are loaded)
-     */
     public startPrewarming(): void {
         this.spatialPrewarming?.start()
     }
     
-    /**
-     * Stop spatial pre-warming
-     */
     public stopPrewarming(): void {
         this.spatialPrewarming?.stop()
     }
     
-    /**
-     * Get spatial pre-warming stats
-     */
-    public getPrewarmingStats() {
-        return this.spatialPrewarming?.getStats() ?? null
+    // =================================================================
+    // Protected accessors for subclass (LodArtworkRendererDebug)
+    // =================================================================
+    
+    protected getLodTextures(): Map<LodLevel, LodTextureState> {
+        return this.lodTextures
+    }
+    
+    protected getFailedArtwork(): Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> {
+        return this.failedArtwork
+    }
+    
+    protected getFallbackSuccesses(): Map<string, { originalUrl: string; fallbackUrl: string; fallbackType: string }> {
+        return this.fallbackSuccesses
+    }
+    
+    protected getNextTextureIndex(): number {
+        return this.nextTextureIndex
+    }
+    
+    protected getInstanceMetadata(): Map<number, InstanceMetadata & { lodLevel: LodLevel }> {
+        return this.instanceMetadata
+    }
+    
+    protected getTextureIndexToInstance(): Map<number, number> {
+        return this.textureIndexToInstance
+    }
+    
+    protected getPendingHighPromotion(): Map<number, number> {
+        return this.pendingHighPromotion
+    }
+    
+    protected getGpuUpdateInterval(): number {
+        return this.gpuUpdateInterval
+    }
+    
+    protected getGpuUpdateFrameCounter(): number {
+        return this.gpuUpdateFrameCounter
+    }
+    
+    protected getSpatialPrewarming(): SpatialPrewarmingManager | null {
+        return this.spatialPrewarming
     }
     
     public dispose(): void {
