@@ -277,6 +277,51 @@ export class DataManager {
     /**
      * Get statistics about data storage
      */
+    // =================================================================
+    // Memory Consumption Tracking
+    // Systems register their estimated GPU/memory usage here
+    // =================================================================
+    
+    private memoryConsumers = new Map<string, { megabytes: number; getCurrentValue?: () => number }>()
+    
+    /**
+     * Register a memory consumer with its current usage in MB
+     * @param name Unique identifier for this consumer (e.g., 'LOD/high', 'InstancedShelf')
+     * @param megabytes Current memory usage in whole megabytes
+     * @param getCurrentValue Optional callback to get current value when aggregating stats
+     */
+    public addMemoryConsumption(
+        name: string, 
+        megabytes: number, 
+        getCurrentValue?: () => number
+    ): void {
+        this.memoryConsumers.set(name, { megabytes, getCurrentValue })
+    }
+    
+    /**
+     * Remove a memory consumer (e.g., on dispose)
+     */
+    public removeMemoryConsumption(name: string): void {
+        this.memoryConsumers.delete(name)
+    }
+    
+    /**
+     * Get all registered memory consumers with current values
+     * If a consumer has getCurrentValue callback, it's called to get fresh data
+     */
+    public getMemoryConsumption(): Map<string, number> {
+        const result = new Map<string, number>()
+        
+        for (const [name, entry] of this.memoryConsumers) {
+            const value = entry.getCurrentValue ? entry.getCurrentValue() : entry.megabytes
+            result.set(name, value)
+        }
+        
+        return result
+    }
+    
+    // =================================================================
+
     public getStats(): {
         totalEntries: number
         domains: number
