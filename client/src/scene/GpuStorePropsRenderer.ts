@@ -26,7 +26,6 @@ import { StorePropsEventTypes, type StorePropsProgressEvent, type SteamGamesBatc
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
-import { ImageManager } from '../steam/images/ImageManager'
 import type { SteamGame } from '../steam'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
@@ -41,7 +40,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private currentStoreGroup: THREE.Group | null = null // Track current store environment
 
     private instancedShelfRenderer?: InstancedShelfRenderer
-    private imageManager: ImageManager
 
     // Track objects we create for proper cleanup
     private createdGameBoxes: THREE.Object3D[] = []
@@ -76,8 +74,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props-instanced'
         this.scene.add(this.propsGroup)
-        
-        this.imageManager = new ImageManager()
         
         this.initializeRenderers()
         

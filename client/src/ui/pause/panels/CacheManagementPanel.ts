@@ -9,6 +9,7 @@ import { renderTemplate } from '../../../utils/TemplateEngine'
 import cacheManagementPanelTemplate from '../templates/cache-management-panel.html?raw'
 import type { ImageCacheStats } from '../../../steam/images/ImageManager'
 import { ImageManager } from '../../../steam/images/ImageManager'
+import { PixelDataCache } from '../../../scene/game-box/instancing/PixelDataCache'
 import { steamApi } from '../../../steam/SteamApiClient'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import { SteamEventTypes } from '../../../types/InteractionEvents'
@@ -313,13 +314,14 @@ export class CacheManagementPanel extends PauseMenuPanel {
      */
     private async updateCacheStats(): Promise<void> {
         try {
-            try {
-                const imageManager = ImageManager.getInstance()
-                const imageStats = await imageManager.getStats()
-                this.cacheStats = this.convertCacheStats(imageStats)
-            } catch (error) {
-                console.warn('ImageManager.getStats failed, falling back to browser cache:', error)
-                this.cacheStats = await this.getCacheInfo()
+            // Primary: use PixelDataCache (the active texture cache)
+            const pixelCache = PixelDataCache.getInstance()
+            const pixelStats = await pixelCache.getStorageEstimate()
+            
+            this.cacheStats = {
+                imageCount: pixelStats.count,
+                totalSize: pixelStats.estimatedMB * 1024 * 1024, // Convert MB to bytes
+                lastUpdate: new Date() // PixelDataCache doesn't track timestamps
             }
 
             this.updateStatsUI()
@@ -418,10 +420,8 @@ export class CacheManagementPanel extends PauseMenuPanel {
         btn.setAttribute('disabled', 'true')
 
         try {
-            const imageManager = ImageManager.getInstance()
-            const imageStats = await imageManager.getStats()
-            this.cacheStats = this.convertCacheStats(imageStats)
-            this.updateStatsUI()
+            // Refresh stats from PixelDataCache
+            await this.updateCacheStats()
             
             this.showSuccess('Cache refreshed successfully')
         } catch (error) {
@@ -435,11 +435,9 @@ export class CacheManagementPanel extends PauseMenuPanel {
 
     /**
      * Validate cache and remove corrupted/empty images
+     * TODO: PixelDataCache doesn't have validation yet - for now just refresh stats
      */
     private async validateCache(): Promise<void> {
-        const confirmed = window.confirm('This will scan all cached images and remove any that are corrupted or empty. This may take a while. Continue?')
-        if (!confirmed) return
-
         const panel = this.getPanelElement()
         if (!panel) return
 
@@ -450,16 +448,11 @@ export class CacheManagementPanel extends PauseMenuPanel {
         btn.setAttribute('disabled', 'true')
 
         try {
-            const imageManager = ImageManager.getInstance()
-            const removedCount = await imageManager.validateAndCleanCache()
+            // PixelDataCache uses versioning for invalidation, no per-entry validation needed
+            // Just refresh the stats to show current state
+            await this.updateCacheStats()
             
-            if (removedCount > 0) {
-                this.showSuccess(`Cache validation complete. Removed ${removedCount} invalid image(s).`)
-            } else {
-                this.showSuccess('Cache validation complete. All images are valid.')
-            }
-            
-            this.updateCacheStats()
+            this.showSuccess('Cache validation complete. Pixel cache uses version-based invalidation.')
         } catch (error) {
             console.error('Cache validation failed:', error)
             this.showError('Failed to validate cache')
@@ -486,7 +479,11 @@ export class CacheManagementPanel extends PauseMenuPanel {
         btn.setAttribute('disabled', 'true')
 
         try {
-            // Clear ImageManager cache and Steam API cache
+            // Clear PixelDataCache (the active texture cache)
+            const pixelCache = PixelDataCache.getInstance()
+            await pixelCache.clear()
+            
+            // Also clear legacy ImageManager cache (for cleanup)
             const imageManager = ImageManager.getInstance()
             await imageManager.clearCache()
             

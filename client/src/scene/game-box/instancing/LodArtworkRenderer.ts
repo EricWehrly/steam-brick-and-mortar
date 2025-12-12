@@ -446,27 +446,52 @@ export class LodArtworkRenderer {
                     
                     let imageData: Uint8ClampedArray | null = null
                     
-                    // For MED textures: check if we have HIGH pixels cached that we can downsample
-                    // This saves bandwidth for returning users - downsample cached HIGH → MED
+                    // For MED textures with lazy HIGH loading: always derive from HIGH pixels
+                    // This ensures single source of truth (HIGH cache) and saves bandwidth
                     if (level === LOD_LEVEL.MID && this.pixelCache && this.lazyHighTextures) {
                         const portraitUrl = this.convertToPortraitUrl(currentUrl)
-                        const cachedHighPixels = await this.pixelCache.get(portraitUrl)
+                        let cachedHighPixels = await this.pixelCache.get(portraitUrl)
                         
-                        if (cachedHighPixels) {
-                            // Cache hit! Downsample HIGH (300×450) → MED (150×225)
-                            imageData = this.downsamplePixels(
-                                cachedHighPixels.pixelData,
-                                cachedHighPixels.width,
-                                cachedHighPixels.height,
-                                width,
-                                height
+                        if (!cachedHighPixels) {
+                            // Cache miss: fetch HIGH at native size, cache it, then downsample
+                            // This ensures the cache is populated for future HIGH texture requests
+                            const highConfig = this.lodConfigs.find(c => c.level === LOD_LEVEL.HIGH)
+                            const highWidth = highConfig?.textureWidth ?? STEAM_CAPSULE_WIDTH
+                            const highHeight = highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT
+                            
+                            const result = await this.textureWorker.fetchAndProcessWithOptions(
+                                portraitUrl,
+                                textureIndex,
+                                gameName,
+                                {
+                                    textureWidth: highWidth,
+                                    textureHeight: highHeight,
+                                    timeout: 10000
+                                }
                             )
-                            log.debug(`MED cache hit for "${gameName}": downsampled ${cachedHighPixels.width}×${cachedHighPixels.height} → ${width}×${height}`)
+                            
+                            // Cache the HIGH pixels for future use (by HighTextureCache and future MED requests)
+                            await this.pixelCache.put(portraitUrl, result.imageData, highWidth, highHeight)
+                            log.debug(`Cached HIGH pixels for "${gameName}": ${highWidth}×${highHeight}`)
+                            
+                            cachedHighPixels = {
+                                pixelData: result.imageData,
+                                width: highWidth,
+                                height: highHeight
+                            }
                         }
-                    }
-                    
-                    // If no cache hit, fetch from network
-                    if (!imageData) {
+                        
+                        // Downsample HIGH → MED
+                        imageData = this.downsamplePixels(
+                            cachedHighPixels.pixelData,
+                            cachedHighPixels.width,
+                            cachedHighPixels.height,
+                            width,
+                            height
+                        )
+                        log.debug(`MED from HIGH for "${gameName}": ${cachedHighPixels.width}×${cachedHighPixels.height} → ${width}×${height}`)
+                    } else {
+                        // Non-lazy mode or non-MED: fetch directly at target size
                         const result = await this.textureWorker.fetchAndProcessWithOptions(
                             currentUrl,
                             textureIndex,
