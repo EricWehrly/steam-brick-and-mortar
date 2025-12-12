@@ -80,6 +80,28 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.graphics-settings-panel .hint-disabled {
+  color: #999;
+  background: rgba(128, 128, 128, 0.2);
+  border: 1px dashed rgba(128, 128, 128, 0.4);
+}
+
+.graphics-settings-panel .hint-instant {
+  color: #6a6;
+  background: rgba(102, 170, 102, 0.15);
+}
+
+/* Disabled setting controls */
+.graphics-settings-panel .disabled-setting .setting-slider {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.graphics-settings-panel .disabled-setting .setting-slider::-webkit-slider-thumb {
+  cursor: not-allowed;
+  background: #666;
+}
+
 /* Light up reload badge when section contains changed reload-required controls */
 .setting-section:has([data-requires-reload][data-changed]) .hint-reload {
   color: var(--warning-color);

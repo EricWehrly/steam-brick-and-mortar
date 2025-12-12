@@ -129,7 +129,7 @@
     <section class="setting-section">
       <div class="setting-group">
         <label class="setting-label">
-          🎨 Texture Level of Detail <span class="setting-hint-badge hint-reload">🔄 reload</span>
+          🎨 Texture Level of Detail
         </label>
         <p class="setting-description">
           Control when game box artwork switches between high and medium quality based on viewing distance.
@@ -174,11 +174,16 @@
           </div>
         </div>
         
-        <!-- VRAM Management -->
-        <div class="setting-control" style="margin-top: 1rem;">
-          <label class="setting-label" for="lod-max-high-slots" style="font-weight: normal; font-size: 0.9rem;">
+        <!-- TODO: Re-enable after texture cache refactor (see docs/active/texture-cache-refactor-plan.md)
+             These settings affect texture array dimensions which requires cache invalidation strategy.
+             Currently disabled to avoid cache corruption during the refactor.
+        -->
+        <!-- VRAM Management - DISABLED pending cache refactor -->
+        <div class="setting-control disabled-setting" style="margin-top: 1rem;">
+          <label class="setting-label" for="lod-max-high-slots" style="font-weight: normal; font-size: 0.9rem; opacity: 0.5;">
             Max HIGH texture slots: <span id="lod-max-high-slots-value">{{lodMaxHighSlots}}</span>
             <span class="setting-hint" id="lod-vram-estimate">(~{{lodVramEstimate}}MB VRAM)</span>
+            <span class="setting-hint-badge hint-disabled">🚧 disabled</span>
           </label>
           <input 
             type="range" 
@@ -189,18 +194,20 @@
             max="512" 
             step="32" 
             value="{{lodMaxHighSlots}}"
+            disabled
           >
-          <div class="slider-labels">
+          <div class="slider-labels" style="opacity: 0.5;">
             <span>32 slots</span>
             <span>512 slots</span>
           </div>
         </div>
         
-        <!-- Texture Quality Ratios -->
-        <div class="setting-control" style="margin-top: 1rem;">
-          <label class="setting-label" for="lod-high-ratio" style="font-weight: normal; font-size: 0.9rem;">
+        <!-- Texture Quality Ratios - DISABLED pending cache refactor -->
+        <div class="setting-control disabled-setting" style="margin-top: 1rem;">
+          <label class="setting-label" for="lod-high-ratio" style="font-weight: normal; font-size: 0.9rem; opacity: 0.5;">
             HIGH texture scale: <span id="lod-high-ratio-value">{{lodHighRatioPercent}}%</span>
             <span class="setting-hint">(<span id="lod-high-dimensions">{{lodHighDimensions}}</span>)</span>
+            <span class="setting-hint-badge hint-disabled">🚧 disabled</span>
           </label>
           <input 
             type="range" 
@@ -211,17 +218,19 @@
             max="1.0" 
             step="0.05" 
             value="{{lodHighReductionRatio}}"
+            disabled
           >
-          <div class="slider-labels">
+          <div class="slider-labels" style="opacity: 0.5;">
             <span>25%</span>
             <span>100%</span>
           </div>
         </div>
         
-        <div class="setting-control" style="margin-top: 1rem;">
-          <label class="setting-label" for="lod-med-ratio" style="font-weight: normal; font-size: 0.9rem;">
+        <div class="setting-control disabled-setting" style="margin-top: 1rem;">
+          <label class="setting-label" for="lod-med-ratio" style="font-weight: normal; font-size: 0.9rem; opacity: 0.5;">
             MED texture scale: <span id="lod-med-ratio-value">{{lodMedRatioPercent}}%</span>
             <span class="setting-hint">(<span id="lod-med-dimensions">{{lodMedDimensions}}</span>)</span>
+            <span class="setting-hint-badge hint-disabled">🚧 disabled</span>
           </label>
           <input 
             type="range" 
@@ -232,12 +241,17 @@
             max="0.5" 
             step="0.05" 
             value="{{lodMedReductionRatio}}"
+            disabled
           >
-          <div class="slider-labels">
+          <div class="slider-labels" style="opacity: 0.5;">
             <span>10%</span>
             <span>50%</span>
           </div>
         </div>
+        
+        <p class="setting-description" style="margin-top: 1rem; font-style: italic; color: #888;">
+          ℹ️ Texture size settings are temporarily disabled while we refactor the caching system for better performance.
+        </p>
       </div>
     </section>
 
