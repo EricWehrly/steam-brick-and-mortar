@@ -4,6 +4,32 @@
 @import './components/lighting-controls.css';
 @import './components/game-artwork-inspector.css';
 
+/* ===== Global Color Scheme ===== */
+:root {
+    /* Primary accent - light blue (Steam-inspired) */
+    --accent-color: #00aaff;
+    --accent-bright: #33bbff;
+    --accent-dim: #0088cc;
+    
+    /* Background colors */
+    --background-dark: #1a1a1a;
+    --background-medium: #2a2a2a;
+    --background-light: #333;
+    
+    /* Text colors */
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --text-tertiary: #888888;
+    
+    /* Status colors */
+    --success-color: #4caf50;
+    --warning-color: #ff9800;
+    --error-color: #dc3545;
+    
+    /* UI transition timing */
+    --menu-transition-time: 0.2s;
+}
+
 body {
     margin: 0;
     padding: 0;
