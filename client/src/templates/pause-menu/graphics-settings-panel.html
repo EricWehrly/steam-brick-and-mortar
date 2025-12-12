@@ -82,6 +82,7 @@
             type="range" 
             id="ceiling-height" 
             class="setting-slider"
+            data-requires-reload
             min="2.5" 
             max="5.0" 
             step="0.1" 
@@ -134,7 +135,7 @@
           Control when game box artwork switches between high and medium quality based on viewing distance.
         </p>
         
-        <!-- Distance Thresholds -->
+        <!-- Distance Thresholds (real-time, no reload needed) -->
         <div class="setting-control">
           <label class="setting-label" for="lod-high-distance" style="font-weight: normal; font-size: 0.9rem;">
             HIGH quality within: <span id="lod-high-distance-value">{{lodHighDistance}}m</span>
@@ -183,6 +184,7 @@
             type="range" 
             id="lod-max-high-slots" 
             class="setting-slider"
+            data-requires-reload
             min="32" 
             max="512" 
             step="32" 
@@ -204,6 +206,7 @@
             type="range" 
             id="lod-high-ratio" 
             class="setting-slider"
+            data-requires-reload
             min="0.25" 
             max="1.0" 
             step="0.05" 
@@ -224,6 +227,7 @@
             type="range" 
             id="lod-med-ratio" 
             class="setting-slider"
+            data-requires-reload
             min="0.1" 
             max="0.5" 
             step="0.05" 

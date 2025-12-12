@@ -62,6 +62,24 @@ export const Setting = {
     DevelopmentMode: 'developmentMode',
 } as const
 
+/** Settings grouped by UI panel/category for bulk operations */
+export const SettingCategory = {
+    Graphics: [
+        Setting.LightingQuality,
+        Setting.ShadowQuality,
+        Setting.CeilingHeight,
+        Setting.EnableLighting,
+        Setting.ShowLightingDebug,
+        Setting.ShowCeiling,
+        Setting.LodHighDistance,
+        Setting.LodMedDistance,
+        Setting.LodMaxHighSlots,
+        Setting.LodHighReductionRatio,
+        Setting.LodMedReductionRatio,
+    ] as const,
+    // Add other categories as needed (Interface, Debug, Steam, etc.)
+} as const
+
 export interface ApplicationSettings {
     // Performance Settings
     qualityLevel: 'low' | 'medium' | 'high' | 'ultra'
@@ -267,6 +285,42 @@ export class AppSettings {
                 })
             }
         }
+    }
+    
+    /**
+     * Reset specific settings to their defaults.
+     * Use SettingCategory.Graphics (etc.) for category-based reset.
+     */
+    public resetSettingsToDefaults(
+        keys: ReadonlyArray<keyof ApplicationSettings>,
+        source: EventSource = EventSource.UI
+    ): Partial<ApplicationSettings> {
+        const defaults = this.getDefaultSettings()
+        const changes: Partial<ApplicationSettings> = {}
+        
+        for (const key of keys) {
+            const defaultValue = defaults[key]
+            const currentValue = this.settings[key]
+            
+            if (currentValue !== defaultValue) {
+                (this.settings as Record<keyof ApplicationSettings, unknown>)[key] = defaultValue
+                ;(changes as Record<keyof ApplicationSettings, unknown>)[key] = defaultValue
+                
+                this.eventManager.emit<SettingChangedEvent>(AppSettingsEventTypes.Changed, {
+                    key,
+                    value: defaultValue,
+                    previousValue: currentValue,
+                    timestamp: Date.now(),
+                    source
+                })
+            }
+        }
+        
+        if (Object.keys(changes).length > 0) {
+            this.saveSettings()
+        }
+        
+        return changes
     }
 
     /**

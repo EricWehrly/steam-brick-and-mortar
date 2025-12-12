@@ -72,6 +72,7 @@
   border-radius: 3px;
   margin-left: 0.5rem;
   opacity: 0.7;
+  transition: all 0.3s ease;
 }
 
 .graphics-settings-panel .hint-reload {
@@ -79,9 +80,11 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-.graphics-settings-panel .hint-instant {
-  color: #6fbf73;
-  background: rgba(76, 175, 80, 0.1);
+/* Light up reload badge when section contains changed reload-required controls */
+.setting-section:has([data-requires-reload][data-changed]) .hint-reload {
+  color: var(--warning-color);
+  background: rgba(255, 152, 0, 0.2);
+  opacity: 1;
 }
 
 .graphics-settings-panel .setting-description {
@@ -224,7 +227,20 @@
   margin-top: 0.25rem;
 }
 
-/* Reload Warning Indicator - lights up when reload-required changes are pending */
+/* =============================================================================
+   RELOAD INDICATOR SYSTEM
+   
+   Uses two data attributes for pure CSS control:
+   - data-requires-reload: Static, declared in HTML on controls that need reload
+   - data-changed: Dynamic, set by JS when value differs from initial
+   
+   CSS :has() selectors cascade the indicator up through sections and tabs.
+   
+   TODO: The reload requirement could be removed by implementing hot-reload
+   of LOD configs and ceiling geometry. See GpuGameBoxRenderer.buildLodConfigsFromSettings()
+   ============================================================================= */
+
+/* Reload Warning Banner - hidden by default */
 .graphics-settings-panel .reload-warning {
   display: none;
   background: rgba(255, 152, 0, 0.15);
@@ -238,9 +254,22 @@
   gap: 0.5rem;
 }
 
-.graphics-settings-panel .reload-warning.active {
+/* Show warning when ANY control has BOTH data-requires-reload AND data-changed */
+.settings-sections:has([data-requires-reload][data-changed]) .reload-warning {
   display: flex;
   animation: pulse-warning 2s ease-in-out infinite;
+}
+
+/* Highlight setting sections that contain changed reload-required controls */
+.setting-section:has([data-requires-reload][data-changed]) {
+  border-left: 3px solid var(--warning-color);
+  padding-left: 0.5rem;
+  margin-left: -0.5rem;
+}
+
+/* Individual control indicator - show when this specific control is changed */
+[data-requires-reload][data-changed] {
+  box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.4);
 }
 
 @keyframes pulse-warning {

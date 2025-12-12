@@ -12,7 +12,7 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import graphicsSettingsPanelTemplate from '../../../templates/pause-menu/graphics-settings-panel.html?raw'
 import '../../../styles/pause-menu/graphics-settings-panel.css'
-import { AppSettings, LIGHTING_QUALITY, type ApplicationSettings } from '../../../core/AppSettings'
+import { AppSettings, LIGHTING_QUALITY, SettingCategory, type ApplicationSettings } from '../../../core/AppSettings'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import { CeilingEventTypes, type CeilingToggleEvent } from '../../../types/InteractionEvents'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
@@ -231,48 +231,36 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     ): void {
         this.appSettings.setSetting(key, value, EventSource.UI)
         this.onSettingsChanged?.({ [key]: value } as Partial<ApplicationSettings>)
-        
         console.log(`🎨 Graphics setting updated: ${key} = ${value}`)
     }
 
     private resetToDefaults(): void {
-        // Reset graphics settings to defaults
-        this.appSettings.setSetting('lightingQuality', LIGHTING_QUALITY.ENHANCED, EventSource.UI)
-        this.appSettings.setSetting('shadowQuality', this.appSettings.getDefaultSetting('shadowQuality'), EventSource.UI)
-        this.appSettings.setSetting('ceilingHeight', 3.2, EventSource.UI)
-        this.appSettings.setSetting('enableLighting', true, EventSource.UI)
-        this.appSettings.setSetting('showLightingDebug', false, EventSource.UI)
-        this.appSettings.setSetting('showCeiling', true, EventSource.UI)
-        
-        // Reset LOD settings
-        this.appSettings.setSetting('lodHighDistance', 3.0, EventSource.UI)
-        this.appSettings.setSetting('lodMedDistance', 8.0, EventSource.UI)
-        this.appSettings.setSetting('lodMaxHighSlots', 128, EventSource.UI)
-        this.appSettings.setSetting('lodHighReductionRatio', 0.5, EventSource.UI)
-        this.appSettings.setSetting('lodMedReductionRatio', 0.25, EventSource.UI)
+        // Reset all graphics settings to system defaults
+        const changes = this.appSettings.resetSettingsToDefaults(
+            SettingCategory.Graphics,
+            EventSource.UI
+        )
         
         this.refreshSettingsDisplay()
         
-        // Notify that all settings changed
-        this.onSettingsChanged?.({
-            lightingQuality: LIGHTING_QUALITY.ENHANCED,
-            shadowQuality: this.appSettings.getDefaultSetting('shadowQuality'),
-            ceilingHeight: 3.2,
-            enableLighting: true,
-            showLightingDebug: false,
-            showCeiling: true,
-            lodHighDistance: 3.0,
-            lodMedDistance: 8.0,
-            lodMaxHighSlots: 128,
-            lodHighReductionRatio: 0.5,
-            lodMedReductionRatio: 0.25
+        // Mark all reload-required controls as changed since values differ from scene
+        document.querySelectorAll('[data-requires-reload]').forEach(control => {
+            control.setAttribute('data-changed', '')
         })
+        
+        // Notify that settings changed
+        if (Object.keys(changes).length > 0) {
+            this.onSettingsChanged?.(changes)
+        }
         
         console.log('🎨 Graphics settings reset to defaults')
     }
 
     onShow(): void {
         this.refreshSettingsDisplay()
+        // Store initial values for change detection, then clear any stale changed states
+        this.storeAllInitialValues()
+        this.clearAllChangedStates()
     }
 
     onHide(): void {
