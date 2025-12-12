@@ -3,9 +3,8 @@
  * 
  * Modal UI that displays all artwork for a specific game:
  * - All image URLs (icon, logo, header, library)
- * - Cache status for each image
- * - Image previews
- * - Metadata (size, timestamp, fallback info)
+ * - Cache status for each image (using PixelDataCache)
+ * - Metadata (size, dimensions)
  * 
  * Usage:
  *   window.inspectGameArtwork("UNLOVED")
@@ -13,18 +12,23 @@
  */
 
 import { GameFinder } from './GameFinder'
-import { ImageManager } from '../steam/images/ImageManager'
+import { PixelDataCache, type CachedPixelResult } from '../scene/game-box/instancing/PixelDataCache'
 import { DataManager } from '../core/data/DataManager'
 import type { SteamGame } from '../steam/SteamApiClientLegacy'
-import type { ImageCacheEntry } from '../steam/images/ImageManager'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
+
+interface PixelCacheEntry {
+    pixelData: Uint8ClampedArray
+    width: number
+    height: number
+}
 
 interface ArtworkInfo {
     type: string
     url: string
     cached: boolean
-    cacheEntry?: ImageCacheEntry
+    cacheEntry?: PixelCacheEntry
     isBeingUsed: boolean
     preview?: string
 }
@@ -32,11 +36,11 @@ interface ArtworkInfo {
 export class GameArtworkInspector {
     private modalElement: HTMLElement | null = null
     private gameFinder: GameFinder
-    private imageManager: ImageManager
+    private pixelCache: PixelDataCache
 
     constructor() {
         this.gameFinder = new GameFinder()
-        this.imageManager = ImageManager.getInstance()
+        this.pixelCache = PixelDataCache.getInstance()
     }
 
     async inspect(identifier: string | number): Promise<void> {
@@ -92,12 +96,14 @@ export class GameArtworkInspector {
                 continue
             }
 
-            const cacheEntry = await this.imageManager.getFromCache(url)
+            // Check PixelDataCache for cached pixel data
+            const cacheEntry = await this.pixelCache.get(url)
             const cached = !!cacheEntry
             
+            // Create preview from cached pixel data if available
             let preview: string | undefined
-            if (cacheEntry?.blob) {
-                preview = URL.createObjectURL(cacheEntry.blob)
+            if (cacheEntry) {
+                preview = this.createPreviewFromPixels(cacheEntry)
             }
 
             const isBeingUsed = this.determineIfUsed(type, usedName, steamGame)
@@ -106,13 +112,27 @@ export class GameArtworkInspector {
                 type,
                 url,
                 cached,
-                cacheEntry,
+                cacheEntry: cacheEntry ?? undefined,
                 isBeingUsed,
                 preview
             })
         }
 
         return artwork
+    }
+
+    private createPreviewFromPixels(cacheEntry: CachedPixelResult): string {
+        const canvas = document.createElement('canvas')
+        canvas.width = cacheEntry.width
+        canvas.height = cacheEntry.height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return ''
+        
+        // Create ImageData from pixel array - use new Uint8ClampedArray to ensure proper ArrayBuffer type
+        const pixelArray = new Uint8ClampedArray(cacheEntry.pixelData)
+        const imageData = new ImageData(pixelArray, cacheEntry.width, cacheEntry.height)
+        ctx.putImageData(imageData, 0, 0)
+        return canvas.toDataURL('image/png')
     }
 
     private determineIfUsed(artworkType: string, usedName?: string, steamGame?: SteamGame): boolean {
@@ -184,10 +204,8 @@ export class GameArtworkInspector {
         
         const cacheInfo = info.cacheEntry ? `
             <div class="cache-metadata">
-                <span>Size: ${this.formatBytes(info.cacheEntry.size)}</span>
-                <span>Cached: ${this.formatTimestamp(info.cacheEntry.timestamp)}</span>
-                ${info.cacheEntry.isFallback ? '<span class="badge badge-warning">FALLBACK</span>' : ''}
-                ${info.cacheEntry.originalType ? `<span class="text-muted">Original: ${info.cacheEntry.originalType}</span>` : ''}
+                <span>Dimensions: ${info.cacheEntry.width}×${info.cacheEntry.height}</span>
+                <span>Size: ${this.formatBytes(info.cacheEntry.pixelData.byteLength)}</span>
             </div>
         ` : ''
 

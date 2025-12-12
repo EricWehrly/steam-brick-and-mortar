@@ -7,16 +7,33 @@
  * - Cache clearing controls
  * - Storage warnings and status
  * 
+ * @deprecated This component is no longer used in production. 
+ * See CacheManagementPanel in the pause menu system instead.
+ * 
  * TODO: ROADMAP - Make this entire cache UI optional via user settings/options
  * This should be configurable once we add user preferences/settings system.
  */
 
-import type { ImageCacheStats } from '../steam/images/ImageManager'
 import { renderTemplate } from '../utils/TemplateEngine'
 import cacheMainTemplate from '../templates/cache-management/main.html?raw'
 import cacheStatsTemplate from '../templates/cache-management/stats.html?raw'
 import cacheErrorTemplate from '../templates/cache-management/error.html?raw'
 import '../styles/components/cache-management-ui.css'
+
+/** @deprecated Use stats from PixelDataCache instead */
+export interface ImageCacheStats {
+    totalImages: number
+    totalSize: number
+    oldestTimestamp: number
+    newestTimestamp: number
+    storageQuota?: {
+        isSupported: boolean
+        usageMB: number
+        quotaMB: number
+        usagePercent: number
+        isNearLimit: boolean
+    }
+}
 
 export interface CacheUIConfig {
     containerId: string

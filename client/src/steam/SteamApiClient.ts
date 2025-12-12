@@ -5,7 +5,6 @@
 import { HttpClient } from './http/HttpClient'
 import { CacheManager } from './cache/SimpleCacheManager'
 import { RateLimiter } from './rate-limit/RateLimiter'
-import { ImageManager } from './images/ImageManager'
 import { BatchAppDetailsClient } from './batch/BatchAppDetailsClient'
 import { Logger } from '../utils/Logger'
 import { AppDetailsCache } from './cache/AppDetailsCache'
@@ -57,7 +56,6 @@ export class SteamApiClient {
     private http: HttpClient
     private cache: CacheManager
     private rateLimiter: RateLimiter
-    private images: ImageManager
     private batchClient: BatchAppDetailsClient
     private appDetailsCache: AppDetailsCache
 
@@ -67,7 +65,6 @@ export class SteamApiClient {
         this.http = new HttpClient({ baseUrl: apiBaseUrl })
         this.cache = new CacheManager({ cachePrefix: 'steam_api_' })
         this.rateLimiter = new RateLimiter({ requestsPerSecond: 4 })
-        this.images = ImageManager.getInstance()
         this.batchClient = new BatchAppDetailsClient(apiBaseUrl)
         this.appDetailsCache = new AppDetailsCache()
         
@@ -409,17 +406,6 @@ export class SteamApiClient {
     }
 
     /**
-     * Image methods (delegate to ImageManager)
-     */
-    public async downloadGameImage(url: string): Promise<Blob | null> {
-        return this.images.downloadImage(url)
-    }
-
-    public async downloadGameArtwork(game: SteamGame): Promise<Record<string, Blob | null>> {
-        return this.images.downloadGameArtwork(game.artwork)
-    }
-
-    /**
      * App details methods (for categories, genres, etc.)
      */
     public async getAppDetails(appid: number): Promise<AppDetailsData | null> {
@@ -430,20 +416,12 @@ export class SteamApiClient {
         return this.appDetailsCache.getMany(appids)
     }
 
-    /**
-     * Image cache management
-     */
-    public async getImageCacheStats() {
-        return this.images.getStats()
-    }
-
     public async getAppDetailsCacheStats() {
         return this.appDetailsCache.getStats()
     }
 
     public async clearCache(): Promise<void> {
         this.cache.clear()
-        await this.images.clearCache()
         await this.appDetailsCache.clear()
     }
 

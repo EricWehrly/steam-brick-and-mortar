@@ -105,38 +105,6 @@ describe('SteamApiClient Integration Tests', () => {
         })
     })
 
-    describe('Image Integration', () => {
-        it('should download game images', async () => {
-            const mockBlob = createMockBlob()
-            const mockResponse = createMockFetchResponse(mockBlob)
-            fetchMock.mockResolvedValue(mockResponse)
-            
-            const result = await client.downloadGameImage(mockGame.artwork.icon)
-            
-            expect(result).toBe(mockBlob)
-            expect(fetchMock).toHaveBeenCalledWith(
-                mockGame.artwork.icon,
-                expect.objectContaining({ mode: 'cors' })
-            )
-        })
-
-        it('should download all game artwork', async () => {
-            const mockBlob = createMockBlob()
-            const mockResponse = createMockFetchResponse(mockBlob)
-            fetchMock.mockResolvedValue(mockResponse)
-            
-            const result = await client.downloadGameArtwork(mockGame)
-            
-            expect(result).toEqual({
-                icon: mockBlob,
-                logo: mockBlob,
-                header: mockBlob,
-                library: mockBlob
-            })
-            expect(fetchMock).toHaveBeenCalledTimes(4)
-        })
-    })
-
     describe('Error Handling', () => {
         it('should handle API errors gracefully', async () => {
             fetchMock.mockRejectedValue(new Error('API Error'))
@@ -144,73 +112,9 @@ describe('SteamApiClient Integration Tests', () => {
             await expect(client.resolveVanityUrl('invaliduser'))
                 .rejects.toThrow('API Error')
         })
-
-        it('should handle image download failures gracefully', async () => {
-            fetchMock.mockRejectedValue(new Error('Network error'))
-            
-            const result = await client.downloadGameImage(mockGame.artwork.icon)
-            
-            expect(result).toBeNull()
-        })
     })
 
-    describe('Game Artwork Integration', () => {
-        it('should download all artwork types for a game', async () => {
-            const mockBlob = createMockBlob()
-            const mockResponse = createMockFetchResponse(mockBlob)
-            fetchMock.mockResolvedValue(mockResponse)
-            
-            const result = await client.downloadGameArtwork(mockGame)
-            
-            expect(result).toEqual({
-                icon: mockBlob,
-                logo: mockBlob,
-                header: mockBlob,
-                library: mockBlob
-            })
-            
-            // Verify all URLs were fetched
-            expect(fetchMock).toHaveBeenCalledTimes(4)
-            expect(fetchMock).toHaveBeenCalledWith(mockGame.artwork.icon, expect.any(Object))
-            expect(fetchMock).toHaveBeenCalledWith(mockGame.artwork.logo, expect.any(Object))
-            expect(fetchMock).toHaveBeenCalledWith(mockGame.artwork.header, expect.any(Object))
-            expect(fetchMock).toHaveBeenCalledWith(mockGame.artwork.library, expect.any(Object))
-        })
-
-        it('should handle partial artwork failures gracefully', async () => {
-            let callCount = 0
-            fetchMock.mockImplementation(() => {
-                callCount++
-                if (callCount === 2) { // Second call fails (logo)
-                    return Promise.reject(new Error('Network error'))
-                }
-                return Promise.resolve(createMockFetchResponse(createMockBlob()))
-            })
-            
-            const result = await client.downloadGameArtwork(mockGame)
-            
-            expect(result.icon).toBeTruthy()
-            expect(result.logo).toBeNull()
-            expect(result.header).toBeTruthy()
-            expect(result.library).toBeTruthy()
-        })
-
-        it('should call image callbacks for each artwork type', async () => {
-            const mockBlob = createMockBlob()
-            const mockResponse = createMockFetchResponse(mockBlob)
-            fetchMock.mockResolvedValue(mockResponse)
-            
-            // Test using the ImageManager's downloadGameArtwork with options
-            const result = await client.downloadGameArtwork(mockGame)
-            
-            expect(result).toEqual({
-                icon: mockBlob,
-                logo: mockBlob,
-                header: mockBlob,
-                library: mockBlob
-            })
-        })
-
+    describe('Progressive Loading Integration', () => {
         it('should integrate progressive loading with game processing', async () => {
             const loadedGames: any[] = []
             const onGameLoaded = vi.fn((game: any) => {

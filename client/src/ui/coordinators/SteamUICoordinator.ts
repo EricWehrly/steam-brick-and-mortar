@@ -35,11 +35,11 @@ export class SteamUICoordinator {
 
     async clearImageCache(): Promise<void> {
         try {
-            const { ImageManager } = await import('../../steam/images/ImageManager')
-            await ImageManager.getInstance().clearCache()
-            console.log('Image cache cleared successfully!')
+            const { PixelDataCache } = await import('../../scene/game-box/instancing/PixelDataCache')
+            await PixelDataCache.getInstance().clear()
+            console.log('Texture pixel cache cleared successfully!')
         } catch (error) {
-            console.error('Failed to clear image cache:', error)
+            console.error('Failed to clear texture cache:', error)
         }
     }
 

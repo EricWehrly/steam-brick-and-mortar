@@ -75,9 +75,10 @@ export class DebugStatsProvider {
         // Get performance stats
         const performanceStats = this.performanceMonitor.getStats()
         
-        // Get cache stats
-        const { ImageManager } = await import('../steam/images/ImageManager')
-        const imageCacheStats = await ImageManager.getInstance().getStats()
+        // Get cache stats from PixelDataCache (the active texture cache)
+        const { PixelDataCache } = await import('../scene/game-box/instancing/PixelDataCache')
+        const pixelCache = PixelDataCache.getInstance()
+        const pixelCacheStorage = await pixelCache.getStorageEstimate()
         
         // Get WebGL context info
         const gl = renderer.getContext()
@@ -108,8 +109,8 @@ export class DebugStatsProvider {
                 drawCalls: info.render.calls
             },
             cache: {
-                imageCount: imageCacheStats.totalImages,
-                imageCacheSize: imageCacheStats.totalSize,
+                imageCount: pixelCacheStorage.count,
+                imageCacheSize: Math.round(pixelCacheStorage.estimatedMB * 1024 * 1024), // Convert MB to bytes
                 gameDataCount: 0, // TODO: Implement getGameDataCount in SteamIntegration
                 gameDataSize: 0, // TODO: Implement getGameDataSize in SteamIntegration
                 quotaUsed: storageInfo.quotaUsed,

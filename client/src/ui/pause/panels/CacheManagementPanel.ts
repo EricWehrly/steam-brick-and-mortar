@@ -7,8 +7,6 @@
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import cacheManagementPanelTemplate from '../templates/cache-management-panel.html?raw'
-import type { ImageCacheStats } from '../../../steam/images/ImageManager'
-import { ImageManager } from '../../../steam/images/ImageManager'
 import { PixelDataCache } from '../../../scene/game-box/instancing/PixelDataCache'
 import { steamApi } from '../../../steam/SteamApiClient'
 import { EventManager, EventSource } from '../../../core/EventManager'
@@ -50,25 +48,6 @@ export class CacheManagementPanel extends PauseMenuPanel {
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)
         this.eventManager = EventManager.getInstance()
-    }
-    
-    /**
-     * Convert ImageCacheStats to internal CacheStats format
-     */
-    private convertCacheStats(imageStats: ImageCacheStats | null): CacheStats {
-        if (!imageStats) {
-            return {
-                imageCount: 0,
-                totalSize: 0,
-                lastUpdate: null
-            }
-        }
-        
-        return {
-            imageCount: imageStats.totalImages,
-            totalSize: imageStats.totalSize,
-            lastUpdate: imageStats.newestTimestamp > 0 ? new Date(imageStats.newestTimestamp) : null
-        }
     }
 
     render(): string {
@@ -483,11 +462,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
             const pixelCache = PixelDataCache.getInstance()
             await pixelCache.clear()
             
-            // Also clear legacy ImageManager cache (for cleanup)
-            const imageManager = ImageManager.getInstance()
-            await imageManager.clearCache()
-            
-            // Also clear Steam API cache
+            // Also clear Steam API cache (metadata)
             steamApi.clearCache()
 
             this.showSuccess('Cache cleared successfully')
@@ -675,26 +650,13 @@ export class CacheManagementPanel extends PauseMenuPanel {
 
     /**
      * Initialize the image previewer
+     * @deprecated Image previewer requires blob cache which was removed. 
+     * PixelDataCache stores RGBA pixels, not blobs.
      */
     private async initializePreviewer(): Promise<void> {
-        try {
-            const imageManager = ImageManager.getInstance()
-            this.imageUrls = await imageManager.getAllCachedImageUrls()
-            
-            if (this.imageUrls.length === 0) {
-                this.showError('No cached images available')
-                return
-            }
-
-            this.currentImageIndex = 0
-            this.previewerInitialized = true
-            this.showPreviewerNavigation()
-            this.loadCurrentImage()
-            this.showSuccess('Image previewer initialized')
-        } catch (error) {
-            console.error('Failed to initialize image previewer:', error)
-            this.showError('Failed to initialize image previewer')
-        }
+        // Image previewer disabled - no longer have blob cache
+        // PixelDataCache stores decoded RGBA pixels, not displayable blobs
+        this.showError('Image previewer not available - cache stores pixel data, not images')
     }
 
     /**
@@ -764,32 +726,9 @@ export class CacheManagementPanel extends PauseMenuPanel {
 
         const currentUrl = this.imageUrls[this.currentImageIndex]
         
-        try {
-            // We need to get the cached blob and create a blob URL for display
-            // For now, we'll need access to ImageManager to get the blob
-            // This is a temporary approach - we need the actual blob retrieval
-            
-            const imageManager = ImageManager.getInstance()
-            const blob = await imageManager.getCachedImageBlob(currentUrl)
-            if (blob) {
-                // Create a blob URL for display
-                const blobUrl = URL.createObjectURL(blob)
-                imageElement.src = blobUrl
-                
-                // Store the blob URL to clean it up later
-                if (imageElement.dataset.blobUrl) {
-                    URL.revokeObjectURL(imageElement.dataset.blobUrl)
-                }
-                imageElement.dataset.blobUrl = blobUrl
-            } else {
-                // Fallback to direct URL if blob not found
-                imageElement.src = currentUrl
-            }
-        } catch (error) {
-            console.error('Failed to load cached image:', error)
-            // Fallback to direct URL on error
-            imageElement.src = currentUrl
-        }
+        // Image previewer disabled - blob cache removed
+        // Just show the URL directly (will fetch from CDN)
+        imageElement.src = currentUrl
         
         // Extract filename from URL for display
         const filename = currentUrl.split('/').pop() || 'Unknown'

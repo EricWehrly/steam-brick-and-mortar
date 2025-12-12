@@ -3,8 +3,10 @@
  * 
  * This single live test file validates core functionality against real services:
  * - Steam API endpoint connectivity
- * - Steam CDN image downloading
  * - Error handling with real network conditions
+ * 
+ * Note: Image downloading tests removed - texture loading now goes through
+ * TextureWorker and PixelDataCache, not SteamApiClient.
  * 
  * Run with: yarn test:live
  */
@@ -31,36 +33,10 @@ describe('Steam API Live Tests - Essential Validation', () => {
             expect(typeof result.steamid).toBe('string')
         }, 10000)
 
-        it('should download real Steam game images of different types', async () => {
-            // Test icon (small), header (medium) - covers main image types 
-            const testCases = [
-                {
-                    name: 'icon',
-                    url: 'https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/220/fcfb366051782b8ebf2aa297f3b746395858cb62.jpg'
-                },
-                {
-                    name: 'header',
-                    url: 'https://cdn.akamai.steamstatic.com/steam/apps/220/header.jpg'
-                }
-            ]
-            
-            for (const testCase of testCases) {
-                const result = await client.downloadGameImage(testCase.url)
-                
-                expect(result, `${testCase.name} should download successfully`).toBeInstanceOf(Blob)
-                expect(result?.type, `${testCase.name} should be valid image type`).toMatch(/^image\//)
-                expect(result?.size, `${testCase.name} should have content`).toBeGreaterThan(0)
-            }
-        }, 20000) // Extended timeout for multiple downloads
-
         it('should handle network errors gracefully', async () => {
             // Test invalid vanity URL
             await expect(client.resolveVanityUrl('this-vanity-url-definitely-does-not-exist-12345'))
                 .rejects.toThrow()
-
-            // Test invalid image URL
-            const result = await client.downloadGameImage('https://example.com/nonexistent-image.jpg')
-            expect(result).toBeNull()
         }, 10000)
 
         it('should handle rate limiting appropriately', async () => {
