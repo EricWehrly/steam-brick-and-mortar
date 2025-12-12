@@ -27,6 +27,7 @@ import fragmentShader from './shaders/instanced-artwork-lod.frag?raw'
 import { TextureWorker } from './TextureWorker'
 import { HighTextureCache, HighTextureState } from './HighTextureCache'
 import { SpatialPrewarmingManager, type PrewarmingConfig } from './SpatialPrewarmingManager'
+import { PixelDataCache } from './PixelDataCache'
 import { Logger } from '../../../utils/Logger'
 
 const log = Logger.withContext('LodArtworkRenderer')
@@ -143,6 +144,9 @@ export class LodArtworkRenderer {
     private spatialPrewarming: SpatialPrewarmingManager | null = null
     private readonly prewarmingConfig: Partial<PrewarmingConfig>
     
+    // Pixel cache for MED textures (downsampled from cached HIGH pixels)
+    private pixelCache: PixelDataCache | null = null
+    
     // Track artwork URLs for lazy loading
     private artworkUrls: Map<number, string> = new Map()  // textureIndex -> url
     
@@ -171,6 +175,12 @@ export class LodArtworkRenderer {
         this.prewarmingConfig = config.prewarmingConfig ?? {}
         
         this.textureWorker = new TextureWorker()
+        
+        // Initialize pixel cache for MED texture cache hits (downsampled from HIGH)
+        this.pixelCache = PixelDataCache.getInstance()
+        this.pixelCache.init().catch(err => {
+            log.warn('PixelDataCache init failed:', err)
+        })
         
         // Load persistent caches to skip known-bad URLs and use known-good fallbacks
         this.loadPersistentCaches()
@@ -434,16 +444,41 @@ export class LodArtworkRenderer {
                     const width = state.config.textureWidth ?? state.config.textureSize ?? 128
                     const height = state.config.textureHeight ?? state.config.textureSize ?? 128
                     
-                    const result = await this.textureWorker.fetchAndProcessWithOptions(
-                        currentUrl,
-                        textureIndex,
-                        gameName,
-                        {
-                            textureWidth: width,
-                            textureHeight: height,
-                            timeout: 10000
+                    let imageData: Uint8ClampedArray | null = null
+                    
+                    // For MED textures: check if we have HIGH pixels cached that we can downsample
+                    // This saves bandwidth for returning users - downsample cached HIGH → MED
+                    if (level === LOD_LEVEL.MID && this.pixelCache && this.lazyHighTextures) {
+                        const portraitUrl = this.convertToPortraitUrl(currentUrl)
+                        const cachedHighPixels = await this.pixelCache.get(portraitUrl)
+                        
+                        if (cachedHighPixels) {
+                            // Cache hit! Downsample HIGH (300×450) → MED (150×225)
+                            imageData = this.downsamplePixels(
+                                cachedHighPixels.pixelData,
+                                cachedHighPixels.width,
+                                cachedHighPixels.height,
+                                width,
+                                height
+                            )
+                            log.debug(`MED cache hit for "${gameName}": downsampled ${cachedHighPixels.width}×${cachedHighPixels.height} → ${width}×${height}`)
                         }
-                    )
+                    }
+                    
+                    // If no cache hit, fetch from network
+                    if (!imageData) {
+                        const result = await this.textureWorker.fetchAndProcessWithOptions(
+                            currentUrl,
+                            textureIndex,
+                            gameName,
+                            {
+                                textureWidth: width,
+                                textureHeight: height,
+                                timeout: 10000
+                            }
+                        )
+                        imageData = result.imageData
+                    }
                     
                     // Copy to texture array
                     if (!state.dataArrayTexture) {
@@ -454,11 +489,11 @@ export class LodArtworkRenderer {
                     const arrayData = state.dataArrayTexture.image.data as Uint8Array
                     
                     // Verify image data size matches expected
-                    if (result.imageData.length !== sliceSize) {
-                        log.error(`Size mismatch for "${gameName}" LOD ${level}: expected ${sliceSize}, got ${result.imageData.length}`)
+                    if (imageData.length !== sliceSize) {
+                        log.error(`Size mismatch for "${gameName}" LOD ${level}: expected ${sliceSize}, got ${imageData.length}`)
                     }
                     
-                    arrayData.set(result.imageData, offset)
+                    arrayData.set(imageData, offset)
                     state.pendingUpdates.add(textureIndex)
                 }
                 
@@ -673,6 +708,70 @@ export class LodArtworkRenderer {
     private extractAppidFromUrl(url: string): number | null {
         const match = url.match(/\/apps\/(\d+)\//)
         return match ? parseInt(match[1], 10) : null
+    }
+    
+    /**
+     * Convert any Steam artwork URL to portrait format (library_600x900.jpg)
+     * This matches the URL format used by PixelDataCache/HighTextureCache
+     */
+    private convertToPortraitUrl(artworkUrl: string): string {
+        const appidMatch = artworkUrl.match(/\/apps\/(\d+)\//)
+        if (!appidMatch) {
+            return artworkUrl
+        }
+        const appid = appidMatch[1]
+        return `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`
+    }
+    
+    /**
+     * Downsample pixel data from HIGH resolution (300×450) to MED resolution (150×225)
+     * Uses simple 2x2 box filter for fast, decent quality downsampling
+     */
+    private downsamplePixels(
+        srcPixels: Uint8ClampedArray,
+        srcWidth: number,
+        srcHeight: number,
+        dstWidth: number,
+        dstHeight: number
+    ): Uint8ClampedArray {
+        const dst = new Uint8ClampedArray(dstWidth * dstHeight * 4)
+        
+        // Calculate scale factors
+        const scaleX = srcWidth / dstWidth
+        const scaleY = srcHeight / dstHeight
+        
+        for (let dstY = 0; dstY < dstHeight; dstY++) {
+            for (let dstX = 0; dstX < dstWidth; dstX++) {
+                // Source region for this destination pixel
+                const srcX0 = Math.floor(dstX * scaleX)
+                const srcY0 = Math.floor(dstY * scaleY)
+                const srcX1 = Math.min(Math.ceil((dstX + 1) * scaleX), srcWidth)
+                const srcY1 = Math.min(Math.ceil((dstY + 1) * scaleY), srcHeight)
+                
+                // Average all source pixels in the region
+                let r = 0, g = 0, b = 0, a = 0
+                let count = 0
+                
+                for (let sy = srcY0; sy < srcY1; sy++) {
+                    for (let sx = srcX0; sx < srcX1; sx++) {
+                        const srcIdx = (sy * srcWidth + sx) * 4
+                        r += srcPixels[srcIdx]
+                        g += srcPixels[srcIdx + 1]
+                        b += srcPixels[srcIdx + 2]
+                        a += srcPixels[srcIdx + 3]
+                        count++
+                    }
+                }
+                
+                const dstIdx = (dstY * dstWidth + dstX) * 4
+                dst[dstIdx] = Math.round(r / count)
+                dst[dstIdx + 1] = Math.round(g / count)
+                dst[dstIdx + 2] = Math.round(b / count)
+                dst[dstIdx + 3] = Math.round(a / count)
+            }
+        }
+        
+        return dst
     }
     
     private categorizeFailure(errorMsg: string): string {

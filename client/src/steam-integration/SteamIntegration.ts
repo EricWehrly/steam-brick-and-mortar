@@ -162,11 +162,6 @@ export class SteamIntegration {
                     // Update game library
                     for (const game of batchGames) {
                         this.gameLibrary.updateGameData(game)
-                        
-                        // Fire-and-forget artwork download to warm cache
-                        this.steamClient.downloadGameArtwork(game).catch(error => {
-                            SteamIntegration.logger.warn(`Failed to download artwork for ${game.name}:`, error)
-                        })
                     }
                     
                     // Emit batch event for progressive shelf rendering
