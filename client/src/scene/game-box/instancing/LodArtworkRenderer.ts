@@ -66,13 +66,16 @@ export interface LodConfig {
 }
 
 /** 
- * Default LOD configurations - Two-tier system
- * HIGH: Native resolution (600x900) portrait capsules - dynamically loaded/evicted for nearby games
- * MID: Square thumbnails (128x128) - covers all games at reasonable quality
+ * Default LOD configurations - Two-tier system with same aspect ratio
+ * HIGH: Half of Steam's advertised 600×900 = 300×450 (what CDN actually serves)
+ * MED: Quarter resolution = 150×225 (same 2:3 portrait aspect ratio)
+ * 
+ * Both use library_600x900.jpg source, resized to target dimensions.
+ * Same aspect ratio ensures smooth visual transition when LOD changes.
  */
 export const DEFAULT_LOD_CONFIGS: LodConfig[] = [
     { level: LOD_LEVEL.HIGH, textureWidth: STEAM_CAPSULE_WIDTH, textureHeight: STEAM_CAPSULE_HEIGHT, name: 'high', maxDepth: 128 },
-    { level: LOD_LEVEL.MID, textureSize: 128, name: 'mid' }  // Uses maxTextures for full coverage
+    { level: LOD_LEVEL.MID, textureWidth: 150, textureHeight: 225, name: 'med' }  // Quarter res, same aspect ratio
 ]
 
 export interface LodArtworkConfig {
@@ -431,12 +434,15 @@ export class LodArtworkRenderer {
                     const width = state.config.textureWidth ?? state.config.textureSize ?? 128
                     const height = state.config.textureHeight ?? state.config.textureSize ?? 128
                     
-                    const result = await this.textureWorker.fetchAndProcess(
+                    const result = await this.textureWorker.fetchAndProcessWithOptions(
                         currentUrl,
-                        width,  // Use width as textureSize for MID (square)
                         textureIndex,
                         gameName,
-                        10000
+                        {
+                            textureWidth: width,
+                            textureHeight: height,
+                            timeout: 10000
+                        }
                     )
                     
                     // Copy to texture array
@@ -566,11 +572,13 @@ export class LodArtworkRenderer {
      * 
      * Note: Primary artwork URLs should come from Steam API metadata (artwork.header, artwork.library)
      * which can point to either CDN correctly. These fallbacks are a last resort.
+     * 
+     * IMPORTANT: library_600x900.jpg (portrait) is first because both LOD levels use portrait aspect ratio.
      */
     private static readonly FALLBACK_PATTERNS = [
-        { pattern: 'header.jpg', name: 'constructed-header' },
-        { pattern: 'library_600x900.jpg', name: 'constructed-library' },
-        { pattern: 'capsule_616x353.jpg', name: 'constructed-capsule' }
+        { pattern: 'library_600x900.jpg', name: 'constructed-library' },  // Portrait - preferred for 2:3 aspect ratio
+        { pattern: 'header.jpg', name: 'constructed-header' },            // Landscape - fallback only
+        { pattern: 'capsule_616x353.jpg', name: 'constructed-capsule' }   // Landscape - last resort
     ] as const
     
     private loadPersistentCaches(): void {

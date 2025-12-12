@@ -26,7 +26,7 @@ const log = Logger.withContext('LodDistanceManager')
 export interface LodDistanceConfig {
     /** Distance threshold: closer than this = HIGH LOD */
     highDistance: number
-    /** Distance threshold: closer than this = MID LOD, farther = LOW */
+    /** Distance threshold: closer than this = MED LOD, farther = LOW */
     midDistance: number
     /** Hysteresis buffer to prevent thrashing at boundaries */
     hysteresis: number
@@ -92,13 +92,13 @@ export class LodDistanceManager {
         
         // Initialize config from AppSettings with fallback to provided config/defaults
         const savedHighDistance = AppSettings.get(Setting.LodHighDistance)
-        const savedMidDistance = AppSettings.get(Setting.LodMidDistance)
+        const savedMedDistance = AppSettings.get(Setting.LodMedDistance)
         
         this.config = { 
             ...DEFAULT_CONFIG, 
             ...config,
             highDistance: savedHighDistance ?? config.highDistance ?? DEFAULT_CONFIG.highDistance,
-            midDistance: savedMidDistance ?? config.midDistance ?? DEFAULT_CONFIG.midDistance
+            midDistance: savedMedDistance ?? config.midDistance ?? DEFAULT_CONFIG.midDistance
         }
         
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
@@ -113,7 +113,7 @@ export class LodDistanceManager {
             this.onSettingChanged.bind(this)
         )
         
-        log.lifecycle(`Initialized: HIGH < ${this.config.highDistance}m, MID < ${this.config.midDistance}m, Hysteresis: ${this.config.hysteresis}m, Update every ${this.config.updateFrequency} frames`)
+        log.lifecycle(`Initialized: HIGH < ${this.config.highDistance}m, MED < ${this.config.midDistance}m, Hysteresis: ${this.config.hysteresis}m, Update every ${this.config.updateFrequency} frames`)
     }
     
     private onSettingChanged(event: SettingChangedEvent): void {
@@ -121,10 +121,10 @@ export class LodDistanceManager {
             this.config.highDistance = event.value
             this.updateSquaredDistances()
             log.info(`HIGH distance updated to ${event.value}m`)
-        } else if (event.key === 'lodMidDistance' && typeof event.value === 'number') {
+        } else if (event.key === 'lodMedDistance' && typeof event.value === 'number') {
             this.config.midDistance = event.value
             this.updateSquaredDistances()
-            log.info(`MID distance updated to ${event.value}m`)
+            log.info(`MED distance updated to ${event.value}m`)
         }
     }
     

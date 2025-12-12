@@ -129,11 +129,12 @@ describe('LodArtworkRenderer', () => {
             expect(highConfig!.name).toBe('high')
         })
 
-        it('should define mid LOD with 128x128 textures', () => {
+        it('should define med LOD with 150x225 portrait textures (half of high resolution)', () => {
             const midConfig = DEFAULT_LOD_CONFIGS.find(c => c.level === LOD_LEVEL.MID)
             expect(midConfig).toBeDefined()
-            expect(midConfig!.textureSize).toBe(128)
-            expect(midConfig!.name).toBe('mid')
+            expect(midConfig!.textureWidth).toBe(150)
+            expect(midConfig!.textureHeight).toBe(225)
+            expect(midConfig!.name).toBe('med')
         })
 
         it('should have 2 LOD levels configured (two-tier system)', () => {
@@ -156,7 +157,7 @@ describe('LodArtworkRenderer', () => {
             
             expect(stats.lods).toBeDefined()
             expect(stats.lods.high).toBeDefined()
-            expect(stats.lods.mid).toBeDefined()
+            expect(stats.lods.med).toBeDefined()
             // No LOW in two-tier system
         })
 

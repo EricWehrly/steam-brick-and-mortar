@@ -43,7 +43,10 @@ export const Setting = {
     UseLodAtlas: 'useLodAtlas',
     // LOD Settings
     LodHighDistance: 'lodHighDistance',
-    LodMidDistance: 'lodMidDistance',
+    LodMedDistance: 'lodMedDistance',
+    LodMaxHighSlots: 'lodMaxHighSlots',
+    LodHighReductionRatio: 'lodHighReductionRatio',
+    LodMedReductionRatio: 'lodMedReductionRatio',
     // Interface
     ShowFPS: 'showFPS',
     ShowPerformanceStats: 'showPerformanceStats',
@@ -79,8 +82,11 @@ export interface ApplicationSettings {
     useLodAtlas: boolean       // Use LOD texture atlas with per-instance detail levels
     
     // LOD Settings
-    lodHighDistance: number    // Distance threshold for HIGH texture quality (meters)
-    lodMidDistance: number     // Distance threshold for MID texture quality (meters)
+    lodHighDistance: number      // Distance threshold for HIGH texture quality (meters)
+    lodMedDistance: number       // Distance threshold for MED texture quality (meters)
+    lodMaxHighSlots: number      // Max HIGH texture slots (affects VRAM)
+    lodHighReductionRatio: number // HIGH texture reduction (0.5 = 50% of source)
+    lodMedReductionRatio: number  // MED texture reduction (0.25 = 25% of source)
     
     // Interface Settings
     showFPS: boolean
@@ -339,7 +345,10 @@ export class AppSettings {
             
             // LOD Settings - distances in meters for texture quality switching
             lodHighDistance: 3.0,  // Within 3m = HIGH quality textures
-            lodMidDistance: 8.0,   // Within 8m = MID quality, beyond = LOW
+            lodMedDistance: 8.0,   // Within 8m = MED quality, beyond = LOW
+            lodMaxHighSlots: 128,  // Max HIGH texture slots (128 × 300×450 = ~66MB VRAM)
+            lodHighReductionRatio: 0.5,  // HIGH = 50% of source (600×900 → 300×450)
+            lodMedReductionRatio: 0.25,  // MED = 25% of source (600×900 → 150×225)
             
             // Interface Settings
             showFPS: false,
