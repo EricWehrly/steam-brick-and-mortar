@@ -19,7 +19,7 @@ import type {
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
 import { MultiAtlasArtworkRenderer } from './instancing/MultiAtlasArtworkRenderer'
-import { type LodLevel } from './instancing/LodArtworkRenderer'
+import { LOD_LEVEL, type LodLevel, type LodConfig } from './instancing/LodArtworkRenderer'
 import { LodArtworkRendererDebug } from './instancing/LodArtworkRendererDebug'
 import { LodDistanceManager } from './instancing/LodDistanceManager'
 import { ShelfSide } from '../props/SharedPropsUtils'
@@ -27,6 +27,10 @@ import { AppSettings, Setting } from '../../core/AppSettings'
 import { Logger } from '../../utils/Logger'
 
 const log = Logger.withContext('GpuGameBoxRenderer')
+
+// Steam capsule source dimensions (what CDN claims, though actual is ~460×690)
+const STEAM_SOURCE_WIDTH = 600
+const STEAM_SOURCE_HEIGHT = 900
 
 /** 67% probability of showing artwork vs label-only */
 const ARTWORK_PROBABILITY = 0.67
@@ -64,16 +68,21 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         // Create artwork renderer based on settings (priority: LOD > MultiAtlas > Single)
         if (this.useLodAtlas) {
+            const lodConfigs = this.buildLodConfigsFromSettings()
+            const maxHighSlots = AppSettings.get(Setting.LodMaxHighSlots)
+            
             this.lodArtworkRenderer = new LodArtworkRendererDebug({
                 maxTextures: maxGames,
                 lazyHighTextures: true,  // Memory optimization: load HIGH textures on demand
                 boxWidth: this.dimensions.width,
                 boxHeight: this.dimensions.height,
-                boxDepth: this.dimensions.depth
+                boxDepth: this.dimensions.depth,
+                lodConfigs,
+                maxHighTextureCache: maxHighSlots
             })
             // Create distance manager for automatic LOD switching
             this.lodDistanceManager = new LodDistanceManager(this.lodArtworkRenderer)
-            log.lifecycle(`Using LOD atlas (max ${maxGames}, lazy HIGH enabled)`)
+            log.lifecycle(`Using LOD atlas (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
             
             // TODO: Remove all these debug functions. all of them
             // Expose diagnostic on window for debugging
@@ -440,8 +449,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         const shouldUseArtwork = Math.random() < ARTWORK_PROBABILITY
         
         // Get best artwork URL from metadata - priority order:
-        // 1. header (most reliable, works on new shared.akamai CDN)
-        // 2. library (portrait format, ideal for game boxes but less reliable)
+        // 1. library (portrait format, ideal for game boxes - consistent LOD rendering)
+        // 2. header (landscape fallback, LodArtworkRenderer will try portrait alternatives)
         // Note: We pass the full artwork object so LodArtworkRenderer can try multiple URLs
         const artworkUrl = shouldUseArtwork ? this.selectBestArtworkUrl(game) : undefined
         
@@ -455,20 +464,21 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     
     /**
      * Select best artwork URL from game metadata
-     * Prioritizes actual metadata URLs over constructed fallbacks
+     * Prioritizes portrait format (library_600x900.jpg) for consistent LOD rendering
      */
     private selectBestArtworkUrl(game: SteamGameData): string | undefined {
-        // Priority 1: Use header URL from metadata (works on new shared.akamai CDN)
-        if (game.artwork?.header) {
-            return game.artwork.header
-        }
-        
-        // Priority 2: Use library URL from metadata (portrait format)
+        // Priority 1: Use library URL from metadata (portrait format - ideal for game boxes)
         if (game.artwork?.library) {
             return game.artwork.library
         }
         
-        // Priority 3: Construct URL as last resort (may fail for newer games)
+        // Priority 2: Use header URL from metadata (landscape - fallback)
+        // Note: LodArtworkRenderer will attempt to find portrait alternatives
+        if (game.artwork?.header) {
+            return game.artwork.header
+        }
+        
+        // Priority 3: Construct portrait URL as last resort (may fail for newer games)
         if (game.appid) {
             log.debug(`No artwork URLs in metadata for "${game.name}" - using constructed URL`)
             return `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
@@ -624,5 +634,28 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         } else {
             log.info('Memory stats only available with multi-atlas or LOD renderer')
         }
+    }
+    
+    /**
+     * Build LOD configs from AppSettings
+     * This allows user to control texture resolutions and VRAM usage
+     */
+    private buildLodConfigsFromSettings(): LodConfig[] {
+        const highRatio = AppSettings.get(Setting.LodHighReductionRatio)
+        const medRatio = AppSettings.get(Setting.LodMedReductionRatio)
+        const maxHighSlots = AppSettings.get(Setting.LodMaxHighSlots)
+        
+        // Calculate dimensions from ratios
+        const highWidth = Math.floor(STEAM_SOURCE_WIDTH * highRatio)
+        const highHeight = Math.floor(STEAM_SOURCE_HEIGHT * highRatio)
+        const medWidth = Math.floor(STEAM_SOURCE_WIDTH * medRatio)
+        const medHeight = Math.floor(STEAM_SOURCE_HEIGHT * medRatio)
+        
+        log.info(`LOD config from settings: HIGH ${highWidth}×${highHeight} (${maxHighSlots} slots), MED ${medWidth}×${medHeight}`)
+        
+        return [
+            { level: LOD_LEVEL.HIGH, textureWidth: highWidth, textureHeight: highHeight, name: 'high', maxDepth: maxHighSlots },
+            { level: LOD_LEVEL.MID, textureWidth: medWidth, textureHeight: medHeight, name: 'med' }
+        ]
     }
 }
