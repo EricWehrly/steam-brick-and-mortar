@@ -35,6 +35,10 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     }
 
     render(): string {
+        const lodHighRatio = this.appSettings.getSetting('lodHighReductionRatio')
+        const lodMedRatio = this.appSettings.getSetting('lodMedReductionRatio')
+        const lodMaxHighSlots = this.appSettings.getSetting('lodMaxHighSlots')
+        
         return renderTemplate(graphicsSettingsPanelTemplate, {
             // Lighting Quality
             lightingQualitySimple: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.SIMPLE,
@@ -54,8 +58,21 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             showLightingDebug: this.appSettings.getSetting('showLightingDebug'),
             showCeiling: this.appSettings.getSetting('showCeiling'),
             
-            // LOD Settings
-            lodHighDistance: this.appSettings.getSetting('lodHighDistance')
+            // LOD Settings - Distance thresholds
+            lodHighDistance: this.appSettings.getSetting('lodHighDistance'),
+            lodMedDistance: this.appSettings.getSetting('lodMedDistance'),
+            
+            // LOD Settings - VRAM management
+            lodMaxHighSlots: lodMaxHighSlots,
+            lodVramEstimate: this.calculateVramEstimate(lodMaxHighSlots, lodHighRatio),
+            
+            // LOD Settings - Texture quality ratios
+            lodHighReductionRatio: lodHighRatio,
+            lodHighRatioPercent: Math.round(lodHighRatio * 100),
+            lodHighDimensions: this.calculateDimensions(lodHighRatio),
+            lodMedReductionRatio: lodMedRatio,
+            lodMedRatioPercent: Math.round(lodMedRatio * 100),
+            lodMedDimensions: this.calculateDimensions(lodMedRatio)
         })
     }
 
@@ -118,6 +135,40 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
                 valueDisplayId: 'lod-high-distance-value',
                 formatDisplay: (v) => `${v}m`,
                 onInput: (value) => this.updateSetting('lodHighDistance', value)
+            },
+            {
+                sliderId: 'lod-med-distance',
+                valueDisplayId: 'lod-med-distance-value',
+                formatDisplay: (v) => `${v}m`,
+                onInput: (value) => this.updateSetting('lodMedDistance', value)
+            },
+            {
+                sliderId: 'lod-max-high-slots',
+                valueDisplayId: 'lod-max-high-slots-value',
+                formatDisplay: (v) => `${v}`,
+                onInput: (value) => {
+                    this.updateSetting('lodMaxHighSlots', value)
+                    this.updateVramEstimate(value)
+                }
+            },
+            {
+                sliderId: 'lod-high-ratio',
+                valueDisplayId: 'lod-high-ratio-value',
+                formatDisplay: (v) => `${Math.round(v * 100)}%`,
+                onInput: (value) => {
+                    this.updateSetting('lodHighReductionRatio', value)
+                    this.updateHighDimensions(value)
+                    this.updateVramEstimate(this.appSettings.getSetting('lodMaxHighSlots'))
+                }
+            },
+            {
+                sliderId: 'lod-med-ratio',
+                valueDisplayId: 'lod-med-ratio-value',
+                formatDisplay: (v) => `${Math.round(v * 100)}%`,
+                onInput: (value) => {
+                    this.updateSetting('lodMedReductionRatio', value)
+                    this.updateMedDimensions(value)
+                }
             }
         ])
     }
@@ -127,6 +178,40 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             buttonId: 'reset-graphics-settings',
             onClick: this.resetToDefaults.bind(this)
         })
+    }
+
+    // LOD helper methods
+    private readonly STEAM_SOURCE_WIDTH = 600
+    private readonly STEAM_SOURCE_HEIGHT = 900
+    
+    private calculateVramEstimate(slots: number, ratio: number): number {
+        const width = Math.floor(this.STEAM_SOURCE_WIDTH * ratio)
+        const height = Math.floor(this.STEAM_SOURCE_HEIGHT * ratio)
+        const bytesPerTexture = width * height * 4 // RGBA
+        return Math.round((slots * bytesPerTexture) / (1024 * 1024))
+    }
+    
+    private calculateDimensions(ratio: number): string {
+        const width = Math.floor(this.STEAM_SOURCE_WIDTH * ratio)
+        const height = Math.floor(this.STEAM_SOURCE_HEIGHT * ratio)
+        return `${width}×${height}`
+    }
+    
+    private updateVramEstimate(slots: number): void {
+        const ratio = this.appSettings.getSetting('lodHighReductionRatio')
+        const vram = this.calculateVramEstimate(slots, ratio)
+        const el = document.getElementById('lod-vram-estimate')
+        if (el) el.textContent = `(~${vram}MB VRAM)`
+    }
+    
+    private updateHighDimensions(ratio: number): void {
+        const el = document.getElementById('lod-high-dimensions')
+        if (el) el.textContent = this.calculateDimensions(ratio)
+    }
+    
+    private updateMedDimensions(ratio: number): void {
+        const el = document.getElementById('lod-med-dimensions')
+        if (el) el.textContent = this.calculateDimensions(ratio)
     }
 
     private getShadowQualityLabel(quality: number): string {
@@ -158,7 +243,13 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         this.appSettings.setSetting('enableLighting', true, EventSource.UI)
         this.appSettings.setSetting('showLightingDebug', false, EventSource.UI)
         this.appSettings.setSetting('showCeiling', true, EventSource.UI)
+        
+        // Reset LOD settings
         this.appSettings.setSetting('lodHighDistance', 3.0, EventSource.UI)
+        this.appSettings.setSetting('lodMedDistance', 8.0, EventSource.UI)
+        this.appSettings.setSetting('lodMaxHighSlots', 128, EventSource.UI)
+        this.appSettings.setSetting('lodHighReductionRatio', 0.5, EventSource.UI)
+        this.appSettings.setSetting('lodMedReductionRatio', 0.25, EventSource.UI)
         
         this.refreshSettingsDisplay()
         
@@ -170,7 +261,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             enableLighting: true,
             showLightingDebug: false,
             showCeiling: true,
-            lodHighDistance: 3.0
+            lodHighDistance: 3.0,
+            lodMedDistance: 8.0,
+            lodMaxHighSlots: 128,
+            lodHighReductionRatio: 0.5,
+            lodMedReductionRatio: 0.25
         })
         
         console.log('🎨 Graphics settings reset to defaults')
@@ -236,6 +331,45 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             const distance = this.appSettings.getSetting('lodHighDistance')
             lodHighDistanceSlider.value = distance.toString()
             lodHighDistanceValue.textContent = `${distance}m`
+        }
+        
+        // Update LOD med distance slider
+        const lodMedDistanceSlider = document.getElementById('lod-med-distance') as HTMLInputElement
+        const lodMedDistanceValue = document.getElementById('lod-med-distance-value') as HTMLSpanElement
+        if (lodMedDistanceSlider && lodMedDistanceValue) {
+            const distance = this.appSettings.getSetting('lodMedDistance')
+            lodMedDistanceSlider.value = distance.toString()
+            lodMedDistanceValue.textContent = `${distance}m`
+        }
+        
+        // Update LOD max high slots slider
+        const lodMaxSlotsSlider = document.getElementById('lod-max-high-slots') as HTMLInputElement
+        const lodMaxSlotsValue = document.getElementById('lod-max-high-slots-value') as HTMLSpanElement
+        if (lodMaxSlotsSlider && lodMaxSlotsValue) {
+            const slots = this.appSettings.getSetting('lodMaxHighSlots')
+            lodMaxSlotsSlider.value = slots.toString()
+            lodMaxSlotsValue.textContent = `${slots}`
+            this.updateVramEstimate(slots)
+        }
+        
+        // Update LOD high ratio slider
+        const lodHighRatioSlider = document.getElementById('lod-high-ratio') as HTMLInputElement
+        const lodHighRatioValue = document.getElementById('lod-high-ratio-value') as HTMLSpanElement
+        if (lodHighRatioSlider && lodHighRatioValue) {
+            const ratio = this.appSettings.getSetting('lodHighReductionRatio')
+            lodHighRatioSlider.value = ratio.toString()
+            lodHighRatioValue.textContent = `${Math.round(ratio * 100)}%`
+            this.updateHighDimensions(ratio)
+        }
+        
+        // Update LOD med ratio slider
+        const lodMedRatioSlider = document.getElementById('lod-med-ratio') as HTMLInputElement
+        const lodMedRatioValue = document.getElementById('lod-med-ratio-value') as HTMLSpanElement
+        if (lodMedRatioSlider && lodMedRatioValue) {
+            const ratio = this.appSettings.getSetting('lodMedReductionRatio')
+            lodMedRatioSlider.value = ratio.toString()
+            lodMedRatioValue.textContent = `${Math.round(ratio * 100)}%`
+            this.updateMedDimensions(ratio)
         }
     }
 
