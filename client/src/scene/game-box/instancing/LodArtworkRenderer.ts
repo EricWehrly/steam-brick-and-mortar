@@ -25,7 +25,7 @@ import { RenderLoopRegistry } from '../../RenderLoopRegistry'
 import vertexShader from './shaders/instanced-artwork-lod.vert?raw'
 import fragmentShader from './shaders/instanced-artwork-lod.frag?raw'
 import { TextureWorker } from './TextureWorker'
-import { HighTextureCache, HighTextureState } from './HighTextureCache'
+import { HighTextureCache, HighTextureState, type HighTextureCacheConfig } from './HighTextureCache'
 import { SpatialPrewarmingManager, type PrewarmingConfig } from './SpatialPrewarmingManager'
 import { PixelDataCache } from './PixelDataCache'
 import { Logger } from '../../../utils/Logger'
@@ -190,7 +190,7 @@ export class LodArtworkRenderer {
             const highConfig = this.lodConfigs.find(c => c.level === LOD_LEVEL.HIGH)
             // HIGH array depth determines how many slots we have for dynamic loading
             const highArrayDepth = highConfig?.maxDepth ?? this.maxTextures
-            this.highTextureCache = new HighTextureCache({
+            this.highTextureCache = this.createHighTextureCache({
                 totalSlots: highArrayDepth,
                 textureWidth: highConfig?.textureWidth ?? STEAM_CAPSULE_WIDTH,
                 textureHeight: highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT,
@@ -361,264 +361,259 @@ export class LodArtworkRenderer {
         artworkUrl: string,
         appid?: number
     ): Promise<{ success: boolean; instanceIndex: number }> {
-        // Lazy initialize
         if (!this.instancedMesh) {
             this.initialize()
         }
         
-        // Check if artwork previously failed (CORS, 404, etc) - don't retry
+        // Early exit checks
+        const earlyResult = this.checkEarlyExitConditions(gameName)
+        if (earlyResult) return earlyResult
+        
+        const textureIndex = this.nextTextureIndex++
+        this.artworkUrls.set(textureIndex, artworkUrl)
+        
+        // Build URL strategy and attempt to load textures
+        const urlsToTry = this.buildUrlStrategy(gameName, artworkUrl, appid)
+        const loadResult = await this.tryLoadTexturesFromUrls(urlsToTry, textureIndex, gameName, artworkUrl)
+        
+        if (!loadResult.success) {
+            this.nextTextureIndex--
+            this.artworkUrls.delete(textureIndex)
+            return { success: false, instanceIndex: -1 }
+        }
+        
+        // Create instance after successful texture load
+        return this.createInstance(position, gameName, textureIndex, loadResult.successUrl, appid)
+    }
+    
+    private checkEarlyExitConditions(gameName: string): { success: boolean; instanceIndex: number } | null {
         if (this.failedArtwork.has(gameName)) {
             const failure = this.failedArtwork.get(gameName)
             log.debug(`Skipping "${gameName}": previously failed (${failure?.reason})`)
             return { success: false, instanceIndex: -1 }
         }
         
-        // Check capacity
         if (this.nextTextureIndex >= this.maxTextures) {
             log.warn(`Atlas full (${this.maxTextures} textures)`)
             return { success: false, instanceIndex: -1 }
         }
         
-        // Check for existing texture
         const existingIndex = this.textureSlots.get(gameName)
         if (existingIndex !== undefined) {
             return { success: true, instanceIndex: existingIndex }
         }
         
-        const textureIndex = this.nextTextureIndex++
-        
-        // Store URL for lazy HIGH texture loading
-        this.artworkUrls.set(textureIndex, artworkUrl)
-        
-        // Check if we have a cached successful fallback URL for this game
-        const cachedSuccess = this.fallbackSuccesses.get(gameName)
-        
-        // Try primary URL first, then fallbacks if needed
-        const triedUrls = new Set<string>()
-        let successUrl = artworkUrl
-        let usedFallback = false
-        
-        // Build list of URLs to try
-        // If we have a cached success, use that URL first (skip known-bad primary)
+        return null
+    }
+    
+    private buildUrlStrategy(gameName: string, artworkUrl: string, appid?: number): Array<{ url: string; type: string }> {
         const urlsToTry: Array<{ url: string; type: string }> = []
         const extractedAppid = appid ?? this.extractAppidFromUrl(artworkUrl)
+        const cachedSuccess = this.fallbackSuccesses.get(gameName)
         
-        // Check if primary URL is from new CDN (shared.akamai) - if so, constructed fallbacks won't work
+        // New CDN URLs don't have fallbacks at cdn.akamai
         const isNewCdnUrl = artworkUrl.includes('shared.akamai.steamstatic.com') || 
                            artworkUrl.includes('store_item_assets')
         
         if (cachedSuccess) {
-            // Use cached working URL first
             urlsToTry.push({ url: cachedSuccess.fallbackUrl, type: `cached-${cachedSuccess.fallbackType}` })
-            // Add other fallbacks in case cached one stopped working (only if old CDN)
             if (extractedAppid && !isNewCdnUrl) {
                 urlsToTry.push(...this.generateFallbackUrls(extractedAppid, new Set([cachedSuccess.fallbackUrl])))
             }
         } else {
-            // Normal flow: try primary first, then fallbacks
             urlsToTry.push({ url: artworkUrl, type: 'primary' })
-            // Only generate constructed fallbacks if using old CDN URL pattern
-            // New CDN URLs (shared.akamai) won't have fallbacks at cdn.akamai
             if (extractedAppid && !isNewCdnUrl) {
                 urlsToTry.push(...this.generateFallbackUrls(extractedAppid, new Set([artworkUrl])))
             }
         }
         
+        return urlsToTry
+    }
+    
+    private async tryLoadTexturesFromUrls(
+        urlsToTry: Array<{ url: string; type: string }>,
+        textureIndex: number,
+        gameName: string,
+        originalUrl: string
+    ): Promise<{ success: boolean; successUrl: string }> {
+        const triedUrls = new Set<string>()
         let lastError: Error | null = null
         
         for (const { url: currentUrl, type: urlType } of urlsToTry) {
             triedUrls.add(currentUrl)
             
             try {
-                // Process LOD levels SEQUENTIALLY - the worker shares a canvas
-                // and concurrent requests with different sizes cause data corruption
-                for (const [level, state] of this.lodTextures) {
-                    // Skip HIGH texture if lazy loading is enabled - will be loaded on demand
-                    // NOTE: We register with HighTextureCache AFTER MID succeeds to avoid
-                    // registering games whose artwork is inaccessible (CORS, 404, etc)
-                    if (this.lazyHighTextures && level === LOD_LEVEL.HIGH) {
-                        continue
-                    }
-                    
-                    // Get texture dimensions (support both square and non-square)
-                    const width = state.config.textureWidth ?? state.config.textureSize ?? 128
-                    const height = state.config.textureHeight ?? state.config.textureSize ?? 128
-                    
-                    let imageData: Uint8ClampedArray | null = null
-                    
-                    // For MED textures with lazy HIGH loading: always derive from HIGH pixels
-                    // This ensures single source of truth (HIGH cache) and saves bandwidth
-                    if (level === LOD_LEVEL.MID && this.pixelCache && this.lazyHighTextures) {
-                        const portraitUrl = this.convertToPortraitUrl(currentUrl)
-                        let cachedHighPixels = await this.pixelCache.get(portraitUrl)
-                        
-                        if (!cachedHighPixels) {
-                            // Cache miss: fetch HIGH at native size, cache it, then downsample
-                            // This ensures the cache is populated for future HIGH texture requests
-                            const highConfig = this.lodConfigs.find(c => c.level === LOD_LEVEL.HIGH)
-                            const highWidth = highConfig?.textureWidth ?? STEAM_CAPSULE_WIDTH
-                            const highHeight = highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT
-                            
-                            const result = await this.textureWorker.fetchAndProcessWithOptions(
-                                portraitUrl,
-                                textureIndex,
-                                gameName,
-                                {
-                                    textureWidth: highWidth,
-                                    textureHeight: highHeight,
-                                    timeout: 10000
-                                }
-                            )
-                            
-                            // Cache the HIGH pixels for future use (by HighTextureCache and future MED requests)
-                            await this.pixelCache.put(portraitUrl, result.imageData, highWidth, highHeight)
-                            log.debug(`Cached HIGH pixels for "${gameName}": ${highWidth}×${highHeight}`)
-                            
-                            cachedHighPixels = {
-                                pixelData: result.imageData,
-                                width: highWidth,
-                                height: highHeight
-                            }
-                        }
-                        
-                        // Downsample HIGH → MED
-                        imageData = this.downsamplePixels(
-                            cachedHighPixels.pixelData,
-                            cachedHighPixels.width,
-                            cachedHighPixels.height,
-                            width,
-                            height
-                        )
-                        log.debug(`MED from HIGH for "${gameName}": ${cachedHighPixels.width}×${cachedHighPixels.height} → ${width}×${height}`)
-                    } else {
-                        // Non-lazy mode or non-MED: fetch directly at target size
-                        const result = await this.textureWorker.fetchAndProcessWithOptions(
-                            currentUrl,
-                            textureIndex,
-                            gameName,
-                            {
-                                textureWidth: width,
-                                textureHeight: height,
-                                timeout: 10000
-                            }
-                        )
-                        imageData = result.imageData
-                    }
-                    
-                    // Copy to texture array
-                    if (!state.dataArrayTexture) {
-                        throw new Error(`${state.config.name} texture array not initialized`)
-                    }
-                    const sliceSize = width * height * 4
-                    const offset = textureIndex * sliceSize
-                    const arrayData = state.dataArrayTexture.image.data as Uint8Array
-                    
-                    // Verify image data size matches expected
-                    if (imageData.length !== sliceSize) {
-                        log.error(`Size mismatch for "${gameName}" LOD ${level}: expected ${sliceSize}, got ${imageData.length}`)
-                    }
-                    
-                    arrayData.set(imageData, offset)
-                    state.pendingUpdates.add(textureIndex)
-                }
-                
-                // Success! Track if we used a fallback (non-primary or cached fallback)
-                successUrl = currentUrl
-                usedFallback = urlType !== 'primary' && !urlType.startsWith('cached-')
-                const usedCachedFallback = urlType.startsWith('cached-')
-                
-                if (usedFallback) {
-                    // New fallback discovery - save it for future loads
-                    log.info(`Fallback success for "${gameName}": ${urlType} (${currentUrl})`)
-                    this.fallbackSuccesses.set(gameName, { 
-                        originalUrl: artworkUrl, 
-                        fallbackUrl: currentUrl, 
-                        fallbackType: urlType 
-                    })
-                    // Persist so we skip the failed primary URL on next load
-                    this.savePersistentSuccesses()
-                } else if (usedCachedFallback) {
-                    // Cached fallback still works - no need to log or re-save
-                    log.debug(`Used cached fallback for "${gameName}": ${currentUrl}`)
-                }
-                lastError = null
-                break // Success - exit URL loop
-                
+                await this.loadTexturesForAllLods(currentUrl, textureIndex, gameName)
+                this.recordUrlSuccess(gameName, originalUrl, currentUrl, urlType)
+                return { success: true, successUrl: currentUrl }
             } catch (error) {
                 lastError = error instanceof Error ? error : new Error(String(error))
                 log.debug(`URL failed for "${gameName}" (${urlType}): ${lastError.message}`)
-                // Continue to next fallback URL
             }
         }
         
-        // If all URLs failed, record failure and bail
-        if (lastError) {
-            this.nextTextureIndex--
-            this.artworkUrls.delete(textureIndex)
+        // All URLs failed
+        this.recordUrlFailure(gameName, originalUrl, triedUrls, lastError!)
+        return { success: false, successUrl: '' }
+    }
+    
+    private async loadTexturesForAllLods(currentUrl: string, textureIndex: number, gameName: string): Promise<void> {
+        // Process LOD levels SEQUENTIALLY - worker shares a canvas
+        for (const [level, state] of this.lodTextures) {
+            if (this.lazyHighTextures && level === LOD_LEVEL.HIGH) {
+                continue
+            }
             
-            const reason = this.categorizeFailure(lastError.message)
-            this.failedArtwork.set(gameName, { 
-                reason, 
-                url: artworkUrl, 
-                urlsTried: Array.from(triedUrls),
-                timestamp: Date.now() 
-            })
-            // Persist failures so we don't retry them after page refresh
-            this.savePersistentFailures()
-            log.debug(`All URLs failed for "${gameName}": ${reason} (tried ${triedUrls.size} URLs)`)
-            return { success: false, instanceIndex: -1 }
+            const width = state.config.textureWidth ?? state.config.textureSize ?? 128
+            const height = state.config.textureHeight ?? state.config.textureSize ?? 128
+            
+            const imageData = await this.loadTextureData(level, currentUrl, textureIndex, gameName, width, height)
+            this.copyToTextureArray(state, textureIndex, imageData, width, height, gameName, level)
+        }
+    }
+    
+    private async loadTextureData(
+        level: LodLevel,
+        currentUrl: string,
+        textureIndex: number,
+        gameName: string,
+        width: number,
+        height: number
+    ): Promise<Uint8ClampedArray> {
+        // For MED with lazy HIGH: derive from cached HIGH pixels
+        if (level === LOD_LEVEL.MID && this.pixelCache && this.lazyHighTextures) {
+            return this.loadMedFromHighCache(currentUrl, textureIndex, gameName, width, height)
         }
         
+        // Direct fetch at target size
+        const result = await this.textureWorker.fetchAndProcessWithOptions(
+            currentUrl, textureIndex, gameName,
+            { textureWidth: width, textureHeight: height, timeout: 10000 }
+        )
+        return result.imageData
+    }
+    
+    private async loadMedFromHighCache(
+        currentUrl: string,
+        textureIndex: number,
+        gameName: string,
+        targetWidth: number,
+        targetHeight: number
+    ): Promise<Uint8ClampedArray> {
+        const portraitUrl = this.getPortraitUrl(currentUrl)
+        let cachedHighPixels = await this.pixelCache!.get(portraitUrl)
+        
+        if (!cachedHighPixels) {
+            // Cache miss: fetch HIGH at native size, cache it, then downsample
+            const highConfig = this.lodConfigs.find(c => c.level === LOD_LEVEL.HIGH)
+            const highWidth = highConfig?.textureWidth ?? STEAM_CAPSULE_WIDTH
+            const highHeight = highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT
+            
+            const result = await this.textureWorker.fetchAndProcessWithOptions(
+                portraitUrl, textureIndex, gameName,
+                { textureWidth: highWidth, textureHeight: highHeight, timeout: 10000 }
+            )
+            
+            await this.pixelCache!.put(portraitUrl, result.imageData, highWidth, highHeight)
+            log.debug(`Cached HIGH pixels for "${gameName}": ${highWidth}×${highHeight}`)
+            
+            cachedHighPixels = { pixelData: result.imageData, width: highWidth, height: highHeight }
+        }
+        
+        const downsampled = this.downsamplePixels(
+            cachedHighPixels.pixelData, cachedHighPixels.width, cachedHighPixels.height,
+            targetWidth, targetHeight
+        )
+        log.debug(`MED from HIGH for "${gameName}": ${cachedHighPixels.width}×${cachedHighPixels.height} → ${targetWidth}×${targetHeight}`)
+        return downsampled
+    }
+    
+    private copyToTextureArray(
+        state: LodTextureState,
+        textureIndex: number,
+        imageData: Uint8ClampedArray,
+        width: number,
+        height: number,
+        gameName: string,
+        level: LodLevel
+    ): void {
+        if (!state.dataArrayTexture) {
+            throw new Error(`${state.config.name} texture array not initialized`)
+        }
+        
+        const sliceSize = width * height * 4
+        const offset = textureIndex * sliceSize
+        const arrayData = state.dataArrayTexture.image.data as Uint8Array
+        
+        if (imageData.length !== sliceSize) {
+            log.error(`Size mismatch for "${gameName}" LOD ${level}: expected ${sliceSize}, got ${imageData.length}`)
+        }
+        
+        arrayData.set(imageData, offset)
+        state.pendingUpdates.add(textureIndex)
+    }
+    
+    private recordUrlSuccess(gameName: string, originalUrl: string, successUrl: string, urlType: string): void {
+        const usedFallback = urlType !== 'primary' && !urlType.startsWith('cached-')
+        const usedCachedFallback = urlType.startsWith('cached-')
+        
+        if (usedFallback) {
+            log.info(`Fallback success for "${gameName}": ${urlType} (${successUrl})`)
+            this.fallbackSuccesses.set(gameName, { 
+                originalUrl, fallbackUrl: successUrl, fallbackType: urlType 
+            })
+            this.savePersistentSuccesses()
+        } else if (usedCachedFallback) {
+            log.debug(`Used cached fallback for "${gameName}": ${successUrl}`)
+        }
+    }
+    
+    private recordUrlFailure(gameName: string, originalUrl: string, triedUrls: Set<string>, error: Error): void {
+        const reason = this.categorizeFailure(error.message)
+        this.failedArtwork.set(gameName, { 
+            reason, url: originalUrl, urlsTried: Array.from(triedUrls), timestamp: Date.now() 
+        })
+        this.savePersistentFailures()
+        log.debug(`All URLs failed for "${gameName}": ${reason} (tried ${triedUrls.size} URLs)`)
+    }
+    
+    private createInstance(
+        position: THREE.Vector3,
+        gameName: string,
+        textureIndex: number,
+        successUrl: string,
+        appid?: number
+    ): { success: boolean; instanceIndex: number } {
         try {
-            // MID loading succeeded - now register with HighTextureCache for lazy HIGH loading
-            // This is done AFTER MID succeeds to avoid registering games with inaccessible artwork
-            // Use the successful URL (may be fallback) for HIGH texture loading
             if (this.lazyHighTextures) {
                 this.highTextureCache?.registerGame(textureIndex, gameName, successUrl)
             }
             
             this.textureSlots.set(gameName, textureIndex)
-            
-            // Add instance
             const instanceIndex = this.currentInstanceCount++
-            
-            // Track the reverse mapping: textureIndex -> instanceIndex
             this.textureIndexToInstance.set(textureIndex, instanceIndex)
             
             const matrix = new THREE.Matrix4()
             matrix.compose(position, LodArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
             this.instancedMesh!.setMatrixAt(instanceIndex, matrix)
             
-            // Set attributes
             const textureIndices = this.geometry!.getAttribute('textureIndex') as THREE.InstancedBufferAttribute
             textureIndices.setX(instanceIndex, textureIndex)
             
             const lodLevelAttr = this.geometry!.getAttribute('lodLevel') as THREE.InstancedBufferAttribute
             lodLevelAttr.setX(instanceIndex, this.defaultLod)
             
-            // Store metadata
             this.instanceMetadata.set(instanceIndex, {
-                name: gameName,
-                appid,
-                position: position.clone(),
-                lodLevel: this.defaultLod
+                name: gameName, appid, position: position.clone(), lodLevel: this.defaultLod
             })
             
-            // Register with spatial prewarming for proactive HIGH texture loading
             this.spatialPrewarming?.registerGamePosition(textureIndex, gameName, position)
-            
-            // Update GPU immediately - the instance is ready to render
-            // This is needed because InstancedBatchComplete fires before async texture loads complete
             this.updateGPU()
             
             return { success: true, instanceIndex }
-            
         } catch (error) {
-            // This catch is for errors AFTER texture loading succeeded (instance setup)
-            // Texture loading failures are handled in the URL loop above
             this.nextTextureIndex--
             this.artworkUrls.delete(textureIndex)
-            
             const msg = error instanceof Error ? error.message : String(error)
             log.error(`Instance setup failed for "${gameName}": ${msg}`)
             return { success: false, instanceIndex: -1 }
@@ -626,7 +621,7 @@ export class LodArtworkRenderer {
     }
     
     /**
-     * Steam CDN fallback URL patterns - ONLY used when metadata URLs fail
+     * Steam CDN fallback URL patterns - ONLY used when metadata URLs fail.
      * These are constructed URLs that work for MOST games on the old CDN
      * but may fail for newer games on shared.akamai.steamstatic.com
      * 
@@ -736,21 +731,38 @@ export class LodArtworkRenderer {
     }
     
     /**
-     * Convert any Steam artwork URL to portrait format (library_600x900.jpg)
-     * This matches the URL format used by PixelDataCache/HighTextureCache
+     * Get the portrait/library URL for caching purposes.
+     * 
+     * Priority:
+     * 1. If input is already a portrait URL (library_600x900), use it as-is (preserves CDN)
+     * 2. Otherwise construct using extracted appid (fallback for header/capsule URLs)
+     * 
+     * Note: We preserve the original URL's CDN when possible because the API may
+     * return URLs from shared.akamai.steamstatic.com which cdn.akamai doesn't have.
      */
-    private convertToPortraitUrl(artworkUrl: string): string {
+    private getPortraitUrl(artworkUrl: string): string {
+        // Already a portrait URL - use it directly (preserves correct CDN)
+        if (artworkUrl.includes('library_600x900')) {
+            return artworkUrl
+        }
+        
+        // Extract appid and construct portrait URL as fallback
         const appidMatch = artworkUrl.match(/\/apps\/(\d+)\//)
         if (!appidMatch) {
             return artworkUrl
         }
+        
+        // Preserve original CDN hostname if possible
         const appid = appidMatch[1]
-        return `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`
+        const cdnMatch = artworkUrl.match(/^(https:\/\/[^/]+)/)
+        const cdnBase = cdnMatch?.[1] ?? 'https://cdn.akamai.steamstatic.com'
+        
+        return `${cdnBase}/steam/apps/${appid}/library_600x900.jpg`
     }
     
     /**
-     * Downsample pixel data from HIGH resolution (300×450) to MED resolution (150×225)
-     * Uses simple 2x2 box filter for fast, decent quality downsampling
+     * Downsample pixel data from HIGH→MED resolution.
+     * Uses box filter averaging for fast, decent quality downsampling.
      */
     private downsamplePixels(
         srcPixels: Uint8ClampedArray,
@@ -1083,7 +1095,12 @@ export class LodArtworkRenderer {
     protected getSpatialPrewarming(): SpatialPrewarmingManager | null {
         return this.spatialPrewarming
     }
-    
+
+    /** Factory method for creating HIGH texture cache - override in debug subclass */
+    protected createHighTextureCache(config: HighTextureCacheConfig): HighTextureCache {
+        return new HighTextureCache(config)
+    }
+
     public dispose(): void {
         this.instancedMesh?.removeFromParent()
         this.geometry?.dispose()

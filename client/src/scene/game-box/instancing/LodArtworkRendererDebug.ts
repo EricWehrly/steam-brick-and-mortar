@@ -1,28 +1,108 @@
-/**
- * LodArtworkRendererDebug - Debug/diagnostic extension for LodArtworkRenderer
- * 
- * TODO: This is a temporary debug extension. Consider:
- * - Moving to a separate debug/ folder
- * - Removing from production builds via tree-shaking
- * - Converting to a mixin pattern for cleaner separation
- * 
- * Contains console diagnostic functions for development use:
- * - Memory stats and VRAM usage
- * - Failure diagnostics and categorization
- * - HIGH texture cache inspection
- * - Pending promotion state
- */
-
 import { LodArtworkRenderer, type LodArtworkConfig } from './LodArtworkRenderer'
+import { HighTextureCache, type HighTextureCacheConfig } from './HighTextureCache'
+import { HighTextureCacheDebug } from './HighTextureCacheDebug'
+import { EventManager } from '../../../core/EventManager'
+import { GameEventTypes } from '../../../types/InteractionEvents'
 import { Logger } from '../../../utils/Logger'
 import { DataManager } from '../../../core/data/DataManager'
 import type { SteamGame } from '../../../steam/SteamApiClient'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 const log = Logger.withContext('LodArtworkRendererDebug')
 
+export interface LodArtworkRendererDebugConfig extends LodArtworkConfig {
+    maxGames?: number
+}
+
 export class LodArtworkRendererDebug extends LodArtworkRenderer {
-    constructor(config: LodArtworkConfig = {}) {
+    private readonly maxGames: number
+    
+    constructor(config: LodArtworkRendererDebugConfig = {}) {
         super(config)
+        this.maxGames = config.maxGames ?? 2000
+        this.registerConsoleCommands()
+        this.registerEventListeners()
+    }
+
+    private registerEventListeners(): void {
+        EventManager.getInstance().registerEventHandler(GameEventTypes.AllBatchesComplete, () => {
+            this.logMemoryStats()
+        })
+    }
+
+    /** Override to use debug version of HighTextureCache */
+    protected override createHighTextureCache(config: HighTextureCacheConfig): HighTextureCache {
+        return new HighTextureCacheDebug(config)
+    }
+
+    private registerConsoleCommands(): void {
+        ;(window as any).lodArtworkRenderer = this
+        
+        // Renderer stats
+        ;(window as any).lodCacheStats = () => this.logHighTextureCacheStats()
+        ;(window as any).diagnosePending = () => this.diagnosePendingState()
+        
+        // Artwork failure tracking
+        ;(window as any).diagnoseArtworkFailures = () => {
+            this.logFailureDiagnostics()
+            return this.getFailureDiagnostics()
+        }
+        ;(window as any).clearArtworkFailures = () => {
+            this.clearFailureCache()
+            console.log('✅ Artwork failure cache cleared - failures will be retried on next load')
+        }
+        ;(window as any).auditArtworkFailures = () => this.auditFailedArtwork()
+
+        // Loading experiments (needs maxGames)
+        ;(window as any).experimentLoadingStrategies = (count = 9) => {
+            const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
+            if (!cache) return console.log('❌ No HIGH texture cache available')
+            const gameIndices: number[] = []
+            for (let i = 0; i < this.maxGames && gameIndices.length < count; i++) {
+                if (cache.getState(i) !== 'loaded') gameIndices.push(i)
+            }
+            console.log(`Testing with game indices: ${gameIndices.join(', ')}`)
+            cache.experimentLoadingStrategies(gameIndices)
+        }
+        ;(window as any).experimentBatch = (count = 9) => {
+            const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
+            if (!cache) return console.log('❌ No HIGH texture cache available')
+            const gameIndices: number[] = []
+            for (let i = 0; i < this.maxGames && gameIndices.length < count; i++) {
+                if (cache.getState(i) !== 'loaded') gameIndices.push(i)
+            }
+            cache.experimentLoadingStrategies(gameIndices, [{ name: 'batch', maxConcurrent: 8 }])
+        }
+
+        // Frame Budget Scheduler (singleton)
+        ;(window as any).diagnoseScheduler = async () => {
+            const { FrameBudgetScheduler } = await import('../../../utils/FrameBudgetScheduler')
+            FrameBudgetScheduler.getInstance().diagnose()
+        }
+        ;(window as any).schedulerStats = async () => {
+            const { FrameBudgetScheduler } = await import('../../../utils/FrameBudgetScheduler')
+            const stats = FrameBudgetScheduler.getInstance().getStats()
+            console.log('📊 Scheduler Stats:', stats)
+            return stats
+        }
+        ;(window as any).schedulerTune = async (maxTasksPerFrame: number) => {
+            const { FrameBudgetScheduler } = await import('../../../utils/FrameBudgetScheduler')
+            FrameBudgetScheduler.getInstance().setMaxTasksPerFrame(maxTasksPerFrame)
+            console.log(`✅ Scheduler max tasks per frame set to ${maxTasksPerFrame}`)
+        }
+
+        // Pixel Data Cache (singleton)
+        ;(window as any).diagnosePixelCache = async () => {
+            const { PixelDataCache } = await import('./PixelDataCache')
+            await PixelDataCache.getInstance().diagnose()
+        }
+        ;(window as any).clearPixelCache = async () => {
+            const { PixelDataCache } = await import('./PixelDataCache')
+            await PixelDataCache.getInstance().clear()
+            console.log('✅ Pixel cache cleared')
+        }
+
+        console.log('🔧 LOD debug exports registered. Try: lodCacheStats(), lodDistribution(), diagnoseArtworkFailures()')
     }
 
     public getMemoryStats(): {
@@ -269,10 +349,6 @@ export class LodArtworkRendererDebug extends LodArtworkRenderer {
         this.getHighTextureCache()?.logStats()
     }
 
-    public measureTextureCosts(): void {
-        this.getHighTextureCache()?.measureOperationCosts()
-    }
-
     public getPendingPromotions(): { textureIndex: number; slot: number; gameName?: string }[] {
         const result: { textureIndex: number; slot: number; gameName?: string }[] = []
         for (const [textureIndex, slot] of this.getPendingHighPromotion()) {
@@ -476,3 +552,5 @@ export class LodArtworkRendererDebug extends LodArtworkRenderer {
         }
     }
 }
+
+/* eslint-enable @typescript-eslint/no-explicit-any */
