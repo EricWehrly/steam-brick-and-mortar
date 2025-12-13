@@ -12,7 +12,7 @@
  */
 
 import * as THREE from 'three'
-import { LodArtworkRenderer, LOD_LEVEL, type LodLevel } from './LodArtworkRenderer'
+import { type ILodArtworkRenderer, LOD_LEVEL, type LodLevel } from './ILodArtworkRenderer'
 import { RenderLoopRegistry } from '../../RenderLoopRegistry'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey } from '../../../core/data/DataTypes'
@@ -56,7 +56,7 @@ interface DiagnosticStats {
 }
 
 export class LodDistanceManager {
-    private readonly renderer: LodArtworkRenderer
+    private readonly renderer: ILodArtworkRenderer
     private config: LodDistanceConfig
     private readonly renderLoopRegistry: RenderLoopRegistry
     private readonly dataManager: DataManager
@@ -87,7 +87,7 @@ export class LodDistanceManager {
     }
     private lastFrameTime: number = 0
 
-    constructor(renderer: LodArtworkRenderer, config: Partial<LodDistanceConfig> = {}) {
+    constructor(renderer: ILodArtworkRenderer, config: Partial<LodDistanceConfig> = {}) {
         this.renderer = renderer
         
         // Initialize config from AppSettings with fallback to provided config/defaults
