@@ -1,9 +1,9 @@
 /**
  * ILodArtworkRenderer - Interface for LOD-based artwork renderers
  * 
- * This interface defines the contract that both the old LodArtworkRenderer
- * and the new LodArtworkFacade implement. Consumers like LodDistanceManager
- * and GpuGameBoxRenderer depend on this interface rather than concrete implementations.
+ * This interface defines the contract that LodArtworkOrchestrator implements.
+ * Consumers like LodDistanceManager depend on this interface rather than
+ * concrete implementations, enabling polymorphic LOD management.
  */
 
 import * as THREE from 'three'
@@ -31,7 +31,7 @@ export interface InstanceLodData {
 
 /**
  * Core interface for LOD artwork renderers.
- * Implemented by both LodArtworkRenderer and LodArtworkFacade.
+ * Implemented by LodArtworkOrchestrator.
  */
 export interface ILodArtworkRenderer {
     /**
@@ -112,7 +112,7 @@ export interface ILodArtworkRenderer {
 
 /**
  * Extended interface for debug versions with memory stats.
- * Implemented by LodArtworkRendererDebug and LodArtworkFacadeDebug.
+ * Implemented by LodArtworkOrchestratorDebug.
  */
 export interface ILodArtworkRendererDebug extends ILodArtworkRenderer {
     /**
