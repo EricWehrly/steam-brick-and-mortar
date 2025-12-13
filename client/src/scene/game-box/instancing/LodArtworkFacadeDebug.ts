@@ -1,0 +1,271 @@
+/**
+ * LOD Artwork Facade Debug - Debug version with console commands and stats
+ * 
+ * Extends LodArtworkFacade with the same debug functionality as
+ * the old LodArtworkRendererDebug class.
+ */
+
+import { LodArtworkFacade, type LodArtworkConfig, type LodConfig } from './LodArtworkFacade'
+import { HighTextureCacheDebug } from './HighTextureCacheDebug'
+import { EventManager } from '../../../core/EventManager'
+import { GameEventTypes } from '../../../types/InteractionEvents'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+// Re-export for consumers
+export type { LodConfig }
+
+export interface LodArtworkFacadeDebugConfig extends LodArtworkConfig {
+    maxGames?: number
+}
+
+export class LodArtworkFacadeDebug extends LodArtworkFacade {
+    private readonly maxGames: number
+    
+    constructor(config: LodArtworkFacadeDebugConfig = {}) {
+        super(config)
+        this.maxGames = config.maxGames ?? 2000
+        this.registerConsoleCommands()
+        this.registerEventListeners()
+    }
+
+    private registerEventListeners(): void {
+        EventManager.getInstance().registerEventHandler(GameEventTypes.AllBatchesComplete, () => {
+            this.logMemoryStats()
+        })
+    }
+
+    private registerConsoleCommands(): void {
+        ;(window as any).lodArtworkRenderer = this
+        
+        // Renderer stats
+        ;(window as any).lodCacheStats = () => this.logHighTextureCacheStats()
+        ;(window as any).diagnosePending = () => this.diagnosePendingState()
+        
+        // Artwork failure tracking
+        ;(window as any).diagnoseArtworkFailures = () => {
+            this.logFailureDiagnostics()
+            return this.getFailureDiagnostics()
+        }
+        ;(window as any).clearArtworkFailures = () => {
+            this.clearFailureCache()
+            console.log('✅ Artwork failure cache cleared - failures will be retried on next load')
+        }
+        ;(window as any).auditArtworkFailures = () => this.auditFailedArtwork()
+
+        // Loading experiments
+        ;(window as any).experimentLoadingStrategies = (count = 9) => {
+            const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
+            if (!cache) return console.log('❌ No HIGH texture cache available')
+            const gameIndices: number[] = []
+            for (let i = 0; i < this.maxGames && gameIndices.length < count; i++) {
+                if (cache.getState(i) !== 'loaded') gameIndices.push(i)
+            }
+            console.log(`Testing with game indices: ${gameIndices.join(', ')}`)
+            cache.experimentLoadingStrategies(gameIndices)
+        }
+        ;(window as any).experimentBatch = (count = 9) => {
+            const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
+            if (!cache) return console.log('❌ No HIGH texture cache available')
+            const gameIndices: number[] = []
+            for (let i = 0; i < this.maxGames && gameIndices.length < count; i++) {
+                if (cache.getState(i) !== 'loaded') gameIndices.push(i)
+            }
+            cache.experimentLoadingStrategies(gameIndices, [{ name: 'batch', maxConcurrent: 8 }])
+        }
+
+        // Frame Budget Scheduler
+        ;(window as any).diagnoseScheduler = async () => {
+            const { FrameBudgetScheduler } = await import('../../../utils/FrameBudgetScheduler')
+            FrameBudgetScheduler.getInstance().diagnose()
+        }
+        ;(window as any).schedulerStats = async () => {
+            const { FrameBudgetScheduler } = await import('../../../utils/FrameBudgetScheduler')
+            const stats = FrameBudgetScheduler.getInstance().getStats()
+            console.log('📊 Scheduler Stats:', stats)
+            return stats
+        }
+        ;(window as any).schedulerTune = async (maxTasksPerFrame: number) => {
+            const { FrameBudgetScheduler } = await import('../../../utils/FrameBudgetScheduler')
+            FrameBudgetScheduler.getInstance().setMaxTasksPerFrame(maxTasksPerFrame)
+            console.log(`✅ Scheduler max tasks per frame set to ${maxTasksPerFrame}`)
+        }
+
+        // Pixel Data Cache
+        ;(window as any).diagnosePixelCache = async () => {
+            const { PixelDataCache } = await import('./PixelDataCache')
+            await PixelDataCache.getInstance().diagnose()
+        }
+        ;(window as any).clearPixelCache = async () => {
+            const { PixelDataCache } = await import('./PixelDataCache')
+            await PixelDataCache.getInstance().clear()
+            console.log('✅ Pixel cache cleared')
+        }
+
+        console.log('🔧 LOD debug exports registered. Try: lodCacheStats(), diagnoseArtworkFailures()')
+    }
+
+    public getMemoryStats(): {
+        lods: Record<string, { allocated: number; textureWidth: number; textureHeight: number; arrayDepth: number }>
+        totalAllocated: number
+        textureCount: number
+        instanceCount: number
+        failedArtworkCount: number
+        failedArtwork: Map<string, { reason: string; url: string; timestamp: number }>
+    } {
+        const lods: Record<string, { allocated: number; textureWidth: number; textureHeight: number; arrayDepth: number }> = {}
+        let totalAllocated = 0
+        
+        const textureManager = this.getTextureManager()
+        for (const tierName of textureManager.getTierNames()) {
+            const config = textureManager.getTierConfig(tierName)
+            if (config) {
+                const allocated = config.width * config.height * config.maxDepth * 4
+                lods[tierName] = {
+                    allocated,
+                    textureWidth: config.width,
+                    textureHeight: config.height,
+                    arrayDepth: config.maxDepth
+                }
+                totalAllocated += allocated
+            }
+        }
+        
+        const failedArtwork = this.getFailedArtwork()
+        
+        return {
+            lods,
+            totalAllocated,
+            textureCount: textureManager.getSlotCount(),
+            instanceCount: this.getInstanceCount(),
+            failedArtworkCount: failedArtwork.size,
+            failedArtwork: new Map(
+                Array.from(failedArtwork.entries()).map(([k, v]) => [k, { reason: v.reason, url: v.url, timestamp: v.timestamp }])
+            )
+        }
+    }
+
+    public logMemoryStats(): void {
+        const stats = this.getMemoryStats()
+        const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1)
+        
+        console.group('📊 LOD Artwork Memory Stats')
+        console.log(`Total VRAM: ${mb(stats.totalAllocated)}MB`)
+        console.log(`Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}`)
+        console.log(`Failed Artwork: ${stats.failedArtworkCount}`)
+        
+        for (const [name, lod] of Object.entries(stats.lods)) {
+            console.log(`  ${name}: ${lod.textureWidth}×${lod.textureHeight}×${lod.arrayDepth} = ${mb(lod.allocated)}MB`)
+        }
+        console.groupEnd()
+    }
+
+    public logHighTextureCacheStats(): void {
+        const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
+        if (!cache) {
+            console.log('❌ HIGH texture cache not enabled (lazyHighTextures=false)')
+            return
+        }
+        
+        const stats = cache.getStats()
+        console.group('🎨 HIGH Texture Cache Stats')
+        console.log(`Loaded: ${stats.loaded}/${stats.totalSlots} (${((stats.loaded/stats.totalSlots)*100).toFixed(0)}%)`)
+        console.log(`Loading: ${stats.loading}, Queued: ${stats.queueLength}`)
+        console.log(`Failed: ${stats.failed}, Permanent Failures: ${stats.permanentFailures}`)
+        console.groupEnd()
+    }
+
+    public diagnosePendingState(): void {
+        console.group('🔍 Pending State Diagnosis')
+        
+        const textureManager = this.getTextureManager()
+        console.log(`Pending GPU updates: ${textureManager.hasPendingUpdates() ? 'Yes' : 'No'}`)
+        
+        const renderer = this.getInternalRenderer()
+        console.log(`Instance count: ${renderer.getInstanceCount()}`)
+        console.log(`Ready: ${renderer.isReady()}`)
+        
+        const cache = this.getHighTextureCache()
+        if (cache) {
+            const stats = (cache as HighTextureCacheDebug).getStats()
+            console.log(`HIGH cache - Loading: ${stats.loading}, Queued: ${stats.queueLength}`)
+        }
+        
+        console.groupEnd()
+    }
+
+    public getFailureDiagnostics(): {
+        totalFailed: number
+        byReason: Record<string, number>
+        recentFailures: Array<{ game: string; reason: string; url: string }>
+    } {
+        const failedArtwork = this.getFailedArtwork()
+        const byReason: Record<string, number> = {}
+        const recentFailures: Array<{ game: string; reason: string; url: string }> = []
+        
+        const now = Date.now()
+        const recentThreshold = 5 * 60 * 1000 // 5 minutes
+        
+        for (const [gameName, failure] of failedArtwork) {
+            byReason[failure.reason] = (byReason[failure.reason] || 0) + 1
+            
+            if (now - failure.timestamp < recentThreshold) {
+                recentFailures.push({ game: gameName, reason: failure.reason, url: failure.url })
+            }
+        }
+        
+        return {
+            totalFailed: failedArtwork.size,
+            byReason,
+            recentFailures: recentFailures.slice(0, 10)
+        }
+    }
+
+    public logFailureDiagnostics(): void {
+        const diag = this.getFailureDiagnostics()
+        
+        console.group('🚨 Artwork Failure Diagnostics')
+        console.log(`Total failed: ${diag.totalFailed}`)
+        console.log('By reason:', diag.byReason)
+        
+        if (diag.recentFailures.length > 0) {
+            console.log('Recent failures:')
+            for (const f of diag.recentFailures) {
+                console.log(`  - "${f.game}": ${f.reason}`)
+            }
+        }
+        console.groupEnd()
+    }
+
+    public async auditFailedArtwork(): Promise<void> {
+        const failedArtwork = this.getFailedArtwork()
+        console.group('🔍 Auditing failed artwork URLs...')
+        
+        let retryable = 0
+        let permanent = 0
+        
+        for (const [_gameName, failure] of failedArtwork) {
+            if (failure.reason === 'CORS' || failure.reason === '404') {
+                permanent++
+            } else {
+                retryable++
+            }
+        }
+        
+        console.log(`Retryable (NETWORK/TIMEOUT): ${retryable}`)
+        console.log(`Permanent (CORS/404): ${permanent}`)
+        console.log(`Use clearArtworkFailures() to retry all`)
+        console.groupEnd()
+    }
+
+    public override dispose(): void {
+        // Clear global references
+        ;(window as any).lodArtworkRenderer = null
+        ;(window as any).lodCacheStats = null
+        ;(window as any).diagnosePending = null
+        ;(window as any).diagnoseArtworkFailures = null
+        ;(window as any).clearArtworkFailures = null
+        ;(window as any).auditArtworkFailures = null
+        
+        super.dispose()
+    }
+}
