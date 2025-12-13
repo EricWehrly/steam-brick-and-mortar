@@ -87,12 +87,14 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             this.lodDistanceManager = new LodDistanceManagerDebug(this.lodArtworkRenderer)
             log.lifecycle(`Using LOD atlas (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
         } else if (this.useMultiAtlas) {
+            // TODO: Legacy renderer - remove once LOD atlas is proven stable (controlled by UseMultiAtlas setting)
             this.multiAtlasRenderer = new MultiAtlasArtworkRenderer({
                 boxWidth: this.dimensions.width,
                 boxHeight: this.dimensions.height
             })
             log.lifecycle(`Using multi-atlas system (max ${maxGames})`)
         } else {
+            // TODO: Legacy renderer - remove once LOD atlas is proven stable (fallback when both atlas flags are false)
             this.instancedArtworkRenderer = new InstancedArtworkRenderer({
                 maxInstances: maxGames,
                 boxWidth: this.dimensions.width,
