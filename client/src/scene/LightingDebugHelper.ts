@@ -126,7 +126,34 @@ export class LightingDebugHelper {
     }
 
     /**
-     * Automatically add debug helpers for all lights in a group
+     * Add debug helpers for all registered lights.
+     * Uses LightRegistry instead of scene traversal.
+     */
+    addHelpersForRegisteredLights(): void {
+        console.log('🔍 Adding debug helpers for all registered lights...')
+        
+        const groupedLights = this.registry.getLightsGroupedByType()
+        
+        for (const [type, lights] of groupedLights) {
+            for (const light of lights) {
+                // Skip if already has attached geometry (debug helper)
+                if (this.registry.getAttachedGeometry(light)) continue
+                
+                if (light instanceof THREE.PointLight) {
+                    this.addPointLightHelper(light)
+                } else if (light instanceof THREE.SpotLight) {
+                    this.addSpotLightHelper(light)
+                } else if (light instanceof THREE.RectAreaLight) {
+                    this.addRectAreaLightHelper(light)
+                } else if (light instanceof THREE.DirectionalLight) {
+                    this.addDirectionalLightHelper(light)
+                }
+            }
+        }
+    }
+
+    /**
+     * @deprecated Use addHelpersForRegisteredLights() instead - avoids scene traversal
      */
     addHelpersForLightGroup(lightGroup: THREE.Group): void {
         console.log(`🔍 Analyzing light group "${lightGroup.name}" for debug helpers...`)

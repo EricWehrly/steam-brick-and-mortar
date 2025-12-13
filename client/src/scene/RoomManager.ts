@@ -312,15 +312,13 @@ export class RoomManager {
         if (this.roomGroup) {
             this.scene.remove(this.roomGroup)
             
-            // Dispose geometries and materials
-            this.roomGroup.traverse((child) => {
-                if (child instanceof THREE.Mesh) {
-                    child.geometry?.dispose()
-                    if (child.material instanceof THREE.Material) {
-                        child.material.dispose()
-                    }
-                }
-            })
+            // Dispose tracked room elements directly (no traverse needed)
+            this.disposeRoomElement(this.floor)
+            this.disposeRoomElement(this.ceiling)
+            this.disposeRoomElement(this.walls.front)
+            this.disposeRoomElement(this.walls.back)
+            this.disposeRoomElement(this.walls.left)
+            this.disposeRoomElement(this.walls.right)
             
             this.roomGroup = null
         }
@@ -331,5 +329,13 @@ export class RoomManager {
         this.walls = { front: null, back: null, left: null, right: null }
         
         console.debug('🏠 RoomManager disposed')
+    }
+    
+    private disposeRoomElement(mesh: THREE.Mesh | null): void {
+        if (!mesh) return
+        mesh.geometry?.dispose()
+        if (mesh.material instanceof THREE.Material) {
+            mesh.material.dispose()
+        }
     }
 }

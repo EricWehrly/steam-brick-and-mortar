@@ -20,6 +20,7 @@ import { AppSettings, LIGHTING_QUALITY, type LightingQuality } from '../core/App
 import { EventManager, EventSource } from '../core/EventManager'
 import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent, RoomEventTypes, type RoomCreatedEvent, type RoomResizedEvent } from '../types/InteractionEvents'
 import { LightFactory } from '../lighting/LightFactory'
+import { LightRegistry } from '../lighting/LightRegistry'
 
 // Lighting configuration constants
 const LIGHT_NAMES = {
@@ -69,6 +70,7 @@ export class LightingRenderer {
     private propRenderer: PropRenderer | null = null
     private lightingGroup: THREE.Group
     private debugHelper: LightingDebugHelper
+    private registry: LightRegistry
     private config: LightingConfig = {}
     private eventManager: EventManager
     private lightFactory: LightFactory
@@ -78,6 +80,7 @@ export class LightingRenderer {
         this.scene = scene
         this.renderer = renderer
         // PropRenderer creation deferred to first use
+        this.registry = LightRegistry.getInstance()
         this.debugHelper = new LightingDebugHelper(scene)
         this.eventManager = EventManager.getInstance()
         
@@ -168,7 +171,7 @@ export class LightingRenderer {
             
             // Only show debug helpers if setting is enabled
             if (appSettings.getSetting('showLightingDebug')) {
-                this.debugHelper.addHelpersForLightGroup(this.lightingGroup)
+                this.debugHelper.addHelpersForRegisteredLights()
             }
             
             // Don't call toggleLighting() here - it would overwrite individual visibility states
@@ -443,7 +446,7 @@ export class LightingRenderer {
         // Only show debug helpers if setting is enabled
         const appSettings = AppSettings.getInstance()
         if (appSettings.getSetting('showLightingDebug')) {
-            this.debugHelper.addHelpersForLightGroup(this.lightingGroup)
+            this.debugHelper.addHelpersForRegisteredLights()
         }
         
         // Emit system ready event for UI components
@@ -500,18 +503,18 @@ export class LightingRenderer {
     public toggleLighting(enabled: boolean): void {
         console.debug(`💡 ${enabled ? 'Enabling' : 'Disabling'} all lights`)
         
-        this.lightingGroup.traverse((child) => {
-            if (child instanceof THREE.Light) {
-                child.visible = enabled
+        for (const [, lights] of this.registry.getLightsGroupedByType()) {
+            for (const light of lights) {
+                light.visible = enabled
             }
-        })
+        }
     }
 
     public toggleDebugVisualization(enabled: boolean): void {
         console.debug(`🔍 ${enabled ? 'Showing' : 'Hiding'} light debug visualization`)
         
         if (enabled) {
-            this.debugHelper.addHelpersForLightGroup(this.lightingGroup)
+            this.debugHelper.addHelpersForRegisteredLights()
         } else {
             this.debugHelper.clearHelpers()
         }
@@ -520,25 +523,20 @@ export class LightingRenderer {
     public refreshShadows(): void {
         console.debug('🔄 Refreshing shadows after props added...')
         
-        // Update shadow cameras for all shadow-casting lights
-        this.lightingGroup.traverse((child) => {
-            if (child instanceof THREE.DirectionalLight && child.castShadow) {
-                // Force shadow camera to update bounds
-                child.shadow.camera.updateProjectionMatrix()
-                child.shadow.map?.dispose()
-                child.shadow.map = null
+        // Update shadow cameras for all shadow-casting lights using registry
+        const groupedLights = this.registry.getLightsGroupedByType()
+        
+        for (const [, lights] of groupedLights) {
+            for (const light of lights) {
+                if (light.castShadow && light.shadow) {
+                    // Shadow cameras are always OrthographicCamera or PerspectiveCamera
+                    const camera = light.shadow.camera as THREE.PerspectiveCamera | THREE.OrthographicCamera
+                    camera.updateProjectionMatrix()
+                    light.shadow.map?.dispose()
+                    light.shadow.map = null
+                }
             }
-            if (child instanceof THREE.SpotLight && child.castShadow) {
-                child.shadow.camera.updateProjectionMatrix()
-                child.shadow.map?.dispose()
-                child.shadow.map = null
-            }
-            if (child instanceof THREE.PointLight && child.castShadow) {
-                child.shadow.camera.updateProjectionMatrix()
-                child.shadow.map?.dispose()
-                child.shadow.map = null
-            }
-        })
+        }
         
         // Force renderer to regenerate shadow maps
         this.renderer.shadowMap.needsUpdate = true
@@ -578,13 +576,13 @@ export class LightingRenderer {
         const ambientLight = this.lightingGroup.getObjectByName(LIGHT_NAMES.AMBIENT) as THREE.AmbientLight
         const directionalLight = this.lightingGroup.getObjectByName(LIGHT_NAMES.MAIN_DIRECTIONAL) as THREE.DirectionalLight
         
-        // Get all light types for debugging
+        // Get all light types for debugging using registry
         const lightTypes: string[] = []
-        this.lightingGroup.traverse((child) => {
-            if (child instanceof THREE.Light) {
-                lightTypes.push(`${child.constructor.name}(${child.name || 'unnamed'})`)
+        for (const [type, lights] of this.registry.getLightsGroupedByType()) {
+            for (const light of lights) {
+                lightTypes.push(`${type}(${light.name || 'unnamed'})`)
             }
-        })
+        }
         
         return {
             lightCount: this.lightingGroup.children.length,
