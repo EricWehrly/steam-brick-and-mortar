@@ -107,7 +107,6 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
                     
                     const ceilingEvent: CeilingToggleEvent = {
                         visible: checked,
-                        timestamp: Date.now(),
                         source: EventSource.UI
                     }
                     EventManager.getInstance().emit(CeilingEventTypes.Toggle, ceilingEvent)

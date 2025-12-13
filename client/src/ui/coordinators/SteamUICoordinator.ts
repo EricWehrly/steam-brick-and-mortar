@@ -15,7 +15,6 @@ export class SteamUICoordinator {
     loadFromCache(userInput: string): void {
         this.eventManager.emit(SteamEventTypes.LoadFromCache, {
             userInput,
-            timestamp: Date.now(),
             source: EventSource.UI
         })
     }

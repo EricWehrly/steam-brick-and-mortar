@@ -52,7 +52,6 @@ export class SteamUIPanel {
         if (userInput) {
           this.eventManager.emit(SteamEventTypes.LoadGames, {
             userInput,
-            timestamp: Date.now(),
             source: EventSource.UI
           })
         }
@@ -66,7 +65,6 @@ export class SteamUIPanel {
         if (userInput) {
           this.eventManager.emit(SteamEventTypes.LoadFromCache, {
             userInput,
-            timestamp: Date.now(),
             source: EventSource.UI
           })
         }
@@ -77,7 +75,6 @@ export class SteamUIPanel {
     if (this.refreshCacheButton) {
       this.refreshCacheButton.addEventListener('click', () => {
         this.eventManager.emit(SteamEventTypes.CacheRefresh, {
-          timestamp: Date.now(),
           source: EventSource.UI
         })
       })
@@ -86,7 +83,6 @@ export class SteamUIPanel {
     if (this.clearCacheButton) {
       this.clearCacheButton.addEventListener('click', () => {
         this.eventManager.emit(SteamEventTypes.CacheClear, {
-          timestamp: Date.now(),
           source: EventSource.UI
         })
       })
@@ -95,7 +91,6 @@ export class SteamUIPanel {
     if (this.showCacheStatsButton) {
       this.showCacheStatsButton.addEventListener('click', () => {
         this.eventManager.emit(SteamEventTypes.CacheStats, {
-          timestamp: Date.now(),
           source: EventSource.UI
         })
       })
@@ -109,7 +104,6 @@ export class SteamUIPanel {
           if (userInput) {
             this.eventManager.emit(SteamEventTypes.LoadGames, {
               userInput,
-              timestamp: Date.now(),
               source: EventSource.UI
             })
           }

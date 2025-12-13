@@ -38,7 +38,6 @@ export class WebXRUICoordinator {
      */
     toggleVR(): void {
         this.eventManager.emit(WebXREventTypes.Toggle, {
-            timestamp: Date.now(),
             source: EventSource.UI
         })
     }

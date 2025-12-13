@@ -415,7 +415,6 @@ export class LightingControlsPanel {
         // Emit lighting toggle event
         this.eventManager.emit(LightingEventTypes.Toggle, {
             enabled,
-            timestamp: Date.now(),
             source: EventSource.UI
         })
         

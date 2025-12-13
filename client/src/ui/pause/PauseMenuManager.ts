@@ -463,7 +463,6 @@ export class PauseMenuManager {
             if (settings.lightingQuality !== undefined) {
                 this.eventManager.emit(LightingEventTypes.QualityChanged, {
                     quality: settings.lightingQuality,
-                    timestamp: Date.now(),
                     source: EventSource.UI
                 })
             }

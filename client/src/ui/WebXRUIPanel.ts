@@ -24,7 +24,6 @@ export class WebXRUIPanel {
     if (this.xrButton) {
       this.xrButton.addEventListener('click', () => {
         this.eventManager.emit(WebXREventTypes.Toggle, {
-          timestamp: Date.now(),
           source: EventSource.UI
         })
       })
