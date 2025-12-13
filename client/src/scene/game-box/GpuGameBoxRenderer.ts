@@ -19,9 +19,10 @@ import type {
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
 import { MultiAtlasArtworkRenderer } from './instancing/MultiAtlasArtworkRenderer'
-import { LOD_LEVEL, type LodLevel, type LodConfig } from './instancing/LodArtworkRenderer'
-import { LodArtworkRendererDebug } from './instancing/LodArtworkRendererDebug'
-import { LodDistanceManager } from './instancing/LodDistanceManager'
+import { LOD_LEVEL, type LodLevel } from './instancing/ILodArtworkRenderer'
+import type { ILodArtworkRendererDebug } from './instancing/ILodArtworkRenderer'
+import { LodArtworkFacadeDebug, type LodConfig } from './instancing/LodArtworkFacadeDebug'
+import { LodDistanceManagerDebug } from './instancing/LodDistanceManagerDebug'
 import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { Logger } from '../../utils/Logger'
@@ -48,9 +49,9 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private instancedLabelRenderer: InstancedLabelRenderer
     private instancedArtworkRenderer: InstancedArtworkRenderer | null = null
     private multiAtlasRenderer: MultiAtlasArtworkRenderer | null = null
-    // TODO: Use base LodArtworkRenderer in production, debug class only for development
-    private lodArtworkRenderer: LodArtworkRendererDebug | null = null
-    private lodDistanceManager: LodDistanceManager | null = null
+    // Uses facade wrapping new clean architecture (GameArtworkProvider + LodTextureArrayManager + LodGameArtworkRenderer)
+    private lodArtworkRenderer: ILodArtworkRendererDebug | null = null
+    private lodDistanceManager: LodDistanceManagerDebug | null = null
     private labelInstanceIndex: number = 0
     private artworkInstanceIndex: number = 0
     private readonly useMultiAtlas: boolean
@@ -71,8 +72,10 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             const lodConfigs = this.buildLodConfigsFromSettings()
             const maxHighSlots = AppSettings.get(Setting.LodMaxHighSlots)
             
-            this.lodArtworkRenderer = new LodArtworkRendererDebug({
+            // LodArtworkFacadeDebug wraps new clean architecture with old API for compatibility
+            this.lodArtworkRenderer = new LodArtworkFacadeDebug({
                 maxTextures: maxGames,
+                maxGames,  // For debug console commands
                 lazyHighTextures: true,  // Memory optimization: load HIGH textures on demand
                 boxWidth: this.dimensions.width,
                 boxHeight: this.dimensions.height,
@@ -81,197 +84,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
                 maxHighTextureCache: maxHighSlots
             })
             // Create distance manager for automatic LOD switching
-            this.lodDistanceManager = new LodDistanceManager(this.lodArtworkRenderer)
+            this.lodDistanceManager = new LodDistanceManagerDebug(this.lodArtworkRenderer)
             log.lifecycle(`Using LOD atlas (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
-            
-            // TODO: Remove all these debug functions. all of them
-            // Expose diagnostic on window for debugging
-            /* eslint-disable @typescript-eslint/no-explicit-any */
-            ;(window as any).measureTextureCosts = () => {
-                this.lodArtworkRenderer?.measureTextureCosts()
-            }
-            ;(window as any).lodCacheStats = () => {
-                this.lodArtworkRenderer?.logHighTextureCacheStats()
-            }
-            ;(window as any).lodDistribution = () => {
-                const dist = this.lodDistanceManager?.getLodDistribution()
-                if (dist) {
-                    console.group('📊 LOD Distribution (Two-Tier System)')
-                    console.log(`HIGH: ${dist.counts.high} games (within ${this.lodDistanceManager?.['config']?.highDistance ?? '?'}m)`)
-                    console.log(`MID:  ${dist.counts.mid} games (everything else)`)
-                    console.log(`Total: ${dist.counts.total} instances`)
-                    console.log(`---`)
-                    console.log(`Current VRAM: ${dist.estimatedVRAM.current}`)
-                    console.log(`Optimal VRAM: ${dist.estimatedVRAM.optimal}`)
-                    console.groupEnd()
-                }
-                return dist
-            }
-            ;(window as any).experimentLoadingStrategies = (count = 9) => {
-                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
-                if (!cache) {
-                    console.log('❌ No HIGH texture cache available')
-                    return
-                }
-                // Get the first N game indices that aren't already loaded
-                const gameIndices: number[] = []
-                for (let i = 0; i < maxGames && gameIndices.length < count; i++) {
-                    if (cache.getState(i) !== 'loaded') {
-                        gameIndices.push(i)
-                    }
-                }
-                console.log(`Testing with game indices: ${gameIndices.join(', ')}`)
-                cache.experimentLoadingStrategies(gameIndices)
-            }
-            ;(window as any).preloadNearestGames = (count = 20) => {
-                this.lodDistanceManager?.preloadNearestGames(count)
-            }
-            // Short aliases for console use
-            ;(window as any).preloadNearest = (count = 20) => {
-                this.lodDistanceManager?.preloadNearestGames(count)
-            }
-            ;(window as any).experimentBatch = (count = 9) => {
-                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
-                if (!cache) {
-                    console.log('❌ No HIGH texture cache available')
-                    return
-                }
-                cache.experimentBatchLoading?.(count)
-            }
-            // Diagnostic functions
-            ;(window as any).diagnoseIndexes = (centerIndex = 64, radius = 3) => {
-                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
-                if (!cache) {
-                    console.log('❌ No HIGH texture cache available')
-                    return
-                }
-                cache.diagnoseIndexCluster(centerIndex, radius)
-            }
-            ;(window as any).diagnoseMismatches = () => {
-                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
-                if (!cache) {
-                    console.log('❌ No HIGH texture cache available')
-                    return
-                }
-                return cache.diagnoseIndexMismatches()
-            }
-            ;(window as any).diagnoseLoadState = () => {
-                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
-                if (!cache) {
-                    console.log('❌ No HIGH texture cache available')
-                    return
-                }
-                cache.diagnoseLoadState()
-            }
-            ;(window as any).diagnoseNearest = (count = 30) => {
-                this.lodDistanceManager?.diagnoseNearestGames(count)
-            }
-            ;(window as any).dumpIndexMapping = (count = 50) => {
-                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
-                if (!cache) {
-                    console.log('❌ No HIGH texture cache available')
-                    return
-                }
-                cache.dumpIndexMapping(count)
-            }
-            ;(window as any).diagnosePending = () => {
-                this.lodArtworkRenderer?.diagnosePendingState()
-            }
-            ;(window as any).diagnoseTimings = () => {
-                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
-                if (!cache) {
-                    console.log('❌ No HIGH texture cache available')
-                    return
-                }
-                cache.diagnoseTimings()
-            }
-            ;(window as any).clearTimings = () => {
-                const cache = (this.lodArtworkRenderer as any)?.highTextureCache
-                if (!cache) {
-                    console.log('❌ No HIGH texture cache available')
-                    return
-                }
-                cache.clearTimingSamples()
-            }
-            // Profiling functions for detailed bottleneck analysis
-            ;(window as any).runProfilingTest = (count = 10) => {
-                const cache = this.lodArtworkRenderer?.getHighTextureCache()
-                if (!cache) {
-                    console.log('❌ No HIGH texture cache available')
-                    return
-                }
-                cache.runProfilingTest(count)
-            }
-            ;(window as any).enableProfiling = () => {
-                const cache = this.lodArtworkRenderer?.getHighTextureCache()
-                if (!cache) {
-                    console.log('❌ No HIGH texture cache available')
-                    return
-                }
-                cache.enableProfiling()
-            }
-            ;(window as any).diagnoseProfile = () => {
-                const cache = this.lodArtworkRenderer?.getHighTextureCache()
-                if (!cache) {
-                    console.log('❌ No HIGH texture cache available')
-                    return
-                }
-                cache.diagnoseProfile()
-            }
-            ;(window as any).diagnoseScheduler = async () => {
-                const { FrameBudgetScheduler } = await import('../../utils/FrameBudgetScheduler')
-                const scheduler = FrameBudgetScheduler.getInstance()
-                scheduler.diagnose()
-            }
-            ;(window as any).schedulerStats = async () => {
-                const { FrameBudgetScheduler } = await import('../../utils/FrameBudgetScheduler')
-                const scheduler = FrameBudgetScheduler.getInstance()
-                console.log('📊 Scheduler Stats:', scheduler.getStats())
-                return scheduler.getStats()
-            }
-            ;(window as any).schedulerTune = async (maxTasksPerFrame: number) => {
-                const { FrameBudgetScheduler } = await import('../../utils/FrameBudgetScheduler')
-                const scheduler = FrameBudgetScheduler.getInstance()
-                scheduler.setMaxTasksPerFrame(maxTasksPerFrame)
-                console.log(`✅ Scheduler max tasks per frame set to ${maxTasksPerFrame}`)
-            }
-            ;(window as any).diagnosePixelCache = async () => {
-                const { PixelDataCache } = await import('./instancing/PixelDataCache')
-                const cache = PixelDataCache.getInstance()
-                await cache.diagnose()
-            }
-            ;(window as any).clearPixelCache = async () => {
-                const { PixelDataCache } = await import('./instancing/PixelDataCache')
-                const cache = PixelDataCache.getInstance()
-                await cache.clear()
-                console.log('✅ Pixel cache cleared')
-            }
-            ;(window as any).diagnoseArtworkFailures = () => {
-                if (!this.lodArtworkRenderer) {
-                    console.log('❌ No LOD artwork renderer available')
-                    return null
-                }
-                this.lodArtworkRenderer.logFailureDiagnostics()
-                return this.lodArtworkRenderer.getFailureDiagnostics()
-            }
-            ;(window as any).clearArtworkFailures = () => {
-                if (!this.lodArtworkRenderer) {
-                    console.log('❌ No LOD artwork renderer available')
-                    return
-                }
-                this.lodArtworkRenderer.clearFailureCache()
-                console.log('✅ Artwork failure cache cleared - failures will be retried on next load')
-            }
-            ;(window as any).auditArtworkFailures = () => {
-                if (!this.lodArtworkRenderer) {
-                    console.log('❌ No LOD artwork renderer available')
-                    return
-                }
-                this.lodArtworkRenderer.auditFailedArtwork()
-            }
-            // Expose the instance for console inspection in development
-            ;(window as any).lodArtworkRenderer = this.lodArtworkRenderer
-            /* eslint-enable @typescript-eslint/no-explicit-any */
         } else if (this.useMultiAtlas) {
             this.multiAtlasRenderer = new MultiAtlasArtworkRenderer({
                 boxWidth: this.dimensions.width,
@@ -588,26 +402,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     /**
      * Get the LOD renderer for advanced control (null if not using LOD atlas)
      */
-    public getLodRenderer(): LodArtworkRendererDebug | null {
+    public getLodRenderer(): ILodArtworkRendererDebug | null {
         return this.lodArtworkRenderer
-    }
-    
-    /**
-     * Start automatic LOD distance management
-     * Call after all games are loaded
-     */
-    public startLodDistanceManager(): void {
-        if (this.lodDistanceManager && this.lodArtworkRenderer) {
-            this.lodDistanceManager.syncInstances()
-            this.lodDistanceManager.startAutoUpdate()
-        }
-    }
-    
-    /**
-     * Stop automatic LOD distance management
-     */
-    public stopLodDistanceManager(): void {
-        this.lodDistanceManager?.stopAutoUpdate()
     }
     
     /**
