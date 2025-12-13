@@ -20,9 +20,9 @@ import { ShelfSide } from './props/SharedPropsUtils'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 import { GameLayoutConstants, VRLayoutUtils, GameBoxUtils, ShelfSurfaceUtils, type ShelfSurface } from './props/SharedPropsUtils'
 
-import { EventManager, EventSource } from '../core/EventManager'
-import { RoomEventTypes, GameEventTypes, SteamEventTypes } from '../types/InteractionEvents'
-import { StorePropsEventTypes, type StorePropsProgressEvent, type SteamGamesBatchEvent } from '../types/InteractionEvents'
+import { EventManager } from '../core/EventManager'
+import { GameEventTypes, SteamEventTypes } from '../types/InteractionEvents'
+import { StorePropsEventTypes, type StorePropsProgressEvent, type SteamGamesBatchEvent, type AllBatchesCompleteEvent } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
@@ -105,6 +105,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         EventManager.getInstance().registerEventHandler(
             SteamEventTypes.DataLoaded, 
             this.handleDataLoaded.bind(this)
+        );
+        // Reset our batch state when all batches complete
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            this.resetBatchState.bind(this)
         );
     }
     
@@ -243,14 +248,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.shelfLayout.rows = Math.max(this.shelfLayout.rows, row + 1)
         this.shelfLayout.shelvesPerRow = maxShelvesPerRow
         
-        // Emit progress update
         EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
             step: 'shelves',
             current: batchIndex + 1,
             total: this.totalExpectedBatches,
-            detail: `Creating shelf ${batchIndex + 1}/${this.totalExpectedBatches}`,
-            timestamp: Date.now(),
-            source: EventSource.System
+            detail: `Creating shelf ${batchIndex + 1}/${this.totalExpectedBatches}`
         })
         
         // Create the shelf (fire-and-forget - game boxes spawn async in worker)
@@ -258,43 +260,16 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.cumulativeShelfCount++
     }
     
-    private async finalizeProgressiveLoading(): Promise<void> {
+    private finalizeProgressiveLoading(): void {
         console.debug(`✅ Progressive loading complete: ${this.allBatchGames.length} games on ${this.cumulativeShelfCount} shelves`)
         
-        // Log LOD atlas stats if using LOD renderer
-        const lodRenderer = this.gameBoxRenderer?.getLodRenderer()
-        if (lodRenderer) {
-            lodRenderer.logMemoryStats()
-            // Start automatic LOD distance management
-            this.gameBoxRenderer?.startLodDistanceManager()
-        } else {
-            // Log multi-atlas stats if using that instead
-            this.gameBoxRenderer?.logMemoryStats()
-        }
-        
-        // Calculate and emit final room dimensions
-        if (this.shelfBounds.minX !== Infinity) {
-            const { RoomConstants } = await import('./RoomManager')
-            const roomWidth = (this.shelfBounds.maxX - this.shelfBounds.minX) + (RoomConstants.STORE_WALL_CLEARANCE * 2)
-            const roomDepth = Math.abs(this.shelfBounds.minZ) + RoomConstants.STORE_BACK_CLEARANCE
-            const roomHeight = RoomConstants.STORE_CEILING_HEIGHT
-            const roomCenterZ = (this.shelfBounds.minZ - RoomConstants.STORE_BACK_CLEARANCE) / 2
-            
-            EventManager.getInstance().emit(RoomEventTypes.Resize, {
-                dimensions: {
-                    width: roomWidth,
-                    depth: roomDepth,
-                    height: roomHeight
-                },
-                centerOffset: { x: 0, y: 0, z: roomCenterZ },
-                shelfLayout: this.shelfLayout,
-                reason: 'shelves-spawned',
-                timestamp: Date.now(),
-                source: EventSource.System
-            })
-        }
-        
-        // Reset batch state for next load
+        EventManager.getInstance().emit<AllBatchesCompleteEvent>(GameEventTypes.AllBatchesComplete, {
+            shelfBounds: { ...this.shelfBounds },
+            shelfLayout: { ...this.shelfLayout }
+        })
+    }
+    
+    private resetBatchState(): void {
         this.batchesReceived = 0
         this.totalExpectedBatches = 0
         this.allBatchGames = []
@@ -377,9 +352,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                     step: 'shelves',
                     current: row + 1,
                     total: rows,
-                    detail: `Creating shelf row ${row + 1}/${rows}`,
-                    timestamp: Date.now(),
-                    source: EventSource.System
+                    detail: `Creating shelf row ${row + 1}/${rows}`
                 })
                 
                 // Yield to main thread between rows to keep app responsive
@@ -398,38 +371,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             // Emit InstancedBatchComplete event to trigger GPU updates
             EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
             
-            // Calculate room dimensions based on actual shelf bounds + clearances
-            if (this.shelfBounds.minX !== Infinity) {
-                const { RoomConstants } = await import('./RoomManager')
-                const roomWidth = (this.shelfBounds.maxX - this.shelfBounds.minX) + (RoomConstants.STORE_WALL_CLEARANCE * 2)
-                // Room extends from origin (front wall/entrance) to back of shelves + back clearance
-                const roomDepth = Math.abs(this.shelfBounds.minZ) + RoomConstants.STORE_BACK_CLEARANCE
-                const roomHeight = RoomConstants.STORE_CEILING_HEIGHT
-                
-                // Calculate room center to position it around shelves
-                // Front wall at origin (Z=0) where player and entrance mat are
-                // Back wall at shelfMinZ - BACK_CLEARANCE (furthest negative Z)
-                // Center is halfway between: 0 and (shelfMinZ - BACK_CLEARANCE)
-                const roomCenterZ = (this.shelfBounds.minZ - RoomConstants.STORE_BACK_CLEARANCE) / 2
-                
-                console.debug(`📐 Shelf bounds: X[${this.shelfBounds.minX.toFixed(1)}, ${this.shelfBounds.maxX.toFixed(1)}], Z[${this.shelfBounds.minZ.toFixed(1)}, ${this.shelfBounds.maxZ.toFixed(1)}]`)
-                console.debug(`🏠 Calculated room: ${roomWidth.toFixed(1)}x${roomDepth.toFixed(1)}x${roomHeight.toFixed(1)}, center Z: ${roomCenterZ.toFixed(1)}`)
-                console.debug(`💡 Shelf layout: ${this.shelfLayout.rows} rows x ${this.shelfLayout.shelvesPerRow} shelves per row`)
-                
-                // Emit room resize event so room encapsulates shelves with player/entrance at origin
-                EventManager.getInstance().emit(RoomEventTypes.Resize, {
-                    dimensions: {
-                        width: roomWidth,
-                        depth: roomDepth,
-                        height: roomHeight
-                    },
-                    centerOffset: { x: 0, y: 0, z: roomCenterZ },
-                    shelfLayout: this.shelfLayout,
-                    reason: 'shelves-spawned',
-                    timestamp: Date.now(),
-                    source: EventSource.System
-                })
-            }
+            EventManager.getInstance().emit<AllBatchesCompleteEvent>(GameEventTypes.AllBatchesComplete, {
+                shelfBounds: { ...this.shelfBounds },
+                shelfLayout: { ...this.shelfLayout }
+            })
             
             // NOTE: Scene validation moved to handleInstancedBatchComplete to happen AFTER GPU updates
         } catch (error) {
