@@ -166,6 +166,18 @@ export interface InstancedBatchCompleteEvent extends BaseInteractionEvent {
     gameCount: number
 }
 
+export interface ShelfBounds {
+    minX: number
+    maxX: number
+    minZ: number
+    maxZ: number
+}
+
+export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
+    shelfBounds: ShelfBounds
+    shelfLayout: { rows: number; shelvesPerRow: number }
+}
+
 // =============================================================================
 // LIGHTING EVENTS
 // =============================================================================
@@ -268,7 +280,8 @@ export const UIEventTypes = {
 export const GameEventTypes = {
     SceneReady: 'game:scene-ready',
     Start: 'game:start',
-    InstancedBatchComplete: 'game:instanced-batch-complete'
+    InstancedBatchComplete: 'game:instanced-batch-complete',
+    AllBatchesComplete: 'game:all-batches-complete'
 } as const
 
 export const LightingEventTypes = {
@@ -336,6 +349,7 @@ export interface InteractionEventMap {
     [GameEventTypes.SceneReady]: SceneReadyEvent
     [GameEventTypes.Start]: GameStartEvent
     [GameEventTypes.InstancedBatchComplete]: InstancedBatchCompleteEvent
+    [GameEventTypes.AllBatchesComplete]: AllBatchesCompleteEvent
     
     // Lighting events
     [LightingEventTypes.Toggle]: LightingToggleEvent
