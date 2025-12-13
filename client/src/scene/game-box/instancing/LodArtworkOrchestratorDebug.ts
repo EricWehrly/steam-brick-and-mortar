@@ -1,11 +1,13 @@
 /**
- * LOD Artwork Facade Debug - Debug version with console commands and stats
+ * LOD Artwork Orchestrator Debug - Debug version with console commands and stats
  * 
- * Extends LodArtworkFacade with the same debug functionality as
- * the old LodArtworkRendererDebug class.
+ * Extends LodArtworkOrchestrator with debug functionality including:
+ * - Console commands for diagnosis and experiments
+ * - Memory statistics logging
+ * - Failure tracking and auditing
  */
 
-import { LodArtworkFacade, type LodArtworkConfig, type LodConfig } from './LodArtworkFacade'
+import { LodArtworkOrchestrator, type LodArtworkConfig, type LodConfig } from './LodArtworkOrchestrator'
 import { HighTextureCacheDebug } from './HighTextureCacheDebug'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
@@ -14,14 +16,14 @@ import { GameEventTypes } from '../../../types/InteractionEvents'
 // Re-export for consumers
 export type { LodConfig }
 
-export interface LodArtworkFacadeDebugConfig extends LodArtworkConfig {
+export interface LodArtworkOrchestratorDebugConfig extends LodArtworkConfig {
     maxGames?: number
 }
 
-export class LodArtworkFacadeDebug extends LodArtworkFacade {
+export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
     private readonly maxGames: number
     
-    constructor(config: LodArtworkFacadeDebugConfig = {}) {
+    constructor(config: LodArtworkOrchestratorDebugConfig = {}) {
         super(config)
         this.maxGames = config.maxGames ?? 2000
         this.registerConsoleCommands()

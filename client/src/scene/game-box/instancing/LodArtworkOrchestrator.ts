@@ -1,11 +1,13 @@
 /**
- * LOD Artwork Facade - Drop-in replacement for old LodArtworkRenderer
+ * LOD Artwork Orchestrator - Coordinates artwork loading pipeline
  * 
- * This facade wraps the new clean architecture (GameArtworkProvider + 
- * LodTextureArrayManager + LodGameArtworkRenderer) with the old API
- * for backward compatibility during migration.
+ * This orchestrator wires together:
+ * - GameArtworkProvider: URL strategy and fetch coordination
+ * - LodTextureArrayManager: Texture array creation and population
+ * - LodGameArtworkRenderer: GPU rendering with LOD support
  * 
- * New code should use GameArtworkOrchestrator directly.
+ * Provides the primary API for game artwork loading (setArtworkInstanceFromUrl)
+ * and implements ILodArtworkRenderer for consumers like LodDistanceManager.
  */
 
 import * as THREE from 'three'
@@ -26,7 +28,7 @@ import {
 import { HighTextureCache } from './HighTextureCache'
 import type { PrewarmingConfig } from './SpatialPrewarmingManager'
 
-const log = Logger.withContext('LodArtworkFacade')
+const log = Logger.withContext('LodArtworkOrchestrator')
 
 // Re-export for backward compatibility
 export { LOD_LEVEL, type LodLevel }
@@ -67,10 +69,10 @@ export interface LodArtworkConfig {
 }
 
 /**
- * Facade that provides the old LodArtworkRenderer API
- * using the new clean architecture underneath.
+ * Orchestrates the complete artwork loading and rendering pipeline.
+ * Implements ILodArtworkRenderer for use by LodDistanceManager.
  */
-export class LodArtworkFacade {
+export class LodArtworkOrchestrator {
     private artworkProvider: GameArtworkProvider
     private textureManager: LodTextureArrayManager
     private renderer: LodGameArtworkRenderer

@@ -21,7 +21,7 @@ import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
 import { MultiAtlasArtworkRenderer } from './instancing/MultiAtlasArtworkRenderer'
 import { LOD_LEVEL, type LodLevel } from './instancing/ILodArtworkRenderer'
 import type { ILodArtworkRendererDebug } from './instancing/ILodArtworkRenderer'
-import { LodArtworkFacadeDebug, type LodConfig } from './instancing/LodArtworkFacadeDebug'
+import { LodArtworkOrchestratorDebug, type LodConfig } from './instancing/LodArtworkOrchestratorDebug'
 import { LodDistanceManagerDebug } from './instancing/LodDistanceManagerDebug'
 import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
@@ -72,8 +72,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             const lodConfigs = this.buildLodConfigsFromSettings()
             const maxHighSlots = AppSettings.get(Setting.LodMaxHighSlots)
             
-            // LodArtworkFacadeDebug wraps new clean architecture with old API for compatibility
-            this.lodArtworkRenderer = new LodArtworkFacadeDebug({
+            // LodArtworkOrchestrator coordinates GameArtworkProvider + LodTextureArrayManager + LodGameArtworkRenderer
+            this.lodArtworkRenderer = new LodArtworkOrchestratorDebug({
                 maxTextures: maxGames,
                 maxGames,  // For debug console commands
                 lazyHighTextures: true,  // Memory optimization: load HIGH textures on demand
