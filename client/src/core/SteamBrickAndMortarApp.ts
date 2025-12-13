@@ -21,7 +21,7 @@ import { CompassRose } from '../ui/debug/CompassRose'
 import { SteamIntegration } from '../steam-integration'
 import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
 import { WebXREventHandler } from '../webxr/WebXREventHandler'
-import { EventManager, EventSource } from './EventManager'
+import { EventManager } from './EventManager'
 import { GameEventTypes, type GameStartEvent, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from './AppSettings'
 import { ServiceContainer } from './di/ServiceContainer'
@@ -437,8 +437,6 @@ export class SteamBrickAndMortarApp {
         this.startupTracker.milestone(StartupPhase.GameStart, 'World ready')
         console.debug('🎮 GameStart event emitted')
         this.eventManager.emit<GameStartEvent>(GameEventTypes.Start, {
-            timestamp: Date.now(),
-            source: EventSource.System,
             prerequisites: {
                 sceneReady: this.prerequisites.sceneReady,
                 renderLoopReady: this.prerequisites.renderLoopReady,

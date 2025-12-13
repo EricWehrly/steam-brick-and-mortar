@@ -1,8 +1,7 @@
 import * as THREE from 'three'
-import { EventManager, EventSource } from '../core/EventManager'
+import { EventManager } from '../core/EventManager'
 import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
-import { RoomEventTypes, type RoomResizedEvent, CeilingEventTypes, type CeilingToggleEvent } from '../types/InteractionEvents'
-import { SteamEventTypes } from '../types/InteractionEvents'
+import { RoomEventTypes, type RoomResizedEvent, CeilingEventTypes, type CeilingToggleEvent, GameEventTypes, type AllBatchesCompleteEvent } from '../types/InteractionEvents'
 import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
@@ -71,7 +70,7 @@ export class RoomManager {
         this.eventManager = EventManager.getInstance()
         
         this.eventManager.registerEventHandler(RoomEventTypes.Resize, this.onResizeRoom.bind(this))
-        this.eventManager.registerEventHandler(SteamEventTypes.DataLoaded, this.onResizeRoom.bind(this))
+        this.eventManager.registerEventHandler(GameEventTypes.AllBatchesComplete, this.onAllBatchesComplete.bind(this))
         this.eventManager.registerEventHandler(CeilingEventTypes.Toggle, this.onCeilingToggle.bind(this))
         
         // Fire-and-forget initial room creation
@@ -102,6 +101,43 @@ export class RoomManager {
         }
     }
 
+    private async onAllBatchesComplete(event: CustomEvent<AllBatchesCompleteEvent>): Promise<void> {
+        const { shelfBounds, shelfLayout } = event.detail
+        
+        // Validate shelf bounds exist
+        if (shelfBounds.minX === Infinity) {
+            console.debug('🏠 AllBatchesComplete received with no shelf bounds - skipping resize')
+            return
+        }
+        
+        // Calculate room dimensions using our own constants
+        const roomWidth = (shelfBounds.maxX - shelfBounds.minX) + (RoomConstants.STORE_WALL_CLEARANCE * 2)
+        const roomDepth = Math.abs(shelfBounds.minZ) + RoomConstants.STORE_BACK_CLEARANCE
+        const roomHeight = RoomConstants.STORE_CEILING_HEIGHT
+        const roomCenterZ = (shelfBounds.minZ - RoomConstants.STORE_BACK_CLEARANCE) / 2
+        
+        const dimensions: RoomDimensions = { width: roomWidth, depth: roomDepth, height: roomHeight }
+        const centerOffset = { x: 0, y: 0, z: roomCenterZ }
+        
+        console.debug(`📐 Shelf bounds: X[${shelfBounds.minX.toFixed(1)}, ${shelfBounds.maxX.toFixed(1)}], Z[${shelfBounds.minZ.toFixed(1)}, ${shelfBounds.maxZ.toFixed(1)}]`)
+        console.debug(`🏠 Calculated room: ${roomWidth.toFixed(1)}x${roomDepth.toFixed(1)}x${roomHeight.toFixed(1)}, center Z: ${roomCenterZ.toFixed(1)}`)
+        
+        if (this.isBuilding) {
+            this.targetDimensions = dimensions
+            this.targetCenterOffset = centerOffset
+            console.debug('🏠 Room building, queued resize target')
+        } else {
+            await this.buildRoom(dimensions, centerOffset)
+        }
+        
+        // Notify listeners that room has resized
+        this.eventManager.emit<RoomResizedEvent>(RoomEventTypes.Resized, { 
+            dimensions,
+            shelfLayout,
+            centerOffset
+        })
+    }
+
     private async onResizeRoom(event: CustomEvent<RoomResizeEventData>): Promise<void> {
         const { dimensions, centerOffset, shelfLayout } = event.detail
         
@@ -124,9 +160,7 @@ export class RoomManager {
         this.eventManager.emit<RoomResizedEvent>(RoomEventTypes.Resized, { 
             dimensions,
             shelfLayout,
-            centerOffset,
-            timestamp: Date.now(), 
-            source: EventSource.System
+            centerOffset
         })
     }
 
@@ -158,9 +192,7 @@ export class RoomManager {
     private emitProgress(detail: string): void {
         this.eventManager.emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
             step: 'room',
-            detail,
-            timestamp: Date.now(),
-            source: EventSource.System
+            detail
         })
     }
 

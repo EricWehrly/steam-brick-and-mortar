@@ -11,7 +11,7 @@
  * but core application logic can access settings directly without going through UI layers.
  */
 
-import { EventManager, EventSource } from './EventManager'
+import { EventManager, EventSource, type BaseInteractionEvent } from './EventManager'
 import { AppSettingsEventTypes } from '../types/InteractionEvents'
 
 // Lighting Quality Constants
@@ -124,12 +124,10 @@ export interface ApplicationSettings {
     developmentMode: boolean // Limit to 20 games for testing
 }
 
-export interface SettingChangedEvent {
+export interface SettingChangedEvent extends BaseInteractionEvent {
     key: keyof ApplicationSettings
     value: ApplicationSettings[keyof ApplicationSettings]
     previousValue: ApplicationSettings[keyof ApplicationSettings]
-    timestamp: number
-    source: EventSource
 }
 
 /**
@@ -213,7 +211,6 @@ export class AppSettings {
             key,
             value,
             previousValue,
-            timestamp: Date.now(),
             source
         })
     }

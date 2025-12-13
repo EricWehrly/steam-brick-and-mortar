@@ -14,8 +14,9 @@
 import * as THREE from 'three'
 import { WebXRManager, type WebXRCapabilities } from './WebXRManager'
 import { InputManager } from './InputManager'
-import { EventManager, EventSource } from '../core/EventManager'
+import { EventManager } from '../core/EventManager'
 import { WebXREventTypes } from '../types/InteractionEvents'
+import type { WebXRErrorEvent, WebXRSupportChangeEvent } from '../types/InteractionEvents'
 import { RenderLoopRegistry } from '../scene/RenderLoopRegistry'
 
 export interface WebXRCoordinatorConfig {
@@ -153,34 +154,20 @@ export class WebXRCoordinator {
 
     private handleSessionStart(): void {
         console.log('✅ WebXR session started!')
-        this.eventManager.emit(WebXREventTypes.SessionStart, {
-            timestamp: Date.now(),
-            source: EventSource.System
-        })
+        this.eventManager.emit(WebXREventTypes.SessionStart, {})
     }
 
     private handleSessionEnd(): void {
         console.log('🚪 WebXR session ended')
-        this.eventManager.emit('webxr:session-end', {
-            timestamp: Date.now(),
-            source: EventSource.System
-        })
+        this.eventManager.emit(WebXREventTypes.SessionEnd, {})
     }
 
     private handleError(error: Error): void {
         console.error('❌ WebXR error:', error)
-        this.eventManager.emit('webxr:error', {
-            error,
-            timestamp: Date.now(),
-            source: EventSource.System
-        })
+        this.eventManager.emit<WebXRErrorEvent>(WebXREventTypes.Error, { error })
     }
 
     private handleSupportChange(capabilities: WebXRCapabilities): void {
-        this.eventManager.emit('webxr:support-change', {
-            capabilities,
-            timestamp: Date.now(),
-            source: EventSource.System
-        })
+        this.eventManager.emit<WebXRSupportChangeEvent>(WebXREventTypes.SupportChange, { capabilities })
     }
 }

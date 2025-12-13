@@ -14,9 +14,9 @@ import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
 import type { SteamGameData } from '../scene'
 import { SteamErrorMessages, type SteamErrorContext } from '../utils/SteamErrorMessages'
-import { EventManager, EventSource } from '../core/EventManager'
+import { EventManager } from '../core/EventManager'
 import { SteamEventTypes, AppSettingsEventTypes } from '../types/InteractionEvents'
-import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamGamesBatchEvent } from '../types/InteractionEvents'
+import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamGamesBatchEvent, SteamDataLoadedEvent } from '../types/InteractionEvents'
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
 
@@ -98,10 +98,8 @@ export class SteamIntegration {
             })
         }
         
-        this.eventManager.emit(SteamEventTypes.DataLoaded, {
-            userInput,
-            timestamp: Date.now(),
-            source: EventSource.System
+        this.eventManager.emit<SteamDataLoadedEvent>(SteamEventTypes.DataLoaded, {
+            userInput
         })
     }
 
