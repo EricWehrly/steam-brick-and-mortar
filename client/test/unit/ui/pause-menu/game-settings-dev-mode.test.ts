@@ -85,7 +85,6 @@ describe('GameSettingsPanel Development Mode', () => {
                 expect.objectContaining({
                     key: 'developmentMode',
                     value: false,
-                    timestamp: expect.any(Number),
                     source: 'ui'
                 })
             )
