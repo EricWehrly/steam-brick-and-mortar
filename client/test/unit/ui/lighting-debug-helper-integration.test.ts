@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { LightingControlsPanel } from '../../../src/ui/LightingControlsPanel'
 import { EventManager } from '../../../src/core/EventManager'
 import { AppSettings } from '../../../src/core/AppSettings'
+import { LightRegistry } from '../../../src/lighting/LightRegistry'
 import * as THREE from 'three'
 
 // Mock the EventManager
@@ -35,10 +36,15 @@ describe('Lighting Controls Panel Debug Helper Integration', () => {
     let debugPointHelper: THREE.Mesh
     let debugSpotHelper: THREE.Mesh
     let debugRectHelper: THREE.Mesh
+    let lightRegistry: LightRegistry
 
     beforeEach(() => {
         // Clear document body
         document.body.innerHTML = ''
+        
+        // Get registry and clear it for clean test state
+        lightRegistry = LightRegistry.getInstance()
+        lightRegistry.clear()
         
         // Create the separate lighting controls button like it exists in index.html
         const separateButton = document.createElement('button')
@@ -91,6 +97,15 @@ describe('Lighting Controls Panel Debug Helper Integration', () => {
         debugRectHelper.visible = true
         scene.add(debugRectHelper)
         
+        // Register lights and debug helpers with the LightRegistry
+        // (simulating what ManagedLights and LightingDebugHelper do)
+        lightRegistry.registerLight(pointLight, { source: 'test' })
+        lightRegistry.registerLight(spotLight, { source: 'test' })
+        lightRegistry.registerLight(rectAreaLight, { source: 'test' })
+        lightRegistry.attachGeometry(pointLight, debugPointHelper)
+        lightRegistry.attachGeometry(spotLight, debugSpotHelper)
+        lightRegistry.attachGeometry(rectAreaLight, debugRectHelper)
+        
         // Setup mock dependencies
         const mockEventManager = EventManager.getInstance()
         const mockAppSettings = AppSettings.getInstance()
@@ -128,6 +143,8 @@ describe('Lighting Controls Panel Debug Helper Integration', () => {
         if (lightingPanel) {
             lightingPanel.dispose()
         }
+        // Clear registry between tests
+        lightRegistry.clear()
         document.body.innerHTML = ''
     })
 
@@ -273,7 +290,11 @@ describe('Lighting Controls Panel Debug Helper Integration', () => {
         nestedLight.name = 'nested-light'
         scene.add(nestedLight)
         
-        // Toggle the light - should find the nested debug helper
+        // Register with LightRegistry (simulating what ManagedLights and LightingDebugHelper do)
+        lightRegistry.registerLight(nestedLight, { source: 'test' })
+        lightRegistry.attachGeometry(nestedLight, nestedDebugHelper)
+        
+        // Toggle the light - should find the nested debug helper via registry
         ;(lightingPanel as any).toggleIndividualLight(nestedLight, false)
         
         expect(nestedLight.visible).toBe(false)

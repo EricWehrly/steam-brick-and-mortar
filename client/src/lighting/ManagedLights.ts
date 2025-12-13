@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../core/EventManager'
 import { LightingEventTypes } from '../types/InteractionEvents'
+import { LightRegistry } from './LightRegistry'
 
 interface IManagedLight {
     addToScene(scene: THREE.Scene, name?: string): this
@@ -14,18 +15,22 @@ function managedLightMixin<T extends new (...args: any[]) => THREE.Light>(Base: 
         addToScene(scene: THREE.Scene, name?: string): this {
             if (name) this.name = name
             scene.add(this)
-            this.emitCreated(scene, this.name)
+            this.registerAndEmit(scene, this.name)
             return this
         }
 
         addToParent(parent: THREE.Object3D, scene: THREE.Scene, name?: string): this {
             if (name) this.name = name
             parent.add(this)
-            this.emitCreated(scene, this.name)
+            this.registerAndEmit(scene, this.name)
             return this
         }
 
-        private emitCreated(scene: THREE.Scene, name?: string): void {
+        private registerAndEmit(scene: THREE.Scene, name?: string): void {
+            // Register with central registry (enables O(1) lookups)
+            LightRegistry.getInstance().registerLight(this, { source: 'ManagedLight' })
+            
+            // Emit event for UI updates
             this.eventManager.emit(LightingEventTypes.Created, {
                 light: this,
                 scene,

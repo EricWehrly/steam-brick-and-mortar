@@ -6,12 +6,15 @@
  * - Group lights by type (RectAreaLight, SpotLight, etc.)
  * - Master controls for entire light types
  * - Real-time updates with scene integration
+ * 
+ * Uses LightRegistry for O(1) lookups instead of scene traversal.
  */
 
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../core/EventManager'
 import { LightingEventTypes, type LightCreatedEvent, type LightingSystemReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from '../core/AppSettings'
+import { LightRegistry } from '../lighting/LightRegistry'
 import '../styles/lighting-controls-panel.css'
 
 interface LightGroupInfo {
@@ -34,9 +37,13 @@ export class LightingControlsPanel {
     private panelCollapsed: boolean = true
     private horizontallyCollapsed: boolean = true
     private checkboxUpdatePending: number | null = null
+    
+    // Use central registry for light and debug helper lookups
+    private registry: LightRegistry
 
     constructor(eventManager: EventManager, appSettings: AppSettings) {
         this.eventManager = eventManager
+        this.registry = LightRegistry.getInstance()
         this.lightCreatedHandler = this.onLightCreated.bind(this)
         this.lightingSystemReadyHandler = this.onLightingSystemReady.bind(this)
         this.appSettings = appSettings
@@ -198,33 +205,20 @@ export class LightingControlsPanel {
     private scanLights(): void {
         const newGroups = new Map<string, LightGroupInfo>()
 
-        // Guard against invalid scene objects (e.g., in tests)
-        if (!this.scene || typeof this.scene.traverse !== 'function') {
-            console.warn('⚠️ Invalid scene object - skipping light scan')
-            this.lightGroups = newGroups
-            return
+        // Use registry for O(1) grouped lookup instead of scene traversal
+        const groupedLights = this.registry.getLightsGroupedByType()
+        
+        for (const [lightType, lights] of groupedLights) {
+            newGroups.set(lightType, {
+                type: lightType,
+                lights: [...lights], // Copy array
+                enabled: true,
+                collapsed: true // Start collapsed
+            })
         }
 
-        // Traverse the scene to find all lights
-        this.scene.traverse((object) => {
-            if (object instanceof THREE.Light) {
-                const lightType = object.constructor.name
-                
-                if (!newGroups.has(lightType)) {
-                    newGroups.set(lightType, {
-                        type: lightType,
-                        lights: [],
-                        enabled: true,
-                        collapsed: true // Start collapsed
-                    })
-                }
-                
-                newGroups.get(lightType)!.lights.push(object)
-            }
-        })
-
         // Update enabled states based on current visibility
-        newGroups.forEach((group, type) => {
+        newGroups.forEach((group) => {
             const enabledCount = group.lights.filter(light => light.visible).length
             group.enabled = enabledCount > 0
         })
@@ -533,46 +527,20 @@ export class LightingControlsPanel {
     }
 
     private toggleDebugHelper(light: THREE.Light, enabled: boolean): void {
-        if (!this.scene) return
-
-        // Generate the debug helper name based on light type and name
-        const lightName = light.name || 'unnamed'
-        let debugHelperName = ''
-        
-        if (light instanceof THREE.PointLight) {
-            debugHelperName = `debug-point-${lightName}`
-        } else if (light instanceof THREE.SpotLight) {
-            debugHelperName = `debug-spot-${lightName}`
-        } else if (light instanceof THREE.RectAreaLight) {
-            debugHelperName = `debug-rectarea-${lightName}`
-        } else if (light instanceof THREE.DirectionalLight) {
-            debugHelperName = `debug-directional-${lightName}`
-        } else {
-            // Unknown light type - no debug helper to toggle
-            return
-        }
-
-        // Find the debug helper in the scene by traversing all objects
-        let debugHelper: THREE.Object3D | null = null
-        this.scene.traverse((object) => {
-            if (object.name === debugHelperName) {
-                debugHelper = object
-            }
-        })
+        // Use registry for O(1) lookup instead of scene traversal
+        const debugHelper = this.registry.getAttachedGeometry(light)
 
         if (debugHelper) {
             debugHelper.visible = this.debugIndicatorEnabled && enabled
         }
-
     }
 
     private toggleAllDebugHelpers(enabled: boolean): void {
-        if (!this.scene) return
-        this.scene.traverse((object) => {
-            if (object.name && object.name.startsWith('debug-')) {
-                object.visible = enabled
-            }
-        })
+        // Use registry for O(1) lookup instead of scene traversal
+        const helpers = this.registry.getAllAttachedGeometry()
+        for (const helper of helpers) {
+            helper.visible = enabled
+        }
     }
 
     public dispose(): void {

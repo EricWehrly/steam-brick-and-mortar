@@ -6,16 +6,21 @@
  * - Red cones for spot lights  
  * - Red rectangles for rect area lights
  * - Semi-transparent to see through them
+ * 
+ * Debug helpers are registered with LightRegistry for O(1) lookups.
  */
 
 import * as THREE from 'three'
+import { LightRegistry } from '../lighting/LightRegistry'
 
 export class LightingDebugHelper {
     private debugGroup: THREE.Group
     private scene: THREE.Scene
+    private registry: LightRegistry
 
     constructor(scene: THREE.Scene) {
         this.scene = scene
+        this.registry = LightRegistry.getInstance()
         this.debugGroup = new THREE.Group()
         this.debugGroup.name = 'lighting-debug'
         this.scene.add(this.debugGroup)
@@ -37,6 +42,9 @@ export class LightingDebugHelper {
         helper.position.copy(light.position)
         helper.name = `debug-point-${light.name || 'unnamed'}`
         this.debugGroup.add(helper)
+        
+        // Register with central registry
+        this.registry.attachGeometry(light, helper)
 
         console.log(`🔴 Added point light debug sphere at (${light.position.x.toFixed(1)}, ${light.position.y.toFixed(1)}, ${light.position.z.toFixed(1)}) radius: ${light.distance || 10}`)
     }
@@ -65,6 +73,9 @@ export class LightingDebugHelper {
         helper.rotateX(-Math.PI / 2) // Align cone with light direction
         helper.name = `debug-spot-${light.name || 'unnamed'}`
         this.debugGroup.add(helper)
+        
+        // Register with central registry
+        this.registry.attachGeometry(light, helper)
 
         console.log(`🔴 Added spot light debug cone at (${light.position.x.toFixed(1)}, ${light.position.y.toFixed(1)}, ${light.position.z.toFixed(1)}) angle: ${(angle * 180 / Math.PI).toFixed(1)}°`)
     }
@@ -86,6 +97,9 @@ export class LightingDebugHelper {
         helper.rotation.copy(light.rotation)
         helper.name = `debug-rectarea-${light.name || 'unnamed'}`
         this.debugGroup.add(helper)
+        
+        // Register with central registry
+        this.registry.attachGeometry(light, helper)
 
         console.log(`🔴 Added RectArea light debug plane at (${light.position.x.toFixed(1)}, ${light.position.y.toFixed(1)}, ${light.position.z.toFixed(1)}) size: ${light.width}x${light.height}`)
     }
@@ -104,6 +118,9 @@ export class LightingDebugHelper {
         const arrowHelper = new THREE.ArrowHelper(direction, origin, 5, 0xff0000, 1, 1)
         arrowHelper.name = `debug-directional-${light.name || 'unnamed'}`
         this.debugGroup.add(arrowHelper)
+        
+        // Register with central registry
+        this.registry.attachGeometry(light, arrowHelper)
 
         console.log(`🔴 Added directional light debug arrow at (${light.position.x.toFixed(1)}, ${light.position.y.toFixed(1)}, ${light.position.z.toFixed(1)})`)
     }
