@@ -24,7 +24,7 @@ import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 import { FrameBudgetScheduler } from '../../../utils/FrameBudgetScheduler'
 
-const log = Logger.withContext('HighTextureCache')
+// Logger will be attached to the class below
 
 /** State of a HIGH texture for a game */
 export enum HighTextureState {
@@ -95,6 +95,7 @@ export interface HighTextureCacheStats {
 }
 
 export class HighTextureCache {
+    public static logger = Logger.createLogFunctions(HighTextureCache.name)
     private readonly config: HighTextureCacheConfig
     private readonly textureWorker: TextureWorker
     private readonly pixelCache: PixelDataCache
@@ -181,7 +182,7 @@ export class HighTextureCache {
         this.pixelCache = PixelDataCache.getInstance()
         this.scheduler = FrameBudgetScheduler.getInstance()
         
-        log.lifecycle(`Initialized: ${this.config.totalSlots} slots, ${this.config.maxConcurrentLoads} concurrent loads (${this.estimateMemoryMB()}MB)`)
+        HighTextureCache.logger.lifecycle(`Initialized: ${this.config.totalSlots} slots, ${this.config.maxConcurrentLoads} concurrent loads (${this.estimateMemoryMB()}MB)`)
     }
     
     /**
@@ -196,7 +197,7 @@ export class HighTextureCache {
      */
     public setTextureArray(texture: THREE.DataArrayTexture): void {
         this.dataArrayTexture = texture
-        log.lifecycle('Texture array reference set')
+        HighTextureCache.logger.lifecycle('Texture array reference set')
     }
     
     /**
@@ -226,7 +227,7 @@ export class HighTextureCache {
         // needsUpdate triggers the actual upload, but now only marked layers are sent
         this.dataArrayTexture.needsUpdate = true
         
-        log.debug(`GPU flush: ${this.dirtySlots.size} slot(s) → ~${(this.dirtySlots.size * 540).toFixed(0)}KB upload`)
+        HighTextureCache.logger.debug(`GPU flush: ${this.dirtySlots.size} slot(s) → ~${(this.dirtySlots.size * 540).toFixed(0)}KB upload`)
         
         this.dirtySlots.clear()
         this.isDirty = false
@@ -247,7 +248,7 @@ export class HighTextureCache {
         // https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1145350/.../header.jpg
         const appidMatch = artworkUrl.match(/\/apps\/(\d+)\//)
         if (!appidMatch) {
-            log.warn(`Could not extract appid from URL: ${artworkUrl}`)
+            HighTextureCache.logger.warn(`Could not extract appid from URL: ${artworkUrl}`)
             return artworkUrl // Return original if can't parse
         }
         
@@ -290,7 +291,7 @@ export class HighTextureCache {
         const entry = this.games.get(gameIndex)
         if (entry) {
             entry.state = HighTextureState.PERMANENT_FAILURE
-            log.info(`Game "${entry.gameName}" marked as permanent failure${reason ? `: ${reason}` : ''}`)
+            HighTextureCache.logger.info(`Game "${entry.gameName}" marked as permanent failure${reason ? `: ${reason}` : ''}`)
         }
     }
     
@@ -309,7 +310,7 @@ export class HighTextureCache {
     public requestHighTexture(gameIndex: number): number {
         const entry = this.games.get(gameIndex)
         if (!entry) {
-            log.warn(`requestHighTexture: unknown game ${gameIndex}`)
+            HighTextureCache.logger.warn(`requestHighTexture: unknown game ${gameIndex}`)
             return -1
         }
         
@@ -319,51 +320,51 @@ export class HighTextureCache {
         switch (entry.state) {
             case HighTextureState.LOADED:
                 this.stats.cacheHits++
-                log.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → HIT slot ${entry.highSlot}`)
+                HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → HIT slot ${entry.highSlot}`)
                 return entry.highSlot
                 
             case HighTextureState.LOADING:
                 // Already loading - return -1, caller should use MID for now
-                log.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → LOADING (wait)`)
+                HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → LOADING (wait)`)
                 return -1
                 
             case HighTextureState.CACHING:
                 // Background caching in progress - check if cache is now ready
                 if (this.backgroundCachingGames.has(gameIndex)) {
                     // Still caching, stay on MID
-                    log.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → CACHING (wait)`)
+                    HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → CACHING (wait)`)
                     return -1
                 }
                 // Background caching finished - transition to EMPTY so next request loads from cache
                 entry.state = HighTextureState.EMPTY
                 // Now trigger load which will hit pixel cache (fast path)
                 this.stats.cacheMisses++
-                log.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → CACHE READY (triggering fast load)`)
+                HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → CACHE READY (triggering fast load)`)
                 this.triggerLoad(entry)
                 return -1
                 
             case HighTextureState.PERMANENT_FAILURE:
                 // Permanently failed (CORS, 404, etc) - never retry
-                log.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → PERMANENT FAILURE (skipped)`)
+                HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → PERMANENT FAILURE (skipped)`)
                 return -1
                 
             case HighTextureState.FAILED:
                 // Check retry limit
                 if (entry.loadAttempts >= (this.config.maxLoadAttempts ?? 2)) {
                     entry.state = HighTextureState.PERMANENT_FAILURE
-                    log.info(`Game "${entry.gameName}" exceeded max load attempts (${entry.loadAttempts}), marking as permanent failure`)
+                    HighTextureCache.logger.info(`Game "${entry.gameName}" exceeded max load attempts (${entry.loadAttempts}), marking as permanent failure`)
                     return -1
                 }
                 // Retry load - fall through to EMPTY handling
                 this.stats.cacheMisses++
-                log.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → RETRY (attempt ${entry.loadAttempts + 1})`)
+                HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → RETRY (attempt ${entry.loadAttempts + 1})`)
                 this.triggerLoad(entry)
                 return -1
                 
             case HighTextureState.EMPTY:
                 // Need to load - trigger async load
                 this.stats.cacheMisses++
-                log.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → MISS (triggering load)`)
+                HighTextureCache.logger.debug(`REQUEST game ${gameIndex} "${entry.gameName.slice(0, 15)}" → MISS (triggering load)`)
                 this.triggerLoad(entry)
                 return -1
         }
@@ -396,11 +397,11 @@ export class HighTextureCache {
     private triggerLoad(entry: GameEntry): void {
         // Already loading or queued?
         if (this.loadingPromises.has(entry.gameIndex)) {
-            log.debug(`TRIGGER game ${entry.gameIndex} → already loading, skip`)
+            HighTextureCache.logger.debug(`TRIGGER game ${entry.gameIndex} → already loading, skip`)
             return
         }
         if (this.loadQueue.includes(entry.gameIndex)) {
-            log.debug(`TRIGGER game ${entry.gameIndex} → already queued at position ${this.loadQueue.indexOf(entry.gameIndex)}`)
+            HighTextureCache.logger.debug(`TRIGGER game ${entry.gameIndex} → already queued at position ${this.loadQueue.indexOf(entry.gameIndex)}`)
             return
         }
         
@@ -408,11 +409,11 @@ export class HighTextureCache {
         if (this.loadingPromises.size >= this.config.maxConcurrentLoads) {
             // Queue for later
             this.loadQueue.push(entry.gameIndex)
-            log.debug(`TRIGGER game ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → QUEUED (pos ${this.loadQueue.length}, active: ${this.loadingPromises.size})`)
+            HighTextureCache.logger.debug(`TRIGGER game ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → QUEUED (pos ${this.loadQueue.length}, active: ${this.loadingPromises.size})`)
             return
         }
         
-        log.debug(`TRIGGER game ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → starting load`)
+        HighTextureCache.logger.debug(`TRIGGER game ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → starting load`)
         this.startLoad(entry)
     }
     
@@ -423,7 +424,7 @@ export class HighTextureCache {
         // Allocate a slot (may evict if full)
         const slot = this.allocateSlot(entry.gameIndex)
         if (slot < 0) {
-            log.warn(`Cannot load HIGH texture ${entry.gameIndex}: no slots available`)
+            HighTextureCache.logger.warn(`Cannot load HIGH texture ${entry.gameIndex}: no slots available`)
             return
         }
         
@@ -494,7 +495,7 @@ export class HighTextureCache {
         }
         
         this.backgroundCachingGames.add(entry.gameIndex)
-        log.debug(`BACKGROUND CACHE START ${entry.gameIndex} "${entry.gameName.slice(0, 15)}"`)
+        HighTextureCache.logger.debug(`BACKGROUND CACHE START ${entry.gameIndex} "${entry.gameName.slice(0, 15)}"`)
         
         // Fire and forget - fetch, decode, and store in pixel cache
         this.textureWorker.fetchAndProcessWithOptions(
@@ -508,7 +509,7 @@ export class HighTextureCache {
         ).then(async (result) => {
             // Verify dimensions
             if (result.width !== this.config.textureWidth || result.height !== this.config.textureHeight) {
-                log.warn(`BACKGROUND CACHE: size mismatch for "${entry.gameName}": expected ${this.config.textureWidth}×${this.config.textureHeight}, got ${result.width}×${result.height}`)
+                HighTextureCache.logger.warn(`BACKGROUND CACHE: size mismatch for "${entry.gameName}": expected ${this.config.textureWidth}×${this.config.textureHeight}, got ${result.width}×${result.height}`)
                 entry.state = HighTextureState.FAILED
                 this.backgroundCachingGames.delete(entry.gameIndex)
                 return
@@ -517,12 +518,12 @@ export class HighTextureCache {
             // Store in pixel cache
             await this.pixelCache.put(entry.artworkUrl, result.imageData, result.width, result.height)
             
-            log.debug(`BACKGROUND CACHE COMPLETE ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${result.width}×${result.height})`)
+            HighTextureCache.logger.debug(`BACKGROUND CACHE COMPLETE ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${result.width}×${result.height})`)
             this.backgroundCachingGames.delete(entry.gameIndex)
             // Entry stays in CACHING state - next requestHighTexture() will detect cache ready
         }).catch((err) => {
             const msg = err instanceof Error ? err.message : String(err)
-            log.debug(`BACKGROUND CACHE FAILED ${entry.gameIndex} "${entry.gameName.slice(0, 15)}": ${msg}`)
+            HighTextureCache.logger.debug(`BACKGROUND CACHE FAILED ${entry.gameIndex} "${entry.gameName.slice(0, 15)}": ${msg}`)
             entry.state = HighTextureState.FAILED
             this.backgroundCachingGames.delete(entry.gameIndex)
         })
@@ -533,13 +534,13 @@ export class HighTextureCache {
      */
     private async loadHighTexture(entry: GameEntry): Promise<boolean> {
         if (!this.dataArrayTexture) {
-            log.warn('Cannot load HIGH texture: texture array not set')
+            HighTextureCache.logger.warn('Cannot load HIGH texture: texture array not set')
             entry.state = HighTextureState.FAILED
             return false
         }
         
         if (entry.highSlot < 0) {
-            log.warn('Cannot load HIGH texture: no slot assigned')
+            HighTextureCache.logger.warn('Cannot load HIGH texture: no slot assigned')
             entry.state = HighTextureState.FAILED
             return false
         }
@@ -549,7 +550,7 @@ export class HighTextureCache {
         let arrayBufferCopyTime = 0
         
         try {
-            log.debug(`START HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | in-flight: ${this.loadingPromises.size}/${this.config.maxConcurrentLoads}, queue: ${this.loadQueue.length}`)
+            HighTextureCache.logger.debug(`START HIGH ${entry.gameIndex} → slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}" | in-flight: ${this.loadingPromises.size}/${this.config.maxConcurrentLoads}, queue: ${this.loadQueue.length}`)
             
             // First, check the pixel cache for decoded RGBA data
             const fetchStart = window.performance.now()
@@ -574,12 +575,12 @@ export class HighTextureCache {
                 arrayBufferCopyTime = window.performance.now() - bufferAccessStart
                 
                 processTime = 0 // No decode needed
-                log.debug(`PIXEL CACHE HIT ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${cachedPixels.width}×${cachedPixels.height})`)
+                HighTextureCache.logger.debug(`PIXEL CACHE HIT ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" (${cachedPixels.width}×${cachedPixels.height})`)
             } else {
                 // Pixel cache MISS - defer to background caching to avoid main thread lag
                 // Release the slot and set CACHING state so we don't block
                 this.stats.pixelCacheMisses++
-                log.debug(`PIXEL CACHE MISS ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → deferring to background caching`)
+                HighTextureCache.logger.debug(`PIXEL CACHE MISS ${entry.gameIndex} "${entry.gameName.slice(0, 15)}" → deferring to background caching`)
                 
                 // Release the allocated slot
                 if (entry.highSlot >= 0) {
@@ -600,7 +601,7 @@ export class HighTextureCache {
             // Verify size matches texture array expectations
             const expectedSize = this.config.textureWidth * this.config.textureHeight * 4
             if (imageData.length !== expectedSize) {
-                log.warn(`HIGH texture data size mismatch for "${entry.gameName}": expected ${expectedSize}, got ${imageData.length}`)
+                HighTextureCache.logger.warn(`HIGH texture data size mismatch for "${entry.gameName}": expected ${expectedSize}, got ${imageData.length}`)
                 entry.state = HighTextureState.FAILED
                 return false
             }
@@ -663,7 +664,7 @@ export class HighTextureCache {
             const inFlight = this.loadingPromises.size - 1  // -1 because this one is about to complete
             const cacheStatus = pixelCacheHit ? '🟢 PIXEL HIT' : '🔴 PIXEL MISS'
             const scheduled = executedImmediately ? 'immediate' : 'scheduled'
-            log.debug(`COMPLETE HIGH ${entry.gameIndex} → slot ${capturedSlot} "${capturedGameName.slice(0, 20)}" | ${cacheStatus} | total: ${totalTime.toFixed(0)}ms (fetch: ${fetchTime.toFixed(0)}ms, copy: ${scheduled}) | in-flight: ${inFlight}, queue: ${this.loadQueue.length}`)
+            HighTextureCache.logger.debug(`COMPLETE HIGH ${entry.gameIndex} → slot ${capturedSlot} "${capturedGameName.slice(0, 20)}" | ${cacheStatus} | total: ${totalTime.toFixed(0)}ms (fetch: ${fetchTime.toFixed(0)}ms, copy: ${scheduled}) | in-flight: ${inFlight}, queue: ${this.loadQueue.length}`)
             
             // Record timing sample for diagnostics (copyTime tracked separately in scheduler callback)
             this.recordTimingSample({
@@ -681,7 +682,7 @@ export class HighTextureCache {
             
         } catch (error) {
             const msg = error instanceof Error ? error.message : String(error)
-            log.debug(`Failed to load HIGH texture "${entry.gameName}": ${msg}`)
+            HighTextureCache.logger.debug(`Failed to load HIGH texture "${entry.gameName}": ${msg}`)
             entry.state = HighTextureState.FAILED
             // Free the slot since we failed
             if (entry.highSlot >= 0) {
@@ -704,7 +705,7 @@ export class HighTextureCache {
         
         // Set access time to 0 so it's evicted first
         entry.lastAccessTime = 0
-        log.debug(`Marked for eviction: game ${gameIndex} slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}"`)
+        HighTextureCache.logger.debug(`Marked for eviction: game ${gameIndex} slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}"`)
     }
     
     /**
@@ -741,7 +742,7 @@ export class HighTextureCache {
             this.onSlotChange(lruEntry.gameIndex, -1)
         }
         
-        log.runtime(`Evicted game ${lruEntry.gameIndex} from slot ${freedSlot} "${lruEntry.gameName.slice(0, 20)}"`)
+        HighTextureCache.logger.runtime(`Evicted game ${lruEntry.gameIndex} from slot ${freedSlot} "${lruEntry.gameName.slice(0, 20)}"`)
         return freedSlot
     }
     
@@ -798,7 +799,7 @@ export class HighTextureCache {
      */
     public logStats(): void {
         const stats = this.getStats()
-        log.info(`HIGH Texture Cache: ${stats.loaded}/${stats.totalSlots} loaded, ${stats.loading} loading, ${stats.failed} failed, ${stats.evictions} evictions, ${stats.cacheHits}/${stats.cacheHits + stats.cacheMisses} cache hits`)
+        HighTextureCache.logger.info(`HIGH Texture Cache: ${stats.loaded}/${stats.totalSlots} loaded, ${stats.loading} loading, ${stats.failed} failed, ${stats.evictions} evictions, ${stats.cacheHits}/${stats.cacheHits + stats.cacheMisses} cache hits`)
     }
 
     // ========================================================================
@@ -889,7 +890,7 @@ export class HighTextureCache {
         this.loadQueue = []
         this.slotToGame = []
         this.textureWorker.dispose()
-        log.lifecycle('Disposed')
+        HighTextureCache.logger.lifecycle('Disposed')
     }
     
     private recordTimingSample(sample: {

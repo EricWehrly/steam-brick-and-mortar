@@ -29,7 +29,7 @@ import { LOD_TIER_NAME } from './ILodArtworkRenderer'
 import { HighTextureCache } from './HighTextureCache'
 import type { PrewarmingConfig } from './SpatialPrewarmingManager'
 
-const log = Logger.withContext('LodArtworkOrchestrator')
+// Class-scoped logger will be attached to the class
 
 // Re-export for backward compatibility
 export { LOD_LEVEL, LOD_TIER_NAME, type LodLevel }
@@ -74,6 +74,7 @@ export interface LodArtworkConfig {
  * Implements ILodArtworkRenderer for use by LodDistanceManager.
  */
 export class LodArtworkOrchestrator {
+    public static logger = Logger.createLogFunctions(LodArtworkOrchestrator.name)
     private artworkProvider: GameArtworkProvider
     private textureManager: LodTextureArrayManager
     private renderer: LodGameArtworkRenderer
@@ -191,7 +192,7 @@ export class LodArtworkOrchestrator {
             }
         }
         
-        log.lifecycle(`LOD VRAM: ${lodInfo.join(', ')} | Total: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
+        LodArtworkOrchestrator.logger.lifecycle(`LOD VRAM: ${lodInfo.join(', ')} | Total: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
     }
     
     /**
@@ -217,7 +218,7 @@ export class LodArtworkOrchestrator {
         // Check known failure
         if (this.artworkProvider.isKnownFailure(appid ?? 0, 'library')) {
             const reason = this.artworkProvider.getFailureReason(appid ?? 0, 'library')
-            log.debug(`Skipping "${gameName}": previously failed (${reason})`)
+            LodArtworkOrchestrator.logger.debug(`Skipping "${gameName}": previously failed (${reason})`)
             return { success: false, instanceIndex: -1 }
         }
         
@@ -225,7 +226,7 @@ export class LodArtworkOrchestrator {
         const textureIndex = this.textureManager.allocateSlot()
         if (textureIndex < 0) {
             if (!this.atlasFullLogged) {
-                log.warn(`Atlas full (${this.maxTextures} configured) - further games will not have artwork`)
+                LodArtworkOrchestrator.logger.warn(`Atlas full (${this.maxTextures} configured) - further games will not have artwork`)
                 this.atlasFullLogged = true
             }
             return { success: false, instanceIndex: -1 }
@@ -286,7 +287,7 @@ export class LodArtworkOrchestrator {
                 urlsTried: [artworkUrl],
                 timestamp: Date.now()
             })
-            log.debug(`Artwork failed for "${gameName}": ${reason}`)
+            LodArtworkOrchestrator.logger.debug(`Artwork failed for "${gameName}": ${reason}`)
             return { success: false, instanceIndex: -1 }
         }
     }
@@ -351,7 +352,7 @@ export class LodArtworkOrchestrator {
     public clearFailureCache(): void {
         this.failedArtwork.clear()
         this.artworkProvider.clearCaches()
-        log.info('Cleared artwork caches - all URLs will be retried on next load')
+        LodArtworkOrchestrator.logger.info('Cleared artwork caches - all URLs will be retried on next load')
     }
     
     // === Protected accessors for debug subclass ===
@@ -392,6 +393,6 @@ export class LodArtworkOrchestrator {
         this.textureIndexToGameName.clear()
         this.failedArtwork.clear()
         
-        log.lifecycle('Disposed')
+        LodArtworkOrchestrator.logger.lifecycle('Disposed')
     }
 }

@@ -29,7 +29,7 @@ type HandlerFunction = (event: CustomEvent<BaseInteractionEvent>) => void
 
 export class EventManager extends EventTarget {
     private static instance: EventManager
-    private static readonly logger = Logger.withContext(EventManager.name)
+    private static readonly logger = Logger.createLogFunctions(EventManager.name)
     
     // Simplified tracking
     private registeredHandlers = new Map<string, Set<HandlerFunction>>()

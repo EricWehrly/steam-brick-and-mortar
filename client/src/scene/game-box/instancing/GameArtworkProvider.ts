@@ -22,7 +22,7 @@ import { Logger } from '../../../utils/Logger'
 import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 
-const log = Logger.withContext('GameArtworkProvider')
+// Class-scoped logger will be attached to the class
 
 /** Supported artwork formats */
 export type ArtworkFormat = 'library' | 'header' | 'capsule'
@@ -103,6 +103,7 @@ const FALLBACK_PATTERNS: Record<ArtworkFormat, Array<{ pattern: string; name: st
  */
 export class GameArtworkProvider {
     private static instance: GameArtworkProvider | null = null
+    public static logger = Logger.createLogFunctions(GameArtworkProvider.name)
     
     private textureWorker: TextureWorker
     private pixelCache: PixelDataCache | null = null
@@ -133,7 +134,7 @@ export class GameArtworkProvider {
             this.pixelCache = PixelDataCache.getInstance()
             await this.pixelCache.init()
         } catch (err) {
-            log.warn('PixelDataCache init failed:', err)
+            GameArtworkProvider.logger.warn('PixelDataCache init failed:', err)
         }
     }
     
@@ -330,9 +331,9 @@ export class GameArtworkProvider {
         try {
             localStorage.removeItem(GameArtworkProvider.FAILURE_CACHE_KEY)
             localStorage.removeItem(GameArtworkProvider.SUCCESS_CACHE_KEY)
-            log.info('Cleared artwork caches')
+            GameArtworkProvider.logger.info('Cleared artwork caches')
         } catch (e) {
-            log.debug('Could not clear localStorage:', e)
+            GameArtworkProvider.logger.debug('Could not clear localStorage:', e)
         }
     }
     
@@ -398,10 +399,10 @@ export class GameArtworkProvider {
                         count++
                     }
                 }
-                if (count > 0) log.info(`Loaded ${count} cached failures`)
+                if (count > 0) GameArtworkProvider.logger.info(`Loaded ${count} cached failures`)
             }
         } catch (e) {
-            log.debug('Could not load failure cache:', e)
+            GameArtworkProvider.logger.debug('Could not load failure cache:', e)
         }
         
         try {
@@ -415,10 +416,10 @@ export class GameArtworkProvider {
                         count++
                     }
                 }
-                if (count > 0) log.info(`Loaded ${count} cached successes`)
+                if (count > 0) GameArtworkProvider.logger.info(`Loaded ${count} cached successes`)
             }
         } catch (e) {
-            log.debug('Could not load success cache:', e)
+            GameArtworkProvider.logger.debug('Could not load success cache:', e)
         }
     }
     
@@ -430,7 +431,7 @@ export class GameArtworkProvider {
             }
             localStorage.setItem(GameArtworkProvider.FAILURE_CACHE_KEY, JSON.stringify(data))
         } catch (e) {
-            log.debug('Could not save failure cache:', e)
+            GameArtworkProvider.logger.debug('Could not save failure cache:', e)
         }
     }
     
@@ -442,14 +443,14 @@ export class GameArtworkProvider {
             }
             localStorage.setItem(GameArtworkProvider.SUCCESS_CACHE_KEY, JSON.stringify(data))
         } catch (e) {
-            log.debug('Could not save success cache:', e)
+            GameArtworkProvider.logger.debug('Could not save success cache:', e)
         }
     }
     
     public dispose(): void {
         this.textureWorker.dispose()
         GameArtworkProvider.instance = null
-        log.lifecycle('Disposed')
+        GameArtworkProvider.logger.lifecycle('Disposed')
     }
 }
 

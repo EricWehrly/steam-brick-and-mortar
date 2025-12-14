@@ -65,7 +65,7 @@ export interface BatchAppDetailsResult {
 import { Logger } from '../../utils/Logger'
 
 export class BatchAppDetailsClient {
-    private static readonly logger = Logger.withContext(BatchAppDetailsClient.name)
+    private static readonly logger = Logger.createLogFunctions(BatchAppDetailsClient.name)
     private apiBaseUrl: string;
 
     constructor(apiBaseUrl: string = 'https://steam-api-dev.wehrly.com') {

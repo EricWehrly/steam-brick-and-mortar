@@ -15,7 +15,7 @@ import {
 export { VR_ERGONOMICS, STEAM_STORE_SECTIONS, type StoreLayoutConfig, type StoreSection };
 
 export class StoreLayout {
-  private static readonly logger = Logger.withContext('StoreLayout')
+  private static readonly logger = Logger.createLogFunctions(StoreLayout.name)
   
   private scene: THREE.Scene;
   private shelfGenerator: ProceduralShelfGenerator | null = null;

@@ -43,7 +43,7 @@ export interface InputCallbacks {
  * Manages input for desktop and VR modes
  */
 export class InputManager {
-    private static readonly logger = Logger.withContext(InputManager.name)
+    private static readonly logger = Logger.createLogFunctions(InputManager.name)
     
     private inputState: InputState = {
         keys: { w: false, a: false, s: false, d: false, q: false, e: false, space: false, c: false },

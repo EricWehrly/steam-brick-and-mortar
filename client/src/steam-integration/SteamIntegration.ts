@@ -36,7 +36,7 @@ export interface LoadGamesOptions {
 }
 
 export class SteamIntegration {
-    private static readonly logger = Logger.withContext(SteamIntegration.name)
+    private static readonly logger = Logger.createLogFunctions(SteamIntegration.name)
     private static _instance: SteamIntegration | null = null
     
     private steamClient: SteamApiClient

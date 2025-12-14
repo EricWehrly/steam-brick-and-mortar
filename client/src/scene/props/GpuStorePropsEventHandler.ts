@@ -21,7 +21,7 @@ import { PropRenderer } from '../PropRenderer'
 // TODO: I think this can just be merged down into the gpu renderer class.
 // This is an added layer, separating out the event handling, but could be slim enough to sit inside the class proper
 export class GpuStorePropsEventHandler {
-    private static readonly logger = Logger.withContext(GpuStorePropsEventHandler.name)
+    private static readonly logger = Logger.createLogFunctions(GpuStorePropsEventHandler.name)
     private eventManager: EventManager
     private renderer: GpuStorePropsRenderer | null = null
     private isCapable: boolean

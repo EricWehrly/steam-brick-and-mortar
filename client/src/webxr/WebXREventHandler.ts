@@ -33,7 +33,7 @@ import type {
 } from '../types/InteractionEvents'
 
 export class WebXREventHandler {
-    private static readonly logger = Logger.withContext(WebXREventHandler.name)
+    private static readonly logger = Logger.createLogFunctions(WebXREventHandler.name)
     private eventManager: EventManager
     private webxrCoordinator: WebXRCoordinator
     private webxrUICoordinator: WebXRUICoordinator

@@ -29,7 +29,7 @@ export interface WebXRSessionCallbacks {
  * Manages WebXR session lifecycle and capabilities
  */
 export class WebXRManager {
-    private static readonly logger = Logger.withContext(WebXRManager.name)
+    private static readonly logger = Logger.createLogFunctions(WebXRManager.name)
     private renderer: THREE.WebGLRenderer | null = null
     private currentSession: XRSession | null = null
     private capabilities: WebXRCapabilities = {

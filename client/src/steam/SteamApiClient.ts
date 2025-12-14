@@ -52,7 +52,7 @@ export interface SteamApiError {
  * All public methods include explicit caching logic for transparency and easier debugging.
  */
 export class SteamApiClient {
-    private static readonly logger = Logger.withContext(SteamApiClient.name)
+    private static readonly logger = Logger.createLogFunctions(SteamApiClient.name)
     private http: HttpClient
     private cache: CacheManager
     private rateLimiter: RateLimiter

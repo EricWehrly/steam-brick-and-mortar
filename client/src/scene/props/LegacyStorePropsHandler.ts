@@ -16,7 +16,7 @@ import { StorePropsEventTypes, type StorePropsSetupRequestEvent, type StoreProps
 import { EventSource } from '../../core/EventManager'
 
 export class LegacyStorePropsHandler {
-    private static readonly logger = Logger.withContext(LegacyStorePropsHandler.name)
+    private static readonly logger = Logger.createLogFunctions(LegacyStorePropsHandler.name)
     private eventManager: EventManager
     private renderer: LegacyStorePropsRenderer | null = null
     

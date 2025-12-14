@@ -32,7 +32,7 @@ import type {
 // Vite worker import
 import PixelCacheWorker from './pixel-cache.worker?worker'
 
-const log = Logger.withContext('PixelDataCache')
+// Logger will be attached to the class below
 
 export interface PixelDataCacheConfig {
     dbName?: string
@@ -59,6 +59,7 @@ const CACHE_VERSION = 1
 
 export class PixelDataCache {
     private static instance: PixelDataCache | null = null
+    public static logger = Logger.createLogFunctions(PixelDataCache.name)
     
     private worker: Worker | null = null
     private readonly dbName: string
@@ -115,7 +116,7 @@ export class PixelDataCache {
                 }
                 
                 this.worker.onerror = (error) => {
-                    log.error('Worker error:', error.message)
+                    PixelDataCache.logger.error('Worker error:', error.message)
                     this.stats.errors++
                 }
                 
@@ -128,7 +129,7 @@ export class PixelDataCache {
                         if (result.success) {
                             this.workerReady = true
                             this.stats.workerReady = true
-                            log.lifecycle(`Worker initialized: ${this.dbName}/${this.storeName}`)
+                            PixelDataCache.logger.lifecycle(`Worker initialized: ${this.dbName}/${this.storeName}`)
                             resolve()
                         } else {
                             reject(new Error(result.error ?? 'Worker init failed'))
@@ -145,8 +146,8 @@ export class PixelDataCache {
                     messageId
                 } satisfies WorkerInMessage)
                 
-            } catch (error) {
-                log.error('Failed to create worker:', error)
+                } catch (error) {
+                PixelDataCache.logger.error('Failed to create worker:', error)
                 reject(error)
             }
         })
@@ -218,7 +219,7 @@ export class PixelDataCache {
                 return null
             }
         } catch (error) {
-            log.debug(`Cache read error for ${url}:`, error)
+            PixelDataCache.logger.debug(`Cache read error for ${url}:`, error)
             this.stats.errors++
             return null
         }
@@ -253,7 +254,7 @@ export class PixelDataCache {
             
             this.stats.stores++
         } catch (error) {
-            log.debug(`Cache write error for ${url}:`, error)
+            PixelDataCache.logger.debug(`Cache write error for ${url}:`, error)
             this.stats.errors++
         }
     }
@@ -271,7 +272,7 @@ export class PixelDataCache {
                 messageId: this.generateMessageId()
             } as WorkerInMessage)
         } catch (error) {
-            log.debug(`Cache delete error for ${url}:`, error)
+            PixelDataCache.logger.debug(`Cache delete error for ${url}:`, error)
         }
     }
     
@@ -288,9 +289,9 @@ export class PixelDataCache {
             })
             
             this.stats = { hits: 0, misses: 0, stores: 0, errors: 0, workerReady: true }
-            log.lifecycle('Cleared all cached pixel data')
+            PixelDataCache.logger.lifecycle('Cleared all cached pixel data')
         } catch (error) {
-            log.error('Failed to clear cache:', error)
+            PixelDataCache.logger.error('Failed to clear cache:', error)
         }
     }
     
@@ -353,6 +354,6 @@ export class PixelDataCache {
         this.workerReady = false
         this.initPromise = null
         this.pendingMessages.clear()
-        log.lifecycle('Disposed')
+        PixelDataCache.logger.lifecycle('Disposed')
     }
 }

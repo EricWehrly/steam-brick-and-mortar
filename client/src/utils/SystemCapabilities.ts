@@ -25,7 +25,7 @@ export interface SystemCapabilities {
 }
 
 export class SystemCapabilitiesDetector {
-    private static readonly logger = Logger.withContext(SystemCapabilitiesDetector.name)
+    private static readonly logger = Logger.createLogFunctions(SystemCapabilitiesDetector.name)
     private static cachedCapabilities: SystemCapabilities | null = null
     
     /**

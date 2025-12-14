@@ -24,7 +24,7 @@ export interface BinderState {
 }
 
 export class GameLibraryBinderUI {
-    private static readonly logger = Logger.withContext(GameLibraryBinderUI.name)
+    private static readonly logger = Logger.createLogFunctions(GameLibraryBinderUI.name)
     private static instance: GameLibraryBinderUI | null = null
     
     private container: HTMLElement | null = null
