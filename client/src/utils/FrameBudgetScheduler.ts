@@ -16,8 +16,6 @@
 
 import { Logger } from './Logger'
 
-const log = Logger.withContext('FrameBudgetScheduler')
-
 export interface TaskOptions {
     /** Estimated execution time in ms (helps budget planning) */
     estimatedMs?: number
@@ -63,6 +61,10 @@ const PRIORITY_MAP = { low: 0, normal: 1, high: 2 } as const
 
 export class FrameBudgetScheduler {
     private static instance: FrameBudgetScheduler | null = null
+    // Support test mocks that may only provide Logger.withContext()
+    public static logger = typeof Logger.createLogFunctions === 'function'
+        ? Logger.createLogFunctions(FrameBudgetScheduler.name)
+        : Logger.withContext(FrameBudgetScheduler.name)
     
     // Configuration
     private targetFps: number
@@ -98,7 +100,7 @@ export class FrameBudgetScheduler {
         const ringSize = config.ringBufferSize ?? 60
         this.frameTimeRing = new Float32Array(ringSize)
         
-        log.lifecycle(`Initialized: target ${this.targetFps}fps, budget threshold ${this.budgetThreshold * 100}%`)
+        FrameBudgetScheduler.logger.lifecycle(`Initialized: target ${this.targetFps}fps, budget threshold ${this.budgetThreshold * 100}%`)
     }
     
     public static getInstance(config?: FrameBudgetSchedulerConfig): FrameBudgetScheduler {
@@ -226,7 +228,7 @@ export class FrameBudgetScheduler {
             const forceExecution = waitTime > task.maxDeferMs
             
             if (forceExecution) {
-                log.warn(`Task forced after ${waitTime.toFixed(0)}ms wait (limit: ${task.maxDeferMs}ms) - system may be overloaded`)
+                FrameBudgetScheduler.logger.warn(`Task forced after ${waitTime.toFixed(0)}ms wait (limit: ${task.maxDeferMs}ms) - system may be overloaded`)
                 this.totalTasksForced++
             }
             
@@ -240,7 +242,7 @@ export class FrameBudgetScheduler {
             try {
                 task.fn()
             } catch (e) {
-                log.error('Task execution failed:', e)
+                    FrameBudgetScheduler.logger.error('Task execution failed:', e)
             }
             tasksExecuted++
         }
@@ -273,24 +275,24 @@ export class FrameBudgetScheduler {
     public setTargetFps(fps: number): void {
         this.targetFps = fps
         this.targetFrameTime = 1000 / fps
-        log.lifecycle(`Target FPS changed to ${fps}`)
+        FrameBudgetScheduler.logger.lifecycle(`Target FPS changed to ${fps}`)
     }
     
     public setBudgetThreshold(threshold: number): void {
         this.budgetThreshold = Math.max(0.1, Math.min(1.0, threshold))
-        log.lifecycle(`Budget threshold changed to ${(this.budgetThreshold * 100).toFixed(0)}%`)
+        FrameBudgetScheduler.logger.lifecycle(`Budget threshold changed to ${(this.budgetThreshold * 100).toFixed(0)}%`)
     }
     
     public setMaxTasksPerFrame(max: number): void {
         this.maxTasksPerFrame = Math.max(1, Math.min(20, max))
-        log.lifecycle(`Max tasks per frame changed to ${this.maxTasksPerFrame}`)
+        FrameBudgetScheduler.logger.lifecycle(`Max tasks per frame changed to ${this.maxTasksPerFrame}`)
     }
     
     public clearPendingTasks(): void {
         const count = this.pendingTasks.length
         this.pendingTasks = []
         if (count > 0) {
-            log.warn(`Cleared ${count} pending tasks`)
+            FrameBudgetScheduler.logger.warn(`Cleared ${count} pending tasks`)
         }
     }
     
@@ -317,6 +319,6 @@ export class FrameBudgetScheduler {
     public dispose(): void {
         this.clearPendingTasks()
         FrameBudgetScheduler.instance = null
-        log.lifecycle('Disposed')
+        FrameBudgetScheduler.logger.lifecycle('Disposed')
     }
 }

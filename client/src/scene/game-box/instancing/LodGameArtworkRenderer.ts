@@ -23,7 +23,7 @@ import { SpatialPrewarmingManager, type PrewarmingConfig } from './SpatialPrewar
 import vertexShader from './shaders/instanced-artwork-lod.vert?raw'
 import fragmentShader from './shaders/instanced-artwork-lod.frag?raw'
 
-const log = Logger.withContext('LodGameArtworkRenderer')
+// Class-scoped logger will be attached to the class
 
 /** LOD level constants */
 export const LOD_LEVEL = {
@@ -74,6 +74,7 @@ export interface InstanceData {
  * Texture population is handled externally.
  */
 export class LodGameArtworkRenderer {
+    public static logger = Logger.createLogFunctions(LodGameArtworkRenderer.name)
     private instancedMesh: THREE.InstancedMesh | null = null
     private geometry: THREE.BoxGeometry | null = null
     private material: THREE.ShaderMaterial | null = null
@@ -126,7 +127,7 @@ export class LodGameArtworkRenderer {
         }
         this.gpuUpdateInterval = this.config.gpuUpdateInterval
         
-        log.lifecycle(`Created with maxInstances=${this.config.maxInstances}, defaultLod=${this.config.defaultLod}, lazyHigh=${this.lazyHighTextures}`)
+        LodGameArtworkRenderer.logger.lifecycle(`Created with maxInstances=${this.config.maxInstances}, defaultLod=${this.config.defaultLod}, lazyHigh=${this.lazyHighTextures}`)
     }
     
     /**
@@ -135,7 +136,7 @@ export class LodGameArtworkRenderer {
      */
     public initialize(textureArrays: LodTextureArrays, scene: THREE.Scene): void {
         if (this.instancedMesh) {
-            log.warn('Already initialized')
+            LodGameArtworkRenderer.logger.warn('Already initialized')
             return
         }
         
@@ -225,7 +226,7 @@ export class LodGameArtworkRenderer {
             this.isRegisteredForRenderLoop = true
         }
         
-        log.lifecycle('Initialized and added to scene')
+        LodGameArtworkRenderer.logger.lifecycle('Initialized and added to scene')
     }
     
     /**
@@ -268,7 +269,7 @@ export class LodGameArtworkRenderer {
         
         if (promotedCount > 0) {
             this.pendingAttributeUpdate = true
-            log.runtime(`Promoted ${promotedCount} games to HIGH LOD (after GPU flush)`)
+            LodGameArtworkRenderer.logger.runtime(`Promoted ${promotedCount} games to HIGH LOD (after GPU flush)`)
         }
         
         this.pendingHighPromotion.clear()
@@ -279,7 +280,7 @@ export class LodGameArtworkRenderer {
         
         const instanceIndex = this.textureIndexToInstance.get(textureIndex)
         if (instanceIndex === undefined) {
-            log.runtime(`HIGH slot change for unknown textureIndex ${textureIndex}`)
+            LodGameArtworkRenderer.logger.runtime(`HIGH slot change for unknown textureIndex ${textureIndex}`)
             return
         }
         
@@ -339,12 +340,12 @@ export class LodGameArtworkRenderer {
         highTextureSlot: number = -1
     ): number {
         if (!this.instancedMesh || !this.geometry) {
-            log.warn('Cannot add instance: renderer not initialized')
+            LodGameArtworkRenderer.logger.warn('Cannot add instance: renderer not initialized')
             return -1
         }
         
         if (this.currentInstanceCount >= this.config.maxInstances) {
-            log.warn(`Cannot add instance: at capacity (${this.config.maxInstances})`)
+            LodGameArtworkRenderer.logger.warn(`Cannot add instance: at capacity (${this.config.maxInstances})`)
             return -1
         }
         
@@ -446,7 +447,7 @@ export class LodGameArtworkRenderer {
         }
         
         this.pendingAttributeUpdate = true
-        log.debug(`Set global LOD to ${lodLevel} for ${this.currentInstanceCount} instances`)
+        LodGameArtworkRenderer.logger.debug(`Set global LOD to ${lodLevel} for ${this.currentInstanceCount} instances`)
     }
     
     /**
@@ -523,6 +524,6 @@ export class LodGameArtworkRenderer {
         this.lodLevels = null
         this.highTextureSlots = null
         
-        log.lifecycle('Disposed')
+        LodGameArtworkRenderer.logger.lifecycle('Disposed')
     }
 }

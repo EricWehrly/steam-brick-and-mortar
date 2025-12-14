@@ -21,8 +21,6 @@ import { EventManager } from '../../../core/EventManager'
 import { AppSettingsEventTypes } from '../../../types/InteractionEvents'
 import { Logger } from '../../../utils/Logger'
 
-const log = Logger.withContext('LodDistanceManager')
-
 export interface LodDistanceConfig {
     /** Distance threshold: closer than this = HIGH LOD */
     highDistance: number
@@ -56,6 +54,7 @@ interface DiagnosticStats {
 }
 
 export class LodDistanceManager {
+    public static logger = Logger.createLogFunctions(LodDistanceManager.name)
     private readonly renderer: ILodArtworkRenderer
     private config: LodDistanceConfig
     private readonly renderLoopRegistry: RenderLoopRegistry
@@ -113,18 +112,18 @@ export class LodDistanceManager {
             this.onSettingChanged.bind(this)
         )
         
-        log.lifecycle(`Initialized: HIGH < ${this.config.highDistance}m, MED < ${this.config.midDistance}m, Hysteresis: ${this.config.hysteresis}m, Update every ${this.config.updateFrequency} frames`)
+        LodDistanceManager.logger.lifecycle(`Initialized: HIGH < ${this.config.highDistance}m, MED < ${this.config.midDistance}m, Hysteresis: ${this.config.hysteresis}m, Update every ${this.config.updateFrequency} frames`)
     }
     
     private onSettingChanged(event: SettingChangedEvent): void {
         if (event.key === 'lodHighDistance' && typeof event.value === 'number') {
             this.config.highDistance = event.value
             this.updateSquaredDistances()
-            log.info(`HIGH distance updated to ${event.value}m`)
+            LodDistanceManager.logger.info(`HIGH distance updated to ${event.value}m`)
         } else if (event.key === 'lodMedDistance' && typeof event.value === 'number') {
             this.config.midDistance = event.value
             this.updateSquaredDistances()
-            log.info(`MED distance updated to ${event.value}m`)
+            LodDistanceManager.logger.info(`MED distance updated to ${event.value}m`)
         }
     }
     
@@ -149,7 +148,7 @@ export class LodDistanceManager {
         
         this.renderLoopRegistry.register('LodDistanceManager', this.onRenderFrame.bind(this))
         this.isRegistered = true
-        log.lifecycle('Registered with render loop')
+        LodDistanceManager.logger.lifecycle('Registered with render loop')
     }
     
     /**
@@ -160,7 +159,7 @@ export class LodDistanceManager {
         
         this.renderLoopRegistry.unregister('LodDistanceManager')
         this.isRegistered = false
-        log.lifecycle('Unregistered from render loop')
+        LodDistanceManager.logger.lifecycle('Unregistered from render loop')
     }
     
     /**
@@ -190,7 +189,7 @@ export class LodDistanceManager {
             })
         }
         
-        log.lifecycle(`Synced ${this.instanceStates.size} instances`)
+        LodDistanceManager.logger.lifecycle(`Synced ${this.instanceStates.size} instances`)
     }
 
     /**
@@ -296,7 +295,7 @@ export class LodDistanceManager {
         
         const lodCounts = this.countLodLevels()
         
-        log.runtime(
+        LodDistanceManager.logger.runtime(
             `Stats | ` +
             `Update: ${avgUpdateTime.toFixed(2)}ms avg | ` +
             `Frame: ${avgFrameTime.toFixed(1)}ms avg | ` +
@@ -360,12 +359,12 @@ export class LodDistanceManager {
     public preloadNearestGames(count: number = 20): void {
         const camera = this.dataManager.get<THREE.Camera>(DataKey.MainCamera)
         if (!camera) {
-            log.runtime('Cannot preload: no camera')
+            LodDistanceManager.logger.runtime('Cannot preload: no camera')
             return
         }
 
         if (this.instanceStates.size === 0) {
-            log.runtime('Cannot preload: no instances')
+            LodDistanceManager.logger.runtime('Cannot preload: no instances')
             return
         }
 
@@ -394,7 +393,7 @@ export class LodDistanceManager {
             }
         }
 
-        log.runtime(`Preloaded ${requested} nearest games to HIGH (${count} requested, ${toPreload.length} in range)`)
+        LodDistanceManager.logger.runtime(`Preloaded ${requested} nearest games to HIGH (${count} requested, ${toPreload.length} in range)`)
     }
 
     /**
@@ -449,6 +448,6 @@ export class LodDistanceManager {
     public dispose(): void {
         this.stopAutoUpdate()
         this.instanceStates.clear()
-        log.lifecycle('Disposed')
+        LodDistanceManager.logger.lifecycle('Disposed')
     }
 }

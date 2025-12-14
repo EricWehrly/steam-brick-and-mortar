@@ -22,8 +22,6 @@ import { DataKey } from '../../../core/data/DataTypes'
 import { Logger } from '../../../utils/Logger'
 import { HighTextureCache, HighTextureState } from './HighTextureCache'
 
-const log = Logger.withContext('SpatialPrewarming')
-
 export interface PrewarmingConfig {
     /** How far ahead to pre-warm (meters) */
     prewarmDistance: number
@@ -65,6 +63,7 @@ interface PrewarmStats {
 }
 
 export class SpatialPrewarmingManager {
+    public static logger = Logger.createLogFunctions(SpatialPrewarmingManager.name)
     private readonly config: PrewarmingConfig
     private readonly highTextureCache: HighTextureCache
     private readonly renderLoopRegistry: RenderLoopRegistry
@@ -105,7 +104,7 @@ export class SpatialPrewarmingManager {
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
         this.dataManager = DataManager.getInstance()
         
-        log.lifecycle(`Initialized: prewarm ${this.config.prewarmDistance}m ahead, max ${this.config.maxConcurrentLoads} concurrent loads`)
+        SpatialPrewarmingManager.logger.lifecycle(`Initialized: prewarm ${this.config.prewarmDistance}m ahead, max ${this.config.maxConcurrentLoads} concurrent loads`)
     }
     
     /**
@@ -134,7 +133,7 @@ export class SpatialPrewarmingManager {
             this.lastCameraPos.copy(camera.position)
         }
         
-        log.lifecycle(`Started with ${this.gamePositions.size} registered games`)
+        SpatialPrewarmingManager.logger.lifecycle(`Started with ${this.gamePositions.size} registered games`)
     }
     
     /**
@@ -145,7 +144,7 @@ export class SpatialPrewarmingManager {
         
         this.renderLoopRegistry.unregister('SpatialPrewarming')
         this.isRegistered = false
-        log.lifecycle('Stopped')
+        SpatialPrewarmingManager.logger.lifecycle('Stopped')
     }
     
     /**
@@ -256,7 +255,7 @@ export class SpatialPrewarmingManager {
         this.stats.queueLength = this.prewarmQueue.length
         
         if (this.prewarmQueue.length > 0) {
-            log.runtime(`Pre-warm queue: ${this.prewarmQueue.length} games ahead`)
+            SpatialPrewarmingManager.logger.runtime(`Pre-warm queue: ${this.prewarmQueue.length} games ahead`)
         }
     }
     
@@ -293,7 +292,7 @@ export class SpatialPrewarmingManager {
             this.stats.totalPrewarmed++
             
             const game = this.gamePositions.get(textureIndex)
-            log.runtime(`Pre-warming "${game?.gameName?.slice(0, 20)}" (${this.currentlyLoading.size}/${this.config.maxConcurrentLoads})`)
+            SpatialPrewarmingManager.logger.runtime(`Pre-warming "${game?.gameName?.slice(0, 20)}" (${this.currentlyLoading.size}/${this.config.maxConcurrentLoads})`)
         }
     }
     
@@ -317,7 +316,7 @@ export class SpatialPrewarmingManager {
             if (dot < -0.3 && distance > this.config.evictBehindDistance) {
                 this.highTextureCache.markForEviction(textureIndex)
                 this.stats.totalEvicted++
-                log.runtime(`Marked for eviction: "${game.gameName.slice(0, 20)}" (behind player)`)
+                SpatialPrewarmingManager.logger.runtime(`Marked for eviction: "${game.gameName.slice(0, 20)}" (behind player)`)
             }
         }
     }
@@ -346,6 +345,6 @@ export class SpatialPrewarmingManager {
         this.prewarmQueue = []
         this.currentlyLoading.clear()
         this.velocitySamples = []
-        log.lifecycle('Disposed')
+        SpatialPrewarmingManager.logger.lifecycle('Disposed')
     }
 }

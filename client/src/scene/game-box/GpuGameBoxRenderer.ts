@@ -27,7 +27,7 @@ import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { Logger } from '../../utils/Logger'
 
-const log = Logger.withContext('GpuGameBoxRenderer')
+// Class-scoped logger will be attached to the class
 
 // Steam capsule source dimensions (what CDN claims, though actual is ~460×690)
 const STEAM_SOURCE_WIDTH = 600
@@ -38,6 +38,7 @@ const ARTWORK_PROBABILITY = 0.67
 import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
 export class GpuGameBoxRenderer implements IGameBoxRenderer {
+    public static logger = Logger.createLogFunctions(GpuGameBoxRenderer.name)
 
     private static readonly DEFAULT_DIMENSIONS: GameBoxDimensions = {
         width: 0.3,   // 30cm width
@@ -85,14 +86,14 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             })
             // Create distance manager for automatic LOD switching
             this.lodDistanceManager = new LodDistanceManagerDebug(this.lodArtworkRenderer)
-            log.lifecycle(`Using LOD atlas (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
+            GpuGameBoxRenderer.logger.lifecycle(`Using LOD atlas (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
         } else if (this.useMultiAtlas) {
             // TODO: Legacy renderer - remove once LOD atlas is proven stable (controlled by UseMultiAtlas setting)
             this.multiAtlasRenderer = new MultiAtlasArtworkRenderer({
                 boxWidth: this.dimensions.width,
                 boxHeight: this.dimensions.height
             })
-            log.lifecycle(`Using multi-atlas system (max ${maxGames})`)
+            GpuGameBoxRenderer.logger.lifecycle(`Using multi-atlas system (max ${maxGames})`)
         } else {
             // TODO: Legacy renderer - remove once LOD atlas is proven stable (fallback when both atlas flags are false)
             this.instancedArtworkRenderer = new InstancedArtworkRenderer({
@@ -101,7 +102,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
                 boxHeight: this.dimensions.height,
                 boxDepth: this.dimensions.depth
             })
-            log.lifecycle(`Using single atlas (max ${maxGames})`)
+            GpuGameBoxRenderer.logger.lifecycle(`Using single atlas (max ${maxGames})`)
         }
     }
 
@@ -173,7 +174,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             }
         }).catch((error) => {
             if (!(error instanceof Error && error.message.includes('Maximum'))) {
-                log.debug(`Artwork fetch failed for "${game.name}": ${error}`)
+                GpuGameBoxRenderer.logger.debug(`Artwork fetch failed for "${game.name}": ${error}`)
             }
             if (AppSettings.get(Setting.EnableLabels)) {
                 this.createInstancedLabelBox(game, position, undefined, side)
@@ -200,7 +201,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             }
         }).catch((error) => {
             if (!(error instanceof Error && error.message.includes('Maximum'))) {
-                log.debug(`Artwork fetch failed for "${game.name}": ${error}`)
+                GpuGameBoxRenderer.logger.debug(`Artwork fetch failed for "${game.name}": ${error}`)
             }
             if (AppSettings.get(Setting.EnableLabels)) {
                 this.createInstancedLabelBox(game, position, undefined, side)
@@ -232,7 +233,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         }).catch((error) => {
             // Don't log "Maximum textures reached" - that's expected once we hit the limit
             if (!(error instanceof Error && error.message === 'Maximum textures reached')) {
-                log.debug(`Artwork fetch failed for "${game.name}": ${error}`)
+                GpuGameBoxRenderer.logger.debug(`Artwork fetch failed for "${game.name}": ${error}`)
             }
             // Fall back to label on error (if labels enabled)
             if (AppSettings.get(Setting.EnableLabels)) {
@@ -296,7 +297,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         // Priority 3: Construct portrait URL as last resort (may fail for newer games)
         if (game.appid) {
-            log.debug(`No artwork URLs in metadata for "${game.name}" - using constructed URL`)
+            GpuGameBoxRenderer.logger.debug(`No artwork URLs in metadata for "${game.name}" - using constructed URL`)
             return `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
         }
         
@@ -310,7 +311,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         _name?: string
     ): THREE.Mesh | null {
         if (!this.instancedArtworkRenderer) {
-            log.warn('createInstancedArtworkBox called but single-atlas renderer not available')
+            GpuGameBoxRenderer.logger.warn('createInstancedArtworkBox called but single-atlas renderer not available')
             return null
         }
         
@@ -323,10 +324,10 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             textureOptions
         ).then((success) => {
             if (!success) {
-                log.debug(`Failed to add instanced artwork box for "${game.name}" at index ${reservedInstanceIndex}`)
+                GpuGameBoxRenderer.logger.debug(`Failed to add instanced artwork box for "${game.name}" at index ${reservedInstanceIndex}`)
             }
         }).catch((error) => {
-            log.debug(`Error adding instanced artwork for "${game.name}": ${error}`)
+            GpuGameBoxRenderer.logger.debug(`Error adding instanced artwork for "${game.name}": ${error}`)
         })
         
         return null
@@ -348,7 +349,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         )
         
         if (!success) {
-            log.debug(`Failed to add instanced label box for "${game.name}"`)
+            GpuGameBoxRenderer.logger.debug(`Failed to add instanced label box for "${game.name}"`)
         }
         
         return null
@@ -377,7 +378,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     }
 
     public dispose(): void {
-        log.lifecycle('Disposing')
+        GpuGameBoxRenderer.logger.lifecycle('Disposing')
         
         this.lodDistanceManager?.dispose()
         this.instancedLabelRenderer.dispose()
@@ -391,7 +392,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         this.labelInstanceIndex = 0
         this.artworkInstanceIndex = 0
         
-        log.lifecycle('Disposed')
+        GpuGameBoxRenderer.logger.lifecycle('Disposed')
     }
     
     /**
@@ -430,7 +431,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         } else if (this.multiAtlasRenderer) {
             this.multiAtlasRenderer.logMemoryStats()
         } else {
-            log.info('Memory stats only available with multi-atlas or LOD renderer')
+            GpuGameBoxRenderer.logger.info('Memory stats only available with multi-atlas or LOD renderer')
         }
     }
     
@@ -449,7 +450,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         const medWidth = Math.floor(STEAM_SOURCE_WIDTH * medRatio)
         const medHeight = Math.floor(STEAM_SOURCE_HEIGHT * medRatio)
         
-        log.info(`LOD config from settings: HIGH ${highWidth}×${highHeight} (${maxHighSlots} slots), MED ${medWidth}×${medHeight}`)
+        GpuGameBoxRenderer.logger.info(`LOD config from settings: HIGH ${highWidth}×${highHeight} (${maxHighSlots} slots), MED ${medWidth}×${medHeight}`)
         
         return [
             { level: LOD_LEVEL.HIGH, textureWidth: highWidth, textureHeight: highHeight, name: LOD_TIER_NAME.HIGH, maxDepth: maxHighSlots },

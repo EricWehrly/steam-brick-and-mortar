@@ -19,8 +19,6 @@ import { Logger } from '../../../utils/Logger'
 // Vite worker import - creates a new worker from the file
 import TextureProcessingWorker from './texture-processing.worker?worker'
 
-const log = Logger.withContext('TextureWorker')
-
 export interface FetchAndProcessResult {
     imageData: Uint8ClampedArray
     blob?: Blob
@@ -43,6 +41,7 @@ export interface FetchAndProcessOptions {
 }
 
 export class TextureWorker {
+    public static logger = Logger.createLogFunctions(TextureWorker.name)
     private worker: Worker
     private pendingMessages = new Map<string, {
         resolve: (data: unknown) => void
@@ -59,7 +58,7 @@ export class TextureWorker {
         }
         
         this.worker.onerror = (error) => {
-            console.error('🔥 TextureWorker error:', {
+            TextureWorker.logger.error('🔥 TextureWorker error:', {
                 message: error.message,
                 filename: error.filename,
                 lineno: error.lineno,
@@ -68,12 +67,12 @@ export class TextureWorker {
                 fullError: error
             })
         }
-        
+
         this.worker.onmessageerror = (error) => {
-            console.error('🔥 TextureWorker message error:', error)
+            TextureWorker.logger.error('🔥 TextureWorker message error:', error)
         }
-        
-        log.lifecycle('Initialized')
+
+        TextureWorker.logger.lifecycle('Initialized')
     }
     
     /**
@@ -155,7 +154,7 @@ export class TextureWorker {
         const pending = this.pendingMessages.get(messageId)
         
         if (!pending) {
-            console.warn('⚠️ Received worker message for unknown messageId:', messageId)
+            TextureWorker.logger.warn('⚠️ Received worker message for unknown messageId:', messageId)
             return
         }
         
@@ -188,6 +187,6 @@ export class TextureWorker {
         this.pendingMessages.clear()
         
         this.worker.terminate()
-        log.lifecycle('Disposed')
+        TextureWorker.logger.lifecycle('Disposed')
     }
 }

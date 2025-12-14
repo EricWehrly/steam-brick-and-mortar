@@ -18,7 +18,7 @@ import { Logger } from '../../../utils/Logger'
 import { DataManager } from '../../../core/data/DataManager'
 import { LOD_TIER_NAME } from './ILodArtworkRenderer'
 
-const log = Logger.withContext('LodTextureArrayManager')
+// Class-scoped logger will be added inside the class
 
 /** Configuration for a single LOD tier */
 export interface LodTierConfig {
@@ -44,6 +44,7 @@ interface TextureArrayState {
  * Manages LOD texture arrays - creation, population, and GPU updates.
  */
 export class LodTextureArrayManager {
+    public static logger = Logger.createLogFunctions(LodTextureArrayManager.name)
     private tiers: Map<string, TextureArrayState> = new Map()
     private nextSlotIndex: number = 0
     private atlasFullLogged: boolean = false
@@ -88,10 +89,10 @@ export class LodTextureArrayManager {
             const vramMB = Math.round(vram / (1024 * 1024))
             dataManager.addMemoryConsumption(`LOD/${name}`, vramMB)
             
-            log.debug(`Created texture array: ${name} (${width}×${height}×${maxDepth})`)
+            LodTextureArrayManager.logger.debug(`Created texture array: ${name} (${width}×${height}×${maxDepth})`)
         }
         
-        log.lifecycle(`LOD VRAM: ${tierInfo.join(', ')} | Total: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
+        LodTextureArrayManager.logger.lifecycle(`LOD VRAM: ${tierInfo.join(', ')} | Total: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
     }
     
     /**
@@ -107,7 +108,7 @@ export class LodTextureArrayManager {
         // Use MID tier depth as the limit (it's the base tier for all games)
         const midTier = this.tiers.get(LOD_TIER_NAME.MID)
         if (!midTier) {
-            log.error('MID tier not found - texture manager misconfigured')
+            LodTextureArrayManager.logger.error('MID tier not found - texture manager misconfigured')
             return -1
         }
         
@@ -115,7 +116,7 @@ export class LodTextureArrayManager {
         
         if (this.nextSlotIndex >= maxSlots) {
             if (!this.atlasFullLogged) {
-                log.warn(`MID texture atlas full (${maxSlots} slots) - no more games can be added`)
+                LodTextureArrayManager.logger.warn(`MID texture atlas full (${maxSlots} slots) - no more games can be added`)
                 this.atlasFullLogged = true
             }
             return -1
@@ -143,27 +144,27 @@ export class LodTextureArrayManager {
     ): boolean {        
         const tier = this.tiers.get(tierName)
         if (!tier) {
-            log.error(`Unknown tier: ${tierName}`)
+            LodTextureArrayManager.logger.error(`Unknown tier: ${tierName}`)
             return false
         }
         
         const { width, height, maxDepth } = tier.config
         
         if (slotIndex < 0 || slotIndex >= maxDepth) {
-            log.error(`Slot index ${slotIndex} out of range for tier ${tierName} (max: ${maxDepth})`)
+            LodTextureArrayManager.logger.error(`Slot index ${slotIndex} out of range for tier ${tierName} (max: ${maxDepth})`)
             return false
         }
         
         const expectedSize = width * height * 4
         if (pixelData.length !== expectedSize) {
-            log.error(`Pixel data size mismatch for ${tierName}[${slotIndex}]: expected ${expectedSize}, got ${pixelData.length}`)
+            LodTextureArrayManager.logger.error(`Pixel data size mismatch for ${tierName}[${slotIndex}]: expected ${expectedSize}, got ${pixelData.length}`)
             return false
         }
         
         // Validate dimensions if provided
         if (expectedWidth !== undefined && expectedHeight !== undefined) {
             if (expectedWidth !== width || expectedHeight !== height) {
-                log.warn(`Dimension mismatch for ${tierName}[${slotIndex}]: expected ${width}×${height}, got ${expectedWidth}×${expectedHeight}`)
+                LodTextureArrayManager.logger.warn(`Dimension mismatch for ${tierName}[${slotIndex}]: expected ${width}×${height}, got ${expectedWidth}×${expectedHeight}`)
             }
         }
         
@@ -242,6 +243,6 @@ export class LodTextureArrayManager {
         }
         
         this.tiers.clear()
-        log.lifecycle('Disposed')
+        LodTextureArrayManager.logger.lifecycle('Disposed')
     }
 }
