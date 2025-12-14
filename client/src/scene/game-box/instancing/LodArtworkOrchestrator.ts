@@ -25,13 +25,14 @@ import {
     type LodGameArtworkRendererConfig,
     type LodTextureArrays
 } from './LodGameArtworkRenderer'
+import { LOD_TIER_NAME } from './ILodArtworkRenderer'
 import { HighTextureCache } from './HighTextureCache'
 import type { PrewarmingConfig } from './SpatialPrewarmingManager'
 
 const log = Logger.withContext('LodArtworkOrchestrator')
 
 // Re-export for backward compatibility
-export { LOD_LEVEL, type LodLevel }
+export { LOD_LEVEL, LOD_TIER_NAME, type LodLevel }
 
 /** Steam library capsule dimensions */
 export const STEAM_CAPSULE_WIDTH = 300
@@ -51,8 +52,8 @@ export interface LodConfig {
 }
 
 export const DEFAULT_LOD_CONFIGS: LodConfig[] = [
-    { level: LOD_LEVEL.HIGH, textureWidth: STEAM_CAPSULE_WIDTH, textureHeight: STEAM_CAPSULE_HEIGHT, name: 'high', maxDepth: 128 },
-    { level: LOD_LEVEL.MID, textureWidth: 150, textureHeight: 225, name: 'med' }
+    { level: LOD_LEVEL.HIGH, textureWidth: STEAM_CAPSULE_WIDTH, textureHeight: STEAM_CAPSULE_HEIGHT, name: LOD_TIER_NAME.HIGH, maxDepth: 128 },
+    { level: LOD_LEVEL.MID, textureWidth: 150, textureHeight: 225, name: LOD_TIER_NAME.MID }
 ]
 
 /** Config matching old LodArtworkConfig */
@@ -87,6 +88,12 @@ export class LodArtworkOrchestrator {
     
     // Track failed artwork (for backward compat)
     private failedArtwork: Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> = new Map()
+    
+    // Prevent log spam when atlas is full
+    private atlasFullLogged: boolean = false
+    
+    // Prevent operations after disposal (async artwork loads may complete after dispose)
+    private disposed: boolean = false
     
     constructor(config: LodArtworkConfig = {}) {
         this.maxTextures = config.maxTextures ?? 512
@@ -150,11 +157,11 @@ export class LodArtworkOrchestrator {
     }
     
     private initialize(scene: THREE.Scene): void {
-        const highTexture = this.textureManager.getTextureArray('high')
-        const midTexture = this.textureManager.getTextureArray('mid')
+        const highTexture = this.textureManager.getTextureArray(LOD_TIER_NAME.HIGH)
+        const midTexture = this.textureManager.getTextureArray(LOD_TIER_NAME.MID)
         
         if (!highTexture || !midTexture) {
-            throw new Error('Failed to get texture arrays - texture manager not properly initialized')
+            throw new Error(`Failed to get texture arrays - expected tiers '${LOD_TIER_NAME.HIGH}' and '${LOD_TIER_NAME.MID}'`)
         }
         
         const textureArrays: LodTextureArrays = {
@@ -196,6 +203,11 @@ export class LodArtworkOrchestrator {
         artworkUrl: string,
         appid?: number
     ): Promise<{ success: boolean; instanceIndex: number }> {
+        // Check if disposed (async operations may complete after disposal)
+        if (this.disposed) {
+            return { success: false, instanceIndex: -1 }
+        }
+        
         // Check if already loaded
         const existingIndex = this.gameNameToTextureIndex.get(gameName)
         if (existingIndex !== undefined) {
@@ -212,7 +224,10 @@ export class LodArtworkOrchestrator {
         // Allocate texture slot
         const textureIndex = this.textureManager.allocateSlot()
         if (textureIndex < 0) {
-            log.warn(`Atlas full (${this.maxTextures} textures)`)
+            if (!this.atlasFullLogged) {
+                log.warn(`Atlas full (${this.maxTextures} configured) - further games will not have artwork`)
+                this.atlasFullLogged = true
+            }
             return { success: false, instanceIndex: -1 }
         }
         
@@ -231,7 +246,7 @@ export class LodArtworkOrchestrator {
             const midHeight = midConfig?.textureHeight ?? midConfig?.textureSize ?? 225
             
             const midResult = await artwork.getPixelsAtSize(midWidth, midHeight)
-            this.textureManager.setSlotPixels('mid', textureIndex, midResult.pixels, midWidth, midHeight)
+            this.textureManager.setSlotPixels(LOD_TIER_NAME.MID, textureIndex, midResult.pixels, midWidth, midHeight)
             
             // For non-lazy mode, also load HIGH
             if (!this.lazyHighTextures) {
@@ -240,7 +255,7 @@ export class LodArtworkOrchestrator {
                 const highHeight = highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT
                 
                 const highResult = await artwork.getPixelsAtSize(highWidth, highHeight)
-                this.textureManager.setSlotPixels('high', textureIndex, highResult.pixels, highWidth, highHeight)
+                this.textureManager.setSlotPixels(LOD_TIER_NAME.HIGH, textureIndex, highResult.pixels, highWidth, highHeight)
             }
             
             // Create instance
@@ -370,6 +385,7 @@ export class LodArtworkOrchestrator {
     }
     
     public dispose(): void {
+        this.disposed = true
         this.renderer.dispose()
         this.textureManager.dispose()
         this.gameNameToTextureIndex.clear()

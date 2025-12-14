@@ -132,7 +132,8 @@ describe('LodTextureArrayManager', () => {
         it('should return -1 when all slots exhausted', () => {
             const smallConfig: LodTextureArrayManagerConfig = {
                 tiers: [
-                    { name: 'test', width: 16, height: 16, maxDepth: 3 }
+                    { name: 'high', width: 16, height: 16, maxDepth: 2 },
+                    { name: 'mid', width: 16, height: 16, maxDepth: 3 }  // MID tier is the limit
                 ]
             }
             manager = new LodTextureArrayManager(smallConfig)
@@ -140,21 +141,26 @@ describe('LodTextureArrayManager', () => {
             expect(manager.allocateSlot()).toBe(0)
             expect(manager.allocateSlot()).toBe(1)
             expect(manager.allocateSlot()).toBe(2)
-            expect(manager.allocateSlot()).toBe(-1)  // Exhausted
+            expect(manager.allocateSlot()).toBe(-1)  // Exhausted (MID tier limit)
         })
 
-        it('should use minimum maxDepth across tiers as limit', () => {
+        it('should use MID tier maxDepth as limit (not minimum across tiers)', () => {
+            // This tests the fix for the bug where HIGH tier's smaller depth
+            // was incorrectly limiting allocation. HIGH is an LRU cache with eviction,
+            // so MID tier's depth should be the limit.
             const config: LodTextureArrayManagerConfig = {
                 tiers: [
-                    { name: 'small', width: 16, height: 16, maxDepth: 2 },
-                    { name: 'large', width: 16, height: 16, maxDepth: 100 }
+                    { name: 'high', width: 16, height: 16, maxDepth: 2 },   // Small HIGH cache
+                    { name: 'mid', width: 16, height: 16, maxDepth: 100 }   // Large MID base tier
                 ]
             }
             manager = new LodTextureArrayManager(config)
             
+            // Should be able to allocate up to MID's limit, not HIGH's
             expect(manager.allocateSlot()).toBe(0)
             expect(manager.allocateSlot()).toBe(1)
-            expect(manager.allocateSlot()).toBe(-1)  // Limited by 'small' tier
+            expect(manager.allocateSlot()).toBe(2)  // Would fail if using Math.min
+            expect(manager.allocateSlot()).toBe(3)
         })
     })
 

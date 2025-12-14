@@ -16,6 +16,7 @@
 import * as THREE from 'three'
 import { Logger } from '../../../utils/Logger'
 import { DataManager } from '../../../core/data/DataManager'
+import { LOD_TIER_NAME } from './ILodArtworkRenderer'
 
 const log = Logger.withContext('LodTextureArrayManager')
 
@@ -45,6 +46,7 @@ interface TextureArrayState {
 export class LodTextureArrayManager {
     private tiers: Map<string, TextureArrayState> = new Map()
     private nextSlotIndex: number = 0
+    private atlasFullLogged: boolean = false
     
     constructor(config: LodTextureArrayManagerConfig) {
         this.initializeTextureArrays(config.tiers)
@@ -94,14 +96,28 @@ export class LodTextureArrayManager {
     
     /**
      * Allocate the next available slot index.
-     * Returns -1 if all tiers are full.
+     * Returns -1 if the MID tier is full.
+     * 
+     * Note: We use the MID tier's depth as the limit because:
+     * - MID is the "base" tier that holds all game textures
+     * - HIGH tier is a separate LRU cache managed by HighTextureCache
+     * - The slot index maps games to their MID texture, HIGH is loaded on-demand
      */
     public allocateSlot(): number {
-        // Check if any tier has room (use smallest maxDepth as the limit)
-        const minDepth = Math.min(...Array.from(this.tiers.values()).map(t => t.config.maxDepth))
+        // Use MID tier depth as the limit (it's the base tier for all games)
+        const midTier = this.tiers.get(LOD_TIER_NAME.MID)
+        if (!midTier) {
+            log.error('MID tier not found - texture manager misconfigured')
+            return -1
+        }
         
-        if (this.nextSlotIndex >= minDepth) {
-            log.warn(`All slots allocated (${minDepth} max)`)
+        const maxSlots = midTier.config.maxDepth
+        
+        if (this.nextSlotIndex >= maxSlots) {
+            if (!this.atlasFullLogged) {
+                log.warn(`MID texture atlas full (${maxSlots} slots) - no more games can be added`)
+                this.atlasFullLogged = true
+            }
             return -1
         }
         
@@ -124,7 +140,7 @@ export class LodTextureArrayManager {
         pixelData: Uint8ClampedArray,
         expectedWidth?: number,
         expectedHeight?: number
-    ): boolean {
+    ): boolean {        
         const tier = this.tiers.get(tierName)
         if (!tier) {
             log.error(`Unknown tier: ${tierName}`)

@@ -19,7 +19,7 @@ import type {
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { InstancedArtworkRenderer } from './instancing/InstancedArtworkRenderer'
 import { MultiAtlasArtworkRenderer } from './instancing/MultiAtlasArtworkRenderer'
-import { LOD_LEVEL, type LodLevel } from './instancing/ILodArtworkRenderer'
+import { LOD_LEVEL, LOD_TIER_NAME, type LodLevel } from './instancing/ILodArtworkRenderer'
 import type { ILodArtworkRendererDebug } from './instancing/ILodArtworkRenderer'
 import { LodArtworkOrchestratorDebug, type LodConfig } from './instancing/LodArtworkOrchestratorDebug'
 import { LodDistanceManagerDebug } from './instancing/LodDistanceManagerDebug'
@@ -452,8 +452,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         log.info(`LOD config from settings: HIGH ${highWidth}×${highHeight} (${maxHighSlots} slots), MED ${medWidth}×${medHeight}`)
         
         return [
-            { level: LOD_LEVEL.HIGH, textureWidth: highWidth, textureHeight: highHeight, name: 'high', maxDepth: maxHighSlots },
-            { level: LOD_LEVEL.MID, textureWidth: medWidth, textureHeight: medHeight, name: 'med' }
+            { level: LOD_LEVEL.HIGH, textureWidth: highWidth, textureHeight: highHeight, name: LOD_TIER_NAME.HIGH, maxDepth: maxHighSlots },
+            { level: LOD_LEVEL.MID, textureWidth: medWidth, textureHeight: medHeight, name: LOD_TIER_NAME.MID }
         ]
     }
 }

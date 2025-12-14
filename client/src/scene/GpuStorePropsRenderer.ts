@@ -60,6 +60,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private allBatchGames: SteamGameData[] = []
     private isFirstBatch: boolean = true
     
+    // Track whether progressive loading completed for this load cycle
+    // This flag prevents DataLoaded from triggering duplicate generation after AllBatchesComplete
+    // It stays true until explicitly cleared by the next load request
+    private progressiveLoadingCompleted: boolean = false
+    
     // Batch queue for serialized processing (prevents race conditions)
     private batchQueue: SteamGamesBatchEvent[] = []
     private isProcessingBatch: boolean = false
@@ -193,6 +198,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
      * Initialize renderers for progressive loading
      */
     private async initializeForProgressiveLoading(totalBatches: number): Promise<void> {
+        // Reset the completion flag - a new progressive load is starting
+        this.progressiveLoadingCompleted = false
+        
         const estimatedGames = totalBatches * 18 // BATCH_SIZE from SteamIntegration
         
         this.gameBoxRenderer?.dispose()
@@ -263,6 +271,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private finalizeProgressiveLoading(): void {
         console.debug(`✅ Progressive loading complete: ${this.allBatchGames.length} games on ${this.cumulativeShelfCount} shelves`)
         
+        // Mark progressive loading as complete BEFORE emitting event
+        // This ensures subsequent DataLoaded events don't trigger duplicate generation
+        this.progressiveLoadingCompleted = true
+        
         EventManager.getInstance().emit<AllBatchesCompleteEvent>(GameEventTypes.AllBatchesComplete, {
             shelfBounds: { ...this.shelfBounds },
             shelfLayout: { ...this.shelfLayout }
@@ -279,13 +291,22 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private async handleDataLoaded(): Promise<void> {
-        // If we already received batches, this is just a final sync - skip
-        if (this.batchesReceived > 0) {
-            console.debug('📦 DataLoaded received after batch processing - skipping duplicate generation')
+        // If progressive loading already completed, this is just a final sync - skip
+        // NOTE: We use progressiveLoadingCompleted instead of batchesReceived because
+        // resetBatchState() clears batchesReceived when AllBatchesComplete fires,
+        // but DataLoaded may arrive after that due to event timing
+        if (this.progressiveLoadingCompleted) {
+            console.debug('📦 DataLoaded received after progressive loading complete - skipping duplicate generation')
             return
         }
         
-        // Fall back to original behavior if no batches received
+        // If we're currently receiving batches, skip duplicate generation
+        if (this.batchesReceived > 0) {
+            console.debug('📦 DataLoaded received during batch processing - skipping duplicate generation')
+            return
+        }
+        
+        // Fall back to original behavior if no batches received (legacy path)
         console.debug('📦 DataLoaded with no prior batches - using legacy generation')
         await this.generateShelvesAsync()
     }
@@ -370,6 +391,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             
             // Emit InstancedBatchComplete event to trigger GPU updates
             EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
+            
+            // Mark as complete (legacy path equivalent of progressive loading completing)
+            this.progressiveLoadingCompleted = true
             
             EventManager.getInstance().emit<AllBatchesCompleteEvent>(GameEventTypes.AllBatchesComplete, {
                 shelfBounds: { ...this.shelfBounds },

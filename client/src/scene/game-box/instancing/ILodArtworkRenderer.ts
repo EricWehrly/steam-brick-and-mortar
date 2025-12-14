@@ -17,6 +17,17 @@ export const LOD_LEVEL = {
 
 export type LodLevel = typeof LOD_LEVEL[keyof typeof LOD_LEVEL]
 
+/** 
+ * LOD tier name constants - use these instead of magic strings.
+ * These names identify texture array tiers in LodTextureArrayManager.
+ */
+export const LOD_TIER_NAME = {
+    HIGH: 'high',
+    MID: 'mid'
+} as const
+
+export type LodTierName = typeof LOD_TIER_NAME[keyof typeof LOD_TIER_NAME]
+
 /** Result of setting an artwork instance */
 export interface SetArtworkResult {
     success: boolean
