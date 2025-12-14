@@ -63,7 +63,8 @@ export class InstancedLabelRenderer {
             this.maxInstances // Pass max textures to match max instances
         )
         
-        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, this.updateGPU.bind(this))
+        // GPU update only needed once after all batches complete
+        EventManager.getInstance().registerEventHandler(GameEventTypes.AllBatchesComplete, this.updateGPU.bind(this))
         
         console.debug(`📋 InstancedLabelRenderer created (max: ${this.maxInstances} labels)`)
     }

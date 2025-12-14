@@ -89,7 +89,10 @@ export class InstancedArtworkRenderer {
             enablePerformanceLogging: config.enablePerformanceLogging
         })
         
-        EventManager.getInstance().registerEventHandler(GameEventTypes.InstancedBatchComplete, this.updateGPU.bind(this))
+        // GPU update only needed once after all batches complete
+        // Individual batch handlers set data directly in arrays; needsUpdate flags
+        // just mark data dirty for next render - no benefit to setting them per-batch
+        EventManager.getInstance().registerEventHandler(GameEventTypes.AllBatchesComplete, this.updateGPU.bind(this))
         
         console.debug(`🎨 InstancedArtworkRenderer created (max: ${this.maxInstances} instances, ${this.maxTextures} textures)`)
     }

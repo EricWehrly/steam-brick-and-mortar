@@ -142,9 +142,9 @@ export class LodArtworkOrchestrator {
             this.initialize(scene)
         }
         
-        // Register for batch complete events
+        // Register for batch complete events - GPU update only needed once at end
         EventManager.getInstance().registerEventHandler(
-            GameEventTypes.InstancedBatchComplete,
+            GameEventTypes.AllBatchesComplete,
             () => this.updateGPU()
         )
         

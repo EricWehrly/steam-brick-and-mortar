@@ -108,9 +108,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.shelfBoardManager = new InstancedMeshManager('InstancedShelf-ShelfBoards')
         this.interiorSurfaceManager = new InstancedMeshManager('InstancedShelf-InteriorSurfaces')
         
-        // Register event listener for GPU updates after batch completes
+        // Register event listener for GPU updates after all batches complete
+        // Individual batch handlers set data directly; needsUpdate only needs to be set once
         EventManager.getInstance().registerEventHandler(
-            GameEventTypes.InstancedBatchComplete,
+            GameEventTypes.AllBatchesComplete,
             this.updateGPU.bind(this)
         )
         
