@@ -7,8 +7,8 @@
  * - Global and per-context level configuration
  * 
  * Usage:
- *   const log = Logger.withContext('MyClass')
- *   log.info('Starting up')           // Always shown at INFO level
+ *   const { info, debug } = Logger.createLogFunctions('MyClass')
+ *   info('Starting up')           // Always shown at INFO level
  *   log.lifecycle('Init phase 1')     // Startup/teardown flow (DEBUG by default)
  *   log.runtime('LOD changed')        // Frame-by-frame events (suppressed by default)
  * 
@@ -69,15 +69,6 @@ export class Logger {
     return Logger.instance
   }
 
-  /**
-   * Create a logger with a specific context prefix
-   */
-  static withContext(context: string): Logger {
-    const logger = Logger.getInstance()
-    const contextLogger = Object.create(logger)
-    contextLogger.context = context
-    return contextLogger
-  }
 
   /**
    * Set log level for a specific context (class name)
@@ -123,30 +114,18 @@ export class Logger {
     }
   }
 
-  /**
-   * Get the current global log level
-   */
   getLevel(): LogLevel {
     return this.globalLevel
   }
 
-  /**
-   * Enable or disable a log category globally
-   */
   static setCategoryEnabled(category: LogCategory, enabled: boolean): void {
     Logger.categoryEnabled.set(category, enabled)
   }
 
-  /**
-   * Get whether a category is enabled
-   */
   static isCategoryEnabled(category: LogCategory): boolean {
     return Logger.categoryEnabled.get(category) ?? true
   }
 
-  /**
-   * Convenience: Enable runtime logging (high-frequency events)
-   */
   static setRuntimeLogging(enabled: boolean): void {
     Logger.setCategoryEnabled(LogCategory.RUNTIME, enabled)
   }
@@ -239,9 +218,9 @@ export class Logger {
   /**
    * Create bound log functions that show the CALLER's file location in browser console.
    * 
-   * When you use Logger.withContext(), the console shows "Logger.ts" as the source because
-   * that's where console.log is called. This method returns bound functions that the class
-   * calls directly, so the browser shows the class file instead.
+  * When you use Logger.createLogFunctions(), the returned functions are bound so the browser
+  * console shows the class/caller file instead of Logger.ts. This gives more useful
+  * stack attribution and makes debugging easier in dev tools.
    * 
    * Usage:
    *   const { info, debug, warn, error } = Logger.createLogFunctions('InstancedShelfRenderer')

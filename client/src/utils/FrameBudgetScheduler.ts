@@ -61,10 +61,9 @@ const PRIORITY_MAP = { low: 0, normal: 1, high: 2 } as const
 
 export class FrameBudgetScheduler {
     private static instance: FrameBudgetScheduler | null = null
-    // Support test mocks that may only provide Logger.withContext()
-    public static logger = typeof Logger.createLogFunctions === 'function'
-        ? Logger.createLogFunctions(FrameBudgetScheduler.name)
-        : Logger.withContext(FrameBudgetScheduler.name)
+    // Use createLogFunctions consistently. Tests should mock `createLogFunctions`
+    // instead of the removed `withContext` helper.
+    public static logger = Logger.createLogFunctions(FrameBudgetScheduler.name)
     
     // Configuration
     private targetFps: number

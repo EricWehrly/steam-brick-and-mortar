@@ -3,12 +3,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 // Mock the Logger to prevent console output during tests
 vi.mock('../../../src/utils/Logger', () => ({
     Logger: {
-        withContext: () => ({
+        createLogFunctions: () => ({
             lifecycle: vi.fn(),
             debug: vi.fn(),
             warn: vi.fn(),
             error: vi.fn(),
-            info: vi.fn()
+            info: vi.fn(),
+            runtime: vi.fn(),
+            trace: vi.fn()
         })
     }
 }))

@@ -49,7 +49,7 @@ describe('Logger', () => {
         })
 
         it('should filter DEBUG messages when global level is INFO', () => {
-            const log = Logger.withContext('TestClass')
+            const log = Logger.createLogFunctions('TestClass')
             Logger.getInstance().setLevel(LogLevel.INFO)
 
             log.debug('This should be filtered')
@@ -60,7 +60,7 @@ describe('Logger', () => {
         })
 
         it('should show DEBUG messages when global level is DEBUG', () => {
-            const log = Logger.withContext('TestClass')
+            const log = Logger.createLogFunctions('TestClass')
             Logger.getInstance().setLevel(LogLevel.DEBUG)
 
             log.debug('This should appear')
@@ -69,7 +69,7 @@ describe('Logger', () => {
         })
 
         it('should always show ERROR messages regardless of level', () => {
-            const log = Logger.withContext('TestClass')
+            const log = Logger.createLogFunctions('TestClass')
             Logger.getInstance().setLevel(LogLevel.ERROR)
 
             log.error('This should always appear')
@@ -86,7 +86,7 @@ describe('Logger', () => {
 
     describe('Per-Context Log Levels (Opt-In)', () => {
         it('should allow classes to opt-in to DEBUG logging', () => {
-            const log = Logger.withContext('MyDebugClass')
+            const log = Logger.createLogFunctions('MyDebugClass')
             Logger.getInstance().setLevel(LogLevel.INFO) // Global is INFO
 
             // Before opt-in, DEBUG is filtered
@@ -101,8 +101,8 @@ describe('Logger', () => {
         })
 
         it('should allow silencing specific noisy classes', () => {
-            const noisyLog = Logger.withContext('NoisyClass')
-            const normalLog = Logger.withContext('NormalClass')
+            const noisyLog = Logger.createLogFunctions('NoisyClass')
+            const normalLog = Logger.createLogFunctions('NormalClass')
             Logger.getInstance().setLevel(LogLevel.INFO)
 
             // Silence the noisy class
@@ -117,7 +117,7 @@ describe('Logger', () => {
         })
 
         it('should allow resetting context level back to global', () => {
-            const log = Logger.withContext('TestClass')
+            const log = Logger.createLogFunctions('TestClass')
             Logger.getInstance().setLevel(LogLevel.INFO)
 
             // Set context level
@@ -132,9 +132,9 @@ describe('Logger', () => {
         })
 
         it('should track multiple context levels independently', () => {
-            const logA = Logger.withContext('ClassA')
-            const logB = Logger.withContext('ClassB')
-            const logC = Logger.withContext('ClassC')
+            const logA = Logger.createLogFunctions('ClassA')
+            const logB = Logger.createLogFunctions('ClassB')
+            const logC = Logger.createLogFunctions('ClassC')
             Logger.getInstance().setLevel(LogLevel.INFO)
 
             Logger.setContextLevel('ClassA', LogLevel.DEBUG)
@@ -174,7 +174,7 @@ describe('Logger', () => {
 
     describe('Log Categories', () => {
         it('should filter RUNTIME logs by default', () => {
-            const log = Logger.withContext('TestClass')
+            const log = Logger.createLogFunctions('TestClass')
             Logger.getInstance().setLevel(LogLevel.DEBUG)
 
             log.runtime('Runtime event - should be filtered by default')
@@ -183,7 +183,7 @@ describe('Logger', () => {
         })
 
         it('should show RUNTIME logs when enabled', () => {
-            const log = Logger.withContext('TestClass')
+            const log = Logger.createLogFunctions('TestClass')
             Logger.getInstance().setLevel(LogLevel.DEBUG)
 
             Logger.setRuntimeLogging(true)
@@ -193,7 +193,7 @@ describe('Logger', () => {
         })
 
         it('should show LIFECYCLE logs by default', () => {
-            const log = Logger.withContext('TestClass')
+            const log = Logger.createLogFunctions('TestClass')
             Logger.getInstance().setLevel(LogLevel.DEBUG)
 
             log.lifecycle('Lifecycle event')
@@ -202,7 +202,7 @@ describe('Logger', () => {
         })
 
         it('should allow disabling LIFECYCLE logs', () => {
-            const log = Logger.withContext('TestClass')
+            const log = Logger.createLogFunctions('TestClass')
             Logger.getInstance().setLevel(LogLevel.DEBUG)
 
             Logger.setCategoryEnabled(LogCategory.LIFECYCLE, false)
@@ -241,19 +241,19 @@ describe('Logger', () => {
 
     describe('Message Formatting', () => {
         it('should include context name in log messages', () => {
-            const log = Logger.withContext('MyComponent')
+            const log = Logger.createLogFunctions('MyComponent')
             Logger.getInstance().setLevel(LogLevel.INFO)
 
             log.info('Test message')
 
             expect(consoleSpy.log).toHaveBeenCalledWith(
                 expect.stringContaining('[MyComponent]'),
-                // No additional args in this case
+                'Test message'
             )
         })
 
         it('should include timestamp in log messages', () => {
-            const log = Logger.withContext('TestClass')
+            const log = Logger.createLogFunctions('TestClass')
             Logger.getInstance().setLevel(LogLevel.INFO)
 
             log.info('Test message')
@@ -261,11 +261,12 @@ describe('Logger', () => {
             // Timestamp format: HH:mm:ss.sss
             expect(consoleSpy.log).toHaveBeenCalledWith(
                 expect.stringMatching(/\d{2}:\d{2}:\d{2}\.\d{3}/),
+                'Test message'
             )
         })
 
         it('should pass additional arguments to console', () => {
-            const log = Logger.withContext('TestClass')
+            const log = Logger.createLogFunctions('TestClass')
             Logger.getInstance().setLevel(LogLevel.INFO)
 
             const testObj = { foo: 'bar' }
@@ -273,6 +274,7 @@ describe('Logger', () => {
 
             expect(consoleSpy.log).toHaveBeenCalledWith(
                 expect.any(String),
+                'Test message',
                 testObj
             )
         })
@@ -280,7 +282,7 @@ describe('Logger', () => {
 
     describe('Log Level Hierarchy', () => {
         it('should respect ERROR < WARN < INFO < DEBUG < TRACE hierarchy', () => {
-            const log = Logger.withContext('TestClass')
+            const log = Logger.createLogFunctions('TestClass')
 
             // At ERROR level, only errors show
             Logger.getInstance().setLevel(LogLevel.ERROR)
