@@ -324,4 +324,83 @@ describe('Logger', () => {
             // trace is filtered because level is DEBUG, not TRACE
         })
     })
+
+    describe('createLogFunctions', () => {
+        it('should return all log function types', () => {
+            const logFuncs = Logger.createLogFunctions('TestClass')
+
+            expect(typeof logFuncs.error).toBe('function')
+            expect(typeof logFuncs.warn).toBe('function')
+            expect(typeof logFuncs.info).toBe('function')
+            expect(typeof logFuncs.debug).toBe('function')
+            expect(typeof logFuncs.lifecycle).toBe('function')
+            expect(typeof logFuncs.runtime).toBe('function')
+            expect(typeof logFuncs.trace).toBe('function')
+        })
+
+        it('should respect level filtering', () => {
+            const { info, debug } = Logger.createLogFunctions('TestClass')
+
+            // At default INFO level, info shows but debug doesn't
+            info('info message')
+            debug('debug message')
+
+            expect(consoleSpy.log).toHaveBeenCalledTimes(1)
+            expect(consoleSpy.debug).toHaveBeenCalledTimes(0)
+        })
+
+        it('should include context in output', () => {
+            const { info } = Logger.createLogFunctions('MyComponent')
+
+            info('test message')
+
+            expect(consoleSpy.log).toHaveBeenCalledWith(
+                expect.stringContaining('[MyComponent]'),
+                'test message'
+            )
+        })
+
+        it('should respect per-context level overrides', () => {
+            const { debug } = Logger.createLogFunctions('DebugComponent')
+
+            // At default INFO, debug is filtered
+            debug('should be filtered')
+            expect(consoleSpy.debug).toHaveBeenCalledTimes(0)
+
+            // Enable DEBUG for this context
+            Logger.setContextLevel('DebugComponent', LogLevel.DEBUG)
+            debug('should appear now')
+            expect(consoleSpy.debug).toHaveBeenCalledTimes(1)
+        })
+
+        it('should handle additional arguments', () => {
+            const { info } = Logger.createLogFunctions('TestClass')
+            const obj = { key: 'value' }
+
+            info('message with object', obj, 42, true)
+
+            expect(consoleSpy.log).toHaveBeenCalledWith(
+                expect.stringContaining('[TestClass]'),
+                'message with object',
+                obj,
+                42,
+                true
+            )
+        })
+
+        it('should filter RUNTIME logs by default', () => {
+            Logger.getInstance().setLevel(LogLevel.DEBUG)
+            const { runtime } = Logger.createLogFunctions('TestClass')
+
+            runtime('runtime event')
+
+            // Runtime is disabled by default
+            expect(consoleSpy.debug).toHaveBeenCalledTimes(0)
+
+            // Enable runtime
+            Logger.setRuntimeLogging(true)
+            runtime('runtime event 2')
+            expect(consoleSpy.debug).toHaveBeenCalledTimes(1)
+        })
+    })
 })

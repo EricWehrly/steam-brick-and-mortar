@@ -235,6 +235,89 @@ export class Logger {
       console.debug(this.formatMessage('TRACE', message), ...args)
     }
   }
+
+  /**
+   * Create bound log functions that show the CALLER's file location in browser console.
+   * 
+   * When you use Logger.withContext(), the console shows "Logger.ts" as the source because
+   * that's where console.log is called. This method returns bound functions that the class
+   * calls directly, so the browser shows the class file instead.
+   * 
+   * Usage:
+   *   const { info, debug, warn, error } = Logger.createLogFunctions('InstancedShelfRenderer')
+   *   info('Initialized')  // Console shows InstancedShelfRenderer.ts, not Logger.ts
+   * 
+   * Note: Level filtering is evaluated at call time, so setContextLevel still works.
+   */
+  static createLogFunctions(context: string): {
+    error: (...args: unknown[]) => void
+    warn: (...args: unknown[]) => void
+    info: (...args: unknown[]) => void
+    debug: (...args: unknown[]) => void
+    lifecycle: (...args: unknown[]) => void
+    runtime: (...args: unknown[]) => void
+    trace: (...args: unknown[]) => void
+  } {
+    const instance = Logger.getInstance()
+    const formatPrefix = () => {
+      const timestamp = new Date().toISOString().slice(11, 23)
+      return `${timestamp} [${context}]`
+    }
+    
+    const getEffectiveLevel = (): LogLevel => {
+      if (Logger.contextLevels.has(context)) {
+        return Logger.contextLevels.get(context)!
+      }
+      return instance.globalLevel
+    }
+    
+    const shouldLog = (level: LogLevel, category: LogCategory = LogCategory.GENERAL): boolean => {
+      if (!Logger.categoryEnabled.get(category)) {
+        return false
+      }
+      return level <= getEffectiveLevel()
+    }
+    
+    // Return functions that check level at call time, then delegate to bound console methods
+    // Using console.log.bind() with prefix means the call stack shows the caller, not Logger.ts
+    return {
+      error: (...args: unknown[]) => {
+        if (shouldLog(LogLevel.ERROR)) {
+          console.error(`${formatPrefix()} ERROR`, ...args)
+        }
+      },
+      warn: (...args: unknown[]) => {
+        if (shouldLog(LogLevel.WARN)) {
+          console.warn(`${formatPrefix()} WARN`, ...args)
+        }
+      },
+      info: (...args: unknown[]) => {
+        if (shouldLog(LogLevel.INFO)) {
+          console.log(`${formatPrefix()} INFO`, ...args)
+        }
+      },
+      debug: (...args: unknown[]) => {
+        if (shouldLog(LogLevel.DEBUG)) {
+          console.debug(`${formatPrefix()} DEBUG`, ...args)
+        }
+      },
+      lifecycle: (...args: unknown[]) => {
+        if (shouldLog(LogLevel.DEBUG, LogCategory.LIFECYCLE)) {
+          console.debug(`${formatPrefix()} LIFE`, ...args)
+        }
+      },
+      runtime: (...args: unknown[]) => {
+        if (shouldLog(LogLevel.DEBUG, LogCategory.RUNTIME)) {
+          console.debug(`${formatPrefix()} RT`, ...args)
+        }
+      },
+      trace: (...args: unknown[]) => {
+        if (shouldLog(LogLevel.TRACE)) {
+          console.debug(`${formatPrefix()} TRACE`, ...args)
+        }
+      }
+    }
+  }
 }
 
 // Export a default instance for convenience
