@@ -21,6 +21,7 @@ import { EventManager, EventSource } from '../core/EventManager'
 import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent, RoomEventTypes, type RoomCreatedEvent, type RoomResizedEvent } from '../types/InteractionEvents'
 import { LightFactory } from '../lighting/LightFactory'
 import { LightRegistry } from '../lighting/LightRegistry'
+import { Logger } from '../utils/Logger'
 
 // Lighting configuration constants
 const LIGHT_NAMES = {
@@ -75,6 +76,7 @@ export class LightingRenderer {
     private eventManager: EventManager
     private lightFactory: LightFactory
     private currentShelfLayout?: { rows: number; shelvesPerRow: number }
+    public static logger = Logger.createLogFunctions(LightingRenderer.name)
 
     constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
         this.scene = scene
@@ -131,7 +133,7 @@ export class LightingRenderer {
         const startTime = window.performance.now()
         this.config = this.getCurrentConfig()
         
-        console.debug(`💡 Setting up BASIC lighting (fast pass)...`)
+        LightingRenderer.logger.lifecycle(`💡 Setting up BASIC lighting (fast pass)...`)
         
         try {
             // No shadows for fast startup
@@ -140,9 +142,9 @@ export class LightingRenderer {
             await this.setupSimpleLighting()
             
             const duration = window.performance.now() - startTime
-            console.log(`✅ Basic lighting ready in ${duration.toFixed(1)}ms (advanced lighting will load in background)`)
+            LightingRenderer.logger.info(`✅ Basic lighting ready in ${duration.toFixed(1)}ms (advanced lighting will load in background)`)
         } catch (error) {
-            console.error('❌ Failed to set up basic lighting:', error)
+            LightingRenderer.logger.error('❌ Failed to set up basic lighting:', error)
             // Absolute fallback - just ambient
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
             this.lightingGroup.add(ambientLight)
@@ -156,7 +158,7 @@ export class LightingRenderer {
         const startTime = window.performance.now()
         this.config = this.getCurrentConfig()
         
-        console.debug(`💡 Upgrading to ${this.config.quality} lighting...`)
+        LightingRenderer.logger.lifecycle(`💡 Upgrading to ${this.config.quality} lighting...`)
         
         try {
             // Clear basic lighting
@@ -179,7 +181,7 @@ export class LightingRenderer {
             // toggleLighting() is only for user-triggered master on/off via UI
             
             const duration = window.performance.now() - startTime
-            console.log(`✅ Advanced lighting setup complete in ${duration.toFixed(1)}ms!`)
+            LightingRenderer.logger.info(`✅ Advanced lighting setup complete in ${duration.toFixed(1)}ms!`)
             
             // Emit system ready event for UI components
             this.eventManager.emit(LightingEventTypes.SystemReady, {
@@ -189,7 +191,7 @@ export class LightingRenderer {
                 source: EventSource.System
             })
         } catch (error) {
-            console.error('❌ Failed to upgrade lighting:', error)
+            LightingRenderer.logger.error('❌ Failed to upgrade lighting:', error)
             // Keep basic lighting - better than nothing
         }
     }
@@ -257,7 +259,7 @@ export class LightingRenderer {
     }
 
     private async setupSimpleLighting(): Promise<void> {
-        console.debug('💡 Setting up SIMPLE lighting - basic illumination only')
+        LightingRenderer.logger.lifecycle('💡 Setting up SIMPLE lighting - basic illumination only')
         
         // Higher ambient light to compensate for fewer light sources
         this.lightFactory.createAmbientLight(0xffffff, 0.4, { 
@@ -272,11 +274,11 @@ export class LightingRenderer {
             position: [0, 10, 0]
         })
         
-        console.debug(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
+        LightingRenderer.logger.info(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
     }
 
     private async setupEnhancedLighting(): Promise<void> {
-        console.debug('💡 Setting up ENHANCED lighting - optimized retail atmosphere')
+        LightingRenderer.logger.lifecycle('💡 Setting up ENHANCED lighting - optimized retail atmosphere')
         
         // Ambient light: now enabled by default with increased intensity (was 0.02, now ~0.023)
         const ambientLight = this.lightFactory.createAmbientLight(0xFFF8E7, (this.config.ambientIntensity ?? 0.02) * 1.15, {
@@ -332,26 +334,26 @@ export class LightingRenderer {
         // NOTE: Fixtures are added later when shelf layout is known (via updateRoomDimensions)
         // This keeps initial room lit with base lighting before shelves spawn
         
-        console.debug(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient enabled, directional/spot/point disabled by default)`)
-        console.debug(`💡 Ceiling fixtures will be added when shelf layout is determined`)
+        LightingRenderer.logger.info(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient enabled, directional/spot/point disabled by default)`)
+        LightingRenderer.logger.debug(`💡 Ceiling fixtures will be added when shelf layout is determined`)
     }
 
     private async setupAdvancedLighting(): Promise<void> {
-        console.debug('💡 Setting up ADVANCED lighting - enhanced + point lights + better shadows')
+        LightingRenderer.logger.lifecycle('💡 Setting up ADVANCED lighting - enhanced + point lights + better shadows')
         
         await this.setupEnhancedLighting()
         this.addPointLights()
         
-        console.debug(`✅ Advanced lighting: ${this.lightingGroup.children.length} lights/groups added`)
+        LightingRenderer.logger.info(`✅ Advanced lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
 
     private async setupOuchMyEyesLighting(): Promise<void> {
-        console.debug('💡 Setting up OUCH-MY-EYES lighting - maximum visual fidelity + dramatic effects')
+        LightingRenderer.logger.lifecycle('💡 Setting up OUCH-MY-EYES lighting - maximum visual fidelity + dramatic effects')
 
         await this.setupAdvancedLighting()
         this.addDramaticLighting()
         
-        console.debug(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
+        LightingRenderer.logger.info(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
 
     private async setupFluorescentFixtures(shelfLayout?: { rows: number; shelvesPerRow: number }): Promise<void> {
@@ -384,7 +386,7 @@ export class LightingRenderer {
         fixtures.name = LIGHT_NAMES.FLUORESCENT_FIXTURES
         this.lightingGroup.add(fixtures)
         
-        console.debug(`💡 Created ${fixtureRows * fixturesPerRow} ceiling fixtures (${fixtureRows} rows x ${fixturesPerRow} per row) for ${shelfRows} shelf rows`)
+        LightingRenderer.logger.info(`💡 Created ${fixtureRows * fixturesPerRow} ceiling fixtures (${fixtureRows} rows x ${fixturesPerRow} per row) for ${shelfRows} shelf rows`)
     }
 
     private addPointLights(): void {
@@ -407,7 +409,7 @@ export class LightingRenderer {
             pointLight.visible = false // Disabled by default - toggleable in lighting panel
         })
         
-        console.debug('💡 Added strategic accent lighting for atmosphere (disabled by default)')
+        LightingRenderer.logger.debug('💡 Added strategic accent lighting for atmosphere (disabled by default)')
     }
 
     private addDramaticLighting(): void {
@@ -463,7 +465,7 @@ export class LightingRenderer {
         shelfLayout?: { rows: number; shelvesPerRow: number },
         centerOffset?: { x: number; y: number; z: number }
     ): void {
-        console.debug(`💡 Updating lighting for room dimensions: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
+        LightingRenderer.logger.debug(`💡 Updating lighting for room dimensions: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
         
         // Update current room dimensions for fluorescent fixture positioning
         CURRENT_ROOM_DIMENSIONS.WIDTH = dimensions.width
@@ -477,13 +479,13 @@ export class LightingRenderer {
         // Store shelf layout for use during lighting upgrades
         if (shelfLayout) {
             this.currentShelfLayout = shelfLayout
-            console.debug(`💡 Stored shelf layout: ${shelfLayout.rows} rows x ${shelfLayout.shelvesPerRow} shelves per row`)
+            LightingRenderer.logger.debug(`💡 Stored shelf layout: ${shelfLayout.rows} rows x ${shelfLayout.shelvesPerRow} shelves per row`)
         }
         
         // Position lighting group to match room offset so lights align with shelves
         if (centerOffset) {
             this.lightingGroup.position.set(centerOffset.x, centerOffset.y, centerOffset.z)
-            console.debug(`💡 Lighting group positioned at: (${centerOffset.x}, ${centerOffset.y}, ${centerOffset.z.toFixed(1)})`)
+            LightingRenderer.logger.debug(`💡 Lighting group positioned at: (${centerOffset.x}, ${centerOffset.y}, ${centerOffset.z.toFixed(1)})`)
         }
         
         // Add or update ceiling fixtures based on shelf layout
@@ -491,17 +493,17 @@ export class LightingRenderer {
         if (shelfLayout) {
             const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
             if (existingFixtures) {
-                console.debug('💡 Updating existing ceiling fixtures for new shelf layout...')
+                LightingRenderer.logger.debug('💡 Updating existing ceiling fixtures for new shelf layout...')
                 this.lightingGroup.remove(existingFixtures)
             } else {
-                console.debug('💡 Adding ceiling fixtures for shelf layout...')
+                LightingRenderer.logger.debug('💡 Adding ceiling fixtures for shelf layout...')
             }
             this.setupFluorescentFixtures(shelfLayout)
         }
     }
 
     public toggleLighting(enabled: boolean): void {
-        console.debug(`💡 ${enabled ? 'Enabling' : 'Disabling'} all lights`)
+        LightingRenderer.logger.debug(`💡 ${enabled ? 'Enabling' : 'Disabling'} all lights`)
         
         for (const [, lights] of this.registry.getLightsGroupedByType()) {
             for (const light of lights) {
@@ -511,7 +513,7 @@ export class LightingRenderer {
     }
 
     public toggleDebugVisualization(enabled: boolean): void {
-        console.debug(`🔍 ${enabled ? 'Showing' : 'Hiding'} light debug visualization`)
+        LightingRenderer.logger.debug(`🔍 ${enabled ? 'Showing' : 'Hiding'} light debug visualization`)
         
         if (enabled) {
             this.debugHelper.addHelpersForRegisteredLights()
@@ -521,7 +523,7 @@ export class LightingRenderer {
     }
 
     public refreshShadows(): void {
-        console.debug('🔄 Refreshing shadows after props added...')
+        LightingRenderer.logger.debug('🔄 Refreshing shadows after props added...')
         
         // Update shadow cameras for all shadow-casting lights using registry
         const groupedLights = this.registry.getLightsGroupedByType()
@@ -540,7 +542,7 @@ export class LightingRenderer {
         
         // Force renderer to regenerate shadow maps
         this.renderer.shadowMap.needsUpdate = true
-        console.debug('✅ Shadow refresh completed')
+        LightingRenderer.logger.info('✅ Shadow refresh completed')
     }
 
 
@@ -552,9 +554,9 @@ export class LightingRenderer {
         const light = this.lightingGroup.getObjectByName(lightName) as THREE.Light
         if (light) {
             light.visible = enabled
-            console.debug(`💡 ${lightName} light ${enabled ? 'enabled' : 'disabled'}`)
+            LightingRenderer.logger.info(`💡 ${lightName} light ${enabled ? 'enabled' : 'disabled'}`)
         } else {
-            console.warn(`⚠️ Light '${lightName}' not found for toggle`)
+            LightingRenderer.logger.warn(`⚠️ Light '${lightName}' not found for toggle`)
         }
     }
 
@@ -615,7 +617,7 @@ export class LightingRenderer {
         // Re-add preserved fixtures
         if (existingFixtures) {
             this.lightingGroup.add(existingFixtures)
-            console.debug('💡 Preserved ceiling fixtures during lighting upgrade')
+            LightingRenderer.logger.debug('💡 Preserved ceiling fixtures during lighting upgrade')
         }
     }
 

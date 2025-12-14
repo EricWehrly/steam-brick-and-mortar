@@ -10,6 +10,9 @@ import type {
 import { ShelfStickerHandler } from '../stickers/ShelfStickerHandler'
 import { EventManager } from '../../core/EventManager'
 import { GameEventTypes } from '../../types/InteractionEvents'
+import { Logger } from '../../utils/Logger'
+
+const { info, debug, warn, error } = Logger.createLogFunctions('InstancedShelfRenderer')
 
 export interface InstancedShelfConfig extends InstancedRendererConfig {
     defaultShelfConfig?: ShelfConfig
@@ -115,12 +118,12 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             this.updateGPU.bind(this)
         )
         
-        console.debug(`🏪 InstancedShelfRenderer created (max units: ${this.maxShelfUnits})`)
+        debug(`🏪 Created (max units: ${this.maxShelfUnits})`)
     }
     
     public async initialize(): Promise<void> {
         if (this.isInitialized) {
-            console.warn('InstancedShelfRenderer already initialized')
+            warn('Already initialized')
             return
         }
         
@@ -182,9 +185,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             
             this.isInitialized = true
             
-        } catch (error) {
-            console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
-            throw error
+        } catch (err) {
+            error('❌ Failed to initialize:', err)
+            throw err
         }
     }
     
@@ -215,7 +218,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             depth * 0.98
         )
         
-        console.debug('📐 Created shelf geometry templates')
+        debug('📐 Created shelf geometry templates')
     }
     
     private setupInstanceAttributes(): void {
@@ -242,12 +245,12 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     // TODO: Is this definitely how we want to write this?
     public setInstance(index: number, data: ShelfInstanceData): boolean {
         if (!this.isInitialized) {
-            console.warn('InstancedShelfRenderer not initialized')
+            warn('Not initialized')
             return false
         }
         
         if (index >= this.maxShelfUnits) {
-            console.warn(`Shelf unit index ${index} exceeds max ${this.maxShelfUnits}`)
+            warn(`Shelf unit index ${index} exceeds max ${this.maxShelfUnits}`)
             return false
         }
         
@@ -269,11 +272,11 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             const shelfUnit = this.createShelfUnit(index, data.position, shelfConfig)
             this.shelfUnits.set(index, shelfUnit)
             
-            console.debug(`🏪 Set shelf unit ${index} at position (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
+            debug(`🏪 Set shelf unit ${index} at position (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
             return true
             
-        } catch (error) {
-            console.error(`❌ Failed to set shelf unit ${index}:`, error)
+        } catch (err) {
+            error(`❌ Failed to set shelf unit ${index}:`, err)
             return false
         }
     }
@@ -425,7 +428,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.shelfBoardManager.updateGPU()
         this.interiorSurfaceManager.updateGPU()
         
-        console.debug(`🔄 InstancedShelfRenderer GPU updated: ${this.shelfUnits.size} shelf units`)
+        debug(`🔄 GPU updated: ${this.shelfUnits.size} shelf units`)
     }
     
     public reset(): void {
@@ -442,7 +445,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             interior: 0
         }
         
-        console.debug('🔄 InstancedShelfRenderer reset')
+        debug('🔄 Reset')
     }
     
     public isReady(): boolean {
@@ -485,7 +488,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     }
 
     public dispose(): void {
-        console.debug('🧹 Disposing InstancedShelfRenderer')
+        debug('🧹 Disposing')
         
         // Dispose all managers
         this.angledBoardManager.dispose()
@@ -502,6 +505,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.shelfUnits.clear()
         this.isInitialized = false
         
-        console.debug('✅ InstancedShelfRenderer disposed')
+        debug('✅ Disposed')
     }
 }

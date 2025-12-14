@@ -18,6 +18,9 @@ import { INSTANCED_LABEL_MESH_NAME } from '../scene/game-box/instancing/Instance
 import { INSTANCED_ARTWORK_MESH_NAME } from '../scene/game-box/instancing/InstancedArtworkRenderer'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
+import { Logger } from '../utils/Logger'
+
+const log = Logger.withContext('GameFinder')
 
 export interface InstanceMetadata {
     name: string
@@ -48,7 +51,7 @@ export class GameFinder {
     public findByName(gameName: string): GameSceneObject | null {
         const searchTerm = gameName.toLowerCase()
         
-        console.debug(`🔍 [GameFinder] Searching for game by name: "${gameName}"`)
+        log.debug(`🔍 Searching for game by name: "${gameName}"`)
         
         const result = this.findGame((child) => {
             if (child.userData?.name?.toLowerCase().includes(searchTerm)) {
@@ -63,25 +66,25 @@ export class GameFinder {
         })
         
         if (result) {
-            console.debug(`✅ [GameFinder] Found: ${result.name} at (${result.position.x.toFixed(2)}, ${result.position.y.toFixed(2)}, ${result.position.z.toFixed(2)})`)
+            log.debug(`✅ Found: ${result.name} at (${result.position.x.toFixed(2)}, ${result.position.y.toFixed(2)}, ${result.position.z.toFixed(2)})`)
         } else {
-            console.warn(`❌ [GameFinder] Not found: "${gameName}"`)
+            log.warn(`❌ Not found: "${gameName}"`)
         }
         
         return result
     }
 
     public findByAppId(appid: number | string): GameSceneObject | null {
-        console.debug(`🔍 [GameFinder] Searching for game by appid: ${appid}`)
+        log.debug(`🔍 Searching for game by appid: ${appid}`)
         
         const result = this.findGame((child) => {
             return child.userData?.appid === appid
         })
         
         if (result) {
-            console.debug(`✅ [GameFinder] Found: ${result.name} (${result.appid})`)
+            log.debug(`✅ Found: ${result.name} (${result.appid})`)
         } else {
-            console.warn(`❌ [GameFinder] Not found: appid ${appid}`)
+            log.warn(`❌ Not found: appid ${appid}`)
         }
         
         return result
@@ -110,14 +113,14 @@ export class GameFinder {
             }
         })
         
-        console.debug(`🔍 [GameFinder] Found ${games.length} game(s) in scene (${instancedGames.length} instanced, ${games.length - instancedGames.length} legacy)`)
+        log.debug(`🔍 Found ${games.length} game(s) in scene (${instancedGames.length} instanced, ${games.length - instancedGames.length} legacy)`)
         return games
     }
 
     public listAllGameNames(): string[] {
         const games = this.findAll()
         const names = games.map(g => g.name || 'unnamed').sort()
-        console.log(`📋 [GameFinder] All games in scene (${names.length}):`, names)
+        log.info(`📋 All games in scene (${names.length}):`, names)
         return names
     }
 
@@ -127,7 +130,7 @@ export class GameFinder {
         try {
             const artworkMetadata = DataManager.getInstance().get<Map<number, InstanceMetadata>>(DataKey.InstancedArtworkMetadata)
             if (artworkMetadata) {
-                console.debug(`🔍 [GameFinder] Instanced artwork metadata contains ${artworkMetadata.size} game(s)`)
+                log.debug(`🔍 Instanced artwork metadata contains ${artworkMetadata.size} game(s)`)
                 for (const [instanceIndex, data] of artworkMetadata.entries()) {
                     games.push({
                         name: data.name,
@@ -142,7 +145,7 @@ export class GameFinder {
             
             const labelMetadata = DataManager.getInstance().get<Map<number, { name: string; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
             if (labelMetadata) {
-                console.debug(`🔍 [GameFinder] Instanced label metadata contains ${labelMetadata.size} game(s)`)
+                log.debug(`🔍 Instanced label metadata contains ${labelMetadata.size} game(s)`)
                 for (const [instanceIndex, data] of labelMetadata.entries()) {
                     games.push({
                         name: data.name,
@@ -155,11 +158,11 @@ export class GameFinder {
             }
             
             if (!artworkMetadata && !labelMetadata) {
-                console.debug(`🔍 [GameFinder] No instanced metadata available`)
+                log.debug(`🔍 No instanced metadata available`)
             }
         } catch (error) {
             // Metadata not available or not initialized yet
-            console.debug('🔍 [GameFinder] Instanced artwork metadata not available:', error)
+            log.debug('🔍 Instanced artwork metadata not available:', error)
         }
         
         return games
@@ -258,10 +261,10 @@ export function initializeGameFinderOnStart(): void {
         return finder.listAllGameNames()
     }
     
-    console.debug('🔍 [GameFinder] Game finder functions exposed to window:')
-    console.debug('  window.findGame("UNLOVED")    - Find game by name')
-    console.debug('  window.findGame(611500)       - Find game by appid')
-    console.debug('  window.findAllGames()         - Get all games')
+    log.debug('🔍 Game finder functions exposed to window:')
+    log.debug('  window.findGame("UNLOVED")    - Find game by name')
+    log.debug('  window.findGame(611500)       - Find game by appid')
+    log.debug('  window.findAllGames()         - Get all games')
 }
 
 EventManager.getInstance().registerEventHandler(GameEventTypes.Start, initializeGameFinderOnStart)

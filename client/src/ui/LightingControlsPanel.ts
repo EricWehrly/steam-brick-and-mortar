@@ -15,6 +15,7 @@ import { EventManager, EventSource } from '../core/EventManager'
 import { LightingEventTypes, type LightCreatedEvent, type LightingSystemReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from '../core/AppSettings'
 import { LightRegistry } from '../lighting/LightRegistry'
+import { Logger } from '../utils/Logger'
 import '../styles/lighting-controls-panel.css'
 
 interface LightGroupInfo {
@@ -25,6 +26,7 @@ interface LightGroupInfo {
 }
 
 export class LightingControlsPanel {
+    public static logger = Logger.createLogFunctions(LightingControlsPanel.name)
     private container: HTMLElement
     private scene: THREE.Scene | null = null
     private lightGroups: Map<string, LightGroupInfo> = new Map()
@@ -148,7 +150,7 @@ export class LightingControlsPanel {
     }
 
     private onLightCreated(event: CustomEvent<LightCreatedEvent>): void {
-        console.debug(`💡 Light created: ${event.detail.lightType} (${event.detail.lightName || 'unnamed'})`)
+        LightingControlsPanel.logger.debug(`💡 Light created: ${event.detail.lightType} (${event.detail.lightName || 'unnamed'})`)
         
         // Get scene from the first light event
         if (!this.scene) {
@@ -161,7 +163,7 @@ export class LightingControlsPanel {
     }
 
     private onLightingSystemReady(event: CustomEvent<LightingSystemReadyEvent>): void {
-        console.debug(`💡 Lighting system ready: ${event.detail.quality} quality`)
+        LightingControlsPanel.logger.debug(`💡 Lighting system ready: ${event.detail.quality} quality`)
         
         // Get scene from the system ready event if we don't have it yet
         if (!this.scene) {
@@ -427,7 +429,7 @@ export class LightingControlsPanel {
         })
         group.enabled = enabled
 
-        console.log(`💡 ${enabled ? 'Enabled' : 'Disabled'} ${type} lights (${group.lights.length} lights)`)
+        LightingControlsPanel.logger.info(`💡 ${enabled ? 'Enabled' : 'Disabled'} ${type} lights (${group.lights.length} lights)`)
         // Only update checkbox states, not full UI rebuild
         this.updateCheckboxStates()
     }
@@ -439,7 +441,7 @@ export class LightingControlsPanel {
         this.toggleDebugHelper(light, enabled)
         
         const lightName = light.name || `${light.constructor.name}-${light.id}`
-        console.log(`💡 ${enabled ? 'Enabled' : 'Disabled'} light: ${lightName}`)
+        LightingControlsPanel.logger.info(`💡 ${enabled ? 'Enabled' : 'Disabled'} light: ${lightName}`)
         
         // Only update checkbox states, not full UI rebuild
         this.updateCheckboxStates()

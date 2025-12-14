@@ -10,6 +10,7 @@
  */
 
 import * as THREE from 'three'
+import { Logger } from '../utils/Logger'
 
 interface LightEntry {
     type: string
@@ -18,6 +19,7 @@ interface LightEntry {
 
 export class LightRegistry {
     private static instance: LightRegistry | null = null
+    public static logger = Logger.createLogFunctions(LightRegistry.name)
     
     private lights: Map<THREE.Light, LightEntry> = new Map()
     private attachedGeometry: Map<THREE.Light, THREE.Object3D> = new Map()
@@ -34,7 +36,7 @@ export class LightRegistry {
     public registerLight(light: THREE.Light, options: { source?: string } = {}): void {
         const lightType = light.constructor.name
         this.lights.set(light, { type: lightType })
-        console.debug(`💡 [LightRegistry] Registered ${lightType}: "${light.name}" (source: ${options.source ?? 'unknown'})`)
+        LightRegistry.logger.debug(`💡 Registered ${lightType}: "${light.name}" (source: ${options.source ?? 'unknown'})`)
     }
     
     public attachGeometry(light: THREE.Light, geometry: THREE.Object3D): void {
@@ -42,7 +44,7 @@ export class LightRegistry {
         if (entry) {
             entry.attachedGeometry = geometry
             this.attachedGeometry.set(light, geometry)
-            console.debug(`💡 [LightRegistry] Attached geometry to "${light.name}"`)
+            LightRegistry.logger.debug(`💡 Attached geometry to "${light.name}"`)
         }
     }
     
@@ -68,6 +70,6 @@ export class LightRegistry {
     public clear(): void {
         this.lights.clear()
         this.attachedGeometry.clear()
-        console.debug('💡 [LightRegistry] Cleared all registrations')
+        LightRegistry.logger.debug('💡 Cleared all registrations')
     }
 }
