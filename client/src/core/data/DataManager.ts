@@ -54,8 +54,6 @@ export class DataManager {
             ...config
         }
         this.eventManager = EventManager.getInstance()
-        
-        console.debug('📊 DataManager initialized')
     }
 
     /**

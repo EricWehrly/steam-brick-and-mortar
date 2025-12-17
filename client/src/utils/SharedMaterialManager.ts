@@ -25,6 +25,7 @@ import { MaterialUtils } from './MaterialUtils'
 import { WoodMaterialGenerator } from './materials/WoodMaterialGenerator'
 import { CarpetMaterialGenerator } from './materials/CarpetMaterialGenerator'
 import { CeilingMaterialGenerator } from './materials/CeilingMaterialGenerator'
+import { Logger } from './Logger'
 
 export enum MaterialType {
     FallbackGameBox = 'fallbackGameBox',
@@ -49,6 +50,7 @@ export interface MaterialStats {
 }
 
 export class SharedMaterialManager {
+    private static readonly logger = Logger.createLogFunctions(SharedMaterialManager.name)
     private static instance: SharedMaterialManager
     private materialPool: MaterialPool | null = null
     
@@ -78,7 +80,7 @@ export class SharedMaterialManager {
         }
 
         if (this.materialPool) {
-            console.warn('⚠️ SharedMaterialManager already initialized')
+            SharedMaterialManager.logger.warn('⚠️ SharedMaterialManager already initialized')
             return
         }
 
@@ -89,7 +91,7 @@ export class SharedMaterialManager {
         }
 
         const endTime = performance.now()
-        console.debug(`✅ SharedMaterialManager initialized in ${(endTime - startTime).toFixed(2)}ms`)
+        SharedMaterialManager.logger.debug(`✅ SharedMaterialManager initialized in ${(endTime - startTime).toFixed(2)}ms`)
     }
 
     public getMaterial(type: MaterialType): THREE.MeshStandardMaterial {

@@ -75,8 +75,6 @@ export class RoomManager {
         
         // Fire-and-forget initial room creation
         this.createInitialRoom()
-        
-        console.debug('🏠 RoomManager initialized')
     }
     
     private async createInitialRoom(): Promise<void> {
