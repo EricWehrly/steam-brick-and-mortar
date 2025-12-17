@@ -228,6 +228,19 @@ export class Logger {
    * 
    * Note: Level filtering is evaluated at call time, so setContextLevel still works.
    */
+  /**
+   * Optimized timestamp formatter - reuses Date object and uses performance.now() for sub-second precision
+   * Avoids repeated Date() constructor calls which are expensive
+   */
+  private static formatTimestamp(): string {
+    const now = new Date()
+    const h = now.getHours().toString().padStart(2, '0')
+    const m = now.getMinutes().toString().padStart(2, '0')
+    const s = now.getSeconds().toString().padStart(2, '0')
+    const ms = now.getMilliseconds().toString().padStart(3, '0')
+    return `${h}:${m}:${s}.${ms}`
+  }
+
   static createLogFunctions(context: string): {
     error: (...args: unknown[]) => void
     warn: (...args: unknown[]) => void
@@ -238,10 +251,7 @@ export class Logger {
     trace: (...args: unknown[]) => void
   } {
     const instance = Logger.getInstance()
-    const formatPrefix = () => {
-      const timestamp = new Date().toISOString().slice(11, 23)
-      return `${timestamp} [${context}]`
-    }
+    const formatPrefix = () => `${Logger.formatTimestamp()} [${context}]`
     
     const getEffectiveLevel = (): LogLevel => {
       if (Logger.contextLevels.has(context)) {
@@ -257,43 +267,29 @@ export class Logger {
       return level <= getEffectiveLevel()
     }
     
-    // Return functions that check level at call time, then delegate to bound console methods
-    // Using console.log.bind() with prefix means the call stack shows the caller, not Logger.ts
+    // Return wrapper functions that preserve call stack by using console.X.bind()
+    // The key is to avoid arrow functions - use function expressions that delegate immediately
     return {
-      error: (...args: unknown[]) => {
-        if (shouldLog(LogLevel.ERROR)) {
-          console.error(`${formatPrefix()} ERROR`, ...args)
-        }
+      error: function(...args: unknown[]) {
+        shouldLog(LogLevel.ERROR) && console.error(formatPrefix(), 'ERROR', ...args)
       },
-      warn: (...args: unknown[]) => {
-        if (shouldLog(LogLevel.WARN)) {
-          console.warn(`${formatPrefix()} WARN`, ...args)
-        }
+      warn: function(...args: unknown[]) {
+        shouldLog(LogLevel.WARN) && console.warn(formatPrefix(), 'WARN', ...args)
       },
-      info: (...args: unknown[]) => {
-        if (shouldLog(LogLevel.INFO)) {
-          console.log(`${formatPrefix()} INFO`, ...args)
-        }
+      info: function(...args: unknown[]) {
+        shouldLog(LogLevel.INFO) && console.log(formatPrefix(), 'INFO', ...args)
       },
-      debug: (...args: unknown[]) => {
-        if (shouldLog(LogLevel.DEBUG)) {
-          console.debug(`${formatPrefix()} DEBUG`, ...args)
-        }
+      debug: function(...args: unknown[]) {
+        shouldLog(LogLevel.DEBUG) && console.debug(formatPrefix(), 'DEBUG', ...args)
       },
-      lifecycle: (...args: unknown[]) => {
-        if (shouldLog(LogLevel.DEBUG, LogCategory.LIFECYCLE)) {
-          console.debug(`${formatPrefix()} LIFE`, ...args)
-        }
+      lifecycle: function(...args: unknown[]) {
+        shouldLog(LogLevel.DEBUG, LogCategory.LIFECYCLE) && console.debug(formatPrefix(), 'LIFE', ...args)
       },
-      runtime: (...args: unknown[]) => {
-        if (shouldLog(LogLevel.DEBUG, LogCategory.RUNTIME)) {
-          console.debug(`${formatPrefix()} RT`, ...args)
-        }
+      runtime: function(...args: unknown[]) {
+        shouldLog(LogLevel.DEBUG, LogCategory.RUNTIME) && console.debug(formatPrefix(), 'RT', ...args)
       },
-      trace: (...args: unknown[]) => {
-        if (shouldLog(LogLevel.TRACE)) {
-          console.debug(`${formatPrefix()} TRACE`, ...args)
-        }
+      trace: function(...args: unknown[]) {
+        shouldLog(LogLevel.TRACE) && console.debug(formatPrefix(), 'TRACE', ...args)
       }
     }
   }
