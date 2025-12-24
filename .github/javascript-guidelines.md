@@ -15,7 +15,21 @@ You have _very often_ thought commands broken because you did not check the work
 - **Clean Architecture**: Modular components, clear separation of concerns
 - **Error Handling**: Proper try/catch blocks, meaningful error messages
 - **Documentation**: Include setup/usage instructions in comments
-Avoid JSDoc-style comments above method descriptions or calls where it would only serve as redundant to well-named methods and parameters. (TODO here: example needed)
+- **Named Functions**: Avoid anonymous/unnamed functions - use named methods or function declarations for better stack traces and readability
+- **No Magic Values**: Extract magic numbers and strings to named constants with clear semantic meaning
+- **Meaningful Comments Only**: Avoid redundant comments that restate what well-named code already expresses
+
+Examples:
+```typescript
+// ❌ BAD: Anonymous function, magic number
+eventManager.registerEventHandler('progress', (event) => {
+    if (progress > 0.9) { /* ... */ }
+})
+
+// ✅ GOOD: Named method, semantic constant
+private readonly CACHED_BATCH_THRESHOLD = 0.9
+eventManager.registerEventHandler('progress', this.handleProgress.bind(this))
+```
 
 ## Testing
 - **Test locally first**: Validate functionality before deploying
