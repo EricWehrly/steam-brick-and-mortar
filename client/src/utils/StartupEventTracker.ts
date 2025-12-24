@@ -9,6 +9,15 @@
  */
 
 import type { StartupProgressUI } from '../ui/startup/StartupProgressUI'
+import { EventManager } from '../core/EventManager'
+import { 
+    StorePropsEventTypes, 
+    SteamEventTypes, 
+    GameEventTypes,
+    type StorePropsProgressEvent,
+    type SteamGamesBatchEvent,
+    type SteamNetworkFetchProgressEvent
+} from '../types/InteractionEvents'
 
 // Use window.performance for browser environment - globally accessible
 const getPerformanceNow = (): number => {
@@ -66,12 +75,30 @@ interface PhaseMetrics {
 
 export class StartupEventTracker {
     private static instance: StartupEventTracker
+
+    // Event collection and phase metrics
     private events: StartupEvent[] = []
     private phases = new Map<StartupPhase, PhaseMetrics>()
     private startTime: number
-    private enabled: boolean = true
+
+    // Feature flag for capturing events (use getter/setter)
+    private _enabled: boolean = true
+    public get enabled(): boolean { return this._enabled }
+    public set enabled(value: boolean) { this._enabled = !!value }
+
+    // Optional progress UI for startup feedback
     private progressUI?: StartupProgressUI
-    
+
+    // Game loading progress tracking
+    private totalGames = 0
+    private loadedGames = 0
+    private cachedBatchesComplete = false
+    private fetchingInProgress = false
+
+    // Constants
+    private readonly CACHED_BATCH_THRESHOLD = 0.9
+    private readonly COMPLETION_DELAY_MS = 300
+
     private constructor() {
         // Use early page load time if available, otherwise use current time
         const windowWithStartTime = window as Window & { __APP_START_TIME?: number }
@@ -95,22 +122,62 @@ export class StartupEventTracker {
     }
     
     private setupProgressListeners(): void {
-        // Listen for props progress events to show detail
-        const eventManager = (async () => {
-            const { EventManager } = await import('../core/EventManager')
-            const { StorePropsEventTypes } = await import('../types/InteractionEvents')
-            return { em: EventManager.getInstance(), types: StorePropsEventTypes }
-        })()
+        const eventManager = EventManager.getInstance()
         
-        eventManager.then(({ em, types }) => {
-            em.registerEventHandler(types.Progress, (event: CustomEvent<any>) => {
-                if (this.progressUI && event.detail.detail) {
-                    this.progressUI.updateDetail(event.detail.detail)
-                }
-            })
-        }).catch(err => {
-            console.warn('Failed to set up progress listeners:', err)
-        })
+        eventManager.registerEventHandler(StorePropsEventTypes.Progress, this.handleStorePropsProgress.bind(this))
+        eventManager.registerEventHandler(SteamEventTypes.GamesBatchReady, this.handleGamesBatchReady.bind(this))
+        eventManager.registerEventHandler(SteamEventTypes.NetworkFetchProgress, this.handleNetworkFetchProgress.bind(this))
+        eventManager.registerEventHandler(GameEventTypes.AllBatchesComplete, this.handleAllBatchesComplete.bind(this))
+    }
+
+    private handleStorePropsProgress(event: CustomEvent<StorePropsProgressEvent>): void {
+        if (this.progressUI && event.detail.detail) {
+            this.progressUI.updateDetail(event.detail.detail)
+        }
+    }
+
+    private handleGamesBatchReady(event: CustomEvent<SteamGamesBatchEvent>): void {
+        if (!this.progressUI) return
+        
+        const { games, batchIndex, totalBatches } = event.detail
+        this.loadedGames += games.length
+        
+        if (batchIndex === 0) {
+            this.totalGames = totalBatches * games.length
+            this.progressUI.startGameLoading(this.totalGames, StartupPhase.SteamAutoLoad)
+        }
+        
+        const estimatedCachedBatches = Math.floor(totalBatches * this.CACHED_BATCH_THRESHOLD)
+        if (batchIndex >= estimatedCachedBatches && !this.cachedBatchesComplete) {
+            this.cachedBatchesComplete = true
+            this.fetchingInProgress = true
+            this.progressUI.updateGameLoadingPhase('fetch', 'Fetching new game metadata from Steam...')
+        }
+        
+        if (!this.cachedBatchesComplete) {
+            this.progressUI.updateGameLoadingPhase('cache', `Loading cached games (${this.loadedGames}/${this.totalGames})...`)
+        } else if (this.fetchingInProgress) {
+            this.progressUI.updateGameLoadingPhase('fetch', `Fetching ${totalBatches - batchIndex} remaining games from Steam...`)
+            this.fetchingInProgress = batchIndex < totalBatches - 1
+        }
+        
+        this.progressUI.updateGameLoadingProgress(this.loadedGames, this.totalGames)
+    }
+
+    private handleNetworkFetchProgress(event: CustomEvent<SteamNetworkFetchProgressEvent>): void {
+        if (!this.progressUI) return
+        
+        const { fetched, total } = event.detail
+        this.progressUI.updateGameLoadingPhase('fetch', `Waiting for Steam API (${fetched}/${total} games)...`)
+    }
+
+    private handleAllBatchesComplete(): void {
+        if (!this.progressUI) return
+        
+        this.progressUI.updateGameLoadingProgress(this.totalGames, this.totalGames)
+        setTimeout(() => {
+            this.completeProgressUI()
+        }, this.COMPLETION_DELAY_MS)
     }
     
     public phaseStart(phase: StartupPhase, description?: string): void {
@@ -232,18 +299,9 @@ export class StartupEventTracker {
         const summary = this.getSummary()
         
         console.log(`\n📊 Startup complete: ${summary.totalTime.toFixed(0)}ms`)
-        
-        // Complete the progress UI
-        if (this.progressUI) {
-            this.progressUI.complete()
-        }
     }
     
-    public disable(): void {
-        this.enabled = false
-    }
-    
-    public enable(): void {
-        this.enabled = true
+    public completeProgressUI(): void {
+        this.progressUI?.complete()
     }
 }

@@ -27,8 +27,11 @@ import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import type { SteamGame } from '../steam'
+import { Logger } from '../utils/Logger'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
+    private static readonly logger = Logger.createLogFunctions(GpuStorePropsRenderer.name)
+    
     private scene: THREE.Scene
     private dataManager: DataManager
 
@@ -68,6 +71,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     // Batch queue for serialized processing (prevents race conditions)
     private batchQueue: SteamGamesBatchEvent[] = []
     private isProcessingBatch: boolean = false
+    
+    // Timing tracking for debug logging
+    private batchTimings: { batchIndex: number; duration: number; mainThreadTime: number }[] = []
+    private progressiveLoadStartTime: number = 0
+    private totalMainThreadTime: number = 0
 
     constructor(scene: THREE.Scene, dataManager: DataManager) {
         this.scene = scene
@@ -155,8 +163,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
      * Process a single batch of games
      */
     private async processOneBatch(batchEvent: SteamGamesBatchEvent): Promise<void> {
+        const batchStartTime = performance.now()
         const { games, batchIndex, totalBatches } = batchEvent
         
+        const mainThreadStart = performance.now()
         const batchGames = games.map(g => this.steamGameToGameData(g))
         this.allBatchGames.push(...batchGames)
         this.batchesReceived++
@@ -165,18 +175,49 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // First batch: initialize renderers
         if (this.isFirstBatch) {
             this.isFirstBatch = false
+            this.progressiveLoadStartTime = batchStartTime
+            const initStart = performance.now()
             await this.initializeForProgressiveLoading(totalBatches)
+            const initTime = performance.now() - initStart
+            if (initTime > 100) {
+                GpuStorePropsRenderer.logger.debug(`[ASYNC] Renderer initialization: ${initTime.toFixed(1)}ms (mostly async waits)`)
+            }
         }
         
         // Tell multi-atlas renderer which batch we're processing (for tier assignment)
         this.gameBoxRenderer?.setBatchIndex(batchIndex)
         
+        const shelfCreationStart = performance.now()
         await this.createShelfForBatch(batchGames, batchIndex)
+        const shelfCreationTime = performance.now() - shelfCreationStart
+        
+        const batchDuration = performance.now() - batchStartTime
+        const mainThreadTime = performance.now() - mainThreadStart
+        this.batchTimings.push({ batchIndex, duration: batchDuration, mainThreadTime })
+        this.totalMainThreadTime += mainThreadTime
+        
+        const batchMsg = `[MAIN THREAD] Batch ${batchIndex + 1}/${totalBatches}: ${mainThreadTime.toFixed(1)}ms main thread (${batchGames.length} games, shelf creation: ${shelfCreationTime.toFixed(1)}ms)`
+        if (mainThreadTime > 200) {
+            GpuStorePropsRenderer.logger.warn(`${batchMsg} ⚠️ Blocking!`)
+        } else {
+            GpuStorePropsRenderer.logger.debug(`${batchMsg}`)
+        }
         
         // Emit GPU update after each batch
         EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
         
         if (this.batchesReceived === this.totalExpectedBatches) {
+            const totalLoadTime = performance.now() - this.progressiveLoadStartTime
+            const avgMainThreadTime = this.totalMainThreadTime / this.batchTimings.length
+            const asyncTime = totalLoadTime - this.totalMainThreadTime
+            
+            const summaryMsg = `[MAIN THREAD] All ${this.batchTimings.length} batches: ${this.totalMainThreadTime.toFixed(1)}ms main thread, ${asyncTime.toFixed(1)}ms async (total ${totalLoadTime.toFixed(1)}ms, avg ${avgMainThreadTime.toFixed(1)}ms/batch main thread)`
+            if (this.totalMainThreadTime > 500) {
+                GpuStorePropsRenderer.logger.warn(`${summaryMsg} ⚠️ Consider optimization!`)
+            } else {
+                GpuStorePropsRenderer.logger.debug(`${summaryMsg}`)
+            }
+            
             console.debug(`📦 [COMPLETE] All ${totalBatches} batches processed, finalizing...`)
             await this.finalizeProgressiveLoading()
         }
@@ -288,6 +329,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.isFirstBatch = true
         this.batchQueue = []
         this.isProcessingBatch = false
+        this.batchTimings = []
+        this.progressiveLoadStartTime = 0
+        this.totalMainThreadTime = 0
     }
     
     private async handleDataLoaded(): Promise<void> {

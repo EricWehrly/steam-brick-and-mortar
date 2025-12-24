@@ -63,6 +63,11 @@ export interface SteamGamesBatchEvent extends BaseInteractionEvent {
     totalBatches: number
 }
 
+export interface SteamNetworkFetchProgressEvent extends BaseInteractionEvent {
+    fetched: number
+    total: number
+}
+
 // =============================================================================
 // ROOM EVENTS
 // =============================================================================
@@ -248,7 +253,8 @@ export const SteamEventTypes = {
     DevModeToggle: 'steam:dev-mode-toggle',
     DataLoaded: 'steam:data-loaded',
     GameLoaded: 'steam:game-loaded',
-    GamesBatchReady: 'steam:games-batch-ready'
+    GamesBatchReady: 'steam:games-batch-ready',
+    NetworkFetchProgress: 'steam:network-fetch-progress'
 } as const
 
 export const RoomEventTypes = {
@@ -328,6 +334,7 @@ export interface InteractionEventMap {
     [SteamEventTypes.DataLoaded]: SteamDataLoadedEvent
     [SteamEventTypes.GameLoaded]: SteamGameLoadedEvent
     [SteamEventTypes.GamesBatchReady]: SteamGamesBatchEvent
+    [SteamEventTypes.NetworkFetchProgress]: SteamNetworkFetchProgressEvent
     
     // WebXR events
     [WebXREventTypes.Toggle]: WebXRToggleEvent

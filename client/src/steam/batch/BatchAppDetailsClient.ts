@@ -6,6 +6,8 @@
  */
 
 import type { SteamGameMetadata } from '../types/SteamMetadata'
+import { EventManager } from '../../core/EventManager'
+import { SteamEventTypes } from '../../types/InteractionEvents'
 
 export interface AppDetailsData extends SteamGameMetadata {
     name: string;
@@ -67,9 +69,11 @@ import { Logger } from '../../utils/Logger'
 export class BatchAppDetailsClient {
     private static readonly logger = Logger.createLogFunctions(BatchAppDetailsClient.name)
     private apiBaseUrl: string;
+    private eventManager: EventManager;
 
-    constructor(apiBaseUrl: string = 'https://steam-api-dev.wehrly.com') {
+    constructor(apiBaseUrl: string = 'https://steam-api-dev.wehrly.com', eventManager?: EventManager) {
         this.apiBaseUrl = apiBaseUrl;
+        this.eventManager = eventManager || EventManager.getInstance();
     }
 
     /**
@@ -97,8 +101,9 @@ export class BatchAppDetailsClient {
             batches.push(appids.slice(i, i + batchSize));
         }
 
-        if (batches.length > 1) {
-            BatchAppDetailsClient.logger.debug(`Fetching ${appids.length} games in ${batches.length} batches`)
+        const overallStart = performance.now();
+        if (batches.length > 0) {
+            BatchAppDetailsClient.logger.info(`[ASYNC] Fetching ${appids.length} uncached games from Steam API (${batches.length} network ${batches.length === 1 ? 'batch' : 'batches'})...`)
         }
 
         let totalFetched = 0;
@@ -118,6 +123,15 @@ export class BatchAppDetailsClient {
             const batch = batches[batchIndex];
             const batchStartTime = performance.now();
             
+            BatchAppDetailsClient.logger.info(`[ASYNC] Starting network batch ${batchIndex + 1}/${batches.length}: Requesting ${batch.length} games from Steam API...`);
+            
+            // Emit event for UI visibility
+            this.eventManager.emit(SteamEventTypes.NetworkFetchProgress, {
+                fetched: totalFetched,
+                total: appids.length,
+                timestamp: Date.now()
+            });
+            
             try {
                 const batchResult = await this.fetchSingleBatch(batch);
                 lastBatchDuration = performance.now() - batchStartTime;
@@ -129,7 +143,15 @@ export class BatchAppDetailsClient {
                 }
 
                 totalFetched += batchResult.total_successful;
+                BatchAppDetailsClient.logger.info(`[ASYNC] Network batch ${batchIndex + 1}/${batches.length}: Fetched ${batchResult.total_successful}/${batch.length} games in ${lastBatchDuration.toFixed(0)}ms (total: ${totalFetched}/${appids.length})`);
                 onProgress?.(totalFetched, appids.length);
+
+                // Emit progress event for UI
+                this.eventManager.emit(SteamEventTypes.NetworkFetchProgress, {
+                    fetched: totalFetched,
+                    total: appids.length,
+                    timestamp: Date.now()
+                });
 
                 // Log cache performance
                 if (batchResult.cache_hits !== undefined && batchResult.cache_misses !== undefined) {
@@ -167,8 +189,10 @@ export class BatchAppDetailsClient {
             }
         }
 
+        const overallDuration = performance.now() - overallStart;
+        BatchAppDetailsClient.logger.info(`[ASYNC] Network fetch complete: ${results.size}/${appids.length} games in ${overallDuration.toFixed(0)}ms`);
         if (results.size < appids.length) {
-            BatchAppDetailsClient.logger.warn(`Fetched ${results.size}/${appids.length} games (${appids.length - results.size} failed)`)
+            BatchAppDetailsClient.logger.warn(`${appids.length - results.size} games failed to fetch`);
         }
         return results;
     }

@@ -8,6 +8,11 @@ export class StartupProgressUI {
     private detailText: HTMLDivElement
     private isVisible: boolean = true
     
+    // Game loading sub-progress tracking
+    private gameLoadingPhase: 'cache' | 'fetch' | 'batch' | null = null
+    private gameLoadingProgress: { current: number; total: number } = { current: 0, total: 0 }
+    private gameLoadingStartWeight: number = 0
+    
     private readonly phaseWeights = new Map<StartupPhase, number>([
         [StartupPhase.PageLoad, 2],
         [StartupPhase.AppConstruction, 3],
@@ -115,6 +120,46 @@ export class StartupProgressUI {
         if (!this.isVisible) return
         
         this.detailText.style.display = 'none'
+    }
+    
+    public startGameLoading(totalGames: number, phase: StartupPhase = StartupPhase.SteamAutoLoad): void {
+        if (!this.isVisible) return
+        
+        // Calculate starting weight for this phase
+        let cumulativeProgress = 0
+        for (const [p, weight] of this.phaseWeights.entries()) {
+            if (p === phase) {
+                break
+            }
+            cumulativeProgress += weight
+        }
+        this.gameLoadingStartWeight = cumulativeProgress
+        this.gameLoadingProgress = { current: 0, total: totalGames }
+    }
+    
+    public updateGameLoadingPhase(phase: 'cache' | 'fetch' | 'batch', detail: string): void {
+        if (!this.isVisible) return
+        
+        this.gameLoadingPhase = phase
+        this.updateDetail(detail)
+    }
+    
+    public updateGameLoadingProgress(current: number, total?: number): void {
+        if (!this.isVisible) return
+        
+        this.gameLoadingProgress.current = current
+        if (total !== undefined) {
+            this.gameLoadingProgress.total = total
+        }
+        
+        // Calculate sub-progress within the phase
+        const phaseWeight = this.phaseWeights.get(StartupPhase.SteamAutoLoad) || 5
+        const progressRatio = this.gameLoadingProgress.total > 0 
+            ? this.gameLoadingProgress.current / this.gameLoadingProgress.total 
+            : 0
+        const subProgress = this.gameLoadingStartWeight + (phaseWeight * progressRatio)
+        
+        this.updateProgressBar(subProgress)
     }
     
     public completePhase(phase: StartupPhase): void {

@@ -301,6 +301,7 @@ export class SteamApiClient {
         
         // PHASE 1: Emit cached games immediately (cache-first for fast startup)
         if (cachedAppids.length > 0 && onBatchReady) {
+            const phaseStartTime = performance.now()
             const cachedGames = sortedGames.filter(g => cachedAppids.includes(g.appid))
             const cachedEnhanced: SteamGame[] = []
             
@@ -312,15 +313,27 @@ export class SteamApiClient {
                 onGameLoaded?.(enhancedGame)
             }
             
+            const buildTime = performance.now() - phaseStartTime
+            const buildMsg = `[MAIN THREAD] Built ${cachedEnhanced.length} cached games in ${buildTime.toFixed(1)}ms`
+            if (buildTime > 100) {
+                SteamApiClient.logger.warn(`${buildMsg} ⚠️ Main thread blocking!`)
+            } else {
+                SteamApiClient.logger.debug(buildMsg)
+            }
+            
             // Emit cached games in batches with yielding
             const cachedBatches = Math.ceil(cachedEnhanced.length / BATCH_SIZE)
             const totalEstimatedBatches = Math.ceil(sortedGames.length / BATCH_SIZE)
+            const batchStartTime = performance.now()
+            let mainThreadTime = 0
             
             for (let i = 0; i < cachedBatches; i++) {
+                const batchIterStart = performance.now()
                 const batchGames = cachedEnhanced.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
                 const isLastCachedBatch = i === cachedBatches - 1
                 
                 onBatchReady(batchGames, i, totalEstimatedBatches)
+                mainThreadTime += performance.now() - batchIterStart
                 
                 // Yield to main thread between batches
                 if (!isLastCachedBatch) {
@@ -328,12 +341,21 @@ export class SteamApiClient {
                 }
             }
             
+            const batchEmitTime = performance.now() - batchStartTime
+            const asyncTime = batchEmitTime - mainThreadTime
             SteamApiClient.logger.info(`Emitted ${cachedEnhanced.length} cached games in ${cachedBatches} batches`)
+            const emitMsg = `[MAIN THREAD] Cached batch emission: ${mainThreadTime.toFixed(1)}ms main thread, ${asyncTime.toFixed(1)}ms async (total ${batchEmitTime.toFixed(1)}ms, avg ${(mainThreadTime / cachedBatches).toFixed(1)}ms/batch)`
+            if (mainThreadTime > 500) {
+                SteamApiClient.logger.warn(`${emitMsg} ⚠️ Main thread blocking!`)
+            } else {
+                SteamApiClient.logger.debug(emitMsg)
+            }
             onProgress?.(cachedAppids.length, appids.length)
         }
         
         // PHASE 2: Fetch uncached games in background (supplemental batches)
         if (uncachedAppids.length > 0) {
+            const fetchPhaseStart = performance.now()
             try {
                 const batchResponses = await this.batchClient.fetchBatch(uncachedAppids, {
                     batchSize: 100,
@@ -341,15 +363,20 @@ export class SteamApiClient {
                         onProgress?.(cachedAppids.length + fetched, appids.length)
                     }
                 })
+                const fetchTime = performance.now() - fetchPhaseStart
+                SteamApiClient.logger.debug(`[ASYNC] Fetched ${uncachedAppids.length} uncached games in ${fetchTime.toFixed(1)}ms (network time, non-blocking)`)
                 
+                const processStartTime = performance.now()
                 const fetchedAppDetails = new Map<number, AppDetailsData>()
                 for (const [appid, response] of batchResponses.entries()) {
                     fetchedAppDetails.set(appid, this.normalizeBatchData(response.data))
                 }
                 
+                const cacheWriteStart = performance.now()
                 if (fetchedAppDetails.size > 0) {
                     await this.appDetailsCache.setMany(fetchedAppDetails)
                 }
+                const cacheWriteTime = performance.now() - cacheWriteStart
                 
                 // Build and emit fetched games as supplemental batches
                 const uncachedGames = sortedGames.filter(g => uncachedAppids.includes(g.appid))
@@ -363,17 +390,29 @@ export class SteamApiClient {
                     onGameLoaded?.(enhancedGame)
                 }
                 
+                const processTime = performance.now() - processStartTime
+                const processMsg = `[MAIN THREAD] Processed ${uncachedEnhanced.length} fetched games in ${processTime.toFixed(1)}ms (includes ${cacheWriteTime.toFixed(1)}ms cache write)`
+                if (processTime > 100) {
+                    SteamApiClient.logger.warn(`${processMsg} ⚠️ Main thread blocking!`)
+                } else {
+                    SteamApiClient.logger.debug(processMsg)
+                }
+                
                 // Emit fetched games as supplemental batches
                 if (onBatchReady && uncachedEnhanced.length > 0) {
+                    const emitStartTime = performance.now()
+                    let emitMainThreadTime = 0
                     const uncachedBatches = Math.ceil(uncachedEnhanced.length / BATCH_SIZE)
                     const startBatchIndex = Math.ceil(cachedAppids.length / BATCH_SIZE)
                     const totalBatches = startBatchIndex + uncachedBatches
                     
                     for (let i = 0; i < uncachedBatches; i++) {
+                        const batchIterStart = performance.now()
                         const batchGames = uncachedEnhanced.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
                         const isLastUncachedBatch = i === uncachedBatches - 1
                         
                         onBatchReady(batchGames, startBatchIndex + i, totalBatches)
+                        emitMainThreadTime += performance.now() - batchIterStart
                         
                         // Yield to main thread between batches
                         if (!isLastUncachedBatch) {
@@ -381,7 +420,10 @@ export class SteamApiClient {
                         }
                     }
                     
+                    const emitTime = performance.now() - emitStartTime
+                    const emitAsyncTime = emitTime - emitMainThreadTime
                     SteamApiClient.logger.info(`Emitted ${uncachedEnhanced.length} fetched games in ${uncachedBatches} supplemental batches`)
+                    SteamApiClient.logger.debug(`[MAIN THREAD] Fetched batch emission: ${emitMainThreadTime.toFixed(1)}ms main thread, ${emitAsyncTime.toFixed(1)}ms async (total ${emitTime.toFixed(1)}ms, avg ${(emitMainThreadTime / uncachedBatches).toFixed(1)}ms/batch)`)
                 }
             } catch (error) {
                 SteamApiClient.logger.error('Batch fetch failed:', error)
