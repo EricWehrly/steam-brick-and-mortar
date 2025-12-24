@@ -14,6 +14,8 @@ import {
     setupFetchMock, 
     mockGame 
 } from '../utils/test-helpers'
+import { EventManager } from '../../src/core/EventManager'
+import { SteamEventTypes } from '../../src/types/InteractionEvents'
 
 describe('Progressive Loading Integration Tests', () => {
     let steamClient: SteamApiClient
@@ -61,34 +63,42 @@ describe('Progressive Loading Integration Tests', () => {
                 json: () => Promise.resolve(mockUserData)
             })
 
-            const gameLoadedCallback = vi.fn()
-            const progressCallback = vi.fn()
+            const gamesLoaded: any[] = []
+            let progressEventFired = false
+            const eventManager = EventManager.getInstance()
+            
+            eventManager.registerEventHandler(SteamEventTypes.GamesBatchReady, ((event: CustomEvent) => {
+                for (const game of event.detail.games) {
+                    gamesLoaded.push(game)
+                }
+            }) as EventListener)
+            
+            eventManager.registerEventHandler(SteamEventTypes.NetworkFetchProgress, (() => {
+                progressEventFired = true
+            }) as EventListener)
 
             // Load games progressively
             const userGames = await steamClient.getUserGames('123')
             
             await steamClient.loadGamesProgressively(userGames, {
-                maxGames: 1,
-                onGameLoaded: gameLoadedCallback,
-                onProgress: progressCallback
+                maxGames: 1
             })
 
-            // Verify game loading callback was called with artwork URLs
-            expect(gameLoadedCallback).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    appid: mockGame.appid,
-                    name: mockGame.name,
-                    artwork: expect.objectContaining({
-                        icon: expect.stringContaining('steamcdn'),
-                        logo: expect.stringContaining('steamcdn'),
-                        header: expect.stringContaining('cdn.akamai'),
-                        library: expect.stringContaining('cdn.akamai')
-                    })
+            // Verify game was loaded with artwork URLs
+            expect(gamesLoaded).toHaveLength(1)
+            expect(gamesLoaded[0]).toMatchObject({
+                appid: mockGame.appid,
+                name: mockGame.name,
+                artwork: expect.objectContaining({
+                    icon: expect.stringContaining('steamcdn'),
+                    logo: expect.stringContaining('steamcdn'),
+                    header: expect.stringContaining('cdn.akamai'),
+                    library: expect.stringContaining('cdn.akamai')
                 })
-            )
+            })
 
-            // Verify progress callback was called
-            expect(progressCallback).toHaveBeenCalled()
+            // Verify progress event was fired
+            expect(progressEventFired).toBe(true)
         })
     })
 

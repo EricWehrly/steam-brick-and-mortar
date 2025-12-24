@@ -8,6 +8,9 @@
  */
 
 import type { SteamGame, SteamUser } from '../steam'
+import { EventManager } from '../core/EventManager'
+import { SteamEventTypes } from '../types/InteractionEvents'
+import type { SteamGamesBatchEvent } from '../types/InteractionEvents'
 
 export interface GameLibraryState {
     userData: SteamUser | null
@@ -25,6 +28,21 @@ export class GameLibraryManager {
         currentGameIndex: 0,
         isLoading: false,
         error: null
+    }
+    
+    private eventManager: EventManager
+
+    constructor() {
+        this.eventManager = EventManager.getInstance()
+        this.eventManager.registerEventHandler(SteamEventTypes.GamesBatchReady, this.handleGamesBatch.bind(this))
+    }
+    
+    private handleGamesBatch(event: CustomEvent<SteamGamesBatchEvent>): void {
+        const { games } = event.detail
+        
+        for (const game of games) {
+            this.updateGameData(game as SteamGame)
+        }
     }
 
     /**

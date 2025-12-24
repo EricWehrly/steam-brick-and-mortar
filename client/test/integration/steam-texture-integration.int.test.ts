@@ -346,25 +346,23 @@ describe('Steam Data Integration (Data Flow Only)', () => {
         
         vi.spyOn(steamClient, 'loadGamesProgressively').mockImplementation(
             async (userGames: SteamUser, options = {}) => {
-                // Simulate calling the callback
-                if (options?.onGameLoaded) {
-                    const mockGame: SteamGame = {
-                        appid: 12345,
-                        name: 'Test Game',
-                        playtime_forever: 120,
-                        playtime_2weeks: 30,
-                        img_icon_url: 'test-icon.jpg',
-                        img_logo_url: 'test-logo.jpg',
-                        artwork: {
-                            icon: 'https://test.com/icon.jpg',
-                            logo: 'https://test.com/logo.jpg',
-                            header: 'https://test.com/header.jpg',
-                            library: 'https://test.com/library.jpg'
-                        }
+                // Simulate emitting the event
+                const mockGame: SteamGame = {
+                    appid: 12345,
+                    name: 'Test Game',
+                    playtime_forever: 120,
+                    playtime_2weeks: 30,
+                    img_icon_url: 'test-icon.jpg',
+                    img_logo_url: 'test-logo.jpg',
+                    artwork: {
+                        icon: 'https://test.com/icon.jpg',
+                        logo: 'https://test.com/logo.jpg',
+                        header: 'https://test.com/header.jpg',
+                        library: 'https://test.com/library.jpg'
                     }
-                    await options.onGameLoaded(mockGame)
                 }
-                return []
+                // GameLibraryManager will handle the event
+                return [mockGame]
             }
         )
 

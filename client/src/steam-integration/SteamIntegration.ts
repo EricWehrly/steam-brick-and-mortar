@@ -148,27 +148,9 @@ export class SteamIntegration {
             
             callbacks.onProgress?.(10, 100, `Found ${userGames.game_count} games. Loading details for top ${Math.min(this.config.maxGames, userGames.game_count)}...`)
             
-            // Step 2: Progressive loading with cache-first batch emission
-            // onBatchReady callback handles batch events directly from SteamApiClient
+            // Progressive loading via events - GameLibraryManager listens to GamesBatchReady
             await this.steamClient.loadGamesProgressively(userGames, {
-                maxGames: this.config.maxGames,
-                onProgress: (current: number, total: number) => {
-                    const percentage = Math.round((current / total) * 90) + 10 // Reserve 10% for initial fetch
-                    callbacks.onProgress?.(percentage, 100, `Loaded ${current}/${total} games`)
-                },
-                onBatchReady: (batchGames, batchIndex, totalBatches) => {
-                    // Update game library
-                    for (const game of batchGames) {
-                        this.gameLibrary.updateGameData(game)
-                    }
-                    
-                    // Emit batch event for progressive shelf rendering
-                    this.eventManager.emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
-                        games: batchGames as ReadonlyArray<Readonly<SteamGame>>,
-                        batchIndex,
-                        totalBatches
-                    })
-                }
+                maxGames: this.config.maxGames
             })
             
             // Complete loading - actual count from library state (populated via onBatchReady)
@@ -310,26 +292,9 @@ export class SteamIntegration {
             
             callbacks.onProgress?.(10, 100, `Found ${cachedGames.game_count} games in cache. Loading...`)
             
-            // Single-pass load with onBatchReady for progressive rendering
+            // Progressive loading via events - GameLibraryManager listens to GamesBatchReady  
             await this.steamClient.loadGamesProgressively(cachedGames, {
-                maxGames: cachedGames.game_count,
-                onProgress: (current: number, total: number) => {
-                    const percentage = Math.round((current / total) * 80) + 10 // 10-90%
-                    callbacks.onProgress?.(percentage, 100, `Loading ${current}/${total} games`)
-                },
-                onBatchReady: (batchGames, batchIndex, totalBatches) => {
-                    // Update game library
-                    for (const game of batchGames) {
-                        this.gameLibrary.updateGameData(game)
-                    }
-                    
-                    // Emit batch event for progressive shelf rendering
-                    this.eventManager.emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
-                        games: batchGames as ReadonlyArray<Readonly<SteamGame>>,
-                        batchIndex,
-                        totalBatches
-                    })
-                }
+                maxGames: cachedGames.game_count
             })
             
             const gamesLoaded = this.gameLibrary.getState().userData?.games?.length ?? 0

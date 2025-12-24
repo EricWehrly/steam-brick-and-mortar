@@ -13,6 +13,9 @@ import {
     mockGame,
     mockUser 
 } from '../utils/test-helpers'
+import { setupIndexedDBMock } from '../mocks/indexeddb.mock'
+import { EventManager } from '../../src/core/EventManager'
+import { SteamEventTypes } from '../../src/types/InteractionEvents'
 
 describe('SteamApiClient Integration Tests', () => {
     let client: SteamApiClient
@@ -21,6 +24,7 @@ describe('SteamApiClient Integration Tests', () => {
 
     beforeEach(() => {
         // Setup all mocks
+        setupIndexedDBMock()
         fetchMock = setupFetchMock()
         localStorageMock = setupLocalStorageMock()
         
@@ -62,21 +66,26 @@ describe('SteamApiClient Integration Tests', () => {
     describe('Progressive Loading', () => {
         it('should load games progressively with rate limiting', async () => {
             const loadedGames: any[] = []
-            const progressUpdates: Array<{current: number, total: number}> = []
+            let progressEventFired = false
+            const eventManager = EventManager.getInstance()
             
-            const result = await client.loadGamesProgressively(mockUser, {
-                maxGames: 1,
-                onProgress: (current, total) => {
-                    progressUpdates.push({ current, total })
-                },
-                onGameLoaded: (game) => {
+            eventManager.registerEventHandler(SteamEventTypes.GamesBatchReady, ((event: CustomEvent) => {
+                for (const game of event.detail.games) {
                     loadedGames.push(game)
                 }
+            }) as EventListener)
+            
+            eventManager.registerEventHandler(SteamEventTypes.NetworkFetchProgress, (() => {
+                progressEventFired = true
+            }) as EventListener)
+            
+            const result = await client.loadGamesProgressively(mockUser, {
+                maxGames: 1
             })
             
             expect(result).toHaveLength(1)
             expect(loadedGames).toHaveLength(1)
-            expect(progressUpdates.length).toBeGreaterThan(0)
+            expect(progressEventFired).toBe(true)
         })
 
         it('should prioritize games by playtime', async () => {
@@ -90,12 +99,16 @@ describe('SteamApiClient Integration Tests', () => {
             }
             
             const loadOrder: any[] = []
+            const eventManager = EventManager.getInstance()
             
-            await client.loadGamesProgressively(multiGameUser, {
-                maxGames: 3,
-                onGameLoaded: (game) => {
+            eventManager.registerEventHandler(SteamEventTypes.GamesBatchReady, ((event: CustomEvent) => {
+                for (const game of event.detail.games) {
                     loadOrder.push(game)
                 }
+            }) as EventListener)
+            
+            await client.loadGamesProgressively(multiGameUser, {
+                maxGames: 3
             })
             
             // Should be ordered by playtime (descending)
@@ -117,24 +130,26 @@ describe('SteamApiClient Integration Tests', () => {
     describe('Progressive Loading Integration', () => {
         it('should integrate progressive loading with game processing', async () => {
             const loadedGames: any[] = []
-            const onGameLoaded = vi.fn((game: any) => {
-                loadedGames.push(game)
-            })
+            const eventManager = EventManager.getInstance()
+            
+            eventManager.registerEventHandler(SteamEventTypes.GamesBatchReady, ((event: CustomEvent) => {
+                for (const game of event.detail.games) {
+                    loadedGames.push(game)
+                }
+            }) as EventListener)
             
             const result = await client.loadGamesProgressively(mockUser, {
-                maxGames: 1,
-                onGameLoaded
+                maxGames: 1
             })
             
             expect(result).toHaveLength(1)
-            expect(onGameLoaded).toHaveBeenCalledWith(mockGame)
             expect(loadedGames).toHaveLength(1)
+            expect(loadedGames[0]).toMatchObject(mockGame)
         })
 
         it('should not call fetch when loading games without artwork', async () => {
             const result = await client.loadGamesProgressively(mockUser, {
-                maxGames: 1,
-                onGameLoaded: vi.fn()
+                maxGames: 1
             })
             
             expect(result).toHaveLength(1)
