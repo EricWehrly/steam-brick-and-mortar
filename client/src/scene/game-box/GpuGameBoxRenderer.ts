@@ -63,6 +63,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         this.useLodAtlas = AppSettings.get(Setting.UseLodAtlas)
         this.useMultiAtlas = AppSettings.get(Setting.UseMultiAtlas)
         
+        GpuGameBoxRenderer.logger.debug(`Constructor: useLodAtlas=${this.useLodAtlas}, useMultiAtlas=${this.useMultiAtlas}`)
+        
         // Create label renderer (always needed for fallback)
         this.instancedLabelRenderer = new InstancedLabelRenderer({
             maxInstances: maxGames
@@ -139,10 +141,13 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         side: ShelfSide = ShelfSide.Front
     ): void {
         if (this.useLodAtlas && this.lodArtworkRenderer) {
+            GpuGameBoxRenderer.logger.debug(`[LOD] "${game.name}"`)
             this.createGameBoxFromUrlLodAtlas(game, position, artworkUrl, side)
         } else if (this.useMultiAtlas && this.multiAtlasRenderer) {
+            GpuGameBoxRenderer.logger.debug(`[MULTI] "${game.name}"`)
             this.createGameBoxFromUrlMultiAtlas(game, position, artworkUrl, side)
         } else {
+            GpuGameBoxRenderer.logger.debug(`[SINGLE] "${game.name}"`)
             this.createGameBoxFromUrlSingleAtlas(game, position, artworkUrl, side)
         }
     }
@@ -161,8 +166,12 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         artworkUrl: string,
         side: ShelfSide
     ): void {
-        if (!this.lodArtworkRenderer) return
+        if (!this.lodArtworkRenderer) {
+            GpuGameBoxRenderer.logger.error('LOD renderer not available!')
+            return
+        }
         
+        GpuGameBoxRenderer.logger.debug(`Loading LOD artwork for "${game.name}"`)
         this.lodArtworkRenderer.setArtworkInstanceFromUrl(
             position,
             game.name,
@@ -270,6 +279,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         // 2. header (landscape fallback, LodArtworkRenderer will try portrait alternatives)
         // Note: We pass the full artwork object so LodArtworkRenderer can try multiple URLs
         const artworkUrl = shouldUseArtwork ? this.selectBestArtworkUrl(game) : undefined
+        
+        GpuGameBoxRenderer.logger.debug(`createGameBoxAuto \"${game.name}\": artwork=${!!artworkUrl}`)
         
         if (artworkUrl) {
             this.createGameBoxFromUrl(game, position, artworkUrl, side)

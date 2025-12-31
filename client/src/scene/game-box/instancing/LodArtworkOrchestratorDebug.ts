@@ -174,6 +174,18 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         console.log(`Loading: ${stats.loading}, Queued: ${stats.queueLength}`)
         console.log(`Failed: ${stats.failed}, Permanent Failures: ${stats.permanentFailures}`)
         console.groupEnd()
+        
+        // Also log MID tier info
+        const textureManager = this.getTextureManager()
+        const midConfig = textureManager.getTierConfig('mid')
+        if (midConfig) {
+            const midSlotCount = textureManager.getSlotCount()
+            console.group('🎨 MID Texture Atlas Info')
+            console.log(`Total Slots: ${midConfig.maxDepth}`)
+            console.log(`Filled Slots: ${midSlotCount}`)
+            console.log(`Dimensions: ${midConfig.width}×${midConfig.height}`)
+            console.groupEnd()
+        }
     }
 
     public diagnosePendingState(): void {
