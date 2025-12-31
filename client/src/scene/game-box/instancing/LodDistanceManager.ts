@@ -196,6 +196,9 @@ export class LodDistanceManager {
      * Called every frame from render loop
      * Only actually updates LOD every N frames
      */
+    // TODO: implement some render hook method for updateFrequency instead
+    // maybe only update if the player has moved
+    // TODO: We don't need the camera, just its position
     public update(camera: THREE.Camera): void {
         // TEMPORARY: Track frame timing
         const now = window.performance.now()

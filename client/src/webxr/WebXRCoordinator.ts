@@ -108,6 +108,7 @@ export class WebXRCoordinator {
      */
     updateCameraMovement(camera: THREE.Camera): void {
         // Handle keyboard movement
+        // we should ABSOLUTELY NOT update the camera in VR this way (from keybinds rather than headset data)
         this.inputManager.updateCameraMovement(camera)
         
         // Handle Q/E roll rotation

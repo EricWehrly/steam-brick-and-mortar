@@ -93,6 +93,7 @@ export class SpatialPrewarmingManager {
     }
     
     // Reusable vectors
+    // TODO: Don't use these, they're brittle and problematic
     private readonly tmpVec = new THREE.Vector3()
     private readonly tmpDir = new THREE.Vector3()
     
@@ -150,6 +151,7 @@ export class SpatialPrewarmingManager {
     /**
      * Render loop callback
      */
+    // TODO: replace with renderer registration for update frequency
     private onFrame(_now: number, _deltaTime: number): void {
         const camera = this.dataManager.get<THREE.Camera>(DataKey.MainCamera)
         if (!camera) return
@@ -157,6 +159,7 @@ export class SpatialPrewarmingManager {
         this.frameCount++
         
         // Update movement direction periodically
+        // TODO: This feels like an unnecessarily expensive way to do this
         if (this.frameCount % this.config.directionUpdateFrequency === 0) {
             this.updateMovementDirection(camera)
         }
