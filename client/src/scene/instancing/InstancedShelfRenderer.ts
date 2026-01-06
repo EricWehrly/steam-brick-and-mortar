@@ -12,8 +12,6 @@ import { EventManager } from '../../core/EventManager'
 import { GameEventTypes } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 
-const { info, debug, warn, error } = Logger.createLogFunctions('InstancedShelfRenderer')
-
 export interface InstancedShelfConfig extends InstancedRendererConfig {
     defaultShelfConfig?: ShelfConfig
     maxShelfUnits?: number
@@ -47,7 +45,20 @@ interface ShelfUnitInstance {
     }
 }
 
+interface ShelfPartTemplate {
+    type: ShelfGeometryType
+    offset: THREE.Vector3
+    rotation?: THREE.Quaternion
+    scale?: THREE.Vector3
+    customAttributes?: { name: string; value: number | number[] }[]
+    isSideBoard?: boolean
+    sideboardIsLeft?: boolean
+}
+
+// TODO: Explore pre-baking shelf geometry as GLTF/FBX for faster load (after dynamic config needs are settled)
 export class InstancedShelfRenderer implements IInstancedRenderer {
+    private static readonly logger = Logger.createLogFunctions('InstancedShelfRenderer')
+    
     private angledBoardManager: InstancedMeshManager
     private sideBoardManager: InstancedMeshManager
     private shelfBoardManager: InstancedMeshManager
@@ -69,6 +80,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     // Pre-calculated shelf data (computed ONCE since all shelves are identical)
     private readonly shelfYPositions: number[]
     private readonly shelfDepthsAndOffsets: Array<{ shelfDepth: number; forwardOffset: number }>
+    
+    // Shelf unit template (computed ONCE, applied to each shelf position)
+    private shelfUnitTemplate: ShelfPartTemplate[] = []
     
     // TODO: Consider making sticker system fully pluggable (dependency injection or optional feature)
     private readonly stickerHandler: ShelfStickerHandler
@@ -111,19 +125,17 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.shelfBoardManager = new InstancedMeshManager('InstancedShelf-ShelfBoards')
         this.interiorSurfaceManager = new InstancedMeshManager('InstancedShelf-InteriorSurfaces')
         
-        // Register event listener for GPU updates after all batches complete
-        // Individual batch handlers set data directly; needsUpdate only needs to be set once
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.AllBatchesComplete,
             this.updateGPU.bind(this)
         )
         
-        debug(`🏪 Created (max units: ${this.maxShelfUnits})`)
+        InstancedShelfRenderer.logger.debug(`🏪 Created (max units: ${this.maxShelfUnits})`)
     }
     
     public async initialize(): Promise<void> {
         if (this.isInitialized) {
-            warn('Already initialized')
+            InstancedShelfRenderer.logger.warn('Already initialized')
             return
         }
         
@@ -183,10 +195,13 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             // Add custom instance attributes for dynamic sizing/positioning
             this.setupInstanceAttributes()
             
+            // Build shelf unit template (stamp pattern for creating shelves)
+            this.buildShelfUnitTemplate()
+            
             this.isInitialized = true
             
         } catch (err) {
-            error('❌ Failed to initialize:', err)
+            InstancedShelfRenderer.logger.error('❌ Failed to initialize:', err)
             throw err
         }
     }
@@ -217,8 +232,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             boardThickness * 0.1,
             depth * 0.98
         )
-        
-        debug('📐 Created shelf geometry templates')
     }
     
     private setupInstanceAttributes(): void {
@@ -234,7 +247,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             { name: 'surfaceScale', itemSize: 2, defaultValue: [1, 1] }
         ])
         
-        // TODO: Move this setup into stickerHandler.initialize() to reduce coupling
         const stickerIntegration = this.stickerHandler.getStickerIntegration()
         if (stickerIntegration) {
             stickerIntegration.setupInstanceAttributes(this.sideBoardManager)
@@ -242,15 +254,80 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.stickerHandler.setManagers(this.sideBoardManager, this.shelfUnits)
     }
     
-    // TODO: Is this definitely how we want to write this?
+    private buildShelfUnitTemplate(): void {
+        const config = this.defaultShelfConfig
+        const angleRad = (config.angle * Math.PI) / 180
+        const boardSeparation = config.depth * 0.8
+        
+        this.shelfUnitTemplate = []
+        
+        // Angled boards (front and back)
+        this.shelfUnitTemplate.push({
+            type: ShelfGeometryType.AngledBoard,
+            offset: new THREE.Vector3(0, config.height / 2, boardSeparation / 2),
+            rotation: new THREE.Quaternion().setFromEuler(new THREE.Euler(-angleRad, 0, 0)),
+            customAttributes: [{ name: 'rotationAngle', value: -config.angle }]
+        })
+        
+        this.shelfUnitTemplate.push({
+            type: ShelfGeometryType.AngledBoard,
+            offset: new THREE.Vector3(0, config.height / 2, -boardSeparation / 2),
+            rotation: new THREE.Quaternion().setFromEuler(new THREE.Euler(angleRad, 0, 0)),
+            customAttributes: [{ name: 'rotationAngle', value: config.angle }]
+        })
+        
+        // Side boards (left and right)
+        this.shelfUnitTemplate.push({
+            type: ShelfGeometryType.SideBoard,
+            offset: new THREE.Vector3(-config.width / 2 - config.boardThickness * 0.5, config.height / 2, 0),
+            isSideBoard: true,
+            sideboardIsLeft: true
+        })
+        
+        this.shelfUnitTemplate.push({
+            type: ShelfGeometryType.SideBoard,
+            offset: new THREE.Vector3(config.width / 2 + config.boardThickness * 0.5, config.height / 2, 0),
+            isSideBoard: true,
+            sideboardIsLeft: false
+        })
+        
+        // Horizontal shelves and interior surfaces
+        for (let i = 0; i < config.shelfCount; i++) {
+            const shelfY = this.shelfYPositions[i]
+            const widthAtHeight = config.width - 2 * (config.height - shelfY) * Math.tan(angleRad)
+            const { shelfDepth, forwardOffset } = this.shelfDepthsAndOffsets[i]
+            
+            const widthScale = widthAtHeight / config.width
+            const depthScale = shelfDepth / config.depth
+            
+            // Shelf board
+            this.shelfUnitTemplate.push({
+                type: ShelfGeometryType.ShelfBoard,
+                offset: new THREE.Vector3(0, shelfY, forwardOffset),
+                scale: new THREE.Vector3(widthScale, 1, depthScale),
+                customAttributes: [{ name: 'shelfScale', value: [widthScale, depthScale] }]
+            })
+            
+            // Interior surface
+            this.shelfUnitTemplate.push({
+                type: ShelfGeometryType.InteriorSurface,
+                offset: new THREE.Vector3(0, shelfY + config.boardThickness * 0.55, forwardOffset),
+                scale: new THREE.Vector3(widthScale, 1, depthScale),
+                customAttributes: [{ name: 'surfaceScale', value: [widthScale, depthScale] }]
+            })
+        }
+        
+        InstancedShelfRenderer.logger.debug(`📋 Built shelf unit template: ${this.shelfUnitTemplate.length} parts per shelf`)
+    }
+    
     public setInstance(index: number, data: ShelfInstanceData): boolean {
         if (!this.isInitialized) {
-            warn('Not initialized')
+            InstancedShelfRenderer.logger.warn('Not initialized')
             return false
         }
         
         if (index >= this.maxShelfUnits) {
-            warn(`Shelf unit index ${index} exceeds max ${this.maxShelfUnits}`)
+            InstancedShelfRenderer.logger.warn(`Shelf unit index ${index} exceeds max ${this.maxShelfUnits}`)
             return false
         }
         
@@ -261,7 +338,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
         
         try {
-            // Add managers to scene on first shelf creation (avoids premature removal during initialization)
             if (this.shelfUnits.size === 0) {
                 this.angledBoardManager.addToMainScene()
                 this.sideBoardManager.addToMainScene()
@@ -269,22 +345,22 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                 this.interiorSurfaceManager.addToMainScene()
             }
             
-            const shelfUnit = this.createShelfUnit(index, data.position, shelfConfig)
+            const shelfUnit = this.applyShelfUnitTemplate(index, data.position, shelfConfig)
             this.shelfUnits.set(index, shelfUnit)
             
-            debug(`🏪 Set shelf unit ${index} at position (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
+            InstancedShelfRenderer.logger.debug(`🏪 Set shelf unit ${index} at position (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
             return true
             
         } catch (err) {
-            error(`❌ Failed to set shelf unit ${index}:`, err)
+            InstancedShelfRenderer.logger.error(`❌ Failed to set shelf unit ${index}:`, err)
             return false
         }
     }
     
-    private createShelfUnit(
+    private applyShelfUnitTemplate(
         shelfUnitIndex: number,
         position: THREE.Vector3,
-        config: Required<ShelfConfig>
+        _config: Required<ShelfConfig>
     ): ShelfUnitInstance {
         const instanceIndices = {
             angledBoards: [] as number[],
@@ -293,129 +369,60 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             interiorSurfaces: [] as number[]
         }
         
-        this.createAngledBoards(position, config, instanceIndices.angledBoards)
-        this.createSideBoards(shelfUnitIndex, position, config, instanceIndices.sideBoards)
-        this.createHorizontalShelves(position, config, instanceIndices)
+        for (const part of this.shelfUnitTemplate) {
+            const worldPos = position.clone().add(part.offset)
+            let instanceIndex: number
+            let manager: InstancedMeshManager
+            let indicesArray: number[]
+            
+            switch (part.type) {
+                case ShelfGeometryType.AngledBoard:
+                    instanceIndex = this.nextInstanceIndex.angledBoard++
+                    manager = this.angledBoardManager
+                    indicesArray = instanceIndices.angledBoards
+                    break
+                case ShelfGeometryType.SideBoard:
+                    instanceIndex = this.nextInstanceIndex.sideBoard++
+                    manager = this.sideBoardManager
+                    indicesArray = instanceIndices.sideBoards
+                    break
+                case ShelfGeometryType.ShelfBoard:
+                    instanceIndex = this.nextInstanceIndex.shelfBoard++
+                    manager = this.shelfBoardManager
+                    indicesArray = instanceIndices.shelfBoards
+                    break
+                case ShelfGeometryType.InteriorSurface:
+                    instanceIndex = this.nextInstanceIndex.interior++
+                    manager = this.interiorSurfaceManager
+                    indicesArray = instanceIndices.interiorSurfaces
+                    break
+            }
+            
+            manager.setInstanceMatrix(instanceIndex, worldPos, part.rotation, part.scale)
+            
+            if (part.customAttributes) {
+                for (const attr of part.customAttributes) {
+                    manager.setInstanceAttribute(attr.name, instanceIndex, attr.value)
+                }
+            }
+            
+            if (part.isSideBoard) {
+                this.stickerHandler.initializeSideboardStickers(
+                    this.sideBoardManager,
+                    instanceIndex,
+                    shelfUnitIndex,
+                    part.sideboardIsLeft ?? true
+                )
+            }
+            
+            indicesArray.push(instanceIndex)
+        }
         
         return {
             position: position.clone(),
-            config,
+            config: _config,
             instanceIndices
         }
-    }
-    
-    private createAngledBoards(position: THREE.Vector3, config: Required<ShelfConfig>, indices: number[]): void {
-        const angleRad = (config.angle * Math.PI) / 180
-        const boardSeparation = config.depth * 0.8
-        
-        const frontBoardIndex = this.nextInstanceIndex.angledBoard++
-        const frontPos = position.clone().add(new THREE.Vector3(0, config.height / 2, boardSeparation / 2))
-        const frontRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(-angleRad, 0, 0))
-        this.angledBoardManager.setInstanceMatrix(frontBoardIndex, frontPos, frontRotation)
-        this.angledBoardManager.setInstanceAttribute('rotationAngle', frontBoardIndex, -config.angle)
-        indices.push(frontBoardIndex)
-        
-        const backBoardIndex = this.nextInstanceIndex.angledBoard++
-        const backPos = position.clone().add(new THREE.Vector3(0, config.height / 2, -boardSeparation / 2))
-        const backRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(angleRad, 0, 0))
-        this.angledBoardManager.setInstanceMatrix(backBoardIndex, backPos, backRotation)
-        this.angledBoardManager.setInstanceAttribute('rotationAngle', backBoardIndex, config.angle)
-        indices.push(backBoardIndex)
-    }
-    
-    private createSideBoards(shelfUnitIndex: number, position: THREE.Vector3, config: Required<ShelfConfig>, indices: number[]): void {
-        const leftBoardIndex = this.nextInstanceIndex.sideBoard++
-        const leftPos = position.clone().add(new THREE.Vector3(
-            -config.width / 2 - config.boardThickness * 0.5,
-            config.height / 2,
-            0
-        ))
-        this.sideBoardManager.setInstanceMatrix(leftBoardIndex, leftPos)
-        // TODO: Consider event-based approach: emit "sideboard-created" event instead of direct call
-        this.stickerHandler.initializeSideboardStickers(
-            this.sideBoardManager,
-            leftBoardIndex,
-            shelfUnitIndex,
-            true
-        )
-        
-        indices.push(leftBoardIndex)
-        
-        const rightBoardIndex = this.nextInstanceIndex.sideBoard++
-        const rightPos = position.clone().add(new THREE.Vector3(
-            config.width / 2 + config.boardThickness * 0.5,
-            config.height / 2,
-            0
-        ))
-        this.sideBoardManager.setInstanceMatrix(rightBoardIndex, rightPos)
-        // TODO: Consider event-based approach: emit "sideboard-created" event instead of direct call
-        this.stickerHandler.initializeSideboardStickers(
-            this.sideBoardManager,
-            rightBoardIndex,
-            shelfUnitIndex,
-            false  // isRightBoard
-        )
-        
-        indices.push(rightBoardIndex)
-    }
-    
-    private createHorizontalShelves(
-        position: THREE.Vector3,
-        config: Required<ShelfConfig>,
-        instanceIndices: ShelfUnitInstance['instanceIndices']
-    ): void {
-        const angleRad = (config.angle * Math.PI) / 180
-        
-        // Use PRE-CALCULATED positions (computed once in constructor, not per shelf unit)
-        for (let i = 0; i < config.shelfCount; i++) {
-            const shelfY = this.shelfYPositions[i]
-            const widthAtHeight = config.width - 2 * (config.height - shelfY) * Math.tan(angleRad)
-            
-            // Use PRE-CALCULATED depths (computed once in constructor)
-            const { shelfDepth, forwardOffset } = this.shelfDepthsAndOffsets[i]
-            
-            const widthScale = widthAtHeight / config.width
-            const depthScale = shelfDepth / config.depth
-            
-            this.createShelfBoard(position, shelfY, forwardOffset, widthScale, depthScale, instanceIndices.shelfBoards)
-            this.createInteriorSurface(position, shelfY, forwardOffset, config.boardThickness, widthScale, depthScale, instanceIndices.interiorSurfaces)
-        }
-    }
-    
-    private createShelfBoard(
-        position: THREE.Vector3,
-        shelfY: number,
-        forwardOffset: number,
-        widthScale: number,
-        depthScale: number,
-        indices: number[]
-    ): void {
-        const shelfBoardIndex = this.nextInstanceIndex.shelfBoard++
-        const shelfPos = position.clone().add(new THREE.Vector3(0, shelfY, forwardOffset))
-        const shelfScale = new THREE.Vector3(widthScale, 1, depthScale)
-        
-        this.shelfBoardManager.setInstanceMatrix(shelfBoardIndex, shelfPos, undefined, shelfScale)
-        this.shelfBoardManager.setInstanceAttribute('shelfScale', shelfBoardIndex, [widthScale, depthScale])
-        indices.push(shelfBoardIndex)
-    }
-    
-    private createInteriorSurface(
-        position: THREE.Vector3,
-        shelfY: number,
-        forwardOffset: number,
-        boardThickness: number,
-        widthScale: number,
-        depthScale: number,
-        indices: number[]
-    ): void {
-        const interiorSurfaceIndex = this.nextInstanceIndex.interior++
-        const interiorPos = position.clone().add(new THREE.Vector3(0, shelfY + boardThickness * 0.55, forwardOffset))
-        const interiorScale = new THREE.Vector3(widthScale, 1, depthScale)
-        
-        this.interiorSurfaceManager.setInstanceMatrix(interiorSurfaceIndex, interiorPos, undefined, interiorScale)
-        this.interiorSurfaceManager.setInstanceAttribute('surfaceScale', interiorSurfaceIndex, [widthScale, depthScale])
-        
-        indices.push(interiorSurfaceIndex)
     }
     
     public updateGPU(): void {
@@ -428,7 +435,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.shelfBoardManager.updateGPU()
         this.interiorSurfaceManager.updateGPU()
         
-        debug(`🔄 GPU updated: ${this.shelfUnits.size} shelf units`)
+        InstancedShelfRenderer.logger.debug(`🔄 GPU updated: ${this.shelfUnits.size} shelf units`)
     }
     
     public reset(): void {
@@ -445,7 +452,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             interior: 0
         }
         
-        debug('🔄 Reset')
+        InstancedShelfRenderer.logger.debug('🔄 Reset')
     }
     
     public isReady(): boolean {
@@ -462,8 +469,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         const shelfStats = this.shelfBoardManager.getStats()
         const interiorStats = this.interiorSurfaceManager.getStats()
         
-        // Count active geometry/material combinations 
-        // Note: Each combination typically corresponds to one draw call in the rendering pipeline
         const activeGeometryTypes = [
             this.angledBoardManager.isReady() ? 1 : 0,
             this.sideBoardManager.isReady() ? 1 : 0, 
@@ -482,13 +487,12 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                 shelfBoards: shelfStats,
                 interiorSurfaces: interiorStats
             },
-            // Number of active geometry/material combinations - should correspond to draw calls
             activeGeometryMaterialCombinations: activeGeometryTypes
         }
     }
 
     public dispose(): void {
-        debug('🧹 Disposing')
+        InstancedShelfRenderer.logger.debug('🧹 Disposing')
         
         // Dispose all managers
         this.angledBoardManager.dispose()
@@ -505,6 +509,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.shelfUnits.clear()
         this.isInitialized = false
         
-        debug('✅ Disposed')
+        InstancedShelfRenderer.logger.debug('✅ Disposed')
     }
 }

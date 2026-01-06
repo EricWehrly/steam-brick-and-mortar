@@ -1,16 +1,3 @@
-/**
- * Instanced Mesh Manager - Shared Component for GPU Instancing
- * 
- * Handles common InstancedMesh operations across different renderer types:
- * - Mesh creation and initialization
- * - Instance matrix management
- * - GPU synchronization
- * - Scene integration
- * - Resource cleanup
- * 
- * Used by: InstancedLabelRenderer, InstancedArtworkRenderer, InstancedShelfRenderer
- */
-
 import * as THREE from 'three'
 import { DataManager } from '../../core/data/DataManager'
 import type { InstancedMeshConfig, InstanceAttribute } from './IInstancedRenderer'
@@ -32,9 +19,6 @@ export class InstancedMeshManager {
         this.maxInstances = 1000 // Default, overridden in initialize
     }
     
-    /**
-     * Initialize with geometry, material, and configuration
-     */
     public initialize(config: InstancedMeshConfig): void {
         if (this.isInitialized) {
             console.warn(`${this.debugName} already initialized`)
@@ -67,9 +51,6 @@ export class InstancedMeshManager {
         console.debug(`✅ ${this.debugName} initialized (max: ${this.maxInstances} instances)`)
     }
     
-    /**
-     * Add custom instance attributes to the geometry
-     */
     public addInstanceAttributes(attributes: InstanceAttribute[]): void {
         if (!this.instancedMesh) {
             throw new Error(`Cannot add attributes: ${this.debugName} not initialized`)
@@ -106,9 +87,6 @@ export class InstancedMeshManager {
         }
     }
     
-    /**
-     * Set transform matrix for a specific instance
-     */
     public setInstanceMatrix(
         index: number,
         position: THREE.Vector3,
@@ -135,9 +113,6 @@ export class InstancedMeshManager {
         return true
     }
     
-    /**
-     * Set value for a custom instance attribute
-     */
     public setInstanceAttribute(
         attributeName: string,
         index: number,
@@ -173,9 +148,6 @@ export class InstancedMeshManager {
         return true
     }
     
-    /**
-     * Apply all pending updates to GPU
-     */
     public updateGPU(): void {
         if (!this.instancedMesh) {
             return
@@ -199,9 +171,6 @@ export class InstancedMeshManager {
         console.debug(`🔄 ${this.debugName} GPU updated: ${this.currentCount} active instances`)
     }
     
-    /**
-     * Reset all instances
-     */
     public reset(): void {
         this.currentCount = 0
         if (this.instancedMesh) {
@@ -210,9 +179,6 @@ export class InstancedMeshManager {
         console.debug(`🔄 ${this.debugName} instances reset`)
     }
     
-    /**
-     * Add the instanced mesh to the main scene
-     */
     public addToMainScene(): void {
         if (!this.instancedMesh) {
             console.warn(`⚠️ Cannot add to scene: ${this.debugName} not initialized`)
@@ -229,9 +195,6 @@ export class InstancedMeshManager {
         console.debug(`➕ ${this.debugName} added to main scene`)
     }
     
-    /**
-     * Remove the instanced mesh from the main scene
-     */
     public removeFromMainScene(): void {
         if (!this.instancedMesh) {
             return
@@ -244,23 +207,15 @@ export class InstancedMeshManager {
         }
     }
     
-    /**
-     * Get the underlying InstancedMesh (for advanced operations)
-     */
+    // For advanced operations only
     public getInstancedMesh(): THREE.InstancedMesh | null {
         return this.instancedMesh
     }
     
-    /**
-     * Check if ready for use
-     */
     public isReady(): boolean {
         return this.isInitialized && this.instancedMesh !== null
     }
     
-    /**
-     * Get current statistics
-     */
     public getStats() {
         return {
             isInitialized: this.isInitialized,
@@ -270,20 +225,13 @@ export class InstancedMeshManager {
         }
     }
     
-    /**
-     * Dispose of all resources
-     */
     public dispose(): void {
         console.debug(`🧹 Disposing ${this.debugName}`)
         
-        // Remove from scene
         this.removeFromMainScene()
         
-        // Dispose geometry and material if they're owned by this manager
-        // Note: In most cases, geometry and material are shared, so we don't dispose them here
-        // The calling renderer should handle disposal of shared resources
+        // NOTE: Geometry and material are shared - caller handles disposal
         
-        // Clear references
         this.instancedMesh = null
         this.isInitialized = false
         this.currentCount = 0
