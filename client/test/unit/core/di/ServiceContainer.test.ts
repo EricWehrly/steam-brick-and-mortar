@@ -126,12 +126,6 @@ describe('ServiceContainer', () => {
             expect(typeof ServiceKeys.SceneCoordinator).toBe('symbol')
         })
 
-        it.skip('should verify dependency chain registration for Phase 2 (SKIPPED - StorePropsRenderer moved to event system)', async () => {
-            // NOTE: This test was testing StorePropsRenderer DI registration
-            // StorePropsRenderer has been moved to pure event-driven architecture
-            // and no longer uses DI, so this test is no longer relevant
-        })
-
         it('should resolve AppSettings as singleton via ServiceRegistration', async () => {
             // Configure with ServiceRegistration
             ServiceRegistration.configureServices(container, {})
@@ -146,12 +140,6 @@ describe('ServiceContainer', () => {
             expect(appSettings1).toBe(appSettings2)
             expect(appSettings1).toBeDefined()
             expect(typeof appSettings1.getSetting).toBe('function')
-        })
-
-        it.skip('should resolve complex shared dependencies (SKIPPED - StorePropsRenderer moved to event system)', async () => {
-            // NOTE: This test was testing StorePropsRenderer DI dependencies
-            // StorePropsRenderer has been moved to pure event-driven architecture
-            // and no longer uses DI, so this test is no longer relevant
         })
     })
 
@@ -173,10 +161,6 @@ describe('ServiceContainer', () => {
     })
 
     describe('Performance Validation', () => {
-        it.skip('GameBoxRenderer DI test skipped - GameBoxRenderer moved to composition pattern', async () => {
-            // Note: GameBoxRenderer no longer uses DI - test kept for reference but skipped
-        })
-
         it('should create new instances efficiently for transient services', async () => {
             container.registerTransient(
                 ServiceKeys.EventManager,
