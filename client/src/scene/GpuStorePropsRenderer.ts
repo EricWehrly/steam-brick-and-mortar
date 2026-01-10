@@ -57,6 +57,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     // Track cumulative shelf count across rows (for correct game assignment)
     private cumulativeShelfCount: number = 0
     
+    // Pre-calculated shelf positions (computed once when total shelf count known)
+    private shelfPositions: THREE.Vector3[] = []
+    private readonly maxShelvesPerRow: number = 4
+    
     // Track progressive batch state
     private batchesReceived: number = 0
     private totalExpectedBatches: number = 0
@@ -261,6 +265,46 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
         this.clearExistingShelves()
+        
+        this.preallocateShelfPositions(totalBatches)
+    }
+    
+    private preallocateShelfPositions(totalShelves: number): void {
+        this.shelfPositions = []
+        
+        for (let shelfIndex = 0; shelfIndex < totalShelves; shelfIndex++) {
+            const row = Math.floor(shelfIndex / this.maxShelvesPerRow)
+            const shelfInRow = shelfIndex % this.maxShelvesPerRow
+            
+            const shelfSpacing = VRLayoutUtils.calculateOptimalShelfSpacing(this.maxShelvesPerRow)
+            const startX = -(this.maxShelvesPerRow - 1) * shelfSpacing / 2
+            const rowZ = VRLayoutUtils.calculateOptimalRowPosition(row)
+            
+            const position = new THREE.Vector3(
+                startX + (shelfInRow * shelfSpacing),
+                0,
+                rowZ
+            )
+            
+            this.shelfPositions.push(position)
+        }
+        
+        this.calculateShelfBoundsAndLayout(totalShelves)
+    }
+    
+    private calculateShelfBoundsAndLayout(totalShelves: number): void {
+        const shelfWidth = 2.0
+        const shelfDepth = 1.0
+        
+        for (const position of this.shelfPositions) {
+            this.shelfBounds.minX = Math.min(this.shelfBounds.minX, position.x - shelfWidth / 2)
+            this.shelfBounds.maxX = Math.max(this.shelfBounds.maxX, position.x + shelfWidth / 2)
+            this.shelfBounds.minZ = Math.min(this.shelfBounds.minZ, position.z - shelfDepth / 2)
+            this.shelfBounds.maxZ = Math.max(this.shelfBounds.maxZ, position.z + shelfDepth / 2)
+        }
+        
+        this.shelfLayout.rows = Math.ceil(totalShelves / this.maxShelvesPerRow)
+        this.shelfLayout.shelvesPerRow = this.maxShelvesPerRow
     }
     
     private async createShelfForBatch(games: SteamGameData[], batchIndex: number): Promise<void> {
@@ -269,33 +313,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             return
         }
         
-        // Calculate shelf position (one shelf per batch)
-        const maxShelvesPerRow = 4
-        const row = Math.floor(batchIndex / maxShelvesPerRow)
-        const shelfInRow = batchIndex % maxShelvesPerRow
-        
-        // VR-optimized spacing calculations
-        const shelfSpacing = VRLayoutUtils.calculateOptimalShelfSpacing(maxShelvesPerRow)
-        const startX = -(maxShelvesPerRow - 1) * shelfSpacing / 2
-        const rowZ = VRLayoutUtils.calculateOptimalRowPosition(row)
-        
-        const shelfPosition = new THREE.Vector3(
-            startX + (shelfInRow * shelfSpacing),
-            0,
-            rowZ
-        )
-        
-        // Track shelf bounds for room sizing
-        const shelfWidth = 2.0
-        const shelfDepth = 1.0
-        this.shelfBounds.minX = Math.min(this.shelfBounds.minX, shelfPosition.x - shelfWidth / 2)
-        this.shelfBounds.maxX = Math.max(this.shelfBounds.maxX, shelfPosition.x + shelfWidth / 2)
-        this.shelfBounds.minZ = Math.min(this.shelfBounds.minZ, shelfPosition.z - shelfDepth / 2)
-        this.shelfBounds.maxZ = Math.max(this.shelfBounds.maxZ, shelfPosition.z + shelfDepth / 2)
-        
-        // Update shelf layout tracking
-        this.shelfLayout.rows = Math.max(this.shelfLayout.rows, row + 1)
-        this.shelfLayout.shelvesPerRow = maxShelvesPerRow
+        const shelfPosition = this.shelfPositions[batchIndex]
         
         EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
             step: 'shelves',
@@ -304,8 +322,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             detail: `Creating shelf ${batchIndex + 1}/${this.totalExpectedBatches}`
         })
         
-        // Create the shelf (fire-and-forget - game boxes spawn async in worker)
-        this.createInstancedShelf(shelfPosition, games, row, shelfInRow)
+        this.createInstancedShelf(shelfPosition, games, Math.floor(batchIndex / this.maxShelvesPerRow), batchIndex % this.maxShelvesPerRow)
         this.cumulativeShelfCount++
     }
     
