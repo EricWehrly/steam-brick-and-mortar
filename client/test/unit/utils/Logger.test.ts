@@ -248,6 +248,7 @@ describe('Logger', () => {
 
             expect(consoleSpy.log).toHaveBeenCalledWith(
                 expect.stringContaining('[MyComponent]'),
+                'INFO',
                 'Test message'
             )
         })
@@ -258,9 +259,9 @@ describe('Logger', () => {
 
             log.info('Test message')
 
-            // Timestamp format: HH:mm:ss.sss
             expect(consoleSpy.log).toHaveBeenCalledWith(
-                expect.stringMatching(/\d{2}:\d{2}:\d{2}\.\d{3}/),
+                expect.stringMatching(/\d{2}:\d{2}:\d{2}\.\d{3} \[TestClass\]/),
+                'INFO',
                 'Test message'
             )
         })
@@ -274,6 +275,7 @@ describe('Logger', () => {
 
             expect(consoleSpy.log).toHaveBeenCalledWith(
                 expect.any(String),
+                'INFO',
                 'Test message',
                 testObj
             )
@@ -358,6 +360,7 @@ describe('Logger', () => {
 
             expect(consoleSpy.log).toHaveBeenCalledWith(
                 expect.stringContaining('[MyComponent]'),
+                'INFO',
                 'test message'
             )
         })
@@ -383,6 +386,7 @@ describe('Logger', () => {
 
             expect(consoleSpy.log).toHaveBeenCalledWith(
                 expect.stringContaining('[TestClass]'),
+                'INFO',
                 'message with object',
                 obj,
                 42,
