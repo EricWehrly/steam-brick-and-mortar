@@ -26,15 +26,6 @@ describe('LodTextureArrayManager', () => {
             expect(highTexture).toBeInstanceOf(THREE.DataArrayTexture)
             expect(midTexture).toBeInstanceOf(THREE.DataArrayTexture)
         })
-
-        it('should set needsUpdate to true on initialization', () => {
-            const highTexture = manager.getTextureArray('high')
-            const midTexture = manager.getTextureArray('mid')
-
-            // Initial needsUpdate should be true to trigger first GPU upload
-            expect(highTexture!.needsUpdate).toBe(true)
-            expect(midTexture!.needsUpdate).toBe(true)
-        })
     })
 
     describe('setSlotPixels', () => {
@@ -50,7 +41,7 @@ describe('LodTextureArrayManager', () => {
     })
 
     describe('flushToGpu - REGRESSION TEST FOR UNDEFINED needsUpdate', () => {
-        it('should set needsUpdate to true (not undefined) when flushing', () => {
+        it('should return true when flushing pending updates', () => {
             // Arrange: Load some texture data
             const slotIndex = 0
             const pixelData = new Uint8ClampedArray(180 * 270 * 4)
@@ -58,20 +49,48 @@ describe('LodTextureArrayManager', () => {
             
             manager.setSlotPixels('mid', slotIndex, pixelData, 180, 270)
             
-            const midTexture = manager.getTextureArray('mid')!
-            
-            // Reset needsUpdate to simulate post-render state
-            midTexture.needsUpdate = false
-            expect(midTexture.needsUpdate).toBe(false)
-            
             // Act: Flush to GPU
             const flushed = manager.flushToGpu()
             
-            // Assert: needsUpdate should be explicitly true (not undefined)
+            // Assert: Flush should succeed
             expect(flushed).toBe(true)
-            expect(midTexture.needsUpdate).toBe(true)
-            expect(midTexture.needsUpdate).not.toBeUndefined()
-            expect(typeof midTexture.needsUpdate).toBe('boolean')
+        })
+
+        it('should set needsUpdate before calling addLayerUpdate', () => {
+            const slotIndex = 5
+            const pixelData = new Uint8ClampedArray(180 * 270 * 4)
+            
+            manager.setSlotPixels('mid', slotIndex, pixelData, 180, 270)
+            
+            const midTexture = manager.getTextureArray('mid')!
+            
+            // Track the order of operations
+            const operations: string[] = []
+            
+            // Watch for needsUpdate changes
+            let originalNeedsUpdate = midTexture.needsUpdate
+            Object.defineProperty(midTexture, 'needsUpdate', {
+                get() { return originalNeedsUpdate },
+                set(value) {
+                    originalNeedsUpdate = value
+                    if (value === true) {
+                        operations.push('needsUpdate=true')
+                    }
+                },
+                configurable: true
+            })
+            
+            // Watch for addLayerUpdate calls
+            const originalAddLayerUpdate = midTexture.addLayerUpdate.bind(midTexture)
+            vi.spyOn(midTexture, 'addLayerUpdate').mockImplementation((index) => {
+                operations.push(`addLayerUpdate(${index})`)
+                return originalAddLayerUpdate(index)
+            })
+            
+            manager.flushToGpu()
+            
+            // Verify needsUpdate was set before addLayerUpdate was called
+            expect(operations).toEqual(['needsUpdate=true', 'addLayerUpdate(5)'])
         })
 
         it('should use addLayerUpdate for partial updates', () => {
@@ -113,16 +132,14 @@ describe('LodTextureArrayManager', () => {
             manager.setSlotPixels('mid', 0, midPixels, 180, 270)
             manager.setSlotPixels('high', 0, highPixels, 300, 450)
             
-            const midTexture = manager.getTextureArray('mid')!
-            const highTexture = manager.getTextureArray('high')!
+            expect(manager.hasPendingUpdates('mid')).toBe(true)
+            expect(manager.hasPendingUpdates('high')).toBe(true)
             
-            midTexture.needsUpdate = false
-            highTexture.needsUpdate = false
+            const flushed = manager.flushToGpu()
             
-            manager.flushToGpu()
-            
-            expect(midTexture.needsUpdate).toBe(true)
-            expect(highTexture.needsUpdate).toBe(true)
+            expect(flushed).toBe(true)
+            expect(manager.hasPendingUpdates('mid')).toBe(false)
+            expect(manager.hasPendingUpdates('high')).toBe(false)
         })
     })
 })

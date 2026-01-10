@@ -190,11 +190,15 @@ export class LodTextureArrayManager {
             if (tier.pendingUpdates.size > 0) {
                 LodTextureArrayManager.logger.debug(`🔄 GPU FLUSH ${tierName}: ${tier.pendingUpdates.size} layers`)
                 
+                tier.dataArrayTexture.needsUpdate = true
+                
                 // Use partial layer updates (massive GPU bandwidth savings)
                 for (const slotIndex of tier.pendingUpdates) {
                     tier.dataArrayTexture.addLayerUpdate(slotIndex)
                 }
-                tier.dataArrayTexture.needsUpdate = true
+                
+                LodTextureArrayManager.logger.debug(`🔄 ${tierName} flushed, needsUpdate=${tier.dataArrayTexture.needsUpdate}, version=${tier.dataArrayTexture.version}`)
+                
                 tier.pendingUpdates.clear()
                 anyUpdates = true
             }
