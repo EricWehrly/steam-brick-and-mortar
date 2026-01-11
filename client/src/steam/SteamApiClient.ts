@@ -281,12 +281,18 @@ export class SteamApiClient {
         
         const { cachedAppids, uncachedAppids, cachedAppDetails } = await this.partitionByCache(appids)
         
+        // Calculate total batches using per-phase rounding to match actual emission
+        // This prevents off-by-one errors when cached+uncached rounds differently than total
+        const cachedBatchCount = Math.ceil(cachedAppids.length / BATCH_SIZE)
+        const uncachedBatchCount = Math.ceil(uncachedAppids.length / BATCH_SIZE)
+        const totalBatchCount = cachedBatchCount + uncachedBatchCount
+        
         // PHASE 1: Emit cached games immediately (cache-first for fast startup)
         let results: SteamGame[] = []
         if (cachedAppids.length > 0) {
             const cachedGames = await this.emitCachedGameBatches(
                 sortedGames, cachedAppids, cachedAppDetails,
-                appids.length, BATCH_SIZE
+                totalBatchCount, BATCH_SIZE
             )
             results = cachedGames
         }
@@ -294,7 +300,7 @@ export class SteamApiClient {
         // PHASE 2: Fetch uncached games in background (emit when ready)
         if (uncachedAppids.length > 0) {
             await this.fetchUncachedGamesInBackground(
-                sortedGames, uncachedAppids, cachedAppids.length, BATCH_SIZE
+                sortedGames, uncachedAppids, cachedAppids.length, totalBatchCount, BATCH_SIZE
             )
         }
         
@@ -330,7 +336,7 @@ export class SteamApiClient {
         sortedGames: SteamGame[],
         cachedAppids: number[],
         cachedAppDetails: Map<number, AppDetailsData>,
-        totalAppids: number,
+        totalBatchCount: number,
         BATCH_SIZE: number
     ): Promise<SteamGame[]> {
         const phaseStartTime = performance.now()
@@ -354,7 +360,6 @@ export class SteamApiClient {
         
         // Emit cached games in batches with yielding
         const cachedBatches = Math.ceil(cachedEnhanced.length / BATCH_SIZE)
-        const totalEstimatedBatches = Math.ceil(sortedGames.length / BATCH_SIZE)
         const batchStartTime = performance.now()
         let mainThreadTime = 0
         
@@ -366,7 +371,7 @@ export class SteamApiClient {
             EventManager.getInstance().emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
                 games: batchGames as ReadonlyArray<Readonly<SteamGame>>,
                 batchIndex: i,
-                totalBatches: totalEstimatedBatches
+                totalBatches: totalBatchCount
             })
             mainThreadTime += performance.now() - batchIterStart
             
@@ -388,7 +393,7 @@ export class SteamApiClient {
         
         EventManager.getInstance().emit<SteamNetworkFetchProgressEvent>(SteamEventTypes.NetworkFetchProgress, {
             fetched: cachedAppids.length,
-            total: totalAppids
+            total: sortedGames.length
         })
         
         return cachedEnhanced
@@ -398,10 +403,11 @@ export class SteamApiClient {
         sortedGames: SteamGame[],
         uncachedAppids: number[],
         cachedAppidsCount: number,
+        totalBatchCount: number,
         BATCH_SIZE: number
     ): Promise<void> {
         // Fetch metadata in background and emit events when ready
-        this.fetchMetadataBackground(uncachedAppids, sortedGames, cachedAppidsCount, BATCH_SIZE)
+        this.fetchMetadataBackground(uncachedAppids, sortedGames, cachedAppidsCount, totalBatchCount, BATCH_SIZE)
             .catch(error => {
                 SteamApiClient.logger.error('Background metadata fetch failed:', error)
             })
@@ -411,6 +417,7 @@ export class SteamApiClient {
         uncachedAppids: number[],
         sortedGames: SteamGame[],
         cachedAppidsCount: number,
+        totalBatchCount: number,
         BATCH_SIZE: number
     ): Promise<void> {
         const fetchPhaseStart = performance.now()
@@ -448,7 +455,6 @@ export class SteamApiClient {
             // Emit uncached games in batches (now that they have metadata)
             const uncachedBatches = Math.ceil(uncachedEnhanced.length / BATCH_SIZE)
             const startBatchIndex = Math.ceil(cachedAppidsCount / BATCH_SIZE)
-            const totalBatches = startBatchIndex + uncachedBatches
             
             for (let i = 0; i < uncachedBatches; i++) {
                 const batchGames = uncachedEnhanced.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
@@ -456,7 +462,7 @@ export class SteamApiClient {
                 EventManager.getInstance().emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
                     games: batchGames as ReadonlyArray<Readonly<SteamGame>>,
                     batchIndex: startBatchIndex + i,
-                    totalBatches
+                    totalBatches: totalBatchCount
                 })
                 
                 // Yield to main thread between batches

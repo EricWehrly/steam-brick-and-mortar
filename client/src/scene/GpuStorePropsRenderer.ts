@@ -210,6 +210,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Emit GPU update after each batch
         EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
         
+        console.log(`📊 Batches received: ${this.batchesReceived}/${this.totalExpectedBatches}`)
         if (this.batchesReceived === this.totalExpectedBatches) {
             const totalLoadTime = performance.now() - this.progressiveLoadStartTime
             const avgMainThreadTime = this.totalMainThreadTime / this.batchTimings.length
@@ -252,13 +253,22 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.gameBoxRenderer = new GpuGameBoxRenderer(estimatedGames + 100)
         
         if (this.instancedShelfRenderer && !this.instancedShelfRenderer.isReady()) {
+            console.warn('⏳ Waiting for InstancedShelfRenderer to be ready...')
             const waitStart = Date.now()
+            let attempts = 0
             while (!this.instancedShelfRenderer.isReady()) {
                 await new Promise(resolve => setTimeout(resolve, 50))
+                attempts++
+                if (attempts % 20 === 0) { // Log every second
+                    console.warn(`⏳ Still waiting for renderer... (${attempts * 50}ms)`)
+                }
                 if (Date.now() - waitStart > 10000) {
                     console.error('❌ Shelf renderer init timeout after 10s')
                     break
                 }
+            }
+            if (this.instancedShelfRenderer.isReady()) {
+                console.log(`✅ Renderer ready after ${Date.now() - waitStart}ms`)
             }
         }
         
@@ -308,12 +318,34 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private async createShelfForBatch(games: SteamGameData[], batchIndex: number): Promise<void> {
-        if (!this.instancedShelfRenderer?.isReady()) {
-            console.error('❌ InstancedShelfRenderer not ready')
+        const isReady = this.instancedShelfRenderer?.isReady()
+        if (!isReady) {
+            console.error(`❌ InstancedShelfRenderer not ready for batch ${batchIndex + 1}!`)
+            console.error('   Renderer state:', {
+                exists: !!this.instancedShelfRenderer,
+                isReady: isReady,
+                stats: this.instancedShelfRenderer?.getStats()
+            })
             return
         }
         
+        // Expand shelf positions array if batch index exceeds current allocation
+        // This handles dynamic batch count increases from background fetches
+        if (batchIndex >= this.shelfPositions.length) {
+            const oldLength = this.shelfPositions.length
+            console.warn(`⚠️ BATCH COUNT MISMATCH: Received batch ${batchIndex + 1} but only allocated ${oldLength} positions. Expanding array...`)
+            console.warn(`   This indicates totalBatches estimate was incorrect. Expected: ${this.totalExpectedBatches}, Actual: >${batchIndex + 1}`)
+            this.preallocateShelfPositions(batchIndex + 1)
+        }
+        
         const shelfPosition = this.shelfPositions[batchIndex]
+        
+        // Defensive check: ensure position was allocated
+        if (!shelfPosition) {
+            console.error(`❌ CRITICAL: Shelf position ${batchIndex} is undefined even after allocation check!`)
+            console.error(`   Array length: ${this.shelfPositions.length}, Index: ${batchIndex}`)
+            return
+        }
         
         EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
             step: 'shelves',
