@@ -45,6 +45,10 @@ export class SteamUIPanel {
   }
   
   private setupEventListeners(): void {
+    // Hide panel when profile loading starts (from UI or auto-load)
+    this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, () => this.hide())
+    this.eventManager.registerEventHandler(SteamEventTypes.LoadFromCache, () => this.hide())
+    
     // Load Games button
     if (this.loadGamesButton) {
       this.loadGamesButton.addEventListener('click', () => {
