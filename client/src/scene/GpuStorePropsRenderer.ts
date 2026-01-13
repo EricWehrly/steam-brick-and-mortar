@@ -30,6 +30,21 @@ import type { SteamGame } from '../steam'
 import { Logger } from '../utils/Logger'
 import { PerformanceTimer } from '../utils/PerformanceTimer'
 
+interface BatchState {
+    received: number
+    expectedTotal: number
+    games: SteamGameData[]
+    isFirstBatch: boolean
+    queue: SteamGamesBatchEvent[]
+    isProcessing: boolean
+}
+
+interface TimingState {
+    batches: Array<{ batchIndex: number; duration: number; mainThreadTime: number }>
+    loadStart: number
+    totalMainThread: number
+}
+
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private static readonly logger = Logger.createLogFunctions(GpuStorePropsRenderer.name)
     
@@ -62,25 +77,20 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private shelfPositions: THREE.Vector3[] = []
     private readonly maxShelvesPerRow: number = 4
     
-    // Track progressive batch state
-    private batchesReceived: number = 0
-    private totalExpectedBatches: number = 0
-    private allBatchGames: SteamGameData[] = []
-    private isFirstBatch: boolean = true
-    
-    // Track whether progressive loading completed for this load cycle
-    // This flag prevents DataLoaded from triggering duplicate generation after AllBatchesComplete
-    // It stays true until explicitly cleared by the next load request
     private progressiveLoadingCompleted: boolean = false
-    
-    // Batch queue for serialized processing (prevents race conditions)
-    private batchQueue: SteamGamesBatchEvent[] = []
-    private isProcessingBatch: boolean = false
-    
-    // Timing tracking for debug logging
-    private batchTimings: { batchIndex: number; duration: number; mainThreadTime: number }[] = []
-    private progressiveLoadStartTime: number = 0
-    private totalMainThreadTime: number = 0
+    private batchState: BatchState = {
+        received: 0,
+        expectedTotal: 0,
+        games: [],
+        isFirstBatch: true,
+        queue: [],
+        isProcessing: false
+    }
+    private timingState: TimingState = {
+        batches: [],
+        loadStart: 0,
+        totalMainThread: 0
+    }
 
     constructor(scene: THREE.Scene, dataManager: DataManager) {
         this.scene = scene
@@ -131,62 +141,48 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         );
     }
     
-    /**
-     * Handle incoming batch of games - queues for serialized processing
-     * Events may arrive faster than we can process, so we queue them and process one at a time
-     */
     private handleGamesBatch(event: CustomEvent<SteamGamesBatchEvent>): void {
-        // Add to queue
-        this.batchQueue.push(event.detail)
+        this.batchState.queue.push(event.detail)
         
-        // Start processing if not already processing
-        if (!this.isProcessingBatch) {
+        if (!this.batchState.isProcessing) {
             this.processBatchQueue()
         }
     }
     
-    /**
-     * Process batches from queue one at a time (serialized)
-     */
     private async processBatchQueue(): Promise<void> {
-        if (this.isProcessingBatch || this.batchQueue.length === 0) return
+        if (this.batchState.isProcessing || this.batchState.queue.length === 0) return
         
-        this.isProcessingBatch = true
+        this.batchState.isProcessing = true
         
-        while (this.batchQueue.length > 0) {
-            this.batchQueue.sort((a, b) => a.batchIndex - b.batchIndex)
-            const batch = this.batchQueue.shift()
+        while (this.batchState.queue.length > 0) {
+            this.batchState.queue.sort((a, b) => a.batchIndex - b.batchIndex)
+            const batch = this.batchState.queue.shift()
             if (!batch) break
             
             await this.processOneBatch(batch)
         }
         
-        this.isProcessingBatch = false
+        this.batchState.isProcessing = false
     }
     
-    /**
-     * Process a single batch of games
-     */
     private async processOneBatch(batchEvent: SteamGamesBatchEvent): Promise<void> {
         const batchTimer = PerformanceTimer.start('Batch processing', GpuStorePropsRenderer.logger)
         const { games, batchIndex, totalBatches } = batchEvent
         
         const mainThreadTimer = PerformanceTimer.start('Main thread work', GpuStorePropsRenderer.logger)
         const batchGames = games.map(g => this.steamGameToGameData(g))
-        this.allBatchGames.push(...batchGames)
-        this.batchesReceived++
-        this.totalExpectedBatches = totalBatches
+        this.batchState.games.push(...batchGames)
+        this.batchState.received++
+        this.batchState.expectedTotal = totalBatches
         
-        // First batch: initialize renderers
-        if (this.isFirstBatch) {
-            this.isFirstBatch = false
-            this.progressiveLoadStartTime = performance.now()
+        if (this.batchState.isFirstBatch) {
+            this.batchState.isFirstBatch = false
+            this.timingState.loadStart = Date.now()
             const initTimer = PerformanceTimer.start('Renderer initialization', GpuStorePropsRenderer.logger)
             await this.initializeForProgressiveLoading(totalBatches)
             initTimer.end({}, { threshold: 100, context: 'ASYNC' })
         }
         
-        // Tell multi-atlas renderer which batch we're processing (for tier assignment)
         this.gameBoxRenderer?.setBatchIndex(batchIndex)
         
         const shelfTimer = PerformanceTimer.start('Shelf creation', GpuStorePropsRenderer.logger)
@@ -195,8 +191,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         const batchDuration = batchTimer.getElapsed()
         const mainThreadTime = mainThreadTimer.getElapsed()
-        this.batchTimings.push({ batchIndex, duration: batchDuration, mainThreadTime })
-        this.totalMainThreadTime += mainThreadTime
+        this.timingState.batches.push({ batchIndex, duration: batchDuration, mainThreadTime })
+        this.timingState.totalMainThread += mainThreadTime
         
         mainThreadTimer.end({ 
             batch: `${batchIndex + 1}/${totalBatches}`,
@@ -204,32 +200,24 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             shelfCreation: shelfCreationTime
         }, { threshold: 200, context: 'MAIN THREAD', warningMessage: '⚠️ Blocking!' })
         
-        // Emit GPU update after each batch
         EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
         
-        console.log(`📊 Batches received: ${this.batchesReceived}/${this.totalExpectedBatches}`)
-        if (this.batchesReceived === this.totalExpectedBatches) {
-            const totalLoadTime = performance.now() - this.progressiveLoadStartTime
-            const avgMainThreadTime = this.totalMainThreadTime / this.batchTimings.length
-            const asyncTime = totalLoadTime - this.totalMainThreadTime
-            
-            const summaryTimer = PerformanceTimer.start('All batches summary', GpuStorePropsRenderer.logger)
-            summaryTimer.end({
-                batchCount: this.batchTimings.length,
-                mainThread: this.totalMainThreadTime,
-                async: asyncTime,
-                total: totalLoadTime,
-                avgPerBatch: avgMainThreadTime
-            }, { threshold: 500, context: 'MAIN THREAD', warningMessage: '⚠️ Consider optimization!' })
-            
-            console.debug(`📦 [COMPLETE] All ${totalBatches} batches processed, finalizing...`)
+        console.log(`📊 Batches received: ${this.batchState.received}/${this.batchState.expectedTotal}`)
+        if (this.batchState.received === this.batchState.expectedTotal) {
+            this.logBatchCompletionSummary(totalBatches)
             await this.finalizeProgressiveLoading()
         }
     }
     
-    /**
-     * Convert SteamGame to SteamGameData format
-     */
+    private logBatchCompletionSummary(totalBatches: number): void {
+        const totalLoadTime = Date.now() - this.timingState.loadStart
+        const avgMainThreadTime = this.timingState.totalMainThread / this.timingState.batches.length
+        const asyncTime = totalLoadTime - this.timingState.totalMainThread
+        
+        console.log(`📊 [BATCH SUMMARY] ${this.timingState.batches.length} batches | Main: ${this.timingState.totalMainThread.toFixed(1)}ms | Async: ${asyncTime.toFixed(1)}ms | Total: ${totalLoadTime.toFixed(1)}ms | Avg/batch: ${avgMainThreadTime.toFixed(1)}ms`)
+        console.debug(`📦 [COMPLETE] All ${totalBatches} batches processed, finalizing...`)
+    }
+    
     private steamGameToGameData(game: Readonly<SteamGame>): SteamGameData {
         return {
             appid: game.appid,
@@ -239,11 +227,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         }
     }
     
-    /**
-     * Initialize renderers for progressive loading
-     */
     private async initializeForProgressiveLoading(totalBatches: number): Promise<void> {
-        // Reset the completion flag - a new progressive load is starting
         this.progressiveLoadingCompleted = false
         
         const estimatedGames = totalBatches * 18 // BATCH_SIZE from SteamIntegration
@@ -251,31 +235,41 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = new GpuGameBoxRenderer(estimatedGames + 100)
         
-        if (this.instancedShelfRenderer && !this.instancedShelfRenderer.isReady()) {
-            console.warn('⏳ Waiting for InstancedShelfRenderer to be ready...')
-            const waitStart = Date.now()
-            let attempts = 0
-            while (!this.instancedShelfRenderer.isReady()) {
-                await new Promise(resolve => setTimeout(resolve, 50))
-                attempts++
-                if (attempts % 20 === 0) { // Log every second
-                    console.warn(`⏳ Still waiting for renderer... (${attempts * 50}ms)`)
-                }
-                if (Date.now() - waitStart > 10000) {
-                    console.error('❌ Shelf renderer init timeout after 10s')
-                    break
-                }
-            }
-            if (this.instancedShelfRenderer.isReady()) {
-                console.log(`✅ Renderer ready after ${Date.now() - waitStart}ms`)
-            }
-        }
+        await this.waitForShelfRendererReady()
         
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
         this.clearExistingShelves()
         
         this.preallocateShelfPositions(totalBatches)
+    }
+    
+    private async waitForShelfRendererReady(): Promise<void> {
+        if (!this.instancedShelfRenderer || this.instancedShelfRenderer.isReady()) {
+            return
+        }
+        
+        console.warn('⏳ Waiting for InstancedShelfRenderer to be ready...')
+        const waitStart = Date.now()
+        let attempts = 0
+        
+        while (!this.instancedShelfRenderer.isReady()) {
+            await new Promise(resolve => setTimeout(resolve, 50))
+            attempts++
+            
+            if (attempts % 20 === 0) {
+                console.warn(`⏳ Still waiting for renderer... (${attempts * 50}ms)`)
+            }
+            
+            if (Date.now() - waitStart > 10000) {
+                console.error('❌ Shelf renderer init timeout after 10s')
+                break
+            }
+        }
+        
+        if (this.instancedShelfRenderer.isReady()) {
+            console.log(`✅ Renderer ready after ${Date.now() - waitStart}ms`)
+        }
     }
     
     private preallocateShelfPositions(totalShelves: number): void {
@@ -316,6 +310,17 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.shelfLayout.shelvesPerRow = this.maxShelvesPerRow
     }
     
+    private ensureShelfPositionAllocated(batchIndex: number): void {
+        if (batchIndex < this.shelfPositions.length) {
+            return
+        }
+        
+        const oldLength = this.shelfPositions.length
+        console.warn(`⚠️ BATCH COUNT MISMATCH: Received batch ${batchIndex + 1} but only allocated ${oldLength} positions`)
+        console.warn(`   Expected: ${this.batchState.expectedTotal}, Actual: >${batchIndex + 1}. Expanding...`)
+        this.preallocateShelfPositions(batchIndex + 1)
+    }
+    
     private async createShelfForBatch(games: SteamGameData[], batchIndex: number): Promise<void> {
         const isReady = this.instancedShelfRenderer?.isReady()
         if (!isReady) {
@@ -328,29 +333,19 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             return
         }
         
-        // Expand shelf positions array if batch index exceeds current allocation
-        // This handles dynamic batch count increases from background fetches
-        if (batchIndex >= this.shelfPositions.length) {
-            const oldLength = this.shelfPositions.length
-            console.warn(`⚠️ BATCH COUNT MISMATCH: Received batch ${batchIndex + 1} but only allocated ${oldLength} positions. Expanding array...`)
-            console.warn(`   This indicates totalBatches estimate was incorrect. Expected: ${this.totalExpectedBatches}, Actual: >${batchIndex + 1}`)
-            this.preallocateShelfPositions(batchIndex + 1)
-        }
-        
+        this.ensureShelfPositionAllocated(batchIndex)
         const shelfPosition = this.shelfPositions[batchIndex]
         
-        // Defensive check: ensure position was allocated
         if (!shelfPosition) {
-            console.error(`❌ CRITICAL: Shelf position ${batchIndex} is undefined even after allocation check!`)
-            console.error(`   Array length: ${this.shelfPositions.length}, Index: ${batchIndex}`)
+            console.error(`❌ CRITICAL: Shelf position ${batchIndex} is undefined even after allocation!`)
             return
         }
         
         EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
             step: 'shelves',
             current: batchIndex + 1,
-            total: this.totalExpectedBatches,
-            detail: `Creating shelf ${batchIndex + 1}/${this.totalExpectedBatches}`
+            total: this.batchState.expectedTotal,
+            detail: `Creating shelf ${batchIndex + 1}/${this.batchState.expectedTotal}`
         })
         
         this.createInstancedShelf(shelfPosition, games, Math.floor(batchIndex / this.maxShelvesPerRow), batchIndex % this.maxShelvesPerRow)
@@ -358,10 +353,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private finalizeProgressiveLoading(): void {
-        console.debug(`✅ Progressive loading complete: ${this.allBatchGames.length} games on ${this.cumulativeShelfCount} shelves`)
+        console.debug(`✅ Progressive loading complete: ${this.batchState.games.length} games on ${this.cumulativeShelfCount} shelves`)
         
-        // Mark progressive loading as complete BEFORE emitting event
-        // This ensures subsequent DataLoaded events don't trigger duplicate generation
         this.progressiveLoadingCompleted = true
         
         EventManager.getInstance().emit<AllBatchesCompleteEvent>(GameEventTypes.AllBatchesComplete, {
@@ -371,34 +364,26 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private resetBatchState(): void {
-        this.batchesReceived = 0
-        this.totalExpectedBatches = 0
-        this.allBatchGames = []
-        this.isFirstBatch = true
-        this.batchQueue = []
-        this.isProcessingBatch = false
-        this.batchTimings = []
-        this.progressiveLoadStartTime = 0
-        this.totalMainThreadTime = 0
+        this.batchState = {
+            received: 0,
+            expectedTotal: 0,
+            games: [],
+            isFirstBatch: true,
+            queue: [],
+            isProcessing: false
+        }
+        this.timingState = {
+            batches: [],
+            loadStart: 0,
+            totalMainThread: 0
+        }
     }
     
     private async handleDataLoaded(): Promise<void> {
-        // If progressive loading already completed, this is just a final sync - skip
-        // NOTE: We use progressiveLoadingCompleted instead of batchesReceived because
-        // resetBatchState() clears batchesReceived when AllBatchesComplete fires,
-        // but DataLoaded may arrive after that due to event timing
-        if (this.progressiveLoadingCompleted) {
-            console.debug('📦 DataLoaded received after progressive loading complete - skipping duplicate generation')
+        if (this.progressiveLoadingCompleted || this.batchState.received > 0) {
             return
         }
         
-        // If we're currently receiving batches, skip duplicate generation
-        if (this.batchesReceived > 0) {
-            console.debug('📦 DataLoaded received during batch processing - skipping duplicate generation')
-            return
-        }
-        
-        // Fall back to original behavior if no batches received (legacy path)
         console.debug('📦 DataLoaded with no prior batches - using legacy generation')
         await this.generateShelvesAsync()
     }
@@ -439,10 +424,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             // Reset shelf bounds tracking
             this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
             
-            // Reset cumulative shelf count
             this.cumulativeShelfCount = 0
             
-            // Clear existing shelves first
             this.clearExistingShelves()
             
             // Create shelf rows based on needed shelves  
@@ -513,11 +496,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const enabledTests = getEnabledTests(testsSettings)
         
         if (enabledTests.length > 0 && isTestEnabled(testsSettings, TestMode.SPAWN_TEST_OBJECTS)) {
-            // Small test cube for reference
             const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
-            const material = new THREE.MeshPhongMaterial({ color: 0x0099ff }) // Blue for GPU version
+            const material = new THREE.MeshPhongMaterial({ color: 0x0099ff })
             const cube = new THREE.Mesh(geometry, material)
-            cube.position.set(2, 0, -1) // Move to side so it doesn't interfere with shelf
+            cube.position.set(2, 0, -1)
             cube.castShadow = true
             cube.name = 'test-cube-gpu'
             this.propsGroup.add(cube)
@@ -539,11 +521,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         }
     }
 
-    /**
-     * Add atmospheric props (wire racks, dividers, etc.)
-     * TODO: PropRenderer not instantiated - this method is currently non-functional
-     */
     public async addAtmosphericProps(): Promise<void> {
+        // TODO: PropRenderer not instantiated - this method is currently non-functional
         console.warn('⚠️ addAtmosphericProps not implemented - PropRenderer not instantiated')
     }
 
@@ -595,6 +574,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const startX = -(shelfCount - 1) * shelfSpacing / 2 // Center the row
         const rowZ = VRLayoutUtils.calculateOptimalRowPosition(rowIndex) // VR-friendly row positioning
         
+        const shelfWidth = 2.0
+        const shelfDepth = 1.0
+        
         for (let i = 0; i < shelfCount; i++) {
             const shelfPosition = new THREE.Vector3(
                 startX + (i * shelfSpacing),
@@ -602,21 +584,17 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 rowZ
             )
             
-            // Track shelf bounds for room sizing (approximate shelf width is ~2m)
-            const shelfWidth = 2.0
-            const shelfDepth = 1.0
             this.shelfBounds.minX = Math.min(this.shelfBounds.minX, shelfPosition.x - shelfWidth / 2)
             this.shelfBounds.maxX = Math.max(this.shelfBounds.maxX, shelfPosition.x + shelfWidth / 2)
             this.shelfBounds.minZ = Math.min(this.shelfBounds.minZ, shelfPosition.z - shelfDepth / 2)
             this.shelfBounds.maxZ = Math.max(this.shelfBounds.maxZ, shelfPosition.z + shelfDepth / 2)
             
-            // Calculate which games belong to this shelf (18 games per shelf: 3 rows × 2 sides × 3 games)
+            // Calculate which games belong to this shelf
             const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF;
             const shelfGlobalIndex = this.cumulativeShelfCount + i // Use cumulative count, not rowIndex * 4
             const startGameIndex = shelfGlobalIndex * gamesPerShelf
             const shelfGames = games.slice(startGameIndex, startGameIndex + gamesPerShelf)
             
-            // Create shelf (fire-and-forget - game box worker calls run async)
             this.createInstancedShelf(shelfPosition, shelfGames, rowIndex, i)
         }
         
@@ -637,7 +615,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             position: position
         })
         
-        // Create game boxes - fire-and-forget, worker handles async work
         if (games.length > 0) {
             this.spawnInstancedGamesOnShelf(position, games, rowIndex, shelfIndex)
         }
@@ -656,14 +633,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         for (const surface of shelfSurfaces) {
             if (gameIndex >= games.length) break
             
-            // Spawn games on front side (fire-and-forget)
             const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
             if (frontGames.length > 0) {
                 this.createInstancedGameBoxes(shelfPosition, surface, frontGames, ShelfSide.Front)
                 gameIndex += frontGames.length
             }
             
-            // Spawn games on back side (fire-and-forget)
             if (gameIndex < games.length) {
                 const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
                 if (backGames.length > 0) {
@@ -683,8 +658,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const boxDimensions = this.gameBoxRenderer?.getDimensions()
         const gamePositions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, games, side, boxDimensions)
         
-        // Fire-and-forget - worker handles these in parallel
-        // GPU update happens via InstancedBatchComplete event
         for (let i = 0; i < games.length; i++) {
             this.createSingleInstancedGameBox(games[i], gamePositions[i], side, i)
         }
@@ -704,15 +677,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     public clearProps(): void {
-        // Clear all tracked objects first
         this.clearExistingShelves()
         
-        // Remove all children from props group (test objects, etc.)
         while (this.propsGroup.children.length > 0) {
             const child = this.propsGroup.children[0]
             this.propsGroup.remove(child)
             
-            // Dispose geometry and materials
             if (child instanceof THREE.Mesh) {
                 child.geometry?.dispose()
                 if (child.material instanceof THREE.Material) {
@@ -729,7 +699,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.signageRenderer?.dispose()
         this.storeLayout?.dispose()
         
-        // Clean up instanced renderer
         this.instancedShelfRenderer?.dispose()
         
         if (this.currentStoreGroup) {
@@ -743,16 +712,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         console.info('GpuStorePropsRenderer disposed')
     }
     
-    /**
-     * Get memory stats from the game box renderer (multi-atlas only)
-     */
     public getArtworkMemoryStats() {
         return this.gameBoxRenderer?.getMemoryStats() ?? null
     }
     
-    /**
-     * Log memory stats to console
-     */
     public logMemoryStats(): void {
         this.gameBoxRenderer?.logMemoryStats()
     }

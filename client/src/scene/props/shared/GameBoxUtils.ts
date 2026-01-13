@@ -3,11 +3,11 @@ import type { SteamGameData } from '../../game-box/types/GameData'
 import type { GameBoxDimensions } from '../../game-box/types/GameBoxOptions'
 import { ShelfSide, type ShelfSurface } from './SharedPropsTypes'
 
-export class GameLayoutConstants {
-    static readonly GAMES_PER_SURFACE = 3
-    static readonly SURFACES_PER_SHELF = 6
-    static readonly GAME_SPACING = 0.55
-}
+export const GameLayoutConstants = {
+    GAMES_PER_SURFACE: 3,
+    SURFACES_PER_SHELF: 6,
+    GAME_SPACING: 0.55
+} as const
 
 /** Shelf construction constant - 6° backward tilt for stability */
 const SHELF_ANGLE_DEGREES = 6
