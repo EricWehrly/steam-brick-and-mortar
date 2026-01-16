@@ -4,9 +4,15 @@ random unsorted idea:
 - (this should actually be easy:)
   rotate shelves alternatingly to make it easier to weave between them
   Angle them at like 15 degrees, and make the opening between them 30 degrees, to make it easier to navigate in
-  Rotate every other shelf negative rather than positive?
+  (can probably do it by) Rotate every other shelf negative rather than positive
 - did we already mention somewhere we wanted the ability to add a little smoke to the atmosphere?
 - light switch with settings for "dingy", "classy", "corporate"
+- (separate) dimmer
+- additional (hidden) switches for flat / doom-style lighting
+maybe also quake 
+- potential support for user-defined css that drives colors used in scene
+- it would be cool to support movie-theater lit walkways
+- and tron-like lights along the shelf edges
 - pixellate obscuring shader
 at distance
 dynamic to attempt to maintain framerate
