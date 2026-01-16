@@ -236,7 +236,7 @@ export class SteamBrickAndMortarApp {
             // This yields to main thread so user sees something and can move immediately
             this.sceneCoordinator.startSceneSetup()
             
-            // 🚀 PRIORITY 3: Everything else happens async (non-blocking)
+            // PRIORITY 3: Everything else happens async (non-blocking)
             this.initializeNonEssentialSystemsAsync()
             
         } catch (error) {
@@ -246,42 +246,25 @@ export class SteamBrickAndMortarApp {
         }
     }
 
-    /**
-     * Initialize controls so user can move around while everything else loads
-     */
     private async initializeControls(): Promise<void> {
-        
         await this.webxrCoordinator.setupWebXR(this.sceneManager.getRenderer())
-        
     }
 
-    /**
-     * Initialize critical UI components needed for interaction
-     */
     private async initializeCriticalUI(): Promise<void> {
-        
-        // Setup UI with minimal components needed for interaction
         this.uiManager.init()
-        this.uiManager.hideLoading() // Remove loading screen immediately
+        this.uiManager.hideLoading()
         
-        
-        // Mark UI as ready (coordinators initialized)
         console.debug('🎨 Critical UI ready')
         this.prerequisites.uiReady = true
         this.checkGameStartPrerequisites()
     }
 
-    /**
-     * Initialize all non-essential systems asynchronously (doesn't block user interaction)
-     */
     private initializeNonEssentialSystemsAsync(): void {
         this.startupTracker.logAsyncStart(StartupPhase.NonEssentialSystemsStart, 'Non-essential systems initialization')
         
-        // Don't await this - let it happen in the background
         this.loadNonEssentialSystems().catch(error => {
             console.error('⚠️ Non-essential systems failed to load:', error)
             this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, `Non-essential systems error: ${error}`)
-            // Don't throw - app should still work
         })
     }
 
@@ -294,74 +277,41 @@ export class SteamBrickAndMortarApp {
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())
             this.startupTracker.phaseEnd(StartupPhase.DebugSystemsInit)
             
-            // Initialize emoji texture atlas now (deferred from startup)
-            // The handler will initialize it when first needed, but doing it now
-            // ensures any texture data is ready before user needs it
             this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, 'Emoji atlas initialization deferred to first use')
             
-            // Initialize Game Library Binder UI (nostalgic CD/DVD binder interface)
             this.gameLibraryBinder = GameLibraryBinderUI.getInstance()
             this.gameLibraryBinder.init()
             this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, 'Game Library Binder UI initialized')
             
-        // Auto-load will happen after GameStart event is emitted            
-            // Show success message once everything is fully loaded
+            // Auto-load will happen after GameStart event is emitted
             this.startupTracker.phaseStart(StartupPhase.FullyLoaded, 'Application fully loaded')
             ToastManager.success('Steam Brick and Mortar is fully loaded!', { duration: 3000 })
             this.startupTracker.phaseEnd(StartupPhase.FullyLoaded)
             
             this.startupTracker.logAsyncEnd(StartupPhase.NonEssentialSystemsStart, 'Non-essential systems loaded', asyncStartTime)
-            // Summary will be printed after Steam auto-load completes
             
         } catch (error) {
             console.error('Failed to load non-essential systems:', error)
             this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, `Load error: ${error}`)
-            // Don't throw - these are nice-to-have features
         }
     }
 
-    private async tryAutoLoadCachedUser(): Promise<void> {
-        console.debug('Attempting auto-load of cached user')
-        try {
-            // Check if auto-load is enabled in settings
-            if (!this.appSettings.getSetting('autoLoadProfile')) {
-                console.debug('Auto-load cached user is disabled in settings')
-                return
-            }
-            
-            const cachedUsers = this.steamIntegration.getCachedUsers()
-            if (cachedUsers.length > 0) {
-                const firstUser = cachedUsers[0]
-                console.debug(`Auto-loading cached user: ${firstUser.displayName} (${firstUser.vanityUrl})`)
-                
-                // Load from cache using the established workflow
-                this.steamUICoordinator.loadFromCache(firstUser.vanityUrl)
-                
-                ToastManager.info(`Auto-loaded ${firstUser.displayName} (${firstUser.gameCount} games)`, { duration: 3000 })
-            }
-        } catch (error) {
-            console.warn('Failed to auto-load cached user:', error)
-            // Don't throw - this is a nice-to-have feature
-        }
-    }    async dispose(): Promise<void> {
+    async dispose(): Promise<void> {
         if (!this.isInitialized) {
             return
         }
         
-        // Stop performance monitoring
         this.performanceMonitor.stop()
         
-        // Dispose workflow managers first
         this.webxrEventHandler.dispose()
         this.eventManager.dispose()
         
-        // Then dispose coordinators
         this.systemUICoordinator.dispose()
         this.webxrCoordinator.dispose()
         this.sceneCoordinator.dispose()
         this.sceneManager.dispose()
         
-        // Dispose and recreate the DI container for clean reinitialization
+        // Recreate DI container for clean reinitialization
         await this.container.dispose()
         this.container = ServiceRegistration.configureServices(
             new ServiceContainer(),
@@ -374,13 +324,7 @@ export class SteamBrickAndMortarApp {
         console.debug('✅ Application disposed')
     }
 
-
-
-    /**
-     * Set up event listeners for GameStart prerequisites
-     */
     private setupPrerequisiteEventListeners(): void {
-        // Listen for SceneReady event
         this.eventManager.registerEventHandler<SceneReadyEvent>(
             GameEventTypes.SceneReady,
             () => {
@@ -390,28 +334,12 @@ export class SteamBrickAndMortarApp {
             }
         )
 
-        // Listen for GameStart event to trigger auto-load
-        this.eventManager.registerEventHandler<GameStartEvent>(
-            GameEventTypes.Start,
-            async () => {
-                this.startupTracker.phaseStart(StartupPhase.SteamAutoLoad, 'Attempting Steam auto-load')
-                this.startupTracker.milestone(StartupPhase.SteamAutoLoad, 'Loading game library')
-                await this.tryAutoLoadCachedUser()
-                this.startupTracker.phaseEnd(StartupPhase.SteamAutoLoad)
-                
-                // Now that everything is truly loaded, print summary and complete UI
-                this.startupTracker.printSummary()
-            }
-        )
+        // GameStart event triggers auto-load via SteamIntegration
     }
 
-    /**
-     * Check if all prerequisites are met and emit GameStart if so
-     */
     private checkGameStartPrerequisites(): void {
-        // Idempotency guard - exit early if already emitted
         if (this.gameStartEmitted) {
-            console.debug('✅ GameStart already emitted - maintaining idempotency')
+            console.debug('✅ GameStart already emitted')
             return
         }
 
@@ -423,7 +351,6 @@ export class SteamBrickAndMortarApp {
             uiReady
         })
 
-        
         if (sceneReady && renderLoopReady && uiReady) {
             this.emitGameStartEvent()
             this.gameStartEmitted = true
@@ -456,6 +383,7 @@ export class SteamBrickAndMortarApp {
 
         // Initialize render loop diagnostics if enabled via URL param (?diagnostics=1)
         // This MUST happen before startRenderLoop() - decision is made once, zero per-frame overhead when disabled
+        // TODO: set appsettings from url, have diagnostics class set up at this phase?
         const urlParams = new URLSearchParams(window.location.search)
         const diagnosticsEnabled = urlParams.get('diagnostics') === '1'
         RenderLoopDiagnostics.initialize({ 
