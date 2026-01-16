@@ -55,6 +55,7 @@ export const Setting = {
     VerboseLogging: 'verboseLogging',
     ShowDebugInfo: 'showDebugInfo',
     ShowCompassRose: 'showCompassRose',
+    EnableBlockingTracker: 'enableBlockingTracker',
     // General
     AutoSave: 'autoSave',
     // Steam
@@ -115,6 +116,7 @@ export interface ApplicationSettings {
     verboseLogging: boolean
     showDebugInfo: boolean
     showCompassRose: boolean
+    enableBlockingTracker: boolean // Track main thread blocking operations
     
     // General Settings
     autoSave: boolean
@@ -387,9 +389,10 @@ export class AppSettings {
             showLightingDebug: false,
             showCeiling: true,
             
-            // Feature Flags - disabled in dev mode for faster startup measurement
-            enableLabels: !isDev,
-            enableStickers: !isDev,
+            // TODO: Review these for removed / unused settings
+            // Feature Flags
+            enableLabels: true, // Text fallback for failed artwork - keep enabled
+            enableStickers: !isDev, // GPU intensive - disable in dev for faster startup
             enableArtwork: true, // Always on - this is the core feature
             useMultiAtlas: false, // Use 3-tier atlas for better VRAM efficiency
             useLodAtlas: true, // Use LOD atlas with switchable detail levels (experimental)
@@ -410,6 +413,7 @@ export class AppSettings {
             verboseLogging: false,
             showDebugInfo: false,
             showCompassRose: false,
+            enableBlockingTracker: isDev, // Enable in dev mode by default
             
             // General Settings
             autoSave: true,
