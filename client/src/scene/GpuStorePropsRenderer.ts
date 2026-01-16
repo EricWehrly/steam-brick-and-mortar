@@ -160,6 +160,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             if (!batch) break
             
             await this.processOneBatch(batch)
+            
+            // Yield to event loop between batches to prevent blocking
+            await new Promise(resolve => setTimeout(resolve, 0))
         }
         
         this.batchState.isProcessing = false
