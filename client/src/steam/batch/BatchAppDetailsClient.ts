@@ -65,7 +65,7 @@ export interface BatchAppDetailsResult {
 }
 
 import { Logger } from '../../utils/Logger'
-import { PerformanceTimer } from '../../utils/PerformanceTimer'
+import { PerformanceMonitor, ASYNC_CONTEXT } from '../../utils/PerformanceMonitor'
 
 export class BatchAppDetailsClient {
     private static readonly logger = Logger.createLogFunctions(BatchAppDetailsClient.name)
@@ -102,7 +102,7 @@ export class BatchAppDetailsClient {
             batches.push(appids.slice(i, i + batchSize));
         }
 
-        const overallTimer = PerformanceTimer.start('Network fetch', BatchAppDetailsClient.logger)
+        const overallMonitor = PerformanceMonitor.start('network-fetch', BatchAppDetailsClient.logger, ASYNC_CONTEXT)
         if (batches.length > 0) {
             BatchAppDetailsClient.logger.info(`[ASYNC] Fetching ${appids.length} uncached games from Steam API (${batches.length} network ${batches.length === 1 ? 'batch' : 'batches'})...`)
         }
@@ -122,7 +122,7 @@ export class BatchAppDetailsClient {
             }
             
             const batch = batches[batchIndex];
-            const batchTimer = PerformanceTimer.start('Network batch', BatchAppDetailsClient.logger)
+            const batchMonitor = PerformanceMonitor.start('network-batch', BatchAppDetailsClient.logger, ASYNC_CONTEXT)
             
             BatchAppDetailsClient.logger.info(`[ASYNC] Starting network batch ${batchIndex + 1}/${batches.length}: Requesting ${batch.length} games from Steam API...`);
             
@@ -135,7 +135,7 @@ export class BatchAppDetailsClient {
             
             try {
                 const batchResult = await this.fetchSingleBatch(batch);
-                lastBatchDuration = batchTimer.getElapsed();
+                lastBatchDuration = batchMonitor.getElapsed();
                 
                 // Process successful results
                 for (const game of batchResult.results) {
@@ -144,11 +144,11 @@ export class BatchAppDetailsClient {
                 }
 
                 totalFetched += batchResult.total_successful;
-                batchTimer.end({
+                batchMonitor.end({
                     batch: `${batchIndex + 1}/${batches.length}`,
                     successful: `${batchResult.total_successful}/${batch.length}`,
                     total: `${totalFetched}/${appids.length}`
-                }, { context: 'ASYNC', level: 'info' });
+                });
                 onProgress?.(totalFetched, appids.length);
 
                 // Emit progress event for UI
@@ -194,7 +194,7 @@ export class BatchAppDetailsClient {
             }
         }
 
-        overallTimer.end({ count: `${results.size}/${appids.length}` }, { context: 'ASYNC', level: 'info' });
+        overallMonitor.end({ count: `${results.size}/${appids.length}` });
         if (results.size < appids.length) {
             BatchAppDetailsClient.logger.warn(`${appids.length - results.size} games failed to fetch`);
         }

@@ -5,6 +5,8 @@ import { RoomEventTypes, type RoomResizedEvent, CeilingEventTypes, type CeilingT
 import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
+import { PerformanceMonitor } from '../utils/PerformanceMonitor'
+import { Logger } from '../utils/Logger'
 
 export class RoomConstants {
     static readonly GAMES_PER_SURFACE = 3
@@ -37,6 +39,7 @@ export class RoomManager {
     private scene: THREE.Scene
     private materialManager: SharedMaterialManager
     private eventManager: EventManager
+    private logger = Logger.createLogFunctions('RoomManager')
     
     // Resize state: if room is building, this is the target; otherwise resize immediately
     private targetDimensions: RoomDimensions | null = null
@@ -100,10 +103,13 @@ export class RoomManager {
     }
 
     private async onAllBatchesComplete(event: CustomEvent<AllBatchesCompleteEvent>): Promise<void> {
+        const perf = PerformanceMonitor.start('room-resize-calculation', this.logger)
+        
         const { shelfBounds, shelfLayout } = event.detail
         
         // Validate shelf bounds exist
         if (shelfBounds.minX === Infinity) {
+            perf.end()
             console.debug('🏠 AllBatchesComplete received with no shelf bounds - skipping resize')
             return
         }
@@ -119,6 +125,8 @@ export class RoomManager {
         
         console.debug(`📐 Shelf bounds: X[${shelfBounds.minX.toFixed(1)}, ${shelfBounds.maxX.toFixed(1)}], Z[${shelfBounds.minZ.toFixed(1)}, ${shelfBounds.maxZ.toFixed(1)}]`)
         console.debug(`🏠 Calculated room: ${roomWidth.toFixed(1)}x${roomDepth.toFixed(1)}x${roomHeight.toFixed(1)}, center Z: ${roomCenterZ.toFixed(1)}`)
+        
+        perf.end({ rows: shelfLayout.rows, shelvesPerRow: shelfLayout.shelvesPerRow })
         
         if (this.isBuilding) {
             this.targetDimensions = dimensions

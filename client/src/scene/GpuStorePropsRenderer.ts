@@ -28,7 +28,7 @@ import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import type { SteamGame } from '../steam'
 import { Logger } from '../utils/Logger'
-import { PerformanceTimer } from '../utils/PerformanceTimer'
+import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 
 interface BatchState {
     received: number
@@ -166,11 +166,14 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private async processOneBatch(batchEvent: SteamGamesBatchEvent): Promise<void> {
-        const batchTimer = PerformanceTimer.start('Batch processing', GpuStorePropsRenderer.logger)
         const { games, batchIndex, totalBatches } = batchEvent
         
-        const mainThreadTimer = PerformanceTimer.start('Main thread work', GpuStorePropsRenderer.logger)
+        const batchMonitor = PerformanceMonitor.start('batch-process', GpuStorePropsRenderer.logger, {
+            metadata: { batchIndex, gameCount: games.length }
+        })
+        
         const batchGames = games.map(g => this.steamGameToGameData(g))
+        
         this.batchState.games.push(...batchGames)
         this.batchState.received++
         this.batchState.expectedTotal = totalBatches
@@ -178,27 +181,28 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         if (this.batchState.isFirstBatch) {
             this.batchState.isFirstBatch = false
             this.timingState.loadStart = Date.now()
-            const initTimer = PerformanceTimer.start('Renderer initialization', GpuStorePropsRenderer.logger)
+            
+            const initMonitor = PerformanceMonitor.start('renderer-initialization', GpuStorePropsRenderer.logger, ASYNC_CONTEXT)
             await this.initializeForProgressiveLoading(totalBatches)
-            initTimer.end({}, { threshold: 100, context: 'ASYNC' })
+            initMonitor.end({ totalBatches })
         }
         
         this.gameBoxRenderer?.setBatchIndex(batchIndex)
         
-        const shelfTimer = PerformanceTimer.start('Shelf creation', GpuStorePropsRenderer.logger)
+        const shelfMonitor = PerformanceMonitor.start('shelf-creation', GpuStorePropsRenderer.logger)
         await this.createShelfForBatch(batchGames, batchIndex)
-        const shelfCreationTime = shelfTimer.getElapsed()
+        const shelfCreationTime = shelfMonitor.getElapsed()
+        shelfMonitor.end({ batchIndex })
         
-        const batchDuration = batchTimer.getElapsed()
-        const mainThreadTime = mainThreadTimer.getElapsed()
-        this.timingState.batches.push({ batchIndex, duration: batchDuration, mainThreadTime })
-        this.timingState.totalMainThread += mainThreadTime
+        const batchDuration = batchMonitor.getElapsed()
+        this.timingState.batches.push({ batchIndex, duration: batchDuration, mainThreadTime: batchDuration })
+        this.timingState.totalMainThread += batchDuration
         
-        mainThreadTimer.end({ 
+        batchMonitor.end({ 
             batch: `${batchIndex + 1}/${totalBatches}`,
             gameCount: batchGames.length,
             shelfCreation: shelfCreationTime
-        }, { threshold: 200, context: 'MAIN THREAD', warningMessage: '⚠️ Blocking!' })
+        })
         
         EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
         

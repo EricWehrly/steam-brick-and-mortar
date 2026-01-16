@@ -7,7 +7,7 @@ import { CacheManager } from './cache/SimpleCacheManager'
 import { RateLimiter } from './rate-limit/RateLimiter'
 import { BatchAppDetailsClient } from './batch/BatchAppDetailsClient'
 import { Logger } from '../utils/Logger'
-import { PerformanceTimer } from '../utils/PerformanceTimer'
+import { PerformanceMonitor, ASYNC_CONTEXT, MAIN_THREAD_CONTEXT } from '../utils/PerformanceMonitor'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import type { AppDetailsData } from './batch/BatchAppDetailsClient'
 import type { SteamGameMetadata } from './types/SteamMetadata'
@@ -340,7 +340,7 @@ export class SteamApiClient {
         totalBatchCount: number,
         BATCH_SIZE: number
     ): Promise<SteamGame[]> {
-        const buildTimer = PerformanceTimer.start('Built cached games', SteamApiClient.logger)
+        const buildMonitor = PerformanceMonitor.start('build-cached-games', SteamApiClient.logger, MAIN_THREAD_CONTEXT)
         const cachedGames = sortedGames.filter(g => cachedAppids.includes(g.appid))
         const cachedEnhanced: SteamGame[] = []
         
@@ -351,15 +351,13 @@ export class SteamApiClient {
             cachedEnhanced.push(enhancedGame)
         }
         
-        buildTimer.end({ count: cachedEnhanced.length }, { threshold: 100, context: 'MAIN THREAD' })
+        buildMonitor.end({ count: cachedEnhanced.length })
         
         // Emit cached games in batches with yielding
         const cachedBatches = Math.ceil(cachedEnhanced.length / BATCH_SIZE)
-        const batchEmitTimer = PerformanceTimer.start('Cached batch emission', SteamApiClient.logger)
-        const mainThreadTimer = PerformanceTimer.start('Main thread work', SteamApiClient.logger)
+        const batchEmitMonitor = PerformanceMonitor.start('cached-batch-emission', SteamApiClient.logger)
         
         for (let i = 0; i < cachedBatches; i++) {
-            const iterTimer = mainThreadTimer.startChild('Batch iteration')
             const batchGames = cachedEnhanced.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
             const isLastCachedBatch = i === cachedBatches - 1
             
@@ -368,7 +366,6 @@ export class SteamApiClient {
                 batchIndex: i,
                 totalBatches: totalBatchCount
             })
-            iterTimer.end()
             
             // Yield to main thread between batches
             if (!isLastCachedBatch) {
@@ -376,16 +373,8 @@ export class SteamApiClient {
             }
         }
         
-        const mainThreadTime = mainThreadTimer.getElapsed()
-        const batchEmitTime = batchEmitTimer.getElapsed()
-        const asyncTime = batchEmitTime - mainThreadTime
+        batchEmitMonitor.end({ batches: cachedBatches })
         SteamApiClient.logger.info(`Emitted ${cachedEnhanced.length} cached games in ${cachedBatches} batches`)
-        batchEmitTimer.end({ 
-            mainThread: mainThreadTime, 
-            async: asyncTime, 
-            total: batchEmitTime, 
-            avgPerBatch: mainThreadTime / cachedBatches 
-        }, { threshold: 500, context: 'MAIN THREAD' })
         
         EventManager.getInstance().emit<SteamNetworkFetchProgressEvent>(SteamEventTypes.NetworkFetchProgress, {
             fetched: cachedAppids.length,
@@ -416,14 +405,14 @@ export class SteamApiClient {
         totalBatchCount: number,
         BATCH_SIZE: number
     ): Promise<void> {
-        const fetchTimer = PerformanceTimer.start('Background metadata fetch', SteamApiClient.logger)
+        const fetchMonitor = PerformanceMonitor.start('background-metadata-fetch', SteamApiClient.logger, ASYNC_CONTEXT)
         SteamApiClient.logger.debug(`[ASYNC] Starting background metadata fetch for ${uncachedAppids.length} games`)
         
         try {
             const batchResponses = await this.batchClient.fetchBatch(uncachedAppids, {
                 batchSize: 100
             })
-            fetchTimer.end({ count: uncachedAppids.length }, { context: 'ASYNC', level: 'info' })
+            fetchMonitor.end({ count: uncachedAppids.length })
             
             // Normalize and cache fetched metadata
             const fetchedAppDetails = new Map<number, AppDetailsData>()
@@ -431,10 +420,10 @@ export class SteamApiClient {
                 fetchedAppDetails.set(appid, this.normalizeBatchData(response.data))
             }
             
-            const cacheTimer = PerformanceTimer.start('Cached metadata', SteamApiClient.logger)
+            const cacheMonitor = PerformanceMonitor.start('cache-metadata', SteamApiClient.logger, ASYNC_CONTEXT)
             if (fetchedAppDetails.size > 0) {
                 await this.appDetailsCache.setMany(fetchedAppDetails)
-                cacheTimer.end({ count: fetchedAppDetails.size }, { context: 'ASYNC' })
+                cacheMonitor.end({ count: fetchedAppDetails.size })
             }
             
             // Build enhanced games with fetched metadata
