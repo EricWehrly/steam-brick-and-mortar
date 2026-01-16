@@ -37,6 +37,7 @@ interface RoomResizeEventData {
 
 export class RoomManager {
     private scene: THREE.Scene
+    private camera: THREE.PerspectiveCamera
     private materialManager: SharedMaterialManager
     private eventManager: EventManager
     private logger = Logger.createLogFunctions('RoomManager')
@@ -69,6 +70,13 @@ export class RoomManager {
             throw new Error('RoomManager requires scene to be registered in DataManager')
         }
         this.scene = scene
+        
+        const camera = DataManager.getInstance().get<THREE.PerspectiveCamera>(DataKey.MainCamera)
+        if (!camera) {
+            throw new Error('RoomManager requires camera to be registered in DataManager')
+        }
+        this.camera = camera
+        
         this.materialManager = SharedMaterialManager.getInstance()
         this.eventManager = EventManager.getInstance()
         
@@ -180,6 +188,13 @@ export class RoomManager {
         if (centerOffset) {
             const appliedZ = centerOffset.z + RoomConstants.STORE_FRONT_OFFSET
             this.roomGroup.position.set(centerOffset.x, centerOffset.y, appliedZ)
+            
+            // Reposition and reorient camera to face the store center
+            // Player spawns at origin (0, 1.6, 0), should look at back wall center
+            const targetZ = appliedZ - (dimensions.depth / 2)
+            this.camera.position.set(0, 1.6, 0)
+            this.camera.lookAt(0, 1.6, targetZ)
+            console.debug(`📷 Camera repositioned to face store center at Z=${targetZ.toFixed(1)}`)
         }
 
         this.emitProgress('Building floor')
