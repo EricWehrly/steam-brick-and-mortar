@@ -20,7 +20,6 @@ import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEve
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
-import { UIManager } from '../ui/UIManager'
 
 export interface SteamIntegrationConfig {
     apiBaseUrl?: string

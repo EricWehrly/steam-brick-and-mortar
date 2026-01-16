@@ -354,8 +354,8 @@ export class SteamApiClient {
         buildMonitor.end({ count: cachedEnhanced.length })
         
         // Emit cached games in batches with yielding
+        // Note: Subscribers (GpuStorePropsRenderer.processOneBatch, etc.) are already instrumented
         const cachedBatches = Math.ceil(cachedEnhanced.length / BATCH_SIZE)
-        const batchEmitMonitor = PerformanceMonitor.start('cached-batch-emission', SteamApiClient.logger)
         
         for (let i = 0; i < cachedBatches; i++) {
             const batchGames = cachedEnhanced.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
@@ -372,8 +372,6 @@ export class SteamApiClient {
                 await new Promise(resolve => setTimeout(resolve, 0))
             }
         }
-        
-        batchEmitMonitor.end({ batches: cachedBatches })
         SteamApiClient.logger.info(`Emitted ${cachedEnhanced.length} cached games in ${cachedBatches} batches`)
         
         EventManager.getInstance().emit<SteamNetworkFetchProgressEvent>(SteamEventTypes.NetworkFetchProgress, {
@@ -405,14 +403,13 @@ export class SteamApiClient {
         totalBatchCount: number,
         BATCH_SIZE: number
     ): Promise<void> {
-        const fetchMonitor = PerformanceMonitor.start('background-metadata-fetch', SteamApiClient.logger, ASYNC_CONTEXT)
-        SteamApiClient.logger.debug(`[ASYNC] Starting background metadata fetch for ${uncachedAppids.length} games`)
+        // Background fetch starting for ${uncachedAppids.length} games
+        // Note: Actual network timing tracked in BatchAppDetailsClient.fetchBatch -> network-batch
         
         try {
             const batchResponses = await this.batchClient.fetchBatch(uncachedAppids, {
                 batchSize: 100
             })
-            fetchMonitor.end({ count: uncachedAppids.length })
             
             // Normalize and cache fetched metadata
             const fetchedAppDetails = new Map<number, AppDetailsData>()

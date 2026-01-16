@@ -22,6 +22,7 @@ import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleE
 import { LightFactory } from '../lighting/LightFactory'
 import { LightRegistry } from '../lighting/LightRegistry'
 import { Logger } from '../utils/Logger'
+import { PerformanceMonitor } from '../utils/PerformanceMonitor'
 
 // Lighting configuration constants
 const LIGHT_NAMES = {
@@ -155,6 +156,7 @@ export class LightingRenderer {
      * Upgrade to full lighting system - called asynchronously after scene is visible
      */
     public async upgradeLighting(): Promise<void> {
+        const monitor = PerformanceMonitor.start('lighting-upgrade', LightingRenderer.logger)
         const startTime = window.performance.now()
         this.config = this.getCurrentConfig()
         
@@ -167,6 +169,7 @@ export class LightingRenderer {
             // Now do full setup with shadows and fixtures
             this.configureShadows()
             await this.setupLightsByQuality()
+            monitor.end({ quality: this.config.quality })
             
             // Check current settings for debug helpers and lighting state
             const appSettings = AppSettings.getInstance()
@@ -357,6 +360,8 @@ export class LightingRenderer {
     }
 
     private async setupFluorescentFixtures(shelfLayout?: { rows: number; shelvesPerRow: number }): Promise<void> {
+        const monitor = PerformanceMonitor.start('ceiling-fixtures-setup', LightingRenderer.logger)
+        
         if (!this.propRenderer) {
             this.propRenderer = new PropRenderer(this.scene)
         }
@@ -386,6 +391,7 @@ export class LightingRenderer {
         fixtures.name = LIGHT_NAMES.FLUORESCENT_FIXTURES
         this.lightingGroup.add(fixtures)
         
+        monitor.end({ fixtureCount: fixtureRows * fixturesPerRow, shelfRows })
         LightingRenderer.logger.info(`💡 Created ${fixtureRows * fixturesPerRow} ceiling fixtures (${fixtureRows} rows x ${fixturesPerRow} per row) for ${shelfRows} shelf rows`)
     }
 

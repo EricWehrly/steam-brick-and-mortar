@@ -120,9 +120,12 @@ describe('PerformanceMonitor', () => {
             monitor.end({ test: 'data' })
 
             const report = PerformanceMonitor.getReport()
-            expect(report.operations).toHaveLength(1)
-            expect(report.operations[0].name).toBe('tracked-op')
-            expect(report.operations[0].metadata).toEqual({ test: 'data' })
+            // Fast operations (< 16ms) go to aggregatedOperations
+            const allAggregated = [...report.mainThreadBlocking.aggregatedOperations, ...report.asyncOperations.aggregatedOperations]
+            expect(allAggregated.length).toBeGreaterThan(0)
+            const trackedOp = allAggregated.find(op => op.name === 'tracked-op')
+            expect(trackedOp).toBeDefined()
+            expect(trackedOp!.count).toBe(1)
         })
 
         it('should not track when blocking detection disabled', () => {
@@ -132,14 +135,18 @@ describe('PerformanceMonitor', () => {
             monitor.end()
 
             const report = PerformanceMonitor.getReport()
-            expect(report.operations).toHaveLength(0)
+            const allOps = [...report.mainThreadBlocking.operations, ...report.asyncOperations.operations]
+            const allAggregated = [...report.mainThreadBlocking.aggregatedOperations, ...report.asyncOperations.aggregatedOperations]
+            expect(allOps).toHaveLength(0)
+            expect(allAggregated).toHaveLength(0)
         })
 
         it('should classify operations by severity', async () => {
-            // Normal operation (< threshold)
+            // Normal operation (< threshold, but >= 16ms to appear in detailed ops)
             const normal = PerformanceMonitor.start('normal-op', mockLogger, {
                 blockingThreshold: 100
             })
+            await new Promise(resolve => setTimeout(resolve, 20))
             normal.end()
 
             // Warning operation (> threshold but < 2x threshold)  
@@ -157,11 +164,24 @@ describe('PerformanceMonitor', () => {
             critical.end()
 
             const report = PerformanceMonitor.getReport()
-            expect(report.operations).toHaveLength(3)
-            expect(report.operations[0].severity).toBe('normal')
+            const allOps = [...report.mainThreadBlocking.operations, ...report.asyncOperations.operations]
+            const allAggregated = [...report.mainThreadBlocking.aggregatedOperations, ...report.asyncOperations.aggregatedOperations]
+            
+            // All 3 operations should be tracked (either in operations or aggregatedOperations)
+            const totalOps = allOps.length + allAggregated.reduce((sum, agg) => sum + agg.count, 0)
+            expect(totalOps).toBe(3)
+            
+            // Find operations by name in either list
+            const normalOp = allOps.find(op => op.name === 'normal-op') || 
+                           allAggregated.find(agg => agg.name === 'normal-op')
+            expect(normalOp?.severity).toBe('normal')
+            
             // Verify we detect slow operations (warning or critical)
-            const slowOperations = report.operations.slice(1)
-            expect(slowOperations.every(op => op.severity === 'warning' || op.severity === 'critical')).toBe(true)
+            const slowOps = allOps.filter(op => op.name !== 'normal-op')
+            const slowAggs = allAggregated.filter(agg => agg.name !== 'normal-op')
+            const allSlowOps = [...slowOps, ...slowAggs]
+            expect(allSlowOps.length).toBeGreaterThan(0)
+            expect(allSlowOps.every(op => op.severity === 'warning' || op.severity === 'critical')).toBe(true)
         })
     })
 
@@ -178,7 +198,9 @@ describe('PerformanceMonitor', () => {
             expect(report.metadata).toBeDefined()
             expect(report.metadata.userAgent).toBeDefined()
             expect(report.metadata.timestamp).toBeDefined()
-            expect(report.operations).toHaveLength(2)
+            // Fast operations go to aggregatedOperations
+            const allAggregated = [...report.mainThreadBlocking.aggregatedOperations, ...report.asyncOperations.aggregatedOperations]
+            expect(allAggregated.length).toBeGreaterThan(0)
             expect(report.summary.totalOperations).toBe(2)
         })
 
@@ -268,27 +290,33 @@ describe('PerformanceMonitor', () => {
     })
 
     describe('Initial Metadata', () => {
-        it('should support initial metadata in options', () => {
+        it('should support initial metadata in options', async () => {
             const monitor = PerformanceMonitor.start('op-with-initial', mockLogger, {
                 metadata: { initial: 'value' }
             })
+            await new Promise(resolve => setTimeout(resolve, 20))
             monitor.end({ final: 'value' })
 
             const report = PerformanceMonitor.getReport()
-            expect(report.operations[0].metadata).toEqual({
+            const allOps = [...report.mainThreadBlocking.operations, ...report.asyncOperations.operations]
+            expect(allOps.length).toBeGreaterThan(0)
+            expect(allOps[0].metadata).toEqual({
                 initial: 'value',
                 final: 'value'
             })
         })
 
-        it('should merge initial and end metadata', () => {
+        it('should merge initial and end metadata', async () => {
             const monitor = PerformanceMonitor.start('merge-test', mockLogger, {
                 metadata: { start: 'data', shared: 'initial' }
             })
+            await new Promise(resolve => setTimeout(resolve, 20))
             monitor.end({ end: 'data', shared: 'final' })
 
             const report = PerformanceMonitor.getReport()
-            expect(report.operations[0].metadata).toEqual({
+            const allOps = [...report.mainThreadBlocking.operations, ...report.asyncOperations.operations]
+            expect(allOps.length).toBeGreaterThan(0)
+            expect(allOps[0].metadata).toEqual({
                 start: 'data',
                 end: 'data',
                 shared: 'final' // End metadata should override

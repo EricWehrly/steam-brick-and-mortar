@@ -13,6 +13,8 @@
 import * as THREE from 'three'
 import { BlockbusterColors } from '../utils/Colors'
 import { LightFactory } from '../lighting/LightFactory'
+import { PerformanceMonitor } from '../utils/PerformanceMonitor'
+import { Logger } from '../utils/Logger'
 
 export interface LightFixtureOptions {
   width?: number
@@ -32,6 +34,7 @@ export interface WireRackOptions {
 }
 
 export class PropRenderer {
+  public static logger = Logger.createLogFunctions(PropRenderer.name)
   private scene: THREE.Scene
   private propsGroup: THREE.Group
   private lightFactory: LightFactory
@@ -50,6 +53,8 @@ export class PropRenderer {
    * TODO: Make this responsive to room resizing events
    */
   public createCeilingLightFixtures(ceilingHeight: number, roomWidth: number, roomDepth: number, options: LightFixtureOptions = {}): THREE.Group {
+    const monitor = PerformanceMonitor.start('create-ceiling-fixtures', PropRenderer.logger)
+    
     const {
       width = 4,
       height = 0.15,
@@ -162,6 +167,7 @@ export class PropRenderer {
     this.propsGroup.add(fixturesGroup)
     console.log(`💡 Created ${rows * fixturesPerRow} ceiling fixtures with ${rows} RectAreaLights at height ${fixtureY.toFixed(2)}m`)
     
+    monitor.end({ totalFixtures: rows * fixturesPerRow, rectAreaLights: rows })
     return fixturesGroup
   }
 

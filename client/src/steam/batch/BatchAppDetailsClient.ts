@@ -102,7 +102,7 @@ export class BatchAppDetailsClient {
             batches.push(appids.slice(i, i + batchSize));
         }
 
-        const overallMonitor = PerformanceMonitor.start('network-fetch', BatchAppDetailsClient.logger, ASYNC_CONTEXT)
+        // Note: Individual batches are tracked with 'network-batch' monitor per batch
         if (batches.length > 0) {
             BatchAppDetailsClient.logger.info(`[ASYNC] Fetching ${appids.length} uncached games from Steam API (${batches.length} network ${batches.length === 1 ? 'batch' : 'batches'})...`)
         }
@@ -144,11 +144,16 @@ export class BatchAppDetailsClient {
                 }
 
                 totalFetched += batchResult.total_successful;
+                
+                // Calculate total work: if fetching N games in parallel, total work ≈ N × elapsed
+                // (Each game's metadata fetch would take ~elapsed ms if done sequentially)
+                const totalWork = batch.length * lastBatchDuration;
+                
                 batchMonitor.end({
                     batch: `${batchIndex + 1}/${batches.length}`,
                     successful: `${batchResult.total_successful}/${batch.length}`,
                     total: `${totalFetched}/${appids.length}`
-                });
+                }, totalWork);
                 onProgress?.(totalFetched, appids.length);
 
                 // Emit progress event for UI
@@ -194,7 +199,6 @@ export class BatchAppDetailsClient {
             }
         }
 
-        overallMonitor.end({ count: `${results.size}/${appids.length}` });
         if (results.size < appids.length) {
             BatchAppDetailsClient.logger.warn(`${appids.length - results.size} games failed to fetch`);
         }
