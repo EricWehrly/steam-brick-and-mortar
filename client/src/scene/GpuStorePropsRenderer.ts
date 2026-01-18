@@ -190,8 +190,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             initMonitor.end({ totalBatches })
         }
         
-        this.gameBoxRenderer?.setBatchIndex(batchIndex)
-        
         const shelfMonitor = PerformanceMonitor.start('shelf-creation', GpuStorePropsRenderer.logger)
         await this.createShelfForBatch(batchGames, batchIndex)
         const shelfCreationTime = shelfMonitor.getElapsed()
