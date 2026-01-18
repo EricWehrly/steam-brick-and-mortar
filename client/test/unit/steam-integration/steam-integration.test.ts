@@ -4,6 +4,7 @@
 
 import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { SteamIntegration } from '../../../src/steam-integration/SteamIntegration'
+import { SteamEventTypes, GameEventTypes, AppSettingsEventTypes } from '../../../src/types/InteractionEvents'
 
 // Mock the EventManager
 vi.mock('../../../src/core/EventManager', () => ({
@@ -42,21 +43,6 @@ vi.mock('../../../src/utils', () => ({
     ValidationUtils: {
         extractVanityFromInput: vi.fn((input: string) => input.toLowerCase()),
         parseSteamUserInput: vi.fn((input: string) => ({ type: 'customurl', value: input.toLowerCase() }))
-    }
-}))
-
-// Mock event types
-vi.mock('../../../src/types/InteractionEvents', () => ({
-    SteamEventTypes: {
-        LoadGames: 'steam:load-games',
-        LoadFromCache: 'steam:load-from-cache',
-        CacheRefresh: 'steam:cache-refresh',
-        CacheClear: 'steam:cache-clear',
-        GameLoaded: 'steam:game-loaded',
-        DataLoaded: 'steam:data-loaded'
-    },
-    AppSettingsEventTypes: {
-        Changed: 'app-settings:changed'
     }
 }))
 
