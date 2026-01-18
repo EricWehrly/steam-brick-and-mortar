@@ -29,21 +29,7 @@ import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import type { SteamGame } from '../steam'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
-
-interface BatchState {
-    received: number
-    expectedTotal: number
-    games: SteamGameData[]
-    isFirstBatch: boolean
-    queue: SteamGamesBatchEvent[]
-    isProcessing: boolean
-}
-
-interface TimingState {
-    batches: Array<{ batchIndex: number; duration: number; mainThreadTime: number }>
-    loadStart: number
-    totalMainThread: number
-}
+import { BatchCoordinator } from './batch/BatchCoordinator'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private static readonly logger = Logger.createLogFunctions(GpuStorePropsRenderer.name)
@@ -78,23 +64,17 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private readonly maxShelvesPerRow: number = 4
     
     private progressiveLoadingCompleted: boolean = false
-    private batchState: BatchState = {
-        received: 0,
-        expectedTotal: 0,
-        games: [],
-        isFirstBatch: true,
-        queue: [],
-        isProcessing: false
-    }
-    private timingState: TimingState = {
-        batches: [],
-        loadStart: 0,
-        totalMainThread: 0
-    }
+    private games: SteamGameData[] = []
+    private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
 
     constructor(scene: THREE.Scene, dataManager: DataManager) {
         this.scene = scene
         this.dataManager = dataManager
+
+        // Initialize batch coordinator for game loading
+        this.batchCoordinator = new BatchCoordinator<SteamGamesBatchEvent>(
+            this.processOneBatch.bind(this)
+        )
 
         // GpuGameBoxRenderer allocation deferred until we know actual game count
         // Texture arrays are expensive - don't allocate VRAM until needed
@@ -142,33 +122,16 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private handleGamesBatch(event: CustomEvent<SteamGamesBatchEvent>): void {
-        this.batchState.queue.push(event.detail)
-        
-        if (!this.batchState.isProcessing) {
-            this.processBatchQueue()
-        }
+        const { batchIndex, totalBatches } = event.detail
+        this.batchCoordinator.enqueueBatch({
+            batchIndex,
+            totalBatches,
+            data: event.detail
+        })
     }
     
-    private async processBatchQueue(): Promise<void> {
-        if (this.batchState.isProcessing || this.batchState.queue.length === 0) return
-        
-        this.batchState.isProcessing = true
-        
-        while (this.batchState.queue.length > 0) {
-            this.batchState.queue.sort((a, b) => a.batchIndex - b.batchIndex)
-            const batch = this.batchState.queue.shift()
-            if (!batch) break
-            
-            await this.processOneBatch(batch)
-            
-            // Yield to event loop between batches to prevent blocking
-            await new Promise(resolve => setTimeout(resolve, 0))
-        }
-        
-        this.batchState.isProcessing = false
-    }
-    
-    private async processOneBatch(batchEvent: SteamGamesBatchEvent): Promise<void> {
+    private async processOneBatch(batch: { batchIndex: number; totalBatches: number; data: SteamGamesBatchEvent }): Promise<void> {
+        const batchEvent = batch.data
         const { games, batchIndex, totalBatches } = batchEvent
         
         const batchMonitor = PerformanceMonitor.start('batch-process', GpuStorePropsRenderer.logger, {
@@ -177,13 +140,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         const batchGames = games.map(g => this.steamGameToGameData(g))
         
-        this.batchState.games.push(...batchGames)
-        this.batchState.received++
-        this.batchState.expectedTotal = totalBatches
+        this.games.push(...batchGames)
         
-        if (this.batchState.isFirstBatch) {
-            this.batchState.isFirstBatch = false
-            this.timingState.loadStart = Date.now()
+        if (this.batchCoordinator.isFirstBatchProcessing()) {
             
             const initMonitor = PerformanceMonitor.start('renderer-initialization', GpuStorePropsRenderer.logger, ASYNC_CONTEXT)
             await this.initializeForProgressiveLoading(totalBatches)
@@ -195,10 +154,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const shelfCreationTime = shelfMonitor.getElapsed()
         shelfMonitor.end({ batchIndex })
         
-        const batchDuration = batchMonitor.getElapsed()
-        this.timingState.batches.push({ batchIndex, duration: batchDuration, mainThreadTime: batchDuration })
-        this.timingState.totalMainThread += batchDuration
-        
         batchMonitor.end({ 
             batch: `${batchIndex + 1}/${totalBatches}`,
             gameCount: batchGames.length,
@@ -207,20 +162,23 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
         
-        console.log(`📊 Batches received: ${this.batchState.received}/${this.batchState.expectedTotal}`)
-        if (this.batchState.received === this.batchState.expectedTotal) {
-            this.logBatchCompletionSummary(totalBatches)
+        const progress = this.batchCoordinator.getProgress()
+        console.log(`📊 Batches received: ${progress.received}/${progress.total}`)
+        
+        if (progress.isComplete) {
+            this.logBatchCompletionSummary()
             await this.finalizeProgressiveLoading()
         }
     }
     
-    private logBatchCompletionSummary(totalBatches: number): void {
-        const totalLoadTime = Date.now() - this.timingState.loadStart
-        const avgMainThreadTime = this.timingState.totalMainThread / this.timingState.batches.length
-        const asyncTime = totalLoadTime - this.timingState.totalMainThread
+    private logBatchCompletionSummary(): void {
+        const metrics = this.batchCoordinator.getMetrics()
+        const totalLoadTime = Date.now() - metrics.loadStart
+        const avgMainThreadTime = metrics.totalMainThreadTime / metrics.batches.length
+        const asyncTime = totalLoadTime - metrics.totalMainThreadTime
         
-        console.log(`📊 [BATCH SUMMARY] ${this.timingState.batches.length} batches | Main: ${this.timingState.totalMainThread.toFixed(1)}ms | Async: ${asyncTime.toFixed(1)}ms | Total: ${totalLoadTime.toFixed(1)}ms | Avg/batch: ${avgMainThreadTime.toFixed(1)}ms`)
-        console.debug(`📦 [COMPLETE] All ${totalBatches} batches processed, finalizing...`)
+        console.log(`📊 [BATCH SUMMARY] ${metrics.batches.length} batches | Main: ${metrics.totalMainThreadTime.toFixed(1)}ms | Async: ${asyncTime.toFixed(1)}ms | Total: ${totalLoadTime.toFixed(1)}ms | Avg/batch: ${avgMainThreadTime.toFixed(1)}ms`)
+        console.debug(`📦 [COMPLETE] All ${metrics.batches.length} batches processed, finalizing...`)
     }
     
     private steamGameToGameData(game: Readonly<SteamGame>): SteamGameData {
@@ -321,8 +279,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         }
         
         const oldLength = this.shelfPositions.length
+        const progress = this.batchCoordinator.getProgress()
         console.warn(`⚠️ BATCH COUNT MISMATCH: Received batch ${batchIndex + 1} but only allocated ${oldLength} positions`)
-        console.warn(`   Expected: ${this.batchState.expectedTotal}, Actual: >${batchIndex + 1}. Expanding...`)
+        console.warn(`   Expected: ${progress.total}, Actual: >${batchIndex + 1}. Expanding...`)
         this.preallocateShelfPositions(batchIndex + 1)
     }
     
@@ -346,11 +305,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             return
         }
         
+        const progress = this.batchCoordinator.getProgress()
         EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
             step: 'shelves',
             current: batchIndex + 1,
-            total: this.batchState.expectedTotal,
-            detail: `Creating shelf ${batchIndex + 1}/${this.batchState.expectedTotal}`
+            total: progress.total,
+            detail: `Creating shelf ${batchIndex + 1}/${progress.total}`
         })
         
         this.createInstancedShelf(shelfPosition, games, Math.floor(batchIndex / this.maxShelvesPerRow), batchIndex % this.maxShelvesPerRow)
@@ -358,7 +318,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private finalizeProgressiveLoading(): void {
-        console.debug(`✅ Progressive loading complete: ${this.batchState.games.length} games on ${this.cumulativeShelfCount} shelves`)
+        console.debug(`✅ Progressive loading complete: ${this.games.length} games on ${this.cumulativeShelfCount} shelves`)
         
         this.progressiveLoadingCompleted = true
         
@@ -369,23 +329,13 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private resetBatchState(): void {
-        this.batchState = {
-            received: 0,
-            expectedTotal: 0,
-            games: [],
-            isFirstBatch: true,
-            queue: [],
-            isProcessing: false
-        }
-        this.timingState = {
-            batches: [],
-            loadStart: 0,
-            totalMainThread: 0
-        }
+        this.games = []
+        this.batchCoordinator.reset()
     }
     
     private async handleDataLoaded(): Promise<void> {
-        if (this.progressiveLoadingCompleted || this.batchState.received > 0) {
+        const progress = this.batchCoordinator.getProgress()
+        if (this.progressiveLoadingCompleted || progress.received > 0) {
             return
         }
         
