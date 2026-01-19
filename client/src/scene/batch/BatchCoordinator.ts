@@ -14,6 +14,8 @@
 
 import { Logger } from '../../utils/Logger'
 import { PerformanceMonitor } from '../../utils/PerformanceMonitor'
+import { EventManager } from '../../core/EventManager'
+import { SteamEventTypes, type SteamGamesBatchEvent } from '../../types/InteractionEvents'
 
 export interface BatchItem<T> {
     batchIndex: number
@@ -55,6 +57,26 @@ export class BatchCoordinator<T> {
 
     constructor(processor: BatchProcessor<T>) {
         this.processor = processor
+        
+        // Self-register for GamesBatchReady events
+        EventManager.getInstance().registerEventHandler(
+            SteamEventTypes.GamesBatchReady,
+            this.handleBatchEvent.bind(this)
+        )
+        BatchCoordinator.logger.debug('Self-registered for GamesBatchReady events')
+    }
+    
+    /**
+     * Handle incoming batch events
+     * Extracts batch data and enqueues for processing
+     */
+    private handleBatchEvent(event: CustomEvent<SteamGamesBatchEvent>): void {
+        const { batchIndex, totalBatches } = event.detail
+        this.enqueueBatch({
+            batchIndex,
+            totalBatches,
+            data: event.detail as unknown as T
+        })
     }
 
     public enqueueBatch(batch: BatchItem<T>): void {

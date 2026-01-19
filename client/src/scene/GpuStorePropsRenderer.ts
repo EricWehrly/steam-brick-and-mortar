@@ -73,7 +73,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.scene = scene
         this.dataManager = dataManager
 
-        // Initialize batch coordinator for game loading
+        // Initialize batch coordinator for game loading with self-registration
         this.batchCoordinator = new BatchCoordinator<SteamGamesBatchEvent>(
             this.processOneBatch.bind(this)
         )
@@ -106,11 +106,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private setupEventListeners(): void {
-        // Listen for game batches for progressive rendering
-        EventManager.getInstance().registerEventHandler(
-            SteamEventTypes.GamesBatchReady, 
-            this.handleGamesBatch.bind(this)
-        );
         // Keep DataLoaded listener for backward compatibility and final room sizing
         EventManager.getInstance().registerEventHandler(
             SteamEventTypes.DataLoaded, 
@@ -121,15 +116,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             GameEventTypes.AllBatchesComplete,
             this.resetBatchState.bind(this)
         );
-    }
-    
-    private handleGamesBatch(event: CustomEvent<SteamGamesBatchEvent>): void {
-        const { batchIndex, totalBatches } = event.detail
-        this.batchCoordinator.enqueueBatch({
-            batchIndex,
-            totalBatches,
-            data: event.detail
-        })
     }
     
     private async processOneBatch(batch: { batchIndex: number; totalBatches: number; data: SteamGamesBatchEvent }): Promise<void> {
