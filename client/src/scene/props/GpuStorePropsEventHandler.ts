@@ -108,7 +108,7 @@ export class GpuStorePropsEventHandler {
                 }
                 
                 // Create renderer with own GameBoxRenderer (composition, not injection)
-                this.renderer = new GpuStorePropsRenderer(scene, dataManager)
+                this.renderer = new GpuStorePropsRenderer(scene)
             }
             
             // Emit setup started event

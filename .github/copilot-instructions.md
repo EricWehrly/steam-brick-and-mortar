@@ -81,6 +81,7 @@ steam-brick-and-mortar/
 - **Meaningful commits**: Group related changes, describe what and why
 - **Review git status** before committing to understand changes
 - **Separate concerns**: Don't mix implementation with documentation
+- **Stage only edited files**: Use `git add <file1> <file2>` for files you modified, never `git add -A` which stages unrelated changes
 
 ### Development Approach
 1. **Research thoroughly**: Understand APIs and constraints before coding

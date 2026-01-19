@@ -23,7 +23,6 @@ import { GameLayoutConstants, VRLayoutUtils, GameBoxUtils, ShelfSurfaceUtils, ty
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes, SteamEventTypes } from '../types/InteractionEvents'
 import { StorePropsEventTypes, type StorePropsProgressEvent, type SteamGamesBatchEvent, type AllBatchesCompleteEvent } from '../types/InteractionEvents'
-import { DataManager } from '../core/data'
 import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import type { SteamGame } from '../steam'
@@ -36,7 +35,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private static readonly logger = Logger.createLogFunctions(GpuStorePropsRenderer.name)
     
     private scene: THREE.Scene
-    private dataManager: DataManager
 
     private storeLayout: StoreLayout
     private gameBoxRenderer: GpuGameBoxRenderer | null = null
@@ -69,9 +67,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
     private gameBoxSpawner?: GameBoxSpawner
 
-    constructor(scene: THREE.Scene, dataManager: DataManager) {
+    constructor(scene: THREE.Scene) {
         this.scene = scene
-        this.dataManager = dataManager
 
         // Initialize batch coordinator for game loading with self-registration
         this.batchCoordinator = new BatchCoordinator<SteamGamesBatchEvent>(
@@ -106,11 +103,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private setupEventListeners(): void {
-        // Keep DataLoaded listener for backward compatibility and final room sizing
-        EventManager.getInstance().registerEventHandler(
-            SteamEventTypes.DataLoaded, 
-            this.handleDataLoaded.bind(this)
-        );
         // Reset our batch state when all batches complete
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.AllBatchesComplete,
@@ -320,111 +312,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private resetBatchState(): void {
         this.games = []
         this.batchCoordinator.reset()
-    }
-    
-    private async handleDataLoaded(): Promise<void> {
-        const progress = this.batchCoordinator.getProgress()
-        if (this.progressiveLoadingCompleted || progress.received > 0) {
-            return
-        }
-        
-        console.debug('📦 DataLoaded with no prior batches - using legacy generation')
-        await this.generateShelvesAsync()
-    }
-
-    private async generateShelvesAsync(): Promise<void> {
-        const games = this.dataManager.get<SteamGameData[]>('steam.games') || []
-        const gameCount = games.length
-        
-        if (games.length > 0) {
-            this.gameBoxRenderer?.dispose()
-            this.gameBoxRenderer = new GpuGameBoxRenderer(gameCount + 100)
-            this.gameBoxSpawner = new GameBoxSpawner(this.gameBoxRenderer)
-        }
-        
-        if (!this.instancedShelfRenderer) {
-            console.error('❌ InstancedShelfRenderer not available - cannot generate instanced shelves')
-            return
-        }
-
-        if (!this.instancedShelfRenderer.isReady()) {
-            // Initialize it now when we need it, then proceed
-            try {
-                await this.instancedShelfRenderer.initialize()
-            } catch (error) {
-                console.error('❌ Failed to initialize InstancedShelfRenderer on-demand:', error)
-                return
-            }
-        }
-        
-        try {
-            // Calculate shelves needed based on game count
-            const gamesPerShelf = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
-            const shelvesNeeded = Math.ceil(gameCount / gamesPerShelf)
-            if (shelvesNeeded === 0) {
-                console.warn('No shelves needed - no games found')
-                return
-            }
-            
-            // Reset shelf bounds tracking
-            this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
-            
-            this.cumulativeShelfCount = 0
-            
-            this.clearExistingShelves()
-            
-            // Create shelf rows based on needed shelves  
-            const maxShelvesPerRow = 4
-            const rows = Math.ceil(shelvesNeeded / maxShelvesPerRow)
-            const fullRows = Math.floor(shelvesNeeded / maxShelvesPerRow)
-            const partialRowCount = shelvesNeeded % maxShelvesPerRow
-            console.debug(`🏗️ Creating ${rows} rows: ${fullRows} full rows + ${partialRowCount > 0 ? '1 partial' : '0 partial'}`)
-            
-            // Store for use in room resize event
-            this.shelfLayout = { rows, shelvesPerRow: maxShelvesPerRow }
-            
-            for (let row = 0; row < rows; row++) {
-                // Put partial row at the back (row 0), full rows toward front
-                const isPartialRow = partialRowCount > 0 && row === 0
-                const shelvesInThisRow = isPartialRow ? partialRowCount : maxShelvesPerRow
-                
-                // Emit progress update for startup UI
-                EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
-                    step: 'shelves',
-                    current: row + 1,
-                    total: rows,
-                    detail: `Creating shelf row ${row + 1}/${rows}`
-                })
-                
-                // Yield to main thread between rows to keep app responsive
-                await new Promise(resolve => setTimeout(resolve, 50)) // Faster than legacy since GPU handles bulk work
-                
-                try {
-                    await this.createInstancedShelfRow(row, shelvesInThisRow, rows, games)
-                } catch (error) {
-                    console.error(`❌ Failed to create instanced shelf row ${row}:`, error)
-                    throw error
-                }
-            }
-            
-            console.debug(`Instanced shelf generation completed: ${shelvesNeeded} shelves for ${gameCount} games`)
-            
-            // Emit InstancedBatchComplete event to trigger GPU updates
-            EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
-            
-            // Mark as complete (legacy path equivalent of progressive loading completing)
-            this.progressiveLoadingCompleted = true
-            
-            EventManager.getInstance().emit<AllBatchesCompleteEvent>(GameEventTypes.AllBatchesComplete, {
-                shelfBounds: { ...this.shelfBounds },
-                shelfLayout: { ...this.shelfLayout }
-            })
-            
-            // NOTE: Scene validation moved to handleInstancedBatchComplete to happen AFTER GPU updates
-        } catch (error) {
-            console.error('❌ Failed to generate instanced shelves asynchronously:', error)
-            throw error
-        }
     }
 
     public async setupProps(config: PropsConfig = {}): Promise<void> {
