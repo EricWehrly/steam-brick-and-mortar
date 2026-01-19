@@ -239,6 +239,29 @@ export interface StorePropsSetupCompletedEvent extends BaseInteractionEvent {
     // No additional data needed
 }
 
+// Phase 3: Event-driven batch-to-placement flow
+export interface BatchReadyForPlacementEvent extends BaseInteractionEvent {
+    games: ReadonlyArray<Readonly<SteamGame>>
+    batchIndex: number
+    totalBatches: number
+}
+
+export interface ShelfSpaceRequestedEvent extends BaseInteractionEvent {
+    gamesCount: number
+    batchIndex: number
+}
+
+export interface ShelfCreatedEvent extends BaseInteractionEvent {
+    position: Readonly<THREE.Vector3>
+    batchIndex: number
+    bounds: ShelfBounds
+}
+
+export interface GamesPlacedEvent extends BaseInteractionEvent {
+    gamesCount: number
+    batchIndex: number
+}
+
 // =============================================================================
 // EVENT TYPE CONSTANTS
 // =============================================================================
@@ -311,7 +334,12 @@ export const StorePropsEventTypes = {
     SetupRequest: 'store-props:setup-request',
     SetupCompleted: 'store-props:setup-completed',
     EnableShelfIndices: 'store-props:enable-shelf-indices',
-    DisableShelfIndices: 'store-props:disable-shelf-indices'
+    DisableShelfIndices: 'store-props:disable-shelf-indices',
+    // Phase 3: Event-driven batch-to-placement flow
+    BatchReadyForPlacement: 'store-props:batch-ready-placement',
+    ShelfSpaceRequested: 'store-props:shelf-space-requested',
+    ShelfCreated: 'store-props:shelf-created',
+    GamesPlaced: 'store-props:games-placed'
 } as const
 
 // =============================================================================
