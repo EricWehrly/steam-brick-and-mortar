@@ -15,7 +15,12 @@
 import { Logger } from '../../utils/Logger'
 import { PerformanceMonitor } from '../../utils/PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
-import { SteamEventTypes, type SteamGamesBatchEvent } from '../../types/InteractionEvents'
+import { 
+    SteamEventTypes, 
+    StorePropsEventTypes,
+    type SteamGamesBatchEvent,
+    type BatchReadyForPlacementEvent 
+} from '../../types/InteractionEvents'
 
 export interface BatchItem<T> {
     batchIndex: number
@@ -197,6 +202,19 @@ export class BatchCoordinator<T> {
             BatchCoordinator.logger.error(`Batch ${batchIndex + 1}/${totalBatches} failed: ${error}`)
             // Don't rethrow - log and continue processing remaining batches
         } finally {
+            // Emit BatchReadyForPlacement event (Phase 3b: dual-path alongside callback)
+            // Emit regardless of processor success/failure - event consumers decide how to handle
+            const batchData = batch.data as unknown as SteamGamesBatchEvent
+            EventManager.getInstance().emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                {
+                    games: batchData.games,
+                    batchIndex,
+                    totalBatches
+                }
+            )
+            BatchCoordinator.logger.debug(`Emitted BatchReadyForPlacement for batch ${batchIndex + 1}/${totalBatches}`)
+            
             // Clear first batch flag after processing completes
             if (this.isFirstBatch) {
                 this.isFirstBatch = false

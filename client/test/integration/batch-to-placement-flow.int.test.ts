@@ -40,7 +40,13 @@ vi.mock('../../src/utils/TextureManager', async () => {
 import { EventManager } from '../../src/core/EventManager'
 import { DataManager } from '../../src/core/data'
 import { GpuStorePropsRenderer } from '../../src/scene/GpuStorePropsRenderer'
-import { SteamEventTypes, GameEventTypes, type SteamGamesBatchEvent } from '../../src/types/InteractionEvents'
+import { 
+    SteamEventTypes, 
+    StorePropsEventTypes,
+    GameEventTypes, 
+    type SteamGamesBatchEvent,
+    type BatchReadyForPlacementEvent 
+} from '../../src/types/InteractionEvents'
 import type { SteamGame } from '../../src/steam'
 
 describe('Batch-to-Placement Flow Integration', () => {
@@ -50,6 +56,7 @@ describe('Batch-to-Placement Flow Integration', () => {
     let renderer: GpuStorePropsRenderer
     let allBatchesCompleteReceived: boolean
     let completionEventData: any
+    let batchReadyEvents: BatchReadyForPlacementEvent[] = []
 
     const createMockGames = (count: number, batchIndex: number): Readonly<SteamGame>[] => {
         return Array.from({ length: count }, (_, i) => ({
@@ -71,6 +78,16 @@ describe('Batch-to-Placement Flow Integration', () => {
         dataManager.clear()
         allBatchesCompleteReceived = false
         completionEventData = null
+        batchReadyEvents = []
+        
+        // Listen for BatchReadyForPlacement (Phase 3b)
+        eventManager.registerEventHandler(
+            StorePropsEventTypes.BatchReadyForPlacement,
+            (event: CustomEvent<BatchReadyForPlacementEvent>) => {
+                console.log('📦 TEST: BatchReadyForPlacement received!', event.detail)
+                batchReadyEvents.push(event.detail)
+            }
+        )
         
         // Listen for completion BEFORE creating renderer
         eventManager.registerEventHandler(
@@ -373,4 +390,75 @@ describe('Batch-to-Placement Flow Integration', () => {
             expect(baselineState.shelfLayout.shelvesPerRow).toBeGreaterThan(0)
         })
     })
-})
+
+    describe('Phase 3b: Dual-Path Event Emission', () => {
+        it('should emit BatchReadyForPlacement alongside callback execution', async () => {
+            const games = createMockGames(5, 0)
+            
+            // Emit batch event
+            eventManager.emit<SteamGamesBatchEvent>(
+                SteamEventTypes.GamesBatchReady,
+                {
+                    games,
+                    batchIndex: 0,
+                    totalBatches: 1
+                }
+            )
+            
+            // Wait for both paths to complete
+            await vi.waitFor(() => {
+                return batchReadyEvents.length > 0 && allBatchesCompleteReceived === true
+            }, { timeout: 8000, interval: 100 })
+            
+            // Verify event was emitted
+            expect(batchReadyEvents.length).toBe(1)
+            expect(batchReadyEvents[0]).toMatchObject({
+                batchIndex: 0,
+                totalBatches: 1
+            })
+            expect(batchReadyEvents[0].games).toHaveLength(5)
+            
+            // Verify callback path still works (completion event received)
+            expect(allBatchesCompleteReceived).toBe(true)
+            expect(completionEventData).toBeDefined()
+        })
+
+        it('should emit BatchReadyForPlacement for each batch in multi-batch scenario', async () => {
+            const batch1 = createMockGames(3, 0)
+            const batch2 = createMockGames(4, 1)
+            
+            // Emit batches
+            eventManager.emit<SteamGamesBatchEvent>(
+                SteamEventTypes.GamesBatchReady,
+                {
+                    games: batch1,
+                    batchIndex: 0,
+                    totalBatches: 2
+                }
+            )
+            
+            eventManager.emit<SteamGamesBatchEvent>(
+                SteamEventTypes.GamesBatchReady,
+                {
+                    games: batch2,
+                    batchIndex: 1,
+                    totalBatches: 2
+                }
+            )
+            
+            // Wait for all batches to process
+            await vi.waitFor(() => {
+                return batchReadyEvents.length === 2 && allBatchesCompleteReceived === true
+            }, { timeout: 8000, interval: 100 })
+            
+            // Verify both BatchReadyForPlacement events emitted
+            expect(batchReadyEvents.length).toBe(2)
+            expect(batchReadyEvents[0].batchIndex).toBe(0)
+            expect(batchReadyEvents[0].games).toHaveLength(3)
+            expect(batchReadyEvents[1].batchIndex).toBe(1)
+            expect(batchReadyEvents[1].games).toHaveLength(4)
+            
+            // Verify callback path still functional
+            expect(allBatchesCompleteReceived).toBe(true)
+        })
+    })})
