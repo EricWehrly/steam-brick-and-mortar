@@ -30,6 +30,7 @@ import type { SteamGame } from '../steam'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { BatchCoordinator } from './batch/BatchCoordinator'
+import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private static readonly logger = Logger.createLogFunctions(GpuStorePropsRenderer.name)
@@ -66,6 +67,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private progressiveLoadingCompleted: boolean = false
     private games: SteamGameData[] = []
     private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
+    private gameBoxSpawner?: GameBoxSpawner
 
     constructor(scene: THREE.Scene, dataManager: DataManager) {
         this.scene = scene
@@ -197,6 +199,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = new GpuGameBoxRenderer(estimatedGames + 100)
+        this.gameBoxSpawner = new GameBoxSpawner(this.gameBoxRenderer)
         
         await this.waitForShelfRendererReady()
         
@@ -350,6 +353,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         if (games.length > 0) {
             this.gameBoxRenderer?.dispose()
             this.gameBoxRenderer = new GpuGameBoxRenderer(gameCount + 100)
+            this.gameBoxSpawner = new GameBoxSpawner(this.gameBoxRenderer)
         }
         
         if (!this.instancedShelfRenderer) {
@@ -571,65 +575,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         })
         
         if (games.length > 0) {
-            this.spawnInstancedGamesOnShelf(position, games, rowIndex, shelfIndex)
+            this.gameBoxSpawner?.spawnGamesOnShelf(position, games, rowIndex, shelfIndex)
         }
     }
 
-    private spawnInstancedGamesOnShelf(shelfPosition: THREE.Vector3, games: SteamGameData[], _rowIndex: number, _shelfIndex: number): void {
-        // Get shelf surface configuration using shared utility (GPU path: hardcoded surfaces)
-        const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
-        
-        if (shelfSurfaces.length === 0) {
-            return
-        }
-        
-        let gameIndex = 0
-        
-        for (const surface of shelfSurfaces) {
-            if (gameIndex >= games.length) break
-            
-            const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
-            if (frontGames.length > 0) {
-                this.createInstancedGameBoxes(shelfPosition, surface, frontGames, ShelfSide.Front)
-                gameIndex += frontGames.length
-            }
-            
-            if (gameIndex < games.length) {
-                const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
-                if (backGames.length > 0) {
-                    this.createInstancedGameBoxes(shelfPosition, surface, backGames, ShelfSide.Back)
-                    gameIndex += backGames.length
-                }
-            }
-        }
-    }
 
-    private createInstancedGameBoxes(
-        shelfPosition: THREE.Vector3,
-        surface: ShelfSurface, 
-        games: SteamGameData[], 
-        side: ShelfSide
-    ): void {
-        const boxDimensions = this.gameBoxRenderer?.getDimensions()
-        const gamePositions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, games, side, boxDimensions)
-        
-        for (let i = 0; i < games.length; i++) {
-            this.createSingleInstancedGameBox(games[i], gamePositions[i], side, i)
-        }
-    }
-
-    private createSingleInstancedGameBox(
-        game: SteamGameData, 
-        worldPosition: THREE.Vector3, 
-        side: ShelfSide,
-        _index: number
-    ): void {
-        if (!this.gameBoxRenderer) {
-            console.warn('⚠️ GpuGameBoxRenderer not initialized - cannot create game box')
-            return
-        }
-        this.gameBoxRenderer.createGameBoxAuto(game, worldPosition, side)
-    }
 
     public clearProps(): void {
         this.clearExistingShelves()
