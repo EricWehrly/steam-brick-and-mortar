@@ -16,37 +16,25 @@ import { Logger } from '../../utils/Logger'
 import { PerformanceMonitor } from '../../utils/PerformanceMonitor'
 
 export interface BatchItem<T> {
-    /** Batch sequential index (0-based) */
     batchIndex: number
-    /** Total number of batches expected */
     totalBatches: number
-    /** Batch payload data */
     data: T
 }
 
 export interface BatchProgress {
-    /** Number of batches received so far */
     received: number
-    /** Total number of batches expected */
     total: number
-    /** Whether all batches have been received */
     isComplete: boolean
 }
 
 export interface BatchMetrics {
-    /** Individual batch timing information */
     batches: Array<{ batchIndex: number; duration: number }>
-    /** Total time spent processing batches (main thread) */
     totalMainThreadTime: number
-    /** When batch processing started */
     loadStart: number
 }
 
 export type BatchProcessor<T> = (batch: BatchItem<T>) => Promise<void>
 
-/**
- * Coordinates batch processing with queue management and progress tracking
- */
 export class BatchCoordinator<T> {
     private static logger = Logger.createLogFunctions(BatchCoordinator.name)
 
@@ -65,17 +53,10 @@ export class BatchCoordinator<T> {
 
     private processor: BatchProcessor<T>
 
-    /**
-     * @param processor - Async function to process each batch
-     */
     constructor(processor: BatchProcessor<T>) {
         this.processor = processor
     }
 
-    /**
-     * Enqueue a batch for processing
-     * Automatically starts processing if not already running
-     */
     public enqueueBatch(batch: BatchItem<T>): void {
         BatchCoordinator.logger.debug(`Enqueuing batch ${batch.batchIndex + 1}/${batch.totalBatches}`)
         
@@ -96,9 +77,6 @@ export class BatchCoordinator<T> {
         }
     }
 
-    /**
-     * Get current progress information
-     */
     public getProgress(): BatchProgress {
         return {
             received: this.received,
@@ -107,23 +85,14 @@ export class BatchCoordinator<T> {
         }
     }
 
-    /**
-     * Get performance metrics
-     */
     public getMetrics(): Readonly<BatchMetrics> {
         return { ...this.metrics }
     }
 
-    /**
-     * Check if this is the first batch being processed
-     */
     public isFirstBatchProcessing(): boolean {
         return this.isFirstBatch
     }
 
-    /**
-     * Reset coordinator state for a new batch sequence
-     */
     public reset(): void {
         BatchCoordinator.logger.debug('Resetting batch coordinator')
         
@@ -140,10 +109,6 @@ export class BatchCoordinator<T> {
         }
     }
 
-    /**
-     * Process all queued batches in order
-     * Handles queue sorting and serialization
-     */
     private async processQueue(): Promise<void> {
         if (this.isProcessing) {
             BatchCoordinator.logger.debug('Already processing, skipping duplicate call')
@@ -177,9 +142,6 @@ export class BatchCoordinator<T> {
         }
     }
 
-    /**
-     * Process a single batch with timing and metrics
-     */
     private async processOneBatch(batch: BatchItem<T>): Promise<void> {
         const { batchIndex, totalBatches } = batch
 
@@ -220,9 +182,6 @@ export class BatchCoordinator<T> {
         }
     }
 
-    /**
-     * Log summary when all batches are complete
-     */
     private logCompletionSummary(): void {
         const totalLoadTime = Date.now() - this.metrics.loadStart
         const avgMainThreadTime = this.metrics.totalMainThreadTime / this.metrics.batches.length
