@@ -152,6 +152,13 @@ export async function createSceneTestContainer(): Promise<ServiceContainer> {
         domain: DataDomain.Scene
     })
 
+    // Create and register mock camera in DataManager for RoomManager
+    const mockCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
+    mockCamera.position.set(0, 1.6, 3)
+    DataManager.getInstance().set(DataKey.MainCamera, mockCamera, {
+        domain: DataDomain.Scene
+    })
+
     // Register mock scene services (no WebGL dependencies)
     container.registerSingleton(ServiceKeys.SceneManager, () => ({
         name: 'MockSceneManager',
