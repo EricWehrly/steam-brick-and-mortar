@@ -176,8 +176,7 @@ export class BatchCoordinator<T> {
             metadata: { batchIndex, totalBatches }
         })
 
-        // Phase 3f: Pure event-driven - emit BatchReadyForPlacement
-        // Event consumers handle initialization, shelf creation, and game spawning
+        // Emit BatchReadyForPlacement event for downstream processing
         const batchData = batch.data as unknown as SteamGamesBatchEvent
         EventManager.getInstance().emit<BatchReadyForPlacementEvent>(
             StorePropsEventTypes.BatchReadyForPlacement,

@@ -77,7 +77,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     constructor(scene: THREE.Scene) {
         this.scene = scene
 
-        // Phase 3f: BatchCoordinator is pure event-driven (no processor callback)
+        // BatchCoordinator handles event-driven batch processing
         this.batchCoordinator = new BatchCoordinator<SteamGamesBatchEvent>()
 
         // GpuGameBoxRenderer allocation deferred until we know actual game count
@@ -114,16 +114,16 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             this.resetBatchState.bind(this)
         );
         
-        // Phase 3f: Listen for BatchReadyForPlacement events (pure event-driven)
+        // Listen for batch events to trigger initialization and shelf creation
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.handleBatchReadyForPlacement.bind(this)
         );
-        GpuStorePropsRenderer.logger.debug('Registered listener for BatchReadyForPlacement events (Phase 3f: pure event-driven)');
+        GpuStorePropsRenderer.logger.debug('Registered listener for BatchReadyForPlacement events');
     }
     
     /**
-     * Handle BatchReadyForPlacement event (Phase 3f: pure event-driven)
+     * Handle BatchReadyForPlacement event
      * Processes game batch: initialization on first batch, shelf creation for all batches
      */
     private async handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
@@ -312,7 +312,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.createInstancedShelf(shelfPosition, games, Math.floor(batchIndex / this.maxShelvesPerRow), batchIndex % this.maxShelvesPerRow)
         this.cumulativeShelfCount++
         
-        // Phase 3d: Emit ShelfCreated event after shelf creation (dual-path)
+        // Emit ShelfCreated event for game placement coordination
         EventManager.getInstance().emit<ShelfCreatedEvent>(
             StorePropsEventTypes.ShelfCreated,
             {
