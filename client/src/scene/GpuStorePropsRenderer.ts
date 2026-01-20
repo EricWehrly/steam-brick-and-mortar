@@ -27,7 +27,7 @@ import {
     type StorePropsProgressEvent, 
     type SteamGamesBatchEvent, 
     type AllBatchesCompleteEvent,
-    type ShelfSpaceRequestedEvent,
+    type BatchReadyForPlacementEvent,
     type ShelfCreatedEvent 
 } from '../types/InteractionEvents'
 import type { SteamGameData } from './game-box/types/GameData'
@@ -77,10 +77,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     constructor(scene: THREE.Scene) {
         this.scene = scene
 
-        // Initialize batch coordinator for game loading with self-registration
-        this.batchCoordinator = new BatchCoordinator<SteamGamesBatchEvent>(
-            this.processOneBatch.bind(this)
-        )
+        // Phase 3f: BatchCoordinator is pure event-driven (no processor callback)
+        this.batchCoordinator = new BatchCoordinator<SteamGamesBatchEvent>()
 
         // GpuGameBoxRenderer allocation deferred until we know actual game count
         // Texture arrays are expensive - don't allocate VRAM until needed
@@ -116,17 +114,20 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             this.resetBatchState.bind(this)
         );
         
-        // Phase 3d: Listen for ShelfSpaceRequested events (dual-path alongside direct calls)
+        // Phase 3f: Listen for BatchReadyForPlacement events (pure event-driven)
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ShelfSpaceRequested,
-            this.handleShelfSpaceRequested.bind(this)
+            StorePropsEventTypes.BatchReadyForPlacement,
+            this.handleBatchReadyForPlacement.bind(this)
         );
-        GpuStorePropsRenderer.logger.debug('Registered listener for ShelfSpaceRequested events (Phase 3d: dual-path)');
+        GpuStorePropsRenderer.logger.debug('Registered listener for BatchReadyForPlacement events (Phase 3f: pure event-driven)');
     }
     
-    private async processOneBatch(batch: { batchIndex: number; totalBatches: number; data: SteamGamesBatchEvent }): Promise<void> {
-        const batchEvent = batch.data
-        const { games, batchIndex, totalBatches } = batchEvent
+    /**
+     * Handle BatchReadyForPlacement event (Phase 3f: pure event-driven)
+     * Processes game batch: initialization on first batch, shelf creation for all batches
+     */
+    private async handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
+        const { games, batchIndex, totalBatches } = event.detail
         
         const batchMonitor = PerformanceMonitor.start('batch-process', GpuStorePropsRenderer.logger, {
             metadata: { batchIndex, gameCount: games.length }
@@ -321,20 +322,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             }
         )
         GpuStorePropsRenderer.logger.debug(`Emitted ShelfCreated for batch ${batchIndex + 1}`)
-    }
-    
-    /**
-     * Handle ShelfSpaceRequested event (Phase 3d: dual-path alongside direct calls)
-     * Creates shelf for requested batch - same logic as createShelfForBatch
-     */
-    private async handleShelfSpaceRequested(event: CustomEvent<ShelfSpaceRequestedEvent>): Promise<void> {
-        const { gamesCount, batchIndex } = event.detail
-        GpuStorePropsRenderer.logger.debug(
-            `[Phase 3d DUAL-PATH] ShelfSpaceRequested received: ${gamesCount} games for batch ${batchIndex + 1}. ` +
-            `Event path AND direct call path both functional.`
-        )
-        // Note: For now, just logging - actual shelf creation happens via direct call
-        // In Phase 3e, we'll switch to using this event path
     }
     
     private finalizeProgressiveLoading(): void {

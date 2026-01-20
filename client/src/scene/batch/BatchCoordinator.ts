@@ -40,8 +40,6 @@ export interface BatchMetrics {
     loadStart: number
 }
 
-export type BatchProcessor<T> = (batch: BatchItem<T>) => Promise<void>
-
 export class BatchCoordinator<T> {
     private static logger = Logger.createLogFunctions(BatchCoordinator.name)
 
@@ -58,10 +56,7 @@ export class BatchCoordinator<T> {
         loadStart: 0
     }
 
-    private processor: BatchProcessor<T>
-
-    constructor(processor: BatchProcessor<T>) {
-        this.processor = processor
+    constructor() {
         
         // Self-register for GamesBatchReady events
         EventManager.getInstance().registerEventHandler(
@@ -181,44 +176,30 @@ export class BatchCoordinator<T> {
             metadata: { batchIndex, totalBatches }
         })
 
-        try {
-            await this.processor(batch)
-
-            const batchDuration = batchMonitor.getElapsed()
-            this.metrics.batches.push({ batchIndex, duration: batchDuration })
-            this.metrics.totalMainThreadTime += batchDuration
-
-            batchMonitor.end({
-                batch: `${batchIndex + 1}/${totalBatches}`
-            })
-
-            BatchCoordinator.logger.debug(`Batch ${batchIndex + 1}/${totalBatches} complete (${batchDuration.toFixed(1)}ms)`)
-        } catch (error) {
-            const batchDuration = batchMonitor.getElapsed()
-            this.metrics.batches.push({ batchIndex, duration: batchDuration })
-            this.metrics.totalMainThreadTime += batchDuration
-            
-            batchMonitor.end({ error: true })
-            BatchCoordinator.logger.error(`Batch ${batchIndex + 1}/${totalBatches} failed: ${error}`)
-            // Don't rethrow - log and continue processing remaining batches
-        } finally {
-            // Emit BatchReadyForPlacement event (Phase 3b: dual-path alongside callback)
-            // Emit regardless of processor success/failure - event consumers decide how to handle
-            const batchData = batch.data as unknown as SteamGamesBatchEvent
-            EventManager.getInstance().emit<BatchReadyForPlacementEvent>(
-                StorePropsEventTypes.BatchReadyForPlacement,
-                {
-                    games: batchData.games,
-                    batchIndex,
-                    totalBatches
-                }
-            )
-            BatchCoordinator.logger.debug(`Emitted BatchReadyForPlacement for batch ${batchIndex + 1}/${totalBatches}`)
-            
-            // Clear first batch flag after processing completes
-            if (this.isFirstBatch) {
-                this.isFirstBatch = false
+        // Phase 3f: Pure event-driven - emit BatchReadyForPlacement
+        // Event consumers handle initialization, shelf creation, and game spawning
+        const batchData = batch.data as unknown as SteamGamesBatchEvent
+        EventManager.getInstance().emit<BatchReadyForPlacementEvent>(
+            StorePropsEventTypes.BatchReadyForPlacement,
+            {
+                games: batchData.games,
+                batchIndex,
+                totalBatches
             }
+        )
+        BatchCoordinator.logger.debug(`Emitted BatchReadyForPlacement for batch ${batchIndex + 1}/${totalBatches}`)
+        
+        const batchDuration = batchMonitor.getElapsed()
+        this.metrics.batches.push({ batchIndex, duration: batchDuration })
+        this.metrics.totalMainThreadTime += batchDuration
+
+        batchMonitor.end({
+            batch: `${batchIndex + 1}/${totalBatches}`
+        })
+        
+        // Clear first batch flag after processing completes
+        if (this.isFirstBatch) {
+            this.isFirstBatch = false
         }
     }
 
