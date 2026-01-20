@@ -3,7 +3,13 @@ import type { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { ShelfSurfaceUtils, type ShelfSurface, ShelfSide, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
-import { StorePropsEventTypes, type BatchReadyForPlacementEvent } from '../../types/InteractionEvents'
+import { 
+    StorePropsEventTypes, 
+    type BatchReadyForPlacementEvent,
+    type ShelfSpaceRequestedEvent,
+    type ShelfCreatedEvent,
+    type GamesPlacedEvent
+} from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 
 /**
@@ -14,35 +20,96 @@ import { Logger } from '../../utils/Logger'
  * 
  * Extracted from GpuStorePropsRenderer to isolate game placement logic.
  * 
- * Phase 3c: Now observes BatchReadyForPlacement events (read-only mode).
- * Currently logs events but continues using direct method calls (dual-path).
+ * Phase 3c: Observes BatchReadyForPlacement events (read-only mode)
+ * Phase 3e: Emits ShelfSpaceRequested and listens for ShelfCreated (dual-path active)
+ * Currently uses BOTH event path and direct method calls for safety
  */
 export class GameBoxSpawner {
     private static logger = Logger.createLogFunctions(GameBoxSpawner.name)
     
+    // Phase 3e: Track pending games waiting for shelf creation
+    private pendingGames: Map<number, readonly SteamGameData[]> = new Map()
+    
     constructor(
         private readonly gameBoxRenderer: GpuGameBoxRenderer
     ) {
-        // Phase 3c: Register listener for BatchReadyForPlacement events (read-only observation)
+        // Phase 3c: Register listener for BatchReadyForPlacement events
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.handleBatchReadyForPlacement.bind(this)
         )
-        GameBoxSpawner.logger.debug('Registered listener for BatchReadyForPlacement events (Phase 3c: observation mode)')
+        
+        // Phase 3e: Register listener for ShelfCreated events
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ShelfCreated,
+            this.handleShelfCreated.bind(this)
+        )
+        
+        GameBoxSpawner.logger.debug('Registered listeners for BatchReadyForPlacement and ShelfCreated events (Phase 3e: dual-path)');
     }
     
     /**
-     * Handle BatchReadyForPlacement event (Phase 3c: read-only observation)
-     * Currently logs event data but does NOT act on it - old path still functional
+     * Handle BatchReadyForPlacement event (Phase 3e: now emits ShelfSpaceRequested)
+     * Stores games and requests shelf space via event
      */
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
         const { games, batchIndex, totalBatches } = event.detail
+        
         GameBoxSpawner.logger.debug(
-            `[Phase 3c OBSERVATION] BatchReadyForPlacement received: ` +
+            `[Phase 3e EVENT PATH] BatchReadyForPlacement received: ` +
             `batch ${batchIndex + 1}/${totalBatches}, ${games.length} games. ` +
-            `NOT ACTING - still using direct method calls.`
+            `Emitting ShelfSpaceRequested...`
         )
-        // No action taken - this is observation-only to verify events arrive correctly
+        
+        // Store games pending shelf creation
+        this.pendingGames.set(batchIndex, games)
+        
+        // Emit ShelfSpaceRequested event
+        EventManager.getInstance().emit<ShelfSpaceRequestedEvent>(
+            StorePropsEventTypes.ShelfSpaceRequested,
+            {
+                gamesCount: games.length,
+                batchIndex: batchIndex
+            }
+        )
+        GameBoxSpawner.logger.debug(`Emitted ShelfSpaceRequested for batch ${batchIndex + 1}`)
+    }
+    
+    /**
+     * Handle ShelfCreated event (Phase 3e: spawn games on created shelf)
+     * Retrieves pending games and places them on the shelf
+     */
+    private handleShelfCreated(event: CustomEvent<ShelfCreatedEvent>): void {
+        const { position, batchIndex } = event.detail
+        
+        GameBoxSpawner.logger.debug(
+            `[Phase 3e EVENT PATH] ShelfCreated received for batch ${batchIndex + 1}. ` +
+            `Spawning games at position (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)})`
+        )
+        
+        const games = this.pendingGames.get(batchIndex)
+        if (!games) {
+            GameBoxSpawner.logger.warn(`No pending games found for batch ${batchIndex}`);
+            return
+        }
+        
+        // Spawn games using event-driven path
+        this.spawnGamesOnShelf(position, games, 0, 0)
+        
+        // Clean up pending games
+        this.pendingGames.delete(batchIndex)
+        
+        // Emit GamesPlaced event
+        EventManager.getInstance().emit<GamesPlacedEvent>(
+            StorePropsEventTypes.GamesPlaced,
+            {
+                gamesCount: games.length,
+                batchIndex: batchIndex
+            }
+        )
+        GameBoxSpawner.logger.debug(
+            `[Phase 3e EVENT PATH] Spawned ${games.length} games, emitted GamesPlaced for batch ${batchIndex + 1}`
+        )
     }
     
     /**
@@ -55,7 +122,7 @@ export class GameBoxSpawner {
      */
     spawnGamesOnShelf(
         shelfPosition: THREE.Vector3, 
-        games: SteamGameData[], 
+        games: readonly SteamGameData[], 
         _rowIndex: number, 
         _shelfIndex: number
     ): void {
@@ -93,14 +160,14 @@ export class GameBoxSpawner {
     private createGameBoxes(
         shelfPosition: THREE.Vector3,
         surface: ShelfSurface, 
-        games: SteamGameData[], 
+        games: readonly SteamGameData[], 
         side: ShelfSide
     ): void {
         const boxDimensions = this.gameBoxRenderer.getDimensions()
         const gamePositions = GameBoxUtils.calculateGamePositions(
             shelfPosition, 
             surface, 
-            games, 
+            games as SteamGameData[], // Cast readonly to mutable for legacy utility
             side, 
             boxDimensions
         )
