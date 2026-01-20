@@ -28,6 +28,7 @@ import {
     type SteamGamesBatchEvent, 
     type AllBatchesCompleteEvent,
     type BatchReadyForPlacementEvent,
+    type ShelfSpaceRequestedEvent,
     type ShelfCreatedEvent 
 } from '../types/InteractionEvents'
 import type { SteamGameData } from './game-box/types/GameData'
@@ -98,7 +99,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         // Create GPU instanced shelf renderer
         this.instancedShelfRenderer = new InstancedShelfRenderer({
-            maxShelfUnits: 50 // Allow up to 50 shelf units
+            maxShelfUnits: 100 // Allow up to 100 shelf units (47+ batches need this)
         })
         
         // Initialize shelf renderer eagerly to avoid blocking when batches arrive
@@ -114,46 +115,57 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             this.resetBatchState.bind(this)
         );
         
-        // Listen for batch events to trigger initialization and shelf creation
+        // Listen for first batch to trigger initialization (creates GameBoxSpawner)
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
-            this.handleBatchReadyForPlacement.bind(this)
+            this.handleInitialBatch.bind(this)
         );
-        GpuStorePropsRenderer.logger.debug('Registered listener for BatchReadyForPlacement events');
+        
+        // Listen for shelf space requests from GameBoxSpawner
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ShelfSpaceRequested,
+            this.handleShelfSpaceRequested.bind(this)
+        );
+        GpuStorePropsRenderer.logger.debug('Registered listeners for BatchReadyForPlacement and ShelfSpaceRequested events');
     }
     
     /**
-     * Handle BatchReadyForPlacement event
-     * Processes game batch: initialization on first batch, shelf creation for all batches
+     * Handle first BatchReadyForPlacement to initialize renderers
+     * After initialization, GameBoxSpawner takes over handling these events
      */
-    private async handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
-        const { games, batchIndex, totalBatches } = event.detail
+    private async handleInitialBatch(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
+        const { totalBatches, batchIndex, games } = event.detail
         
-        const batchMonitor = PerformanceMonitor.start('batch-process', GpuStorePropsRenderer.logger, {
-            metadata: { batchIndex, gameCount: games.length }
-        })
-        
-        const batchGames = games.map(g => this.steamGameToGameData(g))
-        
-        this.games.push(...batchGames)
-        
-        if (this.batchCoordinator.isFirstBatchProcessing()) {
-            
-            const initMonitor = PerformanceMonitor.start('renderer-initialization', GpuStorePropsRenderer.logger, ASYNC_CONTEXT)
-            await this.initializeForProgressiveLoading(totalBatches)
-            initMonitor.end({ totalBatches })
+        // Only handle the first batch for initialization
+        if (!this.batchCoordinator.isFirstBatchProcessing()) {
+            return
         }
         
-        const shelfMonitor = PerformanceMonitor.start('shelf-creation', GpuStorePropsRenderer.logger)
-        await this.createShelfForBatch(batchGames, batchIndex)
-        const shelfCreationTime = shelfMonitor.getElapsed()
-        shelfMonitor.end({ batchIndex })
+        // Initialize renderers (creates GameBoxSpawner which will handle subsequent batches)
+        const initMonitor = PerformanceMonitor.start('renderer-initialization', GpuStorePropsRenderer.logger, ASYNC_CONTEXT)
+        await this.initializeForProgressiveLoading(totalBatches)
+        initMonitor.end({ totalBatches })
         
-        batchMonitor.end({ 
-            batch: `${batchIndex + 1}/${totalBatches}`,
-            gameCount: batchGames.length,
-            shelfCreation: shelfCreationTime
-        })
+        // Re-emit the first batch event so newly-created GameBoxSpawner can process it
+        // GameBoxSpawner was just created, so it missed this event
+        EventManager.getInstance().emit<BatchReadyForPlacementEvent>(
+            StorePropsEventTypes.BatchReadyForPlacement,
+            { games, batchIndex, totalBatches }
+        )
+        GpuStorePropsRenderer.logger.debug(`Re-emitted first batch (${batchIndex}) for GameBoxSpawner`)
+    }
+    
+    /**
+     * Handle ShelfSpaceRequested event from GameBoxSpawner
+     * Creates shelf in response to request, then emits ShelfCreated event
+     */
+    private async handleShelfSpaceRequested(event: CustomEvent<ShelfSpaceRequestedEvent>): Promise<void> {
+        const { gamesCount, batchIndex } = event.detail
+        
+        // Create shelf for the requested batch
+        const shelfMonitor = PerformanceMonitor.start('shelf-creation', GpuStorePropsRenderer.logger)
+        await this.createShelfForBatchIndex(batchIndex)
+        shelfMonitor.end({ batchIndex })
         
         EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
         
@@ -281,7 +293,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.preallocateShelfPositions(batchIndex + 1)
     }
     
-    private async createShelfForBatch(games: SteamGameData[], batchIndex: number): Promise<void> {
+    /**
+     * Create shelf for a specific batch index (called in response to ShelfSpaceRequested)
+     */
+    private async createShelfForBatchIndex(batchIndex: number): Promise<void> {
         const isReady = this.instancedShelfRenderer?.isReady()
         if (!isReady) {
             console.error(`❌ InstancedShelfRenderer not ready for batch ${batchIndex + 1}!`)
@@ -309,10 +324,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             detail: `Creating shelf ${batchIndex + 1}/${progress.total}`
         })
         
-        this.createInstancedShelf(shelfPosition, games, Math.floor(batchIndex / this.maxShelvesPerRow), batchIndex % this.maxShelvesPerRow)
+        // Create shelf without games (GameBoxSpawner will place them)
+        this.createInstancedShelf(shelfPosition, [], Math.floor(batchIndex / this.maxShelvesPerRow), batchIndex % this.maxShelvesPerRow)
         this.cumulativeShelfCount++
         
-        // Emit ShelfCreated event for game placement coordination
+        // Emit ShelfCreated event for GameBoxSpawner to place games
         EventManager.getInstance().emit<ShelfCreatedEvent>(
             StorePropsEventTypes.ShelfCreated,
             {
