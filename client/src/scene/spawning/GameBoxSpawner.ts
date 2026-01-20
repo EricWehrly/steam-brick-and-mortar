@@ -2,6 +2,9 @@ import * as THREE from 'three'
 import type { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { ShelfSurfaceUtils, type ShelfSurface, ShelfSide, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
+import { EventManager } from '../../core/EventManager'
+import { StorePropsEventTypes, type BatchReadyForPlacementEvent } from '../../types/InteractionEvents'
+import { Logger } from '../../utils/Logger'
 
 /**
  * GameBoxSpawner
@@ -10,11 +13,37 @@ import { ShelfSurfaceUtils, type ShelfSurface, ShelfSide, GameBoxUtils, GameLayo
  * Handles game distribution across shelf surfaces (front/back of each shelf board).
  * 
  * Extracted from GpuStorePropsRenderer to isolate game placement logic.
+ * 
+ * Phase 3c: Now observes BatchReadyForPlacement events (read-only mode).
+ * Currently logs events but continues using direct method calls (dual-path).
  */
 export class GameBoxSpawner {
+    private static logger = Logger.createLogFunctions(GameBoxSpawner.name)
+    
     constructor(
         private readonly gameBoxRenderer: GpuGameBoxRenderer
-    ) {}
+    ) {
+        // Phase 3c: Register listener for BatchReadyForPlacement events (read-only observation)
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.BatchReadyForPlacement,
+            this.handleBatchReadyForPlacement.bind(this)
+        )
+        GameBoxSpawner.logger.debug('Registered listener for BatchReadyForPlacement events (Phase 3c: observation mode)')
+    }
+    
+    /**
+     * Handle BatchReadyForPlacement event (Phase 3c: read-only observation)
+     * Currently logs event data but does NOT act on it - old path still functional
+     */
+    private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
+        const { games, batchIndex, totalBatches } = event.detail
+        GameBoxSpawner.logger.debug(
+            `[Phase 3c OBSERVATION] BatchReadyForPlacement received: ` +
+            `batch ${batchIndex + 1}/${totalBatches}, ${games.length} games. ` +
+            `NOT ACTING - still using direct method calls.`
+        )
+        // No action taken - this is observation-only to verify events arrive correctly
+    }
     
     /**
      * Spawn games on a shelf at the given position
