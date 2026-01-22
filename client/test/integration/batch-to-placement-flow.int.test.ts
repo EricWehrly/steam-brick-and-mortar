@@ -45,7 +45,8 @@ import {
     StorePropsEventTypes,
     GameEventTypes, 
     type SteamGamesBatchEvent,
-    type BatchReadyForPlacementEvent 
+    type BatchReadyForPlacementEvent,
+    type ShelfLayoutDeterminedEvent
 } from '../../src/types/InteractionEvents'
 import type { SteamGame } from '../../src/steam'
 
@@ -55,7 +56,9 @@ describe('Batch-to-Placement Flow Integration', () => {
     let dataManager: DataManager
     let renderer: GpuStorePropsRenderer
     let allBatchesCompleteReceived: boolean
+    let layoutDeterminedReceived: boolean
     let completionEventData: any
+    let layoutEventData: ShelfLayoutDeterminedEvent | null
     let batchReadyEvents: BatchReadyForPlacementEvent[] = []
 
     const createMockGames = (count: number, batchIndex: number): Readonly<SteamGame>[] => {
@@ -77,7 +80,9 @@ describe('Batch-to-Placement Flow Integration', () => {
         // Clear state
         dataManager.clear()
         allBatchesCompleteReceived = false
+        layoutDeterminedReceived = false
         completionEventData = null
+        layoutEventData = null
         batchReadyEvents = []
         
         // Listen for BatchReadyForPlacement (Phase 3b)
@@ -86,6 +91,16 @@ describe('Batch-to-Placement Flow Integration', () => {
             (event: CustomEvent<BatchReadyForPlacementEvent>) => {
                 console.log('📦 TEST: BatchReadyForPlacement received!', event.detail)
                 batchReadyEvents.push(event.detail)
+            }
+        )
+        
+        // Listen for layout determination
+        eventManager.registerEventHandler(
+            GameEventTypes.ShelfLayoutDetermined,
+            (event: CustomEvent<ShelfLayoutDeterminedEvent>) => {
+                console.log('📐 TEST: ShelfLayoutDetermined received!', event.detail)
+                layoutDeterminedReceived = true
+                layoutEventData = event.detail
             }
         )
         
@@ -131,9 +146,10 @@ describe('Batch-to-Placement Flow Integration', () => {
             
             // Validate completion event
             expect(allBatchesCompleteReceived).toBe(true)
-            expect(completionEventData).toBeDefined()
-            expect(completionEventData.shelfLayout).toBeDefined()
-            expect(completionEventData.shelfBounds).toBeDefined()
+            expect(layoutDeterminedReceived).toBe(true)
+            expect(layoutEventData).toBeDefined()
+            expect(layoutEventData!.shelfLayout).toBeDefined()
+            expect(layoutEventData!.shelfBounds).toBeDefined()
         })
 
         it('should process multiple batches sequentially', async () => {
@@ -263,11 +279,12 @@ describe('Batch-to-Placement Flow Integration', () => {
             )
             
             await vi.waitFor(() => {
-                expect(allBatchesCompleteReceived).toBe(true)
+                return layoutDeterminedReceived === true && allBatchesCompleteReceived === true
             }, { timeout: 2000 })
             
-            // Verify bounds structure
-            const bounds = completionEventData.shelfBounds
+            // Verify bounds structure from layout event
+            expect(layoutEventData).toBeDefined()
+            const bounds = layoutEventData!.shelfBounds
             expect(bounds).toBeDefined()
             expect(bounds.minX).toBeDefined()
             expect(bounds.maxX).toBeDefined()
@@ -367,7 +384,7 @@ describe('Batch-to-Placement Flow Integration', () => {
             )
             
             await vi.waitFor(() => {
-                return allBatchesCompleteReceived === true
+                return layoutDeterminedReceived === true && allBatchesCompleteReceived === true
             }, { timeout: 8000, interval: 100 })
             
             const objectCountAfter = scene.children.length
@@ -376,9 +393,10 @@ describe('Batch-to-Placement Flow Integration', () => {
             const baselineState = {
                 gamesProcessed: games.length,
                 objectsAdded: objectCountAfter - objectCountBefore,
-                shelfBounds: completionEventData.shelfBounds,
-                shelfLayout: completionEventData.shelfLayout,
-                completionReceived: allBatchesCompleteReceived
+                shelfBounds: layoutEventData!.shelfBounds,
+                shelfLayout: layoutEventData!.shelfLayout,
+                completionReceived: allBatchesCompleteReceived,
+                layoutReceived: layoutDeterminedReceived
             }
             
             // Log baseline for Phase 3 reference

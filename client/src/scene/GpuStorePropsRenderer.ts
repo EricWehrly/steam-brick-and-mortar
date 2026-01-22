@@ -25,6 +25,7 @@ import {
     StorePropsEventTypes, 
     type StorePropsProgressEvent, 
     type SteamGamesBatchEvent, 
+    type ShelfLayoutDeterminedEvent,
     type AllBatchesCompleteEvent,
     type BatchReadyForPlacementEvent,
     type ShelfSpaceRequestedEvent,
@@ -261,6 +262,18 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         this.shelfLayout.rows = Math.ceil(totalShelves / this.maxShelvesPerRow)
         this.shelfLayout.shelvesPerRow = this.maxShelvesPerRow
+        
+        // Emit layout as soon as we know it (no need to wait for batches to finish loading)
+        EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(
+            GameEventTypes.ShelfLayoutDetermined,
+            {
+                shelfBounds: { ...this.shelfBounds },
+                shelfLayout: { ...this.shelfLayout }
+            }
+        )
+        GpuStorePropsRenderer.logger.debug(
+            `Shelf layout determined: ${this.shelfLayout.rows} rows × ${this.shelfLayout.shelvesPerRow} shelves`
+        )
     }
     
     private ensureShelfPositionAllocated(batchIndex: number): void {
@@ -327,10 +340,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         this.progressiveLoadingCompleted = true
         
-        EventManager.getInstance().emit<AllBatchesCompleteEvent>(GameEventTypes.AllBatchesComplete, {
-            shelfBounds: { ...this.shelfBounds },
-            shelfLayout: { ...this.shelfLayout }
-        })
+        // Signal completion (layout was emitted earlier via ShelfLayoutDetermined)
+        EventManager.getInstance().emit<AllBatchesCompleteEvent>(GameEventTypes.AllBatchesComplete, {})
         
         this.resetBatchState()
     }

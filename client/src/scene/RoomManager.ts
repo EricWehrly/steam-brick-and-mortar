@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { EventManager } from '../core/EventManager'
 import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
-import { RoomEventTypes, type RoomResizedEvent, CeilingEventTypes, type CeilingToggleEvent, GameEventTypes, type AllBatchesCompleteEvent } from '../types/InteractionEvents'
+import { RoomEventTypes, type RoomResizedEvent, CeilingEventTypes, type CeilingToggleEvent, GameEventTypes, type ShelfLayoutDeterminedEvent } from '../types/InteractionEvents'
 import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
@@ -81,7 +81,7 @@ export class RoomManager {
         this.eventManager = EventManager.getInstance()
         
         this.eventManager.registerEventHandler(RoomEventTypes.Resize, this.onResizeRoom.bind(this))
-        this.eventManager.registerEventHandler(GameEventTypes.AllBatchesComplete, this.onAllBatchesComplete.bind(this))
+        this.eventManager.registerEventHandler(GameEventTypes.ShelfLayoutDetermined, this.onShelfLayoutDetermined.bind(this))
         this.eventManager.registerEventHandler(CeilingEventTypes.Toggle, this.onCeilingToggle.bind(this))
         
         // Fire-and-forget initial room creation
@@ -110,7 +110,7 @@ export class RoomManager {
         }
     }
 
-    private async onAllBatchesComplete(event: CustomEvent<AllBatchesCompleteEvent>): Promise<void> {
+    private async onShelfLayoutDetermined(event: CustomEvent<ShelfLayoutDeterminedEvent>): Promise<void> {
         const perf = PerformanceMonitor.start('room-resize-calculation', this.logger)
         
         const { shelfBounds, shelfLayout } = event.detail
@@ -118,7 +118,7 @@ export class RoomManager {
         // Validate shelf bounds exist
         if (shelfBounds.minX === Infinity) {
             perf.end()
-            console.debug('🏠 AllBatchesComplete received with no shelf bounds - skipping resize')
+            console.debug('🏠 ShelfLayoutDetermined received with no shelf bounds - skipping resize')
             return
         }
         

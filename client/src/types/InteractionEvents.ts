@@ -178,9 +178,13 @@ export interface ShelfBounds {
     maxZ: number
 }
 
-export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
+export interface ShelfLayoutDeterminedEvent extends BaseInteractionEvent {
     shelfBounds: ShelfBounds
     shelfLayout: { rows: number; shelvesPerRow: number }
+}
+
+export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
+    // Event signals all batches processed - consumers needing layout should use ShelfLayoutDetermined
 }
 
 // =============================================================================
@@ -310,6 +314,7 @@ export const GameEventTypes = {
     SceneReady: 'game:scene-ready',
     Start: 'game:start',
     InstancedBatchComplete: 'game:instanced-batch-complete',
+    ShelfLayoutDetermined: 'game:shelf-layout-determined',
     AllBatchesComplete: 'game:all-batches-complete'
 } as const
 
@@ -384,6 +389,7 @@ export interface InteractionEventMap {
     [GameEventTypes.SceneReady]: SceneReadyEvent
     [GameEventTypes.Start]: GameStartEvent
     [GameEventTypes.InstancedBatchComplete]: InstancedBatchCompleteEvent
+    [GameEventTypes.ShelfLayoutDetermined]: ShelfLayoutDeterminedEvent
     [GameEventTypes.AllBatchesComplete]: AllBatchesCompleteEvent
     
     // Lighting events
