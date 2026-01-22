@@ -15,6 +15,9 @@ import {
     type ArtworkFormat
 } from '../../../../src/scene/game-box/instancing/GameArtworkProvider'
 
+// Cache key constants for testing
+const { FAILURE_CACHE_KEY, SUCCESS_CACHE_KEY } = GameArtworkProvider
+
 // Mock TextureWorker
 vi.mock('../../../../src/scene/game-box/instancing/TextureWorker', () => ({
     TextureWorker: vi.fn().mockImplementation(() => ({
@@ -169,7 +172,7 @@ describe('GameArtworkProvider', () => {
             provider.recordFailure(12345, 'library', 'NETWORK', ['url1'])
             
             expect(localStorageMock.setItem).toHaveBeenCalledWith(
-                'steam-artwork-failures-v2',
+                FAILURE_CACHE_KEY,
                 expect.any(String)
             )
         })
@@ -178,7 +181,7 @@ describe('GameArtworkProvider', () => {
             provider.recordSuccess(12345, 'library', 'https://fallback.com/art.jpg', 'cdn-library')
             
             expect(localStorageMock.setItem).toHaveBeenCalledWith(
-                'steam-artwork-successes-v2',
+                SUCCESS_CACHE_KEY,
                 expect.any(String)
             )
         })
@@ -190,8 +193,8 @@ describe('GameArtworkProvider', () => {
             provider.clearCaches()
             
             expect(provider.isKnownFailure(12345, 'library')).toBe(false)
-            expect(localStorageMock.removeItem).toHaveBeenCalledWith('steam-artwork-failures-v2')
-            expect(localStorageMock.removeItem).toHaveBeenCalledWith('steam-artwork-successes-v2')
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith(FAILURE_CACHE_KEY)
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith(SUCCESS_CACHE_KEY)
         })
     })
 
@@ -210,7 +213,7 @@ describe('GameArtworkProvider', () => {
             
             const artwork = provider.getArtwork(12345, 'Test Game', 'library')
             
-            await expect(artwork.getPixels()).rejects.toThrow('Known failure')
+            await expect(artwork.getPixels()).rejects.toThrow('Permanent failure (CORS) - skipping retry')
         })
 
         it('should fetch pixels at native size', async () => {

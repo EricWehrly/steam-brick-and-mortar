@@ -19,7 +19,7 @@ import {
     SteamEventTypes, 
     StorePropsEventTypes,
     type SteamGamesBatchEvent,
-    type BatchReadyForPlacementEvent 
+    type BatchReadyForPlacementEvent
 } from '../../types/InteractionEvents'
 
 export interface BatchItem<T> {
@@ -158,9 +158,9 @@ export class BatchCoordinator<T> {
             this.isProcessing = false
         }
 
-        // Log completion if all batches received
+        // Emit completion event if all batches received
         if (this.getProgress().isComplete) {
-            this.logCompletionSummary()
+            this.emitCompletionEvent()
         }
     }
 
@@ -202,7 +202,7 @@ export class BatchCoordinator<T> {
         }
     }
 
-    private logCompletionSummary(): void {
+    private emitCompletionEvent(): void {
         const totalLoadTime = Date.now() - this.metrics.loadStart
         const avgMainThreadTime = this.metrics.totalMainThreadTime / this.metrics.batches.length
         const asyncTime = totalLoadTime - this.metrics.totalMainThreadTime
@@ -214,5 +214,6 @@ export class BatchCoordinator<T> {
             `Total: ${totalLoadTime.toFixed(1)}ms | ` +
             `Avg/batch: ${avgMainThreadTime.toFixed(1)}ms`
         )
+        // Note: GpuStorePropsRenderer emits AllBatchesComplete with actual shelf bounds/layout
     }
 }

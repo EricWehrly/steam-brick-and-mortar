@@ -10,7 +10,7 @@
  * 6. Emits GamesPlaced events
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest'
 import * as THREE from 'three'
 import { EventManager } from '../../../../src/core/EventManager'
 import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
@@ -24,29 +24,25 @@ import {
 } from '../../../../src/types/InteractionEvents'
 import type { SteamGame } from '../../../../src/steam'
 
-// Mock EventManager.getInstance() to return a fresh instance for each test
+// Mock EventManager with test helper
 vi.mock('../../../../src/core/EventManager', () => {
-    const EventManager = vi.fn()
-    EventManager.prototype.registerEventHandler = vi.fn()
-    EventManager.prototype.emit = vi.fn()
-    EventManager.prototype.removeEventHandler = vi.fn()
+    type MockInstance = { registerEventHandler: Mock; emit: Mock; removeEventHandler: Mock }
+    let mockInstance: MockInstance | null = null
     
-    let mockInstance: any = null
-    
-    EventManager.getInstance = vi.fn(() => {
-        if (!mockInstance) {
-            mockInstance = new EventManager()
-        }
-        return mockInstance
-    })
-    
-    // Add method to reset the singleton for tests
-    EventManager.resetInstance = () => {
-        mockInstance = null
+    return {
+        EventManager: Object.assign(
+            vi.fn(() => ({ registerEventHandler: vi.fn(), emit: vi.fn(), removeEventHandler: vi.fn() })),
+            {
+                getInstance: vi.fn(() => mockInstance ??= { registerEventHandler: vi.fn(), emit: vi.fn(), removeEventHandler: vi.fn() }),
+                resetInstance: () => { mockInstance = null }
+            }
+        )
     }
-    
-    return { EventManager }
 })
+
+// Access mock's test helper
+const resetEventManager = () => (EventManager as unknown as { resetInstance: () => void }).resetInstance()
+
 
 describe('GameBoxSpawner Event Coordination', () => {
     let eventManager: EventManager
@@ -66,7 +62,7 @@ describe('GameBoxSpawner Event Coordination', () => {
 
     beforeEach(() => {
         // Reset the singleton and get a fresh instance
-        ;(EventManager as any).resetInstance()
+        resetEventManager()
         eventManager = EventManager.getInstance()
         
         // Set up event handler map to track registrations
@@ -80,13 +76,14 @@ describe('GameBoxSpawner Event Coordination', () => {
             eventHandlers.get(eventType)!.add(handler)
         })
         
-        // Mock emit to call registered handlers
+        // Mock emit to call registered handlers (returns boolean to match real signature)
         vi.mocked(eventManager.emit).mockImplementation((eventType: string, detail: any) => {
             const handlers = eventHandlers.get(eventType)
             if (handlers) {
                 const event = new CustomEvent(eventType, { detail })
                 handlers.forEach(handler => handler(event))
             }
+            return true
         })
 
         // Create mock renderer with minimal implementation

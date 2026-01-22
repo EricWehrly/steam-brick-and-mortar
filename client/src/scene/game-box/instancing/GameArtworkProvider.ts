@@ -70,15 +70,27 @@ export interface GameArtwork {
     isCached(): Promise<boolean>
     
     /** Get failure reason if artwork couldn't be loaded */
-    getFailureReason(): string | null
+    getFailureReason(): FailureReason | null
 }
+
+/** Detailed failure reasons for artwork loading */
+export type FailureReason = 
+    | 'CORS'           // CORS policy blocked (permanent)
+    | '404'            // Not found on CDN (permanent)
+    | 'NO_ARTWORK'     // Game has no artwork available (permanent dead-end)
+    | 'TIMEOUT'        // Request timed out (retryable)
+    | 'NETWORK'        // Network error (retryable)
+    | 'DECODE'         // Image decode failed (permanent)
+    | 'UNKNOWN'        // Unknown error (retryable)
 
 /** Internal tracking for URL failures/successes */
 interface UrlCacheEntry {
     timestamp: number
     // For failures
-    reason?: string
+    reason?: FailureReason
     urlsTried?: string[]
+    attemptCount?: number
+    isPermanent?: boolean  // True for dead-ends we shouldn't retry
     // For successes (fallback URL that worked)
     fallbackUrl?: string
     fallbackType?: string
@@ -109,17 +121,22 @@ export class GameArtworkProvider {
     private pixelCache: PixelDataCache | null = null
     
     // Persistent URL caches (localStorage)
-    private static readonly FAILURE_CACHE_KEY = 'steam-artwork-failures-v2'
-    private static readonly SUCCESS_CACHE_KEY = 'steam-artwork-successes-v2'
+    public static readonly FAILURE_CACHE_KEY = 'steam-artwork-failures-v3'
+    public static readonly SUCCESS_CACHE_KEY = 'steam-artwork-successes-v3'
     private static readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000  // 24 hours
     
     private failureCache: Map<string, UrlCacheEntry> = new Map()  // key: appId-format
     private successCache: Map<string, UrlCacheEntry> = new Map()
     
+    // Skip tracking (per session)
+    private skipStats: Map<FailureReason, number> = new Map()
+    private skippedGames: Array<{ appId: number; gameName: string; reason: FailureReason }> = []
+    
     private constructor() {
         this.textureWorker = new TextureWorker()
         this.loadPersistentCaches()
         this.initPixelCache()
+        this.logFailureStats()
     }
     
     public static getInstance(): GameArtworkProvider {
@@ -276,16 +293,35 @@ export class GameArtworkProvider {
     public recordFailure(
         appId: number,
         format: ArtworkFormat,
-        reason: string,
+        reason: FailureReason,
         urlsTried: string[]
     ): void {
         const cacheKey = `${appId}-${format}`
+        const existing = this.failureCache.get(cacheKey)
+        const attemptCount = (existing?.attemptCount ?? 0) + 1
+        
+        // Permanent failures: NO_ARTWORK, CORS, DECODE, or repeated 404s
+        const isPermanent = 
+            reason === 'NO_ARTWORK' || 
+            reason === 'CORS' || 
+            reason === 'DECODE' ||
+            (reason === '404' && attemptCount >= 2)
+        
         this.failureCache.set(cacheKey, {
             timestamp: Date.now(),
             reason,
-            urlsTried
+            urlsTried,
+            attemptCount,
+            isPermanent
         })
         this.savePersistentFailures()
+        
+        // Log permanent failures clearly
+        if (isPermanent) {
+            GameArtworkProvider.logger.info(
+                `🚫 Permanent failure for appId ${appId}: ${reason} (will skip future attempts)`
+            )
+        }
     }
     
     /**
@@ -317,9 +353,83 @@ export class GameArtworkProvider {
     /**
      * Get failure reason for an appId/format.
      */
-    public getFailureReason(appId: number, format: ArtworkFormat): string | null {
+    public getFailureReason(appId: number, format: ArtworkFormat): FailureReason | null {
         const cacheKey = `${appId}-${format}`
         return this.failureCache.get(cacheKey)?.reason ?? null
+    }
+    
+    /**
+     * Check if failure is permanent (should not retry).
+     */
+    public isPermanentFailure(appId: number, format: ArtworkFormat): boolean {
+        const cacheKey = `${appId}-${format}`
+        return this.failureCache.get(cacheKey)?.isPermanent ?? false
+    }
+    
+    /**
+     * Record a skipped attempt (permanent failure).
+     */
+    public recordSkip(appId: number, gameName: string, reason: FailureReason): void {
+        this.skipStats.set(reason, (this.skipStats.get(reason) || 0) + 1)
+        this.skippedGames.push({ appId, gameName, reason })
+    }
+    
+    /**
+     * Get skip statistics for this session.
+     */
+    public getSkipStats(): { total: number; byReason: Record<FailureReason, number> } {
+        const byReason: Record<string, number> = {}
+        for (const [reason, count] of this.skipStats) {
+            byReason[reason] = count
+        }
+        return {
+            total: this.skippedGames.length,
+            byReason: byReason as Record<FailureReason, number>
+        }
+    }
+    
+    /**
+     * Log skip statistics summary.
+     */
+    public logSkipSummary(): void {
+        if (this.skippedGames.length === 0) return
+        
+        const reasons: string[] = []
+        for (const [reason, count] of this.skipStats) {
+            reasons.push(`${reason}: ${count}`)
+        }
+        
+        GameArtworkProvider.logger.info(
+            `📊 Skipped ${this.skippedGames.length} permanent failures this session (${reasons.join(', ')})`
+        )
+    }
+    
+    /**
+     * Clear skip statistics.
+     */
+    public clearSkipStats(): void {
+        this.skipStats.clear()
+        this.skippedGames = []
+    }
+    
+    /**
+     * Get failure statistics grouped by reason.
+     */
+    public getFailureStats(): Record<FailureReason, number> & { total: number; permanent: number } {
+        const stats: Record<string, number> = {
+            total: 0,
+            permanent: 0
+        }
+        
+        for (const entry of this.failureCache.values()) {
+            if (entry.reason) {
+                stats[entry.reason] = (stats[entry.reason] || 0) + 1
+                stats.total++
+                if (entry.isPermanent) stats.permanent++
+            }
+        }
+        
+        return stats as Record<FailureReason, number> & { total: number; permanent: number }
     }
     
     /**
@@ -334,6 +444,27 @@ export class GameArtworkProvider {
             GameArtworkProvider.logger.info('Cleared artwork caches')
         } catch (e) {
             GameArtworkProvider.logger.debug('Could not clear localStorage:', e)
+        }
+    }
+    
+    /**
+     * Log failure statistics summary at startup.
+     */
+    private logFailureStats(): void {
+        const stats = this.getFailureStats()
+        if (stats.total === 0) return
+        
+        const reasons: string[] = []
+        for (const [reason, count] of Object.entries(stats)) {
+            if (reason !== 'total' && reason !== 'permanent' && count > 0) {
+                reasons.push(`${reason}: ${count}`)
+            }
+        }
+        
+        if (reasons.length > 0) {
+            GameArtworkProvider.logger.info(
+                `📊 Artwork failures: ${stats.total} total, ${stats.permanent} permanent dead-ends (${reasons.join(', ')})`
+            )
         }
     }
     
@@ -393,13 +524,29 @@ export class GameArtworkProvider {
             if (failures) {
                 const data = JSON.parse(failures) as Record<string, UrlCacheEntry>
                 let count = 0
+                let migrated = 0
                 for (const [key, entry] of Object.entries(data)) {
                     if (now - entry.timestamp < GameArtworkProvider.CACHE_TTL_MS) {
+                        // Migrate old entries without isPermanent/attemptCount
+                        if (entry.isPermanent === undefined) {
+                            entry.attemptCount = entry.attemptCount ?? 1
+                            entry.isPermanent = 
+                                entry.reason === 'CORS' || 
+                                entry.reason === 'NO_ARTWORK' || 
+                                entry.reason === 'DECODE'
+                            migrated++
+                        }
                         this.failureCache.set(key, entry)
                         count++
                     }
                 }
-                if (count > 0) GameArtworkProvider.logger.info(`Loaded ${count} cached failures`)
+                if (count > 0) {
+                    GameArtworkProvider.logger.info(`Loaded ${count} cached failures`)
+                    if (migrated > 0) {
+                        GameArtworkProvider.logger.info(`Migrated ${migrated} old cache entries`)
+                        this.savePersistentFailures()  // Save migrated entries
+                    }
+                }
             }
         } catch (e) {
             GameArtworkProvider.logger.debug('Could not load failure cache:', e)
@@ -468,7 +615,7 @@ class GameArtworkHandle implements GameArtwork {
     
     private resolvedUrl: string | null = null
     private cachedPixels: PixelDataResult | null = null
-    private failureReason: string | null = null
+    private failureReason: FailureReason | null = null
     
     constructor(
         appId: number,
@@ -508,7 +655,16 @@ class GameArtworkHandle implements GameArtwork {
             return this.cachedPixels
         }
         
-        // If known failure, throw immediately
+        // Check if this is a permanent failure we should skip
+        if (this.provider.isPermanentFailure(this.appId, this.format)) {
+            const reason = this.failureReason ?? this.provider.getFailureReason(this.appId, this.format)
+            if (reason) {
+                this.provider.recordSkip(this.appId, this.gameName, reason)
+            }
+            throw new Error(`Permanent failure (${reason}) - skipping retry`)
+        }
+        
+        // If known failure but not permanent, throw with context
         if (this.failureReason) {
             throw new Error(`Known failure for ${this.gameName}: ${this.failureReason}`)
         }
@@ -539,8 +695,8 @@ class GameArtworkHandle implements GameArtwork {
             }
         }
         
-        // All URLs failed
-        this.failureReason = this.categorizeError(lastError?.message ?? 'Unknown error')
+        // All URLs failed - categorize and record
+        this.failureReason = this.categorizeError(lastError?.message ?? 'Unknown error', triedUrls)
         this.provider.recordFailure(this.appId, this.format, this.failureReason, triedUrls)
         
         throw new Error(`Failed to load artwork for ${this.gameName}: ${this.failureReason}`)
@@ -556,16 +712,45 @@ class GameArtworkHandle implements GameArtwork {
         return false
     }
     
-    getFailureReason(): string | null {
+    getFailureReason(): FailureReason | null {
         return this.failureReason
     }
     
-    private categorizeError(msg: string): string {
+    private categorizeError(msg: string, urlsTried: string[]): FailureReason {
         const lower = msg.toLowerCase()
-        if (lower.includes('cors')) return 'CORS'
-        if (lower.includes('404') || lower.includes('not found')) return '404'
+        
+        // CORS detection (multiple patterns)
+        if (lower.includes('cors') || 
+            lower.includes('cross-origin') || 
+            lower.includes('cross origin') ||
+            lower.includes('opaque')) {
+            return 'CORS'
+        }
+        
+        // Decode/format errors
+        if (lower.includes('decode') || lower.includes('invalid image')) return 'DECODE'
+        
+        // Timeouts
         if (lower.includes('timeout') || lower.includes('abort')) return 'TIMEOUT'
+        
+        // NO_ARTWORK: All fallback URLs failed with 404
+        const all404 = urlsTried.length >= 2 && (
+            lower.includes('404') || 
+            lower.includes('not found')
+        )
+        if (all404) {
+            GameArtworkProvider.logger.debug(
+                `Categorized as NO_ARTWORK: tried ${urlsTried.length} URLs, all failed with 404`
+            )
+            return 'NO_ARTWORK'
+        }
+        
+        // Single 404
+        if (lower.includes('404') || lower.includes('not found')) return '404'
+        
+        // Network errors
         if (lower.includes('network') || lower.includes('failed to fetch')) return 'NETWORK'
+        
         return 'UNKNOWN'
     }
 }

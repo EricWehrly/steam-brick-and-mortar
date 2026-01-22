@@ -16,12 +16,11 @@ import { StoreLayout } from './StoreLayout'
 import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
 import { SignageRenderer } from './SignageRenderer'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
-import { ShelfSide } from './props/SharedPropsUtils'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
-import { GameLayoutConstants, VRLayoutUtils, GameBoxUtils, ShelfSurfaceUtils, type ShelfSurface } from './props/SharedPropsUtils'
+import { GameLayoutConstants, VRLayoutUtils } from './props/SharedPropsUtils'
 
 import { EventManager } from '../core/EventManager'
-import { GameEventTypes, SteamEventTypes } from '../types/InteractionEvents'
+import { GameEventTypes } from '../types/InteractionEvents'
 import { 
     StorePropsEventTypes, 
     type StorePropsProgressEvent, 
@@ -29,7 +28,7 @@ import {
     type AllBatchesCompleteEvent,
     type BatchReadyForPlacementEvent,
     type ShelfSpaceRequestedEvent,
-    type ShelfCreatedEvent 
+    type ShelfCreatedEvent
 } from '../types/InteractionEvents'
 import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
@@ -109,12 +108,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private setupEventListeners(): void {
-        // Reset our batch state when all batches complete
-        EventManager.getInstance().registerEventHandler(
-            GameEventTypes.AllBatchesComplete,
-            this.resetBatchState.bind(this)
-        );
-        
         // Listen for first batch to trigger initialization (creates GameBoxSpawner)
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
@@ -126,7 +119,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             StorePropsEventTypes.ShelfSpaceRequested,
             this.handleShelfSpaceRequested.bind(this)
         );
-        GpuStorePropsRenderer.logger.debug('Registered listeners for BatchReadyForPlacement and ShelfSpaceRequested events');
+        
+        GpuStorePropsRenderer.logger.debug('Registered listeners for batch processing events');
     }
     
     /**
@@ -160,7 +154,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
      * Creates shelf in response to request, then emits ShelfCreated event
      */
     private async handleShelfSpaceRequested(event: CustomEvent<ShelfSpaceRequestedEvent>): Promise<void> {
-        const { gamesCount, batchIndex } = event.detail
+        const { gamesCount: _gamesCount, batchIndex } = event.detail
         
         // Create shelf for the requested batch
         const shelfMonitor = PerformanceMonitor.start('shelf-creation', GpuStorePropsRenderer.logger)
@@ -169,23 +163,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         EventManager.getInstance().emit(GameEventTypes.InstancedBatchComplete)
         
+        // Check if all batches complete - if so, finalize and emit AllBatchesComplete
         const progress = this.batchCoordinator.getProgress()
-        console.log(`📊 Batches received: ${progress.received}/${progress.total}`)
-        
         if (progress.isComplete) {
-            this.logBatchCompletionSummary()
-            await this.finalizeProgressiveLoading()
+            this.finalizeProgressiveLoading()
         }
-    }
-    
-    private logBatchCompletionSummary(): void {
-        const metrics = this.batchCoordinator.getMetrics()
-        const totalLoadTime = Date.now() - metrics.loadStart
-        const avgMainThreadTime = metrics.totalMainThreadTime / metrics.batches.length
-        const asyncTime = totalLoadTime - metrics.totalMainThreadTime
-        
-        console.log(`📊 [BATCH SUMMARY] ${metrics.batches.length} batches | Main: ${metrics.totalMainThreadTime.toFixed(1)}ms | Async: ${asyncTime.toFixed(1)}ms | Total: ${totalLoadTime.toFixed(1)}ms | Avg/batch: ${avgMainThreadTime.toFixed(1)}ms`)
-        console.debug(`📦 [COMPLETE] All ${metrics.batches.length} batches processed, finalizing...`)
     }
     
     private steamGameToGameData(game: Readonly<SteamGame>): SteamGameData {
@@ -349,6 +331,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             shelfBounds: { ...this.shelfBounds },
             shelfLayout: { ...this.shelfLayout }
         })
+        
+        this.resetBatchState()
     }
     
     private resetBatchState(): void {

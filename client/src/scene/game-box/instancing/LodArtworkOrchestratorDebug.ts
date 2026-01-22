@@ -11,6 +11,7 @@ import { LodArtworkOrchestrator, type LodArtworkConfig, type LodConfig } from '.
 import { HighTextureCacheDebug } from './HighTextureCacheDebug'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
+import { GameArtworkProvider } from './GameArtworkProvider'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Re-export for consumers
@@ -33,6 +34,7 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
     private registerEventListeners(): void {
         EventManager.getInstance().registerEventHandler(GameEventTypes.AllBatchesComplete, () => {
             this.logMemoryStats()
+            this.logSkipSummary()
         })
     }
 
@@ -53,6 +55,16 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
             console.log('✅ Artwork failure cache cleared - failures will be retried on next load')
         }
         ;(window as any).auditArtworkFailures = () => this.auditFailedArtwork()
+        ;(window as any).artworkFailureStats = () => {
+            const stats = GameArtworkProvider.getInstance().getFailureStats()
+            console.log('📊 Artwork Failure Statistics:', stats)
+            return stats
+        }
+        ;(window as any).artworkSkipStats = () => {
+            const stats = GameArtworkProvider.getInstance().getSkipStats()
+            console.log('📊 Artwork Skip Statistics (this session):', stats)
+            return stats
+        }
 
         // Loading experiments
         ;(window as any).experimentLoadingStrategies = (count = 9) => {
@@ -160,6 +172,10 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         }
         console.groupEnd()
     }
+    
+    public logSkipSummary(): void {
+        GameArtworkProvider.getInstance().logSkipSummary()
+    }
 
     public logHighTextureCacheStats(): void {
         const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
@@ -256,18 +272,36 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         
         let retryable = 0
         let permanent = 0
+        const permanentReasons: Record<string, number> = {}
+        const retryableReasons: Record<string, number> = {}
         
         for (const [_gameName, failure] of failedArtwork) {
-            if (failure.reason === 'CORS' || failure.reason === '404') {
+            const isPermanent = 
+                failure.reason === 'CORS' || 
+                failure.reason === '404' || 
+                failure.reason === 'NO_ARTWORK' ||
+                failure.reason === 'DECODE'
+            
+            if (isPermanent) {
                 permanent++
+                permanentReasons[failure.reason] = (permanentReasons[failure.reason] || 0) + 1
             } else {
                 retryable++
+                retryableReasons[failure.reason] = (retryableReasons[failure.reason] || 0) + 1
             }
         }
         
-        console.log(`Retryable (NETWORK/TIMEOUT): ${retryable}`)
-        console.log(`Permanent (CORS/404): ${permanent}`)
-        console.log(`Use clearArtworkFailures() to retry all`)
+        console.log(`✅ Retryable (NETWORK/TIMEOUT/UNKNOWN): ${retryable}`)
+        if (Object.keys(retryableReasons).length > 0) {
+            console.log('   Breakdown:', retryableReasons)
+        }
+        
+        console.log(`🚫 Permanent dead-ends (CORS/404/NO_ARTWORK/DECODE): ${permanent}`)
+        if (Object.keys(permanentReasons).length > 0) {
+            console.log('   Breakdown:', permanentReasons)
+        }
+        
+        console.log(`Use clearArtworkFailures() to retry all (including ${permanent} permanent failures)`)
         console.groupEnd()
     }
 
