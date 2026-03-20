@@ -1,3 +1,34 @@
+/**
+ * StoreLayout
+ * 
+ * ROLE: Store environment layout calculations and procedural shelf generation.
+ * Calculates store dimensions based on shelf requirements and VR ergonomics.
+ * 
+ * OWNS:
+ * - Store dimension calculations
+ * - Procedural shelf generation via ProceduralShelfGenerator
+ * - Store layout configuration
+ * - Store group container in scene
+ * 
+ * RECEIVES:
+ * - calculateDynamicStoreDimensions(shelvesNeeded) → Returns required dimensions
+ * - createSection(config) → Creates shelf section
+ * 
+ * EMITS:
+ * - (none currently)
+ * 
+ * DELEGATES TO:
+ * - ProceduralShelfGenerator: Actual shelf mesh generation (non-instanced)
+ * - StoreLayoutConfigFactory: Layout configuration creation
+ * 
+ * NOTE: This is for the PROCEDURAL/LEGACY path. GPU-instanced shelves use
+ * InstancedShelfRenderer directly. Consider consolidating layout logic.
+ * 
+ * RELATED:
+ * - VRLayoutUtils in SharedPropsUtils: VR-optimized spacing calculations
+ * - StoreLayoutConfig: Configuration types and factory
+ */
+
 import * as THREE from 'three';
 import { ProceduralShelfGenerator } from './ProceduralShelfGenerator';
 import { Logger } from '../utils/Logger';

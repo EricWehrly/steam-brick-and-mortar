@@ -1,3 +1,39 @@
+/**
+ * InstancedShelfRenderer
+ * 
+ * ROLE: GPU-instanced rendering of shelf units. Handles geometry, materials,
+ * and efficient batch rendering of multiple shelf instances.
+ * 
+ * OWNS:
+ * - Shelf geometry templates (angled boards, side boards, shelf boards, interior surfaces)
+ * - InstancedMesh managers for each geometry type
+ * - Shelf unit instances (position + config)
+ * - GPU buffer updates
+ * 
+ * RECEIVES:
+ * - setInstance(index, data) → Creates/updates shelf at index
+ * - updateGPU() → Flushes instance changes to GPU
+ * - AllBatchesComplete event → Triggers final GPU update
+ * 
+ * EMITS:
+ * - RendererReady → When initialize() completes (Phase 3: replaces polling)
+ * 
+ * DELEGATES TO:
+ * - InstancedMeshManager: Per-geometry-type instancing
+ * - SharedMaterialManager: Material acquisition
+ * - ShelfStickerHandler: Sticker placement on side boards
+ * 
+ * DOES NOT:
+ * - Calculate shelf positions (that's layout's job)
+ * - Know about games or batches (pure rendering)
+ * - Handle events for shelf creation (receives method calls currently)
+ * 
+ * INITIALIZATION:
+ * - initialize() is async and emits RendererReady event when complete
+ * - Callers can await promise OR listen for event (dual-mode for backward compat)
+ * - Legacy isReady() polling still available but deprecated
+ */
+
 import * as THREE from 'three'
 import { InstancedMeshManager } from './InstancedMeshManager'
 import { SharedMaterialManager, MaterialType } from '../../utils/SharedMaterialManager'
@@ -9,7 +45,7 @@ import type {
 } from './IInstancedRenderer'
 import { ShelfStickerHandler } from '../stickers/ShelfStickerHandler'
 import { EventManager } from '../../core/EventManager'
-import { GameEventTypes } from '../../types/InteractionEvents'
+import { GameEventTypes, StorePropsEventTypes, type RendererReadyEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 
 export interface InstancedShelfConfig extends InstancedRendererConfig {
@@ -199,6 +235,13 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             this.buildShelfUnitTemplate()
             
             this.isInitialized = true
+            
+            // Emit RendererReady event (Phase 3: replace polling with events)
+            EventManager.getInstance().emit<RendererReadyEvent>(
+                StorePropsEventTypes.RendererReady,
+                { rendererType: 'shelf' }
+            )
+            InstancedShelfRenderer.logger.debug('✅ Initialized, emitted RendererReady event')
             
         } catch (err) {
             InstancedShelfRenderer.logger.error('❌ Failed to initialize:', err)

@@ -1,8 +1,22 @@
 /**
- * GPU Store Props Renderer - GPU-instanced shelves and game boxes
+ * GpuStorePropsRenderer
  * 
- * Uses InstancedShelfRenderer and GpuGameBoxRenderer for minimal draw calls.
- * Handles progressive batch loading of Steam games.
+ * ROLE: High-level coordinator for GPU-instanced store rendering.
+ * Creates and wires up rendering components, provides public API for scene lifecycle.
+ * 
+ * OWNS:
+ * - Component instantiation (BatchCoordinator, GameBoxSpawner, InstancedShelfRenderer)
+ * - Props group in scene
+ * - Store layout reference
+ * 
+ * RECEIVES (Events):
+ * - BatchReadyForPlacement → Triggers renderer initialization on first batch
+ * - ShelfSpaceRequested → Creates shelf and emits ShelfCreated
+ * 
+ * CURRENT ISSUES (see gpustoreprops-event-untangling.md):
+ * - Still acts as middleman for some flows
+ * - Owns shelf position calculation (should be in layout utility)
+ * - Phase 3 refactoring in progress to remove remaining coordination
  * 
  * TODO: Eventually integrate with renderer selection system to choose between
  * LegacyStorePropsRenderer and this GPU version based on:
@@ -29,7 +43,8 @@ import {
     type AllBatchesCompleteEvent,
     type BatchReadyForPlacementEvent,
     type ShelfSpaceRequestedEvent,
-    type ShelfCreatedEvent
+    type ShelfCreatedEvent,
+    type RendererReadyEvent
 } from '../types/InteractionEvents'
 import type { SteamGameData } from './game-box/types/GameData'
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
@@ -49,9 +64,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private signageRenderer: SignageRenderer
     private propsGroup: THREE.Group
     private config: PropsConfig = {}
-    private currentStoreGroup: THREE.Group | null = null // Track current store environment
+    private currentStoreGroup: THREE.Object3D | null = null // Track current store environment
 
     private instancedShelfRenderer?: InstancedShelfRenderer
+    private isShelfRendererReady: boolean = false
+    private initializationQueue: Array<() => void> = []
 
     // Track objects we create for proper cleanup
     private createdGameBoxes: THREE.Object3D[] = []
@@ -102,32 +119,48 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             maxShelfUnits: 100 // Allow up to 100 shelf units (47+ batches need this)
         })
         
-        // Initialize shelf renderer eagerly to avoid blocking when batches arrive
+        // Initialize eagerly - emits RendererReady event when complete
         this.instancedShelfRenderer.initialize().catch(error => {
             console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
+            throw error
         })
+    }
+    
+    private handleRendererReady(event: CustomEvent<RendererReadyEvent>): void {
+        if (event.detail.rendererType !== 'shelf') return
+        
+        this.isShelfRendererReady = true
+        console.log('✅ Shelf renderer ready via event')
+        
+        // Process any queued initialization callbacks
+        while (this.initializationQueue.length > 0) {
+            const callback = this.initializationQueue.shift()
+            callback?.()
+        }
     }
 
     private setupEventListeners(): void {
+        // Listen for renderer ready events (Phase 3: replace polling)
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.RendererReady,
+            this.handleRendererReady.bind(this)
+        )
+        
         // Listen for first batch to trigger initialization (creates GameBoxSpawner)
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.handleInitialBatch.bind(this)
-        );
+        )
         
         // Listen for shelf space requests from GameBoxSpawner
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfSpaceRequested,
             this.handleShelfSpaceRequested.bind(this)
-        );
+        )
         
-        GpuStorePropsRenderer.logger.debug('Registered listeners for batch processing events');
+        GpuStorePropsRenderer.logger.debug('Registered listeners for batch processing and renderer ready events')
     }
     
-    /**
-     * Handle first BatchReadyForPlacement to initialize renderers
-     * After initialization, GameBoxSpawner takes over handling these events
-     */
     private async handleInitialBatch(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
         const { totalBatches, batchIndex, games } = event.detail
         
@@ -150,10 +183,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         GpuStorePropsRenderer.logger.debug(`Re-emitted first batch (${batchIndex}) for GameBoxSpawner`)
     }
     
-    /**
-     * Handle ShelfSpaceRequested event from GameBoxSpawner
-     * Creates shelf in response to request, then emits ShelfCreated event
-     */
     private async handleShelfSpaceRequested(event: CustomEvent<ShelfSpaceRequestedEvent>): Promise<void> {
         const { gamesCount: _gamesCount, batchIndex } = event.detail
         
@@ -199,31 +228,22 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private async waitForShelfRendererReady(): Promise<void> {
-        if (!this.instancedShelfRenderer || this.instancedShelfRenderer.isReady()) {
+        if (!this.instancedShelfRenderer) {
+            console.error('❌ No shelf renderer instance')
             return
         }
         
-        console.warn('⏳ Waiting for InstancedShelfRenderer to be ready...')
-        const waitStart = Date.now()
-        let attempts = 0
-        
-        while (!this.instancedShelfRenderer.isReady()) {
-            await new Promise(resolve => setTimeout(resolve, 50))
-            attempts++
-            
-            if (attempts % 20 === 0) {
-                console.warn(`⏳ Still waiting for renderer... (${attempts * 50}ms)`)
-            }
-            
-            if (Date.now() - waitStart > 10000) {
-                console.error('❌ Shelf renderer init timeout after 10s')
-                break
-            }
+        // Fast path: Already ready
+        if (this.isShelfRendererReady || this.instancedShelfRenderer.isReady()) {
+            this.isShelfRendererReady = true
+            return
         }
         
-        if (this.instancedShelfRenderer.isReady()) {
-            console.log(`✅ Renderer ready after ${Date.now() - waitStart}ms`)
-        }
+        // Wait for RendererReady event
+        console.log('⏳ Waiting for RendererReady event...')
+        return new Promise<void>((resolve) => {
+            this.initializationQueue.push(resolve)
+        })
     }
     
     private preallocateShelfPositions(totalShelves: number): void {
@@ -288,9 +308,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.preallocateShelfPositions(batchIndex + 1)
     }
     
-    /**
-     * Create shelf for a specific batch index (called in response to ShelfSpaceRequested)
-     */
     private async createShelfForBatchIndex(batchIndex: number): Promise<void> {
         const isReady = this.instancedShelfRenderer?.isReady()
         if (!isReady) {
@@ -513,6 +530,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.clearProps()
         this.signageRenderer?.dispose()
         this.storeLayout?.dispose()
+        
+        // Dispose game box renderer and its GPU resources
+        this.gameBoxRenderer?.dispose()
+        this.gameBoxRenderer = null
         
         this.instancedShelfRenderer?.dispose()
         

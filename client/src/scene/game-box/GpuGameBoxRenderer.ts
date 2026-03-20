@@ -1,15 +1,38 @@
 /**
- * GPU Game Box Renderer
+ * GpuGameBoxRenderer
  * 
- * GPU-optimized rendering using InstancedMesh and LOD (Level of Detail) atlas system.
- * Requires WebGL2 and instanced arrays support.
+ * ROLE: GPU-instanced rendering of game boxes with LOD (Level of Detail) support.
+ * Creates and manages instanced meshes for game box geometry and artwork textures.
  * 
- * Uses LOD atlas with lazy loading for memory efficiency:
- * - HIGH detail textures loaded on demand for nearby games
- * - MED detail textures for distant games
- * - Automatic LOD switching based on camera distance
+ * OWNS:
+ * - Game box geometry and materials
+ * - InstancedLabelRenderer for text labels
+ * - LOD artwork orchestrator for texture management
+ * - LOD distance manager for camera-based detail switching
+ * - Box instance state (positions, orientations, LOD levels)
  * 
- * Legacy renderers (single-atlas, multi-atlas) moved to LegacyAtlasGameBoxRenderer.ts
+ * RECEIVES:
+ * - createGameBox(request) → Creates box instance at position
+ * - addToScene(scene) → Attaches instanced meshes to scene
+ * - updateLODForCamera(camera) → Adjusts detail levels based on distance
+ * - dispose() → Cleans up GPU resources
+ * 
+ * EMITS:
+ * - (none currently - pure rendering)
+ * 
+ * DELEGATES TO:
+ * - InstancedLabelRenderer: Text label rendering on boxes
+ * - LodArtworkOrchestratorDebug: Texture loading and LOD management
+ * - LodDistanceManagerDebug: Camera distance calculations
+ * 
+ * DOES NOT:
+ * - Know about shelves or layout (receives positions)
+ * - Decide which games to display (told what to render)
+ * - Handle batch processing (receives individual requests)
+ * 
+ * RELATED:
+ * - GameBoxSpawner: Coordinates game placement and calls this renderer
+ * - SharedPropsUtils: Game box dimensions and layout constants
  */
 
 import * as THREE from 'three'

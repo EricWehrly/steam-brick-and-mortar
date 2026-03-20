@@ -266,6 +266,10 @@ export interface GamesPlacedEvent extends BaseInteractionEvent {
     batchIndex: number
 }
 
+export interface RendererReadyEvent extends BaseInteractionEvent {
+    rendererType: 'shelf' | 'gamebox'
+}
+
 // =============================================================================
 // EVENT TYPE CONSTANTS
 // =============================================================================
@@ -344,7 +348,9 @@ export const StorePropsEventTypes = {
     BatchReadyForPlacement: 'store-props:batch-ready-placement',
     ShelfSpaceRequested: 'store-props:shelf-space-requested',
     ShelfCreated: 'store-props:shelf-created',
-    GamesPlaced: 'store-props:games-placed'
+    GamesPlaced: 'store-props:games-placed',
+    // Renderer initialization
+    RendererReady: 'store-props:renderer-ready'
 } as const
 
 // =============================================================================
