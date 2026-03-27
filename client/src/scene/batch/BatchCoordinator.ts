@@ -16,10 +16,14 @@ import { Logger } from '../../utils/Logger'
 import { PerformanceMonitor } from '../../utils/PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
 import { 
+    BatchProcessingStatus,
+    GameEventTypes,
     SteamEventTypes, 
     StorePropsEventTypes,
     type SteamGamesBatchEvent,
-    type BatchReadyForPlacementEvent
+    type BatchReadyForPlacementEvent,
+    type GamesPlacedEvent,
+    type AllBatchesCompleteEvent
 } from '../../types/InteractionEvents'
 
 export interface BatchItem<T> {
@@ -40,6 +44,11 @@ export interface BatchMetrics {
     loadStart: number
 }
 
+interface BatchStatusState {
+    status: BatchProcessingStatus
+    lastModified: number
+}
+
 export class BatchCoordinator<T> {
     private static logger = Logger.createLogFunctions(BatchCoordinator.name)
 
@@ -49,6 +58,8 @@ export class BatchCoordinator<T> {
     private isProcessing: boolean = false
     private isScheduled: boolean = false  // Track if processQueue is scheduled
     private isFirstBatch: boolean = true
+    private completionEmitted: boolean = false
+    private batchStatuses: Map<number, BatchStatusState> = new Map()
     
     private metrics: BatchMetrics = {
         batches: [],
@@ -62,6 +73,10 @@ export class BatchCoordinator<T> {
         EventManager.getInstance().registerEventHandler(
             SteamEventTypes.GamesBatchReady,
             this.handleBatchEvent.bind(this)
+        )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.GamesPlaced,
+            this.handleGamesPlaced.bind(this)
         )
         BatchCoordinator.logger.debug('Self-registered for GamesBatchReady events')
     }
@@ -79,12 +94,24 @@ export class BatchCoordinator<T> {
         })
     }
 
+    private handleGamesPlaced(event: CustomEvent<GamesPlacedEvent>): void {
+        this.batchStatuses.set(event.detail.batchIndex, {
+            status: event.detail.status ?? BatchProcessingStatus.GamesPlaced,
+            lastModified: event.detail.lastModified ?? Date.now()
+        })
+        this.tryEmitCompletionEvent()
+    }
+
     public enqueueBatch(batch: BatchItem<T>): void {
         BatchCoordinator.logger.debug(`Enqueuing batch ${batch.batchIndex + 1}/${batch.totalBatches}`)
         
         this.queue.push(batch)
         this.received++
         this.expectedTotal = batch.totalBatches
+        this.batchStatuses.set(batch.batchIndex, {
+            status: BatchProcessingStatus.Queued,
+            lastModified: Date.now()
+        })
 
         // Sort queue immediately to maintain order
         this.queue.sort((a, b) => a.batchIndex - b.batchIndex)
@@ -124,6 +151,8 @@ export class BatchCoordinator<T> {
         this.isProcessing = false
         this.isScheduled = false
         this.isFirstBatch = true
+        this.completionEmitted = false
+        this.batchStatuses.clear()
         this.metrics = {
             batches: [],
             totalMainThreadTime: 0,
@@ -158,10 +187,7 @@ export class BatchCoordinator<T> {
             this.isProcessing = false
         }
 
-        // Emit completion event if all batches received
-        if (this.getProgress().isComplete) {
-            this.emitCompletionEvent()
-        }
+        this.tryEmitCompletionEvent()
     }
 
     private async processOneBatch(batch: BatchItem<T>): Promise<void> {
@@ -183,9 +209,17 @@ export class BatchCoordinator<T> {
             {
                 games: batchData.games,
                 batchIndex,
-                totalBatches
+                totalBatches,
+                status: BatchProcessingStatus.Dispatched,
+                lastModified: Date.now()
             }
         )
+        // TODO: Revisit whether this should be paired with a globally debounced
+        // "batches ready" signal so consumers don't each implement their own debounce.
+        this.batchStatuses.set(batchIndex, {
+            status: BatchProcessingStatus.Dispatched,
+            lastModified: Date.now()
+        })
         BatchCoordinator.logger.debug(`Emitted BatchReadyForPlacement for batch ${batchIndex + 1}/${totalBatches}`)
         
         const batchDuration = batchMonitor.getElapsed()
@@ -202,7 +236,22 @@ export class BatchCoordinator<T> {
         }
     }
 
-    private emitCompletionEvent(): void {
+    private tryEmitCompletionEvent(): void {
+        if (this.completionEmitted) {
+            return
+        }
+
+        const progress = this.getProgress()
+        const terminalBatchCount = [...this.batchStatuses.values()].filter(({ status }) =>
+            status === BatchProcessingStatus.GamesPlaced || status === BatchProcessingStatus.Failed
+        ).length
+        const allPlaced = this.expectedTotal > 0 && terminalBatchCount >= this.expectedTotal
+        if (!progress.isComplete || !allPlaced) {
+            return
+        }
+
+        this.completionEmitted = true
+
         const totalLoadTime = Date.now() - this.metrics.loadStart
         const avgMainThreadTime = this.metrics.totalMainThreadTime / this.metrics.batches.length
         const asyncTime = totalLoadTime - this.metrics.totalMainThreadTime
@@ -214,6 +263,13 @@ export class BatchCoordinator<T> {
             `Total: ${totalLoadTime.toFixed(1)}ms | ` +
             `Avg/batch: ${avgMainThreadTime.toFixed(1)}ms`
         )
-        // Note: GpuStorePropsRenderer emits AllBatchesComplete with actual shelf bounds/layout
+
+        EventManager.getInstance().emit<AllBatchesCompleteEvent>(
+            GameEventTypes.AllBatchesComplete,
+            {
+                status: BatchProcessingStatus.Complete,
+                lastModified: Date.now()
+            }
+        )
     }
 }

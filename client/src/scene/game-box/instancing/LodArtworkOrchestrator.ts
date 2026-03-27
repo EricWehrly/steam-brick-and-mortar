@@ -14,7 +14,12 @@ import * as THREE from 'three'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { EventManager } from '../../../core/EventManager'
-import { GameEventTypes } from '../../../types/InteractionEvents'
+import {
+    GameEventTypes,
+    StorePropsEventTypes,
+    type AllBatchesCompleteEvent,
+    type GamesPlacedEvent,
+} from '../../../types/InteractionEvents'
 import { Logger } from '../../../utils/Logger'
 import { GameArtworkProvider } from './GameArtworkProvider'
 import { LodTextureArrayManager, type LodTierConfig } from './LodTextureArrayManager'
@@ -93,8 +98,8 @@ export class LodArtworkOrchestrator {
     // Prevent log spam when atlas is full
     private atlasFullLogged: boolean = false
     
-    // Prevent operations after disposal (async artwork loads may complete after dispose)
-    private disposed: boolean = false
+    private pendingGpuUpdateTimeout: ReturnType<typeof setTimeout> | null = null
+    private readonly gpuUpdateDebounceMs: number = 50
     
     constructor(config: LodArtworkConfig = {}) {
         this.maxTextures = config.maxTextures ?? 512
@@ -142,14 +147,26 @@ export class LodArtworkOrchestrator {
         if (scene) {
             this.initialize(scene)
         }
+
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.GamesPlaced,
+            this.handleGamesPlaced.bind(this)
+        )
         
-        // Register for batch complete events - GPU update only needed once at end
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.AllBatchesComplete,
-            () => this.updateGPU()
+            this.handleAllBatchesComplete.bind(this)
         )
         
         this.logConfig()
+    }
+
+    private handleGamesPlaced(_event: CustomEvent<GamesPlacedEvent>): void {
+        this.queueGpuUpdate()
+    }
+
+    private handleAllBatchesComplete(_event: CustomEvent<AllBatchesCompleteEvent>): void {
+        this.flushGpuUpdate()
     }
     
     /** Factory method - override in debug subclass */
@@ -204,11 +221,6 @@ export class LodArtworkOrchestrator {
         artworkUrl: string,
         appid?: number
     ): Promise<{ success: boolean; instanceIndex: number }> {
-        // Check if disposed (async operations may complete after disposal)
-        if (this.disposed) {
-            return { success: false, instanceIndex: -1 }
-        }
-        
         // Check if already loaded
         const existingIndex = this.gameNameToTextureIndex.get(gameName)
         if (existingIndex !== undefined) {
@@ -320,6 +332,26 @@ export class LodArtworkOrchestrator {
         this.textureManager.flushToGpu()
         this.renderer.flushToGpu()
     }
+
+    private queueGpuUpdate(): void {
+        if (this.pendingGpuUpdateTimeout) {
+            clearTimeout(this.pendingGpuUpdateTimeout)
+        }
+
+        this.pendingGpuUpdateTimeout = setTimeout(() => {
+            this.pendingGpuUpdateTimeout = null
+            this.updateGPU()
+        }, this.gpuUpdateDebounceMs)
+    }
+
+    private flushGpuUpdate(): void {
+        if (this.pendingGpuUpdateTimeout) {
+            clearTimeout(this.pendingGpuUpdateTimeout)
+            this.pendingGpuUpdateTimeout = null
+        }
+
+        this.updateGPU()
+    }
     
     public isReady(): boolean {
         return this.renderer.isReady()
@@ -386,7 +418,6 @@ export class LodArtworkOrchestrator {
     }
     
     public dispose(): void {
-        this.disposed = true
         this.renderer.dispose()
         this.textureManager.dispose()
         this.gameNameToTextureIndex.clear()

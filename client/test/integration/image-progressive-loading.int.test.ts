@@ -63,6 +63,39 @@ describe('Progressive Loading Integration Tests', () => {
                 json: () => Promise.resolve(mockUserData)
             })
 
+            // Batch metadata fetch for uncached app details.
+            fetchMock.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({
+                    success: true,
+                    total_requested: 1,
+                    total_successful: 1,
+                    total_failed: 0,
+                    results: [
+                        {
+                            success: true,
+                            appid: mockGame.appid,
+                            data: {
+                                name: mockGame.name,
+                                type: 'game',
+                                is_free: false,
+                                categories: [{ id: 1, description: 'Action' }],
+                                genres: [{ id: '1', description: 'Action' }],
+                                artwork: {
+                                    header: mockGameResponse.artwork.header,
+                                    capsule: null,
+                                    capsule_v5: null,
+                                    background: null,
+                                    background_raw: null
+                                }
+                            },
+                            retrieved_at: new Date().toISOString()
+                        }
+                    ],
+                    timestamp: new Date().toISOString()
+                })
+            })
+
             const gamesLoaded: any[] = []
             let progressEventFired = false
             const eventManager = EventManager.getInstance()
@@ -83,6 +116,8 @@ describe('Progressive Loading Integration Tests', () => {
             await steamClient.loadGamesProgressively(userGames, {
                 maxGames: 1
             })
+
+            await new Promise(resolve => setTimeout(resolve, 25))
 
             // Verify game was loaded with artwork URLs
             expect(gamesLoaded).toHaveLength(1)

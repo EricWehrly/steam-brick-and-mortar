@@ -46,7 +46,8 @@ import {
     GameEventTypes, 
     type SteamGamesBatchEvent,
     type BatchReadyForPlacementEvent,
-    type ShelfLayoutDeterminedEvent
+    type ShelfLayoutDeterminedEvent,
+    type GamesPlacedEvent
 } from '../../src/types/InteractionEvents'
 import type { SteamGame } from '../../src/steam'
 
@@ -60,6 +61,7 @@ describe('Batch-to-Placement Flow Integration', () => {
     let completionEventData: any
     let layoutEventData: ShelfLayoutDeterminedEvent | null
     let batchReadyEvents: BatchReadyForPlacementEvent[] = []
+    let gamesPlacedEvents: GamesPlacedEvent[] = []
 
     const createMockGames = (count: number, batchIndex: number): Readonly<SteamGame>[] => {
         return Array.from({ length: count }, (_, i) => ({
@@ -72,9 +74,14 @@ describe('Batch-to-Placement Flow Integration', () => {
         }))
     }
 
-    beforeEach(() => {
+    const uniqueBatchIndices = (events: Array<{ batchIndex: number }>): number[] => {
+        return [...new Set(events.map((event) => event.batchIndex))]
+    }
+
+    beforeEach(async () => {
         scene = new THREE.Scene()
         eventManager = EventManager.getInstance()
+        eventManager.removeAllListeners()
         dataManager = DataManager.getInstance()
         
         // Clear state
@@ -84,6 +91,7 @@ describe('Batch-to-Placement Flow Integration', () => {
         completionEventData = null
         layoutEventData = null
         batchReadyEvents = []
+        gamesPlacedEvents = []
         
         // Listen for BatchReadyForPlacement (Phase 3b)
         eventManager.registerEventHandler(
@@ -103,6 +111,13 @@ describe('Batch-to-Placement Flow Integration', () => {
                 layoutEventData = event.detail
             }
         )
+
+        eventManager.registerEventHandler(
+            StorePropsEventTypes.GamesPlaced,
+            (event: CustomEvent<GamesPlacedEvent>) => {
+                gamesPlacedEvents.push(event.detail)
+            }
+        )
         
         // Listen for completion BEFORE creating renderer
         eventManager.registerEventHandler(
@@ -116,10 +131,12 @@ describe('Batch-to-Placement Flow Integration', () => {
         
         // Create renderer AFTER listener is registered
         renderer = new GpuStorePropsRenderer(scene)
+        await renderer.setupProps()
     })
 
     afterEach(() => {
         renderer?.dispose()
+        eventManager.removeAllListeners()
         dataManager.clear()
         scene.clear()
         vi.clearAllMocks()
@@ -141,7 +158,7 @@ describe('Batch-to-Placement Flow Integration', () => {
             
             // Wait for batch processing - increased timeout since Worker fails but processing continues
             await vi.waitFor(() => {
-                return allBatchesCompleteReceived === true
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 8000, interval: 100 })
             
             // Validate completion event
@@ -187,30 +204,20 @@ describe('Batch-to-Placement Flow Integration', () => {
             
             // Wait for all batches to complete
             await vi.waitFor(() => {
+                expect(gamesPlacedEvents.length).toBe(3)
                 expect(allBatchesCompleteReceived).toBe(true)
-            }, { timeout: 3000 })
+            }, { timeout: 8000, interval: 100 })
             
             // Verify completion
-            expect(completionEventData).toBeDefined()
-            expect(completionEventData.shelfLayout.rows).toBeGreaterThan(0)
+            expect(layoutEventData).toBeDefined()
+            expect(layoutEventData!.shelfLayout.rows).toBeGreaterThan(0)
+            expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0, 1, 2])
+            expect(gamesPlacedEvents).toHaveLength(3)
         })
 
         it('should create shelves at correct positions', async () => {
             const games = createMockGames(10, 0)
             
-            // GPU renderer uses instanced meshes, not individual scene.add() calls
-            // Track instanced mesh updates instead
-            let instancedMeshesCreated = 0
-            const originalAdd = scene.add.bind(scene)
-            scene.add = vi.fn((...objects: THREE.Object3D[]) => {
-                objects.forEach(obj => {
-                    if (obj instanceof THREE.InstancedMesh) {
-                        instancedMeshesCreated++
-                    }
-                })
-                return originalAdd(...objects)
-            })
-            
             // Emit batch
             eventManager.emit<SteamGamesBatchEvent>(
                 SteamEventTypes.GamesBatchReady,
@@ -222,31 +229,19 @@ describe('Batch-to-Placement Flow Integration', () => {
             )
             
             await vi.waitFor(() => {
-                return allBatchesCompleteReceived === true
+                expect(layoutDeterminedReceived).toBe(true)
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 8000, interval: 100 })
             
-            // Verify instanced meshes were created (GPU renderer uses instancing)
-            expect(instancedMeshesCreated).toBeGreaterThan(0)
+            expect(layoutEventData).toBeDefined()
+            const bounds = layoutEventData!.shelfBounds
+            expect(bounds.maxX - bounds.minX).toBeGreaterThan(0)
+            expect(bounds.maxZ - bounds.minZ).toBeGreaterThan(0)
         })
 
         it('should place games on shelves', async () => {
             const games = createMockGames(8, 0)
             
-            // Track game box creation
-            let gameBoxCount = 0
-            const originalAdd = scene.add.bind(scene)
-            scene.add = vi.fn((...objects: THREE.Object3D[]) => {
-                objects.forEach(obj => {
-                    // Count meshes that look like game boxes
-                    if (obj instanceof THREE.Mesh || obj instanceof THREE.InstancedMesh) {
-                        if (obj.userData.type === 'game-box' || obj.name.includes('game')) {
-                            gameBoxCount++
-                        }
-                    }
-                })
-                return originalAdd(...objects)
-            })
-            
             // Emit batch
             eventManager.emit<SteamGamesBatchEvent>(
                 SteamEventTypes.GamesBatchReady,
@@ -258,12 +253,13 @@ describe('Batch-to-Placement Flow Integration', () => {
             )
             
             await vi.waitFor(() => {
-                return allBatchesCompleteReceived === true
+                expect(gamesPlacedEvents.length).toBeGreaterThan(0)
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 8000, interval: 100 })
             
-            // GPU renderer creates a single instanced mesh for all game boxes
-            // Count should be at least 1 (the instanced mesh container)
-            expect(gameBoxCount).toBeGreaterThanOrEqual(1)
+            expect(gamesPlacedEvents).toHaveLength(1)
+            expect(gamesPlacedEvents[0].batchIndex).toBe(0)
+            expect(gamesPlacedEvents[0].gamesCount).toBe(games.length)
         })
 
         it('should calculate shelf bounds correctly', async () => {
@@ -279,7 +275,8 @@ describe('Batch-to-Placement Flow Integration', () => {
             )
             
             await vi.waitFor(() => {
-                return layoutDeterminedReceived === true && allBatchesCompleteReceived === true
+                expect(layoutDeterminedReceived).toBe(true)
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 2000 })
             
             // Verify bounds structure from layout event
@@ -355,10 +352,11 @@ describe('Batch-to-Placement Flow Integration', () => {
             )
             
             await vi.waitFor(() => {
+                expect(layoutDeterminedReceived).toBe(true)
                 expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 3000 })
             
-            const layout = completionEventData.shelfLayout
+            const layout = layoutEventData!.shelfLayout
             expect(layout).toBeDefined()
             expect(layout.rows).toBeGreaterThan(0)
             expect(layout.shelvesPerRow).toBeGreaterThan(0)
@@ -384,7 +382,8 @@ describe('Batch-to-Placement Flow Integration', () => {
             )
             
             await vi.waitFor(() => {
-                return layoutDeterminedReceived === true && allBatchesCompleteReceived === true
+                expect(layoutDeterminedReceived).toBe(true)
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 8000, interval: 100 })
             
             const objectCountAfter = scene.children.length
@@ -409,8 +408,8 @@ describe('Batch-to-Placement Flow Integration', () => {
         })
     })
 
-    describe('Phase 3b: Dual-Path Event Emission', () => {
-        it('should emit BatchReadyForPlacement alongside callback execution', async () => {
+    describe('Phase 3b: Event Emission', () => {
+        it('should emit BatchReadyForPlacement for a single batch', async () => {
             const games = createMockGames(5, 0)
             
             // Emit batch event
@@ -425,18 +424,21 @@ describe('Batch-to-Placement Flow Integration', () => {
             
             // Wait for both paths to complete
             await vi.waitFor(() => {
-                return batchReadyEvents.length > 0 && allBatchesCompleteReceived === true
+                expect(batchReadyEvents.length).toBeGreaterThan(0)
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 8000, interval: 100 })
             
             // Verify event was emitted
-            expect(batchReadyEvents.length).toBe(1)
-            expect(batchReadyEvents[0]).toMatchObject({
+            expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0])
+            const latestBatchZero = [...batchReadyEvents].reverse().find((event) => event.batchIndex === 0)
+            expect(latestBatchZero).toBeDefined()
+            expect(latestBatchZero!).toMatchObject({
                 batchIndex: 0,
                 totalBatches: 1
             })
-            expect(batchReadyEvents[0].games).toHaveLength(5)
+            expect(latestBatchZero!.games).toHaveLength(5)
             
-            // Verify callback path still works (completion event received)
+            // Verify full flow still completes
             expect(allBatchesCompleteReceived).toBe(true)
             expect(completionEventData).toBeDefined()
         })
@@ -466,23 +468,26 @@ describe('Batch-to-Placement Flow Integration', () => {
             
             // Wait for all batches to process
             await vi.waitFor(() => {
-                return batchReadyEvents.length === 2 && allBatchesCompleteReceived === true
+                expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0, 1])
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 8000, interval: 100 })
             
             // Verify both BatchReadyForPlacement events emitted
-            expect(batchReadyEvents.length).toBe(2)
-            expect(batchReadyEvents[0].batchIndex).toBe(0)
-            expect(batchReadyEvents[0].games).toHaveLength(3)
-            expect(batchReadyEvents[1].batchIndex).toBe(1)
-            expect(batchReadyEvents[1].games).toHaveLength(4)
+            expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0, 1])
+            const latestBatchZero = [...batchReadyEvents].reverse().find((event) => event.batchIndex === 0)
+            const latestBatchOne = [...batchReadyEvents].reverse().find((event) => event.batchIndex === 1)
+            expect(latestBatchZero).toBeDefined()
+            expect(latestBatchOne).toBeDefined()
+            expect(latestBatchZero!.games).toHaveLength(3)
+            expect(latestBatchOne!.games).toHaveLength(4)
             
-            // Verify callback path still functional
+            // Verify completion
             expect(allBatchesCompleteReceived).toBe(true)
         })
         })
 
     describe('Phase 3c: GameBoxSpawner Event Observation', () => {
-        it('should verify GameBoxSpawner receives events while old path remains functional', async () => {
+        it('should verify GameBoxSpawner receives events and placement completes', async () => {
             const games = createMockGames(5, 0)
             
             // Emit batch event
@@ -497,19 +502,23 @@ describe('Batch-to-Placement Flow Integration', () => {
             
             // Wait for events to flow through both paths
             await vi.waitFor(() => {
-                return batchReadyEvents.length > 0 && allBatchesCompleteReceived === true
+                expect(batchReadyEvents.length).toBeGreaterThan(0)
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 8000, interval: 100 })
             
             // Verify events reached the test listener (proving GameBoxSpawner receives them too)
-            expect(batchReadyEvents.length).toBe(1)
-            expect(batchReadyEvents[0].games).toHaveLength(5)
+            expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0])
+            const latestBatchZero = [...batchReadyEvents].reverse().find((event) => event.batchIndex === 0)
+            expect(latestBatchZero).toBeDefined()
+            expect(latestBatchZero!.games).toHaveLength(5)
+            expect(gamesPlacedEvents).toHaveLength(1)
+            expect(gamesPlacedEvents[0].gamesCount).toBe(5)
             
-            // Verify old path still works (callback path functional)
-            // GameBoxSpawner observes events but doesn't act - still uses direct method calls
+            // Verify end-to-end completion
             expect(allBatchesCompleteReceived).toBe(true)
             expect(completionEventData).toBeDefined()
             
-            // Phase 3c SUCCESS: Events flow to observers, old path remains functional
+            // Phase 3c SUCCESS: Events flow and placement completes
         })
     })
 })

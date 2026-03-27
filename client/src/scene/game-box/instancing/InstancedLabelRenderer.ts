@@ -19,9 +19,13 @@
 
 import * as THREE from 'three'
 import { LabelTextureArrayManager } from './LabelTextureArrayManager'
-import type { SteamGameData } from '../types/GameData'
 import { EventManager } from '../../../core/EventManager'
-import { GameEventTypes } from '../../../types/InteractionEvents'
+import {
+    GameEventTypes,
+    StorePropsEventTypes,
+    type AllBatchesCompleteEvent,
+    type GamesPlacedEvent,
+} from '../../../types/InteractionEvents'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { ShelfSide } from '../../props/SharedPropsUtils'
@@ -51,6 +55,8 @@ export class InstancedLabelRenderer {
     private currentCount: number = 0
     private isInitialized: boolean = false
     private gameNameToTextureIndex: Map<string, number> = new Map()
+    private pendingGpuUpdateTimeout: ReturnType<typeof setTimeout> | null = null
+    private readonly gpuUpdateDebounceMs: number = 50
     
     // Constant quaternion for no rotation (performance optimization)
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion() // Identity quaternion (0,0,0,1)
@@ -62,9 +68,15 @@ export class InstancedLabelRenderer {
             config.textureSize || 512,
             this.maxInstances // Pass max textures to match max instances
         )
-        
-        // GPU update only needed once after all batches complete
-        EventManager.getInstance().registerEventHandler(GameEventTypes.AllBatchesComplete, this.updateGPU.bind(this))
+
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.GamesPlaced,
+            this.queueGpuUpdate.bind(this)
+        )
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            this.flushGpuUpdate.bind(this)
+        )
         
         console.debug(`📋 InstancedLabelRenderer created (max: ${this.maxInstances} labels)`)
     }
@@ -220,6 +232,27 @@ export class InstancedLabelRenderer {
         }
         
         console.debug(`🔄 GPU updated: ${this.currentCount} active label instances`)
+    }
+
+    private queueGpuUpdate(_event: CustomEvent<GamesPlacedEvent>): void {
+        if (this.pendingGpuUpdateTimeout) {
+            clearTimeout(this.pendingGpuUpdateTimeout)
+        }
+
+        // TODO: generic debouncing
+        this.pendingGpuUpdateTimeout = setTimeout(() => {
+            this.pendingGpuUpdateTimeout = null
+            this.updateGPU()
+        }, this.gpuUpdateDebounceMs)
+    }
+
+    private flushGpuUpdate(_event: CustomEvent<AllBatchesCompleteEvent>): void {
+        if (this.pendingGpuUpdateTimeout) {
+            clearTimeout(this.pendingGpuUpdateTimeout)
+            this.pendingGpuUpdateTimeout = null
+        }
+
+        this.updateGPU()
     }
     
     /**

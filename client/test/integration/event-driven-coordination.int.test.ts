@@ -73,9 +73,18 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
         }))
     }
 
-    beforeEach(() => {
+    const uniqueBatchIndices = (events: Array<{ batchIndex: number }>): number[] => {
+        return [...new Set(events.map((event) => event.batchIndex))]
+    }
+
+    const findTimelineIndex = (eventName: string, batchIndex: number): number => {
+        return eventTimeline.findIndex((entry) => entry.event === eventName && entry.batchIndex === batchIndex)
+    }
+
+    beforeEach(async () => {
         scene = new THREE.Scene()
         eventManager = EventManager.getInstance()
+        eventManager.removeAllListeners()
         dataManager = DataManager.getInstance()
         
         // Clear state
@@ -155,10 +164,12 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
         
         // Create renderer AFTER listeners are registered
         renderer = new GpuStorePropsRenderer(scene)
+        await renderer.setupProps()
     })
 
     afterEach(() => {
         renderer?.dispose()
+        eventManager.removeAllListeners()
         dataManager.clear()
         scene.clear()
         vi.clearAllMocks()
@@ -180,22 +191,29 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             
             // Wait for complete flow
             await vi.waitFor(() => {
-                return allBatchesCompleteReceived === true && gamesPlacedEvents.length > 0
+                expect(allBatchesCompleteReceived).toBe(true)
+                expect(gamesPlacedEvents.length).toBeGreaterThan(0)
             }, { timeout: 8000, interval: 100 })
             
             // Verify all events fired
-            expect(batchReadyEvents).toHaveLength(1)
+            expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0])
             expect(shelfSpaceRequestedEvents).toHaveLength(1)
             expect(shelfCreatedEvents).toHaveLength(1)
             expect(gamesPlacedEvents).toHaveLength(1)
             expect(allBatchesCompleteReceived).toBe(true)
             
-            // Verify event sequence
-            expect(eventTimeline[0].event).toBe('BatchReadyForPlacement')
-            expect(eventTimeline[1].event).toBe('ShelfSpaceRequested')
-            expect(eventTimeline[2].event).toBe('ShelfCreated')
-            expect(eventTimeline[3].event).toBe('GamesPlaced')
-            expect(eventTimeline[4].event).toBe('AllBatchesComplete')
+            // Verify event sequence for batch 0
+            const batchReadyIdx = findTimelineIndex('BatchReadyForPlacement', 0)
+            const shelfRequestedIdx = findTimelineIndex('ShelfSpaceRequested', 0)
+            const shelfCreatedIdx = findTimelineIndex('ShelfCreated', 0)
+            const gamesPlacedIdx = findTimelineIndex('GamesPlaced', 0)
+            const completeIdx = eventTimeline.findIndex((entry) => entry.event === 'AllBatchesComplete')
+
+            expect(batchReadyIdx).toBeGreaterThanOrEqual(0)
+            expect(shelfRequestedIdx).toBeGreaterThan(batchReadyIdx)
+            expect(shelfCreatedIdx).toBeGreaterThan(shelfRequestedIdx)
+            expect(gamesPlacedIdx).toBeGreaterThan(shelfCreatedIdx)
+            expect(completeIdx).toBeGreaterThan(gamesPlacedIdx)
             
             console.log('Event Timeline:', eventTimeline.map(e => `${e.event}[${e.batchIndex}]`).join(' → '))
         })
@@ -213,11 +231,11 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             )
             
             await vi.waitFor(() => {
-                return gamesPlacedEvents.length > 0
+                expect(gamesPlacedEvents.length).toBeGreaterThan(0)
             }, { timeout: 8000, interval: 100 })
             
             // All events should reference the same batch index
-            expect(batchReadyEvents[0].batchIndex).toBe(0)
+            expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0])
             expect(shelfSpaceRequestedEvents[0].batchIndex).toBe(0)
             expect(shelfCreatedEvents[0].batchIndex).toBe(0)
             expect(gamesPlacedEvents[0].batchIndex).toBe(0)
@@ -237,11 +255,13 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             )
             
             await vi.waitFor(() => {
-                return gamesPlacedEvents.length > 0
+                expect(gamesPlacedEvents.length).toBeGreaterThan(0)
             }, { timeout: 8000, interval: 100 })
             
             // Game counts should match across events
-            expect(batchReadyEvents[0].games).toHaveLength(gameCount)
+            const latestBatchReady = [...batchReadyEvents].reverse().find((event) => event.batchIndex === 0)
+            expect(latestBatchReady).toBeDefined()
+            expect(latestBatchReady!.games).toHaveLength(gameCount)
             expect(shelfSpaceRequestedEvents[0].gamesCount).toBe(gameCount)
             expect(gamesPlacedEvents[0].gamesCount).toBe(gameCount)
         })
@@ -262,7 +282,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             )
             
             await vi.waitFor(() => {
-                return allBatchesCompleteReceived === true
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 8000, interval: 100 })
             
             // Check that no "No pending games" warnings were emitted
@@ -298,17 +318,18 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             
             // Wait for all batches to complete
             await vi.waitFor(() => {
-                return gamesPlacedEvents.length === 3 && allBatchesCompleteReceived === true
+                expect(gamesPlacedEvents.length).toBe(3)
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 10000, interval: 100 })
             
             // Verify all events fired for each batch
-            expect(batchReadyEvents).toHaveLength(3)
+            expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0, 1, 2])
             expect(shelfSpaceRequestedEvents).toHaveLength(3)
             expect(shelfCreatedEvents).toHaveLength(3)
             expect(gamesPlacedEvents).toHaveLength(3)
             
             // Verify batch indices are in order
-            expect(batchReadyEvents.map(e => e.batchIndex)).toEqual([0, 1, 2])
+            expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0, 1, 2])
             expect(shelfSpaceRequestedEvents.map(e => e.batchIndex)).toEqual([0, 1, 2])
             expect(shelfCreatedEvents.map(e => e.batchIndex)).toEqual([0, 1, 2])
             expect(gamesPlacedEvents.map(e => e.batchIndex)).toEqual([0, 1, 2])
@@ -330,7 +351,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             
             // Wait for completion
             await vi.waitFor(() => {
-                return allBatchesCompleteReceived === true
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 10000, interval: 100 })
             
             // No "No pending games" warnings should appear
@@ -357,18 +378,26 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             )
             
             await vi.waitFor(() => {
-                return gamesPlacedEvents.length > 0
+                expect(gamesPlacedEvents.length).toBeGreaterThan(0)
             }, { timeout: 8000, interval: 100 })
             
             // Find the timeline indices for these events
-            const batchReadyIdx = eventTimeline.findIndex(e => e.event === 'BatchReadyForPlacement')
-            const shelfRequestedIdx = eventTimeline.findIndex(e => e.event === 'ShelfSpaceRequested')
+            const shelfRequestedIdx = findTimelineIndex('ShelfSpaceRequested', 0)
+            const priorBatchReadyIdx = eventTimeline
+                .map((entry, index) => ({ entry, index }))
+                .filter(({ entry, index }) =>
+                    index < shelfRequestedIdx &&
+                    entry.event === 'BatchReadyForPlacement' &&
+                    entry.batchIndex === 0
+                )
+                .at(-1)?.index ?? -1
             
             // ShelfSpaceRequested should come right after BatchReadyForPlacement
-            expect(shelfRequestedIdx).toBe(batchReadyIdx + 1)
+            expect(priorBatchReadyIdx).toBeGreaterThanOrEqual(0)
+            expect(shelfRequestedIdx).toBe(priorBatchReadyIdx + 1)
             
             // Time delta should be minimal (< 50ms typically)
-            const timeDelta = eventTimeline[shelfRequestedIdx].timestamp - eventTimeline[batchReadyIdx].timestamp
+            const timeDelta = eventTimeline[shelfRequestedIdx].timestamp - eventTimeline[priorBatchReadyIdx].timestamp
             expect(timeDelta).toBeLessThan(100)
         })
 
@@ -381,11 +410,11 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             )
             
             await vi.waitFor(() => {
-                return gamesPlacedEvents.length > 0
+                expect(gamesPlacedEvents.length).toBeGreaterThan(0)
             }, { timeout: 8000, interval: 100 })
             
-            const shelfRequestedIdx = eventTimeline.findIndex(e => e.event === 'ShelfSpaceRequested')
-            const shelfCreatedIdx = eventTimeline.findIndex(e => e.event === 'ShelfCreated')
+            const shelfRequestedIdx = findTimelineIndex('ShelfSpaceRequested', 0)
+            const shelfCreatedIdx = findTimelineIndex('ShelfCreated', 0)
             
             // ShelfCreated should come right after ShelfSpaceRequested
             expect(shelfCreatedIdx).toBe(shelfRequestedIdx + 1)
@@ -400,11 +429,11 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             )
             
             await vi.waitFor(() => {
-                return gamesPlacedEvents.length > 0
+                expect(gamesPlacedEvents.length).toBeGreaterThan(0)
             }, { timeout: 8000, interval: 100 })
             
-            const shelfCreatedIdx = eventTimeline.findIndex(e => e.event === 'ShelfCreated')
-            const gamesPlacedIdx = eventTimeline.findIndex(e => e.event === 'GamesPlaced')
+            const shelfCreatedIdx = findTimelineIndex('ShelfCreated', 0)
+            const gamesPlacedIdx = findTimelineIndex('GamesPlaced', 0)
             
             // GamesPlaced should come right after ShelfCreated
             expect(gamesPlacedIdx).toBe(shelfCreatedIdx + 1)
@@ -426,11 +455,11 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             
             // Should complete gracefully
             await vi.waitFor(() => {
-                return allBatchesCompleteReceived === true
+                expect(allBatchesCompleteReceived).toBe(true)
             }, { timeout: 3000 })
             
             // Events should still fire (even if no games)
-            expect(batchReadyEvents).toHaveLength(1)
+            expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0])
             expect(allBatchesCompleteReceived).toBe(true)
         })
     })

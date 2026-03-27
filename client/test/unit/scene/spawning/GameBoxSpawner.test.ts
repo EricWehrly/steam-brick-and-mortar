@@ -243,8 +243,11 @@ describe('GameBoxSpawner Event Coordination', () => {
             const warnMessage = warnCall.join(' ')
             expect(warnMessage).toContain('No pending games found for batch 5')
 
-            // Should NOT emit GamesPlaced
-            expect(gamesPlacedEvents).toHaveLength(0)
+            // Emit terminal failure to prevent coordinator completion deadlock
+            expect(gamesPlacedEvents).toHaveLength(1)
+            expect(gamesPlacedEvents[0].batchIndex).toBe(5)
+            expect(gamesPlacedEvents[0].gamesCount).toBe(0)
+            expect(gamesPlacedEvents[0].status).toBe('failed')
 
             warnSpy.mockRestore()
         })

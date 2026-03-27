@@ -22,11 +22,60 @@ describe('SteamApiClient Integration Tests', () => {
     let fetchMock: any
     let localStorageMock: any
 
+    const createBatchResponse = (appids: number[]) => ({
+        success: true,
+        total_requested: appids.length,
+        total_successful: appids.length,
+        total_failed: 0,
+        cache_hits: 0,
+        cache_misses: appids.length,
+        results: appids.map(appid => ({
+            success: true,
+            appid,
+            data: {
+                name: `Game ${appid}`,
+                type: 'game',
+                is_free: false,
+                categories: [{ id: 1, description: 'Action' }],
+                genres: [{ id: '1', description: 'Action' }],
+                artwork: {
+                    header: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
+                    capsule: null,
+                    capsule_v5: null,
+                    background: null,
+                    background_raw: null
+                }
+            },
+            retrieved_at: new Date().toISOString()
+        })),
+        timestamp: new Date().toISOString()
+    })
+
     beforeEach(() => {
         // Setup all mocks
         setupIndexedDBMock()
         fetchMock = setupFetchMock()
         localStorageMock = setupLocalStorageMock()
+
+        fetchMock.mockImplementation((input: string | URL | Request) => {
+            const url = String(input)
+            if (url.includes('/batch-appdetails?appids=')) {
+                const query = url.split('appids=')[1] || ''
+                const appids = query
+                    .split(',')
+                    .map(part => Number(part))
+                    .filter(Number.isFinite)
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve(createBatchResponse(appids))
+                })
+            }
+
+            return Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve({})
+            })
+        })
         
         // Clear all mocks and storage
         vi.clearAllMocks()
@@ -82,8 +131,11 @@ describe('SteamApiClient Integration Tests', () => {
             const result = await client.loadGamesProgressively(mockUser, {
                 maxGames: 1
             })
+
+            // Uncached metadata is fetched/emitted in background.
+            await new Promise(resolve => setTimeout(resolve, 25))
             
-            expect(result).toHaveLength(1)
+            expect(result).toHaveLength(0)
             expect(loadedGames).toHaveLength(1)
             expect(progressEventFired).toBe(true)
         })
@@ -110,6 +162,10 @@ describe('SteamApiClient Integration Tests', () => {
             await client.loadGamesProgressively(multiGameUser, {
                 maxGames: 3
             })
+
+            await new Promise(resolve => setTimeout(resolve, 25))
+
+            expect(loadOrder).toHaveLength(3)
             
             // Should be ordered by playtime (descending)
             expect(loadOrder[0].playtime_forever).toBe(500)
@@ -141,8 +197,10 @@ describe('SteamApiClient Integration Tests', () => {
             const result = await client.loadGamesProgressively(mockUser, {
                 maxGames: 1
             })
+
+            await new Promise(resolve => setTimeout(resolve, 25))
             
-            expect(result).toHaveLength(1)
+            expect(result).toHaveLength(0)
             expect(loadedGames).toHaveLength(1)
             expect(loadedGames[0]).toMatchObject(mockGame)
         })
@@ -151,9 +209,14 @@ describe('SteamApiClient Integration Tests', () => {
             const result = await client.loadGamesProgressively(mockUser, {
                 maxGames: 1
             })
+
+            await new Promise(resolve => setTimeout(resolve, 25))
+
+            const calledUrls = fetchMock.mock.calls.map(([url]: [string | URL | Request]) => String(url))
             
-            expect(result).toHaveLength(1)
-            expect(fetchMock).not.toHaveBeenCalled()
+            expect(result).toHaveLength(0)
+            expect(calledUrls.some(url => url.includes('/batch-appdetails'))).toBe(true)
+            expect(calledUrls.some(url => url.includes('steamcdn') || url.includes('akamai.steamstatic'))).toBe(false)
         })
     })
 })

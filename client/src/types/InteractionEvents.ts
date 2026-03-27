@@ -169,6 +169,9 @@ export interface InstancedBatchCompleteEvent extends BaseInteractionEvent {
     // Emitted when a batch of game boxes has been created and instanced renderers need GPU updates
     batchType: 'shelf' | 'row' | 'custom'
     gameCount: number
+    batchIndex?: number
+    status?: BatchProcessingStatus
+    lastModified?: number
 }
 
 export interface ShelfBounds {
@@ -185,6 +188,8 @@ export interface ShelfLayoutDeterminedEvent extends BaseInteractionEvent {
 
 export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
     // Event signals all batches processed - consumers needing layout should use ShelfLayoutDetermined
+    status?: BatchProcessingStatus
+    lastModified?: number
 }
 
 // =============================================================================
@@ -224,6 +229,16 @@ export interface LightingSystemReadyEvent extends BaseInteractionEvent {
 // STORE PROPS EVENTS
 // =============================================================================
 
+export enum BatchProcessingStatus {
+    Queued = 'queued',
+    Dispatched = 'dispatched',
+    ShelfRequested = 'shelf-requested',
+    ShelfCreated = 'shelf-created',
+    GamesPlaced = 'games-placed',
+    Failed = 'failed',
+    Complete = 'complete'
+}
+
 export interface StorePropsProgressEvent extends BaseInteractionEvent {
     step: 'room' | 'shelves' | 'games'
     current?: number
@@ -248,22 +263,30 @@ export interface BatchReadyForPlacementEvent extends BaseInteractionEvent {
     games: ReadonlyArray<Readonly<SteamGame>>
     batchIndex: number
     totalBatches: number
+    status?: BatchProcessingStatus
+    lastModified?: number
 }
 
 export interface ShelfSpaceRequestedEvent extends BaseInteractionEvent {
     gamesCount: number
     batchIndex: number
+    status?: BatchProcessingStatus
+    lastModified?: number
 }
 
 export interface ShelfCreatedEvent extends BaseInteractionEvent {
     position: Readonly<THREE.Vector3>
     batchIndex: number
     bounds: ShelfBounds
+    status?: BatchProcessingStatus
+    lastModified?: number
 }
 
 export interface GamesPlacedEvent extends BaseInteractionEvent {
     gamesCount: number
     batchIndex: number
+    status?: BatchProcessingStatus
+    lastModified?: number
 }
 
 export interface RendererReadyEvent extends BaseInteractionEvent {

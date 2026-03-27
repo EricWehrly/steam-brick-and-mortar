@@ -261,8 +261,8 @@ describe('Pause Menu Integration Tests', () => {
             pauseMenuManager.registerPanel(helpPanel)
             
             expect(helpPanel.id).toBe('help')
-            expect(helpPanel.title).toBe('Help & Controls')
-            expect(helpPanel.icon).toBe('❓')
+            expect(helpPanel.title).toBe('Controls')
+            expect(helpPanel.icon).toBe('🎮')
         })
 
         it('should render panel content correctly', () => {

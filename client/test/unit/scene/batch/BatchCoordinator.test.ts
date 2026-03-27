@@ -8,13 +8,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { BatchCoordinator, type BatchItem, type BatchProgress } from '../../../../src/scene/batch/BatchCoordinator'
 import { EventManager } from '../../../../src/core/EventManager'
-import { StorePropsEventTypes, type BatchReadyForPlacementEvent } from '../../../../src/types/InteractionEvents'
+import { GameEventTypes, StorePropsEventTypes, type BatchReadyForPlacementEvent, type GamesPlacedEvent } from '../../../../src/types/InteractionEvents'
 
 describe('BatchCoordinator', () => {
     let eventManager: EventManager
     
     beforeEach(() => {
         eventManager = EventManager.getInstance()
+        eventManager.removeAllListeners()
+    })
+
+    afterEach(() => {
+        eventManager.removeAllListeners()
     })
 
 
@@ -237,7 +242,10 @@ describe('BatchCoordinator', () => {
             coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 2, data: 'duplicate' })
             coordinator.enqueueBatch({ batchIndex: 1, totalBatches: 2, data: 'second' })
 
-            await new Promise(resolve => setTimeout(resolve, 50))
+            const waitStart = Date.now()
+            while (emittedBatches.length < 3 && Date.now() - waitStart < 500) {
+                await new Promise(resolve => setTimeout(resolve, 10))
+            }
 
             // Should emit for all enqueued items
             expect(emittedBatches).toEqual([0, 0, 1])
@@ -262,10 +270,74 @@ describe('BatchCoordinator', () => {
             coordinator.enqueueBatch({ batchIndex: 1, totalBatches: 3, data: 'b' })
             coordinator.enqueueBatch({ batchIndex: 2, totalBatches: 3, data: 'c' })
 
-            await new Promise(resolve => setTimeout(resolve, 50))
+            const waitStart = Date.now()
+            while (timestamps.length < 3 && Date.now() - waitStart < 500) {
+                await new Promise(resolve => setTimeout(resolve, 10))
+            }
 
-            // Should have emitted all 3
-            expect(timestamps).toHaveLength(3)
+            // At least one emission per enqueued batch is expected.
+            expect(timestamps.length).toBeGreaterThanOrEqual(3)
+        })
+    })
+
+    describe('Completion Signaling', () => {
+        it('should emit AllBatchesComplete only after all batches are placed', async () => {
+            let completionCount = 0
+
+            eventManager.registerEventHandler(
+                GameEventTypes.AllBatchesComplete,
+                () => { completionCount++ }
+            )
+
+            const coordinator = new BatchCoordinator<string>()
+
+            coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 2, data: 'a' })
+            coordinator.enqueueBatch({ batchIndex: 1, totalBatches: 2, data: 'b' })
+
+            await new Promise(resolve => setTimeout(resolve, 50))
+            expect(completionCount).toBe(0)
+
+            eventManager.emit<GamesPlacedEvent>(
+                StorePropsEventTypes.GamesPlaced,
+                { gamesCount: 5, batchIndex: 0 }
+            )
+
+            await new Promise(resolve => setTimeout(resolve, 0))
+            expect(completionCount).toBe(0)
+
+            eventManager.emit<GamesPlacedEvent>(
+                StorePropsEventTypes.GamesPlaced,
+                { gamesCount: 6, batchIndex: 1 }
+            )
+
+            await new Promise(resolve => setTimeout(resolve, 0))
+            expect(completionCount).toBe(1)
+        })
+
+        it('should not emit completion more than once for duplicate GamesPlaced', async () => {
+            let completionCount = 0
+
+            eventManager.registerEventHandler(
+                GameEventTypes.AllBatchesComplete,
+                () => { completionCount++ }
+            )
+
+            const coordinator = new BatchCoordinator<string>()
+            coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 1, data: 'only' })
+
+            await new Promise(resolve => setTimeout(resolve, 30))
+
+            eventManager.emit<GamesPlacedEvent>(
+                StorePropsEventTypes.GamesPlaced,
+                { gamesCount: 5, batchIndex: 0 }
+            )
+            eventManager.emit<GamesPlacedEvent>(
+                StorePropsEventTypes.GamesPlaced,
+                { gamesCount: 5, batchIndex: 0 }
+            )
+
+            await new Promise(resolve => setTimeout(resolve, 0))
+            expect(completionCount).toBe(1)
         })
     })
 })

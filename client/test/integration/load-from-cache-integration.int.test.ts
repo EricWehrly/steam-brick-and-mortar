@@ -41,6 +41,8 @@ describe('Load from Cache Integration', () => {
   let uiManager: UIManager
 
   beforeEach(async () => {
+    vi.useFakeTimers()
+
     // Setup DOM
     document.body.appendChild(mockSteamUI)
     document.body.appendChild(mockVanityInput)
@@ -59,6 +61,8 @@ describe('Load from Cache Integration', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
+
     // Cleanup DOM
     document.body.innerHTML = ''
   })
@@ -85,6 +89,7 @@ describe('Load from Cache Integration', () => {
     mockVanityInput.value = testVanityUrl
     const inputEvent = new Event('input', { bubbles: true })
     mockVanityInput.dispatchEvent(inputEvent)
+    vi.advanceTimersByTime(300)
     
     // The Load from Cache button should become visible (lose 'hidden' class)
     expect(mockLoadFromCacheButton.classList.contains('hidden')).toBe(false)
@@ -103,6 +108,7 @@ describe('Load from Cache Integration', () => {
     mockVanityInput.value = testVanityUrl
     const inputEvent = new Event('input', { bubbles: true })
     mockVanityInput.dispatchEvent(inputEvent)
+    vi.advanceTimersByTime(300)
     
     // The Load from Cache button should be hidden (have 'hidden' class)
     expect(mockLoadFromCacheButton.classList.contains('hidden')).toBe(true)
@@ -120,6 +126,7 @@ describe('Load from Cache Integration', () => {
     mockVanityInput.value = testVanityUrl
     const inputEvent = new Event('input', { bubbles: true })
     mockVanityInput.dispatchEvent(inputEvent)
+    vi.advanceTimersByTime(300)
     
     // Button should be hidden because no cache exists
     expect(mockLoadFromCacheButton.classList.contains('hidden')).toBe(true)
@@ -130,6 +137,7 @@ describe('Load from Cache Integration', () => {
     
     // Trigger input event again
     mockVanityInput.dispatchEvent(inputEvent)
+    vi.advanceTimersByTime(300)
     
     // Button should now be visible
     expect(mockLoadFromCacheButton.classList.contains('hidden')).toBe(false)
@@ -148,6 +156,7 @@ describe('Load from Cache Integration', () => {
     mockVanityInput.value = testVanityUrl
     const inputEvent = new Event('input', { bubbles: true })
     mockVanityInput.dispatchEvent(inputEvent)
+    vi.advanceTimersByTime(300)
     
     // Verify that hasCachedData was called directly (no events!)
     expect(hasCacheDataSpy).toHaveBeenCalledWith(testVanityUrl)

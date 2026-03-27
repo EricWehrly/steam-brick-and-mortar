@@ -6,6 +6,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { UIManager } from '../../src/ui/UIManager'
 import { SteamUICoordinator } from '../../src/ui/coordinators/SteamUICoordinator'
+import { EventManager } from '../../src/core/EventManager'
+import { SteamEventTypes } from '../../src/types/InteractionEvents'
 
 // Mock window.performance before importing any modules that use it
 Object.defineProperty(window, 'performance', {
@@ -306,31 +308,6 @@ describe('Application Startup Integration', () => {
         // Import classes for testing
         const { SteamIntegration } = await import('../../src/steam-integration/SteamIntegration')
         const { SteamUICoordinator } = await import('../../src/ui/coordinators')
-        const { SceneCoordinator } = await import('../../src/scene/SceneCoordinator')
-        const { SceneManager } = await import('../../src/scene/SceneManager')
-        const { PerformanceMonitor } = await import('../../src/ui/PerformanceMonitor')
-        const { EventManager } = await import('../../src/core/EventManager')
-
-        // Create mock dependencies
-        const mockEventManager = EventManager.getInstance()
-        
-        const mockPerformanceMonitor = new PerformanceMonitor({
-            updateInterval: 1000,
-            showMemory: true
-        })
-        
-        const mockDebugStatsProvider = {
-            getDebugStats: vi.fn().mockResolvedValue({
-                sceneObjects: { total: 0, meshes: 0, lights: 0, cameras: 0, textures: 0, materials: 0, geometries: 0 },
-                performance: { fps: 60, frameTime: 16, memoryUsed: 1024000, memoryTotal: 2048000, triangles: 1000, drawCalls: 50 },
-                cache: { imageCount: 0, imageCacheSize: 0, gameDataCount: 0, gameDataSize: 0, quotaUsed: 0, quotaTotal: 0 },
-                system: { userAgent: 'test', webxrSupported: true, webglVersion: 'WebGL 2.0', maxTextureSize: 4096, vendor: 'test', renderer: 'test' }
-            })
-        } as any
-        
-        // Create mock SceneCoordinator
-        const mockSceneManager = new SceneManager()
-        const mockSceneCoordinator = new SceneCoordinator(mockSceneManager)
 
         // Test SteamIntegration and SteamUICoordinator can be created without binding errors
         // (SteamWorkflowManager functionality now split between these classes)
@@ -358,6 +335,8 @@ describe('Application Startup Integration', () => {
         })
         
         const steamStatus = document.getElementById('steam-status')!
+        const eventManager = EventManager.getInstance()
+        const emitSpy = vi.spyOn(eventManager, 'emit')
 
         expect(() => {
             // Create instances like the real application does
@@ -371,10 +350,12 @@ describe('Application Startup Integration', () => {
             coordinator.loadFromCache('test-user-id')
         }).not.toThrow()
         
-        // Verify the actual DOM integration pipeline worked
+        // Verify the coordinator emits the expected action event
         expect(steamStatus).toBeTruthy()
-        expect(steamStatus.textContent).toBeTruthy()
-        expect(steamStatus.textContent).toContain('Test message')
+        expect(emitSpy).toHaveBeenCalledWith(SteamEventTypes.LoadFromCache, expect.objectContaining({
+            userInput: 'test-user-id'
+        }))
+        emitSpy.mockRestore()
         
         // Cleanup all created elements
         createdElements.forEach(element => {

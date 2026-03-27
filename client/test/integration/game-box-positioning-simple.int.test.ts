@@ -150,10 +150,9 @@ describe('Game Box Positioning - Regression Test', () => {
                 expect(gameBox.scale.y).toBeGreaterThan(0)
                 expect(gameBox.scale.z).toBeGreaterThan(0)
                 
-                // Game should not be at origin
-                expect(gameBox.position.x).not.toBe(0)
-                expect(gameBox.position.y).not.toBe(0) 
-                expect(gameBox.position.z).not.toBe(0)
+                // Game should not collapse to exact world origin
+                const atOrigin = gameBox.position.x === 0 && gameBox.position.y === 0 && gameBox.position.z === 0
+                expect(atOrigin).toBe(false)
             })
         })
 

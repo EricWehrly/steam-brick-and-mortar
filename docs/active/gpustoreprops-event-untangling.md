@@ -1,8 +1,8 @@
 # GpuStorePropsRenderer Event Untangling Plan
 
-**Status**: In Progress (Phase 3e dual-path active, blocker resolved)  
+**Status**: In Progress (Phase 3f single-path active, focused unit coverage passing)  
 **Created**: 2026-01-18  
-**Updated**: 2026-01-23  
+**Updated**: 2026-03-20  
 **Goal**: Remove GpuStorePropsRenderer as middleman, let components communicate directly via events
 
 ## Progress Summary
@@ -11,7 +11,7 @@
 |-------|--------|-------|
 | Phase 1: Extract GameBoxSpawner | ✅ COMPLETE | GameBoxSpawner extracted, event listeners registered |
 | Phase 2: Self-Registering BatchCoordinator | ✅ COMPLETE | Self-registers for GamesBatchReady |
-| Phase 3: Event-Driven Flow | 🔄 IN PROGRESS | Dual-path active, RendererReady event implemented ✅ |
+| Phase 3: Event-Driven Flow | 🔄 IN PROGRESS | Single-path events active; completion now emitted by BatchCoordinator |
 | Phase 4: Remove Middleman | ⬜ NOT STARTED | Waiting for Phase 3 validation |
 
 ### ✅ Blocker Resolved: `waitForShelfRendererReady` Now Event-Driven
@@ -455,12 +455,12 @@ Individual shelves should be able to fail without impacting other shelves or dep
 - [x] ShelfSpaceRequested event implemented
 - [x] ShelfCreated event implemented  
 - [x] GamesPlaced event implemented
-- [x] Dual-path mode working (events alongside callbacks)
-- [ ] Remove callback path (old method calls)
-- [ ] Remove `waitForShelfRendererReady` polling loop
-- [ ] InstancedShelfRenderer emits RendererReady event
-- [ ] Integration test validates complete flow
-- [ ] All tests passing
+- [x] Dual-path transition validated (events alongside callbacks)
+- [x] Remove callback path (old method calls)
+- [x] Remove `waitForShelfRendererReady` polling loop
+- [x] InstancedShelfRenderer emits RendererReady event
+- [ ] Integration test validates complete flow (currently skipped due memory-leak track item)
+- [x] Focused unit suites passing (BatchCoordinator, GameBoxSpawner, RendererReady tests)
 
 ### After Phase 4:
 - [ ] GpuStorePropsRenderer ~150 LOC (currently ~540 LOC)

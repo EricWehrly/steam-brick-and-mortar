@@ -4,6 +4,7 @@ import type { SteamGameData } from '../game-box/types/GameData'
 import { ShelfSurfaceUtils, type ShelfSurface, ShelfSide, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
 import { 
+    BatchProcessingStatus,
     StorePropsEventTypes, 
     type BatchReadyForPlacementEvent,
     type ShelfSpaceRequestedEvent,
@@ -19,44 +20,48 @@ import { Logger } from '../../utils/Logger'
  * Handles game distribution across shelf surfaces (front/back of each shelf board).
  * 
  * Extracted from GpuStorePropsRenderer to isolate game placement logic.
- * 
- * Phase 3c: Observes BatchReadyForPlacement events (read-only mode)
- * Phase 3e: Emits ShelfSpaceRequested and listens for ShelfCreated (dual-path active)
- * Currently uses BOTH event path and direct method calls for safety
+ * Event-driven flow:
+ * - Observes BatchReadyForPlacement
+ * - Emits ShelfSpaceRequested
+ * - Observes ShelfCreated
+ * - Emits GamesPlaced
  */
 export class GameBoxSpawner {
     private static logger = Logger.createLogFunctions(GameBoxSpawner.name)
+    private gameBoxRenderer?: GpuGameBoxRenderer
     
-    // Phase 3e: Track pending games waiting for shelf creation
+    // Track pending games waiting for shelf creation
     private pendingGames: Map<number, readonly SteamGameData[]> = new Map()
     
-    constructor(
-        private readonly gameBoxRenderer: GpuGameBoxRenderer
-    ) {
-        // Phase 3c: Register listener for BatchReadyForPlacement events
+    constructor(gameBoxRenderer?: GpuGameBoxRenderer) {
+        this.gameBoxRenderer = gameBoxRenderer
+
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.handleBatchReadyForPlacement.bind(this)
         )
         
-        // Phase 3e: Register listener for ShelfCreated events
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfCreated,
             this.handleShelfCreated.bind(this)
         )
         
-        GameBoxSpawner.logger.debug('Registered listeners for BatchReadyForPlacement and ShelfCreated events (Phase 3e: dual-path)');
+        GameBoxSpawner.logger.debug('Registered listeners for BatchReadyForPlacement and ShelfCreated events')
+    }
+
+    public setGameBoxRenderer(gameBoxRenderer: GpuGameBoxRenderer): void {
+        this.gameBoxRenderer = gameBoxRenderer
     }
     
     /**
-     * Handle BatchReadyForPlacement event (Phase 3e: now emits ShelfSpaceRequested)
+     * Handle BatchReadyForPlacement event
      * Stores games and requests shelf space via event
      */
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
         const { games, batchIndex, totalBatches } = event.detail
         
         GameBoxSpawner.logger.debug(
-            `[Phase 3e EVENT PATH] BatchReadyForPlacement received: ` +
+            `[EVENT PATH] BatchReadyForPlacement received: ` +
             `batch ${batchIndex + 1}/${totalBatches}, ${games.length} games. ` +
             `Emitting ShelfSpaceRequested...`
         )
@@ -69,27 +74,38 @@ export class GameBoxSpawner {
             StorePropsEventTypes.ShelfSpaceRequested,
             {
                 gamesCount: games.length,
-                batchIndex: batchIndex
+                batchIndex: batchIndex,
+                status: BatchProcessingStatus.ShelfRequested,
+                lastModified: Date.now()
             }
         )
         GameBoxSpawner.logger.debug(`Emitted ShelfSpaceRequested for batch ${batchIndex + 1}`)
     }
     
     /**
-     * Handle ShelfCreated event (Phase 3e: spawn games on created shelf)
+     * Handle ShelfCreated event
      * Retrieves pending games and places them on the shelf
      */
     private handleShelfCreated(event: CustomEvent<ShelfCreatedEvent>): void {
         const { position, batchIndex } = event.detail
         
         GameBoxSpawner.logger.debug(
-            `[Phase 3e EVENT PATH] ShelfCreated received for batch ${batchIndex + 1}. ` +
+            `[EVENT PATH] ShelfCreated received for batch ${batchIndex + 1}. ` +
             `Spawning games at position (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)})`
         )
         
         const games = this.pendingGames.get(batchIndex)
         if (!games) {
             GameBoxSpawner.logger.warn(`No pending games found for batch ${batchIndex}`);
+            EventManager.getInstance().emit<GamesPlacedEvent>(
+                StorePropsEventTypes.GamesPlaced,
+                {
+                    gamesCount: 0,
+                    batchIndex,
+                    status: BatchProcessingStatus.Failed,
+                    lastModified: Date.now()
+                }
+            )
             return
         }
         
@@ -104,11 +120,13 @@ export class GameBoxSpawner {
             StorePropsEventTypes.GamesPlaced,
             {
                 gamesCount: games.length,
-                batchIndex: batchIndex
+                batchIndex: batchIndex,
+                status: BatchProcessingStatus.GamesPlaced,
+                lastModified: Date.now()
             }
         )
         GameBoxSpawner.logger.debug(
-            `[Phase 3e EVENT PATH] Spawned ${games.length} games, emitted GamesPlaced for batch ${batchIndex + 1}`
+            `[EVENT PATH] Spawned ${games.length} games, emitted GamesPlaced for batch ${batchIndex + 1}`
         )
     }
     
@@ -163,6 +181,11 @@ export class GameBoxSpawner {
         games: readonly SteamGameData[], 
         side: ShelfSide
     ): void {
+        if (!this.gameBoxRenderer) {
+            GameBoxSpawner.logger.warn('GameBoxRenderer unavailable while creating game boxes')
+            return
+        }
+
         const boxDimensions = this.gameBoxRenderer.getDimensions()
         const gamePositions = GameBoxUtils.calculateGamePositions(
             shelfPosition, 
@@ -186,6 +209,10 @@ export class GameBoxSpawner {
         side: ShelfSide,
         _index: number
     ): void {
+        if (!this.gameBoxRenderer) {
+            GameBoxSpawner.logger.warn('GameBoxRenderer unavailable while creating a game box')
+            return
+        }
         this.gameBoxRenderer.createGameBoxAuto(game, worldPosition, side)
     }
 }
