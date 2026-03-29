@@ -13,10 +13,15 @@ export class LodDistanceManagerDebug extends LodDistanceManager {
     }
 
     private registerEventListeners(): void {
-        EventManager.getInstance().registerEventHandler(GameEventTypes.AllBatchesComplete, () => {
-            this.syncInstances()
-            this.startAutoUpdate()
-        })
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.SomeBatchesComplete,
+            this.handleSomeBatchesComplete.bind(this)
+        )
+    }
+
+    private handleSomeBatchesComplete(): void {
+        this.syncInstances()
+        this.startAutoUpdate()
     }
 
     private registerConsoleCommands(): void {

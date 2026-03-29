@@ -145,7 +145,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
                     batchIndex: event.detail.batchIndex,
                     timestamp: Date.now() 
                 })
-                console.log(`[EVENT] GamesPlaced: batch ${event.detail.batchIndex}, ${event.detail.gamesCount} games`)
+                console.log(`[EVENT] GamesPlaced: batch ${event.detail.batchIndex}`)
             }
         )
         
@@ -263,7 +263,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             expect(latestBatchReady).toBeDefined()
             expect(latestBatchReady!.games).toHaveLength(gameCount)
             expect(shelfSpaceRequestedEvents[0].gamesCount).toBe(gameCount)
-            expect(gamesPlacedEvents[0].gamesCount).toBe(gameCount)
+            expect(gamesPlacedEvents[0].status).toBe('games-placed')
         })
 
         it('should not emit "No pending games found" warnings', async () => {

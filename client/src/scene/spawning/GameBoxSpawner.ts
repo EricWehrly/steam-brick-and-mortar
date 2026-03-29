@@ -100,10 +100,8 @@ export class GameBoxSpawner {
             EventManager.getInstance().emit<GamesPlacedEvent>(
                 StorePropsEventTypes.GamesPlaced,
                 {
-                    gamesCount: 0,
                     batchIndex,
-                    status: BatchProcessingStatus.Failed,
-                    lastModified: Date.now()
+                    status: BatchProcessingStatus.Failed
                 }
             )
             return
@@ -119,10 +117,8 @@ export class GameBoxSpawner {
         EventManager.getInstance().emit<GamesPlacedEvent>(
             StorePropsEventTypes.GamesPlaced,
             {
-                gamesCount: games.length,
                 batchIndex: batchIndex,
-                status: BatchProcessingStatus.GamesPlaced,
-                lastModified: Date.now()
+                status: BatchProcessingStatus.GamesPlaced
             }
         )
         GameBoxSpawner.logger.debug(

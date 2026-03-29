@@ -13,7 +13,7 @@
  * RECEIVES:
  * - setInstance(index, data) → Creates/updates shelf at index
  * - updateGPU() → Flushes instance changes to GPU
- * - AllBatchesComplete event → Triggers final GPU update
+ * - SomeBatchesComplete event → Triggers coalesced GPU update
  * 
  * EMITS:
  * - RendererReady → When initialize() completes (Phase 3: replaces polling)
@@ -162,7 +162,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.interiorSurfaceManager = new InstancedMeshManager('InstancedShelf-InteriorSurfaces')
         
         EventManager.getInstance().registerEventHandler(
-            GameEventTypes.AllBatchesComplete,
+            GameEventTypes.SomeBatchesComplete,
             this.updateGPU.bind(this)
         )
         

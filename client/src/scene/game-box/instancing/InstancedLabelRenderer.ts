@@ -22,9 +22,7 @@ import { LabelTextureArrayManager } from './LabelTextureArrayManager'
 import { EventManager } from '../../../core/EventManager'
 import {
     GameEventTypes,
-    StorePropsEventTypes,
-    type AllBatchesCompleteEvent,
-    type GamesPlacedEvent,
+    type SomeBatchesCompleteEvent,
 } from '../../../types/InteractionEvents'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
@@ -55,8 +53,6 @@ export class InstancedLabelRenderer {
     private currentCount: number = 0
     private isInitialized: boolean = false
     private gameNameToTextureIndex: Map<string, number> = new Map()
-    private pendingGpuUpdateTimeout: ReturnType<typeof setTimeout> | null = null
-    private readonly gpuUpdateDebounceMs: number = 50
     
     // Constant quaternion for no rotation (performance optimization)
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion() // Identity quaternion (0,0,0,1)
@@ -70,12 +66,8 @@ export class InstancedLabelRenderer {
         )
 
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.GamesPlaced,
-            this.queueGpuUpdate.bind(this)
-        )
-        EventManager.getInstance().registerEventHandler(
-            GameEventTypes.AllBatchesComplete,
-            this.flushGpuUpdate.bind(this)
+            GameEventTypes.SomeBatchesComplete,
+            this.handleSomeBatchesComplete.bind(this)
         )
         
         console.debug(`📋 InstancedLabelRenderer created (max: ${this.maxInstances} labels)`)
@@ -234,24 +226,7 @@ export class InstancedLabelRenderer {
         console.debug(`🔄 GPU updated: ${this.currentCount} active label instances`)
     }
 
-    private queueGpuUpdate(_event: CustomEvent<GamesPlacedEvent>): void {
-        if (this.pendingGpuUpdateTimeout) {
-            clearTimeout(this.pendingGpuUpdateTimeout)
-        }
-
-        // TODO: generic debouncing
-        this.pendingGpuUpdateTimeout = setTimeout(() => {
-            this.pendingGpuUpdateTimeout = null
-            this.updateGPU()
-        }, this.gpuUpdateDebounceMs)
-    }
-
-    private flushGpuUpdate(_event: CustomEvent<AllBatchesCompleteEvent>): void {
-        if (this.pendingGpuUpdateTimeout) {
-            clearTimeout(this.pendingGpuUpdateTimeout)
-            this.pendingGpuUpdateTimeout = null
-        }
-
+    private handleSomeBatchesComplete(_event: CustomEvent<SomeBatchesCompleteEvent>): void {
         this.updateGPU()
     }
     

@@ -36,7 +36,6 @@ import { GameEventTypes } from '../types/InteractionEvents'
 import { 
     BatchProcessingStatus,
     StorePropsEventTypes, 
-    type InstancedBatchCompleteEvent,
     type StorePropsProgressEvent, 
     type SteamGamesBatchEvent,
     type ShelfLayoutDeterminedEvent,
@@ -181,7 +180,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private async handleShelfSpaceRequested(event: CustomEvent<ShelfSpaceRequestedEvent>): Promise<void> {
-        const { gamesCount, batchIndex } = event.detail
+        const { batchIndex } = event.detail
 
         // Guard against same-tick event races: placement work starts only after init is complete.
         if (this.progressiveInitializationPromise) {
@@ -192,14 +191,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const shelfMonitor = PerformanceMonitor.start('shelf-creation', GpuStorePropsRenderer.logger)
         await this.createShelfForBatchIndex(batchIndex)
         shelfMonitor.end({ batchIndex })
-        
-        EventManager.getInstance().emit<InstancedBatchCompleteEvent>(GameEventTypes.InstancedBatchComplete, {
-            batchType: 'shelf',
-            gameCount: gamesCount,
-            batchIndex,
-            status: BatchProcessingStatus.ShelfCreated,
-            lastModified: Date.now()
-        })
     }
 
     private handleAllBatchesComplete(): void {

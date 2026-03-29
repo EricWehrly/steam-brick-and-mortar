@@ -259,7 +259,7 @@ describe('Batch-to-Placement Flow Integration', () => {
             
             expect(gamesPlacedEvents).toHaveLength(1)
             expect(gamesPlacedEvents[0].batchIndex).toBe(0)
-            expect(gamesPlacedEvents[0].gamesCount).toBe(games.length)
+            expect(gamesPlacedEvents[0].status).toBe('games-placed')
         })
 
         it('should calculate shelf bounds correctly', async () => {
@@ -512,7 +512,8 @@ describe('Batch-to-Placement Flow Integration', () => {
             expect(latestBatchZero).toBeDefined()
             expect(latestBatchZero!.games).toHaveLength(5)
             expect(gamesPlacedEvents).toHaveLength(1)
-            expect(gamesPlacedEvents[0].gamesCount).toBe(5)
+            expect(gamesPlacedEvents[0].batchIndex).toBe(0)
+            expect(gamesPlacedEvents[0].status).toBe('games-placed')
             
             // Verify end-to-end completion
             expect(allBatchesCompleteReceived).toBe(true)

@@ -165,15 +165,6 @@ export interface GameStartEvent extends BaseInteractionEvent {
     }
 }
 
-export interface InstancedBatchCompleteEvent extends BaseInteractionEvent {
-    // Emitted when a batch of game boxes has been created and instanced renderers need GPU updates
-    batchType: 'shelf' | 'row' | 'custom'
-    gameCount: number
-    batchIndex?: number
-    status?: BatchProcessingStatus
-    lastModified?: number
-}
-
 export interface ShelfBounds {
     minX: number
     maxX: number
@@ -186,10 +177,13 @@ export interface ShelfLayoutDeterminedEvent extends BaseInteractionEvent {
     shelfLayout: { rows: number; shelvesPerRow: number }
 }
 
+export interface SomeBatchesCompleteEvent extends BaseInteractionEvent {
+    completedBatches: number
+    totalBatches: number
+}
+
 export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
-    // Event signals all batches processed - consumers needing layout should use ShelfLayoutDetermined
-    status?: BatchProcessingStatus
-    lastModified?: number
+    // Pure terminal signal: all batches are complete.
 }
 
 // =============================================================================
@@ -283,10 +277,8 @@ export interface ShelfCreatedEvent extends BaseInteractionEvent {
 }
 
 export interface GamesPlacedEvent extends BaseInteractionEvent {
-    gamesCount: number
     batchIndex: number
-    status?: BatchProcessingStatus
-    lastModified?: number
+    status: BatchProcessingStatus
 }
 
 export interface RendererReadyEvent extends BaseInteractionEvent {
@@ -340,8 +332,8 @@ export const UIEventTypes = {
 export const GameEventTypes = {
     SceneReady: 'game:scene-ready',
     Start: 'game:start',
-    InstancedBatchComplete: 'game:instanced-batch-complete',
     ShelfLayoutDetermined: 'game:shelf-layout-determined',
+    SomeBatchesComplete: 'game:some-batches-complete',
     AllBatchesComplete: 'game:all-batches-complete'
 } as const
 
@@ -417,8 +409,8 @@ export interface InteractionEventMap {
     // Game events
     [GameEventTypes.SceneReady]: SceneReadyEvent
     [GameEventTypes.Start]: GameStartEvent
-    [GameEventTypes.InstancedBatchComplete]: InstancedBatchCompleteEvent
     [GameEventTypes.ShelfLayoutDetermined]: ShelfLayoutDeterminedEvent
+    [GameEventTypes.SomeBatchesComplete]: SomeBatchesCompleteEvent
     [GameEventTypes.AllBatchesComplete]: AllBatchesCompleteEvent
     
     // Lighting events

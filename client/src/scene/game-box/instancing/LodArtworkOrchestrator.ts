@@ -16,9 +16,7 @@ import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { EventManager } from '../../../core/EventManager'
 import {
     GameEventTypes,
-    StorePropsEventTypes,
-    type AllBatchesCompleteEvent,
-    type GamesPlacedEvent,
+    type SomeBatchesCompleteEvent,
 } from '../../../types/InteractionEvents'
 import { Logger } from '../../../utils/Logger'
 import { GameArtworkProvider } from './GameArtworkProvider'
@@ -98,9 +96,6 @@ export class LodArtworkOrchestrator {
     // Prevent log spam when atlas is full
     private atlasFullLogged: boolean = false
     
-    private pendingGpuUpdateTimeout: ReturnType<typeof setTimeout> | null = null
-    private readonly gpuUpdateDebounceMs: number = 50
-    
     constructor(config: LodArtworkConfig = {}) {
         this.maxTextures = config.maxTextures ?? 512
         this.lodConfigs = config.lodConfigs ?? DEFAULT_LOD_CONFIGS
@@ -149,24 +144,15 @@ export class LodArtworkOrchestrator {
         }
 
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.GamesPlaced,
-            this.handleGamesPlaced.bind(this)
-        )
-        
-        EventManager.getInstance().registerEventHandler(
-            GameEventTypes.AllBatchesComplete,
-            this.handleAllBatchesComplete.bind(this)
+            GameEventTypes.SomeBatchesComplete,
+            this.handleSomeBatchesComplete.bind(this)
         )
         
         this.logConfig()
     }
 
-    private handleGamesPlaced(_event: CustomEvent<GamesPlacedEvent>): void {
-        this.queueGpuUpdate()
-    }
-
-    private handleAllBatchesComplete(_event: CustomEvent<AllBatchesCompleteEvent>): void {
-        this.flushGpuUpdate()
+    private handleSomeBatchesComplete(_event: CustomEvent<SomeBatchesCompleteEvent>): void {
+        this.updateGPU()
     }
     
     /** Factory method - override in debug subclass */
@@ -328,29 +314,9 @@ export class LodArtworkOrchestrator {
         return data?.lodLevel ?? null
     }
     
-    public updateGPU(): void {
+    private updateGPU(): void {
         this.textureManager.flushToGpu()
         this.renderer.flushToGpu()
-    }
-
-    private queueGpuUpdate(): void {
-        if (this.pendingGpuUpdateTimeout) {
-            clearTimeout(this.pendingGpuUpdateTimeout)
-        }
-
-        this.pendingGpuUpdateTimeout = setTimeout(() => {
-            this.pendingGpuUpdateTimeout = null
-            this.updateGPU()
-        }, this.gpuUpdateDebounceMs)
-    }
-
-    private flushGpuUpdate(): void {
-        if (this.pendingGpuUpdateTimeout) {
-            clearTimeout(this.pendingGpuUpdateTimeout)
-            this.pendingGpuUpdateTimeout = null
-        }
-
-        this.updateGPU()
     }
     
     public isReady(): boolean {
@@ -393,28 +359,12 @@ export class LodArtworkOrchestrator {
         return this.textureManager
     }
     
-    protected getArtworkProvider(): GameArtworkProvider {
-        return this.artworkProvider
-    }
-    
     protected getInternalRenderer(): LodGameArtworkRenderer {
         return this.renderer
     }
     
     protected getFailedArtwork(): Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> {
         return this.failedArtwork
-    }
-    
-    protected getGameNameToTextureIndex(): Map<string, number> {
-        return this.gameNameToTextureIndex
-    }
-    
-    protected getLodConfigs(): LodConfig[] {
-        return this.lodConfigs
-    }
-    
-    protected getMaxTextures(): number {
-        return this.maxTextures
     }
     
     public dispose(): void {

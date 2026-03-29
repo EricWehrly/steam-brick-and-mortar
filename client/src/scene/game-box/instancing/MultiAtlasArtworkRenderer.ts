@@ -129,7 +129,7 @@ export class MultiAtlasArtworkRenderer {
         }
         
         EventManager.getInstance().registerEventHandler(
-            GameEventTypes.InstancedBatchComplete, 
+            GameEventTypes.SomeBatchesComplete,
             this.updateGPU.bind(this)
         )
         

@@ -23,6 +23,7 @@ import {
     type SteamGamesBatchEvent,
     type BatchReadyForPlacementEvent,
     type GamesPlacedEvent,
+    type SomeBatchesCompleteEvent,
     type AllBatchesCompleteEvent
 } from '../../types/InteractionEvents'
 
@@ -60,6 +61,8 @@ export class BatchCoordinator<T> {
     private isFirstBatch: boolean = true
     private completionEmitted: boolean = false
     private batchStatuses: Map<number, BatchStatusState> = new Map()
+    private pendingSomeBatchesTimeout: ReturnType<typeof setTimeout> | null = null
+    private readonly someBatchesDebounceMs: number = 50
     
     private metrics: BatchMetrics = {
         batches: [],
@@ -97,8 +100,9 @@ export class BatchCoordinator<T> {
     private handleGamesPlaced(event: CustomEvent<GamesPlacedEvent>): void {
         this.batchStatuses.set(event.detail.batchIndex, {
             status: event.detail.status ?? BatchProcessingStatus.GamesPlaced,
-            lastModified: event.detail.lastModified ?? Date.now()
+            lastModified: Date.now()
         })
+        this.scheduleSomeBatchesCompleteEvent()
         this.tryEmitCompletionEvent()
     }
 
@@ -153,6 +157,10 @@ export class BatchCoordinator<T> {
         this.isFirstBatch = true
         this.completionEmitted = false
         this.batchStatuses.clear()
+        if (this.pendingSomeBatchesTimeout) {
+            clearTimeout(this.pendingSomeBatchesTimeout)
+            this.pendingSomeBatchesTimeout = null
+        }
         this.metrics = {
             batches: [],
             totalMainThreadTime: 0,
@@ -242,15 +250,19 @@ export class BatchCoordinator<T> {
         }
 
         const progress = this.getProgress()
-        const terminalBatchCount = [...this.batchStatuses.values()].filter(({ status }) =>
-            status === BatchProcessingStatus.GamesPlaced || status === BatchProcessingStatus.Failed
-        ).length
+        const terminalBatchCount = this.getTerminalBatchCount()
         const allPlaced = this.expectedTotal > 0 && terminalBatchCount >= this.expectedTotal
         if (!progress.isComplete || !allPlaced) {
             return
         }
 
         this.completionEmitted = true
+
+        if (this.pendingSomeBatchesTimeout) {
+            clearTimeout(this.pendingSomeBatchesTimeout)
+            this.pendingSomeBatchesTimeout = null
+        }
+        this.emitSomeBatchesCompleteEvent()
 
         const totalLoadTime = Date.now() - this.metrics.loadStart
         const avgMainThreadTime = this.metrics.totalMainThreadTime / this.metrics.batches.length
@@ -266,10 +278,39 @@ export class BatchCoordinator<T> {
 
         EventManager.getInstance().emit<AllBatchesCompleteEvent>(
             GameEventTypes.AllBatchesComplete,
+            {}
+        )
+    }
+
+    private scheduleSomeBatchesCompleteEvent(): void {
+        if (this.pendingSomeBatchesTimeout) {
+            clearTimeout(this.pendingSomeBatchesTimeout)
+        }
+
+        this.pendingSomeBatchesTimeout = setTimeout(() => {
+            this.pendingSomeBatchesTimeout = null
+            this.emitSomeBatchesCompleteEvent()
+        }, this.someBatchesDebounceMs)
+    }
+
+    private emitSomeBatchesCompleteEvent(): void {
+        const totalBatches = this.expectedTotal
+        if (totalBatches <= 0) {
+            return
+        }
+
+        EventManager.getInstance().emit<SomeBatchesCompleteEvent>(
+            GameEventTypes.SomeBatchesComplete,
             {
-                status: BatchProcessingStatus.Complete,
-                lastModified: Date.now()
+                completedBatches: this.getTerminalBatchCount(),
+                totalBatches
             }
         )
+    }
+
+    private getTerminalBatchCount(): number {
+        return [...this.batchStatuses.values()].filter(({ status }) =>
+            status === BatchProcessingStatus.GamesPlaced || status === BatchProcessingStatus.Failed
+        ).length
     }
 }

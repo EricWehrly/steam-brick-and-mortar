@@ -213,7 +213,7 @@ describe('GameBoxSpawner Event Coordination', () => {
             // Should emit GamesPlaced
             expect(gamesPlacedEvents).toHaveLength(1)
             expect(gamesPlacedEvents[0].batchIndex).toBe(0)
-            expect(gamesPlacedEvents[0].gamesCount).toBe(8)
+            expect(gamesPlacedEvents[0].status).toBe('games-placed')
         })
 
         it('should warn if no pending games found for batch', () => {
@@ -246,7 +246,6 @@ describe('GameBoxSpawner Event Coordination', () => {
             // Emit terminal failure to prevent coordinator completion deadlock
             expect(gamesPlacedEvents).toHaveLength(1)
             expect(gamesPlacedEvents[0].batchIndex).toBe(5)
-            expect(gamesPlacedEvents[0].gamesCount).toBe(0)
             expect(gamesPlacedEvents[0].status).toBe('failed')
 
             warnSpy.mockRestore()
@@ -479,9 +478,10 @@ describe('GameBoxSpawner Event Coordination', () => {
             // Should not call createGameBoxAuto
             expect(mockRenderer.createGameBoxAuto).not.toHaveBeenCalled()
 
-            // Should still emit GamesPlaced with count 0
+            // Should still emit GamesPlaced for this batch
             expect(gamesPlacedEvents).toHaveLength(1)
-            expect(gamesPlacedEvents[0].gamesCount).toBe(0)
+            expect(gamesPlacedEvents[0].batchIndex).toBe(0)
+            expect(gamesPlacedEvents[0].status).toBe('games-placed')
         })
 
         it('should handle large batch counts', () => {
@@ -520,8 +520,8 @@ describe('GameBoxSpawner Event Coordination', () => {
             
             // Should emit GamesPlaced event
             expect(gamesPlacedEvents).toHaveLength(1)
-            expect(gamesPlacedEvents[0].gamesCount).toBe(100) // Event reports total batch count
             expect(gamesPlacedEvents[0].batchIndex).toBe(0)
+            expect(gamesPlacedEvents[0].status).toBe('games-placed')
         })
     })
 })

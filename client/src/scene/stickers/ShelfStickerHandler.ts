@@ -61,7 +61,7 @@ export class ShelfStickerHandler {
     private registerEventListeners(): void {
         // Populate stickers after GPU batch completes
         EventManager.getInstance().registerEventHandler(
-            GameEventTypes.InstancedBatchComplete,
+            GameEventTypes.SomeBatchesComplete,
             this.populateStickersAfterGeneration.bind(this)
         )
         

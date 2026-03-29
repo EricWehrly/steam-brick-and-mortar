@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { BatchCoordinator, type BatchItem, type BatchProgress } from '../../../../src/scene/batch/BatchCoordinator'
 import { EventManager } from '../../../../src/core/EventManager'
-import { GameEventTypes, StorePropsEventTypes, type BatchReadyForPlacementEvent, type GamesPlacedEvent } from '../../../../src/types/InteractionEvents'
+import { BatchProcessingStatus, GameEventTypes, StorePropsEventTypes, type BatchReadyForPlacementEvent, type GamesPlacedEvent } from '../../../../src/types/InteractionEvents'
 
 describe('BatchCoordinator', () => {
     let eventManager: EventManager
@@ -299,7 +299,7 @@ describe('BatchCoordinator', () => {
 
             eventManager.emit<GamesPlacedEvent>(
                 StorePropsEventTypes.GamesPlaced,
-                { gamesCount: 5, batchIndex: 0 }
+                { batchIndex: 0, status: BatchProcessingStatus.GamesPlaced }
             )
 
             await new Promise(resolve => setTimeout(resolve, 0))
@@ -307,7 +307,7 @@ describe('BatchCoordinator', () => {
 
             eventManager.emit<GamesPlacedEvent>(
                 StorePropsEventTypes.GamesPlaced,
-                { gamesCount: 6, batchIndex: 1 }
+                { batchIndex: 1, status: BatchProcessingStatus.GamesPlaced }
             )
 
             await new Promise(resolve => setTimeout(resolve, 0))
@@ -329,11 +329,11 @@ describe('BatchCoordinator', () => {
 
             eventManager.emit<GamesPlacedEvent>(
                 StorePropsEventTypes.GamesPlaced,
-                { gamesCount: 5, batchIndex: 0 }
+                { batchIndex: 0, status: BatchProcessingStatus.GamesPlaced }
             )
             eventManager.emit<GamesPlacedEvent>(
                 StorePropsEventTypes.GamesPlaced,
-                { gamesCount: 5, batchIndex: 0 }
+                { batchIndex: 0, status: BatchProcessingStatus.GamesPlaced }
             )
 
             await new Promise(resolve => setTimeout(resolve, 0))
