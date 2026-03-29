@@ -1,6 +1,14 @@
 // Test setup file
 // Add any global test configuration here
 
+import { beforeEach } from 'vitest'
+import { installMockWorker, resetMockWorkerMessageHandlers } from './utils/mock-worker'
+
+installMockWorker()
+beforeEach(() => {
+  resetMockWorkerMessageHandlers()
+})
+
 // Mock WebXR API for testing
 Object.defineProperty(navigator, 'xr', {
   value: {
