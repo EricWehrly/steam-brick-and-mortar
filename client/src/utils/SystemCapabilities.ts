@@ -27,6 +27,7 @@ export interface SystemCapabilities {
 export class SystemCapabilitiesDetector {
     private static readonly logger = Logger.createLogFunctions(SystemCapabilitiesDetector.name)
     private static cachedCapabilities: SystemCapabilities | null = null
+    private static readonly LARGE_TEXTURE_THRESHOLD = 4096
     
     /**
      * Detect system capabilities (cached after first call)
@@ -58,7 +59,7 @@ export class SystemCapabilitiesDetector {
         const gl1 = canvas.getContext('webgl')
         
         const hasWebGL2 = !!gl
-        const hasInstancedArrays = hasWebGL2 || !!(gl1 && gl1.getExtension('ANGLE_instanced_arrays'))
+        const hasInstancedArrays = hasWebGL2 || !!(gl1 && typeof gl1.getExtension === 'function' && gl1.getExtension('ANGLE_instanced_arrays'))
         
         let maxTextureSize = 0
         let renderer = 'unknown'
@@ -66,19 +67,27 @@ export class SystemCapabilitiesDetector {
         let supportsLargeTextures = false
         let hasGoodGPU = false
         
-        if (gl || gl1) {
-            const context = gl || gl1
-            maxTextureSize = context.getParameter(context.MAX_TEXTURE_SIZE)
-            
-            // Get renderer info if available
-            const debugInfo = context.getExtension('WEBGL_debug_renderer_info')
-            if (debugInfo) {
-                renderer = context.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || 'unknown'
+        const context = gl || gl1
+        if (context) {
+            const canQueryParameters = typeof context.getParameter === 'function'
+            const canGetExtensions = typeof context.getExtension === 'function'
+            if (!canQueryParameters || !canGetExtensions) {
+                SystemCapabilitiesDetector.logger.warn('WebGL context missing expected query APIs; using conservative capability defaults')
             }
+
+            maxTextureSize = SystemCapabilitiesDetector.readMaxTextureSize(context, canQueryParameters)
+            renderer = SystemCapabilitiesDetector.readRenderer(context, canQueryParameters, canGetExtensions)
             
-            // Separate hardware and texture size detection
+            // TODO: Validate this heuristic with real-world telemetry once the app reaches a broader user base.
+            // For now, keep current behavior to avoid changing handler selection semantics.
             hasHardwareRenderer = !renderer.toLowerCase().includes('software')
-            supportsLargeTextures = maxTextureSize >= 4096
+            supportsLargeTextures = maxTextureSize >= SystemCapabilitiesDetector.LARGE_TEXTURE_THRESHOLD
+
+            SystemCapabilitiesDetector.logUnknownRendererMetrics(renderer, {
+                hasWebGL2,
+                hasInstancedArrays,
+                maxTextureSize
+            })
             
             // Legacy compatibility: "good GPU" means both hardware renderer and large textures
             hasGoodGPU = hasHardwareRenderer && supportsLargeTextures
@@ -96,6 +105,45 @@ export class SystemCapabilitiesDetector {
             maxTextureSize,
             renderer
         }
+    }
+
+    private static readMaxTextureSize(
+        context: WebGLRenderingContext | WebGL2RenderingContext,
+        canQueryParameters: boolean
+    ): number {
+        if (!canQueryParameters || context.MAX_TEXTURE_SIZE === undefined) {
+            return 0
+        }
+
+        return context.getParameter(context.MAX_TEXTURE_SIZE)
+    }
+
+    private static readRenderer(
+        context: WebGLRenderingContext | WebGL2RenderingContext,
+        canQueryParameters: boolean,
+        canGetExtensions: boolean
+    ): string {
+        if (!canGetExtensions || !canQueryParameters) {
+            return 'unknown'
+        }
+
+        const debugInfo = context.getExtension('WEBGL_debug_renderer_info')
+        if (!debugInfo) {
+            return 'unknown'
+        }
+
+        return context.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) ?? 'unknown'
+    }
+
+    private static logUnknownRendererMetrics(
+        renderer: string,
+        details: { hasWebGL2: boolean; hasInstancedArrays: boolean; maxTextureSize: number }
+    ): void {
+        if (renderer !== 'unknown') {
+            return
+        }
+
+        SystemCapabilitiesDetector.logger.info('Renderer reported as unknown; tracking values for future heuristic tuning', details)
     }
     
     /**

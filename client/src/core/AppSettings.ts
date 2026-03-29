@@ -225,14 +225,18 @@ export class AppSettings {
         source: EventSource = EventSource.System
     ): void {
         const changes: Array<SettingChangedEvent> = []
+        const settingsRecord = this.settings as Record<keyof ApplicationSettings, ApplicationSettings[keyof ApplicationSettings]>
         
-        for (const [key, value] of Object.entries(updates)) {
-            const typedKey = key as keyof ApplicationSettings
-            const previousValue = this.settings[typedKey]
+        for (const typedKey of Object.keys(updates) as Array<keyof ApplicationSettings>) {
+            const value = updates[typedKey]
+            if (value === undefined) {
+                continue
+            }
+
+            const previousValue = settingsRecord[typedKey]
             
             if (previousValue !== value) {
-                // Type assertion needed due to TypeScript limitation with dynamic key assignment
-                (this.settings as any)[typedKey] = value
+                settingsRecord[typedKey] = value as ApplicationSettings[keyof ApplicationSettings]
                 changes.push({
                     key: typedKey,
                     value: value as ApplicationSettings[keyof ApplicationSettings],
@@ -373,9 +377,9 @@ export class AppSettings {
     }
 
     private getDefaultSettings(): ApplicationSettings {
-        // In development mode, disable GPU-intensive features by default for faster startup
-        const isDev = typeof window !== 'undefined' && 
-            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        // In development mode, disable GPU-intensive features by default for faster startup.
+        const hostname = typeof window !== 'undefined' && window.location ? window.location.hostname : ''
+        const isDev = hostname === 'localhost' || hostname === '127.0.0.1'
         
         return {
             // Performance Settings

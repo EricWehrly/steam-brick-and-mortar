@@ -25,18 +25,19 @@ describe('Steam API Live Tests - Essential Validation', () => {
     describe('Core Live Integration', () => {
         it('should resolve a real Steam vanity URL', async () => {
             // Using a known public Steam profile
-            const result = await client.resolveVanityUrl('spitemonger')
-            
-            expect(result).toHaveProperty('steamid')
-            expect(result).toHaveProperty('vanity_url', 'spitemonger')
-            expect(result).toHaveProperty('resolved_at')
-            expect(typeof result.steamid).toBe('string')
+            const payload = await client.resolveVanityUrl('spitemonger')
+
+            expect(payload).toHaveProperty('steamid')
+            expect(payload).toHaveProperty('vanity_url', 'spitemonger')
+            expect(payload).toHaveProperty('resolved_at')
+            expect(typeof payload.steamid).toBe('string')
         }, 10000)
 
         it('should handle network errors gracefully', async () => {
             // Test invalid vanity URL
-            await expect(client.resolveVanityUrl('this-vanity-url-definitely-does-not-exist-12345'))
-                .rejects.toThrow()
+            const invalidInput = 'this-vanity-url-definitely-does-not-exist-12345'
+
+            await expect(client.resolveVanityUrl(invalidInput)).rejects.toThrow()
         }, 10000)
 
         it('should handle rate limiting appropriately', async () => {
@@ -48,10 +49,9 @@ describe('Steam API Live Tests - Essential Validation', () => {
             
             const results = await Promise.allSettled(promises)
             
-            // At least one should succeed (or fail gracefully due to rate limiting)
-            // This tests that our rate limiter doesn't break under load
+            // This test validates that batching requests settles cleanly under load.
             expect(results.length).toBe(3)
-            expect(results.some(r => r.status === 'fulfilled' || r.status === 'rejected')).toBe(true)
+            expect(results.every(r => r.status === 'fulfilled' || r.status === 'rejected')).toBe(true)
         }, 15000)
     })
 })

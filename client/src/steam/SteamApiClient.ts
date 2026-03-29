@@ -103,17 +103,39 @@ export class SteamApiClient {
         const endpoint = `/resolve/${encodeURIComponent(cleanVanityUrl)}`
         SteamApiClient.logger.debug(`Resolving vanity URL: "${vanityUrl}" -> "${cleanVanityUrl}"`)
         
-        try {
-            const response = await this.http.makeRequest<SteamResolveResponse>(endpoint)
-            SteamApiClient.logger.info(`Vanity URL resolved: ${response.vanity_url || cleanVanityUrl}`)
-            
-            // Cache the result
-            this.cache.set(cacheKey, response)
-            
-            return response
-        } catch (error) {
-            // Let the calling code handle error logging with proper context  
-            throw error
+        const rawResponse = await this.http.makeRequest<unknown>(endpoint)
+        const response = this.normalizeResolveResponse(rawResponse, cleanVanityUrl)
+        SteamApiClient.logger.info(`Vanity URL resolved: ${response.vanity_url || cleanVanityUrl}`)
+        
+        // Cache the result
+        this.cache.set(cacheKey, response)
+        
+        return response
+    }
+
+    private normalizeResolveResponse(response: unknown, requestedVanityUrl: string): SteamResolveResponse {
+        const isObject = (value: unknown): value is Record<string, unknown> =>
+            typeof value === 'object' && value !== null
+
+        if (!isObject(response)) {
+            throw new Error('Invalid resolve vanity URL response shape')
+        }
+
+        if (response.success === false) {
+            const message = typeof response.message === 'string' ? response.message : 'Failed to resolve vanity URL'
+            throw new Error(message)
+        }
+
+        const payload = response.success === true && isObject(response.data) ? response.data : response
+        const steamid = typeof payload.steamid === 'string' ? payload.steamid : undefined
+        if (!steamid) {
+            throw new Error('Invalid resolve vanity URL response shape')
+        }
+
+        return {
+            steamid,
+            vanity_url: typeof payload.vanity_url === 'string' ? payload.vanity_url : requestedVanityUrl,
+            resolved_at: typeof payload.resolved_at === 'string' ? payload.resolved_at : new Date().toISOString()
         }
     }
 
