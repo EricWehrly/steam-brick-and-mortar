@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { SharedMaterialManager, MaterialType } from '../../src/utils/SharedMaterialManager'
+import { createMockWebGLContext } from '../utils/webgl-test-mocks'
 
 describe('SharedMaterialManager API Integration Tests', () => {
   let materialManager: SharedMaterialManager
@@ -8,12 +9,12 @@ describe('SharedMaterialManager API Integration Tests', () => {
     // Mock canvas for texture creation
     const mockCanvas = {
       getContext: vi.fn().mockReturnValue({
+        ...createMockWebGLContext(),
         createTexture: vi.fn(),
         bindTexture: vi.fn(),
         texImage2D: vi.fn(),
         texParameteri: vi.fn(),
         generateMipmap: vi.fn(),
-        getParameter: vi.fn().mockReturnValue(16),
         createImageData: vi.fn(() => ({ 
           data: new Uint8ClampedArray(512 * 512 * 4),
           width: 512,

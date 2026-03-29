@@ -8,6 +8,32 @@ import { UIManager } from '../../src/ui/UIManager'
 import { SteamUICoordinator } from '../../src/ui/coordinators/SteamUICoordinator'
 import { EventManager } from '../../src/core/EventManager'
 import { SteamEventTypes } from '../../src/types/InteractionEvents'
+import { createMockWebGLContext } from '../utils/webgl-test-mocks'
+
+const mockCapabilities = {
+    hasWebGL2: true,
+    hasInstancedArrays: true,
+    hasHardwareRenderer: true,
+    supportsLargeTextures: true,
+    hasGoodGPU: true,
+    maxTextureSize: 4096,
+    renderer: 'Mock GPU Renderer'
+}
+
+vi.mock('../../src/utils/SystemCapabilities', () => ({
+    hasWebGL2: () => true,
+    hasInstancedArrays: () => true,
+    hasHardwareRenderer: () => true,
+    supportsLargeTextures: () => true,
+    hasGoodGPU: () => true,
+    detectSystemCapabilities: () => mockCapabilities,
+    SystemCapabilitiesDetector: {
+        detect: () => mockCapabilities,
+        redetect: () => mockCapabilities,
+        meetsRequirements: (requirements: Record<string, unknown>) =>
+            Object.entries(requirements).every(([key, value]) => mockCapabilities[key as keyof typeof mockCapabilities] === value)
+    }
+}))
 
 // Mock window.performance before importing any modules that use it
 Object.defineProperty(window, 'performance', {
@@ -62,9 +88,7 @@ vi.mock('three', async (importOriginal) => {
             isWebGL2: true,
             maxTextureSize: 4096
         },
-        getContext: vi.fn().mockReturnValue({
-            getParameter: vi.fn().mockReturnValue('Mock WebGL')
-        }),
+        getContext: vi.fn().mockReturnValue(createMockWebGLContext()),
         debug: {
             checkShaderErrors: false
         }
@@ -239,6 +263,7 @@ Object.defineProperty(globalThis, 'document', {
             // Add specific methods for canvas elements
             if (tagName === 'canvas') {
                 element.getContext = vi.fn().mockReturnValue({
+                    ...createMockWebGLContext(),
                     fillStyle: '#000000',
                     fillRect: vi.fn(),
                     clearRect: vi.fn(),
