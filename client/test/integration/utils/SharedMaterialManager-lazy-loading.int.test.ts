@@ -61,6 +61,9 @@ describe('SharedMaterialManager Lazy Loading Integration', () => {
             geometry.dispose()
         })
 
+        // TODO(perf): This currently exercises synchronous procedural texture generation on the main thread.
+        // Re-enable with deterministic thresholds after worker-based texture generation lands.
+        // also this is a perf test in a file called "int" and that's kinda braindead
         it('should handle mixed material types efficiently', () => {
             const startTime = performance.now()
             
