@@ -9,11 +9,18 @@
 import { EventManager } from '../../core/EventManager'
 import { DataManager } from '../../core/data'
 import type { SteamGameData } from '../../scene/game-box/types/GameData'
+import { InputEventTypes } from '../../types/InteractionEvents'
+import type { InputPauseEvent, InputResumeEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import './binder.css'
 
 const GAMES_PER_PAGE = 4
 const PAGES_PER_SPREAD = 2
+
+interface RenderLifecycleController {
+    pauseRendering: () => void
+    resumeRendering: () => void
+}
 
 export interface BinderState {
     isOpen: boolean
@@ -141,6 +148,9 @@ export class GameLibraryBinderUI {
      */
     public open(): void {
         if (!this.container) return
+
+        this.pauseRendering()
+        this.eventManager.emit<InputPauseEvent>(InputEventTypes.Pause, { reason: 'menu' })
         
         this.state.isOpen = true
         this.state.currentSpreadIndex = 0
@@ -165,6 +175,9 @@ export class GameLibraryBinderUI {
         
         this.state.isOpen = false
         this.state.selectedGame = null
+
+        this.resumeRendering()
+        this.eventManager.emit<InputResumeEvent>(InputEventTypes.Resume, { reason: 'menu' })
         
         this.container.style.display = 'none'
         
@@ -269,14 +282,13 @@ export class GameLibraryBinderUI {
         
         this.container.innerHTML = `
             <div class="binder-header">
-                <h1 class="binder-title">📚 Steam Library Binder</h1>
                 <div class="binder-header-controls">
                     <div class="binder-search-wrapper">
                         <input 
                             type="text" 
                             id="binder-search" 
                             class="binder-search"
-                            placeholder="🔍 Search games..." 
+                            placeholder="🔍 Search ${totalGames} games" 
                             value="${this.escapeHtml(this.state.searchQuery)}"
                         >
                         <button 
@@ -285,7 +297,6 @@ export class GameLibraryBinderUI {
                             title="Clear search"
                         >✕</button>
                     </div>
-                    <span class="binder-game-count">${totalGames} games</span>
                 </div>
             </div>
             
@@ -299,23 +310,12 @@ export class GameLibraryBinderUI {
                 <!-- Left nav button -->
                 <button id="binder-prev" class="binder-nav-btn side-nav left ${canGoPrev ? '' : 'disabled'}">◄</button>
                 
-                ${this.renderPage(leftPage, leftPageNum)}
+                ${this.renderPage(leftPage, leftPageNum, 'left', 'Press <kbd>B</kbd> to close • <kbd>←</kbd> <kbd>→</kbd> to navigate')}
                 <div class="binder-gutter"></div>
-                ${this.renderPage(rightPage, rightPageNum)}
+                ${this.renderPage(rightPage, rightPageNum, 'right', `${totalSpreads * 2} pages total`)}
                 
                 <!-- Right nav button -->
                 <button id="binder-next" class="binder-nav-btn side-nav right ${canGoNext ? '' : 'disabled'}">►</button>
-            </div>
-            
-            <div class="binder-footer">
-                <span class="binder-page-info">
-                    ${totalSpreads * 2} pages total
-                </span>
-                <div class="binder-keyboard-hints">
-                    Press <kbd>B</kbd> to close • 
-                    <kbd>←</kbd>
-                    <kbd>→</kbd> to navigate
-                </div>
             </div>
         `
         
@@ -326,7 +326,7 @@ export class GameLibraryBinderUI {
     /**
      * Render a single page with 4 game slots
      */
-    private renderPage(games: SteamGameData[], pageNum: number): string {
+    private renderPage(games: SteamGameData[], pageNum: number, side: 'left' | 'right', metaText: string): string {
         const slots = []
         
         for (let i = 0; i < GAMES_PER_PAGE; i++) {
@@ -338,9 +338,22 @@ export class GameLibraryBinderUI {
             <div class="binder-page">
                 <div class="binder-page-shine"></div>
                 ${slots.join('')}
+                <div class="binder-page-meta ${side}">${metaText}</div>
                 <div class="binder-page-number">Page ${pageNum + 1}</div>
             </div>
         `
+    }
+
+    private getRenderLifecycleController(): RenderLifecycleController | null {
+        return this.dataManager.get<RenderLifecycleController>('core.sceneManager') || null
+    }
+
+    private pauseRendering(): void {
+        this.getRenderLifecycleController()?.pauseRendering()
+    }
+
+    private resumeRendering(): void {
+        this.getRenderLifecycleController()?.resumeRendering()
     }
     
     /**
@@ -478,8 +491,14 @@ export class GameLibraryBinderUI {
                 <button id="detail-close-btn" class="detail-close-btn">✕</button>
                 <h2 class="detail-title">${this.escapeHtml(game.name)}</h2>
             </div>
-            
+
             <div class="detail-content">
+                <div class="detail-actions">
+                    <a href="steam://run/${game.appid}" class="detail-btn play">▶ Play</a>
+                    <button id="detail-spotlight-btn" class="detail-btn spotlight">🔦 Spotlight</button>
+                    <a href="https://store.steampowered.com/app/${game.appid}" target="_blank" class="detail-btn store">🌐 Store Page</a>
+                </div>
+
                 <div class="detail-stats">
                     <div class="detail-stat">
                         <div class="detail-stat-label">Total Playtime</div>
@@ -496,7 +515,7 @@ export class GameLibraryBinderUI {
                         <div class="detail-stat-value">${game.appid}</div>
                     </div>
                 </div>
-                
+
                 <div class="detail-artwork">
                     <div class="detail-section-label">Artwork</div>
                     <div class="detail-artwork-grid">
@@ -510,13 +529,7 @@ export class GameLibraryBinderUI {
                         </div>
                     </div>
                 </div>
-                
-                <div class="detail-actions">
-                    <a href="steam://run/${game.appid}" class="detail-btn play">▶ Play</a>
-                    <button id="detail-spotlight-btn" class="detail-btn spotlight">🔦 Spotlight</button>
-                    <a href="https://store.steampowered.com/app/${game.appid}" target="_blank" class="detail-btn store">Store Page</a>
-                </div>
-                
+
                 <div class="detail-json">
                     <div class="detail-section-label">Cache Entry (JSON)</div>
                     <pre class="detail-json-content">${this.escapeHtml(jsonBlob)}</pre>
