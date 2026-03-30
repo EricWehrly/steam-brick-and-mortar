@@ -281,8 +281,8 @@ export class GameLibraryBinderUI {
         const canGoNext = this.state.currentSpreadIndex < totalSpreads - 1
         
         this.container.innerHTML = `
-            <div class="binder-header">
-                <div class="binder-header-controls">
+            <div class="binder-spread">
+                <div class="binder-surface-top">
                     <div class="binder-search-wrapper">
                         <input 
                             type="text" 
@@ -298,9 +298,7 @@ export class GameLibraryBinderUI {
                         >✕</button>
                     </div>
                 </div>
-            </div>
-            
-            <div class="binder-spread">
+
                 <div class="binder-spine"></div>
                 <div class="binder-ring" style="top: 40px;"></div>
                 <div class="binder-ring" style="top: 120px;"></div>
@@ -310,12 +308,15 @@ export class GameLibraryBinderUI {
                 <!-- Left nav button -->
                 <button id="binder-prev" class="binder-nav-btn side-nav left ${canGoPrev ? '' : 'disabled'}">◄</button>
                 
-                ${this.renderPage(leftPage, leftPageNum, 'left', 'Press <kbd>B</kbd> to close • <kbd>←</kbd> <kbd>→</kbd> to navigate')}
+                ${this.renderPage(leftPage, leftPageNum)}
                 <div class="binder-gutter"></div>
-                ${this.renderPage(rightPage, rightPageNum, 'right', `${totalSpreads * 2} pages total`)}
+                ${this.renderPage(rightPage, rightPageNum)}
                 
                 <!-- Right nav button -->
                 <button id="binder-next" class="binder-nav-btn side-nav right ${canGoNext ? '' : 'disabled'}">►</button>
+
+                <div class="binder-surface-bottom left">Press <kbd>B</kbd> to close • <kbd>←</kbd> <kbd>→</kbd> to navigate</div>
+                <div class="binder-surface-bottom right">${totalSpreads * 2} pages total</div>
             </div>
         `
         
@@ -326,7 +327,7 @@ export class GameLibraryBinderUI {
     /**
      * Render a single page with 4 game slots
      */
-    private renderPage(games: SteamGameData[], pageNum: number, side: 'left' | 'right', metaText: string): string {
+    private renderPage(games: SteamGameData[], pageNum: number): string {
         const slots = []
         
         for (let i = 0; i < GAMES_PER_PAGE; i++) {
@@ -338,7 +339,6 @@ export class GameLibraryBinderUI {
             <div class="binder-page">
                 <div class="binder-page-shine"></div>
                 ${slots.join('')}
-                <div class="binder-page-meta ${side}">${metaText}</div>
                 <div class="binder-page-number">Page ${pageNum + 1}</div>
             </div>
         `
