@@ -164,7 +164,7 @@
     }
 
     .binder-page {
-        --binder-slot-scale: 0.84;
+        --slot-size: min(46cqw, 42cqh);
         gap: 12px;
         padding: 16px 14px 50px;
     }
@@ -197,7 +197,7 @@
     }
 
     .binder-page {
-        --binder-slot-scale: 0.72;
+        --slot-size: min(46cqw, 40cqh);
         gap: 10px;
         padding: 14px 12px 44px;
     }
@@ -230,7 +230,7 @@
     }
 
     .binder-page {
-        --binder-slot-scale: 0.62;
+        --slot-size: min(46cqw, 38cqh);
         gap: 8px;
         padding: 10px 10px 38px;
     }
@@ -274,7 +274,8 @@
    ============================================================================= */
 
 .binder-page {
-    --binder-slot-scale: 0.94;
+    container-type: size;
+    --slot-size: min(46cqw, 44cqh);
     flex: 1 1 0;
     width: auto;
     min-width: 0;
@@ -357,10 +358,8 @@
 
 .game-slot {
     aspect-ratio: 1 / 1;
-    height: calc(100% * var(--binder-slot-scale, 1));
-    width: auto;
-    max-width: 100%;
-    max-height: 100%;
+    width: var(--slot-size);
+    height: var(--slot-size);
     justify-self: center;
     align-self: center;
     background-color: #1a1a1a;
@@ -382,7 +381,7 @@
 }
 
 .game-slot:hover {
-    transform: perspective(400px) rotateY(0deg) rotateX(0deg) scale(1.06);
+    transform: perspective(400px) rotateY(0deg) rotateX(0deg) scale(1.04);
     box-shadow: 0 8px 24px rgba(0,0,0,0.6);
     z-index: 5;
 }
