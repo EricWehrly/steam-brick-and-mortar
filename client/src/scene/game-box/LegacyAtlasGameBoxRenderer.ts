@@ -45,7 +45,6 @@ export class LegacyAtlasGameBoxRenderer implements IGameBoxRenderer {
     private instancedLabelRenderer: InstancedLabelRenderer
     private instancedArtworkRenderer: InstancedArtworkRenderer | null = null
     private multiAtlasRenderer: MultiAtlasArtworkRenderer | null = null
-    private labelInstanceIndex: number = 0
     private artworkInstanceIndex: number = 0
     private readonly useMultiAtlas: boolean
 
@@ -245,10 +244,7 @@ export class LegacyAtlasGameBoxRenderer implements IGameBoxRenderer {
         name?: string,
         side: ShelfSide = ShelfSide.Front
     ): THREE.Mesh | null {
-        const reservedInstanceIndex = this.labelInstanceIndex++
-
-        const success = this.instancedLabelRenderer.setLabelInstance(
-            reservedInstanceIndex,
+        const success = this.instancedLabelRenderer.addLabelInstance(
             position,
             game.name,
             side
@@ -290,7 +286,6 @@ export class LegacyAtlasGameBoxRenderer implements IGameBoxRenderer {
         this.instancedArtworkRenderer?.dispose()
         this.multiAtlasRenderer?.dispose()
         
-        this.labelInstanceIndex = 0
         this.artworkInstanceIndex = 0
         
         LegacyAtlasGameBoxRenderer.logger.lifecycle('Disposed')

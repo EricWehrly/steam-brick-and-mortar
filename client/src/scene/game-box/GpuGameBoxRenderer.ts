@@ -55,9 +55,6 @@ import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 const STEAM_SOURCE_WIDTH = 600
 const STEAM_SOURCE_HEIGHT = 900
 
-// TODO: Need to test label fallbacks for non-artwork boxes
-const ARTWORK_PROBABILITY = 0.67
-
 export class GpuGameBoxRenderer implements IGameBoxRenderer {
     public static logger = Logger.createLogFunctions(GpuGameBoxRenderer.name)
 
@@ -158,8 +155,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         position: THREE.Vector3,
         side: ShelfSide = ShelfSide.Front
     ): void {
-        const success = this.instancedLabelRenderer.setLabelInstance(
-            0, // Index managed internally by renderer
+        const success = this.instancedLabelRenderer.addLabelInstance(
             position,
             game.name,
             side
@@ -179,8 +175,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         position: THREE.Vector3,
         side: ShelfSide = ShelfSide.Front
     ): void {
-        const shouldUseArtwork = Math.random() < ARTWORK_PROBABILITY
-        const artworkUrl = shouldUseArtwork ? this.selectBestArtworkUrl(game) : undefined
+        const artworkUrl = this.selectBestArtworkUrl(game)
         
         GpuGameBoxRenderer.logger.debug(`createGameBoxAuto "${game.name}": artwork=${!!artworkUrl}`)
         

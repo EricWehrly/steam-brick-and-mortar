@@ -13,7 +13,7 @@
  * Usage:
  * 1. Create with maximum expected instances
  * 2. Initialize with game data to build texture array
- * 3. Set individual label positions/textures via setLabelInstance()
+ * 3. Add label instances via addLabelInstance()
  * 4. Call updateGPU() to apply changes
  */
 
@@ -52,6 +52,7 @@ export class InstancedLabelRenderer {
     // State tracking
     private currentCount: number = 0
     private isInitialized: boolean = false
+    private nextInstanceIndex: number = 0
     private gameNameToTextureIndex: Map<string, number> = new Map()
     
     // Constant quaternion for no rotation (performance optimization)
@@ -131,11 +132,9 @@ export class InstancedLabelRenderer {
     }
     
     /**
-     * Set position, rotation and texture for a specific label instance
-     * Dynamically adds texture for game if not already in mapping (supports progressive loading)
+     * Add a label instance using renderer-managed indexing.
      */
-    public setLabelInstance(
-        index: number,
+    public addLabelInstance(
         position: THREE.Vector3,
         gameName: string,
         side: ShelfSide = ShelfSide.Front
@@ -150,10 +149,12 @@ export class InstancedLabelRenderer {
             return false
         }
         
-        if (index >= this.maxInstances) {
-            console.warn(`Instance index ${index} exceeds max ${this.maxInstances}`)
+        if (this.nextInstanceIndex >= this.maxInstances) {
+            console.warn(`No label slots remaining (${this.maxInstances})`)
             return false
         }
+
+        const index = this.nextInstanceIndex++
         
         // Get texture index for this game, or dynamically add if not present
         let textureIndex = this.gameNameToTextureIndex.get(gameName)
@@ -235,6 +236,7 @@ export class InstancedLabelRenderer {
      */
     public reset(): void {
         this.currentCount = 0
+        this.nextInstanceIndex = 0
         if (this.instancedMesh) {
             this.instancedMesh.count = 0
         }
@@ -331,6 +333,7 @@ export class InstancedLabelRenderer {
         this.gameNameToTextureIndex.clear()
         this.isInitialized = false
         this.currentCount = 0
+        this.nextInstanceIndex = 0
         
         console.debug('✅ InstancedLabelRenderer disposed')
     }
