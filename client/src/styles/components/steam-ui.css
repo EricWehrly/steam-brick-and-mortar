@@ -1,10 +1,10 @@
 /* Steam UI Panel Styles */
 
 #steam-ui {
-    position: absolute;
-    top: 8px;
-    left: 50%;
-    transform: translateX(-50%);
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
     background: rgba(0, 0, 0, 0.8);
     border: 1px solid #444;
     border-radius: 8px;

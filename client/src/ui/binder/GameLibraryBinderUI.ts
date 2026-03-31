@@ -81,8 +81,13 @@ export class GameLibraryBinderUI {
         this.toggleButton.innerHTML = '📚'
         this.toggleButton.title = 'Open Game Binder (B)'
         this.toggleButton.addEventListener('click', () => this.toggle())
-        
-        document.body.appendChild(this.toggleButton)
+
+        const slot = document.getElementById('ui-slot-top-right')
+        if (slot) {
+            slot.appendChild(this.toggleButton)
+        } else {
+            document.body.appendChild(this.toggleButton)
+        }
     }
     
     /**
@@ -92,8 +97,13 @@ export class GameLibraryBinderUI {
         this.container = document.createElement('div')
         this.container.id = 'game-library-binder'
         this.container.className = 'binder-container'
-        
-        document.body.appendChild(this.container)
+
+        const slot = document.getElementById('ui-slot-center')
+        if (slot) {
+            slot.appendChild(this.container)
+        } else {
+            document.body.appendChild(this.container)
+        }
     }
     
     /**
@@ -300,10 +310,10 @@ export class GameLibraryBinderUI {
                 </div>
 
                 <div class="binder-spine"></div>
-                <div class="binder-ring" style="top: 40px;"></div>
-                <div class="binder-ring" style="top: 120px;"></div>
-                <div class="binder-ring" style="bottom: 120px;"></div>
-                <div class="binder-ring" style="bottom: 40px;"></div>
+                <div class="binder-ring ring-1"></div>
+                <div class="binder-ring ring-2"></div>
+                <div class="binder-ring ring-3"></div>
+                <div class="binder-ring ring-4"></div>
                 
                 <!-- Left nav button -->
                 <button id="binder-prev" class="binder-nav-btn side-nav left ${canGoPrev ? '' : 'disabled'}">◄</button>

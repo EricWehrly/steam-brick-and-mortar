@@ -8,12 +8,15 @@
 }
 
 .lighting-controls-panel {
-    position: absolute;
-    top: 50%;
-    right: 20px;
-    transform: translateY(-50%);
-    width: 280px;
-    max-height: 60vh;
+    position: relative;
+    top: auto;
+    right: auto;
+    transform: none;
+    width: 100%;
+    max-height: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    align-self: stretch;
     background: rgba(0, 0, 0, 0.85);
     border: 2px solid #333;
     border-radius: 8px;
@@ -97,7 +100,8 @@
     padding: 12px;
     overflow-y: auto;
     flex: 1;
-    max-height: 60vh;
+    max-height: none;
+    min-height: 0;
     opacity: 1;
     transition: max-height var(--menu-transition-time) ease, min-height var(--menu-transition-time) ease, opacity var(--menu-transition-time) ease, padding var(--menu-transition-time) ease, flex var(--menu-transition-time) ease;
 }

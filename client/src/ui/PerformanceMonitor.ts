@@ -83,14 +83,19 @@ export class PerformanceMonitor {
         }
         
         this.setupStyles()
-        document.body.appendChild(this.container)
+        const slot = document.getElementById('ui-slot-top-right')
+        if (slot) {
+            slot.appendChild(this.container)
+        } else {
+            document.body.appendChild(this.container)
+        }
         this.uiInitialized = true
     }
     
     private createContainer(): HTMLElement {
         const container = document.createElement('div')
         container.id = 'performance-monitor'
-        container.style.position = 'fixed'
+        container.style.position = 'relative'
         container.style.zIndex = '10000'
         container.style.fontFamily = 'Monaco, monospace'
         container.style.fontSize = '10px'
@@ -115,23 +120,28 @@ export class PerformanceMonitor {
     
     private setupStyles(): void {
         const { position } = this.config
+
+        this.container.style.top = ''
+        this.container.style.right = ''
+        this.container.style.bottom = ''
+        this.container.style.left = ''
+        this.container.style.margin = '0'
+        this.container.style.alignSelf = ''
         
         switch (position) {
             case 'top-left':
-                this.container.style.top = '10px'
-                this.container.style.left = '10px'
+                this.container.style.alignSelf = 'flex-start'
                 break
             case 'top-right':
-                this.container.style.top = '10px'
-                this.container.style.right = '10px'
+                this.container.style.alignSelf = 'flex-end'
                 break
             case 'bottom-left':
-                this.container.style.bottom = '10px'
-                this.container.style.left = '10px'
+                this.container.style.alignSelf = 'flex-start'
+                this.container.style.marginTop = 'auto'
                 break
             case 'bottom-right':
-                this.container.style.bottom = '10px'
-                this.container.style.right = '10px'
+                this.container.style.alignSelf = 'flex-end'
+                this.container.style.marginTop = 'auto'
                 break
         }
     }

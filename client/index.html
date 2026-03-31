@@ -27,45 +27,51 @@
         <p>Setting up your shop...</p>
     </div>
     
-    <div id="steam-ui" class="hidden">
-        <label for="steam-user-input">SteamID or (Custom or profile) URL:</label>
-        <div class="input-row">
-            <input 
-                type="text" 
-                id="steam-user-input" 
-                placeholder="e.g. 76561197960287930 / steamcommunity.com/id/GabeLoganNewell / steamcommunity.com/profiles/76561197960287930"
-                autocomplete="off"
-            />
-            <!-- Supports: Custom URL, Steam ID (17-digit number), or profile URLs -->
-            <button id="load-steam-games" class="load-button">Load Games</button>
+    <div id="ui-overlay-layout">
+        <div id="ui-slot-top-left" class="ui-slot ui-slot-top-left">
+            <button id="settings-button" class="settings-button">⚙️ Settings</button>
         </div>
-        <div class="button-group">
-            <button id="load-from-cache" class="hidden button-cache">Load from Cache</button>
-        </div>
-        
-        <!-- Progressive loading indicator -->
-        <div id="loading-progress" class="hidden">
-            <div class="progress-bar">
-                <div class="progress-fill" id="progress-fill"></div>
+        <div id="ui-slot-bottom-left" class="ui-slot ui-slot-bottom-left">
+            <div id="controls-help" class="hidden">
+                <strong>Controls:</strong><br>
+                WASD - Move around<br>
+                Mouse - Look left/right<br>
+                Q/E - Roll camera
             </div>
-            <div class="progress-text" id="progress-text">Loading games...</div>
-            <div class="progress-game" id="progress-game"></div>
+            <button id="webxr-button" class="hidden">Enter VR</button>
         </div>
-        
-        <div id="steam-status" class="status-hidden"></div>
+        <div id="ui-slot-top-right" class="ui-slot ui-slot-top-right"></div>
+        <div id="ui-slot-center-top" class="ui-slot ui-slot-center-top">
+            <div id="steam-ui" class="hidden">
+                <label for="steam-user-input">SteamID or (Custom or profile) URL:</label>
+                <div class="input-row">
+                    <input 
+                        type="text" 
+                        id="steam-user-input" 
+                        placeholder="e.g. 76561197960287930 / steamcommunity.com/id/GabeLoganNewell / steamcommunity.com/profiles/76561197960287930"
+                        autocomplete="off"
+                    />
+                    <!-- Supports: Custom URL, Steam ID (17-digit number), or profile URLs -->
+                    <button id="load-steam-games" class="load-button">Load Games</button>
+                </div>
+                <div class="button-group">
+                    <button id="load-from-cache" class="hidden button-cache">Load from Cache</button>
+                </div>
+                
+                <!-- Progressive loading indicator -->
+                <div id="loading-progress" class="hidden">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">Loading games...</div>
+                    <div class="progress-game" id="progress-game"></div>
+                </div>
+                
+                <div id="steam-status" class="status-hidden"></div>
+            </div>
+        </div>
+        <div id="ui-slot-center" class="ui-slot ui-slot-center"></div>
     </div>
-    
-    <!-- Settings Button -->
-    <button id="settings-button" class="settings-button">⚙️ Settings</button>
-    
-    <div id="controls-help" class="hidden">
-        <strong>Controls:</strong><br>
-        WASD - Move around<br>
-        Mouse - Look left/right<br>
-        Q/E - Roll camera
-    </div>
-    
-    <button id="webxr-button" class="hidden">Enter VR</button>
     
     <!-- WebXR Polyfill loaded in body (only needed when VR is used) -->
     <script async src="https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.js"></script>

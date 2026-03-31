@@ -94,7 +94,12 @@ export class LightingControlsPanel {
 
         // Styles are now loaded from external CSS file
 
-        document.body.appendChild(panel)
+        const slot = document.getElementById('ui-slot-top-right')
+        if (slot) {
+            slot.appendChild(panel)
+        } else {
+            document.body.appendChild(panel)
+        }
         this.attachEventHandlers()
         return panel
     }

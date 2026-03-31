@@ -28,6 +28,22 @@
     
     /* UI transition timing */
     --menu-transition-time: 0.2s;
+
+    /* Shared UI layout rails */
+    --ui-edge-gap: 20px;
+    --ui-top-inset: 20px;
+    --ui-control-size: 50px;
+    --ui-stack-gap: 12px;
+    --ui-left-rail: clamp(220px, 20vw, 320px);
+    --ui-right-rail: clamp(240px, 24vw, 360px);
+    --ui-right-reserved: calc(var(--ui-control-size) + 18px);
+    --ui-center-max-width: calc(
+        100vw
+        - (2 * var(--ui-edge-gap))
+        - (2 * var(--ui-stack-gap))
+        - var(--ui-left-rail)
+        - var(--ui-right-reserved)
+    );
 }
 
 body {
@@ -37,6 +53,79 @@ body {
     color: #fff;
     font-family: Arial, sans-serif;
     overflow: hidden;
+}
+
+#ui-overlay-layout {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.ui-slot {
+    pointer-events: none;
+    min-width: 0;
+    position: absolute;
+}
+
+.ui-slot > * {
+    pointer-events: auto;
+}
+
+#ui-slot-top-left {
+    top: var(--ui-top-inset);
+    left: var(--ui-edge-gap);
+    width: var(--ui-left-rail);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ui-stack-gap);
+}
+
+#ui-slot-bottom-left {
+    bottom: var(--ui-edge-gap);
+    left: var(--ui-edge-gap);
+    width: var(--ui-left-rail);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: var(--ui-stack-gap);
+}
+
+#ui-slot-top-right {
+    top: var(--ui-top-inset);
+    right: var(--ui-edge-gap);
+    width: auto;
+    min-width: var(--ui-right-reserved);
+    max-width: min(var(--ui-right-rail), calc(100vw - 2 * var(--ui-edge-gap)));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--ui-stack-gap);
+    overflow: visible;
+}
+
+#ui-slot-center-top {
+    top: var(--ui-top-inset);
+    left: calc(var(--ui-edge-gap) + var(--ui-left-rail) + var(--ui-stack-gap));
+    right: calc(var(--ui-edge-gap) + var(--ui-right-reserved) + var(--ui-stack-gap));
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+#ui-slot-center {
+    top: var(--ui-top-inset);
+    bottom: var(--ui-edge-gap);
+    left: calc(var(--ui-edge-gap) + var(--ui-left-rail) + var(--ui-stack-gap));
+    right: calc(var(--ui-edge-gap) + var(--ui-right-reserved) + var(--ui-stack-gap));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 0;
 }
 
 canvas {
@@ -55,9 +144,9 @@ canvas {
 }
 
 #webxr-button {
-    position: absolute;
-    bottom: 20px; /* Now below controls */
-    left: 20px; /* Moved to left to be under controls */
+    position: relative;
+    bottom: auto;
+    left: auto;
     padding: 12px 24px;
     background: #007acc;
     color: white;
@@ -78,9 +167,9 @@ canvas {
 }
 
 #controls-help {
-    position: absolute;
-    bottom: 80px; /* Moved up to make room for VR button */
-    left: 20px;
+    position: relative;
+    bottom: auto;
+    left: auto;
     background: rgba(0, 0, 0, 0.7);
     color: #ccc;
     padding: 10px;
@@ -111,9 +200,9 @@ canvas {
 
 /* Pause menu trigger button styles */
 .settings-button {
-    position: absolute;
-    top: 20px;
-    left: 20px;
+    position: relative;
+    top: auto;
+    left: auto;
     z-index: 1000;
     padding: 10px 15px;
     background: rgba(0, 0, 0, 0.8);
@@ -131,8 +220,23 @@ canvas {
 
 /* Lighting controls button - positioned below settings */
 .lighting-button {
-    top: 70px; /* Position below settings button */
+    top: auto;
     background: rgba(0, 40, 120, 0.8); /* Blue tint to distinguish from settings */
+}
+
+#lighting-controls-button {
+    position: relative;
+    top: auto;
+    right: auto;
+    left: auto;
+}
+
+@media (max-width: 1200px) {
+    :root {
+        --ui-left-rail: clamp(160px, 18vw, 240px);
+        --ui-right-rail: clamp(180px, 20vw, 280px);
+        --ui-right-reserved: calc(var(--ui-control-size) + 14px);
+    }
 }
 
 .lighting-button:hover {

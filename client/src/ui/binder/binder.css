@@ -8,9 +8,9 @@
    ============================================================================= */
 
 .binder-toggle-btn {
-    position: fixed;
-    top: 220px;
-    right: 20px;
+    position: relative;
+    top: auto;
+    right: auto;
     width: 50px;
     height: 50px;
     border-radius: 50%;
@@ -37,13 +37,11 @@
    ============================================================================= */
 
 .binder-container {
-    position: fixed;
-    top: 0;
-    left: 0;
+    position: relative;
+    top: auto;
+    left: auto;
     width: 100%;
     height: 100%;
-    /* TODO: Revisit optional fabric overlay effect after binder sizing/layout settles. */
-    background: rgba(8, 8, 10, 0.14);
     z-index: 999;
     display: none;
     flex-direction: column;
@@ -61,10 +59,6 @@
 }
 
 /* =============================================================================
-   Header
-   ============================================================================= */
-
-/* =============================================================================
    Search + Binder Surface Text
    ============================================================================= */
 
@@ -77,8 +71,8 @@
 .binder-surface-top {
     position: absolute;
     top: 12px;
-    left: clamp(22px, 2.5vw, 36px);
-    right: clamp(22px, 2.5vw, 36px);
+    left: clamp(18px, 2.2vw, 30px);
+    right: clamp(18px, 2.2vw, 30px);
     display: flex;
     justify-content: flex-end;
     z-index: 12;
@@ -120,11 +114,6 @@
     cursor: default;
 }
 
-.binder-game-count {
-    color: #888;
-    font-size: 14px;
-}
-
 .binder-surface-bottom {
     position: absolute;
     bottom: clamp(14px, 2.6vh, 24px);
@@ -137,11 +126,11 @@
 }
 
 .binder-surface-bottom.left {
-    left: clamp(22px, 2.5vw, 36px);
+    left: clamp(18px, 2.2vw, 30px);
 }
 
 .binder-surface-bottom.right {
-    right: clamp(22px, 2.5vw, 36px);
+    right: clamp(18px, 2.2vw, 30px);
     text-align: right;
 }
 
@@ -159,12 +148,18 @@
    ============================================================================= */
 
 .binder-spread {
+    --spread-top-pad: clamp(58px, 8.5vh, 92px);
+    --spread-bottom-pad: clamp(56px, 8vh, 86px);
+    --ring-row1-center: calc(var(--spread-top-pad) + (100% - var(--spread-top-pad) - var(--spread-bottom-pad)) * 0.25);
+    --ring-row2-center: calc(var(--spread-top-pad) + (100% - var(--spread-top-pad) - var(--spread-bottom-pad)) * 0.75);
+    --ring-offset: clamp(8px, 1.4vh, 16px);
     display: flex;
     gap: 0;
-    width: min(96vw, 1700px);
+    width: min(100%, var(--ui-center-max-width, 96vw), 1700px);
     height: clamp(420px, calc(100dvh - 170px), 980px);
     max-height: calc(100dvh - 92px);
-    padding: clamp(58px, 8.5vh, 92px) clamp(20px, 2vw, 34px) clamp(56px, 8vh, 86px);
+    padding: var(--spread-top-pad) clamp(20px, 2vw, 34px) var(--spread-bottom-pad);
+    box-sizing: border-box;
     align-items: stretch;
     background: 
         linear-gradient(90deg, rgba(0,0,0,0.3) 0%, transparent 5%, transparent 95%, rgba(0,0,0,0.3) 100%),
@@ -181,8 +176,11 @@
 
 @media (max-height: 1100px) {
     .binder-spread {
+        --spread-top-pad: clamp(48px, 7.5vh, 72px);
+        --spread-bottom-pad: clamp(44px, 7vh, 66px);
+        --ring-offset: clamp(7px, 1.2vh, 14px);
         height: clamp(390px, calc(100dvh - 155px), 860px);
-        padding: clamp(48px, 7.5vh, 72px) clamp(14px, 1.6vw, 24px) clamp(44px, 7vh, 66px);
+        padding: var(--spread-top-pad) clamp(14px, 1.6vw, 24px) var(--spread-bottom-pad);
     }
 
     .binder-page {
@@ -210,8 +208,11 @@
     }
 
     .binder-spread {
+        --spread-top-pad: 42px;
+        --spread-bottom-pad: 40px;
+        --ring-offset: 8px;
         height: calc(100dvh - 132px);
-        padding: 42px 12px 40px;
+        padding: var(--spread-top-pad) 12px var(--spread-bottom-pad);
     }
 
     .binder-page {
@@ -247,8 +248,11 @@
     }
 
     .binder-spread {
+        --spread-top-pad: 36px;
+        --spread-bottom-pad: 34px;
+        --ring-offset: 7px;
         height: calc(100dvh - 116px);
-        padding: 36px 10px 34px;
+        padding: var(--spread-top-pad) 10px var(--spread-bottom-pad);
     }
 
     .binder-page {
@@ -289,6 +293,22 @@
     background: #0a0a0a;
     border-radius: 50%;
     border: 2px solid #444;
+}
+
+.binder-ring.ring-1 {
+    top: calc(var(--ring-row1-center) - var(--ring-offset));
+}
+
+.binder-ring.ring-2 {
+    top: calc(var(--ring-row1-center) + var(--ring-offset));
+}
+
+.binder-ring.ring-3 {
+    top: calc(var(--ring-row2-center) - var(--ring-offset));
+}
+
+.binder-ring.ring-4 {
+    top: calc(var(--ring-row2-center) + var(--ring-offset));
 }
 
 .binder-gutter {
