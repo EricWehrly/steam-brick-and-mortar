@@ -17,6 +17,7 @@
 
 import * as THREE from 'three'
 import { RenderLoopRegistry } from '../../RenderLoopRegistry'
+import { SceneLayer } from '../../SceneLayers'
 import { Logger } from '../../../utils/Logger'
 import { HighTextureCache, type HighTextureCacheConfig } from './HighTextureCache'
 import { SpatialPrewarmingManager, type PrewarmingConfig } from './SpatialPrewarmingManager'
@@ -188,6 +189,7 @@ export class LodGameArtworkRenderer {
             this.config.maxInstances
         )
         this.instancedMesh.name = 'lod-game-artwork'
+        this.instancedMesh.layers.enable(SceneLayer.Interactable)
         this.instancedMesh.count = 0
         this.instancedMesh.castShadow = true
         this.instancedMesh.receiveShadow = true
@@ -315,6 +317,7 @@ export class LodGameArtworkRenderer {
         
         this.instancedMesh.instanceMatrix.needsUpdate = true
         this.instancedMesh.count = this.currentInstanceCount
+        this.instancedMesh.boundingSphere = null  // Force recompute; stale sphere breaks raycasting
         
         const textureIndexAttr = this.geometry.getAttribute('textureIndex')
         const lodLevelAttr = this.geometry.getAttribute('lodLevel')

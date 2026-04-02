@@ -26,6 +26,7 @@ import {
 } from '../../../types/InteractionEvents'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
+import { SceneLayer } from '../../SceneLayers'
 import { ShelfSide } from '../../props/SharedPropsUtils'
 import vertexShader from './shaders/instanced-label.vert?raw'
 import fragmentShader from './shaders/instanced-label.frag?raw'
@@ -100,6 +101,7 @@ export class InstancedLabelRenderer {
             
             // Name the mesh for debugging
             this.instancedMesh.name = INSTANCED_LABEL_MESH_NAME
+            this.instancedMesh.layers.enable(SceneLayer.Interactable)
             
             // CRITICAL: Set count to 0 initially (will update as instances are added)
             this.instancedMesh.count = 0
@@ -216,8 +218,8 @@ export class InstancedLabelRenderer {
         this.textureArrayManager.markDirty()
         
         this.instancedMesh.instanceMatrix.needsUpdate = true
-        
         this.instancedMesh.count = this.currentCount
+        this.instancedMesh.boundingSphere = null  // Force recompute; stale sphere breaks raycasting
         
         const textureIndices = this.geometry.getAttribute('textureIndex')
         if (textureIndices) {

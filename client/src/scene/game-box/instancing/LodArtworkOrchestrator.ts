@@ -31,6 +31,7 @@ import {
 import { LOD_TIER_NAME } from './ILodArtworkRenderer'
 import { HighTextureCache } from './HighTextureCache'
 import type { PrewarmingConfig } from './SpatialPrewarmingManager'
+import type { InstanceMetadata } from '../../../debug/GameFinder'
 
 // Class-scoped logger will be attached to the class
 
@@ -89,6 +90,7 @@ export class LodArtworkOrchestrator {
     // Track game names to texture indices
     private gameNameToTextureIndex: Map<string, number> = new Map()
     private textureIndexToGameName: Map<number, string> = new Map()
+    private instanceMetadata: Map<number, InstanceMetadata> = new Map()
     
     // Track failed artwork (for backward compat)
     private failedArtwork: Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> = new Map()
@@ -174,11 +176,11 @@ export class LodArtworkOrchestrator {
         }
         this.renderer.initialize(textureArrays, scene)
         
-        // Register metadata with DataManager for compatibility
+        // Register instance metadata map for downstream systems (raycast, diagnostics)
         DataManager.getInstance().set(
-            'artworkMetadata_lod' as DataKey,
-            this.renderer.getAllInstances(),
-            { domain: DataDomain.Scene }
+            DataKey.InstancedArtworkMetadata,
+            this.instanceMetadata,
+            { domain: DataDomain.Renderer }
         )
     }
     
@@ -274,6 +276,11 @@ export class LodArtworkOrchestrator {
             // Track mapping
             this.gameNameToTextureIndex.set(gameName, textureIndex)
             this.textureIndexToGameName.set(textureIndex, gameName)
+            this.instanceMetadata.set(instanceIndex, {
+                name: gameName,
+                appid,
+                position: position.clone()
+            })
             
             return { success: true, instanceIndex }
             
@@ -372,6 +379,7 @@ export class LodArtworkOrchestrator {
         this.textureManager.dispose()
         this.gameNameToTextureIndex.clear()
         this.textureIndexToGameName.clear()
+        this.instanceMetadata.clear()
         this.failedArtwork.clear()
         
         LodArtworkOrchestrator.logger.lifecycle('Disposed')

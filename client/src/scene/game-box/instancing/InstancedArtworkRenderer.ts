@@ -23,6 +23,7 @@ import * as THREE from 'three'
 import type { GameBoxTextureOptions } from '../types/GameBoxOptions'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
+import { SceneLayer } from '../../SceneLayers'
 import { TextureProcessor } from './TextureProcessor'
 import type { InstanceMetadata } from '../../../debug/GameFinder'
 import { InstancedArtworkDebugger } from './InstancedArtworkDebugger'
@@ -122,6 +123,7 @@ export class InstancedArtworkRenderer {
             
             // Name the mesh for debugging
             this.instancedMesh.name = INSTANCED_ARTWORK_MESH_NAME
+            this.instancedMesh.layers.enable(SceneLayer.Interactable)
             
             // CRITICAL: Set count to 0 initially
             this.instancedMesh.count = 0

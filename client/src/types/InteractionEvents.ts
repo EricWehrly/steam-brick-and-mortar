@@ -133,6 +133,14 @@ export interface InputResumeEvent extends BaseInteractionEvent {
     reason?: 'menu' | 'user' | 'system'
 }
 
+export interface SceneCanvasClickEvent extends BaseInteractionEvent {
+    clientX: number
+    clientY: number
+    button: number
+    ndcX: number
+    ndcY: number
+}
+
 // =============================================================================
 // UI EVENTS
 // =============================================================================
@@ -320,7 +328,8 @@ export const WebXREventTypes = {
 
 export const InputEventTypes = {
     Pause: 'input:pause',
-    Resume: 'input:resume'
+    Resume: 'input:resume',
+    SceneCanvasClick: 'input:scene-canvas-click'
 } as const
 
 export const UIEventTypes = {

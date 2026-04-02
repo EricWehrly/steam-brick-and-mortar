@@ -15,8 +15,9 @@ import { LightingControlsPanel } from '../LightingControlsPanel'
 import { EventManager } from '../../core/EventManager'
 import type { DebugStatsProvider } from '../../core/DebugStatsProvider'
 import { AppSettings } from '../../core/AppSettings'
-import { UIEventTypes } from '../../types/InteractionEvents'
+import { UIEventTypes, InputEventTypes, type SceneCanvasClickEvent } from '../../types/InteractionEvents'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
+import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
 
 export class SystemUICoordinator {
     private pauseMenuManager: PauseMenuManager
@@ -26,6 +27,8 @@ export class SystemUICoordinator {
     private appSettings: AppSettings
     private renderLoopRegistry: RenderLoopRegistry
     private renderer?: THREE.WebGLRenderer
+    private rendererDomElement?: HTMLCanvasElement
+    private sceneClickGameBoxRaycast?: SceneClickGameBoxRaycast
     private lastPerformanceUpdate = 0
     private readonly performanceUpdateInterval = 1000 // Update every second
 
@@ -47,6 +50,17 @@ export class SystemUICoordinator {
         renderer: THREE.WebGLRenderer
     ): Promise<void> {
         this.renderer = renderer
+        this.rendererDomElement = renderer.domElement
+
+        if (this.rendererDomElement) {
+            this.rendererDomElement.addEventListener('click', this.handleRendererCanvasClick)
+            this.rendererDomElement.addEventListener('contextmenu', this.handleRendererContextMenu)
+        }
+
+        this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({
+            maxDistance: 10,
+            lineColor: 0xff0000
+        })
         
         // Initialize pause menu system
         this.pauseMenuManager.init()
@@ -86,18 +100,14 @@ export class SystemUICoordinator {
     private setupSettingsButton(): void {
         const settingsButton = document.getElementById('settings-button')
         if (settingsButton) {
-            settingsButton.addEventListener('click', () => {
-                this.pauseMenuManager.toggle()
-            })
+            settingsButton.addEventListener('click', this.handleSettingsButtonClick)
         }
     }
 
     private setupLightingControlsButton(): void {
         const lightingButton = document.getElementById('lighting-controls-button')
         if (lightingButton) {
-            lightingButton.addEventListener('click', () => {
-                this.toggleLightingControls()
-            })
+            lightingButton.addEventListener('click', this.handleLightingControlsButtonClick)
         }
     }
 
@@ -121,29 +131,67 @@ export class SystemUICoordinator {
 
     private registerEventHandlers(): void {
         // Register UI event handlers for pause menu
-        this.eventManager.registerEventHandler(UIEventTypes.MenuOpen, (event) => {
-            this.pauseMenuManager.open()
+        this.eventManager.registerEventHandler(UIEventTypes.MenuOpen, this.handleMenuOpen)
+        this.eventManager.registerEventHandler(UIEventTypes.MenuClose, this.handleMenuClose)
+    }
+
+    private readonly handleSettingsButtonClick = (): void => {
+        this.pauseMenuManager.toggle()
+    }
+
+    private readonly handleLightingControlsButtonClick = (): void => {
+        this.toggleLightingControls()
+    }
+
+    private readonly handleMenuOpen = (): void => {
+        this.pauseMenuManager.open()
+    }
+
+    private readonly handleMenuClose = (): void => {
+        this.pauseMenuManager.close()
+    }
+
+    private readonly handleRendererCanvasClick = (event: MouseEvent): void => {
+        if (!this.rendererDomElement) {
+            return
+        }
+
+        const rect = this.rendererDomElement.getBoundingClientRect()
+        if (rect.width === 0 || rect.height === 0) {
+            return
+        }
+
+        const ndcX = ((event.clientX - rect.left) / rect.width) * 2 - 1
+        const ndcY = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+        this.eventManager.emit<SceneCanvasClickEvent>(InputEventTypes.SceneCanvasClick, {
+            clientX: event.clientX,
+            clientY: event.clientY,
+            button: event.button,
+            ndcX,
+            ndcY
         })
-
-        this.eventManager.registerEventHandler(UIEventTypes.MenuClose, (event) => {
-            this.pauseMenuManager.close()
-        })
     }
 
-    public getPauseMenuManager(): PauseMenuManager {
-        return this.pauseMenuManager
+    private readonly handleRendererContextMenu = (event: MouseEvent): void => {
+        event.preventDefault()
     }
 
-    public getPerformanceMonitor(): PerformanceMonitor {
-        return this.performanceMonitor
-    }
-
-    public updateRenderStats(renderer: THREE.WebGLRenderer, scene?: THREE.Scene): void {
+    public updateRenderStats(renderer: THREE.WebGLRenderer): void {
         this.performanceMonitor.updateRenderStats(renderer)
     }
 
     public dispose(): void {
         this.renderLoopRegistry.unregister(this.constructor.name)
+
+        if (this.rendererDomElement) {
+            this.rendererDomElement.removeEventListener('click', this.handleRendererCanvasClick)
+            this.rendererDomElement.removeEventListener('contextmenu', this.handleRendererContextMenu)
+            this.rendererDomElement = undefined
+        }
+
+        this.sceneClickGameBoxRaycast?.dispose()
+        this.sceneClickGameBoxRaycast = undefined
         this.pauseMenuManager?.dispose()
         this.performanceMonitor?.dispose()
         this.lightingControlsPanel?.dispose()
@@ -154,7 +202,5 @@ export class SystemUICoordinator {
             lightingButton.parentNode.removeChild(lightingButton)
         }
         
-        // Deregister event handlers
-        // Note: EventManager will handle cleanup of all registered handlers
     }
 }

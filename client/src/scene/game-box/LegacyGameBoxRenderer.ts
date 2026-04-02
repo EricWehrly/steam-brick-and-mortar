@@ -14,6 +14,7 @@ import type {
 } from './types/GameBoxOptions'
 import { GameBoxTextureManager } from './GameBoxTextureManager'
 import { GameBoxLayoutUtils } from './GameBoxLayoutUtils'
+import { SceneLayer } from '../SceneLayers'
 import { SharedMaterialManager, MaterialType } from '../../utils/SharedMaterialManager'
 import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
@@ -81,6 +82,7 @@ export class LegacyGameBoxRenderer implements IGameBoxRenderer {
         const gameBox = new THREE.Mesh(this.gameBoxGeometry, material)
         gameBox.position.copy(position)
         gameBox.name = name || `game-${game.name?.replace(/[^a-zA-Z0-9]/g, '-') || 'unknown'}`
+        gameBox.layers.enable(SceneLayer.Interactable)
         
         gameBox.userData = {
             isGameBox: true,
