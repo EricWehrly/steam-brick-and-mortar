@@ -13,6 +13,9 @@
 
 import * as THREE from 'three'
 import { GameFinder } from './GameFinder'
+import { LightRegistry } from '../lighting/LightRegistry'
+import { DataManager } from '../core/data/DataManager'
+import { DataKey } from '../core/data/DataTypes'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
 import vertexShader from './shaders/spotlight-beam.vert?raw'
@@ -36,7 +39,6 @@ export class DiagnosticSpotlight {
     private scene: THREE.Scene | null = null
     private readonly DIM_FACTOR = 0.2 // Dim to 20% of original intensity
     private camera: THREE.Camera | null = null
-    private cachedRectAreaLights: THREE.RectAreaLight[] | null = null
     private animationFrameId: number | null = null
     private baseIntensities: Map<THREE.SpotLight, number> = new Map()
     private beamsBySpotlight: Map<THREE.SpotLight, THREE.Mesh> = new Map()
@@ -262,27 +264,7 @@ export class DiagnosticSpotlight {
     }
 
     private getRectAreaLights(): THREE.RectAreaLight[] {
-        if (this.cachedRectAreaLights) {
-            return this.cachedRectAreaLights
-        }
-
-        if (!this.scene) return []
-
-        const lights: THREE.RectAreaLight[] = []
-        this.scene.traverse((object) => {
-            if (object instanceof THREE.RectAreaLight) {
-                lights.push(object)
-            }
-        })
-
-        this.cachedRectAreaLights = lights
-        console.debug(`🔦 [Spotlight] Cached ${lights.length} RectAreaLights (avoids scene traversal on every toggle)`)
-        return lights
-    }
-
-    public invalidateLightCache(): void {
-        this.cachedRectAreaLights = null
-        console.debug('🔦 [Spotlight] Light cache invalidated')
+        return LightRegistry.getInstance().getLightsByType(THREE.RectAreaLight)
     }
 
     private dimStoreLights(): void {
@@ -377,10 +359,47 @@ export class DiagnosticSpotlight {
             DiagnosticSpotlight.sharedBeamMaterial = null
         }
     }
+
+    // Pre-compile the beam ShaderMaterial so the GPU driver doesn't JIT-compile it
+    // on the first frame the spotlight appears (which causes a visible lag spike).
+    public precompileBeamShader(): void {
+        const renderer = DataManager.getInstance().get<THREE.WebGLRenderer>(DataKey.Renderer)
+        const scene = this.scene
+        const camera = this.camera
+        if (!renderer || !scene || !camera) return
+
+        // Ensure the shared geometry and material exist before compiling
+        if (!DiagnosticSpotlight.sharedBeamGeometry) {
+            DiagnosticSpotlight.sharedBeamGeometry = new THREE.CylinderGeometry(0.08, 0.12, 3.5, 24, 1, true)
+        }
+        if (!DiagnosticSpotlight.sharedBeamMaterial) {
+            DiagnosticSpotlight.sharedBeamMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    color: { value: new THREE.Color(0xfff8e7) },
+                    opacity: { value: 0.2 },
+                    gameBottomY: { value: 0.0 },
+                    beamBottomY: { value: 0.0 }
+                },
+                vertexShader,
+                fragmentShader,
+                transparent: true,
+                side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            })
+        }
+
+        const tempMesh = new THREE.Mesh(DiagnosticSpotlight.sharedBeamGeometry, DiagnosticSpotlight.sharedBeamMaterial)
+        tempMesh.frustumCulled = false
+        scene.add(tempMesh)
+        renderer.compile(scene, camera)
+        scene.remove(tempMesh)
+    }
 }
 
 export function initializeDiagnosticSpotlightOnStart(): void {
     const spotlight = new DiagnosticSpotlight()
+    spotlight.precompileBeamShader()
 
     // @ts-ignore - Intentionally adding to window for debugging
     window.spotlightGame = (target: string | number | Array<string | number>) => {

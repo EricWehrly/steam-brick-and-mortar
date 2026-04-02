@@ -12,6 +12,7 @@ export interface SceneClickGameBoxRaycastOptions {
     maxDistance?: number
     lineColor?: number
     enableDebugLogs?: boolean
+    enableDebugLine?: boolean
     onHit?: (hit: SceneGameBoxHit) => void
 }
 
@@ -29,6 +30,7 @@ export class SceneClickGameBoxRaycast {
     private readonly cameraOption: THREE.Camera | undefined
     private readonly maxDistance: number
     private readonly enableDebugLogs: boolean
+    private readonly enableDebugLine: boolean
     private readonly onHit?: (hit: SceneGameBoxHit) => void
     private readonly eventManager: EventManager
 
@@ -48,6 +50,7 @@ export class SceneClickGameBoxRaycast {
         this.cameraOption = options.camera
         this.maxDistance = options.maxDistance ?? 10
         this.enableDebugLogs = options.enableDebugLogs ?? false
+        this.enableDebugLine = options.enableDebugLine ?? false
         this.onHit = options.onHit
         this.eventManager = EventManager.getInstance()
 
@@ -103,15 +106,14 @@ export class SceneClickGameBoxRaycast {
         this.pointer.x = ndcX
         this.pointer.y = ndcY
 
-        camera.updateMatrixWorld(true)
-        scene.updateMatrixWorld(true)
-
         this.raycaster.far = this.maxDistance
         this.raycaster.setFromCamera(this.pointer, camera)
 
         const lineStart = this.raycaster.ray.origin.clone()
         const lineEnd = lineStart.clone().add(this.direction.copy(this.raycaster.ray.direction).multiplyScalar(this.maxDistance))
-        this.updateDebugLine(lineStart, lineEnd, scene)
+        if (this.enableDebugLine) {
+            this.updateDebugLine(lineStart, lineEnd, scene)
+        }
 
         const intersections = this.raycaster.intersectObjects(scene.children, true)
 

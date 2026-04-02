@@ -75,6 +75,10 @@ export class SceneManager {
             antialias: options.antialias ?? true 
         })
 
+        DataManager.getInstance().set(DataKey.Renderer, this.renderer, {
+            domain: DataDomain.Scene
+        })
+
         // PropRenderer creation deferred to avoid blocking startup
         // Will be created on first use by LightingRenderer
 

@@ -48,6 +48,14 @@ export class LightRegistry {
         }
     }
     
+    public getLightsByType<T extends THREE.Light>(lightClass: new (...args: unknown[]) => T): T[] {
+        const results: T[] = []
+        for (const [light] of this.lights) {
+            if (light instanceof lightClass) results.push(light)
+        }
+        return results
+    }
+
     public getLightsGroupedByType(): Map<string, THREE.Light[]> {
         const groups = new Map<string, THREE.Light[]>()
         for (const [light, entry] of this.lights) {
