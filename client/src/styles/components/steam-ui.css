@@ -175,18 +175,5 @@
     text-overflow: ellipsis;
 }
 
-/* Settings Button */
-#settings-button {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    z-index: 1000;
-    padding: 10px 15px;
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    border: 1px solid #333;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 14px;
-}
+/* Settings Button styles live on .settings-button in main.css */
 

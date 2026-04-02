@@ -152,7 +152,6 @@
     --spread-bottom-pad: clamp(56px, 8vh, 86px);
     --ring-row1-center: calc(var(--spread-top-pad) + (100% - var(--spread-top-pad) - var(--spread-bottom-pad)) * 0.25);
     --ring-row2-center: calc(var(--spread-top-pad) + (100% - var(--spread-top-pad) - var(--spread-bottom-pad)) * 0.75);
-    --ring-offset: clamp(8px, 1.4vh, 16px);
     display: flex;
     gap: 0;
     width: min(100%, var(--ui-center-max-width, 96vw), 1700px);
@@ -178,7 +177,6 @@
     .binder-spread {
         --spread-top-pad: clamp(48px, 7.5vh, 72px);
         --spread-bottom-pad: clamp(44px, 7vh, 66px);
-        --ring-offset: clamp(7px, 1.2vh, 14px);
         height: clamp(390px, calc(100dvh - 155px), 860px);
         padding: var(--spread-top-pad) clamp(14px, 1.6vw, 24px) var(--spread-bottom-pad);
     }
@@ -190,7 +188,7 @@
     }
 
     .binder-gutter {
-        width: 20px;
+        width: 14px;
     }
 
     .binder-nav-btn.side-nav {
@@ -210,15 +208,9 @@
     .binder-spread {
         --spread-top-pad: 42px;
         --spread-bottom-pad: 40px;
-        --ring-offset: 8px;
         height: calc(100dvh - 132px);
         padding: var(--spread-top-pad) 12px var(--spread-bottom-pad);
     }
-
-    .binder-page {
-        --slot-size: min(46cqw, 40cqh);
-        gap: 10px;
-        padding: 14px 12px 44px;
     }
 
     .binder-ring {
@@ -250,7 +242,6 @@
     .binder-spread {
         --spread-top-pad: 36px;
         --spread-bottom-pad: 34px;
-        --ring-offset: 7px;
         height: calc(100dvh - 116px);
         padding: var(--spread-top-pad) 10px var(--spread-bottom-pad);
     }
@@ -262,7 +253,7 @@
     }
 
     .binder-gutter {
-        width: 14px;
+        width: 10px;
     }
 
     .binder-surface-bottom {
@@ -276,43 +267,15 @@
     left: 50%;
     top: 10px;
     bottom: 10px;
-    width: 8px;
+    width: 4px;
     transform: translateX(-50%);
-    background: linear-gradient(90deg, #1a1a1a 0%, #333 50%, #1a1a1a 100%);
+    background: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%);
     border-radius: 4px;
     box-shadow: inset 0 0 4px rgba(0,0,0,0.8);
 }
 
-/* Ring holes */
-.binder-ring {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 12px;
-    height: 12px;
-    background: #0a0a0a;
-    border-radius: 50%;
-    border: 2px solid #444;
-}
-
-.binder-ring.ring-1 {
-    top: calc(var(--ring-row1-center) - var(--ring-offset));
-}
-
-.binder-ring.ring-2 {
-    top: calc(var(--ring-row1-center) + var(--ring-offset));
-}
-
-.binder-ring.ring-3 {
-    top: calc(var(--ring-row2-center) - var(--ring-offset));
-}
-
-.binder-ring.ring-4 {
-    top: calc(var(--ring-row2-center) + var(--ring-offset));
-}
-
 .binder-gutter {
-    width: 30px;
+    width: 18px;
 }
 
 /* =============================================================================
@@ -340,6 +303,43 @@
         0 2px 8px rgba(0,0,0,0.3);
     position: relative;
     overflow: hidden;
+}
+
+.binder-page.left::before,
+.binder-page.left::after,
+.binder-page.right::before,
+.binder-page.right::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #171412 0%, #231f1c 62%, #4a433e 100%);
+    box-shadow:
+        inset 0 1px 3px rgba(0,0,0,0.75),
+        0 0 0 1px rgba(110,100,92,0.22);
+    z-index: 3;
+    pointer-events: none;
+}
+
+.binder-page.left::before,
+.binder-page.left::after {
+    right: 6px;
+}
+
+.binder-page.right::before,
+.binder-page.right::after {
+    left: 6px;
+}
+
+.binder-page.left::before,
+.binder-page.right::before {
+    top: calc(var(--ring-row1-center) - 7px);
+}
+
+.binder-page.left::after,
+.binder-page.right::after {
+    top: calc(var(--ring-row2-center) - 7px);
 }
 
 /* Plastic sheet shine effect */

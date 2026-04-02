@@ -310,10 +310,6 @@ export class GameLibraryBinderUI {
                 </div>
 
                 <div class="binder-spine"></div>
-                <div class="binder-ring ring-1"></div>
-                <div class="binder-ring ring-2"></div>
-                <div class="binder-ring ring-3"></div>
-                <div class="binder-ring ring-4"></div>
                 
                 <!-- Left nav button -->
                 <button id="binder-prev" class="binder-nav-btn side-nav left ${canGoPrev ? '' : 'disabled'}">◄</button>
@@ -346,7 +342,7 @@ export class GameLibraryBinderUI {
         }
         
         return `
-            <div class="binder-page">
+            <div class="binder-page ${pageNum % 2 === 0 ? 'left' : 'right'}">
                 <div class="binder-page-shine"></div>
                 ${slots.join('')}
                 <div class="binder-page-number">Page ${pageNum + 1}</div>

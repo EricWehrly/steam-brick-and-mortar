@@ -30,13 +30,14 @@
     --menu-transition-time: 0.2s;
 
     /* Shared UI layout rails */
-    --ui-edge-gap: 20px;
+    --ui-edge-gap: 10px;
     --ui-top-inset: 20px;
     --ui-control-size: 50px;
     --ui-stack-gap: 12px;
-    --ui-left-rail: clamp(220px, 20vw, 320px);
+    --ui-wing-rail: 110px;
+    --ui-left-rail: var(--ui-wing-rail);
     --ui-right-rail: clamp(240px, 24vw, 360px);
-    --ui-right-reserved: calc(var(--ui-control-size) + 18px);
+    --ui-right-reserved: var(--ui-wing-rail);
     --ui-center-max-width: calc(
         100vw
         - (2 * var(--ui-edge-gap))
@@ -147,13 +148,13 @@ canvas {
     position: relative;
     bottom: auto;
     left: auto;
-    padding: 12px 24px;
+    padding: 8px 12px;
     background: #007acc;
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: 5px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
     z-index: 1000;
 }
 
@@ -233,9 +234,10 @@ canvas {
 
 @media (max-width: 1200px) {
     :root {
-        --ui-left-rail: clamp(160px, 18vw, 240px);
+        --ui-wing-rail: clamp(80px, 10vw, 110px);
+        --ui-left-rail: var(--ui-wing-rail);
         --ui-right-rail: clamp(180px, 20vw, 280px);
-        --ui-right-reserved: calc(var(--ui-control-size) + 14px);
+        --ui-right-reserved: var(--ui-wing-rail);
     }
 }
 

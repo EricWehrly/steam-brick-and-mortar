@@ -12,11 +12,11 @@
     top: auto;
     right: auto;
     transform: none;
-    width: 100%;
-    max-height: 100%;
-    min-height: 0;
-    flex: 1 1 auto;
-    align-self: stretch;
+    width: min(var(--ui-right-rail), calc(100vw - 2 * var(--ui-edge-gap)));
+    max-height: calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap));
+    min-height: auto;
+    flex: 0 0 auto;
+    align-self: flex-end;
     background: rgba(0, 0, 0, 0.85);
     border: 2px solid #333;
     border-radius: 8px;
@@ -99,9 +99,9 @@
 .lighting-controls-panel .panel-content {
     padding: 12px;
     overflow-y: auto;
-    flex: 1;
-    max-height: none;
-    min-height: 0;
+    flex: 0 1 auto;
+    max-height: min(65vh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap) - 72px));
+    min-height: auto;
     opacity: 1;
     transition: max-height var(--menu-transition-time) ease, min-height var(--menu-transition-time) ease, opacity var(--menu-transition-time) ease, padding var(--menu-transition-time) ease, flex var(--menu-transition-time) ease;
 }
