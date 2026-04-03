@@ -90,8 +90,9 @@ export class SceneCoordinator {
             tracker.phaseEnd(StartupPhase.SceneConstruction)
             tracker.milestone(StartupPhase.SceneConstruction, 'Scene fully constructed')
             
+            // TODO: Re-enable after diagnosing startup hitch (suspected ceiling fixture bake)
             // Upgrade to full lighting now that scene is complete
-            await this.lightingRenderer.upgradeLighting()
+            // await this.lightingRenderer.upgradeLighting()
             
             this.eventManager.emit(GameEventTypes.SceneReady, {})
         })
