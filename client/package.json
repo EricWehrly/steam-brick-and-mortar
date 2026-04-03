@@ -25,7 +25,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.7.2",
-    "@types/three": "^0.169.0",
+    "@types/three": "^0.183.1",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
     "@vitest/ui": "^2.1.8",
@@ -38,7 +38,7 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
-    "three": "^0.170.0"
+    "three": "^0.183.2"
   },
   "engines": {
     "node": ">=18.0.0"

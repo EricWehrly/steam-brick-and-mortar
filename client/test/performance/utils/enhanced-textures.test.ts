@@ -91,8 +91,8 @@ describe('ProceduralTextures Enhanced', () => {
       const texture = proceduralTextures.createEnhancedWoodTexture()
       
       expect(texture).toBeInstanceOf(THREE.Texture)
-      expect(texture.image.width).toBe(2048)
-      expect(texture.image.height).toBe(2048)
+      expect((texture.image as { width: number; height: number }).width).toBe(2048)
+      expect((texture.image as { width: number; height: number }).height).toBe(2048)
       expect(texture.wrapS).toBe(THREE.RepeatWrapping)
       expect(texture.wrapT).toBe(THREE.RepeatWrapping)
     })
@@ -103,8 +103,8 @@ describe('ProceduralTextures Enhanced', () => {
         height: 256
       })
       
-      expect(texture.image.width).toBe(256)
-      expect(texture.image.height).toBe(256)
+      expect((texture.image as { width: number; height: number }).width).toBe(256)
+      expect((texture.image as { width: number; height: number }).height).toBe(256)
     })
 
     it('should cache textures with same parameters', () => {
@@ -128,8 +128,8 @@ describe('ProceduralTextures Enhanced', () => {
       const texture = proceduralTextures.createEnhancedCarpetTexture()
       
       expect(texture).toBeInstanceOf(THREE.Texture)
-      expect(texture.image.width).toBe(512)
-      expect(texture.image.height).toBe(512)
+      expect((texture.image as { width: number; height: number }).width).toBe(512)
+      expect((texture.image as { width: number; height: number }).height).toBe(512)
     })
 
     it('should handle different fiber densities', () => {
@@ -152,8 +152,8 @@ describe('ProceduralTextures Enhanced', () => {
       const texture = proceduralTextures.createEnhancedCeilingTexture()
       
       expect(texture).toBeInstanceOf(THREE.Texture)
-      expect(texture.image.width).toBe(512)
-      expect(texture.image.height).toBe(512)
+      expect((texture.image as { width: number; height: number }).width).toBe(512)
+      expect((texture.image as { width: number; height: number }).height).toBe(512)
     })
 
     it('should handle different bump sizes', () => {
@@ -276,8 +276,8 @@ describe('VR Performance Considerations', () => {
     const texture = proceduralTextures.createEnhancedWoodTexture()
     
     // 2048x2048 for high-fidelity VR experience (Phase 1 - enhanced quality)
-    expect(texture.image.width).toBe(2048)
-    expect(texture.image.height).toBe(2048)
+    expect((texture.image as { width: number; height: number }).width).toBe(2048)
+    expect((texture.image as { width: number; height: number }).height).toBe(2048)
   })
 
   it('should handle large numbers of materials without memory leaks', () => {

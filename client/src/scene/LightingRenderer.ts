@@ -549,12 +549,13 @@ export class LightingRenderer {
         
         for (const [, lights] of groupedLights) {
             for (const light of lights) {
-                if (light.castShadow && light.shadow) {
+                const shadowLight = light as THREE.DirectionalLight | THREE.SpotLight | THREE.PointLight
+                if (light.castShadow && 'shadow' in shadowLight && shadowLight.shadow) {
                     // Shadow cameras are always OrthographicCamera or PerspectiveCamera
-                    const camera = light.shadow.camera as THREE.PerspectiveCamera | THREE.OrthographicCamera
+                    const camera = shadowLight.shadow.camera as THREE.PerspectiveCamera | THREE.OrthographicCamera
                     camera.updateProjectionMatrix()
-                    light.shadow.map?.dispose()
-                    light.shadow.map = null
+                    shadowLight.shadow.map?.dispose()
+                    shadowLight.shadow.map = null
                 }
             }
         }
@@ -628,8 +629,11 @@ export class LightingRenderer {
             this.lightingGroup.remove(child)
             
             // Dispose any resources if needed
-            if (child instanceof THREE.Light && child.shadow) {
-                child.shadow.dispose()
+            if (child instanceof THREE.Light) {
+                const shadowLight = child as THREE.DirectionalLight | THREE.SpotLight | THREE.PointLight
+                if ('shadow' in shadowLight && shadowLight.shadow) {
+                    shadowLight.shadow.dispose()
+                }
             }
         }
         
