@@ -230,6 +230,52 @@ export class LodTextureArrayManager {
     }
     
     /**
+     * Compact the MID tier to the actual number of allocated slots.
+     * After all games are loaded, the MID array was pre-allocated to an estimate
+     * (totalBatches * 18 + 100). This trims it to the exact slot count used.
+     *
+     * Mutates the existing DataArrayTexture in-place so any renderer uniform
+     * already holding a reference to it will see the new data automatically
+     * on the next Three.js render upload — no reference threading required.
+     */
+    public compactMidTier(): void {
+        const tier = this.tiers.get(LOD_TIER_NAME.MID)
+        if (!tier) return
+
+        const actualDepth = this.nextSlotIndex
+        if (actualDepth >= tier.config.maxDepth) return  // Already exact — nothing to do
+
+        const { width, height } = tier.config
+        const bytesPerSlice = width * height * 4
+
+        const oldData = tier.dataArrayTexture.image.data as Uint8Array
+        const newData = new Uint8Array(bytesPerSlice * actualDepth)
+        newData.set(oldData.subarray(0, bytesPerSlice * actualDepth))
+
+        const oldMB = Math.round((width * height * tier.config.maxDepth * 4) / (1024 * 1024))
+        const newMB = Math.round((bytesPerSlice * actualDepth) / (1024 * 1024))
+        const oldMaxDepth = tier.config.maxDepth
+
+        // Mutate in-place — Three.js re-uploads via texImage3D on next needsUpdate cycle.
+        // Any material uniform already referencing this texture stays valid.
+        const image = tier.dataArrayTexture.image as { data: Uint8Array; width: number; height: number; depth: number }
+        image.data = newData
+        image.depth = actualDepth
+        tier.dataArrayTexture.needsUpdate = true
+
+        tier.config = { ...tier.config, maxDepth: actualDepth }
+        tier.pendingUpdates.clear()
+
+        const dataManager = DataManager.getInstance()
+        dataManager.removeMemoryConsumption(`LOD/${LOD_TIER_NAME.MID}`)
+        dataManager.addMemoryConsumption(`LOD/${LOD_TIER_NAME.MID}`, newMB)
+
+        LodTextureArrayManager.logger.info(
+            `MID compacted: ${width}×${height}×${oldMaxDepth} → ${width}×${height}×${actualDepth} (~${oldMB - newMB} MB freed est.)`
+        )
+    }
+
+    /**
      * Check if a tier has pending updates.
      */
     public hasPendingUpdates(tierName?: string): boolean {

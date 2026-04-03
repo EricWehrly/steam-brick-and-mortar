@@ -149,12 +149,20 @@ export class LodArtworkOrchestrator {
             GameEventTypes.SomeBatchesComplete,
             this.handleSomeBatchesComplete.bind(this)
         )
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            this.compactMidTierAfterLoad.bind(this)
+        )
         
         this.logConfig()
     }
 
     private handleSomeBatchesComplete(_event: CustomEvent<SomeBatchesCompleteEvent>): void {
         this.updateGPU()
+    }
+
+    private compactMidTierAfterLoad(): void {
+        this.textureManager.compactMidTier()
     }
     
     /** Factory method - override in debug subclass */
