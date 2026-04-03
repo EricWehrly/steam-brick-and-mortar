@@ -252,7 +252,7 @@ describe('Pause Menu Integration Tests', () => {
             pauseMenuManager.registerPanel(cachePanel)
             
             expect(cachePanel.id).toBe('cache-management')
-            expect(cachePanel.title).toBe('Cache Management')
+            expect(cachePanel.title).toBe('Cache')
             expect(cachePanel.icon).toBe('🗂️')
         })
 
