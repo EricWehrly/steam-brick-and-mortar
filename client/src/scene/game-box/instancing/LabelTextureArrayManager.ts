@@ -10,6 +10,7 @@
  */
 
 import * as THREE from 'three'
+import { DataManager } from '../../../core/data/DataManager'
 
 export interface TextureSource {
     /** Game/item identifier */
@@ -70,7 +71,11 @@ export class LabelTextureArrayManager {
         this.sharedCanvas.height = size
         this.sharedContext = this.sharedCanvas.getContext('2d')
         
-        console.debug(`📦 [LabelTextureArrayManager] Empty texture array created: ${size}×${size}×${depth}`)
+        // Register memory consumption for monitoring
+        const vramMB = Math.round((size * size * depth * 4) / (1024 * 1024))
+        DataManager.getInstance().addMemoryConsumption('Labels/textureArray', vramMB)
+        
+        console.debug(`📦 [LabelTextureArrayManager] ⚠️ ALLOCATED ${vramMB}MB (est.): texture array ${size}×${size}×${depth} (Uint8Array + GPU copy)`)
         return this.textureArray
     }
     
@@ -309,6 +314,7 @@ export class LabelTextureArrayManager {
         this.textureArray = null
         this.loadedImages.clear()
         this.canvases = []
+        DataManager.getInstance().removeMemoryConsumption('Labels/textureArray')
         
         console.log('🗑️ [LabelTextureArrayManager] Disposed')
     }

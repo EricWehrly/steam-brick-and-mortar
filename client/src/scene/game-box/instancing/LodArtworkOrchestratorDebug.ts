@@ -12,6 +12,7 @@ import { HighTextureCacheDebug } from './HighTextureCacheDebug'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
 import { GameArtworkProvider } from './GameArtworkProvider'
+import { DataManager } from '../../../core/data/DataManager'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Re-export for consumers
@@ -162,14 +163,34 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         const stats = this.getMemoryStats()
         const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1)
         
-        console.group('📊 LOD Artwork Memory Stats')
-        console.log(`Total VRAM: ${mb(stats.totalAllocated)}MB`)
-        console.log(`Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}`)
-        console.log(`Failed Artwork: ${stats.failedArtworkCount}`)
-        
+        console.group('📊 Memory Stats')
+
+        let totalMB = 0
+
         for (const [name, lod] of Object.entries(stats.lods)) {
-            console.log(`  ${name}: ${lod.textureWidth}×${lod.textureHeight}×${lod.arrayDepth} = ${mb(lod.allocated)}MB`)
+            const lodMB = lod.allocated / (1024 * 1024)
+            totalMB += lodMB
+            console.log(`  ${name}: ${lod.textureWidth}×${lod.textureHeight}×${lod.arrayDepth} = ~${mb(lod.allocated)} MB (est.)`)
         }
+
+        const consumers = DataManager.getInstance().getMemoryConsumption()
+        for (const [name, megabytes] of consumers) {
+            if (name.startsWith('LOD/')) continue  // Already shown above with dimension detail
+            totalMB += megabytes
+            console.log(`  ${name}: ${megabytes} MB (est.)`)
+        }
+
+        console.log(`  ────────────────────────`)
+        console.log(`  Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}, Failed artwork: ${stats.failedArtworkCount}`)
+        console.log(`  Total tracked VRAM: ~${totalMB.toFixed(1)} MB (est. — actual GPU usage typically higher due to driver overhead)`)
+
+        const perf = window.performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number } }
+        if (perf.memory) {
+            const heapUsed = Math.round(perf.memory.usedJSHeapSize / (1024 * 1024))
+            const heapTotal = Math.round(perf.memory.totalJSHeapSize / (1024 * 1024))
+            console.log(`  JS Heap: ${heapUsed} / ${heapTotal} MB`)
+        }
+
         console.groupEnd()
     }
     

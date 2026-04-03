@@ -48,31 +48,70 @@ export class InstancedLabelRenderer {
     private material: THREE.ShaderMaterial | null = null
     
     // Configuration
-    private readonly maxInstances: number
+    private maxInstances: number
+    private readonly textureSize: number
     
     // State tracking
     private currentCount: number = 0
     private isInitialized: boolean = false
     private nextInstanceIndex: number = 0
     private gameNameToTextureIndex: Map<string, number> = new Map()
+
+    // Deferred allocation: buffer label requests until all batches are known,
+    // then allocate the texture array at exactly the right size.
+    private deferLabels: boolean = true
+    private pendingLabels: Array<{ gameName: string; position: THREE.Vector3; side: ShelfSide }> = []
+    private static readonly DEFERRED_OVERFLOW = 32  // Extra slots for late-arriving failures
     
     // Constant quaternion for no rotation (performance optimization)
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion() // Identity quaternion (0,0,0,1)
     
     constructor(config: InstancedLabelConfig = {}) {
         this.maxInstances = config.maxInstances || 2000
+        this.textureSize = config.textureSize || 128
         
+        // Placeholder manager — will be replaced with right-sized instance in materializeLabels()
         this.textureArrayManager = new LabelTextureArrayManager(
-            config.textureSize || 512,
-            this.maxInstances // Pass max textures to match max instances
+            this.textureSize,
+            this.maxInstances
         )
 
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SomeBatchesComplete,
             this.handleSomeBatchesComplete.bind(this)
         )
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            () => this.materializeLabels()
+        )
         
         console.debug(`📋 InstancedLabelRenderer created (max: ${this.maxInstances} labels)`)
+    }
+
+    /**
+     * Materialize all deferred labels at exact size.
+     * Call once after all game batches are known (on AllBatchesComplete).
+     * Allocates the texture array and InstancedMesh sized to actual label count
+     * rather than the max-games estimate, saving ~900 MB+ for a typical library.
+     */
+    public materializeLabels(): void {
+        if (this.isInitialized) return
+        if (this.pendingLabels.length === 0) return
+
+        const count = this.pendingLabels.length + InstancedLabelRenderer.DEFERRED_OVERFLOW
+        this.maxInstances = count
+        this.textureArrayManager = new LabelTextureArrayManager(this.textureSize, count)
+
+        this.deferLabels = false
+        this.initialize()
+
+        for (const { gameName, position, side } of this.pendingLabels) {
+            this.addLabelInstance(position, gameName, side)
+        }
+        this.pendingLabels = []
+
+        this.updateGPU()
+        console.log(`✅ Labels materialized: ${this.currentCount} labels, ${this.textureSize}×${this.textureSize}×${count} = ${(this.textureSize * this.textureSize * count * 4 / (1024 * 1024)).toFixed(1)} MB`)
     }
     
     /**
@@ -141,6 +180,12 @@ export class InstancedLabelRenderer {
         gameName: string,
         side: ShelfSide = ShelfSide.Front
     ): boolean {
+        // Deferred path: buffer until materializeLabels() is called
+        if (this.deferLabels) {
+            this.pendingLabels.push({ gameName, position: position.clone(), side })
+            return true
+        }
+
         // Lazy initialization - initialize on first use to avoid blocking startup
         if (!this.isInitialized) {
             this.initialize()
