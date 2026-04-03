@@ -14,8 +14,6 @@
 import * as THREE from 'three'
 import { GameFinder } from './GameFinder'
 import { LightRegistry } from '../lighting/LightRegistry'
-import { DataManager } from '../core/data/DataManager'
-import { DataKey } from '../core/data/DataTypes'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
 import vertexShader from './shaders/spotlight-beam.vert?raw'
@@ -29,12 +27,22 @@ export interface SpotlightTarget {
 }
 
 export class DiagnosticSpotlight {
+    // TODO: rename this class — DiagnosticSpotlight conflates "debug tool" with production click-highlight behavior
+    private static instance: DiagnosticSpotlight | null = null
+
+    static getInstance(): DiagnosticSpotlight | null {
+        return DiagnosticSpotlight.instance
+    }
+
     private gameFinder: GameFinder | null = null
     private spotlights: THREE.SpotLight[] = []
+    // Pre-created pool: all spots are in the scene at startup with intensity=0 so
+    // materials compile with the full light count during the startup stall, not on
+    // first click. visible=true is intentional — invisible lights are excluded from
+    // Three.js's light hash and won't trigger pre-compilation.
+    private spotlightPool: THREE.SpotLight[] = []
     private spotlightGroup: THREE.Group
-    // Limit spotlight count to prevent performance degradation from excessive real-time shadow/light calculations
-    // Each SpotLight adds computational cost to the render loop
-    private maxSpotlights: number = 10
+    private maxSpotlights: number = 1
     private originalLightIntensities: Map<THREE.Light, number> = new Map()
     private scene: THREE.Scene | null = null
     private readonly DIM_FACTOR = 0.2 // Dim to 20% of original intensity
@@ -49,11 +57,26 @@ export class DiagnosticSpotlight {
         this.spotlightGroup = new THREE.Group()
         this.spotlightGroup.name = 'diagnostic-spotlights'
         
+        DiagnosticSpotlight.instance = this
+
         try {
             this.gameFinder = new GameFinder()
             this.scene = this.gameFinder['scene']
             this.scene.add(this.spotlightGroup)
-            
+
+            // Pre-create the full pool so shader compilation happens at startup.
+            // All pool spotlights are in-scene with intensity=0 — they count toward the
+            // light hash (forcing MeshStandardMaterial recompile now) but emit nothing.
+            for (let i = 0; i < this.maxSpotlights; i++) {
+                const spotlight = this.createSpotlight()
+                spotlight.intensity = 0
+                this.spotlightGroup.add(spotlight)
+                this.spotlightGroup.add(spotlight.target)
+                const beam = this.beamsBySpotlight.get(spotlight)
+                if (beam) beam.visible = false
+                this.spotlightPool.push(spotlight)
+            }
+
             // Get camera reference for distance calculations
             this.camera = this.scene.children.find(child => child instanceof THREE.Camera) as THREE.Camera || null
         } catch (error) {
@@ -68,13 +91,12 @@ export class DiagnosticSpotlight {
         }
 
         const gameObjects = this.findTargetsInScene(targets)
-        
+
         if (gameObjects.length === 0) {
-            this.clear();
+            this.clear()
         } else {
             this.updateSpotlights(gameObjects)
         }
-        
     }
 
     private findTargetsInScene(targets: string | number | (string | number)[]) : SpotlightTarget[]{
@@ -93,14 +115,13 @@ export class DiagnosticSpotlight {
 
     private updateSpotlights(targets: SpotlightTarget[]): void {
         const neededCount = Math.min(targets.length, this.maxSpotlights)
-        
+
         this.removeExcessSpotlights(neededCount)
-        
         this.createSpotlights(neededCount)
-        
+
         // Dim store/prop lights when spotlights are active
         this.dimStoreLights()
-        
+
         // Position spotlights on targets
         for (let i = 0; i < neededCount; i++) {
             const spotlight = this.spotlights[i]
@@ -110,10 +131,8 @@ export class DiagnosticSpotlight {
             
             // Store base intensity for animation
             this.baseIntensities.set(spotlight, spotlight.intensity)
-
-            console.debug(`🔦 [Spotlight ${i}] Positioned at (${spotlight.position.x.toFixed(2)}, ${spotlight.position.y.toFixed(2)}, ${spotlight.position.z.toFixed(2)}) → ${target.name || target.appid}`)
         }
-        
+
         // Start animation loop
         this.startAnimation()
     }
@@ -137,17 +156,24 @@ export class DiagnosticSpotlight {
 
             this.updateBeamHeight(spotlight)
 
-            spotlight.visible = true
-            spotlight.target.visible = true
+            // visible stays true — pool spotlights are always visible=true,
+            // we control activation via intensity instead
         }
     }
 
     private createSpotlights(neededCount: number) {
         while (this.spotlights.length < neededCount) {
-            const spotlight = this.createSpotlight()
+            // Activate from pool (already in scene) rather than constructing a new light,
+            // so no shader recompilation occurs here.
+            const spotlight = this.spotlightPool.pop() ?? this.createSpotlight()
+            spotlight.intensity = 3.0
+            const beam = this.beamsBySpotlight.get(spotlight)
+            if (beam) beam.visible = true
+            if (!this.spotlightGroup.children.includes(spotlight)) {
+                this.spotlightGroup.add(spotlight)
+                this.spotlightGroup.add(spotlight.target)
+            }
             this.spotlights.push(spotlight)
-            this.spotlightGroup.add(spotlight)
-            this.spotlightGroup.add(spotlight.target)
         }
     }
 
@@ -160,14 +186,11 @@ export class DiagnosticSpotlight {
     private removeSpotlight(): void {
         const spotlight = this.spotlights.pop()
         if (spotlight) {
+            spotlight.intensity = 0
             const beam = this.beamsBySpotlight.get(spotlight)
-            if (beam) {
-                this.spotlightGroup.remove(beam)
-                this.beamsBySpotlight.delete(spotlight)
-            }
-            this.spotlightGroup.remove(spotlight)
-            this.spotlightGroup.remove(spotlight.target)
-            spotlight.dispose()
+            if (beam) beam.visible = false
+            this.spotlightPool.push(spotlight)
+            // Stays in scene so the light-count hash remains stable
         }
     }
 
@@ -180,13 +203,9 @@ export class DiagnosticSpotlight {
             0.5,           // penumbra: 0-1, higher = softer edges
             2              // decay: 2 = physically accurate falloff
         )
-        
         spotlight.castShadow = false // Don't interfere with scene lighting
         spotlight.name = 'diagnostic-spotlight'
-        
-        // Create visible light column/beam
         this.createLightBeam(spotlight)
-        
         return spotlight
     }
 
@@ -259,7 +278,7 @@ export class DiagnosticSpotlight {
         }
         
         this.baseIntensities.clear()
-        this.beamsBySpotlight.clear()
+        // beamsBySpotlight intentionally NOT cleared — pooled spotlights still own their beams
         this.restoreStoreLights()
     }
 
@@ -360,46 +379,13 @@ export class DiagnosticSpotlight {
         }
     }
 
-    // Pre-compile the beam ShaderMaterial so the GPU driver doesn't JIT-compile it
-    // on the first frame the spotlight appears (which causes a visible lag spike).
-    public precompileBeamShader(): void {
-        const renderer = DataManager.getInstance().get<THREE.WebGLRenderer>(DataKey.Renderer)
-        const scene = this.scene
-        const camera = this.camera
-        if (!renderer || !scene || !camera) return
-
-        // Ensure the shared geometry and material exist before compiling
-        if (!DiagnosticSpotlight.sharedBeamGeometry) {
-            DiagnosticSpotlight.sharedBeamGeometry = new THREE.CylinderGeometry(0.08, 0.12, 3.5, 24, 1, true)
-        }
-        if (!DiagnosticSpotlight.sharedBeamMaterial) {
-            DiagnosticSpotlight.sharedBeamMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    color: { value: new THREE.Color(0xfff8e7) },
-                    opacity: { value: 0.2 },
-                    gameBottomY: { value: 0.0 },
-                    beamBottomY: { value: 0.0 }
-                },
-                vertexShader,
-                fragmentShader,
-                transparent: true,
-                side: THREE.DoubleSide,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false
-            })
-        }
-
-        const tempMesh = new THREE.Mesh(DiagnosticSpotlight.sharedBeamGeometry, DiagnosticSpotlight.sharedBeamMaterial)
-        tempMesh.frustumCulled = false
-        scene.add(tempMesh)
-        renderer.compile(scene, camera)
-        scene.remove(tempMesh)
-    }
 }
 
 export function initializeDiagnosticSpotlightOnStart(): void {
+    // TODO: move construction to before buildScene() in SteamBrickAndMortarApp so that
+    // pool SpotLights exist before room MeshStandardMaterials first render. That way
+    // materials compile once with the full light count instead of recompiling at startup.
     const spotlight = new DiagnosticSpotlight()
-    spotlight.precompileBeamShader()
 
     // @ts-ignore - Intentionally adding to window for debugging
     window.spotlightGame = (target: string | number | Array<string | number>) => {
