@@ -195,9 +195,9 @@ describe('LodArtworkOrchestrator', () => {
             orchestrator = new LodArtworkOrchestrator()
             
             expect(mockDataManager.set).toHaveBeenCalledWith(
-                'artworkMetadata_lod',
+                DataKey.InstancedArtworkMetadata,
                 expect.any(Map),
-                expect.objectContaining({ domain: DataDomain.Scene })
+                expect.objectContaining({ domain: DataDomain.Renderer })
             )
         })
     })
