@@ -16,6 +16,8 @@ import * as THREE from 'three'
 import { MaterialUtils } from './MaterialUtils'
 import { Logger } from './Logger'
 import { ProceduralTextureWorker } from './textures/ProceduralTextureWorker'
+import { EventManager } from '../core/EventManager'
+import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 
 export enum MaterialType {
     FallbackGameBox = 'fallbackGameBox',
@@ -51,6 +53,21 @@ export class SharedMaterialManager {
 
     private constructor() {
         // Lightweight — no sync texture generation here.
+
+        // SharedMaterialManager manages its own lifecycle response.
+        // Begin async prewarm when the scene setup starts.
+        EventManager.getInstance().registerDefaultHandler(
+            StorePropsEventTypes.SetupRequest,
+            this.handleSetupRequest.bind(this)
+        )
+    }
+
+    private async handleSetupRequest(): Promise<void> {
+        try {
+            await this.prewarm()
+        } catch (err) {
+            SharedMaterialManager.logger.warn('Material prewarm failed during setup request:', err)
+        }
     }
 
     public static getInstance(): SharedMaterialManager {
@@ -80,6 +97,11 @@ export class SharedMaterialManager {
      * Call once at startup. Subsequent calls return the same Promise (idempotent).
      */
     public async prewarm(): Promise<void> {
+        if (this.disposed) {
+            SharedMaterialManager.logger.warn('Attempted to prewarm after disposal.')
+            return
+        }
+
         if (this.prewarmPromise) return this.prewarmPromise
         this.prewarmPromise = this.doPrewarm()
         return this.prewarmPromise
@@ -151,7 +173,6 @@ export class SharedMaterialManager {
     // ─── Async prewarm helpers ────────────────────────────────────────────────
 
     private async prewarmMDFVeneer(worker: ProceduralTextureWorker): Promise<void> {
-        if (this.materialPool!.materials.has(MaterialType.MdfVeneer)) return
         const [diffuseBitmap, normalBitmap] = await Promise.all([
             worker.generate('wood_enhanced', {
                 width: 2048, height: 2048,
@@ -162,32 +183,29 @@ export class SharedMaterialManager {
         ])
         const diffuse = this.bitmapToTexture(diffuseBitmap, 6, 4)
         const normal  = this.bitmapToTexture(normalBitmap,  6, 4)
-        this.materialPool!.materials.set(MaterialType.MdfVeneer,
+        this.upsertMaterial(MaterialType.MdfVeneer,
             new THREE.MeshStandardMaterial({ map: diffuse, normalMap: normal, roughness: 0.4, metalness: 0.0 }))
     }
 
     private async prewarmCarpet(worker: ProceduralTextureWorker): Promise<void> {
-        if (this.materialPool!.materials.has(MaterialType.Carpet)) return
         const bitmap = await worker.generate('carpet_enhanced', {
             width: 512, height: 512, color: '#8B0000', fiberDensity: 0.5, roughness: 0.8,
         })
         const texture = this.bitmapToTexture(bitmap, 4, 4)
-        this.materialPool!.materials.set(MaterialType.Carpet,
+        this.upsertMaterial(MaterialType.Carpet,
             new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9, metalness: 0.0 }))
     }
 
     private async prewarmCeiling(worker: ProceduralTextureWorker): Promise<void> {
-        if (this.materialPool!.materials.has(MaterialType.Ceiling)) return
         const bitmap = await worker.generate('ceiling_enhanced', {
             width: 512, height: 512, color: '#F5F5DC', bumpSize: 0.6, density: 0.8,
         })
         const texture = this.bitmapToTexture(bitmap, 3, 3)
-        this.materialPool!.materials.set(MaterialType.Ceiling,
+        this.upsertMaterial(MaterialType.Ceiling,
             new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9, metalness: 0.0 }))
     }
 
     private async prewarmWallWood(worker: ProceduralTextureWorker): Promise<void> {
-        if (this.materialPool!.materials.has(MaterialType.WallWood)) return
         const [d, n] = await Promise.all([
             worker.generate('wood_enhanced', {
                 width: 2048, height: 2048, grainStrength: 0.5, ringFrequency: 0.1,
@@ -195,7 +213,7 @@ export class SharedMaterialManager {
             }),
             worker.generate('wood_normal', { width: 2048, height: 2048, strength: 0.3 }),
         ])
-        this.materialPool!.materials.set(MaterialType.WallWood,
+        this.upsertMaterial(MaterialType.WallWood,
             new THREE.MeshStandardMaterial({
                 map: this.bitmapToTexture(d, 3, 1),
                 normalMap: this.bitmapToTexture(n, 3, 1),
@@ -204,7 +222,6 @@ export class SharedMaterialManager {
     }
 
     private async prewarmBasicWood(worker: ProceduralTextureWorker): Promise<void> {
-        if (this.materialPool!.materials.has(MaterialType.BasicWood)) return
         const [d, n] = await Promise.all([
             worker.generate('wood_enhanced', {
                 width: 2048, height: 2048, grainStrength: 0.3, ringFrequency: 0.08,
@@ -212,7 +229,7 @@ export class SharedMaterialManager {
             }),
             worker.generate('wood_normal', { width: 2048, height: 2048, strength: 0.18 }),
         ])
-        this.materialPool!.materials.set(MaterialType.BasicWood,
+        this.upsertMaterial(MaterialType.BasicWood,
             new THREE.MeshStandardMaterial({
                 map: this.bitmapToTexture(d, 3, 1),
                 normalMap: this.bitmapToTexture(n, 3, 1),
@@ -220,13 +237,53 @@ export class SharedMaterialManager {
             }))
     }
 
-    /** Wrap an ImageBitmap in a repeating THREE.CanvasTexture. */
+    /** Wrap an ImageBitmap in a repeating THREE.Texture. */
     private bitmapToTexture(bitmap: ImageBitmap, repeatX: number, repeatY: number): THREE.Texture {
-        const texture = new THREE.CanvasTexture(bitmap) as unknown as THREE.Texture
+        const texture = new THREE.Texture(bitmap)
         texture.wrapS = texture.wrapT = THREE.RepeatWrapping
         texture.repeat.set(repeatX, repeatY)
         texture.needsUpdate = true
         return texture
+    }
+
+    /**
+     * Insert or upgrade a pooled material.
+     *
+     * Critical behavior: if a fallback material is already in use by live meshes,
+     * mutate that same material instance instead of replacing the object reference.
+     * This allows textured prewarm results to "pop in" without rebuilding meshes.
+     */
+    private upsertMaterial(type: MaterialType, material: THREE.MeshStandardMaterial): void {
+        const existing = this.materialPool!.materials.get(type)
+
+        if (!existing) {
+            this.materialPool!.materials.set(type, material)
+            return
+        }
+
+        // Dispose old GPU textures on the existing material before swapping properties.
+        if (existing.map) existing.map.dispose()
+        if (existing.normalMap) existing.normalMap.dispose()
+
+        // Transfer core PBR properties to preserve object identity for all meshes
+        // currently referencing this material instance.
+        existing.color.copy(material.color)
+        existing.emissive.copy(material.emissive)
+        existing.emissiveIntensity = material.emissiveIntensity
+        existing.roughness = material.roughness
+        existing.metalness = material.metalness
+        existing.transparent = material.transparent
+        existing.opacity = material.opacity
+        existing.side = material.side
+        existing.map = material.map
+        existing.normalMap = material.normalMap
+        existing.name = material.name
+        existing.needsUpdate = true
+
+        // Avoid double-disposing transferred textures.
+        material.map = null
+        material.normalMap = null
+        material.dispose()
     }
 
     // ─── Sync fallback (instant, no canvas work) ─────────────────────────────
