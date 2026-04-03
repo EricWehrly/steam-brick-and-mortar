@@ -29,7 +29,7 @@ export interface CachedUser {
 
 export class CacheManagementPanel extends PauseMenuPanel {
     readonly id = 'cache-management'
-    readonly title = 'Cache Management'
+    readonly title = 'Cache'
     readonly icon = '🗂️'
 
     private cacheStats: CacheStats = {
