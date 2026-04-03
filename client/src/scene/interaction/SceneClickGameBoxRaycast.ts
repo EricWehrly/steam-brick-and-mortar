@@ -5,7 +5,7 @@ import { EventManager } from '../../core/EventManager'
 import { InputEventTypes, type SceneCanvasClickEvent } from '../../types/InteractionEvents'
 import { SceneLayer } from '../SceneLayers'
 import type { InstanceMetadata } from '../../debug/GameFinder'
-import { DiagnosticSpotlight } from '../../debug/DiagnosticSpotlight'
+import { GameSpotlight } from '../../debug/GameSpotlight'
 
 export interface SceneClickGameBoxRaycastOptions {
     scene?: THREE.Scene
@@ -198,11 +198,11 @@ export class SceneClickGameBoxRaycast {
     private highlightHit(hit: SceneGameBoxHit): void {
         const spotlightTarget = hit.name ?? hit.appid
         if (spotlightTarget !== undefined) {
-            const spotlight = DiagnosticSpotlight.getInstance()
+            const spotlight = GameSpotlight.getInstance()
             if (spotlight) {
                 spotlight.spotlight(spotlightTarget)
             } else if (this.enableDebugLogs) {
-                console.log('🎯 [SceneClickGameBoxRaycast] DiagnosticSpotlight not ready yet')
+                console.log('🎯 [SceneClickGameBoxRaycast] GameSpotlight not ready yet')
             }
         } else if (this.enableDebugLogs) {
             console.log('🎯 [SceneClickGameBoxRaycast] Hit had no spotlight target metadata', {

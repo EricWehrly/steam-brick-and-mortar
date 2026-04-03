@@ -23,6 +23,7 @@ import { LightFactory } from '../lighting/LightFactory'
 import { LightRegistry } from '../lighting/LightRegistry'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor } from '../utils/PerformanceMonitor'
+import { GameSpotlight } from '../debug/GameSpotlight'
 
 // Lighting configuration constants
 const LIGHT_NAMES = {
@@ -141,6 +142,11 @@ export class LightingRenderer {
             this.renderer.shadowMap.enabled = false
             
             await this.setupSimpleLighting()
+
+            // Create GameSpotlight pool BEFORE room geometry renders, so its SpotLight
+            // is counted in the initial light-hash. Materials compile once with the
+            // full light count during startup instead of recompiling on first click.
+            new GameSpotlight()
             
             const duration = window.performance.now() - startTime
             LightingRenderer.logger.info(`✅ Basic lighting ready in ${duration.toFixed(1)}ms (advanced lighting will load in background)`)
@@ -154,6 +160,13 @@ export class LightingRenderer {
 
     /**
      * Upgrade to full lighting system - called asynchronously after scene is visible
+     * 
+     * TODO: Currently disabled in SceneCoordinator (suspected startup hitch).
+     * Re-evaluate: this clears all lights then rebuilds from scratch, which forces
+     * a full shader recompile of every MeshStandardMaterial in the scene. If lights
+     * are already set up correctly in setupBasicLighting(), this method may be
+     * unnecessary — or should be restructured to add lights incrementally rather
+     * than clear-and-rebuild.
      */
     public async upgradeLighting(): Promise<void> {
         const monitor = PerformanceMonitor.start('lighting-upgrade', LightingRenderer.logger)

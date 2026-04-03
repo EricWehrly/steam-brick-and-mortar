@@ -20,7 +20,7 @@
 import { describe, it, beforeEach, afterEach, expect, vi } from 'vitest'
 import * as THREE from 'three'
 
-import { DiagnosticSpotlight } from '../../src/debug/DiagnosticSpotlight'
+import { GameSpotlight } from '../../src/debug/GameSpotlight'
 import { GameFinder } from '../../src/debug/GameFinder'
 import { DataManager } from '../../src/core/data/DataManager'
 import { DataDomain, DataKey } from '../../src/core/data/DataTypes'
@@ -84,7 +84,7 @@ const RECT_LIGHT_COUNT = 6      // ← realistic: one per shelf row pair
 
 let scene: THREE.Scene
 let dataManager: DataManager
-let spotlight: DiagnosticSpotlight
+let spotlight: GameSpotlight
 
 beforeEach(() => {
     vi.stubGlobal('requestAnimationFrame', vi.fn())
@@ -102,7 +102,7 @@ beforeEach(() => {
     addRectAreaLights(scene, RECT_LIGHT_COUNT)
 
     // Construct spotlight (constructor calls GameFinder, which reads DataKey.MainScene)
-    spotlight = new DiagnosticSpotlight()
+    spotlight = new GameSpotlight()
 })
 
 afterEach(() => {

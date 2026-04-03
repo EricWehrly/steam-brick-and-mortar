@@ -1,10 +1,6 @@
 /**
- * Diagnostic Spotlight System
- * 
- * Provides debugging spotlights to visually highlight specific games in the scene.
- * Useful for debugging empty/black textures and other visual issues.
- * 
- * Usage from console:
+ * Game Spotlight — click-to-highlight system for games in the scene.
+ * Also exposed to the browser console for manual debugging:
  *   window.spotlightGame("UNLOVED")
  *   window.spotlightGame(["Psychonauts", "Half Life: Alyx"])
  *   window.spotlightGame(611500) // by appid
@@ -26,12 +22,11 @@ export interface SpotlightTarget {
     mesh?: THREE.Object3D
 }
 
-export class DiagnosticSpotlight {
-    // TODO: rename this class — DiagnosticSpotlight conflates "debug tool" with production click-highlight behavior
-    private static instance: DiagnosticSpotlight | null = null
+export class GameSpotlight {
+    private static instance: GameSpotlight | null = null
 
-    static getInstance(): DiagnosticSpotlight | null {
-        return DiagnosticSpotlight.instance
+    static getInstance(): GameSpotlight | null {
+        return GameSpotlight.instance
     }
 
     private gameFinder: GameFinder | null = null
@@ -57,7 +52,7 @@ export class DiagnosticSpotlight {
         this.spotlightGroup = new THREE.Group()
         this.spotlightGroup.name = 'diagnostic-spotlights'
         
-        DiagnosticSpotlight.instance = this
+        GameSpotlight.instance = this
 
         try {
             this.gameFinder = new GameFinder()
@@ -80,7 +75,7 @@ export class DiagnosticSpotlight {
             // Get camera reference for distance calculations
             this.camera = this.scene.children.find(child => child instanceof THREE.Camera) as THREE.Camera || null
         } catch (error) {
-            console.error('Failed to initialize DiagnosticSpotlight:', error)
+            console.error('Failed to initialize GameSpotlight:', error)
         }
     }
 
@@ -215,8 +210,8 @@ export class DiagnosticSpotlight {
         const radiusTop = 0.08
         const radiusBottom = 0.12
         
-        if (!DiagnosticSpotlight.sharedBeamGeometry) {
-            DiagnosticSpotlight.sharedBeamGeometry = new THREE.CylinderGeometry(
+        if (!GameSpotlight.sharedBeamGeometry) {
+            GameSpotlight.sharedBeamGeometry = new THREE.CylinderGeometry(
                 radiusTop,
                 radiusBottom,
                 height,
@@ -226,8 +221,8 @@ export class DiagnosticSpotlight {
             )
         }
         
-        if (!DiagnosticSpotlight.sharedBeamMaterial) {
-            DiagnosticSpotlight.sharedBeamMaterial = new THREE.ShaderMaterial({
+        if (!GameSpotlight.sharedBeamMaterial) {
+            GameSpotlight.sharedBeamMaterial = new THREE.ShaderMaterial({
                 uniforms: {
                     color: { value: new THREE.Color(0xfff8e7) },
                     opacity: { value: 0.2 }, // Low opacity for subtle effect
@@ -244,8 +239,8 @@ export class DiagnosticSpotlight {
         }
         
         const beamMesh = new THREE.Mesh(
-            DiagnosticSpotlight.sharedBeamGeometry,
-            DiagnosticSpotlight.sharedBeamMaterial
+            GameSpotlight.sharedBeamGeometry,
+            GameSpotlight.sharedBeamMaterial
         )
         beamMesh.name = 'spotlight-beam'
         beamMesh.position.set(0, 0, 0)
@@ -368,42 +363,37 @@ export class DiagnosticSpotlight {
     }
 
     public static disposeSharedResources(): void {
-        if (DiagnosticSpotlight.sharedBeamGeometry) {
-            DiagnosticSpotlight.sharedBeamGeometry.dispose()
-            DiagnosticSpotlight.sharedBeamGeometry = null
+        if (GameSpotlight.sharedBeamGeometry) {
+            GameSpotlight.sharedBeamGeometry.dispose()
+            GameSpotlight.sharedBeamGeometry = null
         }
         
-        if (DiagnosticSpotlight.sharedBeamMaterial) {
-            DiagnosticSpotlight.sharedBeamMaterial.dispose()
-            DiagnosticSpotlight.sharedBeamMaterial = null
+        if (GameSpotlight.sharedBeamMaterial) {
+            GameSpotlight.sharedBeamMaterial.dispose()
+            GameSpotlight.sharedBeamMaterial = null
         }
     }
 
 }
 
-export function initializeDiagnosticSpotlightOnStart(): void {
+export function initializeGameSpotlightOnStart(): void {
     // TODO: move construction to before buildScene() in SteamBrickAndMortarApp so that
     // pool SpotLights exist before room MeshStandardMaterials first render. That way
     // materials compile once with the full light count instead of recompiling at startup.
-    const spotlight = new DiagnosticSpotlight()
+    const instance = GameSpotlight.getInstance() ?? new GameSpotlight()
 
     // @ts-ignore - Intentionally adding to window for debugging
     window.spotlightGame = (target: string | number | Array<string | number>) => {
-        spotlight.spotlight(target)
+        instance.spotlight(target)
     }
 
     // @ts-ignore - Intentionally adding to window for debugging
     window.clearSpotlights = () => {
-        spotlight.clear()
+        instance.clear()
     }
 
-    // TODO: find a namespace within window to aggregate app functions
-    console.debug('🔦 [Spotlight] Diagnostic spotlight functions exposed to window:')
-    console.debug('  window.spotlightGame("UNLOVED")        - Spotlight a game by name')
-    console.debug('  window.spotlightGame(611500)           - Spotlight by appid')
-    console.debug('  window.spotlightGame(["Game1", "Game2"]) - Spotlight multiple')
-    console.debug('  window.clearSpotlights()               - Clear all spotlights')
+    console.debug('🔦 [GameSpotlight] Console functions: spotlightGame(), clearSpotlights()')
 }
 
 // Register the named handler with the EventManager
-EventManager.getInstance().registerEventHandler(GameEventTypes.Start, initializeDiagnosticSpotlightOnStart)
+EventManager.getInstance().registerEventHandler(GameEventTypes.Start, initializeGameSpotlightOnStart)

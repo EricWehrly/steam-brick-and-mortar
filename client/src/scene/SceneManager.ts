@@ -22,6 +22,7 @@ import { DataManager } from '../core/data/DataManager'
 import { DataDomain, DataKey } from '../core/data/DataTypes'
 import { RenderLoopRegistry } from './RenderLoopRegistry'
 import { FrameBudgetScheduler } from '../utils/FrameBudgetScheduler'
+import { ThreeWebGLRendererDebug } from '../debug/ThreeWebGLRendererDebug'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -71,9 +72,10 @@ export class SceneManager {
             domain: DataDomain.Scene
         })
         
-        this.renderer = new THREE.WebGLRenderer({ 
-            antialias: options.antialias ?? true 
-        })
+        // Swap ThreeWebGLRendererDebug ↔ THREE.WebGLRenderer to toggle shader-compile
+        // logging and slow-frame warnings. Both are identical at the type level.
+        this.renderer = new ThreeWebGLRendererDebug({ antialias: options.antialias ?? true })
+        // this.renderer = new THREE.WebGLRenderer({ antialias: options.antialias ?? true })
 
         DataManager.getInstance().set(DataKey.Renderer, this.renderer, {
             domain: DataDomain.Scene
@@ -149,7 +151,6 @@ export class SceneManager {
             // Execute all registered render loop callbacks
             this.renderLoopRegistry.executeAll(now, deltaTime)
             
-            // Render the scene
             this.renderer.render(this.scene, this.camera)
         })
     }
