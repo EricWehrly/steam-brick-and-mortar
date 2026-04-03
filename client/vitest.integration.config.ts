@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  maxWorkers: 4,
+  minWorkers: 1,
   test: {
     globals: true,
     environment: 'jsdom',
@@ -11,6 +13,7 @@ export default defineConfig({
     reporters: ['default'],
     testTimeout: 35000,
     hookTimeout: 35000,
+
     // Integration tests only
     include: [
       '**/integration/**/*.int.test.ts'

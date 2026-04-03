@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  maxWorkers: 4,
+  minWorkers: 1,
   test: {
     globals: true,
     environment: 'jsdom',
@@ -13,6 +15,7 @@ export default defineConfig({
     outputFile: './test-results/test-results.json',
     testTimeout: 30000,  // Generous ceiling for slow material/shelf generation tests
     hookTimeout: 15000,
+
     // Default config excludes live tests, performance tests, and integration tests
     exclude: [
       '**/node_modules/**',

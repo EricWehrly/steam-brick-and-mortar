@@ -50,7 +50,7 @@ export class ProceduralTextureWorker {
     }
 
     public static getInstance(): ProceduralTextureWorker {
-        if (!ProceduralTextureWorker.instance) {
+        if (!ProceduralTextureWorker.instance || ProceduralTextureWorker.instance.disposed) {
             ProceduralTextureWorker.instance = new ProceduralTextureWorker()
         }
         return ProceduralTextureWorker.instance

@@ -184,8 +184,12 @@ export class SteamBrickAndMortarApp {
             this.startupTracker.phaseEnd(StartupPhase.DIContainerSetup)
 
             // Kick off procedural material pre-warming in parallel with coordinator resolution.
-            // By the time the scene renders, all materials will be cached off-thread.
-            const materialPrewarmPromise = SharedMaterialManager.getInstance().prewarm()
+            // Fire-and-forget — the scene setup pipeline is async enough that materials
+            // will be ready by the time shelves are actually built. Swallow errors gracefully
+            // (worst case: getMaterial() returns flat-colour fallback).
+            SharedMaterialManager.getInstance().prewarm().catch(err => {
+                console.warn('Material prewarm failed, using sync fallback:', err)
+            })
 
             this.startupTracker.phaseStart(StartupPhase.CoordinatorResolution, 'Resolving coordinators from DI')
             
@@ -243,14 +247,11 @@ export class SteamBrickAndMortarApp {
             
             this.isInitialized = true
             this.startupTracker.milestone(StartupPhase.RenderLoopStart, 'User can move - starting world build')
-            
-            // Wait for materials to be pre-warmed before the scene starts building.
-            // This runs concurrently with coordinator resolution above so the wait
-            // should typically be zero (or very short) by the time we get here.
-            await materialPrewarmPromise
 
-            // 🎬 PRIORITY 2.5: Start scene building AFTER render loop is running
-            // This yields to main thread so user sees something and can move immediately
+            // 🎬 PRIORITY 2.5: Start scene building AFTER render loop is running.
+            // Material prewarm runs concurrently — the scene setup pipeline has enough
+            // async steps that materials will be ready before shelves are actually built.
+            // Do NOT await materialPrewarmPromise here — that caused a visible black-screen hitch.
             this.sceneCoordinator.startSceneSetup()
             
             // PRIORITY 3: Everything else happens async (non-blocking)
