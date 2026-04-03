@@ -31,6 +31,7 @@ import type { AppConfig as DIAppConfig } from './di'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { RenderLoopDiagnostics } from '../debug/RenderLoopDiagnostics'
 import { Logger, LogLevel } from '../utils/Logger'
+import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 // Side-effect import: registers GpuMemoryEstimator to window for console debugging
 import '../debug/GpuMemoryEstimator'
 
@@ -181,7 +182,11 @@ export class SteamBrickAndMortarApp {
             this.startupTracker.logEvent(StartupPhase.DIContainerSetup, 'Initializing DI services')
             await this.container.initialize()
             this.startupTracker.phaseEnd(StartupPhase.DIContainerSetup)
-            
+
+            // Kick off procedural material pre-warming in parallel with coordinator resolution.
+            // By the time the scene renders, all materials will be cached off-thread.
+            const materialPrewarmPromise = SharedMaterialManager.getInstance().prewarm()
+
             this.startupTracker.phaseStart(StartupPhase.CoordinatorResolution, 'Resolving coordinators from DI')
             
             // Resolve EventManager from DI container
@@ -239,6 +244,11 @@ export class SteamBrickAndMortarApp {
             this.isInitialized = true
             this.startupTracker.milestone(StartupPhase.RenderLoopStart, 'User can move - starting world build')
             
+            // Wait for materials to be pre-warmed before the scene starts building.
+            // This runs concurrently with coordinator resolution above so the wait
+            // should typically be zero (or very short) by the time we get here.
+            await materialPrewarmPromise
+
             // 🎬 PRIORITY 2.5: Start scene building AFTER render loop is running
             // This yields to main thread so user sees something and can move immediately
             this.sceneCoordinator.startSceneSetup()
