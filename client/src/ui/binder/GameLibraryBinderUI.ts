@@ -321,7 +321,7 @@ export class GameLibraryBinderUI {
                 <!-- Right nav button -->
                 <button id="binder-next" class="binder-nav-btn side-nav right ${canGoNext ? '' : 'disabled'}">►</button>
 
-                <div class="binder-surface-bottom left">Press <kbd>B</kbd> to close • <kbd>←</kbd> <kbd>→</kbd> to navigate</div>
+                <div class="binder-surface-bottom left">Press <kbd>B</kbd> to close<span class="hint-sep">·</span><kbd>←</kbd> <kbd>→</kbd> to navigate</div>
                 <div class="binder-surface-bottom right">${totalSpreads * 2} pages total</div>
             </div>
         `
