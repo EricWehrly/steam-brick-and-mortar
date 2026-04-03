@@ -4,7 +4,7 @@
 
 import { vi } from 'vitest'
 
-export const DebugStatsProviderMock = vi.fn().mockImplementation(() => ({
+export const DebugStatsProviderMock = vi.fn().mockImplementation(function() { return {
     getDebugStats: vi.fn().mockReturnValue({
         renderer: {
             triangles: 1000,
@@ -33,7 +33,7 @@ export const DebugStatsProviderMock = vi.fn().mockImplementation(() => ({
         }
     }),
     dispose: vi.fn()
-}))
+} })
 
 export async function debugStatsProviderMockFactory() {
     return {

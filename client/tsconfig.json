@@ -26,6 +26,7 @@
 
     // Language and environment
     "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["node"],
     "skipLibCheck": true,
 
     // Build output

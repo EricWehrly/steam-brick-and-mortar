@@ -14,9 +14,9 @@ interface TestEvent extends BaseInteractionEvent {
 
 describe('EventManager Simplified API', () => {
     let eventManager: EventManager
-    let mockHandler1: ReturnType<typeof vi.fn>
-    let mockHandler2: ReturnType<typeof vi.fn>
-    let mockHandler3: ReturnType<typeof vi.fn>
+    let mockHandler1: (event: CustomEvent<BaseInteractionEvent>) => void
+    let mockHandler2: (event: CustomEvent<BaseInteractionEvent>) => void
+    let mockHandler3: (event: CustomEvent<BaseInteractionEvent>) => void
 
     beforeEach(() => {
         eventManager = EventManager.getInstance()

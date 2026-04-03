@@ -20,12 +20,12 @@ const { FAILURE_CACHE_KEY, SUCCESS_CACHE_KEY } = GameArtworkProvider
 
 // Mock TextureWorker
 vi.mock('../../../../src/scene/game-box/instancing/TextureWorker', () => ({
-    TextureWorker: vi.fn().mockImplementation(() => ({
+    TextureWorker: vi.fn().mockImplementation(function() { return {
         fetchAndProcessWithOptions: vi.fn().mockResolvedValue({
             imageData: new Uint8ClampedArray(300 * 450 * 4).fill(128)
         }),
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 // Mock PixelDataCache

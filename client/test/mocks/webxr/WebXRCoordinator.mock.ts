@@ -4,7 +4,7 @@
 
 import { vi } from 'vitest'
 
-export const WebXRCoordinatorMock = vi.fn().mockImplementation(() => ({
+export const WebXRCoordinatorMock = vi.fn().mockImplementation(function() { return {
     setupWebXR: vi.fn().mockResolvedValue(undefined),
     handleWebXRToggle: vi.fn().mockResolvedValue(undefined),
     updateCameraMovement: vi.fn(),
@@ -21,7 +21,7 @@ export const WebXRCoordinatorMock = vi.fn().mockImplementation(() => ({
         dispose: vi.fn()
     }),
     dispose: vi.fn()
-}))
+} })
 
 export async function webxrCoordinatorMockFactory() {
     return {

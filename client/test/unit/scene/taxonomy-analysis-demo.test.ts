@@ -13,7 +13,7 @@ import { createSceneTestContainer } from '../../utils/test-container-helpers'
 
 // Mock all dependencies
 vi.mock('../../../src/scene/SceneManager', () => ({
-    SceneManager: vi.fn().mockImplementation(() => ({
+    SceneManager: vi.fn().mockImplementation(function() { return {
         getScene: vi.fn().mockReturnValue({
             add: vi.fn(),
             remove: vi.fn(),
@@ -22,29 +22,29 @@ vi.mock('../../../src/scene/SceneManager', () => ({
         getRenderer: vi.fn().mockReturnValue({
             shadowMap: { enabled: false }
         })
-    }))
+    } })
 }))
 
 vi.mock('../../../src/scene/StorePropsRenderer', () => ({
-    StorePropsRenderer: vi.fn().mockImplementation(() => ({
+    StorePropsRenderer: vi.fn().mockImplementation(function() { return {
         setupProps: vi.fn().mockResolvedValue(undefined)
-    }))
+    } })
 }))
 
 
 
 vi.mock('../../../src/ui/coordinators/SystemUICoordinator', () => ({
-    SystemUICoordinator: vi.fn().mockImplementation(() => ({}))
+    SystemUICoordinator: vi.fn().mockImplementation(function() { return {} })
 }))
 
 vi.mock('../../../src/lighting/LightingManager', () => ({
-    LightingManager: vi.fn().mockImplementation(() => ({
+    LightingManager: vi.fn().mockImplementation(function() { return {
         getLightingStats: vi.fn().mockReturnValue({ lightCount: 0, quality: 'enhanced' })
-    }))
+    } })
 }))
 
 vi.mock('../../../src/scene/LightingRenderer', () => ({
-    LightingRenderer: vi.fn().mockImplementation(() => ({
+    LightingRenderer: vi.fn().mockImplementation(function() { return {
         getLightingStats: vi.fn().mockReturnValue({ 
             lightCount: 0, 
             shadowsEnabled: false,
@@ -53,7 +53,7 @@ vi.mock('../../../src/scene/LightingRenderer', () => ({
         }),
         setupLighting: vi.fn().mockResolvedValue(undefined),
         refreshShadows: vi.fn().mockResolvedValue(undefined)
-    }))
+    } })
 }))
 
 import { SceneCoordinator } from '../../../src/scene/SceneCoordinator'

@@ -20,7 +20,7 @@ vi.mock('three', async () => {
     const actual = await vi.importActual('three') as any
     return {
         ...actual,
-        TextureLoader: vi.fn().mockImplementation(() => ({
+        TextureLoader: vi.fn().mockImplementation(function() { return {
             load: vi.fn((url, onLoad) => {
                 // Simulate successful texture loading
                 const mockTexture = {
@@ -34,7 +34,7 @@ vi.mock('three', async () => {
                 setTimeout(() => onLoad(mockTexture), 0)
                 return mockTexture
             })
-        }))
+        } })
     }
 })
 

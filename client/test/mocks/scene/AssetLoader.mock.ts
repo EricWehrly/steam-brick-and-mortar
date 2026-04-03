@@ -3,9 +3,9 @@
  */
 import { vi } from 'vitest'
 
-export const AssetLoaderMock = vi.fn().mockImplementation(() => ({
+export const AssetLoaderMock = vi.fn().mockImplementation(function() { return {
     dispose: vi.fn()
-}))
+} })
 
 // Export async factory function for vi.mock() - enables one-line usage
 export const assetLoaderMockFactory = async () => ({ AssetLoader: AssetLoaderMock })

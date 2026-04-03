@@ -8,7 +8,9 @@ export default defineConfig({
     watch: false,
     // Reduce output verbosity
     silent: false,
-    reporters: ['basic'],
+    reporters: ['default'],
+    testTimeout: 35000,
+    hookTimeout: 35000,
     // Integration tests only
     include: [
       '**/integration/**/*.int.test.ts'

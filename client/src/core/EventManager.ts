@@ -25,6 +25,7 @@ export interface EventHandlerOptions extends AddEventListenerOptions {
 }
 
 // Type alias for cleaner code
+// Handler type for internal use
 type HandlerFunction = (event: CustomEvent<BaseInteractionEvent>) => void
 
 export class EventManager extends EventTarget {

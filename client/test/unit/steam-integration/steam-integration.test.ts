@@ -22,20 +22,22 @@ vi.mock('../../../src/core/EventManager', () => ({
 
 // Mock the SteamApiClient
 vi.mock('../../../src/steam', () => ({
-    SteamApiClient: vi.fn().mockImplementation(() => ({
-        resolveVanityUrl: vi.fn(),
-        getUserGames: vi.fn(),
-        loadGamesProgressively: vi.fn(),
-        clearCache: vi.fn(),
-        getCacheStats: vi.fn(),
-        getCacheManager: vi.fn().mockReturnValue({
-            getStats: vi.fn().mockReturnValue({
-                totalEntries: 0,
-                totalSize: 0
-            })
-        }),
-        downloadGameArtwork: vi.fn().mockResolvedValue({})
-    }))
+    SteamApiClient: vi.fn().mockImplementation(function() {
+        return {
+            resolveVanityUrl: vi.fn(),
+            getUserGames: vi.fn(),
+            loadGamesProgressively: vi.fn(),
+            clearCache: vi.fn(),
+            getCacheStats: vi.fn(),
+            getCacheManager: vi.fn().mockReturnValue({
+                getStats: vi.fn().mockReturnValue({
+                    totalEntries: 0,
+                    totalSize: 0
+                })
+            }),
+            downloadGameArtwork: vi.fn().mockResolvedValue({})
+        }
+    })
 }))
 
 // Mock ValidationUtils

@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { EventManager, EventSource } from '../../../src/core/EventManager'
+import { EventManager, EventSource, type BaseInteractionEvent } from '../../../src/core/EventManager'
 import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
 import type { PropsConfig } from '../../../src/scene/IStorePropsRenderer'
 
@@ -18,7 +18,7 @@ import '../../../src/scene/props'
 describe('Store Props Renderer Independence - Event System', () => {
     let scene: THREE.Scene
     let eventManager: EventManager
-    let mockEventHandler: ReturnType<typeof vi.fn>
+    let mockEventHandler: (event: CustomEvent<BaseInteractionEvent>) => void
 
     beforeEach(() => {
         scene = new THREE.Scene()
@@ -28,6 +28,7 @@ describe('Store Props Renderer Independence - Event System', () => {
         mockEventHandler = vi.fn()
         
         // Register mock handler for store props events
+        // Cast needed: Vitest 4 Mock type includes constructor signature, incompatible with plain function type
         eventManager.registerEventHandler(StorePropsEventTypes.SetupCompleted, mockEventHandler)
     })
 

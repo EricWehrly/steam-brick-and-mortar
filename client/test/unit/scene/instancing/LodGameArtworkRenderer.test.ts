@@ -31,7 +31,7 @@ vi.mock('../../../../src/scene/RenderLoopRegistry', () => ({
 
 // Mock HighTextureCache
 vi.mock('../../../../src/scene/game-box/instancing/HighTextureCache', () => ({
-    HighTextureCache: vi.fn().mockImplementation(() => ({
+    HighTextureCache: vi.fn().mockImplementation(function() { return {
         setSlotChangeCallback: vi.fn(),
         setTextureArray: vi.fn(),
         registerGame: vi.fn(),
@@ -39,17 +39,17 @@ vi.mock('../../../../src/scene/game-box/instancing/HighTextureCache', () => ({
         isLoaded: vi.fn().mockReturnValue(false),
         flushToGpu: vi.fn().mockReturnValue(false),
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 // Mock SpatialPrewarmingManager
 vi.mock('../../../../src/scene/game-box/instancing/SpatialPrewarmingManager', () => ({
-    SpatialPrewarmingManager: vi.fn().mockImplementation(() => ({
+    SpatialPrewarmingManager: vi.fn().mockImplementation(function() { return {
         registerGamePosition: vi.fn(),
         start: vi.fn(),
         stop: vi.fn(),
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 describe('LodGameArtworkRenderer', () => {

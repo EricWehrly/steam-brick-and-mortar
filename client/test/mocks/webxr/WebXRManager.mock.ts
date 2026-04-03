@@ -3,7 +3,7 @@
  */
 import { vi } from 'vitest'
 
-export const WebXRManagerMock = vi.fn().mockImplementation(() => ({
+export const WebXRManagerMock = vi.fn().mockImplementation(function() { return {
     setRenderer: vi.fn(),
     checkCapabilities: vi.fn().mockResolvedValue({
         supportsImmersiveVR: true,
@@ -12,7 +12,7 @@ export const WebXRManagerMock = vi.fn().mockImplementation(() => ({
     startSession: vi.fn().mockResolvedValue(undefined),
     endSession: vi.fn().mockResolvedValue(undefined),
     dispose: vi.fn()
-}))
+} })
 
 // Export async factory function for vi.mock() - enables one-line usage
 export const webxrManagerMockFactory = async () => ({ WebXRManager: WebXRManagerMock })

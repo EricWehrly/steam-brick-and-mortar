@@ -4,7 +4,7 @@
 
 import { vi } from 'vitest'
 
-export const PerformanceMonitorMock = vi.fn().mockImplementation(() => ({
+export const PerformanceMonitorMock = vi.fn().mockImplementation(function() { return {
     start: vi.fn(),
     stop: vi.fn(),
     getStats: vi.fn().mockReturnValue({
@@ -21,7 +21,7 @@ export const PerformanceMonitorMock = vi.fn().mockImplementation(() => ({
     dispose: vi.fn(),
     isVisible: vi.fn().mockReturnValue(true),
     isRunning: vi.fn().mockReturnValue(false)
-}))
+} })
 
 export async function performanceMonitorMockFactory() {
     return {

@@ -4,7 +4,7 @@
 
 import { vi } from 'vitest'
 
-export const SceneCoordinatorMock = vi.fn().mockImplementation(() => ({
+export const SceneCoordinatorMock = vi.fn().mockImplementation(function() { return {
     setupCompleteScene: vi.fn().mockResolvedValue(undefined),
     updatePerformanceData: vi.fn(),
     getGameBoxRenderer: vi.fn().mockReturnValue({
@@ -20,7 +20,7 @@ export const SceneCoordinatorMock = vi.fn().mockImplementation(() => ({
         })
     }),
     dispose: vi.fn()
-}))
+} })
 
 export async function sceneCoordinatorMockFactory() {
     return {

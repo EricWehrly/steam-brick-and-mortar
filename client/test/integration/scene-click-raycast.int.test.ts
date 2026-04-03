@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 
-import { SceneClickGameBoxRaycast } from '../../src/scene/interaction/SceneClickGameBoxRaycast'
+import { SceneClickGameBoxRaycast, type SceneGameBoxHit } from '../../src/scene/interaction/SceneClickGameBoxRaycast'
 import { EventManager } from '../../src/core/EventManager'
 import { DataManager } from '../../src/core/data/DataManager'
 import { DataDomain, DataKey } from '../../src/core/data/DataTypes'
@@ -38,7 +38,7 @@ describe('SceneClickGameBoxRaycast integration', () => {
             scene,
             camera,
             maxDistance: 10,
-            onHit
+            onHit: onHit as (hit: SceneGameBoxHit) => void
         })
 
         // @ts-ignore - test helper on window

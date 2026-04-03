@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 // Scene and rendering mocks
 vi.mock('../../../src/scene/SceneManager', () => ({
-    SceneManager: vi.fn().mockImplementation(() => ({
+    SceneManager: vi.fn().mockImplementation(function() { return {
         getRenderer: vi.fn().mockReturnValue({}),
         getCamera: vi.fn().mockReturnValue({}),
         getScene: vi.fn().mockReturnValue({
@@ -24,11 +24,11 @@ vi.mock('../../../src/scene/SceneManager', () => ({
         }),
         startRenderLoop: vi.fn(),
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 vi.mock('../../../src/scene/SceneCoordinator', () => ({
-    SceneCoordinator: vi.fn().mockImplementation(() => ({
+    SceneCoordinator: vi.fn().mockImplementation(function() { return {
         setupCompleteScene: vi.fn().mockResolvedValue(undefined),
         setupSceneAsPrerequisite: vi.fn().mockResolvedValue(undefined),
         startSceneSetup: vi.fn(),
@@ -41,26 +41,26 @@ vi.mock('../../../src/scene/SceneCoordinator', () => ({
             generateStore: vi.fn().mockResolvedValue(undefined)
         }),
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 // WebXR mocks
 vi.mock('../../../src/webxr/WebXRCoordinator', () => ({
-    WebXRCoordinator: vi.fn().mockImplementation(() => ({
+    WebXRCoordinator: vi.fn().mockImplementation(function() { return {
         setupWebXR: vi.fn().mockResolvedValue(undefined),
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 vi.mock('../../../src/webxr/WebXREventHandler', () => ({
-    WebXREventHandler: vi.fn().mockImplementation(() => ({
+    WebXREventHandler: vi.fn().mockImplementation(function() { return {
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 // UI mocks
 vi.mock('../../../src/ui/UICoordinator', () => ({
-    UICoordinator: vi.fn().mockImplementation(() => ({
+    UICoordinator: vi.fn().mockImplementation(function() { return {
         setupUI: vi.fn().mockResolvedValue(undefined),
         dispose: vi.fn(),
         steam: {
@@ -82,16 +82,16 @@ vi.mock('../../../src/ui/UICoordinator', () => ({
             getCurrentPerformanceStats: vi.fn().mockReturnValue({}),
             dispose: vi.fn()
         }
-    }))
+    } })
 }))
 
 vi.mock('../../../src/ui/PerformanceMonitor', () => ({
-    PerformanceMonitor: vi.fn().mockImplementation(() => ({
+    PerformanceMonitor: vi.fn().mockImplementation(function() { return {
         start: vi.fn(),
         stop: vi.fn(),
         getStats: vi.fn().mockReturnValue({}),
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 vi.mock('../../../src/ui/ToastManager', () => ({
@@ -107,27 +107,27 @@ vi.mock('../../../src/ui/ToastManager', () => ({
 
 // Steam integration mocks
 vi.mock('../../../src/steam-integration/SteamIntegration', () => ({
-    SteamIntegration: vi.fn().mockImplementation(() => ({
+    SteamIntegration: vi.fn().mockImplementation(function() { return {
         loadGamesForUser: vi.fn().mockResolvedValue(undefined),
         clearCache: vi.fn(),
         getCacheStats: vi.fn().mockReturnValue({}),
         getImageCacheStats: vi.fn().mockReturnValue({}),
         refreshData: vi.fn().mockResolvedValue(undefined),
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 vi.mock('../../../src/steam-integration/SteamWorkflowManager', () => ({
-    SteamWorkflowManager: vi.fn().mockImplementation(() => ({
+    SteamWorkflowManager: vi.fn().mockImplementation(function() { return {
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 // Core component mocks
 vi.mock('../../../src/core/DebugStatsProvider', () => ({
-    DebugStatsProvider: vi.fn().mockImplementation(() => ({
+    DebugStatsProvider: vi.fn().mockImplementation(function() { return {
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 // =============================================================================

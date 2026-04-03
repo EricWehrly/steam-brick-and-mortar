@@ -28,14 +28,14 @@
     "@types/three": "^0.183.1",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
-    "@vitest/ui": "^2.1.8",
+    "@vitest/ui": "^4.1.2",
     "@webxr-input-profiles/motion-controllers": "^1.0.0",
     "canvas": "^3.1.2",
     "eslint": "^10.1.0",
-    "jsdom": "^25.0.1",
+    "jsdom": "^29.0.1",
     "typescript": "^6.0.2",
-    "vite": "^6.0.5",
-    "vitest": "^2.1.8"
+    "vite": "^8.0.3",
+    "vitest": "^4.1.2"
   },
   "dependencies": {
     "three": "^0.183.2"

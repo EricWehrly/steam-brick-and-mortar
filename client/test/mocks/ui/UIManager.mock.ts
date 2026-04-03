@@ -3,7 +3,7 @@
  */
 import { vi } from 'vitest'
 
-export const UIManagerMock = vi.fn().mockImplementation(() => ({
+export const UIManagerMock = vi.fn().mockImplementation(function() { return {
     init: vi.fn(),
     hideLoading: vi.fn(),
     showError: vi.fn(),
@@ -22,7 +22,7 @@ export const UIManagerMock = vi.fn().mockImplementation(() => ({
         setSupported: vi.fn(),
         setSessionActive: vi.fn()
     }
-}))
+} })
 
 // Add static methods to the mock constructor
 ;(UIManagerMock as any).getInstance = vi.fn().mockReturnValue({

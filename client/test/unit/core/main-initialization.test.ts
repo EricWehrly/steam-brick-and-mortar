@@ -14,7 +14,7 @@ const mockApp = {
     init: vi.fn().mockResolvedValue(undefined)
 }
 
-const MockSteamBrickAndMortarApp = vi.fn().mockImplementation(() => mockApp)
+const MockSteamBrickAndMortarApp = vi.fn().mockImplementation(function() { return mockApp })
 
 // Mock the entire core module
 vi.mock('../../../src/core', () => ({

@@ -16,15 +16,15 @@ vi.mock('../../../src/scene/SceneManager', () => ({
 }))
 
 vi.mock('../../../src/scene/StoreLayout', () => ({
-    StoreLayout: vi.fn().mockImplementation(() => ({}))
+    StoreLayout: vi.fn().mockImplementation(function() { return {} })
 }))
 
 vi.mock('../../../src/scene/SignageRenderer', () => ({
-    SignageRenderer: vi.fn().mockImplementation(() => ({}))
+    SignageRenderer: vi.fn().mockImplementation(function() { return {} })
 }))
 
 vi.mock('../../../src/scene/GameBoxRenderer', () => ({
-    GameBoxRenderer: vi.fn().mockImplementation(() => ({}))
+    GameBoxRenderer: vi.fn().mockImplementation(function() { return {} })
 }))
 
 import { SceneCoordinator } from '../../../src/scene/SceneCoordinator'

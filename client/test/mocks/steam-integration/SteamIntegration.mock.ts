@@ -3,10 +3,10 @@
  */
 import { vi } from 'vitest'
 
-export const SteamIntegrationMock = vi.fn().mockImplementation(() => ({
+export const SteamIntegrationMock = vi.fn().mockImplementation(function() { return {
     loadGamesForUser: vi.fn().mockResolvedValue([]),
     dispose: vi.fn()
-}))
+} })
 
 // Export async factory function for vi.mock() - enables one-line usage
 export const steamIntegrationMockFactory = async () => ({ SteamIntegration: SteamIntegrationMock })

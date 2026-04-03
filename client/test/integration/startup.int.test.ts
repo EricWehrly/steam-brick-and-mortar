@@ -68,7 +68,7 @@ vi.mock('three', async (importOriginal) => {
     const actual: any = await importOriginal()
     return {
         ...actual,
-    WebGLRenderer: vi.fn().mockImplementation(() => ({
+    WebGLRenderer: vi.fn().mockImplementation(function() { return {
         setSize: vi.fn(),
         setClearColor: vi.fn(),
         render: vi.fn(),
@@ -92,8 +92,8 @@ vi.mock('three', async (importOriginal) => {
         debug: {
             checkShaderErrors: false
         }
-    })),
-    Scene: vi.fn().mockImplementation(() => ({
+    } }),
+    Scene: vi.fn().mockImplementation(function() { return {
         add: vi.fn(),
         remove: vi.fn(),
         children: [],
@@ -101,13 +101,13 @@ vi.mock('three', async (importOriginal) => {
         getObjectByName: vi.fn(),
         userData: {},
         background: null
-    })),
-    PerspectiveCamera: vi.fn().mockImplementation(() => ({
+    } }),
+    PerspectiveCamera: vi.fn().mockImplementation(function() { return {
         position: { set: vi.fn() },
         lookAt: vi.fn(),
         aspect: 1,
         updateProjectionMatrix: vi.fn()
-    })),
+    } }),
     Color: vi.fn(),
     // Shadow map constants
     PCFSoftShadowMap: 1,
@@ -118,7 +118,7 @@ vi.mock('three', async (importOriginal) => {
     SRGBColorSpace: 'srgb',
     LinearSRGBColorSpace: 'srgb-linear',
     // Other commonly used Three.js exports
-    Mesh: vi.fn().mockImplementation(() => ({
+    Mesh: vi.fn().mockImplementation(function() { return {
         add: vi.fn(),
         remove: vi.fn(),
         children: [],
@@ -128,8 +128,8 @@ vi.mock('three', async (importOriginal) => {
         material: null,
         geometry: null,
         userData: {}
-    })),
-    Group: vi.fn().mockImplementation(() => ({
+    } }),
+    Group: vi.fn().mockImplementation(function() { return {
         add: vi.fn(),
         remove: vi.fn(),
         children: [],
@@ -137,18 +137,18 @@ vi.mock('three', async (importOriginal) => {
         rotation: { x: 0, y: 0, z: 0, set: vi.fn() },
         scale: { x: 1, y: 1, z: 1, set: vi.fn() },
         userData: {}
-    })),
+    } }),
     Material: vi.fn(),
     MeshStandardMaterial: vi.fn(),
     BoxGeometry: vi.fn(),
     PlaneGeometry: vi.fn(),
     Vector3: vi.fn(),
     Euler: vi.fn(),
-    Light: vi.fn().mockImplementation(() => ({
+    Light: vi.fn().mockImplementation(function() { return {
         position: { set: vi.fn() },
         castShadow: false
-    })),
-    DirectionalLight: vi.fn().mockImplementation(() => ({
+    } }),
+    DirectionalLight: vi.fn().mockImplementation(function() { return {
         position: { set: vi.fn() },
         castShadow: false,
         shadow: {
@@ -162,23 +162,23 @@ vi.mock('three', async (importOriginal) => {
                 bottom: -50
             }
         }
-    })),
-    AmbientLight: vi.fn().mockImplementation(() => ({
+    } }),
+    AmbientLight: vi.fn().mockImplementation(function() { return {
         intensity: 1
-    })),
+    } }),
     Camera: vi.fn(),
     Object3D: vi.fn(),
-    TextureLoader: vi.fn().mockImplementation(() => ({
+    TextureLoader: vi.fn().mockImplementation(function() { return {
         load: vi.fn(),
         setPath: vi.fn(),
         setCrossOrigin: vi.fn()
-    })),
+    } }),
     Texture: vi.fn()
     }
 })
 
 vi.mock('../../src/ui/PerformanceMonitor', () => ({
-    PerformanceMonitor: vi.fn().mockImplementation(() => ({
+    PerformanceMonitor: vi.fn().mockImplementation(function() { return {
         getStats: vi.fn().mockReturnValue({
             fps: 60,
             frameTime: 16.7,
@@ -189,21 +189,21 @@ vi.mock('../../src/ui/PerformanceMonitor', () => ({
         hide: vi.fn(),
         show: vi.fn(),
         update: vi.fn()
-    }))
+    } })
 }))
 
 vi.mock('../../src/webxr/WebXRManager', () => ({
-    WebXRManager: vi.fn().mockImplementation(() => ({
+    WebXRManager: vi.fn().mockImplementation(function() { return {
         init: vi.fn(),
         dispose: vi.fn(),
         checkWebXRSupport: vi.fn().mockResolvedValue({ supportsImmersiveVR: false }),
         getCapabilities: vi.fn().mockReturnValue({ supportsImmersiveVR: false }),
         isSessionActive: vi.fn().mockReturnValue(false)
-    }))
+    } })
 }))
 
 vi.mock('../../src/scene/SceneManager', () => ({
-    SceneManager: vi.fn().mockImplementation(() => ({
+    SceneManager: vi.fn().mockImplementation(function() { return {
         init: vi.fn(),
         dispose: vi.fn(),
         getRenderer: vi.fn().mockReturnValue({
@@ -229,14 +229,14 @@ vi.mock('../../src/scene/SceneManager', () => ({
             aspect: 1,
             updateProjectionMatrix: vi.fn()
         })
-    }))
+    } })
 }))
 
 vi.mock('../../src/scene/StoreLayout', () => ({
-    StoreLayout: vi.fn().mockImplementation(() => ({
+    StoreLayout: vi.fn().mockImplementation(function() { return {
         createDefaultLayout: vi.fn().mockReturnValue({}),
         dispose: vi.fn()
-    }))
+    } })
 }))
 
 // Mock DOM elements

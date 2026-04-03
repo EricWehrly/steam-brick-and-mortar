@@ -3,7 +3,7 @@
  */
 import { vi } from 'vitest'
 
-export const StoreLayoutMock = vi.fn().mockImplementation(() => ({
+export const StoreLayoutMock = vi.fn().mockImplementation(function() { return {
     generateStore: vi.fn().mockResolvedValue(undefined),
     getStoreStats: vi.fn().mockReturnValue({
         totalShelves: 5,
@@ -11,7 +11,7 @@ export const StoreLayoutMock = vi.fn().mockImplementation(() => ({
         totalGames: 0
     }),
     dispose: vi.fn()
-}))
+} })
 
 // Export async factory function for vi.mock() - enables one-line usage
 export const storeLayoutMockFactory = async () => ({ StoreLayout: StoreLayoutMock })
