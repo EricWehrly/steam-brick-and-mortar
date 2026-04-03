@@ -31,7 +31,8 @@ describe('Overlay slot layout contract', () => {
         expect(topRightBlock).toContain('min-width: var(--ui-right-reserved);')
         expect(topRightBlock).toContain('max-width: min(var(--ui-right-rail), calc(100vw - 2 * var(--ui-edge-gap)));')
         expect(topRightBlock).not.toContain('width: var(--ui-right-rail);')
-        expect(topRightBlock).not.toContain('bottom:')
+        // slot must not have a fixed pixel bottom that locks its height
+        expect(topRightBlock).not.toMatch(/bottom:\s*\d+px/)
     })
 })
 

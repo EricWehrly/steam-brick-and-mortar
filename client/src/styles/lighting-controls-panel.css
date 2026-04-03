@@ -13,7 +13,7 @@
     right: auto;
     transform: none;
     width: min(var(--ui-right-rail), calc(100vw - 2 * var(--ui-edge-gap)));
-    max-height: calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap));
+    max-height: min(55dvh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap)));
     min-height: auto;
     flex: 0 0 auto;
     align-self: flex-end;

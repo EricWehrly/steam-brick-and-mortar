@@ -97,6 +97,7 @@ body {
 
 #ui-slot-top-right {
     top: var(--ui-top-inset);
+    bottom: var(--ui-edge-gap);
     right: var(--ui-edge-gap);
     width: auto;
     min-width: var(--ui-right-reserved);
@@ -104,8 +105,17 @@ body {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: var(--ui-stack-gap);
     overflow: visible;
+}
+
+/* Binder toggle + lighting panel — vertically centered as a group */
+.ui-right-center-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--ui-stack-gap);
+    margin-top: auto;
+    margin-bottom: auto;
 }
 
 #ui-slot-center-top {
@@ -120,8 +130,8 @@ body {
 #ui-slot-center {
     top: var(--ui-top-inset);
     bottom: var(--ui-edge-gap);
-    left: calc(var(--ui-edge-gap) + var(--ui-left-rail) + var(--ui-stack-gap));
-    right: calc(var(--ui-edge-gap) + var(--ui-right-reserved) + var(--ui-stack-gap));
+    left: calc(var(--ui-edge-gap) + var(--ui-left-rail));
+    right: calc(var(--ui-edge-gap) + var(--ui-left-rail));
     display: flex;
     align-items: center;
     justify-content: center;

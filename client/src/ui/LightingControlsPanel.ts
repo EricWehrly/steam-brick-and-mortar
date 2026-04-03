@@ -94,7 +94,7 @@ export class LightingControlsPanel {
 
         // Styles are now loaded from external CSS file
 
-        const slot = document.getElementById('ui-slot-top-right')
+        const slot = document.getElementById('ui-right-center-group') ?? document.getElementById('ui-slot-top-right')
         if (slot) {
             slot.appendChild(panel)
         } else {

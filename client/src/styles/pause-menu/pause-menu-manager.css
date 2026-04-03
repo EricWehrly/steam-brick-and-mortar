@@ -11,8 +11,7 @@
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    padding-left: max(12px, var(--ui-left-rail, 0px));
-    padding-right: max(12px, var(--ui-right-rail, 0px));
+    padding: 12px;
 }
 
 .pause-menu {
@@ -20,8 +19,8 @@
     border: 1px solid #444;
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    max-width: min(800px, var(--ui-center-max-width, 90vw));
-    width: min(90vw, var(--ui-center-max-width, 90vw));
+    max-width: min(800px, calc(100vw - 24px));
+    width: min(90vw, 800px);
     max-height: 85vh;
     overflow: hidden;
     display: flex;

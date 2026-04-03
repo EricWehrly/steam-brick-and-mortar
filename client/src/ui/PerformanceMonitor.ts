@@ -85,7 +85,7 @@ export class PerformanceMonitor {
         this.setupStyles()
         const slot = document.getElementById('ui-slot-top-right')
         if (slot) {
-            slot.appendChild(this.container)
+            slot.prepend(this.container)
         } else {
             document.body.appendChild(this.container)
         }
