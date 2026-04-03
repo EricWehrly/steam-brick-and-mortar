@@ -23,16 +23,17 @@
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.7.2",
     "@types/three": "^0.169.0",
-    "@typescript-eslint/eslint-plugin": "^8.15.0",
-    "@typescript-eslint/parser": "^8.15.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
     "@vitest/ui": "^2.1.8",
     "@webxr-input-profiles/motion-controllers": "^1.0.0",
     "canvas": "^3.1.2",
-    "eslint": "^9.17.0",
+    "eslint": "^10.1.0",
     "jsdom": "^25.0.1",
-    "typescript": "^5.7.2",
+    "typescript": "^6.0.2",
     "vite": "^6.0.5",
     "vitest": "^2.1.8"
   },

@@ -59,12 +59,12 @@ export class HttpClient {
             
             if (error instanceof Error) {
                 if (error.name === 'AbortError') {
-                    throw new Error(`Request timeout after ${this.timeout}ms`);
+                    throw new Error(`Request timeout after ${this.timeout}ms`, { cause: error });
                 }
                 throw error;
             }
             
-            throw new Error('Unknown error occurred during API request');
+            throw new Error('Unknown error occurred during API request', { cause: error });
         }
     }
 }

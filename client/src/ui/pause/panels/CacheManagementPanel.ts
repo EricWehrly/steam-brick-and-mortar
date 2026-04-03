@@ -221,7 +221,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
         if (!select) return
 
         // Generate options HTML based on current cached users state
-        let options = ''
+        let options: string
         if (this.cachedUsers.length > 0) {
             options = this.cachedUsers
                 .map(user => `<option value="${user.vanityUrl}">${user.displayName} (${user.gameCount} games)</option>`)

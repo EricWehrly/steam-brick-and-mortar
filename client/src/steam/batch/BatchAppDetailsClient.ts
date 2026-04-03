@@ -109,7 +109,7 @@ export class BatchAppDetailsClient {
 
         let totalFetched = 0;
         let consecutiveFailures = 0;
-        let lastBatchDuration = 0; // Track response time for adaptive delays
+        let lastBatchDuration: number; // Track response time for adaptive delays
         const MAX_CONSECUTIVE_FAILURES = 3; // Circuit breaker threshold
         const FAST_RESPONSE_THRESHOLD = 2000; // If batch returns in <2s, it's mostly cached
 
