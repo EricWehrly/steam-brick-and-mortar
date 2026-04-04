@@ -68,7 +68,7 @@ export class GameLibraryBinderUI {
         this.createBinderContainer()
         this.setupKeyboardShortcut()
         
-        GameLibraryBinderUI.logger.info('GameLibraryBinderUI initialized')
+        GameLibraryBinderUI.logger.debug('GameLibraryBinderUI initialized')
     }
     
     /**

@@ -66,7 +66,7 @@ export class RenderLoopDiagnostics {
         this.config = { ...this.config, ...config }
         
         if (!this.config.enabled) {
-            console.log('🔧 [RenderLoopDiagnostics] Disabled - zero overhead mode')
+            
             this.isInitialized = true
             return
         }
@@ -76,7 +76,7 @@ export class RenderLoopDiagnostics {
         // Set instrumentation wrapper - registry owns the iteration
         registry.setInstrumentation(this.instrumentCallback.bind(this))
         
-        console.log('🔧 [RenderLoopDiagnostics] Enabled - logging every', this.config.logInterval, 'frames')
+        
         this.isInitialized = true
     }
 
@@ -203,7 +203,7 @@ export class RenderLoopDiagnostics {
         const registry = RenderLoopRegistry.getInstance()
         registry.setInstrumentation(null)
         this.config.enabled = false
-        console.log('🔧 [RenderLoopDiagnostics] Disabled')
+        
     }
 
     /**

@@ -40,7 +40,7 @@ export class SystemCapabilitiesDetector {
         const capabilities = SystemCapabilitiesDetector.detectCapabilities()
         SystemCapabilitiesDetector.cachedCapabilities = capabilities
         
-        SystemCapabilitiesDetector.logger.info('System capabilities detected:', capabilities)
+        SystemCapabilitiesDetector.logger.debug('System capabilities detected:', capabilities)
         return capabilities
     }
     
@@ -143,7 +143,7 @@ export class SystemCapabilitiesDetector {
             return
         }
 
-        SystemCapabilitiesDetector.logger.info('Renderer reported as unknown; tracking values for future heuristic tuning', details)
+        SystemCapabilitiesDetector.logger.debug('Renderer reported as unknown; tracking values for future heuristic tuning', details)
     }
     
     /**
