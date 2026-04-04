@@ -13,7 +13,8 @@
     right: auto;
     transform: none;
     width: min(var(--ui-right-rail), calc(100vw - 2 * var(--ui-edge-gap)));
-    max-height: min(55dvh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap)));
+    /* Increased from 55dvh — give the panel more room to expand vertically */
+    max-height: min(80dvh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap)));
     min-height: auto;
     flex: 0 0 auto;
     align-self: flex-end;
@@ -97,10 +98,11 @@
 }
 
 .lighting-controls-panel .panel-content {
-    padding: 12px;
+    /* Tighter padding — expanded menus have their own internal padding */
+    padding: 8px;
     overflow-y: auto;
     flex: 0 1 auto;
-    max-height: min(65vh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap) - 72px));
+    max-height: min(75vh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap) - 52px));
     min-height: auto;
     opacity: 1;
     transition: max-height var(--menu-transition-time) ease, min-height var(--menu-transition-time) ease, opacity var(--menu-transition-time) ease, padding var(--menu-transition-time) ease, flex var(--menu-transition-time) ease;
@@ -116,15 +118,17 @@
 }
 
 .lighting-controls-panel .master-controls {
-    margin-bottom: 12px;
-    padding-bottom: 8px;
+    /* No bottom margin — the separator is enough */
+    margin-bottom: 6px;
+    padding-bottom: 4px;
     border-bottom: 1px solid #444;
 }
 
 .lighting-controls-panel .control-item {
+    /* Bare-bones layout — no container border, no extra vertical padding */
     display: flex;
     align-items: center;
-    margin-bottom: 6px;
+    margin-bottom: 3px;
     cursor: pointer;
 }
 
@@ -144,7 +148,7 @@
 }
 
 .lighting-controls-panel .light-group {
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     border: 1px solid #444;
     border-radius: 4px;
     overflow: hidden;
@@ -154,8 +158,8 @@
     display: flex;
     align-items: center;
     background: rgba(30, 30, 30, 0.8);
-    padding: 6px 8px;
-    gap: 8px;
+    padding: 4px 6px;
+    gap: 6px;
 }
 
 .lighting-controls-panel .group-checkbox-area {
@@ -217,7 +221,7 @@
 }
 
 .lighting-controls-panel .light-control {
-    padding: 4px 12px;
+    padding: 2px 8px;
     font-size: 12px;
     background: rgba(20, 20, 20, 0.5);
     transition: background-color 0.2s ease;

@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { EventManager } from '../../../src/core/EventManager'
 import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
+import type { StorePropsSetupRequestEvent } from '../../../src/scene/props/PropsEvents'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ describe('LightingRenderer event registration', () => {
         )
 
         // Emit the event
-        eventManager.emit(StorePropsEventTypes.SetupRequest, { config: {} })
+        eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, { config: {} })
 
         expect(lightingObserver).toHaveBeenCalledOnce()
     })
@@ -71,7 +72,7 @@ describe('LightingRenderer event registration', () => {
             lightingObserver
         )
 
-        eventManager.emit(StorePropsEventTypes.SetupRequest, { config: {} })
+        eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, { config: {} })
 
         // Default handler was skipped → observer NOT called
         expect(lightingObserver).not.toHaveBeenCalled()
@@ -104,7 +105,7 @@ describe('LightingRenderer event registration', () => {
         eventManager.registerEventHandler(StorePropsEventTypes.SetupRequest, lightingObserver)
         eventManager.registerEventHandler(StorePropsEventTypes.SetupRequest, materialObserver)
 
-        eventManager.emit(StorePropsEventTypes.SetupRequest, { config: {} })
+        eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, { config: {} })
 
         expect(propsObserver).toHaveBeenCalledOnce()
         expect(lightingObserver).toHaveBeenCalledOnce()

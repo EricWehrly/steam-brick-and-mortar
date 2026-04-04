@@ -22,10 +22,12 @@
  */
 
 import * as THREE from 'three'
+import { Logger } from '../utils/Logger'
 
 const SLOW_FRAME_THRESHOLD_MS = 100
 
 export class ThreeWebGLRendererDebug extends THREE.WebGLRenderer {
+    private static readonly logger = Logger.createLogFunctions(ThreeWebGLRendererDebug.name)
     constructor(parameters?: THREE.WebGLRendererParameters) {
         super(parameters)
         this.installShaderCompileLogger()
@@ -40,7 +42,7 @@ export class ThreeWebGLRendererDebug extends THREE.WebGLRenderer {
         super.render(scene, camera)
         const elapsed = performance.now() - start
         if (elapsed > SLOW_FRAME_THRESHOLD_MS) {
-            console.warn(`🐌 [RendererDebug] Slow frame: render() took ${elapsed.toFixed(1)}ms (frame budget ~16ms)`)
+            ThreeWebGLRendererDebug.logger.warn(`🐌 Slow frame: render() took ${elapsed.toFixed(1)}ms (frame budget ~16ms)`)
         }
     }
 
@@ -90,7 +92,7 @@ export class ThreeWebGLRendererDebug extends THREE.WebGLRenderer {
                 .map(f => f.trim().replace(/^at /, ''))
                 .join(' → ')
 
-            console.debug(`🔧 [ShaderCompile] Program #${programCount}: ${summary}\n  ${relevantFrames}`)
+            ThreeWebGLRendererDebug.logger.debug(`🔧 [ShaderCompile] Program #${programCount}: ${summary}\n  ${relevantFrames}`)
 
             return originalLinkProgram(program)
         }

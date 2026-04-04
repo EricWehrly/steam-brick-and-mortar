@@ -105,6 +105,7 @@ export class SteamBrickAndMortarApp {
         Logger.setContextLevel('GpuGameBoxRenderer', LogLevel.INFO)
         Logger.setContextLevel('SteamApiClient', LogLevel.INFO)
         Logger.setContextLevel('BatchAppDetailsClient', LogLevel.INFO)
+        Logger.setContextLevel('ThreeWebGLRendererDebug', LogLevel.INFO)
         
         this.startupTracker.logEvent(StartupPhase.AppConstruction, 'Creating SceneManager')
         this.sceneManager = new SceneManager({
