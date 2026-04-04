@@ -51,6 +51,7 @@
     align-items: center;
     transition: background-color 0.2s ease;
     cursor: pointer;
+    margin-bottom: 0;
 }
 
 .lighting-controls-panel .clickable-header:hover {
@@ -99,7 +100,7 @@
 
 .lighting-controls-panel .panel-content {
     /* Tighter padding — expanded menus have their own internal padding */
-    padding: 8px;
+    padding: 0;
     overflow-y: auto;
     flex: 0 1 auto;
     max-height: min(75vh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap) - 52px));

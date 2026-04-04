@@ -284,15 +284,15 @@ export class SteamBrickAndMortarApp {
         
         try {
             this.startupTracker.phaseStart(StartupPhase.DebugSystemsInit, 'Debug systems initialization')
-            // Initialize system UI coordinator (debug panels, etc.)
-            await this.systemUICoordinator.init(this.sceneManager.getRenderer())
-            this.startupTracker.phaseEnd(StartupPhase.DebugSystemsInit)
-            
-            this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, 'Emoji atlas initialization deferred to first use')
-            
+            // Binder button first so it occupies the top slot in ui-right-center-group;
+            // lighting panel appends after and sits below it.
             this.gameLibraryBinder = GameLibraryBinderUI.getInstance()
             this.gameLibraryBinder.init()
             this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, 'Game Library Binder UI initialized')
+
+            // Initialize system UI coordinator (lighting panel, debug panels, etc.)
+            await this.systemUICoordinator.init(this.sceneManager.getRenderer())
+            this.startupTracker.phaseEnd(StartupPhase.DebugSystemsInit)
             
             // Auto-load will happen after GameStart event is emitted
             this.startupTracker.phaseStart(StartupPhase.FullyLoaded, 'Application fully loaded')

@@ -140,13 +140,6 @@ export class SceneCoordinator {
             console.warn('⚠️ Skybox loading failed:', error)
         }
 
-        try {
-            // LightingRenderer manages its own lifecycle natively via EventManager
-            tracker.milestone(StartupPhase.SceneConstruction, 'Adding lights')
-        } catch (error) {
-            console.warn('Lighting setup failed:', error)
-        }
-
         // 🏪 STEP 3: Props (room, shelves, games - the heavy stuff)
         tracker.milestone(StartupPhase.SceneConstruction, 'Building store')
         this.requestPropsSetup()
