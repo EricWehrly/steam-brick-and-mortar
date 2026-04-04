@@ -362,6 +362,10 @@ export class LightingRenderer {
         // This keeps initial room lit with base lighting before shelves spawn
         
         LightingRenderer.logger.info(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient enabled, directional/spot/point disabled by default)`)
+                // Ensure proper state when enhanced lighting takes over
+        this.toggleLighting(true)
+        this.toggleDebugHelpers(false)
+
         LightingRenderer.logger.debug(`💡 Ceiling fixtures will be added when shelf layout is determined`)
     }
 
