@@ -99,11 +99,13 @@ function octaveNoise(x: number, y: number, octaves: number, persistence: number,
     return total / maxValue
 }
 
-function woodGrain(offsetX: number, offsetY: number, ringFrequency: number, grainStrength: number): number {
-    const dist = Math.sqrt(offsetX * offsetX + offsetY * offsetY)
-    const rings = Math.sin(dist * ringFrequency * Math.PI * 2) * 0.5 + 0.5
-    const grain = noise2D(offsetX * 0.02, offsetY * 0.02) * grainStrength
-    return Math.max(0, Math.min(1, rings + grain))
+function woodGrainLinear(x: number, y: number, ringFrequency: number, grainStrength: number): number {
+    // Lumber-like longitudinal grain: dominant variation across Y, subtle drift across X.
+    // This avoids tree-ring cross-section appearance (radial circles).
+    const baseLines = Math.sin(y * ringFrequency) * 0.5 + 0.5
+    const alongGrainVariation = octaveNoise(x * 0.01, y * 0.05, 2, 0.3, 1) * 0.2
+    const fineCrossGrain = octaveNoise(x * 0.08, y * 0.02, 3, 0.4, 1) * grainStrength
+    return Math.max(0, Math.min(1, baseLines + alongGrainVariation + fineCrossGrain))
 }
 
 function carpetFiber(x: number, y: number, fiberDensity: number): number {
@@ -132,13 +134,10 @@ function paintWoodEnhanced(data: Uint8ClampedArray, width: number, height: numbe
     const rgb1 = hexToRgb(color1)
     const rgb2 = hexToRgb(color2)
     const rgb3 = hexToRgb(color3)
-    const centerX = width / 2
-    const centerY = height / 2
-
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4
-            const gv = woodGrain(x - centerX, y - centerY, ringFrequency, grainStrength)
+            const gv = woodGrainLinear(x, y, ringFrequency, grainStrength)
             const c1 = octaveNoise(x * 0.03, y * 0.03, 3, 0.5, 1) * 0.12
             const c2 = octaveNoise(x * 0.08, y * 0.08, 4, 0.4, 1) * 0.08
             const c3 = octaveNoise(x * 0.15, y * 0.15, 2, 0.3, 1) * 0.05
