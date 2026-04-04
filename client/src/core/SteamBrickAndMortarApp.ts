@@ -182,7 +182,6 @@ export class SteamBrickAndMortarApp {
             await this.container.initialize()
             this.startupTracker.phaseEnd(StartupPhase.DIContainerSetup)
 
-
             this.startupTracker.phaseStart(StartupPhase.CoordinatorResolution, 'Resolving coordinators from DI')
             
             // Resolve EventManager from DI container
@@ -241,9 +240,6 @@ export class SteamBrickAndMortarApp {
             this.startupTracker.milestone(StartupPhase.RenderLoopStart, 'User can move - starting world build')
 
             // 🎬 PRIORITY 2.5: Start scene building AFTER render loop is running.
-            // Material prewarm runs concurrently — the scene setup pipeline has enough
-            // async steps that materials will be ready before shelves are actually built.
-            // Do NOT await materialPrewarmPromise here — that caused a visible black-screen hitch.
             this.sceneCoordinator.startSceneSetup()
             
             // PRIORITY 3: Everything else happens async (non-blocking)
