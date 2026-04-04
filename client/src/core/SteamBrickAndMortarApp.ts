@@ -382,6 +382,12 @@ export class SteamBrickAndMortarApp {
             }
         })
         this.startupTracker.phaseEnd(StartupPhase.GameStart)
+
+        // Signal for Playwright visual tools — set after first GameStart so
+        // screenshot/log capture tests know the scene is ready.
+        if (import.meta.env.DEV) {
+            (window as any).__playwrightSceneReady = true
+        }
     }
 
     private startRenderLoop(): void {
