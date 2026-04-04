@@ -54,7 +54,9 @@ export class SharedMaterialManager {
     private constructor() {
         // Lightweight — no sync texture generation here.
 
-        EventManager.getInstance().registerDefaultHandler(
+        // Observe SetupRequest to trigger prewarm. Use plain registerEventHandler
+        // so this fires even when GpuStorePropsEventHandler holds the normal handler slot.
+        EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.SetupRequest,
             this.prewarm.bind(this)
         )

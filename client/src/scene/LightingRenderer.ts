@@ -127,12 +127,16 @@ export class LightingRenderer {
             this.updateRoomDimensions(event.detail.dimensions, event.detail.shelfLayout, event.detail.centerOffset) 
         })
 
-        this.eventManager.registerDefaultHandler(
+        // Observe store-props lifecycle to drive lighting phases.
+        // Use plain registerEventHandler (not default) so these fire even when
+        // GpuStorePropsEventHandler / LegacyStorePropsHandler hold the normal handler slot.
+        // Lighting is a side-effect observer of the scene lifecycle, not the owner.
+        this.eventManager.registerEventHandler(
             StorePropsEventTypes.SetupRequest,
             this.setupBasicLighting.bind(this)
         )
 
-        this.eventManager.registerDefaultHandler(
+        this.eventManager.registerEventHandler(
             StorePropsEventTypes.SetupCompleted,
             this.upgradeLighting.bind(this)
         )
