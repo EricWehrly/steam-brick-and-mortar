@@ -84,20 +84,19 @@ export class SteamBrickAndMortarApp {
         // Initialize startup tracker first to capture all events
         this.startupTracker = StartupEventTracker.getInstance()
         
-        // Mark the page load phase (from initial HTML to app constructor)
-        this.startupTracker.phaseStart(StartupPhase.PageLoad, 'Page resources loading')
-        
-        // Create and attach progress UI
-        const progressUI = new StartupProgressUI()
-        this.startupTracker.setProgressUI(progressUI)
-        
-        this.startupTracker.phaseStart(StartupPhase.AppConstruction, 'App construction')
+        // Phase 1: CoreInit — everything up through DI resolution
+        this.startupTracker.phaseStart(StartupPhase.CoreInit, 'Core initialization')
+
+        // Create startup progress UI (self-contained; listens to AppEventTypes events)
+        new StartupProgressUI()
+        // Wire game-loading progress listeners now that we have an EventManager instance
+        this.startupTracker.setupProgressListeners()
         
         // Store config for potential container recreation
         this.config = config
         
         // Initialize AppSettings first (needed for default values)
-        this.startupTracker.logEvent(StartupPhase.AppConstruction, 'Initializing AppSettings')
+        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Initializing AppSettings')
         this.appSettings = AppSettings.getInstance()
         
         // TODO: Revisit this
@@ -107,17 +106,17 @@ export class SteamBrickAndMortarApp {
         Logger.setContextLevel('BatchAppDetailsClient', LogLevel.INFO)
         Logger.setContextLevel('ThreeWebGLRendererDebug', LogLevel.INFO)
         
-        this.startupTracker.logEvent(StartupPhase.AppConstruction, 'Creating SceneManager')
+        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating SceneManager')
         this.sceneManager = new SceneManager({
             antialias: config.scene?.antialias ?? true,
             outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
         })
         
-        this.startupTracker.logEvent(StartupPhase.AppConstruction, 'Setting up DI Container')
+        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Setting up DI Container')
         this.container = new ServiceContainer()
         ServiceRegistration.configureServices(this.container, config, this.sceneManager, this.appSettings)
         
-        this.startupTracker.logEvent(StartupPhase.AppConstruction, 'Creating PerformanceMonitor')
+        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating PerformanceMonitor')
         this.performanceMonitor = new PerformanceMonitor({
             position: 'top-right',
             showMemory: true,
@@ -130,13 +129,13 @@ export class SteamBrickAndMortarApp {
         const defaultMaxGames = isDevelopmentMode ? 20 : 100
         const maxGames = config.steam?.maxGames ?? defaultMaxGames
 
-        this.startupTracker.logEvent(StartupPhase.AppConstruction, 'Creating SteamIntegration')
+        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating SteamIntegration')
         this.steamIntegration = new SteamIntegration({
             apiBaseUrl: config.steam?.apiBaseUrl ?? BACKEND_URL,
             maxGames: maxGames
         })
 
-        this.startupTracker.logEvent(StartupPhase.AppConstruction, 'Creating WebXRCoordinator')
+        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating WebXRCoordinator')
         this.webxrCoordinator = new WebXRCoordinator({
             camera: this.sceneManager.getCamera(),
             input: {
@@ -145,17 +144,17 @@ export class SteamBrickAndMortarApp {
             }
         })
 
-        this.startupTracker.logEvent(StartupPhase.AppConstruction, 'Creating DebugStatsProvider')
+        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating DebugStatsProvider')
         this.debugStatsProvider = new DebugStatsProvider(
             this.sceneManager,
             this.steamIntegration,
             this.performanceMonitor
         )
 
-        this.startupTracker.logEvent(StartupPhase.AppConstruction, 'Creating UIManager')
+        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating UIManager')
         this.uiManager = new UIManager()
-        
-        this.startupTracker.phaseEnd(StartupPhase.AppConstruction, 'Constructor complete')
+
+        this.startupTracker.phaseEnd(StartupPhase.CoreInit, 'Constructor complete')
     }
 
     async init(): Promise<void> {
@@ -164,10 +163,10 @@ export class SteamBrickAndMortarApp {
         }
         
         try {
-            this.startupTracker.phaseStart(StartupPhase.DIContainerSetup, 'DI Container initialization')
+            this.startupTracker.phaseStart(StartupPhase.EngineStart, 'DI Container + coordinators initialization')
             
             // Register SystemUICoordinator with runtime dependencies BEFORE initialization
-            this.startupTracker.logEvent(StartupPhase.DIContainerSetup, 'Registering SystemUICoordinator')
+            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Registering SystemUICoordinator')
             ServiceRegistration.registerSystemUICoordinator(
                 this.container,
                 this.performanceMonitor,
@@ -179,67 +178,60 @@ export class SteamBrickAndMortarApp {
             )
             
             // Initialize DI services
-            this.startupTracker.logEvent(StartupPhase.DIContainerSetup, 'Initializing DI services')
+            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Initializing DI services')
             await this.container.initialize()
-            this.startupTracker.phaseEnd(StartupPhase.DIContainerSetup)
 
 
-            this.startupTracker.phaseStart(StartupPhase.CoordinatorResolution, 'Resolving coordinators from DI')
-            
             // Resolve EventManager from DI container
-            this.startupTracker.logEvent(StartupPhase.CoordinatorResolution, 'Resolving EventManager')
+            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Resolving EventManager')
             this.eventManager = await this.container.resolve(ServiceKeys.EventManager) as EventManager
             
             // Set up prerequisite event listeners now that EventManager is available
-            this.startupTracker.logEvent(StartupPhase.CoordinatorResolution, 'Setting up prerequisite event listeners')
+            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Setting up prerequisite event listeners')
             this.setupPrerequisiteEventListeners()
             
             // Resolve SceneCoordinator from DI container
-            this.startupTracker.logEvent(StartupPhase.CoordinatorResolution, 'Resolving SceneCoordinator')
+            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Resolving SceneCoordinator')
             this.sceneCoordinator = await this.container.resolve(ServiceKeys.SceneCoordinator) as SceneCoordinator
             
             // Resolve UI coordinators from DI container
-            this.startupTracker.logEvent(StartupPhase.CoordinatorResolution, 'Resolving UI coordinators')
+            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Resolving UI coordinators')
             this.steamUICoordinator = await this.container.resolve(ServiceKeys.SteamUICoordinator) as SteamUICoordinator
             this.webxrUICoordinator = await this.container.resolve(ServiceKeys.WebXRUICoordinator) as WebXRUICoordinator
             this.systemUICoordinator = await this.container.resolve(ServiceKeys.SystemUICoordinator) as SystemUICoordinator
             
-            this.startupTracker.phaseEnd(StartupPhase.CoordinatorResolution)
-            
-            this.startupTracker.phaseStart(StartupPhase.EventHandlerSetup, 'WebXR event handler setup')
             // Initialize webxr event handler now that UI coordinators are available
             this.webxrEventHandler = new WebXREventHandler(
                 this.webxrCoordinator,
                 this.webxrUICoordinator,
                 this.eventManager
             )
-            this.startupTracker.phaseEnd(StartupPhase.EventHandlerSetup)
-            
-            
+
+            this.startupTracker.phaseEnd(StartupPhase.EngineStart)
+
+
             // 🎯 PRIORITY 1: Get controls working ASAP - this enables user input immediately
-            this.startupTracker.phaseStart(StartupPhase.ControlsInit, 'Controls initialization')
-            this.startupTracker.milestone(StartupPhase.ControlsInit, 'Setting up controls')
+            this.startupTracker.phaseStart(StartupPhase.ControlsReady, 'Controls initialization')
+            this.startupTracker.milestone(StartupPhase.ControlsReady, 'Setting up controls')
             await this.initializeControls()
-            this.startupTracker.phaseEnd(StartupPhase.ControlsInit)
+            this.startupTracker.phaseEnd(StartupPhase.ControlsReady)
             
-            this.startupTracker.milestone(StartupPhase.ControlsInit, 'Player can move')
+            this.startupTracker.milestone(StartupPhase.ControlsReady, 'Player can move')
             
             // 🎯 PRIORITY 2: Basic UI and render loop (blocking for interaction)
-            this.startupTracker.phaseStart(StartupPhase.CriticalUIInit, 'Critical UI initialization')
-            this.startupTracker.milestone(StartupPhase.CriticalUIInit, 'Initializing UI')
+            this.startupTracker.phaseStart(StartupPhase.Interactive, 'Starting render loop and critical UI')
+            this.startupTracker.milestone(StartupPhase.Interactive, 'Initializing UI')
             await this.initializeCriticalUI()
-            this.startupTracker.phaseEnd(StartupPhase.CriticalUIInit)
             
-            this.startupTracker.phaseStart(StartupPhase.RenderLoopStart, 'Starting render loop')
-            this.startupTracker.milestone(StartupPhase.RenderLoopStart, 'Starting render engine')
+            this.startupTracker.milestone(StartupPhase.Interactive, 'Starting render engine')
             this.startRenderLoop()
-            this.startupTracker.phaseEnd(StartupPhase.RenderLoopStart)
             
             this.prerequisites.renderLoopReady = true
             this.checkGameStartPrerequisites()
             
             this.isInitialized = true
-            this.startupTracker.milestone(StartupPhase.RenderLoopStart, 'User can move - starting world build')
+            this.startupTracker.phaseEnd(StartupPhase.Interactive)
+            this.startupTracker.milestone(StartupPhase.Interactive, 'User can move - starting world build')
 
             // 🎬 PRIORITY 2.5: Start scene building AFTER render loop is running.
             // Material prewarm runs concurrently — the scene setup pipeline has enough
@@ -252,7 +244,7 @@ export class SteamBrickAndMortarApp {
             
         } catch (error) {
             console.error('Failed to initialize application:', error)
-            this.startupTracker.logEvent(StartupPhase.RenderLoopStart, `INITIALIZATION ERROR: ${error}`)
+            this.startupTracker.logEvent(StartupPhase.Interactive, `INITIALIZATION ERROR: ${error}`)
             throw error
         }
     }
@@ -271,39 +263,39 @@ export class SteamBrickAndMortarApp {
     }
 
     private initializeNonEssentialSystemsAsync(): void {
-        this.startupTracker.logAsyncStart(StartupPhase.NonEssentialSystemsStart, 'Non-essential systems initialization')
+        this.startupTracker.logAsyncStart(StartupPhase.DataFetchEncore, 'Non-essential systems initialization')
         
         this.loadNonEssentialSystems().catch(error => {
             console.error('⚠️ Non-essential systems failed to load:', error)
-            this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, `Non-essential systems error: ${error}`)
+            this.startupTracker.logEvent(StartupPhase.DataFetchEncore, `Non-essential systems error: ${error}`)
         })
     }
 
     private async loadNonEssentialSystems(): Promise<void> {
-        const asyncStartTime = this.startupTracker.logAsyncStart(StartupPhase.NonEssentialSystemsStart, 'Loading non-essential systems')
+        const asyncStartTime = this.startupTracker.logAsyncStart(StartupPhase.DataFetchEncore, 'Loading non-essential systems')
         
         try {
-            this.startupTracker.phaseStart(StartupPhase.DebugSystemsInit, 'Debug systems initialization')
+            this.startupTracker.phaseStart(StartupPhase.PrewarmEncore, 'Debug systems initialization')
             // Binder button first so it occupies the top slot in ui-right-center-group;
             // lighting panel appends after and sits below it.
             this.gameLibraryBinder = GameLibraryBinderUI.getInstance()
             this.gameLibraryBinder.init()
-            this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, 'Game Library Binder UI initialized')
+            this.startupTracker.logEvent(StartupPhase.PrewarmEncore, 'Game Library Binder UI initialized')
 
             // Initialize system UI coordinator (lighting panel, debug panels, etc.)
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())
-            this.startupTracker.phaseEnd(StartupPhase.DebugSystemsInit)
+            this.startupTracker.phaseEnd(StartupPhase.PrewarmEncore)
             
-            // Auto-load will happen after GameStart event is emitted
-            this.startupTracker.phaseStart(StartupPhase.FullyLoaded, 'Application fully loaded')
+            // DataFetchEncore: auto-load Steam games; progress events handled via AppEventTypes
+            this.startupTracker.phaseStart(StartupPhase.DataFetchEncore, 'Steam data fetch')
             ToastManager.success('Steam Brick and Mortar is fully loaded!', { duration: 3000 })
-            this.startupTracker.phaseEnd(StartupPhase.FullyLoaded)
+            this.startupTracker.phaseEnd(StartupPhase.DataFetchEncore)
             
-            this.startupTracker.logAsyncEnd(StartupPhase.NonEssentialSystemsStart, 'Non-essential systems loaded', asyncStartTime)
+            this.startupTracker.logAsyncEnd(StartupPhase.DataFetchEncore, 'Non-essential systems loaded', asyncStartTime)
             
         } catch (error) {
             console.error('Failed to load non-essential systems:', error)
-            this.startupTracker.logEvent(StartupPhase.NonEssentialSystemsStart, `Load error: ${error}`)
+            this.startupTracker.logEvent(StartupPhase.DataFetchEncore, `Load error: ${error}`)
         }
     }
 
@@ -339,7 +331,7 @@ export class SteamBrickAndMortarApp {
         this.eventManager.registerEventHandler<SceneReadyEvent>(
             GameEventTypes.SceneReady,
             () => {
-                this.startupTracker.milestone(StartupPhase.GameStart, 'World has spawned')
+                this.startupTracker.milestone(StartupPhase.WorldBuild, 'World has spawned')
                 this.prerequisites.sceneReady = true
                 this.checkGameStartPrerequisites()
             }
@@ -356,7 +348,7 @@ export class SteamBrickAndMortarApp {
 
         const { sceneReady, renderLoopReady, uiReady } = this.prerequisites
         
-        this.startupTracker.logEvent(StartupPhase.GameStart, 'Checking prerequisites', {
+        this.startupTracker.logEvent(StartupPhase.WorldBuild, 'Checking prerequisites', {
             sceneReady,
             renderLoopReady,
             uiReady
@@ -371,8 +363,8 @@ export class SteamBrickAndMortarApp {
     }
 
     private emitGameStartEvent(): void {
-        this.startupTracker.phaseStart(StartupPhase.GameStart, 'Emitting GameStart event')
-        this.startupTracker.milestone(StartupPhase.GameStart, 'World ready')
+        this.startupTracker.phaseStart(StartupPhase.WorldBuild, 'Emitting GameStart event')
+        this.startupTracker.milestone(StartupPhase.WorldBuild, 'World ready')
         console.debug('🎮 GameStart event emitted')
         this.eventManager.emit<GameStartEvent>(GameEventTypes.Start, {
             prerequisites: {
@@ -381,7 +373,7 @@ export class SteamBrickAndMortarApp {
                 uiReady: this.prerequisites.uiReady
             }
         })
-        this.startupTracker.phaseEnd(StartupPhase.GameStart)
+        this.startupTracker.phaseEnd(StartupPhase.WorldBuild)
     }
 
     private startRenderLoop(): void {

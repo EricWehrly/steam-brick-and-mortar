@@ -1,208 +1,194 @@
+import { EventManager } from '../../core/EventManager'
+import { AppEventTypes, type PhaseCompletedEvent, type GameLoadingProgressEvent, type GameLoadingStartedEvent, type GameLoadingPhaseChangedEvent } from '../../types/InteractionEvents'
 import { StartupPhase } from '../../utils/StartupEventTracker'
 import './StartupProgressUI.css'
 
+/**
+ * StartupProgressUI
+ *
+ * Displays a startup progress bar driven exclusively by AppEventTypes events emitted
+ * through the EventManager. It no longer holds a reference to StartupEventTracker and
+ * is not directly called by it.
+ */
 export class StartupProgressUI {
     private container: HTMLDivElement
     private progressBar: HTMLDivElement
     private phaseText: HTMLDivElement
     private detailText: HTMLDivElement
     private isVisible: boolean = true
-    
+
     // Game loading sub-progress tracking
     private gameLoadingPhase: 'cache' | 'fetch' | 'batch' | null = null
     private gameLoadingProgress: { current: number; total: number } = { current: 0, total: 0 }
     private gameLoadingStartWeight: number = 0
-    
+
+    /**
+     * Phase weights determine how much each phase contributes to the 0-100 progress bar.
+     * Ordered to match the new 5-phase architecture.
+     */
     private readonly phaseWeights = new Map<StartupPhase, number>([
-        [StartupPhase.PageLoad, 2],
-        [StartupPhase.AppConstruction, 3],
-        [StartupPhase.DIContainerSetup, 5],
-        [StartupPhase.CoordinatorResolution, 5],
-        [StartupPhase.EventHandlerSetup, 2],
-        [StartupPhase.ControlsInit, 5],
-        [StartupPhase.CriticalUIInit, 3],
-        [StartupPhase.RenderLoopStart, 5],
-        [StartupPhase.SceneConstruction, 40],
-        [StartupPhase.NonEssentialSystemsStart, 5],
-        [StartupPhase.DebugSystemsInit, 5],
-        [StartupPhase.GameStart, 10],
-        [StartupPhase.SteamAutoLoad, 5],
-        [StartupPhase.FullyLoaded, 5]
+        [StartupPhase.CoreInit,        10],
+        [StartupPhase.EngineStart,     15],
+        [StartupPhase.WorldBuild,      40],
+        [StartupPhase.ControlsReady,    5],
+        [StartupPhase.Interactive,     10],
+        [StartupPhase.PrewarmEncore,    5],
+        [StartupPhase.DataFetchEncore, 15],
     ])
-    
+
     private currentProgress: number = 0
-    
+
     constructor() {
         this.container = this.createContainer()
         this.phaseText = this.createPhaseText()
         this.detailText = this.createDetailText()
         this.progressBar = this.createProgressBarWithLayout()
-        
+
         document.body.appendChild(this.container)
+
+        this.registerEventListeners()
     }
-    
-    private createContainer(): HTMLDivElement {
-        const container = document.createElement('div')
-        container.id = 'startup-progress-container'
-        return container
+
+    // -------------------------------------------------------------------------
+    // Event-driven wiring
+    // -------------------------------------------------------------------------
+
+    private registerEventListeners(): void {
+        const em = EventManager.getInstance()
+
+        em.registerEventHandler(AppEventTypes.PhaseStarted, (e: CustomEvent<PhaseCompletedEvent>) => {
+            this.onPhaseStarted(e.detail.phase as StartupPhase)
+        })
+
+        em.registerEventHandler(AppEventTypes.PhaseCompleted, (e: CustomEvent<PhaseCompletedEvent>) => {
+            this.onPhaseCompleted(e.detail.phase as StartupPhase)
+        })
+
+        em.registerEventHandler(AppEventTypes.Milestone, (e: CustomEvent) => {
+            this.updateMilestone((e.detail as { description: string }).description)
+        })
+
+        em.registerEventHandler(AppEventTypes.DetailUpdate, (e: CustomEvent) => {
+            this.updateDetail((e.detail as { detail: string }).detail)
+        })
+
+        em.registerEventHandler(AppEventTypes.GameLoadingStarted, (e: CustomEvent<GameLoadingStartedEvent>) => {
+            this.startGameLoading(e.detail.totalGames, e.detail.phase as StartupPhase)
+        })
+
+        em.registerEventHandler(AppEventTypes.GameLoadingPhaseChanged, (e: CustomEvent<GameLoadingPhaseChangedEvent>) => {
+            this.gameLoadingPhase = e.detail.loadingPhase
+            this.updateDetail(e.detail.detail)
+        })
+
+        em.registerEventHandler(AppEventTypes.GameLoadingProgress, (e: CustomEvent<GameLoadingProgressEvent>) => {
+            this.updateGameLoadingProgress(e.detail.current, e.detail.total)
+        })
+
+        em.registerEventHandler(AppEventTypes.StartupComplete, () => {
+            this.complete()
+        })
     }
-    
-    private createPhaseText(): HTMLDivElement {
-        const text = document.createElement('div')
-        text.className = 'startup-phase-text'
-        text.textContent = 'Loading...'
-        return text
-    }
-    
-    private createDetailText(): HTMLDivElement {
-        const text = document.createElement('div')
-        text.className = 'startup-detail-text'
-        return text
-    }
-    
-    private createProgressBarWithLayout(): HTMLDivElement {
-        const textColumn = document.createElement('div')
-        textColumn.className = 'startup-text-column'
-        textColumn.appendChild(this.phaseText)
-        textColumn.appendChild(this.detailText)
-        
-        const barContainer = document.createElement('div')
-        barContainer.className = 'startup-bar-container'
-        
-        const bar = document.createElement('div')
-        bar.className = 'startup-progress-bar'
-        barContainer.appendChild(bar)
-        
-        this.container.appendChild(textColumn)
-        this.container.appendChild(barContainer)
-        
-        return bar
-    }
-    
-    public updatePhase(phase: StartupPhase): void {
+
+    // -------------------------------------------------------------------------
+    // UI update helpers
+    // -------------------------------------------------------------------------
+
+    private onPhaseStarted(phase: StartupPhase): void {
         if (!this.isVisible) return
-        
+
         let cumulativeProgress = 0
-        let foundPhase = false
-        
         for (const [p, weight] of this.phaseWeights.entries()) {
-            if (p === phase) {
-                foundPhase = true
-                break
-            }
+            if (p === phase) break
             cumulativeProgress += weight
         }
-        
-        if (foundPhase) {
-            this.currentProgress = cumulativeProgress
-            this.updateProgressBar(this.currentProgress)
-        }
-        
-        const phaseName = this.formatPhaseName(phase)
-        this.phaseText.textContent = phaseName
+
+        this.currentProgress = cumulativeProgress
+        this.updateProgressBar(this.currentProgress)
+        this.phaseText.textContent = this.formatPhaseName(phase)
     }
-    
-    public updateMilestone(description: string): void {
+
+    private onPhaseCompleted(phase: StartupPhase): void {
         if (!this.isVisible) return
-        
+
+        const weight = this.phaseWeights.get(phase) || 0
+        this.currentProgress += weight
+        this.updateProgressBar(this.currentProgress)
+    }
+
+    private updateMilestone(description: string): void {
+        if (!this.isVisible) return
         this.phaseText.textContent = description
         this.hideDetail()
     }
-    
-    public updateDetail(detail: string): void {
+
+    private updateDetail(detail: string): void {
         if (!this.isVisible) return
-        
         this.detailText.textContent = detail
         this.detailText.style.display = 'block'
     }
-    
-    public hideDetail(): void {
+
+    private hideDetail(): void {
         if (!this.isVisible) return
-        
         this.detailText.style.display = 'none'
     }
-    
-    public startGameLoading(totalGames: number, phase: StartupPhase = StartupPhase.SteamAutoLoad): void {
+
+    private startGameLoading(totalGames: number, phase: StartupPhase = StartupPhase.DataFetchEncore): void {
         if (!this.isVisible) return
-        
-        // Calculate starting weight for this phase
+
         let cumulativeProgress = 0
         for (const [p, weight] of this.phaseWeights.entries()) {
-            if (p === phase) {
-                break
-            }
+            if (p === phase) break
             cumulativeProgress += weight
         }
         this.gameLoadingStartWeight = cumulativeProgress
         this.gameLoadingProgress = { current: 0, total: totalGames }
     }
-    
-    public updateGameLoadingPhase(phase: 'cache' | 'fetch' | 'batch', detail: string): void {
+
+    private updateGameLoadingProgress(current: number, total?: number): void {
         if (!this.isVisible) return
-        
-        this.gameLoadingPhase = phase
-        this.updateDetail(detail)
-    }
-    
-    public updateGameLoadingProgress(current: number, total?: number): void {
-        if (!this.isVisible) return
-        
+
         this.gameLoadingProgress.current = current
         if (total !== undefined) {
             this.gameLoadingProgress.total = total
         }
-        
-        // Calculate sub-progress within the phase
-        const phaseWeight = this.phaseWeights.get(StartupPhase.SteamAutoLoad) || 5
-        const progressRatio = this.gameLoadingProgress.total > 0 
-            ? this.gameLoadingProgress.current / this.gameLoadingProgress.total 
+
+        const phaseWeight = this.phaseWeights.get(StartupPhase.DataFetchEncore) || 15
+        const progressRatio = this.gameLoadingProgress.total > 0
+            ? this.gameLoadingProgress.current / this.gameLoadingProgress.total
             : 0
         const subProgress = this.gameLoadingStartWeight + (phaseWeight * progressRatio)
-        
+
         this.updateProgressBar(subProgress)
     }
-    
-    public completePhase(phase: StartupPhase): void {
+
+    private complete(): void {
         if (!this.isVisible) return
-        
-        const weight = this.phaseWeights.get(phase) || 0
-        this.currentProgress += weight
-        this.updateProgressBar(this.currentProgress)
-    }
-    
-    public complete(): void {
-        if (!this.isVisible) return
-        
+
         this.updateProgressBar(100)
         this.phaseText.textContent = 'Application loaded'
         this.hideDetail()
-        
+
         setTimeout(() => {
             this.fadeOut()
         }, 800)
     }
-    
+
     private updateProgressBar(progress: number): void {
         const clampedProgress = Math.min(100, Math.max(0, progress))
         this.progressBar.style.width = `${clampedProgress}%`
     }
-    
+
     private formatPhaseName(phase: StartupPhase): string {
-        // Convert kebab-case to Title Case
-        return phase
-            .split('-')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ')
+        // PascalCase → spaced words
+        return phase.replace(/([A-Z])/g, ' $1').trim()
     }
-    
+
     private fadeOut(): void {
         this.container.style.opacity = '0'
-        
-        setTimeout(() => {
-            this.remove()
-        }, 500)
+        setTimeout(() => { this.remove() }, 500)
     }
-    
+
     public remove(): void {
         if (this.container.parentElement) {
             this.container.parentElement.removeChild(this.container)
@@ -210,21 +196,58 @@ export class StartupProgressUI {
         this.isVisible = false
 
         // Signal for Playwright visual tools.
-        // TODO: ideally this should be driven by a semantic "world fully interactive" event
-        // once the startup sequence is cleaned up — something that fires after prewarm completes
-        // AND all batches are rendered, not just after the progress UI fades out.
-        // For now, overlay removal is the closest reliable "visually done" moment we have.
         if (import.meta.env.DEV) {
             (window as any).__playwrightSceneReady = true
         }
     }
-    
+
     public showError(message: string): void {
         if (!this.isVisible) return
-        
         this.container.classList.add('startup-error')
         this.phaseText.textContent = 'Startup failed'
         this.detailText.textContent = message
         this.detailText.style.display = 'block'
+    }
+
+    // -------------------------------------------------------------------------
+    // DOM construction
+    // -------------------------------------------------------------------------
+
+    private createContainer(): HTMLDivElement {
+        const container = document.createElement('div')
+        container.id = 'startup-progress-container'
+        return container
+    }
+
+    private createPhaseText(): HTMLDivElement {
+        const text = document.createElement('div')
+        text.className = 'startup-phase-text'
+        text.textContent = 'Loading...'
+        return text
+    }
+
+    private createDetailText(): HTMLDivElement {
+        const text = document.createElement('div')
+        text.className = 'startup-detail-text'
+        return text
+    }
+
+    private createProgressBarWithLayout(): HTMLDivElement {
+        const textColumn = document.createElement('div')
+        textColumn.className = 'startup-text-column'
+        textColumn.appendChild(this.phaseText)
+        textColumn.appendChild(this.detailText)
+
+        const barContainer = document.createElement('div')
+        barContainer.className = 'startup-bar-container'
+
+        const bar = document.createElement('div')
+        bar.className = 'startup-progress-bar'
+        barContainer.appendChild(bar)
+
+        this.container.appendChild(textColumn)
+        this.container.appendChild(barContainer)
+
+        return bar
     }
 }

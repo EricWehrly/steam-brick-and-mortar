@@ -8,7 +8,6 @@
 
 import './styles/main.css'
 import { SteamBrickAndMortarApp } from './core'
-import { StartupEventTracker, StartupPhase } from './utils/StartupEventTracker'
 import './debug/GameFinder'  // Self-executing on GameStart
 import './debug/GameArtworkInspector'  // Self-executing on GameStart
 
@@ -29,9 +28,7 @@ export async function initializeApp(): Promise<void> {
     isInitializing = true
     
     try {
-        // Mark page load completion
-        const tracker = StartupEventTracker.getInstance()
-        tracker.phaseEnd(StartupPhase.PageLoad)
+        // CoreInit begins in the SteamBrickAndMortarApp constructor; nothing to mark here.
         
         
         
