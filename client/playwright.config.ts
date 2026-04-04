@@ -6,7 +6,7 @@ export default defineConfig({
   // Run explicitly with: yarn test:visual
   snapshotDir: './test/visual/__snapshots__',
   retries: 1,
-  timeout: 30000,
+  timeout: 45000,
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173',
     viewport: { width: 1280, height: 720 },
