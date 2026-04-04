@@ -307,8 +307,10 @@ export class LightingRenderer {
     private async setupEnhancedLighting(): Promise<void> {
         LightingRenderer.logger.lifecycle('💡 Setting up ENHANCED lighting - optimized retail atmosphere')
         
-        // Ambient light: now enabled by default with increased intensity (was 0.02, now ~0.023)
-        const ambientLight = this.lightFactory.createAmbientLight(0xFFF8E7, (this.config.ambientIntensity ?? 0.02) * 1.15, {
+        // Ambient light — warm retail white, noticeable brightness.
+        // ambientIntensity in config is near-zero by design (keeps specular bias down),
+        // but ambient *base* must be high enough to see the room before fixtures kick in.
+        const ambientLight = this.lightFactory.createAmbientLight(0xFFF8E7, 0.45, {
             name: LIGHT_NAMES.AMBIENT,
             parent: this.lightingGroup
         })
@@ -364,7 +366,7 @@ export class LightingRenderer {
         LightingRenderer.logger.info(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient enabled, directional/spot/point disabled by default)`)
                 // Ensure proper state when enhanced lighting takes over
         this.toggleLighting(true)
-        this.toggleDebugHelpers(false)
+        this.toggleDebugVisualization(false)
 
         LightingRenderer.logger.debug(`💡 Ceiling fixtures will be added when shelf layout is determined`)
     }
@@ -632,6 +634,9 @@ export class LightingRenderer {
     }
 
     private clearLights(): void {
+        // Clear registry first so the controls panel doesn't see stale entries
+        this.registry.clear()
+
         // Preserve ceiling fixtures if they exist (added when shelves spawn)
         const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
         if (existingFixtures) {
