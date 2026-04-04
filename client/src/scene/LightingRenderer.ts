@@ -19,6 +19,7 @@ import { LightingDebugHelper } from './LightingDebugHelper'
 import { AppSettings, LIGHTING_QUALITY, type LightingQuality } from '../core/AppSettings'
 import { EventManager, EventSource } from '../core/EventManager'
 import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent, RoomEventTypes, type RoomCreatedEvent, type RoomResizedEvent } from '../types/InteractionEvents'
+import { StorePropsEventTypes } from './props/PropsEvents'
 import { LightFactory } from '../lighting/LightFactory'
 import { LightRegistry } from '../lighting/LightRegistry'
 import { Logger } from '../utils/Logger'
@@ -125,6 +126,16 @@ export class LightingRenderer {
         this.eventManager.registerEventHandler(RoomEventTypes.Resized, (event: CustomEvent<RoomResizedEvent>) => {
             this.updateRoomDimensions(event.detail.dimensions, event.detail.shelfLayout, event.detail.centerOffset) 
         })
+
+        this.eventManager.registerDefaultHandler(
+            StorePropsEventTypes.SetupRequest,
+            this.setupBasicLighting.bind(this)
+        )
+
+        this.eventManager.registerDefaultHandler(
+            StorePropsEventTypes.SetupCompleted,
+            this.upgradeLighting.bind(this)
+        )
     }
 
     /**
