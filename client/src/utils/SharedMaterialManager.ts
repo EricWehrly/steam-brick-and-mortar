@@ -16,6 +16,8 @@ import * as THREE from 'three'
 import { MaterialUtils } from './MaterialUtils'
 import { Logger } from './Logger'
 import { ProceduralTextureWorker } from './textures/ProceduralTextureWorker'
+import { EventManager } from '../core/EventManager'
+import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 
 export enum MaterialType {
     FallbackGameBox = 'fallbackGameBox',
@@ -51,6 +53,11 @@ export class SharedMaterialManager {
 
     private constructor() {
         // Lightweight — no sync texture generation here.
+
+        EventManager.getInstance().registerDefaultHandler(
+            StorePropsEventTypes.SetupRequest,
+            this.prewarm.bind(this)
+        )
     }
 
     public static getInstance(): SharedMaterialManager {
@@ -79,34 +86,37 @@ export class SharedMaterialManager {
      * Pre-warm all procedurally-generated materials off the main thread.
      * Call once at startup. Subsequent calls return the same Promise (idempotent).
      */
-    public async prewarm(): Promise<void> {
+﻿    public prewarm(): Promise<void> {
+        if (this.disposed) return Promise.resolve()
         if (this.prewarmPromise) return this.prewarmPromise
-        this.prewarmPromise = this.doPrewarm()
+
+        this.prewarmPromise = (async () => {
+            if (!this.materialPool) this.initialize()
+            const worker = ProceduralTextureWorker.getInstance()
+            const t0 = performance.now()
+            SharedMaterialManager.logger.debug('🚀 Starting off-thread material prewarm...')
+
+            await Promise.all([
+                this.prewarmMDFVeneer(worker),
+                this.prewarmCarpet(worker),
+                this.prewarmCeiling(worker),
+                this.prewarmWallWood(worker),
+                this.prewarmBasicWood(worker),
+            ])
+
+            SharedMaterialManager.logger.debug(
+                `✨ Material prewarm complete in ms`
+            )
+        })().catch(err => {
+            SharedMaterialManager.logger.warn('Material prewarm failed, continuing with fallback materials:', err)
+        })
+
         return this.prewarmPromise
     }
 
-    private async doPrewarm(): Promise<void> {
-        if (!this.materialPool) this.initialize()
-        const worker = ProceduralTextureWorker.getInstance()
-        const t0 = performance.now()
-        SharedMaterialManager.logger.debug('🎨 Starting off-thread material prewarm...')
 
-        await Promise.all([
-            this.prewarmMDFVeneer(worker),
-            this.prewarmCarpet(worker),
-            this.prewarmCeiling(worker),
-            this.prewarmWallWood(worker),
-            this.prewarmBasicWood(worker),
-        ])
+    // --- Public API ----------------------------------------------------------
 
-        SharedMaterialManager.logger.debug(
-            `✅ Material prewarm complete in ${(performance.now() - t0).toFixed(0)}ms`
-        )
-    }
-
-    // ─── Public API ──────────────────────────────────────────────────────────
-
-    /** Returns a material from cache (instant), or creates it synchronously as fallback. */
     public getMaterial(type: MaterialType): THREE.MeshStandardMaterial {
         if (!this.materialPool) this.initialize()
 

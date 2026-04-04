@@ -31,7 +31,6 @@ import type { AppConfig as DIAppConfig } from './di'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { RenderLoopDiagnostics } from '../debug/RenderLoopDiagnostics'
 import { Logger, LogLevel } from '../utils/Logger'
-import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 // Side-effect import: registers GpuMemoryEstimator to window for console debugging
 import '../debug/GpuMemoryEstimator'
 
@@ -183,13 +182,6 @@ export class SteamBrickAndMortarApp {
             await this.container.initialize()
             this.startupTracker.phaseEnd(StartupPhase.DIContainerSetup)
 
-            // Kick off procedural material pre-warming in parallel with coordinator resolution.
-            // Fire-and-forget — the scene setup pipeline is async enough that materials
-            // will be ready by the time shelves are actually built. Swallow errors gracefully
-            // (worst case: getMaterial() returns flat-colour fallback).
-            SharedMaterialManager.getInstance().prewarm().catch(err => {
-                console.warn('Material prewarm failed, using sync fallback:', err)
-            })
 
             this.startupTracker.phaseStart(StartupPhase.CoordinatorResolution, 'Resolving coordinators from DI')
             
