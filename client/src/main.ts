@@ -33,7 +33,7 @@ export async function initializeApp(): Promise<void> {
         const tracker = StartupEventTracker.getInstance()
         tracker.phaseEnd(StartupPhase.PageLoad)
         
-        console.log('🚀 Starting Steam Brick and Mortar...')
+        
         
         const app = new SteamBrickAndMortarApp({
             scene: {

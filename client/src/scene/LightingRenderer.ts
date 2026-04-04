@@ -164,7 +164,7 @@ export class LightingRenderer {
             new GameSpotlight()
             
             const duration = window.performance.now() - startTime
-            LightingRenderer.logger.info(`✅ Basic lighting ready in ${duration.toFixed(1)}ms (advanced lighting will load in background)`)
+            LightingRenderer.logger.debug(`✅ Basic lighting ready in ${duration.toFixed(1)}ms (advanced lighting will load in background)`)
         } catch (error) {
             LightingRenderer.logger.error('❌ Failed to set up basic lighting:', error)
             // Absolute fallback - just ambient
@@ -212,7 +212,7 @@ export class LightingRenderer {
             // toggleLighting() is only for user-triggered master on/off via UI
             
             const duration = window.performance.now() - startTime
-            LightingRenderer.logger.info(`✅ Advanced lighting setup complete in ${duration.toFixed(1)}ms!`)
+            LightingRenderer.logger.debug(`✅ Advanced lighting setup complete in ${duration.toFixed(1)}ms!`)
             
             // Emit system ready event for UI components
             this.eventManager.emit(LightingEventTypes.SystemReady, {
@@ -305,7 +305,7 @@ export class LightingRenderer {
             position: [0, 10, 0]
         })
         
-        LightingRenderer.logger.info(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
+        LightingRenderer.logger.debug(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
     }
 
     private async setupEnhancedLighting(): Promise<void> {
@@ -367,7 +367,7 @@ export class LightingRenderer {
         // NOTE: Fixtures are added later when shelf layout is known (via updateRoomDimensions)
         // This keeps initial room lit with base lighting before shelves spawn
         
-        LightingRenderer.logger.info(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient enabled, directional/spot/point disabled by default)`)
+        LightingRenderer.logger.debug(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient enabled, directional/spot/point disabled by default)`)
                 // Ensure proper state when enhanced lighting takes over
         this.toggleLighting(true)
         this.toggleDebugVisualization(false)
@@ -381,7 +381,7 @@ export class LightingRenderer {
         await this.setupEnhancedLighting()
         this.addPointLights()
         
-        LightingRenderer.logger.info(`✅ Advanced lighting: ${this.lightingGroup.children.length} lights/groups added`)
+        LightingRenderer.logger.debug(`✅ Advanced lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
 
     private async setupOuchMyEyesLighting(): Promise<void> {
@@ -390,7 +390,7 @@ export class LightingRenderer {
         await this.setupAdvancedLighting()
         this.addDramaticLighting()
         
-        LightingRenderer.logger.info(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
+        LightingRenderer.logger.debug(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
 
     private async setupFluorescentFixtures(shelfLayout?: { rows: number; shelvesPerRow: number }): Promise<void> {
@@ -426,7 +426,7 @@ export class LightingRenderer {
         this.lightingGroup.add(fixtures)
         
         monitor.end({ fixtureCount: fixtureRows * fixturesPerRow, shelfRows })
-        LightingRenderer.logger.info(`💡 Created ${fixtureRows * fixturesPerRow} ceiling fixtures (${fixtureRows} rows x ${fixturesPerRow} per row) for ${shelfRows} shelf rows`)
+        LightingRenderer.logger.debug(`💡 Created ${fixtureRows * fixturesPerRow} ceiling fixtures (${fixtureRows} rows x ${fixturesPerRow} per row) for ${shelfRows} shelf rows`)
     }
 
     private addPointLights(): void {
@@ -583,7 +583,7 @@ export class LightingRenderer {
         
         // Force renderer to regenerate shadow maps
         this.renderer.shadowMap.needsUpdate = true
-        LightingRenderer.logger.info('✅ Shadow refresh completed')
+        LightingRenderer.logger.debug('✅ Shadow refresh completed')
     }
 
 
@@ -595,7 +595,7 @@ export class LightingRenderer {
         const light = this.lightingGroup.getObjectByName(lightName) as THREE.Light
         if (light) {
             light.visible = enabled
-            LightingRenderer.logger.info(`💡 ${lightName} light ${enabled ? 'enabled' : 'disabled'}`)
+            LightingRenderer.logger.debug(`💡 ${lightName} light ${enabled ? 'enabled' : 'disabled'}`)
         } else {
             LightingRenderer.logger.warn(`⚠️ Light '${lightName}' not found for toggle`)
         }

@@ -187,7 +187,7 @@ export class LightingDebugHelper {
                 }
             }
         }
-        console.log('🔴 Cleared all lighting debug helpers')
+        
     }
 
     /**

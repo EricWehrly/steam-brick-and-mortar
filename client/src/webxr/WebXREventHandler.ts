@@ -61,7 +61,7 @@ export class WebXREventHandler {
         }
         
         this.setupEventListeners()
-        WebXREventHandler.logger.info('WebXREventHandler initialized')
+        WebXREventHandler.logger.debug('WebXREventHandler initialized')
     }
 
     private setupEventListeners(): void {
@@ -113,17 +113,17 @@ export class WebXREventHandler {
     }
 
     private async handleWebXRToggle(_event: WebXRToggleEvent): Promise<void> {
-        WebXREventHandler.logger.info('Handling WebXR toggle request')
+        WebXREventHandler.logger.debug('Handling WebXR toggle request')
         await this.webxrCoordinator.handleWebXRToggle()
     }
 
     private handleWebXRSessionStart(_event: WebXRSessionStartEvent): void {
-        WebXREventHandler.logger.info('WebXR session started')
+        WebXREventHandler.logger.debug('WebXR session started')
         this.webxrUICoordinator.updateWebXRSessionState(true)
     }
 
     private handleWebXRSessionEnd(_event: WebXRSessionEndEvent): void {
-        WebXREventHandler.logger.info('WebXR session ended')
+        WebXREventHandler.logger.debug('WebXR session ended')
         this.webxrUICoordinator.updateWebXRSessionState(false)
     }
 
@@ -133,7 +133,7 @@ export class WebXREventHandler {
     }
 
     private handleWebXRSupportChange(event: WebXRSupportChangeEvent): void {
-        WebXREventHandler.logger.info('WebXR capabilities changed:', event.capabilities)
+        WebXREventHandler.logger.debug('WebXR capabilities changed:', event.capabilities)
         this.webxrUICoordinator.updateWebXRSupport(event.capabilities)
     }
 
@@ -170,6 +170,6 @@ export class WebXREventHandler {
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuOpen, this.boundHandlers.onMenuOpen)
         this.eventManager.deregisterEventHandler(UIEventTypes.MenuClose, this.boundHandlers.onMenuClose)
         
-        WebXREventHandler.logger.info('WebXREventHandler disposed')
+        WebXREventHandler.logger.debug('WebXREventHandler disposed')
     }
 }

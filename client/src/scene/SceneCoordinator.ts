@@ -135,7 +135,7 @@ export class SceneCoordinator {
             const presetName = config.skyboxPreset ?? 'aurora'
             const preset = (SkyboxPresets as any)[presetName] || SkyboxPresets.aurora
             await this.skyboxManager.applySkybox(preset)
-            console.log('🌌 Skybox loaded')
+            
         } catch (error) {
             console.warn('⚠️ Skybox loading failed:', error)
         }
@@ -143,7 +143,7 @@ export class SceneCoordinator {
         // 🏪 STEP 3: Props (room, shelves, games - the heavy stuff)
         tracker.milestone(StartupPhase.SceneConstruction, 'Building store')
         this.requestPropsSetup()
-        console.log('🏪 Props setup requested - store environment loading!')
+        
     }
 
     private requestPropsSetup(): void {

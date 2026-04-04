@@ -122,7 +122,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         if (event.detail.rendererType !== 'shelf') return
         
         this.isShelfRendererReady = true
-        console.log('✅ Shelf renderer ready via event')
+        
         
         // Process any queued initialization callbacks
         while (this.initializationQueue.length > 0) {

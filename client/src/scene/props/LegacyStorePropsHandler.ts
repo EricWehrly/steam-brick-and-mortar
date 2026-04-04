@@ -27,7 +27,7 @@ export class LegacyStorePropsHandler {
     private constructor() {
         this.eventManager = EventManager.getInstance()
         this.registerAsDefault()
-        LegacyStorePropsHandler.logger.info('LegacyStorePropsHandler initialized and registered as default')
+        LegacyStorePropsHandler.logger.debug('LegacyStorePropsHandler initialized and registered as default')
     }
     
     private registerAsDefault(): void {
@@ -55,7 +55,7 @@ export class LegacyStorePropsHandler {
         const { config } = event.detail
         
         try {
-            LegacyStorePropsHandler.logger.info('Handling store props setup request with legacy renderer')
+            LegacyStorePropsHandler.logger.debug('Handling store props setup request with legacy renderer')
             
             // NOTE: This handler only runs when NO override handler (GpuStorePropsEventHandler) is registered
             // If system has GPU capabilities, GpuStorePropsEventHandler registers as override and this won't be called
@@ -93,7 +93,7 @@ export class LegacyStorePropsHandler {
                 source: EventSource.System
             })
             
-            LegacyStorePropsHandler.logger.info(`Legacy store props setup completed in ${setupTimeMs.toFixed(2)}ms`)
+            LegacyStorePropsHandler.logger.debug(`Legacy store props setup completed in ${setupTimeMs.toFixed(2)}ms`)
             
         } catch (error) {
             LegacyStorePropsHandler.logger.error('Legacy store props setup failed:', error)
@@ -121,6 +121,6 @@ export class LegacyStorePropsHandler {
             this.renderer.dispose()
             this.renderer = null
         }
-        LegacyStorePropsHandler.logger.info('LegacyStorePropsHandler disposed')
+        LegacyStorePropsHandler.logger.debug('LegacyStorePropsHandler disposed')
     }
 }
