@@ -142,7 +142,7 @@ export class LightingRenderer {
      * Setup basic lighting fast - just ambient + directional
      * This lets the scene become visible quickly without expensive fixtures
      */
-    public async setupBasicLighting(): Promise<void> {
+    private async setupBasicLighting(): Promise<void> {
         const startTime = window.performance.now()
         this.config = this.getCurrentConfig()
         
@@ -179,7 +179,7 @@ export class LightingRenderer {
      * unnecessary — or should be restructured to add lights incrementally rather
      * than clear-and-rebuild.
      */
-    public async upgradeLighting(): Promise<void> {
+    private async upgradeLighting(): Promise<void> {
         const monitor = PerformanceMonitor.start('lighting-upgrade', LightingRenderer.logger)
         const startTime = window.performance.now()
         this.config = this.getCurrentConfig()
@@ -467,7 +467,7 @@ export class LightingRenderer {
         })
     }
 
-    public async updateLightingQuality(quality: LightingQuality): Promise<void> {
+    private async updateLightingQuality(quality: LightingQuality): Promise<void> {
         this.debugHelper.clearHelpers()
         this.clearLights()
         
@@ -627,7 +627,7 @@ export class LightingRenderer {
         }
     }
 
-    public clearLights(): void {
+    private clearLights(): void {
         // Preserve ceiling fixtures if they exist (added when shelves spawn)
         const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
         if (existingFixtures) {
