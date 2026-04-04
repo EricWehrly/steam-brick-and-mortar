@@ -208,6 +208,15 @@ export class StartupProgressUI {
             this.container.parentElement.removeChild(this.container)
         }
         this.isVisible = false
+
+        // Signal for Playwright visual tools.
+        // TODO: ideally this should be driven by a semantic "world fully interactive" event
+        // once the startup sequence is cleaned up — something that fires after prewarm completes
+        // AND all batches are rendered, not just after the progress UI fades out.
+        // For now, overlay removal is the closest reliable "visually done" moment we have.
+        if (import.meta.env.DEV) {
+            (window as any).__playwrightSceneReady = true
+        }
     }
     
     public showError(message: string): void {
