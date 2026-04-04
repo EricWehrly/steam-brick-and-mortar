@@ -1,57 +1,36 @@
-# Documentation Navigation
+# Steam Brick and Mortar - LLM Exobrain
 
-This directory contains all project documentation organized by category.
+This directory is structured specifically as a knowledge base and entrypoint for AI agents (like Vex) working on the project.
 
-## 📁 Directory Structure
+## Where to start
+1. Read oadmaps/current-status.md to understand what we are working on right now.
+2. Read gent-context/startup-sequence.md to understand the 5-phase startup architecture.
+3. Read gent-context/component-interaction-map.md to understand the DI and event flow.
 
-### 🎯 **Active Planning**
-- [`active/`](./active/) - Current roadmaps, feature plans, and active work
-  - Current roadmap and planning documents
-  - Feature plans in development
-  - Technical debt tracking
+## Directory Structure
 
-### 🏗️ **Architecture & Design**
-- [`architecture/`](./architecture/) - System design and technical decisions
-  - WebXR architecture decisions
-  - Infrastructure design (AWS Lambda, API Gateway)
-  - CDN access strategy
+### ?? gent-context/
+High-value, fast-load architectural rules and interaction maps. **Read these to understand how the codebase works.**
 
-### 📋 **Development Guidelines**
-- [`guidelines/`](./guidelines/) - Development standards and practices
-  - README writing guidelines
-  - Testing guidelines
-  - Reference links and documentation
+### ?? oadmaps/
+**Active work and tracking.**
+- current-status.md - The immediate focus.
+- ugs.md - Active bugs.
+- 	ech-debt.md - Known technical debt.
+- phaseX...md - High-level project milestones.
 
-### 🔬 **Research**
-- [`research/`](./research/) - Completed research organized by topic
-  - [`alternatives/`](./research/alternatives/) - Technology comparisons and alternatives
-  - [`installation/`](./research/installation/) - Tool installation and setup research
-  - [`steam-api/`](./research/steam-api/) - Steam Web API research and findings
-  - [`implementation/`](./research/implementation/) - Implementation-specific research
+### ?? plans/
+**Pending feature plans and refactor proposals.**
+These are things we *intend* to do, but are not actively coding right this second. Check these before starting a new major feature to see if we already designed it.
 
-### 📚 **Archive**
-- [`archive/`](./archive/) - Completed work and historical documents
-  - [`phases/`](./archive/phases/) - Completed phase summaries
-  - [`appearance/`](./archive/appearance/) - Visual design phase documentation
+### ??? rchitecture/
+**Deep-dive technical design documents.**
+Read these when touching specific complex systems (e.g., WebXR, Instancing, Event-Driven patterns).
 
-## 🗺️ **Main Roadmap Files** (Root Level)
+### ?? guidelines/
+**Conventions and rules.**
+UI patterns, testing rules, etc.
 
-The three main roadmap documents remain in the root for easy access:
-
-- [`roadmap-phase1-ready-for-me.md`](./roadmap-phase1-ready-for-me.md) - Phase 1: Personal demo readiness
-- [`roadmap-phase2-ready-for-friends.md`](./roadmap-phase2-ready-for-friends.md) - Phase 2: Shared demo readiness  
-- [`roadmap-phase3-ready-for-everyone.md`](./roadmap-phase3-ready-for-everyone.md) - Phase 3: Public release readiness
-
-## 🚀 **Quick Start**
-
-- **Current work**: See [`active/roadmap.md`](./active/roadmap.md) for the current focus
-- **Architecture overview**: Start with [`architecture/webxr-architecture.md`](./architecture/webxr-architecture.md)
-- **Development setup**: Check [`guidelines/`](./guidelines/) for development standards
-- **Research findings**: Browse [`research/`](./research/) by topic area
-
-## 📝 **Contributing to Documentation**
-
-- Follow guidelines in [`guidelines/readme-guidelines.md`](./guidelines/readme-guidelines.md)
-- Keep active work in [`active/`](./active/)
-- Move completed research to appropriate [`research/`](./research/) subfolder
-- Archive completed phases in [`archive/`](./archive/)
+### ?? esearch/ & ??? rchive/
+**Historical context.**
+Do not read these unless specifically looking for why a past decision was made or how an old feature worked.
