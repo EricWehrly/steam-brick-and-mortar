@@ -81,14 +81,14 @@ export class SceneCoordinator {
         // Initialize room manager for event-driven room structure (retrieves scene from DataManager)
         this.roomManager = new RoomManager()
 
-        // Track scene construction phase - will remain open until props complete
+        // Track WorldBuild phase — opens here, closes when props complete
         const tracker = StartupEventTracker.getInstance()
-        tracker.phaseStart(StartupPhase.SceneConstruction, 'Building 3D environment')
+        tracker.phaseStart(StartupPhase.WorldBuild, 'Building 3D environment')
         
-        // Listen for props setup completion to end scene construction and emit SceneReady
+        // Listen for props setup completion to end WorldBuild and emit SceneReady
         this.eventManager.registerEventHandler(StorePropsEventTypes.SetupCompleted, async () => {
-            tracker.phaseEnd(StartupPhase.SceneConstruction)
-            tracker.milestone(StartupPhase.SceneConstruction, 'Scene fully constructed')
+            tracker.phaseEnd(StartupPhase.WorldBuild)
+            tracker.milestone(StartupPhase.WorldBuild, 'Scene fully constructed')
             
             // Lighting upgrades automatically via SetupCompleted handler natively
             
@@ -131,7 +131,7 @@ export class SceneCoordinator {
         
         try {
             // TODO: Skyboxmanager responds to ready event itself
-            tracker.milestone(StartupPhase.SceneConstruction, 'Creating sky')
+            tracker.milestone(StartupPhase.WorldBuild, 'Creating sky')
             const presetName = config.skyboxPreset ?? 'aurora'
             const preset = (SkyboxPresets as any)[presetName] || SkyboxPresets.aurora
             await this.skyboxManager.applySkybox(preset)
@@ -140,8 +140,8 @@ export class SceneCoordinator {
             console.warn('⚠️ Skybox loading failed:', error)
         }
 
-        // 🏪 STEP 3: Props (room, shelves, games - the heavy stuff)
-        tracker.milestone(StartupPhase.SceneConstruction, 'Building store')
+        // 🏪 Props (room, shelves, games — the heavy stuff)
+        tracker.milestone(StartupPhase.WorldBuild, 'Building store')
         this.requestPropsSetup()
         
     }

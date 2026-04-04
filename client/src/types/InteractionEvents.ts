@@ -378,6 +378,60 @@ export const StorePropsEventTypes = {
 } as const
 
 // =============================================================================
+// APP / STARTUP EVENTS
+// =============================================================================
+
+export const AppEventTypes = {
+    /** Fired when a startup phase begins */
+    PhaseStarted:          'app:phase-started',
+    /** Fired when a startup phase completes (with duration) */
+    PhaseCompleted:        'app:phase-completed',
+    /** Fired for named milestones within a phase */
+    Milestone:             'app:milestone',
+    /** Fired when a detail string should be shown in the progress UI */
+    DetailUpdate:          'app:detail-update',
+    /** Fired when game loading kicks off (DataFetchEncore) */
+    GameLoadingStarted:    'app:game-loading-started',
+    /** Fired when the loading sub-phase changes (cache / fetch) */
+    GameLoadingPhaseChanged: 'app:game-loading-phase-changed',
+    /** Fired with current/total games progress */
+    GameLoadingProgress:   'app:game-loading-progress',
+    /** Fired when startup is fully complete and UI should fade out */
+    StartupComplete:       'app:startup-complete',
+} as const
+
+export interface PhaseCompletedEvent extends BaseInteractionEvent {
+    /** StartupPhase value (string enum) */
+    phase: string
+    timestamp: number
+    duration: number
+}
+
+export interface MilestoneEvent extends BaseInteractionEvent {
+    description: string
+}
+
+export interface DetailUpdateEvent extends BaseInteractionEvent {
+    detail: string
+}
+
+export interface GameLoadingStartedEvent extends BaseInteractionEvent {
+    totalGames: number
+    /** StartupPhase value (string enum) */
+    phase: string
+}
+
+export interface GameLoadingPhaseChangedEvent extends BaseInteractionEvent {
+    loadingPhase: 'cache' | 'fetch' | 'batch'
+    detail: string
+}
+
+export interface GameLoadingProgressEvent extends BaseInteractionEvent {
+    current: number
+    total: number
+}
+
+// =============================================================================
 // EVENT TYPE MAPPINGS
 // =============================================================================
 
