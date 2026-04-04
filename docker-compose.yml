@@ -33,6 +33,22 @@ services:
       - NODE_ENV=development
     command: npm run test-browser
 
+  # Playwright visual tools — screenshot capture and console log collection
+  # Targets the Vite dev server running on the host (host.docker.internal:5173)
+  # Run: docker compose run --rm playwright
+  # Or:  yarn test:visual:docker  (from client/)
+  playwright:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.playwright
+    environment:
+      - PLAYWRIGHT_BASE_URL=http://host.docker.internal:5173
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Mount test-results back to host so screenshots/reports are accessible
+      - ./client/test-results:/app/test-results
+
 volumes:
   blender-cache:
     driver: local

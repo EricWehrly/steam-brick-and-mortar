@@ -20,10 +20,13 @@
     "clean": "rm -rf dist node_modules .vite",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:visual": "playwright test --config playwright.config.ts",
+    "test:visual:docker": "docker compose -f ../docker-compose.yml run --rm playwright"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.59.1",
     "@types/node": "^24.7.2",
     "@types/three": "^0.183.1",
     "@typescript-eslint/eslint-plugin": "^8.58.0",

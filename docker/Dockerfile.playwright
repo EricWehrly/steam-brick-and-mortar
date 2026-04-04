@@ -1,0 +1,18 @@
+FROM mcr.microsoft.com/playwright:v1.59.1-noble
+
+WORKDIR /app
+
+# Copy the client source
+COPY client/ .
+
+# Use npm to install (avoids Yarn PnP workspace resolution issues in container)
+# Generate package-lock from package.json, then install cleanly
+RUN npm install --legacy-peer-deps
+
+# Playwright browsers are already baked into the base image — just link them
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# Default: run visual tests against host Vite dev server
+ENV PLAYWRIGHT_BASE_URL=http://host.docker.internal:5173
+
+CMD ["npx", "playwright", "test", "--config", "playwright.config.ts"]
