@@ -143,14 +143,10 @@ export class SceneCoordinator {
         }
 
         try {
-            // TODO: lightingRenderer Own event registration
+            // LightingRenderer manages its own lifecycle natively via EventManager
             tracker.milestone(StartupPhase.SceneConstruction, 'Adding lights')
-            await this.lightingRenderer.setupBasicLighting()
-            // TODO: move this to after props spawn event
-            this.lightingRenderer.refreshShadows()
-            console.log('💡 Lighting ready')
         } catch (error) {
-            console.warn('⚠️ Lighting setup failed:', error)
+            console.warn('Lighting setup failed:', error)
         }
 
         // 🏪 STEP 3: Props (room, shelves, games - the heavy stuff)
