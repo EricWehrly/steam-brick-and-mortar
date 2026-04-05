@@ -402,7 +402,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                 this.ensureMeshesAddedToScene()
             }
             
-            const shelfUnit = this.applyShelfUnitTemplate(index, data.position, shelfConfig)
+            const shelfUnit = this.applyShelfUnitTemplate(index, data.position, shelfConfig, data.rotation)
             this.shelfUnits.set(index, shelfUnit)
             
             InstancedShelfRenderer.logger.debug(`🏪 Set shelf unit ${index} at position (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
@@ -441,7 +441,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     private applyShelfUnitTemplate(
         shelfUnitIndex: number,
         position: THREE.Vector3,
-        _config: Required<ShelfConfig>
+        _config: Required<ShelfConfig>,
+        unitRotation?: THREE.Quaternion
     ): ShelfUnitInstance {
         const instanceIndices = {
             angledBoards: [] as number[],
@@ -451,7 +452,11 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
         
         for (const part of this.shelfUnitTemplate) {
-            const worldPos = position.clone().add(part.offset)
+            // Rotate the part offset around the unit origin if a Y rotation is provided
+            const rotatedOffset = unitRotation
+                ? part.offset.clone().applyQuaternion(unitRotation)
+                : part.offset.clone()
+            const worldPos = position.clone().add(rotatedOffset)
             let instanceIndex: number
             let manager: InstancedMeshManager
             let indicesArray: number[]
@@ -479,7 +484,11 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                     break
             }
             
-            manager.setInstanceMatrix(instanceIndex, worldPos, part.rotation, part.scale)
+            // Combine unit-level Y rotation with part's own rotation (e.g. shelf board tilt)
+            const finalRotation = unitRotation
+                ? (part.rotation ? unitRotation.clone().multiply(part.rotation) : unitRotation.clone())
+                : part.rotation
+            manager.setInstanceMatrix(instanceIndex, worldPos, finalRotation, part.scale)
             
             if (part.customAttributes) {
                 for (const attr of part.customAttributes) {
