@@ -49,7 +49,13 @@ export class MeshPrewarmer {
      * No-op if prewarm has already completed or KHR is unavailable.
      */
     public register(mesh: THREE.InstancedMesh): void {
-        if (this.completed) return
+        if (this.completed) {
+            MeshPrewarmer.logger.warn(
+                `register("${mesh.name}") called after prewarm completed — mesh will compile on first render. ` +
+                `If this is unexpected, ensure register() is called before the prewarm debounce fires.`
+            )
+            return
+        }
 
         const capabilities = SystemCapabilitiesDetector.detect()
         if (!capabilities.hasParallelShaderCompile) return
