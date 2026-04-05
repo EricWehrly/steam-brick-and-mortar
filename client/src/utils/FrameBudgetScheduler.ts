@@ -61,11 +61,19 @@ export interface FrameBudgetSchedulerConfig {
     /** Number of frames to track for rolling average (default: 60) */
     ringBufferSize?: number
     /**
-     * After a heavy frame (any frame that caused a force or exceeded budget),
+     * After a heavy frame (one that exceeded the frame time budget),
      * skip this many frames before processing tasks again. Provides breathing
      * room so the renderer can catch up. Default: 2.
+     * Note: force-executed tasks (anti-starvation) do NOT trigger cooldown on their own.
      */
     heavyFrameCooldownFrames?: number
+    /**
+     * If a frame gap exceeds this many ms, treat it as a deliberate pause
+     * (tab hidden, rAF suspended) rather than genuine overload.
+     * Pending task timestamps are shifted forward so they don't appear overdue.
+     * Default: 500ms.
+     */
+    pauseGapThresholdMs?: number
 }
 
 const PRIORITY_MAP = { low: 0, normal: 1, high: 2 } as const
@@ -100,7 +108,10 @@ export class FrameBudgetScheduler {
     private totalTasksDeferred = 0
     private totalTasksForced = 0
 
-    // Cooldown state: skip N frames after a heavy frame
+    // Pause/resume detection
+    private readonly pauseGapThresholdMs: number
+
+    // Cooldown state: skip N frames after a heavy (over-budget) frame
     private heavyFrameCooldownFrames: number
     private cooldownFramesRemaining = 0
     
@@ -111,6 +122,7 @@ export class FrameBudgetScheduler {
         this.maxTasksPerFrame = config.maxTasksPerFrame ?? 1  // take longer, ride smoother
         this.defaultMaxDeferMs = config.defaultMaxDeferMs ?? 400
         this.heavyFrameCooldownFrames = config.heavyFrameCooldownFrames ?? 120
+        this.pauseGapThresholdMs = config.pauseGapThresholdMs ?? 500
         
         const ringSize = config.ringBufferSize ?? 60
         this.frameTimeRing = new Float32Array(ringSize)
@@ -134,6 +146,17 @@ export class FrameBudgetScheduler {
         if (this.lastFrameTime > 0) {
             const delta = now - this.lastFrameTime
             this.updateFrameTime(delta)
+
+            // If the gap looks like a deliberate rAF pause (tab hidden, window minimized),
+            // shift all pending task timestamps forward by the gap so they don't appear
+            // overdue when the app resumes. This prevents a burst of forced executions
+            // on re-focus that would all fire as if they'd been "waiting" for the full
+            // hidden duration.
+            if (delta > this.pauseGapThresholdMs && this.pendingTasks.length > 0) {
+                for (const task of this.pendingTasks) {
+                    task.queuedAt += delta
+                }
+            }
         }
         
         this.lastFrameTime = now
@@ -239,7 +262,7 @@ export class FrameBudgetScheduler {
         }
         
         let tasksExecuted = 0
-        let heavyFrameTriggered = false
+        let budgetExceeded = false
         
         while (this.pendingTasks.length > 0 && tasksExecuted < this.maxTasksPerFrame) {
             const task = this.pendingTasks[0]
@@ -247,22 +270,21 @@ export class FrameBudgetScheduler {
             // maxDeferMs === 0 means "never force — cosmetic update, skip if busy"
             if (task.maxDeferMs === 0) {
                 if (!this.hasBudget(task.estimatedMs)) {
+                    budgetExceeded = true
                     break
                 }
             } else {
                 // Anti-starvation: force if task has been waiting too long.
-                // Clamp wait time to maxDeferMs * 3 so a deliberate tab-hidden pause
-                // (where rAF stops but queuedAt keeps accruing) doesn't instantly
-                // force-flush the entire queue when focus returns.
-                const rawWait = now - task.queuedAt
-                const waitTime = Math.min(rawWait, task.maxDeferMs * 3)
+                // Note: pause-resume gaps are already compensated in onFrameStart by
+                // advancing queuedAt, so this check reflects genuine scheduler delay.
+                const waitTime = now - task.queuedAt
                 const forceExecution = waitTime > task.maxDeferMs
                 
                 if (forceExecution) {
-                    FrameBudgetScheduler.logger.warn(`Task forced after ${rawWait.toFixed(0)}ms wait (limit: ${task.maxDeferMs}ms) - system may be overloaded`)
+                    FrameBudgetScheduler.logger.warn(`Task forced after ${waitTime.toFixed(0)}ms wait (limit: ${task.maxDeferMs}ms) - system may be overloaded`)
                     this.totalTasksForced++
-                    heavyFrameTriggered = true
                 } else if (!this.hasBudget(task.estimatedMs)) {
+                    budgetExceeded = true
                     break
                 }
             }
@@ -279,11 +301,11 @@ export class FrameBudgetScheduler {
         
         this.tasksExecutedLastFrame = tasksExecuted
 
-        // Only impose cooldown after a *forced* execution (genuine overload signal).
-        // Normal within-budget task execution doesn't warrant blocking the queue for
-        // 120 frames — that would stall lightweight tasks (texture copies, mesh inserts)
-        // for 2+ seconds and cause them to force-fire repeatedly.
-        if (heavyFrameTriggered && this.heavyFrameCooldownFrames > 0) {
+        // Impose cooldown when the frame genuinely ran out of budget — that's the
+        // signal that the system is under load and needs breathing room.
+        // Forced executions (anti-starvation) are already a late response to starvation
+        // and don't warrant adding more delay on top.
+        if (budgetExceeded && this.heavyFrameCooldownFrames > 0) {
             this.cooldownFramesRemaining = this.heavyFrameCooldownFrames
         }
     }

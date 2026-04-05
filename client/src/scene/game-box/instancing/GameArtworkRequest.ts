@@ -13,7 +13,7 @@ import type {
  * Handle to artwork for a specific game.
  * Implements GameArtwork interface with lazy loading.
  */
-export class GameArtworkHandle implements GameArtwork {
+export class GameArtworkRequest implements GameArtwork {
     readonly appId: number
     readonly gameName: string
     readonly format: ArtworkFormat
