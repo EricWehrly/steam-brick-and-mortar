@@ -18,6 +18,7 @@ import { Logger } from './Logger'
 import { ProceduralTextureWorker } from './textures/ProceduralTextureWorker'
 import { EventManager } from '../core/EventManager'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
+import { FrameBudgetScheduler } from './FrameBudgetScheduler'
 
 export enum MaterialType {
     FallbackGameBox = 'fallbackGameBox',
@@ -88,8 +89,8 @@ export class SharedMaterialManager {
      * Pre-warm all procedurally-generated materials off the main thread.
      * Call once at startup. Subsequent calls return the same Promise (idempotent).
      */
-﻿    public prewarm(): Promise<void> {
-        if (this.disposed) return Promise.resolve()
+    public async prewarm(): Promise<void> {
+        if (this.disposed) return
         if (this.prewarmPromise) return this.prewarmPromise
 
         this.prewarmPromise = (async () => {
@@ -107,7 +108,7 @@ export class SharedMaterialManager {
             ])
 
             SharedMaterialManager.logger.debug(
-                `✨ Material prewarm complete in ms`
+                `✨ Material prewarm complete in ${(performance.now() - t0).toFixed(2)}ms`
             )
         })().catch(err => {
             SharedMaterialManager.logger.warn('Material prewarm failed, continuing with fallback materials:', err)
@@ -173,8 +174,12 @@ export class SharedMaterialManager {
         ])
         const diffuse = this.bitmapToTexture(diffuseBitmap, 6, 4)
         const normal  = this.bitmapToTexture(normalBitmap,  6, 4)
-        this.upsertMaterial(MaterialType.MdfVeneer,
-            new THREE.MeshStandardMaterial({ map: diffuse, normalMap: normal, roughness: 0.4, metalness: 0.0 }))
+        
+        FrameBudgetScheduler.getInstance().schedule(
+            () => this.upsertMaterial(MaterialType.MdfVeneer,
+                new THREE.MeshStandardMaterial({ map: diffuse, normalMap: normal, roughness: 0.4, metalness: 0.0 })),
+            { priority: 'normal', estimatedMs: 2 }
+        )
     }
 
     private async prewarmCarpet(worker: ProceduralTextureWorker): Promise<void> {
@@ -182,8 +187,12 @@ export class SharedMaterialManager {
             width: 512, height: 512, color: '#8B0000', fiberDensity: 0.5, roughness: 0.8,
         })
         const texture = this.bitmapToTexture(bitmap, 4, 4)
-        this.upsertMaterial(MaterialType.Carpet,
-            new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9, metalness: 0.0 }))
+        
+        FrameBudgetScheduler.getInstance().schedule(
+            () => this.upsertMaterial(MaterialType.Carpet,
+                new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9, metalness: 0.0 })),
+            { priority: 'normal', estimatedMs: 2 }
+        )
     }
 
     private async prewarmCeiling(worker: ProceduralTextureWorker): Promise<void> {
@@ -191,8 +200,12 @@ export class SharedMaterialManager {
             width: 512, height: 512, color: '#F5F5DC', bumpSize: 0.6, density: 0.8,
         })
         const texture = this.bitmapToTexture(bitmap, 3, 3)
-        this.upsertMaterial(MaterialType.Ceiling,
-            new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9, metalness: 0.0 }))
+        
+        FrameBudgetScheduler.getInstance().schedule(
+            () => this.upsertMaterial(MaterialType.Ceiling,
+                new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9, metalness: 0.0 })),
+            { priority: 'normal', estimatedMs: 2 }
+        )
     }
 
     private async prewarmWallWood(worker: ProceduralTextureWorker): Promise<void> {
@@ -203,12 +216,18 @@ export class SharedMaterialManager {
             }),
             worker.generate('wood_normal', { width: 2048, height: 2048, strength: 0.3 }),
         ])
-        this.upsertMaterial(MaterialType.WallWood,
-            new THREE.MeshStandardMaterial({
-                map: this.bitmapToTexture(d, 3, 1),
-                normalMap: this.bitmapToTexture(n, 3, 1),
-                roughness: 0.8, metalness: 0.1,
-            }))
+        const diffuse = this.bitmapToTexture(d, 3, 1)
+        const normal  = this.bitmapToTexture(n, 3, 1)
+        
+        FrameBudgetScheduler.getInstance().schedule(
+            () => this.upsertMaterial(MaterialType.WallWood,
+                new THREE.MeshStandardMaterial({
+                    map: diffuse,
+                    normalMap: normal,
+                    roughness: 0.8, metalness: 0.1,
+                })),
+            { priority: 'normal', estimatedMs: 2 }
+        )
     }
 
     private async prewarmBasicWood(worker: ProceduralTextureWorker): Promise<void> {
@@ -219,12 +238,18 @@ export class SharedMaterialManager {
             }),
             worker.generate('wood_normal', { width: 2048, height: 2048, strength: 0.18 }),
         ])
-        this.upsertMaterial(MaterialType.BasicWood,
-            new THREE.MeshStandardMaterial({
-                map: this.bitmapToTexture(d, 3, 1),
-                normalMap: this.bitmapToTexture(n, 3, 1),
-                roughness: 0.8, metalness: 0.1,
-            }))
+        const diffuse = this.bitmapToTexture(d, 3, 1)
+        const normal  = this.bitmapToTexture(n, 3, 1)
+
+        FrameBudgetScheduler.getInstance().schedule(
+            () => this.upsertMaterial(MaterialType.BasicWood,
+                new THREE.MeshStandardMaterial({
+                    map: diffuse,
+                    normalMap: normal,
+                    roughness: 0.8, metalness: 0.1,
+                })),
+            { priority: 'normal', estimatedMs: 2 }
+        )
     }
 
     /** Wrap an ImageBitmap in a repeating THREE.Texture. */
