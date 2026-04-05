@@ -225,6 +225,122 @@ describe('FrameBudgetScheduler', () => {
         })
     })
 
+    describe('cooldown and pause-resume gap', () => {
+        it('should NOT set cooldown for forced tasks', () => {
+            scheduler.setMaxTasksPerFrame(2)
+            const executed: string[] = []
+            
+            // Schedule a task with maxDeferMs: 100
+            scheduler.schedule(() => executed.push('forced'), { maxDeferMs: 100 })
+            
+            // Simulate 200ms wait
+            mockNow += 200
+            
+            // This frame should force-fire the task. 
+            // We ensure budget is available so it doesn't trigger cooldown due to budget.
+            // (At frame start it should have budget anyway)
+            scheduler.onFrameStart(mockNow)
+            
+            expect(executed).toContain('forced')
+            expect(scheduler.getStats().totalTasksForced).toBe(1)
+            
+            // Now schedule another task. If cooldown was NOT set, it should run next frame.
+            scheduler.schedule(() => executed.push('next'), { maxDeferMs: 100 })
+            
+            mockNow += 16.67
+            scheduler.onFrameStart(mockNow)
+            
+            expect(executed).toContain('next')
+            expect(scheduler.getStats().pendingTasks).toBe(0)
+        })
+
+        it('should set cooldown when budget is exceeded', () => {
+            scheduler.setMaxTasksPerFrame(1)
+            const executed: string[] = []
+            
+            // Schedule a task that never forces (maxDeferMs: 0)
+            scheduler.schedule(() => executed.push('budgeted'), { maxDeferMs: 0 })
+            
+            // Mock hasBudget to return false (simulate no budget)
+            const hasBudgetSpy = vi.spyOn(scheduler, 'hasBudget').mockReturnValue(false)
+            
+            // Frame start: should see no budget, skip task, and set cooldown
+            scheduler.onFrameStart(mockNow)
+            
+            expect(executed).not.toContain('budgeted')
+            expect(scheduler.getStats().pendingTasks).toBe(1)
+            
+            hasBudgetSpy.mockRestore()
+            
+            // Next frame: even with budget, cooldown should block execution
+            mockNow += 16.67
+            scheduler.onFrameStart(mockNow)
+            
+            expect(executed).not.toContain('budgeted')
+            
+            // Cooldown is 120 frames by default. We can't wait 120 frames easily, 
+            // but we've verified it's blocked.
+        })
+
+        it('should shift queuedAt timestamps on pause-resume gap', () => {
+            const executed: string[] = []
+            // maxDeferMs: 200
+            scheduler.schedule(() => executed.push('task'), { maxDeferMs: 200 })
+            
+            // Initial frame to set lastFrameTime
+            scheduler.onFrameStart(mockNow)
+            
+            // Simulate 1000ms gap (e.g. tab hidden)
+            mockNow += 1000
+            
+            // onFrameStart should detect 1000ms > 500ms (pauseGapThresholdMs)
+            // and shift queuedAt by 1000ms.
+            scheduler.onFrameStart(mockNow)
+            
+            // If it WASN't shifted, waitTime (1000ms) > 200ms would have forced it.
+            // Since it IS shifted, waitTime should be ~0 relative to the new frame start.
+            // It will execute normally in this frame because it's at frame start (budget available),
+            // but we check totalTasksForced to be sure it wasn't FORCED.
+            
+            expect(executed).toContain('task')
+            expect(scheduler.getStats().totalTasksForced).toBe(0)
+        })
+
+        it('should handle forced task and budget-exceeded task in same frame correctly', () => {
+            scheduler.setMaxTasksPerFrame(2)
+            const executed: string[] = []
+            
+            // 1. Task that will be forced
+            scheduler.schedule(() => executed.push('forced'), { maxDeferMs: 50 })
+            
+            // 2. Task that requires budget
+            scheduler.schedule(() => executed.push('budget-check'), { maxDeferMs: 0 })
+            
+            // Wait 100ms so first task is forced
+            mockNow += 100
+            
+            // Mock hasBudget to return false for the second task
+            // We need to be careful: the forced task runs first, then hasBudget is checked for the second.
+            const hasBudgetSpy = vi.spyOn(scheduler, 'hasBudget').mockReturnValue(false)
+            
+            scheduler.onFrameStart(mockNow)
+            
+            expect(executed).toContain('forced')
+            expect(executed).not.toContain('budget-check')
+            expect(scheduler.getStats().totalTasksForced).toBe(1)
+            
+            // Verify cooldown is active by trying to run a third task next frame
+            hasBudgetSpy.mockReturnValue(true) // Restore budget
+            scheduler.schedule(() => executed.push('third'), { maxDeferMs: 100 })
+            
+            mockNow += 16.67
+            scheduler.onFrameStart(mockNow)
+            
+            expect(executed).not.toContain('third')
+            expect(executed).not.toContain('budget-check')
+        })
+    })
+
     describe('cleanup', () => {
         it('should clear pending tasks', () => {
             scheduler.schedule(() => {})
