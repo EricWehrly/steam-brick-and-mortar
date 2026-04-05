@@ -12,7 +12,29 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
-### Types: Tighten `getLightsByType` Constructor Signature
+### Architecture: Review `LegacyStorePropsHandler` value and future
+**Priority**: Low  
+**Effort**: 2-4 hours (investigation + decision)
+**Context**: `LegacyStorePropsHandler` exists as a CPU-fallback path when the GPU instancing check fails. Questions to answer: (1) Does it still function at all without GPU instancing? (2) Can we test it in Docker with SwiftShader or a software renderer? (3) Is there DRY opportunity with `GpuStorePropsEventHandler`, or should they stay fully separate? (4) Is anyone likely to hit this path in practice?
+**Source**: Apr 2026
+
+### Naming: Rename `GameArtworkHandle` to something more descriptive
+**Priority**: Low  
+**Effort**: 30 min  
+**Context**: `GameArtworkHandle` is awkward. The interface is `GameArtwork`; the concrete class is the lazy-loading implementation of it. Candidates: `GameArtworkRequest`, `GameArtworkLoader`, or `GameArtworkImpl`. Pick one and rename the class + file (`GameArtworkHandle.ts`). No behavior change.
+**Source**: Apr 2026
+
+### Convention: Remove noisy JSDoc that just restates the signature
+**Priority**: Low (ongoing hygiene)  
+**Effort**: 5-10 min per file as touched  
+**Context**: Copilot-generated JSDoc that only restates the method name/params adds noise without signal. TypeScript types already describe parameters better. Going forward: remove `/** ... */` blocks that say nothing beyond what the signature already communicates. Keep comments that explain *why*, edge cases, or non-obvious behavior. `GameArtworkProvider.ts` is a good example of over-commented code to clean as we touch it.
+**Source**: Apr 2026
+
+### Performance: Review carpet pattern implementation for DRY/quality improvement (late Phase 2)
+**Priority**: Low  
+**Effort**: 2-4 hours  
+**Context**: Procedural carpet pattern generator was brought in from `origin/carpet-rebase`. It currently runs synchronously on the main thread during the `SharedMaterialManager` prewarm phase. Questions: (1) Should it be worker-offloaded like the other texture generators? (2) Are there DRY opportunities between `ClassicCarpetPatternGenerator`, `GeometricPatternGenerator`, and the base? (3) Does the output quality meet the bar for Phase 2 "ready for friends"? Review after UI system is in place and showcase UI is built.
+**Source**: Apr 2026
 **Priority**: Low
 **Effort**: 30 min
 **Context**: `LightRegistry.getLightsByType<T>` uses `unknown[]` for the constructor rest-args parameter. The linter flags both `any[]` and `unknown[]` as type-system opt-outs. The correct type depends on whether Three.js light constructors share a common abstract base constructor signature — they don't, so this may need a `{ prototype: T }` pattern (no constructor call needed, just `instanceof`) or a mapped type of known light constructors.
@@ -418,7 +440,7 @@ class Foo {
 
 Benefits: no repeated `getInstance()` calls at call sites, the null check lives in one place, and the `#instance` field is truly private (not just `private` TS).
 
-**Agree on the pattern with a poster-child class before going wide.** Good candidates: `FrameBudgetScheduler`, `MeshPrewarmer`, `SharedMaterialManager`.
+**Agree on the pattern with a poster-child class before going wide.** Best first candidate: **`DataManager`** — it's referenced in many files, its `getInstance()` calls are among the noisiest, and it has no complex constructor logic. Once `DataManager` is reshaped and reviewed, apply the pattern to `FrameBudgetScheduler`, `MeshPrewarmer`, `SharedMaterialManager`, etc.
 
 **Files tagged**: (add `// TD: singleton-pattern-refactor` as files are identified)
 
