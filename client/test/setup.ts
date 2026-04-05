@@ -1,7 +1,7 @@
 // Test setup file
 // Add any global test configuration here
 
-import { beforeEach, afterEach } from 'vitest'
+import { beforeEach } from 'vitest'
 import { installMockWorker, resetMockWorkerMessageHandlers } from './utils/mock-worker'
 import { installNetworkIsolation, resetNetworkIsolation } from './utils/network-isolation'
 
@@ -9,8 +9,8 @@ installMockWorker()
 installNetworkIsolation()
 
 beforeEach(() => {
-  resetMockWorkerMessageHandlers()
-  resetNetworkIsolation()
+    resetMockWorkerMessageHandlers()
+    resetNetworkIsolation()
 })
 
 // Mock WebXR API for testing

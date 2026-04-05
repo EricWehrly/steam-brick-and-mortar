@@ -1,7 +1,6 @@
 /**
  * Game Artwork Provider - Universal artwork retrieval for any renderer
  *
- * TD: file-size-500-line-limit (split in progress — GameArtworkRequest extracted)
  * TD: singleton-pattern-refactor
  *
  * - URL for the artwork

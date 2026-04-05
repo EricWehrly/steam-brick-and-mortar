@@ -1,6 +1,9 @@
 /**
  * Shared Material Manager - Material Resource Pooling
  *
+ * TD: singleton-pattern-refactor
+ * TD: carpet-worker-offload
+ *
  * Provides centralized management of shared material instances to reduce
  * material duplication and enable effective batching.
  *
@@ -195,8 +198,11 @@ export class SharedMaterialManager {
         )
     }
 
-    private async prewarmCarpet(worker: ProceduralTextureWorker): Promise<void> {
-        // Use the new generator for the carpet material
+    private async prewarmCarpet(_worker: ProceduralTextureWorker): Promise<void> {
+        // TD: carpet-worker-offload
+        // Currently runs synchronously on the main thread. Should be moved to
+        // ProceduralTextureWorker (add a 'carpet_enhanced' type) like the other
+        // procedural textures. See tech-debt.md for tracking.
         const config = {
             width: 512,
             height: 512,
@@ -205,11 +211,6 @@ export class SharedMaterialManager {
             metalness: 0.0,
             repeat: { x: 4, y: 4 }
         }
-        
-        // Note: ProceduralCarpetPatternGenerator currently runs on main thread in the rebase branch
-        // but SharedMaterialManager expects worker.generate().
-        // For now, we'll keep the worker call if possible, or adapt to the new generator's output.
-        // Actually, the diff showed ProceduralCarpetPatternGenerator.createCarpetMaterial being used.
         
         const material = this.proceduralCarpetPatternGenerator.createCarpetMaterial(config)
         
@@ -378,8 +379,8 @@ export class SharedMaterialManager {
             case MaterialType.Ceiling:
             case MaterialType.WallWood:
             case MaterialType.BasicWood:
-                SharedMaterialManager.logger.warn(
-                    `⚠️ getMaterial(${type}) called before prewarm() — generating synchronously (blocks main thread)`
+                SharedMaterialManager.logger.debug(
+                    `getMaterial(${type}) called before prewarm() — returning flat-color fallback (prewarm not yet complete)`
                 )
                 return this.createProceduralFallback(type)
             default:
