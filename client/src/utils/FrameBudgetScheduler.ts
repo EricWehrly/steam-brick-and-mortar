@@ -21,7 +21,12 @@ export interface TaskOptions {
     estimatedMs?: number
     /** Task priority - higher priority tasks execute first */
     priority?: 'low' | 'normal' | 'high'
-    /** Maximum time to defer before forcing execution (default: ~16.6 seconds) */
+    /**
+     * Maximum time to defer before forcing execution (default: ~400ms).
+     * Set to 0 to never force (task runs only when budget allows).
+     * Use 0 for cosmetic updates (texture upserts, material upgrades) where
+     * skipping beats hitching.
+     */
     maxDeferMs?: number
 }
 
@@ -49,12 +54,18 @@ export interface FrameBudgetSchedulerConfig {
     targetFps?: number
     /** Fraction of remaining frame budget to use (default: 0.8) */
     budgetThreshold?: number
-    /** Maximum tasks to process per frame (default: 10) */
+    /** Maximum tasks to process per frame (default: 1) */
     maxTasksPerFrame?: number
-    /** Default max defer time in ms (default: 16666 = ~1000 frames at 60fps) */
+    /** Default max defer time in ms (default: 400). 0 = never force. */
     defaultMaxDeferMs?: number
     /** Number of frames to track for rolling average (default: 60) */
     ringBufferSize?: number
+    /**
+     * After a heavy frame (any frame that caused a force or exceeded budget),
+     * skip this many frames before processing tasks again. Provides breathing
+     * room so the renderer can catch up. Default: 2.
+     */
+    heavyFrameCooldownFrames?: number
 }
 
 const PRIORITY_MAP = { low: 0, normal: 1, high: 2 } as const
@@ -88,6 +99,10 @@ export class FrameBudgetScheduler {
     private tasksExecutedLastFrame = 0
     private totalTasksDeferred = 0
     private totalTasksForced = 0
+
+    // Cooldown state: skip N frames after a heavy frame
+    private heavyFrameCooldownFrames: number
+    private cooldownFramesRemaining = 0
     
     private constructor(config: FrameBudgetSchedulerConfig = {}) {
         this.targetFps = config.targetFps ?? 60
@@ -95,6 +110,7 @@ export class FrameBudgetScheduler {
         this.budgetThreshold = config.budgetThreshold ?? 0.8
         this.maxTasksPerFrame = config.maxTasksPerFrame ?? 1  // take longer, ride smoother
         this.defaultMaxDeferMs = config.defaultMaxDeferMs ?? 400
+        this.heavyFrameCooldownFrames = config.heavyFrameCooldownFrames ?? 2
         
         const ringSize = config.ringBufferSize ?? 60
         this.frameTimeRing = new Float32Array(ringSize)
@@ -123,6 +139,12 @@ export class FrameBudgetScheduler {
         this.lastFrameTime = now
         this.frameStartTime = now
         this.tasksExecutedLastFrame = 0
+
+        // Respect cooldown — let the renderer breathe after a heavy frame
+        if (this.cooldownFramesRemaining > 0) {
+            this.cooldownFramesRemaining--
+            return
+        }
         
         // Process pending tasks at frame start (when we have full budget)
         this.processPendingTasks(now)
@@ -217,23 +239,28 @@ export class FrameBudgetScheduler {
         }
         
         let tasksExecuted = 0
+        let heavyFrameTriggered = false
         
         while (this.pendingTasks.length > 0 && tasksExecuted < this.maxTasksPerFrame) {
             const task = this.pendingTasks[0]
             
-            // Anti-starvation: check if task has been waiting too long
-            // This is O(1): one subtraction, one comparison
-            const waitTime = now - task.queuedAt
-            const forceExecution = waitTime > task.maxDeferMs
-            
-            if (forceExecution) {
-                FrameBudgetScheduler.logger.warn(`Task forced after ${waitTime.toFixed(0)}ms wait (limit: ${task.maxDeferMs}ms) - system may be overloaded`)
-                this.totalTasksForced++
-            }
-            
-            // Check budget (skip if forced)
-            if (!forceExecution && !this.hasBudget(task.estimatedMs)) {
-                break  // No budget and not forced - wait for next frame
+            // maxDeferMs === 0 means "never force — cosmetic update, skip if busy"
+            if (task.maxDeferMs === 0) {
+                if (!this.hasBudget(task.estimatedMs)) {
+                    break
+                }
+            } else {
+                // Anti-starvation: force if task has been waiting too long
+                const waitTime = now - task.queuedAt
+                const forceExecution = waitTime > task.maxDeferMs
+                
+                if (forceExecution) {
+                    FrameBudgetScheduler.logger.warn(`Task forced after ${waitTime.toFixed(0)}ms wait (limit: ${task.maxDeferMs}ms) - system may be overloaded`)
+                    this.totalTasksForced++
+                    heavyFrameTriggered = true
+                } else if (!this.hasBudget(task.estimatedMs)) {
+                    break
+                }
             }
             
             // Execute task
@@ -241,12 +268,17 @@ export class FrameBudgetScheduler {
             try {
                 task.fn()
             } catch (e) {
-                    FrameBudgetScheduler.logger.error('Task execution failed:', e)
+                FrameBudgetScheduler.logger.error('Task execution failed:', e)
             }
             tasksExecuted++
         }
         
         this.tasksExecutedLastFrame = tasksExecuted
+
+        // If we forced a task into a heavy frame, impose a cooldown
+        if (heavyFrameTriggered && this.heavyFrameCooldownFrames > 0) {
+            this.cooldownFramesRemaining = this.heavyFrameCooldownFrames
+        }
     }
     
     public tryExecuteOrSchedule(task: () => void, options: TaskOptions = {}): boolean {

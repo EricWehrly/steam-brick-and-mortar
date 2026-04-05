@@ -178,7 +178,7 @@ export class SharedMaterialManager {
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.MdfVeneer,
                 new THREE.MeshStandardMaterial({ map: diffuse, normalMap: normal, roughness: 0.4, metalness: 0.0 })),
-            { priority: 'normal', estimatedMs: 2 }
+            { priority: 'normal', estimatedMs: 2, maxDeferMs: 0 }
         )
     }
 
@@ -191,7 +191,7 @@ export class SharedMaterialManager {
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.Carpet,
                 new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9, metalness: 0.0 })),
-            { priority: 'normal', estimatedMs: 2 }
+            { priority: 'normal', estimatedMs: 2, maxDeferMs: 0 }
         )
     }
 
@@ -204,7 +204,7 @@ export class SharedMaterialManager {
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.Ceiling,
                 new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9, metalness: 0.0 })),
-            { priority: 'normal', estimatedMs: 2 }
+            { priority: 'normal', estimatedMs: 2, maxDeferMs: 0 }
         )
     }
 
@@ -226,7 +226,7 @@ export class SharedMaterialManager {
                     normalMap: normal,
                     roughness: 0.8, metalness: 0.1,
                 })),
-            { priority: 'normal', estimatedMs: 2 }
+            { priority: 'normal', estimatedMs: 2, maxDeferMs: 0 }
         )
     }
 
@@ -248,7 +248,7 @@ export class SharedMaterialManager {
                     normalMap: normal,
                     roughness: 0.8, metalness: 0.1,
                 })),
-            { priority: 'normal', estimatedMs: 2 }
+            { priority: 'normal', estimatedMs: 2, maxDeferMs: 0 }
         )
     }
 
