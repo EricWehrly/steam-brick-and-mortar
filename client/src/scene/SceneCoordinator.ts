@@ -32,6 +32,7 @@ import { DataManager } from '../core/data'
 import { StorePropsEventTypes, type StorePropsSetupRequestEvent, type StorePropsSetupCompletedEvent } from './props'
 import type { SteamGameData } from './game-box/types/GameData'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
+import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 
 export interface SceneCoordinatorConfig {
     environment?: {
@@ -128,6 +129,12 @@ export class SceneCoordinator {
 
     private async loadEnhancedScene(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
         const tracker = StartupEventTracker.getInstance()
+
+        // Kick off procedural material generation now, fire-and-forget.
+        // RoomManager and shelf renderers will receive flat-colour fallback materials
+        // immediately via getMaterial(), and upsertMaterial() will swap in the textured
+        // version once the worker resolves — no blocking, no warning.
+        SharedMaterialManager.getInstance().prewarm()
         
         try {
             // TODO: Skyboxmanager responds to ready event itself

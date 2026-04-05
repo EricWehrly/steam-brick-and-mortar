@@ -281,15 +281,20 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
 
         const capabilities = SystemCapabilitiesDetector.detect()
-        const hasParallelCompile = capabilities.hasParallelShaderCompile
 
-        InstancedShelfRenderer.logger.debug(
-            `🔥 Starting shader prewarm (KHR_parallel_shader_compile: ${hasParallelCompile})`
-        )
+        if (!capabilities.hasParallelShaderCompile) {
+            // Without KHR_parallel_shader_compile, compileAsync() blocks the main thread
+            // just like a normal render() call — no benefit, and Three.js logs a warning.
+            // Shaders will compile on first render instead (or when FrameBudgetScheduler
+            // stagger spreads the addToMainScene() calls across frames).
+            InstancedShelfRenderer.logger.debug('Skipping compileAsync: KHR_parallel_shader_compile not available')
+            return
+        }
+
+        InstancedShelfRenderer.logger.debug('🔥 Starting non-blocking shader prewarm (KHR_parallel_shader_compile available)')
         const startTime = performance.now()
 
         const prewarmScene = new THREE.Scene()
-
         const meshes = [
             this.angledBoardManager.getInstancedMesh(),
             this.sideBoardManager.getInstancedMesh(),
@@ -307,11 +312,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                 `✅ Shader prewarm complete in ${(performance.now() - startTime).toFixed(0)}ms`
             )
         } catch (error) {
-            // compileAsync failure is non-fatal — shaders will compile on first render instead
             InstancedShelfRenderer.logger.warn('Shader prewarm failed (non-fatal), shaders will compile on first render:', error)
         } finally {
-            // Remove meshes from the temporary scene — they belong to the main scene only
-            // after setInstance() calls addToMainScene()
             for (const mesh of meshes) {
                 prewarmScene.remove(mesh)
             }

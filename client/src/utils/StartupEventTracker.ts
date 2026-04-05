@@ -286,14 +286,13 @@ export class StartupEventTracker {
             })
         }
 
-        // Stop hitch detector when all blocking phases are done
+        // Stop hitch detector when all blocking phases are done.
+        // Note: WorldBuild starts concurrently after Interactive ends, so we use
+        // activeBlockingPhaseCount rather than keying off Interactive specifically —
+        // the detector stays alive until the last BLOCKING_PHASES entry closes.
         if (BLOCKING_PHASES.has(phase)) {
             this.activeBlockingPhaseCount = Math.max(0, this.activeBlockingPhaseCount - 1)
-
-            // If this is Interactive phase ending, stop unconditionally
-            if (phase === StartupPhase.Interactive) {
-                this.stopHitchDetector()
-            } else if (this.activeBlockingPhaseCount === 0) {
+            if (this.activeBlockingPhaseCount === 0) {
                 this.stopHitchDetector()
             }
         }
