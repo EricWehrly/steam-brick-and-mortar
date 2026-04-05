@@ -390,7 +390,7 @@ export const AppEventTypes = {
     Milestone:             'app:milestone',
     /** Fired when a detail string should be shown in the progress UI */
     DetailUpdate:          'app:detail-update',
-    /** Fired when game loading kicks off (DataFetchEncore) */
+    /** Fired when game loading kicks off (PostSetupEncore) */
     GameLoadingStarted:    'app:game-loading-started',
     /** Fired when the loading sub-phase changes (cache / fetch) */
     GameLoadingPhaseChanged: 'app:game-loading-phase-changed',

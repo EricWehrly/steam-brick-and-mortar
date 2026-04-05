@@ -263,16 +263,16 @@ export class SteamBrickAndMortarApp {
     }
 
     private initializeNonEssentialSystemsAsync(): void {
-        this.startupTracker.logAsyncStart(StartupPhase.DataFetchEncore, 'Non-essential systems initialization')
+        this.startupTracker.logAsyncStart(StartupPhase.PostSetupEncore, 'Non-essential systems initialization')
         
         this.loadNonEssentialSystems().catch(error => {
             console.error('⚠️ Non-essential systems failed to load:', error)
-            this.startupTracker.logEvent(StartupPhase.DataFetchEncore, `Non-essential systems error: ${error}`)
+            this.startupTracker.logEvent(StartupPhase.PostSetupEncore, `Non-essential systems error: ${error}`)
         })
     }
 
     private async loadNonEssentialSystems(): Promise<void> {
-        const asyncStartTime = this.startupTracker.logAsyncStart(StartupPhase.DataFetchEncore, 'Loading non-essential systems')
+        const asyncStartTime = this.startupTracker.logAsyncStart(StartupPhase.PostSetupEncore, 'Loading non-essential systems')
         
         try {
             this.startupTracker.phaseStart(StartupPhase.PrewarmEncore, 'Debug systems initialization')
@@ -286,16 +286,16 @@ export class SteamBrickAndMortarApp {
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())
             this.startupTracker.phaseEnd(StartupPhase.PrewarmEncore)
             
-            // DataFetchEncore: auto-load Steam games; progress events handled via AppEventTypes
-            this.startupTracker.phaseStart(StartupPhase.DataFetchEncore, 'Steam data fetch')
+            // PostSetupEncore: auto-load Steam games; progress events handled via AppEventTypes
+            this.startupTracker.phaseStart(StartupPhase.PostSetupEncore, 'Steam data fetch')
             ToastManager.success('Steam Brick and Mortar is fully loaded!', { duration: 3000 })
-            this.startupTracker.phaseEnd(StartupPhase.DataFetchEncore)
+            this.startupTracker.phaseEnd(StartupPhase.PostSetupEncore)
             
-            this.startupTracker.logAsyncEnd(StartupPhase.DataFetchEncore, 'Non-essential systems loaded', asyncStartTime)
+            this.startupTracker.logAsyncEnd(StartupPhase.PostSetupEncore, 'Non-essential systems loaded', asyncStartTime)
             
         } catch (error) {
             console.error('Failed to load non-essential systems:', error)
-            this.startupTracker.logEvent(StartupPhase.DataFetchEncore, `Load error: ${error}`)
+            this.startupTracker.logEvent(StartupPhase.PostSetupEncore, `Load error: ${error}`)
         }
     }
 

@@ -56,7 +56,7 @@ export enum StartupPhase {
 
     // Post-interactive async encores
     PrewarmEncore    = 'PrewarmEncore',
-    DataFetchEncore  = 'DataFetchEncore',
+    PostSetupEncore  = 'PostSetupEncore',
 }
 
 // Phases considered "blocking" for the purpose of hitch detection.
@@ -114,7 +114,7 @@ export class StartupEventTracker {
     public get enabled(): boolean { return this._enabled }
     public set enabled(value: boolean) { this._enabled = !!value }
 
-    // Game loading progress tracking (for DataFetchEncore)
+    // Game loading progress tracking (for PostSetupEncore)
     private totalGames = 0
     private loadedGames = 0
     private cachedBatchesComplete = false
@@ -175,7 +175,7 @@ export class StartupEventTracker {
             this.totalGames = totalBatches * games.length
             EventManager.getInstance().emit<GameLoadingStartedEvent>(AppEventTypes.GameLoadingStarted, {
                 totalGames: this.totalGames,
-                phase: StartupPhase.DataFetchEncore
+                phase: StartupPhase.PostSetupEncore
             })
         }
 
