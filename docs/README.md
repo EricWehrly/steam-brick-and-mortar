@@ -3,34 +3,50 @@
 This directory is structured specifically as a knowledge base and entrypoint for AI agents (like Vex) working on the project.
 
 ## Where to start
-1. Read oadmaps/current-status.md to understand what we are working on right now.
-2. Read gent-context/startup-sequence.md to understand the 5-phase startup architecture.
-3. Read gent-context/component-interaction-map.md to understand the DI and event flow.
+1. Read `roadmaps/current-status.md` to understand what we are working on right now.
+2. Read `agent-context/startup-sequence.md` to understand the 5-phase startup architecture.
+3. Read `agent-context/component-interaction-map.md` to understand the DI and event flow.
+
+## Tech Debt Tags
+
+Source files may contain one or more `// TD: <tag-id>` comments near the top. These signal that the file is affected by a tracked tech debt item.
+
+- **Tag format**: `// TD: kebab-case-name` — one line per item, in the file's top comment block or just below imports
+- **Lookup**: Find the tag as an `## id: <tag-id>` section in `roadmaps/tech-debt.md`
+- **Meaning**: "This file needs attention when working on this debt item, but it is NOT a blocker for unrelated work"
+- **Status**: Some debt items are marked `(pattern not yet finalized)` — means the approach is still being designed; tag the files now so we don't lose track, but don't act on them yet
+
+Example in a source file:
+```typescript
+// TD: singleton-pattern-refactor
+// TD: event-migration-store-props
+import { ... }
+```
 
 ## Directory Structure
 
-### ?? gent-context/
+### 📋 agent-context/
 High-value, fast-load architectural rules and interaction maps. **Read these to understand how the codebase works.**
 
-### ?? oadmaps/
+### 🗺️ roadmaps/
 **Active work and tracking.**
-- current-status.md - The immediate focus.
-- ugs.md - Active bugs.
-- 	ech-debt.md - Known technical debt.
-- phaseX...md - High-level project milestones.
+- `current-status.md` - The immediate focus.
+- `bugs.md` - Active bugs.
+- `tech-debt.md` - Known technical debt (keyed by TD tag IDs).
+- `phaseX-*.md` - High-level project milestones.
 
-### ?? plans/
+### 📝 plans/
 **Pending feature plans and refactor proposals.**
 These are things we *intend* to do, but are not actively coding right this second. Check these before starting a new major feature to see if we already designed it.
 
-### ??? rchitecture/
+### 🏛️ architecture/
 **Deep-dive technical design documents.**
 Read these when touching specific complex systems (e.g., WebXR, Instancing, Event-Driven patterns).
 
-### ?? guidelines/
+### 📏 guidelines/
 **Conventions and rules.**
 UI patterns, testing rules, etc.
 
-### ?? esearch/ & ??? rchive/
+### 🔬 research/ & 📦 archive/
 **Historical context.**
 Do not read these unless specifically looking for why a past decision was made or how an old feature worked.
