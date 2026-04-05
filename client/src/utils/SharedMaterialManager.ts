@@ -210,16 +210,18 @@ export class SharedMaterialManager {
 
     private async prewarmWallWood(worker: ProceduralTextureWorker): Promise<void> {
         const [d, n] = await Promise.all([
-            worker.generate('wood_enhanced', {
-                width: 1024, height: 1024, grainStrength: 0.5, ringFrequency: 0.1,
-                color1: '#8B4513', color2: '#A0522D', color3: '#654321',
+            worker.generate('wood_planks', {
+                width: 1024, height: 1024,
+                numPlanks: 4,
+                grainFrequency: 1.2,
+                grainStrength: 0.12,
+                baseColors: ['#7B3F10', '#8B4A14', '#9B5520', '#A8622A', '#8C4A18', '#955218'],
+                edgeColor: '#5C2F0A',
             }),
             worker.generate('wood_normal', { width: 1024, height: 1024, strength: 0.3 }),
         ])
-        // The grain runs along texture Y. On a wall plane, UV.y = world height, so
-        // naively the bands appear as horizontal stripes. Rotating the texture 90°
-        // makes the bands run vertically (plank-like) on the wall.
-        // repeat(1, 12): 1 tile tall (full ceiling height), 12 tiles wide (~0.55m planks).
+        // Texture Y = plank bands. Rotated 90deg so planks run vertically on wall.
+        // repeat(1, 12): 1 tile per ceiling height, 12 tiles across wall width (~0.55m per plank width).
         const diffuse = this.bitmapToTexture(d, 1, 12)
         const normal  = this.bitmapToTexture(n, 1, 12)
         diffuse.rotation = Math.PI / 2
