@@ -414,11 +414,17 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         rowIndex: number, 
         shelfIndex: number
     ): void {
-        // Add shelf instance at position
-        const globalShelfIndex = rowIndex * 4 + shelfIndex
+        const globalShelfIndex = rowIndex * this.maxShelvesPerRow + shelfIndex
+        
+        // Odd rows face the opposite direction — creates natural back-to-back aisle pairs
+        // like a real store, with browsing on both sides of the aisle.
+        const rotation = rowIndex % 2 === 1
+            ? new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0))
+            : undefined
         
         this.instancedShelfRenderer.setInstance(globalShelfIndex, {
-            position: position
+            position,
+            rotation
         })
     }
 
