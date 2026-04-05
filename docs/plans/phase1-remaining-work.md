@@ -5,6 +5,19 @@
 
 ---
 
+## The Two Phase 1 Pillars
+
+Phase 1 is done when these two things work:
+
+1. **Shelf layout** — shelves are arranged in the room intentionally and navigably (not randomly). Dynamically sized to library. Configurable enough to be a real store layout, not a proof-of-concept corridor.
+2. **Categories** — shelves are grouped and labeled by Steam category. Requires pulling category data from Steam first.
+
+Everything else listed below either unblocks these, improves quality while they're built, or is bonus if cycles allow.
+
+Sorting/filtering is explicitly "right at the edge of Phase 1" — defer to early Phase 2 if needed, and plan it during Phase 2 prep rather than blocking Phase 1 on it.
+
+---
+
 ## Where we actually are
 
 **Completed solid:**
@@ -39,65 +52,90 @@
 
 **Acceptance**: Walk through the store, games visible on shelves, artwork loading on them.
 
-### 2. Level layout — shelf/room spatial design (6.1 + 6.2.1) 🔴 IMMEDIATE
-*The store needs to feel like a store, not a corridor of floating shelves.*
+### 2. Shelf-in-room layout (6.1 + 6.2.1) 🔴 PILLAR 1
+*The store needs to feel like a store.*
 
-- [ ] Confirm alternating shelf rotation (15° offset) is implemented or implement it
-- [ ] Verify shelf spacing makes it navigable (can walk between them)
+- [ ] Shelves are arranged in an intentional layout (rows, navigable aisles)
+- [ ] Confirm or implement alternating shelf rotation (15° offset)
 - [ ] Room size scales reasonably for typical library (100–800 games)
+- [ ] Layout is configurable (row count / spacing) even if we ship with one preset
 - [ ] Entrance/spawn position feels correct
 
 **Acceptance**: Standing at spawn, the scene reads as a store.
 
-### 3. UI normalization (6.6) 🟡 PARALLEL WORK
-*See `docs/plans/ui-normalization-plan.md`. Sub-agent eligible.*
-- [ ] Design token spec
+### 3. Steam categorization data (6.5 prerequisite) 🔴 PILLAR 2 PREREQUISITE
+*Before we can shelve by category, we need to know what categories we have.*
+
+- [ ] Research / confirm which Steam API endpoints give us usable category data
+  - See `docs/steam-categorization-research.md` for prior findings
+- [ ] Pull and cache categories alongside game library data
+- [ ] Data shape defined so shelf-layout code can consume it
+
+### 4. Category-based shelf grouping (6.5) 🔴 PILLAR 2
+*Groups of shelves correspond to Steam categories, with visible labels.*
+
+- [ ] Category data drives shelf assignment (which games → which shelves)
+- [ ] Shelf group labels visible in scene (signage or floating text)
+- [ ] Graceful fallback for uncategorized games
+
+**Acceptance**: Walking the store, distinct sections are labeled by category.
+
+### 5. UI normalization (6.6) 🟡 PARALLEL / GREENLIT
+*Sub-agent eligible. Start now — unblocks all future UI work.*
+- [ ] Design token spec (colors, spacing, typography)
 - [ ] Shared component set (Button, Checkbox, Panel, TabBar)
-- [ ] Migrate existing panels
+- [ ] Migrate existing panels to shared components
 
-### 4. Game search / omnibar (6.6 UI, after normalization) 🔴 LAST FEATURE FOR PHASE 1
-*This stays in Phase 1, after UI normalization.*
-- [ ] Omnibar-like search in place of Steam profile UI once library is loaded
-- [ ] Spotlight highlighting of search results
-- [ ] DRY query/filter logic with Game Library Binder search path
-
-### 5. Cache previewer fix (6.6.3)
+### 6. Cache previewer fix (6.6.3)
 - [ ] Cache preview in Debug tab is broken — diagnose and fix
 
-### 6. GPU memory in Debug tab (6.6.3)
+### 7. GPU memory in Debug tab (6.6.3)
 - [ ] `GpuMemoryEstimator` output visible in UI, not just console
+
+---
+
+## Parallel threads we can run now
+
+| Thread | Work | Notes |
+|---|---|---|
+| Main | 6.2.2.1 game spawning QA + shelf layout (Pillars 1+2) | Needs visual QA |
+| Subagent A | UI normalization (6.6) — token spec + component migration | Greenlit |
+| Subagent B | Steam categorization research + data pull | Can start independently |
+
+Max 3 concurrent threads against one provider. These are the three.
 
 ---
 
 ## Layout vocabulary note (2026-04-05)
 
-"Layout" means two different things — we need to keep them separate:
+"Layout" means different things — keep them separate:
 
-- **Game-on-shelf layout**: How many games per shelf surface, spacing, front/back, which game goes where. Current work.
-- **Shelf-in-room layout**: How shelves are arranged in 3D space (rows, spokes, circles, etc.). Milestone 6.7 in the roadmap.
-- **Room layout**: Room shape, dimensions, number of rooms. Phase 2 (multiple rooms is a Phase 2 item after "ready for friends").
-- **Room styles**: Different visual/structural themes for the room itself (not just textures — geometry and layout). Phase 2, after "ready for friends".
+- **Game-on-shelf layout**: Spacing, density, front/back placement per shelf board. Current work.
+- **Shelf-in-room layout**: How shelves are arranged in 3D space (rows, aisles). Phase 1 Pillar 1.
+- **Room layout**: Room shape, dimensions, multiple rooms. Phase 2.
+- **Room styles**: Different visual/structural themes. Phase 2.
 
 ---
 
 ## What "Phase 1 done" looks like
 
 1. Walk into the store from spawn
-2. Shelves are laid out navigably, roughly store-shaped
-3. Games from Steam library are on the shelves with artwork
-4. Can search for a game and it spotlights
+2. Shelves are laid out navigably in a real store layout
+3. Shelves are grouped and labeled by Steam category
+4. Games from Steam library are on the shelves with artwork
 5. Pause menu works (settings, graphics options, cache management)
-6. No obvious visual bugs that would embarrass you showing it
+6. No obvious visual bugs that would embarrass you showing it to yourself
 
-That's it. Not perfect — just demo-ready for yourself.
+That's it. Omnibar/search is nice-to-have if binder already mostly covers it — don't block Phase 1 on it.
 
 ---
 
 ## Parking lot (not Phase 1)
 
+- Sorting & filtering (defer to early Phase 2 / Phase 2 prep)
+- Omnibar/search (nice-to-have, binder may cover it already)
 - Multiple rooms
-- Categorization-based shelving (6.5)
-- Layout selector (6.7)
+- Layout selector / multiple layout types (6.7)
 - Theme system (6.8)
 - Network rate limiting hardening (Phase 2 feature 5.4)
 - Keyboard navigation
