@@ -33,7 +33,7 @@ export class StartupProgressUI {
         [StartupPhase.ControlsReady,    5],
         [StartupPhase.Interactive,     10],
         [StartupPhase.PrewarmEncore,    5],
-        [StartupPhase.DataFetchEncore, 15],
+        [StartupPhase.PostSetupEncore, 15],
     ])
 
     private currentProgress: number = 0
@@ -133,7 +133,7 @@ export class StartupProgressUI {
         this.detailText.style.display = 'none'
     }
 
-    private startGameLoading(totalGames: number, phase: StartupPhase = StartupPhase.DataFetchEncore): void {
+    private startGameLoading(totalGames: number, phase: StartupPhase = StartupPhase.PostSetupEncore): void {
         if (!this.isVisible) return
 
         let cumulativeProgress = 0
@@ -153,7 +153,7 @@ export class StartupProgressUI {
             this.gameLoadingProgress.total = total
         }
 
-        const phaseWeight = this.phaseWeights.get(StartupPhase.DataFetchEncore) || 15
+        const phaseWeight = this.phaseWeights.get(StartupPhase.PostSetupEncore) || 15
         const progressRatio = this.gameLoadingProgress.total > 0
             ? this.gameLoadingProgress.current / this.gameLoadingProgress.total
             : 0

@@ -17,6 +17,8 @@ export interface SystemCapabilities {
     hasGoodGPU: boolean // Deprecated: use hasHardwareRenderer && supportsLargeTextures
     maxTextureSize: number
     renderer: string
+    /** True when KHR_parallel_shader_compile is available — compileAsync() is non-blocking */
+    hasParallelShaderCompile: boolean
     // TODO: Add more capabilities as needed:
     // TODO: - hasVertexArrayObjects: boolean
     // TODO: - hasFloatTextures: boolean  
@@ -66,6 +68,7 @@ export class SystemCapabilitiesDetector {
         let hasHardwareRenderer = false
         let supportsLargeTextures = false
         let hasGoodGPU = false
+        let hasParallelShaderCompile = false
         
         const context = gl || gl1
         if (context) {
@@ -77,6 +80,10 @@ export class SystemCapabilitiesDetector {
 
             maxTextureSize = SystemCapabilitiesDetector.readMaxTextureSize(context, canQueryParameters)
             renderer = SystemCapabilitiesDetector.readRenderer(context, canQueryParameters, canGetExtensions)
+            
+            // KHR_parallel_shader_compile — when present, compileAsync() offloads shader linking
+            // to the driver background thread and resolves without blocking the main thread.
+            hasParallelShaderCompile = canGetExtensions && !!context.getExtension('KHR_parallel_shader_compile')
             
             // TODO: Validate this heuristic with real-world telemetry once the app reaches a broader user base.
             // For now, keep current behavior to avoid changing handler selection semantics.
@@ -103,7 +110,8 @@ export class SystemCapabilitiesDetector {
             supportsLargeTextures,
             hasGoodGPU,
             maxTextureSize,
-            renderer
+            renderer,
+            hasParallelShaderCompile
         }
     }
 
@@ -174,6 +182,7 @@ export const hasInstancedArrays = (): boolean => SystemCapabilitiesDetector.dete
 export const hasHardwareRenderer = (): boolean => SystemCapabilitiesDetector.detect().hasHardwareRenderer
 export const supportsLargeTextures = (): boolean => SystemCapabilitiesDetector.detect().supportsLargeTextures
 export const hasGoodGPU = (): boolean => SystemCapabilitiesDetector.detect().hasGoodGPU
+export const hasParallelShaderCompile = (): boolean => SystemCapabilitiesDetector.detect().hasParallelShaderCompile
 
 // Export the detection function for convenience
 export const detectSystemCapabilities = SystemCapabilitiesDetector.detect
