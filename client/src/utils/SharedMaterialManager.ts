@@ -59,7 +59,7 @@ export class SharedMaterialManager {
         // so this fires even when GpuStorePropsEventHandler holds the normal handler slot.
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.SetupRequest,
-            this.prewarm.bind(this)
+            this.generateTexturesAsync.bind(this)
         )
     }
 
@@ -89,7 +89,7 @@ export class SharedMaterialManager {
      * Pre-warm all procedurally-generated materials off the main thread.
      * Call once at startup. Subsequent calls return the same Promise (idempotent).
      */
-    public async prewarm(): Promise<void> {
+    public async generateTexturesAsync(): Promise<void> {
         if (this.disposed) return
         if (this.prewarmPromise) return this.prewarmPromise
 

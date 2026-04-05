@@ -134,7 +134,7 @@ export class SceneCoordinator {
         // RoomManager and shelf renderers will receive flat-colour fallback materials
         // immediately via getMaterial(), and upsertMaterial() will swap in the textured
         // version once the worker resolves — no blocking, no warning.
-        SharedMaterialManager.getInstance().prewarm()
+        SharedMaterialManager.getInstance().generateTexturesAsync()
         
         try {
             // TODO: Skyboxmanager responds to ready event itself
