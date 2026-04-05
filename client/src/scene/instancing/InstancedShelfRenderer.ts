@@ -433,10 +433,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                                 this.shelfBoardManager, this.interiorSurfaceManager]) {
             scheduler.schedule(() => {
                 if (!this.sceneInsertCancelled) manager.addToMainScene()
-            }, { priority: 'high', maxDeferMs: 2000 })
+            }, { priority: 'high', maxDeferMs: 0 })
         }
 
-        InstancedShelfRenderer.logger.debug('Scheduled 4 instanced shelf mesh insertions (one per frame)')
+        InstancedShelfRenderer.logger.debug('Scheduled 4 instanced shelf mesh insertions (one per frame, never forced)')
     }
 
     private applyShelfUnitTemplate(
