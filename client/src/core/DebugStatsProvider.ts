@@ -6,7 +6,7 @@
  */
 
 import * as THREE from 'three'
-import type { PerformanceMonitor } from '../ui'
+import type { PerformanceMonitorUI } from '../ui'
 import type { SteamIntegration } from '../steam-integration'
 import type { SceneManager } from '../scene'
 
@@ -49,12 +49,12 @@ export interface DebugStats {
 export class DebugStatsProvider {
     private sceneManager: SceneManager
     private steamIntegration: SteamIntegration
-    private performanceMonitor: PerformanceMonitor
+    private performanceMonitor: PerformanceMonitorUI
 
     constructor(
         sceneManager: SceneManager,
         steamIntegration: SteamIntegration,
-        performanceMonitor: PerformanceMonitor
+        performanceMonitor: PerformanceMonitorUI
     ) {
         this.sceneManager = sceneManager
         this.steamIntegration = steamIntegration
