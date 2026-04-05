@@ -242,7 +242,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
 
             // Register meshes with MeshPrewarmer — it batches all registrations
             // across a debounce window and calls compileAsync once, non-blocking.
-            // Also capture capability for no-KHR fallback scene insertion strategy.
+            // We detect KHR here for future use: if we later need to stagger mesh registration
+            // *into* the prewarm scene on capable hardware, this flag drives that gate.
+            // It does NOT control how we insert into the main scene (always staggered).
             this.hasParallelShaderCompile = SystemCapabilitiesDetector.detect().hasParallelShaderCompile
             const prewarmer = MeshPrewarmer.getInstance()
             for (const manager of [this.angledBoardManager, this.sideBoardManager, this.shelfBoardManager, this.interiorSurfaceManager]) {
@@ -425,22 +427,17 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             this.interiorSurfaceManager
         ]
 
-        // With KHR prewarm, add all immediately — shaders are expected to be linked.
-        if (this.hasParallelShaderCompile) {
-            for (const manager of managers) {
-                manager.addToMainScene()
-            }
-            this.meshesAddedToScene = true
-            return
-        }
-
-        // No KHR: stagger mesh insertion across frames to avoid a single giant compile hitch.
+        // Always stagger mesh insertion across frames regardless of KHR status.
+        // The offscreen prewarm canvas and the main scene render on the same hardware;
+        // we can't assume that completing compileAsync prevents a hitch when meshes hit
+        // the main scene. One mesh per frame keeps any remaining compile work spread out.
+        // (hasParallelShaderCompile is retained for a future consideration: staggering
+        // registration *into* the prewarm scene on capable hardware — not yet needed.)
         this.addingMeshesToScene = true
         const queue = [...managers]
         const generation = ++this.sceneAddGeneration
 
         const runNext = () => {
-            // Abandon stale queue work after reset/dispose/new queue start.
             if (generation !== this.sceneAddGeneration || !this.isInitialized) {
                 this.addingMeshesToScene = false
                 return
@@ -457,7 +454,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             scheduleNextFrame(runNext)
         }
 
-        InstancedShelfRenderer.logger.debug('KHR_parallel_shader_compile unavailable; staggering instanced shelf mesh insertion across frames')
+        InstancedShelfRenderer.logger.debug('Staggering instanced shelf mesh insertion across frames')
         runNext()
     }
 
