@@ -16,11 +16,13 @@ import type { ShelfConfig } from '../../../../src/scene/props/SharedPropsUtils'
 import { SharedMaterialManager, MaterialType } from '../../../../src/utils/SharedMaterialManager'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { EventManager } from '../../../../src/core/EventManager'
+import { SystemCapabilitiesDetector } from '../../../../src/utils/SystemCapabilities'
 
 // Mock dependencies to isolate unit under test
 vi.mock('../../../../src/utils/SharedMaterialManager')
 vi.mock('../../../../src/core/data/DataManager')
 vi.mock('../../../../src/core/EventManager')
+vi.mock('../../../../src/utils/SystemCapabilities')
 
 describe('InstancedShelfRenderer', () => {
     let renderer: InstancedShelfRenderer
@@ -28,6 +30,7 @@ describe('InstancedShelfRenderer', () => {
     let mockMaterialManager: any
     let mockDataManager: any
     let mockEventManager: any
+    let mockSystemCapabilitiesDetector: any
 
     beforeEach(() => {
         // Reset all mocks
@@ -55,6 +58,12 @@ describe('InstancedShelfRenderer', () => {
             emit: vi.fn()
         }
         vi.mocked(EventManager.getInstance).mockReturnValue(mockEventManager)
+
+        // Setup default capabilities (simulate no KHR to exercise fallback-safe path)
+        mockSystemCapabilitiesDetector = {
+            detect: vi.fn().mockReturnValue({ hasParallelShaderCompile: false })
+        }
+        vi.mocked(SystemCapabilitiesDetector.detect).mockImplementation(mockSystemCapabilitiesDetector.detect)
     })
 
     afterEach(() => {
