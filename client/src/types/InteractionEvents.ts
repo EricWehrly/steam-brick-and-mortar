@@ -482,6 +482,16 @@ export interface InteractionEventMap {
     [LightingEventTypes.QualityChanged]: LightingQualityChangedEvent
     [LightingEventTypes.Created]: LightCreatedEvent
     [LightingEventTypes.SystemReady]: LightingSystemReadyEvent
+    
+    // App events
+    [AppEventTypes.PhaseStarted]: PhaseCompletedEvent
+    [AppEventTypes.PhaseCompleted]: PhaseCompletedEvent
+    [AppEventTypes.Milestone]: MilestoneEvent
+    [AppEventTypes.DetailUpdate]: DetailUpdateEvent
+    [AppEventTypes.GameLoadingStarted]: GameLoadingStartedEvent
+    [AppEventTypes.GameLoadingPhaseChanged]: GameLoadingPhaseChangedEvent
+    [AppEventTypes.GameLoadingProgress]: GameLoadingProgressEvent
+    [AppEventTypes.StartupComplete]: BaseInteractionEvent
 }
 
 /**
