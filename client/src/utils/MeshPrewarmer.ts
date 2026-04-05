@@ -9,11 +9,12 @@
  * compileAsync() blocks the main thread anyway and Three.js logs a warning,
  * so we skip it entirely and let shaders compile on first render.
  *
- * Usage:
- *   MeshPrewarmer.getInstance().register(myInstancedMesh)
+ * Usage (static API — no getInstance() needed):
+ *   MeshPrewarmer.register(myInstancedMesh)
  *
  * The prewarm scene is a lightweight container (holds references only, no copies).
- * After compileAsync resolves the meshes are removed and the scene is released.
+ * After compileAsync resolves the meshes are removed and the instance is released
+ * for GC (one-shot lifecycle).
  */
 
 import * as THREE from 'three'
@@ -25,21 +26,23 @@ import { Logger } from './Logger'
 const DEBOUNCE_MS = 500
 
 export class MeshPrewarmer {
-    private static instance: MeshPrewarmer | null = null
+    // ES2022 private static field — truly private, not just TS-private
+    static #instance: MeshPrewarmer | null = null
     private static readonly logger = Logger.createLogFunctions(MeshPrewarmer.name)
+
+    // Lazy accessor — creates the instance on first use
+    static get #inst(): MeshPrewarmer {
+        if (!MeshPrewarmer.#instance) {
+            MeshPrewarmer.#instance = new MeshPrewarmer()
+        }
+        return MeshPrewarmer.#instance
+    }
 
     private readonly prewarmScene = new THREE.Scene()
     private debounceHandle: ReturnType<typeof setTimeout> | null = null
     private completed = false
 
     private constructor() {}
-
-    public static getInstance(): MeshPrewarmer {
-        if (!MeshPrewarmer.instance) {
-            MeshPrewarmer.instance = new MeshPrewarmer()
-        }
-        return MeshPrewarmer.instance
-    }
 
     /**
      * Register a mesh for shader prewarm. Safe to call multiple times — each
@@ -48,7 +51,11 @@ export class MeshPrewarmer {
      *
      * No-op if prewarm has already completed or KHR is unavailable.
      */
-    public register(mesh: THREE.InstancedMesh): void {
+    public static register(mesh: THREE.InstancedMesh): void {
+        MeshPrewarmer.#inst.registerImpl(mesh)
+    }
+
+    private registerImpl(mesh: THREE.InstancedMesh): void {
         if (this.completed) {
             MeshPrewarmer.logger.warn(
                 `register("${mesh.name}") called after prewarm completed — mesh will compile on first render. ` +
@@ -99,11 +106,10 @@ export class MeshPrewarmer {
     }
 
     private cleanup(): void {
-        // Remove all meshes from the temporary scene (they belong to their own managers)
         for (const child of [...this.prewarmScene.children]) {
             this.prewarmScene.remove(child)
         }
         this.completed = true
-        MeshPrewarmer.instance = null  // allow GC
+        MeshPrewarmer.#instance = null  // release for GC — one-shot lifecycle
     }
 }

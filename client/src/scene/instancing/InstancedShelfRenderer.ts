@@ -246,10 +246,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             // *into* the prewarm scene on capable hardware, this flag drives that gate.
             // It does NOT control how we insert into the main scene (always staggered).
             this.hasParallelShaderCompile = SystemCapabilitiesDetector.detect().hasParallelShaderCompile
-            const prewarmer = MeshPrewarmer.getInstance()
             for (const manager of [this.angledBoardManager, this.sideBoardManager, this.shelfBoardManager, this.interiorSurfaceManager]) {
                 const mesh = manager.getInstancedMesh()
-                if (mesh) prewarmer.register(mesh)
+                if (mesh) MeshPrewarmer.register(mesh)
             }
             
             this.isInitialized = true
