@@ -6,11 +6,20 @@ import { installMockWorker, resetMockWorkerMessageHandlers } from './utils/mock-
 import { installNetworkIsolation, resetNetworkIsolation } from './utils/network-isolation'
 
 installMockWorker()
-installNetworkIsolation()
+
+// Network isolation blocks all outbound fetch.
+// Opt out by setting VITEST_LIVE=true in the vitest config (used for live integration tests
+// that intentionally hit real external endpoints).
+const isLiveRun = import.meta.env.VITEST_LIVE === 'true'
+if (!isLiveRun) {
+    installNetworkIsolation()
+}
 
 beforeEach(() => {
     resetMockWorkerMessageHandlers()
-    resetNetworkIsolation()
+    if (!isLiveRun) {
+        resetNetworkIsolation()
+    }
 })
 
 // Mock WebXR API for testing

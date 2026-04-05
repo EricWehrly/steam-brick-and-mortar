@@ -1,10 +1,10 @@
 # Tech Debt Backlog
 
-> **Bugs belong in `bugs.md`. This file tracks technical debt, architecture work, and improvements.**
-> **Intake Queue** = recently added, not yet triaged into a priority section.
+> **Bugs belong in `bugs.md`. This file tracks architectural and code-quality debt that requires deliberate work to resolve.**
+> Ongoing code conventions (JSDoc hygiene, file size, naming) live in `docs/guidelines/code-conventions.md` — not here.
 >
-> **Tech Debt Tags**: Source files are annotated with `// TD: <tag-id>` comments to link them to entries here.
-> Each entry below uses `## id: <tag-id>` as its header so tags can be looked up directly.
+> **Tech Debt Tags**: Source files are annotated with `// TD: <tag-id>` at the file top to link them to entries here.
+> Each tagged entry uses `## id: <tag-id>` as its header for easy lookup.
 > See `docs/README.md` for the full tagging convention.
 
 ---
@@ -16,12 +16,6 @@
 **Priority**: Low  
 **Effort**: 2-4 hours (investigation + decision)  
 **Context**: `LegacyStorePropsHandler` exists as a CPU-fallback path when the GPU instancing check fails. Questions to answer: (1) Does it still function at all without GPU instancing? (2) Can we test it in Docker with SwiftShader or a software renderer? (3) Is there DRY opportunity with `GpuStorePropsEventHandler`, or should they stay fully separate? (4) Is anyone likely to hit this path in practice?  
-**Source**: Apr 2026
-
-### Convention: Remove noisy JSDoc that just restates the signature
-**Priority**: Low (ongoing hygiene — apply as you touch files)  
-**Effort**: Minutes per file  
-**Context**: Remove `/** ... */` blocks that say nothing beyond what the signature already communicates. TypeScript types describe parameters better. Keep comments that explain *why*, edge cases, or non-obvious behavior. This is a "clean as you go" rule, not a separate task — check each file you're already editing.  
 **Source**: Apr 2026
 
 ### Performance: Offload carpet texture generation to worker (`carpet-worker-offload`)
