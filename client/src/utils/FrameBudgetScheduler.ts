@@ -110,7 +110,7 @@ export class FrameBudgetScheduler {
         this.budgetThreshold = config.budgetThreshold ?? 0.8
         this.maxTasksPerFrame = config.maxTasksPerFrame ?? 1  // take longer, ride smoother
         this.defaultMaxDeferMs = config.defaultMaxDeferMs ?? 400
-        this.heavyFrameCooldownFrames = config.heavyFrameCooldownFrames ?? 12000
+        this.heavyFrameCooldownFrames = config.heavyFrameCooldownFrames ?? 120
         
         const ringSize = config.ringBufferSize ?? 60
         this.frameTimeRing = new Float32Array(ringSize)
@@ -275,9 +275,16 @@ export class FrameBudgetScheduler {
         
         this.tasksExecutedLastFrame = tasksExecuted
 
-        // If we forced a task into a heavy frame, impose a cooldown
-        if (heavyFrameTriggered && this.heavyFrameCooldownFrames > 0) {
+        // After executing any task, impose a cooldown so the renderer gets
+        // breathing room between consecutive GPU-heavy operations.
+        if (tasksExecuted > 0 && this.heavyFrameCooldownFrames > 0) {
             this.cooldownFramesRemaining = this.heavyFrameCooldownFrames
+        }
+
+        // If we force-executed a task (maxDeferMs exceeded), log the warning.
+        // Cooldown is already set above.
+        if (heavyFrameTriggered) {
+            // warning already logged inline above
         }
     }
     

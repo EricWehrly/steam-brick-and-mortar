@@ -216,12 +216,16 @@ export class SharedMaterialManager {
             }),
             worker.generate('wood_normal', { width: 1024, height: 1024, strength: 0.3 }),
         ])
-        // Each tile represents ~1m of vertical planking (full ceiling height).
-        // Repeat horizontally across the wall width. The room is ~22m wide so
-        // 12 repeats gives ~0.55m plank width, which reads as narrow wall boards.
-        // RepeatY = 1 keeps the plank running full floor-to-ceiling without stretching.
-        const diffuse = this.bitmapToTexture(d, 12, 1)
-        const normal  = this.bitmapToTexture(n, 12, 1)
+        // The grain runs along texture Y. On a wall plane, UV.y = world height, so
+        // naively the bands appear as horizontal stripes. Rotating the texture 90°
+        // makes the bands run vertically (plank-like) on the wall.
+        // repeat(1, 12): 1 tile tall (full ceiling height), 12 tiles wide (~0.55m planks).
+        const diffuse = this.bitmapToTexture(d, 1, 12)
+        const normal  = this.bitmapToTexture(n, 1, 12)
+        diffuse.rotation = Math.PI / 2
+        normal.rotation  = Math.PI / 2
+        diffuse.center.set(0.5, 0.5)
+        normal.center.set(0.5, 0.5)
         
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.WallWood,
