@@ -160,9 +160,14 @@ describe('FrameBudgetScheduler', () => {
             scheduler.schedule(() => order.push('low'), { priority: 'low' })
             scheduler.schedule(() => order.push('normal'), { priority: 'normal' })
             
-            // With maxTasksPerFrame=1, need two frames
-            scheduler.onFrameStart(1000)  // executes 'normal' (higher priority)
-            scheduler.onFrameStart(1016)  // executes 'low'
+            // maxTasksPerFrame=1 and heavyFrameCooldownFrames=120 means we need to
+            // call onFrameStart 121 more times after the first execution to drain
+            // the cooldown counter before the second task can run.
+            scheduler.onFrameStart(1000)  // executes 'normal' (higher priority), sets cooldown=120
+            for (let frame = 1; frame <= 120; frame++) {
+                scheduler.onFrameStart(1000 + frame * 16)  // drains cooldown
+            }
+            scheduler.onFrameStart(1000 + 121 * 16)  // cooldown=0, executes 'low'
             
             expect(order[0]).toBe('normal')
             expect(order[1]).toBe('low')
