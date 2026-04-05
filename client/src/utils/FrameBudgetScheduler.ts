@@ -250,12 +250,16 @@ export class FrameBudgetScheduler {
                     break
                 }
             } else {
-                // Anti-starvation: force if task has been waiting too long
-                const waitTime = now - task.queuedAt
+                // Anti-starvation: force if task has been waiting too long.
+                // Clamp wait time to maxDeferMs * 3 so a deliberate tab-hidden pause
+                // (where rAF stops but queuedAt keeps accruing) doesn't instantly
+                // force-flush the entire queue when focus returns.
+                const rawWait = now - task.queuedAt
+                const waitTime = Math.min(rawWait, task.maxDeferMs * 3)
                 const forceExecution = waitTime > task.maxDeferMs
                 
                 if (forceExecution) {
-                    FrameBudgetScheduler.logger.warn(`Task forced after ${waitTime.toFixed(0)}ms wait (limit: ${task.maxDeferMs}ms) - system may be overloaded`)
+                    FrameBudgetScheduler.logger.warn(`Task forced after ${rawWait.toFixed(0)}ms wait (limit: ${task.maxDeferMs}ms) - system may be overloaded`)
                     this.totalTasksForced++
                     heavyFrameTriggered = true
                 } else if (!this.hasBudget(task.estimatedMs)) {
@@ -275,16 +279,12 @@ export class FrameBudgetScheduler {
         
         this.tasksExecutedLastFrame = tasksExecuted
 
-        // After executing any task, impose a cooldown so the renderer gets
-        // breathing room between consecutive GPU-heavy operations.
-        if (tasksExecuted > 0 && this.heavyFrameCooldownFrames > 0) {
+        // Only impose cooldown after a *forced* execution (genuine overload signal).
+        // Normal within-budget task execution doesn't warrant blocking the queue for
+        // 120 frames — that would stall lightweight tasks (texture copies, mesh inserts)
+        // for 2+ seconds and cause them to force-fire repeatedly.
+        if (heavyFrameTriggered && this.heavyFrameCooldownFrames > 0) {
             this.cooldownFramesRemaining = this.heavyFrameCooldownFrames
-        }
-
-        // If we force-executed a task (maxDeferMs exceeded), log the warning.
-        // Cooldown is already set above.
-        if (heavyFrameTriggered) {
-            // warning already logged inline above
         }
     }
     
