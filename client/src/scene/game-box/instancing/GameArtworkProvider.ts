@@ -1,7 +1,9 @@
 /**
  * Game Artwork Provider - Universal artwork retrieval for any renderer
- * 
- * Given an appId, returns a GameArtwork object that can provide:
+ *
+ * TD: file-size-500-line-limit (split in progress — GameArtworkHandle extracted)
+ * TD: singleton-pattern-refactor
+ *
  * - URL for the artwork
  * - Pixel data (Uint8ClampedArray) at requested dimensions
  * - Format information

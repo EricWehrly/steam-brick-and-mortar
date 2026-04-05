@@ -2,6 +2,10 @@
 
 > **Bugs belong in `bugs.md`. This file tracks technical debt, architecture work, and improvements.**
 > **Intake Queue** = recently added, not yet triaged into a priority section.
+>
+> **Tech Debt Tags**: Source files are annotated with `// TD: <tag-id>` comments to link them to entries here.
+> Each entry below uses `## id: <tag-id>` as its header so tags can be looked up directly.
+> See `docs/README.md` for the full tagging convention.
 
 ---
 
@@ -386,3 +390,76 @@ Add a reference doc or inline comments explaining when and why to adjust each.
 2. **Triage**: Move to appropriate priority section with effort estimate
 3. **Active work**: Use dedicated planning docs in `docs/active/` for complex items
 4. **Completion**: Remove from this file (or add brief note if useful for history)
+
+---
+
+## id: singleton-pattern-refactor
+**Priority**: Low  
+**Effort**: 15-30 min per class  
+**Status**: Pattern not yet finalized — tag files now, act later  
+**Context**: All singleton classes use `public static getInstance(): T` which forces callers to call the method explicitly. A cleaner pattern uses ES2022 private class fields so that each static method delegates through a single internal accessor rather than repeating the null-check:
+
+```typescript
+class Foo {
+    static #instance: Foo | null = null
+
+    static get #inst(): Foo {
+        if (!Foo.#instance) Foo.#instance = new Foo()
+        return Foo.#instance
+    }
+
+    static doThing(): void { Foo.#inst.doThingImpl() }
+    static dispose(): void { Foo.#inst.disposeImpl(); Foo.#instance = null }
+
+    private doThingImpl(): void { ... }
+    private disposeImpl(): void { ... }
+}
+```
+
+Benefits: no repeated `getInstance()` calls at call sites, the null check lives in one place, and the `#instance` field is truly private (not just `private` TS).
+
+**Agree on the pattern with a poster-child class before going wide.** Good candidates: `FrameBudgetScheduler`, `MeshPrewarmer`, `SharedMaterialManager`.
+
+**Files tagged**: (add `// TD: singleton-pattern-refactor` as files are identified)
+
+---
+
+## id: raf-loop-migration
+**Priority**: Low  
+**Effort**: 1-2 hours per class  
+**Status**: Ready to act on opportunistically (one class at a time)  
+**Context**: `GameSpotlight` and `PerformanceMonitorUI` run independent `requestAnimationFrame` loops. These should register with `RenderLoopRegistry` to benefit from centralized frame scheduling, diagnostics, and `FrameBudgetScheduler` integration.  
+
+**Do not migrate**: one-shot rAF uses in `LightingControlsPanel` and `GameLibraryBinderUI` — those are correct as independent calls.
+
+**Files tagged with `// TD: raf-loop-migration`**:
+- `client/src/debug/GameSpotlight.ts`
+- `client/src/ui/PerformanceMonitor.ts` (UI overlay)
+
+---
+
+## id: legacy-atlas-removal
+**Priority**: High  
+**Effort**: 1 day  
+**Context**: `InstancedArtworkRenderer` and `MultiAtlasArtworkRenderer` are dead code paths (LOD atlas is stable in production). See `docs/archive/hot-path-refactoring-plan.md` Pass 1 for full step-by-step. Also remove `Setting.UseMultiAtlas` / `Setting.UseLodAtlas` from `AppSettings`.  
+
+**Files tagged with `// TD: legacy-atlas-removal`**:
+- `client/src/scene/game-box/GpuGameBoxRenderer.ts`
+- `client/src/scene/game-box/instancing/InstancedArtworkRenderer.ts`
+- `client/src/scene/game-box/LegacyAtlasGameBoxRenderer.ts`
+- `client/src/core/AppSettings.ts`
+
+---
+
+## id: file-size-500-line-limit
+**Priority**: Low (ongoing discipline)  
+**Effort**: Varies  
+**Status**: Convention, not a one-time fix  
+**Context**: Files approaching or exceeding 500 lines (including whitespace) are a signal of concern/responsibility bloat and can cause model patching difficulties. When touching a file near this threshold, consider splitting it as part of the same PR.  
+
+**Not a hard rule** — some files are legitimately large (test files, generated types). Use judgment.  
+
+**Current candidates** (to split opportunistically):
+- `client/src/scene/game-box/instancing/HighTextureCache.ts` (~928 lines)
+- `client/src/utils/PerformanceMonitor.ts` (~503 lines)
+- `client/src/scene/game-box/instancing/GameArtworkProvider.ts` (split in progress)

@@ -1,4 +1,5 @@
 /**
+ * TD: raf-loop-migration
  * Game Spotlight — click-to-highlight system for games in the scene.
  * Also exposed to the browser console for manual debugging:
  *   window.spotlightGame("UNLOVED")

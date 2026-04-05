@@ -1,4 +1,5 @@
 /**
+ * TD: raf-loop-migration
  * Performance Statistics Display
  * 
  * A lightweight performance monitoring component that displays FPS, memory usage,
@@ -65,6 +66,7 @@ export class PerformanceMonitorUI {
     }
     
     /**
+ * TD: raf-loop-migration
      * Initialize UI elements (deferred from constructor to avoid blocking startup)
      */
     private ensureUIInitialized(): void {
@@ -152,6 +154,7 @@ export class PerformanceMonitorUI {
     }
     
     /**
+ * TD: raf-loop-migration
      * Start monitoring performance (creates UI if needed)
      */
     public start(): void {
@@ -173,6 +176,7 @@ export class PerformanceMonitorUI {
     }
     
     /**
+ * TD: raf-loop-migration
      * Stop monitoring performance
      */
     public stop(): void {
@@ -183,6 +187,7 @@ export class PerformanceMonitorUI {
     }
     
     /**
+ * TD: raf-loop-migration
      * Update performance statistics
      */
     private update(): void {
@@ -249,6 +254,7 @@ export class PerformanceMonitorUI {
     }
     
     /**
+ * TD: raf-loop-migration
      * Update render statistics from Three.js renderer
      */
     public updateRenderStats(renderer: THREE.WebGLRenderer): void {
@@ -262,6 +268,7 @@ export class PerformanceMonitorUI {
     }
     
     /**
+ * TD: raf-loop-migration
      * Get current performance statistics
      */
     public getStats(): PerformanceStats {
@@ -287,6 +294,7 @@ export class PerformanceMonitorUI {
     }
     
     /**
+ * TD: raf-loop-migration
      * Hide the performance monitor
      */
     public hide(): void {
@@ -295,6 +303,7 @@ export class PerformanceMonitorUI {
     }
     
     /**
+ * TD: raf-loop-migration
      * Show the performance monitor (creates UI if needed)
      */
     public show(): void {
@@ -304,6 +313,7 @@ export class PerformanceMonitorUI {
     }
     
     /**
+ * TD: raf-loop-migration
      * Toggle visibility of the performance monitor (creates UI if needed)
      */
     public toggle(): void {
@@ -319,6 +329,7 @@ export class PerformanceMonitorUI {
     }
     
     /**
+ * TD: raf-loop-migration
      * Remove the performance monitor from the DOM and stop monitoring
      */
     public dispose(): void {
