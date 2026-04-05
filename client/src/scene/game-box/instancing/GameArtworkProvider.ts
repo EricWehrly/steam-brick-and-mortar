@@ -229,9 +229,12 @@ export class GameArtworkProvider {
         targetHeight: number,
         cacheKey: string
     ): Promise<PixelDataResult> {
+        // Build a size-qualified cache key for disk lookups
+        const sizedCacheUrl = `${url}@${targetWidth}x${targetHeight}`
+
         // Check disk cache first
         if (this.pixelCache) {
-            const cached = await this.pixelCache.get(url)
+            const cached = await this.pixelCache.get(sizedCacheUrl)
             if (cached) {
                 // If cached at different size, we may need to resize
                 if (cached.width === targetWidth && cached.height === targetHeight) {
@@ -262,12 +265,9 @@ export class GameArtworkProvider {
             { textureWidth: targetWidth, textureHeight: targetHeight, timeout: 10000 }
         )
         
-        // Cache at native size for future use
+        // Always store using size-qualified key
         if (this.pixelCache) {
-            const nativeDims = this.getNativeDimensionsFromUrl(url)
-            if (nativeDims.width === targetWidth && nativeDims.height === targetHeight) {
-                await this.pixelCache.put(url, result.imageData, targetWidth, targetHeight)
-            }
+            await this.pixelCache.put(sizedCacheUrl, result.imageData, targetWidth, targetHeight)
         }
         
         return {
@@ -281,9 +281,10 @@ export class GameArtworkProvider {
     /**
      * Check if pixels are cached for a URL.
      */
-    public async isPixelsCached(url: string): Promise<boolean> {
+    public async isPixelsCached(url: string, width?: number, height?: number): Promise<boolean> {
         if (!this.pixelCache) return false
-        const cached = await this.pixelCache.get(url)
+        const key = (width !== undefined && height !== undefined) ? `${url}@${width}x${height}` : url
+        const cached = await this.pixelCache.get(key)
         return cached !== null
     }
     
@@ -468,6 +469,7 @@ export class GameArtworkProvider {
         }
     }
     
+    // TODO: getNativeDimensionsFromUrl is no longer used in fetchPixels — remove when confirmed safe
     private getNativeDimensionsFromUrl(url: string): { width: number; height: number } {
         if (url.includes('library_600x900')) return ARTWORK_DIMENSIONS.library
         if (url.includes('header')) return ARTWORK_DIMENSIONS.header
@@ -704,8 +706,9 @@ class GameArtworkHandle implements GameArtwork {
     
     async isCached(): Promise<boolean> {
         const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.preferredUrl)
+        const dims = ARTWORK_DIMENSIONS[this.format]
         for (const { url } of strategy) {
-            if (await this.provider.isPixelsCached(url)) {
+            if (await this.provider.isPixelsCached(url, dims.width, dims.height)) {
                 return true
             }
         }
