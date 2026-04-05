@@ -47,9 +47,7 @@ import { ShelfStickerHandler } from '../stickers/ShelfStickerHandler'
 import { EventManager } from '../../core/EventManager'
 import { GameEventTypes, StorePropsEventTypes, type RendererReadyEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
-import { DataManager } from '../../core/data/DataManager'
-import { DataKey } from '../../core/data/DataTypes'
-import { SystemCapabilitiesDetector } from '../../utils/SystemCapabilities'
+import { MeshPrewarmer } from '../../utils/MeshPrewarmer'
 
 export interface InstancedShelfConfig extends InstancedRendererConfig {
     defaultShelfConfig?: ShelfConfig
@@ -236,12 +234,14 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             
             // Build shelf unit template (stamp pattern for creating shelves)
             this.buildShelfUnitTemplate()
-            
-            // Pre-warm GPU shader programs before any mesh is added to the main scene.
-            // Uses a temporary off-screen scene so no visual artifact occurs.
-            // On drivers with KHR_parallel_shader_compile this is non-blocking;
-            // on older drivers it still moves the compile cost here rather than on first render.
-            await this.prewarmShaders()
+
+            // Register meshes with MeshPrewarmer — it batches all registrations
+            // across a debounce window and calls compileAsync once, non-blocking.
+            const prewarmer = MeshPrewarmer.getInstance()
+            for (const manager of [this.angledBoardManager, this.sideBoardManager, this.shelfBoardManager, this.interiorSurfaceManager]) {
+                const mesh = manager.getInstancedMesh()
+                if (mesh) prewarmer.register(mesh)
+            }
             
             this.isInitialized = true
             
@@ -258,68 +258,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
     }
     
-    /**
-     * Pre-warm GPU shader programs for all shelf InstancedMeshes.
-     *
-     * Creates a temporary off-screen scene, adds the four meshes to it, and
-     * calls renderer.compileAsync(). When KHR_parallel_shader_compile is
-     * available the driver links shaders on a background thread and this
-     * resolves without blocking the main thread. Without that extension the
-     * compile still happens synchronously here — but that moves the freeze to
-     * initialization time (hidden behind async startup) rather than first render.
-     *
-     * If the renderer or camera aren't in DataManager yet (e.g. in unit tests),
-     * the method logs a warning and returns early without throwing.
-     */
-    private async prewarmShaders(): Promise<void> {
-        const renderer = DataManager.getInstance().get<THREE.WebGLRenderer>(DataKey.Renderer)
-        const camera   = DataManager.getInstance().get<THREE.Camera>(DataKey.MainCamera)
-
-        if (!renderer || !camera) {
-            InstancedShelfRenderer.logger.warn('Skipping shader prewarm — renderer/camera not available (test environment?)')
-            return
-        }
-
-        const capabilities = SystemCapabilitiesDetector.detect()
-
-        if (!capabilities.hasParallelShaderCompile) {
-            // Without KHR_parallel_shader_compile, compileAsync() blocks the main thread
-            // just like a normal render() call — no benefit, and Three.js logs a warning.
-            // Shaders will compile on first render instead (or when FrameBudgetScheduler
-            // stagger spreads the addToMainScene() calls across frames).
-            InstancedShelfRenderer.logger.debug('Skipping compileAsync: KHR_parallel_shader_compile not available')
-            return
-        }
-
-        InstancedShelfRenderer.logger.debug('🔥 Starting non-blocking shader prewarm (KHR_parallel_shader_compile available)')
-        const startTime = performance.now()
-
-        const prewarmScene = new THREE.Scene()
-        const meshes = [
-            this.angledBoardManager.getInstancedMesh(),
-            this.sideBoardManager.getInstancedMesh(),
-            this.shelfBoardManager.getInstancedMesh(),
-            this.interiorSurfaceManager.getInstancedMesh(),
-        ].filter((mesh): mesh is THREE.InstancedMesh => mesh !== null)
-
-        for (const mesh of meshes) {
-            prewarmScene.add(mesh)
-        }
-
-        try {
-            await renderer.compileAsync(prewarmScene, camera)
-            InstancedShelfRenderer.logger.debug(
-                `✅ Shader prewarm complete in ${(performance.now() - startTime).toFixed(0)}ms`
-            )
-        } catch (error) {
-            InstancedShelfRenderer.logger.warn('Shader prewarm failed (non-fatal), shaders will compile on first render:', error)
-        } finally {
-            for (const mesh of meshes) {
-                prewarmScene.remove(mesh)
-            }
-        }
-    }
-
     private createGeometryTemplates(): void {
         const { width, height, depth, boardThickness } = this.defaultShelfConfig
         
