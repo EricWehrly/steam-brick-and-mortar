@@ -5,7 +5,7 @@ This directory is structured specifically as a knowledge base and entrypoint for
 ## Where to start
 1. Read `roadmaps/current-status.md` to understand what we are working on right now.
 2. Read `agent-context/startup-sequence.md` to understand the 5-phase startup architecture.
-3. Read `agent-context/component-interaction-map.md` to understand the DI and event flow.
+3. Read `agent-context/component-interaction-map.md` **only when touching the DI/event layer** — it is a deep-dive reference (~1700 lines), not required reading for every task.
 
 ## Tech Debt Tags
 

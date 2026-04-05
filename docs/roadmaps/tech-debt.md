@@ -14,40 +14,43 @@
 
 ### Architecture: Review `LegacyStorePropsHandler` value and future
 **Priority**: Low  
-**Effort**: 2-4 hours (investigation + decision)
-**Context**: `LegacyStorePropsHandler` exists as a CPU-fallback path when the GPU instancing check fails. Questions to answer: (1) Does it still function at all without GPU instancing? (2) Can we test it in Docker with SwiftShader or a software renderer? (3) Is there DRY opportunity with `GpuStorePropsEventHandler`, or should they stay fully separate? (4) Is anyone likely to hit this path in practice?
-**Source**: Apr 2026
-
-### Naming: Rename `GameArtworkHandle` to something more descriptive
-**Priority**: Low  
-**Effort**: 30 min  
-**Context**: `GameArtworkHandle` is awkward. The interface is `GameArtwork`; the concrete class is the lazy-loading implementation of it. Candidates: `GameArtworkRequest`, `GameArtworkLoader`, or `GameArtworkImpl`. Pick one and rename the class + file (`GameArtworkHandle.ts`). No behavior change.
+**Effort**: 2-4 hours (investigation + decision)  
+**Context**: `LegacyStorePropsHandler` exists as a CPU-fallback path when the GPU instancing check fails. Questions to answer: (1) Does it still function at all without GPU instancing? (2) Can we test it in Docker with SwiftShader or a software renderer? (3) Is there DRY opportunity with `GpuStorePropsEventHandler`, or should they stay fully separate? (4) Is anyone likely to hit this path in practice?  
 **Source**: Apr 2026
 
 ### Convention: Remove noisy JSDoc that just restates the signature
-**Priority**: Low (ongoing hygiene)  
-**Effort**: 5-10 min per file as touched  
-**Context**: Copilot-generated JSDoc that only restates the method name/params adds noise without signal. TypeScript types already describe parameters better. Going forward: remove `/** ... */` blocks that say nothing beyond what the signature already communicates. Keep comments that explain *why*, edge cases, or non-obvious behavior. `GameArtworkProvider.ts` is a good example of over-commented code to clean as we touch it.
+**Priority**: Low (ongoing hygiene — apply as you touch files)  
+**Effort**: Minutes per file  
+**Context**: Remove `/** ... */` blocks that say nothing beyond what the signature already communicates. TypeScript types describe parameters better. Keep comments that explain *why*, edge cases, or non-obvious behavior. This is a "clean as you go" rule, not a separate task — check each file you're already editing.  
 **Source**: Apr 2026
 
-### Performance: Review carpet pattern implementation for DRY/quality improvement (late Phase 2)
+### Performance: Offload carpet texture generation to worker (`carpet-worker-offload`)
+**Priority**: Medium  
+**Effort**: 2-3 hours  
+**Context**: `prewarmCarpet` in `SharedMaterialManager` calls `ProceduralCarpetPatternGenerator.createCarpetMaterial()` synchronously on the main thread. All other procedural textures run through `ProceduralTextureWorker`. Add a `carpet_enhanced` texture type to the worker pipeline and migrate this call.  
+**Source**: Apr 2026  
+**Tag**: `// TD: carpet-worker-offload` in `SharedMaterialManager.ts`
+
+### Architecture: Review carpet patterns for DRY/quality (late Phase 2)
 **Priority**: Low  
 **Effort**: 2-4 hours  
-**Context**: Procedural carpet pattern generator was brought in from `origin/carpet-rebase`. It currently runs synchronously on the main thread during the `SharedMaterialManager` prewarm phase. Questions: (1) Should it be worker-offloaded like the other texture generators? (2) Are there DRY opportunities between `ClassicCarpetPatternGenerator`, `GeometricPatternGenerator`, and the base? (3) Does the output quality meet the bar for Phase 2 "ready for friends"? Review after UI system is in place and showcase UI is built.
+**Context**: Brought in from `origin/carpet-rebase`. Check for DRY opportunities between `ClassicCarpetPatternGenerator`, `GeometricPatternGenerator`, and the base. Evaluate output quality before Phase 2 "ready for friends". Review after showcase UI is built.  
 **Source**: Apr 2026
-**Priority**: Low
-**Effort**: 30 min
-**Context**: `LightRegistry.getLightsByType<T>` uses `unknown[]` for the constructor rest-args parameter. The linter flags both `any[]` and `unknown[]` as type-system opt-outs. The correct type depends on whether Three.js light constructors share a common abstract base constructor signature — they don't, so this may need a `{ prototype: T }` pattern (no constructor call needed, just `instanceof`) or a mapped type of known light constructors.
+
+### Types: Tighten `getLightsByType` Constructor Signature
+**Priority**: Low  
+**Effort**: 30 min  
+**Context**: `LightRegistry.getLightsByType<T>` uses `unknown[]` for the constructor rest-args parameter. The linter flags both `any[]` and `unknown[]` as type-system opt-outs. The correct type depends on whether Three.js light constructors share a common abstract base constructor signature — they don't, so this may need a `{ prototype: T }` pattern (no constructor call needed, just `instanceof`) or a mapped type of known light constructors.  
 **Source**: Apr 2026 — spotlight lag spike work
 
 ### Events: Make UI Emissions Use a `UIEvent` Base Type
-**Priority**: Medium
-**Effort**: 2-3 hours
+**Priority**: Medium  
+**Effort**: 2-3 hours  
 **Context**: UI components emit events ad-hoc. They should all emit a `UIEvent` type with a sub-identifier, so UI events are distinguishable from game/system events in the event log.
 
 ### Performance: Document LOD Configuration Levers
-**Priority**: Low
-**Effort**: 1 hour
+**Priority**: Low  
+**Effort**: 1 hour  
 **Context**: The following LOD parameters exist but lack documented tuning guidance:
 ```
 maxTextureSize, nearDistance, farDistance,
@@ -473,15 +476,3 @@ Benefits: no repeated `getInstance()` calls at call sites, the null check lives 
 
 ---
 
-## id: file-size-500-line-limit
-**Priority**: Low (ongoing discipline)  
-**Effort**: Varies  
-**Status**: Convention, not a one-time fix  
-**Context**: Files approaching or exceeding 500 lines (including whitespace) are a signal of concern/responsibility bloat and can cause model patching difficulties. When touching a file near this threshold, consider splitting it as part of the same PR.  
-
-**Not a hard rule** — some files are legitimately large (test files, generated types). Use judgment.  
-
-**Current candidates** (to split opportunistically):
-- `client/src/scene/game-box/instancing/HighTextureCache.ts` (~928 lines)
-- `client/src/utils/PerformanceMonitor.ts` (~503 lines)
-- `client/src/scene/game-box/instancing/GameArtworkProvider.ts` (split in progress)
