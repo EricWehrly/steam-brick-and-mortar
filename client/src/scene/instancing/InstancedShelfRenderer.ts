@@ -48,6 +48,7 @@ import { EventManager } from '../../core/EventManager'
 import { GameEventTypes, StorePropsEventTypes, type RendererReadyEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import { MeshPrewarmer } from '../../utils/MeshPrewarmer'
+import { SystemCapabilitiesDetector } from '../../utils/SystemCapabilities'
 
 export interface InstancedShelfConfig extends InstancedRendererConfig {
     defaultShelfConfig?: ShelfConfig
@@ -120,6 +121,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     
     // Shelf unit template (computed ONCE, applied to each shelf position)
     private shelfUnitTemplate: ShelfPartTemplate[] = []
+    private hasParallelShaderCompile = false
+    private meshesAddedToScene = false
+    private addingMeshesToScene = false
+    private sceneAddGeneration = 0
     
     // TODO: Consider making sticker system fully pluggable (dependency injection or optional feature)
     private readonly stickerHandler: ShelfStickerHandler
@@ -237,6 +242,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
 
             // Register meshes with MeshPrewarmer — it batches all registrations
             // across a debounce window and calls compileAsync once, non-blocking.
+            // Also capture capability for no-KHR fallback scene insertion strategy.
+            this.hasParallelShaderCompile = SystemCapabilitiesDetector.detect().hasParallelShaderCompile
             const prewarmer = MeshPrewarmer.getInstance()
             for (const manager of [this.angledBoardManager, this.sideBoardManager, this.shelfBoardManager, this.interiorSurfaceManager]) {
                 const mesh = manager.getInstancedMesh()
@@ -391,10 +398,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         
         try {
             if (this.shelfUnits.size === 0) {
-                this.angledBoardManager.addToMainScene()
-                this.sideBoardManager.addToMainScene()
-                this.shelfBoardManager.addToMainScene()
-                this.interiorSurfaceManager.addToMainScene()
+                this.ensureMeshesAddedToScene()
             }
             
             const shelfUnit = this.applyShelfUnitTemplate(index, data.position, shelfConfig)
@@ -409,6 +413,54 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
     }
     
+    private ensureMeshesAddedToScene(): void {
+        if (this.meshesAddedToScene || this.addingMeshesToScene) {
+            return
+        }
+
+        const managers = [
+            this.angledBoardManager,
+            this.sideBoardManager,
+            this.shelfBoardManager,
+            this.interiorSurfaceManager
+        ]
+
+        // With KHR prewarm, add all immediately — shaders are expected to be linked.
+        if (this.hasParallelShaderCompile) {
+            for (const manager of managers) {
+                manager.addToMainScene()
+            }
+            this.meshesAddedToScene = true
+            return
+        }
+
+        // No KHR: stagger mesh insertion across frames to avoid a single giant compile hitch.
+        this.addingMeshesToScene = true
+        const queue = [...managers]
+        const generation = ++this.sceneAddGeneration
+
+        const runNext = () => {
+            // Abandon stale queue work after reset/dispose/new queue start.
+            if (generation !== this.sceneAddGeneration || !this.isInitialized) {
+                this.addingMeshesToScene = false
+                return
+            }
+
+            const next = queue.shift()
+            if (!next) {
+                this.meshesAddedToScene = true
+                this.addingMeshesToScene = false
+                return
+            }
+
+            next.addToMainScene()
+            scheduleNextFrame(runNext)
+        }
+
+        InstancedShelfRenderer.logger.debug('KHR_parallel_shader_compile unavailable; staggering instanced shelf mesh insertion across frames')
+        runNext()
+    }
+
     private applyShelfUnitTemplate(
         shelfUnitIndex: number,
         position: THREE.Vector3,
@@ -503,6 +555,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             shelfBoard: 0,
             interior: 0
         }
+        this.meshesAddedToScene = false
+        this.addingMeshesToScene = false
+        this.sceneAddGeneration++
         
         InstancedShelfRenderer.logger.debug('🔄 Reset')
     }
@@ -560,7 +615,20 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         
         this.shelfUnits.clear()
         this.isInitialized = false
+        this.meshesAddedToScene = false
+        this.addingMeshesToScene = false
+        this.hasParallelShaderCompile = false
+        this.sceneAddGeneration++
         
         InstancedShelfRenderer.logger.debug('✅ Disposed')
     }
+}
+
+function scheduleNextFrame(callback: () => void): void {
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => callback())
+        return
+    }
+
+    setTimeout(callback, 16)
 }
