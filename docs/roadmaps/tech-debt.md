@@ -415,31 +415,35 @@ Add a reference doc or inline comments explaining when and why to adjust each.
 ## id: singleton-pattern-refactor
 **Priority**: Low  
 **Effort**: 15-30 min per class  
-**Status**: Pattern not yet finalized — tag files now, act later  
-**Context**: All singleton classes use `public static getInstance(): T` which forces callers to call the method explicitly. A cleaner pattern uses ES2022 private class fields so that each static method delegates through a single internal accessor rather than repeating the null-check:
+**Status**: Pattern finalized — `MeshPrewarmer` is the reference implementation  
+**Context**: All singleton classes use `public static getInstance(): T` which forces callers to call the method explicitly. The agreed pattern uses ES2022 private class fields with nullish assignment:
 
 ```typescript
 class Foo {
     static #instance: Foo | null = null
 
-    static get #inst(): Foo {
-        if (!Foo.#instance) Foo.#instance = new Foo()
-        return Foo.#instance
+    // Static public API — no getInstance() at call sites
+    static doThing(): void {
+        ;(Foo.#instance ??= new Foo()).doThingImpl()
     }
-
-    static doThing(): void { Foo.#inst.doThingImpl() }
-    static dispose(): void { Foo.#inst.disposeImpl(); Foo.#instance = null }
+    static dispose(): void {
+        Foo.#instance?.disposeImpl()
+        Foo.#instance = null
+    }
 
     private doThingImpl(): void { ... }
     private disposeImpl(): void { ... }
 }
 ```
 
-Benefits: no repeated `getInstance()` calls at call sites, the null check lives in one place, and the `#instance` field is truly private (not just `private` TS).
+**Reference implementation**: `client/src/utils/MeshPrewarmer.ts` (merged Apr 2026)  
+**Note on dispose()**: Before applying to classes with complex teardown (event unregistration, GPU cleanup, etc.), review what the existing `dispose()` does. Some singletons have disposal logic that shouldn't be hidden behind a static method without careful thought.
 
-**Agree on the pattern with a poster-child class before going wide.** Best first candidate: **`DataManager`** — it's referenced in many files, its `getInstance()` calls are among the noisiest, and it has no complex constructor logic. Once `DataManager` is reshaped and reviewed, apply the pattern to `FrameBudgetScheduler`, `MeshPrewarmer`, `SharedMaterialManager`, etc.
+**Next candidates** (easiest first): `TextureLoader`, `StartupEventTracker`, `LightRegistry`, then `SharedMaterialManager`, then eventually `DataManager`.
 
-**Files tagged**: (add `// TD: singleton-pattern-refactor` as files are identified)
+**Files tagged with `// TD: singleton-pattern-refactor`**:
+- `client/src/utils/SharedMaterialManager.ts`
+- `client/src/scene/game-box/instancing/GameArtworkProvider.ts`
 
 ---
 
