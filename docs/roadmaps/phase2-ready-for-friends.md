@@ -563,6 +563,23 @@
   - **Deferral Reason**: Should wait until after first batch of "Ready for Friends" infrastructure items are complete
 
 ### Visual Effects & Immersion
+
+#### Story 6.1.3: Wall/Ceiling Texture Visual Polish 🔮 **POST-PHASE-1 CAPSTONE**
+**Context**: Wall and ceiling textures need a second pass before showing to friends. Currently in place but design quality needs improvement. Sequenced after Phase 1 proper work is complete — important for first impressions, but not imperative for core functionality.
+
+- **Task 6.1.3.1**: Revisit wood plank wall texture design
+  - Evaluate current plank proportions, color variation, and grain fidelity
+  - Improve or replace texture to feel like a real video store back wall
+  - Ensure grain direction, plank scale, and tiling read correctly at VR scale
+- **Task 6.1.3.2**: Revisit popcorn ceiling texture design
+  - Evaluate bumpiness, color, and tiling at ceiling scale
+  - Improve or replace texture for natural overhead appearance in VR
+- **Task 6.1.3.3**: Evaluate Godot-based procedural texture generation (optional)
+  - Investigate using Godot’s material/shader system to generate and export textures
+  - If promising: prototype one texture, compare quality vs. current worker-based approach
+
+**Acceptance**: Surfaces don’t visibly read as procedurally generated when standing in the scene
+
 - **Dissolve Animation System**: Implement smooth entrance animations for store geometry
   - **Context**: Eliminate jarring "pop" appearance when scene loads with immersive materialization effects
   - **Research**: See `docs/research/dissolve-animation-research.md` for technical findings and implementation approach
