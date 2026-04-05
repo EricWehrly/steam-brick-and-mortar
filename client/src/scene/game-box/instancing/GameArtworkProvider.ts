@@ -1,7 +1,7 @@
 /**
  * Game Artwork Provider - Universal artwork retrieval for any renderer
  *
- * TD: file-size-500-line-limit (split in progress — GameArtworkHandle extracted)
+ * TD: file-size-500-line-limit (split in progress — GameArtworkRequest extracted)
  * TD: singleton-pattern-refactor
  *
  * - URL for the artwork
@@ -23,7 +23,7 @@
 import { Logger } from '../../../utils/Logger'
 import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
-import { GameArtworkHandle } from './GameArtworkHandle'
+import { GameArtworkRequest } from './GameArtworkRequest'
 import { resizePixels } from './ArtworkPixelUtils'
 
 // Class-scoped logger will be attached to the class
@@ -169,7 +169,7 @@ export class GameArtworkProvider {
         format: ArtworkFormat = 'library',
         preferredUrl?: string
     ): GameArtwork {
-        return new GameArtworkHandle(
+        return new GameArtworkRequest(
             appId,
             gameName,
             format,
@@ -471,14 +471,6 @@ export class GameArtworkProvider {
                 `📊 Artwork failures: ${stats.total} total, ${stats.permanent} permanent dead-ends (${reasons.join(', ')})`
             )
         }
-    }
-    
-    // TODO: getNativeDimensionsFromUrl is no longer used in fetchPixels — remove when confirmed safe
-    private getNativeDimensionsFromUrl(url: string): { width: number; height: number } {
-        if (url.includes('library_600x900')) return ARTWORK_DIMENSIONS.library
-        if (url.includes('header')) return ARTWORK_DIMENSIONS.header
-        if (url.includes('capsule')) return ARTWORK_DIMENSIONS.capsule
-        return ARTWORK_DIMENSIONS.library  // Default
     }
     
     private loadPersistentCaches(): void {
