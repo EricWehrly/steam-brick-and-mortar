@@ -441,7 +441,7 @@ class Foo {
 
 **Next candidates** (easiest first): `TextureLoader`, `StartupEventTracker`, `LightRegistry`, then `SharedMaterialManager`, then eventually `DataManager`.
 
-**Files tagged with `// TD: singleton-pattern-refactor`**:
+**Files tagged** (search for `singleton-pattern-refactor` in file header comments):
 - `client/src/utils/SharedMaterialManager.ts`
 - `client/src/scene/game-box/instancing/GameArtworkProvider.ts`
 
