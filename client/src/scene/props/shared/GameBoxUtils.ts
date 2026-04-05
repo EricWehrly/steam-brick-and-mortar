@@ -3,14 +3,21 @@ import type { SteamGameData } from '../../game-box/types/GameData'
 import type { GameBoxDimensions } from '../../game-box/types/GameBoxOptions'
 import { ShelfSide, type ShelfSurface } from './SharedPropsTypes'
 
+// TD: approximated-placement-tripwire
+// NOTE: Game positions are approximated from DEFAULT_SHELF_CONFIG (width, shelfCount, etc.).
+// If shelf GLTF geometry changes, update GameBoxUtils.calculateGamePositions or
+// run `test/unit/scene/placement-tripwire.test.ts` to validate positions don't
+// float outside the modeled shelf. This is a deliberate tripwire to catch model-sync regressions.
 export const GameLayoutConstants = {
     // Games per shelf board surface (front or back).
-    // With 0.32m spacing and 2.0m shelf width, 6 games spans 1.6m — fits with margin.
-    GAMES_PER_SURFACE: 6,
+    // Intentionally low — readability over density. With 800 games, layout and FOV
+    // constrain what's visible; we don't want to cram the shelves.
+    GAMES_PER_SURFACE: 3,
     // Number of shelf board surfaces per shelf unit (3 boards × front+back = 6).
     SURFACES_PER_SHELF: 6,
-    // Spacing between game box centers. Box width is 0.3m; 0.32m gives ~2cm gap.
-    GAME_SPACING: 0.32
+    // Spacing between game box centers. Box width is 0.3m.
+    // 0.55m gives comfortable spacing at VR scale — readable from player distance.
+    GAME_SPACING: 0.55
 } as const
 
 /** Shelf construction constant - 6° backward tilt for stability */
@@ -47,13 +54,10 @@ export class GameBoxUtils {
         const gameZ = baseZ + (side === ShelfSide.Front ? angleOffset : -angleOffset)
                 
         const totalWidth = (games.length - 1) * GameLayoutConstants.GAME_SPACING
-        // Clamp startX so games can't walk off the shelf edge
-        const halfShelfWidth = (surface.width / 2) - (boxDimensions.width / 2)
-        const rawStartX = shelfPosition.x + surface.centerX - totalWidth / 2
-        const startX = Math.max(
-            shelfPosition.x + surface.centerX - halfShelfWidth,
-            Math.min(rawStartX, shelfPosition.x + surface.centerX + halfShelfWidth - totalWidth)
-        )
+        // Center games on surface. If the span exceeds shelf width, the games will overflow
+        // the shelf edge — the spawner should limit GAMES_PER_SURFACE to prevent this.
+        // TODO(approx-geometry): clamp based on actual shelf geometry once dynamic surfaces are used.
+        const startX = shelfPosition.x + surface.centerX - totalWidth / 2
         
         for (let i = 0; i < games.length; i++) {
             const gameX = startX + (i * GameLayoutConstants.GAME_SPACING)
