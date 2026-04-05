@@ -54,38 +54,38 @@ export class StartupProgressUI {
     // -------------------------------------------------------------------------
 
     private registerEventListeners(): void {
-        const em = EventManager.getInstance()
+        const eventManager = EventManager.getInstance()
 
-        em.registerEventHandler(AppEventTypes.PhaseStarted, (e: CustomEvent<PhaseCompletedEvent>) => {
+        eventManager.registerEventHandler(AppEventTypes.PhaseStarted, (e: CustomEvent<PhaseCompletedEvent>) => {
             this.onPhaseStarted(e.detail.phase as StartupPhase)
         })
 
-        em.registerEventHandler(AppEventTypes.PhaseCompleted, (e: CustomEvent<PhaseCompletedEvent>) => {
+        eventManager.registerEventHandler(AppEventTypes.PhaseCompleted, (e: CustomEvent<PhaseCompletedEvent>) => {
             this.onPhaseCompleted(e.detail.phase as StartupPhase)
         })
 
-        em.registerEventHandler(AppEventTypes.Milestone, (e: CustomEvent) => {
+        eventManager.registerEventHandler(AppEventTypes.Milestone, (e: CustomEvent) => {
             this.updateMilestone((e.detail as { description: string }).description)
         })
 
-        em.registerEventHandler(AppEventTypes.DetailUpdate, (e: CustomEvent) => {
+        eventManager.registerEventHandler(AppEventTypes.DetailUpdate, (e: CustomEvent) => {
             this.updateDetail((e.detail as { detail: string }).detail)
         })
 
-        em.registerEventHandler(AppEventTypes.GameLoadingStarted, (e: CustomEvent<GameLoadingStartedEvent>) => {
+        eventManager.registerEventHandler(AppEventTypes.GameLoadingStarted, (e: CustomEvent<GameLoadingStartedEvent>) => {
             this.startGameLoading(e.detail.totalGames, e.detail.phase as StartupPhase)
         })
 
-        em.registerEventHandler(AppEventTypes.GameLoadingPhaseChanged, (e: CustomEvent<GameLoadingPhaseChangedEvent>) => {
+        eventManager.registerEventHandler(AppEventTypes.GameLoadingPhaseChanged, (e: CustomEvent<GameLoadingPhaseChangedEvent>) => {
             this.gameLoadingPhase = e.detail.loadingPhase
             this.updateDetail(e.detail.detail)
         })
 
-        em.registerEventHandler(AppEventTypes.GameLoadingProgress, (e: CustomEvent<GameLoadingProgressEvent>) => {
+        eventManager.registerEventHandler(AppEventTypes.GameLoadingProgress, (e: CustomEvent<GameLoadingProgressEvent>) => {
             this.updateGameLoadingProgress(e.detail.current, e.detail.total)
         })
 
-        em.registerEventHandler(AppEventTypes.StartupComplete, () => {
+        eventManager.registerEventHandler(AppEventTypes.StartupComplete, () => {
             this.complete()
         })
     }
