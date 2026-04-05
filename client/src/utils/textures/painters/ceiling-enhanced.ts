@@ -1,10 +1,16 @@
 import { octaveNoise, hexToRgb } from '../noise-utils'
 
-export function paintCeilingEnhanced(data: Uint8ClampedArray, width: number, height: number, opts: {
-    color: string; bumpSize: number; density: number
-}): void {
-    const { bumpSize, density } = opts
-    const rgb = hexToRgb(opts.color)
+export interface CeilingEnhancedOptions {
+    color?: string
+    bumpSize?: number
+    density?: number
+}
+
+export function paintCeilingEnhanced(data: Uint8ClampedArray, width: number, height: number, opts: CeilingEnhancedOptions = {}): void {
+    const color = opts.color ?? '#F5F5DC'
+    const bumpSize = opts.bumpSize ?? 0.5
+    const density = opts.density ?? 0.7
+    const rgb = hexToRgb(color)
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4

@@ -1,18 +1,29 @@
 import { octaveNoise, hexToRgb } from '../noise-utils'
 
+export interface CeilingPopcornOptions {
+    color?: string
+    bumpDensity?: number
+    bumpHeight?: number
+    detailScale?: number
+}
+
+export interface CeilingPopcornNormalOptions {
+    bumpDensity?: number
+    detailScale?: number
+    strength?: number
+}
+
 /**
  * Popcorn ceiling diffuse texture.
  * Tight, tile-safe bumps using fractional noise coordinates so the tile
  * wraps seamlessly. Higher bumpDensity = more, smaller bumps.
  */
-export function paintCeilingPopcorn(data: Uint8ClampedArray, width: number, height: number, opts: {
-    color: string
-    bumpDensity: number
-    bumpHeight: number
-    detailScale: number
-}): void {
-    const { bumpDensity, bumpHeight, detailScale } = opts
-    const rgb = hexToRgb(opts.color)
+export function paintCeilingPopcorn(data: Uint8ClampedArray, width: number, height: number, opts: CeilingPopcornOptions = {}): void {
+    const color = opts.color ?? '#E8E6D0'
+    const bumpDensity = opts.bumpDensity ?? 14
+    const bumpHeight = opts.bumpHeight ?? 1.4
+    const detailScale = opts.detailScale ?? 5
+    const rgb = hexToRgb(color)
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4
@@ -34,12 +45,10 @@ export function paintCeilingPopcorn(data: Uint8ClampedArray, width: number, heig
 /**
  * Normal map for popcorn ceiling — same seamless coordinates as the diffuse.
  */
-export function paintCeilingPopcornNormal(data: Uint8ClampedArray, width: number, height: number, opts: {
-    bumpDensity: number
-    detailScale: number
-    strength: number
-}): void {
-    const { bumpDensity, detailScale, strength } = opts
+export function paintCeilingPopcornNormal(data: Uint8ClampedArray, width: number, height: number, opts: CeilingPopcornNormalOptions = {}): void {
+    const bumpDensity = opts.bumpDensity ?? 14
+    const detailScale = opts.detailScale ?? 5
+    const strength = opts.strength ?? 20
     const heightAt = (px: number, py: number): number => {
         const nx = (px / width)  * bumpDensity
         const ny = (py / height) * bumpDensity

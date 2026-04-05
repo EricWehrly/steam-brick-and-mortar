@@ -9,12 +9,12 @@
  * entirely in worker context — no DOM dependencies.
  */
 
-import { paintWoodEnhanced } from './painters/wood-enhanced'
-import { paintWoodPlanks } from './painters/wood-planks'
-import { paintWoodNormal } from './painters/wood-normal'
-import { paintCarpetEnhanced } from './painters/carpet-enhanced'
-import { paintCeilingPopcorn, paintCeilingPopcornNormal } from './painters/ceiling-popcorn'
-import { paintCeilingEnhanced } from './painters/ceiling-enhanced'
+import { paintWoodEnhanced, type WoodEnhancedOptions } from './painters/wood-enhanced'
+import { paintWoodPlanks, type WoodPlanksOptions } from './painters/wood-planks'
+import { paintWoodNormal, type WoodNormalOptions } from './painters/wood-normal'
+import { paintCarpetEnhanced, type CarpetEnhancedOptions } from './painters/carpet-enhanced'
+import { paintCeilingPopcorn, paintCeilingPopcornNormal, type CeilingPopcornOptions, type CeilingPopcornNormalOptions } from './painters/ceiling-popcorn'
+import { paintCeilingEnhanced, type CeilingEnhancedOptions } from './painters/ceiling-enhanced'
 
 // Worker global scope
 const ctx: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope
@@ -68,61 +68,26 @@ async function handleGenerate(msg: GenerateTextureMessage): Promise<void> {
     const data = imageData.data as Uint8ClampedArray
 
     switch (textureType) {
-        case 'wood_planks': {
-            const baseColors = (options.baseColors as string[] | undefined) ?? [
-                '#7B3F10', '#8B4A14', '#9B5520', '#A8622A', '#8C4A18', '#955218'
-            ]
-            paintWoodPlanks(data, width, height, {
-                numPlanks:      (options.numPlanks      as number)   ?? 4,
-                grainFrequency: (options.grainFrequency as number)   ?? 1.2,
-                grainStrength:  (options.grainStrength  as number)   ?? 0.12,
-                baseColors,
-                edgeColor:      (options.edgeColor      as string)   ?? '#5C2F0A',
-            })
+        case 'wood_planks':
+            paintWoodPlanks(data, width, height, options as WoodPlanksOptions)
             break
-        }
         case 'wood_enhanced':
-            paintWoodEnhanced(data, width, height, {
-                grainStrength: (options.grainStrength as number) ?? 0.4,
-                ringFrequency: (options.ringFrequency as number) ?? 0.08,
-                color1: (options.color1 as string) ?? '#8B4513',
-                color2: (options.color2 as string) ?? '#A0522D',
-                color3: (options.color3 as string) ?? '#654321',
-            })
+            paintWoodEnhanced(data, width, height, options as WoodEnhancedOptions)
             break
         case 'wood_normal':
-            paintWoodNormal(data, width, height, {
-                strength: (options.strength as number) ?? 0.5,
-            })
+            paintWoodNormal(data, width, height, options as WoodNormalOptions)
             break
         case 'carpet_enhanced':
-            paintCarpetEnhanced(data, width, height, {
-                color:       (options.color       as string) ?? '#8B0000',
-                fiberDensity:(options.fiberDensity as number) ?? 0.4,
-                roughness:   (options.roughness   as number) ?? 0.8,
-            })
+            paintCarpetEnhanced(data, width, height, options as CarpetEnhancedOptions)
             break
         case 'ceiling_popcorn':
-            paintCeilingPopcorn(data, width, height, {
-                color:       (options.color       as string) ?? '#E8E6D0',
-                bumpDensity: (options.bumpDensity as number) ?? 14,
-                bumpHeight:  (options.bumpHeight  as number) ?? 1.4,
-                detailScale: (options.detailScale as number) ?? 5,
-            })
+            paintCeilingPopcorn(data, width, height, options as CeilingPopcornOptions)
             break
         case 'ceiling_popcorn_normal':
-            paintCeilingPopcornNormal(data, width, height, {
-                bumpDensity: (options.bumpDensity as number) ?? 14,
-                detailScale: (options.detailScale as number) ?? 5,
-                strength:    (options.strength    as number) ?? 20,
-            })
+            paintCeilingPopcornNormal(data, width, height, options as CeilingPopcornNormalOptions)
             break
         case 'ceiling_enhanced':
-            paintCeilingEnhanced(data, width, height, {
-                color:    (options.color    as string) ?? '#F5F5DC',
-                bumpSize: (options.bumpSize as number) ?? 0.5,
-                density:  (options.density  as number) ?? 0.7,
-            })
+            paintCeilingEnhanced(data, width, height, options as CeilingEnhancedOptions)
             break
         default:
             ctx.postMessage({

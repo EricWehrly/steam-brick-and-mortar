@@ -1,5 +1,13 @@
 import { noise2D, octaveNoise, hexToRgb } from '../noise-utils'
 
+export interface WoodPlanksOptions {
+    numPlanks?: number
+    grainFrequency?: number
+    grainStrength?: number
+    baseColors?: string[]
+    edgeColor?: string
+}
+
 /**
  * Wood paneling with distinct plank zones.
  * Each plank is a horizontal band in texture space. Since this texture is applied
@@ -12,14 +20,14 @@ import { noise2D, octaveNoise, hexToRgb } from '../noise-utils'
  * baseColors:     array of hex colors cycling across planks (each slightly different)
  * edgeColor:      gap/shadow color between planks
  */
-export function paintWoodPlanks(data: Uint8ClampedArray, width: number, height: number, opts: {
-    numPlanks: number
-    grainFrequency: number
-    grainStrength: number
-    baseColors: string[]
-    edgeColor: string
-}): void {
-    const { numPlanks, grainFrequency, grainStrength, baseColors, edgeColor } = opts
+export function paintWoodPlanks(data: Uint8ClampedArray, width: number, height: number, opts: WoodPlanksOptions = {}): void {
+    const numPlanks = opts.numPlanks ?? 4
+    const grainFrequency = opts.grainFrequency ?? 1.2
+    const grainStrength = opts.grainStrength ?? 0.12
+    const baseColors = opts.baseColors ?? [
+        '#7B3F10', '#8B4A14', '#9B5520', '#A8622A', '#8C4A18', '#955218'
+    ]
+    const edgeColor = opts.edgeColor ?? '#5C2F0A'
     const plankHeight = height / numPlanks
     const edgeRgb = hexToRgb(edgeColor)
 

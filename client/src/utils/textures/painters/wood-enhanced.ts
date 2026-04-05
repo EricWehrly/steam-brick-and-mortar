@@ -9,11 +9,20 @@ function woodGrainLinear(x: number, y: number, ringFrequency: number, grainStren
     return Math.max(0, Math.min(1, baseLines + alongGrainVariation + fineCrossGrain))
 }
 
-export function paintWoodEnhanced(data: Uint8ClampedArray, width: number, height: number, opts: {
-    grainStrength: number; ringFrequency: number
-    color1: string; color2: string; color3: string
-}): void {
-    const { grainStrength, ringFrequency, color1, color2, color3 } = opts
+export interface WoodEnhancedOptions {
+    grainStrength?: number
+    ringFrequency?: number
+    color1?: string
+    color2?: string
+    color3?: string
+}
+
+export function paintWoodEnhanced(data: Uint8ClampedArray, width: number, height: number, opts: WoodEnhancedOptions = {}): void {
+    const grainStrength = opts.grainStrength ?? 0.4
+    const ringFrequency = opts.ringFrequency ?? 0.08
+    const color1 = opts.color1 ?? '#8B4513'
+    const color2 = opts.color2 ?? '#A0522D'
+    const color3 = opts.color3 ?? '#654321'
     const rgb1 = hexToRgb(color1)
     const rgb2 = hexToRgb(color2)
     const rgb3 = hexToRgb(color3)

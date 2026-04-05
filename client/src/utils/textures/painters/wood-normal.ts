@@ -1,7 +1,9 @@
-export function paintWoodNormal(data: Uint8ClampedArray, width: number, height: number, opts: {
-    strength: number
-}): void {
-    const { strength } = opts
+export interface WoodNormalOptions {
+    strength?: number
+}
+
+export function paintWoodNormal(data: Uint8ClampedArray, width: number, height: number, opts: WoodNormalOptions = {}): void {
+    const strength = opts.strength ?? 0.5
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4

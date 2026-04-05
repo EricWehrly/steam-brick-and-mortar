@@ -7,11 +7,17 @@ function carpetFiber(x: number, y: number, fiberDensity: number): number {
     return fiber1 + fiber2 + fiber3
 }
 
-export function paintCarpetEnhanced(data: Uint8ClampedArray, width: number, height: number, opts: {
-    color: string; fiberDensity: number; roughness: number
-}): void {
-    const { fiberDensity, roughness } = opts
-    const rgb = hexToRgb(opts.color)
+export interface CarpetEnhancedOptions {
+    color?: string
+    fiberDensity?: number
+    roughness?: number
+}
+
+export function paintCarpetEnhanced(data: Uint8ClampedArray, width: number, height: number, opts: CarpetEnhancedOptions = {}): void {
+    const color = opts.color ?? '#8B0000'
+    const fiberDensity = opts.fiberDensity ?? 0.4
+    const roughness = opts.roughness ?? 0.8
+    const rgb = hexToRgb(color)
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4
