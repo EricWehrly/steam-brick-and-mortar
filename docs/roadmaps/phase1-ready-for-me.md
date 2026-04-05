@@ -446,6 +446,29 @@
 
 **Expected Deliverable**: Realistic MDF veneer shelves with brand-consistent blue accents
 
+#### Story 6.1.3: Wall/Ceiling Texture Visual Polish 🔄 **PRE-FRIENDS (before 6.5+)**
+**Context**: Wall and ceiling textures need a second pass before showing to friends. The wood plank wall and popcorn ceiling are in place but the design quality needs improvement. A Godot-based procedural texture approach has been proposed as an alternative generation strategy to evaluate.
+
+- **Task 6.1.3.1**: Revisit wood plank wall texture design
+  - Evaluate current plank proportions, color variation, and grain fidelity
+  - Compare against Godot-based procedural texture generation approach
+  - Improve or replace texture to feel like a real video store back wall
+  - Ensure grain direction, plank scale, and tiling all read correctly at VR scale
+- **Task 6.1.3.2**: Revisit popcorn ceiling texture design
+  - Evaluate bumpiness, color, and tiling at ceiling scale
+  - Compare against Godot-based approach if evaluated in 6.1.3.1
+  - Improve or replace texture for natural overhead appearance in VR
+- **Task 6.1.3.3**: Evaluate Godot-based procedural texture generation
+  - Investigate using Godot's material/shader system to generate and export textures
+  - Determine if this produces better results than current worker-based generation
+  - If promising: prototype one texture, compare quality/workflow vs current approach
+
+**Expected Deliverable**: Wall and ceiling textures that feel polished and store-appropriate
+
+**Acceptance**: A person standing in the scene doesn't immediately notice the textures as procedurally generated
+
+**Sequencing note (2026-04-05)**: Do this before 6.5 (categorization) and before showing to friends. Quality matters here — these surfaces take up the most visual real estate.
+
 #### Story 6.1.2: Wall-Mounted Shelf Implementation 🔄
 - **Task 6.1.2.1**: Design wall-mounted shelf geometry
   - Create single-sided shelf models for wall mounting (no backing)
@@ -549,8 +572,117 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 
 **Note**: Advanced lighting research includes WebGL pathtracing investigation
 
---- 
+---
 
+## Milestone 6.5: Game Categorization and Shelf Organization 🔮 **NEXT MAJOR FEATURE**
+*Goal: Replace hardcoded categories with Steam-native genre/category data, enabling dynamic shelf organization*
+
+**Sequencing note (2026-04-05)**: This is the next major feature after the Phase 1 visual polish pass (6.1.3). Research is complete in `docs/steam-categorization-research.md`. Implementation follows a phased plan: genres/categories first, then community tags, then personalization.
+
+**Key research findings already available**:
+- Steam Store API genres + categories: public, 200 req/5min, accessible via existing app detail calls
+- Community tags: most nuanced, user-driven, good for “cozy games”-style groupings
+- User-defined library categories: ❌ not available through public API; may exist in local Steam install files — **worth investigating before building API-only solution**
+- Rate limiting: batch with existing game-load API calls to avoid extra limits
+
+### Feature 6.5.1: Steam API Categorization 🔮
+**Context**: Integrate genre and category data from Steam Store API to replace hardcoded categories
+
+#### Story 6.5.1.1: User-Defined Category Investigation
+- **Task 6.5.1.1.1**: Investigate local Steam install for user library categories
+  - Check if Steam stores user-defined library categories in local JSON/VDF files (e.g., `userdata/`, `localconfig.vdf`, `sharedconfig.vdf`)
+  - Document any accessible user category data and its schema
+  - Evaluate whether desktop-only (Electron/local access) or impossible in pure web context
+  - **If found**: design integration path; **if not**: document clearly and proceed with API-only approach
+
+**Expected Deliverable**: Definitive answer on user-defined category accessibility; integration plan or clear rationale for API-only approach
+
+#### Story 6.5.1.2: Genre/Category Data Fetching
+- **Task 6.5.1.2.1**: Integrate genre/category fetching into game loading workflow
+  - Extend existing Steam API calls to capture `genres` and `categories` arrays from app detail responses
+  - Add genre/category fields to game data model (`SteamGameData`)
+  - Cache category data with 7-day expiration alongside game metadata
+  - Handle missing category data gracefully with fallback categorization
+- **Task 6.5.1.2.2**: Build category grouping system
+  - Implement `CategoryManager` that groups game app IDs by genre/category
+  - Design priority system for games with multiple genres (primary genre assignment)
+  - Create fallback categories for uncategorized games (playtime-based: “Most Played”, “Recently Added”)
+
+**Expected Deliverable**: Game library with genre/category metadata, `CategoryManager` grouping utility
+
+#### Story 6.5.1.3: Category-Based Shelf Assignment
+- **Task 6.5.1.3.1**: Wire categories into shelf layout
+  - Use `CategoryManager` output to assign games to category-labelled shelves
+  - Update shelf generation to accept category as a first-class parameter
+  - Update signage/label system to display category name per shelf section
+  - Preserve fallback for games without category (overflow shelf or “Miscellaneous”)
+- **Task 6.5.1.3.2**: Category browsing UX
+  - Design how categories are navigable in the store layout
+  - Plan aisle/spoke arrangement for category groupings (see TBD section in Phase 2 for spoke layout research)
+  - Consider wayfinding signals (signs, lighting cues) for category sections
+
+**Expected Deliverable**: VR store where shelves are organized by game genre/category
+
+**Acceptance**: User can walk to a section and see shelves of one genre; no obviously miscategorized games; graceful handling for large libraries
+
+### Feature 6.5.2: Community Tags (Phase 2 candidate) 🔮
+**Context**: Richer categorization using Steam community tags. Deferred pending Phase 1 completion, but designed to layer on top of 6.5.1.
+
+- Leverage community tag data from Steam Store API
+- Identify top tags across user’s library for dynamic “theme” groupings (e.g., “Cozy”, “Competitive”)
+- Allow user to choose preferred grouping: genre-based vs. tag-based vs. playtime-based
+
+**Note**: This may move to Phase 2 depending on timeline pressure.
+
+---
+
+## Milestone 6.6: UI System Normalization and Theming 🔮 **PARALLEL-ELIGIBLE**
+*Goal: Establish a consistent, reusable, themeable UI component system before further UI construction*
+
+**Sequencing note (2026-04-05)**: This should happen **before** building any new UI widgets or panels. Normalizing first means all subsequent UI work inherits consistent components. Well-suited for sub-agent parallelization when starting a new work block.
+
+**Rationale**: Current UI has inconsistent styling, disconnected controls, and panels/checkboxes built without shared components. Building more UI on top of this makes the problem bigger. Normalize first.
+
+### Feature 6.6.1: UI Component Audit and Design System 🔮
+- **Task 6.6.1.1**: Audit all existing UI elements for inconsistency
+  - Inventory all buttons, checkboxes, panels, labels, inputs across pause menu and other panels
+  - Document inconsistencies: color, font, padding, border radius, hover/active states
+  - Identify which elements are “local one-offs” vs. candidates for shared components
+- **Task 6.6.1.2**: Define theme token system
+  - Establish CSS custom properties (variables) for: primary/accent colors, background layers, border colors, text colors, spacing scale, radius scale
+  - Design for theming: tokens should support future light/dark/custom themes without component rewrites
+  - Document token naming convention and usage rules
+
+**Expected Deliverable**: Design token spec (`docs/ui-design-tokens.md`) and audit findings
+
+### Feature 6.6.2: Reusable Component Library 🔮
+- **Task 6.6.2.1**: Build base component set using theme tokens
+  - Implement shared: `Button`, `Checkbox`, `Toggle`, `SliderInput`, `Panel`, `TabBar`, `Label`
+  - All components styled from CSS custom properties only — no hardcoded colors/sizes
+  - Add hover/active/disabled/focus states consistently
+- **Task 6.6.2.2**: Migrate existing UI panels to shared components
+  - Replace inline styles and one-off classes in pause menu, settings panels, Steam UI panel
+  - Prioritize: settings panel (most visually inconsistent), cache panel (broken preview), lighting panel
+  - Verify no visual regressions after migration
+
+**Expected Deliverable**: Component library; migrated panels using shared components
+
+### Feature 6.6.3: Known UI Bugs and Regressions 🔮
+**Context**: Fix known broken/disconnected UI before adding more
+
+- **Task 6.6.3.1**: Fix cache previewer (stopped working)
+  - Diagnose why preview is broken, restore functionality
+- **Task 6.6.3.2**: Move GPU memory estimates from console/logger into Debug tab
+  - Surface `GpuMemoryEstimator` output in the Debug panel instead of only the browser console
+- **Task 6.6.3.3**: Audit and connect disconnected settings controls
+  - FPS counter checkbox, performance stats checkbox, and other settings panel controls that are wired to UI but not functional
+  - Connect or clearly mark each as “not yet implemented” in a consistent way
+
+**Expected Deliverable**: Functional, non-broken UI across all panels; GPU memory visible in Debug tab
+
+**Acceptance**: No obviously broken UI; all checkboxes and toggles have visible effect or placeholder state
+
+---
 ## Phase 1 Deferred Items
 
 ### Story 4.2.2: Error Handling and Reliability - **DEFERRED TO PHASE 2**
