@@ -65,9 +65,22 @@ In this codebase: `src/ui/PerformanceMonitor.ts` (stats overlay) and `src/utils/
 
 ---
 
-## `FrameBudgetScheduler` — Tuning Notes
+## `FrameBudgetScheduler` — Stagger vs. GPU Upload Timing
 
-- Default `maxDeferMs: 400` — forces tasks after 400ms regardless of frame budget. For material upserts, this is too aggressive during heavy startup. Consider `maxDeferMs: Infinity` (or a very large value like 30000) for non-critical visual upgrades.
-- `maxTasksPerFrame: 1` — already set conservatively. Good.
-- The scheduler only processes tasks at `onFrameStart()`. If `RenderLoopRegistry` calls `onFrameStart` every frame, tasks will process once per frame at most.
-- **No breathing room between forced tasks** — if a heavy frame occurs, the scheduler doesn't back off. A "cooldown" counter (skip N frames after a force or after a heavy frame) would help here.
+**Important:** `onFrameStart` fires *before* `renderer.render()`. Setting `material.needsUpdate = true` inside a scheduled task only schedules the GPU upload — the actual `texImage2D` call happens in the *next* `renderer.render()`. This means each upserted material causes a heavy render frame *after* the frame where the JS mutation runs.
+
+**Consequence:** Staggering upserts to one per frame results in N consecutive heavy render frames (one per material), not one combined stall. This is still better than all-at-once, but each individual frame is still heavy.
+
+**The real mitigation:** Reduce texture resolution. A 1024×1024 uploads ~4× faster than 2048×2048. For materials viewed at >1m distance, 1024 is visually equivalent.
+
+**Quadrant-split idea (future):** In theory, splitting a 2048×2048 into four 1024×1024 quadrants and distributing across UV tiles could spread the upload cost across 4 frames and 4 render calls. Downsides: 4× draw calls per mesh using the material; complex UV seam management; probably not worth it unless textures are genuinely huge (4096+).
+
+## Wall Texture Repeat Values
+
+Room dimensions: 22m wide × 16m deep × 3.5m tall.
+- `repeatX = 3, repeatY = 1` (old) → each tile spans ~7.3m horizontally — hugely stretched planks
+- `repeatX = 12, repeatY = 1` (new) → each tile spans ~1.8m — reads as narrow wall boards
+- `repeatY = 1` keeps planks running floor-to-ceiling without vertical distortion
+
+The `woodGrainLinear` function is periodically seamless vertically (uses `Math.sin`) but uses noise horizontally — meaning visible seams at horizontal tile boundaries. At wall distance (~5–10m) this is typically not noticeable.
+

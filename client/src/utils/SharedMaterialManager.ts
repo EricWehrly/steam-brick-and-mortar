@@ -166,11 +166,11 @@ export class SharedMaterialManager {
     private async prewarmMDFVeneer(worker: ProceduralTextureWorker): Promise<void> {
         const [diffuseBitmap, normalBitmap] = await Promise.all([
             worker.generate('wood_enhanced', {
-                width: 2048, height: 2048,
+                width: 1024, height: 1024,
                 grainStrength: 0.3, ringFrequency: 0.01,
                 color1: '#E6D3B7', color2: '#D4C4A0', color3: '#C8B896',
             }),
-            worker.generate('wood_normal', { width: 2048, height: 2048, strength: 0.06 }),
+            worker.generate('wood_normal', { width: 1024, height: 1024, strength: 0.06 }),
         ])
         const diffuse = this.bitmapToTexture(diffuseBitmap, 6, 4)
         const normal  = this.bitmapToTexture(normalBitmap,  6, 4)
@@ -211,13 +211,17 @@ export class SharedMaterialManager {
     private async prewarmWallWood(worker: ProceduralTextureWorker): Promise<void> {
         const [d, n] = await Promise.all([
             worker.generate('wood_enhanced', {
-                width: 2048, height: 2048, grainStrength: 0.5, ringFrequency: 0.1,
+                width: 1024, height: 1024, grainStrength: 0.5, ringFrequency: 0.1,
                 color1: '#8B4513', color2: '#A0522D', color3: '#654321',
             }),
-            worker.generate('wood_normal', { width: 2048, height: 2048, strength: 0.3 }),
+            worker.generate('wood_normal', { width: 1024, height: 1024, strength: 0.3 }),
         ])
-        const diffuse = this.bitmapToTexture(d, 3, 1)
-        const normal  = this.bitmapToTexture(n, 3, 1)
+        // Each tile represents ~1m of vertical planking (full ceiling height).
+        // Repeat horizontally across the wall width. The room is ~22m wide so
+        // 12 repeats gives ~0.55m plank width, which reads as narrow wall boards.
+        // RepeatY = 1 keeps the plank running full floor-to-ceiling without stretching.
+        const diffuse = this.bitmapToTexture(d, 12, 1)
+        const normal  = this.bitmapToTexture(n, 12, 1)
         
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.WallWood,
@@ -233,10 +237,10 @@ export class SharedMaterialManager {
     private async prewarmBasicWood(worker: ProceduralTextureWorker): Promise<void> {
         const [d, n] = await Promise.all([
             worker.generate('wood_enhanced', {
-                width: 2048, height: 2048, grainStrength: 0.3, ringFrequency: 0.08,
+                width: 1024, height: 1024, grainStrength: 0.3, ringFrequency: 0.08,
                 color1: '#8B4513', color2: '#A0522D', color3: '#654321',
             }),
-            worker.generate('wood_normal', { width: 2048, height: 2048, strength: 0.18 }),
+            worker.generate('wood_normal', { width: 1024, height: 1024, strength: 0.18 }),
         ])
         const diffuse = this.bitmapToTexture(d, 3, 1)
         const normal  = this.bitmapToTexture(n, 3, 1)
@@ -273,6 +277,7 @@ export class SharedMaterialManager {
 
         if (!existing) {
             this.materialPool!.materials.set(type, material)
+            SharedMaterialManager.logger.debug(`✅ Inserted material ${type} (first use)`)
             return
         }
 
@@ -298,6 +303,8 @@ export class SharedMaterialManager {
         // Avoid double-disposing transferred textures.
         material.map = null
         material.normalMap = null
+
+        SharedMaterialManager.logger.debug(`🎨 Upserted material ${type} — needsUpdate set, GPU upload on next render`)
         material.dispose()
     }
 

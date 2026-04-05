@@ -110,7 +110,7 @@ export class FrameBudgetScheduler {
         this.budgetThreshold = config.budgetThreshold ?? 0.8
         this.maxTasksPerFrame = config.maxTasksPerFrame ?? 1  // take longer, ride smoother
         this.defaultMaxDeferMs = config.defaultMaxDeferMs ?? 400
-        this.heavyFrameCooldownFrames = config.heavyFrameCooldownFrames ?? 2
+        this.heavyFrameCooldownFrames = config.heavyFrameCooldownFrames ?? 12000
         
         const ringSize = config.ringBufferSize ?? 60
         this.frameTimeRing = new Float32Array(ringSize)
