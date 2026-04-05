@@ -20,7 +20,7 @@ test('screenshot: scene at startup', async ({ page }) => {
   const entries = attachConsoleCollector(page)
 
   await page.goto('/')
-  await waitForSceneReady(page)
+  await waitForSceneReady(page, 25000, 12000)  // 12s settle — allows material upserts to complete
 
   await mkdir('test-results', { recursive: true })
 
