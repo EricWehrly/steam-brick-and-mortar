@@ -45,7 +45,8 @@ Read these when touching specific complex systems (e.g., WebXR, Instancing, Even
 
 ### 📏 guidelines/
 **Conventions and rules.**
-UI patterns, testing rules, etc.
+- `code-conventions.md` — JSDoc hygiene, file size, naming, TD tags ("clean as you go" rules)
+- Other UI patterns and testing rules.
 
 ### 🔬 research/ & 📦 archive/
 **Historical context.**
