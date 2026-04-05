@@ -664,7 +664,7 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 ## Milestone 6.7: Layout System 🔮 **POST-CATEGORIZATION**
 *Goal: Multiple configurable room layout modes for game browsing*
 
-**Prerequisite**: Steam categorization (6.5) + faceted filtering/sorting must exist first so layouts are meaningful. UI theme system (6.6) should precede this so the layout selector widget is styled correctly.
+**Prerequisite**: Steam categorization (6.5) + faceted filtering/sorting must exist first so layouts are meaningful. This milestone sits at the intersection of categorization + layout and depends on both being sufficiently implemented. UI theme system (6.6) should precede this so the layout selector widget is styled correctly.
 
 ### Feature 6.7.1: Layout Selector UI
 - ASCII-based icon representations in a layout selector widget

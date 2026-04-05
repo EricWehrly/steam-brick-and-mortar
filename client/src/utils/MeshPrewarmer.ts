@@ -31,6 +31,11 @@ export class MeshPrewarmer {
     static #instance: MeshPrewarmer | null = null
     private static readonly logger = Logger.createLogFunctions(MeshPrewarmer.name)
 
+    // Single declaration of lazy-init logic. All static methods go through this getter.
+    static get #current(): MeshPrewarmer {
+        return MeshPrewarmer.#instance ??= new MeshPrewarmer()
+    }
+
     private readonly prewarmScene = new THREE.Scene()
     private debounceHandle: ReturnType<typeof setTimeout> | null = null
     private completed = false
@@ -45,9 +50,7 @@ export class MeshPrewarmer {
      * No-op if prewarm has already completed or KHR is unavailable.
      */
     public static register(mesh: THREE.InstancedMesh): void {
-        // ??= creates the instance on first call; subsequent calls reuse it.
-        // #instance is nulled in cleanup() once prewarm completes.
-        ;(MeshPrewarmer.#instance ??= new MeshPrewarmer()).registerImpl(mesh)
+        MeshPrewarmer.#current.registerImpl(mesh)
     }
 
     private registerImpl(mesh: THREE.InstancedMesh): void {

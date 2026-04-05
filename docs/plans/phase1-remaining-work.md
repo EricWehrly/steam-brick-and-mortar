@@ -21,7 +21,7 @@
 
 **Plumbed but unverified / needs QA:**
 - 🔄 Games appearing on shelves — event chain exists, visual confirmation pending (6.2.2.1 audit in progress)
-- 🔄 Room resizes dynamically to fit game library — implemented, not visually confirmed at scale
+- 🔄 Room resizes dynamically to fit game library — implemented, not visually confirmed at scale; retest when alternate layouts and room differentiation land
 - 🔄 Shelf capacity calculation — `GameLayoutConstants` hardcoded values may need tuning
 - 🔄 GameStart event → model generation — task 6.0.1.2 (models deferred until GameStart) may already be done
 
@@ -49,30 +49,22 @@
 
 **Acceptance**: Standing at spawn, the scene reads as a store.
 
-### 3. MDF veneer shelf visual pass (6.1.1) 🟡 NEXT
-- [ ] Shelves display MDF veneer material (implemented — confirm visually)
-- [ ] Brand accent color (blue) on vertical supports
-- [ ] Shelf interior surfaces glossy white
-
-### 4. Wall/ceiling texture polish (Phase 2 capstone, but pull forward if easy)
-- [ ] Wall planks read as planks at VR scale — may just need repeat/scale tuning
-- [ ] Ceiling popcorn visible at natural overhead view angle
-
-### 5. Game search / omnibar (6.6 UI, post-normalization)
-*After UI normalization is in place.*
-- [ ] Omnibar-like search in place of Steam profile UI once library is loaded
-- [ ] Spotlight highlighting of search results
-
-### 6. UI normalization (6.6) 🟡 PARALLEL WORK
+### 3. UI normalization (6.6) 🟡 PARALLEL WORK
 *See `docs/plans/ui-normalization-plan.md`. Sub-agent eligible.*
 - [ ] Design token spec
 - [ ] Shared component set (Button, Checkbox, Panel, TabBar)
 - [ ] Migrate existing panels
 
-### 7. Cache previewer fix (6.6.3)
+### 4. Game search / omnibar (6.6 UI, after normalization) 🔴 LAST FEATURE FOR PHASE 1
+*This stays in Phase 1, after UI normalization.*
+- [ ] Omnibar-like search in place of Steam profile UI once library is loaded
+- [ ] Spotlight highlighting of search results
+- [ ] DRY query/filter logic with Game Library Binder search path
+
+### 5. Cache previewer fix (6.6.3)
 - [ ] Cache preview in Debug tab is broken — diagnose and fix
 
-### 8. GPU memory in Debug tab (6.6.3)
+### 6. GPU memory in Debug tab (6.6.3)
 - [ ] `GpuMemoryEstimator` output visible in UI, not just console
 
 ---
