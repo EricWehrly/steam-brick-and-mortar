@@ -446,29 +446,6 @@
 
 **Expected Deliverable**: Realistic MDF veneer shelves with brand-consistent blue accents
 
-#### Story 6.1.3: Wall/Ceiling Texture Visual Polish 🔄 **PRE-FRIENDS (before 6.5+)**
-**Context**: Wall and ceiling textures need a second pass before showing to friends. The wood plank wall and popcorn ceiling are in place but the design quality needs improvement. A Godot-based procedural texture approach has been proposed as an alternative generation strategy to evaluate.
-
-- **Task 6.1.3.1**: Revisit wood plank wall texture design
-  - Evaluate current plank proportions, color variation, and grain fidelity
-  - Compare against Godot-based procedural texture generation approach
-  - Improve or replace texture to feel like a real video store back wall
-  - Ensure grain direction, plank scale, and tiling all read correctly at VR scale
-- **Task 6.1.3.2**: Revisit popcorn ceiling texture design
-  - Evaluate bumpiness, color, and tiling at ceiling scale
-  - Compare against Godot-based approach if evaluated in 6.1.3.1
-  - Improve or replace texture for natural overhead appearance in VR
-- **Task 6.1.3.3**: Evaluate Godot-based procedural texture generation
-  - Investigate using Godot's material/shader system to generate and export textures
-  - Determine if this produces better results than current worker-based generation
-  - If promising: prototype one texture, compare quality/workflow vs current approach
-
-**Expected Deliverable**: Wall and ceiling textures that feel polished and store-appropriate
-
-**Acceptance**: A person standing in the scene doesn't immediately notice the textures as procedurally generated
-
-**Sequencing note (2026-04-05)**: Do this before 6.5 (categorization) and before showing to friends. Quality matters here — these surfaces take up the most visual real estate.
-
 #### Story 6.1.2: Wall-Mounted Shelf Implementation 🔄
 - **Task 6.1.2.1**: Design wall-mounted shelf geometry
   - Create single-sided shelf models for wall mounting (no backing)
@@ -577,7 +554,7 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 ## Milestone 6.5: Game Categorization and Shelf Organization 🔮 **NEXT MAJOR FEATURE**
 *Goal: Replace hardcoded categories with Steam-native genre/category data, enabling dynamic shelf organization*
 
-**Sequencing note (2026-04-05)**: This is the next major feature after the Phase 1 visual polish pass (6.1.3). Research is complete in `docs/steam-categorization-research.md`. Implementation follows a phased plan: genres/categories first, then community tags, then personalization.
+**Sequencing note (2026-04-05)**: This is the next major feature after Phase 1 proper work completes. Research is complete in `docs/steam-categorization-research.md`.
 
 **Key research findings already available**:
 - Steam Store API genres + categories: public, 200 req/5min, accessible via existing app detail calls
