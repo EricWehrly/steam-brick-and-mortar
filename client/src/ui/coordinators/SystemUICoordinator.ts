@@ -10,7 +10,7 @@
 
 import * as THREE from 'three'
 import { PauseMenuManager } from '../pause/PauseMenuManager'
-import { PerformanceMonitor } from '../PerformanceMonitor'
+import { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { LightingControlsPanel } from '../LightingControlsPanel'
 import { EventManager } from '../../core/EventManager'
 import type { DebugStatsProvider } from '../../core/DebugStatsProvider'
@@ -21,7 +21,7 @@ import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGame
 
 export class SystemUICoordinator {
     private pauseMenuManager: PauseMenuManager
-    private performanceMonitor: PerformanceMonitor
+    private performanceMonitor: PerformanceMonitorUI
     private lightingControlsPanel?: LightingControlsPanel
     private eventManager: EventManager
     private appSettings: AppSettings
@@ -33,7 +33,7 @@ export class SystemUICoordinator {
     private readonly performanceUpdateInterval = 1000 // Update every second
 
     constructor(
-        performanceMonitor: PerformanceMonitor,
+        performanceMonitor: PerformanceMonitorUI,
         debugStatsProvider: DebugStatsProvider,
         eventManager: EventManager,
         appSettings: AppSettings
