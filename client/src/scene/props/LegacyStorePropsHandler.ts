@@ -59,7 +59,6 @@ export class LegacyStorePropsHandler {
             
             // NOTE: This handler only runs when NO override handler (GpuStorePropsEventHandler) is registered
             // If system has GPU capabilities, GpuStorePropsEventHandler registers as override and this won't be called
-            // If system has GPU capabilities, GpuStorePropsEventHandler registers as override and this won't be called
             
             // Initialize legacy renderer if not already done
             if (!this.renderer) {
