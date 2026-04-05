@@ -84,3 +84,21 @@ Room dimensions: 22m wide × 16m deep × 3.5m tall.
 
 The `woodGrainLinear` function is periodically seamless vertically (uses `Math.sin`) but uses noise horizontally — meaning visible seams at horizontal tile boundaries. At wall distance (~5–10m) this is typically not noticeable.
 
+
+
+## Build-Time Texture Generation (Future Option)
+
+Currently we generate procedural textures at runtime via web worker. This means:
+- Flat-color fallback visible until worker resolves (~1-3s)
+- Upload stall when textures arrive (mitigated by FrameBudgetScheduler stagger)
+- Worker bundle overhead
+
+**Better long-term:** Generate textures at build time (Vite plugin or standalone script), ship as static KTX2/Basis Universal files, load with KTX2Loader. Benefits:
+- Zero runtime generation cost
+- No fallback/pop-in
+- GPU-compressed format = smaller upload, faster GPU sampling
+- Can use higher quality offline generation (no web worker perf constraints)
+
+**Compression in-flight (mid-term option):** basis_encoder.wasm runs in workers. Could compress ImageBitmap pixel data to ETC1S in the worker before returning, then upload via compressedTexImage2D. More work but eliminates the texImage2D stall entirely. Worth investigating once the worker pipeline is stable.
+
+**External texture programs worth watching:** Substance Alchemist (Adobe), AwesomeBump, NormalMap-Online, Material Maker (open source, Godot-based). Could replace the procedural generator entirely for non-dynamic materials.
