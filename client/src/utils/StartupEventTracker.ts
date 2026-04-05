@@ -10,11 +10,13 @@
  * Emits AppEventTypes.PhaseCompleted via EventManager so that UI (StartupProgressUI)
  * can react without being directly coupled to this tracker.
  *
- * Also runs a requestAnimationFrame hitch detector during blocking startup phases
- * (CoreInit → Interactive). If the gap between two rAF ticks exceeds 100ms the
- * tracker logs "Main Thread Hitch Detected: Xms" — intentionally formatted so that
- * our Playwright console-capture tests can find it. The rAF loop is stopped once the
- * Interactive phase ends.
+ * Also runs a requestAnimationFrame hitch detector from the first blocking phase
+ * (CoreInit) through StartupComplete. If the gap between two rAF ticks exceeds
+ * 100ms the tracker logs "Main Thread Hitch Detected: Xms" — intentionally
+ * formatted so that our Playwright console-capture tests can find it.
+ * The detector stays alive through async encores (PrewarmEncore, PostSetupEncore)
+ * because those run off-thread work that can still hitch the main thread, and stops
+ * only when StartupComplete fires.
  */
 
 import { EventManager } from '../core/EventManager'
@@ -223,6 +225,8 @@ export class StartupEventTracker {
         })
         setTimeout(() => {
             EventManager.getInstance().emit(AppEventTypes.StartupComplete, {})
+        // Stop hitch detector at true startup completion — encores may have been hitching
+        this.stopHitchDetector()
         }, this.COMPLETION_DELAY_MS)
     }
 
@@ -286,10 +290,9 @@ export class StartupEventTracker {
             })
         }
 
-        // Stop hitch detector when all blocking phases are done.
-        // Note: WorldBuild starts concurrently after Interactive ends, so we use
-        // activeBlockingPhaseCount rather than keying off Interactive specifically —
-        // the detector stays alive until the last BLOCKING_PHASES entry closes.
+        // Stop hitch detector when all *blocking* phases are done as a fallback.
+        // The primary stop is driven by StartupComplete (see handleAllBatchesComplete).
+        // This fallback catches edge cases where StartupComplete never fires (e.g. no games loaded).
         if (BLOCKING_PHASES.has(phase)) {
             this.activeBlockingPhaseCount = Math.max(0, this.activeBlockingPhaseCount - 1)
             if (this.activeBlockingPhaseCount === 0) {
