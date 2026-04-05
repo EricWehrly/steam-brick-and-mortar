@@ -104,7 +104,8 @@ export class SharedMaterialManager {
                 this.prewarmCarpet(worker),
                 this.prewarmCeiling(worker),
                 this.prewarmWallWood(worker),
-                this.prewarmBasicWood(worker),
+                // BasicWood: currently unused — no getMaterial(BasicWood) callers exist.
+                // Re-add this.prewarmBasicWood(worker) if a use is introduced.
             ])
 
             SharedMaterialManager.logger.debug(
