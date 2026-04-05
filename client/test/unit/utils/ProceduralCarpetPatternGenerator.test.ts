@@ -30,9 +30,10 @@ describe('ProceduralCarpetPatternGenerator', () => {
         style
       })
 
+      const image = texture.image as HTMLImageElement
       expect(texture).toBeInstanceOf(THREE.Texture)
-      expect(texture.image.width).toBe(256)
-      expect(texture.image.height).toBe(256)
+      expect(image.width).toBe(256)
+      expect(image.height).toBe(256)
       expect(texture.wrapS).toBe(THREE.RepeatWrapping)
       expect(texture.wrapT).toBe(THREE.RepeatWrapping)
     })
@@ -52,9 +53,10 @@ describe('ProceduralCarpetPatternGenerator', () => {
         style
       })
 
+      const image = texture.image as HTMLImageElement
       expect(texture).toBeInstanceOf(THREE.Texture)
-      expect(texture.image.width).toBe(512)
-      expect(texture.image.height).toBe(512)
+      expect(image.width).toBe(512)
+      expect(image.height).toBe(512)
     })
 
     it('should cache textures with identical configurations', () => {
@@ -216,9 +218,10 @@ describe('ProceduralCarpetPatternGenerator', () => {
           style
         })
 
+        const image = texture.image as HTMLImageElement
         expect(texture).toBeInstanceOf(THREE.Texture)
-        expect(texture.image.width).toBe(256)
-        expect(texture.image.height).toBe(256)
+        expect(image.width).toBe(256)
+        expect(image.height).toBe(256)
       })
     })
   })
@@ -247,9 +250,12 @@ describe('ProceduralCarpetPatternGenerator', () => {
         style
       })
 
+      const image1 = texture1.image as HTMLImageElement
+      const image2 = texture2.image as HTMLImageElement
+
       // Since we're using seeded random, the textures should have identical pixel data
-      expect(texture1.image.width).toBe(texture2.image.width)
-      expect(texture1.image.height).toBe(texture2.image.height)
+      expect(image1.width).toBe(image2.width)
+      expect(image1.height).toBe(image2.height)
       
       // Note: In a real test, we'd compare the actual pixel data
       // For now, we just verify the textures were generated successfully

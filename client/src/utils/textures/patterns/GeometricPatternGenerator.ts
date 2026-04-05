@@ -135,7 +135,8 @@ export class GeometricPatternGenerator extends BasePatternGenerator {
       const y = random() * height
       const size = (random() * 60 + 40) * scale
       const letter = letters[Math.floor(random() * letters.length)]
-      const color = colors[Math.floor(random() * colors.length)]
+      const colorIndex = Math.floor(random() * colors.length)
+      const color = colors[colorIndex] || (colors.length > 0 ? colors[0] : '#00FFFF')
 
       this.drawBubbleLetter(ctx, letter, x, y, size, color, glowIntensity)
     }

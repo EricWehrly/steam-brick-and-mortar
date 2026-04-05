@@ -20,6 +20,8 @@ import { EventManager } from '../core/EventManager'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 import { FrameBudgetScheduler } from './FrameBudgetScheduler'
 
+import { ProceduralCarpetPatternGenerator, type CarpetStyleConfig } from './textures/ProceduralCarpetPatternGenerator'
+
 export enum MaterialType {
     FallbackGameBox = 'fallbackGameBox',
     MdfVeneer       = 'mdfVeneer',
@@ -52,7 +54,17 @@ export class SharedMaterialManager {
     private poolHits     = 0
     private disposed     = false
 
+    private proceduralCarpetPatternGenerator: ProceduralCarpetPatternGenerator
+    private currentCarpetStyle: CarpetStyleConfig = {
+        patternType: 'classic',
+        variant: 'diamond',
+        colors: ['#8B0000', '#800020', '#722F37'],
+        scale: 1.0,
+        density: 0.4
+    }
+
     private constructor() {
+        this.proceduralCarpetPatternGenerator = new ProceduralCarpetPatternGenerator()
         // Lightweight — no sync texture generation here.
 
         // Observe SetupRequest to trigger prewarm. Use plain registerEventHandler
@@ -184,15 +196,26 @@ export class SharedMaterialManager {
     }
 
     private async prewarmCarpet(worker: ProceduralTextureWorker): Promise<void> {
-        const bitmap = await worker.generate('carpet_enhanced', {
-            width: 512, height: 512, color: '#8B0000', fiberDensity: 0.5, roughness: 0.8,
-        })
-        const texture = this.bitmapToTexture(bitmap, 4, 4)
+        // Use the new generator for the carpet material
+        const config = {
+            width: 512,
+            height: 512,
+            style: this.currentCarpetStyle,
+            roughness: 0.9,
+            metalness: 0.0,
+            repeat: { x: 4, y: 4 }
+        }
+        
+        // Note: ProceduralCarpetPatternGenerator currently runs on main thread in the rebase branch
+        // but SharedMaterialManager expects worker.generate().
+        // For now, we'll keep the worker call if possible, or adapt to the new generator's output.
+        // Actually, the diff showed ProceduralCarpetPatternGenerator.createCarpetMaterial being used.
+        
+        const material = this.proceduralCarpetPatternGenerator.createCarpetMaterial(config)
         
         FrameBudgetScheduler.getInstance().schedule(
-            () => this.upsertMaterial(MaterialType.Carpet,
-                new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9, metalness: 0.0 })),
-            { priority: 'normal', estimatedMs: 2, maxDeferMs: 0 }
+            () => this.upsertMaterial(MaterialType.Carpet, material),
+            { priority: 'normal', estimatedMs: 5, maxDeferMs: 0 }
         )
     }
 
