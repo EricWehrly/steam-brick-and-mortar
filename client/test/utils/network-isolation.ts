@@ -6,6 +6,9 @@
  * - 5-second timeout stalls from unreachable external services
  * - Flaky tests due to network availability in CI/CD
  *
+ * When the isolation backstop is hit (a test tries to fetch without a mock),
+ * a `console.warn` will be emitted in addition to the promise rejection.
+ *
  * To allow network calls in a specific test, override fetch in that test:
  *   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(...))
  * or use the test-local mock pattern already established for image downloads.
@@ -24,6 +27,11 @@ const BLOCKED_FETCH_ERROR =
 export function installNetworkIsolation(): void {
     // Block fetch globally — tests that need network must mock it explicitly
     vi.stubGlobal('fetch', (_url: RequestInfo | URL) => {
+        console.warn(
+            `⚠️ [test-network-isolation] fetch blocked for: ${String(_url)}\n` +
+            '   This test hit the network isolation backstop — the test should mock fetch explicitly.\n' +
+            '   See test-network-isolation.md for guidance.'
+        )
         return Promise.reject(new Error(`${BLOCKED_FETCH_ERROR} (URL: ${String(_url)})`))
     })
 }
@@ -31,6 +39,11 @@ export function installNetworkIsolation(): void {
 export function resetNetworkIsolation(): void {
     // Reset to blocked state between tests (prevents leaking per-test stubs)
     vi.stubGlobal('fetch', (_url: RequestInfo | URL) => {
+        console.warn(
+            `⚠️ [test-network-isolation] fetch blocked for: ${String(_url)}\n` +
+            '   This test hit the network isolation backstop — the test should mock fetch explicitly.\n' +
+            '   See test-network-isolation.md for guidance.'
+        )
         return Promise.reject(new Error(`${BLOCKED_FETCH_ERROR} (URL: ${String(_url)})`))
     })
 }
