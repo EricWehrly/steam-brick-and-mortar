@@ -13,7 +13,7 @@
  */
 
 import * as THREE from 'three'
-import { PerformanceMonitor, type PerformanceStats, ToastManager, UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
+import { PerformanceMonitorUI, type PerformanceStats, ToastManager, UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
 import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { DebugStatsProvider } from './DebugStatsProvider'
@@ -57,7 +57,7 @@ export class SteamBrickAndMortarApp {
     private webxrUICoordinator: WebXRUICoordinator  
     private systemUICoordinator: SystemUICoordinator
     private uiManager: UIManager
-    private performanceMonitor: PerformanceMonitor
+    private performanceMonitor: PerformanceMonitorUI
     private steamIntegration: SteamIntegration
     private debugStatsProvider: DebugStatsProvider
     private eventManager: EventManager
@@ -109,7 +109,7 @@ export class SteamBrickAndMortarApp {
         ServiceRegistration.configureServices(this.container, config, this.sceneManager, this.appSettings)
         
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating PerformanceMonitor')
-        this.performanceMonitor = new PerformanceMonitor({
+        this.performanceMonitor = new PerformanceMonitorUI({
             position: 'top-right',
             showMemory: true,
             showDrawCalls: true,
