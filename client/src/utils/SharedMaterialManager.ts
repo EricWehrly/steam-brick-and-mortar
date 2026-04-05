@@ -196,14 +196,25 @@ export class SharedMaterialManager {
     }
 
     private async prewarmCeiling(worker: ProceduralTextureWorker): Promise<void> {
-        const bitmap = await worker.generate('ceiling_enhanced', {
-            width: 512, height: 512, color: '#F5F5DC', bumpSize: 0.6, density: 0.8,
-        })
-        const texture = this.bitmapToTexture(bitmap, 3, 3)
-        
+        const [diffuseBitmap, normalBitmap] = await Promise.all([
+            worker.generate('ceiling_popcorn', {
+                width: 512, height: 512,
+                color: '#E8E6D0', bumpDensity: 14, bumpHeight: 1.4, detailScale: 5,
+            }),
+            worker.generate('ceiling_popcorn_normal', {
+                width: 512, height: 512,
+                bumpDensity: 14, detailScale: 5, strength: 20,
+            }),
+        ])
+        const diffuse = this.bitmapToTexture(diffuseBitmap, 6, 6)
+        const normal  = this.bitmapToTexture(normalBitmap, 6, 6)
+
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.Ceiling,
-                new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9, metalness: 0.0 })),
+                new THREE.MeshStandardMaterial({
+                    map: diffuse, normalMap: normal,
+                    roughness: 0.95, metalness: 0.0,
+                })),
             { priority: 'normal', estimatedMs: 2, maxDeferMs: 0 }
         )
     }
