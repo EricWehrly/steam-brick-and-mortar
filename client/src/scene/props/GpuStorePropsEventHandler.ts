@@ -13,6 +13,7 @@ import { EventManager } from '../../core/EventManager'
 import { GpuStorePropsRenderer } from '../GpuStorePropsRenderer'
 import { Logger } from '../../utils/Logger'
 import { StorePropsEventTypes, type StorePropsSetupRequestEvent, type StorePropsSetupStartedEvent, type StorePropsSetupCompletedEvent, type StorePropsClearRequestEvent, type StorePropsAtmosphericRequestEvent } from './PropsEvents'
+import { SharedMaterialManager } from '../../utils/SharedMaterialManager'
 import { EventSource } from '../../core/EventManager'
 import { hasWebGL2, hasInstancedArrays, hasHardwareRenderer, supportsLargeTextures } from '../../utils/SystemCapabilities'
 import { RoomEventTypes, type RoomResizedEvent } from '../../types/InteractionEvents'
@@ -95,6 +96,11 @@ export class GpuStorePropsEventHandler {
         
         try {
             GpuStorePropsEventHandler.logger.info('Handling store props setup request with instanced renderer')
+            
+            // Ensure procedural materials (carpet, ceiling, wallWood) are ready before
+            // any getMaterial() calls happen inside renderer.setupProps(). prewarm() is
+            // idempotent — it returns the same Promise if already started.
+            await SharedMaterialManager.getInstance().prewarm()
             
             // Initialize instanced renderer if not already done
             if (!this.renderer) {

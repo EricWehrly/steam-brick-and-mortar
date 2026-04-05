@@ -14,6 +14,7 @@ import { LegacyStorePropsRenderer } from '../LegacyStorePropsRenderer'
 import { Logger } from '../../utils/Logger'
 import { StorePropsEventTypes, type StorePropsSetupRequestEvent, type StorePropsSetupStartedEvent, type StorePropsSetupCompletedEvent, type StorePropsClearRequestEvent, type StorePropsAtmosphericRequestEvent } from './PropsEvents'
 import { EventSource } from '../../core/EventManager'
+import { SharedMaterialManager } from '../../utils/SharedMaterialManager'
 
 export class LegacyStorePropsHandler {
     private static readonly logger = Logger.createLogFunctions(LegacyStorePropsHandler.name)
@@ -57,7 +58,11 @@ export class LegacyStorePropsHandler {
         try {
             LegacyStorePropsHandler.logger.debug('Handling store props setup request with legacy renderer')
             
+            // Ensure procedural materials are ready before getMaterial() calls in setupProps()
+            await SharedMaterialManager.getInstance().prewarm()
+            
             // NOTE: This handler only runs when NO override handler (GpuStorePropsEventHandler) is registered
+            // If system has GPU capabilities, GpuStorePropsEventHandler registers as override and this won't be called
             // If system has GPU capabilities, GpuStorePropsEventHandler registers as override and this won't be called
             
             // Initialize legacy renderer if not already done
