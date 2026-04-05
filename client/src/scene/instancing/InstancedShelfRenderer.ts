@@ -49,6 +49,7 @@ import { GameEventTypes, StorePropsEventTypes, type RendererReadyEvent } from '.
 import { Logger } from '../../utils/Logger'
 import { MeshPrewarmer } from '../../utils/MeshPrewarmer'
 import { SystemCapabilitiesDetector } from '../../utils/SystemCapabilities'
+import { FrameBudgetScheduler } from '../../utils/FrameBudgetScheduler'
 
 export interface InstancedShelfConfig extends InstancedRendererConfig {
     defaultShelfConfig?: ShelfConfig
@@ -123,8 +124,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     private shelfUnitTemplate: ShelfPartTemplate[] = []
     private hasParallelShaderCompile = false
     private meshesAddedToScene = false
-    private addingMeshesToScene = false
-    private sceneAddGeneration = 0
+    private sceneInsertCancelled = false
     
     // TODO: Consider making sticker system fully pluggable (dependency injection or optional feature)
     private readonly stickerHandler: ShelfStickerHandler
@@ -416,46 +416,27 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     }
     
     private ensureMeshesAddedToScene(): void {
-        if (this.meshesAddedToScene || this.addingMeshesToScene) {
+        if (this.meshesAddedToScene) {
             return
         }
+        this.meshesAddedToScene = true
+        this.sceneInsertCancelled = false
 
-        const managers = [
-            this.angledBoardManager,
-            this.sideBoardManager,
-            this.shelfBoardManager,
-            this.interiorSurfaceManager
-        ]
-
-        // Always stagger mesh insertion across frames regardless of KHR status.
-        // The offscreen prewarm canvas and the main scene render on the same hardware;
-        // we can't assume that completing compileAsync prevents a hitch when meshes hit
-        // the main scene. One mesh per frame keeps any remaining compile work spread out.
-        // (hasParallelShaderCompile is retained for a future consideration: staggering
-        // registration *into* the prewarm scene on capable hardware — not yet needed.)
-        this.addingMeshesToScene = true
-        const queue = [...managers]
-        const generation = ++this.sceneAddGeneration
-
-        const runNext = () => {
-            if (generation !== this.sceneAddGeneration || !this.isInitialized) {
-                this.addingMeshesToScene = false
-                return
-            }
-
-            const next = queue.shift()
-            if (!next) {
-                this.meshesAddedToScene = true
-                this.addingMeshesToScene = false
-                return
-            }
-
-            next.addToMainScene()
-            scheduleNextFrame(runNext)
+        // Schedule one mesh per frame via FrameBudgetScheduler.
+        // The scheduler runs at most one task per frame by default, so the 4 inserts
+        // spread across 4 consecutive frames naturally — keeping any residual GPU compile
+        // work from landing in a single frame regardless of whether compileAsync ran.
+        // (hasParallelShaderCompile is retained for a future gate: staggering registration
+        // *into* the prewarm scene on capable hardware — not yet needed.)
+        const scheduler = FrameBudgetScheduler.getInstance()
+        for (const manager of [this.angledBoardManager, this.sideBoardManager,
+                                this.shelfBoardManager, this.interiorSurfaceManager]) {
+            scheduler.schedule(() => {
+                if (!this.sceneInsertCancelled) manager.addToMainScene()
+            }, { priority: 'high', maxDeferMs: 2000 })
         }
 
-        InstancedShelfRenderer.logger.debug('Staggering instanced shelf mesh insertion across frames')
-        runNext()
+        InstancedShelfRenderer.logger.debug('Scheduled 4 instanced shelf mesh insertions (one per frame)')
     }
 
     private applyShelfUnitTemplate(
@@ -553,8 +534,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             interior: 0
         }
         this.meshesAddedToScene = false
-        this.addingMeshesToScene = false
-        this.sceneAddGeneration++
+        this.sceneInsertCancelled = true
         
         InstancedShelfRenderer.logger.debug('🔄 Reset')
     }
@@ -613,19 +593,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.shelfUnits.clear()
         this.isInitialized = false
         this.meshesAddedToScene = false
-        this.addingMeshesToScene = false
+        this.sceneInsertCancelled = true
         this.hasParallelShaderCompile = false
-        this.sceneAddGeneration++
         
         InstancedShelfRenderer.logger.debug('✅ Disposed')
     }
-}
-
-function scheduleNextFrame(callback: () => void): void {
-    if (typeof requestAnimationFrame === 'function') {
-        requestAnimationFrame(() => callback())
-        return
-    }
-
-    setTimeout(callback, 16)
 }
