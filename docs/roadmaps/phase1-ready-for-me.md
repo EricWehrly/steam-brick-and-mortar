@@ -549,7 +549,48 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 
 **Note**: Advanced lighting research includes WebGL pathtracing investigation
 
---- 
+### Feature 6.5: Layout System 🔄 **POST-CATEGORIZATION**
+**Context**: Multiple configurable room layout modes for game browsing
+
+**Prerequisite**: Steam categorization + faceted filtering/sorting must be implemented first so layouts are meaningful.
+
+**Phase 1 capstone (before layouts):** Standardize UI with a theme picker (see Feature 6.6).
+
+#### Story 6.5.1: Layout Selector UI
+- ASCII-based icon representations in a layout selector widget
+- Terminal/glowing neon aesthetic for the selector itself
+- Simple pattern names, not complex labels
+
+#### Story 6.5.2: Layout Implementations
+- **Rectangle (current)**: Columns configurable, dynamically adjustable in UI
+- **Circle**: Radius configurable, games arranged in arc/ring
+- **Concentric Circles**: Multiple rings (the "Dreamcast logo"), radius per ring, games spread outward
+- Each layout defined by a simple data structure; layouts are pluggable
+
+#### Story 6.5.3: Sorting & Filtering Prerequisites
+- Faceted sorting: sort by X, then Y, then Z (e.g., genre → playtime → name)
+- Filtering: hide/show categories, platforms, played/unplayed, etc.
+- Layout system should be downstream of filtered/sorted game list
+
+### Feature 6.6: UI Theme System 🔄 **PHASE 1 CAPSTONE**
+**Context**: Standardize UI appearance before investing in layouts
+
+**Approach**: CSS custom properties + per-theme stylesheet overrides. Users can supply their own theme file.
+
+#### Story 6.6.1: Theme Picker
+- Simple dropdown or radio selector in settings
+- Themes applied by swapping a root stylesheet or a `data-theme` attribute
+
+#### Story 6.6.2: Built-in Themes
+- **Modern Steam** (current direction — dark, blue accents, Valve-ish)
+- **Classic Steam** (older green/teal Steam era color palette)
+- **Neon / Cyberpunk** (hot pink, cyan, dark backgrounds, glowing UI elements)
+
+#### Story 6.6.3: Custom Theme Support
+- Document CSS variable names
+- Let users override by supplying their own stylesheet or editing a `custom-theme.css`
+
+---
 
 ## Phase 1 Deferred Items
 
