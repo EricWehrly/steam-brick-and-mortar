@@ -146,7 +146,6 @@ export class ProceduralCarpetPatternGenerator {
     const width = resolution
     const height = resolution
     
-    // Use existing texture if provided, otherwise generate new one (but this causes mismatch!)
     const diffuseTexture = existingTexture || this.generateCarpetTexture(options)
     console.log(`🗺️ NORMAL MAP GEN - Using ${existingTexture ? 'PROVIDED' : 'NEW'} texture - ID: ${diffuseTexture.id}`)
     
@@ -162,8 +161,9 @@ export class ProceduralCarpetPatternGenerator {
     }
     
     // Draw the diffuse texture to extract pixel data
-    if (diffuseTexture.image) {
-      ctx.drawImage(diffuseTexture.image, 0, 0, width, height)
+    const image = diffuseTexture.image as CanvasImageSource
+    if (image) {
+      ctx.drawImage(image, 0, 0, width, height)
       const imageData = ctx.getImageData(0, 0, width, height)
       
       console.log(`🗺️ Generating normal map from diffuse texture pixels - Pattern: ${style.patternType}, Resolution: ${width}x${height}`)
@@ -207,13 +207,14 @@ export class ProceduralCarpetPatternGenerator {
       diffuseTexture = this.generateCarpetTexture(options)
       console.log(`🗺️ Generated NEW diffuse texture for height data - ID: ${diffuseTexture.id}`)
     }
-    if (diffuseTexture.image) {
+    const image = diffuseTexture.image as CanvasImageSource
+    if (image) {
       const canvas = document.createElement('canvas')
       canvas.width = width
       canvas.height = height
       const ctx = canvas.getContext('2d')
       if (ctx) {
-        ctx.drawImage(diffuseTexture.image, 0, 0, width, height)
+        ctx.drawImage(image, 0, 0, width, height)
         const imageData = ctx.getImageData(0, 0, width, height)
         heightData = this.normalMapGenerator.generateGeometricHeightData(width, height, imageData.data, {
           pileHeight: style.normalMapIntensity || 0.5,
