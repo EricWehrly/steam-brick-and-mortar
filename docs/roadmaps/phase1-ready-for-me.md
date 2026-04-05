@@ -660,7 +660,52 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 **Acceptance**: No obviously broken UI; all checkboxes and toggles have visible effect or placeholder state
 
 ---
-## Phase 1 Deferred Items
+
+## Milestone 6.7: Layout System 🔮 **POST-CATEGORIZATION**
+*Goal: Multiple configurable room layout modes for game browsing*
+
+**Prerequisite**: Steam categorization (6.5) + faceted filtering/sorting must exist first so layouts are meaningful. UI theme system (6.6) should precede this so the layout selector widget is styled correctly.
+
+### Feature 6.7.1: Layout Selector UI
+- ASCII-based icon representations in a layout selector widget
+- Terminal/glowing neon aesthetic for the selector itself
+- Simple pattern names, not complex labels
+- Dropdown or panel in settings (post UI-normalization)
+
+### Feature 6.7.2: Layout Implementations
+- **Rectangle (current)**: Columns configurable, dynamically adjustable in UI
+- **Circle**: Radius configurable, games arranged in arc/ring
+- **Concentric Circles**: Multiple rings (the "Dreamcast logo" pattern), radius per ring, games spread outward
+- Each layout defined by a simple data structure; layouts are pluggable
+
+### Feature 6.7.3: Sorting & Filtering Prerequisites
+- Faceted sorting: sort by X, then Y, then Z (e.g., genre → playtime → name)
+- Filtering: hide/show categories, platforms, played/unplayed, etc.
+- Layout system is downstream of the filtered/sorted game list
+
+---
+
+## Milestone 6.8: UI Theme System 🔮 **PHASE 1 CAPSTONE**
+*Goal: Standardize UI appearance with theming before investing further in layout/visual work*
+
+**Sequencing**: After UI Normalization (6.6), before Layout System (6.7). Token system from 6.6 is the foundation for themes.
+
+**Approach**: CSS custom properties + per-theme stylesheet overrides. Users can supply their own theme file.
+
+### Feature 6.8.1: Theme Picker
+- Simple dropdown or radio selector in settings
+- Themes applied by swapping a `data-theme` attribute on root
+
+### Feature 6.8.2: Built-in Themes
+- **Modern Steam** (current direction — dark, blue accents)
+- **Classic Steam** (older green/teal Steam era color palette)
+- **Neon / Cyberpunk** (hot pink, cyan, dark backgrounds, glowing UI elements)
+
+### Feature 6.8.3: Custom Theme Support
+- Document CSS variable names
+- Let users override by supplying their own stylesheet or editing a `custom-theme.css`
+
+---
 
 ### Story 4.2.2: Error Handling and Reliability - **DEFERRED TO PHASE 2**
 - **Task 4.2.2.1**: Test API rate limiting behavior
