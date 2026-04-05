@@ -17,7 +17,7 @@ import { ApplicationPanel } from './panels/ApplicationPanel'
 import { GameSettingsPanel } from './panels/GameSettingsPanel'
 import { GraphicsSettingsPanel } from './panels/GraphicsSettingsPanel'
 import { CameraSettingsPanel } from './panels/CameraSettingsPanel'
-import type { PerformanceMonitor } from '../PerformanceMonitor'
+import type { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { EventManager, EventSource } from '../../core/EventManager'
 import { SteamEventTypes, LightingEventTypes } from '../../types/InteractionEvents'
 import type { SteamDataLoadedEvent, LightingToggleEvent, LightingDebugToggleEvent, LightingQualityChangedEvent } from '../../types/InteractionEvents'
@@ -47,7 +47,7 @@ export interface PauseMenuCallbacks {
 }
 
 export interface SystemDependencies {
-    performanceMonitor: PerformanceMonitor
+    performanceMonitor: PerformanceMonitorUI
     renderer: THREE.WebGLRenderer
 }
 

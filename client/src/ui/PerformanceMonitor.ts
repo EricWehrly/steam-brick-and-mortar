@@ -35,7 +35,7 @@ interface PerformanceWithMemory extends Performance {
     memory?: MemoryInfo
 }
 
-export class PerformanceMonitor {
+export class PerformanceMonitorUI {
     private container: HTMLElement | null = null
     private fpsDisplay: HTMLElement | null = null
     private frameTimeDisplay: HTMLElement | null = null

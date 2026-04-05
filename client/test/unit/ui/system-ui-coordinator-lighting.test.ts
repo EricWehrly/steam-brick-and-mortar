@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SystemUICoordinator } from '../../../src/ui/coordinators/SystemUICoordinator'
-import { PerformanceMonitor } from '../../../src/ui/PerformanceMonitor'
+import { PerformanceMonitorUI } from '../../../src/ui/PerformanceMonitor'
 import { EventManager } from '../../../src/core/EventManager'
 import { AppSettings } from '../../../src/core/AppSettings'
 import * as THREE from 'three'
@@ -45,6 +45,10 @@ vi.mock('../../../src/ui/LightingControlsPanel', () => ({
 }))
 
 vi.mock('../../../src/ui/PerformanceMonitor', () => ({
+    PerformanceMonitorUI: class {
+        dispose() {}
+    },
+    // Backward-compat alias while imports transition
     PerformanceMonitor: class {
         dispose() {}
     }
@@ -52,7 +56,7 @@ vi.mock('../../../src/ui/PerformanceMonitor', () => ({
 
 describe('SystemUICoordinator Lighting Integration', () => {
     let systemCoordinator: SystemUICoordinator
-    let performanceMonitor: PerformanceMonitor
+    let performanceMonitor: PerformanceMonitorUI
     let renderer: THREE.WebGLRenderer
 
     beforeEach(() => {
@@ -78,7 +82,7 @@ describe('SystemUICoordinator Lighting Integration', () => {
         const mockAppSettings = AppSettings.getInstance()
         
         // Create coordinator
-        performanceMonitor = new PerformanceMonitor()
+        performanceMonitor = new PerformanceMonitorUI()
         systemCoordinator = new SystemUICoordinator(
             performanceMonitor,
             { getDebugStats: () => ({}) } as any,
