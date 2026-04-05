@@ -61,8 +61,13 @@
 
 ---
 
-## Feature 5.4: Network Request Management & Rate Limiting Infrastructure 🔮 **PRE-FRIENDS RELEASE**
+## Feature 5.4: Network Request Management & Rate Limiting Infrastructure 🔮 **LATE PHASE 2 (PRE-FRIENDS SIGN-OFF)**
 **Context**: Comprehensive network traffic optimization and rate limiting before any multi-user testing
+
+**Sequencing (2026-04-05)**:
+- Defer active implementation until **late Phase 2** (after core Input/UX stabilization work in Milestones 7/8)
+- Execute before Phase 2 exit/sign-off so friends/family usage is still protected by robust rate limiting
+- Treat this as a **late-phase hardening pass**, not an early Phase 2 blocker
 
 ### Story 5.4.1: Network Traffic Audit and Optimization Analysis
 - **Task 5.4.1.1**: Audit all network calls and patterns
@@ -138,7 +143,7 @@
 
 **Context**: **Critical for "Ready for Friends"** - 800 games × 3 requests/game ÷ 20 req/min = 120+ minutes without caching
 
-**IMPORTANT**: Stories 5.4.1 and 5.4.2 are **BLOCKERS** for any friends/family release. Current network behavior is acceptable for solo testing but will cause problems with multiple concurrent users or larger libraries.
+**IMPORTANT**: Stories 5.4.1 and 5.4.2 are **LATE PHASE 2 BLOCKERS** for friends/family release sign-off. Current network behavior is acceptable for solo testing while earlier Phase 2 milestones are in progress, but must be hardened before Phase 2 completion.
 
 ---
 
