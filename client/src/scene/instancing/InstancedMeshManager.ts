@@ -1,8 +1,10 @@
 import * as THREE from 'three'
 import { DataManager } from '../../core/data/DataManager'
+import { Logger } from '../../utils/Logger'
 import type { InstancedMeshConfig, InstanceAttribute } from './IInstancedRenderer'
 
 export class InstancedMeshManager {
+    private static readonly logger = Logger.createLogFunctions(InstancedMeshManager.name)
     private instancedMesh: THREE.InstancedMesh | null = null
     private maxInstances: number
     private currentCount: number = 0
@@ -21,7 +23,7 @@ export class InstancedMeshManager {
     
     public initialize(config: InstancedMeshConfig): void {
         if (this.isInitialized) {
-            console.warn(`${this.debugName} already initialized`)
+            InstancedMeshManager.logger.warn(`${this.debugName} already initialized`)
             return
         }
         
@@ -48,11 +50,12 @@ export class InstancedMeshManager {
         this.instancedMesh.scale.set(1, 1, 1)
         
         this.isInitialized = true
-        console.debug(`✅ ${this.debugName} initialized (max: ${this.maxInstances} instances)`)
+        InstancedMeshManager.logger.debug(`✅ ${this.debugName} initialized (max: ${this.maxInstances} instances)`)
     }
     
     public addInstanceAttributes(attributes: InstanceAttribute[]): void {
         if (!this.instancedMesh) {
+            InstancedMeshManager.logger.error(`Cannot add attributes: ${this.debugName} not initialized`)
             throw new Error(`Cannot add attributes: ${this.debugName} not initialized`)
         }
         
@@ -83,7 +86,7 @@ export class InstancedMeshManager {
             
             geometry.setAttribute(attr.name, bufferAttribute)
             
-            console.debug(`📊 Added instance attribute "${attr.name}" (${attr.itemSize} components) to ${this.debugName}`)
+            InstancedMeshManager.logger.debug(`📊 Added instance attribute "${attr.name}" (${attr.itemSize} components) to ${this.debugName}`)
         }
     }
     
@@ -94,12 +97,12 @@ export class InstancedMeshManager {
         scale: THREE.Vector3 = InstancedMeshManager.DEFAULT_SCALE
     ): boolean {
         if (!this.instancedMesh) {
-            console.warn(`Cannot set instance: ${this.debugName} not initialized`)
+            InstancedMeshManager.logger.warn(`Cannot set instance: ${this.debugName} not initialized`)
             return false
         }
         
         if (index >= this.maxInstances) {
-            console.warn(`Instance index ${index} exceeds max ${this.maxInstances} for ${this.debugName}`)
+            InstancedMeshManager.logger.warn(`Instance index ${index} exceeds max ${this.maxInstances} for ${this.debugName}`)
             return false
         }
         
@@ -119,7 +122,7 @@ export class InstancedMeshManager {
         value: number | number[]
     ): boolean {
         if (!this.instancedMesh) {
-            console.warn(`Cannot set attribute: ${this.debugName} not initialized`)
+            InstancedMeshManager.logger.warn(`Cannot set attribute: ${this.debugName} not initialized`)
             return false
         }
         
@@ -127,12 +130,12 @@ export class InstancedMeshManager {
         const attribute = geometry.getAttribute(attributeName) as THREE.InstancedBufferAttribute
         
         if (!attribute) {
-            console.warn(`Attribute "${attributeName}" not found on ${this.debugName}`)
+            InstancedMeshManager.logger.warn(`Attribute "${attributeName}" not found on ${this.debugName}`)
             return false
         }
         
         if (index >= this.maxInstances) {
-            console.warn(`Instance index ${index} exceeds max ${this.maxInstances} for ${this.debugName}`)
+            InstancedMeshManager.logger.warn(`Instance index ${index} exceeds max ${this.maxInstances} for ${this.debugName}`)
             return false
         }
         
@@ -168,7 +171,7 @@ export class InstancedMeshManager {
             }
         }
         
-        console.debug(`🔄 ${this.debugName} GPU updated: ${this.currentCount} active instances`)
+        InstancedMeshManager.logger.debug(`🔄 ${this.debugName} GPU updated: ${this.currentCount} active instances`)
     }
     
     public reset(): void {
@@ -176,23 +179,23 @@ export class InstancedMeshManager {
         if (this.instancedMesh) {
             this.instancedMesh.count = 0
         }
-        console.debug(`🔄 ${this.debugName} instances reset`)
+        InstancedMeshManager.logger.debug(`🔄 ${this.debugName} instances reset`)
     }
     
     public addToMainScene(): void {
         if (!this.instancedMesh) {
-            console.warn(`⚠️ Cannot add to scene: ${this.debugName} not initialized`)
+            InstancedMeshManager.logger.warn(`⚠️ Cannot add to scene: ${this.debugName} not initialized`)
             return
         }
         
         const scene = DataManager.getInstance().get<any>('core.mainScene')
         if (!scene) {
-            console.warn(`⚠️ Cannot add to scene: main scene not available in DataManager`)
+            InstancedMeshManager.logger.warn(`⚠️ Cannot add to scene: main scene not available in DataManager`)
             return
         }
         
         scene.add(this.instancedMesh)
-        console.debug(`➕ ${this.debugName} added to main scene`)
+        InstancedMeshManager.logger.debug(`➕ ${this.debugName} added to main scene`)
     }
     
     public removeFromMainScene(): void {
@@ -203,7 +206,7 @@ export class InstancedMeshManager {
         const scene = DataManager.getInstance().get<any>('core.mainScene')
         if (scene) {
             scene.remove(this.instancedMesh)
-            console.debug(`➖ ${this.debugName} removed from main scene`)
+            InstancedMeshManager.logger.debug(`➖ ${this.debugName} removed from main scene`)
         }
     }
     
@@ -226,7 +229,7 @@ export class InstancedMeshManager {
     }
     
     public dispose(): void {
-        console.debug(`🧹 Disposing ${this.debugName}`)
+        InstancedMeshManager.logger.debug(`🧹 Disposing ${this.debugName}`)
         
         this.removeFromMainScene()
         
@@ -236,6 +239,6 @@ export class InstancedMeshManager {
         this.isInitialized = false
         this.currentCount = 0
         
-        console.debug(`✅ ${this.debugName} disposed`)
+        InstancedMeshManager.logger.debug(`✅ ${this.debugName} disposed`)
     }
 }

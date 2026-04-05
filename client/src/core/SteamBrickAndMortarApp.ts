@@ -30,7 +30,6 @@ import { ServiceKeys } from './di/ServiceKeys'
 import type { AppConfig as DIAppConfig } from './di'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { RenderLoopDiagnostics } from '../debug/RenderLoopDiagnostics'
-import { Logger, LogLevel } from '../utils/Logger'
 // Side-effect import: registers GpuMemoryEstimator to window for console debugging
 import '../debug/GpuMemoryEstimator'
 
@@ -98,13 +97,6 @@ export class SteamBrickAndMortarApp {
         // Initialize AppSettings first (needed for default values)
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Initializing AppSettings')
         this.appSettings = AppSettings.getInstance()
-        
-        // TODO: Revisit this
-        // Configure log levels for noisy classes
-        Logger.setContextLevel('GpuGameBoxRenderer', LogLevel.INFO)
-        Logger.setContextLevel('SteamApiClient', LogLevel.INFO)
-        Logger.setContextLevel('BatchAppDetailsClient', LogLevel.INFO)
-        Logger.setContextLevel('ThreeWebGLRendererDebug', LogLevel.INFO)
         
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating SceneManager')
         this.sceneManager = new SceneManager({

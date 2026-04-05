@@ -65,10 +65,22 @@ export class Logger {
   static getInstance(): Logger {
     if (!Logger.instance) {
       Logger.instance = new Logger()
+      Logger.initializeDefaultContextLevels()
     }
     return Logger.instance
   }
 
+  /**
+   * Initialize default context log levels
+   * Classes with noisy output are set to INFO by default to reduce console spam
+   */
+  private static initializeDefaultContextLevels(): void {
+    // Classes that produce a lot of noise which is only helpful when actively debugging them
+    Logger.setContextLevel('GpuGameBoxRenderer', LogLevel.INFO)
+    Logger.setContextLevel('SteamApiClient', LogLevel.INFO)
+    Logger.setContextLevel('BatchAppDetailsClient', LogLevel.INFO)
+    Logger.setContextLevel('GameArtworkInspector', LogLevel.INFO)
+  }
 
   /**
    * Set log level for a specific context (class name)
