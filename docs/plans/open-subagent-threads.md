@@ -23,21 +23,36 @@ Tracks ongoing and queued work for bounded subagent tasks. When a thread complet
 
 ---
 
-### Thread: Steam Categorization — Shelf Assignment
+### Thread: Steam Categorization — CategoryAssigner
 **Status**: Ready to start (data already exists!)  
 **Model**: gemini-3-flash  
-**Mode**: one-shot subagent  
-**Work**: `SteamGameData` already has `genres` and `categories`. Missing piece: assign games to category-labeled shelf groups.  
-**Ref**: `docs/steam-categorization-research.md`, `client/src/scene/StoreLayoutConfig.ts`  
-**Depends on**: Nothing — data is in-hand  
+**Mode**: one-shot subagent, single file scope  
+**Ref**: `docs/plans/feature-priority-spec.md`, `client/src/steam/types/SteamMetadata.ts`
 
-**Concrete work items**:
-1. Write a `CategoryAssigner` that takes `SteamGameData[]` and returns games grouped by primary genre
-2. Define a `ShelfGroup` type: `{ category: string; label: string; games: SteamGameData[] }`
-3. Wire `GpuStorePropsRenderer` to receive shelf groups instead of a flat game list
-4. Fallback: games with no genre → "Other" group
+**What exists already:**
+- `SteamGameData.genres[]` — type `SteamGenre[]` (`id: string, description: string`)
+- `SteamGameData.categories[]` — type `SteamCategory[]` (`id: number, description: string`)
+- `STEAM_STORE_SECTIONS` in `StoreLayoutConfig.ts` — dead code placeholder section names
 
----
+**Subagent task A — CategoryAssigner (one file):**
+Create `client/src/scene/categorization/CategoryAssigner.ts`:
+- Input: `SteamGameData[]`
+- Output: `ShelfGroup[]` where `ShelfGroup = { genre: string; label: string; games: SteamGameData[] }`
+- Group by `genres[0].description` (primary genre)
+- Games with no genre go into an `"Other"` group
+- Sort groups: largest first, `"Other"` always last
+- Write unit tests alongside
+
+**Subagent task B — FeaturePriorityConfig (one file):**
+Create `client/src/ui/FeaturePriorityConfig.ts`:
+- `HIDDEN_PRIORITY = 9999` constant
+- Default priority table as a `Map<number, number>` (categoryId → priority)
+- Helper: `sortAndFilterCategories(categories: SteamCategory[]): SteamCategory[]`
+  - Filters out `priority >= HIDDEN_PRIORITY`
+  - Sorts remaining by priority ascending
+- Write unit tests
+
+**These are independent — either can run first.**
 
 ### Thread: getInstance Singleton Refactor
 **Status**: Queued — defer until fresh branch  
