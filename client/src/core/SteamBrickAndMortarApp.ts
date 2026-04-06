@@ -14,6 +14,7 @@
 
 import * as THREE from 'three'
 import { PerformanceMonitorUI, type PerformanceStats, ToastManager, UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
+import { CategoryReferencePanel } from '../ui/CategoryReferencePanel'
 import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { DebugStatsProvider } from './DebugStatsProvider'
@@ -64,6 +65,7 @@ export class SteamBrickAndMortarApp {
     private appSettings: AppSettings
     private compassRose?: CompassRose
     private gameLibraryBinder?: GameLibraryBinderUI
+    private categoryReferencePanel?: CategoryReferencePanel
     
     // Startup tracking
     private startupTracker: StartupEventTracker
@@ -273,6 +275,10 @@ export class SteamBrickAndMortarApp {
             this.gameLibraryBinder = GameLibraryBinderUI.getInstance()
             this.gameLibraryBinder.init()
             this.startupTracker.logEvent(StartupPhase.PrewarmEncore, 'Game Library Binder UI initialized')
+
+            this.categoryReferencePanel = new CategoryReferencePanel()
+            this.categoryReferencePanel.init()
+            this.startupTracker.logEvent(StartupPhase.PrewarmEncore, 'Category Reference Panel initialized')
 
             // Initialize system UI coordinator (lighting panel, debug panels, etc.)
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())

@@ -1,25 +1,11 @@
 /**
  * ShelfSectionPlanner
  *
- * ROLE: Middle-layer coordinator that maps loaded games to shelf sections
- * and drives category sign placement.
+ * Accumulates game data across progressive batches, then places
+ * category signs in one pass after all batches complete.
  *
- * OWNS:
- * - Game accumulation across progressive batches
- * - CategoryAssigner invocation over full library
- * - Section anchor tracking (first batch index per label)
- * - CategorySignSystem lifecycle calls
- *
- * DOES NOT:
- * - Know about shelf geometry or GPU instancing
- * - Know about batch events (caller passes data in)
- * - Decide shelf positions (caller provides shelfPositions[])
- *
- * DESIGN NOTE:
- * This lives between the batch pipeline and the sign/layout system.
- * It is intentionally re-runnable: calling `planSections()` at any time
- * rebuilds signs from the current accumulated game set, supporting
- * future filter/sort/label-change flows without a full reload.
+ * Signs appear only after planSections() � no provisional signs during load.
+ * planSections() is re-runnable: safe to call after filter/sort changes.
  */
 
 import * as THREE from 'three'
@@ -29,9 +15,7 @@ import type { SteamGameData } from './game-box/types/GameData'
 import { Logger } from '../utils/Logger'
 
 export interface ShelfSectionPlannerConfig {
-    /** Y offset above shelf anchor for section signs */
     signYOffset?: number
-    /** Mount style for section signs */
     signMountStyle?: SignMount['style']
 }
 
@@ -45,14 +29,7 @@ export class ShelfSectionPlanner {
     private readonly signSystem: CategorySignSystem
     private readonly config: Required<ShelfSectionPlannerConfig>
 
-    /** Accumulated games across all received batches */
     private games: SteamGameData[] = []
-
-    /** First batch index observed for each label during progressive load */
-    private firstBatchIndexByLabel: Map<string, number> = new Map()
-
-    /** Labels for which provisional signs have already been shown */
-    private provisionalLabels: Set<string> = new Set()
 
     constructor(scene: THREE.Scene, config: ShelfSectionPlannerConfig = {}) {
         this.signSystem = new CategorySignSystem(scene)
@@ -62,117 +39,79 @@ export class ShelfSectionPlanner {
         }
     }
 
-    // ─── Progressive load interface ───────────────────────────────────────────
-
     /**
-     * Call once per batch as games stream in.
-     * Adds games to the accumulator and optionally places a provisional sign
-     * for non-Other labels on first occurrence.
-     *
-     * @param batchIndex  Index of this batch in the progressive sequence
-     * @param games       Games in this batch
-     * @param shelfPosition  World position of the shelf created for this batch
-     * @param shelfLabel  Optional label pre-derived from batch genre (from GameBoxSpawner)
+     * Accumulate games from one batch.
+     * Does NOT place any signs � signs are deferred to planSections().
      */
     public onBatchPlaced(
-        batchIndex: number,
+        _batchIndex: number,
         games: readonly SteamGameData[],
-        shelfPosition: THREE.Vector3,
-        shelfLabel?: string
+        _shelfPosition: THREE.Vector3,
+        _shelfLabel?: string
     ): void {
         this.games.push(...games)
-
-        if (!shelfLabel || shelfLabel === 'Other') return
-
-        // Track first batch index for this label (used by planSections())
-        if (!this.firstBatchIndexByLabel.has(shelfLabel)) {
-            this.firstBatchIndexByLabel.set(shelfLabel, batchIndex)
-        }
-
-        // Show provisional sign on first occurrence of this label
-        if (!this.provisionalLabels.has(shelfLabel)) {
-            this.signSystem.setSign({
-                label: shelfLabel,
-                anchorPosition: shelfPosition,
-                mount: { style: this.config.signMountStyle, yOffset: this.config.signYOffset }
-            })
-            this.provisionalLabels.add(shelfLabel)
-            ShelfSectionPlanner.logger.debug(`Provisional sign: "${shelfLabel}" at batch ${batchIndex}`)
-        }
     }
 
     /**
-     * Rebuild all section signs using the full accumulated game set.
-     * Safe to call multiple times — each call replaces previous signs.
-     * Call this after all batches have landed, or after any filter/sort change.
-     *
-     * @param shelfPositions  Ordered world positions of all shelves (by batch index)
+     * Place all category signs using the full accumulated game set.
+     * Each group is anchored to the shelf position where its games start
+     * in the playtime-sorted order.
      */
     public planSections(shelfPositions: THREE.Vector3[]): void {
-        if (this.games.length === 0) return
+        if (this.games.length === 0) {
+            ShelfSectionPlanner.logger.warn('planSections called with no games � skipping')
+            return
+        }
+        if (shelfPositions.length === 0) {
+            ShelfSectionPlanner.logger.warn('planSections called with no shelf positions � skipping')
+            return
+        }
 
         this.signSystem.clearAll()
-        this.provisionalLabels.clear()
 
         const groups = this.assigner.assign(this.games)
+        ShelfSectionPlanner.logger.info(
+            `[SIGN-DEBUG] planSections: ${groups.length} groups � ` +
+            groups.map(g => `${g.label}(${g.games.length})`).join(', ')
+        )
+
         let placed = 0
+        let gameOffset = 0
+        const batchSize = 18
 
         for (const group of groups) {
-            const firstBatchIndex = this.firstBatchIndexByLabel.get(group.label)
-            const anchorIndex = firstBatchIndex !== undefined
-                ? firstBatchIndex
-                : this.estimateBatchAnchor(group.label, groups, shelfPositions.length)
-
+            const anchorIndex = Math.min(
+                Math.floor(gameOffset / batchSize),
+                shelfPositions.length - 1
+            )
             const anchorPos = shelfPositions[anchorIndex]
-            if (!anchorPos) continue
+            if (!anchorPos) {
+                ShelfSectionPlanner.logger.warn(`No shelf position for group "${group.label}" at index ${anchorIndex}`)
+                gameOffset += group.games.length
+                continue
+            }
 
             this.signSystem.setSign({
                 label: group.label,
                 anchorPosition: anchorPos,
                 mount: { style: this.config.signMountStyle, yOffset: this.config.signYOffset }
             })
-            this.provisionalLabels.add(group.label)
             placed++
+            gameOffset += group.games.length
         }
 
         ShelfSectionPlanner.logger.debug(
-            `planSections: placed ${placed} signs for ${groups.length} groups ` +
-            `(${this.games.length} total games)`
+            `planSections: placed ${placed}/${groups.length} signs ` +
+            `(${this.games.length} total games, ${shelfPositions.length} shelves)`
         )
     }
 
-    // ─── Reset ────────────────────────────────────────────────────────────────
-
-    /** Clear accumulated state. Call before a new load cycle. */
     public reset(): void {
         this.games = []
-        this.firstBatchIndexByLabel.clear()
-        this.provisionalLabels.clear()
         this.signSystem.clearAll()
     }
 
     public dispose(): void {
         this.signSystem.dispose()
-    }
-
-    // ─── Internal helpers ─────────────────────────────────────────────────────
-
-    /**
-     * Fallback anchor estimation when first-batch tracking is unavailable
-     * (e.g. for uncached batches where genre metadata wasn't set at dispatch time).
-     * Uses batch-count proportional to group size.
-     */
-    private estimateBatchAnchor(
-        label: string,
-        groups: ReturnType<CategoryAssigner['assign']>,
-        totalShelves: number
-    ): number {
-        let offset = 0
-        const batchSize = 18
-        for (const group of groups) {
-            if (group.label === label) return Math.min(offset, totalShelves - 1)
-            offset += Math.ceil(group.games.length / batchSize)
-        }
-        return 0
     }
 }

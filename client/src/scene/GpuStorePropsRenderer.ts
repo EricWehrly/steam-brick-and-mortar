@@ -1,4 +1,4 @@
-﻿/**
+/**
  * GpuStorePropsRenderer
  *
  * ROLE: High-level coordinator for GPU-instanced store rendering.
@@ -10,8 +10,8 @@
  * - Store layout reference
  *
  * RECEIVES (Events):
- * - BatchReadyForPlacement → Triggers renderer initialization on first batch
- * - ShelfSpaceRequested → Creates shelf and emits ShelfCreated
+ * - BatchReadyForPlacement ? Triggers renderer initialization on first batch
+ * - ShelfSpaceRequested ? Creates shelf and emits ShelfCreated
  *
  * CURRENT ISSUES (see gpustoreprops-event-untangling.md):
  * - Still acts as middleman for some flows
@@ -90,8 +90,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
     private gameBoxSpawner?: GameBoxSpawner
     private readonly shelfSectionPlanner: ShelfSectionPlanner
-    /** Batch-index keyed games for section planning as shelves are created */
-    private batchGamesByIndex: Map<number, readonly SteamGameData[]> = new Map()
 
     constructor(scene: THREE.Scene) {
         this.scene = scene
@@ -123,7 +121,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         // Initialize eagerly - emits RendererReady event when complete
         this.instancedShelfRenderer.initialize().catch(error => {
-            console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
+            console.error('? Failed to initialize InstancedShelfRenderer:', error)
             throw error
         })
 
@@ -176,17 +174,14 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private async handleInitialBatch(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
         const { totalBatches, batchIndex, games } = event.detail
 
-        // Capture games for section planning regardless of whether this is first batch
-        this.batchGamesByIndex.set(batchIndex, games as unknown as SteamGameData[])
-
-        // Only handle the first batch for initialization
+        // Non-first batches: accumulate games immediately (init already done)
         if (!this.batchCoordinator.isFirstBatchProcessing()) {
+            this.shelfSectionPlanner.onBatchPlaced(batchIndex, games as SteamGameData[], new THREE.Vector3())
             return
         }
 
         if (!this.progressiveInitializationPromise) {
             this.progressiveInitializationPromise = (async () => {
-                // Initialize deferred GPU resources on first real data batch.
                 const initMonitor = PerformanceMonitor.start('renderer-initialization', GpuStorePropsRenderer.logger, ASYNC_CONTEXT)
                 await this.initializeForProgressiveLoading(totalBatches)
                 initMonitor.end({ totalBatches })
@@ -194,6 +189,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         }
 
         await this.progressiveInitializationPromise
+
+        // Accumulate AFTER init (which calls reset()) so games aren't wiped
+        this.shelfSectionPlanner.onBatchPlaced(batchIndex, games as SteamGameData[], new THREE.Vector3())
     }
 
     private async handleShelfSpaceRequested(event: CustomEvent<ShelfSpaceRequestedEvent>): Promise<void> {
@@ -226,7 +224,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
-        this.batchGamesByIndex.clear()
+        // batchGamesByIndex removed � games accumulated directly in shelfSectionPlanner
         this.shelfSectionPlanner.reset()
         this.clearExistingShelves()
 
@@ -235,7 +233,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private async waitForShelfRendererReady(): Promise<void> {
         if (!this.instancedShelfRenderer) {
-            console.error('❌ No shelf renderer instance')
+            console.error('? No shelf renderer instance')
             return
         }
 
@@ -246,7 +244,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         }
 
         // Wait for RendererReady event
-        console.log('⏳ Waiting for RendererReady event...')
+        console.log('? Waiting for RendererReady event...')
         return new Promise<void>((resolve) => {
             this.initializationQueue.push(resolve)
         })
@@ -278,7 +276,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private calculateShelfRowZ(row: number): number {
         const normalRowZ = VRLayoutUtils.calculateOptimalRowPosition(row)
 
-        // Odd rows are rotated 180° and should sit closer to previous even row
+        // Odd rows are rotated 180� and should sit closer to previous even row
         // to create back-to-back aisle pairs (instead of uniformly marching rows).
         if (row % 2 === 1) {
             return normalRowZ + (RoomConstants.SHELF_SPACING_Z - this.backToBackRowSpacingZ)
@@ -310,7 +308,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             }
         )
         GpuStorePropsRenderer.logger.debug(
-            `Shelf layout determined: ${this.shelfLayout.rows} rows × ${this.shelfLayout.shelvesPerRow} shelves`
+            `Shelf layout determined: ${this.shelfLayout.rows} rows � ${this.shelfLayout.shelvesPerRow} shelves`
         )
     }
 
@@ -321,7 +319,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         const oldLength = this.shelfPositions.length
         const progress = this.batchCoordinator.getProgress()
-        console.warn(`⚠️ BATCH COUNT MISMATCH: Received batch ${batchIndex + 1} but only allocated ${oldLength} positions`)
+        console.warn(`?? BATCH COUNT MISMATCH: Received batch ${batchIndex + 1} but only allocated ${oldLength} positions`)
         console.warn(`   Expected: ${progress.total}, Actual: >${batchIndex + 1}. Expanding...`)
         this.preallocateShelfPositions(batchIndex + 1)
     }
@@ -329,7 +327,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private async createShelfForBatchIndex(batchIndex: number, shelfLabel?: string): Promise<void> {
         const isReady = this.instancedShelfRenderer?.isReady()
         if (!isReady) {
-            console.error(`❌ InstancedShelfRenderer not ready for batch ${batchIndex + 1}!`)
+            console.error(`? InstancedShelfRenderer not ready for batch ${batchIndex + 1}!`)
             console.error('   Renderer state:', {
                 exists: !!this.instancedShelfRenderer,
                 isReady: isReady,
@@ -342,7 +340,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const shelfPosition = this.shelfPositions[batchIndex]
 
         if (!shelfPosition) {
-            console.error(`❌ CRITICAL: Shelf position ${batchIndex} is undefined even after allocation!`)
+            console.error(`? CRITICAL: Shelf position ${batchIndex} is undefined even after allocation!`)
             return
         }
 
@@ -361,13 +359,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.createInstancedShelf(shelfPosition, rowIndex, shelfIndex)
         this.cumulativeShelfCount++
 
-        // Delegate provisional sign + tracking to ShelfSectionPlanner
-        // Use actual games captured from BatchReadyForPlacement for this batch.
-        const batchGames = this.batchGamesByIndex.get(batchIndex) ?? []
-        if (shelfLabel || batchGames.length > 0) {
-            this.shelfSectionPlanner.onBatchPlaced(batchIndex, batchGames, shelfPosition, shelfLabel)
-            this.batchGamesByIndex.delete(batchIndex)
-        }
+        // Game accumulation for section planning happens in handleInitialBatch.
+        // Sign placement happens in planSections() after AllBatchesComplete.
 
         // Emit ShelfCreated event for GameBoxSpawner to place games
         EventManager.getInstance().emit<ShelfCreatedEvent>(
@@ -389,7 +382,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private finalizeProgressiveLoading(): void {
-        console.debug(`✅ Progressive loading complete: ${this.cumulativeShelfCount} shelves created`)
+        console.debug(`? Progressive loading complete: ${this.cumulativeShelfCount} shelves created`)
 
         this.resetBatchState()
     }
@@ -441,7 +434,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     public async addAtmosphericProps(): Promise<void> {
         // TODO: PropRenderer not instantiated - this method is currently non-functional
-        console.warn('⚠️ addAtmosphericProps not implemented - PropRenderer not instantiated')
+        console.warn('?? addAtmosphericProps not implemented - PropRenderer not instantiated')
     }
 
     public updatePerformanceData(_camera: THREE.Camera): void {
@@ -502,7 +495,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     public clearProps(): void {
         this.clearExistingShelves()
-        this.batchGamesByIndex.clear()
         this.shelfSectionPlanner.reset()
 
         while (this.propsGroup.children.length > 0) {
