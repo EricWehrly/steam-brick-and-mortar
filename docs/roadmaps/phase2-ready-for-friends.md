@@ -433,6 +433,28 @@
 - **Flat / Wolfenstein-mode**: Uniform ambient, no dynamic lights — like the pre-dynamic-lights era of the codebase. Fast, nostalgic, great fallback.
 - **Blacklight room**: UV-style ambient with glowing accent colors. Pairs naturally with the planned basement room variant.
 
+**Tone knob presets (corporate → dank scale):**
+A single knob/control with named positions controlling the overall emotional tone of lighting:
+- **Corporate**: Bright, even, neutral/cool — high ambient, minimal shadow, productive feel
+- **Cheery**: Warm-white, upbeat, slightly directional — old-school store with good bulbs
+- **Dim**: Cozy warm, soft shadows, lower ambient — closing-time video store feel
+- **Dank**: Very low ambient, strong contrast, cool shadows — sketchy basement vibes
+
+---
+
+### Feature 8.5.1 (revised): Dongle Switch Panel
+**Context**: Second lighting control panel design — runs alongside current panel, not replacing it.
+
+**Visual design concept**:
+- A row of retro dongle-style rocker switches (on/off positions) — one per light in the scene
+- Each switch has a tiny LED indicator at its tip reflecting current light state
+- Switches labeled with a strip of hand-torn masking tape (canvas texture)
+- Human-readable labels for each light group (not raw WebGL names)
+  - Raw WebGL names retained as tooltips for developer context
+- A tone knob to one side — rotates through the 4 preset positions (corporate / cheery / dim / dank)
+
+**Implementation note**: This is a design-phase item. Wait until UI normalization baseline (Phase B) is in place before building. Requires the lighting preset system (Feature 8.5.0) to exist first.
+
 **Additional lighting atmosphere ideas** (brainstorm, subject to review):
 - **Golden hour / warm close**: Warm directional from low angle, long shadows — cozy evening feel
 - **Neon city**: Deep dark ambient, colored point lights (magenta/cyan/green) — cyberpunk

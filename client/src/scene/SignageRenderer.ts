@@ -141,33 +141,28 @@ export class SignageRenderer {
     /**
      * Create text texture using canvas
      */
-    private createTextTexture(text: string, backgroundColor: number, textColor: number): THREE.CanvasTexture {
-        // Clear canvas
+    private createTextTexture(text: string, backgroundColor: number, textColor: number): THREE.Texture {
+        // Reuse a single working canvas, but freeze each sign texture into a separate
+        // DataTexture snapshot so signs don't all update to the last rendered label.
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
-        
-        // Set background color
+
         this.context.fillStyle = `#${backgroundColor.toString(16).padStart(6, '0')}`
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height)
-        
-        // Set text properties
+
         this.context.fillStyle = `#${textColor.toString(16).padStart(6, '0')}`
         this.context.font = `bold ${SignageRenderer.DEFAULT_FONT_SIZE}px ${SignageRenderer.DEFAULT_FONT_FAMILY}`
         this.context.textAlign = 'center'
         this.context.textBaseline = 'middle'
-        
-        // Add text shadow for better visibility
         this.context.shadowColor = 'rgba(0, 0, 0, 0.5)'
         this.context.shadowBlur = 4
         this.context.shadowOffsetX = 2
         this.context.shadowOffsetY = 2
-        
-        // Draw text
         this.context.fillText(text, this.canvas.width / 2, this.canvas.height / 2)
-        
-        // Create texture from canvas
-        const texture = new THREE.CanvasTexture(this.canvas)
+
+        const snapshot = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height)
+        const pixels = new Uint8Array(snapshot.data)
+        const texture = new THREE.DataTexture(pixels, this.canvas.width, this.canvas.height, THREE.RGBAFormat)
         texture.needsUpdate = true
-        
         return texture
     }
 
