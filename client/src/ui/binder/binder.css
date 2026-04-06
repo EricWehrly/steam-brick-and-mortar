@@ -747,6 +747,17 @@
     margin-bottom: 20px;
 }
 
+.detail-section {
+    border-bottom: 1px solid #333;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+}
+
+.detail-section--last {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
 .detail-section-label {
     font-size: 13px;
     color: #888;

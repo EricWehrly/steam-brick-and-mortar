@@ -486,10 +486,10 @@ describe('InstancedShelfRenderer', () => {
             const z1 = calcRowZ(1)
             const z2 = calcRowZ(2)
 
-            // Pair gap should be visibly tighter than normal row spacing
-            expect(Math.abs(z1 - z0)).toBeCloseTo(1.4, 2)
+            // Pair gap should be the configured back-to-back spacing (2.0m)
+            expect(Math.abs(z1 - z0)).toBeCloseTo(2.0, 2)
             // Gap to next pair is larger (normal spacing plus pair-compression carryover)
-            expect(Math.abs(z2 - z1)).toBeCloseTo(4.6, 2)
+            expect(Math.abs(z2 - z1)).toBeCloseTo(4.0, 2)
         })
     })
 })

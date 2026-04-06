@@ -42,24 +42,18 @@ Sorting/filtering is explicitly "right at the edge of Phase 1" — defer to earl
 
 ## Remaining work (ordered)
 
-### 1. Verify & fix game spawning on shelves (6.2.2.1) 🔴 IMMEDIATE
-*Can't show anyone until games visually sit on shelves correctly.*
+### 1. ~~Verify & fix game spawning on shelves (6.2.2.1)~~ ✅ VERIFIED
 
-- [ ] Confirm full event chain fires end-to-end: batch → shelf → games placed
-- [ ] Games appear at correct positions relative to shelf geometry
-- [ ] No obvious overlaps or clipping through shelf boards
-- [ ] At least 18 games/shelf (3 per surface × 6 surfaces) renders correctly
-
-**Acceptance**: Walk through the store, games visible on shelves, artwork loading on them.
+> Owner-verified 2026-04-05: Game spawning is working. Prior to rotation implementation, `Verify & fix game spawning on shelves` is confirmed done. All items in this section considered complete.
 
 ### 2. Shelf-in-room layout (6.1 + 6.2.1) 🔴 PILLAR 1
 *The store needs to feel like a store.*
 
-- [ ] Shelves are arranged in an intentional layout (rows, navigable aisles)
-- [ ] Confirm or implement alternating shelf rotation (15° offset)
+- [x] Entrance/spawn position confirmed good (review again after VR, not before)
+- [x] Alternating shelf rotation wired — visual verification in progress
+- [ ] Shelves arranged in intentional layout with navigable aisles (spacing tuning needed)
 - [ ] Room size scales reasonably for typical library (100–800 games)
 - [ ] Layout is configurable (row count / spacing) even if we ship with one preset
-- [ ] Entrance/spawn position feels correct
 
 **Acceptance**: Standing at spawn, the scene reads as a store.
 
