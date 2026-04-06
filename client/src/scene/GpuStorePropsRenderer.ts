@@ -93,6 +93,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private categorySignSystem: CategorySignSystem
     private placedCategoryLabels: Set<string> = new Set()
     /**
+     * First batch index observed for each category label during progressive placement.
+     * Used to anchor section signs at exact group boundaries (not a shelf-count proxy).
+     */
+    private firstBatchIndexByLabel: Map<string, number> = new Map()
+    /**
      * Accumulates all games across batches for post-load category sign placement.
      * Reset on each progressive load cycle.
      */
@@ -234,19 +239,14 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         const groups = this.categoryAssigner.assign(this.allGamesAccumulated)
 
-        // Map genre label → first shelf position in batch order
-        // shelfPositions[batchIndex] gives the anchor for each batch
-        // We need to find the first batch whose games belong to each group.
-        // Build a lookup: game appid → batchIndex
-        // Simpler: iterate groups in order; for each group find the first
-        // shelfPosition that served at least one game of that genre.
-        // Since we don't yet have per-batch genre maps, use group ordering
-        // (largest group → shelf 0, next → where it starts, etc.) as a proxy.
-        let shelfOffset = 0
+        // Map genre label → exact first batch index observed during placement.
+        // This anchors signs at real group boundaries instead of estimated shelf offsets.
         for (const group of groups) {
-            const shelvesNeeded = Math.ceil(group.games.length / (18)) // ~18 games/shelf
-            const anchorIndex = Math.min(shelfOffset, this.shelfPositions.length - 1)
-            const anchorPos = this.shelfPositions[anchorIndex]
+            const firstBatchIndex = this.firstBatchIndexByLabel.get(group.label)
+            if (firstBatchIndex === undefined) {
+                continue
+            }
+            const anchorPos = this.shelfPositions[firstBatchIndex]
             if (anchorPos) {
                 this.categorySignSystem.setSign({
                     label: group.label,
@@ -255,7 +255,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 })
                 this.placedCategoryLabels.add(group.label)
             }
-            shelfOffset += shelvesNeeded
         }
 
         GpuStorePropsRenderer.logger.debug(
@@ -275,6 +274,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
         this.placedCategoryLabels.clear()
+        this.firstBatchIndexByLabel.clear()
         this.allGamesAccumulated = []
         this.clearExistingShelves()
 
@@ -409,13 +409,21 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.createInstancedShelf(shelfPosition, rowIndex, shelfIndex)
         this.cumulativeShelfCount++
 
-        if (shelfLabel && !this.placedCategoryLabels.has(shelfLabel)) {
-            this.categorySignSystem.setSign({
-                label: shelfLabel,
-                anchorPosition: shelfPosition,
-                mount: { style: 'above-shelf', yOffset: 2.2 }
-            })
-            this.placedCategoryLabels.add(shelfLabel)
+        if (shelfLabel) {
+            // Track exact first batch index for this label
+            if (!this.firstBatchIndexByLabel.has(shelfLabel)) {
+                this.firstBatchIndexByLabel.set(shelfLabel, batchIndex)
+            }
+
+            // Provisional sign while batches stream in; replaced by final exact signs on completion
+            if (!this.placedCategoryLabels.has(shelfLabel)) {
+                this.categorySignSystem.setSign({
+                    label: shelfLabel,
+                    anchorPosition: shelfPosition,
+                    mount: { style: 'above-shelf', yOffset: 2.2 }
+                })
+                this.placedCategoryLabels.add(shelfLabel)
+            }
         }
 
         // Emit ShelfCreated event for GameBoxSpawner to place games
@@ -553,6 +561,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.clearExistingShelves()
         this.categorySignSystem.clearAll()
         this.placedCategoryLabels.clear()
+        this.firstBatchIndexByLabel.clear()
         
         while (this.propsGroup.children.length > 0) {
             const child = this.propsGroup.children[0]
