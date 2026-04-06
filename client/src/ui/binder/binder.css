@@ -744,7 +744,7 @@
 }
 
 .detail-artwork {
-    margin-bottom: 20px;
+    /* margin handled by .detail-section */
 }
 
 .detail-section {
@@ -756,6 +756,12 @@
 .detail-section--last {
     border-bottom: none;
     margin-bottom: 0;
+}
+
+/* Action buttons don't need a divider below them — the stats section provides enough visual separation */
+.detail-section--no-border {
+    border-bottom: none;
+    padding-bottom: 0;
 }
 
 .detail-section-label {

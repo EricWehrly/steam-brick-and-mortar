@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GpuStorePropsRenderer
  * 
  * ROLE: High-level coordinator for GPU-instanced store rendering.
@@ -356,7 +356,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 batchIndex: batchIndex,
                 rowIndex,
                 shelfIndex,
-                shelfRotationY: rowIndex % 2 === 1 ? Math.PI : 0,
+                // Combined angle: row-flip + herringbone toe-out (matches createInstancedShelf)
+                shelfRotationY: (rowIndex % 2 === 1 ? Math.PI : 0) +
+                    ((shelfIndex % 2 === 0 ? -1 : 1) * (this.SHELF_TOE_DEGREES * Math.PI) / 180),
                 bounds: { ...this.shelfBounds },
                 status: BatchProcessingStatus.ShelfCreated,
                 lastModified: Date.now()
@@ -434,6 +436,13 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         }
     }
 
+    /**
+     * Herringbone toe-out angle in degrees.
+     * Adjacent shelves in a row toe away from each other by this amount,
+     * widening the passable gap at their ends. Stacks on top of the 180deg row flip.
+     */
+    private readonly SHELF_TOE_DEGREES: number = 20
+
     private createInstancedShelf(
         position: THREE.Vector3,
         rowIndex: number,
@@ -441,14 +450,23 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     ): void {
         const globalShelfIndex = rowIndex * this.maxShelvesPerRow + shelfIndex
 
-        // Odd rows face the opposite direction — creates natural back-to-back aisle pairs
-        // like a real store, with browsing on both sides of the aisle.
-        const rotation = rowIndex % 2 === 1
-            ? new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0))
-            : undefined
+        // Base: odd rows flip 180deg to face the opposite direction (back-to-back aisle pairs)
+        const baseAngle = rowIndex % 2 === 1 ? Math.PI : 0
 
-        // DEBUG: log per-shelf placement for visual/playwright diagnosis
-        // TODO: remove once rotation is confirmed working in scene
+        // Herringbone toe-out: alternate shelves within each row angle away from each other.
+        // Even-position shelves toe left (negative), odd-position toe right (positive).
+        // This opens up the end-cap gap so the aisle is passable at the corners.
+        const toeRad = (this.SHELF_TOE_DEGREES * Math.PI) / 180
+        const toeAngle = shelfIndex % 2 === 0 ? -toeRad : toeRad
+
+        const rotation = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(0, baseAngle + toeAngle, 0)
+        )
+
+        // DEBUG: log per-shelf placement
+        // TODO: remove once confirmed working — creates natural back-to-back aisle pairs
+        // like a real store, with browsing on both sides of the aisle.
+
         console.debug(
             `[SHELF-DEBUG] shelf ${globalShelfIndex} row=${rowIndex} col=${shelfIndex} ` +
             `pos=(${position.x.toFixed(2)},${position.y.toFixed(2)},${position.z.toFixed(2)}) ` +
