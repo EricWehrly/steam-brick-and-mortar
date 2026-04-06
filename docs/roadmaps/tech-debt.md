@@ -481,3 +481,32 @@ class Foo {
 
 ---
 
+
+---
+
+## Intake Queue (2026-04-05 additions)
+
+### Memory budget monitoring
+**Priority**: High (as soon as we have cycles)
+**Context**: No current way to compare estimated VRAM/RAM usage (GpuMemoryEstimator) against actual measured usage. Need Playwright to report actual memory usage figures and a watch target we periodically check.
+**Next steps**:
+- Wire GpuMemoryEstimator output into the Debug UI tab (already noted elsewhere, but cross-ref here)
+- Add Playwright page.metrics() or performance.memory reporting to the visual test suite
+- Set soft budget watch targets (e.g. JS heap < 500MB) that emit warnings in CI/visual test output
+
+### Frame time monitoring
+**Priority**: High (as soon as we have cycles)
+**Context**: Frame time (ms) should be tracked as a routine health metric alongside tests.
+**Next steps**:
+- Collect rAF delta averages during Playwright startup test
+- Write to test-results/perf-report.json alongside console-report.json
+- Set soft watch target (e.g. avg < 16ms at startup settle time)
+
+### Linter baseline pass + CI integration
+**Priority**: High (end of Phase 1 / Phase 2 prep)
+**Context**: Linter is currently not a routine check. Before Phase 2, we want a clean lint baseline and automated enforcement.
+**Next steps**:
+- Run `yarn lint` (or `npx eslint src`), triage all current errors/warnings
+- Suppress or fix anything not worth fixing now (with explicit comments)
+- Once baseline is clean, add lint step to the same run as unit tests
+- Enforce: lint must be clean for PR merge going forward
