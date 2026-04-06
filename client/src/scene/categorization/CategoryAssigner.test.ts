@@ -67,4 +67,22 @@ describe('CategoryAssigner', () => {
         expect(result[0].genre).toBe('Action')
         expect(result[1].genre).toBe('Other')
     })
+
+    it('should produce at most one "Other" group regardless of input shape', () => {
+        // Regression: multiple batches of genre-less games must not produce multiple Other groups
+        const gamesNoGenre: Partial<SteamGameData>[] = Array.from({ length: 40 }, (_, i) => ({
+            appid: i + 1,
+            name: `Game ${i + 1}`,
+            // no genres field at all
+        }))
+        const gamesWithGenre: Partial<SteamGameData>[] = [
+            { appid: 100, name: 'Action Game', genres: [{ id: '1', description: 'Action' }] },
+        ]
+
+        const result = assigner.assign([...gamesNoGenre, ...gamesWithGenre] as SteamGameData[])
+        const otherGroups = result.filter(g => g.genre === 'Other')
+
+        expect(otherGroups).toHaveLength(1)
+        expect(result[result.length - 1].genre).toBe('Other')
+    })
 })

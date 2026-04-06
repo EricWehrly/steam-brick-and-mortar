@@ -410,13 +410,15 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.cumulativeShelfCount++
 
         if (shelfLabel) {
-            // Track exact first batch index for this label
+            // Track exact first batch index for this label (used for final sign anchoring)
             if (!this.firstBatchIndexByLabel.has(shelfLabel)) {
                 this.firstBatchIndexByLabel.set(shelfLabel, batchIndex)
             }
 
-            // Provisional sign while batches stream in; replaced by final exact signs on completion
-            if (!this.placedCategoryLabels.has(shelfLabel)) {
+            // Only place provisional signs for real genre labels (not 'Other').
+            // 'Other' is valid only after CategoryAssigner runs over the full library
+            // at load completion — streaming batches may have empty genres transiently.
+            if (shelfLabel !== 'Other' && !this.placedCategoryLabels.has(shelfLabel)) {
                 this.categorySignSystem.setSign({
                     label: shelfLabel,
                     anchorPosition: shelfPosition,
