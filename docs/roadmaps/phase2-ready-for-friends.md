@@ -584,6 +584,11 @@
   - **Priority**: Low / nice-to-have (late Phase 2)
   - **Dependencies**: Prop/scene update loop hook
 
+- **Poster Walls from User Media**: Optional wall posters sourced from user-owned public screenshots/artwork where available
+  - **Context**: Atmosphere + personalization; could rotate featured images by category/zone
+  - **Priority**: Low / nice-to-have (late Phase 2)
+  - **Dependencies**: rights/privacy review, API/source reliability, fallback poster pack
+
 #### Story 6.1.3: Wall/Ceiling Texture Visual Polish 🔮 **POST-PHASE-1 CAPSTONE**
 **Context**: Wall and ceiling textures need a second pass before showing to friends. Currently in place but design quality needs improvement. Sequenced after Phase 1 proper work is complete — important for first impressions, but not imperative for core functionality.
 

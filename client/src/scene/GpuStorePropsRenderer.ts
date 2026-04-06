@@ -30,6 +30,7 @@ import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 import { VRLayoutUtils } from './props/SharedPropsUtils'
+import { RoomConstants } from './RoomManager'
 
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
@@ -75,6 +76,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     // Pre-calculated shelf positions (computed once when total shelf count known)
     private shelfPositions: THREE.Vector3[] = []
     private readonly maxShelvesPerRow: number = 4
+    /**
+     * Distance between rows that face each other (back-to-back aisle pair).
+     * Smaller than full row spacing to make alternating-row rotation visually obvious.
+     */
+    private readonly backToBackRowSpacingZ: number = 1.4
 
     private progressiveInitializationPromise: Promise<void> | null = null
     private setupPhaseInitialized: boolean = false
@@ -241,7 +247,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             
             const shelfSpacing = VRLayoutUtils.calculateOptimalShelfSpacing(this.maxShelvesPerRow)
             const startX = -(this.maxShelvesPerRow - 1) * shelfSpacing / 2
-            const rowZ = VRLayoutUtils.calculateOptimalRowPosition(row)
+            const rowZ = this.calculateShelfRowZ(row)
             
             const position = new THREE.Vector3(
                 startX + (shelfInRow * shelfSpacing),
@@ -255,6 +261,18 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.calculateShelfBoundsAndLayout(totalShelves)
     }
     
+    private calculateShelfRowZ(row: number): number {
+        const normalRowZ = VRLayoutUtils.calculateOptimalRowPosition(row)
+
+        // Odd rows are rotated 180° and should sit closer to previous even row
+        // to create back-to-back aisle pairs (instead of uniformly marching rows).
+        if (row % 2 === 1) {
+            return normalRowZ + (RoomConstants.SHELF_SPACING_Z - this.backToBackRowSpacingZ)
+        }
+
+        return normalRowZ
+    }
+
     private calculateShelfBoundsAndLayout(totalShelves: number): void {
         const shelfWidth = 2.0
         const shelfDepth = 1.0
