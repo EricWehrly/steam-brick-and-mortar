@@ -9,6 +9,7 @@
  */
 
 import { SteamApiClient, type SteamGame, type SteamUser, type SteamResolveResponse } from '../steam'
+import { DEMO_STEAM_USER } from '../steam/fixtures/demo-games'
 import { ValidationUtils } from '../utils'
 import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
@@ -355,16 +356,23 @@ export class SteamIntegration {
      */
     
     private async handleGameStart(): Promise<void> {
+        const cachedUsers = this.getCachedUsers()
+
+        // Dev/test fallback: load demo games when no cached user exists, regardless of
+        // autoLoadProfile (which defaults false and won't be set in a fresh test env)
+        if (cachedUsers.length === 0 && AppSettings.get('developmentMode')) {
+            SteamIntegration.logger.info('No cached user — loading demo store for dev/test')
+            await this.loadDemoGames()
+            return
+        }
+
         if (!AppSettings.get('autoLoadProfile')) {
             SteamIntegration.logger.debug('Auto-load disabled')
             return
         }
         
-        const cachedUsers = this.getCachedUsers()
         if (cachedUsers.length === 0) {
             SteamIntegration.logger.warn('⚠️ Auto-load enabled but no Steam profiles cached yet - user must load a profile first')
-
-            // TODO: UI indication?
             return
         }
         
@@ -374,6 +382,43 @@ export class SteamIntegration {
         this.eventManager.emit<SteamLoadFromCacheEvent>(SteamEventTypes.LoadFromCache, {
             userInput: user.vanityUrl
         })
+    }
+
+    /**
+     * Load hardcoded demo games for dev/test environments.
+     * Emits games directly into the batch pipeline — no network calls.
+     */
+    private async loadDemoGames(): Promise<void> {
+        try {
+            const demoUser = DEMO_STEAM_USER
+            const games = demoUser.games as SteamGame[]
+            const BATCH_SIZE = 18
+            const totalBatches = Math.ceil(games.length / BATCH_SIZE)
+
+            this.gameLibrary.setUserData(demoUser)
+
+            // Emit games directly as batch events — no Steam API network calls.
+            // Strip artwork so game boxes render as text labels immediately, without
+            // waiting for CDN fetches that will CORS-fail in test/anonymous contexts.
+            for (let i = 0; i < totalBatches; i++) {
+                const batchGames = games.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE).map(g => ({
+                    ...g,
+                    artwork: undefined
+                }))
+                EventManager.getInstance().emit<SteamGamesBatchEvent>(
+                    SteamEventTypes.GamesBatchReady,
+                    { games: batchGames, batchIndex: i, totalBatches }
+                )
+                if (i < totalBatches - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 0))
+                }
+            }
+
+            this.storeSteamDataAndEmitEvent('demo-user')
+            SteamIntegration.logger.info(`Demo store loaded: ${games.length} games in ${totalBatches} batches`)
+        } catch (error) {
+            SteamIntegration.logger.error('Failed to load demo games:', error)
+        }
     }
     
     private async handleLoadGames(event: CustomEvent<SteamLoadGamesEvent>): Promise<void> {

@@ -1,0 +1,18 @@
+/**
+ * UI Design Tokens
+ * Global CSS custom properties for the project's dark video-store aesthetic.
+ * Import this file first in main.css so tokens are available everywhere.
+ */
+
+:root {
+  --panel-bg: rgba(0, 0, 0, 0.85);
+  --panel-border: #333;
+  --panel-border-radius: 8px;
+  --panel-header-bg: rgba(40, 40, 40, 0.9);
+  --panel-text: #ddd;
+  --panel-text-muted: #888;
+  --panel-accent: #5599dd;
+  --panel-transition: 0.3s ease;
+  --panel-font: Arial, sans-serif;
+  --panel-font-size: 13px;
+}

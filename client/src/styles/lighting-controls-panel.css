@@ -18,11 +18,11 @@
     min-height: auto;
     flex: 0 0 auto;
     align-self: flex-end;
-    background: rgba(0, 0, 0, 0.85);
-    border: 2px solid #333;
-    border-radius: 8px;
-    color: white;
-    font-family: Arial, sans-serif;
+    background: var(--panel-bg);
+    border: 2px solid var(--panel-border);
+    border-radius: var(--panel-border-radius);
+    color: var(--panel-text);
+    font-family: var(--panel-font);
     z-index: 1000;
     overflow: hidden;
     display: flex;
@@ -44,7 +44,7 @@
 
 .lighting-controls-panel .clickable-header {
     padding: 8px 12px;
-    background: rgba(40, 40, 40, 0.9);
+    background: var(--panel-header-bg);
     border-bottom: 1px solid #555;
     display: flex;
     justify-content: space-between;
@@ -138,14 +138,14 @@
 }
 
 .lighting-controls-panel .control-label {
-    font-size: 13px;
+    font-size: var(--panel-font-size);
     user-select: none;
 }
 
 .lighting-controls-panel .light-info {
     margin-left: auto;
     font-size: 11px;
-    color: #888;
+    color: var(--panel-text-muted);
 }
 
 .lighting-controls-panel .light-group {
