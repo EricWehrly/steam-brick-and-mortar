@@ -356,9 +356,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 batchIndex: batchIndex,
                 rowIndex,
                 shelfIndex,
-                // Combined angle: row-flip + herringbone toe-out (matches createInstancedShelf)
+                // Combined angle: row-flip + row-uniform toe-out (matches createInstancedShelf)
                 shelfRotationY: (rowIndex % 2 === 1 ? Math.PI : 0) +
-                    ((shelfIndex % 2 === 0 ? -1 : 1) * (this.SHELF_TOE_DEGREES * Math.PI) / 180),
+                    ((rowIndex % 2 === 0 ? 1 : -1) * (this.SHELF_TOE_DEGREES * Math.PI) / 180),
                 bounds: { ...this.shelfBounds },
                 status: BatchProcessingStatus.ShelfCreated,
                 lastModified: Date.now()
@@ -453,11 +453,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Base: odd rows flip 180deg to face the opposite direction (back-to-back aisle pairs)
         const baseAngle = rowIndex % 2 === 1 ? Math.PI : 0
 
-        // Herringbone toe-out: alternate shelves within each row angle away from each other.
-        // Even-position shelves toe left (negative), odd-position toe right (positive).
-        // This opens up the end-cap gap so the aisle is passable at the corners.
+        // Row-uniform toe: all shelves in a row share the same toe direction.
+        // Even rows toe right (+), odd rows toe left (-), so paired rows angle toward each other
+        // creating a consistent angled-aisle effect (like //// and \\\\ rows).
         const toeRad = (this.SHELF_TOE_DEGREES * Math.PI) / 180
-        const toeAngle = shelfIndex % 2 === 0 ? -toeRad : toeRad
+        const toeAngle = rowIndex % 2 === 0 ? toeRad : -toeRad
 
         const rotation = new THREE.Quaternion().setFromEuler(
             new THREE.Euler(0, baseAngle + toeAngle, 0)

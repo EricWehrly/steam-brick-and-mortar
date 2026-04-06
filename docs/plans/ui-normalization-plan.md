@@ -131,6 +131,15 @@ Write findings to `docs/plans/steam-tag-research.md`.
 
 ---
 
+---
+
+## Phase F — UX Polish Items (deferred, not blocking normalization)
+
+### F1. Scroll-to-top anchors
+For any scrollable panel content that extends 300%+ of the visible panel height, add a "scroll to top" anchor/button. Design it so adding a "scroll to bottom" later is trivial (same component, different direction). Low priority — implement when panels have substantial content.
+
+---
+
 ## Done criteria
 - [ ] `docs/ui-design-tokens.md` committed
 - [ ] All buttons, checkboxes, panels use shared components
