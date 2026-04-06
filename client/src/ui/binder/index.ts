@@ -3,3 +3,4 @@
  */
 
 export { GameLibraryBinderUI } from './GameLibraryBinderUI'
+export { BinderGameDetailPanel } from './BinderGameDetailPanel'
