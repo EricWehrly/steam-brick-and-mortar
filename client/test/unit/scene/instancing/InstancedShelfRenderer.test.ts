@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
 import { InstancedShelfRenderer, type InstancedShelfConfig } from '../../../../src/scene/instancing/InstancedShelfRenderer'
+import { GpuStorePropsRenderer } from '../../../../src/scene/GpuStorePropsRenderer'
 import type { ShelfConfig } from '../../../../src/scene/props/SharedPropsUtils'
 import { SharedMaterialManager, MaterialType } from '../../../../src/utils/SharedMaterialManager'
 import { DataManager } from '../../../../src/core/data/DataManager'
@@ -23,6 +24,8 @@ vi.mock('../../../../src/utils/SharedMaterialManager')
 vi.mock('../../../../src/core/data/DataManager')
 vi.mock('../../../../src/core/EventManager')
 vi.mock('../../../../src/utils/SystemCapabilities')
+vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer')
+vi.mock('../../../../src/scene/spawning/GameBoxSpawner')
 
 describe('InstancedShelfRenderer', () => {
     let renderer: InstancedShelfRenderer
@@ -473,4 +476,21 @@ describe('InstancedShelfRenderer', () => {
             expect(renderer.getStats().activeInstances).toBe(5)
         })
     })
+    describe('Aisle pairing row spacing', () => {
+        it('should place odd rows closer to previous even row to form back-to-back pairs', () => {
+            const scene = new THREE.Scene()
+            const gpuRenderer = new GpuStorePropsRenderer(scene)
+
+            const calcRowZ = (gpuRenderer as any).calculateShelfRowZ.bind(gpuRenderer) as (row: number) => number
+            const z0 = calcRowZ(0)
+            const z1 = calcRowZ(1)
+            const z2 = calcRowZ(2)
+
+            // Pair gap should be visibly tighter than normal row spacing
+            expect(Math.abs(z1 - z0)).toBeCloseTo(1.4, 2)
+            // Gap to next pair is larger (normal spacing plus pair-compression carryover)
+            expect(Math.abs(z2 - z1)).toBeCloseTo(4.6, 2)
+        })
+    })
 })
+
