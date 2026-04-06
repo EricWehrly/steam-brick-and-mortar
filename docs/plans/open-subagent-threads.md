@@ -60,3 +60,18 @@ Create `client/src/ui/FeaturePriorityConfig.ts`:
 **Notes**: DataManager changes are significant — do those on a fresh branch when ready. Other singletons can be lighter touches.
 
 ---
+
+### Thread: Visual Materials Planning (design-only)
+**Status**: Queued (when cycles open)  
+**Goal**: Produce implementation-ready plans (not code) for:
+- popcorn ceiling texture
+- wood paneling texture
+
+**Model preference order (design pass only)**:
+1. gemini-pro
+2. opus
+3. sonnet
+
+**Constraint**: output should be simple-model implementation plans to minimize iterative turns.
+
+---
