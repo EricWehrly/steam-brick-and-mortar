@@ -224,15 +224,15 @@ export class SharedMaterialManager {
         const [diffuseBitmap, normalBitmap] = await Promise.all([
             worker.generate('ceiling_popcorn', {
                 width: 512, height: 512,
-                color: '#E8E6D0', bumpDensity: 14, bumpHeight: 1.4, detailScale: 5,
+                color: '#E8E6D0', bumpDensity: 40, bumpHeight: 1.4, detailScale: 5,
             }),
             worker.generate('ceiling_popcorn_normal', {
                 width: 512, height: 512,
-                bumpDensity: 14, detailScale: 5, strength: 20,
+                bumpDensity: 40, detailScale: 5, strength: 40,
             }),
         ])
-        const diffuse = this.bitmapToTexture(diffuseBitmap, 6, 6)
-        const normal  = this.bitmapToTexture(normalBitmap, 6, 6)
+        const diffuse = this.bitmapToTexture(diffuseBitmap, 10, 10)
+        const normal  = this.bitmapToTexture(normalBitmap, 10, 10)
 
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.Ceiling,
