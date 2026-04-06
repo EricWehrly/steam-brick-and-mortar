@@ -294,12 +294,14 @@ export class SteamApiClient {
         steamUser: SteamUser,
         options: {
             maxGames?: number
+            /** Optional comparator to override default playtime-descending sort. */
+            sortFn?: (a: SteamGame, b: SteamGame) => number
         } = {}
     ): Promise<SteamGame[]> {
-        const { maxGames = 10 } = options
+        const { maxGames = 10, sortFn } = options
         const BATCH_SIZE = 18 // One shelf's worth
         
-        const sortedGames = this.sortAndLimitGames(steamUser.games, maxGames)
+        const sortedGames = this.sortAndLimitGames(steamUser.games, maxGames, sortFn)
         const appids = sortedGames.map(g => g.appid)
         
         const { cachedAppids, uncachedAppids, cachedAppDetails } = await this.partitionByCache(appids)
@@ -331,9 +333,10 @@ export class SteamApiClient {
         return results
     }
 
-    private sortAndLimitGames(games: SteamGame[], maxGames: number): SteamGame[] {
+    private sortAndLimitGames(games: SteamGame[], maxGames: number, sortFn?: (a: SteamGame, b: SteamGame) => number): SteamGame[] {
+        const comparator = sortFn ?? ((a: SteamGame, b: SteamGame) => (b.playtime_forever ?? 0) - (a.playtime_forever ?? 0))
         return [...games]
-            .sort((a, b) => (b.playtime_forever ?? 0) - (a.playtime_forever ?? 0))
+            .sort(comparator)
             .slice(0, maxGames)
     }
 
