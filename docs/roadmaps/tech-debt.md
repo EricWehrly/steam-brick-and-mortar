@@ -12,6 +12,13 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
+### UI: Formalize z-index layering system
+**Priority**: Very Low  
+**Effort**: 1-2 hours  
+**Context**: Currently z-index values are scattered and ad-hoc (binder: 1500, detail panel fixed to 2000 to sit above it). We've hit at least one "panel behind another" bug already. When the UI system grows (VR overlay layers, spatial UI etc.) this will bite us more. The right fix: define named z-index layers as CSS custom properties or JS constants (e.g. `--z-base`, `--z-panel`, `--z-overlay`, `--z-modal`) reserved in blocks of 100. Low priority until it causes more than one incident per quarter.  
+**Tags**: none (not yet worth tagging source files)  
+**Source**: Apr 2026
+
 ### Architecture: Review `LegacyStorePropsHandler` value and future
 **Priority**: Low  
 **Effort**: 2-4 hours (investigation + decision)  
