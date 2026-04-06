@@ -57,13 +57,9 @@ Sorting/filtering is explicitly "right at the edge of Phase 1" — defer to earl
 
 **Acceptance**: Standing at spawn, the scene reads as a store.
 
-### 3. Steam categorization data (6.5 prerequisite) 🔴 PILLAR 2 PREREQUISITE
-*Before we can shelve by category, we need to know what categories we have.*
+### 3. Steam categorization data (6.5 prerequisite) ✅ DATA ALREADY IN HAND
 
-- [ ] Research / confirm which Steam API endpoints give us usable category data
-  - See `docs/steam-categorization-research.md` for prior findings
-- [ ] Pull and cache categories alongside game library data
-- [ ] Data shape defined so shelf-layout code can consume it
+> **Confirmed 2026-04-05**: `genres` and `categories` are already fetched and cached in `SteamGameMetadata`. No new API calls needed. The work is purely building a `CategoryAssigner` and wiring it to the shelf renderer.
 
 ### 4. Category-based shelf grouping (6.5) 🔴 PILLAR 2
 *Groups of shelves correspond to Steam categories, with visible labels.*
