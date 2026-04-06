@@ -87,7 +87,7 @@ export class GameBoxSpawner {
      * Retrieves pending games and places them on the shelf
      */
     private handleShelfCreated(event: CustomEvent<ShelfCreatedEvent>): void {
-        const { position, batchIndex } = event.detail
+        const { position, batchIndex, rowIndex = 0, shelfIndex = 0, shelfRotationY = 0 } = event.detail
         
         GameBoxSpawner.logger.debug(
             `[EVENT PATH] ShelfCreated received for batch ${batchIndex + 1}. ` +
@@ -108,7 +108,7 @@ export class GameBoxSpawner {
         }
         
         // Spawn games using event-driven path
-        this.spawnGamesOnShelf(position, games, 0, 0)
+        this.spawnGamesOnShelf(position, games, rowIndex, shelfIndex, shelfRotationY)
         
         // Clean up pending games
         this.pendingGames.delete(batchIndex)
@@ -135,10 +135,11 @@ export class GameBoxSpawner {
      * @param shelfIndex - Shelf index within row (for debugging)
      */
     spawnGamesOnShelf(
-        shelfPosition: THREE.Vector3, 
-        games: readonly SteamGameData[], 
-        _rowIndex: number, 
-        _shelfIndex: number
+        shelfPosition: THREE.Vector3,
+        games: readonly SteamGameData[],
+        _rowIndex: number,
+        _shelfIndex: number,
+        shelfRotationY: number = 0
     ): void {
         // Get shelf surface configuration using shared utility (GPU path: hardcoded surfaces)
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
@@ -154,7 +155,7 @@ export class GameBoxSpawner {
             
             const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
             if (frontGames.length > 0) {
-                this.createGameBoxes(shelfPosition, surface, frontGames, ShelfSide.Front)
+                this.createGameBoxes(shelfPosition, surface, frontGames, ShelfSide.Front, shelfRotationY)
                 gameIndex += frontGames.length
             }
             
@@ -164,7 +165,7 @@ export class GameBoxSpawner {
                 // are differentiated, gate this on shelf.isWallMounted or similar.
                 const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
                 if (backGames.length > 0) {
-                    this.createGameBoxes(shelfPosition, surface, backGames, ShelfSide.Back)
+                    this.createGameBoxes(shelfPosition, surface, backGames, ShelfSide.Back, shelfRotationY)
                     gameIndex += backGames.length
                 }
             }
@@ -176,9 +177,10 @@ export class GameBoxSpawner {
      */
     private createGameBoxes(
         shelfPosition: THREE.Vector3,
-        surface: ShelfSurface, 
-        games: readonly SteamGameData[], 
-        side: ShelfSide
+        surface: ShelfSurface,
+        games: readonly SteamGameData[],
+        side: ShelfSide,
+        shelfRotationY: number
     ): void {
         if (!this.gameBoxRenderer) {
             GameBoxSpawner.logger.warn('GameBoxRenderer unavailable while creating game boxes')
@@ -187,15 +189,16 @@ export class GameBoxSpawner {
 
         const boxDimensions = this.gameBoxRenderer.getDimensions()
         const gamePositions = GameBoxUtils.calculateGamePositions(
-            shelfPosition, 
-            surface, 
+            shelfPosition,
+            surface,
             games as SteamGameData[], // Cast readonly to mutable for legacy utility
-            side, 
-            boxDimensions
+            side,
+            boxDimensions,
+            shelfRotationY
         )
         
         for (let i = 0; i < games.length; i++) {
-            this.createSingleGameBox(games[i], gamePositions[i], side, i)
+            this.createSingleGameBox(games[i], gamePositions[i], side, i, shelfRotationY)
         }
     }
     
@@ -203,15 +206,20 @@ export class GameBoxSpawner {
      * Create a single game box at the specified position
      */
     private createSingleGameBox(
-        game: SteamGameData, 
-        worldPosition: THREE.Vector3, 
+        game: SteamGameData,
+        worldPosition: THREE.Vector3,
         side: ShelfSide,
-        _index: number
+        _index: number,
+        shelfRotationY: number
     ): void {
         if (!this.gameBoxRenderer) {
             GameBoxSpawner.logger.warn('GameBoxRenderer unavailable while creating a game box')
             return
         }
-        this.gameBoxRenderer.createGameBoxAuto(game, worldPosition, side)
+        const effectiveSide = shelfRotationY === Math.PI
+            ? (side === ShelfSide.Front ? ShelfSide.Back : ShelfSide.Front)
+            : side
+
+        this.gameBoxRenderer.createGameBoxAuto(game, worldPosition, effectiveSide)
     }
 }

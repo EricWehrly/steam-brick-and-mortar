@@ -136,6 +136,42 @@ describe('SharedPropsUtils - Game Positioning Fixes', () => {
             }
         })
 
+        it('should rotate game positions with shelfRotationY=Math.PI', () => {
+            const shelfPosition = new THREE.Vector3(10, 0, -5)
+            const surface: ShelfSurface = {
+                topY: 1.0,
+                frontZ: -0.2,
+                backZ: 0.2,
+                centerX: 0,
+                width: 2.0
+            }
+
+            const unrotated = GameBoxUtils.calculateGamePositions(
+                shelfPosition,
+                surface,
+                [mockGames[0]],
+                ShelfSide.Front,
+                TEST_BOX_DIMENSIONS,
+                0
+            )
+
+            const rotated = GameBoxUtils.calculateGamePositions(
+                shelfPosition,
+                surface,
+                [mockGames[0]],
+                ShelfSide.Front,
+                TEST_BOX_DIMENSIONS,
+                Math.PI
+            )
+
+            // 180° Y rotation around shelf origin should mirror local X and Z offsets.
+            // For centered single-game case localX=0 => X unchanged; Z offset flips sign.
+            expect(rotated[0].x).toBeCloseTo(unrotated[0].x, 3)
+            const unrotatedOffsetZ = unrotated[0].z - shelfPosition.z
+            const rotatedOffsetZ = rotated[0].z - shelfPosition.z
+            expect(rotatedOffsetZ).toBeCloseTo(-unrotatedOffsetZ, 3)
+        })
+
         it('should center games correctly on narrow and wide shelves', () => {
             const shelfPosition = new THREE.Vector3(0, 0, 0)
             

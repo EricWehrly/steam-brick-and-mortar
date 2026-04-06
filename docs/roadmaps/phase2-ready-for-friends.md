@@ -15,6 +15,11 @@
 
 **Entry Criteria**: Phase 1 complete - all imagined functionality demonstrated with personal demo capability
 
+**VR Gate (2026-04-05)**:
+- Treat Phase 2 as **desktop/flatscreen-first** by default.
+- Defer VR-specific interaction implementation until after Phase 2 core stability milestones (network hardening, caching, UI normalization baseline, and input architecture groundwork) are in place.
+- Permit VR work in Phase 2 only as gated spikes or low-risk compatibility checks, not as the primary delivery track.
+
 ---
 
 ## Feature 5.3: Menu Keyboard Navigation System 🔮
@@ -563,6 +568,21 @@
   - **Deferral Reason**: Should wait until after first batch of "Ready for Friends" infrastructure items are complete
 
 ### Visual Effects & Immersion
+
+- **Architectural Columns & Decorative Variants**: Add optional in-room decorative columns (including Roman/Corinthian style variants)
+  - **Context**: Atmosphere and theme support; can break up long wall runs and frame aisles
+  - **Priority**: Low / nice-to-have (late Phase 2)
+  - **Dependencies**: Stable room/layout baseline
+
+- **Waist-Height Counter Area**: Add a service counter/check-out zone near front-of-store
+  - **Context**: Strong video-store vibe anchor; helps orient player in space
+  - **Priority**: Low / nice-to-have (late Phase 2)
+  - **Dependencies**: Room zoning/layout pass
+
+- **Working Analog Wall Clock**: In-world analog clock prop with real-time hand movement
+  - **Context**: Ambient polish detail; should be inexpensive and highly thematic
+  - **Priority**: Low / nice-to-have (late Phase 2)
+  - **Dependencies**: Prop/scene update loop hook
 
 #### Story 6.1.3: Wall/Ceiling Texture Visual Polish 🔮 **POST-PHASE-1 CAPSTONE**
 **Context**: Wall and ceiling textures need a second pass before showing to friends. Currently in place but design quality needs improvement. Sequenced after Phase 1 proper work is complete — important for first impressions, but not imperative for core functionality.
