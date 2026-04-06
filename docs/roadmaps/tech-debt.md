@@ -510,3 +510,9 @@ class Foo {
 - Suppress or fix anything not worth fixing now (with explicit comments)
 - Once baseline is clean, add lint step to the same run as unit tests
 - Enforce: lint must be clean for PR merge going forward
+
+### UI: Compare SignageRenderer DataTexture approach with InstancedLabelRenderer
+**Priority**: Low
+**Context**: Signs now use DataTexture pixel snapshots. InstancedLabelRenderer uses a texture array approach. Worth reviewing if one can serve both, or if the approaches should stay separate for different use cases (sign = large static label, game box = dense small label). Revisit during UI normalization or when sign rendering needs improving.
+**Source**: Apr 2026
+

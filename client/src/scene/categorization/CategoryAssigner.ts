@@ -20,6 +20,32 @@ export const KNOWN_GENRES: ReadonlyArray<string> = [
 
 const GENRE_LOOKUP: ReadonlyMap<string, string> = new Map(KNOWN_GENRES.map(g => [g.toLowerCase(), g]))
 
+/**
+ * Sort comparator for genre-first, playtime-second ordering.
+ * Games with recognised genres are grouped together; within each genre,
+ * sorted by playtime descending. Games with no recognised genre sort last.
+ *
+ * Safe to use as the sortFn option in SteamApiClient.loadGamesProgressively.
+ */
+export function genrePlaytimeSortFn(
+    a: { genres?: Array<{ description: string }>, playtime_forever?: number },
+    b: { genres?: Array<{ description: string }>, playtime_forever?: number }
+): number {
+    const genreA = a.genres?.[0]?.description ? (GENRE_LOOKUP.get(a.genres[0].description.toLowerCase()) ?? 'Other') : 'Other'
+    const genreB = b.genres?.[0]?.description ? (GENRE_LOOKUP.get(b.genres[0].description.toLowerCase()) ?? 'Other') : 'Other'
+
+    if (genreA === 'Other' && genreB !== 'Other') return 1
+    if (genreB === 'Other' && genreA !== 'Other') return -1
+
+    if (genreA === genreB) {
+        return (b.playtime_forever ?? 0) - (a.playtime_forever ?? 0)
+    }
+
+    const idxA = KNOWN_GENRES.indexOf(genreA)
+    const idxB = KNOWN_GENRES.indexOf(genreB)
+    return idxA - idxB
+}
+
 export class CategoryAssigner {
     private static readonly logger = Logger.createLogFunctions(CategoryAssigner.name)
 
@@ -51,7 +77,7 @@ export class CategoryAssigner {
         }
 
         if (noGenreCount > 0) {
-            CategoryAssigner.logger.warn(`[CAT-DEBUG] ${noGenreCount}/${games.length} games had no recognised genre — landed in "Other".`)
+            CategoryAssigner.logger.warn(`[CAT-DEBUG] ${noGenreCount}/${games.length} games had no recognised genre ï¿½ landed in "Other".`)
         }
 
         const shelfGroups: ShelfGroup[] = Array.from(groupsMap.entries()).map(([genre, groupGames]) => ({
