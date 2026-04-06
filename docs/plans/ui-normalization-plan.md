@@ -109,6 +109,28 @@ Convert one checkbox.
 
 ---
 
+## Phase E — Steam-style Tag Components
+
+**Goal**: Game categories/genres display as Steam-style tag pills, not plain text.
+
+Steam's store uses compact, rounded-corner tag boxes with a subtle background tint on genre/feature labels. We want to match this visual language in the detail panel.
+
+### Research task (subagent)
+Before implementation, probe the current Steam store page for an existing game and note:
+- Tag box CSS: background color, border-radius, font-size, padding, font-weight, hover state
+- Whether Steam uses a single class or multiple (genre vs. feature tags look similar but may differ slightly)
+- Any color-coding by category type
+
+Write findings to `docs/plans/steam-tag-research.md`.
+
+### Implementation (after research)
+- Create `UITag.ts` + `ui-tag.css` as a component (tokens-based)
+- Replace current `.detail-tag` styles in `binder.css` with the component
+- Wire into `BinderGameDetailPanel` — genres and categories both use it
+- This component also feeds the future in-world shelf category label system
+
+---
+
 ## Done criteria
 - [ ] `docs/ui-design-tokens.md` committed
 - [ ] All buttons, checkboxes, panels use shared components
