@@ -151,6 +151,18 @@ export class InstancedMeshManager {
         return true
     }
     
+    public setInstanceColor(index: number, color: THREE.Color): boolean {
+        if (!this.instancedMesh) return false
+        if (index >= this.maxInstances) return false
+        // Ensure instanceColor buffer is allocated on first use
+        if (!this.instancedMesh.instanceColor) {
+            this.instancedMesh.setColorAt(index, color)
+        } else {
+            this.instancedMesh.setColorAt(index, color)
+        }
+        return true
+    }
+
     public updateGPU(): void {
         if (!this.instancedMesh) {
             return
@@ -158,6 +170,9 @@ export class InstancedMeshManager {
         
         // Update instance matrices
         this.instancedMesh.instanceMatrix.needsUpdate = true
+        if (this.instancedMesh.instanceColor) {
+            this.instancedMesh.instanceColor.needsUpdate = true
+        }
         
         // Update instance count
         this.instancedMesh.count = this.currentCount
