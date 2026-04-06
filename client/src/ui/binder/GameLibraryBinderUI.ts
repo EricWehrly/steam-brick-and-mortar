@@ -193,6 +193,9 @@ export class GameLibraryBinderUI {
         
         this.state.isOpen = false
         this.state.selectedGame = null
+        this.detailPanel.hide()
+        // Safety: also remove by id in case panel was opened via external path
+        document.getElementById('binder-detail-panel')?.remove()
 
         this.resumeRendering()
         this.eventManager.emit<InputResumeEvent>(InputEventTypes.Resume, { reason: 'menu' })
