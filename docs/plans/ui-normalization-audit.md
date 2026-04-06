@@ -9,7 +9,7 @@ This audit covers the current state of the UI in the Steam Brick and Mortar clie
 |-----------|-------|--------------|-------------------|
 | **LightingControlsPanel** | `LightingControlsPanel.ts`, `lighting-controls-panel.css` | External CSS + Inline (visibility) | Uses a mix of specific classes and general selectors. Some hardcoded hex/rgba. |
 | **PerformanceMonitorUI** | `PerformanceMonitor.ts` | **Inline Only** | Highly inconsistent with the rest of the app. Hardcoded colors like `#00ff00`, `#ffff00`, `#ff0000`. |
-| **ToastManager** | `ToastManager.ts`, `toast.css` | External CSS | Relatively clean, but uses hardcoded colors in CSS. |
+| **ToastManager** | `ToastManager.ts`, `toast.css` | External CSS | Relatively clean, but uses hardcoded colors in CSS. Leave as-is until later in Phase 2 — may be shut off entirely alongside other UI cleanup. Lowest priority. |
 | **PauseMenu** | `PauseMenuManager.ts`, `PauseMenuPanel.ts`, `shared-components.css` | External CSS (Shared) | The most "normalized" part of the app, but still has hardcoded values in the shared CSS. |
 | **GraphicsSettingsPanel** | `GraphicsSettingsPanel.ts`, `graphics-settings-panel.css` | External CSS + Template | Uses `UIComponentUtils` for setup, which helps consistency but still relies on hardcoded CSS values. |
 | **CacheManagementUI** | `CacheManagementUI.ts`, `cache-management-ui.css` | External CSS | Marked as @deprecated but still contains logic. Uses its own set of styles. |
@@ -41,7 +41,17 @@ This audit covers the current state of the UI in the Steam Brick and Mortar clie
 4. **Scrolling**: `overflow-y: auto` is applied per-component with different scrollbar handling (or lack thereof).
 5. **Transitions**: Panel expansion in `LightingControlsPanel` uses `1.3s`, while the rest of the UI uses `0.2s`.
 
-## Immediate Recommendations
+## Panels Needing Normalization
+
+All of the following need attention — not just `GraphicsSettingsPanel` and the cache panel:
+- All **Pause Menu panels** (tabs + the overall menu container)
+- `LightingControlsPanel`
+- `CacheManagementUI` (deprecated but still live)
+- `GraphicsSettingsPanel`
+- `PerformanceMonitorUI` (highest inconsistency — inline-only styles)
+- `StartupProgressUI`
+- Binder + BinderGameDetailPanel (touched this session, partially normalized)
+
 - Unify `PerformanceMonitorUI` to use CSS classes instead of inline styles.
 - Standardize the "Steam Blue" into a single set of palette tokens.
 - Create a shared `UIPanel` class/CSS to wrap these disparate control containers.

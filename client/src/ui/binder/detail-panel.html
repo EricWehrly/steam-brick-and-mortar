@@ -5,13 +5,13 @@
 </div>
 
 <div class="detail-content">
-    <div class="detail-actions">
+    <div class="detail-actions detail-section">
         <a href="steam://run/{{appid}}" class="detail-btn play">▶ Play</a>
         <button id="detail-spotlight-btn" class="detail-btn spotlight">🔦 Spotlight</button>
         <a href="https://store.steampowered.com/app/{{appid}}" target="_blank" class="detail-btn store">🌐 Store Page</a>
     </div>
 
-    <div class="detail-stats">
+    <div class="detail-stats detail-section">
         <div class="detail-stat">
             <div class="detail-stat-label">Total Playtime</div>
             <div class="detail-stat-value playtime">{{playtimeHours}} hours</div>
@@ -23,9 +23,11 @@
         </div>
     </div>
 
-    {{categoriesBlock}}
+    <div class="detail-categories-wrapper detail-section">
+        {{categoriesBlock}}
+    </div>
 
-    <div class="detail-artwork">
+    <div class="detail-artwork detail-section">
         <div class="detail-section-label">Artwork</div>
         <div class="detail-artwork-grid">
             <div class="detail-artwork-item">
@@ -39,7 +41,7 @@
         </div>
     </div>
 
-    <div class="detail-json">
+    <div class="detail-json detail-section detail-section--last">
         <div class="detail-section-label">Cache Entry (JSON)</div>
         <pre class="detail-json-content">{{jsonBlob}}</pre>
     </div>

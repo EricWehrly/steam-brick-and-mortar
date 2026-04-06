@@ -77,10 +77,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private shelfPositions: THREE.Vector3[] = []
     private readonly maxShelvesPerRow: number = 4
     /**
-     * Distance between rows that face each other (back-to-back aisle pair).
-     * Smaller than full row spacing to make alternating-row rotation visually obvious.
+     * Pair gap: center-to-center distance between the two rows in a back-to-back aisle pair.
+     * ~2m gives a comfortable browsing aisle when shelf depth is ~1m.
+     * Inter-pair gap uses normal SHELF_SPACING_Z (3m).
      */
-    private readonly backToBackRowSpacingZ: number = 1.4
+    private readonly backToBackRowSpacingZ: number = 2.0
 
     private progressiveInitializationPromise: Promise<void> | null = null
     private setupPhaseInitialized: boolean = false
