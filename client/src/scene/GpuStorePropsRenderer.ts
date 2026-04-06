@@ -441,7 +441,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
      * Adjacent shelves in a row toe away from each other by this amount,
      * widening the passable gap at their ends. Stacks on top of the 180deg row flip.
      */
-    private readonly SHELF_TOE_DEGREES: number = 20
+    /** Shelf toe-out angle in degrees. 0 = straight rows. Wired for future layout patterns. */
+    private readonly SHELF_TOE_DEGREES: number = 0
 
     private createInstancedShelf(
         position: THREE.Vector3,
