@@ -22,6 +22,8 @@
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "type-check": "tsc --noEmit",
     "test:visual": "playwright test --config playwright.config.ts",
+    "test:visual:lighting-shot": "playwright test --config playwright.config.ts --grep \"lighting controls panel\"",
+    "test:visual:perf": "playwright test --config playwright.config.ts --grep \"console log report\" && node scripts/append-perf-history.cjs",
     "test:visual:docker": "docker compose -f ../docker-compose.yml run --rm playwright"
   },
   "devDependencies": {

@@ -1,4 +1,5 @@
 import type { SteamGameData } from '../game-box/types/GameData'
+import { Logger } from '../../utils/Logger'
 
 export interface ShelfGroup {
     genre: string        // e.g. "Action", "RPG", "Other"
@@ -6,7 +7,38 @@ export interface ShelfGroup {
     games: SteamGameData[]
 }
 
+/**
+ * TD: remove once categories bug is resolved.
+ * Hard-coded set of recognized genre names used for debug validation.
+ * Any game whose primary genre is not in this set triggers a warning.
+ */
+const RECOGNIZED_GENRES: ReadonlySet<string> = new Set([
+    'Action',
+    'Adventure',
+    'RPG',
+    'Strategy',
+    'Simulation',
+    'Sports',
+    'Racing',
+    'Casual',
+    'Indie',
+    'Massively Multiplayer',
+    'Free to Play',
+    'Early Access',
+    'Puzzle',
+    'Platformer',
+    'Shooter',
+    'Horror',
+    'Stealth',
+    'Fighting',
+    'Survival',
+    'Anime',
+    'Other',
+])
+
 export class CategoryAssigner {
+    private static readonly logger = Logger.createLogFunctions(CategoryAssigner.name)
+
     /**
      * Assigns games to groups based on their primary genre.
      * 
@@ -22,17 +54,36 @@ export class CategoryAssigner {
         }
 
         const groupsMap = new Map<string, SteamGameData[]>()
-        const otherGroupName = "Other"
+        const otherGroupName = 'Other'
+        let noGenreCount = 0
 
         for (const game of games) {
-            const genre = (game.genres && game.genres.length > 0) 
-                ? game.genres[0].description 
-                : otherGroupName
-            
+            let genre: string
+            if (game.genres && game.genres.length > 0) {
+                genre = game.genres[0].description
+                // TD: remove — debug only; warns when a genre isn't in our recognized list
+                if (!RECOGNIZED_GENRES.has(genre)) {
+                    CategoryAssigner.logger.warn(
+                        `[CAT-DEBUG] Unrecognized genre "${genre}" for "${game.name}" (appid ${game.appid})`
+                    )
+                }
+            } else {
+                genre = otherGroupName
+                noGenreCount++
+            }
+
             if (!groupsMap.has(genre)) {
                 groupsMap.set(genre, [])
             }
             groupsMap.get(genre)!.push(game)
+        }
+
+        // TD: remove — debug summary
+        if (noGenreCount > 0) {
+            CategoryAssigner.logger.warn(
+                `[CAT-DEBUG] ${noGenreCount}/${games.length} games had NO genre data — landed in "Other". ` +
+                `Check buildEnhancedGame / normalizeBatchData paths.`
+            )
         }
 
         const shelfGroups: ShelfGroup[] = Array.from(groupsMap.entries()).map(([genre, groupGames]) => ({
@@ -45,7 +96,6 @@ export class CategoryAssigner {
         shelfGroups.sort((a, b) => {
             if (a.genre === otherGroupName) return 1
             if (b.genre === otherGroupName) return -1
-            
             return b.games.length - a.games.length
         })
 
