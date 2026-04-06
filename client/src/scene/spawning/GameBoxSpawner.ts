@@ -68,13 +68,17 @@ export class GameBoxSpawner {
         
         // Store games pending shelf creation
         this.pendingGames.set(batchIndex, games)
-        
+
+        // Determine a provisional label from primary genre for shelf signage
+        const shelfLabel = this.determinePrimaryGenreLabel(games)
+
         // Emit ShelfSpaceRequested event
         EventManager.getInstance().emit<ShelfSpaceRequestedEvent>(
             StorePropsEventTypes.ShelfSpaceRequested,
             {
                 gamesCount: games.length,
                 batchIndex: batchIndex,
+                shelfLabel,
                 status: BatchProcessingStatus.ShelfRequested,
                 lastModified: Date.now()
             }
@@ -82,6 +86,24 @@ export class GameBoxSpawner {
         GameBoxSpawner.logger.debug(`Emitted ShelfSpaceRequested for batch ${batchIndex + 1}`)
     }
     
+    private determinePrimaryGenreLabel(games: ReadonlyArray<SteamGameData>): string {
+        const counts = new Map<string, number>()
+        for (const game of games) {
+            const genre = game.genres?.[0]?.description ?? 'Other'
+            counts.set(genre, (counts.get(genre) ?? 0) + 1)
+        }
+
+        let bestGenre = 'Other'
+        let bestCount = -1
+        for (const [genre, count] of counts) {
+            if (count > bestCount) {
+                bestGenre = genre
+                bestCount = count
+            }
+        }
+        return bestGenre
+    }
+
     /**
      * Handle ShelfCreated event
      * Retrieves pending games and places them on the shelf

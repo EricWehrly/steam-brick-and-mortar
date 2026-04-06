@@ -277,6 +277,8 @@ export interface BatchReadyForPlacementEvent extends BaseInteractionEvent {
 export interface ShelfSpaceRequestedEvent extends BaseInteractionEvent {
     gamesCount: number
     batchIndex: number
+    /** Optional display label for the shelf section (e.g. primary genre) */
+    shelfLabel?: string
     status?: BatchProcessingStatus
     lastModified?: number
 }
