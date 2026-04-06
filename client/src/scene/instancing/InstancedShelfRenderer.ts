@@ -444,6 +444,11 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         _config: Required<ShelfConfig>,
         unitRotation?: THREE.Quaternion
     ): ShelfUnitInstance {
+        // DEBUG: tint odd-indexed shelf units red on angled boards so rotation is visually verifiable
+        // TODO: remove once rotation is confirmed working in scene
+        const debugTintColor = shelfUnitIndex % 2 === 1
+            ? new THREE.Color(1, 0.15, 0.15)   // red tint → rotated rows
+            : new THREE.Color(1, 1, 1)           // white → normal rows
         const instanceIndices = {
             angledBoards: [] as number[],
             sideBoards: [] as number[],
@@ -489,6 +494,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
                 ? (part.rotation ? unitRotation.clone().multiply(part.rotation) : unitRotation.clone())
                 : part.rotation
             manager.setInstanceMatrix(instanceIndex, worldPos, finalRotation, part.scale)
+            // Apply debug tint to angled boards to visually distinguish alternating rows
+            if (part.type === ShelfGeometryType.AngledBoard) {
+                manager.setInstanceColor(instanceIndex, debugTintColor)
+            }
             
             if (part.customAttributes) {
                 for (const attr of part.customAttributes) {
