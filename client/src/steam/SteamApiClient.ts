@@ -252,9 +252,13 @@ export class SteamApiClient {
      * Build enhanced SteamGame object from base game + app details
      */
     private buildEnhancedGame(game: SteamGame, appDetails: AppDetailsData | undefined): SteamGame {
-        const headerUrl = appDetails?.artwork?.header 
-            || appDetails?.artwork?.capsule_v5 
-            || appDetails?.artwork?.capsule
+        // Normalize cached + fetched metadata the same way so nested full_data fields
+        // (genres/categories/etc.) are consistently available during batch labeling.
+        const normalized = appDetails ? this.normalizeBatchData(appDetails) : undefined
+
+        const headerUrl = normalized?.artwork?.header 
+            || normalized?.artwork?.capsule_v5 
+            || normalized?.artwork?.capsule
             || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
 
         return {
@@ -269,13 +273,13 @@ export class SteamApiClient {
                 header: headerUrl,
                 library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
             },
-            categories: appDetails?.categories,
-            genres: appDetails?.genres,
-            developers: appDetails?.developers,
-            publishers: appDetails?.publishers,
-            release_date: appDetails?.release_date,
-            metacritic: appDetails?.metacritic,
-            short_description: appDetails?.short_description
+            categories: normalized?.categories,
+            genres: normalized?.genres,
+            developers: normalized?.developers,
+            publishers: normalized?.publishers,
+            release_date: normalized?.release_date,
+            metacritic: normalized?.metacritic,
+            short_description: normalized?.short_description
         }
     }
 
