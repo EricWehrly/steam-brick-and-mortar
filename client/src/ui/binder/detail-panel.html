@@ -1,0 +1,46 @@
+<div class="detail-header" style="background-image: url('{{headerUrl}}');">
+    <div class="detail-header-gradient"></div>
+    <button id="detail-close-btn" class="detail-close-btn">✕</button>
+    <h2 class="detail-title">{{gameName}}</h2>
+</div>
+
+<div class="detail-content">
+    <div class="detail-actions">
+        <a href="steam://run/{{appid}}" class="detail-btn play">▶ Play</a>
+        <button id="detail-spotlight-btn" class="detail-btn spotlight">🔦 Spotlight</button>
+        <a href="https://store.steampowered.com/app/{{appid}}" target="_blank" class="detail-btn store">🌐 Store Page</a>
+    </div>
+
+    <div class="detail-stats">
+        <div class="detail-stat">
+            <div class="detail-stat-label">Total Playtime</div>
+            <div class="detail-stat-value playtime">{{playtimeHours}} hours</div>
+        </div>
+        {{playtime2WeeksBlock}}
+        <div class="detail-stat">
+            <div class="detail-stat-label">App ID</div>
+            <div class="detail-stat-value">{{appid}}</div>
+        </div>
+    </div>
+
+    {{categoriesBlock}}
+
+    <div class="detail-artwork">
+        <div class="detail-section-label">Artwork</div>
+        <div class="detail-artwork-grid">
+            <div class="detail-artwork-item">
+                <div class="detail-artwork-label">Header</div>
+                <img src="{{headerUrl}}" class="detail-artwork-img" onerror="this.style.display='none'">
+            </div>
+            <div class="detail-artwork-item library">
+                <div class="detail-artwork-label">Library</div>
+                <img src="{{libraryUrl}}" class="detail-artwork-img" onerror="this.src=''; this.style.background='#333'; this.style.aspectRatio='2/3';">
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-json">
+        <div class="detail-section-label">Cache Entry (JSON)</div>
+        <pre class="detail-json-content">{{jsonBlob}}</pre>
+    </div>
+</div>

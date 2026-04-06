@@ -197,8 +197,6 @@ export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
 export interface GameSelectedEvent extends BaseInteractionEvent {
     /** App ID of the selected game */
     appid: number | string
-    /** Display name, if known */
-    name?: string
 }
 
 // =============================================================================

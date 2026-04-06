@@ -20,10 +20,12 @@ const mockGame: SteamGameData = {
         { id: '2', description: 'Free to Play' }
     ],
     categories: [
-        { id: '1', description: 'Multi-player' },
-        { id: '22', description: 'Steam Achievements' }
+        { id: 1, description: 'Multi-player' },
+        { id: 22, description: 'Steam Achievements' }
     ],
     artwork: {
+        icon: '',
+        logo: '',
         header: 'https://example.com/header.jpg',
         library: 'https://example.com/library.jpg'
     }
