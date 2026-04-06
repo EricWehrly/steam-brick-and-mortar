@@ -50,6 +50,7 @@ import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
+import { CategorySignSystem } from './CategorySignSystem'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private static readonly logger = Logger.createLogFunctions(GpuStorePropsRenderer.name)
@@ -87,6 +88,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private setupPhaseInitialized: boolean = false
     private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
     private gameBoxSpawner?: GameBoxSpawner
+    private categorySignSystem: CategorySignSystem
 
     constructor(scene: THREE.Scene) {
         this.scene = scene
@@ -100,6 +102,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props-instanced'
         this.scene.add(this.propsGroup)
+
+        this.categorySignSystem = new CategorySignSystem(this.scene)
 
         this.setupEventListeners()
     }
@@ -187,7 +191,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private async handleShelfSpaceRequested(event: CustomEvent<ShelfSpaceRequestedEvent>): Promise<void> {
-        const { batchIndex } = event.detail
+        const { batchIndex, shelfLabel } = event.detail
 
         // Guard against same-tick event races: placement work starts only after init is complete.
         if (this.progressiveInitializationPromise) {
@@ -196,7 +200,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         // Create shelf for the requested batch
         const shelfMonitor = PerformanceMonitor.start('shelf-creation', GpuStorePropsRenderer.logger)
-        await this.createShelfForBatchIndex(batchIndex)
+        await this.createShelfForBatchIndex(batchIndex, shelfLabel)
         shelfMonitor.end({ batchIndex })
     }
 
@@ -313,7 +317,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.preallocateShelfPositions(batchIndex + 1)
     }
     
-    private async createShelfForBatchIndex(batchIndex: number): Promise<void> {
+    private async createShelfForBatchIndex(batchIndex: number, shelfLabel?: string): Promise<void> {
         const isReady = this.instancedShelfRenderer?.isReady()
         if (!isReady) {
             console.error(`❌ InstancedShelfRenderer not ready for batch ${batchIndex + 1}!`)
@@ -347,6 +351,14 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Create shelf without games (GameBoxSpawner will place them)
         this.createInstancedShelf(shelfPosition, rowIndex, shelfIndex)
         this.cumulativeShelfCount++
+
+        if (shelfLabel) {
+            this.categorySignSystem.setSign({
+                label: shelfLabel,
+                anchorPosition: shelfPosition,
+                mount: { style: 'above-shelf', yOffset: 2.2 }
+            })
+        }
 
         // Emit ShelfCreated event for GameBoxSpawner to place games
         EventManager.getInstance().emit<ShelfCreatedEvent>(
@@ -437,11 +449,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     /**
-     * Herringbone toe-out angle in degrees.
-     * Adjacent shelves in a row toe away from each other by this amount,
-     * widening the passable gap at their ends. Stacks on top of the 180deg row flip.
+     * Shelf toe-out angle in degrees. 0 = straight rows.
+     * Kept plumbed for future layout patterns.
      */
-    /** Shelf toe-out angle in degrees. 0 = straight rows. Wired for future layout patterns. */
     private readonly SHELF_TOE_DEGREES: number = 0
 
     private createInstancedShelf(
@@ -465,13 +475,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         )
 
         // DEBUG: log per-shelf placement
-        // TODO: remove once confirmed working — creates natural back-to-back aisle pairs
-        // like a real store, with browsing on both sides of the aisle.
-
+        // TODO: remove once confirmed working
+        const rotY = baseAngle + toeAngle
         console.debug(
             `[SHELF-DEBUG] shelf ${globalShelfIndex} row=${rowIndex} col=${shelfIndex} ` +
             `pos=(${position.x.toFixed(2)},${position.y.toFixed(2)},${position.z.toFixed(2)}) ` +
-            `rotY=${rotation ? 'PI' : '0'}`
+            `rotY=${rotY.toFixed(2)}rad`
         )
 
         this.instancedShelfRenderer.setInstance(globalShelfIndex, {
@@ -484,6 +493,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     public clearProps(): void {
         this.clearExistingShelves()
+        this.categorySignSystem.clearAll()
         
         while (this.propsGroup.children.length > 0) {
             const child = this.propsGroup.children[0]
@@ -509,7 +519,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.gameBoxRenderer = null
         
         this.instancedShelfRenderer?.dispose()
-        
+        this.categorySignSystem.dispose()
+
         this.scene.remove(this.propsGroup)
         
         console.info('GpuStorePropsRenderer disposed')
