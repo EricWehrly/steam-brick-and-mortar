@@ -12,6 +12,7 @@ import type { SteamGameData } from '../../scene/game-box/types/GameData'
 import { InputEventTypes, GameEventTypes } from '../../types/InteractionEvents'
 import type { InputPauseEvent, InputResumeEvent, GameSelectedEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
+import { BinderGameDetailPanel } from './BinderGameDetailPanel'
 import './binder.css'
 
 const GAMES_PER_PAGE = 4
@@ -47,6 +48,7 @@ export class GameLibraryBinderUI {
     private eventManager: EventManager
     private dataManager: DataManager
     private keyboardHandler: ((e: KeyboardEvent) => void) | null = null
+    private readonly detailPanel = new BinderGameDetailPanel()
     
     private constructor() {
         this.eventManager = EventManager.getInstance()
@@ -491,10 +493,7 @@ export class GameLibraryBinderUI {
      */
     private closeDetailPanel(): void {
         this.state.selectedGame = null
-        const panel = document.getElementById('binder-detail-panel')
-        if (panel) {
-            panel.remove()
-        }
+        this.detailPanel.hide()
     }
     
     /**
@@ -502,121 +501,15 @@ export class GameLibraryBinderUI {
      */
     private renderDetailPanel(): void {
         const game = this.state.selectedGame
-        if (!game || !this.container) return
-        
-        // Remove existing panel if any
-        const existing = document.getElementById('binder-detail-panel')
-        if (existing) existing.remove()
-        
-        const headerUrl = game.artwork?.header || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
-        const libraryUrl = game.artwork?.library || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
-        const playtimeHours = Math.round((game.playtime_forever || 0) / 60)
-        const playtime2Weeks = Math.round((game.playtime_2weeks || 0) / 60)
+        if (!game) return
 
-        // Build categories/genres block
-        const genres = game.genres?.map(g => g.description) ?? []
-        const steamCategories = game.categories?.map(c => c.description) ?? []
-        const categoriesHtml = genres.length > 0 || steamCategories.length > 0 ? `
-            <div class="detail-categories">
-                <div class="detail-section-label">Categories</div>
-                ${genres.length > 0 ? `
-                <div class="detail-category-group">
-                    <span class="detail-category-label">Genres</span>
-                    <div class="detail-tags">${genres.map(g => `<span class="detail-tag">${this.escapeHtml(g)}</span>`).join('')}</div>
-                </div>` : ''}
-                ${steamCategories.length > 0 ? `
-                <div class="detail-category-group">
-                    <span class="detail-category-label">Features</span>
-                    <div class="detail-tags">${steamCategories.map(c => `<span class="detail-tag">${this.escapeHtml(c)}</span>`).join('')}</div>
-                </div>` : ''}
-            </div>
-        ` : ''
-        
-        // Create a sanitized JSON blob for display
-        const jsonBlob = JSON.stringify(game, null, 2)
-
-        const panel = document.createElement('div')
-        panel.id = 'binder-detail-panel'
-        panel.className = 'detail-panel'
-        
-        panel.innerHTML = `
-            <div class="detail-header" style="background-image: url('${headerUrl}');">
-                <div class="detail-header-gradient"></div>
-                <button id="detail-close-btn" class="detail-close-btn">✕</button>
-                <h2 class="detail-title">${this.escapeHtml(game.name)}</h2>
-            </div>
-
-            <div class="detail-content">
-                <div class="detail-actions">
-                    <a href="steam://run/${game.appid}" class="detail-btn play">▶ Play</a>
-                    <button id="detail-spotlight-btn" class="detail-btn spotlight">🔦 Spotlight</button>
-                    <a href="https://store.steampowered.com/app/${game.appid}" target="_blank" class="detail-btn store">🌐 Store Page</a>
-                </div>
-
-                <div class="detail-stats">
-                    <div class="detail-stat">
-                        <div class="detail-stat-label">Total Playtime</div>
-                        <div class="detail-stat-value playtime">${playtimeHours} hours</div>
-                    </div>
-                    ${playtime2Weeks > 0 ? `
-                    <div class="detail-stat">
-                        <div class="detail-stat-label">Last 2 Weeks</div>
-                        <div class="detail-stat-value recent">${playtime2Weeks} hours</div>
-                    </div>
-                    ` : ''}
-                    <div class="detail-stat">
-                        <div class="detail-stat-label">App ID</div>
-                        <div class="detail-stat-value">${game.appid}</div>
-                    </div>
-                </div>
-
-                ${categoriesHtml}
-
-                <div class="detail-artwork">
-                    <div class="detail-section-label">Artwork</div>
-                    <div class="detail-artwork-grid">
-                        <div class="detail-artwork-item">
-                            <div class="detail-artwork-label">Header</div>
-                            <img src="${headerUrl}" class="detail-artwork-img" onerror="this.style.display='none'">
-                        </div>
-                        <div class="detail-artwork-item library">
-                            <div class="detail-artwork-label">Library</div>
-                            <img src="${libraryUrl}" class="detail-artwork-img" onerror="this.src=''; this.style.background='#333'; this.style.aspectRatio='2/3';">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="detail-json">
-                    <div class="detail-section-label">Cache Entry (JSON)</div>
-                    <pre class="detail-json-content">${this.escapeHtml(jsonBlob)}</pre>
-                </div>
-            </div>
-        `
-        
-        this.container.appendChild(panel)
-        
-        // Add close button listener
-        const closeBtn = document.getElementById('detail-close-btn')
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.closeDetailPanel())
-        }
-        
-        // Close on ESC
-        const escHandler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                this.closeDetailPanel()
-                document.removeEventListener('keydown', escHandler)
-            }
-        }
-        document.addEventListener('keydown', escHandler)
-        
-        // Close when clicking outside
-        panel.addEventListener('click', (e) => {
-            if (e.target === panel) {
-                this.closeDetailPanel()
+        this.detailPanel.show(game, {
+            onClose: () => {
+                this.state.selectedGame = null
             }
         })
     }
+    
     
     /**
      * Escape HTML to prevent XSS
@@ -626,7 +519,7 @@ export class GameLibraryBinderUI {
         div.textContent = text
         return div.innerHTML
     }
-    
+
     /**
      * Dispose of the binder UI
      */
@@ -640,6 +533,7 @@ export class GameLibraryBinderUI {
             this.onGameSelected
         )
 
+        this.detailPanel.hide()
         this.container?.remove()
         this.toggleButton?.remove()
 
