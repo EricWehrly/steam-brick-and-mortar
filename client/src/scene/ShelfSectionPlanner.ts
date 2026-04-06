@@ -80,6 +80,10 @@ export class ShelfSectionPlanner {
         const batchSize = 18
 
         for (const group of groups) {
+            // Skip 'Other' — it's a catch-all for tools/servers without a proper genre.
+            // Small groups also tend to cluster at the same anchor shelf as Other,
+            // and a section sign for 'Other' adds noise without useful navigation value.
+            if (group.label === 'Other') { gameOffset += group.games.length; continue }
             const anchorIndex = Math.min(
                 Math.floor(gameOffset / batchSize),
                 shelfPositions.length - 1
