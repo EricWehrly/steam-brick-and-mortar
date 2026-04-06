@@ -24,6 +24,7 @@ const RECOGNIZED_GENRES: ReadonlySet<string> = new Set([
     'Indie',
     'Massively Multiplayer',
     'Free to Play',
+    'Free To Play',   // Steam uses both casings
     'Early Access',
     'Puzzle',
     'Platformer',
