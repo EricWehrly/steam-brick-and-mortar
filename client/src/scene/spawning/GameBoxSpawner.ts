@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { ShelfSurfaceUtils, type ShelfSurface, ShelfSide, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
+import { CategoryAssigner } from '../categorization/CategoryAssigner'
 import { EventManager } from '../../core/EventManager'
 import { 
     BatchProcessingStatus,
@@ -32,6 +33,7 @@ export class GameBoxSpawner {
     
     // Track pending games waiting for shelf creation
     private pendingGames: Map<number, readonly SteamGameData[]> = new Map()
+    private readonly categoryAssigner = new CategoryAssigner()
     
     constructor(gameBoxRenderer?: GpuGameBoxRenderer) {
         this.gameBoxRenderer = gameBoxRenderer
@@ -87,21 +89,10 @@ export class GameBoxSpawner {
     }
     
     private determinePrimaryGenreLabel(games: ReadonlyArray<SteamGameData>): string {
-        const counts = new Map<string, number>()
-        for (const game of games) {
-            const genre = game.genres?.[0]?.description ?? 'Other'
-            counts.set(genre, (counts.get(genre) ?? 0) + 1)
-        }
-
-        let bestGenre = 'Other'
-        let bestCount = -1
-        for (const [genre, count] of counts) {
-            if (count > bestCount) {
-                bestGenre = genre
-                bestCount = count
-            }
-        }
-        return bestGenre
+        const groups = this.categoryAssigner.assign([...games])
+        // Prefer first non-Other group; fall back to Other
+        const firstNonOther = groups.find(g => g.genre !== 'Other')
+        return firstNonOther?.label ?? 'Other'
     }
 
     /**

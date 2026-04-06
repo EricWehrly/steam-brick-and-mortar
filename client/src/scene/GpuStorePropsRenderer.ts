@@ -89,6 +89,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
     private gameBoxSpawner?: GameBoxSpawner
     private categorySignSystem: CategorySignSystem
+    private placedCategoryLabels: Set<string> = new Set()
 
     constructor(scene: THREE.Scene) {
         this.scene = scene
@@ -219,8 +220,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
+        this.placedCategoryLabels.clear()
         this.clearExistingShelves()
-        
+
         this.preallocateShelfPositions(totalBatches)
     }
     
@@ -352,12 +354,13 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.createInstancedShelf(shelfPosition, rowIndex, shelfIndex)
         this.cumulativeShelfCount++
 
-        if (shelfLabel) {
+        if (shelfLabel && !this.placedCategoryLabels.has(shelfLabel)) {
             this.categorySignSystem.setSign({
                 label: shelfLabel,
                 anchorPosition: shelfPosition,
                 mount: { style: 'above-shelf', yOffset: 2.2 }
             })
+            this.placedCategoryLabels.add(shelfLabel)
         }
 
         // Emit ShelfCreated event for GameBoxSpawner to place games
@@ -494,6 +497,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     public clearProps(): void {
         this.clearExistingShelves()
         this.categorySignSystem.clearAll()
+        this.placedCategoryLabels.clear()
         
         while (this.propsGroup.children.length > 0) {
             const child = this.propsGroup.children[0]
