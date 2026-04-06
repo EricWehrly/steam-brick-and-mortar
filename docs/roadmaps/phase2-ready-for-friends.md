@@ -426,6 +426,21 @@
 ## Milestone 8.5: Interactive Scene Controls 🔮
 *Goal: In-world interactive elements that enhance immersion and usability*
 
+### Feature 8.5.0: Lighting Presets / Atmospheres
+**Context**: Lighting system currently has quality levels but no distinct *mood* presets. Different atmospheres should have first-class support.
+
+**Requested presets** (owner-specified, keep separate from additional suggestions):
+- **Flat / Wolfenstein-mode**: Uniform ambient, no dynamic lights — like the pre-dynamic-lights era of the codebase. Fast, nostalgic, great fallback.
+- **Blacklight room**: UV-style ambient with glowing accent colors. Pairs naturally with the planned basement room variant.
+
+**Additional lighting atmosphere ideas** (brainstorm, subject to review):
+- **Golden hour / warm close**: Warm directional from low angle, long shadows — cozy evening feel
+- **Neon city**: Deep dark ambient, colored point lights (magenta/cyan/green) — cyberpunk
+- **Candle / firelight**: Flickering warm orange point lights scattered in scene
+- **Museum**: Cool neutral overhead spots, minimal ambient — clean gallery feel
+
+Design note: the lighting preset system and the room variant system (cozy basement, etc.) should be loosely coupled — any lighting preset should work in any room, even if some combos are especially curated.
+
 ### Feature 8.5.1: Interactive Lighting Controls
 **Context**: Physical interactive elements in the 3D scene for lighting control - UI lighting panel incarnated as interactive 3D objects
 
