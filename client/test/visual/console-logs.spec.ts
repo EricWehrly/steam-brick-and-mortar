@@ -27,6 +27,57 @@ test('console log report', async ({ page }) => {
   const info     = entries.filter(e => e.type === 'log' || e.type === 'info')
   const debug    = entries.filter(e => e.type === 'debug')
 
+  // Collect lightweight runtime metrics for budget tracking
+  const browserMetrics = await (page as unknown as { metrics?: () => Promise<unknown> }).metrics?.() ?? null
+  const runtimeMetrics = await page.evaluate(async () => {
+    const perf = performance
+    const memory = (perf as Performance & { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number; jsHeapSizeLimit?: number } }).memory
+
+    const sampleFrameDeltas = async (frames: number): Promise<number[]> => {
+      const deltas: number[] = []
+      return new Promise((resolve) => {
+        let count = 0
+        let prev = 0
+        const step = (ts: number): void => {
+          if (count === 0) {
+            prev = ts
+            count++
+            requestAnimationFrame(step)
+            return
+          }
+          deltas.push(ts - prev)
+          prev = ts
+          count++
+          if (count <= frames) {
+            requestAnimationFrame(step)
+          } else {
+            resolve(deltas)
+          }
+        }
+        requestAnimationFrame(step)
+      })
+    }
+
+    const deltas = await sampleFrameDeltas(120)
+    const avgFrameMs = deltas.reduce((a, b) => a + b, 0) / (deltas.length || 1)
+    const p95FrameMs = deltas.length > 0
+      ? [...deltas].sort((a, b) => a - b)[Math.min(deltas.length - 1, Math.floor(deltas.length * 0.95))]
+      : 0
+
+    return {
+      memory: {
+        usedJSHeapSize: memory?.usedJSHeapSize ?? null,
+        totalJSHeapSize: memory?.totalJSHeapSize ?? null,
+        jsHeapSizeLimit: memory?.jsHeapSizeLimit ?? null,
+      },
+      frameTiming: {
+        sampleCount: deltas.length,
+        avgFrameMs,
+        p95FrameMs,
+      }
+    }
+  })
+
   // Always print summary to test output
   console.log('\n=== Startup Console Report ===')
   console.log(`  errors:   ${errors.length}`)
@@ -34,6 +85,8 @@ test('console log report', async ({ page }) => {
   console.log(`  info/log: ${info.length}`)
   console.log(`  debug:    ${debug.length}`)
   console.log(`  total:    ${entries.length}`)
+  console.log(`  js heap used: ${(runtimeMetrics.memory.usedJSHeapSize ?? 0) / (1024 * 1024)} MB`)
+  console.log(`  frame avg: ${runtimeMetrics.frameTiming.avgFrameMs.toFixed(2)}ms  p95: ${runtimeMetrics.frameTiming.p95FrameMs.toFixed(2)}ms`)
 
   if (errors.length > 0) {
     console.log('\nERRORS:')
@@ -48,6 +101,14 @@ test('console log report', async ({ page }) => {
   const report = {
     timestamp: new Date().toISOString(),
     summary: { errors: errors.length, warnings: warnings.length, info: info.length, debug: debug.length, total: entries.length },
+    budgets: {
+      // Soft watch targets only (non-failing). Tune as we gather real baselines.
+      jsHeapUsedMbTarget: 500,
+      avgFrameMsTarget: 16,
+      p95FrameMsTarget: 25,
+    },
+    runtimeMetrics,
+    browserMetrics,
     errors,
     warnings,
     info,
@@ -57,5 +118,12 @@ test('console log report', async ({ page }) => {
 
   await mkdir('test-results', { recursive: true })
   await writeFile('test-results/console-report.json', JSON.stringify(report, null, 2))
+  await writeFile('test-results/perf-report.json', JSON.stringify({
+    timestamp: report.timestamp,
+    budgets: report.budgets,
+    runtimeMetrics,
+    browserMetrics,
+  }, null, 2))
   console.log('\nFull report: test-results/console-report.json')
+  console.log('Perf report: test-results/perf-report.json')
 })
