@@ -337,6 +337,33 @@ export class SteamApiClient {
             .slice(0, maxGames)
     }
 
+    /**
+     * Group games by primary genre label while preserving relative order within each group.
+     * "Other" (no genre) is always last.
+     */
+    private groupGamesByPrimaryGenre<T extends SteamGame>(games: T[]): T[] {
+        const groups = new Map<string, T[]>()
+        for (const game of games) {
+            const label = game.genres?.[0]?.description ?? 'Other'
+            if (!groups.has(label)) groups.set(label, [])
+            groups.get(label)!.push(game)
+        }
+
+        const entries = [...groups.entries()]
+        entries.sort((a, b) => {
+            if (a[0] === 'Other') return 1
+            if (b[0] === 'Other') return -1
+            return b[1].length - a[1].length
+        })
+
+        return entries.flatMap(([, list]) => list)
+    }
+
+    private deriveBatchShelfLabel(batchGames: ReadonlyArray<Readonly<SteamGame>>): string {
+        const first = batchGames[0]
+        return first?.genres?.[0]?.description ?? 'Other'
+    }
+
     private async partitionByCache(appids: number[]): Promise<{
         cachedAppids: number[]
         uncachedAppids: number[]
@@ -375,18 +402,21 @@ export class SteamApiClient {
         
         buildMonitor.end({ count: cachedEnhanced.length })
         
-        // Emit cached games in batches with yielding
+        // Emit cached games in category-aware grouped order (for cleaner shelf sections)
         // Note: Subscribers (GpuStorePropsRenderer.processOneBatch, etc.) are already instrumented
-        const cachedBatches = Math.ceil(cachedEnhanced.length / BATCH_SIZE)
-        
+        const groupedCached = this.groupGamesByPrimaryGenre(cachedEnhanced)
+        const cachedBatches = Math.ceil(groupedCached.length / BATCH_SIZE)
+
         for (let i = 0; i < cachedBatches; i++) {
-            const batchGames = cachedEnhanced.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
+            const batchGames = groupedCached.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
             const isLastCachedBatch = i === cachedBatches - 1
-            
+            const shelfLabel = this.deriveBatchShelfLabel(batchGames)
+
             EventManager.getInstance().emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
                 games: batchGames as ReadonlyArray<Readonly<SteamGame>>,
                 batchIndex: i,
-                totalBatches: totalBatchCount
+                totalBatches: totalBatchCount,
+                shelfLabel
             })
             
             // Yield to main thread between batches
@@ -455,17 +485,20 @@ export class SteamApiClient {
                 uncachedEnhanced.push(enhancedGame)
             }
             
-            // Emit uncached games in batches (now that they have metadata)
-            const uncachedBatches = Math.ceil(uncachedEnhanced.length / BATCH_SIZE)
+            // Emit uncached games in category-aware grouped order (now that metadata is present)
+            const groupedUncached = this.groupGamesByPrimaryGenre(uncachedEnhanced)
+            const uncachedBatches = Math.ceil(groupedUncached.length / BATCH_SIZE)
             const startBatchIndex = Math.ceil(cachedAppidsCount / BATCH_SIZE)
-            
+
             for (let i = 0; i < uncachedBatches; i++) {
-                const batchGames = uncachedEnhanced.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
-                
+                const batchGames = groupedUncached.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
+                const shelfLabel = this.deriveBatchShelfLabel(batchGames)
+
                 EventManager.getInstance().emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
                     games: batchGames as ReadonlyArray<Readonly<SteamGame>>,
                     batchIndex: startBatchIndex + i,
-                    totalBatches: totalBatchCount
+                    totalBatches: totalBatchCount,
+                    shelfLabel
                 })
                 
                 // Yield to main thread between batches

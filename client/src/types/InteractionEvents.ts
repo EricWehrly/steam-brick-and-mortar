@@ -61,6 +61,8 @@ export interface SteamGamesBatchEvent extends BaseInteractionEvent {
     games: ReadonlyArray<Readonly<SteamGame>>
     batchIndex: number
     totalBatches: number
+    /** Optional primary shelf label derived from batch genre grouping */
+    shelfLabel?: string
 }
 
 export interface SteamNetworkFetchProgressEvent extends BaseInteractionEvent {
@@ -270,6 +272,8 @@ export interface BatchReadyForPlacementEvent extends BaseInteractionEvent {
     games: ReadonlyArray<Readonly<SteamGame>>
     batchIndex: number
     totalBatches: number
+    /** Optional primary shelf label derived from source batch */
+    shelfLabel?: string
     status?: BatchProcessingStatus
     lastModified?: number
 }

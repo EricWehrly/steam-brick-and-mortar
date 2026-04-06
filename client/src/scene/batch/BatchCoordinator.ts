@@ -218,6 +218,7 @@ export class BatchCoordinator<T> {
                 games: batchData.games,
                 batchIndex,
                 totalBatches,
+                shelfLabel: batchData.shelfLabel,
                 status: BatchProcessingStatus.Dispatched,
                 lastModified: Date.now()
             }

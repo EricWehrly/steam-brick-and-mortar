@@ -60,7 +60,7 @@ export class GameBoxSpawner {
      * Stores games and requests shelf space via event
      */
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
-        const { games, batchIndex, totalBatches } = event.detail
+        const { games, batchIndex, totalBatches, shelfLabel: eventShelfLabel } = event.detail
         
         GameBoxSpawner.logger.debug(
             `[EVENT PATH] BatchReadyForPlacement received: ` +
@@ -71,8 +71,8 @@ export class GameBoxSpawner {
         // Store games pending shelf creation
         this.pendingGames.set(batchIndex, games)
 
-        // Determine a provisional label from primary genre for shelf signage
-        const shelfLabel = this.determinePrimaryGenreLabel(games)
+        // Prefer upstream batch label (group-aware batching), fallback to local inference
+        const shelfLabel = eventShelfLabel ?? this.determinePrimaryGenreLabel(games)
 
         // Emit ShelfSpaceRequested event
         EventManager.getInstance().emit<ShelfSpaceRequestedEvent>(
