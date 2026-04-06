@@ -322,16 +322,22 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             detail: `Creating shelf ${batchIndex + 1}/${progress.total}`
         })
         
+        const rowIndex = Math.floor(batchIndex / this.maxShelvesPerRow)
+        const shelfIndex = batchIndex % this.maxShelvesPerRow
+
         // Create shelf without games (GameBoxSpawner will place them)
-        this.createInstancedShelf(shelfPosition, Math.floor(batchIndex / this.maxShelvesPerRow), batchIndex % this.maxShelvesPerRow)
+        this.createInstancedShelf(shelfPosition, rowIndex, shelfIndex)
         this.cumulativeShelfCount++
-        
+
         // Emit ShelfCreated event for GameBoxSpawner to place games
         EventManager.getInstance().emit<ShelfCreatedEvent>(
             StorePropsEventTypes.ShelfCreated,
             {
                 position: shelfPosition.clone(),
                 batchIndex: batchIndex,
+                rowIndex,
+                shelfIndex,
+                shelfRotationY: rowIndex % 2 === 1 ? Math.PI : 0,
                 bounds: { ...this.shelfBounds },
                 status: BatchProcessingStatus.ShelfCreated,
                 lastModified: Date.now()

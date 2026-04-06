@@ -34,7 +34,8 @@ export class GameBoxUtils {
         surface: ShelfSurface,
         games: SteamGameData[],
         side: ShelfSide,
-        boxDimensions: GameBoxDimensions
+        boxDimensions: GameBoxDimensions,
+        shelfRotationY: number = 0
     ): THREE.Vector3[] {
         const positions: THREE.Vector3[] = []
         
@@ -47,21 +48,39 @@ export class GameBoxUtils {
         
         const gameHalfDepth = boxDimensions.depth / 2
         
-        const baseZ = shelfPosition.z + (side === ShelfSide.Front 
+        const localZ = (side === ShelfSide.Front
             ? surface.frontZ + (gameHalfDepth * 3)
-            : surface.backZ - (gameHalfDepth * 3) )
-        
-        const gameZ = baseZ + (side === ShelfSide.Front ? angleOffset : -angleOffset)
-                
+            : surface.backZ - (gameHalfDepth * 3))
+        const localZWithAngle = localZ + (side === ShelfSide.Front ? angleOffset : -angleOffset)
+
         const totalWidth = (games.length - 1) * GameLayoutConstants.GAME_SPACING
         // Center games on surface. If the span exceeds shelf width, the games will overflow
         // the shelf edge — the spawner should limit GAMES_PER_SURFACE to prevent this.
         // TODO(approx-geometry): clamp based on actual shelf geometry once dynamic surfaces are used.
-        const startX = shelfPosition.x + surface.centerX - totalWidth / 2
-        
+        const startLocalX = surface.centerX - totalWidth / 2
+
+        const hasRotation = Math.abs(shelfRotationY) > 1e-6
+        const shelfQuat = hasRotation
+            ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), shelfRotationY)
+            : null
+
         for (let i = 0; i < games.length; i++) {
-            const gameX = startX + (i * GameLayoutConstants.GAME_SPACING)
-            positions.push(new THREE.Vector3(gameX, gameY, gameZ))
+            const localX = startLocalX + (i * GameLayoutConstants.GAME_SPACING)
+
+            if (shelfQuat) {
+                const rotated = new THREE.Vector3(localX, 0, localZWithAngle).applyQuaternion(shelfQuat)
+                positions.push(new THREE.Vector3(
+                    shelfPosition.x + rotated.x,
+                    gameY,
+                    shelfPosition.z + rotated.z
+                ))
+            } else {
+                positions.push(new THREE.Vector3(
+                    shelfPosition.x + localX,
+                    gameY,
+                    shelfPosition.z + localZWithAngle
+                ))
+            }
         }
         
         return positions

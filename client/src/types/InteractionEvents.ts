@@ -286,6 +286,10 @@ export interface ShelfSpaceRequestedEvent extends BaseInteractionEvent {
 export interface ShelfCreatedEvent extends BaseInteractionEvent {
     position: Readonly<THREE.Vector3>
     batchIndex: number
+    rowIndex?: number
+    shelfIndex?: number
+    /** Y rotation of this shelf unit in radians (0 or PI for current aisle layout) */
+    shelfRotationY?: number
     bounds: ShelfBounds
     status?: BatchProcessingStatus
     lastModified?: number
