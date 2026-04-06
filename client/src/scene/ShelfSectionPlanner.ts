@@ -54,8 +54,14 @@ export class ShelfSectionPlanner {
 
     /**
      * Place all category signs using the full accumulated game set.
-     * Each group is anchored to the shelf position where its games start
-     * in the playtime-sorted order.
+     *
+     * Each genre group is anchored to the shelf where its games start
+     * in the playtime-sorted order. A minimum-advance rule ensures each
+     * group gets a unique shelf even when multiple small groups would
+     * otherwise map to the same position.
+     *
+     * "Other" is skipped — it's a catch-all for tools/dedicated servers
+     * and adds no navigation value as a section sign.
      */
     public planSections(shelfPositions: THREE.Vector3[]): void {
         if (this.games.length === 0) {
@@ -78,16 +84,23 @@ export class ShelfSectionPlanner {
         let placed = 0
         let gameOffset = 0
         const batchSize = 18
+        let lastUsedAnchor = -1  // ensures each genre gets a unique shelf position
 
         for (const group of groups) {
-            // Skip 'Other' — it's a catch-all for tools/servers without a proper genre.
-            // Small groups also tend to cluster at the same anchor shelf as Other,
-            // and a section sign for 'Other' adds noise without useful navigation value.
-            if (group.label === 'Other') { gameOffset += group.games.length; continue }
+            // Skip 'Other' — catch-all for tools/servers, not useful as a section sign
+            if (group.label === 'Other') {
+                gameOffset += group.games.length
+                continue
+            }
+
+            // Compute natural anchor from game offset, then advance past any collision
+            const naturalIndex = Math.floor(gameOffset / batchSize)
             const anchorIndex = Math.min(
-                Math.floor(gameOffset / batchSize),
+                Math.max(naturalIndex, lastUsedAnchor + 1),
                 shelfPositions.length - 1
             )
+            lastUsedAnchor = anchorIndex
+
             const anchorPos = shelfPositions[anchorIndex]
             if (!anchorPos) {
                 ShelfSectionPlanner.logger.warn(`No shelf position for group "${group.label}" at index ${anchorIndex}`)
@@ -104,8 +117,8 @@ export class ShelfSectionPlanner {
             gameOffset += group.games.length
         }
 
-        ShelfSectionPlanner.logger.debug(
-            `planSections: placed ${placed}/${groups.length} signs ` +
+        ShelfSectionPlanner.logger.info(
+            `[SIGN-DEBUG] planSections complete: placed ${placed}/${groups.length} signs ` +
             `(${this.games.length} total games, ${shelfPositions.length} shelves)`
         )
     }
