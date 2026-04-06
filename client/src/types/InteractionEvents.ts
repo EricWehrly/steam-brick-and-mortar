@@ -194,6 +194,13 @@ export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
     // Pure terminal signal: all batches are complete.
 }
 
+export interface GameSelectedEvent extends BaseInteractionEvent {
+    /** App ID of the selected game */
+    appid: number | string
+    /** Display name, if known */
+    name?: string
+}
+
 // =============================================================================
 // LIGHTING EVENTS
 // =============================================================================
@@ -343,7 +350,9 @@ export const GameEventTypes = {
     Start: 'game:start',
     ShelfLayoutDetermined: 'game:shelf-layout-determined',
     SomeBatchesComplete: 'game:some-batches-complete',
-    AllBatchesComplete: 'game:all-batches-complete'
+    AllBatchesComplete: 'game:all-batches-complete',
+    /** Fired when a game is selected (e.g. clicked in scene) — opens detail panel */
+    Selected: 'game:selected'
 } as const
 
 export const LightingEventTypes = {

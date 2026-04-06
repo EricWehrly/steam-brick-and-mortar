@@ -2,10 +2,9 @@ import * as THREE from 'three'
 import { DataManager } from '../../core/data/DataManager'
 import { DataKey } from '../../core/data/DataTypes'
 import { EventManager } from '../../core/EventManager'
-import { InputEventTypes, type SceneCanvasClickEvent } from '../../types/InteractionEvents'
+import { InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type GameSelectedEvent } from '../../types/InteractionEvents'
 import { SceneLayer } from '../SceneLayers'
 import type { InstanceMetadata } from '../../debug/GameFinder'
-import { GameSpotlight } from '../../debug/GameSpotlight'
 
 export interface SceneClickGameBoxRaycastOptions {
     scene?: THREE.Scene
@@ -196,16 +195,14 @@ export class SceneClickGameBoxRaycast {
     }
 
     private highlightHit(hit: SceneGameBoxHit): void {
-        const spotlightTarget = hit.name ?? hit.appid
-        if (spotlightTarget !== undefined) {
-            const spotlight = GameSpotlight.getInstance()
-            if (spotlight) {
-                spotlight.spotlight(spotlightTarget)
-            } else if (this.enableDebugLogs) {
-                console.log('🎯 [SceneClickGameBoxRaycast] GameSpotlight not ready yet')
-            }
+        const appid = hit.appid
+        if (appid !== undefined) {
+            this.eventManager.emit<GameSelectedEvent>(GameEventTypes.Selected, {
+                appid,
+                name: hit.name
+            })
         } else if (this.enableDebugLogs) {
-            console.log('🎯 [SceneClickGameBoxRaycast] Hit had no spotlight target metadata', {
+            console.log('🎯 [SceneClickGameBoxRaycast] Hit had no appid metadata', {
                 instanceId: hit.instanceId
             })
         }

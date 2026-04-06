@@ -9,8 +9,8 @@
 import { EventManager } from '../../core/EventManager'
 import { DataManager } from '../../core/data'
 import type { SteamGameData } from '../../scene/game-box/types/GameData'
-import { InputEventTypes } from '../../types/InteractionEvents'
-import type { InputPauseEvent, InputResumeEvent } from '../../types/InteractionEvents'
+import { InputEventTypes, GameEventTypes } from '../../types/InteractionEvents'
+import type { InputPauseEvent, InputResumeEvent, GameSelectedEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import './binder.css'
 
@@ -67,7 +67,13 @@ export class GameLibraryBinderUI {
         this.createToggleButton()
         this.createBinderContainer()
         this.setupKeyboardShortcut()
-        
+
+        // Listen for game selection from scene (raycast clicks)
+        EventManager.getInstance().registerEventHandler<GameSelectedEvent>(
+            GameEventTypes.Selected,
+            this.onGameSelected
+        )
+
         GameLibraryBinderUI.logger.debug('GameLibraryBinderUI initialized')
     }
     
@@ -449,6 +455,29 @@ export class GameLibraryBinderUI {
     }
     
     /**
+     * Open the detail panel for a specific game by appid.
+     * Called externally (e.g. from scene raycast click).
+     */
+    public openGameDetail(appid: number | string): void {
+        // Search filteredGames first (fast path if binder is open/loaded),
+        // then fall back to full library from DataManager
+        let game = this.state.filteredGames.find(g => String(g.appid) === String(appid))
+        if (!game) {
+            const allGames = this.dataManager.get<SteamGameData[]>('steam.games') ?? []
+            game = allGames.find(g => String(g.appid) === String(appid))
+        }
+        if (game) {
+            this.selectGame(game)
+        } else {
+            GameLibraryBinderUI.logger.warn(`openGameDetail: appid ${appid} not found in library`)
+        }
+    }
+
+    private readonly onGameSelected = (event: CustomEvent<GameSelectedEvent>): void => {
+        this.openGameDetail(event.detail.appid)
+    }
+
+    /**
      * Select a game to show details
      */
     private selectGame(game: SteamGameData): void {
@@ -483,10 +512,29 @@ export class GameLibraryBinderUI {
         const libraryUrl = game.artwork?.library || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
         const playtimeHours = Math.round((game.playtime_forever || 0) / 60)
         const playtime2Weeks = Math.round((game.playtime_2weeks || 0) / 60)
+
+        // Build categories/genres block
+        const genres = game.genres?.map(g => g.description) ?? []
+        const steamCategories = game.categories?.map(c => c.description) ?? []
+        const categoriesHtml = genres.length > 0 || steamCategories.length > 0 ? `
+            <div class="detail-categories">
+                <div class="detail-section-label">Categories</div>
+                ${genres.length > 0 ? `
+                <div class="detail-category-group">
+                    <span class="detail-category-label">Genres</span>
+                    <div class="detail-tags">${genres.map(g => `<span class="detail-tag">${this.escapeHtml(g)}</span>`).join('')}</div>
+                </div>` : ''}
+                ${steamCategories.length > 0 ? `
+                <div class="detail-category-group">
+                    <span class="detail-category-label">Features</span>
+                    <div class="detail-tags">${steamCategories.map(c => `<span class="detail-tag">${this.escapeHtml(c)}</span>`).join('')}</div>
+                </div>` : ''}
+            </div>
+        ` : ''
         
         // Create a sanitized JSON blob for display
         const jsonBlob = JSON.stringify(game, null, 2)
-        
+
         const panel = document.createElement('div')
         panel.id = 'binder-detail-panel'
         panel.className = 'detail-panel'
@@ -521,6 +569,8 @@ export class GameLibraryBinderUI {
                         <div class="detail-stat-value">${game.appid}</div>
                     </div>
                 </div>
+
+                ${categoriesHtml}
 
                 <div class="detail-artwork">
                     <div class="detail-section-label">Artwork</div>
@@ -584,10 +634,15 @@ export class GameLibraryBinderUI {
         if (this.keyboardHandler) {
             document.removeEventListener('keydown', this.keyboardHandler)
         }
-        
+
+        EventManager.getInstance().deregisterEventHandler<GameSelectedEvent>(
+            GameEventTypes.Selected,
+            this.onGameSelected
+        )
+
         this.container?.remove()
         this.toggleButton?.remove()
-        
+
         GameLibraryBinderUI.instance = null
     }
 }

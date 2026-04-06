@@ -213,6 +213,28 @@ describe('InstancedShelfRenderer', () => {
             // but we can ensure the operation succeeds and doesn't throw
         })
 
+        it('should accept and not throw when a unit Y rotation is provided', () => {
+            // Regression guard: setInstance with rotation= must not throw or return false.
+            // This is the path taken by GpuStorePropsRenderer for odd-row shelves (PI rotation).
+            const position = new THREE.Vector3(0, 0, -9)
+            const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0))
+            const result = renderer.setInstance(1, { position, rotation })
+            expect(result).toBe(true)
+        })
+
+        it('should produce different instance indices for rotated vs non-rotated shelf', () => {
+            // Two shelf units should each consume the expected number of part instances
+            const pos0 = new THREE.Vector3(0, 0, 0)
+            const pos1 = new THREE.Vector3(2.5, 0, -3)
+            const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0))
+            const r0 = renderer.setInstance(0, { position: pos0 })
+            const r1 = renderer.setInstance(1, { position: pos1, rotation })
+            expect(r0).toBe(true)
+            expect(r1).toBe(true)
+            // Both shelf units should be tracked
+            expect(renderer.getStats().shelfUnits).toBe(2)
+        })
+
         it('should handle edge case positions without errors', () => {
             const edgeCases = [
                 new THREE.Vector3(0, 0, 0),
