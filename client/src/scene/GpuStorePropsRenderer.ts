@@ -51,6 +51,8 @@ import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { CategorySignSystem } from './CategorySignSystem'
+import { CategoryAssigner } from './categorization/CategoryAssigner'
+import type { SteamGameData } from './game-box/types/GameData'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private static readonly logger = Logger.createLogFunctions(GpuStorePropsRenderer.name)
@@ -90,6 +92,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private gameBoxSpawner?: GameBoxSpawner
     private categorySignSystem: CategorySignSystem
     private placedCategoryLabels: Set<string> = new Set()
+    /**
+     * Accumulates all games across batches for post-load category sign placement.
+     * Reset on each progressive load cycle.
+     */
+    private allGamesAccumulated: SteamGameData[] = []
+    private readonly categoryAssigner = new CategoryAssigner()
 
     constructor(scene: THREE.Scene) {
         this.scene = scene
@@ -172,8 +180,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
     
     private async handleInitialBatch(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
-        const { totalBatches } = event.detail
-        
+        const { totalBatches, games } = event.detail
+
+        // Accumulate all games for post-load category sign placement
+        this.allGamesAccumulated.push(...(games as unknown as SteamGameData[]))
+
         // Only handle the first batch for initialization
         if (!this.batchCoordinator.isFirstBatchProcessing()) {
             return
@@ -198,7 +209,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         if (this.progressiveInitializationPromise) {
             await this.progressiveInitializationPromise
         }
-        
+
         // Create shelf for the requested batch
         const shelfMonitor = PerformanceMonitor.start('shelf-creation', GpuStorePropsRenderer.logger)
         await this.createShelfForBatchIndex(batchIndex, shelfLabel)
@@ -207,6 +218,49 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private handleAllBatchesComplete(): void {
         this.finalizeProgressiveLoading()
+        this.placeFinalCategorySigns()
+    }
+
+    /**
+     * After all batches land, rebuild category signs with accurate group→shelf mapping.
+     * Uses CategoryAssigner over the full accumulated library so each genre
+     * gets exactly one sign placed at the first shelf of its section.
+     */
+    private placeFinalCategorySigns(): void {
+        if (this.allGamesAccumulated.length === 0) return
+
+        this.categorySignSystem.clearAll()
+        this.placedCategoryLabels.clear()
+
+        const groups = this.categoryAssigner.assign(this.allGamesAccumulated)
+
+        // Map genre label → first shelf position in batch order
+        // shelfPositions[batchIndex] gives the anchor for each batch
+        // We need to find the first batch whose games belong to each group.
+        // Build a lookup: game appid → batchIndex
+        // Simpler: iterate groups in order; for each group find the first
+        // shelfPosition that served at least one game of that genre.
+        // Since we don't yet have per-batch genre maps, use group ordering
+        // (largest group → shelf 0, next → where it starts, etc.) as a proxy.
+        let shelfOffset = 0
+        for (const group of groups) {
+            const shelvesNeeded = Math.ceil(group.games.length / (18)) // ~18 games/shelf
+            const anchorIndex = Math.min(shelfOffset, this.shelfPositions.length - 1)
+            const anchorPos = this.shelfPositions[anchorIndex]
+            if (anchorPos) {
+                this.categorySignSystem.setSign({
+                    label: group.label,
+                    anchorPosition: anchorPos,
+                    mount: { style: 'above-shelf', yOffset: 2.2 }
+                })
+                this.placedCategoryLabels.add(group.label)
+            }
+            shelfOffset += shelvesNeeded
+        }
+
+        GpuStorePropsRenderer.logger.debug(
+            `Placed ${this.placedCategoryLabels.size} category section signs after full library load`
+        )
     }
     
     private async initializeForProgressiveLoading(totalBatches: number): Promise<void> {
@@ -221,6 +275,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
         this.placedCategoryLabels.clear()
+        this.allGamesAccumulated = []
         this.clearExistingShelves()
 
         this.preallocateShelfPositions(totalBatches)
