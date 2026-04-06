@@ -444,6 +444,14 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         _config: Required<ShelfConfig>,
         unitRotation?: THREE.Quaternion
     ): ShelfUnitInstance {
+        // DEBUG: force 37° Y rotation on ALL shelves unconditionally to verify wiring
+        // If shelves still don't rotate after this, the problem is upstream of this method
+        // TODO: remove once rotation is confirmed working in scene
+        const DEBUG_FORCE_ROTATION = true
+        const effectiveRotation = DEBUG_FORCE_ROTATION
+            ? new THREE.Quaternion().setFromEuler(new THREE.Euler(0, (37 * Math.PI) / 180, 0))
+            : unitRotation
+
         // DEBUG: tint odd-indexed shelf units red on angled boards so rotation is visually verifiable
         // TODO: remove once rotation is confirmed working in scene
         const debugTintColor = shelfUnitIndex % 2 === 1
@@ -458,8 +466,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         
         for (const part of this.shelfUnitTemplate) {
             // Rotate the part offset around the unit origin if a Y rotation is provided
-            const rotatedOffset = unitRotation
-                ? part.offset.clone().applyQuaternion(unitRotation)
+            const rotatedOffset = effectiveRotation
+                ? part.offset.clone().applyQuaternion(effectiveRotation)
                 : part.offset.clone()
             const worldPos = position.clone().add(rotatedOffset)
             let instanceIndex: number
@@ -490,8 +498,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             }
             
             // Combine unit-level Y rotation with part's own rotation (e.g. shelf board tilt)
-            const finalRotation = unitRotation
-                ? (part.rotation ? unitRotation.clone().multiply(part.rotation) : unitRotation.clone())
+            const finalRotation = effectiveRotation
+                ? (part.rotation ? effectiveRotation.clone().multiply(part.rotation) : effectiveRotation.clone())
                 : part.rotation
             manager.setInstanceMatrix(instanceIndex, worldPos, finalRotation, part.scale)
             // Apply debug tint to angled boards to visually distinguish alternating rows
