@@ -21,7 +21,8 @@ const mockGame: SteamGameData = {
     ],
     categories: [
         { id: 1, description: 'Multi-player' },
-        { id: 22, description: 'Steam Achievements' }
+        { id: 22, description: 'Steam Achievements' },
+        { id: 29, description: 'Steam Trading Cards' }
     ],
     artwork: {
         icon: '',
@@ -102,6 +103,18 @@ describe('BinderGameDetailPanel', () => {
             const tags = Array.from(document.querySelectorAll('.detail-tag')).map(t => t.textContent)
             expect(tags).toContain('Multi-player')
             expect(tags).toContain('Steam Achievements')
+        })
+
+        it('Steam Achievements should appear (priority 40, not hidden)', () => {
+            panel.show(mockGame)
+            const tags = Array.from(document.querySelectorAll('.detail-tag')).map(t => t.textContent)
+            expect(tags).toContain('Steam Achievements')
+        })
+
+        it('Steam Trading Cards should NOT appear (hidden priority)', () => {
+            panel.show(mockGame)
+            const tags = Array.from(document.querySelectorAll('.detail-tag')).map(t => t.textContent)
+            expect(tags).not.toContain('Steam Trading Cards')
         })
 
         it('omits categories section for games with no genres/categories', () => {

@@ -1,3 +1,4 @@
+import { sortAndFilterCategories } from '../FeaturePriorityConfig'
 import { GameSpotlight } from '../../debug/GameSpotlight'
 import type { SteamGameData } from '../../scene/game-box/types/GameData'
 import detailPanelTemplate from './detail-panel.html?raw'
@@ -33,7 +34,7 @@ export class BinderGameDetailPanel {
             </div>` : ''
 
         const genres = game.genres?.map(g => g.description) ?? []
-        const steamCategories = game.categories?.map(c => c.description) ?? []
+        const steamCategories = sortAndFilterCategories(game.categories ?? []).map(c => c.description)
         const categoriesBlock = genres.length > 0 || steamCategories.length > 0 ? `
             <div class="detail-categories">
                 <div class="detail-section-label">Categories</div>
