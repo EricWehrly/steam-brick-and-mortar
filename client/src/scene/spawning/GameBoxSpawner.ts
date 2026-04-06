@@ -90,6 +90,14 @@ export class GameBoxSpawner {
     
     private determinePrimaryGenreLabel(games: ReadonlyArray<SteamGameData>): string {
         const groups = this.categoryAssigner.assign([...games])
+        // Debug: log genre distribution for the first batch to trace 'Other' issue
+        if (GameBoxSpawner.logger) {
+            const genreSample = games.slice(0, 3).map(g => `${g.name}:${g.genres?.[0]?.description ?? 'none'}`)
+            GameBoxSpawner.logger.debug(
+                `[CAT-DEBUG] batch genres sample: ${genreSample.join(', ')} ` +
+                `→ groups: ${groups.map(g => `${g.genre}(${g.games.length})`).join(', ')}`
+            )
+        }
         // Prefer first non-Other group; fall back to Other
         const firstNonOther = groups.find(g => g.genre !== 'Other')
         return firstNonOther?.label ?? 'Other'

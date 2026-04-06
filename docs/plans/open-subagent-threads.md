@@ -54,6 +54,19 @@ Create `client/src/ui/FeaturePriorityConfig.ts`:
 
 **These are independent — either can run first.**
 
+### Thread: Popcorn Ceiling Texture Improvement
+**Status**: Queued — start when visual design cycles open  
+**Model preference (design pass)**: gemini-pro → opus → sonnet  
+**Constraint**: output = implementation-ready plan for cheap model execution, minimal iteration  
+**Goal**: Improve popcorn ceiling procedural texture to read convincingly in-scene at VR scale.
+- Leads naturally into a "stucco wall" variant using similar noise pattern
+- Wall shelves may replace the need for stucco walls (parking stucco for now)
+- Focus on ceiling first
+
+**Deliverable**: `docs/plans/popcorn-ceiling-plan.md` — specific shader/canvas algorithm changes a gemini-flash subagent can implement without design ambiguity
+
+---
+
 ### Thread: getInstance Singleton Refactor
 **Status**: Queued — defer until fresh branch  
 **Work**: Apply `#current` getter singleton pattern to other classes (post-MeshPrewarmer prototype).  

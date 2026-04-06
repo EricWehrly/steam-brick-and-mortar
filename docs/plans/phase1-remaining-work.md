@@ -79,8 +79,10 @@ Sorting/filtering is explicitly "right at the edge of Phase 1" — defer to earl
 ### 6. Cache previewer fix (6.6.3)
 - [ ] Cache preview in Debug tab is broken — diagnose and fix
 
-### 7. GPU memory in Debug tab (6.6.3)
+### 7. GPU memory + runtime metrics in Debug tab (6.6.3)
 - [ ] `GpuMemoryEstimator` output visible in UI, not just console
+- [ ] Runtime memory stats panel in Debug menu (JS heap used, estimated VRAM)
+- [ ] Frame-time display (avg + p95 ms) in Debug panel — these metrics now captured by Playwright perf report, need a live in-scene readout too
 
 ---
 
