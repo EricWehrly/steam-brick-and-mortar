@@ -584,6 +584,19 @@
   - **Priority**: Low / nice-to-have (late Phase 2)
   - **Dependencies**: Prop/scene update loop hook
 
+- **Personalized Store Sign**: Display user's vanity URL (e.g. `SpiteMonger's Steam Library`) as a stylized sign in the store entrance
+  - **Context**: `SteamUser.vanity_url` is already available from the API response; signage renderer hookup only
+  - **Priority**: Low / nice-to-have (late Phase 2)
+  - **Note**: Needs graceful fallback for anonymous/no-vanity-url users
+
+- **Anonymous / "Empty Store" Mode (Dev Utility)**: Pre-populate store with free-to-play games (e.g. TF2 appid 440) when no Steam user is loaded
+  - **Context**: Useful as a Playwright/visual debugging baseline so scene contains actual games without API auth
+  - **Priority**: Medium for tooling (moves up if Playwright visual tests become meaningful debugging loop), low for user-facing
+
+- **Room Variant — Cozy Basement Gaming Library**: Alternate room style with lower ceilings, warmer lighting, carpet, wood paneling
+  - **Priority**: Low / Phase 2 atmosphere pass
+  - **Dependencies**: Room variant/style system (same infra as columns etc.)
+
 - **Poster Walls from User Media**: Optional wall posters sourced from user-owned public screenshots/artwork where available
   - **Context**: Atmosphere + personalization; could rotate featured images by category/zone
   - **Priority**: Low / nice-to-have (late Phase 2)
@@ -665,3 +678,4 @@
 - ✅ Complete monitoring and observability
 
 **Exit Criteria**: System works reliably for multiple concurrent users with large Steam libraries, demonstrating production-level infrastructure without public compliance requirements
+
