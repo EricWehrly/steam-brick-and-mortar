@@ -30,15 +30,15 @@ export class RecentlyPlayedCeilingSign {
         return SceneSignManager.instance
     }
 
-    private position: THREE.Vector3 = new THREE.Vector3(0, RoomConstants.STORE_CEILING_HEIGHT - SIGN_DROP_FROM_CEILING, SIGN_ANCHOR_Z)
+    private readonly position: THREE.Vector3 = new THREE.Vector3(0, RoomConstants.STORE_CEILING_HEIGHT - SIGN_DROP_FROM_CEILING, SIGN_ANCHOR_Z)
 
     constructor() {
         // SceneSignManager is a singleton - no local instance needed
     }
 
-    /** Get the position of the sign. */
+    /** Get the position of the sign (caller should clone if mutation is needed). */
     public getPosition(): THREE.Vector3 {
-        return this.position.clone()
+        return this.position
     }
 
     /** Place (or replace) the Recently Played ceiling sign. */
