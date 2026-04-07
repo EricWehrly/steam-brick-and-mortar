@@ -308,6 +308,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.shelfLayout.shelvesPerRow = this.maxShelvesPerRow
 
         // Emit layout as soon as we know it (no need to wait for batches to finish loading)
+        // Tech debt link: docs/roadmaps/tech-debt.md → "Category System Tech Debt / Readonly event payloads"
         EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(
             GameEventTypes.ShelfLayoutDetermined,
             {
