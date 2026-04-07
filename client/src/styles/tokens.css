@@ -1,7 +1,7 @@
 /**
- * UI Panel Tokens
- * Shared CSS custom properties for panel-like overlays.
- * Import from main.css before component styles.
+ * tokens.css
+ * Shared CSS custom properties. Generic bucket for now; split when there are enough
+ * distinct concerns to warrant it.
  */
 
 :root {
