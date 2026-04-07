@@ -12,9 +12,11 @@ export interface ShelfGroup {
  * Case-insensitive lookup so "Free to Play" / "Free To Play" both match.
  * Unrecognised genres fall into "Other".
  */
+// Note: 'Early Access' is intentionally excluded — it is a release state, not a content genre.
+// Games tagged only as Early Access land in Other.
 export const KNOWN_GENRES: ReadonlyArray<string> = [
     'Action', 'Adventure', 'RPG', 'Strategy', 'Simulation', 'Sports', 'Racing',
-    'Casual', 'Indie', 'Massively Multiplayer', 'Free to Play', 'Early Access',
+    'Casual', 'Indie', 'Massively Multiplayer', 'Free to Play',
     'Puzzle', 'Platformer', 'Shooter', 'Horror', 'Stealth', 'Fighting', 'Survival', 'Anime',
 ]
 
@@ -59,8 +61,18 @@ export class CategoryAssigner {
         for (const game of games) {
             let genre: string
             if (game.genres && game.genres.length > 0) {
-                const raw = game.genres[0].description
-                const canonical = GENRE_LOOKUP.get(raw.toLowerCase())
+                // Prefer a more specific genre when Action is the primary tag.
+                // Steam applies 'Action' broadly; secondary genres are often more useful.
+                const primaryRaw = game.genres[0].description
+                const primaryCanonical = GENRE_LOOKUP.get(primaryRaw.toLowerCase())
+                const useSecondary = primaryCanonical === 'Action' && game.genres.length > 1
+                const resolvedCanonical = useSecondary
+                    ? game.genres.slice(1)
+                        .map(g => GENRE_LOOKUP.get(g.description.toLowerCase()))
+                        .find(c => c !== undefined && c !== 'Action') ?? primaryCanonical
+                    : primaryCanonical
+                const raw = primaryRaw
+                const canonical = resolvedCanonical
                 if (canonical !== undefined) {
                     genre = canonical
                 } else {

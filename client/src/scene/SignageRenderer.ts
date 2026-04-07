@@ -162,6 +162,7 @@ export class SignageRenderer {
         const snapshot = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height)
         const pixels = new Uint8Array(snapshot.data)
         const texture = new THREE.DataTexture(pixels, this.canvas.width, this.canvas.height, THREE.RGBAFormat)
+        texture.flipY = true  // DataTexture defaults to false; canvas pixel data is top-down like CanvasTexture
         texture.needsUpdate = true
         return texture
     }
