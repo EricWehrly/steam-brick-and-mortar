@@ -62,7 +62,6 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
     private readonly version: number
     private initPromise: Promise<void> | null = null
     private workerReady = false
-    private pdcCounter = 0
 
     private stats: PixelCacheStats = {
         hits: 0,
@@ -98,21 +97,22 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
      * Initialize the worker's IndexedDB connection.
      * Safe to call multiple times; only initializes once.
      *
-     * Pattern note: this class uses a two-phase lifecycle (construct -> init).
-     * TD [lifecycle-pattern]: document this pattern in a shared patterns.md.
+     * Two-phase lifecycle (construct -> init):
+     * The worker starts on construction (ManagedWorker base), but requires
+     * an explicit INIT message to open the IndexedDB connection before
+     * it can serve GET/PUT requests.
      */
     public async init(): Promise<void> {
         if (this.workerReady) return
         if (this.initPromise) return this.initPromise
 
         this.initPromise = (async () => {
-            const messageId = `pdc_${Date.now()}_${this.pdcCounter++}`
             const result = await this.send<InitResult>({
                 type: 'INIT',
                 dbName: this.dbName,
                 storeName: this.storeName,
                 version: this.version,
-                messageId
+                messageId: this.nextId()
             })
             if (!result.success) {
                 throw new Error(result.error ?? 'Worker init failed')
@@ -139,7 +139,7 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
                 type: 'GET',
                 url,
                 version: this.version,
-                messageId: `pdc_${Date.now()}_${this.pdcCounter++}`
+                messageId: this.nextId()
             })
             if (result.found && result.pixels) {
                 this.stats.hits++
@@ -170,7 +170,7 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
             width,
             height,
             version: this.version,
-            messageId: `pdc_${Date.now()}_${this.pdcCounter++}`
+            messageId: this.nextId()
         }).then((result) => {
             if (result.success) this.stats.stores++
             return result.success
@@ -188,7 +188,7 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
         try {
             const result = await this.send<ClearResult>({
                 type: 'CLEAR',
-                messageId: `pdc_${Date.now()}_${this.pdcCounter++}`
+                messageId: this.nextId()
             })
             return result.success
         } catch {
@@ -207,7 +207,7 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
         try {
             const result = await this.send<StatsResult>({
                 type: 'GET_STATS',
-                messageId: `pdc_${Date.now()}_${this.pdcCounter++}`
+                messageId: this.nextId()
             })
             return { count: result.count, estimatedMB: result.estimatedMB }
         } catch {
