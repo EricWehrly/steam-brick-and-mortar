@@ -1,5 +1,6 @@
 import { test } from '@playwright/test'
 import { writeFile, mkdir } from 'fs/promises'
+import { getResultPath } from './helpers/results'
 import { waitForSceneReady, attachConsoleCollector } from './helpers/scene'
 
 /**
@@ -22,9 +23,7 @@ test('screenshot: scene at startup', async ({ page }) => {
   await page.goto('/')
   await waitForSceneReady(page, 25000, 12000)  // 12s settle — allows material upserts to complete
 
-  await mkdir('test-results', { recursive: true })
-
-  const screenshotPath = 'test-results/screenshot-startup.png'
+  const screenshotPath = await getResultPath('screenshot-startup.png')
   await page.screenshot({ path: screenshotPath, fullPage: false })
   console.log(`\nScreenshot saved: ${screenshotPath}`)
 
