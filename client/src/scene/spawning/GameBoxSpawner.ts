@@ -98,7 +98,7 @@ export class GameBoxSpawner {
     spawnGamesOnShelf(
         shelfPosition: THREE.Vector3,
         games: readonly SteamGameData[],
-        _rowIndex: number,
+        rowIndex: number,
         _shelfIndex: number,
         shelfRotationY: number = 0
     ): void {
@@ -114,7 +114,15 @@ export class GameBoxSpawner {
                 gameIndex += frontGames.length
             }
             if (gameIndex < games.length) {
-                // TD: wall-shelf-back-side � wall-mounted shelves should not fill the back side.
+                // Temporary layout rule: suppress backside fill on backmost ring (row 4)
+                // so the far wall reads cleaner and avoids clipping/overdensity.
+                // TD: formalize as layout policy from planner (not hardcoded row index).
+                const allowBackSide = rowIndex < 4
+                if (!allowBackSide) {
+                    continue
+                }
+
+                // TD: wall-shelf-back-side - wall-mounted shelves should not fill the back side.
                 // Currently all shelves fill both sides. When wall vs. floor-standing shelf types
                 // are differentiated, gate this on shelf.isWallMounted or similar.
                 const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)

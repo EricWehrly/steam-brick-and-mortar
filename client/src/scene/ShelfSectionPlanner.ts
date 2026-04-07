@@ -34,7 +34,7 @@ export class ShelfSectionPlanner {
     private games: SteamGameData[] = []
 
     constructor(scene: THREE.Scene, config: ShelfSectionPlannerConfig = {}) {
-        this.signSystem = new SceneSignManager(scene)
+        this.signSystem = new SceneSignManager()
         this.config = {
             signYOffset: config.signYOffset ?? DEFAULT_SIGN_Y_OFFSET,
             signMountStyle: config.signMountStyle ?? DEFAULT_MOUNT_STYLE,

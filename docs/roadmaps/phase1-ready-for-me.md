@@ -763,3 +763,7 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 **Rationale**: Phase 2 infrastructure hardening works best with clean architectural foundations. Address structural issues now to prevent compound complexity later.
 
 **Decision Trigger**: Complete remaining Phase 1 features → Tech debt cleanup sprint → Begin Phase 2
+
+
+## Transitional Glue Work (No New Phase Label)
+See docs/roadmaps/glue-work-before-phase2.md for short-run cleanup + scheduling work that happens after Phase 1 completion and before full Phase 2 execution.

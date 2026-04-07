@@ -2,6 +2,8 @@
 
 ## Phase Overview
 
+**Pre-Phase-2 Glue Track:** see docs/roadmaps/glue-work-before-phase2.md for transition tasks (lint baseline, tech debt scheduling, branch polish).
+
 **Goal**: Works for people standing next to you during conversation
 
 **Scope**: Infrastructure hardening and multi-user capability
@@ -716,3 +718,26 @@ Design note: the lighting preset system and the room variant system (cozy baseme
 
 **Exit Criteria**: System works reliably for multiple concurrent users with large Steam libraries, demonstrating production-level infrastructure without public compliance requirements
 
+
+---
+
+## Scheduled Inputs from Session Dossier (Apr 6-7)
+
+These items are carried from session-dossier-2026-04-06.md into Phase 2 planning where appropriate:
+
+### Early Phase 2
+- Steam user tags pipeline (SteamSpy-backed): Lambda exposure -> client categorization
+- Artwork fetch-on-demand policy (game-box art first, detail art deferred)
+- Detail-page artwork metadata listing (source + cache)
+- "Sort by" in-scene affordance and sort mode switch UI
+
+### Mid / General Phase 2
+- SceneManager/DataManager scene access pattern consolidation
+- Sort policy ownership fix (off SteamApiClient)
+- Generic sort utility (sortByFields)
+- Readonly event payload hardening
+- SignageRenderer singleton/static-method evaluation
+
+### Deferred beyond current Phase 2 scope
+- Physical neon sign mounting hardware pass (ceiling bracket/cable)
+- Multi-instance genre sections architecture (same game in multiple thematic views)

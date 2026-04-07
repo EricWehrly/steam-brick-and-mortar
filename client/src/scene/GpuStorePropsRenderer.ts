@@ -271,21 +271,30 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Most-recently-played games are at the front within arm's reach;
         // older games fill the panoramic back arcs.
         // Per-row counts distributed to fill total: front gets fewer, back gets more.
-        const BASE_FRONT = 3   // inner ring — intimate, browsable from standing position
-        const BASE_BACK  = Math.ceil((totalShelves - BASE_FRONT * 2) / 3)  // distribute remainder
         const arcConfig: ArcLayoutConfig = {
             rows: 5,
-            shelvesPerRow: BASE_BACK,
+            shelvesPerRow: 10,
             shelvesPerRowByRow: [
-                BASE_FRONT,                      // row 0: 3  — closest, sparse
-                Math.ceil(BASE_FRONT * 1.5),     // row 1: ~5 — transition
-                BASE_BACK,                       // row 2: N  — normal density
-                Math.ceil(BASE_BACK * 1.3),      // row 3: bigger arc
-                Math.ceil(BASE_BACK * 1.6),      // row 4: widest, most games
+                4,
+                6,
+                10,
+                12,
+                Math.max(1, totalShelves - 4 - 6 - 10 - 12),
             ],
-            rowRadiusStep: 4.0,
-            firstRowRadius: 4.5,   // slightly closer front row
+            // Narrower front angle keeps row0 shelves closer together without overlap
+            // while wider back angles preserve horizon spread.
             halfAngle: Math.PI / 3,
+            halfAngleByRow: [
+                Math.PI / 4.2, // row0
+                Math.PI / 3.8, // row1
+                Math.PI / 3.2, // row2
+                Math.PI / 3.0, // row3
+                Math.PI / 2.6, // row4
+            ],
+            minShelfGap: 1.0,
+            shelfWidthMetres: 2.0,
+            rowRadiusStep: 4.0,
+            firstRowRadius: 4.5,
         }
         const arcShelves = computeArcShelfLayout(totalShelves, arcConfig)
 

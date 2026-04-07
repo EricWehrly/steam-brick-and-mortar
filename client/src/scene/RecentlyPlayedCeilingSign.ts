@@ -29,7 +29,7 @@ export class RecentlyPlayedCeilingSign {
     private readonly signSystem: SceneSignManager
 
     constructor(scene: THREE.Scene) {
-        this.signSystem = new SceneSignManager(scene)
+        this.signSystem = new SceneSignManager()
     }
 
     /** Place (or replace) the Recently Played ceiling sign. */
