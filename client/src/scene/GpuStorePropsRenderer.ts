@@ -10,8 +10,8 @@
  * - Store layout reference
  *
  * RECEIVES (Events):
- * - BatchReadyForPlacement ? Triggers renderer initialization on first batch
- * - ShelfSpaceRequested ? Creates shelf and emits ShelfCreated
+ * - BatchReadyForPlacement → Triggers renderer initialization on first batch
+ * - ShelfSpaceRequested → Creates shelf and emits ShelfCreated
  *
  * CURRENT ISSUES (see gpustoreprops-event-untangling.md):
  * - Still acts as middleman for some flows
@@ -127,7 +127,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         // Initialize eagerly - emits RendererReady event when complete
         this.instancedShelfRenderer.initialize().catch(error => {
-            console.error('? Failed to initialize InstancedShelfRenderer:', error)
+            console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
             throw error
         })
 
@@ -241,7 +241,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private async waitForShelfRendererReady(): Promise<void> {
         if (!this.instancedShelfRenderer) {
-            console.error('? No shelf renderer instance')
+            console.error('❌ No shelf renderer instance')
             return
         }
 
@@ -252,7 +252,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         }
 
         // Wait for RendererReady event
-        console.log('? Waiting for RendererReady event...')
+        console.log('⚠️ Waiting for RendererReady event...')
         return new Promise<void>((resolve) => {
             this.initializationQueue.push(resolve)
         })
@@ -316,7 +316,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             }
         )
         GpuStorePropsRenderer.logger.debug(
-            `Shelf layout determined: ${this.shelfLayout.rows} rows � ${this.shelfLayout.shelvesPerRow} shelves`
+            `Shelf layout determined: ${this.shelfLayout.rows} rows → ${this.shelfLayout.shelvesPerRow} shelves`
         )
     }
 
@@ -327,7 +327,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         const oldLength = this.shelfPositions.length
         const progress = this.batchCoordinator.getProgress()
-        console.warn(`?? BATCH COUNT MISMATCH: Received batch ${batchIndex + 1} but only allocated ${oldLength} positions`)
+        console.warn(`⚠️ BATCH COUNT MISMATCH: Received batch ${batchIndex + 1} but only allocated ${oldLength} positions`)
         console.warn(`   Expected: ${progress.total}, Actual: >${batchIndex + 1}. Expanding...`)
         this.preallocateShelfPositions(batchIndex + 1)
     }
@@ -335,7 +335,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private async createShelfForBatchIndex(batchIndex: number): Promise<void> {
         const isReady = this.instancedShelfRenderer?.isReady()
         if (!isReady) {
-            console.error(`? InstancedShelfRenderer not ready for batch ${batchIndex + 1}!`)
+            console.error(`❌ InstancedShelfRenderer not ready for batch ${batchIndex + 1}!`)
             console.error('   Renderer state:', {
                 exists: !!this.instancedShelfRenderer,
                 isReady: isReady,
@@ -348,7 +348,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const baseShelfPosition = this.shelfPositions[batchIndex]
 
         if (!baseShelfPosition) {
-            console.error(`? CRITICAL: Shelf position ${batchIndex} is undefined even after allocation!`)
+            console.error(`❌ CRITICAL: Shelf position ${batchIndex} is undefined even after allocation!`)
             return
         }
 
@@ -399,7 +399,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private finalizeProgressiveLoading(): void {
-        console.debug(`? Progressive loading complete: ${this.cumulativeShelfCount} shelves created`)
+        console.debug(`✅ Progressive loading complete: ${this.cumulativeShelfCount} shelves created`)
 
         this.resetBatchState()
     }
@@ -451,7 +451,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     public async addAtmosphericProps(): Promise<void> {
         // TODO: PropRenderer not instantiated - this method is currently non-functional
-        console.warn('?? addAtmosphericProps not implemented - PropRenderer not instantiated')
+        console.warn('⚠️ addAtmosphericProps not implemented - PropRenderer not instantiated')
     }
 
     public updatePerformanceData(_camera: THREE.Camera): void {

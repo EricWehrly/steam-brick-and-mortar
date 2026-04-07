@@ -516,3 +516,50 @@ class Foo {
 **Context**: Signs now use DataTexture pixel snapshots. InstancedLabelRenderer uses a texture array approach. Worth reviewing if one can serve both, or if the approaches should stay separate for different use cases (sign = large static label, game box = dense small label). Revisit during UI normalization or when sign rendering needs improving.
 **Source**: Apr 2026
 
+
+
+---
+
+## Category System Tech Debt (from PR #38 review, Apr 2026)
+
+### Generic sort-by-field utility
+**Priority**: Medium (next categories refactor)
+**Context**: sortByGenreThenPlaytime in CategoryAssigner.ts is a one-off comparator. The right abstraction is a generic sortByFields(['genre', 'playtime']) function that takes field names as parameters. TypeScript's mapped types make this achievable without losing type safety. The current function has a TD comment.
+**Next steps**:
+- Design a sortByFields<T>(fields: (keyof T)[]) utility in src/utils/
+- Replace sortByGenreThenPlaytime with a call to it
+- Move sort policy out of CategoryAssigner (see "Sort policy in SteamApiClient" below)
+
+### Sort policy belongs off SteamApiClient
+**Priority**: Medium
+**Context**: SteamApiClient.loadGamesProgressively accepts a sortFn param (currently used for sortByGenreThenPlaytime). This works as a pass-through, but the sort policy — what field order we care about — doesn't belong in the data-fetching layer. It's a presentation concern.
+**Next steps**:
+- Move sort application upstream: caller assembles sort policy, passes pre-sorted games to the pipeline
+- Or: introduce a GameSortPipeline that wraps the fetch and handles transform
+- Discuss when designing the "groups ? shelves conversation" layout system
+
+### CategorySignSystem ? SceneSignManager rename
+**Priority**: Low (next sign-related work)
+**Context**: CategorySignSystem is named too narrowly — it handles sign placement in a scene, not just category signs. When ceiling signs (recently-played) are added it'll look wrong.
+**Candidate name**: SceneSignManager
+**Next steps**: Rename file + class when we add the second sign type; no need to do it in isolation
+
+### CategoryAssigner is a temporary classification hack
+**Priority**: Medium (before user-tag pipeline)
+**Context**: The current genre-lookup approach is known-imperfect. It was introduced as a stand-in while we pursue Steam user tags (from SteamSpy API) as a better category source. Once tags are available, CategoryAssigner will likely be replaced or heavily refactored.
+**Note**: Don't over-invest in refining the genre-lookup logic; invest in the tag pipeline instead.
+
+### CategorySignSystem: scene access pattern / SceneManager
+**Priority**: Medium (architecture cleanup)
+**Context**: CategorySignSystem takes scene as a constructor param. The desired pattern is to get scene from a DataManager / SceneManager static accessor, so there's one access pattern for the scene across all code.
+**Proposed**: Add a SceneManager with a static get(index: SceneIndex): THREE.Scene that pulls from the DataManager. Register scenes with an index enum on creation.
+**Next steps**: Design SceneManager interface; migrate CategorySignSystem and other direct-scene-param classes
+
+### SignageRenderer: singleton vs instance
+**Priority**: Low
+**Context**: SignageRenderer is currently instantiated per-use. If it holds no instance state (all methods are pure given inputs), it could be a module with exported functions, or a singleton. Evaluate when touching sign rendering.
+
+### Readonly event payloads
+**Priority**: Low/Medium
+**Context**: Events should emit eadonly everything to prevent accidental mutation of shared event data. Currently not enforced. Worth a lint rule or type-level enforcement.
+**Next steps**: Add Readonly<T> wrapping to all emitted event payloads in InteractionEvents.ts; consider a custom ESLint rule
