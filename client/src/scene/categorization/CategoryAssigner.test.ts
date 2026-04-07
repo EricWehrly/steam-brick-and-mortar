@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CategoryAssigner, KNOWN_GENRES, sortByGenreThenPlaytime, sortByRecentlyPlayed, type ShelfGroup } from './CategoryAssigner'
+import { CategoryAssigner, KNOWN_GENRES, sortByGenreThenPlaytime, sortByRecentlyPlayed, getRecentlyPlayedBucket, getBucketLabel, type ShelfGroup } from './CategoryAssigner'
 import type { SteamGameData } from '../game-box/types/GameData'
 
 describe('CategoryAssigner', () => {
@@ -142,12 +142,12 @@ describe('sortByGenreThenPlaytime', () => {
         const games = [
             game(null, 1000),         // no genre
             game('Action', 50),
-            game('Acción', 500),      // unrecognised genre -> Other
+            game('Acciï¿½n', 500),      // unrecognised genre -> Other
             game('RPG', 100),
         ]
         const sorted = [...games].sort(sortByGenreThenPlaytime)
         const lastTwo = sorted.slice(-2).map(g => g.genres?.[0]?.description ?? 'Other')
-        expect(lastTwo.every(g => g === 'Other' || g === 'Acción')).toBe(true)
+        expect(lastTwo.every(g => g === 'Other' || g === 'Acciï¿½n')).toBe(true)
     })
 
     it('is stable for equal genre+playtime', () => {
@@ -157,7 +157,7 @@ describe('sortByGenreThenPlaytime', () => {
     })
 })
 
-describe('CategoryAssigner — genre policy', () => {
+describe('CategoryAssigner ï¿½ genre policy', () => {
     const assigner = new CategoryAssigner()
     const game = (genres: Array<{ id: string, description: string }>, playtime = 100) => ({
         appid: Math.random(),
@@ -168,7 +168,7 @@ describe('CategoryAssigner — genre policy', () => {
 
     it('uses genres[0] as the primary category (secondary genre preference is deferred)', () => {
         // Current behavior: genres[0] is used as-is.
-        // TODO: Secondary genre preference for Action-tagged games is complex —
+        // TODO: Secondary genre preference for Action-tagged games is complex ï¿½
         // [Action, Adventure] is just as broad as [Action] alone. Deferred until
         // we have a smarter policy (e.g. rarest genre wins, or a curated override list).
         const games = [
@@ -244,5 +244,59 @@ describe('sortByRecentlyPlayed', () => {
         ]
         const sorted = [...games].sort(sortByRecentlyPlayed)
         expect(sorted[0].rtime_last_played).toBe(50)
+    })
+})
+
+describe('getRecentlyPlayedBucket', () => {
+    const DAY = 24 * 60 * 60
+    const now = 1000000000 // Fixed reference time for deterministic tests
+
+    const game = (rtime: number | undefined) => ({
+        rtime_last_played: rtime,
+    } as SteamGameData)
+
+    it('returns "unplayed" for rtime_last_played = 0 or undefined', () => {
+        expect(getRecentlyPlayedBucket(game(0), now)).toBe('unplayed')
+        expect(getRecentlyPlayedBucket(game(undefined), now)).toBe('unplayed')
+    })
+
+    it('returns "today" for within 24h', () => {
+        expect(getRecentlyPlayedBucket(game(now - 1), now)).toBe('today')
+        expect(getRecentlyPlayedBucket(game(now - DAY + 1), now)).toBe('today')
+    })
+
+    it('returns "this-week" for within 7 days', () => {
+        expect(getRecentlyPlayedBucket(game(now - DAY), now)).toBe('this-week')
+        expect(getRecentlyPlayedBucket(game(now - 7 * DAY + 1), now)).toBe('this-week')
+    })
+
+    it('returns "this-month" for within 30 days', () => {
+        expect(getRecentlyPlayedBucket(game(now - 7 * DAY), now)).toBe('this-month')
+        expect(getRecentlyPlayedBucket(game(now - 30 * DAY + 1), now)).toBe('this-month')
+    })
+
+    it('returns "this-year" for within 365 days', () => {
+        expect(getRecentlyPlayedBucket(game(now - 30 * DAY), now)).toBe('this-year')
+        expect(getRecentlyPlayedBucket(game(now - 365 * DAY + 1), now)).toBe('this-year')
+    })
+
+    it('returns "before" for older than 365 days', () => {
+        expect(getRecentlyPlayedBucket(game(now - 365 * DAY), now)).toBe('before')
+        expect(getRecentlyPlayedBucket(game(now - 1000 * DAY), now)).toBe('before')
+    })
+
+    it('handles future dates as "today"', () => {
+        expect(getRecentlyPlayedBucket(game(now + 3600), now)).toBe('today')
+    })
+})
+
+describe('getBucketLabel', () => {
+    it('returns correct human-readable labels', () => {
+        expect(getBucketLabel('today')).toBe('Played Today')
+        expect(getBucketLabel('this-week')).toBe('Played This Week')
+        expect(getBucketLabel('this-month')).toBe('Played This Month')
+        expect(getBucketLabel('this-year')).toBe('Played This Year')
+        expect(getBucketLabel('before')).toBe('Played Before')
+        expect(getBucketLabel('unplayed')).toBe('Never Played')
     })
 })
