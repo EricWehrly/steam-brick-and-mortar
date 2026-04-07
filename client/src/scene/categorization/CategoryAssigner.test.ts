@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CategoryAssigner, KNOWN_GENRES, sortByGenreThenPlaytime, sortByRecentlyPlayed, getRecentlyPlayedBucket, getBucketLabel, type ShelfGroup } from './CategoryAssigner'
+import { CategoryAssigner, KNOWN_GENRES, sortByGenreThenPlaytime, sortByRecentlyPlayed, getRecentlyPlayedBucket, getBucketLabel, RecentlyPlayedBucket, type ShelfGroup } from './CategoryAssigner'
 import type { SteamGameData } from '../game-box/types/GameData'
 
 describe('CategoryAssigner', () => {
@@ -256,47 +256,47 @@ describe('getRecentlyPlayedBucket', () => {
     } as SteamGameData)
 
     it('returns "unplayed" for rtime_last_played = 0 or undefined', () => {
-        expect(getRecentlyPlayedBucket(game(0), now)).toBe('unplayed')
-        expect(getRecentlyPlayedBucket(game(undefined), now)).toBe('unplayed')
+        expect(getRecentlyPlayedBucket(game(0), now)).toBe(RecentlyPlayedBucket.Unplayed)
+        expect(getRecentlyPlayedBucket(game(undefined), now)).toBe(RecentlyPlayedBucket.Unplayed)
     })
 
     it('returns "today" for within 24h', () => {
-        expect(getRecentlyPlayedBucket(game(now - 1), now)).toBe('today')
-        expect(getRecentlyPlayedBucket(game(now - DAY + 1), now)).toBe('today')
+        expect(getRecentlyPlayedBucket(game(now - 1), now)).toBe(RecentlyPlayedBucket.Today)
+        expect(getRecentlyPlayedBucket(game(now - DAY + 1), now)).toBe(RecentlyPlayedBucket.Today)
     })
 
     it('returns "this-week" for within 7 days', () => {
-        expect(getRecentlyPlayedBucket(game(now - DAY), now)).toBe('this-week')
-        expect(getRecentlyPlayedBucket(game(now - 7 * DAY + 1), now)).toBe('this-week')
+        expect(getRecentlyPlayedBucket(game(now - DAY), now)).toBe(RecentlyPlayedBucket.ThisWeek)
+        expect(getRecentlyPlayedBucket(game(now - 7 * DAY + 1), now)).toBe(RecentlyPlayedBucket.ThisWeek)
     })
 
     it('returns "this-month" for within 30 days', () => {
-        expect(getRecentlyPlayedBucket(game(now - 7 * DAY), now)).toBe('this-month')
-        expect(getRecentlyPlayedBucket(game(now - 30 * DAY + 1), now)).toBe('this-month')
+        expect(getRecentlyPlayedBucket(game(now - 7 * DAY), now)).toBe(RecentlyPlayedBucket.ThisMonth)
+        expect(getRecentlyPlayedBucket(game(now - 30 * DAY + 1), now)).toBe(RecentlyPlayedBucket.ThisMonth)
     })
 
     it('returns "this-year" for within 365 days', () => {
-        expect(getRecentlyPlayedBucket(game(now - 30 * DAY), now)).toBe('this-year')
-        expect(getRecentlyPlayedBucket(game(now - 365 * DAY + 1), now)).toBe('this-year')
+        expect(getRecentlyPlayedBucket(game(now - 30 * DAY), now)).toBe(RecentlyPlayedBucket.ThisYear)
+        expect(getRecentlyPlayedBucket(game(now - 365 * DAY + 1), now)).toBe(RecentlyPlayedBucket.ThisYear)
     })
 
     it('returns "before" for older than 365 days', () => {
-        expect(getRecentlyPlayedBucket(game(now - 365 * DAY), now)).toBe('before')
-        expect(getRecentlyPlayedBucket(game(now - 1000 * DAY), now)).toBe('before')
+        expect(getRecentlyPlayedBucket(game(now - 365 * DAY), now)).toBe(RecentlyPlayedBucket.Before)
+        expect(getRecentlyPlayedBucket(game(now - 1000 * DAY), now)).toBe(RecentlyPlayedBucket.Before)
     })
 
     it('handles future dates as "today"', () => {
-        expect(getRecentlyPlayedBucket(game(now + 3600), now)).toBe('today')
+        expect(getRecentlyPlayedBucket(game(now + 3600), now)).toBe(RecentlyPlayedBucket.Today)
     })
 })
 
 describe('getBucketLabel', () => {
     it('returns correct human-readable labels', () => {
-        expect(getBucketLabel('today')).toBe('Played Today')
-        expect(getBucketLabel('this-week')).toBe('Played This Week')
-        expect(getBucketLabel('this-month')).toBe('Played This Month')
-        expect(getBucketLabel('this-year')).toBe('Played This Year')
-        expect(getBucketLabel('before')).toBe('Played Before')
-        expect(getBucketLabel('unplayed')).toBe('Never Played')
+        expect(getBucketLabel(RecentlyPlayedBucket.Today)).toBe('Played Today')
+        expect(getBucketLabel(RecentlyPlayedBucket.ThisWeek)).toBe('Played This Week')
+        expect(getBucketLabel(RecentlyPlayedBucket.ThisMonth)).toBe('Played This Month')
+        expect(getBucketLabel(RecentlyPlayedBucket.ThisYear)).toBe('Played This Year')
+        expect(getBucketLabel(RecentlyPlayedBucket.Before)).toBe('Played Before')
+        expect(getBucketLabel(RecentlyPlayedBucket.Unplayed)).toBe('Never Played')
     })
 })

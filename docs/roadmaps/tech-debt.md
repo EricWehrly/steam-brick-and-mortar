@@ -596,3 +596,8 @@ ManagedWorker.ts and be used only internally.
 **Issue**: // TD comments are hard to search/track without a consistent tag.
 **Fix direction**: Adopt // TD [tag-id]: description format e.g. // TD [layout-policy]: ....
 Apply to new TD comments going forward; backfill existing ones during lint pass.
+
+### CSS token file naming convention
+**Priority**: Low
+**Issue**: ui-design-tokens.css is too generic; split into purposeful token files (e.g. 	okens-colors.css, 	okens-spacing.css) and component token maps (	okens-panel.css, 	okens-button.css).
+**Source**: PR #40 review comment on main.css line 2.

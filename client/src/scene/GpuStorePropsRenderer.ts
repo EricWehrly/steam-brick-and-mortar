@@ -58,6 +58,7 @@ import {
     getRecentlyPlayedBucket,
     getBucketLabel,
     sortByRecentlyPlayed,
+    RecentlyPlayedBucket,
 } from './categorization/CategoryAssigner'
 import { SceneSignManager, SignStyles } from './SceneSignManager'
 import {
@@ -260,7 +261,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const SIGN_ANCHOR_Y_OFFSET = 1.1
         const MIN_DIST_FROM_CEILING_SIGN = 1.5
         const ceilingSignPos = this.recentlyPlayedSign.getPosition()
-        let lastBucket: string | null = null
+        let lastBucket: RecentlyPlayedBucket | null = null
 
         // Iterate through shelves; each shelf holds ~18 games (BATCH_SIZE)
         // We use this.shelfPositions to determine where to place the signs.
@@ -274,7 +275,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             const firstGame = sortedGames[firstGameIndex]
             const bucket = getRecentlyPlayedBucket(firstGame)
 
-            if (bucket !== 'unplayed' && bucket !== lastBucket) {
+            if (bucket !== RecentlyPlayedBucket.Unplayed && bucket !== lastBucket) {
                 // Check distance from Recently Played ceiling sign
                 const anchor = new THREE.Vector3(
                     shelfPos.x,
