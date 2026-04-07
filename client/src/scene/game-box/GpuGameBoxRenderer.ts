@@ -155,12 +155,14 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     public createLabelGameBox(
         game: SteamGameData,
         position: THREE.Vector3,
-        side: ShelfSide = ShelfSide.Front
+        side: ShelfSide = ShelfSide.Front,
+        rotation?: THREE.Quaternion
     ): void {
         const success = this.instancedLabelRenderer.addLabelInstance(
             position,
             game.name,
-            side
+            side,
+            rotation
         )
         
         if (!success) {
@@ -185,7 +187,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         if (artworkUrl) {
             this.createGameBoxFromUrl(game, position, artworkUrl, side, rotation)
         } else if (AppSettings.get(Setting.EnableLabels)) {
-            this.createLabelGameBox(game, position, side)
+            this.createLabelGameBox(game, position, side, rotation)
         }
     }
     
