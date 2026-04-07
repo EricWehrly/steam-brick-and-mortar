@@ -13,6 +13,7 @@ import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
 import { GameArtworkProvider } from './GameArtworkProvider'
 import { DataManager } from '../../../core/data/DataManager'
+import { captureMemorySnapshot } from '../../../utils/MemoryReport'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Re-export for consumers
@@ -44,6 +45,7 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         
         // Renderer stats
         ;(window as any).lodCacheStats = () => this.logHighTextureCacheStats()
+        ;(window as any).memorySnapshot = () => captureMemorySnapshot()
         ;(window as any).diagnosePending = () => this.diagnosePendingState()
         
         // Artwork failure tracking
