@@ -1,5 +1,5 @@
 /* Main application styles */
-@import './ui-design-tokens.css';
+@import './ui-panel-tokens.css';
 @import './components/toast.css';
 @import './components/steam-ui.css';
 @import './components/lighting-controls.css';

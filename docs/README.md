@@ -51,3 +51,7 @@ Read these when touching specific complex systems (e.g., WebXR, Instancing, Even
 ### 🔬 research/ & 📦 archive/
 **Historical context.**
 Do not read these unless specifically looking for why a past decision was made or how an old feature worked.
+
+## Delegation Notes
+- docs/plans/open-subagent-threads.md is the active prioritized queue for bounded subagent work.
+- Non-project-specific agent prompts belong in the OpenClaw workspace (outside this repo).
