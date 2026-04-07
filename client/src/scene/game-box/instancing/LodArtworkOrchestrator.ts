@@ -270,15 +270,14 @@ export class LodArtworkOrchestrator {
             
             // Create instance
             const resolvedUrl = artwork.getUrl()
-            const instanceIndex = this.renderer.addInstance(
+            const instanceIndex = this.renderer.addInstance({
                 position,
                 textureIndex,
                 gameName,
-                resolvedUrl,
-                this.lazyHighTextures ? LOD_LEVEL.MID : LOD_LEVEL.HIGH,
-                undefined,
-                rotation
-            )
+                artworkUrl: resolvedUrl,
+                lodLevel: this.lazyHighTextures ? LOD_LEVEL.MID : LOD_LEVEL.HIGH,
+                rotation,
+            })
             
             if (instanceIndex < 0) {
                 return { success: false, instanceIndex: -1 }

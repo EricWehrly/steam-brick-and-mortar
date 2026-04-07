@@ -5,7 +5,7 @@
  * front of the store. The sign uses the SceneSignManager ceiling mount style.
  *
  * Phase 1: flat above-shelf geometry at ceiling height (visible, not yet a
- * true hanging cable-and-bracket sign — that is a future visual pass).
+ * true hanging cable-and-bracket sign ï¿½ that is a future visual pass).
  * Tech debt: docs/roadmaps/tech-debt.md -> "Ceiling sign visual pass"
  */
 
@@ -20,16 +20,18 @@ export const RECENTLY_PLAYED_SIGN_LABEL = 'Recently Played'
 const SIGN_ANCHOR_Z = -6.4
 
 /**
- * Drop from ceiling — how far below ceiling surface the sign centre sits.
+ * Drop from ceiling ï¿½ how far below ceiling surface the sign centre sits.
  * Enough to be clearly readable when standing at the entrance.
  */
 const SIGN_DROP_FROM_CEILING = 0.5
 
 export class RecentlyPlayedCeilingSign {
-    private readonly signSystem: SceneSignManager
+    private get signSystem(): SceneSignManager {
+        return SceneSignManager.instance
+    }
 
     constructor() {
-        this.signSystem = new SceneSignManager()
+        // SceneSignManager is a singleton - no local instance needed
     }
 
     /** Place (or replace) the Recently Played ceiling sign. */
@@ -44,7 +46,7 @@ export class RecentlyPlayedCeilingSign {
             label: RECENTLY_PLAYED_SIGN_LABEL,
             anchorPosition: new THREE.Vector3(centerX, y, SIGN_ANCHOR_Z),
             mount,
-            // Blue text on gold — matches the store theme direction.
+            // Blue text on gold ï¿½ matches the store theme direction.
             // TD: align with UI design tokens once store theme is finalised
             //     docs/roadmaps/tech-debt.md -> "UI design tokens"
             style: {
@@ -57,6 +59,6 @@ export class RecentlyPlayedCeilingSign {
     }
 
     public dispose(): void {
-        this.signSystem.dispose()
+        // Shared SceneSignManager.instance - not disposed here; owner is responsible
     }
 }

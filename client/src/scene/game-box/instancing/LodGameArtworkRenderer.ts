@@ -345,15 +345,15 @@ export class LodGameArtworkRenderer {
      * Add a new instance at the given position.
      * Returns the instance index, or -1 if at capacity.
      */
-    public addInstance(
-        position: THREE.Vector3,
-        textureIndex: number,
-        gameName: string,
-        artworkUrl?: string,
-        lodLevel: LodLevel = this.config.defaultLod,
-        highTextureSlot: number = -1,
-        rotation?: THREE.Quaternion
-    ): number {
+    public addInstance({
+        position,
+        textureIndex,
+        gameName,
+        artworkUrl,
+        lodLevel = this.config.defaultLod,
+        highTextureSlot = -1,
+        rotation,
+    }: AddInstanceParams): number {
         if (!this.instancedMesh || !this.geometry) {
             LodGameArtworkRenderer.logger.warn('Cannot add instance: renderer not initialized')
             return -1
