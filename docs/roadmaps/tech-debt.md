@@ -616,3 +616,11 @@ Apply to new TD comments going forward; backfill existing ones during lint pass.
 **Context**: Current per-call counters (hits/misses/stores/errors) may be heavier than needed. Review lower-instrumentation alternatives (sampling, debug-only counters, worker-native stats only) and keep only data that is actually consumed.
 **Source**: PR #40 follow-up
 
+
+
+### Workers: Support Transferables in ManagedWorker
+**Priority**: Low
+**Effort**: XS
+**Context**: ManagedWorker.send() does not currently support passing a transfer array. If we ever need to pass large buffers TO the worker without copying, ManagedWorker needs a signature update (e.g. send<T>(msg, transfer?: Transferable[])).
+**Source**: Apr 2026 class review
+
