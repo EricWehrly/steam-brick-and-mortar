@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sortByGenreThenPlaytime } from './CategoryAssigner'
-import { CategoryAssigner, KNOWN_GENRES, type ShelfGroup } from './CategoryAssigner'
+import { CategoryAssigner, KNOWN_GENRES, sortByGenreThenPlaytime, sortByRecentlyPlayed, type ShelfGroup } from './CategoryAssigner'
 import type { SteamGameData } from '../game-box/types/GameData'
 
 describe('CategoryAssigner', () => {
@@ -102,6 +101,8 @@ describe('CategoryAssigner', () => {
         expect(result[result.length - 1].genre).toBe('Other')
     })
 
+})
+
 describe('sortByGenreThenPlaytime', () => {
     const game = (genre: string | null, playtime: number) => ({
         appid: Math.random(),
@@ -154,7 +155,7 @@ describe('sortByGenreThenPlaytime', () => {
         const sorted = [...games].sort(sortByGenreThenPlaytime)
         expect(sorted).toHaveLength(2)
     })
-})})
+})
 
 describe('CategoryAssigner — genre policy', () => {
     const assigner = new CategoryAssigner()
@@ -203,5 +204,45 @@ describe('CategoryAssigner — genre policy', () => {
         const earlyAccess = result.find(g => g.genre === 'Early Access')
         expect(earlyAccess).toBeUndefined()
         expect(result.find(g => g.genre === 'Other')?.games).toHaveLength(1)
+    })
+})
+
+describe('sortByRecentlyPlayed', () => {
+    it('sorts most-recently-played first', () => {
+        const games = [
+            { rtime_last_played: 100, playtime_forever: 50 },
+            { rtime_last_played: 999, playtime_forever: 10 },
+            { rtime_last_played: 200, playtime_forever: 30 },
+        ]
+        const sorted = [...games].sort(sortByRecentlyPlayed)
+        expect(sorted.map(g => g.rtime_last_played)).toEqual([999, 200, 100])
+    })
+
+    it('places never-played games (rtime=0) last', () => {
+        const games = [
+            { rtime_last_played: 0, playtime_forever: 100 },
+            { rtime_last_played: 500, playtime_forever: 5 },
+        ]
+        const sorted = [...games].sort(sortByRecentlyPlayed)
+        expect(sorted[0].rtime_last_played).toBe(500)
+        expect(sorted[1].rtime_last_played).toBe(0)
+    })
+
+    it('breaks ties by playtime descending', () => {
+        const games = [
+            { rtime_last_played: 100, playtime_forever: 30 },
+            { rtime_last_played: 100, playtime_forever: 80 },
+        ]
+        const sorted = [...games].sort(sortByRecentlyPlayed)
+        expect(sorted[0].playtime_forever).toBe(80)
+    })
+
+    it('handles missing rtime_last_played (treats as 0)', () => {
+        const games = [
+            { playtime_forever: 100 },
+            { rtime_last_played: 50, playtime_forever: 10 },
+        ]
+        const sorted = [...games].sort(sortByRecentlyPlayed)
+        expect(sorted[0].rtime_last_played).toBe(50)
     })
 })

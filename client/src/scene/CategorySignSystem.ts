@@ -155,13 +155,15 @@ export class CategorySignSystem {
                     anchor.z - CategorySignSystem.SIGN_Z_FACE_PLAYER // face player
                 )
             }
-            case 'wall':
-            case 'ceiling': {
-                // TODO: Phase 2 â€” wall and ceiling mount resolution
-                // Wall: position at anchor.x, anchor.y + yOffset, against nearest wall Z
-                // Ceiling: position at anchor.x, ceilingHeight - yOffset, anchor.z
+            case 'wall': {
+                // TD: wall mount position resolution — needs nearest wall Z (defer to SceneManager pass)
                 const yOff = mount.yOffset ?? 0
                 return new THREE.Vector3(anchor.x, anchor.y + yOff, anchor.z)
+            }
+            case 'ceiling': {
+                // Ceiling mount: caller sets anchor.y directly to the desired sign height
+                // (e.g. RoomConstants.STORE_CEILING_HEIGHT - drop). yOffset is not applied here.
+                return new THREE.Vector3(anchor.x, anchor.y, anchor.z)
             }
         }
     }
