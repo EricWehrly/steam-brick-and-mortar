@@ -20,6 +20,8 @@ export interface SteamGame extends SteamGameMetadata {
     name: string
     playtime_forever: number
     playtime_2weeks?: number
+    /** Unix timestamp of last play session. 0 means never played (but owned). */
+    rtime_last_played?: number
     img_icon_url: string
     img_logo_url: string
     artwork: {

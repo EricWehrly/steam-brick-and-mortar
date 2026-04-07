@@ -66,6 +66,22 @@ export function sortByGenreThenPlaytime(
  * and group ordering is a separate concern from the transform itself.
  * Tech debt link: docs/roadmaps/tech-debt.md → "Category System Tech Debt / CategoryAssigner is a temporary classification hack"
  */
+
+/**
+ * Sort comparator: most-recently-played first.
+ * Games with rtime_last_played = 0 (never played) sort last.
+ * Ties fall back to playtime descending.
+ */
+export function sortByRecentlyPlayed(
+    a: { rtime_last_played?: number, playtime_forever?: number },
+    b: { rtime_last_played?: number, playtime_forever?: number }
+): number {
+    const rtimeA = a.rtime_last_played ?? 0
+    const rtimeB = b.rtime_last_played ?? 0
+    if (rtimeA !== rtimeB) return rtimeB - rtimeA
+    return (b.playtime_forever ?? 0) - (a.playtime_forever ?? 0)
+}
+
 export class CategoryAssigner {
     private static readonly logger = Logger.createLogFunctions(CategoryAssigner.name)
 

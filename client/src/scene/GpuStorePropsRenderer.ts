@@ -51,6 +51,7 @@ import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
+import { RecentlyPlayedCeilingSign } from './RecentlyPlayedCeilingSign'
 import {
     computeAlternatingClusterXOffset,
     getPrimaryGenreFromBatch,
@@ -96,6 +97,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
     private gameBoxSpawner?: GameBoxSpawner
     private readonly shelfSectionPlanner: ShelfSectionPlanner
+    private readonly recentlyPlayedSign: RecentlyPlayedCeilingSign
 
     constructor(scene: THREE.Scene) {
         this.scene = scene
@@ -111,6 +113,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.scene.add(this.propsGroup)
 
         this.shelfSectionPlanner = new ShelfSectionPlanner(this.scene)
+        this.recentlyPlayedSign = new RecentlyPlayedCeilingSign(this.scene)
 
         this.setupEventListeners()
     }
@@ -218,6 +221,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.finalizeProgressiveLoading()
         this.calculateShelfBoundsAndLayout(this.shelfPositions.length)
         this.shelfSectionPlanner.planSections(this.shelfPositions)
+        this.recentlyPlayedSign.place()
     }
 
     private async initializeForProgressiveLoading(totalBatches: number): Promise<void> {
@@ -540,6 +544,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         this.instancedShelfRenderer?.dispose()
         this.shelfSectionPlanner.dispose()
+        this.recentlyPlayedSign.dispose()
 
         this.scene.remove(this.propsGroup)
 
