@@ -81,6 +81,51 @@ updated alongside GameBoxUtils.calculateGameRotation.
 apply the same rotY+PI convention for front-facing labels. Write a test asserting label
 and artwork boxes at the same shelf position face the same direction.
 **Ref**: Noted during PR #39 final review (Apr 7)
+
+### Time-Bucketed Shelf Labels ("Played today", "Played this week", etc.)
+**Status**: `planned` -- subagent queued
+**Complexity**: S
+**Context**: Replace static "Recently Played" ceiling sign with time-bucketed section labels.
+rtime_last_played timestamps are already in SteamGameData. Buckets:
+  "Played Today" (within 24h), "Played This Week" (7d), "Played This Month" (30d),
+  "Played This Year" (365d), "Played Before" (older).
+Arc layout currently has one group; this would introduce logical sub-sections
+within the single recently-played flow.
+**Next**: Subagent to: (1) add bucket assignment logic to CategoryAssigner,
+(2) wire section labels via SceneSignManager at appropriate arc positions,
+(3) write unit tests for bucket edge cases (midnight boundary, timezone).
+rtime_last_played is Unix epoch seconds from Steam API.
+**Ref**: rtime_last_played in SteamApiClient.ts, CategoryAssigner.ts, SceneSignManager.ts
+
+### Raycast drag suppression
+**Status**: `note` -- no code yet
+**Complexity**: XS
+**Context**: TD [raycast-drag] - Mouse drag = camera look, not game selection intent.
+Suppress SceneClickGameBoxRaycast hit if mouse moved more than N pixels between
+mousedown and mouseup. N ~ 5-8px to allow minor cursor drift on click.
+Track accumulated delta in the InputEventHandler or SceneCanvasClick event producer.
+**Ref**: SystemUICoordinator.ts - SceneClickGameBoxRaycast setup
+
+### Performance + Memory Pulse (ongoing subagent cycles)
+**Status**: `in-progress` -- initial framework being built
+**Complexity**: M (framework) + ongoing
+**Context**: Want a running "pulse" on:
+  (1) Memory utilization breakdown (texture cache, geometry, etc.)
+  (2) Startup smoothness (frame time during load, hitch counts)
+  (3) Playwright-driven deterministic reports + real-world app measurements
+Already have: perf-history.md trend tracking, StartupEventTracker phase timings,
+GpuMemoryEstimator (window-attached), RenderLoopDiagnostics (?diagnostics=1 URL param).
+**Next**: 
+  - Playwright: add a memory snapshot test (window.performance.memory if available,
+    or navigator.deviceMemory as proxy) to the visual test suite.
+  - Add a "startup smoothness" Playwright test: capture hitch count and total
+    startup duration from StartupEventTracker events.
+  - Build a MemoryReport utility that queries GpuMemoryEstimator + texture array
+    sizes + IndexedDB cache size and formats as a structured report.
+  - Schedule periodic subagent runs to append to perf-history.md.
+**Ref**: GpuMemoryEstimator.ts, StartupEventTracker.ts, RenderLoopDiagnostics.ts,
+docs/perf/perf-history.md
+
 ---
 
 ## P2 -- Medium Priority

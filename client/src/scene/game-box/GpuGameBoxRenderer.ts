@@ -137,14 +137,14 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             rotation
         ).then((result) => {
             if (!result.success && AppSettings.get(Setting.EnableLabels)) {
-                this.createLabelGameBox(game, position, side)
+                this.createLabelGameBox(game, position, side, rotation)
             }
         }).catch((error) => {
             if (!(error instanceof Error && error.message.includes('Maximum'))) {
                 GpuGameBoxRenderer.logger.debug(`Artwork fetch failed for "${game.name}": ${error}`)
             }
             if (AppSettings.get(Setting.EnableLabels)) {
-                this.createLabelGameBox(game, position, side)
+                this.createLabelGameBox(game, position, side, rotation)
             }
         })
     }

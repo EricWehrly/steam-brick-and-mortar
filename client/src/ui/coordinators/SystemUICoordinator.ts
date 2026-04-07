@@ -60,7 +60,7 @@ export class SystemUICoordinator {
         }
 
         this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({
-            maxDistance: 10,  // updated dynamically on ShelfLayoutDetermined
+            maxDistance: 5,   // updated dynamically on ShelfLayoutDetermined; halved from 10
             lineColor: 0xff0000
         })
 
@@ -70,8 +70,9 @@ export class SystemUICoordinator {
             GameEventTypes.ShelfLayoutDetermined,
             (event) => {
                 const bounds = event.detail.shelfBounds
-                // Add 2m margin beyond the furthest shelf face
-                const reach = Math.abs(bounds.minZ) + 2
+                // Half the full room reach - comfortable interaction range for flatscreen.
+                // TD [raycast-drag]: don't fire if significant mouse movement (drag = look, not click).
+                const reach = (Math.abs(bounds.minZ) + 2) / 2
                 this.sceneClickGameBoxRaycast?.setMaxDistance(reach)
             }
         )
