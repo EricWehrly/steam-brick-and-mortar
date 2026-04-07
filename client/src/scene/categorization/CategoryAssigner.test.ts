@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { genrePlaytimeSortFn } from './CategoryAssigner'
+import { sortByGenreThenPlaytime } from './CategoryAssigner'
 import { CategoryAssigner, KNOWN_GENRES, type ShelfGroup } from './CategoryAssigner'
 import type { SteamGameData } from '../game-box/types/GameData'
 
@@ -102,7 +102,7 @@ describe('CategoryAssigner', () => {
         expect(result[result.length - 1].genre).toBe('Other')
     })
 
-describe('genrePlaytimeSortFn', () => {
+describe('sortByGenreThenPlaytime', () => {
     const game = (genre: string | null, playtime: number) => ({
         appid: Math.random(),
         name: `${genre}-${playtime}`,
@@ -117,7 +117,7 @@ describe('genrePlaytimeSortFn', () => {
             game('RPG', 300),
             game('Action', 200),
         ]
-        const sorted = [...games].sort(genrePlaytimeSortFn)
+        const sorted = [...games].sort(sortByGenreThenPlaytime)
         const genres = sorted.map(g => g.genres?.[0]?.description ?? 'Other')
         // First two should be the same genre, last two should be the same genre
         expect(genres[0]).toBe(genres[1])
@@ -131,7 +131,7 @@ describe('genrePlaytimeSortFn', () => {
             game('Action', 500),
             game('Action', 200),
         ]
-        const sorted = [...games].sort(genrePlaytimeSortFn)
+        const sorted = [...games].sort(sortByGenreThenPlaytime)
         expect(sorted[0].playtime_forever).toBe(500)
         expect(sorted[1].playtime_forever).toBe(200)
         expect(sorted[2].playtime_forever).toBe(100)
@@ -144,14 +144,14 @@ describe('genrePlaytimeSortFn', () => {
             game('Acción', 500),      // unrecognised genre -> Other
             game('RPG', 100),
         ]
-        const sorted = [...games].sort(genrePlaytimeSortFn)
+        const sorted = [...games].sort(sortByGenreThenPlaytime)
         const lastTwo = sorted.slice(-2).map(g => g.genres?.[0]?.description ?? 'Other')
         expect(lastTwo.every(g => g === 'Other' || g === 'Acción')).toBe(true)
     })
 
     it('is stable for equal genre+playtime', () => {
         const games = [game('Action', 100), game('Action', 100)]
-        const sorted = [...games].sort(genrePlaytimeSortFn)
+        const sorted = [...games].sort(sortByGenreThenPlaytime)
         expect(sorted).toHaveLength(2)
     })
 })})

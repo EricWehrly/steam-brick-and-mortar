@@ -114,6 +114,9 @@ export class GameBoxSpawner {
                 gameIndex += frontGames.length
             }
             if (gameIndex < games.length) {
+                // TD: wall-shelf-back-side — wall-mounted shelves should not fill the back side.
+                // Currently all shelves fill both sides. When wall vs. floor-standing shelf types
+                // are differentiated, gate this on shelf.isWallMounted or similar.
                 const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
                 if (backGames.length > 0) {
                     this.createGameBoxes(shelfPosition, surface, backGames, ShelfSide.Back, shelfRotationY)

@@ -23,13 +23,15 @@ export const KNOWN_GENRES: ReadonlyArray<string> = [
 const GENRE_LOOKUP: ReadonlyMap<string, string> = new Map(KNOWN_GENRES.map(g => [g.toLowerCase(), g]))
 
 /**
- * Sort comparator for genre-first, playtime-second ordering.
- * Games with recognised genres are grouped together; within each genre,
- * sorted by playtime descending. Games with no recognised genre sort last.
+ * Sort comparator: canonical genre index first, playtime descending within each genre.
+ * Unrecognised genres sort last.
  *
- * Safe to use as the sortFn option in SteamApiClient.loadGamesProgressively.
+ * Use as the sortFn option in SteamApiClient.loadGamesProgressively.
+ * TD: generic-sort — replace with a generic sortByFields(['genre', 'playtime']) utility
+ * once the sort-policy abstraction is designed.
  */
-export function genrePlaytimeSortFn(
+// TD: generic-sort — this should be a generic sortByFields utility once sort policy is formalized
+export function sortByGenreThenPlaytime(
     a: { genres?: Array<{ description: string }>, playtime_forever?: number },
     b: { genres?: Array<{ description: string }>, playtime_forever?: number }
 ): number {
@@ -63,11 +65,9 @@ export class CategoryAssigner {
             if (game.genres && game.genres.length > 0) {
                 const raw = game.genres[0].description
                 const canonical = GENRE_LOOKUP.get(raw.toLowerCase())
-                if (canonical !== undefined) {
-                    genre = canonical
-                } else {
-                    CategoryAssigner.logger.warn(`[CAT-DEBUG] Unrecognized genre "${raw}" for "${game.name}" (appid ${game.appid}) ? Other`)
-                    genre = otherGroupName
+                genre = canonical ?? otherGroupName
+                if (!canonical) {
+                    CategoryAssigner.logger.warn(`[CAT-DEBUG] Unrecognized genre "${raw}" for "${game.name}" (appid ${game.appid}) → Other`)
                     noGenreCount++
                 }
             } else {
@@ -86,6 +86,10 @@ export class CategoryAssigner {
             genre, label: genre, games: groupGames
         }))
 
+        // Sort groups by size desc, Other last. This sorts groups, not individual games;
+        // it is not redundant with sortByGenreThenPlaytime which sorts games within the pipeline.
+        // Sort groups by size desc, Other last. Not redundant with sortByGenreThenPlaytime
+        // (which sorts individual games upstream; this sorts the resulting groups).
         shelfGroups.sort((a, b) => {
             if (a.genre === otherGroupName) return 1
             if (b.genre === otherGroupName) return -1
