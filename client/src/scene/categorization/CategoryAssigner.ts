@@ -64,6 +64,7 @@ export function sortByGenreThenPlaytime(
  * Data transformer: maps a flat list of SteamGameData into ShelfGroup[] bucketed by genre.
  * Responsibility: grouping only. Sorting policy lives upstream (SteamApiClient sortFn)
  * and group ordering is a separate concern from the transform itself.
+ * Tech debt link: docs/roadmaps/tech-debt.md → "Category System Tech Debt / CategoryAssigner is a temporary classification hack"
  */
 export class CategoryAssigner {
     private static readonly logger = Logger.createLogFunctions(CategoryAssigner.name)

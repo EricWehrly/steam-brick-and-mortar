@@ -2,6 +2,7 @@
  * CategorySignSystem
  *
  * Generic scene-space sign system for category labels.
+ * Tech debt link: docs/roadmaps/tech-debt.md → "Category System Tech Debt / CategorySignSystem → SceneSignManager rename"
  *
  * A "sign" is a canvas-texture plane mesh with configurable:
  * - Text and color
@@ -79,6 +80,9 @@ export class CategorySignSystem {
     private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 0.6
     private static readonly SIGN_Z_FACE_PLAYER = 0.01 // slight forward push to avoid z-fighting
 
+    // Tech debt link: docs/roadmaps/tech-debt.md →
+    // - "Category System Tech Debt / CategorySignSystem: scene access pattern / SceneManager"
+    // - "Category System Tech Debt / SignageRenderer: singleton vs instance"
     constructor(scene: THREE.Scene) {
         this.scene = scene
         this.renderer = new SignageRenderer()
