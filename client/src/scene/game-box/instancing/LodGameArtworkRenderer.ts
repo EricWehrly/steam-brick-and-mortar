@@ -340,7 +340,8 @@ export class LodGameArtworkRenderer {
         gameName: string,
         artworkUrl?: string,
         lodLevel: LodLevel = this.config.defaultLod,
-        highTextureSlot: number = -1
+        highTextureSlot: number = -1,
+        rotation?: THREE.Quaternion
     ): number {
         if (!this.instancedMesh || !this.geometry) {
             LodGameArtworkRenderer.logger.warn('Cannot add instance: renderer not initialized')
@@ -356,7 +357,7 @@ export class LodGameArtworkRenderer {
         
         // Set transform
         const matrix = new THREE.Matrix4()
-        matrix.compose(position, LodGameArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
+        matrix.compose(position, rotation ?? LodGameArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
         this.instancedMesh.setMatrixAt(instanceIndex, matrix)
         
         // Set attributes

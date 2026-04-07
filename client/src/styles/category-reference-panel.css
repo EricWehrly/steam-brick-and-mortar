@@ -20,7 +20,7 @@
 
 .cat-ref-toggle-btn.active {
     background: rgba(30, 80, 140, 0.85);
-    border-color: var(--panel-accent);
+    border-color: var(--color-accent, #00aaff);
 }
 
 /* ── Panel ──────────────────────────────────────────────────────────────── */
@@ -32,12 +32,12 @@
     transform: translate(-50%, -50%);
     width: min(860px, 92vw);
     max-height: 80dvh;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
+    background: var(--color-surface-1, #1a1a1a);
+    border: 1px solid var(--color-border, #333333);
     border-radius: 10px;
-    color: var(--panel-text);
-    font-family: var(--panel-font);
-    font-size: var(--panel-font-size);
+    color: var(--color-text-primary, #ffffff);
+    font-family: var(--font-family-ui, Arial, sans-serif);
+    font-size: var(--font-size-md, 14px);
     z-index: 2500;
     display: flex;
     flex-direction: column;
@@ -95,13 +95,13 @@
 }
 
 .cat-count {
-    color: var(--panel-text-muted);
+    color: var(--color-text-tertiary, #888888);
     font-weight: normal;
 }
 
 .cat-section-note {
     margin: 0 0 8px;
-    color: var(--panel-text-muted);
+    color: var(--color-text-tertiary, #888888);
     font-size: 11px;
 }
 
