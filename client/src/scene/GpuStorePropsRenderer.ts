@@ -94,6 +94,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private readonly batchPrimaryGenreByIndex = new Map<number, string>()
     /** Per-shelf rotation Y from arc layout calculation. Indexed same as shelfPositions. */
     private shelfRotationsY: number[] = []
+    /** Per-shelf arc row index from arc layout calculation. Indexed same as shelfPositions. */
+    private shelfRowIndices: number[] = []
 
     private progressiveInitializationPromise: Promise<void> | null = null
     private setupPhaseInitialized: boolean = false
@@ -303,12 +305,14 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         this.shelfPositions = arcShelves.map(s => s.position)
         this.shelfRotationsY = arcShelves.map(s => s.rotationY)
+        this.shelfRowIndices = arcShelves.map(s => s.row)
 
         this.calculateShelfBoundsAndLayout(totalShelves, suppressEmit)
     }
 
     private preallocateShelfPositions(totalShelves: number): void {
         this.shelfPositions = []
+        this.shelfRowIndices = []
 
         for (let shelfIndex = 0; shelfIndex < totalShelves; shelfIndex++) {
             const row = Math.floor(shelfIndex / this.maxShelvesPerRow)
@@ -414,7 +418,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             detail: `Creating shelf ${batchIndex + 1}/${progress.total}`
         })
 
-        const rowIndex = Math.floor(batchIndex / this.maxShelvesPerRow)
+        // Arc layout: use stored row index. Falls back to grid formula for legacy path.
+        const rowIndex = this.shelfRowIndices[batchIndex] ?? Math.floor(batchIndex / this.maxShelvesPerRow)
         const shelfIndex = batchIndex % this.maxShelvesPerRow
 
         // Create shelf without games (GameBoxSpawner will place them)
