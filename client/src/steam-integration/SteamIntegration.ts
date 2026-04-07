@@ -9,7 +9,7 @@
  */
 
 import { SteamApiClient, type SteamGame, type SteamUser, type SteamResolveResponse } from '../steam'
-import { DEMO_STEAM_USER } from '../steam/fixtures/demo-games'
+import { ANONYMOUS_STORE_USER } from '../steam/fixtures/demo-games'
 import { ValidationUtils } from '../utils'
 import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
@@ -361,7 +361,7 @@ export class SteamIntegration {
         // Dev/test fallback: load demo games when no cached user exists, regardless of
         // autoLoadProfile (which defaults false and won't be set in a fresh test env)
         if (cachedUsers.length === 0 && AppSettings.get('developmentMode')) {
-            SteamIntegration.logger.info('No cached user — loading demo store for dev/test')
+            SteamIntegration.logger.info('No cached user - loading anonymous store for dev/test')
             await this.loadDemoGames()
             return
         }
@@ -390,13 +390,13 @@ export class SteamIntegration {
      */
     private async loadDemoGames(): Promise<void> {
         try {
-            const demoUser = DEMO_STEAM_USER
+            const demoUser = ANONYMOUS_STORE_USER
             const games = demoUser.games as SteamGame[]
             const BATCH_SIZE = 18
             const totalBatches = Math.ceil(games.length / BATCH_SIZE)
 
-            this.gameLibrary.setUserData(demoUser)
-
+            // Anonymous store: do not populate a Steam user identity
+            // this.gameLibrary.setUserData(demoUser) - omitted so UI shows no profile
             // Emit games directly as batch events — no Steam API network calls.
             // Strip artwork so game boxes render as text labels immediately, without
             // waiting for CDN fetches that will CORS-fail in test/anonymous contexts.

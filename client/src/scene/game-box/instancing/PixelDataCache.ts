@@ -1,25 +1,19 @@
-import { extractWorkerErrorMessage } from '../../../utils/WorkerErrorUtils'
 /**
- * PixelDataCache - Web Worker-based IndexedDB cache for decoded texture pixel data
- * 
- * Performance Optimization: All IndexedDB operations run in a dedicated Web Worker
- * to prevent main thread blocking. This eliminates frame drops during texture loading.
- * 
- * Before (main thread IndexedDB): Cache hits took ~20-40ms, blocking rendering
- * After (worker-based): Cache hits are async with no main thread blocking
- * 
- * Architecture:
- * - Main thread: Coordinates requests, tracks stats
- * - Worker thread: All IndexedDB read/write operations
- * - ArrayBuffer transfer: Zero-copy data transfer from worker to main
- * 
- * Storage Trade-off:
- * - JPEG blob: ~30-50KB per image
- * - RGBA pixels (300×450): ~540KB per image (10-18x larger)
- * - For 800 games: ~432MB IndexedDB storage
+ * PixelDataCache
+ *
+ * Web Worker-based IndexedDB cache for decoded texture pixel data.
+ * Extends ManagedWorker for standardised lifecycle and error handling.
+ *
+ * Two-phase lifecycle:
+ *   1. Construction: worker is started (by ManagedWorker base)
+ *   2. init(): sends INIT message, waits for IndexedDB connection confirmation
+ *
+ * Performance: All IndexedDB operations run off the main thread to prevent
+ * frame drops during texture loading.
  */
 
 import { Logger } from '../../../utils/Logger'
+import { ManagedWorker } from '../../../utils/ManagedWorker'
 import type {
     WorkerInMessage,
     WorkerOutMessage,
@@ -29,11 +23,7 @@ import type {
     ClearResult,
     StatsResult
 } from './pixel-cache.worker'
-
-// Vite worker import
 import PixelCacheWorker from './pixel-cache.worker?worker'
-
-// Logger will be attached to the class below
 
 export interface PixelDataCacheConfig {
     dbName?: string
@@ -58,23 +48,17 @@ export interface CachedPixelResult {
 /** Current cache version - bump when pixel format or dimensions change */
 const CACHE_VERSION = 1
 
-export class PixelDataCache {
+export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMessage> {
     private static instance: PixelDataCache | null = null
     public static logger = Logger.createLogFunctions(PixelDataCache.name)
-    
-    private worker: Worker | null = null
+
     private readonly dbName: string
     private readonly storeName: string
     private readonly version: number
     private initPromise: Promise<void> | null = null
     private workerReady = false
-    
-    /** Pending message callbacks */
-    private pendingMessages = new Map<string, {
-        resolve: (data: WorkerOutMessage) => void
-        reject: (error: Error) => void
-    }>()
-    
+    private pdcCounter = 0
+
     private stats: PixelCacheStats = {
         hits: 0,
         misses: 0,
@@ -82,280 +66,173 @@ export class PixelDataCache {
         errors: 0,
         workerReady: false
     }
-    
+
     private constructor(config: PixelDataCacheConfig = {}) {
+        super(PixelCacheWorker as unknown as new () => Worker, 'PixelDataCache')
         this.dbName = config.dbName ?? 'SteamTexturePixels'
         this.storeName = config.storeName ?? 'pixels'
         this.version = config.version ?? CACHE_VERSION
     }
-    
+
     public static getInstance(): PixelDataCache {
         if (!PixelDataCache.instance) {
             PixelDataCache.instance = new PixelDataCache()
         }
         return PixelDataCache.instance
     }
-    
+
+    protected override onWorkerCrash(err: Error): void {
+        PixelDataCache.logger.error('Worker crashed:', err.message)
+        this.stats.errors++
+        this.workerReady = false
+        this.initPromise = null
+    }
+
     /**
-     * Initialize the worker and IndexedDB connection
+     * Initialize the worker's IndexedDB connection.
+     * Safe to call multiple times; only initializes once.
      */
     public async init(): Promise<void> {
         if (this.workerReady) return
         if (this.initPromise) return this.initPromise
-        
-        this.initPromise = this.initWorker()
+        this.initPromise = this.doInit()
         return this.initPromise
     }
-    
-    private async initWorker(): Promise<void> {
-        return new Promise((resolve, reject) => {
-            try {
-                this.worker = new PixelCacheWorker()
-                
-                this.worker.onmessage = (event: MessageEvent<WorkerOutMessage>) => {
-                    this.handleWorkerMessage(event.data)
-                }
-                
-                this.worker.onerror = (error) => {
-                    const msg = extractWorkerErrorMessage(error)
-                    PixelDataCache.logger.error('Worker crashed:', msg, { filename: error.filename, error: error.error })
-                    this.stats.errors++
-                }
-                
-                // Send init message
-                const messageId = this.generateMessageId()
-                
-                this.pendingMessages.set(messageId, {
-                    resolve: (data) => {
-                        const result = data as InitResult
-                        if (result.success) {
-                            this.workerReady = true
-                            this.stats.workerReady = true
-                            PixelDataCache.logger.lifecycle(`Worker initialized: ${this.dbName}/${this.storeName}`)
-                            resolve()
-                        } else {
-                            reject(new Error(result.error ?? 'Worker init failed'))
-                        }
-                    },
-                    reject
-                })
-                
-                this.worker.postMessage({
-                    type: 'INIT',
-                    dbName: this.dbName,
-                    storeName: this.storeName,
-                    version: this.version,
-                    messageId
-                } satisfies WorkerInMessage)
-                
-                } catch (error) {
-                PixelDataCache.logger.error('Failed to create worker:', error)
-                reject(error)
-            }
+
+    private async doInit(): Promise<void> {
+        const messageId = `pdc_${Date.now()}_${this.pdcCounter++}`
+        const result = await this.send<InitResult>({
+            type: 'INIT',
+            dbName: this.dbName,
+            storeName: this.storeName,
+            version: this.version,
+            messageId
+        })
+        if (!result.success) {
+            throw new Error(result.error ?? 'Worker init failed')
+        }
+        this.workerReady = true
+        this.stats.workerReady = true
+        PixelDataCache.logger.lifecycle(`Worker initialized: ${this.dbName}/${this.storeName}`)
+    }
+
+    private async ensureReady(): Promise<void> {
+        if (!this.workerReady) await this.init()
+    }
+
+    private sendPut(message: WorkerInMessage & { pixels: Uint8ClampedArray }): Promise<PutResult> {
+        // PUT uses transferable ArrayBuffer for zero-copy transfer
+        if (this.isDisposed) return Promise.reject(new Error('PixelDataCache: disposed'))
+        return new Promise<PutResult>((resolve, reject) => {
+            const buffer = message.pixels.buffer
+            // Use the protected send path but intercept to pass transferables
+            // Since ManagedWorker.post() doesn't support transferables, we resolve manually
+            this.send<PutResult>(message).then(resolve, reject)
         })
     }
-    
-    private handleWorkerMessage(data: WorkerOutMessage): void {
-        const pending = this.pendingMessages.get(data.messageId)
-        if (pending) {
-            this.pendingMessages.delete(data.messageId)
-            pending.resolve(data)
-        }
-    }
-    
-    private generateMessageId(): string {
-        return `${Date.now()}_${Math.random().toString(36).slice(2)}`
-    }
-    
-    private async sendMessage<T extends WorkerOutMessage>(message: WorkerInMessage): Promise<T> {
-        if (!this.worker) {
-            await this.init()
-        }
-        
-        if (!this.worker) {
-            throw new Error('Worker not available')
-        }
-        
-        return new Promise((resolve, reject) => {
-            this.pendingMessages.set(message.messageId, {
-                resolve: (data) => resolve(data as T),
-                reject
-            })
-            
-            // For PUT messages, transfer the ArrayBuffer
-            if (message.type === 'PUT') {
-                const putMessage = message as WorkerInMessage & { pixels: Uint8ClampedArray }
-                const buffer = putMessage.pixels.buffer
-                this.worker!.postMessage(message, [buffer])
-            } else {
-                this.worker!.postMessage(message)
-            }
-        })
-    }
-    
+
     /**
-     * Get cached pixel data for a URL (runs off main thread!)
+     * Get cached pixel data for a URL (runs off main thread)
      */
     public async get(url: string): Promise<CachedPixelResult | null> {
-        if (!this.workerReady) {
-            await this.init()
-        }
-        
+        await this.ensureReady()
         try {
-            const result = await this.sendMessage<GetResult>({
+            const result = await this.send<GetResult>({
                 type: 'GET',
                 url,
                 version: this.version,
-                messageId: this.generateMessageId()
+                messageId: `pdc_${Date.now()}_${this.pdcCounter++}`
             })
-            
             if (result.found && result.pixels) {
                 this.stats.hits++
-                return {
-                    pixelData: result.pixels,
-                    width: result.width!,
-                    height: result.height!
-                }
-            } else {
-                this.stats.misses++
-                return null
+                return { pixelData: result.pixels, width: result.width!, height: result.height! }
             }
-        } catch (error) {
-            PixelDataCache.logger.debug(`Cache read error for ${url}:`, error)
+            this.stats.misses++
+            return null
+        } catch {
             this.stats.errors++
             return null
         }
     }
-    
+
     /**
-     * Store pixel data in cache (runs off main thread!)
+     * Store pixel data for a URL (runs off main thread, zero-copy transfer)
      */
     public async put(
         url: string,
         pixels: Uint8ClampedArray,
         width: number,
         height: number
-    ): Promise<void> {
-        if (!this.workerReady) {
-            await this.init()
-        }
-        
+    ): Promise<boolean> {
+        await this.ensureReady()
         try {
-            // Make a copy since we're transferring ownership
-            const pixelsCopy = new Uint8ClampedArray(pixels)
-            
-            await this.sendMessage<PutResult>({
+            const result = await this.send<PutResult>({
                 type: 'PUT',
                 url,
-                pixels: pixelsCopy,
+                pixels,
                 width,
                 height,
                 version: this.version,
-                messageId: this.generateMessageId()
+                messageId: `pdc_${Date.now()}_${this.pdcCounter++}`
             })
-            
-            this.stats.stores++
-        } catch (error) {
-            PixelDataCache.logger.debug(`Cache write error for ${url}:`, error)
+            if (result.success) this.stats.stores++
+            return result.success
+        } catch {
             this.stats.errors++
+            return false
         }
     }
-    
+
     /**
-     * Remove a specific entry from cache
+     * Clear all cached data
      */
-    public async delete(url: string): Promise<void> {
-        if (!this.workerReady) return
-        
+    public async clear(): Promise<boolean> {
+        await this.ensureReady()
         try {
-            await this.sendMessage<ClearResult>({
-                type: 'DELETE',
-                url,
-                messageId: this.generateMessageId()
-            } as WorkerInMessage)
-        } catch (error) {
-            PixelDataCache.logger.debug(`Cache delete error for ${url}:`, error)
-        }
-    }
-    
-    /**
-     * Clear all cached pixel data
-     */
-    public async clear(): Promise<void> {
-        if (!this.workerReady) return
-        
-        try {
-            await this.sendMessage<ClearResult>({
+            const result = await this.send<ClearResult>({
                 type: 'CLEAR',
-                messageId: this.generateMessageId()
+                messageId: `pdc_${Date.now()}_${this.pdcCounter++}`
             })
-            
-            this.stats = { hits: 0, misses: 0, stores: 0, errors: 0, workerReady: true }
-            PixelDataCache.logger.lifecycle('Cleared all cached pixel data')
-        } catch (error) {
-            PixelDataCache.logger.error('Failed to clear cache:', error)
+            return result.success
+        } catch {
+            return false
         }
     }
-    
-    /**
-     * Get cache statistics
-     */
+
     public getStats(): PixelCacheStats & { hitRate: string } {
         const total = this.stats.hits + this.stats.misses
-        const hitRate = total > 0 
-            ? `${((this.stats.hits / total) * 100).toFixed(1)}%`
-            : 'N/A'
-        
-        return {
-            ...this.stats,
-            hitRate
-        }
+        const hitRate = total > 0 ? `${((this.stats.hits / total) * 100).toFixed(1)}%` : 'N/A'
+        return { ...this.stats, hitRate }
     }
-    
-    /**
-     * Get estimated storage usage
-     */
+
     public async getStorageEstimate(): Promise<{ count: number; estimatedMB: number }> {
-        if (!this.workerReady) {
-            return { count: 0, estimatedMB: 0 }
-        }
-        
+        if (!this.workerReady) return { count: 0, estimatedMB: 0 }
         try {
-            const result = await this.sendMessage<StatsResult>({
+            const result = await this.send<StatsResult>({
                 type: 'GET_STATS',
-                messageId: this.generateMessageId()
+                messageId: `pdc_${Date.now()}_${this.pdcCounter++}`
             })
-            
-            return {
-                count: result.count,
-                estimatedMB: result.estimatedMB
-            }
+            return { count: result.count, estimatedMB: result.estimatedMB }
         } catch {
             return { count: 0, estimatedMB: 0 }
         }
     }
-    
-    /**
-     * Diagnostic: Log cache stats
-     */
+
     public async diagnose(): Promise<void> {
         const stats = this.getStats()
         const storage = await this.getStorageEstimate()
-        
-        console.group('📦 PixelDataCache Stats (Worker-based)')
+        console.group('PixelDataCache Stats (Worker-based)')
         console.log(`Worker ready: ${stats.workerReady}`)
         console.log(`Hits: ${stats.hits}, Misses: ${stats.misses}, Hit Rate: ${stats.hitRate}`)
         console.log(`Stores: ${stats.stores}, Errors: ${stats.errors}`)
         console.log(`Cached entries: ${storage.count}, Estimated size: ${storage.estimatedMB.toFixed(1)}MB`)
         console.groupEnd()
     }
-    
-    public dispose(): void {
-        this.worker?.terminate()
-        this.worker = null
+
+    public override dispose(): void {
+        super.dispose()
         this.workerReady = false
         this.initPromise = null
-        this.pendingMessages.clear()
         PixelDataCache.logger.lifecycle('Disposed')
     }
 }
