@@ -61,6 +61,16 @@ export interface SignMount {
      * For wall: offset from wall surface.
      */
     yOffset?: number
+    /**
+     * For above-shelf mounts, push sign out from shelf face.
+     * Uses signFacingY to compute local face direction.
+     */
+    frontOffset?: number
+    /**
+     * Yaw (radians) the sign should face.
+     * Useful for curved/arc layouts where shelves are rotated.
+     */
+    signFacingY?: number
 }
 
 // ─── Category sign descriptor ─────────────────────────────────────────────────
@@ -126,6 +136,10 @@ export class SceneSignManager {
         mesh.userData.categoryLabel = descriptor.label
         mesh.userData.mountStyle = descriptor.mount.style
 
+        if (descriptor.mount.signFacingY !== undefined) {
+            mesh.rotation.y = descriptor.mount.signFacingY
+        }
+
         this.scene.add(mesh)
         this.signs.set(descriptor.label, mesh)
 
@@ -163,10 +177,12 @@ export class SceneSignManager {
         switch (mount.style) {
             case 'above-shelf': {
                 const yOff = mount.yOffset ?? SceneSignManager.ABOVE_SHELF_DEFAULT_Y_OFFSET
+                const facingY = mount.signFacingY ?? Math.PI
+                const frontOff = mount.frontOffset ?? SceneSignManager.SIGN_Z_FACE_PLAYER
                 return new THREE.Vector3(
-                    anchor.x,
+                    anchor.x + Math.sin(facingY) * frontOff,
                     anchor.y + yOff,
-                    anchor.z - SceneSignManager.SIGN_Z_FACE_PLAYER // face player
+                    anchor.z + Math.cos(facingY) * frontOff
                 )
             }
             case 'wall': {

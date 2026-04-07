@@ -265,6 +265,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Iterate through shelves; each shelf holds ~18 games (BATCH_SIZE)
         // We use this.shelfPositions to determine where to place the signs.
         const BATCH_SIZE = 18
+        const SIGN_FRONT_OFFSET = 0.28
 
         for (let i = 0; i < this.shelfPositions.length; i++) {
             const shelfPos = this.shelfPositions[i]
@@ -283,10 +284,16 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 )
                 const dist = ceilingSignPos.distanceTo(anchor)
                 if (dist > MIN_DIST_FROM_CEILING_SIGN) {
+                    const facingY = this.shelfRotationsY[i] ?? (i % 2 === 1 ? Math.PI : 0)
                     SceneSignManager.instance.setSign({
                         label: getBucketLabel(bucket),
                         anchorPosition: anchor,
-                        mount: { style: 'above-shelf', yOffset: 0.2 },
+                        mount: {
+                            style: 'above-shelf',
+                            yOffset: 0.2,
+                            frontOffset: SIGN_FRONT_OFFSET,
+                            signFacingY: facingY,
+                        },
                         style: SignStyles.Category
                     })
                 }
