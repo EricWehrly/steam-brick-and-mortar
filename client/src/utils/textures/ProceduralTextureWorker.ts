@@ -2,13 +2,10 @@
  * ProceduralTextureWorker
  *
  * Main-thread manager for the procedural-texture.worker.
- * Wraps message-passing in a Promise API so callers get an ImageBitmap
- * without blocking the main thread.
+ * Extends ManagedWorker for standardised lifecycle and error handling.
  *
  * Usage:
- *   const worker = ProceduralTextureWorker.getInstance()
- *   const bitmap = await worker.generate('wood_enhanced', { grainStrength: 0.3, ... })
- *   const texture = new THREE.CanvasTexture(bitmap)  // or use from ImageBitmap
+ *   const bitmap = await ProceduralTextureWorker.instance.generate('wood_enhanced', { ... })
  */
 
 import type {
@@ -17,85 +14,52 @@ import type {
     TextureGeneratedResult,
     TextureGenerationError,
 } from './procedural-texture.worker'
-import { Logger } from '../Logger'
 import ProceduralTextureWorkerModule from './procedural-texture.worker?worker'
-import { makeWorkerErrorHandler } from '../WorkerErrorUtils'
+import { ManagedWorker } from '../ManagedWorker'
 
-interface PendingRequest {
-    resolve: (bitmap: ImageBitmap) => void
-    reject:  (err: Error) => void
-}
+type PTWIn = GenerateTextureMessage
+type PTWOut = TextureGeneratedResult | TextureGenerationError
 
-export class ProceduralTextureWorker {
-    private static readonly logger = Logger.createLogFunctions(ProceduralTextureWorker.name)
-    private static instance: ProceduralTextureWorker | null = null
-
-    private worker: Worker
-    private pending = new Map<string, PendingRequest>()
-    private nextId = 0
-    private disposed = false
+export class ProceduralTextureWorker extends ManagedWorker<PTWIn, PTWOut> {
+    private static _instance: ProceduralTextureWorker | null = null
+    private ptwCounter = 0
 
     private constructor() {
-        this.worker = new ProceduralTextureWorkerModule()
-        this.worker.onmessage = (e: MessageEvent<TextureGeneratedResult | TextureGenerationError>) => {
-            this.handleMessage(e.data)
-        }
-        this.worker.onerror = makeWorkerErrorHandler('ProceduralTextureWorker', this.pending as never, ProceduralTextureWorker.logger)
+        super(ProceduralTextureWorkerModule as unknown as new () => Worker, 'ProceduralTextureWorker')
     }
 
-    public static getInstance(): ProceduralTextureWorker {
-        if (!ProceduralTextureWorker.instance || ProceduralTextureWorker.instance.disposed) {
-            ProceduralTextureWorker.instance = new ProceduralTextureWorker()
+    public static get instance(): ProceduralTextureWorker {
+        if (!ProceduralTextureWorker._instance || ProceduralTextureWorker._instance.isDisposed) {
+            ProceduralTextureWorker._instance = new ProceduralTextureWorker()
         }
+        return ProceduralTextureWorker._instance
+    }
+
+    /** @deprecated Use ProceduralTextureWorker.instance */
+    public static getInstance(): ProceduralTextureWorker {
         return ProceduralTextureWorker.instance
     }
 
     /** Generate a texture bitmap off the main thread. */
-    public generate(
+    public async generate(
         textureType: ProceduralTextureType,
         options: Record<string, unknown> = {}
     ): Promise<ImageBitmap> {
-        if (this.disposed) {
-            return Promise.reject(new Error('ProceduralTextureWorker has been disposed'))
-        }
-
-        const messageId = `ptw_${this.nextId++}`
-
-        return new Promise<ImageBitmap>((resolve, reject) => {
-            this.pending.set(messageId, { resolve, reject })
-
-            const msg: GenerateTextureMessage = {
-                type: 'GENERATE',
-                textureType,
-                options,
-                messageId,
-            }
-            this.worker.postMessage(msg)
+        const messageId = `ptw_${this.ptwCounter++}`
+        const response = await this.send<PTWOut>({
+            type: 'GENERATE',
+            textureType,
+            options,
+            messageId,
         })
+        if (response.type === 'ERROR') {
+            throw new Error((response as TextureGenerationError).error)
+        }
+        return (response as TextureGeneratedResult).bitmap
     }
 
-    private handleMessage(data: TextureGeneratedResult | TextureGenerationError): void {
-        const req = this.pending.get(data.messageId)
-        if (!req) return
-        this.pending.delete(data.messageId)
-
-        if (data.type === 'RESULT') {
-            ProceduralTextureWorker.logger.debug(
-                `Generated ${data.messageId} in ${data.generationMs.toFixed(0)}ms`
-            )
-            req.resolve(data.bitmap)
-        } else {
-            req.reject(new Error(data.error))
-        }
-    }
-
-    public dispose(): void {
-        this.disposed = true
-        this.worker.terminate()
-        ProceduralTextureWorker.instance = null
-        for (const [, req] of this.pending) {
-            req.reject(new Error('ProceduralTextureWorker disposed'))
-        }
-        this.pending.clear()
+    public override dispose(): void {
+        super.dispose()
+        ProceduralTextureWorker._instance = null
     }
 }

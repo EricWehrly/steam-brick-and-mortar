@@ -96,6 +96,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private shelfRotationsY: number[] = []
     /** Per-shelf arc row index from arc layout calculation. Indexed same as shelfPositions. */
     private shelfRowIndices: number[] = []
+    /** Guards against emitting ShelfLayoutDetermined more than once (initial layout only). */
+    private layoutDetermined = false
 
     private progressiveInitializationPromise: Promise<void> | null = null
     private setupPhaseInitialized: boolean = false
@@ -239,6 +241,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         await this.waitForShelfRendererReady()
 
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
+        this.layoutDetermined = false  // reset so new layout emits when next initialized
         this.cumulativeShelfCount = 0
         this.batchPrimaryGenreByIndex.clear()
         this.shelfRotationsY = []
@@ -268,7 +271,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         })
     }
 
-    private preallocateArcLayout(totalShelves: number, suppressEmit = false): void {
+    private preallocateArcLayout(totalShelves: number): void {
         // Inverted arc layout: front ring sparse (close, narrow), back rings dense (far, wide)
         // Most-recently-played games are at the front within arm's reach;
         // older games fill the panoramic back arcs.
@@ -277,7 +280,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Radii are stepped out (5.5 -> 9.5 -> 13.5 ...) and halfAngle is PI/3 for rows 0-3
         // so each ring is wide enough to accommodate requested shelf counts at >=1m gap.
         // Row 4 (back wall) absorbs all remaining shelves; gap enforcement is skipped for it.
-        const FIXED_ROWS_COUNT = 4 + 6 + 10 + 12  // 32 � row 0-3 fixed counts
+        const FIXED_ROWS_COUNT = 4 + 6 + 10 + 12  // 32 � row 0-3 fixed counts
         const arcConfig: ArcLayoutConfig = {
             rows: 5,
             shelvesPerRow: 10,
@@ -307,7 +310,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.shelfRotationsY = arcShelves.map(s => s.rotationY)
         this.shelfRowIndices = arcShelves.map(s => s.row)
 
-        this.calculateShelfBoundsAndLayout(totalShelves, suppressEmit)
+        this.calculateShelfBoundsAndLayout(totalShelves)
     }
 
     private preallocateShelfPositions(totalShelves: number): void {
@@ -346,7 +349,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         return normalRowZ
     }
 
-    private calculateShelfBoundsAndLayout(totalShelves: number, suppressEmit = false): void {
+    private calculateShelfBoundsAndLayout(totalShelves: number): void {
         const shelfWidth = 2.0
         const shelfDepth = 1.0
 
@@ -360,18 +363,22 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.shelfLayout.rows = Math.ceil(totalShelves / this.maxShelvesPerRow)
         this.shelfLayout.shelvesPerRow = this.maxShelvesPerRow
 
-        // Emit layout once (on first allocation). Suppress during expand to avoid repeated room resizes.
+        // Emit layout once - on the first call only. Subsequent calls (e.g. overflow expansion)
+        // recalculate bounds but don't re-trigger room layout and wall rebuilds.
         // Tech debt link: docs/roadmaps/tech-debt.md -> "Category System Tech Debt / Readonly event payloads"
-        if (!suppressEmit) EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(
-            GameEventTypes.ShelfLayoutDetermined,
-            {
-                shelfBounds: { ...this.shelfBounds },
-                shelfLayout: { ...this.shelfLayout }
-            }
-        )
-        GpuStorePropsRenderer.logger.debug(
-            `Shelf layout determined: ${this.shelfLayout.rows} rows → ${this.shelfLayout.shelvesPerRow} shelves`
-        )
+        if (!this.layoutDetermined) {
+            this.layoutDetermined = true
+            EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(
+                GameEventTypes.ShelfLayoutDetermined,
+                {
+                    shelfBounds: { ...this.shelfBounds },
+                    shelfLayout: { ...this.shelfLayout }
+                }
+            )
+            GpuStorePropsRenderer.logger.debug(
+                `Shelf layout determined: ${this.shelfLayout.rows} rows x ${this.shelfLayout.shelvesPerRow} shelves`
+            )
+        }
     }
 
     private ensureShelfPositionAllocated(batchIndex: number): void {
@@ -383,9 +390,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const progress = this.batchCoordinator.getProgress()
         console.warn(`⚠️ BATCH COUNT MISMATCH: Received batch ${batchIndex + 1} but only allocated ${oldLength} positions`)
         console.warn(`   Expected: ${progress.total}, Actual: >${batchIndex + 1}. Expanding...`)
-        // Expand to cover ALL remaining batches (not just batchIndex+1) to avoid repeated re-allocations.
-        // suppressEmit=true: don't re-fire ShelfLayoutDetermined and trigger another room resize.
-        this.preallocateArcLayout(Math.max(progress.total, batchIndex + 1), true)
+        // Expand to cover ALL remaining batches to avoid repeated re-allocations.
+        // ShelfLayoutDetermined won't re-fire because layoutDetermined is already true after initial allocation.
+        this.preallocateArcLayout(Math.max(progress.total, batchIndex + 1))
     }
 
     private async createShelfForBatchIndex(batchIndex: number): Promise<void> {
