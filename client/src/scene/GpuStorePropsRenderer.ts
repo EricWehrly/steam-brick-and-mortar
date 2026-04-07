@@ -49,7 +49,6 @@ import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { DataManager } from '../core/data/DataManager'
-import { DataKey } from '../core/data'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
@@ -237,12 +236,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.finalizeProgressiveLoading()
         this.calculateShelfBoundsAndLayout(this.shelfPositions.length)
 
-        const steamMode = DataManager.getInstance().get<string>(DataKey.SteamMode)
-        const isAnonymousStore = steamMode === 'anonymous'
+        const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
+        const hasRecentlyPlayedData = games.some(g => (g.rtime_last_played ?? 0) > 0)
 
-        // Anonymous store is curated and not sorted by recency buckets.
-        // Skip recently-played signage entirely in this mode.
-        if (!isAnonymousStore) {
+        // Only show recently-played signage when we actually have recency data.
+        // Anonymous/curated stores (no rtime_last_played) skip this path entirely.
+        if (hasRecentlyPlayedData) {
             this.recentlyPlayedSign.place()
             this.placeTimeBucketSigns()
         }
