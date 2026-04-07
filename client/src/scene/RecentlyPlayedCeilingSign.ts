@@ -28,7 +28,7 @@ const SIGN_DROP_FROM_CEILING = 0.5
 export class RecentlyPlayedCeilingSign {
     private readonly signSystem: SceneSignManager
 
-    constructor(scene: THREE.Scene) {
+    constructor() {
         this.signSystem = new SceneSignManager()
     }
 
