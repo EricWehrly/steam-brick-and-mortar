@@ -16,7 +16,7 @@ import { CategoryReferencePanel } from '../CategoryReferencePanel'
 import { EventManager } from '../../core/EventManager'
 import type { DebugStatsProvider } from '../../core/DebugStatsProvider'
 import { AppSettings } from '../../core/AppSettings'
-import { UIEventTypes, InputEventTypes, type SceneCanvasClickEvent } from '../../types/InteractionEvents'
+import { UIEventTypes, InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type ShelfLayoutDeterminedEvent } from '../../types/InteractionEvents'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
 
@@ -60,9 +60,21 @@ export class SystemUICoordinator {
         }
 
         this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({
-            maxDistance: 10,
+            maxDistance: 10,  // updated dynamically on ShelfLayoutDetermined
             lineColor: 0xff0000
         })
+
+        // Update raycast reach when shelf layout is known so far shelves (arc row 4 at ~21.5m)
+        // are reachable. Default of 10m predates the arc layout.
+        this.eventManager.registerEventHandler<ShelfLayoutDeterminedEvent>(
+            GameEventTypes.ShelfLayoutDetermined,
+            (event) => {
+                const bounds = event.detail.shelfBounds
+                // Add 2m margin beyond the furthest shelf face
+                const reach = Math.abs(bounds.minZ) + 2
+                this.sceneClickGameBoxRaycast?.setMaxDistance(reach)
+            }
+        )
         
         // Initialize pause menu system
         this.pauseMenuManager.init()
