@@ -70,6 +70,17 @@ export interface InstanceData {
     highTextureSlot: number  // -1 if HIGH not loaded
 }
 
+/** Parameters for addInstance() - extracted per PR review. */
+export interface AddInstanceParams {
+    position: THREE.Vector3
+    textureIndex: number
+    gameName: string
+    artworkUrl?: string
+    lodLevel?: LodLevel
+    highTextureSlot?: number
+    rotation?: THREE.Quaternion
+}
+
 /**
  * Clean renderer focused solely on GPU rendering.
  * Texture population is handled externally.

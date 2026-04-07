@@ -116,7 +116,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.scene.add(this.propsGroup)
 
         this.shelfSectionPlanner = new ShelfSectionPlanner(this.scene)
-        this.recentlyPlayedSign = new RecentlyPlayedCeilingSign(this.scene)
+        this.recentlyPlayedSign = new RecentlyPlayedCeilingSign()
 
         this.setupEventListeners()
     }
@@ -266,11 +266,16 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         })
     }
 
-    private preallocateArcLayout(totalShelves: number): void {
+    private preallocateArcLayout(totalShelves: number, suppressEmit = false): void {
         // Inverted arc layout: front ring sparse (close, narrow), back rings dense (far, wide)
         // Most-recently-played games are at the front within arm's reach;
         // older games fill the panoramic back arcs.
         // Per-row counts distributed to fill total: front gets fewer, back gets more.
+        // Arc config tuned so minShelfGap enforcement never reduces row counts below targets.
+        // Radii are stepped out (5.5 -> 9.5 -> 13.5 ...) and halfAngle is PI/3 for rows 0-3
+        // so each ring is wide enough to accommodate requested shelf counts at >=1m gap.
+        // Row 4 (back wall) absorbs all remaining shelves; gap enforcement is skipped for it.
+        const FIXED_ROWS_COUNT = 4 + 6 + 10 + 12  // 32 — row 0-3 fixed counts
         const arcConfig: ArcLayoutConfig = {
             rows: 5,
             shelvesPerRow: 10,
@@ -279,29 +284,27 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 6,
                 10,
                 12,
-                Math.max(1, totalShelves - 4 - 6 - 10 - 12),
+                Math.max(1, totalShelves - FIXED_ROWS_COUNT),
             ],
-            // Narrower front angle keeps row0 shelves closer together without overlap
-            // while wider back angles preserve horizon spread.
             halfAngle: Math.PI / 3,
             halfAngleByRow: [
-                Math.PI / 4.2, // row0
-                Math.PI / 3.8, // row1
-                Math.PI / 3.2, // row2
-                Math.PI / 3.0, // row3
-                Math.PI / 2.6, // row4
+                Math.PI / 3,   // row0: same as default - wide enough for 4@r5.5 + walkable
+                Math.PI / 3.5, // row1
+                Math.PI / 3,   // row2: wide enough for 10@r13.5 + walkable
+                Math.PI / 3,   // row3: wide enough for 12@r17.5 + walkable
+                Math.PI / 2.6, // row4: panoramic back wall
             ],
             minShelfGap: 1.0,
             shelfWidthMetres: 2.0,
             rowRadiusStep: 4.0,
-            firstRowRadius: 4.5,
+            firstRowRadius: 5.5,  // slightly further out than before so row0 gap constraint passes
         }
         const arcShelves = computeArcShelfLayout(totalShelves, arcConfig)
 
         this.shelfPositions = arcShelves.map(s => s.position)
         this.shelfRotationsY = arcShelves.map(s => s.rotationY)
 
-        this.calculateShelfBoundsAndLayout(totalShelves)
+        this.calculateShelfBoundsAndLayout(totalShelves, suppressEmit)
     }
 
     private preallocateShelfPositions(totalShelves: number): void {
@@ -339,7 +342,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         return normalRowZ
     }
 
-    private calculateShelfBoundsAndLayout(totalShelves: number): void {
+    private calculateShelfBoundsAndLayout(totalShelves: number, suppressEmit = false): void {
         const shelfWidth = 2.0
         const shelfDepth = 1.0
 
@@ -353,9 +356,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.shelfLayout.rows = Math.ceil(totalShelves / this.maxShelvesPerRow)
         this.shelfLayout.shelvesPerRow = this.maxShelvesPerRow
 
-        // Emit layout as soon as we know it (no need to wait for batches to finish loading)
-        // Tech debt link: docs/roadmaps/tech-debt.md â†’ "Category System Tech Debt / Readonly event payloads"
-        EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(
+        // Emit layout once (on first allocation). Suppress during expand to avoid repeated room resizes.
+        // Tech debt link: docs/roadmaps/tech-debt.md -> "Category System Tech Debt / Readonly event payloads"
+        if (!suppressEmit) EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(
             GameEventTypes.ShelfLayoutDetermined,
             {
                 shelfBounds: { ...this.shelfBounds },

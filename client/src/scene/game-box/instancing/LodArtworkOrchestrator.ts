@@ -276,7 +276,7 @@ export class LodArtworkOrchestrator {
                 gameName,
                 resolvedUrl,
                 this.lazyHighTextures ? LOD_LEVEL.MID : LOD_LEVEL.HIGH,
-                undefined, // highTextureSlot
+                undefined,
                 rotation
             )
             
