@@ -63,6 +63,19 @@ and `include_appinfo=1` -- returns playtime + rtime_last_played for all owned ga
 in one request. Debounce/cache the result for 24h after that. Gate behind flag initially.
 **Ref**: `client/src/steam/SteamApiClient.ts`
 
+
+### Label Box Rotation (demo-store branch target)
+**Status**: planned
+**Complexity**: S
+**Context**: After the arc layout rotation convention fix (Front=rotY+PI), artwork boxes
+face correctly but label boxes still use the wrong rotation. They appear sideways/backward
+on arc shelves. Artwork and label boxes share the same shelf position but are different
+instanced meshes -- the label renderer likely has its own rotation logic that wasn't
+updated alongside GameBoxUtils.calculateGameRotation.
+**Next**: On openclaw/feat-demo-store, find InstancedLabelRenderer or equivalent and
+apply the same rotY+PI convention for front-facing labels. Write a test asserting label
+and artwork boxes at the same shelf position face the same direction.
+**Ref**: Noted during PR #39 final review (Apr 7)
 ---
 
 ## P2 -- Medium Priority
