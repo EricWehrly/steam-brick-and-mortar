@@ -1,7 +1,7 @@
 /**
- * UI Design Tokens
- * Global CSS custom properties for the project's dark video-store aesthetic.
- * Import this file first in main.css so tokens are available everywhere.
+ * UI Panel Tokens
+ * Shared CSS custom properties for panel-like overlays.
+ * Import from main.css before component styles.
  */
 
 :root {

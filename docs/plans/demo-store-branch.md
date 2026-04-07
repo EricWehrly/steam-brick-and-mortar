@@ -1,35 +1,40 @@
 # Branch: openclaw/feat-demo-store
 
 ## Purpose
-Demonstrate the store without requiring a Steam user to be logged in.
-Primary audience: dev testing, CI visual tests, and showing the store to
-someone who doesn't have a Steam account nearby.
+Support a strong **anonymous first-visit store** experience for dev/testing/showcase,
+without requiring a signed-in Steam user.
 
-This branch is also used for iterative visual polish on top of the stable
-openclaw/6.2.x base.
+Primary uses:
+- CI and local visual verification
+- UX polish for first-run flow
+- Stable sandbox for signage/layout experiments
 
-## What's Here vs 6.2.x
+## Current Behavior (vs 6.2.x)
 
-### From the old demo-store branch (cherry-picked)
-- Anonymous store mode: client/src/steam/fixtures/demo-games.ts
-  18 hardcoded fixture games (TF2, Dota2, CS2, etc.) auto-load in
-  developmentMode when no cached Steam user exists. No network, no CDN
-  art, immediate label rendering.
-- ui-design-tokens.css: CSS custom property token file
+### Anonymous fixture flow
+- Uses `client/src/steam/fixtures/demo-games.ts` (F2P-curated set).
+- Loads via `SteamIntegration.loadDemoGames()` when no cached user path is active.
+- Keeps artwork metadata in fixture data (production contract), rather than mutating model shape for tests.
 
-### Added on this branch
-- Label rotation fix (InstancedLabelRenderer now accepts rotation from GameBoxUtils)
-- suppressEmit removed from GpuStorePropsRenderer (layoutDetermined flag instead)
-- ProceduralTextureWorker migrated to ManagedWorker base class
-- Lighting panel UI token application (in progress - subagent)
+### Sort/signage semantics
+- Recency signage is **data-driven**, not mode-key driven:
+  - if no game has `rtime_last_played > 0`, recently-played/time-bucket signs do not render.
+- Avoids introducing extra global DataManager mode keys for this behavior.
 
-## Current Scope / What To Do Next
-1. Verify anonymous store renders (yarn dev, no Steam user cached)
-2. Label rotation - verify label boxes now face correctly on arc shelves
-3. Migrate TextureWorker and PixelDataCache to ManagedWorker (see tech-debt.md)
-4. Delete WorkerErrorUtils once all three workers use ManagedWorker
-5. GpuStorePropsRenderer split - extract layout functionality to ShelfLayoutManager
+### Shelf/time-bucket sign placement
+- Time-bucket signs are shelf-mounted and aligned to shelf facing.
+- Mount uses shelf-top anchored Y and shelf rotation for sign orientation.
 
-## Rename Note
-"Demo store" is slightly misleading. The key feature is an "anonymous/empty store"
-mode for development. Could rename to feat-anonymous-store on next branch cut.
+### Worker/lifecycle cleanup in this branch
+- ManagedWorker migration landed for texture/worker utilities.
+- PixelDataCache lifecycle and docs cleaned up (including storage trade-off note restoration).
+
+## Near-term Work (small, branch-safe)
+1. Keep PR #40 comments fully addressed and non-stale.
+2. Add focused regression tests for any visual placement bug fixed here.
+3. Continue anonymous-store polish without broad architecture refactors.
+4. Keep docs synchronized with branch reality (no stale "demo" assumptions).
+
+## Naming note
+"demo-store" branch name remains for continuity, but feature intent is now primarily
+**anonymous store** behavior and polish.

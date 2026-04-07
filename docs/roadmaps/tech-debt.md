@@ -601,3 +601,18 @@ Apply to new TD comments going forward; backfill existing ones during lint pass.
 **Priority**: Low
 **Issue**: ui-design-tokens.css is too generic; split into purposeful token files (e.g. 	okens-colors.css, 	okens-spacing.css) and component token maps (	okens-panel.css, 	okens-button.css).
 **Source**: PR #40 review comment on main.css line 2.
+
+
+### Testing: Suite-cost simplification pass
+**Priority**: High
+**Effort**: M
+**Context**: Test suite has grown quickly. Need a structured pass to reduce runtime/setup cost (consolidate overlap, keep coverage, prefer cheap deterministic tests first).
+**Tasks**: inventory top 20 slow tests, identify overlap, replace expensive setup where equivalent unit/integration assertions exist, preserve regression value.
+**Source**: Apr 2026 branch review
+
+### PixelDataCache stats instrumentation model
+**Priority**: Medium
+**Effort**: S
+**Context**: Current per-call counters (hits/misses/stores/errors) may be heavier than needed. Review lower-instrumentation alternatives (sampling, debug-only counters, worker-native stats only) and keep only data that is actually consumed.
+**Source**: PR #40 follow-up
+
