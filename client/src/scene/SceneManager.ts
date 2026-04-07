@@ -61,7 +61,10 @@ export class SceneManager {
         // Far Clipping Plane: Furthest visible distance
         //   - Too small: Objects pop out of view too soon
         //   - Too large (>10000): Reduces depth buffer precision
-        const CAMERA_FOV = 90;  // was 75 - wider FOV for VR comfort
+        // 70 deg: good flatscreen default. VR headsets use 90-110 but that causes
+        // fisheye edge distortion on a flat monitor. When WebXR is active, the
+        // headset takes over projection entirely so this value only affects desktop view.
+        const CAMERA_FOV = 70;
         const CAMERA_ASPECT = window.innerWidth / window.innerHeight;
         const CAMERA_NEAR_DIST = 0.1;
         const CAMERA_FAR_DIST = 1000;
