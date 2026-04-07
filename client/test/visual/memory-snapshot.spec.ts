@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { writeFile, mkdir } from 'fs/promises'
+import { getResultPath } from './helpers/results'
 import { waitForSceneReady } from './helpers/scene'
 
 /**
@@ -38,8 +39,8 @@ test('memory snapshot', async ({ page }) => {
   }
 
   // 4. Save result to test-results/memory-snapshot.json
-  await mkdir('test-results', { recursive: true })
-  await writeFile('test-results/memory-snapshot.json', JSON.stringify(snapshot, null, 2))
+  const snapshotPath = await getResultPath('memory-snapshot.json')
+  await writeFile(snapshotPath, JSON.stringify(snapshot, null, 2))
 
   // 5. Assert mainHeapMB is defined and < 500
   // Note: mainHeapMB might be undefined in non-Chrome browsers, but Playwright 
@@ -58,5 +59,5 @@ test('memory snapshot', async ({ page }) => {
     console.log('  Notes:')
     snapshot.notes.forEach((note: string) => console.log(`    - ${note}`))
   }
-  console.log(`  Full report:  test-results/memory-snapshot.json`)
+  console.log(`  Full report:  ${snapshotPath}`)
 })

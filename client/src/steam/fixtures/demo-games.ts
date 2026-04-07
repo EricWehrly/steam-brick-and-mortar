@@ -3,12 +3,12 @@ import type { SteamUser } from '../SteamApiClient';
 /**
  * Anonymous store fixture for dev/test environments.
  *
- * Used when no Steam user is cached to provide a populated store for visual testing.
- * Games are a curated mix of well-known paid titles with good capsule art coverage.
- * No free-to-play titles: this store represents a "typical owned library" sample.
+ * Shows the store before a Steam user is provided. Uses Free to Play titles only
+ * because F2P games are accessible to any Steam account - this store represents
+ * "what you might own before even buying anything".
  *
+ * Curated F2P list: high-profile titles with good capsule art and broad recognition.
  * Artwork: library_600x900.jpg portrait format matches GpuGameBoxRenderer's preferred URL.
- * Art will attempt to load via CDN; in strict CORS environments labels render instead.
  */
 
 function lib(appid: number): string {
@@ -18,30 +18,37 @@ function header(appid: number): string {
     return `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`
 }
 
+const F2P = [{ id: '37', description: 'Free to Play' }]
+const F2P_ACTION = [...F2P, { id: '1', description: 'Action' }]
+const F2P_RPG = [...F2P, { id: '3', description: 'RPG' }]
+const F2P_STRAT = [...F2P, { id: '2', description: 'Strategy' }]
+
 export const ANONYMOUS_STORE_USER: SteamUser = {
     steamid: '',
     vanity_url: 'anonymous',
     game_count: 18,
     retrieved_at: new Date().toISOString(),
     games: [
-        { appid: 292030, name: 'The Witcher 3: Wild Hunt',     playtime_forever: 12000, img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(292030), library: lib(292030) }, genres: [{ id: '3', description: 'RPG' }] },
-        { appid: 1245620, name: 'Elden Ring',                   playtime_forever: 10000, img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1245620), library: lib(1245620) }, genres: [{ id: '1', description: 'Action' }, { id: '3', description: 'RPG' }] },
-        { appid: 1091500, name: 'Cyberpunk 2077',               playtime_forever: 9000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1091500), library: lib(1091500) }, genres: [{ id: '3', description: 'RPG' }, { id: '1', description: 'Action' }] },
-        { appid: 271590, name: 'Grand Theft Auto V',            playtime_forever: 8500,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(271590), library: lib(271590) }, genres: [{ id: '1', description: 'Action' }, { id: '1', description: 'Adventure' }] },
-        { appid: 1172620, name: 'Dark Souls III',               playtime_forever: 7000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1172620), library: lib(1172620) }, genres: [{ id: '1', description: 'Action' }, { id: '3', description: 'RPG' }] },
-        { appid: 304930, name: 'Unturned',                      playtime_forever: 6000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(304930), library: lib(304930) }, genres: [{ id: '1', description: 'Action' }, { id: '28', description: 'Simulation' }] },
-        { appid: 433340, name: "No Man's Sky",                  playtime_forever: 5500,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(433340), library: lib(433340) }, genres: [{ id: '28', description: 'Simulation' }, { id: '1', description: 'Adventure' }] },
-        { appid: 1517290, name: 'Farming Simulator 22',         playtime_forever: 5000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1517290), library: lib(1517290) }, genres: [{ id: '28', description: 'Simulation' }] },
-        { appid: 1145360, name: 'Hades',                        playtime_forever: 4500,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1145360), library: lib(1145360) }, genres: [{ id: '1', description: 'Action' }, { id: '23', description: 'Indie' }] },
-        { appid: 49520,   name: 'Borderlands 2',                playtime_forever: 4000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(49520), library: lib(49520) }, genres: [{ id: '1', description: 'Action' }, { id: '3', description: 'RPG' }] },
-        { appid: 620,     name: 'Portal 2',                     playtime_forever: 3800,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(620), library: lib(620) }, genres: [{ id: '1', description: 'Action' }, { id: '23', description: 'Adventure' }] },
-        { appid: 413150,  name: 'Stardew Valley',               playtime_forever: 3500,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(413150), library: lib(413150) }, genres: [{ id: '3', description: 'RPG' }, { id: '23', description: 'Indie' }] },
-        { appid: 367520,  name: 'Hollow Knight',                playtime_forever: 3200,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(367520), library: lib(367520) }, genres: [{ id: '1', description: 'Action' }, { id: '23', description: 'Indie' }] },
-        { appid: 105600,  name: 'Terraria',                     playtime_forever: 3000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(105600), library: lib(105600) }, genres: [{ id: '1', description: 'Action' }, { id: '23', description: 'Indie' }] },
-        { appid: 570940,  name: 'Dark Souls Remastered',        playtime_forever: 2800,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(570940), library: lib(570940) }, genres: [{ id: '1', description: 'Action' }, { id: '3', description: 'RPG' }] },
-        { appid: 359550,  name: "Tom Clancy's Rainbow Six Siege", playtime_forever: 2500, img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(359550), library: lib(359550) }, genres: [{ id: '1', description: 'Action' } ] },
-        { appid: 252490,  name: 'Rust',                         playtime_forever: 2000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(252490), library: lib(252490) }, genres: [{ id: '1', description: 'Action' }, { id: '28', description: 'Simulation' }] },
-        { appid: 1063730, name: 'New World: Aeternum',          playtime_forever: 1500,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1063730), library: lib(1063730) }, genres: [{ id: '3', description: 'RPG' }, { id: '1', description: 'Action' }] },
+        // Valve F2P - always available
+        { appid: 440,     name: 'Team Fortress 2',      playtime_forever: 10000, img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(440),     library: lib(440)     }, genres: F2P_ACTION },
+        { appid: 570,     name: 'Dota 2',               playtime_forever: 9000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(570),     library: lib(570)     }, genres: F2P_STRAT  },
+        { appid: 730,     name: 'Counter-Strike 2',     playtime_forever: 8000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(730),     library: lib(730)     }, genres: F2P_ACTION },
+        // High-profile F2P titles
+        { appid: 1172470, name: 'Apex Legends',         playtime_forever: 7500,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1172470), library: lib(1172470) }, genres: F2P_ACTION },
+        { appid: 1085660, name: 'Destiny 2',            playtime_forever: 7000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1085660), library: lib(1085660) }, genres: F2P_ACTION },
+        { appid: 238960,  name: 'Path of Exile',        playtime_forever: 6000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(238960),  library: lib(238960)  }, genres: F2P_RPG    },
+        { appid: 230410,  name: 'Warframe',             playtime_forever: 5500,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(230410),  library: lib(230410)  }, genres: F2P_ACTION },
+        { appid: 252950,  name: 'Rocket League',        playtime_forever: 5000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(252950),  library: lib(252950)  }, genres: [...F2P, { id: '18', description: 'Sports' }] },
+        { appid: 1091298, name: 'Infinity Nikki',       playtime_forever: 4500,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1091298), library: lib(1091298) }, genres: F2P_RPG    },
+        { appid: 386360,  name: 'MultiVersus',          playtime_forever: 3000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(386360),  library: lib(386360)  }, genres: F2P_ACTION },
+        { appid: 1167630, name: 'Super People',         playtime_forever: 2500,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1167630), library: lib(1167630) }, genres: F2P_ACTION },
+        { appid: 1097150, name: 'Fall Guys',            playtime_forever: 2000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1097150), library: lib(1097150) }, genres: F2P_ACTION },
+        { appid: 359550,  name: 'Ring of Elysium',      playtime_forever: 1800,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(359550),  library: lib(359550)  }, genres: F2P_ACTION },
+        { appid: 812140,  name: 'Dauntless',            playtime_forever: 1500,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(812140),  library: lib(812140)  }, genres: F2P_ACTION },
+        { appid: 1282100, name: 'Cuisine Royale',       playtime_forever: 1200,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1282100), library: lib(1282100) }, genres: F2P_ACTION },
+        { appid: 730640,  name: 'Phantom Forces',       playtime_forever: 1000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(730640),  library: lib(730640)  }, genres: F2P_ACTION },
+        { appid: 945360,  name: 'Among Us',             playtime_forever: 900,   img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(945360),  library: lib(945360)  }, genres: F2P        },
+        { appid: 359320,  name: 'Creativerse',          playtime_forever: 800,   img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(359320),  library: lib(359320)  }, genres: F2P        },
     ]
 };
 

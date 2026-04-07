@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { writeFile, mkdir } from 'fs/promises'
+import { getResultPath } from './helpers/results'
 import { attachConsoleCollector } from './helpers/scene'
 
 /**
@@ -51,8 +52,8 @@ test('startup smoothness', async ({ page }) => {
     }
   }
 
-  await mkdir('test-results', { recursive: true })
-  await writeFile('test-results/startup-smoothness.json', JSON.stringify(report, null, 2))
+  const reportPath = await getResultPath('startup-smoothness.json')
+  await writeFile(reportPath, JSON.stringify(report, null, 2))
 
   // 6. Assertions & Output
   console.log('\n=== Startup Smoothness Report ===')
@@ -69,5 +70,5 @@ test('startup smoothness', async ({ page }) => {
 
   // Loose bound - currently seeing ~1-2
   expect(hitchCount).toBeLessThan(5)
-  console.log(`\nFull report: test-results/startup-smoothness.json`)
+  console.log(`\nFull report: ${reportPath}`)
 })

@@ -1,5 +1,6 @@
 import { test } from '@playwright/test'
 import { writeFile, mkdir } from 'fs/promises'
+import { getResultPath } from './helpers/results'
 import { waitForSceneReady, attachConsoleCollector } from './helpers/scene'
 
 /**
@@ -44,10 +45,10 @@ test('shelf rotation: log trace', async ({ page }) => {
     errors.forEach(e => console.log(`  [${e.type}] ${e.text}`))
   }
 
-  await mkdir('test-results', { recursive: true })
+  const logPath = await getResultPath('shelf-rotation-log.json')
   await writeFile(
-    'test-results/shelf-rotation-log.json',
+    logPath,
     JSON.stringify({ timestamp: new Date().toISOString(), shelfLogs, errors, all: entries }, null, 2)
   )
-  console.log('Full trace: test-results/shelf-rotation-log.json')
+  console.log(`Full trace: ${logPath}`)
 })

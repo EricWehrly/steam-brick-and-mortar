@@ -174,6 +174,25 @@ Emit sort-changed event -> SteamIntegration re-sorts and re-emits batches.
 the main scene. Leave injectable for testable units.
 **Ref**: `docs/roadmaps/tech-debt.md`
 
+
+### Offline Data Import + Local Steam Harvesting
+**Status**: `planned` -- background research thread
+**Complexity**: M (research) + L (implementation)
+**Context**: Two goals:
+  1. Bookmarklet: User loads a Steam web page (e.g. store.steampowered.com/games),
+     clicks a bookmarklet, which scrapes their owned games / library data and
+     downloads a JSON file they can import into the app. Bypasses API CORS issues entirely.
+  2. Local Steam install: Read Steam's local VDF/ACF files to harvest richer data
+     than the API provides -- specifically user-created library groupings/collections
+     (the shelf organization the user has set in the Steam client).
+     Local path: %STEAM_PATH%/userdata/<userid>/7/remote/sharedconfig.vdf
+**Research questions**:
+  - What fields does the Steam client expose in sharedconfig.vdf? Are collections in there?
+  - What would a safe bookmarklet look like? (CSP concerns on steam pages)
+  - Is there a local HTTP server approach (e.g. steamctl) that could serve local data?
+**Next**: Spawn a research subagent to investigate both angles and produce a doc in
+  docs/research/offline-data-import.md with findings and recommended approach.
+  This feeds into the broader "data pipeline" work.
 ---
 
 ## P3 -- Low Priority / Deferred

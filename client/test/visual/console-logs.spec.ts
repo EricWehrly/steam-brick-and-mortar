@@ -1,5 +1,6 @@
 import { test } from '@playwright/test'
 import { writeFile, mkdir } from 'fs/promises'
+import { getResultPath } from './helpers/results'
 import { waitForSceneReady, attachConsoleCollector, type ConsoleEntry } from './helpers/scene'
 
 /**
@@ -55,7 +56,7 @@ test('console log report', async ({ page }) => {
     all: entries,
   }
 
-  await mkdir('test-results', { recursive: true })
-  await writeFile('test-results/console-report.json', JSON.stringify(report, null, 2))
-  console.log('\nFull report: test-results/console-report.json')
+  const reportPath = await getResultPath('console-report.json')
+  await writeFile(reportPath, JSON.stringify(report, null, 2))
+  console.log(`\nFull report: ${reportPath}`)
 })
