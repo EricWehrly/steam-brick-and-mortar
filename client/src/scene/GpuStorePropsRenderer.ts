@@ -423,7 +423,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const shelfIndex = batchIndex % this.maxShelvesPerRow
 
         // Create shelf without games (GameBoxSpawner will place them)
-        this.createInstancedShelf(shelfPosition, rowIndex, shelfIndex)
+        this.createInstancedShelf(shelfPosition, rowIndex, shelfIndex, batchIndex)
         this.cumulativeShelfCount++
 
         // Game accumulation for section planning happens in handleInitialBatch.
@@ -524,12 +524,16 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private createInstancedShelf(
         position: THREE.Vector3,
         rowIndex: number,
-        shelfIndex: number
+        shelfIndex: number,
+        batchIndex?: number
     ): void {
+        // Arc layout: batchIndex IS the direct index into shelfRotationsY.
+        // globalShelfIndex (row * maxPerRow + indexInRow) only matches for uniform-row-count grids.
+        const directIndex = batchIndex ?? (rowIndex * this.maxShelvesPerRow + shelfIndex)
         const globalShelfIndex = rowIndex * this.maxShelvesPerRow + shelfIndex
 
         // Use arc-computed rotation if available; fall back to flat-row toe logic
-        const storedRotY = this.shelfRotationsY[globalShelfIndex]
+        const storedRotY = this.shelfRotationsY[directIndex] ?? this.shelfRotationsY[globalShelfIndex]
         const rotY = storedRotY !== undefined
             ? storedRotY
             : (rowIndex % 2 === 1 ? Math.PI : 0)
@@ -538,7 +542,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             new THREE.Euler(0, rotY, 0)
         )
 
-        this.instancedShelfRenderer.setInstance(globalShelfIndex, {
+        this.instancedShelfRenderer.setInstance(directIndex, {
             position,
             rotation
         })

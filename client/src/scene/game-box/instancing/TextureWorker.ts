@@ -18,6 +18,7 @@ import { Logger } from '../../../utils/Logger'
 
 // Vite worker import - creates a new worker from the file
 import TextureProcessingWorker from './texture-processing.worker?worker'
+import { makeWorkerErrorHandler } from '../../../utils/WorkerErrorUtils'
 
 export interface FetchAndProcessResult {
     imageData: Uint8ClampedArray
@@ -57,19 +58,10 @@ export class TextureWorker {
             this.handleWorkerMessage(event.data)
         }
         
-        this.worker.onerror = (error) => {
-            TextureWorker.logger.error('🔥 TextureWorker error:', {
-                message: error.message,
-                filename: error.filename,
-                lineno: error.lineno,
-                colno: error.colno,
-                error: error.error,
-                fullError: error
-            })
-        }
+        this.worker.onerror = makeWorkerErrorHandler('TextureWorker', this.pendingMessages as never, TextureWorker.logger)
 
         this.worker.onmessageerror = (error) => {
-            TextureWorker.logger.error('🔥 TextureWorker message error:', error)
+            TextureWorker.logger.error('TextureWorker message deserialization error:', error)
         }
 
         TextureWorker.logger.lifecycle('Initialized')

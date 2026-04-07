@@ -88,11 +88,18 @@ export class GameBoxUtils {
 
     /**
      * Calculate world-space quaternion for a game box given shelf orientation and side.
-     * Front side: rotated by shelfRotationY. Back side: additionally flipped PI around Y.
+     *
+     * Convention: game box artwork is on the -Z face of the model.
+     * Arc shelves have rotationY = atan2(x,z) + PI so their +Z front faces inward (toward origin).
+     * For the game artwork (-Z face) to face the player, we need rotationY + PI on the front side.
+     * For the back side, rotationY alone points the -Z artwork face outward.
+     *
+     * Front: totalY = shelfRotationY + PI
+     * Back:  totalY = shelfRotationY  (no extra flip - already facing outward)
      */
     static calculateGameRotation(shelfRotationY: number, side: ShelfSide): THREE.Quaternion {
-        const backFlip = side === ShelfSide.Back ? Math.PI : 0
-        const totalY = shelfRotationY + backFlip
+        const frontFlip = side === ShelfSide.Front ? Math.PI : 0
+        const totalY = shelfRotationY + frontFlip
         return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), totalY)
     }
 }

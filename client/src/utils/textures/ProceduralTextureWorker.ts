@@ -19,6 +19,7 @@ import type {
 } from './procedural-texture.worker'
 import { Logger } from '../Logger'
 import ProceduralTextureWorkerModule from './procedural-texture.worker?worker'
+import { makeWorkerErrorHandler } from '../WorkerErrorUtils'
 
 interface PendingRequest {
     resolve: (bitmap: ImageBitmap) => void
@@ -39,14 +40,7 @@ export class ProceduralTextureWorker {
         this.worker.onmessage = (e: MessageEvent<TextureGeneratedResult | TextureGenerationError>) => {
             this.handleMessage(e.data)
         }
-        this.worker.onerror = (e) => {
-            ProceduralTextureWorker.logger.error('Worker error:', e.message)
-            // Reject all pending with the error
-            for (const [, req] of this.pending) {
-                req.reject(new Error(e.message))
-            }
-            this.pending.clear()
-        }
+        this.worker.onerror = makeWorkerErrorHandler('ProceduralTextureWorker', this.pending as never, ProceduralTextureWorker.logger)
     }
 
     public static getInstance(): ProceduralTextureWorker {

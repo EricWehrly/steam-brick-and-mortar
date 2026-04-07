@@ -1,3 +1,4 @@
+import { extractWorkerErrorMessage } from '../../../utils/WorkerErrorUtils'
 /**
  * PixelDataCache - Web Worker-based IndexedDB cache for decoded texture pixel data
  * 
@@ -116,7 +117,8 @@ export class PixelDataCache {
                 }
                 
                 this.worker.onerror = (error) => {
-                    PixelDataCache.logger.error('Worker error:', error.message)
+                    const msg = extractWorkerErrorMessage(error)
+                    PixelDataCache.logger.error('Worker crashed:', msg, { filename: error.filename, error: error.error })
                     this.stats.errors++
                 }
                 
