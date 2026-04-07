@@ -2,7 +2,7 @@
  * RecentlyPlayedCeilingSign
  *
  * Places a single "Recently Played" sign hanging from the ceiling near the
- * front of the store. The sign uses the CategorySignSystem ceiling mount style.
+ * front of the store. The sign uses the SceneSignManager ceiling mount style.
  *
  * Phase 1: flat above-shelf geometry at ceiling height (visible, not yet a
  * true hanging cable-and-bracket sign — that is a future visual pass).
@@ -10,13 +10,14 @@
  */
 
 import * as THREE from 'three'
-import { CategorySignSystem, SignStyles, type SignMount } from './CategorySignSystem'
+import { SceneSignManager, SignStyles, type SignMount } from './SceneSignManager'
 import { RoomConstants } from './RoomManager'
 
 export const RECENTLY_PLAYED_SIGN_LABEL = 'Recently Played'
 
 /** Z-position (depth into store) where the sign is anchored. 0 = entrance. */
-const SIGN_ANCHOR_Z = -1.5
+// Z midpoint between first arc row (r=5, z=-5) and second (r=7.8, z=-7.8) at centre angle
+const SIGN_ANCHOR_Z = -6.4
 
 /**
  * Drop from ceiling — how far below ceiling surface the sign centre sits.
@@ -25,10 +26,10 @@ const SIGN_ANCHOR_Z = -1.5
 const SIGN_DROP_FROM_CEILING = 0.5
 
 export class RecentlyPlayedCeilingSign {
-    private readonly signSystem: CategorySignSystem
+    private readonly signSystem: SceneSignManager
 
     constructor(scene: THREE.Scene) {
-        this.signSystem = new CategorySignSystem(scene)
+        this.signSystem = new SceneSignManager(scene)
     }
 
     /** Place (or replace) the Recently Played ceiling sign. */
@@ -49,8 +50,8 @@ export class RecentlyPlayedCeilingSign {
             style: {
                 backgroundColor: 0xd4a017, // gold
                 textColor: 0x003087,        // deep blue
-                width: 3.0,
-                height: 0.5,
+                width: 4.0,
+                height: 0.65,
             },
         })
     }

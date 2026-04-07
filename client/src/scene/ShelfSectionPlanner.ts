@@ -12,7 +12,7 @@ import * as THREE from 'three'
 import { EventManager } from '../core/EventManager'
 import { StorePropsEventTypes, type BatchReadyForPlacementEvent } from '../types/InteractionEvents'
 import { CategoryAssigner } from './categorization/CategoryAssigner'
-import { CategorySignSystem, type SignMount } from './CategorySignSystem'
+import { SceneSignManager, type SignMount } from './SceneSignManager'
 import type { SteamGameData } from './game-box/types/GameData'
 import { Logger } from '../utils/Logger'
 
@@ -28,13 +28,13 @@ export class ShelfSectionPlanner {
     private static readonly logger = Logger.createLogFunctions(ShelfSectionPlanner.name)
 
     private readonly assigner = new CategoryAssigner()
-    private readonly signSystem: CategorySignSystem
+    private readonly signSystem: SceneSignManager
     private readonly config: Required<ShelfSectionPlannerConfig>
 
     private games: SteamGameData[] = []
 
     constructor(scene: THREE.Scene, config: ShelfSectionPlannerConfig = {}) {
-        this.signSystem = new CategorySignSystem(scene)
+        this.signSystem = new SceneSignManager(scene)
         this.config = {
             signYOffset: config.signYOffset ?? DEFAULT_SIGN_Y_OFFSET,
             signMountStyle: config.signMountStyle ?? DEFAULT_MOUNT_STYLE,
