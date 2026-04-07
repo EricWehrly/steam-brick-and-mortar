@@ -51,6 +51,10 @@ import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
+import {
+    computeAlternatingClusterXOffset,
+    getPrimaryGenreFromBatch,
+} from './categorization/CategoryAisleOffset'
 import type { SteamGameData } from './game-box/types/GameData'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
@@ -84,6 +88,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
      * Inter-pair gap uses normal SHELF_SPACING_Z (3m).
      */
     private readonly backToBackRowSpacingZ: number = 2.0
+    private readonly categoryClusterOffsetX: number = 1.25
+    private readonly batchPrimaryGenreByIndex = new Map<number, string>()
 
     private progressiveInitializationPromise: Promise<void> | null = null
     private setupPhaseInitialized: boolean = false
@@ -172,7 +178,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private async handleInitialBatch(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
-        const { totalBatches } = event.detail
+        const { totalBatches, batchIndex, games } = event.detail
+
+        const primaryGenre = getPrimaryGenreFromBatch(games as readonly SteamGameData[])
+        this.batchPrimaryGenreByIndex.set(batchIndex, primaryGenre)
 
         // ShelfSectionPlanner self-subscribes to BatchReadyForPlacement for game accumulation.
         // This handler only drives first-batch renderer initialization.
@@ -207,6 +216,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private handleAllBatchesComplete(): void {
         this.finalizeProgressiveLoading()
+        this.calculateShelfBoundsAndLayout(this.shelfPositions.length)
         this.shelfSectionPlanner.planSections(this.shelfPositions)
     }
 
@@ -221,6 +231,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
+        this.batchPrimaryGenreByIndex.clear()
         // batchGamesByIndex removed � games accumulated directly in shelfSectionPlanner
         this.shelfSectionPlanner.reset()
         this.clearExistingShelves()
@@ -334,12 +345,21 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         }
 
         this.ensureShelfPositionAllocated(batchIndex)
-        const shelfPosition = this.shelfPositions[batchIndex]
+        const baseShelfPosition = this.shelfPositions[batchIndex]
 
-        if (!shelfPosition) {
+        if (!baseShelfPosition) {
             console.error(`? CRITICAL: Shelf position ${batchIndex} is undefined even after allocation!`)
             return
         }
+
+        const xOffset = computeAlternatingClusterXOffset(
+            batchIndex,
+            this.batchPrimaryGenreByIndex,
+            this.categoryClusterOffsetX
+        )
+        const shelfPosition = baseShelfPosition.clone()
+        shelfPosition.x += xOffset
+        this.shelfPositions[batchIndex] = shelfPosition
 
         const progress = this.batchCoordinator.getProgress()
         EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
