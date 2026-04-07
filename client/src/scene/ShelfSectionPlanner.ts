@@ -4,7 +4,7 @@
  * Accumulates game data across progressive batches, then places
  * category signs in one pass after all batches complete.
  *
- * Signs appear only after planSections() — no provisional signs during load.
+ * Signs appear only after planSections() ï¿½ no provisional signs during load.
  * planSections() is re-runnable: safe to call after filter/sort changes.
  */
 
@@ -41,7 +41,7 @@ export class ShelfSectionPlanner {
 
     /**
      * Accumulate games from one batch.
-     * Does NOT place any signs — signs are deferred to planSections().
+     * Does NOT place any signs ï¿½ signs are deferred to planSections().
      */
     public onBatchPlaced(
         _batchIndex: number,
@@ -60,16 +60,16 @@ export class ShelfSectionPlanner {
      * group gets a unique shelf even when multiple small groups would
      * otherwise map to the same position.
      *
-     * "Other" is skipped — it's a catch-all for tools/dedicated servers
+     * "Other" is skipped ï¿½ it's a catch-all for tools/dedicated servers
      * and adds no navigation value as a section sign.
      */
     public planSections(shelfPositions: THREE.Vector3[]): void {
         if (this.games.length === 0) {
-            ShelfSectionPlanner.logger.warn('planSections called with no games — skipping')
+            ShelfSectionPlanner.logger.warn('planSections called with no games ï¿½ skipping')
             return
         }
         if (shelfPositions.length === 0) {
-            ShelfSectionPlanner.logger.warn('planSections called with no shelf positions — skipping')
+            ShelfSectionPlanner.logger.warn('planSections called with no shelf positions ï¿½ skipping')
             return
         }
 
@@ -77,9 +77,24 @@ export class ShelfSectionPlanner {
 
         const groups = this.assigner.assign(this.games)
         ShelfSectionPlanner.logger.info(
-            `[SIGN-DEBUG] planSections: ${groups.length} groups — ` +
+            `[SIGN-DEBUG] planSections: ${groups.length} groups ï¿½ ` +
             groups.map(g => `${g.label}(${g.games.length})`).join(', ')
         )
+
+        // [CAT-ALIGN-DEBUG] Per-game shelf alignment â€” remove once categories are verified
+        let _dbgOffset = 0
+        const _batchSz = 18
+        const _lines: string[] = []
+        for (const _grp of groups) {
+            const _si = Math.floor(_dbgOffset / _batchSz)
+            _grp.games.slice(0, 3).forEach((g: any) => {
+                const _raw = g.genres?.map((x: any) => x.description).join(',') ?? 'none'
+                _lines.push(`shelf~${_si} [${_grp.label}] ${g.name} (genres: ${_raw})`)
+            })
+            if (_grp.games.length > 3) _lines.push(`shelf~${_si} [${_grp.label}] ...+${_grp.games.length - 3} more`)
+            _dbgOffset += _grp.games.length
+        }
+        console.log('[CAT-ALIGN-DEBUG]\n' + _lines.join('\n'))
 
         let placed = 0
         let gameOffset = 0
@@ -87,7 +102,7 @@ export class ShelfSectionPlanner {
         let lastUsedAnchor = -1  // ensures each genre gets a unique shelf position
 
         for (const group of groups) {
-            // Skip 'Other' — catch-all for tools/servers, not useful as a section sign
+            // Skip 'Other' ï¿½ catch-all for tools/servers, not useful as a section sign
             if (group.label === 'Other') {
                 gameOffset += group.games.length
                 continue
