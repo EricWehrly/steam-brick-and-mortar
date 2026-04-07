@@ -27,6 +27,7 @@ export enum DataKey {
     MainScene = 'core.mainScene',
     MainCamera = 'core.mainCamera',
     Renderer = 'core.renderer',
+    SteamMode = 'steam.mode',
     InstancedArtworkMetadata = 'renderer.instancedArtworkMetadata',
     InstancedLabelMetadata = 'renderer.instancedLabelMetadata'
 }
