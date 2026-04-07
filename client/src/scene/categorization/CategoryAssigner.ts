@@ -67,7 +67,7 @@ export class CategoryAssigner {
                 const canonical = GENRE_LOOKUP.get(raw.toLowerCase())
                 genre = canonical ?? otherGroupName
                 if (!canonical) {
-                    CategoryAssigner.logger.warn(`[CAT-DEBUG] Unrecognized genre "${raw}" for "${game.name}" (appid ${game.appid}) → Other`)
+                    CategoryAssigner.logger.warn(`[CAT-DEBUG] Unrecognized genre "${raw}" for "${game.name}" (appid ${game.appid}) -> Other`)
                     noGenreCount++
                 }
             } else {
@@ -79,7 +79,7 @@ export class CategoryAssigner {
         }
 
         if (noGenreCount > 0) {
-            CategoryAssigner.logger.warn(`[CAT-DEBUG] ${noGenreCount}/${games.length} games had no recognised genre � landed in "Other".`)
+            CategoryAssigner.logger.warn(`[CAT-DEBUG] ${noGenreCount}/${games.length} games had no recognised genre -> landed in "Other".`)
         }
 
         const shelfGroups: ShelfGroup[] = Array.from(groupsMap.entries()).map(([genre, groupGames]) => ({
