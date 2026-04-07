@@ -624,3 +624,11 @@ Apply to new TD comments going forward; backfill existing ones during lint pass.
 **Context**: ManagedWorker.send() does not currently support passing a transfer array. If we ever need to pass large buffers TO the worker without copying, ManagedWorker needs a signature update (e.g. send<T>(msg, transfer?: Transferable[])).
 **Source**: Apr 2026 class review
 
+
+
+### Signs: Move placeTimeBucketSigns out of GpuStorePropsRenderer
+**Priority**: Medium
+**Effort**: S
+**Context**: placeTimeBucketSigns() is layout+signage logic jammed into a renderer. SceneSignManager is the right home. Needs shelf position/rotation data as inputs, likely via an event or explicit call from the coordinator layer after layout is determined.
+**Source**: PR #40 r3048445863
+
