@@ -43,7 +43,7 @@
 }
 
 .lighting-controls-panel .clickable-header {
-    padding: 8px 12px;
+    padding: var(--panel-space-8) var(--panel-space-12);
     background: var(--panel-header-bg);
     border-bottom: 1px solid var(--panel-border);
     display: flex;
@@ -55,23 +55,23 @@
 }
 
 .lighting-controls-panel .clickable-header:hover {
-    background: rgba(60, 60, 60, 0.9); /* TD: no token yet */
+    background: var(--panel-hover-bg);
 }
 
 .lighting-controls-panel .clickable-header h3 {
     margin: 0;
-    font-size: 14px; /* TD: no token yet */
+    font-size: var(--panel-font-size-md);
     user-select: none;
 }
 
 .lighting-controls-panel .header-controls {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--panel-space-8);
 }
 
 .lighting-controls-panel .toggle-indicator {
-    font-size: 12px; /* TD: no token yet */
+    font-size: var(--panel-font-size-sm);
     color: var(--panel-text-muted);
     user-select: none;
     transition: transform var(--menu-transition-time) ease;
@@ -87,15 +87,15 @@
     border: none;
     color: var(--panel-text-muted);
     cursor: pointer;
-    font-size: 12px; /* TD: no token yet */
-    padding: 2px 4px;
-    border-radius: 3px; /* TD: no token yet */
+    font-size: var(--panel-font-size-sm);
+    padding: var(--panel-space-2) var(--panel-space-4);
+    border-radius: var(--panel-radius-sm);
     transition: background-color 0.2s ease;
 }
 
 .lighting-controls-panel .refresh-button:hover {
-    background: rgba(255, 255, 255, 0.1); /* TD: no token yet */
-    color: white; /* TD: no token yet */
+    background: var(--panel-strong-hover-bg);
+    color: var(--panel-text-strong);
 }
 
 .lighting-controls-panel .panel-content {
@@ -120,8 +120,8 @@
 
 .lighting-controls-panel .master-controls {
     /* No bottom margin — the separator is enough */
-    margin-bottom: 6px; /* TD: no token yet */
-    padding-bottom: 4px; /* TD: no token yet */
+    margin-bottom: var(--panel-space-6);
+    padding-bottom: var(--panel-space-4);
     border-bottom: 1px solid var(--panel-border);
 }
 
@@ -129,12 +129,12 @@
     /* Bare-bones layout — no container border, no extra vertical padding */
     display: flex;
     align-items: center;
-    margin-bottom: 3px; /* TD: no token yet */
+    margin-bottom: var(--panel-space-3);
     cursor: pointer;
 }
 
 .lighting-controls-panel .control-item input[type="checkbox"] {
-    margin-right: 8px; /* TD: no token yet */
+    margin-right: var(--panel-space-8);
 }
 
 .lighting-controls-panel .control-label {
@@ -144,23 +144,23 @@
 
 .lighting-controls-panel .light-info {
     margin-left: auto;
-    font-size: 11px; /* TD: no token yet */
+    font-size: var(--panel-font-size-xs);
     color: var(--panel-text-muted);
 }
 
 .lighting-controls-panel .light-group {
-    margin-bottom: 4px; /* TD: no token yet */
+    margin-bottom: var(--panel-space-4);
     border: 1px solid var(--panel-border);
-    border-radius: 4px; /* TD: no token yet */
+    border-radius: var(--panel-radius-md);
     overflow: hidden;
 }
 
 .lighting-controls-panel .group-header {
     display: flex;
     align-items: center;
-    background: rgba(30, 30, 30, 0.8); /* TD: no token yet */
-    padding: 4px 6px; /* TD: no token yet */
-    gap: 6px; /* TD: no token yet */
+    background: var(--panel-group-header-bg);
+    padding: var(--panel-space-4) var(--panel-space-6);
+    gap: var(--panel-space-6);
 }
 
 .lighting-controls-panel .group-checkbox-area {
@@ -168,29 +168,29 @@
     align-items: center;
     flex: 1;
     cursor: pointer;
-    padding: 4px; /* TD: no token yet */
-    border-radius: 3px; /* TD: no token yet */
+    padding: var(--panel-space-4);
+    border-radius: var(--panel-radius-sm);
     transition: background-color 0.2s ease;
 }
 
 .lighting-controls-panel .group-checkbox-area:hover {
-    background: rgba(255, 255, 255, 0.05); /* TD: no token yet */
+    background: var(--panel-subtle-hover-bg);
 }
 
 .lighting-controls-panel .group-expander {
-    padding: 4px 8px; /* TD: no token yet */
+    padding: var(--panel-space-4) var(--panel-space-8);
     cursor: pointer;
     color: var(--panel-text-muted);
-    font-size: 12px; /* TD: no token yet */
-    border-radius: 3px; /* TD: no token yet */
+    font-size: var(--panel-font-size-sm);
+    border-radius: var(--panel-radius-sm);
     transition: background-color 0.2s ease, transform var(--menu-transition-time) ease;
     user-select: none;
     display: inline-block;
 }
 
 .lighting-controls-panel .group-expander:hover {
-    background: rgba(255, 255, 255, 0.1); /* TD: no token yet */
-    color: white; /* TD: no token yet */
+    background: var(--panel-strong-hover-bg);
+    color: var(--panel-text-strong);
 }
 
 .lighting-controls-panel .group-expander.collapsed {
@@ -214,22 +214,22 @@
 }
 
 .lighting-controls-panel .individual-lights h4 {
-    margin: 12px 0 8px 0; /* TD: no token yet */
-    font-size: 12px; /* TD: no token yet */
-    color: #ccc; /* TD: no token yet */
+    margin: var(--panel-space-12) 0 var(--panel-space-8) 0;
+    font-size: var(--panel-font-size-sm);
+    color: var(--panel-heading-text);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .lighting-controls-panel .light-control {
-    padding: 2px 8px; /* TD: no token yet */
-    font-size: 12px; /* TD: no token yet */
-    background: rgba(20, 20, 20, 0.5); /* TD: no token yet */
+    padding: var(--panel-space-2) var(--panel-space-8);
+    font-size: var(--panel-font-size-sm);
+    background: var(--panel-item-bg);
     transition: background-color 0.2s ease;
 }
 
 .lighting-controls-panel .light-control:hover {
-    background: rgba(40, 40, 40, 0.7); /* TD: no token yet */
+    background: var(--panel-item-hover-bg);
 }
 
 .lighting-controls-panel .light-control .control-label {
