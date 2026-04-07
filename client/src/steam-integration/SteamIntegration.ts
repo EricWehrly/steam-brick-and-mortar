@@ -20,7 +20,7 @@ import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEve
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
-import { sortByGenreThenPlaytime } from '../scene/categorization/CategoryAssigner'
+import { sortByGenreThenPlaytime, sortByRecentlyPlayed } from '../scene/categorization/CategoryAssigner'
 
 export interface SteamIntegrationConfig {
     apiBaseUrl?: string
@@ -157,7 +157,7 @@ export class SteamIntegration {
             // Progressive loading via events - GameLibraryManager listens to GamesBatchReady
             await this.steamClient.loadGamesProgressively(userGames, {
                 maxGames: this.config.maxGames,
-                sortFn: sortByGenreThenPlaytime,
+                sortFn: sortByRecentlyPlayed,
             })
             
             // Complete loading - actual count from library state (populated via onBatchReady)
@@ -302,7 +302,7 @@ export class SteamIntegration {
             // Progressive loading via events - GameLibraryManager listens to GamesBatchReady  
             await this.steamClient.loadGamesProgressively(cachedGames, {
                 maxGames: cachedGames.game_count,
-                sortFn: sortByGenreThenPlaytime,
+                sortFn: sortByRecentlyPlayed,
             })
             
             const gamesLoaded = this.gameLibrary.getState().userData?.games?.length ?? 0

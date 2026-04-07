@@ -43,8 +43,12 @@ export class RecentlyPlayedCeilingSign {
             label: RECENTLY_PLAYED_SIGN_LABEL,
             anchorPosition: new THREE.Vector3(centerX, y, SIGN_ANCHOR_Z),
             mount,
+            // Blue text on gold — matches the store theme direction.
+            // TD: align with UI design tokens once store theme is finalised
+            //     docs/roadmaps/tech-debt.md -> "UI design tokens"
             style: {
-                ...SignStyles.Featured,
+                backgroundColor: 0xd4a017, // gold
+                textColor: 0x003087,        // deep blue
                 width: 3.0,
                 height: 0.5,
             },

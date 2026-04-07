@@ -56,6 +56,7 @@ import {
     computeAlternatingClusterXOffset,
     getPrimaryGenreFromBatch,
 } from './categorization/CategoryAisleOffset'
+import { computeArcShelfLayout, type ArcLayoutConfig } from './props/shared/ArcLayoutUtils'
 import type { SteamGameData } from './game-box/types/GameData'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
@@ -91,6 +92,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private readonly backToBackRowSpacingZ: number = 2.0
     private readonly categoryClusterOffsetX: number = 1.25
     private readonly batchPrimaryGenreByIndex = new Map<number, string>()
+    /** Per-shelf rotation Y from arc layout calculation. Indexed same as shelfPositions. */
+    private shelfRotationsY: number[] = []
 
     private progressiveInitializationPromise: Promise<void> | null = null
     private setupPhaseInitialized: boolean = false
@@ -220,7 +223,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private handleAllBatchesComplete(): void {
         this.finalizeProgressiveLoading()
         this.calculateShelfBoundsAndLayout(this.shelfPositions.length)
-        this.shelfSectionPlanner.planSections(this.shelfPositions)
+        // Genre section signs skipped on recently-played branch (single group, no genre splits)\n        // Uncomment to re-enable: this.shelfSectionPlanner.planSections(this.shelfPositions)
         this.recentlyPlayedSign.place()
     }
 
@@ -236,11 +239,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
         this.batchPrimaryGenreByIndex.clear()
+        this.shelfRotationsY = []
         // batchGamesByIndex removed � games accumulated directly in shelfSectionPlanner
         this.shelfSectionPlanner.reset()
         this.clearExistingShelves()
 
-        this.preallocateShelfPositions(totalBatches)
+        this.preallocateArcLayout(totalBatches)
     }
 
     private async waitForShelfRendererReady(): Promise<void> {
@@ -260,6 +264,22 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         return new Promise<void>((resolve) => {
             this.initializationQueue.push(resolve)
         })
+    }
+
+    private preallocateArcLayout(totalShelves: number): void {
+        const arcConfig: ArcLayoutConfig = {
+            rows: 5,
+            shelvesPerRow: Math.ceil(totalShelves / 5),
+            rowRadiusStep: 2.8,
+            firstRowRadius: 5.0,
+            halfAngle: Math.PI / 3,
+        }
+        const arcShelves = computeArcShelfLayout(totalShelves, arcConfig)
+
+        this.shelfPositions = arcShelves.map(s => s.position)
+        this.shelfRotationsY = arcShelves.map(s => s.rotationY)
+
+        this.calculateShelfBoundsAndLayout(totalShelves)
     }
 
     private preallocateShelfPositions(totalShelves: number): void {
@@ -334,7 +354,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const progress = this.batchCoordinator.getProgress()
         console.warn(`⚠️ BATCH COUNT MISMATCH: Received batch ${batchIndex + 1} but only allocated ${oldLength} positions`)
         console.warn(`   Expected: ${progress.total}, Actual: >${batchIndex + 1}. Expanding...`)
-        this.preallocateShelfPositions(batchIndex + 1)
+        this.preallocateArcLayout(batchIndex + 1)
     }
 
     private async createShelfForBatchIndex(batchIndex: number): Promise<void> {
@@ -357,15 +377,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             return
         }
 
-        const xOffset = computeAlternatingClusterXOffset(
-            batchIndex,
-            this.batchPrimaryGenreByIndex,
-            this.categoryClusterOffsetX
-        )
-        const shelfPosition = baseShelfPosition.clone()
-        shelfPosition.x += xOffset
-        this.shelfPositions[batchIndex] = shelfPosition
-
+        // Arc layout: shelf position already set from arc calculation, no X nudge needed
+        const shelfPosition = baseShelfPosition
         const progress = this.batchCoordinator.getProgress()
         EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
             step: 'shelves',
@@ -392,9 +405,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 batchIndex: batchIndex,
                 rowIndex,
                 shelfIndex,
-                // Combined angle: row-flip + row-uniform toe-out (matches createInstancedShelf)
-                shelfRotationY: (rowIndex % 2 === 1 ? Math.PI : 0) +
-                    ((rowIndex % 2 === 0 ? 1 : -1) * (this.SHELF_TOE_DEGREES * Math.PI) / 180),
+                shelfRotationY: this.shelfRotationsY[batchIndex] ?? (rowIndex % 2 === 1 ? Math.PI : 0),
                 bounds: { ...this.shelfBounds },
                 status: BatchProcessingStatus.ShelfCreated,
                 lastModified: Date.now()
@@ -485,26 +496,14 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     ): void {
         const globalShelfIndex = rowIndex * this.maxShelvesPerRow + shelfIndex
 
-        // Base: odd rows flip 180deg to face the opposite direction (back-to-back aisle pairs)
-        const baseAngle = rowIndex % 2 === 1 ? Math.PI : 0
-
-        // Row-uniform toe: all shelves in a row share the same toe direction.
-        // Even rows toe right (+), odd rows toe left (-), so paired rows angle toward each other
-        // creating a consistent angled-aisle effect (like //// and \\\\ rows).
-        const toeRad = (this.SHELF_TOE_DEGREES * Math.PI) / 180
-        const toeAngle = rowIndex % 2 === 0 ? toeRad : -toeRad
+        // Use arc-computed rotation if available; fall back to flat-row toe logic
+        const storedRotY = this.shelfRotationsY[globalShelfIndex]
+        const rotY = storedRotY !== undefined
+            ? storedRotY
+            : (rowIndex % 2 === 1 ? Math.PI : 0)
 
         const rotation = new THREE.Quaternion().setFromEuler(
-            new THREE.Euler(0, baseAngle + toeAngle, 0)
-        )
-
-        // DEBUG: log per-shelf placement
-        // TODO: remove once confirmed working
-        const rotY = baseAngle + toeAngle
-        console.debug(
-            `[SHELF-DEBUG] shelf ${globalShelfIndex} row=${rowIndex} col=${shelfIndex} ` +
-            `pos=(${position.x.toFixed(2)},${position.y.toFixed(2)},${position.z.toFixed(2)}) ` +
-            `rotY=${rotY.toFixed(2)}rad`
+            new THREE.Euler(0, rotY, 0)
         )
 
         this.instancedShelfRenderer.setInstance(globalShelfIndex, {
