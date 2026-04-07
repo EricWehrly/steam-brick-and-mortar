@@ -22,7 +22,6 @@ type PTWOut = TextureGeneratedResult | TextureGenerationError
 
 export class ProceduralTextureWorker extends ManagedWorker<PTWIn, PTWOut> {
     private static _instance: ProceduralTextureWorker | null = null
-    private ptwCounter = 0
 
     private constructor() {
         super(ProceduralTextureWorkerModule as unknown as new () => Worker, 'ProceduralTextureWorker')
@@ -45,17 +44,16 @@ export class ProceduralTextureWorker extends ManagedWorker<PTWIn, PTWOut> {
         textureType: ProceduralTextureType,
         options: Record<string, unknown> = {}
     ): Promise<ImageBitmap> {
-        const messageId = `ptw_${this.ptwCounter++}`
         const response = await this.send<PTWOut>({
             type: 'GENERATE',
             textureType,
             options,
-            messageId,
+            messageId: this.nextId(),
         })
         if (response.type === 'ERROR') {
-            throw new Error((response as TextureGenerationError).error)
+            throw new Error(response.error)
         }
-        return (response as TextureGeneratedResult).bitmap
+        return response.bitmap
     }
 
     public override dispose(): void {
