@@ -60,7 +60,7 @@ export class InstancedLabelRenderer {
     // Deferred allocation: buffer label requests until all batches are known,
     // then allocate the texture array at exactly the right size.
     private deferLabels: boolean = true
-    private pendingLabels: Array<{ gameName: string; position: THREE.Vector3; side: ShelfSide }> = []
+    private pendingLabels: Array<{ gameName: string; position: THREE.Vector3; side: ShelfSide; rotation?: THREE.Quaternion }> = []
     private static readonly DEFERRED_OVERFLOW = 32  // Extra slots for late-arriving failures
     
     // Constant quaternion for no rotation (performance optimization)
@@ -105,8 +105,8 @@ export class InstancedLabelRenderer {
         this.deferLabels = false
         this.initialize()
 
-        for (const { gameName, position, side } of this.pendingLabels) {
-            this.addLabelInstance(position, gameName, side)
+        for (const { gameName, position, side, rotation } of this.pendingLabels) {
+            this.addLabelInstance(position, gameName, side, rotation)
         }
         this.pendingLabels = []
 
@@ -178,11 +178,12 @@ export class InstancedLabelRenderer {
     public addLabelInstance(
         position: THREE.Vector3,
         gameName: string,
-        side: ShelfSide = ShelfSide.Front
+        side: ShelfSide = ShelfSide.Front,
+        rotation?: THREE.Quaternion
     ): boolean {
         // Deferred path: buffer until materializeLabels() is called
         if (this.deferLabels) {
-            this.pendingLabels.push({ gameName, position: position.clone(), side })
+            this.pendingLabels.push({ gameName, position: position.clone(), side, rotation })
             return true
         }
 
@@ -216,13 +217,16 @@ export class InstancedLabelRenderer {
             }
         }
         
-        // Update matrix for this instance (position + rotation based on side)
-        const rotation = side === ShelfSide.Back 
-            ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI) // 180° Y rotation for back side
-            : InstancedLabelRenderer.DEFAULT_ROTATION // No rotation for front side
-            
+        // Use caller-supplied rotation (from GameBoxUtils.calculateGameRotation with arc convention:
+        // Front=rotY+PI, Back=rotY). Fall back to legacy logic for axis-aligned shelves.
+        const effectiveRotation = rotation ?? (
+            side === ShelfSide.Back
+                ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI)
+                : InstancedLabelRenderer.DEFAULT_ROTATION
+        )
+
         const matrix = new THREE.Matrix4()
-        matrix.compose(position, rotation, new THREE.Vector3(1, 1, 1))
+        matrix.compose(position, effectiveRotation, new THREE.Vector3(1, 1, 1))
         this.instancedMesh.setMatrixAt(index, matrix)
         
         // Update texture index attribute
