@@ -290,7 +290,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             ],
             halfAngle: Math.PI / 3,
             halfAngleByRow: [
-                Math.PI / 4,   // row0: tighter cluster at entrance - fills view without feeling sparse
+                Math.PI / 3.5, // row0: 4 shelves at ~1.24m gap - center pair reads close, wings spread
                 Math.PI / 3.5, // row1
                 Math.PI / 3,   // row2: wide enough for 10@r13.5 + walkable
                 Math.PI / 3,   // row3: wide enough for 12@r17.5 + walkable
