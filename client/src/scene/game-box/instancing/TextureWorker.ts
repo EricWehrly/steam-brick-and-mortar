@@ -1,11 +1,8 @@
 /**
- * Web Worker manager for texture processing using OffscreenCanvas
- * Offloads expensive image operations from the main thread:
- * - Network fetch of image URLs
- * - Blob to ImageBitmap conversion
- * - getImageData extraction
- * 
- * Uses Vite's worker import syntax to load the worker from a separate file.
+ * TextureWorker
+ *
+ * Main-thread manager for texture-processing.worker.
+ * Extends ManagedWorker for standardised lifecycle and error handling.
  */
 
 import type { 
@@ -15,10 +12,8 @@ import type {
     TextureProcessingError 
 } from './texture-processing.worker'
 import { Logger } from '../../../utils/Logger'
-
-// Vite worker import - creates a new worker from the file
+import { ManagedWorker } from '../../../utils/ManagedWorker'
 import TextureProcessingWorker from './texture-processing.worker?worker'
-import { makeWorkerErrorHandler } from '../../../utils/WorkerErrorUtils'
 
 export interface FetchAndProcessResult {
     imageData: Uint8ClampedArray
@@ -41,56 +36,51 @@ export interface FetchAndProcessOptions {
     timeout?: number
 }
 
-export class TextureWorker {
+type TWIn = TextureProcessingMessage | TextureFetchMessage
+type TWOut = TextureProcessingResult | TextureProcessingError
+
+export class TextureWorker extends ManagedWorker<TWIn, TWOut> {
     public static logger = Logger.createLogFunctions(TextureWorker.name)
-    private worker: Worker
-    private pendingMessages = new Map<string, {
-        resolve: (data: unknown) => void
-        reject: (error: Error) => void
-        includeBlob?: boolean
-    }>()
-    
+    // Side-channel: tracks whether to include blob in resolved result per messageId
+    private readonly includeBlobFor = new Set<string>()
+    private twCounter = 0
+
     constructor() {
-        // Create worker using Vite's worker constructor
-        this.worker = new TextureProcessingWorker()
-        
-        this.worker.onmessage = (event: MessageEvent) => {
-            this.handleWorkerMessage(event.data)
-        }
-        
-        this.worker.onerror = makeWorkerErrorHandler('TextureWorker', this.pendingMessages as never, TextureWorker.logger)
-
-        this.worker.onmessageerror = (error) => {
-            TextureWorker.logger.error('TextureWorker message deserialization error:', error)
-        }
-
+        super(TextureProcessingWorker as unknown as new () => Worker, 'TextureWorker')
         TextureWorker.logger.lifecycle('Initialized')
     }
-    
+
+    protected override handleMessage(data: TWOut): void {
+        // nothing extra needed here - dispatch already resolved the pending promise
+    }
+
+    protected override onWorkerCrash(err: Error): void {
+        TextureWorker.logger.error('Worker crashed:', err.message)
+        this.includeBlobFor.clear()
+    }
+
+    private nextMsgId(prefix: string): string {
+        return `${prefix}_${this.twCounter++}_${Date.now()}`
+    }
+
     /**
      * Process texture from blob in web worker (legacy mode)
      */
     public async processTexture(blob: Blob, textureSize: number, textureIndex: number): Promise<Uint8ClampedArray> {
-        return new Promise((resolve, reject) => {
-            const messageId = `texture_${textureIndex}_${Date.now()}_${Math.random()}`
-            
-            this.pendingMessages.set(messageId, { resolve, reject })
-            
-            const message: TextureProcessingMessage = {
-                type: 'PROCESS_TEXTURE',
-                blob,
-                textureSize,
-                textureIndex,
-                messageId
-            }
-            
-            this.worker.postMessage(message)
-        })
+        const messageId = this.nextMsgId(`texture_${textureIndex}`)
+        const result = await this.send<TextureProcessingResult>({
+            type: 'PROCESS_TEXTURE',
+            blob,
+            textureSize,
+            textureIndex,
+            messageId
+        } as TextureProcessingMessage)
+        if (result.type !== 'TEXTURE_PROCESSED') throw new Error((result as unknown as TextureProcessingError).error)
+        return result.imageData
     }
-    
+
     /**
      * Fetch image from URL and process in web worker (legacy square textures)
-     * Returns both the processed image data and optionally the blob for caching
      */
     public async fetchAndProcess(
         url: string, 
@@ -99,15 +89,11 @@ export class TextureWorker {
         gameName: string,
         timeout: number = 10000
     ): Promise<FetchAndProcessResult> {
-        return this.fetchAndProcessWithOptions(url, textureIndex, gameName, {
-            textureSize,
-            timeout
-        })
+        return this.fetchAndProcessWithOptions(url, textureIndex, gameName, { textureSize, timeout })
     }
-    
+
     /**
-     * Fetch image from URL and process in web worker with flexible options
-     * Supports native resolution (no resize), width/height, or legacy square textures
+     * Fetch image from URL and process in web worker with flexible options.
      */
     public async fetchAndProcessWithOptions(
         url: string,
@@ -115,16 +101,10 @@ export class TextureWorker {
         gameName: string,
         options: FetchAndProcessOptions = {}
     ): Promise<FetchAndProcessResult> {
-        return new Promise((resolve, reject) => {
-            const messageId = `fetch_${textureIndex}_${Date.now()}_${Math.random()}`
-            
-            this.pendingMessages.set(messageId, { 
-                resolve, 
-                reject,
-                includeBlob: true
-            })
-            
-            const message: TextureFetchMessage = {
+        const messageId = this.nextMsgId(`fetch_${textureIndex}`)
+        this.includeBlobFor.add(messageId)
+        try {
+            const result = await this.send<TextureProcessingResult>({
                 type: 'FETCH_AND_PROCESS',
                 url,
                 textureSize: options.textureSize,
@@ -135,50 +115,29 @@ export class TextureWorker {
                 messageId,
                 gameName,
                 timeout: options.timeout ?? 10000
+            } as TextureFetchMessage)
+
+            if (result.type !== 'TEXTURE_PROCESSED') {
+                throw new Error((result as unknown as TextureProcessingError).error)
             }
-            
-            this.worker.postMessage(message)
-        })
-    }
-    
-    private handleWorkerMessage(data: TextureProcessingResult | TextureProcessingError): void {
-        const { messageId } = data
-        const pending = this.pendingMessages.get(messageId)
-        
-        if (!pending) {
-            TextureWorker.logger.warn('⚠️ Received worker message for unknown messageId:', messageId)
-            return
-        }
-        
-        this.pendingMessages.delete(messageId)
-        
-        if (data.type === 'TEXTURE_PROCESSED') {
-            if (pending.includeBlob) {
-                // Return full result with blob for caching
-                pending.resolve({
-                    imageData: data.imageData,
-                    blob: data.blob,
-                    processingTime: data.processingTime,
-                    width: data.width,
-                    height: data.height
-                })
-            } else {
-                // Legacy mode - just return imageData
-                pending.resolve(data.imageData)
+
+            const includeBlob = this.includeBlobFor.has(messageId)
+            this.includeBlobFor.delete(messageId)
+            return {
+                imageData: result.imageData,
+                blob: includeBlob ? result.blob : undefined,
+                processingTime: result.processingTime,
+                width: result.width,
+                height: result.height
             }
-        } else if (data.type === 'TEXTURE_ERROR') {
-            pending.reject(new Error(data.error))
+        } catch (err) {
+            this.includeBlobFor.delete(messageId)
+            throw err
         }
     }
-    
-    public dispose(): void {
-        // Reject any pending messages
-        for (const [, pending] of this.pendingMessages) {
-            pending.reject(new Error('Worker disposed'))
-        }
-        this.pendingMessages.clear()
-        
-        this.worker.terminate()
-        TextureWorker.logger.lifecycle('Disposed')
+
+    public override dispose(): void {
+        this.includeBlobFor.clear()
+        super.dispose()
     }
 }

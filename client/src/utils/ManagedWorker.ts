@@ -16,7 +16,6 @@
  *   - Call this.send<TResponse>(message) to send and await a response
  */
 
-import { makeWorkerErrorHandler } from './WorkerErrorUtils'
 import { Logger } from './Logger'
 
 export interface WorkerMessage {
@@ -30,6 +29,15 @@ type PendingEntry<TOut> = {
 
 /** Accept either a Vite "?worker" constructable or a plain factory function (useful in tests). */
 type WorkerFactory = (() => Worker) | (new () => Worker)
+
+
+/** Extract meaningful message from a browser ErrorEvent (runtime crashes set message=undefined). */
+function extractWorkerError(e: ErrorEvent): string {
+    if (e.error instanceof Error) return e.error.message || e.error.toString()
+    if (e.message) return e.message
+    if (e.filename) return `Worker error in ${e.filename}:${e.lineno}`
+    return 'Unknown worker error (likely a runtime crash inside the worker)'
+}
 
 export abstract class ManagedWorker<TIn extends WorkerMessage, TOut extends WorkerMessage> {
     private readonly worker: Worker
@@ -55,10 +63,13 @@ export abstract class ManagedWorker<TIn extends WorkerMessage, TOut extends Work
         }
 
         const logger = Logger.createLogFunctions(workerName)
-        const baseHandler = makeWorkerErrorHandler(workerName, this.pending as never, logger)
         this.worker.onerror = (e: ErrorEvent) => {
-            baseHandler(e)
-            this.onWorkerCrash(new Error(e.error?.message ?? e.message ?? 'unknown worker error'))
+            const msg = extractWorkerError(e)
+            logger.error(`Worker crashed: ${msg}`, { filename: e.filename, error: e.error })
+            const err = new Error(`${workerName} crashed: ${msg}`)
+            for (const [, entry] of this.pending) entry.reject(err)
+            this.pending.clear()
+            this.onWorkerCrash(err)
         }
     }
 
