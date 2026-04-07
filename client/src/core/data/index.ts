@@ -6,7 +6,7 @@
  */
 
 export { DataManager } from './DataManager'
-export { DataDomain } from './DataTypes'
+export { DataDomain, DataKey } from './DataTypes'
 export type { 
     DataMetadata, 
     DataEntry, 

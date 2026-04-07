@@ -20,7 +20,7 @@ import { SteamEventTypes, AppSettingsEventTypes, GameEventTypes } from '../types
 import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamGamesBatchEvent, SteamDataLoadedEvent } from '../types/InteractionEvents'
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppSettings } from '../core/AppSettings'
-import { DataManager, DataDomain } from '../core/data'
+import { DataManager, DataDomain, DataKey } from '../core/data'
 import { sortByGenreThenPlaytime, sortByRecentlyPlayed } from '../scene/categorization/CategoryAssigner'
 
 export interface SteamIntegrationConfig {
@@ -152,6 +152,7 @@ export class SteamIntegration {
             
             // Update game library state
             this.gameLibrary.setUserData(userGames)
+            DataManager.getInstance().set(DataKey.SteamMode, 'user', { domain: DataDomain.SteamIntegration })
             
             callbacks.onProgress?.(10, 100, `Found ${userGames.game_count} games. Loading details for top ${Math.min(this.config.maxGames, userGames.game_count)}...`)
             
@@ -297,6 +298,7 @@ export class SteamIntegration {
             
             // Update game library state with cached data
             this.gameLibrary.setUserData(cachedGames)
+            DataManager.getInstance().set(DataKey.SteamMode, 'user', { domain: DataDomain.SteamIntegration })
             
             callbacks.onProgress?.(10, 100, `Found ${cachedGames.game_count} games in cache. Loading...`)
             
@@ -395,6 +397,8 @@ export class SteamIntegration {
             const BATCH_SIZE = 18
             const totalBatches = Math.ceil(games.length / BATCH_SIZE)
 
+            DataManager.getInstance().set(DataKey.SteamMode, 'anonymous', { domain: DataDomain.SteamIntegration })
+
             // Anonymous store: do not populate a Steam user identity
             // this.gameLibrary.setUserData(demoUser) - omitted so UI shows no profile
             // Emit games directly as batch events — no Steam API network calls.
@@ -402,8 +406,7 @@ export class SteamIntegration {
             // waiting for CDN fetches that will CORS-fail in test/anonymous contexts.
             for (let i = 0; i < totalBatches; i++) {
                 const batchGames = games.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE).map(g => ({
-                    ...g,
-                    artwork: undefined
+                    ...g
                 }))
                 EventManager.getInstance().emit<SteamGamesBatchEvent>(
                     SteamEventTypes.GamesBatchReady,

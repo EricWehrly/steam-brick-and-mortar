@@ -49,6 +49,7 @@ import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { DataManager } from '../core/data/DataManager'
+import { DataKey } from '../core/data'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
@@ -234,10 +235,16 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private handleAllBatchesComplete(): void {
         this.finalizeProgressiveLoading()
         this.calculateShelfBoundsAndLayout(this.shelfPositions.length)
-        // Genre section signs skipped on recently-played branch (single group, no genre splits)
-        // Uncomment to re-enable: this.shelfSectionPlanner.planSections(this.shelfPositions)
-        this.recentlyPlayedSign.place()
-        this.placeTimeBucketSigns()
+
+        const steamMode = DataManager.getInstance().get<string>(DataKey.SteamMode)
+        const isAnonymousStore = steamMode === 'anonymous'
+
+        // Anonymous store is curated and not sorted by recency buckets.
+        // Skip recently-played signage entirely in this mode.
+        if (!isAnonymousStore) {
+            this.recentlyPlayedSign.place()
+            this.placeTimeBucketSigns()
+        }
     }
 
     private placeTimeBucketSigns(): void {
@@ -247,7 +254,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Sort them by rtime_last_played descending (same order as the shelves)
         const sortedGames = [...games].sort(sortByRecentlyPlayed)
 
-        const SIGN_Y = 2.5
+        // Shelf-mount signs directly above shelf top (not ceiling level)
+        // Shelf unit height is 2.0m (DEFAULT_SHELF_CONFIG.height), so y+1.1 keeps the sign
+        // clearly above shelf while below ceiling fixtures.
+        const SIGN_ANCHOR_Y_OFFSET = 1.1
         const MIN_DIST_FROM_CEILING_SIGN = 1.5
         const ceilingSignPos = this.recentlyPlayedSign.getPosition()
         let lastBucket: string | null = null
@@ -266,12 +276,17 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
             if (bucket !== 'unplayed' && bucket !== lastBucket) {
                 // Check distance from Recently Played ceiling sign
-                const dist = ceilingSignPos.distanceTo(new THREE.Vector3(shelfPos.x, SIGN_Y, shelfPos.z))
+                const anchor = new THREE.Vector3(
+                    shelfPos.x,
+                    shelfPos.y + SIGN_ANCHOR_Y_OFFSET,
+                    shelfPos.z
+                )
+                const dist = ceilingSignPos.distanceTo(anchor)
                 if (dist > MIN_DIST_FROM_CEILING_SIGN) {
                     SceneSignManager.instance.setSign({
                         label: getBucketLabel(bucket),
-                        anchorPosition: new THREE.Vector3(shelfPos.x, SIGN_Y, shelfPos.z),
-                        mount: { style: 'above-shelf' },
+                        anchorPosition: anchor,
+                        mount: { style: 'above-shelf', yOffset: 0.2 },
                         style: SignStyles.Category
                     })
                 }
