@@ -17,7 +17,7 @@ XS (<2h) | S (2-8h) | M (1-3d) | L (3d+)
 ## P0 — Active
 
 ### PR #40 review follow-through
-**Status**: `in-progress`  
+**Status**: `done`  
 **Complexity**: S  
 **Scope**:
 - Keep PR comments at zero stale/unaddressed.
@@ -25,7 +25,7 @@ XS (<2h) | S (2-8h) | M (1-3d) | L (3d+)
 - Add targeted regression tests where a bug was fixed.
 
 ### Anonymous mode signage/layout polish
-**Status**: `in-progress`  
+**Status**: `done`  
 **Complexity**: S  
 **Scope**:
 - Keep recency signage fully data-driven (only when recency data exists).
