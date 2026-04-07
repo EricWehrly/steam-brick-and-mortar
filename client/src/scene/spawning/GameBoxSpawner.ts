@@ -105,30 +105,34 @@ export class GameBoxSpawner {
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         if (shelfSurfaces.length === 0) return
 
+        // ShelfSide naming note: 'Front' = local -Z face (away from player after arc rotation).
+        // 'Back' = local +Z face (toward origin = toward player spawn).
+        // We always populate the player-facing side (Back) first.
+        // The far side (Front) is suppressed on the back wall ring to avoid clipping.
+        // TD: rename ShelfSide.Front/Back to ShelfSide.Far/Near once naming is audited.
         let gameIndex = 0
         for (const surface of shelfSurfaces) {
             if (gameIndex >= games.length) break
-            const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
-            if (frontGames.length > 0) {
-                this.createGameBoxes(shelfPosition, surface, frontGames, ShelfSide.Front, shelfRotationY)
-                gameIndex += frontGames.length
+            // Near side = ShelfSide.Back (+localZ, faces origin/player)
+            const nearGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
+            if (nearGames.length > 0) {
+                this.createGameBoxes(shelfPosition, surface, nearGames, ShelfSide.Back, shelfRotationY)
+                gameIndex += nearGames.length
             }
             if (gameIndex < games.length) {
-                // Temporary layout rule: suppress backside fill on backmost ring (row 4)
-                // so the far wall reads cleaner and avoids clipping/overdensity.
+                // Far side = ShelfSide.Front (-localZ, faces away from player)
+                // Suppress on back wall ring (row 4) to avoid clipping and overdensity.
                 // TD: formalize as layout policy from planner (not hardcoded row index).
-                const allowBackSide = rowIndex < 4
-                if (!allowBackSide) {
+                const allowFarSide = rowIndex < 4
+                if (!allowFarSide) {
                     continue
                 }
 
-                // TD: wall-shelf-back-side - wall-mounted shelves should not fill the back side.
-                // Currently all shelves fill both sides. When wall vs. floor-standing shelf types
-                // are differentiated, gate this on shelf.isWallMounted or similar.
-                const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
-                if (backGames.length > 0) {
-                    this.createGameBoxes(shelfPosition, surface, backGames, ShelfSide.Back, shelfRotationY)
-                    gameIndex += backGames.length
+                // TD: wall-shelf-back-side - wall-mounted shelves should not fill the far side.
+                const farGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
+                if (farGames.length > 0) {
+                    this.createGameBoxes(shelfPosition, surface, farGames, ShelfSide.Front, shelfRotationY)
+                    gameIndex += farGames.length
                 }
             }
         }
