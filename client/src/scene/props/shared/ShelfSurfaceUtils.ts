@@ -31,7 +31,8 @@ export class ShelfSurfaceUtils {
             })
         })
         
-        return surfaces
+        // Sort top-to-bottom: partially-filled shelves fill from eye level down
+        return surfaces.sort((a, b) => b.topY - a.topY)
     }
     
     private static findDynamicShelfSurfaces(shelfUnit: THREE.Group, shelfPosition?: THREE.Vector3): ShelfSurface[] {
@@ -60,6 +61,6 @@ export class ShelfSurfaceUtils {
             return index === 0 || Math.abs(surface.topY - array[index - 1].topY) > 0.02
         })
         
-        return uniqueSurfaces.sort((a, b) => a.topY - b.topY)
+        return uniqueSurfaces.sort((a, b) => b.topY - a.topY)
     }
 }

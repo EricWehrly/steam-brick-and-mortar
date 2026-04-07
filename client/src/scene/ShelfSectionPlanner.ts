@@ -28,13 +28,12 @@ export class ShelfSectionPlanner {
     private static readonly logger = Logger.createLogFunctions(ShelfSectionPlanner.name)
 
     private readonly assigner = new CategoryAssigner()
-    private readonly signSystem: SceneSignManager
+    private get signSystem(): SceneSignManager { return SceneSignManager.instance }
     private readonly config: Required<ShelfSectionPlannerConfig>
 
     private games: SteamGameData[] = []
 
-    constructor(scene: THREE.Scene, config: ShelfSectionPlannerConfig = {}) {
-        this.signSystem = new SceneSignManager()
+    constructor(config: ShelfSectionPlannerConfig = {}) {
         this.config = {
             signYOffset: config.signYOffset ?? DEFAULT_SIGN_Y_OFFSET,
             signMountStyle: config.signMountStyle ?? DEFAULT_MOUNT_STYLE,

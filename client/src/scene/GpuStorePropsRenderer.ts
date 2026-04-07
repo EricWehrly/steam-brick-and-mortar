@@ -117,7 +117,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.propsGroup.name = 'props-instanced'
         this.scene.add(this.propsGroup)
 
-        this.shelfSectionPlanner = new ShelfSectionPlanner(this.scene)
+        this.shelfSectionPlanner = new ShelfSectionPlanner()
         this.recentlyPlayedSign = new RecentlyPlayedCeilingSign()
 
         this.setupEventListeners()
@@ -290,7 +290,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             ],
             halfAngle: Math.PI / 3,
             halfAngleByRow: [
-                Math.PI / 3,   // row0: same as default - wide enough for 4@r5.5 + walkable
+                Math.PI / 4,   // row0: tighter cluster at entrance - fills view without feeling sparse
                 Math.PI / 3.5, // row1
                 Math.PI / 3,   // row2: wide enough for 10@r13.5 + walkable
                 Math.PI / 3,   // row3: wide enough for 12@r17.5 + walkable

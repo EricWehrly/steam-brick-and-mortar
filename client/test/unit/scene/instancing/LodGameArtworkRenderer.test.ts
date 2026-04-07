@@ -117,11 +117,7 @@ describe('LodGameArtworkRenderer', () => {
             
             renderer.initialize(mockTextureArrays, mockScene)
             
-            const instanceIndex = renderer.addInstance(
-                new THREE.Vector3(0, 0, 0),
-                0,
-                'Test Game'
-            )
+            const instanceIndex = renderer.addInstance({ position: new THREE.Vector3(0, 0, 0), textureIndex: 0, gameName: 'Test Game' })
             
             const instance = renderer.getInstance(instanceIndex)
             expect(instance?.lodLevel).toBe(LOD_LEVEL.MID)
@@ -136,11 +132,7 @@ describe('LodGameArtworkRenderer', () => {
             
             renderer.initialize(mockTextureArrays, mockScene)
             
-            const instanceIndex = renderer.addInstance(
-                new THREE.Vector3(0, 0, 0),
-                0,
-                'Test Game'
-            )
+            const instanceIndex = renderer.addInstance({ position: new THREE.Vector3(0, 0, 0), textureIndex: 0, gameName: 'Test Game' })
             
             const instance = renderer.getInstance(instanceIndex)
             expect(instance?.lodLevel).toBe(LOD_LEVEL.HIGH)
@@ -217,11 +209,7 @@ describe('LodGameArtworkRenderer', () => {
         })
 
         it('should add instance and return index', () => {
-            const instanceIndex = renderer.addInstance(
-                new THREE.Vector3(1, 2, 3),
-                0,
-                'Test Game'
-            )
+            const instanceIndex = renderer.addInstance({ position: new THREE.Vector3(1, 2, 3), textureIndex: 0, gameName: 'Test Game' })
             
             expect(instanceIndex).toBe(0)
             expect(renderer.getInstanceCount()).toBe(1)
@@ -229,7 +217,7 @@ describe('LodGameArtworkRenderer', () => {
 
         it('should track instance data', () => {
             const position = new THREE.Vector3(1, 2, 3)
-            const instanceIndex = renderer.addInstance(position, 5, 'Test Game')
+            const instanceIndex = renderer.addInstance({ position: position, textureIndex: 5, gameName: 'Test Game' })
             
             const data = renderer.getInstance(instanceIndex)
             
@@ -248,9 +236,9 @@ describe('LodGameArtworkRenderer', () => {
             })
             smallRenderer.initialize(mockTextureArrays, mockScene)
             
-            expect(smallRenderer.addInstance(new THREE.Vector3(), 0, 'Game 1')).toBe(0)
-            expect(smallRenderer.addInstance(new THREE.Vector3(), 1, 'Game 2')).toBe(1)
-            expect(smallRenderer.addInstance(new THREE.Vector3(), 2, 'Game 3')).toBe(-1)
+            expect(smallRenderer.addInstance({ position: new THREE.Vector3(), textureIndex: 0, gameName: 'Game 1' })).toBe(0)
+            expect(smallRenderer.addInstance({ position: new THREE.Vector3(), textureIndex: 1, gameName: 'Game 2' })).toBe(1)
+            expect(smallRenderer.addInstance({ position: new THREE.Vector3(), textureIndex: 2, gameName: 'Game 3' })).toBe(-1)
             
             smallRenderer.dispose()
         })
@@ -258,15 +246,15 @@ describe('LodGameArtworkRenderer', () => {
         it('should return -1 when not initialized', () => {
             const uninitRenderer = new LodGameArtworkRenderer(defaultConfig)
             
-            const index = uninitRenderer.addInstance(new THREE.Vector3(), 0, 'Test')
+            const index = uninitRenderer.addInstance({ position: new THREE.Vector3(), textureIndex: 0, gameName: 'Test' })
             
             expect(index).toBe(-1)
         })
 
         it('should return all instances', () => {
-            renderer.addInstance(new THREE.Vector3(0, 0, 0), 0, 'Game 1')
-            renderer.addInstance(new THREE.Vector3(1, 0, 0), 1, 'Game 2')
-            renderer.addInstance(new THREE.Vector3(2, 0, 0), 2, 'Game 3')
+            renderer.addInstance({ position: new THREE.Vector3(0, 0, 0), textureIndex: 0, gameName: 'Game 1' })
+            renderer.addInstance({ position: new THREE.Vector3(1, 0, 0), textureIndex: 1, gameName: 'Game 2' })
+            renderer.addInstance({ position: new THREE.Vector3(2, 0, 0), textureIndex: 2, gameName: 'Game 3' })
             
             const all = renderer.getAllInstances()
             
@@ -289,7 +277,7 @@ describe('LodGameArtworkRenderer', () => {
         })
 
         it('should set instance LOD', () => {
-            const instanceIndex = renderer.addInstance(new THREE.Vector3(), 0, 'Test')
+            const instanceIndex = renderer.addInstance({ position: new THREE.Vector3(), textureIndex: 0, gameName: 'Test' })
             
             const success = renderer.setInstanceLod(instanceIndex, LOD_LEVEL.HIGH)
             
@@ -303,9 +291,9 @@ describe('LodGameArtworkRenderer', () => {
         })
 
         it('should set global LOD for all instances', () => {
-            renderer.addInstance(new THREE.Vector3(0, 0, 0), 0, 'Game 1')
-            renderer.addInstance(new THREE.Vector3(1, 0, 0), 1, 'Game 2')
-            renderer.addInstance(new THREE.Vector3(2, 0, 0), 2, 'Game 3')
+            renderer.addInstance({ position: new THREE.Vector3(0, 0, 0), textureIndex: 0, gameName: 'Game 1' })
+            renderer.addInstance({ position: new THREE.Vector3(1, 0, 0), textureIndex: 1, gameName: 'Game 2' })
+            renderer.addInstance({ position: new THREE.Vector3(2, 0, 0), textureIndex: 2, gameName: 'Game 3' })
             
             renderer.setGlobalLod(LOD_LEVEL.HIGH)
             
@@ -315,7 +303,7 @@ describe('LodGameArtworkRenderer', () => {
         })
 
         it('should update HIGH texture slot', () => {
-            const instanceIndex = renderer.addInstance(new THREE.Vector3(), 0, 'Test')
+            const instanceIndex = renderer.addInstance({ position: new THREE.Vector3(), textureIndex: 0, gameName: 'Test' })
             
             const success = renderer.setInstanceHighSlot(instanceIndex, 5)
             
@@ -334,7 +322,7 @@ describe('LodGameArtworkRenderer', () => {
         })
 
         it('should check if HIGH texture is loaded', () => {
-            renderer.addInstance(new THREE.Vector3(), 0, 'Test')
+            renderer.addInstance({ position: new THREE.Vector3(), textureIndex: 0, gameName: 'Test' })
             
             // Mock returns false for isLoaded
             expect(renderer.isHighTextureLoaded(0)).toBe(false)
@@ -357,7 +345,7 @@ describe('LodGameArtworkRenderer', () => {
         })
 
         it('should flush to GPU manually', () => {
-            renderer.addInstance(new THREE.Vector3(), 0, 'Test')
+            renderer.addInstance({ position: new THREE.Vector3(), textureIndex: 0, gameName: 'Test' })
             
             // Should not throw
             renderer.flushToGpu()
@@ -368,7 +356,7 @@ describe('LodGameArtworkRenderer', () => {
         it('should dispose all resources', () => {
             renderer = new LodGameArtworkRenderer(defaultConfig)
             renderer.initialize(mockTextureArrays, mockScene)
-            renderer.addInstance(new THREE.Vector3(), 0, 'Test')
+            renderer.addInstance({ position: new THREE.Vector3(), textureIndex: 0, gameName: 'Test' })
             
             renderer.dispose()
             

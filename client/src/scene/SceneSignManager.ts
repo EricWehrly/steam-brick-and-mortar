@@ -75,6 +75,16 @@ export interface CategorySignDescriptor {
 // ─── System ───────────────────────────────────────────────────────────────────
 
 export class SceneSignManager {
+    private static _instance: SceneSignManager | null = null
+
+    /** Shared instance for scene-level sign management. */
+    static get instance(): SceneSignManager {
+        if (!SceneSignManager._instance) {
+            SceneSignManager._instance = new SceneSignManager()
+        }
+        return SceneSignManager._instance
+    }
+
     private readonly renderer: SignageRenderer
     private readonly scene: THREE.Scene
     private readonly signs: Map<string, THREE.Mesh> = new Map()
@@ -160,7 +170,7 @@ export class SceneSignManager {
                 )
             }
             case 'wall': {
-                // TD: wall mount position resolution � needs nearest wall Z (defer to SceneManager pass)
+                // TD: wall mount position resolution � needs nearest wall Z (defer to SceneManager pass)
                 const yOff = mount.yOffset ?? 0
                 return new THREE.Vector3(anchor.x, anchor.y + yOff, anchor.z)
             }
