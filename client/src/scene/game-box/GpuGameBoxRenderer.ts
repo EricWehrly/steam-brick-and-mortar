@@ -209,7 +209,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         // Priority 3: Construct portrait URL as last resort
         // Only fire if game has an artwork object — if artwork is explicitly absent,
         // the caller wants label-only rendering (e.g. demo/test fixtures).
-        if (game.appid && game.artwork !== undefined) {
+        if (game.appid) {
             GpuGameBoxRenderer.logger.debug(`No artwork URLs in metadata for "${game.name}" - using constructed URL`)
             return `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
         }
