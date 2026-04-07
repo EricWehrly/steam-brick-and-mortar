@@ -10,6 +10,11 @@
  *
  * Performance: All IndexedDB operations run off the main thread to prevent
  * frame drops during texture loading.
+ *
+ * Storage trade-off (kept as design note):
+ * - JPEG blob: ~30-50KB per image
+ * - Decoded RGBA pixels (300x450): ~540KB per image (~10-18x larger)
+ * - For 800 games: ~432MB IndexedDB storage
  */
 
 import { Logger } from '../../../utils/Logger'
@@ -81,8 +86,9 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
         return PixelDataCache.instance
     }
 
-    protected override onWorkerCrash(err: Error): void {
-        PixelDataCache.logger.error('Worker crashed:', err.message)
+    protected override onWorkerCrash(_err: Error): void {
+        // Generic crash logging/rejection is handled by ManagedWorker.
+        // PixelDataCache-specific state reset lives here.
         this.stats.errors++
         this.workerReady = false
         this.initPromise = null
@@ -91,44 +97,36 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
     /**
      * Initialize the worker's IndexedDB connection.
      * Safe to call multiple times; only initializes once.
+     *
+     * Pattern note: this class uses a two-phase lifecycle (construct -> init).
+     * TD [lifecycle-pattern]: document this pattern in a shared patterns.md.
      */
     public async init(): Promise<void> {
         if (this.workerReady) return
         if (this.initPromise) return this.initPromise
-        this.initPromise = this.doInit()
-        return this.initPromise
-    }
 
-    private async doInit(): Promise<void> {
-        const messageId = `pdc_${Date.now()}_${this.pdcCounter++}`
-        const result = await this.send<InitResult>({
-            type: 'INIT',
-            dbName: this.dbName,
-            storeName: this.storeName,
-            version: this.version,
-            messageId
-        })
-        if (!result.success) {
-            throw new Error(result.error ?? 'Worker init failed')
-        }
-        this.workerReady = true
-        this.stats.workerReady = true
-        PixelDataCache.logger.lifecycle(`Worker initialized: ${this.dbName}/${this.storeName}`)
+        this.initPromise = (async () => {
+            const messageId = `pdc_${Date.now()}_${this.pdcCounter++}`
+            const result = await this.send<InitResult>({
+                type: 'INIT',
+                dbName: this.dbName,
+                storeName: this.storeName,
+                version: this.version,
+                messageId
+            })
+            if (!result.success) {
+                throw new Error(result.error ?? 'Worker init failed')
+            }
+            this.workerReady = true
+            this.stats.workerReady = true
+            PixelDataCache.logger.lifecycle(`Worker initialized: ${this.dbName}/${this.storeName}`)
+        })()
+
+        return this.initPromise
     }
 
     private async ensureReady(): Promise<void> {
         if (!this.workerReady) await this.init()
-    }
-
-    private sendPut(message: WorkerInMessage & { pixels: Uint8ClampedArray }): Promise<PutResult> {
-        // PUT uses transferable ArrayBuffer for zero-copy transfer
-        if (this.isDisposed) return Promise.reject(new Error('PixelDataCache: disposed'))
-        return new Promise<PutResult>((resolve, reject) => {
-            const buffer = message.pixels.buffer
-            // Use the protected send path but intercept to pass transferables
-            // Since ManagedWorker.post() doesn't support transferables, we resolve manually
-            this.send<PutResult>(message).then(resolve, reject)
-        })
     }
 
     /**
@@ -165,22 +163,21 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
         height: number
     ): Promise<boolean> {
         await this.ensureReady()
-        try {
-            const result = await this.send<PutResult>({
-                type: 'PUT',
-                url,
-                pixels,
-                width,
-                height,
-                version: this.version,
-                messageId: `pdc_${Date.now()}_${this.pdcCounter++}`
-            })
+        return this.send<PutResult>({
+            type: 'PUT',
+            url,
+            pixels,
+            width,
+            height,
+            version: this.version,
+            messageId: `pdc_${Date.now()}_${this.pdcCounter++}`
+        }).then((result) => {
             if (result.success) this.stats.stores++
             return result.success
-        } catch {
+        }).catch(() => {
             this.stats.errors++
             return false
-        }
+        })
     }
 
     /**
