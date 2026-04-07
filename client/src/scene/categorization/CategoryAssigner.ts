@@ -1,6 +1,16 @@
 import type { SteamGameData } from '../game-box/types/GameData'
 import { Logger } from '../../utils/Logger'
 
+
+/**
+ * Well-known group names for category assignment.
+ * Using an enum prevents magic string scatter and makes exhaustive checks possible.
+ */
+export const CategoryGroupName = {
+    Other: 'Other',
+} as const
+export type CategoryGroupName = typeof CategoryGroupName[keyof typeof CategoryGroupName]
+
 export interface ShelfGroup {
     genre: string
     label: string
@@ -50,6 +60,11 @@ export function sortByGenreThenPlaytime(
     return idxA - idxB
 }
 
+/**
+ * Data transformer: maps a flat list of SteamGameData into ShelfGroup[] bucketed by genre.
+ * Responsibility: grouping only. Sorting policy lives upstream (SteamApiClient sortFn)
+ * and group ordering is a separate concern from the transform itself.
+ */
 export class CategoryAssigner {
     private static readonly logger = Logger.createLogFunctions(CategoryAssigner.name)
 
@@ -57,7 +72,7 @@ export class CategoryAssigner {
         if (!games || games.length === 0) return []
 
         const groupsMap = new Map<string, SteamGameData[]>()
-        const otherGroupName = 'Other'
+        const otherGroupName: string = CategoryGroupName.Other
         let noGenreCount = 0
 
         for (const game of games) {
