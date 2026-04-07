@@ -155,3 +155,51 @@ describe('genrePlaytimeSortFn', () => {
         expect(sorted).toHaveLength(2)
     })
 })})
+
+describe('CategoryAssigner — genre policy', () => {
+    const assigner = new CategoryAssigner()
+    const game = (genres: Array<{ id: string, description: string }>, playtime = 100) => ({
+        appid: Math.random(),
+        name: 'test',
+        playtime_forever: playtime,
+        genres,
+    } as any as SteamGameData)
+
+    it('uses a non-Action secondary genre when Action is genre[0] and a more specific genre exists', () => {
+        // Many games are tagged Action but have a more precise genre as genre[1]
+        const games = [
+            game([{ id: '1', description: 'Action' }, { id: '3', description: 'RPG' }]),
+        ]
+        const result = assigner.assign(games)
+        // Should land in RPG, not Action
+        expect(result.find(g => g.genre === 'RPG')?.games).toHaveLength(1)
+        expect(result.find(g => g.genre === 'Action')).toBeUndefined()
+    })
+
+    it('keeps Action when no other known genre is present', () => {
+        const games = [
+            game([{ id: '1', description: 'Action' }]),
+        ]
+        const result = assigner.assign(games)
+        expect(result.find(g => g.genre === 'Action')?.games).toHaveLength(1)
+    })
+
+    it('ignores unrecognised secondary genres and still falls back to Action', () => {
+        const games = [
+            game([{ id: '1', description: 'Action' }, { id: '99', description: 'Massively Weird' }]),
+        ]
+        const result = assigner.assign(games)
+        expect(result.find(g => g.genre === 'Action')?.games).toHaveLength(1)
+    })
+
+    it('does not treat Early Access as a shelf genre (should fall to Other)', () => {
+        const games = [
+            game([{ id: '70', description: 'Early Access' }]),
+        ]
+        const result = assigner.assign(games)
+        // Early Access games should land in Other once removed from KNOWN_GENRES
+        const earlyAccess = result.find(g => g.genre === 'Early Access')
+        expect(earlyAccess).toBeUndefined()
+        expect(result.find(g => g.genre === 'Other')?.games).toHaveLength(1)
+    })
+})
