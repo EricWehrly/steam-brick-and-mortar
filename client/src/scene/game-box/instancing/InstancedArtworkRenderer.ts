@@ -218,7 +218,8 @@ export class InstancedArtworkRenderer {
         index: number,
         position: THREE.Vector3,
         gameName: string,
-        textureOptions: GameBoxTextureOptions
+        textureOptions: GameBoxTextureOptions,
+        rotation?: THREE.Quaternion
     ): Promise<boolean> {
         // Lazy initialization - initialize on first use to avoid blocking startup
         if (!this.isInitialized) {
@@ -263,7 +264,7 @@ export class InstancedArtworkRenderer {
             
             // Update matrix for this instance
             const matrix = new THREE.Matrix4()
-            matrix.compose(position, InstancedArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
+            matrix.compose(position, rotation ?? InstancedArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
             this.instancedMesh.setMatrixAt(index, matrix)
             
             // Update texture index attribute
@@ -303,7 +304,8 @@ export class InstancedArtworkRenderer {
         position: THREE.Vector3,
         gameName: string,
         artworkUrl: string,
-        appid?: number
+        appid?: number,
+        rotation?: THREE.Quaternion
     ): Promise<boolean> {
         // Lazy initialization
         if (!this.isInitialized) {
@@ -331,7 +333,7 @@ export class InstancedArtworkRenderer {
 
             // Update matrix for this instance
             const matrix = new THREE.Matrix4()
-            matrix.compose(position, InstancedArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
+            matrix.compose(position, rotation ?? InstancedArtworkRenderer.DEFAULT_ROTATION, new THREE.Vector3(1, 1, 1))
             this.instancedMesh.setMatrixAt(index, matrix)
 
             // Update texture index attribute

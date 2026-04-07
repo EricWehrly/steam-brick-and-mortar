@@ -53,7 +53,8 @@ export interface ILodArtworkRenderer {
         position: THREE.Vector3,
         gameName: string,
         artworkUrl: string,
-        appid?: number
+        appid?: number,
+        rotation?: THREE.Quaternion
     ): Promise<SetArtworkResult>
 
     /**

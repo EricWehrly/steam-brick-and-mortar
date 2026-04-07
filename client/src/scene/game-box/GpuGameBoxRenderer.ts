@@ -124,7 +124,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         game: SteamGameData,
         position: THREE.Vector3,
         artworkUrl: string,
-        side: ShelfSide = ShelfSide.Front
+        side: ShelfSide = ShelfSide.Front,
+        rotation?: THREE.Quaternion
     ): void {
         GpuGameBoxRenderer.logger.debug(`[LOD] Loading artwork for "${game.name}"`)
         
@@ -132,7 +133,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             position,
             game.name,
             artworkUrl,
-            typeof game.appid === 'number' ? game.appid : undefined
+            typeof game.appid === 'number' ? game.appid : undefined,
+            rotation
         ).then((result) => {
             if (!result.success && AppSettings.get(Setting.EnableLabels)) {
                 this.createLabelGameBox(game, position, side)
@@ -173,14 +175,15 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     public createGameBoxAuto(
         game: SteamGameData,
         position: THREE.Vector3,
-        side: ShelfSide = ShelfSide.Front
+        side: ShelfSide = ShelfSide.Front,
+        rotation?: THREE.Quaternion
     ): void {
         const artworkUrl = this.selectBestArtworkUrl(game)
         
         GpuGameBoxRenderer.logger.debug(`createGameBoxAuto "${game.name}": artwork=${!!artworkUrl}`)
         
         if (artworkUrl) {
-            this.createGameBoxFromUrl(game, position, artworkUrl, side)
+            this.createGameBoxFromUrl(game, position, artworkUrl, side, rotation)
         } else if (AppSettings.get(Setting.EnableLabels)) {
             this.createLabelGameBox(game, position, side)
         }

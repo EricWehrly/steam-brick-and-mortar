@@ -215,7 +215,8 @@ export class LodArtworkOrchestrator {
         position: THREE.Vector3,
         gameName: string,
         artworkUrl: string,
-        appid?: number
+        appid?: number,
+        rotation?: THREE.Quaternion
     ): Promise<{ success: boolean; instanceIndex: number }> {
         // Check if already loaded
         const existingIndex = this.gameNameToTextureIndex.get(gameName)
@@ -274,7 +275,9 @@ export class LodArtworkOrchestrator {
                 textureIndex,
                 gameName,
                 resolvedUrl,
-                this.lazyHighTextures ? LOD_LEVEL.MID : LOD_LEVEL.HIGH
+                this.lazyHighTextures ? LOD_LEVEL.MID : LOD_LEVEL.HIGH,
+                undefined, // highTextureSlot
+                rotation
             )
             
             if (instanceIndex < 0) {

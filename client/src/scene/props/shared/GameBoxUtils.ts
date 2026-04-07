@@ -85,4 +85,14 @@ export class GameBoxUtils {
         
         return positions
     }
+
+    /**
+     * Calculate world-space quaternion for a game box given shelf orientation and side.
+     * Front side: rotated by shelfRotationY. Back side: additionally flipped PI around Y.
+     */
+    static calculateGameRotation(shelfRotationY: number, side: ShelfSide): THREE.Quaternion {
+        const backFlip = side === ShelfSide.Back ? Math.PI : 0
+        const totalY = shelfRotationY + backFlip
+        return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), totalY)
+    }
 }
