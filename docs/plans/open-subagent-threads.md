@@ -33,7 +33,7 @@ XS (<2h) | S (2-8h) | M (1-3d) | L (3d+)
 - Keep anonymous store free of Recently Played semantics.
 
 ### Class-level review workflow (agent prompt)
-**Status**: `in-progress`  
+**Status**: `done`  
 **Complexity**: XS  
 **Scope**:
 - Prompt template now lives in workspace (`.openclaw/workspace-threejs-developer/prompts/`).
@@ -71,7 +71,7 @@ XS (<2h) | S (2-8h) | M (1-3d) | L (3d+)
 ## P2 — Isolated feature spikes (good delegation targets)
 
 ### Neon sign “&” 3D tube spike
-**Status**: `planned`  
+**Status**: `done` (on branch `openclaw/spike-neon-sign-agent`)
 **Complexity**: M  
 **Ref**: `docs/plans/neon-sign-3d-design.md`  
 **Scope**:
