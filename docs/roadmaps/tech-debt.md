@@ -563,3 +563,36 @@ class Foo {
 **Priority**: Low/Medium
 **Context**: Events should emit eadonly everything to prevent accidental mutation of shared event data. Currently not enforced. Worth a lint rule or type-level enforcement.
 **Next steps**: Add Readonly<T> wrapping to all emitted event payloads in InteractionEvents.ts; consider a custom ESLint rule
+
+---
+
+## PR #39 Review Feedback (Apr 7 2026)
+
+### suppressEmit flag (GpuStorePropsRenderer)
+**Priority**: High (reviewer explicitly disliked)
+**Location**: client/src/scene/GpuStorePropsRenderer.ts - calculateShelfBoundsAndLayout
+**Issue**: suppressEmit = false param was added to prevent repeated ShelfLayoutDetermined events
+during overflow expansion. Reviewer considers this a code smell.
+**Fix direction**: Emit ShelfLayoutDetermined only once from a single dedicated call site
+(e.g., after preallocateArcLayout completes on initial setup only). Remove the flag entirely.
+
+### GpuStorePropsRenderer file length
+**Priority**: Medium
+**Location**: client/src/scene/GpuStorePropsRenderer.ts
+**Issue**: File is too long; layout-related functionality should be extracted to its own class.
+**Fix direction**: Extract arc layout, shelf position management, and bounds calculation to
+a ShelfLayoutManager or similar. GpuStorePropsRenderer should only handle GPU/rendering concerns.
+
+### WorkerErrorUtils -> ManagedWorker
+**Priority**: Low (cleanup)
+**Location**: client/src/utils/WorkerErrorUtils.ts
+**Issue**: Now that ManagedWorker exists and owns error handling, WorkerErrorUtils exports
+are redundant. extractWorkerErrorMessage and makeWorkerErrorHandler should move into
+ManagedWorker.ts and be used only internally.
+**Fix direction**: Migrate exports, update 3 worker managers to extend ManagedWorker, delete WorkerErrorUtils.ts.
+
+### TD comment ID convention
+**Priority**: Low (developer experience)
+**Issue**: // TD comments are hard to search/track without a consistent tag.
+**Fix direction**: Adopt // TD [tag-id]: description format e.g. // TD [layout-policy]: ....
+Apply to new TD comments going forward; backfill existing ones during lint pass.

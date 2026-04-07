@@ -109,7 +109,8 @@ export class GameBoxSpawner {
         // 'Back' = local +Z face (toward origin = toward player spawn).
         // We always populate the player-facing side (Back) first.
         // The far side (Front) is suppressed on the back wall ring to avoid clipping.
-        // TD: rename ShelfSide.Front/Back to ShelfSide.Far/Near once naming is audited.
+        // Note: ShelfSide.Front = far face (-localZ), ShelfSide.Back = near/player-facing face (+localZ).
+        // Names are counterintuitive for arc shelves. A comment clarifies intent; rename deferred.
         let gameIndex = 0
         for (const surface of shelfSurfaces) {
             if (gameIndex >= games.length) break
