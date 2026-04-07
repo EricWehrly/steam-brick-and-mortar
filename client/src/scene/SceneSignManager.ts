@@ -1,8 +1,8 @@
 /**
- * CategorySignSystem
+ * SceneSignManager
  *
  * Generic scene-space sign system for category labels.
- * Tech debt link: docs/roadmaps/tech-debt.md → "Category System Tech Debt / CategorySignSystem → SceneSignManager rename"
+ * Tech debt link: docs/roadmaps/tech-debt.md → "Category System Tech Debt / SceneSignManager → SceneSignManager rename"
  *
  * A "sign" is a canvas-texture plane mesh with configurable:
  * - Text and color
@@ -72,7 +72,7 @@ export interface CategorySignDescriptor {
 
 // ─── System ───────────────────────────────────────────────────────────────────
 
-export class CategorySignSystem {
+export class SceneSignManager {
     private readonly renderer: SignageRenderer
     private readonly scene: THREE.Scene
     private readonly signs: Map<string, THREE.Mesh> = new Map()
@@ -81,7 +81,7 @@ export class CategorySignSystem {
     private static readonly SIGN_Z_FACE_PLAYER = 0.01 // slight forward push to avoid z-fighting
 
     // Tech debt link: docs/roadmaps/tech-debt.md →
-    // - "Category System Tech Debt / CategorySignSystem: scene access pattern / SceneManager"
+    // - "Category System Tech Debt / SceneSignManager: scene access pattern / SceneManager"
     // - "Category System Tech Debt / SignageRenderer: singleton vs instance"
     constructor(scene: THREE.Scene) {
         this.scene = scene
@@ -148,11 +148,11 @@ export class CategorySignSystem {
     private resolvePosition(anchor: THREE.Vector3, mount: SignMount): THREE.Vector3 {
         switch (mount.style) {
             case 'above-shelf': {
-                const yOff = mount.yOffset ?? CategorySignSystem.ABOVE_SHELF_DEFAULT_Y_OFFSET
+                const yOff = mount.yOffset ?? SceneSignManager.ABOVE_SHELF_DEFAULT_Y_OFFSET
                 return new THREE.Vector3(
                     anchor.x,
                     anchor.y + yOff,
-                    anchor.z - CategorySignSystem.SIGN_Z_FACE_PLAYER // face player
+                    anchor.z - SceneSignManager.SIGN_Z_FACE_PLAYER // face player
                 )
             }
             case 'wall': {

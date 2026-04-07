@@ -22,18 +22,27 @@ export interface ArcLayoutConfig {
     rows?: number
     /** Shelves per row (arc segment). Default 4. */
     shelvesPerRow?: number
-    /** Radius increment per row (metres). Default 3. */
+    /** Radius increment per row (metres). Default 4. */
     rowRadiusStep?: number
     /** Radius of the first row (metres from player origin). Default 5. */
     firstRowRadius?: number
     /** Half-angle of the arc in radians. Default PI/3 (60 deg each side = 120 deg span). */
     halfAngle?: number
+    /**
+     * Per-row shelf counts. If provided, overrides shelvesPerRow for each row index.
+     * Allows outer rings to have more shelves than inner rings.
+     * TD: inverted-layout - use this to implement the "wider-outer-ring" plan:
+     *   front ring: 3 shelves (sparse, close), back rings: 6-8 (dense, far)
+     *   combine with decreasing halfAngle toward front for the narrowing effect
+     *   docs/roadmaps/tech-debt.md -> "Inverted arc layout"
+     */
+    shelvesPerRowByRow?: number[]
 }
 
-const DEFAULTS: Required<ArcLayoutConfig> = {
+const DEFAULTS: Omit<Required<ArcLayoutConfig>, 'shelvesPerRowByRow'> & Pick<ArcLayoutConfig, 'shelvesPerRowByRow'> = {
     rows: 5,
     shelvesPerRow: 4,
-    rowRadiusStep: 2.8,
+    rowRadiusStep: 4.0,
     firstRowRadius: 5.0,
     halfAngle: Math.PI / 3, // 60 deg each side
 }
@@ -60,7 +69,7 @@ export function computeArcShelfLayout(
     let shelfIndex = 0
     for (let row = 0; row < cfg.rows && shelfIndex < totalShelves; row++) {
         const radius = cfg.firstRowRadius + row * cfg.rowRadiusStep
-        const count = cfg.shelvesPerRow
+        const count = cfg.shelvesPerRowByRow?.[row] ?? cfg.shelvesPerRow
 
         for (let i = 0; i < count && shelfIndex < totalShelves; i++) {
             // Spread shelves evenly across the arc span

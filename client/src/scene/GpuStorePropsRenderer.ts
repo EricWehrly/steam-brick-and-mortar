@@ -267,10 +267,19 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private preallocateArcLayout(totalShelves: number): void {
+        const shelvesPerRow = Math.max(4, Math.ceil(totalShelves / 5))
         const arcConfig: ArcLayoutConfig = {
             rows: 5,
-            shelvesPerRow: Math.ceil(totalShelves / 5),
-            rowRadiusStep: 2.8,
+            shelvesPerRow,
+            // Outer rings get more shelves to fill the wider arc
+            shelvesPerRowByRow: [
+                shelvesPerRow,
+                Math.ceil(shelvesPerRow * 1.2),
+                Math.ceil(shelvesPerRow * 1.4),
+                Math.ceil(shelvesPerRow * 1.6),
+                Math.ceil(shelvesPerRow * 1.8),
+            ],
+            rowRadiusStep: 4.0,
             firstRowRadius: 5.0,
             halfAngle: Math.PI / 3,
         }
