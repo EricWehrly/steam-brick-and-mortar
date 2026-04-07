@@ -379,7 +379,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const progress = this.batchCoordinator.getProgress()
         console.warn(`⚠️ BATCH COUNT MISMATCH: Received batch ${batchIndex + 1} but only allocated ${oldLength} positions`)
         console.warn(`   Expected: ${progress.total}, Actual: >${batchIndex + 1}. Expanding...`)
-        this.preallocateArcLayout(batchIndex + 1)
+        // Expand to cover ALL remaining batches (not just batchIndex+1) to avoid repeated re-allocations.
+        // suppressEmit=true: don't re-fire ShelfLayoutDetermined and trigger another room resize.
+        this.preallocateArcLayout(Math.max(progress.total, batchIndex + 1), true)
     }
 
     private async createShelfForBatchIndex(batchIndex: number): Promise<void> {
