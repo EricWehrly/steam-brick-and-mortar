@@ -92,4 +92,40 @@ describe('computeArcShelfLayout', () => {
             }
         }
     })
+
+    // --- Regression: batch-count mismatch (shelf position overflow) ---
+    // Verifies the production arc config never allocates fewer positions than requested.
+    // This catches the "CRITICAL: Shelf position N is undefined" bug (ea54d8d).
+    it.each([
+        [44, 'lower bound typical library'],
+        [47, 'observed production count (spitemonger)'],
+        [52, 'headroom for larger libraries'],
+        [80, 'large library'],
+    ])('allocates exactly %i positions for %s', (total) => {
+        const FIXED = 4 + 6 + 10 + 12
+        const shelves = computeArcShelfLayout(total, {
+            rows: 5,
+            shelvesPerRow: 10,
+            shelvesPerRowByRow: [4, 6, 10, 12, Math.max(1, total - FIXED)],
+            halfAngle: Math.PI / 3,
+            halfAngleByRow: [
+                Math.PI / 3,
+                Math.PI / 3.5,
+                Math.PI / 3,
+                Math.PI / 3,
+                Math.PI / 2.6,
+            ],
+            minShelfGap: 1.0,
+            shelfWidthMetres: 2.0,
+            rowRadiusStep: 4.0,
+            firstRowRadius: 5.5,
+        })
+        expect(shelves.length).toBe(total)
+        // Every position must be defined (no undefined slot)
+        shelves.forEach((s, i) => {
+            expect(s, `shelf ${i} should be defined`).toBeDefined()
+            expect(isFinite(s.position.x), `shelf ${i} x must be finite`).toBe(true)
+            expect(isFinite(s.position.z), `shelf ${i} z must be finite`).toBe(true)
+        })
+    })
 })
