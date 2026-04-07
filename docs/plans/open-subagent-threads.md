@@ -15,7 +15,12 @@ XS < 2h | S 2-8h | M 1-3 days | L 3+ days
 
 ## P0 -- Active / Blocking
 
-*(none currently)*
+### Screenshot test flakiness (Playwright timeout)
+**Status**: `known` -- passes on retry
+**Complexity**: XS
+**Context**: screenshot.spec.ts times out at 30s on first attempt (fonts-loading wait).
+Passes on retry. Fix: increase timeout to 60s or add explicit waitForLoadState('networkidle') before screenshot.
+
 
 ---
 
