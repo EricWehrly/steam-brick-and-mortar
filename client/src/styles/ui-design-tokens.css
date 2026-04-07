@@ -15,4 +15,29 @@
   --panel-transition: 0.3s ease;
   --panel-font: Arial, sans-serif;
   --panel-font-size: 13px;
+  /* Panel spacing/radii scale */
+  --panel-space-2: 2px;
+  --panel-space-3: 3px;
+  --panel-space-4: 4px;
+  --panel-space-6: 6px;
+  --panel-space-8: 8px;
+  --panel-space-12: 12px;
+
+  --panel-radius-sm: 3px;
+  --panel-radius-md: 4px;
+
+  /* Panel font sizes */
+  --panel-font-size-xs: 11px;
+  --panel-font-size-sm: 12px;
+  --panel-font-size-md: 14px;
+
+  /* Panel surface/hover alphas */
+  --panel-hover-bg: rgba(60, 60, 60, 0.9);
+  --panel-subtle-hover-bg: rgba(255, 255, 255, 0.05);
+  --panel-strong-hover-bg: rgba(255, 255, 255, 0.1);
+  --panel-group-header-bg: rgba(30, 30, 30, 0.8);
+  --panel-item-bg: rgba(20, 20, 20, 0.5);
+  --panel-item-hover-bg: rgba(40, 40, 40, 0.7);
+  --panel-text-strong: #fff;
+  --panel-heading-text: #ccc;
 }
