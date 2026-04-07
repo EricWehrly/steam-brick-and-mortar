@@ -61,18 +61,8 @@ export class CategoryAssigner {
         for (const game of games) {
             let genre: string
             if (game.genres && game.genres.length > 0) {
-                // Prefer a more specific genre when Action is the primary tag.
-                // Steam applies 'Action' broadly; secondary genres are often more useful.
-                const primaryRaw = game.genres[0].description
-                const primaryCanonical = GENRE_LOOKUP.get(primaryRaw.toLowerCase())
-                const useSecondary = primaryCanonical === 'Action' && game.genres.length > 1
-                const resolvedCanonical = useSecondary
-                    ? game.genres.slice(1)
-                        .map(g => GENRE_LOOKUP.get(g.description.toLowerCase()))
-                        .find(c => c !== undefined && c !== 'Action') ?? primaryCanonical
-                    : primaryCanonical
-                const raw = primaryRaw
-                const canonical = resolvedCanonical
+                const raw = game.genres[0].description
+                const canonical = GENRE_LOOKUP.get(raw.toLowerCase())
                 if (canonical !== undefined) {
                     genre = canonical
                 } else {
