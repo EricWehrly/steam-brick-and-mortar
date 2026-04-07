@@ -48,10 +48,17 @@ import {
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
+import { DataManager } from '../core/data/DataManager'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
 import { RecentlyPlayedCeilingSign } from './RecentlyPlayedCeilingSign'
+import {
+    getRecentlyPlayedBucket,
+    getBucketLabel,
+    sortByRecentlyPlayed,
+} from './categorization/CategoryAssigner'
+import { SceneSignManager, SignStyles } from './SceneSignManager'
 import {
     computeAlternatingClusterXOffset,
     getPrimaryGenreFromBatch,
@@ -227,8 +234,50 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private handleAllBatchesComplete(): void {
         this.finalizeProgressiveLoading()
         this.calculateShelfBoundsAndLayout(this.shelfPositions.length)
-        // Genre section signs skipped on recently-played branch (single group, no genre splits)\n        // Uncomment to re-enable: this.shelfSectionPlanner.planSections(this.shelfPositions)
+        // Genre section signs skipped on recently-played branch (single group, no genre splits)
+        // Uncomment to re-enable: this.shelfSectionPlanner.planSections(this.shelfPositions)
         this.recentlyPlayedSign.place()
+        this.placeTimeBucketSigns()
+    }
+
+    private placeTimeBucketSigns(): void {
+        const games = DataManager.getInstance().get<SteamGameData[]>('steam.games')
+        if (!games || games.length === 0) return
+
+        // Sort them by rtime_last_played descending (same order as the shelves)
+        const sortedGames = [...games].sort(sortByRecentlyPlayed)
+
+        const SIGN_Y = 2.5
+        const MIN_DIST_FROM_CEILING_SIGN = 1.5
+        const ceilingSignPos = this.recentlyPlayedSign.getPosition()
+        let lastBucket: string | null = null
+
+        // Iterate through shelves; each shelf holds ~18 games (BATCH_SIZE)
+        // We use this.shelfPositions to determine where to place the signs.
+        const BATCH_SIZE = 18
+
+        for (let i = 0; i < this.shelfPositions.length; i++) {
+            const shelfPos = this.shelfPositions[i]
+            const firstGameIndex = i * BATCH_SIZE
+            if (firstGameIndex >= sortedGames.length) break
+
+            const firstGame = sortedGames[firstGameIndex]
+            const bucket = getRecentlyPlayedBucket(firstGame)
+
+            if (bucket !== 'unplayed' && bucket !== lastBucket) {
+                // Check distance from Recently Played ceiling sign
+                const dist = ceilingSignPos.distanceTo(new THREE.Vector3(shelfPos.x, SIGN_Y, shelfPos.z))
+                if (dist > MIN_DIST_FROM_CEILING_SIGN) {
+                    SceneSignManager.instance.setSign({
+                        label: getBucketLabel(bucket),
+                        anchorPosition: new THREE.Vector3(shelfPos.x, SIGN_Y, shelfPos.z),
+                        mount: { style: 'above-shelf' },
+                        style: SignStyles.Category
+                    })
+                }
+                lastBucket = bucket
+            }
+        }
     }
 
     private async initializeForProgressiveLoading(totalBatches: number): Promise<void> {
