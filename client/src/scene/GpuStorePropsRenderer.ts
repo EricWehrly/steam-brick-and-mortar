@@ -30,7 +30,6 @@ import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 import { VRLayoutUtils } from './props/SharedPropsUtils'
-import { DEFAULT_SHELF_CONFIG } from './props/shared/SharedPropsTypes'
 import { RoomConstants } from './RoomManager'
 
 import { EventManager } from '../core/EventManager'
@@ -255,9 +254,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Sort them by rtime_last_played descending (same order as the shelves)
         const sortedGames = [...games].sort(sortByRecentlyPlayed)
 
-        // Shelf-mount signs from shelf top, not shelf midpoint.
-        // shelfPositions are shelf-base world positions; top sits near +height.
-        const SIGN_ANCHOR_Y_OFFSET = DEFAULT_SHELF_CONFIG.height + 0.05
+        // Shelf-mount signs directly above the top shelf board.
+        // shelfPos.y is the base of the unit; 1.1m puts the anchor just above
+        // the top shelf surface on a 2m-tall unit. Tuned visually - do not change
+        // without testing in-scene.
+        const SIGN_ANCHOR_Y_OFFSET = 1.1
         const MIN_DIST_FROM_CEILING_SIGN = 1.5
         const ceilingSignPos = this.recentlyPlayedSign.getPosition()
         let lastBucket: RecentlyPlayedBucket | null = null
