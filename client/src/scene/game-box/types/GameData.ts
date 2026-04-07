@@ -12,6 +12,7 @@ export interface SteamGameData extends SteamGameMetadata {
     name: string
     playtime_forever: number
     playtime_2weeks?: number
+    rtime_last_played?: number
     img_icon_url?: string
     img_logo_url?: string
     artwork?: {
