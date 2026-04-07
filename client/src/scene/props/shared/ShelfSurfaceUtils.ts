@@ -32,7 +32,6 @@ export class ShelfSurfaceUtils {
         })
         
         // Sort top-to-bottom: partially-filled shelves fill from eye level down
-        // TD [shelf-surface-sort]: no unit test for this sort order yet - add when ShelfSurface tests exist
         return surfaces.sort((a, b) => b.topY - a.topY)
     }
     
