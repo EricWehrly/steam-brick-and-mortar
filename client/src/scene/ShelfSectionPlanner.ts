@@ -9,6 +9,8 @@
  */
 
 import * as THREE from 'three'
+import { EventManager } from '../core/EventManager'
+import { StorePropsEventTypes, type BatchReadyForPlacementEvent } from '../types/InteractionEvents'
 import { CategoryAssigner } from './categorization/CategoryAssigner'
 import { CategorySignSystem, type SignMount } from './CategorySignSystem'
 import type { SteamGameData } from './game-box/types/GameData'
@@ -37,19 +39,20 @@ export class ShelfSectionPlanner {
             signYOffset: config.signYOffset ?? DEFAULT_SIGN_Y_OFFSET,
             signMountStyle: config.signMountStyle ?? DEFAULT_MOUNT_STYLE,
         }
+        // Self-register for batch events so callers don't need to invoke onBatchPlaced
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.BatchReadyForPlacement,
+            this.handleBatchReady.bind(this)
+        )
     }
 
-    /**
-     * Accumulate games from one batch.
-     * Does NOT place any signs � signs are deferred to planSections().
-     */
-    public onBatchPlaced(
-        _batchIndex: number,
-        games: readonly SteamGameData[],
-        _shelfPosition: THREE.Vector3,
-        _shelfLabel?: string
-    ): void {
+    /** Accumulate games from one batch. Called from event handler; private by design. */
+    private onBatchPlaced(games: readonly SteamGameData[]): void {
         this.games.push(...games)
+    }
+
+    private handleBatchReady(event: CustomEvent<BatchReadyForPlacementEvent>): void {
+        this.onBatchPlaced(event.detail.games as readonly SteamGameData[])
     }
 
     /**
@@ -80,22 +83,6 @@ export class ShelfSectionPlanner {
             `[SIGN-DEBUG] planSections: ${groups.length} groups � ` +
             groups.map(g => `${g.label}(${g.games.length})`).join(', ')
         )
-
-        // [CAT-ALIGN-DEBUG] Per-game shelf alignment — remove once categories are verified
-        let _dbgOffset = 0
-        const _batchSz = 18
-        const _lines: string[] = []
-        for (const _grp of groups) {
-            const _si = Math.floor(_dbgOffset / _batchSz)
-            _grp.games.slice(0, 3).forEach((g: any) => {
-                const _raw = g.genres?.map((x: any) => x.description).join(',') ?? 'none'
-                _lines.push(`shelf~${_si} [${_grp.label}] ${g.name} (genres: ${_raw})`)
-            })
-            if (_grp.games.length > 3) _lines.push(`shelf~${_si} [${_grp.label}] ...+${_grp.games.length - 3} more`)
-            _dbgOffset += _grp.games.length
-        }
-        console.log('[CAT-ALIGN-DEBUG]\n' + _lines.join('\n'))
-
         let placed = 0
         let gameOffset = 0
         const batchSize = 18

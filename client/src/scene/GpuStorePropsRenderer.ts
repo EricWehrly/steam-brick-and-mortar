@@ -172,11 +172,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private async handleInitialBatch(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
-        const { totalBatches, batchIndex, games } = event.detail
+        const { totalBatches } = event.detail
 
-        // Non-first batches: accumulate games immediately (init already done)
+        // ShelfSectionPlanner self-subscribes to BatchReadyForPlacement for game accumulation.
+        // This handler only drives first-batch renderer initialization.
         if (!this.batchCoordinator.isFirstBatchProcessing()) {
-            this.shelfSectionPlanner.onBatchPlaced(batchIndex, games as SteamGameData[], new THREE.Vector3())
             return
         }
 
@@ -189,9 +189,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         }
 
         await this.progressiveInitializationPromise
-
-        // Accumulate AFTER init (which calls reset()) so games aren't wiped
-        this.shelfSectionPlanner.onBatchPlaced(batchIndex, games as SteamGameData[], new THREE.Vector3())
     }
 
     private async handleShelfSpaceRequested(event: CustomEvent<ShelfSpaceRequestedEvent>): Promise<void> {
@@ -224,7 +221,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.cumulativeShelfCount = 0
-        // batchGamesByIndex removed — games accumulated directly in shelfSectionPlanner
+        // batchGamesByIndex removed ï¿½ games accumulated directly in shelfSectionPlanner
         this.shelfSectionPlanner.reset()
         this.clearExistingShelves()
 
@@ -276,7 +273,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private calculateShelfRowZ(row: number): number {
         const normalRowZ = VRLayoutUtils.calculateOptimalRowPosition(row)
 
-        // Odd rows are rotated 180° and should sit closer to previous even row
+        // Odd rows are rotated 180ï¿½ and should sit closer to previous even row
         // to create back-to-back aisle pairs (instead of uniformly marching rows).
         if (row % 2 === 1) {
             return normalRowZ + (RoomConstants.SHELF_SPACING_Z - this.backToBackRowSpacingZ)
@@ -308,7 +305,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             }
         )
         GpuStorePropsRenderer.logger.debug(
-            `Shelf layout determined: ${this.shelfLayout.rows} rows × ${this.shelfLayout.shelvesPerRow} shelves`
+            `Shelf layout determined: ${this.shelfLayout.rows} rows ï¿½ ${this.shelfLayout.shelvesPerRow} shelves`
         )
     }
 

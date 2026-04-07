@@ -12,6 +12,7 @@ import * as THREE from 'three'
 import { PauseMenuManager } from '../pause/PauseMenuManager'
 import { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { LightingControlsPanel } from '../LightingControlsPanel'
+import { CategoryReferencePanel } from '../CategoryReferencePanel'
 import { EventManager } from '../../core/EventManager'
 import type { DebugStatsProvider } from '../../core/DebugStatsProvider'
 import { AppSettings } from '../../core/AppSettings'
@@ -23,6 +24,7 @@ export class SystemUICoordinator {
     private pauseMenuManager: PauseMenuManager
     private performanceMonitor: PerformanceMonitorUI
     private lightingControlsPanel?: LightingControlsPanel
+    private categoryReferencePanel?: CategoryReferencePanel
     private eventManager: EventManager
     private appSettings: AppSettings
     private renderLoopRegistry: RenderLoopRegistry
@@ -85,6 +87,9 @@ export class SystemUICoordinator {
         
         // Initialize integrated lighting controls panel
         this.initializeLightingControls()
+
+        // Category reference panel (dev/debug tool)
+        this.initializeCategoryReferencePanel()
         
         // Register update method with render loop
         this.renderLoopRegistry.register(this.constructor.name, this.updatePerformanceStats.bind(this))
@@ -126,6 +131,13 @@ export class SystemUICoordinator {
             this.lightingControlsPanel = new LightingControlsPanel(this.eventManager, this.appSettings)
             // Show the integrated panel by default since the button is now part of it
             this.lightingControlsPanel.show()
+        }
+    }
+
+    private initializeCategoryReferencePanel(): void {
+        if (!this.categoryReferencePanel) {
+            this.categoryReferencePanel = new CategoryReferencePanel()
+            this.categoryReferencePanel.init()
         }
     }
 
