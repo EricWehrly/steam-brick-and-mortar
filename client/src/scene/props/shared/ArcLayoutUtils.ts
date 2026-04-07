@@ -28,6 +28,17 @@ export interface ArcLayoutConfig {
     firstRowRadius?: number
     /** Half-angle of the arc in radians. Default PI/3 (60 deg each side = 120 deg span). */
     halfAngle?: number
+    /** Optional per-row half-angle overrides (radians). */
+    halfAngleByRow?: number[]
+    /** Physical width of one shelf unit in metres (used with minShelfGap). Default 2.0. */
+    shelfWidthMetres?: number
+    /**
+     * Minimum centre-to-centre gap between adjacent shelves in a row (metres).
+     * If set, the per-row shelf count is capped so no row violates this gap.
+     * Row 0 always respects this; for the last row it is relaxed to allow the back wall.
+     * Default: undefined (no enforcement).
+     */
+    minShelfGap?: number
     /**
      * Per-row shelf counts. If provided, overrides shelvesPerRow for each row index.
      * Allows outer rings to have more shelves than inner rings.
@@ -39,7 +50,7 @@ export interface ArcLayoutConfig {
     shelvesPerRowByRow?: number[]
 }
 
-const DEFAULTS: Omit<Required<ArcLayoutConfig>, 'shelvesPerRowByRow'> & Pick<ArcLayoutConfig, 'shelvesPerRowByRow'> = {
+const DEFAULTS: Required<Pick<ArcLayoutConfig, 'rows' | 'shelvesPerRow' | 'rowRadiusStep' | 'firstRowRadius' | 'halfAngle'>> = {
     rows: 5,
     shelvesPerRow: 4,
     rowRadiusStep: 4.0,
@@ -56,6 +67,19 @@ export interface ArcShelfInfo {
 }
 
 /**
+ * Maximum number of shelves that can fit in an arc row while keeping inter-shelf
+ * chord distance >= shelfWidth + minGap.
+ */
+function maxShelvesForGap(radius: number, halfAngle: number, minGap: number, shelfWidth: number): number {
+    for (let n = 40; n >= 2; n--) {
+        const angleStep = (2 * halfAngle) / (n - 1)
+        const chord = 2 * radius * Math.sin(angleStep / 2)
+        if (chord >= shelfWidth + minGap) return n
+    }
+    return 1
+}
+
+/**
  * Generate shelf positions and orientations for a concentric-arc layout.
  * Returns positions in row-major order (all shelves of row 0, then row 1, etc).
  */
@@ -69,12 +93,20 @@ export function computeArcShelfLayout(
     let shelfIndex = 0
     for (let row = 0; row < cfg.rows && shelfIndex < totalShelves; row++) {
         const radius = cfg.firstRowRadius + row * cfg.rowRadiusStep
-        const count = cfg.shelvesPerRowByRow?.[row] ?? cfg.shelvesPerRow
+        const rowHalfAngle = cfg.halfAngleByRow?.[row] ?? cfg.halfAngle
+        let count = cfg.shelvesPerRowByRow?.[row] ?? cfg.shelvesPerRow
+
+        // Enforce minimum walkable gap unless this is the last row (back wall)
+        if (cfg.minShelfGap !== undefined && row < cfg.rows - 1) {
+            const shelfWidth = cfg.shelfWidthMetres ?? 2.0
+            const max = maxShelvesForGap(radius, rowHalfAngle, cfg.minShelfGap, shelfWidth)
+            if (count > max) count = max
+        }
 
         for (let i = 0; i < count && shelfIndex < totalShelves; i++) {
             // Spread shelves evenly across the arc span
             const t = count === 1 ? 0 : (i / (count - 1)) - 0.5   // -0.5 .. +0.5
-            const angle = t * 2 * cfg.halfAngle                     // -halfAngle .. +halfAngle
+            const angle = t * 2 * rowHalfAngle                     // -halfAngle .. +halfAngle
 
             // Arc is in the -Z half-space (in front of player)
             // angle = 0 means straight ahead (-Z axis), positive angle = left, negative = right

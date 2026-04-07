@@ -17,6 +17,8 @@
  */
 
 import * as THREE from 'three'
+import { DataManager } from '../core/data/DataManager'
+import { DataKey } from '../core/data/DataTypes'
 import { SignageRenderer, type SignageConfig } from './SignageRenderer'
 
 // ─── Style definitions ────────────────────────────────────────────────────────
@@ -83,7 +85,9 @@ export class SceneSignManager {
     // Tech debt link: docs/roadmaps/tech-debt.md →
     // - "Category System Tech Debt / SceneSignManager: scene access pattern / SceneManager"
     // - "Category System Tech Debt / SignageRenderer: singleton vs instance"
-    constructor(scene: THREE.Scene) {
+    constructor() {
+        const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
+        if (!scene) throw new Error('SceneSignManager: scene not registered in DataManager (DataKey.MainScene)')
         this.scene = scene
         this.renderer = new SignageRenderer()
     }

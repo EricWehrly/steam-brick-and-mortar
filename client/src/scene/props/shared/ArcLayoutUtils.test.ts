@@ -53,4 +53,43 @@ describe('computeArcShelfLayout', () => {
             expect(dot).toBeGreaterThan(0.95)
         }
     })
+
+    it('44-shelf layout keeps walkable side gaps on rows 0-3 and allows tighter last row', () => {
+        const shelves = computeArcShelfLayout(44, {
+            rows: 5,
+            shelvesPerRowByRow: [4, 6, 10, 12, 12],
+            firstRowRadius: 4.5,
+            rowRadiusStep: 4.0,
+            halfAngle: Math.PI / 3,
+            halfAngleByRow: [Math.PI / 4.2, Math.PI / 3.8, Math.PI / 3.2, Math.PI / 3.0, Math.PI / 2.6],
+            minShelfGap: 1.0,
+            shelfWidthMetres: 2.0,
+        })
+
+        const rows = new Map<number, typeof shelves>()
+        for (const s of shelves) {
+            if (!rows.has(s.row)) rows.set(s.row, [])
+            rows.get(s.row)!.push(s)
+        }
+
+        // For each row, sort by indexInRow then compute adjacent centre distances
+        const SHELF_WIDTH = 2.0
+        for (let row = 0; row < 5; row++) {
+            const rowShelves = (rows.get(row) ?? []).sort((a, b) => a.indexInRow - b.indexInRow)
+            for (let i = 1; i < rowShelves.length; i++) {
+                const a = rowShelves[i - 1].position
+                const b = rowShelves[i].position
+                const dist = Math.hypot(b.x - a.x, b.z - a.z)
+                const gap = dist - SHELF_WIDTH
+
+                if (row < 4) {
+                    // Rows 0-3 should keep at least 1m side aisle gap
+                    expect(gap).toBeGreaterThanOrEqual(0.95)
+                } else {
+                    // Last row may be tighter to maximize back wall density
+                    expect(gap).toBeGreaterThan(0.2)
+                }
+            }
+        }
+    })
 })
