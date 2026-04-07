@@ -17,6 +17,36 @@ export interface ShelfGroup {
     games: SteamGameData[]
 }
 
+export type RecentlyPlayedBucket = 'today' | 'this-week' | 'this-month' | 'this-year' | 'before' | 'unplayed'
+
+export function getRecentlyPlayedBucket(game: SteamGameData, nowSeconds?: number): RecentlyPlayedBucket {
+    const now = nowSeconds ?? Math.floor(Date.now() / 1000)
+    const lastPlayed = game.rtime_last_played ?? 0
+
+    if (lastPlayed === 0) return 'unplayed'
+
+    const diff = now - lastPlayed
+    if (diff < 0) return 'today' // Future? Treat as today.
+
+    const DAY = 24 * 60 * 60
+    if (diff < DAY) return 'today'
+    if (diff < 7 * DAY) return 'this-week'
+    if (diff < 30 * DAY) return 'this-month'
+    if (diff < 365 * DAY) return 'this-year'
+    return 'before'
+}
+
+export function getBucketLabel(bucket: RecentlyPlayedBucket): string {
+    switch (bucket) {
+        case 'today': return 'Played Today'
+        case 'this-week': return 'Played This Week'
+        case 'this-month': return 'Played This Month'
+        case 'this-year': return 'Played This Year'
+        case 'before': return 'Played Before'
+        case 'unplayed': return 'Never Played'
+    }
+}
+
 /**
  * Hardcoded list of recognised genre names, in display-canonical casing.
  * Case-insensitive lookup so "Free to Play" / "Free To Play" both match.
