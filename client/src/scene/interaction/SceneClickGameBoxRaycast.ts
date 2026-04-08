@@ -196,6 +196,11 @@ export class SceneClickGameBoxRaycast {
 
     private highlightHit(hit: SceneGameBoxHit): void {
         const appid = hit.appid
+
+        // Always log the resolved hit so appid is visible in console during development.
+        // Remove or gate on enableDebugLogs once raycast is stable.
+        console.warn(`[Raycast] hit: name="${hit.name ?? '?'}" appid=${appid ?? 'none'} instanceId=${hit.instanceId ?? '?'} mesh="${hit.object.name}"`)
+
         if (appid !== undefined) {
             this.eventManager.emit<GameSelectedEvent>(GameEventTypes.Selected, {
                 appid
