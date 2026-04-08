@@ -4,7 +4,7 @@ import { DataKey } from '../../core/data/DataTypes'
 import { EventManager } from '../../core/EventManager'
 import { InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type GameSelectedEvent } from '../../types/InteractionEvents'
 import { SceneLayer } from '../SceneLayers'
-import type { InstanceMetadata } from '../../debug/GameFinder'
+import { GameFinder } from '../../debug/GameFinder'
 
 export interface SceneClickGameBoxRaycastOptions {
     scene?: THREE.Scene
@@ -13,7 +13,6 @@ export interface SceneClickGameBoxRaycastOptions {
     lineColor?: number
     enableDebugLogs?: boolean
     enableDebugLine?: boolean
-    onHit?: (hit: SceneGameBoxHit) => void
 }
 
 export interface SceneGameBoxHit {
@@ -31,7 +30,6 @@ export class SceneClickGameBoxRaycast {
     private readonly maxDistance: number
     private readonly enableDebugLogs: boolean
     private readonly enableDebugLine: boolean
-    private readonly onHit?: (hit: SceneGameBoxHit) => void
     private readonly eventManager: EventManager
 
     private resolvedScene: THREE.Scene | null = null
@@ -51,7 +49,6 @@ export class SceneClickGameBoxRaycast {
         this.maxDistance = options.maxDistance ?? 10
         this.enableDebugLogs = options.enableDebugLogs ?? false
         this.enableDebugLine = options.enableDebugLine ?? false
-        this.onHit = options.onHit
         this.eventManager = EventManager.getInstance()
 
         this.lineMaterial = new THREE.LineBasicMaterial({
@@ -117,21 +114,17 @@ export class SceneClickGameBoxRaycast {
 
         const intersections = this.raycaster.intersectObjects(scene.children, true)
 
-        let firstGameBoxHit: SceneGameBoxHit | null = null
         for (const intersection of intersections) {
             const hit = this.resolveGameBoxIntersection(intersection, dm)
-            if (hit) { firstGameBoxHit = hit; break }
-        }
-
-        if (!firstGameBoxHit) {
-            if (this.enableDebugLogs) {
-                console.log('🎯 [SceneClickGameBoxRaycast] No game box hit', { maxDistance: this.maxDistance })
+            if (hit) {
+                this.highlightHit(hit)
+                return
             }
-            return
         }
 
-        this.highlightHit(firstGameBoxHit)
-        this.onHit?.(firstGameBoxHit)
+        if (this.enableDebugLogs) {
+            console.log('🎯 [SceneClickGameBoxRaycast] No game box hit', { maxDistance: this.maxDistance })
+        }
     }
 
     private updateDebugLine(start: THREE.Vector3, end: THREE.Vector3, scene: THREE.Scene): void {
@@ -144,16 +137,19 @@ export class SceneClickGameBoxRaycast {
         }
     }
 
-    private resolveGameBoxIntersection(intersection: THREE.Intersection<THREE.Object3D>, dm: DataManager): SceneGameBoxHit | null {
+    private resolveGameBoxIntersection(intersection: THREE.Intersection<THREE.Object3D>, _dm: DataManager): SceneGameBoxHit | null {
         const object = intersection.object
 
         if (intersection.instanceId !== undefined) {
-            const artworkMetadata = dm.get<Map<number, InstanceMetadata>>(DataKey.InstancedArtworkMetadata)
-            const artworkHit = artworkMetadata?.get(intersection.instanceId)
-            if (artworkHit) {
+            // Use GameFinder.findByIntersection — resolves via the dumb instanceId→appId
+            // maps (per-mesh, keyed by mesh name) so artwork and label meshes can't
+            // cross-contaminate each other's lookups.
+            const finder = new GameFinder()
+            const result = finder.findByIntersection(object, intersection.instanceId)
+            if (result) {
                 return {
-                    name: artworkHit.name,
-                    appid: artworkHit.appid,
+                    name: result.name,
+                    appid: result.appid,
                     point: intersection.point.clone(),
                     distance: intersection.distance,
                     object,
@@ -161,18 +157,7 @@ export class SceneClickGameBoxRaycast {
                 }
             }
 
-            const labelMetadata = dm.get<Map<number, { name: string; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
-            const labelHit = labelMetadata?.get(intersection.instanceId)
-            if (labelHit) {
-                return {
-                    name: labelHit.name,
-                    point: intersection.point.clone(),
-                    distance: intersection.distance,
-                    object,
-                    instanceId: intersection.instanceId
-                }
-            }
-
+            // Fallback: unknown instanced mesh not in our maps
             return {
                 point: intersection.point.clone(),
                 distance: intersection.distance,
