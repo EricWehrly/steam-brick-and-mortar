@@ -12,7 +12,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest'
 import * as THREE from 'three'
-import { EventManager } from '../../../../src/core/EventManager'
+import { EventManager, EventSource } from '../../../../src/core/EventManager'
+import { DataManager } from '../../../../src/core/data/DataManager'
+import { DataKey } from '../../../../src/core/data/DataTypes'
 import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
 import { GpuGameBoxRenderer } from '../../../../src/scene/game-box/GpuGameBoxRenderer'
 import {
@@ -25,11 +27,13 @@ import {
 import type { SteamGame } from '../../../../src/steam'
 
 // Mock EventManager with test helper
-vi.mock('../../../../src/core/EventManager', () => {
+vi.mock('../../../../src/core/EventManager', async (importOriginal) => {
+    const actual = await importOriginal() as any
     type MockInstance = { registerEventHandler: Mock; emit: Mock; removeEventHandler: Mock }
     let mockInstance: MockInstance | null = null
     
     return {
+        ...actual,
         EventManager: Object.assign(
             vi.fn(() => ({ registerEventHandler: vi.fn(), emit: vi.fn(), removeEventHandler: vi.fn() })),
             {
@@ -61,6 +65,10 @@ describe('GameBoxSpawner Event Coordination', () => {
     }
 
     beforeEach(() => {
+        // Mock Scene for SceneSignManager
+        const mockScene = new THREE.Scene()
+        DataManager.getInstance().set(DataKey.MainScene, mockScene, { persistent: true })
+
         // Reset the singleton and get a fresh instance
         resetEventManager()
         eventManager = EventManager.getInstance()

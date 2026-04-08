@@ -92,6 +92,7 @@ export interface SignMount {
 
 export interface CategorySignDescriptor {
     label: string
+    text?: string   // display text — defaults to label if omitted
     anchorPosition: THREE.Vector3   // World position to anchor sign to (e.g. shelf center)
     mount: SignMount
     style?: SignStyle
@@ -139,7 +140,7 @@ export class SceneSignManager {
         const signPos = this.resolvePosition(descriptor.anchorPosition, descriptor.mount)
 
         const config: SignageConfig = {
-            text: descriptor.label,
+            text: descriptor.text ?? descriptor.label,
             position: signPos,
             backgroundColor: style.backgroundColor,
             textColor: style.textColor,
