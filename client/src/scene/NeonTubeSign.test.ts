@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
 
 // Mock Three.js heavy constructors to keep tests fast
@@ -17,11 +17,22 @@ vi.mock('three', async (importOriginal) => {
             return {
                 add: vi.fn((child: any) => children.push(child)),
                 children,
-                position: { copy: vi.fn() },
+                position: { 
+                    copy: vi.fn(),
+                    clone: vi.fn().mockReturnValue(new THREE.Vector3())
+                },
                 scale: { setScalar: vi.fn() },
-                traverse: vi.fn((cb: (o: any) => void) => children.forEach(cb)),
+                traverse: vi.fn(function(this: any, cb: (o: any) => void) {
+                    children.forEach(cb)
+                }),
                 isObject3D: true,
             }
+        }),
+        CatmullRomCurve3: vi.fn().mockImplementation(function() {
+            return {}
+        }),
+        TubeGeometry: vi.fn().mockImplementation(function() {
+            return { dispose: vi.fn() }
         }),
     }
 })
@@ -29,16 +40,22 @@ vi.mock('three', async (importOriginal) => {
 vi.mock('three/examples/jsm/loaders/FontLoader.js', () => ({
     FontLoader: vi.fn().mockImplementation(function () {
         return {
-            load: vi.fn((url: string, onLoad: (f: any) => void) => {
-                onLoad({ isFont: true })
+            load: vi.fn((_url: string, onLoad: (f: any) => void) => {
+                onLoad({
+                    isFont: true,
+                    generateShapes: vi.fn().mockReturnValue([
+                        {
+                            getPoints: vi.fn().mockReturnValue([
+                                new THREE.Vector2(0, 0),
+                                new THREE.Vector2(1, 0),
+                                new THREE.Vector2(1, 1),
+                            ]),
+                            holes: [],
+                        }
+                    ])
+                })
             }),
         }
-    }),
-}))
-
-vi.mock('three/examples/jsm/geometries/TextGeometry.js', () => ({
-    TextGeometry: vi.fn().mockImplementation(function () {
-        return { center: vi.fn(), dispose: vi.fn() }
     }),
 }))
 
@@ -72,11 +89,31 @@ describe('NeonTubeSign', () => {
         expect(sign.mesh.scale.setScalar).toHaveBeenCalledWith(1.5)
     })
 
-    it('does not add a PointLight to the scene (avoids shadow map recalculation hitch)', () => {
+    it('adds tube meshes to the group', () => {
         const sign = new NeonTubeSign(config)
-        // No PointLight should be added — lighting must go through LightingRenderer
-        const hasLight = sign.mesh.children.some((c: any) => c.isLight)
-        expect(hasLight).toBe(false)
+        // Wait for the async buildSign (FontLoader.load + requestIdleCallback/setTimeout)
+        // In this mock setup, onLoad is called synchronously, but buildSign is via setTimeout(0)
+        // so we need to wait a tick.
+        return new Promise<void>((resolve) => {
+            setTimeout(() => {
+                expect(sign.mesh.children.length).toBeGreaterThan(0)
+                const isTubeMesh = sign.mesh.children.some((c: any) => c.geometry)
+                expect(isTubeMesh).toBe(true)
+                resolve()
+            }, 0)
+        })
+    })
+
+    it('does not add a PointLight to the group (avoids shadow map recalculation hitch)', () => {
+        const sign = new NeonTubeSign(config)
+        return new Promise<void>((resolve) => {
+            setTimeout(() => {
+                // No PointLight should be added ΓÇö lighting must go through LightingRenderer
+                const hasLight = sign.mesh.children.some((c: any) => c.isLight)
+                expect(hasLight).toBe(false)
+                resolve()
+            }, 0)
+        })
     })
 
     it('dispose() can be called without throwing', () => {
@@ -84,3 +121,4 @@ describe('NeonTubeSign', () => {
         expect(() => sign.dispose()).not.toThrow()
     })
 })
+

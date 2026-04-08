@@ -1,20 +1,19 @@
-/**
+﻿/**
  * NeonTubeSign
  *
- * Spike: 3D neon-style text sign using TextGeometry + emissive material.
- * Currently renders "steam" — intended for category divider signage in the store.
+ * 3D neon-style text sign using TubeGeometry along font outline paths.
+ * Renders glowing, rounded neon tubing for a realistic appearance.
  *
- * Status: prototype — wired into scene in GpuStorePropsRenderer for review.
+ * Status: production ΓÇö updated to TubeGeometry for rounded cross-section.
  *
- * TODO: more tubey appearance — TubeGeometry along text outline paths instead of
- * ExtrudeGeometry, for proper neon-tube cross-section look.
- * TODO: lighting should go through LightingRenderer event system, not added directly.
- *       For now: no light emitted (avoids shadow map recalculation hitch).
+ * Lighting is requested via LightingRenderer event system to avoid shadow map hitches.
  */
 
 import * as THREE from 'three'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
-import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
+import { DataManager } from '../core/data/DataManager'
+import { DataKey } from '../core/data/DataTypes'
+import type { LightingRenderer } from './LightingRenderer'
 
 export interface NeonTubeSignConfig {
     /** Hex color integer, e.g. 0xff6600 */
@@ -42,37 +41,75 @@ export class NeonTubeSign {
         loader.load('/fonts/helvetiker_bold.typeface.json', (font) => {
             const buildSign = () => {
                 const t0 = performance.now()
-
-                const geometry = new TextGeometry(text, {
-                    font,
-                    size: 0.3,
-                    depth: 0.05,
-                    curveSegments: 8,
-                    bevelEnabled: true,
-                    bevelThickness: 0.01,
-                    bevelSize: 0.008,
-                    bevelSegments: 3,
-                })
-
-                geometry.center()
-
+                const shapes = font.generateShapes(text, 0.3)
                 const material = new THREE.MeshStandardMaterial({
                     color,
                     emissive: new THREE.Color(color),
-                    emissiveIntensity: 2.0,
-                    roughness: 0.3,
+                    emissiveIntensity: 2.5,
+                    roughness: 0.1,
                     metalness: 0.0,
                 })
 
-                const textMesh = new THREE.Mesh(geometry, material)
-                this.mesh.add(textMesh)
+                // Center offset ΓÇö compute bounding box across all shapes first
+                let minX = Infinity, maxX = -Infinity
+                let minY = Infinity, maxY = -Infinity
+                for (const shape of shapes) {
+                    for (const pt of shape.getPoints(12)) {
+                        minX = Math.min(minX, pt.x); maxX = Math.max(maxX, pt.x)
+                        minY = Math.min(minY, pt.y); maxY = Math.max(maxY, pt.y)
+                    }
+                }
+                const offsetX = -(minX + maxX) / 2
+                const offsetY = -(minY + maxY) / 2
 
-                // NOTE: No PointLight here — adding lights directly to scene causes
-                // full shadow map recalculation. Any lighting must go through LightingRenderer.
-                // TD: wire ambient glow through LightingRenderer event system.
+                // Collect all paths upfront (cheap), then build one TubeGeometry per
+                // idle slice so no single frame pays the full geometry cost.
+                const allPaths: THREE.Vector3[][] = []
+                for (const shape of shapes) {
+                    for (const path of [shape, ...shape.holes]) {
+                        const pts2d = path.getPoints(12)
+                        if (pts2d.length < 2) continue
+                        allPaths.push(pts2d.map(p => new THREE.Vector3(p.x + offsetX, p.y + offsetY, 0)))
+                    }
+                }
 
-                const elapsed = (performance.now() - t0).toFixed(1)
-                console.debug(`[NeonTubeSign] TextGeometry built in ${elapsed}ms`)
+                // Build one tube per idle callback so each geometry hits a separate frame.
+                const buildNext = (index: number) => {
+                    if (index >= allPaths.length) {
+                        const elapsed = (performance.now() - t0).toFixed(1)
+                        console.debug(`[NeonTubeSign] TubeGeometry complete (${allPaths.length} tubes) in ${elapsed}ms total`)
+
+                        // Request point light only after geometry is done
+                        const lightingRenderer = DataManager.getInstance()
+                            .get<LightingRenderer>(DataKey.LightingRenderer)
+                        if (lightingRenderer) {
+                            lightingRenderer.requestPointLight({
+                                color,
+                                intensity: 1.5,
+                                distance: 2.0,
+                                position: this.mesh.position.clone(),
+                                name: 'neon-tube-sign-glow',
+                            })
+                        } else {
+                            console.warn('[NeonTubeSign] LightingRenderer not in DataManager -- no glow light')
+                        }
+                        return
+                    }
+
+                    const pts3d = allPaths[index]
+                    const curve = new THREE.CatmullRomCurve3(pts3d, true)
+                    const tubeGeo = new THREE.TubeGeometry(curve, pts3d.length * 2, 0.015, 8, true)
+                    const mesh = new THREE.Mesh(tubeGeo, material)
+                    this.mesh.add(mesh)
+
+                    if (typeof requestIdleCallback !== 'undefined') {
+                        requestIdleCallback(() => buildNext(index + 1), { timeout: 2000 })
+                    } else {
+                        setTimeout(() => buildNext(index + 1), 0)
+                    }
+                }
+
+                buildNext(0)
             }
 
             if (typeof requestIdleCallback !== 'undefined') {
