@@ -1,6 +1,10 @@
 /**
  * Game Finder - Locate game objects in the Three.js scene
- * 
+ *
+ * TD: GameFinder belongs in src/utils/ (or src/scene/), not src/debug/.
+ * It's used in production raycast resolution paths, not just debug tooling.
+ * Deferred to avoid a disruptive move while the raycast path is actively changing.
+ *
  * Reusable utility for finding games by name, appid, or other identifiers.
  * Works with both GPU instanced renderer and legacy renderer.
  * 
