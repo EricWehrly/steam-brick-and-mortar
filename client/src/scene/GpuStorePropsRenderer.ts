@@ -54,6 +54,7 @@ import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
 import { RecentlyPlayedCeilingSign } from './RecentlyPlayedCeilingSign'
+import { NeonAmpersandSign } from './NeonAmpersandSign'
 import {
     getRecentlyPlayedBucket,
     getBucketLabel,
@@ -246,6 +247,14 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             this.recentlyPlayedSign.place()
             this.placeTimeBucketSigns()
         }
+
+        // Add NeonAmpersandSign at center of store (spike-neon-sign-agent)
+        const neonSign = new NeonAmpersandSign({
+            color: 0xff6600,
+            position: new THREE.Vector3(0, 2.5, -3),
+            scale: 1.0
+        })
+        this.scene.add(neonSign.mesh)
     }
 
     private placeTimeBucketSigns(): void {
