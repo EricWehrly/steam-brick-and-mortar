@@ -23,6 +23,7 @@ import { DataDomain, DataKey } from '../core/data/DataTypes'
 import { RenderLoopRegistry } from './RenderLoopRegistry'
 import { FrameBudgetScheduler } from '../utils/FrameBudgetScheduler'
 import { ThreeWebGLRendererDebug } from '../debug/ThreeWebGLRendererDebug'
+import { SceneManagerDebug } from '../debug/SceneManagerDebug'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -99,6 +100,9 @@ export class SceneManager {
         
         // Initialize skybox asynchronously (non-blocking)
         this.initializeSkybox()
+
+        // Attach debug utilities to window (drawCallReport etc.)
+        new SceneManagerDebug()
     }
 
     /**
