@@ -14,6 +14,8 @@
  */
 
 import * as THREE from 'three'
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
+import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
 
 export interface NeonAmpersandConfig {
     /** Hex color integer, e.g. 0xff6600 */
@@ -26,80 +28,50 @@ export interface NeonAmpersandConfig {
     addLight?: boolean
 }
 
-/**
- * Control points tracing a stylised "&" glyph in the XY plane.
- * Normalised to roughly [-0.5, 0.5] in X and [-0.5, 0.5] in Y ΓÇö scale via config.
- */
-function buildAmpersandCurve(): THREE.CatmullRomCurve3 {
-    // Approximate an ampersand shape with a single looping spline.
-    // Upper loop ΓåÆ crossover ΓåÆ lower loop ΓåÆ diagonal tail.
-    const pts = [
-        // Upper-left loop start
-        new THREE.Vector3(-0.05, 0.4, 0),
-        new THREE.Vector3(-0.3, 0.35, 0),
-        new THREE.Vector3(-0.35, 0.15, 0),
-        new THREE.Vector3(-0.15, 0.0, 0),
-        // Crossover
-        new THREE.Vector3(0.05, -0.05, 0),
-        new THREE.Vector3(-0.1, -0.2, 0),
-        // Lower loop
-        new THREE.Vector3(-0.35, -0.35, 0),
-        new THREE.Vector3(-0.2, -0.45, 0),
-        new THREE.Vector3(0.1, -0.45, 0),
-        new THREE.Vector3(0.3, -0.3, 0),
-        new THREE.Vector3(0.2, -0.1, 0),
-        new THREE.Vector3(-0.05, 0.0, 0),
-        // Diagonal tail going upper-right
-        new THREE.Vector3(0.2, 0.2, 0),
-        new THREE.Vector3(0.3, 0.35, 0),
-        // Close back to upper-left to complete the glyph
-        new THREE.Vector3(0.1, 0.45, 0),
-        new THREE.Vector3(-0.05, 0.4, 0),
-    ]
-    return new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5)
-}
-
 export class NeonAmpersandSign {
     public readonly mesh: THREE.Group
-
-    private readonly light: THREE.PointLight | null
 
     constructor(config: NeonAmpersandConfig) {
         const { color, position, scale = 1.0, addLight = true } = config
 
-        const curve = buildAmpersandCurve()
-
-        const tubeGeo = new THREE.TubeGeometry(
-            curve,
-            128,   // tubularSegments ΓÇö keep path smooth
-            0.025, // radius of the tube itself (thin neon tube)
-            8,     // radialSegments ΓÇö low poly, neon tubes are round not detailed
-            false
-        )
-
-        const mat = new THREE.MeshStandardMaterial({
-            color,
-            emissive: new THREE.Color(color),
-            emissiveIntensity: 2.0,
-            roughness: 0.3,
-            metalness: 0.0,
-        })
-
-        const tube = new THREE.Mesh(tubeGeo, mat)
-
         this.mesh = new THREE.Group()
-        this.mesh.add(tube)
         this.mesh.position.copy(position)
         this.mesh.scale.setScalar(scale)
 
-        // PointLight for environmental glow ΓÇö more reliable than bloom in XR
-        if (addLight) {
-            this.light = new THREE.PointLight(color, 1.5, 2.0)
-            this.light.position.set(0, 0, 0)
-            this.mesh.add(this.light)
-        } else {
-            this.light = null
-        }
+        const loader = new FontLoader()
+        // TD: if more signs are added consider ManagedWorker for batch font rasterization
+        loader.load('/fonts/helvetiker_bold.typeface.json', (font) => {
+            const geometry = new TextGeometry('steam', {
+                font,
+                size: 0.3,
+                depth: 0.05,
+                curveSegments: 8,
+                bevelEnabled: true,
+                bevelThickness: 0.01,
+                bevelSize: 0.008,
+                bevelSegments: 3,
+            })
+
+            geometry.center()
+
+            const material = new THREE.MeshStandardMaterial({
+                color,
+                emissive: new THREE.Color(color),
+                emissiveIntensity: 2.0,
+                roughness: 0.3,
+                metalness: 0.0,
+            })
+
+            const textMesh = new THREE.Mesh(geometry, material)
+            this.mesh.add(textMesh)
+
+            // PointLight for environmental glow — more reliable than bloom in XR
+            if (addLight) {
+                const light = new THREE.PointLight(color, 1.5, 2.0)
+                light.position.set(0, 0, 0)
+                this.mesh.add(light)
+            }
+        })
     }
 
     /** Remove from scene and dispose GPU resources */
