@@ -43,6 +43,7 @@ export class TextureWorker extends ManagedWorker<TWIn, TWOut> {
     public static logger = Logger.createLogFunctions(TextureWorker.name)
     // Side-channel: tracks whether to include blob in resolved result per messageId
     private readonly includeBlobFor = new Set<string>()
+    private readonly gameNames = new Map<string, string>()
     private twCounter = 0
 
     constructor() {
@@ -51,12 +52,13 @@ export class TextureWorker extends ManagedWorker<TWIn, TWOut> {
     }
 
     protected override handleMessage(data: TWOut): void {
-        // nothing extra needed here - dispatch already resolved the pending promise
+        this.gameNames.delete(data.messageId)
     }
 
     protected override onWorkerCrash(err: Error): void {
         TextureWorker.logger.error('Worker crashed:', err.message)
         this.includeBlobFor.clear()
+        this.gameNames.clear()
     }
 
     private nextMsgId(prefix: string): string {
@@ -103,6 +105,7 @@ export class TextureWorker extends ManagedWorker<TWIn, TWOut> {
     ): Promise<FetchAndProcessResult> {
         const messageId = this.nextMsgId(`fetch_${textureIndex}`)
         this.includeBlobFor.add(messageId)
+        this.gameNames.set(messageId, gameName)
         try {
             const result = await this.send<TextureProcessingResult>({
                 type: 'FETCH_AND_PROCESS',
@@ -132,12 +135,14 @@ export class TextureWorker extends ManagedWorker<TWIn, TWOut> {
             }
         } catch (err) {
             this.includeBlobFor.delete(messageId)
+            this.gameNames.delete(messageId)
             throw err
         }
     }
 
     public override dispose(): void {
         this.includeBlobFor.clear()
+        this.gameNames.clear()
         super.dispose()
     }
 }
