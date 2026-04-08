@@ -268,6 +268,11 @@ export class LodArtworkOrchestrator {
                 this.textureManager.setSlotPixels(LOD_TIER_NAME.HIGH, textureIndex, highResult.pixels, highWidth, highHeight)
             }
             
+            // Flush texture to GPU immediately after pixel data is ready.
+            // Without this, MID textures only reach the GPU on the next SomeBatchesComplete
+            // event — which may have already fired in a single-batch load (e.g. demo store).
+            this.updateGPU()
+            
             // Create instance
             const resolvedUrl = artwork.getUrl()
             const instanceIndex = this.renderer.addInstance({
