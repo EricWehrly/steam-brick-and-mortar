@@ -97,6 +97,12 @@ export class SceneManager {
         this.setupCamera()
         this.setupEventListeners()
         
+        // Expose scene and renderer on window for Playwright draw-call reports and debug tools
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(window as any).__threeScene = this.scene
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(window as any).__threeRenderer = this.renderer
+        
         // Initialize skybox asynchronously (non-blocking)
         this.initializeSkybox()
     }
