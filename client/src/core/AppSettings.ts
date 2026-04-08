@@ -13,7 +13,6 @@
 
 import { EventManager, EventSource, type BaseInteractionEvent } from './EventManager'
 import { AppSettingsEventTypes } from '../types/InteractionEvents'
-import { StorageVersions } from './StorageVersions'
 
 // Lighting Quality Constants
 export const LIGHTING_QUALITY = {
@@ -142,9 +141,9 @@ export class AppSettings {
     private settings: ApplicationSettings
     private eventManager: EventManager
     private readonly STORAGE_KEY = 'steam-brick-mortar-app-settings'
-    private readonly STORAGE_SCHEMA_VERSION = StorageVersions.APP_SETTINGS
 
     private constructor() {
+        this.eventManager = EventManager.getInstance()
         this.settings = this.loadSettings()
     }
 
@@ -332,10 +331,7 @@ export class AppSettings {
      */
     public saveSettings(): void {
         try {
-            localStorage.setItem(this.STORAGE_KEY, JSON.stringify({
-                _schemaVersion: this.STORAGE_SCHEMA_VERSION,
-                ...this.settings
-            }))
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.settings))
         } catch (error) {
             console.error('Failed to save settings:', error)
         }
@@ -371,13 +367,7 @@ export class AppSettings {
             const saved = localStorage.getItem(this.STORAGE_KEY)
             if (saved) {
                 const parsed = JSON.parse(saved)
-                if (parsed._schemaVersion !== this.STORAGE_SCHEMA_VERSION) {
-                    console.warn(`AppSettings schema mismatch (stored ${parsed._schemaVersion} vs ${this.STORAGE_SCHEMA_VERSION}) — resetting to defaults`)
-                    localStorage.removeItem(this.STORAGE_KEY)
-                    return this.getDefaultSettings()
-                }
-                const { _schemaVersion: _, ...settings } = parsed
-                return { ...this.getDefaultSettings(), ...settings }
+                return { ...this.getDefaultSettings(), ...parsed }
             }
         } catch (error) {
             console.warn('Failed to load settings:', error)

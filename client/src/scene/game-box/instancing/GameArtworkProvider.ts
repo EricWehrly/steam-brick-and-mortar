@@ -24,7 +24,6 @@ import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 import { GameArtworkRequest } from './GameArtworkRequest'
 import { resizePixels } from './ArtworkPixelUtils'
-import { StorageVersions } from '../../../core/StorageVersions'
 
 // Class-scoped logger will be attached to the class
 
@@ -125,8 +124,8 @@ export class GameArtworkProvider {
     private pixelCache: PixelDataCache | null = null
     
     // Persistent URL caches (localStorage)
-    public static readonly FAILURE_CACHE_KEY = `steam-artwork-failures-v${StorageVersions.ARTWORK_URL_CACHE}`
-    public static readonly SUCCESS_CACHE_KEY = `steam-artwork-successes-v${StorageVersions.ARTWORK_URL_CACHE}`
+    public static readonly FAILURE_CACHE_KEY = 'steam-artwork-failures-v3'
+    public static readonly SUCCESS_CACHE_KEY = 'steam-artwork-successes-v3'
     private static readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000  // 24 hours
     
     private failureCache: Map<string, UrlCacheEntry> = new Map()  // key: appId-format
