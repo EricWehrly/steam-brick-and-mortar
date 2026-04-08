@@ -632,3 +632,34 @@ Apply to new TD comments going forward; backfill existing ones during lint pass.
 **Context**: placeTimeBucketSigns() is layout+signage logic jammed into a renderer. SceneSignManager is the right home. Needs shelf position/rotation data as inputs, likely via an event or explicit call from the coordinator layer after layout is determined.
 **Source**: PR #40 r3048445863
 
+
+### Architecture: GameSorter ? event-driven shelf/sign commissioning
+**Priority:** High (before Phase 2)
+**Context:** Current shape has GpuStorePropsRenderer deciding sign placement after batch load.
+Intended shape:
+  1. Games finish batching ? GameSorter executes scene-load sort (recently-played default for cached user; alphabetical for anon)
+  2. GamesSort event emitted with sort order + category groupings
+  3. Shelf commissioner listens ? assigns games to shelves, each shelf gets a category/sign descriptor or nothing
+  4. SceneSignManager listens to GamesSort ? updates ceiling sign to match active sort
+This removes all sign/sort logic from GpuStorePropsRenderer.
+**Source:** PR #40 r3048445863 follow-up discussion
+
+### Playwright memory: tare-weight model
+**Priority:** Medium
+**Context:** Current memory-snapshot.spec.ts reads window.performance.memory (JS heap only, non-standard).
+Intended model:
+  1. Navigate to about:blank, capture CDP JSHeapUsedSize + process RSS as baseline (tare)
+  2. Navigate to app, wait for scene ready, capture again
+  3. Report: net JS heap (app - tare), net process RSS, GPU estimate from GpuMemoryEstimator
+  This matches what Chrome Task Manager shows per-tab vs browser overhead.
+  Use page.metrics() for per-tab JS heap; browser.process().memoryUsage() for process tare.
+  SwiftShader targets should be noted separately from hardware targets.
+**Source:** Discussion 2026-04-07
+
+### Test suite: SIGKILL on full run (memory pressure)
+**Priority:** High
+**Context:** yarn test:all and yarn test are getting killed by OOM on this machine.
+Likely causes: jsdom worker count, large mock objects not being cleaned up, or Vitest worker pool size.
+Mitigation already in place: maxWorkers:4, minWorkers:1.
+Next step: identify which test file/suite is the memory culprit (run suites individually, watch RSS).
+**Source:** Repeated SIGKILL in session 2026-04-07
