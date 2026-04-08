@@ -51,6 +51,10 @@ export function getBucketLabel(bucket: RecentlyPlayedBucket): string {
         case RecentlyPlayedBucket.ThisYear: return 'Played This Year'
         case RecentlyPlayedBucket.Before: return 'Played Before'
         case RecentlyPlayedBucket.Unplayed: return 'Never Played'
+        default: {
+            const exhaustiveCheck: never = bucket
+            return exhaustiveCheck
+        }
     }
 }
 
@@ -152,13 +156,13 @@ export class CategoryAssigner {
         }
 
         const shelfGroups: ShelfGroup[] = Array.from(groupsMap.entries()).map(([genre, groupGames]) => ({
-            genre, label: genre, games: groupGames
+            genre,
+            label: genre,
+            games: groupGames
         }))
 
         // Sort groups by size desc, Other last. This sorts groups, not individual games;
         // it is not redundant with sortByGenreThenPlaytime which sorts games within the pipeline.
-        // Sort groups by size desc, Other last. Not redundant with sortByGenreThenPlaytime
-        // (which sorts individual games upstream; this sorts the resulting groups).
         shelfGroups.sort((a, b) => {
             if (a.genre === otherGroupName) return 1
             if (b.genre === otherGroupName) return -1
