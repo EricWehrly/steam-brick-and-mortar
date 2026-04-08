@@ -7,19 +7,10 @@ vi.mock('three', async (importOriginal) => {
     return {
         ...actual,
         MeshStandardMaterial: vi.fn().mockImplementation(function () {
-            return {
-                dispose: vi.fn(),
-            }
+            return { dispose: vi.fn() }
         }),
         Mesh: vi.fn().mockImplementation(function (geo: any, mat: any) {
             return { geometry: geo, material: mat, isObject3D: true }
-        }),
-        PointLight: vi.fn().mockImplementation(function () {
-            return {
-                position: { set: vi.fn() },
-                isObject3D: true,
-                isLight: true,
-            }
         }),
         Group: vi.fn().mockImplementation(function () {
             const children: any[] = []
@@ -38,7 +29,7 @@ vi.mock('three', async (importOriginal) => {
 vi.mock('three/examples/jsm/loaders/FontLoader.js', () => ({
     FontLoader: vi.fn().mockImplementation(function () {
         return {
-            load: vi.fn((url, onLoad) => {
+            load: vi.fn((url: string, onLoad: (f: any) => void) => {
                 onLoad({ isFont: true })
             }),
         }
@@ -47,17 +38,14 @@ vi.mock('three/examples/jsm/loaders/FontLoader.js', () => ({
 
 vi.mock('three/examples/jsm/geometries/TextGeometry.js', () => ({
     TextGeometry: vi.fn().mockImplementation(function () {
-        return {
-            center: vi.fn(),
-            dispose: vi.fn(),
-        }
+        return { center: vi.fn(), dispose: vi.fn() }
     }),
 }))
 
-import { NeonAmpersandSign, type NeonAmpersandConfig } from './NeonAmpersandSign'
+import { NeonTubeSign, type NeonTubeSignConfig } from './NeonTubeSign'
 
-describe('NeonAmpersandSign', () => {
-    let config: NeonAmpersandConfig
+describe('NeonTubeSign', () => {
+    let config: NeonTubeSignConfig
 
     beforeEach(() => {
         config = {
@@ -69,23 +57,30 @@ describe('NeonAmpersandSign', () => {
     })
 
     it('creates a Group as the mesh property', () => {
-        const sign = new NeonAmpersandSign(config)
+        const sign = new NeonTubeSign(config)
         expect(sign.mesh).toBeDefined()
         expect(THREE.Group).toHaveBeenCalledTimes(1)
     })
 
     it('positions the group at the given position', () => {
-        const sign = new NeonAmpersandSign(config)
+        const sign = new NeonTubeSign(config)
         expect(sign.mesh.position.copy).toHaveBeenCalledWith(config.position)
     })
 
     it('applies the scale from config', () => {
-        const sign = new NeonAmpersandSign(config)
+        const sign = new NeonTubeSign(config)
         expect(sign.mesh.scale.setScalar).toHaveBeenCalledWith(1.5)
     })
 
+    it('does not add a PointLight to the scene (avoids shadow map recalculation hitch)', () => {
+        const sign = new NeonTubeSign(config)
+        // No PointLight should be added — lighting must go through LightingRenderer
+        const hasLight = sign.mesh.children.some((c: any) => c.isLight)
+        expect(hasLight).toBe(false)
+    })
+
     it('dispose() can be called without throwing', () => {
-        const sign = new NeonAmpersandSign(config)
+        const sign = new NeonTubeSign(config)
         expect(() => sign.dispose()).not.toThrow()
     })
 })

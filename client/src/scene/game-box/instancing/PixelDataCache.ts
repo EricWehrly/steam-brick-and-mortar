@@ -19,6 +19,7 @@
 
 import { Logger } from '../../../utils/Logger'
 import { ManagedWorker } from '../../../utils/ManagedWorker'
+import { StorageVersions } from '../../../core/StorageVersions'
 import type {
     WorkerInMessage,
     WorkerOutMessage,
@@ -51,7 +52,7 @@ export interface CachedPixelResult {
 }
 
 /** Current cache version - bump when pixel format or dimensions change */
-const CACHE_VERSION = 1
+const CACHE_VERSION = StorageVersions.PIXEL_CACHE
 
 export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMessage> {
     private static instance: PixelDataCache | null = null
