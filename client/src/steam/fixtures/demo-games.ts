@@ -48,6 +48,7 @@ export const ANONYMOUS_STORE_USER: SteamUser = {
         { appid: 1282100, name: 'Cuisine Royale',       playtime_forever: 1200,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(1282100), library: lib(1282100) }, genres: F2P_ACTION },
         { appid: 730640,  name: 'Phantom Forces',       playtime_forever: 1000,  img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(730640),  library: lib(730640)  }, genres: F2P_ACTION },
         { appid: 945360,  name: 'Among Us',             playtime_forever: 900,   img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(945360),  library: lib(945360)  }, genres: F2P        },
+        { appid: 359320,  name: 'Creativerse',          playtime_forever: 800,   img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(359320),  library: lib(359320)  }, genres: F2P        },
     ]
 };
 

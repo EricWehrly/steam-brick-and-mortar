@@ -152,8 +152,8 @@ export class SignPositionManipulator {
 
     private setupKeyboardShortcut(): void {
         window.addEventListener('keydown', (e) => {
-            // F8 toggles sign manipulator — no modifier needed, unambiguous in-scene key
-            if (e.key === 'F8') {
+            // 'm' toggles sign manipulator — unambiguous in-scene key, no modifier
+            if (e.key === 'm' && !e.ctrlKey && !e.metaKey) {
                 this.toggle()
             }
         })

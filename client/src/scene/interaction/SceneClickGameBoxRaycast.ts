@@ -142,29 +142,43 @@ export class SceneClickGameBoxRaycast {
         console.warn(object.userData)
 
         if (intersection.instanceId !== undefined) {
-            const artworkMetadata = dm.get<Map<number, InstanceMetadata>>(DataKey.InstancedArtworkMetadata)
-            const artworkHit = artworkMetadata?.get(intersection.instanceId)
-            if (artworkHit) {
-                return {
-                    name: artworkHit.name,
-                    appid: artworkHit.appid,
-                    point: intersection.point.clone(),
-                    distance: intersection.distance,
-                    object,
-                    instanceId: intersection.instanceId
+            // Identify which InstancedMesh was hit by name before consulting metadata maps.
+            // Artwork and label renderers both use InstancedMesh — instanceId is per-mesh,
+            // so the same index can exist in both maps referring to different games.
+            // Without this check, clicking a label box could return an artwork game's data.
+            const meshName = object.name
+            const isLabelMesh = meshName === 'gpu-instanced-game-boxes'
+            const isArtworkMesh = meshName === 'lod-game-artwork'
+
+            if (!isLabelMesh) {
+                // Artwork mesh (or unknown instanced mesh) — check artwork metadata first
+                const artworkMetadata = dm.get<Map<number, InstanceMetadata>>(DataKey.InstancedArtworkMetadata)
+                const artworkHit = artworkMetadata?.get(intersection.instanceId)
+                if (artworkHit) {
+                    return {
+                        name: artworkHit.name,
+                        appid: artworkHit.appid,
+                        point: intersection.point.clone(),
+                        distance: intersection.distance,
+                        object,
+                        instanceId: intersection.instanceId
+                    }
                 }
             }
 
-            const labelMetadata = dm.get<Map<number, { name: string; appid?: number | string; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
-            const labelHit = labelMetadata?.get(intersection.instanceId)
-            if (labelHit) {
-                return {
-                    name: labelHit.name,
-                    appid: labelHit.appid,
-                    point: intersection.point.clone(),
-                    distance: intersection.distance,
-                    object,
-                    instanceId: intersection.instanceId
+            if (!isArtworkMesh) {
+                // Label mesh (or unknown instanced mesh) — check label metadata
+                const labelMetadata = dm.get<Map<number, { name: string; appid?: number | string; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
+                const labelHit = labelMetadata?.get(intersection.instanceId)
+                if (labelHit) {
+                    return {
+                        name: labelHit.name,
+                        appid: labelHit.appid,
+                        point: intersection.point.clone(),
+                        distance: intersection.distance,
+                        object,
+                        instanceId: intersection.instanceId
+                    }
                 }
             }
 
