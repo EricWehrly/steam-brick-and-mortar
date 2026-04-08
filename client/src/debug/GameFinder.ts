@@ -89,6 +89,50 @@ export class GameFinder {
         return result
     }
 
+    /**
+     * Resolve a scene intersection object to a GameSceneObject using the
+     * dumb instanceId→appId maps (DataKey.ArtworkInstanceIdToAppId /
+     * DataKey.LabelInstanceIdToAppId).
+     *
+     * Prefer this over the metadata-map path in raycast resolution — it's
+     * a direct lookup with no fallback guessing.
+     *
+     * @param object    The THREE.Object3D that was hit (from raycaster intersection)
+     * @param instanceId The instanceId from the intersection (intersection.instanceId)
+     * @returns GameSceneObject if the instanceId resolves to a known appId, null otherwise
+     */
+    public findByIntersection(object: THREE.Object3D, instanceId: number): GameSceneObject | null {
+        const dm = DataManager.getInstance()
+        const meshName = object.name
+
+        const isArtwork = meshName === INSTANCED_ARTWORK_MESH_NAME
+        const isLabel = meshName === INSTANCED_LABEL_MESH_NAME
+
+        if (!isArtwork && !isLabel) return null
+
+        const mapKey = isArtwork
+            ? DataKey.ArtworkInstanceIdToAppId
+            : DataKey.LabelInstanceIdToAppId
+
+        const idMap = dm.get<Map<number, number | string>>(mapKey)
+        const appid = idMap?.get(instanceId)
+        if (appid === undefined) return null
+
+        // Resolve richer metadata from the existing full-metadata maps if available
+        const metaKey = isArtwork ? DataKey.InstancedArtworkMetadata : DataKey.InstancedLabelMetadata
+        const metadata = dm.get<Map<number, InstanceMetadata>>(metaKey)
+        const meta = metadata?.get(instanceId)
+
+        return {
+            name: meta?.name,
+            appid,
+            position: meta?.position.clone() ?? new THREE.Vector3(),
+            mesh: object,
+            instanceIndex: instanceId,
+            rendererType: isArtwork ? 'gpu' : 'label',
+        }
+    }
+
     public find(identifier: string | number): GameSceneObject | null {
         if (typeof identifier === 'number') {
             return this.findByAppId(identifier)

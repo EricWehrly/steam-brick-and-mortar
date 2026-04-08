@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vite
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../../../../src/core/EventManager'
 import { DataManager } from '../../../../src/core/data/DataManager'
-import { DataKey } from '../../../../src/core/data/DataTypes'
+import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
 import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
 import { GpuGameBoxRenderer } from '../../../../src/scene/game-box/GpuGameBoxRenderer'
 import {
@@ -67,7 +67,7 @@ describe('GameBoxSpawner Event Coordination', () => {
     beforeEach(() => {
         // Mock Scene for SceneSignManager
         const mockScene = new THREE.Scene()
-        DataManager.getInstance().set(DataKey.MainScene, mockScene, { persistent: true })
+        DataManager.getInstance().set(DataKey.MainScene, mockScene, { domain: DataDomain.Scene })
 
         // Reset the singleton and get a fresh instance
         resetEventManager()
