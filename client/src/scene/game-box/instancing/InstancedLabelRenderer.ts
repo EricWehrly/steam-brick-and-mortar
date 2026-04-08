@@ -219,8 +219,10 @@ export class InstancedLabelRenderer {
         
         // Use caller-supplied rotation (from GameBoxUtils.calculateGameRotation with arc convention:
         // Front=rotY+PI, Back=rotY). Fall back to legacy logic for axis-aligned shelves.
+        // Convention: label artwork is on the -Z face. Back (near) side needs no flip (rotY=0),
+        // Front (far) side needs PI to flip artwork toward player.
         const effectiveRotation = rotation ?? (
-            side === ShelfSide.Back
+            side === ShelfSide.Front
                 ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI)
                 : InstancedLabelRenderer.DEFAULT_ROTATION
         )
