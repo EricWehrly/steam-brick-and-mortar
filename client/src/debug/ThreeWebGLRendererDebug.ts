@@ -34,15 +34,35 @@ export class ThreeWebGLRendererDebug extends THREE.WebGLRenderer {
     }
 
     /**
-     * Timed render — warns when a frame render exceeds the slow-frame threshold.
-     * Synchronous shader compilation (new material × light-config pairs) shows up here.
+     * Timed render -- warns when a frame exceeds the slow-frame threshold.
+     * Also tracks light count changes which trigger shader recompile + shadow map rebuild.
      */
+    private lastLightCount = -1
+
     override render(scene: THREE.Object3D, camera: THREE.Camera): void {
+        // Detect light count change before render -- triggers shader recompile + shadow map
+        let lightDelta = 0
+        if (scene instanceof THREE.Scene) {
+            let lightCount = 0
+            scene.traverse((obj) => { if ((obj as any).isLight) lightCount++ })
+            if (this.lastLightCount >= 0 && lightCount !== this.lastLightCount) {
+                lightDelta = lightCount - this.lastLightCount
+                ThreeWebGLRendererDebug.logger.warn(
+                    '[ShadowMap] Light count changed by ' + (lightDelta > 0 ? '+' : '') + lightDelta +
+                    ' (' + this.lastLightCount + '->' + lightCount + ') -- shadow map recompile imminent'
+                )
+            }
+            this.lastLightCount = lightCount
+        }
+
         const start = performance.now()
         super.render(scene, camera)
         const elapsed = performance.now() - start
         if (elapsed > SLOW_FRAME_THRESHOLD_MS) {
-            ThreeWebGLRendererDebug.logger.warn(`🐌 Slow frame: render() took ${elapsed.toFixed(1)}ms (frame budget ~16ms)`)
+            const reason = lightDelta !== 0
+                ? ' (light count changed by ' + (lightDelta > 0 ? '+' : '') + lightDelta + ')'
+                : ''
+            ThreeWebGLRendererDebug.logger.warn('Slow frame: render() took ' + elapsed.toFixed(1) + 'ms' + reason)
         }
     }
 
