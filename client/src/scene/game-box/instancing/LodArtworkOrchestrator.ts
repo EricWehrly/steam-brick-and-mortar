@@ -271,6 +271,7 @@ export class LodArtworkOrchestrator {
             // Flush texture to GPU immediately after pixel data is ready.
             // Without this, MID textures only reach the GPU on the next SomeBatchesComplete
             // event — which may have already fired in a single-batch load (e.g. demo store).
+            // TODO: tear this back out and probably force a gpu update when we get an event after SomeBatchesComplete
             this.updateGPU()
             
             // Create instance
