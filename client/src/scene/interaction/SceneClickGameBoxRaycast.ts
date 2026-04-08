@@ -69,11 +69,6 @@ export class SceneClickGameBoxRaycast {
         )
     }
 
-    /** Update the raycast reach. Called when room/shelf layout is determined. */
-    public setMaxDistance(distance: number): void {
-        this.raycaster.far = distance
-    }
-
     public dispose(): void {
         this.eventManager.deregisterEventHandler<SceneCanvasClickEvent>(
             InputEventTypes.SceneCanvasClick,
