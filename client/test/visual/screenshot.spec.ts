@@ -21,7 +21,7 @@ test('screenshot: scene at startup', async ({ page }) => {
   const entries = attachConsoleCollector(page)
 
   await page.goto('/')
-  await waitForSceneReady(page, 25000, 12000)  // 12s settle — allows material upserts to complete
+  await waitForSceneReady(page, 45000, 20000)  // 20s settle — allows demo game batch + SwiftShader render
 
   const screenshotPath = await getResultPath('screenshot-startup.png')
   await page.screenshot({ path: screenshotPath, fullPage: false })
