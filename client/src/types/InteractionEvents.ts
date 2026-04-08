@@ -227,6 +227,21 @@ export interface LightCreatedEvent extends BaseInteractionEvent {
     lightName?: string
 }
 
+/**
+ * Request a point light be added to the scene via LightingRenderer.
+ * Emitting this avoids adding lights directly to the scene (which causes
+ * full shadow map recalculation outside the lighting system's control).
+ */
+export interface PointLightRequestEvent extends BaseInteractionEvent {
+    color: number
+    intensity: number
+    distance: number
+    position: THREE.Vector3
+    name?: string
+    /** Optional parent Object3D; if omitted, light is added to lighting group */
+    parent?: THREE.Object3D
+}
+
 export interface LightingSystemReadyEvent extends BaseInteractionEvent {
     scene: THREE.Scene
     quality: string
@@ -362,7 +377,7 @@ export const LightingEventTypes = {
     DebugToggle: 'lighting:debug-toggle',
     QualityChanged: 'lighting:quality-changed',
     Created: 'lighting:created',
-    SystemReady: 'lighting:system-ready'
+    SystemReady: 'lighting:system-ready',
 } as const
 
 export const CeilingEventTypes = {

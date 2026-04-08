@@ -68,6 +68,16 @@ export interface LightingConfig {
     quality?: LightingQuality
 }
 
+
+export interface PointLightConfig {
+    color: number
+    intensity: number
+    distance: number
+    position?: THREE.Vector3 | [number, number, number]
+    name?: string
+    parent?: THREE.Object3D
+}
+
 export class LightingRenderer {
     private scene: THREE.Scene
     private renderer: THREE.WebGLRenderer
@@ -79,6 +89,11 @@ export class LightingRenderer {
     private eventManager: EventManager
     private lightFactory: LightFactory
     private currentShelfLayout?: { rows: number; shelvesPerRow: number }
+    private isReady = false
+    private pendingLightRequests: Array<{
+        config: PointLightConfig
+        resolve: (light: THREE.PointLight) => void
+    }> = []
     public static logger = Logger.createLogFunctions(LightingRenderer.name)
 
     constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
@@ -140,6 +155,8 @@ export class LightingRenderer {
             StorePropsEventTypes.SetupCompleted,
             this.upgradeLighting.bind(this)
         )
+
+
     }
 
     /**
@@ -221,10 +238,49 @@ export class LightingRenderer {
                 timestamp: Date.now(),
                 source: EventSource.System
             })
+
+            // Resolve pending requestPointLight calls queued before init
+            this.isReady = true
+            for (const { config, resolve } of this.pendingLightRequests) {
+                resolve(this.createPointLightFromConfig(config))
+            }
+            this.pendingLightRequests = []
+
         } catch (error) {
             LightingRenderer.logger.error('❌ Failed to upgrade lighting:', error)
             // Keep basic lighting - better than nothing
         }
+    }
+
+
+    /**
+     * Request a managed point light from the lighting system.
+     * Returns a Promise resolving once lighting is initialised (after SystemReady).
+     * Never add PointLight directly to scene -- that triggers a full shadow map recalculation.
+     */
+    public requestPointLight(config: PointLightConfig): Promise<THREE.PointLight> {
+        if (this.isReady) {
+            return Promise.resolve(this.createPointLightFromConfig(config))
+        }
+        return new Promise<THREE.PointLight>((resolve) => {
+            this.pendingLightRequests.push({ config, resolve })
+        })
+    }
+
+    private createPointLightFromConfig(config: PointLightConfig): THREE.PointLight {
+        const managed = this.lightFactory.createPointLight(
+            config.color,
+            config.intensity,
+            config.distance,
+            undefined,
+            {
+                name: config.name ?? 'requested-point-light',
+                position: config.position,
+                parent: config.parent,
+                addToScene: !config.parent,
+            }
+        )
+        return managed as unknown as THREE.PointLight
     }
 
     private getCurrentConfig(): LightingConfig {

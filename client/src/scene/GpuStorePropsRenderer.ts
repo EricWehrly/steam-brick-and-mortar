@@ -53,6 +53,7 @@ import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
 import { RecentlyPlayedCeilingSign } from './RecentlyPlayedCeilingSign'
+import { NeonTubeSign } from './NeonTubeSign'
 import { SceneSignManager } from './SceneSignManager'
 import {
     computeAlternatingClusterXOffset,
@@ -244,6 +245,14 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 this.recentlyPlayedSign.getPosition()
             )
         }
+
+        // Neon tube sign — spike visualization, wired at store center
+        const neonSign = new NeonTubeSign({
+            color: 0xff6600,
+            position: new THREE.Vector3(0, 2.5, -3),
+            scale: 1.0
+        })
+        this.scene.add(neonSign.mesh)
     }
 
     private async initializeForProgressiveLoading(totalBatches: number): Promise<void> {

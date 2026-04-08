@@ -19,12 +19,14 @@ import { AppSettings } from '../../core/AppSettings'
 import { UIEventTypes, InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type ShelfLayoutDeterminedEvent } from '../../types/InteractionEvents'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
+import { SignPositionManipulator } from '../../debug/SignPositionManipulator'
 
 export class SystemUICoordinator {
     private pauseMenuManager: PauseMenuManager
     private performanceMonitor: PerformanceMonitorUI
     private lightingControlsPanel?: LightingControlsPanel
     private categoryReferencePanel?: CategoryReferencePanel
+    private signPositionManipulator?: SignPositionManipulator
     private eventManager: EventManager
     private appSettings: AppSettings
     private renderLoopRegistry: RenderLoopRegistry
@@ -90,6 +92,9 @@ export class SystemUICoordinator {
         // Category reference panel (dev/debug tool)
         this.initializeCategoryReferencePanel()
         
+        // Sign position manipulator (debug-only tool)
+        this.initializeSignPositionManipulator()
+        
         // Register update method with render loop
         this.renderLoopRegistry.register(this.constructor.name, this.updatePerformanceStats.bind(this))
     }
@@ -137,6 +142,12 @@ export class SystemUICoordinator {
         if (!this.categoryReferencePanel) {
             this.categoryReferencePanel = new CategoryReferencePanel()
             this.categoryReferencePanel.init()
+        }
+    }
+
+    private initializeSignPositionManipulator(): void {
+        if (!this.signPositionManipulator) {
+            this.signPositionManipulator = new SignPositionManipulator()
         }
     }
 

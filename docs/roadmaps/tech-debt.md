@@ -663,3 +663,21 @@ Likely causes: jsdom worker count, large mock objects not being cleaned up, or V
 Mitigation already in place: maxWorkers:4, minWorkers:1.
 Next step: identify which test file/suite is the memory culprit (run suites individually, watch RSS).
 **Source:** Repeated SIGKILL in session 2026-04-07
+
+### Persistent storage versioning (localStorage + IndexedDB)
+**Priority:** High (ASAP — schema drift will silently corrupt cached data)
+**Context:** Multiple storage locations have no version field or migration path:
+- pixel-cache.worker.ts: indexedDB.open(dbName, 1) — hardcoded version 1, no migration logic
+- CacheManager.ts, SimpleCacheManager.ts: localStorage cache state with no schema version
+- GameArtworkProvider.ts: failure/success URL caches stored as raw JSON, no version field
+- AppSettings.ts: settings object in localStorage, no version field
+- GameSettingsPanel.ts, CacheManagementPanel.ts: additional isolated localStorage keys
+
+**Needed:**
+1. Add a schemaVersion field to each store's data format
+2. On open/load: check stored version vs current, and either migrate or blow away stale data
+3. Define a clear policy: blow away vs migrate (suggest blow-away for caches, migrate for settings)
+4. Centralise the version constants somewhere obvious (StorageVersions.ts or similar)
+
+**Decision to make:** Choose blow-away vs migrate strategy per store type before implementing.
+**Source:** Discussion 2026-04-08

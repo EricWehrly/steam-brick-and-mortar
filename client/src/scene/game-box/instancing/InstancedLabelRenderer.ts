@@ -60,7 +60,7 @@ export class InstancedLabelRenderer {
     // Deferred allocation: buffer label requests until all batches are known,
     // then allocate the texture array at exactly the right size.
     private deferLabels: boolean = true
-    private pendingLabels: Array<{ gameName: string; position: THREE.Vector3; side: ShelfSide; rotation?: THREE.Quaternion }> = []
+    private pendingLabels: Array<{ gameName: string; appid?: number | string; position: THREE.Vector3; side: ShelfSide; rotation?: THREE.Quaternion }> = []
     private static readonly DEFERRED_OVERFLOW = 32  // Extra slots for late-arriving failures
     
     // Constant quaternion for no rotation (performance optimization)
@@ -84,6 +84,14 @@ export class InstancedLabelRenderer {
             GameEventTypes.AllBatchesComplete,
             () => this.materializeLabels()
         )
+
+        // Register a fresh empty metadata map immediately so any pre-existing stale
+        // map from a previous InstancedLabelRenderer instance is replaced.
+        DataManager.getInstance().set(
+            DataKey.InstancedLabelMetadata,
+            new Map<number, { name: string; position: THREE.Vector3 }>(),
+            { domain: DataDomain.Renderer }
+        )
         
         console.debug(`📋 InstancedLabelRenderer created (max: ${this.maxInstances} labels)`)
     }
@@ -105,8 +113,8 @@ export class InstancedLabelRenderer {
         this.deferLabels = false
         this.initialize()
 
-        for (const { gameName, position, side, rotation } of this.pendingLabels) {
-            this.addLabelInstance(position, gameName, side, rotation)
+        for (const { gameName, appid, position, side, rotation } of this.pendingLabels) {
+            this.addLabelInstance(position, gameName, side, rotation, appid)
         }
         this.pendingLabels = []
 
@@ -179,11 +187,12 @@ export class InstancedLabelRenderer {
         position: THREE.Vector3,
         gameName: string,
         side: ShelfSide = ShelfSide.Front,
-        rotation?: THREE.Quaternion
+        rotation?: THREE.Quaternion,
+        appid?: number | string
     ): boolean {
         // Deferred path: buffer until materializeLabels() is called
         if (this.deferLabels) {
-            this.pendingLabels.push({ gameName, position: position.clone(), side, rotation })
+            this.pendingLabels.push({ gameName, appid, position: position.clone(), side, rotation })
             return true
         }
 
@@ -219,8 +228,10 @@ export class InstancedLabelRenderer {
         
         // Use caller-supplied rotation (from GameBoxUtils.calculateGameRotation with arc convention:
         // Front=rotY+PI, Back=rotY). Fall back to legacy logic for axis-aligned shelves.
+        // Convention: label artwork is on the -Z face. Back (near) side needs no flip (rotY=0),
+        // Front (far) side needs PI to flip artwork toward player.
         const effectiveRotation = rotation ?? (
-            side === ShelfSide.Back
+            side === ShelfSide.Front
                 ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI)
                 : InstancedLabelRenderer.DEFAULT_ROTATION
         )
@@ -235,14 +246,14 @@ export class InstancedLabelRenderer {
         
         this.currentCount = Math.max(this.currentCount, index + 1)
         
-        this.storeLabelMetadata(index, gameName, position)
+        this.storeLabelMetadata(index, gameName, position, appid)
         
         return true
     }
     
-    private storeLabelMetadata(index: number, gameName: string, position: THREE.Vector3): void {
+    private storeLabelMetadata(index: number, gameName: string, position: THREE.Vector3, appid?: number | string): void {
         const dataManager = DataManager.getInstance()
-        let metadata = dataManager.get<Map<number, { name: string; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
+        let metadata = dataManager.get<Map<number, { name: string; appid?: number | string; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
         
         if (!metadata) {
             metadata = new Map()
@@ -251,7 +262,7 @@ export class InstancedLabelRenderer {
             })
         }
         
-        metadata.set(index, { name: gameName, position: position.clone() })
+        metadata.set(index, { name: gameName, appid, position: position.clone() })
     }
     
     /**
@@ -291,6 +302,9 @@ export class InstancedLabelRenderer {
         if (this.instancedMesh) {
             this.instancedMesh.count = 0
         }
+        // Clear metadata map so stale entries don't cause wrong-game clicks on re-load
+        const map = DataManager.getInstance().get<Map<number, unknown>>(DataKey.InstancedLabelMetadata)
+        map?.clear()
     }
     
     /**
