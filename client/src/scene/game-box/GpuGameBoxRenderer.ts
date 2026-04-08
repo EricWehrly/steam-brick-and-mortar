@@ -49,7 +49,6 @@ import { LodDistanceManagerDebug } from './instancing/LodDistanceManagerDebug'
 import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { EventManager } from '../../core/EventManager'
-import { GameEventTypes } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
@@ -96,14 +95,9 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             maxHighTextureCache: maxHighSlots
         })
         
-        // Create distance manager for automatic LOD switching
+        // Create distance manager for automatic LOD switching.
+        // LodDistanceManager self-subscribes to AllBatchesComplete to start auto-updates.
         this.lodDistanceManager = new LodDistanceManagerDebug(this.lodArtworkRenderer)
-
-        // Start LOD distance checks once all batches have loaded
-        EventManager.getInstance().registerEventHandler(
-            GameEventTypes.AllBatchesComplete,
-            this.onAllBatchesComplete.bind(this)
-        )
         
         GpuGameBoxRenderer.logger.lifecycle(`LOD atlas initialized (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
     }
@@ -241,12 +235,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
 
     public getDimensions(): GameBoxDimensions {
         return { ...this.dimensions }
-    }
-
-    private onAllBatchesComplete(): void {
-        this.lodDistanceManager.syncInstances()
-        this.lodDistanceManager.startAutoUpdate()
-        GpuGameBoxRenderer.logger.lifecycle('LOD distance manager started after all batches complete')
     }
 
     public dispose(): void {
