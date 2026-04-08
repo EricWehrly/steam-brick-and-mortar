@@ -109,7 +109,11 @@ export class SceneSignManager {
     private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 0.6
     private static readonly SIGN_Z_FACE_PLAYER = 0.01 // slight forward push to avoid z-fighting
 
-    // Tech debt link: docs/roadmaps/tech-debt.md →
+    // For debug live updates
+    private _lastShelfPositions: THREE.Vector3[] | null = null
+    private _lastShelfRotationsY: number[] | null = null
+    private _lastCeilingSignPos: THREE.Vector3 | null = null
+    private _debugOverrides: any | null = null
     // - "Category System Tech Debt / SceneSignManager: scene access pattern / SceneManager"
     // - "Category System Tech Debt / SignageRenderer: singleton vs instance"
     constructor() {
@@ -197,6 +201,10 @@ export class SceneSignManager {
     ): void {
         if (games.length === 0) return
 
+        this._lastShelfPositions = [...shelfPositions]
+        this._lastShelfRotationsY = [...shelfRotationsY]
+        this._lastCeilingSignPos = ceilingSignPos.clone()
+
         const sortedGames = [...games].sort(sortByRecentlyPlayed)
 
         // Shelf-mount signs sit ON TOP of the shelf unit, just inside the side brackets.
@@ -204,13 +212,13 @@ export class SceneSignManager {
         // boardThickness (0.05m) × 2 subtracted from width (2.0m) = 1.9m interior span;
         // use 1.8m to leave a small margin inside the bracket edges.
         // ⚠️ Do not change SIGN_ANCHOR_Y_OFFSET without checking DEFAULT_SHELF_CONFIG.height.
-        const SIGN_ANCHOR_Y_OFFSET = 2.0  // shelf top (DEFAULT_SHELF_CONFIG.height)
-        const SIGN_Y_CLEARANCE = 0.02     // small lift so sign doesn't z-fight with top board
+        const SIGN_ANCHOR_Y_OFFSET = this._debugOverrides?.SIGN_ANCHOR_Y_OFFSET ?? 2.0  // shelf top (DEFAULT_SHELF_CONFIG.height)
+        const SIGN_Y_CLEARANCE = this._debugOverrides?.SIGN_Y_CLEARANCE ?? 0.02     // small lift so sign doesn't z-fight with top board
         const SIGN_WIDTH = 1.8            // fits inside side brackets (interior = 1.9m)
         const SIGN_HEIGHT = 0.32          // shelf-top label — slightly shorter than hanging sign
         const MIN_DIST_FROM_CEILING_SIGN = 1.5
         const BATCH_SIZE = 18
-        const SIGN_FRONT_OFFSET = 0.28
+        const SIGN_FRONT_OFFSET = this._debugOverrides?.SIGN_FRONT_OFFSET ?? 0.28
 
         let lastBucket: RecentlyPlayedBucket | null = null
 
