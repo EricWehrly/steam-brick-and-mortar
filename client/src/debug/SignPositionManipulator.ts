@@ -3,7 +3,6 @@
  */
 
 import { SceneSignManager } from '../scene/SceneSignManager'
-import { AppSettings } from '../core/AppSettings'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
 import { RecentlyPlayedCeilingSign } from '../scene/RecentlyPlayedCeilingSign'
@@ -22,14 +21,10 @@ export class SignPositionManipulator {
     }
 
     constructor() {
-        // Only initialize if diagnostics/debug mode is enabled
-        const params = new URLSearchParams(window.location.search)
-        const isDebug = params.get('diagnostics') === '1' || AppSettings.get('showDebugInfo')
-        
-        if (isDebug) {
-            this.createPanel()
-            this.setupKeyboardShortcut()
-        }
+        // TODO: dev mode consolidation — multiple debug activation patterns exist in codebase.
+        // For now, always create the panel (debug-only build consideration for later).
+        this.createPanel()
+        this.setupKeyboardShortcut()
     }
 
     private createPanel(): void {
@@ -157,7 +152,8 @@ export class SignPositionManipulator {
 
     private setupKeyboardShortcut(): void {
         window.addEventListener('keydown', (e) => {
-            if (e.key === 'S' && e.shiftKey && e.altKey) {
+            // F8 toggles sign manipulator — no modifier needed, unambiguous in-scene key
+            if (e.key === 'F8') {
                 this.toggle()
             }
         })

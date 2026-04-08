@@ -13,7 +13,6 @@ export interface SceneClickGameBoxRaycastOptions {
     lineColor?: number
     enableDebugLogs?: boolean
     enableDebugLine?: boolean
-    onHit?: (hit: SceneGameBoxHit) => void
 }
 
 export interface SceneGameBoxHit {
@@ -31,7 +30,6 @@ export class SceneClickGameBoxRaycast {
     private readonly maxDistance: number
     private readonly enableDebugLogs: boolean
     private readonly enableDebugLine: boolean
-    private readonly onHit?: (hit: SceneGameBoxHit) => void
     private readonly eventManager: EventManager
 
     private resolvedScene: THREE.Scene | null = null
@@ -51,7 +49,6 @@ export class SceneClickGameBoxRaycast {
         this.maxDistance = options.maxDistance ?? 10
         this.enableDebugLogs = options.enableDebugLogs ?? false
         this.enableDebugLine = options.enableDebugLine ?? false
-        this.onHit = options.onHit
         this.eventManager = EventManager.getInstance()
 
         this.lineMaterial = new THREE.LineBasicMaterial({
@@ -117,21 +114,17 @@ export class SceneClickGameBoxRaycast {
 
         const intersections = this.raycaster.intersectObjects(scene.children, true)
 
-        let firstGameBoxHit: SceneGameBoxHit | null = null
         for (const intersection of intersections) {
             const hit = this.resolveGameBoxIntersection(intersection, dm)
-            if (hit) { firstGameBoxHit = hit; break }
-        }
-
-        if (!firstGameBoxHit) {
-            if (this.enableDebugLogs) {
-                console.log('🎯 [SceneClickGameBoxRaycast] No game box hit', { maxDistance: this.maxDistance })
+            if (hit) {
+                this.highlightHit(hit)
+                return
             }
-            return
         }
 
-        this.highlightHit(firstGameBoxHit)
-        this.onHit?.(firstGameBoxHit)
+        if (this.enableDebugLogs) {
+            console.log('🎯 [SceneClickGameBoxRaycast] No game box hit', { maxDistance: this.maxDistance })
+        }
     }
 
     private updateDebugLine(start: THREE.Vector3, end: THREE.Vector3, scene: THREE.Scene): void {
@@ -146,6 +139,7 @@ export class SceneClickGameBoxRaycast {
 
     private resolveGameBoxIntersection(intersection: THREE.Intersection<THREE.Object3D>, dm: DataManager): SceneGameBoxHit | null {
         const object = intersection.object
+        console.warn(object.userData)
 
         if (intersection.instanceId !== undefined) {
             const artworkMetadata = dm.get<Map<number, InstanceMetadata>>(DataKey.InstancedArtworkMetadata)
@@ -161,11 +155,12 @@ export class SceneClickGameBoxRaycast {
                 }
             }
 
-            const labelMetadata = dm.get<Map<number, { name: string; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
+            const labelMetadata = dm.get<Map<number, { name: string; appid?: number | string; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
             const labelHit = labelMetadata?.get(intersection.instanceId)
             if (labelHit) {
                 return {
                     name: labelHit.name,
+                    appid: labelHit.appid,
                     point: intersection.point.clone(),
                     distance: intersection.distance,
                     object,

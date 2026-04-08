@@ -163,7 +163,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             position,
             game.name,
             side,
-            rotation
+            rotation,
+            typeof game.appid === 'number' || typeof game.appid === 'string' ? game.appid : undefined
         )
         
         if (!success) {
