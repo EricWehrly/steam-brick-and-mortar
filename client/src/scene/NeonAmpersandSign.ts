@@ -41,35 +41,52 @@ export class NeonAmpersandSign {
         const loader = new FontLoader()
         // TD: if more signs are added consider ManagedWorker for batch font rasterization
         loader.load('/fonts/helvetiker_bold.typeface.json', (font) => {
-            const geometry = new TextGeometry('steam', {
-                font,
-                size: 0.3,
-                depth: 0.05,
-                curveSegments: 8,
-                bevelEnabled: true,
-                bevelThickness: 0.01,
-                bevelSize: 0.008,
-                bevelSegments: 3,
-            })
+            // Defer geometry construction to avoid a synchronous hitch mid-frame.
+            // TextGeometry for 'steam' with bevel takes ~5-20ms on main thread.
+            const buildSign = () => {
+                const t0 = performance.now()
 
-            geometry.center()
+                const geometry = new TextGeometry('steam', {
+                    font,
+                    size: 0.3,
+                    depth: 0.05,
+                    curveSegments: 8,
+                    bevelEnabled: true,
+                    bevelThickness: 0.01,
+                    bevelSize: 0.008,
+                    bevelSegments: 3,
+                })
 
-            const material = new THREE.MeshStandardMaterial({
-                color,
-                emissive: new THREE.Color(color),
-                emissiveIntensity: 2.0,
-                roughness: 0.3,
-                metalness: 0.0,
-            })
+                geometry.center()
 
-            const textMesh = new THREE.Mesh(geometry, material)
-            this.mesh.add(textMesh)
+                const material = new THREE.MeshStandardMaterial({
+                    color,
+                    emissive: new THREE.Color(color),
+                    emissiveIntensity: 2.0,
+                    roughness: 0.3,
+                    metalness: 0.0,
+                })
 
-            // PointLight for environmental glow — more reliable than bloom in XR
-            if (addLight) {
-                const light = new THREE.PointLight(color, 1.5, 2.0)
-                light.position.set(0, 0, 0)
-                this.mesh.add(light)
+                const textMesh = new THREE.Mesh(geometry, material)
+                this.mesh.add(textMesh)
+
+                // PointLight for environmental glow — more reliable than bloom in XR
+                if (addLight) {
+                    const light = new THREE.PointLight(color, 1.5, 2.0)
+                    light.position.set(0, 0, 0)
+                    this.mesh.add(light)
+                }
+
+                const elapsed = (performance.now() - t0).toFixed(1)
+                console.debug(`[NeonSign] TextGeometry built in ${elapsed}ms`)
+            }
+
+            // Use requestIdleCallback when available so geometry builds between frames.
+            // Falls back to setTimeout(0) which at least defers to next task queue entry.
+            if (typeof requestIdleCallback !== 'undefined') {
+                requestIdleCallback(buildSign, { timeout: 2000 })
+            } else {
+                setTimeout(buildSign, 0)
             }
         })
     }
