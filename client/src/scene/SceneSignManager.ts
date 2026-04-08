@@ -193,7 +193,13 @@ export class SceneSignManager {
             case 'ceiling': {
                 // Ceiling mount: caller sets anchor.y directly to the desired sign height
                 // (e.g. RoomConstants.STORE_CEILING_HEIGHT - drop). yOffset is not applied here.
-                return new THREE.Vector3(anchor.x, anchor.y, anchor.z)
+                const facingY = mount.signFacingY ?? 0
+                const frontOff = mount.frontOffset ?? 0
+                return new THREE.Vector3(
+                    anchor.x + Math.sin(facingY) * frontOff,
+                    anchor.y,
+                    anchor.z + Math.cos(facingY) * frontOff
+                )
             }
         }
     }

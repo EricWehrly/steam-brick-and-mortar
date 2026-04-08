@@ -291,7 +291,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                         anchorPosition: anchor,
                         mount: {
                             style: 'above-shelf',
-                            yOffset: 0.2,
+                            yOffset: 0.2, // Use explicit yOffset to stack above shelf
                             frontOffset: SIGN_FRONT_OFFSET,
                             signFacingY: facingY,
                         },

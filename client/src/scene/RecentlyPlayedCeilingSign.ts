@@ -38,7 +38,7 @@ export class RecentlyPlayedCeilingSign {
 
     /** Get the position of the sign (caller should clone if mutation is needed). */
     public getPosition(): THREE.Vector3 {
-        return this.position
+        return this.position.clone()
     }
 
     /** Place (or replace) the Recently Played ceiling sign. */
@@ -48,11 +48,12 @@ export class RecentlyPlayedCeilingSign {
 
         const mount: SignMount = {
             style: 'ceiling',
+            signFacingY: 0,
         }
 
         this.signSystem.setSign({
             label: RECENTLY_PLAYED_SIGN_LABEL,
-            anchorPosition: new THREE.Vector3(centerX, y, SIGN_ANCHOR_Z),
+            anchorPosition: this.position,
             mount,
             // Blue text on gold � matches the store theme direction.
             // TD: align with UI design tokens once store theme is finalised
