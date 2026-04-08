@@ -51,5 +51,3 @@ Read these when touching specific complex systems (e.g., WebXR, Instancing, Even
 ### 🔬 research/ & 📦 archive/
 **Historical context.**
 Do not read these unless specifically looking for why a past decision was made or how an old feature worked.
-
-

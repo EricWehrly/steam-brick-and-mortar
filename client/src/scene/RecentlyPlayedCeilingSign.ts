@@ -36,9 +36,9 @@ export class RecentlyPlayedCeilingSign {
         // SceneSignManager is a singleton - no local instance needed
     }
 
-    /** Get the position of the sign (caller should clone if mutation is needed). */
+    /** Get the position of the sign. Caller must clone if mutation is needed. */
     public getPosition(): THREE.Vector3 {
-        return this.position.clone()
+        return this.position
     }
 
     /** Place (or replace) the Recently Played ceiling sign. */
