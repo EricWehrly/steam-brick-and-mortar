@@ -129,3 +129,30 @@ describe('computeArcShelfLayout', () => {
         })
     })
 })
+
+describe('partial-row centering', () => {
+    it('single shelf in a row lands at angle=0 (straight ahead, not off to the side)', () => {
+        const shelves = computeArcShelfLayout(1, {
+            rows: 5,
+            shelvesPerRow: 4,
+            firstRowRadius: 5.5,
+            halfAngle: Math.PI / 3,
+        })
+        expect(shelves).toHaveLength(1)
+        // Straight ahead is x≈0, z≈-radius. Allow ±0.01m tolerance.
+        expect(Math.abs(shelves[0].position.x)).toBeLessThan(0.01)
+        expect(shelves[0].position.z).toBeCloseTo(-5.5, 1)
+    })
+
+    it('two shelves in a four-slot row are symmetric around x=0', () => {
+        const shelves = computeArcShelfLayout(2, {
+            rows: 5,
+            shelvesPerRow: 4,
+            firstRowRadius: 5.5,
+            halfAngle: Math.PI / 3,
+        })
+        expect(shelves).toHaveLength(2)
+        const xSum = shelves[0].position.x + shelves[1].position.x
+        expect(Math.abs(xSum)).toBeLessThan(0.01) // symmetric around x=0
+    })
+})

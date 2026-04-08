@@ -103,9 +103,14 @@ export function computeArcShelfLayout(
             if (count > max) count = max
         }
 
+        // Clamp to how many shelves we'll actually place in this row so the
+        // placed shelves are centred at angle=0 rather than bunched to one side.
+        const actualCount = Math.min(count, totalShelves - shelfIndex)
+
         for (let i = 0; i < count && shelfIndex < totalShelves; i++) {
-            // Spread shelves evenly across the arc span
-            const t = count === 1 ? 0 : (i / (count - 1)) - 0.5   // -0.5 .. +0.5
+            // Spread shelves evenly across the arc span, using actualCount for
+            // spacing so a partial row stays centred (not left-justified).
+            const t = actualCount === 1 ? 0 : (i / (actualCount - 1)) - 0.5   // -0.5 .. +0.5
             const angle = t * 2 * rowHalfAngle                     // -halfAngle .. +halfAngle
 
             // Arc is in the -Z half-space (in front of player)
