@@ -122,6 +122,7 @@ export class GameBoxSpawner {
             
             SceneSignManager.instance.setSign({
                 label: `shelf-front-label-${batchIndex}`,
+                text: 'FRONT',
                 anchorPosition: frontPos,
                 mount: {
                     style: 'above-shelf',
@@ -138,6 +139,7 @@ export class GameBoxSpawner {
             
             SceneSignManager.instance.setSign({
                 label: `shelf-back-label-${batchIndex}`,
+                text: 'BACK',
                 anchorPosition: backPos,
                 mount: {
                     style: 'above-shelf',
