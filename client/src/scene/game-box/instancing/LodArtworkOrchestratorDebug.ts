@@ -13,6 +13,7 @@ import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
 import { GameArtworkProvider } from './GameArtworkProvider'
 import { DataManager } from '../../../core/data/DataManager'
+import { GpuMemoryEstimator } from '../../../debug/GpuMemoryEstimator'
 import { DataKey } from '../../../core/data/DataTypes'
 import * as THREE from 'three'
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -53,9 +54,8 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
                 notes: []
             } : { mainHeapMB: undefined, notes: ['window.performance.memory not available'] }
             const renderer = DataManager.getInstance().get<THREE.WebGLRenderer>(DataKey.Renderer)
-            const GpuMemoryEstimator = (window as any).GpuMemoryEstimator
-            const gpu = GpuMemoryEstimator?.estimate(renderer ?? undefined)
-            return { ...heap, gpuEstimateMB: gpu?.totalEstimatedMB }
+            const gpu = GpuMemoryEstimator.estimate(renderer ?? undefined)
+            return { ...heap, gpuEstimateMB: gpu.totalEstimatedMB }
         }
         ;(window as any).diagnosePending = () => this.diagnosePendingState()
         
