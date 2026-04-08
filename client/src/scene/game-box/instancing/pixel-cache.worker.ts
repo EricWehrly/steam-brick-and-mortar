@@ -133,7 +133,7 @@ async function initDatabase(dbName: string, store: string, version: number): Pro
     dbVersion = version
     
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(dbName, 1) // DB schema version, not cache version
+        const request = indexedDB.open(dbName, version)
         
         request.onerror = () => {
             reject(new Error(`Failed to open IndexedDB: ${request.error?.message}`))

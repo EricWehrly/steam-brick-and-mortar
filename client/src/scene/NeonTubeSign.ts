@@ -1,38 +1,37 @@
 /**
- * NeonAmpersandSign
+ * NeonTubeSign
  *
- * Spike: 3D neon-style "&" sign using TubeGeometry + CatmullRomCurve3.
- * Intended for category divider signage in the store.
+ * Spike: 3D neon-style text sign using TextGeometry + emissive material.
+ * Currently renders "steam" — intended for category divider signage in the store.
  *
- * Status: prototype ΓÇö not wired into scene yet.
- * See docs/plans/neon-sign-3d-design.md for integration notes.
+ * Status: prototype — wired into scene in GpuStorePropsRenderer for review.
  *
- * Visual approach:
- * - TubeGeometry traces the ampersand glyph via control points
- * - MeshStandardMaterial with high emissive for neon glow
- * - Optional PointLight at center for environmental bloom without PostProcessing
+ * TODO: more tubey appearance — TubeGeometry along text outline paths instead of
+ * ExtrudeGeometry, for proper neon-tube cross-section look.
+ * TODO: lighting should go through LightingRenderer event system, not added directly.
+ *       For now: no light emitted (avoids shadow map recalculation hitch).
  */
 
 import * as THREE from 'three'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
 
-export interface NeonAmpersandConfig {
+export interface NeonTubeSignConfig {
     /** Hex color integer, e.g. 0xff6600 */
     color: number
     /** World-space position for the sign center */
     position: THREE.Vector3
     /** Uniform scale multiplier (default: 1.0) */
     scale?: number
-    /** Whether to add a point light at center for environmental glow (default: true) */
-    addLight?: boolean
+    /** Text to display (default: 'steam') */
+    text?: string
 }
 
-export class NeonAmpersandSign {
+export class NeonTubeSign {
     public readonly mesh: THREE.Group
 
-    constructor(config: NeonAmpersandConfig) {
-        const { color, position, scale = 1.0, addLight = true } = config
+    constructor(config: NeonTubeSignConfig) {
+        const { color, position, scale = 1.0, text = 'steam' } = config
 
         this.mesh = new THREE.Group()
         this.mesh.position.copy(position)
@@ -41,12 +40,10 @@ export class NeonAmpersandSign {
         const loader = new FontLoader()
         // TD: if more signs are added consider ManagedWorker for batch font rasterization
         loader.load('/fonts/helvetiker_bold.typeface.json', (font) => {
-            // Defer geometry construction to avoid a synchronous hitch mid-frame.
-            // TextGeometry for 'steam' with bevel takes ~5-20ms on main thread.
             const buildSign = () => {
                 const t0 = performance.now()
 
-                const geometry = new TextGeometry('steam', {
+                const geometry = new TextGeometry(text, {
                     font,
                     size: 0.3,
                     depth: 0.05,
@@ -70,19 +67,14 @@ export class NeonAmpersandSign {
                 const textMesh = new THREE.Mesh(geometry, material)
                 this.mesh.add(textMesh)
 
-                // PointLight for environmental glow — more reliable than bloom in XR
-                if (addLight) {
-                    const light = new THREE.PointLight(color, 1.5, 2.0)
-                    light.position.set(0, 0, 0)
-                    this.mesh.add(light)
-                }
+                // NOTE: No PointLight here — adding lights directly to scene causes
+                // full shadow map recalculation. Any lighting must go through LightingRenderer.
+                // TD: wire ambient glow through LightingRenderer event system.
 
                 const elapsed = (performance.now() - t0).toFixed(1)
-                console.debug(`[NeonSign] TextGeometry built in ${elapsed}ms`)
+                console.debug(`[NeonTubeSign] TextGeometry built in ${elapsed}ms`)
             }
 
-            // Use requestIdleCallback when available so geometry builds between frames.
-            // Falls back to setTimeout(0) which at least defers to next task queue entry.
             if (typeof requestIdleCallback !== 'undefined') {
                 requestIdleCallback(buildSign, { timeout: 2000 })
             } else {
@@ -91,7 +83,6 @@ export class NeonAmpersandSign {
         })
     }
 
-    /** Remove from scene and dispose GPU resources */
     public dispose(): void {
         this.mesh.traverse((child) => {
             if (child instanceof THREE.Mesh) {
