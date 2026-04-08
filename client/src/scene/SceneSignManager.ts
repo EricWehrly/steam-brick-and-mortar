@@ -20,6 +20,13 @@ import * as THREE from 'three'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
 import { SignageRenderer, type SignageConfig } from './SignageRenderer'
+import {
+    getRecentlyPlayedBucket,
+    getBucketLabel,
+    sortByRecentlyPlayed,
+    RecentlyPlayedBucket,
+} from './categorization/CategoryAssigner'
+import type { SteamGameData } from './game-box/types/GameData'
 
 // ─── Style definitions ────────────────────────────────────────────────────────
 
@@ -169,6 +176,70 @@ export class SceneSignManager {
     public dispose(): void {
         this.clearAll()
         this.renderer.dispose()
+    }
+
+    /**
+     * Place time-bucket section signs ("This Week", "This Month", etc.) above shelves.
+     *
+     * Called after all batches complete, once shelf positions and rotations are known.
+     * Skipped automatically for buckets that don't appear in the game data.
+     *
+     * @param shelfPositions  World-space base positions for each shelf unit
+     * @param shelfRotationsY Y-rotation (radians) for each shelf
+     * @param games           Full sorted game list (same order as shelf layout)
+     * @param ceilingSignPos  Position of the "Recently Played" ceiling sign (signs too close are skipped)
+     */
+    public placeTimeBucketSigns(
+        shelfPositions: THREE.Vector3[],
+        shelfRotationsY: number[],
+        games: SteamGameData[],
+        ceilingSignPos: THREE.Vector3
+    ): void {
+        if (games.length === 0) return
+
+        const sortedGames = [...games].sort(sortByRecentlyPlayed)
+
+        // Shelf-mount signs directly above the top shelf board.
+        // shelfPos.y is the base of the unit; 1.1m puts the anchor just above
+        // the top shelf surface on a 2m-tall unit. Tuned visually.
+        const SIGN_ANCHOR_Y_OFFSET = 1.1
+        const MIN_DIST_FROM_CEILING_SIGN = 1.5
+        const BATCH_SIZE = 18
+        const SIGN_FRONT_OFFSET = 0.28
+
+        let lastBucket: RecentlyPlayedBucket | null = null
+
+        for (let i = 0; i < shelfPositions.length; i++) {
+            const shelfPos = shelfPositions[i]
+            const firstGameIndex = i * BATCH_SIZE
+            if (firstGameIndex >= sortedGames.length) break
+
+            const firstGame = sortedGames[firstGameIndex]
+            const bucket = getRecentlyPlayedBucket(firstGame)
+
+            if (bucket !== RecentlyPlayedBucket.Unplayed && bucket !== lastBucket) {
+                const anchor = new THREE.Vector3(
+                    shelfPos.x,
+                    shelfPos.y + SIGN_ANCHOR_Y_OFFSET,
+                    shelfPos.z
+                )
+                if (ceilingSignPos.distanceTo(anchor) > MIN_DIST_FROM_CEILING_SIGN) {
+                    const facingY = shelfRotationsY[i] ?? (i % 2 === 1 ? Math.PI : 0)
+                    this.setSign({
+                        label: getBucketLabel(bucket),
+                        anchorPosition: anchor,
+                        mount: {
+                            style: 'above-shelf',
+                            yOffset: 0.2,
+                            frontOffset: SIGN_FRONT_OFFSET,
+                            signFacingY: facingY,
+                        },
+                        style: SignStyles.Category
+                    })
+                }
+                lastBucket = bucket
+            }
+        }
     }
 
     // ─── Position resolution ──────────────────────────────────────────────────

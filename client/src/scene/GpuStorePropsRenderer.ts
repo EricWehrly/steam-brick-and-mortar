@@ -53,13 +53,7 @@ import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
 import { RecentlyPlayedCeilingSign } from './RecentlyPlayedCeilingSign'
-import {
-    getRecentlyPlayedBucket,
-    getBucketLabel,
-    sortByRecentlyPlayed,
-    RecentlyPlayedBucket,
-} from './categorization/CategoryAssigner'
-import { SceneSignManager, SignStyles } from './SceneSignManager'
+import { SceneSignManager } from './SceneSignManager'
 import {
     computeAlternatingClusterXOffset,
     getPrimaryGenreFromBatch,
@@ -243,63 +237,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Anonymous/curated stores (no rtime_last_played) skip this path entirely.
         if (hasRecentlyPlayedData) {
             this.recentlyPlayedSign.place()
-            this.placeTimeBucketSigns()
-        }
-    }
-
-    private placeTimeBucketSigns(): void {
-        const games = DataManager.getInstance().get<SteamGameData[]>('steam.games')
-        if (!games || games.length === 0) return
-
-        // Sort them by rtime_last_played descending (same order as the shelves)
-        const sortedGames = [...games].sort(sortByRecentlyPlayed)
-
-        // Shelf-mount signs directly above the top shelf board.
-        // shelfPos.y is the base of the unit; 1.1m puts the anchor just above
-        // the top shelf surface on a 2m-tall unit. Tuned visually - do not change
-        // without testing in-scene.
-        const SIGN_ANCHOR_Y_OFFSET = 1.1
-        const MIN_DIST_FROM_CEILING_SIGN = 1.5
-        const ceilingSignPos = this.recentlyPlayedSign.getPosition()
-        let lastBucket: RecentlyPlayedBucket | null = null
-
-        // Iterate through shelves; each shelf holds ~18 games (BATCH_SIZE)
-        // We use this.shelfPositions to determine where to place the signs.
-        const BATCH_SIZE = 18
-        const SIGN_FRONT_OFFSET = 0.28
-
-        for (let i = 0; i < this.shelfPositions.length; i++) {
-            const shelfPos = this.shelfPositions[i]
-            const firstGameIndex = i * BATCH_SIZE
-            if (firstGameIndex >= sortedGames.length) break
-
-            const firstGame = sortedGames[firstGameIndex]
-            const bucket = getRecentlyPlayedBucket(firstGame)
-
-            if (bucket !== RecentlyPlayedBucket.Unplayed && bucket !== lastBucket) {
-                // Check distance from Recently Played ceiling sign
-                const anchor = new THREE.Vector3(
-                    shelfPos.x,
-                    shelfPos.y + SIGN_ANCHOR_Y_OFFSET,
-                    shelfPos.z
-                )
-                const dist = ceilingSignPos.distanceTo(anchor)
-                if (dist > MIN_DIST_FROM_CEILING_SIGN) {
-                    const facingY = this.shelfRotationsY[i] ?? (i % 2 === 1 ? Math.PI : 0)
-                    SceneSignManager.instance.setSign({
-                        label: getBucketLabel(bucket),
-                        anchorPosition: anchor,
-                        mount: {
-                            style: 'above-shelf',
-                            yOffset: 0.2, // Use explicit yOffset to stack above shelf
-                            frontOffset: SIGN_FRONT_OFFSET,
-                            signFacingY: facingY,
-                        },
-                        style: SignStyles.Category
-                    })
-                }
-                lastBucket = bucket
-            }
+            SceneSignManager.instance.placeTimeBucketSigns(
+                this.shelfPositions,
+                this.shelfRotationsY,
+                games,
+                this.recentlyPlayedSign.getPosition()
+            )
         }
     }
 
