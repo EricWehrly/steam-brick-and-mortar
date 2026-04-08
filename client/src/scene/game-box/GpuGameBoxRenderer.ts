@@ -95,8 +95,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             maxHighTextureCache: maxHighSlots
         })
         
-        // Create distance manager for automatic LOD switching.
-        // LodDistanceManager self-subscribes to AllBatchesComplete to start auto-updates.
+        // Create distance manager for automatic LOD switching
         this.lodDistanceManager = new LodDistanceManagerDebug(this.lodArtworkRenderer)
         
         GpuGameBoxRenderer.logger.lifecycle(`LOD atlas initialized (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
