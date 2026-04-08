@@ -15,6 +15,8 @@
 import * as THREE from 'three'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
+import { EventManager } from '../core/EventManager'
+import { LightingEventTypes, type PointLightRequestEvent } from '../types/InteractionEvents'
 
 export interface NeonTubeSignConfig {
     /** Hex color integer, e.g. 0xff6600 */
@@ -67,9 +69,23 @@ export class NeonTubeSign {
                 const textMesh = new THREE.Mesh(geometry, material)
                 this.mesh.add(textMesh)
 
-                // NOTE: No PointLight here — adding lights directly to scene causes
-                // full shadow map recalculation. Any lighting must go through LightingRenderer.
-                // TD: wire ambient glow through LightingRenderer event system.
+                // Request a point light from the lighting system rather than adding
+                // one directly to the scene (which would cause a full shadow map recalc).
+                // LightingRenderer listens for PointLightRequested and creates it safely.
+                // TD: the light won't exist until LightingRenderer has initialised.
+                // If this sign loads before SetupCompleted, the request fires into the void.
+                // Fix: LightingRenderer should replay queued requests, or NeonTubeSign
+                // should wait for LightingEventTypes.SystemReady before emitting.
+                EventManager.getInstance().emit<PointLightRequestEvent>(
+                    LightingEventTypes.PointLightRequested,
+                    {
+                        color,
+                        intensity: 1.5,
+                        distance: 2.0,
+                        position: this.mesh.position.clone(),
+                        name: 'neon-tube-sign-glow',
+                    }
+                )
 
                 const elapsed = (performance.now() - t0).toFixed(1)
                 console.debug(`[NeonTubeSign] TextGeometry built in ${elapsed}ms`)

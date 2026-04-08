@@ -18,7 +18,7 @@ import { PropRenderer } from './PropRenderer'
 import { LightingDebugHelper } from './LightingDebugHelper'
 import { AppSettings, LIGHTING_QUALITY, type LightingQuality } from '../core/AppSettings'
 import { EventManager, EventSource } from '../core/EventManager'
-import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent, RoomEventTypes, type RoomCreatedEvent, type RoomResizedEvent } from '../types/InteractionEvents'
+import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent, type PointLightRequestEvent, RoomEventTypes, type RoomCreatedEvent, type RoomResizedEvent } from '../types/InteractionEvents'
 import { StorePropsEventTypes } from './props/PropsEvents'
 import { LightFactory } from '../lighting/LightFactory'
 import { LightRegistry } from '../lighting/LightRegistry'
@@ -139,6 +139,22 @@ export class LightingRenderer {
         this.eventManager.registerEventHandler(
             StorePropsEventTypes.SetupCompleted,
             this.upgradeLighting.bind(this)
+        )
+
+        // Allow other systems to request point lights without adding to scene directly.
+        // This keeps all light creation inside the lighting system, preventing
+        // uncontrolled shadow map recalculations.
+        this.eventManager.registerEventHandler(
+            LightingEventTypes.PointLightRequested,
+            (event: CustomEvent<PointLightRequestEvent>) => {
+                const { color, intensity, distance, position, name, parent } = event.detail
+                this.lightFactory.createPointLight(color, intensity, distance, undefined, {
+                    name: name ?? 'requested-point-light',
+                    addToScene: !parent,
+                    parent,
+                    position,
+                })
+            }
         )
     }
 
