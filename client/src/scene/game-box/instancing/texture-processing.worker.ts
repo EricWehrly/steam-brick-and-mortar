@@ -251,21 +251,16 @@ ctx.onmessage = async (event: MessageEvent<WorkerMessage>): Promise<void> => {
             // Process the blob with appropriate dimensions
             let processed: ProcessBlobResult
             
-            try {
-                if (useNativeSize || (textureWidth && textureHeight)) {
-                    // Use new flexible processing
-                    processed = await processBlobWithDimensions(blob, textureWidth, textureHeight, useNativeSize)
-                } else if (textureSize) {
-                    // Legacy square mode
-                    const imageData = await processBlob(blob, textureSize)
-                    processed = { imageData, width: textureSize, height: textureSize }
-                } else {
-                    // Default to native size if nothing specified
-                    processed = await processBlobWithDimensions(blob, undefined, undefined, true)
-                }
-            } catch (processError) {
-                // If processing fails, we should still return the error properly
-                throw processError
+            if (useNativeSize || (textureWidth && textureHeight)) {
+                // Use new flexible processing
+                processed = await processBlobWithDimensions(blob, textureWidth, textureHeight, useNativeSize)
+            } else if (textureSize) {
+                // Legacy square mode
+                const imageData = await processBlob(blob, textureSize)
+                processed = { imageData, width: textureSize, height: textureSize }
+            } else {
+                // Default to native size if nothing specified
+                processed = await processBlobWithDimensions(blob, undefined, undefined, true)
             }
             
             const processingTime = performance.now() - startTime

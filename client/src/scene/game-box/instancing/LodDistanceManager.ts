@@ -18,7 +18,7 @@ import { DataManager } from '../../../core/data/DataManager'
 import { DataKey } from '../../../core/data/DataTypes'
 import { AppSettings, Setting, type SettingChangedEvent } from '../../../core/AppSettings'
 import { EventManager } from '../../../core/EventManager'
-import { AppSettingsEventTypes } from '../../../types/InteractionEvents'
+import { AppSettingsEventTypes, GameEventTypes } from '../../../types/InteractionEvents'
 import { Logger } from '../../../utils/Logger'
 
 export interface LodDistanceConfig {
@@ -111,10 +111,24 @@ export class LodDistanceManager {
             AppSettingsEventTypes.Changed,
             this.onSettingChanged.bind(this)
         )
+
+        // Start LOD distance checks once all batches have loaded.
+        // Subscribing here rather than in the caller enforces that this class
+        // owns its own lifecycle — callers should not drive syncInstances/startAutoUpdate.
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            this.onAllBatchesComplete.bind(this)
+        )
         
         LodDistanceManager.logger.lifecycle(`Initialized: HIGH < ${this.config.highDistance}m, MED < ${this.config.midDistance}m, Hysteresis: ${this.config.hysteresis}m, Update every ${this.config.updateFrequency} frames`)
     }
     
+    private onAllBatchesComplete(): void {
+        this.syncInstances()
+        this.startAutoUpdate()
+        LodDistanceManager.logger.lifecycle('Started after AllBatchesComplete')
+    }
+
     private onSettingChanged(event: SettingChangedEvent): void {
         if (event.key === 'lodHighDistance' && typeof event.value === 'number') {
             this.config.highDistance = event.value
