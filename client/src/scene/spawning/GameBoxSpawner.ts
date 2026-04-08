@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { ShelfSurfaceUtils, type ShelfSurface, ShelfSide, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
+import { SceneSignManager, SignStyles } from '../SceneSignManager'
 import { EventManager } from '../../core/EventManager'
 import { 
     BatchProcessingStatus,
@@ -85,7 +86,7 @@ export class GameBoxSpawner {
             return
         }
 
-        this.spawnGamesOnShelf(position, games, rowIndex, shelfIndex, shelfRotationY)
+        this.spawnGamesOnShelf(position, games, rowIndex, shelfIndex, shelfRotationY, batchIndex)
         this.pendingGames.delete(batchIndex)
 
         EventManager.getInstance().emit<GamesPlacedEvent>(
@@ -100,10 +101,52 @@ export class GameBoxSpawner {
         games: readonly SteamGameData[],
         rowIndex: number,
         _shelfIndex: number,
-        shelfRotationY: number = 0
+        shelfRotationY: number = 0,
+        batchIndex: number = 0
     ): void {
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         if (shelfSurfaces.length === 0) return
+
+        // ─── Shelf Orientation Labels (Front/Back) ──────────────────────────────
+        // Place diagnostic labels on the right end-cap of the top shelf board.
+        const topSurface = shelfSurfaces[0] // ShelfSurfaceUtils sorts top-to-bottom
+        if (topSurface) {
+            // Label is at the RIGHT end cap. In local space, that's +X.
+            const labelX = topSurface.centerX + (topSurface.width / 2) - 0.15
+            const labelY = topSurface.topY + 0.1
+
+            // "Front" label (player-facing/near side)
+            // Near side is backZ (+Z in local space)
+            const frontPosLocal = new THREE.Vector3(labelX, labelY, topSurface.backZ)
+            const frontPos = frontPosLocal.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), shelfRotationY).add(shelfPosition)
+            
+            SceneSignManager.instance.setSign({
+                label: `shelf-front-label-${batchIndex}`,
+                anchorPosition: frontPos,
+                mount: {
+                    style: 'above-shelf',
+                    yOffset: 0,
+                    signFacingY: shelfRotationY
+                },
+                style: SignStyles.ShelfEndLabel
+            })
+
+            // "Back" label (far side)
+            // Far side is frontZ (-Z in local space)
+            const backPosLocal = new THREE.Vector3(labelX, labelY, topSurface.frontZ)
+            const backPos = backPosLocal.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), shelfRotationY).add(shelfPosition)
+            
+            SceneSignManager.instance.setSign({
+                label: `shelf-back-label-${batchIndex}`,
+                anchorPosition: backPos,
+                mount: {
+                    style: 'above-shelf',
+                    yOffset: 0,
+                    signFacingY: shelfRotationY + Math.PI
+                },
+                style: SignStyles.ShelfEndLabel
+            })
+        }
 
         // ShelfSide naming note: 'Front' = local -Z face (away from player after arc rotation).
         // 'Back' = local +Z face (toward origin = toward player spawn).

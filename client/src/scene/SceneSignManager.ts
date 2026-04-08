@@ -53,6 +53,14 @@ export const SignStyles = {
         width: 2.2,
         height: 0.38,
     } satisfies SignStyle,
+
+    /** Small orientation/debug label */
+    ShelfEndLabel: {
+        backgroundColor: 0x2a2a2a,
+        textColor: 0xffffff,
+        width: 0.4,
+        height: 0.25,
+    } satisfies SignStyle,
 } as const
 
 // ─── Mount styles ─────────────────────────────────────────────────────────────
