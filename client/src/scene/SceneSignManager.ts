@@ -199,10 +199,15 @@ export class SceneSignManager {
 
         const sortedGames = [...games].sort(sortByRecentlyPlayed)
 
-        // Shelf-mount signs directly above the top shelf board.
-        // shelfPos.y is the base of the unit; 1.1m puts the anchor just above
-        // the top shelf surface on a 2m-tall unit. Tuned visually.
-        const SIGN_ANCHOR_Y_OFFSET = 1.1
+        // Shelf-mount signs sit ON TOP of the shelf unit, just inside the side brackets.
+        // shelfPos.y is the base of the unit. DEFAULT_SHELF_CONFIG.height (2.0m) is the top board.
+        // boardThickness (0.05m) × 2 subtracted from width (2.0m) = 1.9m interior span;
+        // use 1.8m to leave a small margin inside the bracket edges.
+        // ⚠️ Do not change SIGN_ANCHOR_Y_OFFSET without checking DEFAULT_SHELF_CONFIG.height.
+        const SIGN_ANCHOR_Y_OFFSET = 2.0  // shelf top (DEFAULT_SHELF_CONFIG.height)
+        const SIGN_Y_CLEARANCE = 0.02     // small lift so sign doesn't z-fight with top board
+        const SIGN_WIDTH = 1.8            // fits inside side brackets (interior = 1.9m)
+        const SIGN_HEIGHT = 0.32          // shelf-top label — slightly shorter than hanging sign
         const MIN_DIST_FROM_CEILING_SIGN = 1.5
         const BATCH_SIZE = 18
         const SIGN_FRONT_OFFSET = 0.28
@@ -220,7 +225,7 @@ export class SceneSignManager {
             if (bucket !== RecentlyPlayedBucket.Unplayed && bucket !== lastBucket) {
                 const anchor = new THREE.Vector3(
                     shelfPos.x,
-                    shelfPos.y + SIGN_ANCHOR_Y_OFFSET,
+                    shelfPos.y + SIGN_ANCHOR_Y_OFFSET + SIGN_Y_CLEARANCE,
                     shelfPos.z
                 )
                 if (ceilingSignPos.distanceTo(anchor) > MIN_DIST_FROM_CEILING_SIGN) {
@@ -230,11 +235,11 @@ export class SceneSignManager {
                         anchorPosition: anchor,
                         mount: {
                             style: 'above-shelf',
-                            yOffset: 0.2,
+                            yOffset: 0,           // anchor is already at shelf top
                             frontOffset: SIGN_FRONT_OFFSET,
                             signFacingY: facingY,
                         },
-                        style: SignStyles.Category
+                        style: { ...SignStyles.Category, width: SIGN_WIDTH, height: SIGN_HEIGHT }
                     })
                 }
                 lastBucket = bucket
