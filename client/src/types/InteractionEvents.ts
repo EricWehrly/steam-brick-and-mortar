@@ -378,8 +378,6 @@ export const LightingEventTypes = {
     QualityChanged: 'lighting:quality-changed',
     Created: 'lighting:created',
     SystemReady: 'lighting:system-ready',
-    /** Request a point light be created by the lighting system (avoids direct scene add) */
-    PointLightRequested: 'lighting:point-light-requested',
 } as const
 
 export const CeilingEventTypes = {

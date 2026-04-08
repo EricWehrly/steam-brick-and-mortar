@@ -28,7 +28,7 @@ import { EventManager } from '../core/EventManager'
 import { GameEventTypes, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager } from '../core/data'
-// Initialize store props system (self-registering module with dedicated events)
+import { DataKey, DataDomain } from '../core/data/DataTypes'
 import { StorePropsEventTypes, type StorePropsSetupRequestEvent, type StorePropsSetupCompletedEvent } from './props'
 import type { SteamGameData } from './game-box/types/GameData'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
@@ -79,6 +79,9 @@ export class SceneCoordinator {
             this.sceneManager.getScene(),
             this.sceneManager.getRenderer()
         )
+        DataManager.getInstance().set(DataKey.LightingRenderer, this.lightingRenderer, {
+            domain: DataDomain.Lighting
+        })
         // Initialize room manager for event-driven room structure (retrieves scene from DataManager)
         this.roomManager = new RoomManager()
 
