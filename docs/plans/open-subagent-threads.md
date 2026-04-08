@@ -89,3 +89,9 @@ XS (<2h) | S (2-8h) | M (1-3d) | L (3d+)
 - Prefer one bounded subagent task per run.
 - Prefer cheap models for mechanical/documentation tasks.
 - Avoid launching large refactors before lint branch kickoff.
+
+### [HIGH] Research: offline access / bookmarklet export format
+**Status:** open
+**Context:** demo-games.ts fixture format should eventually match whatever static export format we land on for offline/bookmarklet access (circumventing Lambda). When that research resolves, dovetail the fixture format to match.
+**Source:** PR #40 r3048468746
+**Location:** client/src/steam/fixtures/demo-games.ts:26

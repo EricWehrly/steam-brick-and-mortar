@@ -60,20 +60,22 @@ export class SystemUICoordinator {
         }
 
         this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({
-            maxDistance: 5,   // updated dynamically on ShelfLayoutDetermined; halved from 10
+            maxDistance: 5,   // initial default; updated on ShelfLayoutDetermined
             lineColor: 0xff0000
         })
 
-        // Update raycast reach when shelf layout is known so far shelves (arc row 4 at ~21.5m)
-        // are reachable. Default of 10m predates the arc layout.
+        // Update raycast reach when shelf layout is known.
+        // Arc layout: rows at r=5, 9, 13... (4m step). The inter-ring spacing (4m)
+        // is a natural reach ceiling — you shouldn't click through an entire aisle.
+        // Tuned: firstRowRadius (5m) + comfortable near-side depth (~2m) = 7m.
+        // ⚠ This will need per-device tuning eventually (VR vs flatscreen vs mobile).
+        // When re-tuning, borrow from ArcLayoutUtils defaults: firstRowRadius=5, rowRadiusStep=4.
+        const FLATSCREEN_MAX_REACH_M = 7
         this.eventManager.registerEventHandler<ShelfLayoutDeterminedEvent>(
             GameEventTypes.ShelfLayoutDetermined,
-            (event) => {
-                const bounds = event.detail.shelfBounds
-                // Half the full room reach - comfortable interaction range for flatscreen.
+            (_event) => {
                 // TD [raycast-drag]: don't fire if significant mouse movement (drag = look, not click).
-                const reach = (Math.abs(bounds.minZ) + 2) / 2
-                this.sceneClickGameBoxRaycast?.setMaxDistance(reach)
+                this.sceneClickGameBoxRaycast?.setMaxDistance(FLATSCREEN_MAX_REACH_M)
             }
         )
         
