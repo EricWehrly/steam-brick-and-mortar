@@ -60,7 +60,7 @@ export class InstancedLabelRenderer {
     // Deferred allocation: buffer label requests until all batches are known,
     // then allocate the texture array at exactly the right size.
     private deferLabels: boolean = true
-    private pendingLabels: Array<{ gameName: string; position: THREE.Vector3; side: ShelfSide; rotation?: THREE.Quaternion }> = []
+    private pendingLabels: Array<{ gameName: string; appid?: number; position: THREE.Vector3; side: ShelfSide; rotation?: THREE.Quaternion }> = []
     private static readonly DEFERRED_OVERFLOW = 32  // Extra slots for late-arriving failures
     
     // Constant quaternion for no rotation (performance optimization)
@@ -105,8 +105,8 @@ export class InstancedLabelRenderer {
         this.deferLabels = false
         this.initialize()
 
-        for (const { gameName, position, side, rotation } of this.pendingLabels) {
-            this.addLabelInstance(position, gameName, side, rotation)
+        for (const { gameName, appid, position, side, rotation } of this.pendingLabels) {
+            this.addLabelInstance(position, gameName, appid, side, rotation)
         }
         this.pendingLabels = []
 
@@ -178,12 +178,13 @@ export class InstancedLabelRenderer {
     public addLabelInstance(
         position: THREE.Vector3,
         gameName: string,
+        appid?: number,
         side: ShelfSide = ShelfSide.Front,
         rotation?: THREE.Quaternion
     ): boolean {
         // Deferred path: buffer until materializeLabels() is called
         if (this.deferLabels) {
-            this.pendingLabels.push({ gameName, position: position.clone(), side, rotation })
+            this.pendingLabels.push({ gameName, appid, position: position.clone(), side, rotation })
             return true
         }
 
@@ -243,14 +244,14 @@ export class InstancedLabelRenderer {
         
         this.currentCount = Math.max(this.currentCount, index + 1)
         
-        this.storeLabelMetadata(index, gameName, position)
+        this.storeLabelMetadata(index, gameName, position, appid)
         
         return true
     }
     
-    private storeLabelMetadata(index: number, gameName: string, position: THREE.Vector3): void {
+    private storeLabelMetadata(index: number, gameName: string, position: THREE.Vector3, appid?: number): void {
         const dataManager = DataManager.getInstance()
-        let metadata = dataManager.get<Map<number, { name: string; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
+        let metadata = dataManager.get<Map<number, { name: string; appid?: number; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
         
         if (!metadata) {
             metadata = new Map()
@@ -259,7 +260,7 @@ export class InstancedLabelRenderer {
             })
         }
         
-        metadata.set(index, { name: gameName, position: position.clone() })
+        metadata.set(index, { name: gameName, appid, position: position.clone() })
     }
     
     /**
