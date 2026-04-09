@@ -611,6 +611,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         console.info('GpuStorePropsRenderer disposed')
     }
 
+    // TD: unused — no production callers found. Remove if still unused in next cleanup pass.
     public getArtworkMemoryStats() {
         return this.gameBoxRenderer?.getMemoryStats() ?? null
     }

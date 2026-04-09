@@ -565,6 +565,7 @@ export class LightingRenderer {
         }
     }
 
+    // TD: unused — only appears in test mocks, not in production code. Review before next cleanup.
     public refreshShadows(): void {
         LightingRenderer.logger.debug('🔄 Refreshing shadows after props added...')
         
@@ -611,6 +612,7 @@ export class LightingRenderer {
         this.toggleLightByName(LIGHT_NAMES.AMBIENT, enabled)
     }
 
+    // TD: unused — only appears in test mocks, not in production code. Review before next cleanup.
     public getLightingStats(): {
         lightCount: number
         shadowsEnabled: boolean

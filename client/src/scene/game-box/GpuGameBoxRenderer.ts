@@ -260,6 +260,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     /**
      * Get the LOD renderer for advanced control
      */
+    // TD: unused — no production callers found. Remove if still unused in next cleanup pass.
     public getLodRenderer(): ILodArtworkRendererDebug {
         return this.lodArtworkRenderer
     }
