@@ -176,6 +176,48 @@ export class SceneSignManager {
     }
 
     /** Remove all signs. */
+    /**
+     * Place FRONT/BACK orientation end-cap labels on a shelf unit.
+     *
+     * Called from shelf construction (not game placement) so labels describe
+     * the shelf geometry, not the games on it.
+     *
+     * @param shelfIndex  Index of this shelf unit (used for stable sign labels)
+     * @param position    World-space base position of the shelf unit
+     * @param rotY        Y-rotation (radians) of the shelf unit
+     * @param topSurface  The top shelf surface — provides Z extents and centerX for placement
+     */
+    public placeShelfEndCapLabels(
+        shelfIndex: number,
+        position: THREE.Vector3,
+        rotY: number,
+        topSurface: { centerX: number; topY: number; backZ: number; frontZ: number; width: number }
+    ): void {
+        const labelX = topSurface.centerX + (topSurface.width / 2) - 0.15
+        const labelY = topSurface.topY + 0.1
+        const yAxis = new THREE.Vector3(0, 1, 0)
+
+        const frontPosLocal = new THREE.Vector3(labelX, labelY, topSurface.backZ)
+        const frontPos = frontPosLocal.clone().applyAxisAngle(yAxis, rotY).add(position)
+        this.setSign({
+            label: `shelf-front-label-${shelfIndex}`,
+            text: 'FRONT',
+            anchorPosition: frontPos,
+            mount: { style: 'above-shelf', yOffset: 0, signFacingY: rotY },
+            style: SignStyles.ShelfEndLabel
+        })
+
+        const backPosLocal = new THREE.Vector3(labelX, labelY, topSurface.frontZ)
+        const backPos = backPosLocal.clone().applyAxisAngle(yAxis, rotY).add(position)
+        this.setSign({
+            label: `shelf-back-label-${shelfIndex}`,
+            text: 'BACK',
+            anchorPosition: backPos,
+            mount: { style: 'above-shelf', yOffset: 0, signFacingY: rotY + Math.PI },
+            style: SignStyles.ShelfEndLabel
+        })
+    }
+
     public clearAll(): void {
         for (const label of [...this.signs.keys()]) {
             this.removeSign(label)

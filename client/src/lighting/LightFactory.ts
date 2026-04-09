@@ -7,6 +7,8 @@ import {
     ManagedRectAreaLight,
     ManagedHemisphereLight
 } from './ManagedLights'
+import { EventManager } from '../core/EventManager'
+import { LightingEventTypes, type PointLightRequestEvent } from '../types/LightingEvents'
 
 export interface LightFactoryOptions {
     name?: string
@@ -22,7 +24,23 @@ type ManagedLight = {
 }
 
 export class LightFactory {
-    constructor(private scene: THREE.Scene) {}
+    constructor(private scene: THREE.Scene) {
+        // Subscribe to PointLightRequested so any system can safely request a point
+        // light without reaching into the scene directly (which would bypass the
+        // lighting system and cause uncontrolled shadow map recalculations).
+        EventManager.getInstance().registerEventHandler(
+            LightingEventTypes.PointLightRequested,
+            (event: CustomEvent<PointLightRequestEvent>) => {
+                const { color, intensity, distance, position, name, parent } = event.detail
+                this.createPointLight(color, intensity, distance, undefined, {
+                    name: name ?? 'requested-point-light',
+                    addToScene: !parent,
+                    parent,
+                    position,
+                })
+            }
+        )
+    }
 
     private add<T extends ManagedLight>(light: T, options: LightFactoryOptions): T {
         if (options.position) {
