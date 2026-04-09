@@ -5,6 +5,11 @@
  * startAutoUpdate() or syncInstances(), so distance-based LOD switching
  * never ran. Games stayed at MID and only upgraded when spatial pre-warmer
  * happened to kick in (i.e., only on close approach).
+ *
+ * Fix (bc7d955): The subscription was moved INTO LodDistanceManager itself
+ * (self-subscription pattern). GpuGameBoxRenderer no longer drives this;
+ * LodDistanceManager/LodDistanceManagerDebug registers for AllBatchesComplete
+ * in its own constructor and calls syncInstances + startAutoUpdate when it fires.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { GameEventTypes } from '../../types/InteractionEvents'
@@ -32,12 +37,23 @@ const mockSyncInstances = vi.fn()
 const mockStartAutoUpdate = vi.fn()
 
 vi.mock('./instancing/LodDistanceManagerDebug', () => ({
-    LodDistanceManagerDebug: vi.fn().mockImplementation(function() {
-        return {
+    // Simulate self-subscription: the real LodDistanceManager registers for
+    // AllBatchesComplete in its constructor and calls syncInstances/startAutoUpdate.
+    // The mock must replicate this so tests can verify the contract.
+    LodDistanceManagerDebug: vi.fn().mockImplementation(function(this: Record<string, unknown>) {
+        const instance = {
             syncInstances: mockSyncInstances,
             startAutoUpdate: mockStartAutoUpdate,
             dispose: vi.fn(),
         }
+        // Self-subscribe: register handler just like the real class does
+        const handlers = mockEventHandlers.get(GameEventTypes.AllBatchesComplete) ?? []
+        handlers.push(() => {
+            instance.syncInstances()
+            instance.startAutoUpdate()
+        })
+        mockEventHandlers.set(GameEventTypes.AllBatchesComplete, handlers)
+        return instance
     }),
 }))
 vi.mock('./instancing/LodArtworkOrchestratorDebug', () => ({
