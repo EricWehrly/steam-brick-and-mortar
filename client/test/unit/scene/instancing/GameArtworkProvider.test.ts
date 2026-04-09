@@ -208,12 +208,23 @@ describe('GameArtworkProvider', () => {
             expect(isCached).toBe(false)
         })
 
-        it('should throw immediately for known failures', async () => {
+        it('should throw immediately for known permanent failures', async () => {
             provider.recordFailure(12345, 'library', 'CORS', ['url1'])
             
             const artwork = provider.getArtwork(12345, 'Test Game', 'library')
             
             await expect(artwork.getPixels()).rejects.toThrow('Permanent failure (CORS) - skipping retry')
+        })
+
+        it('should retry for known non-permanent failures', async () => {
+            provider.recordFailure(12345, 'library', 'UNKNOWN', ['url1'])
+
+            const artwork = provider.getArtwork(12345, 'Test Game', 'library', 'https://example.com/art.jpg')
+            const result = await artwork.getPixels()
+
+            expect(result.width).toBe(300)
+            expect(result.height).toBe(450)
+            expect(result.pixels).toBeInstanceOf(Uint8ClampedArray)
         })
 
         it('should fetch pixels at native size', async () => {

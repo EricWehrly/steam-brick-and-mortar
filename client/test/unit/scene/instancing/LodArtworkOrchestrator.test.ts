@@ -18,6 +18,7 @@ import {
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
 import { EventManager } from '../../../../src/core/EventManager'
+import { GameArtworkProvider } from '../../../../src/scene/game-box/instancing/GameArtworkProvider'
 
 // Mock DataManager
 vi.mock('../../../../src/core/data/DataManager', () => ({
@@ -47,6 +48,7 @@ vi.mock('../../../../src/scene/game-box/instancing/GameArtworkProvider', () => (
         getInstance: vi.fn().mockReturnValue({
             getArtwork: vi.fn(),
             isKnownFailure: vi.fn().mockReturnValue(false),
+            isPermanentFailure: vi.fn().mockReturnValue(false),
             getFailureReason: vi.fn(),
             clearCaches: vi.fn()
         })
@@ -237,6 +239,61 @@ describe('LodArtworkOrchestrator', () => {
             expect(() => {
                 orchestrator = new LodArtworkOrchestrator({ lodConfigs: badConfigs })
             }).toThrow(/Failed to get texture arrays/)
+        })
+    })
+
+    describe('Failure skip semantics', () => {
+        it('does not short-circuit on non-permanent known failures', async () => {
+            const mockScene = new THREE.Scene()
+            mockDataManager.get.mockImplementation((key: DataKey) => {
+                if (key === DataKey.MainScene) return mockScene
+                return null
+            })
+            orchestrator = new LodArtworkOrchestrator({ lazyHighTextures: true })
+
+            const provider = GameArtworkProvider.getInstance() as unknown as {
+                isPermanentFailure: ReturnType<typeof vi.fn>
+                getArtwork: ReturnType<typeof vi.fn>
+            }
+
+            provider.isPermanentFailure.mockReturnValue(false)
+            provider.getArtwork.mockReturnValue({
+                getPixelsAtSize: vi.fn().mockResolvedValue({ pixels: new Uint8ClampedArray(150 * 225 * 4), width: 150, height: 225 }),
+                getUrl: vi.fn().mockReturnValue('https://example.com/art.jpg')
+            })
+
+            await orchestrator.setArtworkInstanceFromUrl(
+                new THREE.Vector3(0, 0, 0),
+                'Test Game',
+                'https://example.com/art.jpg',
+                123
+            )
+
+            expect(provider.getArtwork).toHaveBeenCalled()
+        })
+
+        it('short-circuits on permanent failures', async () => {
+            mockDataManager.get.mockReturnValue(null)
+            orchestrator = new LodArtworkOrchestrator()
+
+            const provider = GameArtworkProvider.getInstance() as unknown as {
+                isPermanentFailure: ReturnType<typeof vi.fn>
+                getArtwork: ReturnType<typeof vi.fn>
+                getFailureReason: ReturnType<typeof vi.fn>
+            }
+
+            provider.isPermanentFailure.mockReturnValue(true)
+            provider.getFailureReason.mockReturnValue('CORS')
+
+            const result = await orchestrator.setArtworkInstanceFromUrl(
+                new THREE.Vector3(0, 0, 0),
+                'Blocked Game',
+                'https://example.com/art.jpg',
+                999
+            )
+
+            expect(result.success).toBe(false)
+            expect(provider.getArtwork).not.toHaveBeenCalled()
         })
     })
 
