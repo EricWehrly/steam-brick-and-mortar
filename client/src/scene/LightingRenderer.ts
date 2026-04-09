@@ -18,7 +18,7 @@ import { PropRenderer } from './PropRenderer'
 import { LightingDebugHelper } from './LightingDebugHelper'
 import { AppSettings, LIGHTING_QUALITY, type LightingQuality } from '../core/AppSettings'
 import { EventManager, EventSource } from '../core/EventManager'
-import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent, type PointLightRequestEvent } from '../types/LightingEvents'
+import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent } from '../types/LightingEvents'
 import { RoomEventTypes, type RoomCreatedEvent, type RoomResizedEvent } from '../types/InteractionEvents'
 import { StorePropsEventTypes } from './props/PropsEvents'
 import { LightFactory } from '../lighting/LightFactory'
@@ -108,12 +108,12 @@ export class LightingRenderer {
         this.eventManager.registerEventHandler(LightingEventTypes.Toggle, (event: CustomEvent<LightingToggleEvent>) => {
             this.toggleLighting(event.detail.enabled)
         })
-        
+
         // Listen for debug visualization toggle events
         this.eventManager.registerEventHandler(LightingEventTypes.DebugToggle, (event: CustomEvent<LightingDebugToggleEvent>) => {
             this.toggleDebugVisualization(event.detail.enabled)
         })
-        
+
         // Listen for lighting quality change events
         this.eventManager.registerEventHandler(LightingEventTypes.QualityChanged, (event: CustomEvent<LightingQualityChangedEvent>) => {
             this.updateLightingQuality(event.detail.quality)
@@ -141,22 +141,8 @@ export class LightingRenderer {
             StorePropsEventTypes.SetupCompleted,
             this.upgradeLighting.bind(this)
         )
-
-        // Allow other systems to request point lights without adding to scene directly.
-        // This keeps all light creation inside the lighting system, preventing
-        // uncontrolled shadow map recalculations.
-        this.eventManager.registerEventHandler(
-            LightingEventTypes.PointLightRequested,
-            (event: CustomEvent<PointLightRequestEvent>) => {
-                const { color, intensity, distance, position, name, parent } = event.detail
-                this.lightFactory.createPointLight(color, intensity, distance, undefined, {
-                    name: name ?? 'requested-point-light',
-                    addToScene: !parent,
-                    parent,
-                    position,
-                })
-            }
-        )
+        // PointLightRequested is handled by LightFactory directly — it self-registers
+        // in its constructor so the factory owns all light creation, including event-driven requests.
     }
 
     /**

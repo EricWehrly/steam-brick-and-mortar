@@ -3,6 +3,7 @@ import { writeFile } from 'fs/promises'
 import { getResultPath } from './helpers/results'
 import { waitForSceneReady } from './helpers/scene'
 import type { DrawCallReport } from '../../src/debug/SceneManagerDebug'
+import { drawCallReportToMarkdown } from '../../src/debug/SceneManagerDebug'
 
 /**
  * Draw Call Report
@@ -27,44 +28,7 @@ test('draw call report', async ({ page }) => {
   }
 
   // Build markdown table
-  const lines: string[] = []
-  lines.push('# Draw Call Report')
-  lines.push('')
-  lines.push(`**Captured:** ${report.timestamp}`)
-  lines.push('')
-
-  if (report.renderer) {
-    const r = report.renderer
-    lines.push('## Renderer Summary')
-    lines.push('')
-    lines.push('| Metric | Value |')
-    lines.push('|--------|-------|')
-    lines.push(`| Draw Calls | ${r.calls} |`)
-    lines.push(`| Triangles | ${r.triangles.toLocaleString()} |`)
-    lines.push(`| Points | ${r.points} |`)
-    lines.push(`| Lines | ${r.lines} |`)
-    lines.push(`| Shader Programs | ${r.programs} |`)
-    lines.push(`| Geometries | ${r.geometries} |`)
-    lines.push(`| Textures | ${r.textures} |`)
-    lines.push('')
-  } else {
-    lines.push('> ⚠️ renderer.info not available')
-    lines.push('')
-  }
-
-  lines.push('## Scene Objects')
-  lines.push('')
-  if (report.objects.length > 0) {
-    lines.push('| Name | Type | Visible | Instances | Triangles | Material |')
-    lines.push('|------|------|---------|-----------|-----------|----------|')
-    for (const obj of report.objects) {
-      lines.push(`| ${obj.name} | ${obj.type} | ${obj.visible ? '✓' : '✗'} | ${obj.instanceCount ?? '—'} | ${obj.triangles.toLocaleString()} | ${obj.material ?? '?'} |`)
-    }
-  } else {
-    lines.push('> ⚠️ No scene objects found.')
-  }
-
-  const md = lines.join('\n')
+  const md = drawCallReportToMarkdown(report)
   const mdPath = await getResultPath('draw-call-report.md')
   const jsonPath = await getResultPath('draw-call-report.json')
 

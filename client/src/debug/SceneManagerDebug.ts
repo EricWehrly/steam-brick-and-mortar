@@ -99,3 +99,49 @@ export class SceneManagerDebug extends SceneManager {
         }
     }
 }
+
+/**
+ * Format a DrawCallReport as a markdown string.
+ * Extracted here so both the Playwright test and any other consumer
+ * can use the same canonical representation.
+ */
+export function drawCallReportToMarkdown(report: DrawCallReport): string {
+    const lines: string[] = []
+    lines.push('# Draw Call Report')
+    lines.push('')
+    lines.push(`**Captured:** ${report.timestamp}`)
+    lines.push('')
+
+    if (report.renderer) {
+        const r = report.renderer
+        lines.push('## Renderer Summary')
+        lines.push('')
+        lines.push('| Metric | Value |')
+        lines.push('|--------|-------|')
+        lines.push(`| Draw Calls | ${r.calls} |`)
+        lines.push(`| Triangles | ${r.triangles.toLocaleString()} |`)
+        lines.push(`| Points | ${r.points} |`)
+        lines.push(`| Lines | ${r.lines} |`)
+        lines.push(`| Shader Programs | ${r.programs} |`)
+        lines.push(`| Geometries | ${r.geometries} |`)
+        lines.push(`| Textures | ${r.textures} |`)
+        lines.push('')
+    } else {
+        lines.push('> \u26a0\ufe0f renderer.info not available')
+        lines.push('')
+    }
+
+    lines.push('## Scene Objects')
+    lines.push('')
+    if (report.objects.length > 0) {
+        lines.push('| Name | Type | Visible | Instances | Triangles | Material |')
+        lines.push('|------|------|---------|-----------|-----------|----------|')
+        for (const obj of report.objects) {
+            lines.push(`| ${obj.name} | ${obj.type} | ${obj.visible ? '\u2713' : '\u2717'} | ${obj.instanceCount ?? '\u2014'} | ${obj.triangles.toLocaleString()} | ${obj.material ?? '?'} |`)
+        }
+    } else {
+        lines.push('> \u26a0\ufe0f No scene objects found.')
+    }
+
+    return lines.join('\n')
+}
