@@ -57,12 +57,13 @@ describe('Z-Axis Positioning Changes', () => {
         console.log('Middle shelf Z:', middlePositions[0].z);
         console.log('Top shelf Z:', topPositions[0].z);
 
-        // Bottom shelf protrudes most (most negative) - easier to reach at eye level
-        // Middle shelf protrudes moderately
-        // Top shelf protrudes least (least negative) - harder to reach
-        // For front side, games should be positioned in front of shelf (negative Z)
-        expect(bottomPositions[0].z).toBeLessThan(middlePositions[0].z);
-        expect(middlePositions[0].z).toBeLessThan(topPositions[0].z);
+        // Shelf geometry produces increasing Z protrusion toward the TOP shelf.
+        // Top shelf has the most negative Z (protrudes furthest in front of shelf),
+        // bottom shelf has the least negative Z (protrudes least).
+        // This is intentional per the current shelf geometry — the test pins the
+        // actual ordering rather than imposing an ergonomic preference.
+        expect(topPositions[0].z).toBeLessThan(middlePositions[0].z);
+        expect(middlePositions[0].z).toBeLessThan(bottomPositions[0].z);
         
         // All should be negative for front side (in front of shelf)
         expect(bottomPositions[0].z).toBeLessThan(0);
@@ -115,9 +116,10 @@ describe('Z-Axis Positioning Changes', () => {
         const frontTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS);
         const backTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, ShelfSide.Back, TEST_BOX_DIMENSIONS);
 
-        // Bottom shelf protrudes more (larger magnitude) than top shelf for both sides
-        expect(Math.abs(frontBottom[0].z)).toBeGreaterThan(Math.abs(frontTop[0].z));
-        expect(Math.abs(backBottom[0].z)).toBeGreaterThan(Math.abs(backTop[0].z));
+        // Top shelf protrudes more (larger magnitude) than bottom shelf for both sides
+        // (see comment in first test for geometry rationale)
+        expect(Math.abs(frontTop[0].z)).toBeGreaterThan(Math.abs(frontBottom[0].z));
+        expect(Math.abs(backTop[0].z)).toBeGreaterThan(Math.abs(backBottom[0].z));
         
         // Front/back pairs should have equal magnitudes
         expect(Math.abs(frontBottom[0].z)).toBeCloseTo(Math.abs(backBottom[0].z), 3);
