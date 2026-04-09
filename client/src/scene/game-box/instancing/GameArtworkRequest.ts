@@ -133,7 +133,6 @@ export class GameArtworkRequest implements GameArtwork {
         //           is never readable. We infer CORS from message patterns.
         if (lower.includes('cors') ||
             lower.includes('cross-origin') ||
-            lower.includes('cross origin') ||
             lower.includes('opaque') ||
             lower.includes('networkerror when attempting to fetch')) {
             return 'CORS'

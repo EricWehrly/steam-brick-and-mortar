@@ -294,6 +294,13 @@ export class GameArtworkProvider {
     /**
      * Record a URL failure.
      */
+    /**
+     * Determine if a failure reason is permanent (should not retry).
+     */
+    private static isReasonPermanent(reason: FailureReason | undefined): boolean {
+        return reason === 'NO_ARTWORK' || reason === 'CORS' || reason === 'DECODE' || reason === '404'
+    }
+
     public recordFailure(
         appId: number,
         format: ArtworkFormat,
@@ -307,11 +314,7 @@ export class GameArtworkProvider {
         // Permanent failures: NO_ARTWORK, CORS, DECODE, and 404.
         // 404 from Steam CDN is permanent — the image doesn't exist on the CDN.
         // (CORS failures sometimes mask 404s; both are unretryable.)
-        const isPermanent = 
-            reason === 'NO_ARTWORK' || 
-            reason === 'CORS' || 
-            reason === 'DECODE' ||
-            reason === '404'
+        const isPermanent = GameArtworkProvider.isReasonPermanent(reason)
         
         this.failureCache.set(cacheKey, {
             timestamp: Date.now(),
@@ -488,11 +491,7 @@ export class GameArtworkProvider {
                         // Migrate old entries without isPermanent/attemptCount
                         if (entry.isPermanent === undefined) {
                             entry.attemptCount = entry.attemptCount ?? 1
-                            entry.isPermanent = 
-                                entry.reason === 'CORS' || 
-                                entry.reason === 'NO_ARTWORK' || 
-                                entry.reason === 'DECODE' ||
-                                entry.reason === '404'  // 404 is now always permanent
+                            entry.isPermanent = GameArtworkProvider.isReasonPermanent(entry.reason)
                             migrated++
                         }
                         this.failureCache.set(key, entry)

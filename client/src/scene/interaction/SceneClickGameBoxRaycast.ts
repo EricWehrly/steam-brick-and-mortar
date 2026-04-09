@@ -5,6 +5,7 @@ import { EventManager } from '../../core/EventManager'
 import { InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type GameSelectedEvent } from '../../types/InteractionEvents'
 import { SceneLayer } from '../SceneLayers'
 import { GameFinder, type InstancedObject } from '../../debug/GameFinder'
+import { Logger } from '../../utils/Logger'
 
 export interface SceneClickGameBoxRaycastOptions {
     scene?: THREE.Scene
@@ -25,6 +26,7 @@ export interface SceneGameBoxHit {
 }
 
 export class SceneClickGameBoxRaycast {
+    private static readonly logger = Logger.createLogFunctions(SceneClickGameBoxRaycast.name)
     private readonly sceneOption: THREE.Scene | undefined
     private readonly cameraOption: THREE.Camera | undefined
     private readonly maxDistance: number
@@ -123,7 +125,7 @@ export class SceneClickGameBoxRaycast {
         }
 
         if (this.enableDebugLogs) {
-            console.log('🎯 [SceneClickGameBoxRaycast] No game box hit', { maxDistance: this.maxDistance })
+            SceneClickGameBoxRaycast.logger.debug('No game box hit', { maxDistance: this.maxDistance })
         }
     }
 
@@ -182,21 +184,25 @@ export class SceneClickGameBoxRaycast {
         const appid = hit.appid
 
         // Development aid: log resolved hit so appid is visible in console.
-        // TODO: gate on enableDebugLogs once raycast is stable.
-        console.log(`[Raycast] hit: name="${hit.name ?? '?'}" appid=${appid ?? 'none'} instanceId=${hit.instanceId ?? '?'} mesh="${hit.object.name}"`)
+        // Gated on enableDebugLogs — remove gate when raycast is fully stable.
+        if (this.enableDebugLogs) {
+            SceneClickGameBoxRaycast.logger.debug(
+                `hit: name="${hit.name ?? '?'}" appid=${appid ?? 'none'} instanceId=${hit.instanceId ?? '?'} mesh="${hit.object.name}"`
+            )
+        }
 
         if (appid !== undefined) {
             this.eventManager.emit<GameSelectedEvent>(GameEventTypes.Selected, {
                 appid
             })
         } else if (this.enableDebugLogs) {
-            console.log('🎯 [SceneClickGameBoxRaycast] Hit had no appid metadata', {
+            SceneClickGameBoxRaycast.logger.debug('Hit had no appid metadata', {
                 instanceId: hit.instanceId
             })
         }
 
         if (this.enableDebugLogs) {
-            console.log('🎯 [SceneClickGameBoxRaycast] Hit game box', {
+            SceneClickGameBoxRaycast.logger.debug('Hit game box', {
                 name: hit.name,
                 appid: hit.appid,
                 distance: hit.distance,
