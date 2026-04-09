@@ -177,9 +177,7 @@ export class LightingRenderer {
             // Create GameSpotlight pool BEFORE room geometry renders, so its SpotLight
             // is counted in the initial light-hash. Materials compile once with the
             // full light count during startup instead of recompiling on first click.
-            // Pass lightingGroup so spotlight geometry is owned by the lighting system,
-            // not added directly to the scene.
-            new GameSpotlight(this.lightingGroup)
+            new GameSpotlight()
             
             const duration = window.performance.now() - startTime
             LightingRenderer.logger.debug(`✅ Basic lighting ready in ${duration.toFixed(1)}ms (advanced lighting will load in background)`)

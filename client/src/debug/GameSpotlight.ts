@@ -31,12 +31,16 @@ export class GameSpotlight {
     }
 
     private spotlights: THREE.SpotLight[] = []
+    // Pre-created pool: all spots are in the scene at startup with intensity=0 so
+    // materials compile with the full light count during the startup stall, not on
+    // first click. visible=true is intentional — invisible lights are excluded from
+    // Three.js's light hash and won't trigger pre-compilation.
     private spotlightPool: THREE.SpotLight[] = []
     private spotlightGroup: THREE.Group
     private maxSpotlights: number = 1
     private originalLightIntensities: Map<THREE.Light, number> = new Map()
     private scene: THREE.Scene | null = null
-    private readonly DIM_FACTOR = 0.2
+    private readonly DIM_FACTOR = 0.2 // Dim to 20% of original intensity
     private camera: THREE.Camera | null = null
     private animationFrameId: number | null = null
     private baseIntensities: Map<THREE.SpotLight, number> = new Map()
@@ -44,24 +48,15 @@ export class GameSpotlight {
     private static sharedBeamGeometry: THREE.CylinderGeometry | null = null
     private static sharedBeamMaterial: THREE.ShaderMaterial | null = null
 
-    /**
-     * @param lightParent  The group to attach spotlight geometry to.
-     *                     Should be LightingRenderer's lightingGroup so the
-     *                     lighting system owns the scene addition and the
-     *                     spotlight counts toward the startup light-hash.
-     */
-    constructor(lightParent?: THREE.Object3D) {
+    constructor() {
         this.spotlightGroup = new THREE.Group()
         this.spotlightGroup.name = 'diagnostic-spotlights'
-
+        
         GameSpotlight.instance = this
 
         try {
             this.scene = GameFinder.getScene()
-            // Prefer a parent supplied by LightingRenderer (keeps light addition
-            // inside the lighting system). Fall back to scene direct-add only if
-            // constructed outside the lighting lifecycle (e.g. console init).
-            ;(lightParent ?? this.scene).add(this.spotlightGroup)
+            this.scene.add(this.spotlightGroup)
 
             // Pre-create the full pool so shader compilation happens at startup.
             // All pool spotlights are in-scene with intensity=0 — they count toward the
