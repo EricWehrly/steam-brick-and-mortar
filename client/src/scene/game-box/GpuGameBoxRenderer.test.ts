@@ -36,16 +36,15 @@ vi.mock('../../core/EventManager', () => ({
 const mockSyncInstances = vi.fn()
 const mockStartAutoUpdate = vi.fn()
 
-vi.mock('./instancing/LodDistanceManager', () => ({
+vi.mock('./instancing/LodDistanceManagerDebug', () => ({
     // Simulate self-subscription: the real LodDistanceManager registers for
     // AllBatchesComplete in its constructor and calls syncInstances/startAutoUpdate.
-    LodDistanceManager: vi.fn().mockImplementation(function(this: Record<string, unknown>) {
+    LodDistanceManagerDebug: vi.fn().mockImplementation(function(this: Record<string, unknown>) {
         const instance = {
             syncInstances: mockSyncInstances,
             startAutoUpdate: mockStartAutoUpdate,
             dispose: vi.fn(),
         }
-        // Self-subscribe: register handler just like the real class does
         const handlers = mockEventHandlers.get(GameEventTypes.AllBatchesComplete) ?? []
         handlers.push(() => {
             instance.syncInstances()
@@ -55,8 +54,8 @@ vi.mock('./instancing/LodDistanceManager', () => ({
         return instance
     }),
 }))
-vi.mock('./instancing/LodArtworkOrchestrator', () => ({
-    LodArtworkOrchestrator: vi.fn().mockImplementation(function() {
+vi.mock('./instancing/LodArtworkOrchestratorDebug', () => ({
+    LodArtworkOrchestratorDebug: vi.fn().mockImplementation(function() {
         return {
             setArtworkInstanceFromUrl: vi.fn(),
             getInstanceData: vi.fn().mockReturnValue(new Map()),
