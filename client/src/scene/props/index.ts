@@ -1,9 +1,13 @@
 /**
- * Store Props Module - Self-Contained Props System
+ * Store Props Module
  *
- * Self-registering handlers activate on module import.
- * GpuStorePropsEventHandler registers as the primary handler;
- * legacy handler removed (LegacyStorePropsHandler.ts deleted).
+ * Self-contained event-driven system for store props (shelves, game boxes, signage).
+ * Simply importing this module activates the GPU props handler via side-effect import:
+ *
+ *   import './props'  // triggers GpuStorePropsEventHandler self-registration
+ *
+ * Architecture: GpuStorePropsEventHandler listens for StorePropsEvents and drives
+ * the instanced GPU rendering pipeline. No explicit initialization needed.
  */
 
 // Import handler (triggers self-registration)
