@@ -128,33 +128,65 @@ const MAX_QUEUE_SIZE = 10
 
 // === IndexedDB Operations ===
 
-async function initDatabase(dbName: string, store: string, version: number): Promise<void> {
-    storeName = store
-    dbVersion = version
-    
+function openDatabase(dbName: string, version?: number): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(dbName, 1) // DB schema version, not cache version
-        
+        const request = version == null ? indexedDB.open(dbName) : indexedDB.open(dbName, version)
+
         request.onerror = () => {
             reject(new Error(`Failed to open IndexedDB: ${request.error?.message}`))
         }
-        
-        request.onsuccess = () => {
-            db = request.result
-            resolve()
+
+        request.onblocked = () => {
+            reject(new Error('Failed to open IndexedDB: open request was blocked by another tab/session'))
         }
-        
-        request.onupgradeneeded = (event) => {
-            const database = (event.target as IDBOpenDBRequest).result
-            
-            if (database.objectStoreNames.contains(storeName)) {
-                database.deleteObjectStore(storeName)
-            }
-            
-            const objectStore = database.createObjectStore(storeName, { keyPath: 'url' })
-            objectStore.createIndex('cachedAt', 'cachedAt', { unique: false })
+
+        request.onsuccess = () => {
+            resolve(request.result)
         }
     })
+}
+
+async function ensureStoreExists(dbName: string): Promise<IDBDatabase> {
+    const initialDb = await openDatabase(dbName)
+
+    if (initialDb.objectStoreNames.contains(storeName)) {
+        return initialDb
+    }
+
+    // Newly-created DBs (or legacy DBs) may be missing the store.
+    // Reopen with a bumped schema version to create it.
+    const nextVersion = Math.max(1, initialDb.version + 1)
+    initialDb.close()
+
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, nextVersion)
+
+        request.onerror = () => {
+            reject(new Error(`Failed to upgrade IndexedDB schema: ${request.error?.message}`))
+        }
+
+        request.onblocked = () => {
+            reject(new Error('Failed to upgrade IndexedDB schema: request was blocked by another tab/session'))
+        }
+
+        request.onupgradeneeded = (event) => {
+            const database = (event.target as IDBOpenDBRequest).result
+            if (!database.objectStoreNames.contains(storeName)) {
+                const objectStore = database.createObjectStore(storeName, { keyPath: 'url' })
+                objectStore.createIndex('cachedAt', 'cachedAt', { unique: false })
+            }
+        }
+
+        request.onsuccess = () => {
+            resolve(request.result)
+        }
+    })
+}
+
+async function initDatabase(dbName: string, store: string, version: number): Promise<void> {
+    storeName = store
+    dbVersion = version
+    db = await ensureStoreExists(dbName)
 }
 
 async function getPixelData(url: string, version: number): Promise<CachedPixelData | null> {

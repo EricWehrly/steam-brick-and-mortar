@@ -72,10 +72,8 @@ export class GameArtworkRequest implements GameArtwork {
             throw new Error(`Permanent failure (${reason}) - skipping retry`)
         }
         
-        // If known failure but not permanent, throw with context
-        if (this.failureReason) {
-            throw new Error(`Known failure for ${this.gameName}: ${this.failureReason}`)
-        }
+        // Known non-permanent failures should be retried.
+        // They are historical hints, not hard blocks.
         
         const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.preferredUrl)
         const triedUrls: string[] = []
