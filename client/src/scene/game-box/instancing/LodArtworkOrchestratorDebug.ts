@@ -66,24 +66,24 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         }
         ;(window as any).clearArtworkFailures = () => {
             this.clearFailureCache()
-            console.log('Γ£à Artwork failure cache cleared - failures will be retried on next load')
+            console.log('✅ Artwork failure cache cleared - failures will be retried on next load')
         }
         ;(window as any).auditArtworkFailures = () => this.auditFailedArtwork()
         ;(window as any).artworkFailureStats = () => {
             const stats = GameArtworkProvider.getInstance().getFailureStats()
-            console.log('≡ƒôè Artwork Failure Statistics:', stats)
+            console.log('📊 Artwork Failure Statistics:', stats)
             return stats
         }
         ;(window as any).artworkSkipStats = () => {
             const stats = GameArtworkProvider.getInstance().getSkipStats()
-            console.log('≡ƒôè Artwork Skip Statistics (this session):', stats)
+            console.log('📊 Artwork Skip Statistics (this session):', stats)
             return stats
         }
 
         // Loading experiments
         ;(window as any).experimentLoadingStrategies = (count = 9) => {
             const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
-            if (!cache) return console.log('Γ¥î No HIGH texture cache available')
+            if (!cache) return console.log('❌ No HIGH texture cache available')
             const gameIndices: number[] = []
             for (let i = 0; i < this.maxGames && gameIndices.length < count; i++) {
                 if (cache.getState(i) !== 'loaded') gameIndices.push(i)
@@ -93,7 +93,7 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         }
         ;(window as any).experimentBatch = (count = 9) => {
             const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
-            if (!cache) return console.log('Γ¥î No HIGH texture cache available')
+            if (!cache) return console.log('❌ No HIGH texture cache available')
             const gameIndices: number[] = []
             for (let i = 0; i < this.maxGames && gameIndices.length < count; i++) {
                 if (cache.getState(i) !== 'loaded') gameIndices.push(i)
@@ -109,13 +109,13 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         ;(window as any).schedulerStats = async () => {
             const { FrameBudgetScheduler } = await import('../../../utils/FrameBudgetScheduler')
             const stats = FrameBudgetScheduler.getInstance().getStats()
-            console.log('≡ƒôè Scheduler Stats:', stats)
+            console.log('📊 Scheduler Stats:', stats)
             return stats
         }
         ;(window as any).schedulerTune = async (maxTasksPerFrame: number) => {
             const { FrameBudgetScheduler } = await import('../../../utils/FrameBudgetScheduler')
             FrameBudgetScheduler.getInstance().setMaxTasksPerFrame(maxTasksPerFrame)
-            console.log(`Γ£à Scheduler max tasks per frame set to ${maxTasksPerFrame}`)
+            console.log(`✅ Scheduler max tasks per frame set to ${maxTasksPerFrame}`)
         }
 
         // Pixel Data Cache
@@ -126,10 +126,10 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         ;(window as any).clearPixelCache = async () => {
             const { PixelDataCache } = await import('./PixelDataCache')
             await PixelDataCache.getInstance().clear()
-            console.log('Γ£à Pixel cache cleared')
+            console.log('✅ Pixel cache cleared')
         }
 
-        console.log('≡ƒöº LOD debug exports registered. Try: lodCacheStats(), diagnoseArtworkFailures()')
+        console.log('🔧 LOD debug exports registered. Try: lodCacheStats(), diagnoseArtworkFailures()')
     }
 
     public getMemoryStats(): {
@@ -176,14 +176,14 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         const stats = this.getMemoryStats()
         const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1)
         
-        console.group('≡ƒôè Memory Stats')
+        console.group('📊 Memory Stats')
 
         let totalMB = 0
 
         for (const [name, lod] of Object.entries(stats.lods)) {
             const lodMB = lod.allocated / (1024 * 1024)
             totalMB += lodMB
-            console.log(`  ${name}: ${lod.textureWidth}├ù${lod.textureHeight}├ù${lod.arrayDepth} = ~${mb(lod.allocated)} MB (est.)`)
+            console.log(`  ${name}: ${lod.textureWidth}×${lod.textureHeight}×${lod.arrayDepth} = ~${mb(lod.allocated)} MB (est.)`)
         }
 
         const consumers = DataManager.getInstance().getMemoryConsumption()
@@ -193,9 +193,9 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
             console.log(`  ${name}: ${megabytes} MB (est.)`)
         }
 
-        console.log(`  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ`)
+        console.log(`  ────────────────────────`)
         console.log(`  Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}, Failed artwork: ${stats.failedArtworkCount}`)
-        console.log(`  Total tracked VRAM: ~${totalMB.toFixed(1)} MB (est. ΓÇö actual GPU usage typically higher due to driver overhead)`)
+        console.log(`  Total tracked VRAM: ~${totalMB.toFixed(1)} MB (est. — actual GPU usage typically higher due to driver overhead)`)
 
         const perf = window.performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number } }
         if (perf.memory) {
@@ -214,12 +214,12 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
     public logHighTextureCacheStats(): void {
         const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
         if (!cache) {
-            console.log('Γ¥î HIGH texture cache not enabled (lazyHighTextures=false)')
+            console.log('❌ HIGH texture cache not enabled (lazyHighTextures=false)')
             return
         }
         
         const stats = cache.getStats()
-        console.group('≡ƒÄ¿ HIGH Texture Cache Stats')
+        console.group('🎨 HIGH Texture Cache Stats')
         console.log(`Loaded: ${stats.loaded}/${stats.totalSlots} (${((stats.loaded/stats.totalSlots)*100).toFixed(0)}%)`)
         console.log(`Loading: ${stats.loading}, Queued: ${stats.queueLength}`)
         console.log(`Failed: ${stats.failed}, Permanent Failures: ${stats.permanentFailures}`)
@@ -230,16 +230,16 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         const midConfig = textureManager.getTierConfig('mid')
         if (midConfig) {
             const midSlotCount = textureManager.getSlotCount()
-            console.group('≡ƒÄ¿ MID Texture Atlas Info')
+            console.group('🎨 MID Texture Atlas Info')
             console.log(`Total Slots: ${midConfig.maxDepth}`)
             console.log(`Filled Slots: ${midSlotCount}`)
-            console.log(`Dimensions: ${midConfig.width}├ù${midConfig.height}`)
+            console.log(`Dimensions: ${midConfig.width}×${midConfig.height}`)
             console.groupEnd()
         }
     }
 
     public diagnosePendingState(): void {
-        console.group('≡ƒöì Pending State Diagnosis')
+        console.group('🔍 Pending State Diagnosis')
         
         const textureManager = this.getTextureManager()
         console.log(`Pending GPU updates: ${textureManager.hasPendingUpdates() ? 'Yes' : 'No'}`)
@@ -287,7 +287,7 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
     public logFailureDiagnostics(): void {
         const diag = this.getFailureDiagnostics()
         
-        console.group('≡ƒÜ¿ Artwork Failure Diagnostics')
+        console.group('🚨 Artwork Failure Diagnostics')
         console.log(`Total failed: ${diag.totalFailed}`)
         console.log('By reason:', diag.byReason)
         
@@ -302,7 +302,7 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
 
     public async auditFailedArtwork(): Promise<void> {
         const failedArtwork = this.getFailedArtwork()
-        console.group('≡ƒöì Auditing failed artwork URLs...')
+        console.group('🔍 Auditing failed artwork URLs...')
         
         let retryable = 0
         let permanent = 0
@@ -325,12 +325,12 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
             }
         }
         
-        console.log(`Γ£à Retryable (NETWORK/TIMEOUT/UNKNOWN): ${retryable}`)
+        console.log(`✅ Retryable (NETWORK/TIMEOUT/UNKNOWN): ${retryable}`)
         if (Object.keys(retryableReasons).length > 0) {
             console.log('   Breakdown:', retryableReasons)
         }
         
-        console.log(`≡ƒÜ½ Permanent dead-ends (CORS/404/NO_ARTWORK/DECODE): ${permanent}`)
+        console.log(`🚫 Permanent dead-ends (CORS/404/NO_ARTWORK/DECODE): ${permanent}`)
         if (Object.keys(permanentReasons).length > 0) {
             console.log('   Breakdown:', permanentReasons)
         }

@@ -49,7 +49,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
         const loadQueue = this.getLoadQueue()
         const loadingPromises = this.getLoadingPromises()
 
-        console.group(`≡ƒöì Index Cluster Diagnosis: ${centerIndex} ┬▒ ${radius}`)
+        console.group(`🔍 Index Cluster Diagnosis: ${centerIndex} ± ${radius}`)
         
         const start = Math.max(0, centerIndex - radius)
         const end = centerIndex + radius
@@ -68,13 +68,13 @@ export class HighTextureCacheDebug extends HighTextureCache {
             }
         }
         
-        console.log('\nSlot ΓåÆ Game mapping (occupied slots):')
+        console.log('\nSlot → Game mapping (occupied slots):')
         const occupiedSlots: string[] = []
         for (let slot = 0; slot < config.totalSlots; slot++) {
             const gameIdx = slotToGame[slot]
             if (gameIdx >= start && gameIdx <= end) {
                 const entry = games.get(gameIdx)
-                occupiedSlots.push(`  slot ${slot} ΓåÆ game ${gameIdx} "${truncName(entry?.gameName ?? '?')}"`)
+                occupiedSlots.push(`  slot ${slot} → game ${gameIdx} "${truncName(entry?.gameName ?? '?')}"`)
             }
         }
         if (occupiedSlots.length > 0) {
@@ -149,9 +149,9 @@ export class HighTextureCacheDebug extends HighTextureCache {
         }
         
         if (mismatches.length === 0) {
-            console.log('Γ£à No index mismatches found')
+            console.log('✅ No index mismatches found')
         } else {
-            console.group(`Γ¥î Found ${mismatches.length} index mismatches`)
+            console.group(`❌ Found ${mismatches.length} index mismatches`)
             for (const m of mismatches) {
                 console.log(`  Game ${m.gameIndex}: ${m.issues.join(', ')}`)
             }
@@ -171,7 +171,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
         const loadingPromises = this.getLoadingPromises()
         const stats = this.getInternalStats()
 
-        console.group('≡ƒôª Load State Diagnosis')
+        console.group('📦 Load State Diagnosis')
         
         console.log(`Active loads: ${loadingPromises.size}/${config.maxConcurrentLoads}`)
         if (loadingPromises.size > 0) {
@@ -201,12 +201,12 @@ export class HighTextureCacheDebug extends HighTextureCache {
     }
 
     /**
-     * Diagnostic: Dump full indexΓåÆgame mapping for first N entries
+     * Diagnostic: Dump full index→game mapping for first N entries
      */
     public dumpIndexMapping(count: number = 50): void {
         const games = this.getGames()
 
-        console.group(`≡ƒôï Index ΓåÆ Game Mapping (first ${count})`)
+        console.group(`📋 Index → Game Mapping (first ${count})`)
         
         const entries = Array.from(games.entries())
             .sort((a, b) => a[0] - b[0])
@@ -233,7 +233,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
     public enableProfiling(): void {
         this.setProfilingEnabled(true)
         this.clearProfilingSamples()
-        console.log('≡ƒö¼ Profiling enabled - load some textures then call diagnoseProfile()')
+        console.log('🔬 Profiling enabled - load some textures then call diagnoseProfile()')
     }
     
     /**
@@ -241,7 +241,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
      */
     public disableProfiling(): void {
         this.setProfilingEnabled(false)
-        console.log('≡ƒö¼ Profiling disabled')
+        console.log('🔬 Profiling disabled')
     }
 
     /**
@@ -250,10 +250,10 @@ export class HighTextureCacheDebug extends HighTextureCache {
     public diagnoseProfile(): void {
         const samples = this.getProfilingSamples().filter(s => s.pixelCacheHit)
 
-        console.group('≡ƒö¼ Detailed Profiling Analysis (Main Thread Impact)')
+        console.group('🔬 Detailed Profiling Analysis (Main Thread Impact)')
         
         if (!this.isProfilingEnabled()) {
-            console.log('ΓÜá∩╕Å Profiling not enabled. Call enableProfiling() first.')
+            console.log('⚠️ Profiling not enabled. Call enableProfiling() first.')
             console.groupEnd()
             return
         }
@@ -283,9 +283,9 @@ export class HighTextureCacheDebug extends HighTextureCache {
         console.log('--- Average Breakdown (ms) ---')
         console.log(`  Worker round-trip (async): ${avgWorkerRT.toFixed(2)}ms`)
         console.log(`  ArrayBuffer access:       ${avgBufferCopy.toFixed(3)}ms`)
-        console.log(`  Texture array .set():     ${avgTextureCopy.toFixed(2)}ms  ΓåÉ likely culprit if >1ms`)
+        console.log(`  Texture array .set():     ${avgTextureCopy.toFixed(2)}ms  ← likely culprit if >1ms`)
         console.log(`  Slot callback:            ${avgCallback.toFixed(3)}ms`)
-        console.log(`  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ`)
+        console.log(`  ─────────────────────────`)
         console.log(`  MAIN THREAD BLOCKING:     ${avgMainThread.toFixed(2)}ms`)
         console.log('')
         console.log('--- Maximum Values (worst case) ---')
@@ -296,13 +296,13 @@ export class HighTextureCacheDebug extends HighTextureCache {
         
         // Identify bottleneck
         if (avgTextureCopy > avgMainThread * 0.7) {
-            console.log('≡ƒÄ» BOTTLENECK: Texture array copy (.set()) dominates main thread time')
+            console.log('🎯 BOTTLENECK: Texture array copy (.set()) dominates main thread time')
             console.log('   Mitigation: Consider chunked copying or requestIdleCallback')
         } else if (avgWorkerRT > 5) {
-            console.log('≡ƒÄ» BOTTLENECK: Worker round-trip is slow (>5ms)')
+            console.log('🎯 BOTTLENECK: Worker round-trip is slow (>5ms)')
             console.log('   This includes message serialization and IndexedDB read')
         } else {
-            console.log('Γ£à No clear bottleneck - times look reasonable')
+            console.log('✅ No clear bottleneck - times look reasonable')
         }
         
         // Show worst samples
@@ -323,7 +323,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
         const timingSamples = this.getTimingSamples()
         const maxSamples = this.getMaxTimingSamples()
 
-        console.group('ΓÅ▒∩╕Å HIGH Texture Load Timing Statistics')
+        console.group('⏱️ HIGH Texture Load Timing Statistics')
         
         if (timingSamples.length === 0) {
             console.log('No timing samples recorded yet.')
@@ -357,8 +357,8 @@ export class HighTextureCacheDebug extends HighTextureCache {
         // Show pixel cache breakdown
         const hitPercent = count > 0 ? ((pixelHits.length / count) * 100).toFixed(1) : '0'
         console.log('--- Pixel Cache ---')
-        console.log(`  ≡ƒƒó Hits:   ${pixelHits.length} (${hitPercent}%)`)
-        console.log(`  ≡ƒö┤ Misses: ${pixelMisses.length}`)
+        console.log(`  🟢 Hits:   ${pixelHits.length} (${hitPercent}%)`)
+        console.log(`  🔴 Misses: ${pixelMisses.length}`)
         if (pixelHits.length > 0) {
             const avgHitTime = pixelHits.reduce((sum, s) => sum + s.totalTime, 0) / pixelHits.length
             console.log(`  Avg HIT time:  ${avgHitTime.toFixed(1)}ms (skips decode!)`)
@@ -389,7 +389,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
             .sort((a, b) => b.totalTime - a.totalTime)
             .slice(0, 5)
         slowest.forEach((s, i) => {
-            const cacheIcon = s.pixelCacheHit ? '≡ƒƒó' : '≡ƒö┤'
+            const cacheIcon = s.pixelCacheHit ? '🟢' : '🔴'
             console.log(`  ${i + 1}. ${cacheIcon} ${s.totalTime.toFixed(0)}ms - "${truncName(s.gameName, 25)}" (fetch: ${s.fetchTime.toFixed(0)}ms)`)
         })
         
@@ -398,7 +398,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
         console.log('--- Most Recent 5 Loads ---')
         const recent = [...timingSamples].slice(-5).reverse()
         recent.forEach((s, i) => {
-            const cacheIcon = s.pixelCacheHit ? '≡ƒƒó' : '≡ƒö┤'
+            const cacheIcon = s.pixelCacheHit ? '🟢' : '🔴'
             console.log(`  ${i + 1}. ${cacheIcon} ${s.totalTime.toFixed(0)}ms - "${truncName(s.gameName, 25)}" (game ${s.gameIndex})`)
         })
         
@@ -441,7 +441,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
         const loadingPromises = this.getLoadingPromises()
         const loadQueue = this.getLoadQueue()
 
-        console.group('≡ƒº¬ Loading Strategy Experiment')
+        console.group('🧪 Loading Strategy Experiment')
         console.log(`Testing ${gameIndices.length} textures with ${strategies.length} strategies`)
         
         const results: { name: string; totalTime: number; avgFrameImpact: string }[] = []
@@ -501,7 +501,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
                 avgFrameImpact: `avg: ${avgFrame.toFixed(1)}ms, max: ${maxFrame.toFixed(1)}ms (${frameTimeSamples.length} samples)`
             })
             
-            console.log(`\n≡ƒôè ${strategy.name.toUpperCase()} (max ${strategy.maxConcurrent} concurrent):`)
+            console.log(`\n📊 ${strategy.name.toUpperCase()} (max ${strategy.maxConcurrent} concurrent):`)
             console.log(`   Total time: ${totalTime.toFixed(0)}ms`)
             console.log(`   Frame impact: ${results[results.length - 1].avgFrameImpact}`)
             
@@ -509,7 +509,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
             ;(config as { maxConcurrentLoads: number }).maxConcurrentLoads = originalMaxConcurrent
         }
         
-        console.log('\n≡ƒôê SUMMARY:')
+        console.log('\n📈 SUMMARY:')
         console.table(results)
         console.groupEnd()
     }
@@ -529,7 +529,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
         const loadingPromises = this.getLoadingPromises()
         const loadQueue = this.getLoadQueue()
 
-        console.group(`≡ƒö¼ Running Profiling Test (${count} textures)`)
+        console.group(`🔬 Running Profiling Test (${count} textures)`)
         
         // Get loaded games that we can evict and reload
         const loadedGames: number[] = []
@@ -569,7 +569,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
         
         // Phase 1: Evict all test games
         currentPhase = 'evict'
-        console.log(`\n1∩╕ÅΓâú Evicting ${loadedGames.length} textures...`)
+        console.log(`\n1️⃣ Evicting ${loadedGames.length} textures...`)
         for (const gameIndex of loadedGames) {
             this.evictGame(gameIndex)
         }
@@ -577,7 +577,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
         
         // Phase 2: Request all games (triggers reload from pixel cache)
         currentPhase = 'reload'
-        console.log(`2∩╕ÅΓâú Reloading ${loadedGames.length} textures (should hit pixel cache)...`)
+        console.log(`2️⃣ Reloading ${loadedGames.length} textures (should hit pixel cache)...`)
         const reloadStart = window.performance.now()
         
         for (const gameIndex of loadedGames) {
@@ -598,7 +598,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
         trackingActive = false
         
         // Analyze results
-        console.log(`\n3∩╕ÅΓâú Analysis:`)
+        console.log(`\n3️⃣ Analysis:`)
         console.log(`   Reload time: ${reloadTime.toFixed(0)}ms total`)
         
         // Frame time analysis by phase
@@ -617,9 +617,9 @@ export class HighTextureCacheDebug extends HighTextureCache {
             console.log(`     >33.33ms:   ${verySlowFrames.length} (dropped 30fps)`)
             
             if (maxFrame > 16.67) {
-                console.log(`\n   ΓÜá∩╕Å Frame dips detected! Max frame: ${maxFrame.toFixed(1)}ms`)
+                console.log(`\n   ⚠️ Frame dips detected! Max frame: ${maxFrame.toFixed(1)}ms`)
             } else {
-                console.log(`\n   Γ£à No significant frame dips during reload`)
+                console.log(`\n   ✅ No significant frame dips during reload`)
             }
         }
         
@@ -640,7 +640,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
         const dataArrayTexture = this.getDataArrayTexture()
 
         if (!dataArrayTexture) {
-            console.log('Γ¥î No texture array available')
+            console.log('❌ No texture array available')
             return
         }
         
@@ -649,8 +649,8 @@ export class HighTextureCacheDebug extends HighTextureCache {
         const sliceBytes = width * height * 4
         const totalBytes = sliceBytes * config.totalSlots
         
-        console.group('≡ƒö¼ HIGH Texture Cache Operation Costs')
-        console.log(`Texture array: ${width}├ù${height}├ù${config.totalSlots} = ${(totalBytes / 1024 / 1024).toFixed(1)}MB`)
+        console.group('🔬 HIGH Texture Cache Operation Costs')
+        console.log(`Texture array: ${width}×${height}×${config.totalSlots} = ${(totalBytes / 1024 / 1024).toFixed(1)}MB`)
         
         // Test 1: CPU array copy (single slice)
         const testData = new Uint8Array(sliceBytes)
@@ -672,11 +672,11 @@ export class HighTextureCacheDebug extends HighTextureCache {
         console.log(`needsUpdate flag: ${flagTime.toFixed(4)}ms (negligible)`)
         
         // Note about GPU upload
-        console.log(`ΓÜá∩╕Å GPU upload happens on render - can't measure directly here`)
+        console.log(`⚠️ GPU upload happens on render - can't measure directly here`)
         console.log(`   The upload transfers the ENTIRE ${(totalBytes / 1024 / 1024).toFixed(1)}MB array to GPU`)
         console.log(`   This is the likely source of lag spikes`)
         
-        console.log('\n≡ƒôè Current stats:', this.getStats())
+        console.log('\n📊 Current stats:', this.getStats())
         console.groupEnd()
     }
 

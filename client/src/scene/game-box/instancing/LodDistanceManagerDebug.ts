@@ -31,7 +31,7 @@ export class LodDistanceManagerDebug extends LodDistanceManager {
             const dist = this.getLodDistribution()
             if (dist) {
                 const config = (this as any).config
-                console.group('≡ƒôè LOD Distribution (Two-Tier System)')
+                console.group('📊 LOD Distribution (Two-Tier System)')
                 console.log(`HIGH: ${dist.counts.high} games (within ${config?.highDistance ?? '?'}m)`)
                 console.log(`MID:  ${dist.counts.mid} games (everything else)`)
                 console.log(`Total: ${dist.counts.total} instances`)
@@ -47,7 +47,7 @@ export class LodDistanceManagerDebug extends LodDistanceManager {
         ;(window as any).preloadNearest = (count = 20) => this.preloadNearestGames(count)
         ;(window as any).diagnoseNearest = (count = 30) => this.diagnoseNearestGames(count)
 
-        console.log('≡ƒöº LOD distance debug exports registered. Try: lodDistribution(), preloadNearest(), diagnoseNearest()')
+        console.log('🔧 LOD distance debug exports registered. Try: lodDistribution(), preloadNearest(), diagnoseNearest()')
     }
 }
 
