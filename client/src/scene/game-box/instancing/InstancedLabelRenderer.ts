@@ -85,14 +85,6 @@ export class InstancedLabelRenderer {
             () => this.materializeLabels()
         )
 
-        // Register a fresh empty metadata map immediately so any pre-existing stale
-        // map from a previous InstancedLabelRenderer instance is replaced.
-        DataManager.getInstance().set(
-            DataKey.InstancedLabelMetadata,
-            new Map<number, { name: string; position: THREE.Vector3 }>(),
-            { domain: DataDomain.Renderer }
-        )
-        
         console.debug(`📋 InstancedLabelRenderer created (max: ${this.maxInstances} labels)`)
     }
 
@@ -398,6 +390,15 @@ export class InstancedLabelRenderer {
         this.isInitialized = false
         this.currentCount = 0
         this.nextInstanceIndex = 0
+
+        // Clear metadata map — this renderer owns it, so clean it up.
+        // Without this, a new InstancedLabelRenderer would inherit stale instanceId
+        // entries from the previous load, causing wrong-game-on-click after reload.
+        DataManager.getInstance().set(
+            DataKey.InstancedLabelMetadata,
+            new Map<number, { name: string; position: THREE.Vector3 }>(),
+            { domain: DataDomain.Renderer }
+        )
         
         console.debug('✅ InstancedLabelRenderer disposed')
     }
