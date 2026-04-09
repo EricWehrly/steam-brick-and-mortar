@@ -1,15 +1,19 @@
 /**
  * Interaction Event Types
- * 
+ *
  * Type definitions for all interaction events in the application.
  * Events are namespaced by system for clarity and organization.
- * 
- * TODO: Review all event interfaces for unnecessary properties (timestamp/source default,
- * many events may have cruft that's passed but never consumed). Tech debt backlog item.
+ *
+ * TD: This file conflates user interaction events (input, game selection) with
+ * system-to-system events (Steam loading, store props lifecycle, room events).
+ * These are intentionally different concepts and should be disentangled into
+ * separate files (e.g. InputEvents.ts, SteamEvents.ts, SceneEvents.ts).
+ * LightingEvents.ts is the first step in that direction.
+ *
+ * TODO: Review all event interfaces for unnecessary properties (timestamp/source
+ * default, many events may have cruft that's passed but never consumed).
  */
 
-// I really don't like that we let this get imported ... YOLO
-import type { LightingQuality } from '../core/AppSettings'
 import * as THREE from 'three'
 import type { BaseInteractionEvent } from '../core/EventManager'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'

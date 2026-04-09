@@ -4,20 +4,7 @@ Active bugs and issues that need investigation or fixing.
 
 ## High Priority
 
-### Shelf end-cap labels
-**Priority**: High (do soon)
-**Context**: Shelf units should have small label planes at each end cap (front + back per shelf board,
-one per shelf unit). Uses the existing `SceneSignManager` / `SignStyles.ShelfEndLabel`.
-The diagnostic scaffolding already exists in `GameBoxSpawner.spawnGamesOnShelf` (commit 7e2be41)
-but needs proper text content (e.g. category name or orientation marker), correct sizing,
-and visual polish. The subagent task is to finish and clean up that implementation.
-**Files**: `src/scene/spawning/GameBoxSpawner.ts`, `src/scene/SceneSignManager.ts`
-**Source**: 2026-04-08 session
-
-
-**Status**: 🔴 Open  
-**Reported**: 2026-01-16  
-**Description**: When loading an uncached profile for the first time, the room appears but games don't seem to load properly. A refresh fixes it.  
+### Uncached profile first load creates "cursed room"  
 **Steps to Reproduce**:
 1. Load a Steam profile that has never been cached
 2. Observe the room appears but games may not display correctly

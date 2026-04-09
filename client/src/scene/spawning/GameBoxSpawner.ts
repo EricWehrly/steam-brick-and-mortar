@@ -85,7 +85,7 @@ export class GameBoxSpawner {
             return
         }
 
-        this.spawnGamesOnShelf(position, games, rowIndex, shelfIndex, shelfRotationY, batchIndex)
+        this.spawnGamesOnShelf(position, games, rowIndex, shelfIndex, shelfRotationY)
         this.pendingGames.delete(batchIndex)
 
         EventManager.getInstance().emit<GamesPlacedEvent>(
@@ -100,8 +100,7 @@ export class GameBoxSpawner {
         games: readonly SteamGameData[],
         rowIndex: number,
         _shelfIndex: number,
-        shelfRotationY: number = 0,
-        batchIndex: number = 0
+        shelfRotationY: number = 0
     ): void {
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         if (shelfSurfaces.length === 0) return
