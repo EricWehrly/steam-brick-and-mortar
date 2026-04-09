@@ -19,7 +19,9 @@
 import * as THREE from 'three'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
+import { EventManager } from '../core/EventManager'
 import { SignageRenderer, type SignageConfig } from './SignageRenderer'
+import { RoomEventTypes, type RoomResizedEvent, StorePropsEventTypes, type ShelfCreatedEvent } from '../types/InteractionEvents'
 import {
     getRecentlyPlayedBucket,
     getBucketLabel,
@@ -27,6 +29,7 @@ import {
     RecentlyPlayedBucket,
 } from './categorization/CategoryAssigner'
 import type { SteamGameData } from './game-box/types/GameData'
+import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
 
 // ─── Style definitions ────────────────────────────────────────────────────────
 
@@ -126,6 +129,21 @@ export class SceneSignManager {
         if (!scene) throw new Error('SceneSignManager: scene not registered in DataManager (DataKey.MainScene)')
         this.scene = scene
         this.renderer = new SignageRenderer()
+
+        // Self-subscribe to shelf creation events to place end-cap labels automatically.
+        // This keeps sign placement logic where it belongs — in the sign manager.
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ShelfCreated,
+            (event: CustomEvent<ShelfCreatedEvent>) => {
+                const { position, shelfIndex, shelfRotationY } = event.detail
+                const rotY = shelfRotationY ?? 0
+                const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
+                const topSurface = shelfSurfaces[0]
+                if (topSurface) {
+                    this.placeShelfEndCapLabels(shelfIndex ?? 0, position as THREE.Vector3, rotY, topSurface)
+                }
+            }
+        )
     }
 
     /**

@@ -30,7 +30,6 @@ import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 import { SceneSignManager } from './SceneSignManager'
-import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
 import { VRLayoutUtils } from './props/SharedPropsUtils'
 import { RoomConstants } from './RoomManager'
 
@@ -570,12 +569,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             rotation
         })
 
-        // End-cap orientation labels — shelf construction concern, not game placement.
-        const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
-        const topSurface = shelfSurfaces[0]
-        if (topSurface) {
-            SceneSignManager.instance.placeShelfEndCapLabels(directIndex, position, rotY, topSurface)
-        }
+        // End-cap orientation labels are now placed by SceneSignManager
+        // on ShelfCreated events — no call needed here.
     }
 
 
