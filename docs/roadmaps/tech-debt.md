@@ -717,3 +717,30 @@ Next step: identify which test file/suite is the memory culprit (run suites indi
   - DataManager: key/domain discipline, who owns each DataKey
   - ShelfSide naming counterintuitiveness (Front=far, Back=near)
 **Source:** PR #44 review comment 2026-04-09
+
+### Debug/diagnostic layer architecture
+**Priority:** Medium
+**Context:** Three ...Debug subclasses (LodArtworkOrchestratorDebug, LodDistanceManagerDebug,
+  HighTextureCacheDebug) mix two concerns: production-useful behavior (memory logging at
+  AllBatchesComplete, SomeBatchesComplete LOD sync) and devtools console commands (window.*).
+  This caused them to be deleted as "debug-only" during cleanup, removing needed diagnostics.
+  
+  Desired end state:
+  - Production-relevant behavior (logMemoryStats, AllBatchesComplete handler) moves INTO
+    the base classes (LodArtworkOrchestrator, LodDistanceManager)
+  - Console command registration (window.lodDistribution, window.diagnoseArtworkFailures, etc.)
+    lives in a single DevTools bootstrapper that is optionally enabled in dev mode
+  - ILodArtworkRendererDebug interface is satisfied by the base class, not just the Debug subclass
+  
+  For now: Debug subclasses are restored and GpuGameBoxRenderer always uses them (always-on dev
+  tooling). This is fine; the window.* commands only fire on demand.
+**Source:** Cleanup branch review 2026-04-09
+
+### GpuMemoryEstimator: bridge to DataManager memory registry
+**Priority:** Low-Medium
+**Context:** GpuMemoryEstimator.ts has documented gaps — it cannot see LOD texture arrays.
+  LodTextureArrayManager and LabelTextureArrayManager already register to DataManager via
+  addMemoryConsumption(). LodArtworkOrchestratorDebug.logMemoryStats() already reads that registry.
+  GpuMemoryEstimator should also query DataManager.getMemoryConsumption() to include those
+  registrations in its estimate, giving a unified picture in the Playwright memory snapshot test.
+**Source:** Cleanup branch review 2026-04-09
