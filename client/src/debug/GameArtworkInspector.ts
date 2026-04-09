@@ -35,17 +35,15 @@ interface ArtworkInfo {
 
 export class GameArtworkInspector {
     private modalElement: HTMLElement | null = null
-    private gameFinder: GameFinder
     private pixelCache: PixelDataCache
 
     constructor() {
-        this.gameFinder = new GameFinder()
         this.pixelCache = PixelDataCache.getInstance()
     }
 
     async inspect(identifier: string | number): Promise<void> {
         // First try to find in scene
-        const sceneGame = this.gameFinder.find(identifier)
+        const sceneGame = GameFinder.find(identifier)
         
         // Then look up Steam game data (works for both scene and non-scene games)
         const steamGame = await this.findSteamGameData(

@@ -182,26 +182,24 @@ describe('Spotlight first activation — section timings', () => {
     it('measures each section in isolation', () => {
         const results: string[] = []
 
-        // ── SECTION A: GameFinder.find() ─────────────────────────────────────
+        // ── SECTION A: GameGameFinder.find() ─────────────────────────────────────
         // Comment out this block to remove GameFinder cost from total
         {
-            const finder = new GameFinder()
             const target = `Instanced Game ${Math.floor(INSTANCED_GAME_COUNT / 2)}`
             const t0 = performance.now()
-            finder.find(target)
+            GameFinder.find(target)
             const t1 = performance.now()
-            results.push(ms('A: GameFinder.find() [instanced]', t0, t1))
+            results.push(ms('A: GameGameFinder.find() [instanced]', t0, t1))
         }
 
-        // ── SECTION B: GameFinder.find() — legacy traverse ──────────────────
+        // ── SECTION B: GameGameFinder.find() — legacy traverse ──────────────────
         // Comment out to remove scene.traverse cost
         if (LEGACY_GAME_COUNT > 0) {
-            const finder = new GameFinder()
             const target = `Legacy Game ${Math.floor(LEGACY_GAME_COUNT / 2)}`
             const t0 = performance.now()
-            finder.find(target)
+            GameFinder.find(target)
             const t1 = performance.now()
-            results.push(ms(`B: GameFinder.find() [legacy traverse, ${LEGACY_GAME_COUNT} nodes]`, t0, t1))
+            results.push(ms(`B: GameGameFinder.find() [legacy traverse, ${LEGACY_GAME_COUNT} nodes]`, t0, t1))
         }
 
         // ── SECTION C: LightRegistry.getLightsByType() ───────────────────────
@@ -283,7 +281,7 @@ describe('Spotlight first activation — section timings', () => {
 // ---------------------------------------------------------------------------
 
 describe('Spotlight activation — scale sensitivity', () => {
-    it('measures GameFinder.find() across scene sizes', () => {
+    it('measures GameGameFinder.find() across scene sizes', () => {
         const sizes = [50, 200, 500, 1000]
         const results: string[] = []
 
@@ -303,14 +301,13 @@ describe('Spotlight activation — scale sensitivity', () => {
             }
             dataManager.set(DataKey.InstancedArtworkMetadata, metadata, { domain: DataDomain.Renderer })
 
-            const finder = new GameFinder()
             const target = `Scale Game ${Math.floor(count / 2)}`
 
             const t0 = performance.now()
-            finder.find(target)
+            GameFinder.find(target)
             const t1 = performance.now()
 
-            results.push(ms(`GameFinder.find() @ ${count} instanced games`, t0, t1))
+            results.push(ms(`GameGameFinder.find() @ ${count} instanced games`, t0, t1))
         }
 
         // Restore scene for afterEach
@@ -324,3 +321,4 @@ describe('Spotlight activation — scale sensitivity', () => {
         expect(results.length).toBe(sizes.length)
     })
 })
+

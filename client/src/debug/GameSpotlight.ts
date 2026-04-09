@@ -30,7 +30,6 @@ export class GameSpotlight {
         return GameSpotlight.instance
     }
 
-    private gameFinder: GameFinder | null = null
     private spotlights: THREE.SpotLight[] = []
     // Pre-created pool: all spots are in the scene at startup with intensity=0 so
     // materials compile with the full light count during the startup stall, not on
@@ -56,8 +55,7 @@ export class GameSpotlight {
         GameSpotlight.instance = this
 
         try {
-            this.gameFinder = new GameFinder()
-            this.scene = this.gameFinder['scene']
+            this.scene = GameFinder.getScene()
             this.scene.add(this.spotlightGroup)
 
             // Pre-create the full pool so shader compilation happens at startup.
@@ -81,8 +79,8 @@ export class GameSpotlight {
     }
 
     public spotlight(targets: string | number | Array<string | number>): void {
-        if (!this.gameFinder) {
-            console.error('❌ [Spotlight] Scene or GameFinder not available')
+        if (!this.scene) {
+            console.error('❌ [Spotlight] Scene not available')
             return
         }
 
@@ -101,7 +99,7 @@ export class GameSpotlight {
         const gameObjects: SpotlightTarget[] = []
         
         for (const target of targetArray) {
-            const found = this.gameFinder.find(target)
+            const found = GameFinder.find(target)
             if (found) {
                 gameObjects.push(found)
             }
