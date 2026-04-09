@@ -454,7 +454,18 @@ class Foo {
 
 ---
 
-## id: raf-loop-migration
+### Debug: Migrate GameSpotlight light lifecycle to LightingRenderer
+**Priority**: Medium (next spotlight-related work)
+**Context**: `GameSpotlight` currently owns spotlight pool creation, scene addition, dimming/restoring store lights (via `LightRegistry`), and light disposal. This should belong to `LightingRenderer`.
+
+**Proposed split:**
+- `LightingRenderer` owns: spotlight pool (pre-warmed at startup with `intensity=0`), `acquireSpotlight()` / `releaseSpotlight()`, `dimStoreLights(factor)` / `restoreStoreLights()`
+- `GameSpotlight` becomes: thin coordinator â€” calls `LightingRenderer` to claim/release spotlights, aims them at game positions, runs intensity animation, exposes `window.spotlightGame` API. No Three.js light construction, no `LightRegistry` reads, no scene adds.
+
+**Why deferred**: Needs design thought on the `LightingRenderer` API shape before implementation.
+**Source**: PR #42 review + 2026-04-08 discussion
+
+
 **Priority**: Low  
 **Effort**: 1-2 hours per class  
 **Status**: Ready to act on opportunistically (one class at a time)  
@@ -532,7 +543,7 @@ class Foo {
 
 ### Sort policy belongs off SteamApiClient
 **Priority**: Medium
-**Context**: SteamApiClient.loadGamesProgressively accepts a sortFn param (currently used for sortByGenreThenPlaytime). This works as a pass-through, but the sort policy — what field order we care about — doesn't belong in the data-fetching layer. It's a presentation concern.
+**Context**: SteamApiClient.loadGamesProgressively accepts a sortFn param (currently used for sortByGenreThenPlaytime). This works as a pass-through, but the sort policy ï¿½ what field order we care about ï¿½ doesn't belong in the data-fetching layer. It's a presentation concern.
 **Next steps**:
 - Move sort application upstream: caller assembles sort policy, passes pre-sorted games to the pipeline
 - Or: introduce a GameSortPipeline that wraps the fetch and handles transform
@@ -540,7 +551,7 @@ class Foo {
 
 ### CategorySignSystem ? SceneSignManager rename
 **Priority**: Low (next sign-related work)
-**Context**: CategorySignSystem is named too narrowly — it handles sign placement in a scene, not just category signs. When ceiling signs (recently-played) are added it'll look wrong.
+**Context**: CategorySignSystem is named too narrowly ï¿½ it handles sign placement in a scene, not just category signs. When ceiling signs (recently-played) are added it'll look wrong.
 **Candidate name**: SceneSignManager
 **Next steps**: Rename file + class when we add the second sign type; no need to do it in isolation
 
@@ -561,7 +572,8 @@ class Foo {
 
 ### Readonly event payloads
 **Priority**: Low/Medium
-**Context**: Events should emit eadonly everything to prevent accidental mutation of shared event data. Currently not enforced. Worth a lint rule or type-level enforcement.
+**Context**: Events should emit 
+eadonly everything to prevent accidental mutation of shared event data. Currently not enforced. Worth a lint rule or type-level enforcement.
 **Next steps**: Add Readonly<T> wrapping to all emitted event payloads in InteractionEvents.ts; consider a custom ESLint rule
 
 ---
