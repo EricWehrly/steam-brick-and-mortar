@@ -423,7 +423,7 @@ export class AppSettings {
             autoSave: true,
             
             // Steam Settings  
-            autoLoadProfile: isDev, // Auto-load cached profile in dev; user must explicitly enable in prod
+            autoLoadProfile: isDev, // TD: should come from first-run setup flow, not env heuristic
             developmentMode: isDev // Default based on environment
         }
     }

@@ -16,6 +16,7 @@ import * as THREE from 'three'
 import { PerformanceMonitorUI, type PerformanceStats, ToastManager, UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
 import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
 import { SceneManager, SceneCoordinator } from '../scene'
+import { SceneManagerDebug } from '../debug/SceneManagerDebug'
 import { DebugStatsProvider } from './DebugStatsProvider'
 import { CompassRose } from '../ui/debug/CompassRose'
 import { SteamIntegration } from '../steam-integration'
@@ -103,6 +104,7 @@ export class SteamBrickAndMortarApp {
             antialias: config.scene?.antialias ?? true,
             outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
         })
+        new SceneManagerDebug()
         
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Setting up DI Container')
         this.container = new ServiceContainer()

@@ -231,6 +231,9 @@ export interface LightCreatedEvent extends BaseInteractionEvent {
  * Request a point light be added to the scene via LightingRenderer.
  * Emitting this avoids adding lights directly to the scene (which causes
  * full shadow map recalculation outside the lighting system's control).
+ *
+ * TD: this is a system-to-system event, not a user interaction. Should live
+ * in a LightingEvents.ts alongside other system event definitions, not here.
  */
 export interface PointLightRequestEvent extends BaseInteractionEvent {
     color: number

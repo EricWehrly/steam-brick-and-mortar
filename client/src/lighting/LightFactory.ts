@@ -21,6 +21,12 @@ type ManagedLight = {
     position: THREE.Vector3
 }
 
+/**
+ * TD: LightFactory should accept a LightRegistry and call registerLight()
+ * automatically on every created light, so LightingRenderer doesn't need to
+ * register manually after each factory call. Requires passing LightRegistry
+ * into the factory constructor.
+ */
 export class LightFactory {
     constructor(private scene: THREE.Scene) {}
 
