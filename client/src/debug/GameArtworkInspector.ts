@@ -14,9 +14,9 @@
 import { GameFinder } from './GameFinder'
 import { PixelDataCache, type CachedPixelResult } from '../scene/game-box/instancing/PixelDataCache'
 import { DataManager } from '../core/data/DataManager'
-import type { SteamGame } from '../steam/SteamApiClientLegacy'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
+import type { SteamGame } from '../steam'
 
 interface PixelCacheEntry {
     pixelData: Uint8ClampedArray

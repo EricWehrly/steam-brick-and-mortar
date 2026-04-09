@@ -101,22 +101,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         GpuGameBoxRenderer.logger.lifecycle(`LOD atlas initialized (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
     }
 
-    
-    /**
-     * Create game box (legacy interface - delegates to createGameBoxAuto)
-     * @deprecated Use createGameBoxAuto() or createGameBoxFromUrl() directly
-     */
-    public createGameBox(
-        game: SteamGameData,
-        position: THREE.Vector3 = new THREE.Vector3(0, 0, 0),
-        _textureOptions?: GameBoxTextureOptions,
-        _name?: string,
-        side: ShelfSide = ShelfSide.Front
-    ): THREE.Mesh | null {
-        this.createGameBoxAuto(game, position, side)
-        return null
-    }
-
     /**
      * Create game box with artwork by URL - entire fetch+process happens in worker
      * This is the preferred path - keeps main thread completely free
@@ -150,9 +134,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         })
     }
     
-    /**
-     * Create game box with just a label (no artwork)
-     */
     public createLabelGameBox(
         game: SteamGameData,
         position: THREE.Vector3,
@@ -217,7 +198,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         return undefined
     }
 
-    public createBatchGameBoxes(requests: GameBoxRequest[]): THREE.Mesh[] {
+    public createBatchGameBoxes(requests: GameBoxRequest[]) {
         requests.forEach(request => {
             this.createGameBoxAuto(
                 request.game,
@@ -225,12 +206,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
                 request.side
             )
         })
-        
-        return []
-    }
-
-    public hasInstancedLabelRenderer(): boolean {
-        return this.instancedLabelRenderer.isReady()
     }
 
     public getDimensions(): GameBoxDimensions {
@@ -251,30 +226,10 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         GpuGameBoxRenderer.logger.lifecycle('Disposed')
     }
     
-    /**
-     * Set global LOD level for all artwork instances
-     */
-    public setGlobalLod(lodLevel: LodLevel): void {
-        this.lodArtworkRenderer.setGlobalLod(lodLevel)
-    }
-    
-    /**
-     * Get the LOD renderer for advanced control
-     */
-    public getLodRenderer(): ILodArtworkRendererDebug {
-        return this.lodArtworkRenderer
-    }
-    
-    /**
-     * Get memory stats
-     */
     public getMemoryStats() {
         return this.lodArtworkRenderer.getMemoryStats()
     }
     
-    /**
-     * Log memory stats to console
-     */
     public logMemoryStats(): void {
         this.lodArtworkRenderer.logMemoryStats()
     }
