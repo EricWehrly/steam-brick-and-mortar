@@ -100,11 +100,10 @@ export class SteamBrickAndMortarApp {
         this.appSettings = AppSettings.getInstance()
         
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating SceneManager')
-        this.sceneManager = new SceneManager({
+        this.sceneManager = new SceneManagerDebug({
             antialias: config.scene?.antialias ?? true,
             outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
         })
-        new SceneManagerDebug()
         
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Setting up DI Container')
         this.container = new ServiceContainer()

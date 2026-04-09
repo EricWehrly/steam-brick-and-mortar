@@ -14,6 +14,14 @@ import * as THREE from 'three'
 import type { BaseInteractionEvent } from '../core/EventManager'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { SteamGame } from '../steam'
+import {
+    LightingEventTypes,
+    type LightingToggleEvent,
+    type LightingDebugToggleEvent,
+    type LightingQualityChangedEvent,
+    type LightCreatedEvent,
+    type LightingSystemReadyEvent,
+} from './LightingEvents'
 
 // =============================================================================
 // STEAM EVENTS
@@ -200,55 +208,18 @@ export interface GameSelectedEvent extends BaseInteractionEvent {
 }
 
 // =============================================================================
-// LIGHTING EVENTS
+// LIGHTING EVENTS — defined in LightingEvents.ts, re-exported here for compat
 // =============================================================================
-
-export interface LightingToggleEvent extends BaseInteractionEvent {
-    enabled: boolean
-}
-
-export interface LightingDebugToggleEvent extends BaseInteractionEvent {
-    enabled: boolean
-}
-
-export interface LightingQualityChangedEvent extends BaseInteractionEvent {
-    quality: LightingQuality
-}
-
-export interface CeilingToggleEvent extends BaseInteractionEvent {
-    visible: boolean
-}
-
-// TODO: Can we do this without importing THREE?
-export interface LightCreatedEvent extends BaseInteractionEvent {
-    light: THREE.Light
-    scene: THREE.Scene
-    lightType: string
-    lightName?: string
-}
-
-/**
- * Request a point light be added to the scene via LightingRenderer.
- * Emitting this avoids adding lights directly to the scene (which causes
- * full shadow map recalculation outside the lighting system's control).
- *
- * TD: this is a system-to-system event, not a user interaction. Should live
- * in a LightingEvents.ts alongside other system event definitions, not here.
- */
-export interface PointLightRequestEvent extends BaseInteractionEvent {
-    color: number
-    intensity: number
-    distance: number
-    position: THREE.Vector3
-    name?: string
-    /** Optional parent Object3D; if omitted, light is added to lighting group */
-    parent?: THREE.Object3D
-}
-
-export interface LightingSystemReadyEvent extends BaseInteractionEvent {
-    scene: THREE.Scene
-    quality: string
-}
+export type {
+    LightingToggleEvent,
+    LightingDebugToggleEvent,
+    LightingQualityChangedEvent,
+    CeilingToggleEvent,
+    LightCreatedEvent,
+    PointLightRequestEvent,
+    LightingSystemReadyEvent,
+} from './LightingEvents'
+export { LightingEventTypes } from './LightingEvents'
 
 // =============================================================================
 // STORE PROPS EVENTS
@@ -373,16 +344,6 @@ export const GameEventTypes = {
     AllBatchesComplete: 'game:all-batches-complete',
     /** Fired when a game is selected (e.g. clicked in scene) — opens detail panel */
     Selected: 'game:selected'
-} as const
-
-export const LightingEventTypes = {
-    Toggle: 'lighting:toggle',
-    DebugToggle: 'lighting:debug-toggle',
-    QualityChanged: 'lighting:quality-changed',
-    Created: 'lighting:created',
-    SystemReady: 'lighting:system-ready',
-    /** Request a point light be created by the lighting system (avoids direct scene add) */
-    PointLightRequested: 'lighting:point-light-requested',
 } as const
 
 export const CeilingEventTypes = {
