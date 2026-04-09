@@ -18,14 +18,12 @@
  * ```
  * 
  * Architecture:
- * - LegacyStorePropsHandler: Default handler, always available
  * - GpuStorePropsEventHandler: High-performance replacement for capable systems
  * - PropsEvents: Dedicated event types and interfaces
  * - Automatic capability detection and handler registration
  */
 
 // Import handlers (this triggers self-registration)
-import './LegacyStorePropsHandler'
 import './GpuStorePropsEventHandler'
 
 // Export events and types for external use

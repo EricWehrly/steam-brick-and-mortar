@@ -6,7 +6,6 @@
  */
 
 // Bifurcated renderers - Legacy and GPU implementations
-export { LegacyGameBoxRenderer } from './LegacyGameBoxRenderer'
 export { GpuGameBoxRenderer } from './GpuGameBoxRenderer'
 export type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
