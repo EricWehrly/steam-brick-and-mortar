@@ -284,23 +284,6 @@ export class InstancedLabelRenderer {
         this.updateGPU()
     }
     
-    /**
-     * Reset all instances (clears positions and count)
-     */
-    public reset(): void {
-        this.currentCount = 0
-        this.nextInstanceIndex = 0
-        if (this.instancedMesh) {
-            this.instancedMesh.count = 0
-        }
-        // Clear metadata map so stale entries don't cause wrong-game clicks on re-load
-        const map = DataManager.getInstance().get<Map<number, unknown>>(DataKey.InstancedLabelMetadata)
-        map?.clear()
-    }
-    
-    /**
-     * Get current statistics
-     */
     public getStats(): {
         isInitialized: boolean
         activeInstances: number
@@ -315,9 +298,6 @@ export class InstancedLabelRenderer {
         }
     }
 
-    /**
-     * Create shader material for instanced labels with texture array support
-     */
     private createLabelMaterial(textureArray: THREE.DataArrayTexture): THREE.ShaderMaterial {
         return new THREE.ShaderMaterial({
             uniforms: {
@@ -332,9 +312,6 @@ export class InstancedLabelRenderer {
         })
     }
     
-    /**
-     * Set up per-instance buffer attributes
-     */
     private setupInstanceAttributes(): void {
         if (!this.geometry) return
         

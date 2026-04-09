@@ -80,17 +80,4 @@ describe('InstancedLabelRenderer metadata lifecycle', () => {
         expect(map).not.toBe(staleMap)   // must be a new map object
         expect(map.size).toBe(0)          // must be empty
     })
-
-    it('reset() clears the metadata map so stale entries cannot be hit', () => {
-        const renderer = new InstancedLabelRenderer({ maxInstances: 10 })
-        // Manually inject a stale entry as if a previous add left it behind
-        const map = mockStore.get(DataKey.InstancedLabelMetadata) as Map<number, unknown>
-        map.set(0, { name: 'StaleGame', position: null })
-        map.set(1, { name: 'AnotherStaleGame', position: null })
-
-        renderer.reset()
-
-        const mapAfterReset = mockStore.get(DataKey.InstancedLabelMetadata) as Map<number, unknown>
-        expect(mapAfterReset.size).toBe(0)
-    })
 })
