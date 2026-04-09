@@ -12,6 +12,11 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
+### Remove ServiceRegistry?
+probably
+seems like we were kind of tearing it out but didn't finish
+need to move to newer and preferable patterns
+
 ### UI: Formalize z-index layering system
 **Priority**: Very Low  
 **Effort**: 1-2 hours  
@@ -656,7 +661,28 @@ Intended shape:
 This removes all sign/sort logic from GpuStorePropsRenderer.
 **Source:** PR #40 r3048445863 follow-up discussion
 
-### Playwright memory: tare-weight model
+### Artwork: header image fallback when library image is missing
+**Priority:** High (soon)
+**Context:** Some games have a header image in Steam metadata but no library_600x900.jpg.
+  The game binder shows a header image, but the 3D box tries library first, gets a 404/CORS block,
+  and falls back to a label box instead of trying the header image.
+  `GpuGameBoxRenderer.selectBestArtworkUrl` already tries `game.artwork.header` as a fallback
+  (line ~206), but GameArtworkRequest's URL strategy only retries within the same format.
+  Fix: when a library format fails permanently, trigger a retry with the header format URL.
+**Source:** User report 2026-04-09
+
+### Artwork: 404 from Steam CDN is obscured as CORS error
+**Priority:** Informational (mitigated)
+**Context:** When cdn.akamai.steamstatic.com returns a 404, the 404 response lacks CORS headers,
+  so the browser blocks the response entirely and throws a generic NetworkError — hiding the 404.
+  Firefox DevTools shows the 404 status, but JS cannot read it.
+  Mitigation (2026-04-09): categorizeError now matches Firefox's exact CORS error string
+  ("NetworkError when attempting to fetch resource") and marks it as CORS → permanent.
+  All 404s are also now marked permanent immediately (not after 2 attempts).
+  Long-term: the Lambda proxy could track 404s server-side so all clients benefit.
+**Source:** User report 2026-04-09
+
+
 **Priority:** Medium
 **Context:** Current memory-snapshot.spec.ts reads window.performance.memory (JS heap only, non-standard).
 Intended model:

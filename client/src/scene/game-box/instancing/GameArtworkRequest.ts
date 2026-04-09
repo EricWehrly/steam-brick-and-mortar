@@ -125,12 +125,17 @@ export class GameArtworkRequest implements GameArtwork {
     
     private categorizeError(msg: string, urlsTried: string[]): FailureReason {
         const lower = msg.toLowerCase()
-        
-        // CORS detection (multiple patterns)
-        if (lower.includes('cors') || 
-            lower.includes('cross-origin') || 
+
+        // CORS detection.
+        // Firefox:  "TypeError: NetworkError when attempting to fetch resource."
+        // Chrome:   "TypeError: Failed to fetch" (with no status) / "has been blocked by CORS policy"
+        // Both:     fetch with mode:'cors' throws a TypeError — NOT an HTTP error — so response.status
+        //           is never readable. We infer CORS from message patterns.
+        if (lower.includes('cors') ||
+            lower.includes('cross-origin') ||
             lower.includes('cross origin') ||
-            lower.includes('opaque')) {
+            lower.includes('opaque') ||
+            lower.includes('networkerror when attempting to fetch')) {
             return 'CORS'
         }
         
@@ -140,22 +145,18 @@ export class GameArtworkRequest implements GameArtwork {
         // Timeouts
         if (lower.includes('timeout') || lower.includes('abort')) return 'TIMEOUT'
         
-        // NO_ARTWORK: All fallback URLs failed with 404
-        const all404 = urlsTried.length >= 2 && (
-            lower.includes('404') || 
-            lower.includes('not found')
-        )
-        if (all404) {
+        // HTTP 404: worker throws 'HTTP 404: Not Found' when response is accessible.
+        // When the CDN returns 404 WITH valid CORS headers we can read the status.
+        // When it returns 404 WITHOUT CORS headers, CORS fires first (see above).
+        // Treat any 404 as permanent — the artwork doesn't exist on the CDN.
+        if (lower.includes('http 404') || lower.includes('404') || lower.includes('not found')) {
             GameArtworkProvider.logger.debug(
-                `Categorized as NO_ARTWORK: tried ${urlsTried.length} URLs, all failed with 404`
+                `Categorized as 404 (permanent): tried ${urlsTried.length} URL(s): ${urlsTried.join(', ')}`
             )
-            return 'NO_ARTWORK'
+            return '404'
         }
         
-        // Single 404
-        if (lower.includes('404') || lower.includes('not found')) return '404'
-        
-        // Network errors
+        // Generic network errors not matching CORS patterns above.
         if (lower.includes('network') || lower.includes('failed to fetch')) return 'NETWORK'
         
         return 'UNKNOWN'

@@ -124,8 +124,8 @@ export class GameArtworkProvider {
     private pixelCache: PixelDataCache | null = null
     
     // Persistent URL caches (localStorage)
-    public static readonly FAILURE_CACHE_KEY = 'steam-artwork-failures-v3'
-    public static readonly SUCCESS_CACHE_KEY = 'steam-artwork-successes-v3'
+    public static readonly FAILURE_CACHE_KEY = 'steam-artwork-failures-v4'
+    public static readonly SUCCESS_CACHE_KEY = 'steam-artwork-successes-v4'
     private static readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000  // 24 hours
     
     private failureCache: Map<string, UrlCacheEntry> = new Map()  // key: appId-format
@@ -304,12 +304,14 @@ export class GameArtworkProvider {
         const existing = this.failureCache.get(cacheKey)
         const attemptCount = (existing?.attemptCount ?? 0) + 1
         
-        // Permanent failures: NO_ARTWORK, CORS, DECODE, or repeated 404s
+        // Permanent failures: NO_ARTWORK, CORS, DECODE, and 404.
+        // 404 from Steam CDN is permanent — the image doesn't exist on the CDN.
+        // (CORS failures sometimes mask 404s; both are unretryable.)
         const isPermanent = 
             reason === 'NO_ARTWORK' || 
             reason === 'CORS' || 
             reason === 'DECODE' ||
-            (reason === '404' && attemptCount >= 2)
+            reason === '404'
         
         this.failureCache.set(cacheKey, {
             timestamp: Date.now(),
@@ -489,7 +491,8 @@ export class GameArtworkProvider {
                             entry.isPermanent = 
                                 entry.reason === 'CORS' || 
                                 entry.reason === 'NO_ARTWORK' || 
-                                entry.reason === 'DECODE'
+                                entry.reason === 'DECODE' ||
+                                entry.reason === '404'  // 404 is now always permanent
                             migrated++
                         }
                         this.failureCache.set(key, entry)
