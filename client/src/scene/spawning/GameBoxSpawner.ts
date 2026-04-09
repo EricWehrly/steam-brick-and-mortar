@@ -107,6 +107,10 @@ export class GameBoxSpawner {
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         if (shelfSurfaces.length === 0) return
 
+        // TD: shelf end-cap labels belong in the shelf constructor, not GameBoxSpawner.
+        // SceneSignManager calls here are a sign-management concern — move to wherever
+        // shelf units are instantiated (InstancedShelfRenderer or similar) so the spawner
+        // only handles game placement.
         // ─── Shelf Orientation Labels (Front/Back) ──────────────────────────────
         // Place diagnostic labels on the right end-cap of the top shelf board.
         const topSurface = shelfSurfaces[0] // ShelfSurfaceUtils sorts top-to-bottom
