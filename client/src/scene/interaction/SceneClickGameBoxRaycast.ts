@@ -115,7 +115,7 @@ export class SceneClickGameBoxRaycast {
         const intersections = this.raycaster.intersectObjects(scene.children, true)
 
         for (const intersection of intersections) {
-            const hit = this.resolveGameBoxIntersection(intersection, dm)
+            const hit = this.resolveGameBoxIntersection(intersection)
             if (hit) {
                 this.highlightHit(hit)
                 return
@@ -137,15 +137,14 @@ export class SceneClickGameBoxRaycast {
         }
     }
 
-    private resolveGameBoxIntersection(intersection: THREE.Intersection<THREE.Object3D>, _dm: DataManager): SceneGameBoxHit | null {
+    private resolveGameBoxIntersection(intersection: THREE.Intersection<THREE.Object3D>): SceneGameBoxHit | null {
         const object = intersection.object
 
         if (intersection.instanceId !== undefined) {
-            // Use GameFinder.findByIntersection — resolves via the dumb instanceId→appId
-            // maps (per-mesh, keyed by mesh name) so artwork and label meshes can't
-            // cross-contaminate each other's lookups.
-            const finder = new GameFinder()
-            const result = finder.findByIntersection(object, intersection.instanceId)
+            // GameFinder.findByIntersection disambiguates artwork vs label mesh by name,
+            // then looks up the appropriate metadata map. instanceId is per-mesh (0..N)
+            // so mesh identity must be checked before map lookup.
+            const result = GameFinder.findByIntersection(intersection)
             if (result) {
                 return {
                     name: result.name,

@@ -28,17 +28,7 @@ export enum DataKey {
     MainCamera = 'core.mainCamera',
     Renderer = 'core.renderer',
     InstancedArtworkMetadata = 'renderer.instancedArtworkMetadata',
-    InstancedLabelMetadata = 'renderer.instancedLabelMetadata',
-    /**
-     * Dumb instanceId → appId maps for raycast resolution.
-     * Two separate maps because artwork and label renderers use independent
-     * InstancedMesh instances — instanceId is per-mesh, not global.
-     *
-     * TD: revisit whether these can be unified once the raycast identity picture
-     * is clearer. For now keep them separate to avoid cross-mesh collisions.
-     */
-    ArtworkInstanceIdToAppId = 'renderer.artworkInstanceIdToAppId',
-    LabelInstanceIdToAppId = 'renderer.labelInstanceIdToAppId'
+    InstancedLabelMetadata = 'renderer.instancedLabelMetadata'
 }
 
 /**
