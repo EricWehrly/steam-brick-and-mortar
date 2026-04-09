@@ -170,10 +170,7 @@ export class GameBoxSpawner {
             GameBoxSpawner.logger.warn('GameBoxRenderer unavailable while creating a game box')
             return
         }
-        const effectiveSide = shelfRotationY === Math.PI
-            ? (side === ShelfSide.Front ? ShelfSide.Back : ShelfSide.Front)
-            : side
-        const rotation = GameBoxUtils.calculateGameRotation(shelfRotationY, effectiveSide)
-        this.gameBoxRenderer.createGameBoxAuto(game, worldPosition, effectiveSide, rotation)
+        const rotation = GameBoxUtils.calculateGameRotation(shelfRotationY, side)
+        this.gameBoxRenderer.createGameBoxAuto(game, worldPosition, side, rotation)
     }
 }

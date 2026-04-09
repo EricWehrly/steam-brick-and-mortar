@@ -224,6 +224,30 @@ describe('GameBoxSpawner Event Coordination', () => {
             expect(gamesPlacedEvents[0].status).toBe('games-placed')
         })
 
+        it('preserves side convention on PI-rotated shelves (no front/back swap)', () => {
+            const games = createMockGames(2, 0)
+
+            eventManager.emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                { games, batchIndex: 0, totalBatches: 1 }
+            )
+
+            eventManager.emit<ShelfCreatedEvent>(
+                StorePropsEventTypes.ShelfCreated,
+                {
+                    position: new THREE.Vector3(0, 0, 0),
+                    batchIndex: 0,
+                    shelfRotationY: Math.PI,
+                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
+                }
+            )
+
+            expect(mockRenderer.createGameBoxAuto).toHaveBeenCalled()
+            const firstCall = (mockRenderer.createGameBoxAuto as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]
+            // args: (game, worldPosition, side, rotation)
+            expect(firstCall[2]).toBe('back')
+        })
+
         it('should warn if no pending games found for batch', () => {
             const warnSpy = vi.spyOn(console, 'warn')
             const gamesPlacedEvents: GamesPlacedEvent[] = []
