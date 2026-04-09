@@ -29,6 +29,8 @@ import * as THREE from 'three'
 import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
+import { SceneSignManager, SignStyles } from './SceneSignManager'
+import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
 import { VRLayoutUtils } from './props/SharedPropsUtils'
 import { RoomConstants } from './RoomManager'
 
@@ -53,7 +55,6 @@ import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
 import { RecentlyPlayedCeilingSign } from './RecentlyPlayedCeilingSign'
-import { SceneSignManager } from './SceneSignManager'
 import {
     computeAlternatingClusterXOffset,
     getPrimaryGenreFromBatch,
@@ -568,6 +569,36 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             position,
             rotation
         })
+
+        // End-cap orientation labels — placed here because this is shelf construction,
+        // not game placement. Labels describe the shelf unit, not the games on it.
+        const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
+        const topSurface = shelfSurfaces[0]
+        if (topSurface) {
+            const labelX = topSurface.centerX + (topSurface.width / 2) - 0.15
+            const labelY = topSurface.topY + 0.1
+            const yAxis = new THREE.Vector3(0, 1, 0)
+
+            const frontPosLocal = new THREE.Vector3(labelX, labelY, topSurface.backZ)
+            const frontPos = frontPosLocal.clone().applyAxisAngle(yAxis, rotY).add(position)
+            SceneSignManager.instance.setSign({
+                label: `shelf-front-label-${directIndex}`,
+                text: 'FRONT',
+                anchorPosition: frontPos,
+                mount: { style: 'above-shelf', yOffset: 0, signFacingY: rotY },
+                style: SignStyles.ShelfEndLabel
+            })
+
+            const backPosLocal = new THREE.Vector3(labelX, labelY, topSurface.frontZ)
+            const backPos = backPosLocal.clone().applyAxisAngle(yAxis, rotY).add(position)
+            SceneSignManager.instance.setSign({
+                label: `shelf-back-label-${directIndex}`,
+                text: 'BACK',
+                anchorPosition: backPos,
+                mount: { style: 'above-shelf', yOffset: 0, signFacingY: rotY + Math.PI },
+                style: SignStyles.ShelfEndLabel
+            })
+        }
     }
 
 
