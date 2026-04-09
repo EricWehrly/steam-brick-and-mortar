@@ -565,32 +565,6 @@ export class LightingRenderer {
         }
     }
 
-    public refreshShadows(): void {
-        LightingRenderer.logger.debug('🔄 Refreshing shadows after props added...')
-        
-        // Update shadow cameras for all shadow-casting lights using registry
-        const groupedLights = this.registry.getLightsGroupedByType()
-        
-        for (const [, lights] of groupedLights) {
-            for (const light of lights) {
-                const shadowLight = light as THREE.DirectionalLight | THREE.SpotLight | THREE.PointLight
-                if (light.castShadow && 'shadow' in shadowLight && shadowLight.shadow) {
-                    // Shadow cameras are always OrthographicCamera or PerspectiveCamera
-                    const camera = shadowLight.shadow.camera as THREE.PerspectiveCamera | THREE.OrthographicCamera
-                    camera.updateProjectionMatrix()
-                    shadowLight.shadow.map?.dispose()
-                    shadowLight.shadow.map = null
-                }
-            }
-        }
-        
-        // Force renderer to regenerate shadow maps
-        this.renderer.shadowMap.needsUpdate = true
-        LightingRenderer.logger.debug('✅ Shadow refresh completed')
-    }
-
-
-
     /**
      * Toggle specific light by name on/off
      */
@@ -609,35 +583,6 @@ export class LightingRenderer {
      */
     public toggleAmbientLight(enabled: boolean): void {
         this.toggleLightByName(LIGHT_NAMES.AMBIENT, enabled)
-    }
-
-    public getLightingStats(): {
-        lightCount: number
-        shadowsEnabled: boolean
-        quality: string
-        ambientIntensity: number
-        directionalIntensity: number
-        lightTypes: string[]
-    } {
-        const ambientLight = this.lightingGroup.getObjectByName(LIGHT_NAMES.AMBIENT) as THREE.AmbientLight
-        const directionalLight = this.lightingGroup.getObjectByName(LIGHT_NAMES.MAIN_DIRECTIONAL) as THREE.DirectionalLight
-        
-        // Get all light types for debugging using registry
-        const lightTypes: string[] = []
-        for (const [type, lights] of this.registry.getLightsGroupedByType()) {
-            for (const light of lights) {
-                lightTypes.push(`${type}(${light.name || 'unnamed'})`)
-            }
-        }
-        
-        return {
-            lightCount: this.lightingGroup.children.length,
-            shadowsEnabled: this.renderer.shadowMap.enabled,
-            quality: this.config.quality ?? LIGHTING_QUALITY.ENHANCED,
-            ambientIntensity: ambientLight?.intensity ?? 0,
-            directionalIntensity: directionalLight?.intensity ?? 0,
-            lightTypes
-        }
     }
 
     private clearLights(): void {
