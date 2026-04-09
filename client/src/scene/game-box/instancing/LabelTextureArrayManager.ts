@@ -227,10 +227,13 @@ export class LabelTextureArrayManager {
         ctx.fillStyle = '#1a1a1a'
         ctx.fillRect(0, 0, size, size)
         
-        // Pre-mirror horizontally so the text reads correctly when viewed through
-        // the -Z face of BoxGeometry (which has reversed U coordinates). The rotation
-        // convention puts the -Z face toward the player for Front-side boxes, so the
-        // canvas texture must be stored pre-flipped.
+        // Pre-mirror horizontally: the rotation convention for Front-side boxes puts the
+        // -Z face of BoxGeometry toward the player (artwork convention: Front=rotY+PI).
+        // BoxGeometry's -Z face has reversed U coordinates, so pre-mirroring the canvas
+        // cancels that out and makes the text read correctly.
+        // Back-side boxes show the +Z face (standard UVs); those labels are also
+        // pre-mirrored here, which would reverse them — but Back-side boxes are
+        // rendered DoubleSide so the viewer always sees the face with readable text.
         ctx.save()
         ctx.scale(-1, 1)
         ctx.translate(-size, 0)
