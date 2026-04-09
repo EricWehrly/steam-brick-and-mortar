@@ -224,10 +224,11 @@ export class LodArtworkOrchestrator {
             return { success: true, instanceIndex: existingIndex }
         }
         
-        // Check known failure
-        if (this.artworkProvider.isKnownFailure(appid ?? 0, 'library')) {
+        // Only skip known permanent failures. Non-permanent historical failures
+        // (UNKNOWN/TIMEOUT/NETWORK) should be retried.
+        if (this.artworkProvider.isPermanentFailure(appid ?? 0, 'library')) {
             const reason = this.artworkProvider.getFailureReason(appid ?? 0, 'library')
-            LodArtworkOrchestrator.logger.debug(`Skipping "${gameName}": previously failed (${reason})`)
+            LodArtworkOrchestrator.logger.debug(`Skipping "${gameName}": permanent failure (${reason})`)
             return { success: false, instanceIndex: -1 }
         }
         
