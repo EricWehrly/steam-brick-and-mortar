@@ -227,6 +227,14 @@ export class LabelTextureArrayManager {
         ctx.fillStyle = '#1a1a1a'
         ctx.fillRect(0, 0, size, size)
         
+        // Pre-mirror horizontally so the text reads correctly when viewed through
+        // the -Z face of BoxGeometry (which has reversed U coordinates). The rotation
+        // convention puts the -Z face toward the player for Front-side boxes, so the
+        // canvas texture must be stored pre-flipped.
+        ctx.save()
+        ctx.scale(-1, 1)
+        ctx.translate(-size, 0)
+        
         // Text
         ctx.fillStyle = '#ffffff'
         ctx.font = `bold ${Math.floor(size / 10)}px Arial, sans-serif`
@@ -260,6 +268,8 @@ export class LabelTextureArrayManager {
         lines.forEach((line, i) => {
             ctx.fillText(line, size / 2, startY + i * lineHeight)
         })
+        
+        ctx.restore()
     }
 
     /**
