@@ -10,6 +10,8 @@
  * before consulting each map, so the correct game is always returned.
  */
 import { describe, it, expect } from 'vitest'
+import { INSTANCED_LABEL_MESH_NAME } from '../../scene/game-box/instancing/InstancedLabelRenderer'
+import { LOD_ARTWORK_MESH_NAME } from '../../scene/game-box/instancing/LodGameArtworkRenderer'
 
 // Inline the minimal metadata type to avoid cross-module import in test
 interface InstanceMetadata { name: string; appid?: number | string; position: any }
@@ -84,16 +86,13 @@ describe('raycast mesh identity check', () => {
 
     describe('DataKey names match the actual mesh names used in renderers', () => {
         it('INSTANCED_LABEL_MESH_NAME is gpu-instanced-game-boxes', () => {
-            // This constant comes from InstancedLabelRenderer.ts line 42.
-            // If the mesh name changes there, this test will fail and alert us.
-            const EXPECTED = 'gpu-instanced-game-boxes'
-            // Regression pin ??? update if mesh name intentionally changes
-            expect(EXPECTED).toBe('gpu-instanced-game-boxes')
+            // Imported from InstancedLabelRenderer. If the mesh name changes, this fails.
+            expect(INSTANCED_LABEL_MESH_NAME).toBe('gpu-instanced-game-boxes')
         })
 
-        it('artwork mesh name is lod-game-artwork', () => {
-            const EXPECTED = 'lod-game-artwork'
-            expect(EXPECTED).toBe('lod-game-artwork')
+        it('LOD_ARTWORK_MESH_NAME is lod-game-artwork', () => {
+            // Imported from LodGameArtworkRenderer. If the mesh name changes, this fails.
+            expect(LOD_ARTWORK_MESH_NAME).toBe('lod-game-artwork')
         })
     })
 })

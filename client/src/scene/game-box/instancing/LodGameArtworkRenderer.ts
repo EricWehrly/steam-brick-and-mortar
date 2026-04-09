@@ -26,6 +26,9 @@ import fragmentShader from './shaders/instanced-artwork-lod.frag?raw'
 
 // Class-scoped logger will be attached to the class
 
+/** Mesh name used by the LOD artwork InstancedMesh — used by GameFinder for raycast identity checks. */
+export const LOD_ARTWORK_MESH_NAME = 'lod-game-artwork' as const
+
 /** LOD level constants */
 export const LOD_LEVEL = {
     HIGH: 0,
