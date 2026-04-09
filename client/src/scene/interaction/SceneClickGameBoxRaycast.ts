@@ -48,7 +48,7 @@ export class SceneClickGameBoxRaycast {
     constructor(options: SceneClickGameBoxRaycastOptions) {
         this.sceneOption = options.scene
         this.cameraOption = options.camera
-        this.maxDistance = options.maxDistance ?? 10
+        this.maxDistance = options.maxDistance ?? 5
         this.enableDebugLogs = options.enableDebugLogs ?? false
         this.enableDebugLine = options.enableDebugLine ?? false
         this.eventManager = EventManager.getInstance()

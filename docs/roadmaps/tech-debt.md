@@ -726,11 +726,10 @@ Next step: identify which test file/suite is the memory culprit (run suites indi
   This caused them to be deleted as "debug-only" during cleanup, removing needed diagnostics.
   
   Desired end state:
-  - Production-relevant behavior (logMemoryStats, AllBatchesComplete handler) moves INTO
+  - Production-relevant behavior (AllBatchesComplete handler) moves INTO
     the base classes (LodArtworkOrchestrator, LodDistanceManager)
-  - Console command registration (window.lodDistribution, window.diagnoseArtworkFailures, etc.)
+  - Console command registration (logMemoryStats, window.lodDistribution, window.diagnoseArtworkFailures, etc.)
     lives in a single DevTools bootstrapper that is optionally enabled in dev mode
-  - ILodArtworkRendererDebug interface is satisfied by the base class, not just the Debug subclass
   
   For now: Debug subclasses are restored and GpuGameBoxRenderer always uses them (always-on dev
   tooling). This is fine; the window.* commands only fire on demand.

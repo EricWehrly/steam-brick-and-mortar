@@ -35,16 +35,23 @@ export class SystemUICoordinator {
     private readonly performanceUpdateInterval = 1000 // Update every second
 
     constructor(
-        performanceMonitor: PerformanceMonitorUI,
         debugStatsProvider: DebugStatsProvider,
         eventManager: EventManager,
         appSettings: AppSettings
     ) {
-        this.performanceMonitor = performanceMonitor
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
         
         this.eventManager = eventManager
         this.appSettings = appSettings
+
+        this.performanceMonitor = new PerformanceMonitorUI({
+            position: 'top-right',
+            showMemory: true,
+            showDrawCalls: true,
+            updateInterval: 100,
+            precision: 1
+        })
+        
         this.pauseMenuManager = new PauseMenuManager({}, {}, undefined, this.eventManager, this.appSettings, debugStatsProvider)
     }
 
@@ -54,14 +61,14 @@ export class SystemUICoordinator {
         this.renderer = renderer
         this.rendererDomElement = renderer.domElement
 
+        this.performanceMonitor.start()
+
         if (this.rendererDomElement) {
             this.rendererDomElement.addEventListener('click', this.handleRendererCanvasClick)
             this.rendererDomElement.addEventListener('contextmenu', this.handleRendererContextMenu)
         }
 
-        this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({
-            maxDistance: 5     // about 5m
-        })
+        this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({})
         
         // Initialize pause menu system
         this.pauseMenuManager.init()
