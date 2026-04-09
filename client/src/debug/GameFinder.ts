@@ -18,7 +18,7 @@ import * as THREE from 'three'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
 import { INSTANCED_LABEL_MESH_NAME } from '../scene/game-box/instancing/InstancedLabelRenderer'
-import { INSTANCED_ARTWORK_MESH_NAME } from '../scene/game-box/instancing/InstancedArtworkRenderer'
+import { LOD_ARTWORK_MESH_NAME } from '../scene/game-box/instancing/LodGameArtworkRenderer'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
 import { Logger } from '../utils/Logger'
@@ -78,14 +78,20 @@ export class GameFinder {
         if (instanceId === undefined) return null
 
         const meshName = object.name
-        const isArtwork = meshName === INSTANCED_ARTWORK_MESH_NAME
+        const isArtwork = meshName === LOD_ARTWORK_MESH_NAME
         const isLabel = meshName === INSTANCED_LABEL_MESH_NAME
-        if (!isArtwork && !isLabel) return null
+        if (!isArtwork && !isLabel) {
+            GameFinder.logger.warn(`findByInstancedObject: unrecognized mesh "${meshName}" (instanceId=${instanceId}) — not in artwork or label maps`)
+            return null
+        }
 
         const dataManager = DataManager.getInstance()
         const metaKey = isArtwork ? DataKey.InstancedArtworkMetadata : DataKey.InstancedLabelMetadata
         const meta = dataManager.get<Map<number, InstanceMetadata>>(metaKey)?.get(instanceId)
-        if (!meta?.appid) return null
+        if (!meta?.appid) {
+            GameFinder.logger.warn(`findByInstancedObject: instanceId=${instanceId} on "${meshName}" has no appid in metadata (meta=${JSON.stringify(meta ?? null)})`)
+            return null
+        }
 
         return {
             name: meta.name,
@@ -242,7 +248,7 @@ export class GameFinder {
 
     private isInstancedMeshParent(child: THREE.Object3D): boolean {
         return child.name === INSTANCED_LABEL_MESH_NAME ||
-               child.name === INSTANCED_ARTWORK_MESH_NAME
+               child.name === LOD_ARTWORK_MESH_NAME
     }
 }
 

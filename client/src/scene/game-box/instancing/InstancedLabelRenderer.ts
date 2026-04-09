@@ -227,6 +227,12 @@ export class InstancedLabelRenderer {
                 : InstancedLabelRenderer.DEFAULT_ROTATION
         )
 
+        // Temporary: log first 3 labels to verify rotation convention
+        if (index < 3) {
+            const angle = 2 * Math.atan2(effectiveRotation.y, effectiveRotation.w) * 180 / Math.PI
+            console.log(`[LabelDebug] index=${index} side=${side} rotY=${angle.toFixed(1)}° rotation=${rotation ? 'passed' : 'fallback'}`)
+        }
+
         const matrix = new THREE.Matrix4()
         matrix.compose(position, effectiveRotation, new THREE.Vector3(1, 1, 1))
         this.instancedMesh.setMatrixAt(index, matrix)
