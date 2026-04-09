@@ -14,7 +14,7 @@
 
 import * as THREE from 'three'
 import { PerformanceMonitorUI, type PerformanceStats, ToastManager, UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
-import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
+import { WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { SceneManagerDebug } from '../debug/SceneManagerDebug'
 import { DebugStatsProvider } from './DebugStatsProvider'
@@ -146,36 +146,30 @@ export class SteamBrickAndMortarApp {
         try {
             this.startupTracker.phaseStart(StartupPhase.EngineStart, 'DI Container + coordinators initialization')
             
-            // Register SystemUICoordinator with runtime dependencies BEFORE initialization
-            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Registering SystemUICoordinator')
-            ServiceRegistration.registerSystemUICoordinator(
-                this.container,
-                this.debugStatsProvider,
-                EventManager.getInstance(), // Pass EventManager (not yet resolved from DI)
-                this.appSettings, // Pass AppSettings for panel DI
-            )
-            
-            // Initialize DI services
+            // Initialize DI services (SceneCoordinator has async deps)
             this.startupTracker.logEvent(StartupPhase.EngineStart, 'Initializing DI services')
             await this.container.initialize()
 
 
-            // Resolve EventManager from DI container
-            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Resolving EventManager')
-            this.eventManager = await this.container.resolve(ServiceKeys.EventManager) as EventManager
+            // EventManager — already a singleton, no need to route through container
+            this.eventManager = EventManager.getInstance()
             
             // Set up prerequisite event listeners now that EventManager is available
             this.startupTracker.logEvent(StartupPhase.EngineStart, 'Setting up prerequisite event listeners')
             this.setupPrerequisiteEventListeners()
             
-            // Resolve SceneCoordinator from DI container
+            // Resolve SceneCoordinator from DI container (async deps: SceneManager, AppSettings, DataManager, EventManager)
             this.startupTracker.logEvent(StartupPhase.EngineStart, 'Resolving SceneCoordinator')
             this.sceneCoordinator = await this.container.resolve(ServiceKeys.SceneCoordinator) as SceneCoordinator
             
-            // Resolve UI coordinators from DI container
-            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Resolving UI coordinators')
-            this.webxrUICoordinator = await this.container.resolve(ServiceKeys.WebXRUICoordinator) as WebXRUICoordinator
-            this.systemUICoordinator = await this.container.resolve(ServiceKeys.SystemUICoordinator) as SystemUICoordinator
+            // Construct UI coordinators directly — no DI indirection needed
+            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Constructing UI coordinators')
+            this.webxrUICoordinator = new WebXRUICoordinator()
+            this.systemUICoordinator = new SystemUICoordinator(
+                this.debugStatsProvider,
+                this.eventManager,
+                this.appSettings
+            )
             
             // Initialize webxr event handler now that UI coordinators are available
             this.webxrEventHandler = new WebXREventHandler(
