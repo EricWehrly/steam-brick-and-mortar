@@ -202,7 +202,7 @@ export class LodGameArtworkRenderer {
             this.material,
             this.config.maxInstances
         )
-        this.instancedMesh.name = 'lod-game-artwork'
+        this.instancedMesh.name = LOD_ARTWORK_MESH_NAME
         this.instancedMesh.layers.enable(SceneLayer.Interactable)
         this.instancedMesh.count = 0
         this.instancedMesh.castShadow = true
