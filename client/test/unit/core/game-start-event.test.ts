@@ -27,6 +27,22 @@ vi.mock('../../../src/scene/SceneManager', () => ({
     } })
 }))
 
+// SceneManagerDebug extends SceneManager and calls attachToWindow() (uses window).
+// Mock it out so the test env (no DOM window) doesn't crash.
+vi.mock('../../../src/debug/SceneManagerDebug', () => ({
+    SceneManagerDebug: vi.fn().mockImplementation(function() { return {
+        getRenderer: vi.fn().mockReturnValue({}),
+        getCamera: vi.fn().mockReturnValue({}),
+        getScene: vi.fn().mockReturnValue({
+            getObjectByName: vi.fn().mockReturnValue(null),
+            children: [],
+            add: vi.fn()
+        }),
+        startRenderLoop: vi.fn(),
+        dispose: vi.fn()
+    } })
+}))
+
 vi.mock('../../../src/scene/SceneCoordinator', () => ({
     SceneCoordinator: vi.fn().mockImplementation(function() { return {
         setupCompleteScene: vi.fn().mockResolvedValue(undefined),
@@ -87,6 +103,13 @@ vi.mock('../../../src/ui/UICoordinator', () => ({
 
 vi.mock('../../../src/ui/PerformanceMonitor', () => ({
     PerformanceMonitor: vi.fn().mockImplementation(function() { return {
+        start: vi.fn(),
+        stop: vi.fn(),
+        getStats: vi.fn().mockReturnValue({}),
+        dispose: vi.fn()
+    } }),
+    // Production code now imports PerformanceMonitorUI (renamed class)
+    PerformanceMonitorUI: vi.fn().mockImplementation(function() { return {
         start: vi.fn(),
         stop: vi.fn(),
         getStats: vi.fn().mockReturnValue({}),
