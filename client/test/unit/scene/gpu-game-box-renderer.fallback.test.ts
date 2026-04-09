@@ -18,8 +18,8 @@ vi.mock('../../../src/scene/game-box/instancing/InstancedLabelRenderer', () => {
     return { InstancedLabelRenderer: MockInstancedLabelRenderer }
 })
 
-vi.mock('../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug', () => {
-    class MockLodArtworkOrchestratorDebug {
+vi.mock('../../../src/scene/game-box/instancing/LodArtworkOrchestrator', () => {
+    class MockLodArtworkOrchestrator {
         constructor(_config?: unknown) {}
 
         public setArtworkInstanceFromUrl = artworkSetFromUrlSpy
@@ -29,16 +29,16 @@ vi.mock('../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug', ()
         public setGlobalLod = vi.fn()
     }
 
-    return { LodArtworkOrchestratorDebug: MockLodArtworkOrchestratorDebug }
+    return { LodArtworkOrchestrator: MockLodArtworkOrchestrator }
 })
 
-vi.mock('../../../src/scene/game-box/instancing/LodDistanceManagerDebug', () => {
-    class MockLodDistanceManagerDebug {
+vi.mock('../../../src/scene/game-box/instancing/LodDistanceManager', () => {
+    class MockLodDistanceManager {
         constructor(_renderer?: unknown) {}
         public dispose = vi.fn()
     }
 
-    return { LodDistanceManagerDebug: MockLodDistanceManagerDebug }
+    return { LodDistanceManager: MockLodDistanceManager }
 })
 
 vi.mock('../../../src/core/AppSettings', () => {
