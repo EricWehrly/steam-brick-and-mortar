@@ -680,6 +680,10 @@ This removes all sign/sort logic from GpuStorePropsRenderer.
   ("NetworkError when attempting to fetch resource") and marks it as CORS → permanent.
   All 404s are also now marked permanent immediately (not after 2 attempts).
   Long-term: the Lambda proxy could track 404s server-side so all clients benefit.
+  **Open question:** Transitory 404s — a game's CDN image could be temporarily unavailable
+  (CDN hiccup, new release where image propagates slowly). Permanent-forever may be too
+  aggressive; consider "permanent until TTL" (e.g. 7 days) for 404 specifically vs.
+  true-permanent for CORS (CORS policy changes rarely). Review when header fallback lands.
 **Source:** User report 2026-04-09
 
 
@@ -701,3 +705,15 @@ Likely causes: jsdom worker count, large mock objects not being cleaned up, or V
 Mitigation already in place: maxWorkers:4, minWorkers:1.
 Next step: identify which test file/suite is the memory culprit (run suites individually, watch RSS).
 **Source:** Repeated SIGKILL in session 2026-04-07
+
+### Project conventions doc
+**Priority:** Medium
+**Context:** Logger, EventManager, DataManager usage patterns aren't documented for contributors or AI agents.
+  Without a conventions doc, each PR review has to re-teach the same patterns (Logger over console.log,
+  event ownership, DataManager key/domain conventions, etc.).
+  Create docs/technical/conventions.md covering at minimum:
+  - Logger.createLogFunctions() usage and log levels
+  - EventManager: registerEventHandler vs registerDefaultHandler footgun
+  - DataManager: key/domain discipline, who owns each DataKey
+  - ShelfSide naming counterintuitiveness (Front=far, Back=near)
+**Source:** PR #44 review comment 2026-04-09
