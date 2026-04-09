@@ -162,6 +162,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         const success = this.instancedLabelRenderer.addLabelInstance(
             position,
             game.name,
+            typeof game.appid === 'number' ? game.appid : undefined,
             side,
             rotation
         )
