@@ -677,10 +677,10 @@ This removes all sign/sort logic from GpuStorePropsRenderer.
   so the browser blocks the response entirely and throws a generic NetworkError — hiding the 404.
   Firefox DevTools shows the 404 status, but JS cannot read it.
   Mitigation (2026-04-09): categorizeError now matches Firefox's exact CORS error string
-  ("NetworkError when attempting to fetch resource") and marks it as CORS → permanent.
+  ("NetworkError when attempting to fetch resource") and marks it as CORS -> permanent.
   All 404s are also now marked permanent immediately (not after 2 attempts).
   Long-term: the Lambda proxy could track 404s server-side so all clients benefit.
-  **Open question:** Transitory 404s — a game's CDN image could be temporarily unavailable
+  **Open question:** Transitory 404s - a game's CDN image could be temporarily unavailable
   (CDN hiccup, new release where image propagates slowly). Permanent-forever may be too
   aggressive; consider "permanent until TTL" (e.g. 7 days) for 404 specifically vs.
   true-permanent for CORS (CORS policy changes rarely). Review when header fallback lands.
@@ -738,7 +738,7 @@ Next step: identify which test file/suite is the memory culprit (run suites indi
 
 ### GpuMemoryEstimator: bridge to DataManager memory registry
 **Priority:** Low-Medium
-**Context:** GpuMemoryEstimator.ts has documented gaps � it cannot see LOD texture arrays.
+**Context:** GpuMemoryEstimator.ts has documented gaps � it cannot see LOD texture arrays.
   LodTextureArrayManager and LabelTextureArrayManager already register to DataManager via
   addMemoryConsumption(). LodArtworkOrchestratorDebug.logMemoryStats() already reads that registry.
   GpuMemoryEstimator should also query DataManager.getMemoryConsumption() to include those
