@@ -29,6 +29,11 @@ export interface InstanceMetadata {
     position: THREE.Vector3
 }
 
+export interface InstancedObject {
+    object: THREE.Object3D
+    instanceId: number
+}
+
 export interface GameSceneObject {
     name?: string
     appid?: number | string
@@ -67,11 +72,8 @@ export class GameFinder {
      * Mesh name is the discriminator between artwork and label InstancedMeshes —
      * instanceId is per-mesh (0..N), so the same number on two different meshes
      * means two different games. The metadata maps are keyed the same way.
-     *
-     * @param intersection  THREE.Intersection from raycaster.intersectObjects()
      */
-    public static findByIntersection(intersection: THREE.Intersection): GameSceneObject | null {
-        const { object, instanceId } = intersection
+    public static findByInstancedObject({ object, instanceId }: InstancedObject): GameSceneObject | null {
         if (instanceId === undefined) return null
 
         const meshName = object.name

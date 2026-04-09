@@ -4,7 +4,7 @@ import { DataKey } from '../../core/data/DataTypes'
 import { EventManager } from '../../core/EventManager'
 import { InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type GameSelectedEvent } from '../../types/InteractionEvents'
 import { SceneLayer } from '../SceneLayers'
-import { GameFinder } from '../../debug/GameFinder'
+import { GameFinder, type InstancedObject } from '../../debug/GameFinder'
 
 export interface SceneClickGameBoxRaycastOptions {
     scene?: THREE.Scene
@@ -144,7 +144,7 @@ export class SceneClickGameBoxRaycast {
             // GameFinder.findByIntersection disambiguates artwork vs label mesh by name,
             // then looks up the appropriate metadata map. instanceId is per-mesh (0..N)
             // so mesh identity must be checked before map lookup.
-            const result = GameFinder.findByIntersection(intersection)
+            const result = GameFinder.findByInstancedObject({ object, instanceId: intersection.instanceId! })
             if (result) {
                 return {
                     name: result.name,
