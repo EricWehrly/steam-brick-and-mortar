@@ -85,6 +85,15 @@ export class InstancedLabelRenderer {
             () => this.materializeLabels()
         )
 
+        // Register a fresh metadata map immediately so stale data from a previous
+        // renderer instance is cleared (dispose() also clears it, but construction
+        // must be self-sufficient in case dispose() wasn't called cleanly).
+        DataManager.getInstance().set(
+            DataKey.InstancedLabelMetadata,
+            new Map<number, { name: string; appid?: number; position: THREE.Vector3 }>(),
+            { domain: DataDomain.Renderer }
+        )
+
         console.debug(`📋 InstancedLabelRenderer created (max: ${this.maxInstances} labels)`)
     }
 
@@ -218,23 +227,28 @@ export class InstancedLabelRenderer {
             }
         }
         
-        // Use caller-supplied rotation (from GameBoxUtils.calculateGameRotation with arc convention:
-        // Front=rotY+PI, Back=rotY). Fall back to legacy logic for axis-aligned shelves.
-        // Convention: label artwork is on the -Z face. Back (near) side needs no flip (rotY=0),
-        // Front (far) side needs PI to flip artwork toward player.
-        const effectiveRotation = rotation ?? (
-            side === ShelfSide.Front
-                ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI)
-                : InstancedLabelRenderer.DEFAULT_ROTATION
-        )
-
-        // Temporary: log first 3 labels to verify rotation convention
-        if (index < 3) {
-            const angle = 2 * Math.atan2(effectiveRotation.y, effectiveRotation.w) * 180 / Math.PI
-            console.log(`[LabelDebug] index=${index} side=${side} rotY=${angle.toFixed(1)}° rotation=${rotation ? 'passed' : 'fallback'}`)
+        // Label rotation convention (differs from artwork):
+        // Artwork uses -Z face as the texture face; rotation encodes Front=rotY+PI, Back=rotY.
+        // Labels use FrontSide material, so only the +Z face renders. The +Z face must
+        // always face the player regardless of shelf side. If the caller passed a rotation
+        // for a Front-side box it includes an extra +PI; undo that so +Z faces the player.
+        // For Back-side boxes the rotation is correct already (no extra PI).
+        // Fallback (no rotation supplied) defaults to identity for Back, PI for Front — same logic.
+        let effectiveRotation: THREE.Quaternion
+        if (rotation) {
+            if (side === ShelfSide.Front) {
+                // Undo the +PI that calculateGameRotation added for artwork convention
+                const undoFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI)
+                effectiveRotation = rotation.clone().multiply(undoFlip)
+            } else {
+                effectiveRotation = rotation
+            }
+        } else {
+            // Legacy fallback (axis-aligned shelves, no rotation supplied)
+            effectiveRotation = InstancedLabelRenderer.DEFAULT_ROTATION
         }
 
-        const matrix = new THREE.Matrix4()
+const matrix = new THREE.Matrix4()
         matrix.compose(position, effectiveRotation, new THREE.Vector3(1, 1, 1))
         this.instancedMesh.setMatrixAt(index, matrix)
         
@@ -313,8 +327,8 @@ export class InstancedLabelRenderer {
             vertexShader,
             fragmentShader,
             transparent: true,
-            side: THREE.DoubleSide,
-            depthWrite: false,  // Avoid depth fighting with game boxes
+            side: THREE.FrontSide,
+            depthWrite: true,   // Solid box — don't let geometry behind show through
             depthTest: true
         })
     }
