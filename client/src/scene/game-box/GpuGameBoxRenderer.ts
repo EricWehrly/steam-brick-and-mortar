@@ -22,8 +22,8 @@
  * 
  * DELEGATES TO:
  * - InstancedLabelRenderer: Text label rendering on boxes
- * - LodArtworkOrchestratorDebug: Texture loading and LOD management
- * - LodDistanceManagerDebug: Camera distance calculations
+ * - LodArtworkOrchestrator: Texture loading and LOD management
+ * - LodDistanceManager: Camera distance calculations
  * 
  * DOES NOT:
  * - Know about shelves or layout (receives positions)
@@ -44,8 +44,8 @@ import type {
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { LOD_LEVEL, LOD_TIER_NAME, type LodLevel } from './instancing/ILodArtworkRenderer'
 import type { ILodArtworkRendererDebug } from './instancing/ILodArtworkRenderer'
-import { LodArtworkOrchestratorDebug, type LodConfig } from './instancing/LodArtworkOrchestratorDebug'
-import { LodDistanceManagerDebug } from './instancing/LodDistanceManagerDebug'
+import { LodArtworkOrchestrator, type LodConfig } from './instancing/LodArtworkOrchestrator'
+import { LodDistanceManager } from './instancing/LodDistanceManager'
 import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { EventManager } from '../../core/EventManager'
@@ -68,7 +68,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private readonly dimensions: GameBoxDimensions
     private readonly instancedLabelRenderer: InstancedLabelRenderer
     private readonly lodArtworkRenderer: ILodArtworkRendererDebug
-    private readonly lodDistanceManager: LodDistanceManagerDebug
+    private readonly lodDistanceManager: LodDistanceManager
 
     constructor(maxGames: number = 2000) {
         this.dimensions = { ...GpuGameBoxRenderer.DEFAULT_DIMENSIONS }
@@ -84,7 +84,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         const lodConfigs = this.buildLodConfigsFromSettings()
         const maxHighSlots = AppSettings.get(Setting.LodMaxHighSlots)
         
-        this.lodArtworkRenderer = new LodArtworkOrchestratorDebug({
+        this.lodArtworkRenderer = new LodArtworkOrchestrator({
             maxTextures: maxGames,
             maxGames,
             lazyHighTextures: true,  // Memory optimization: load HIGH textures on demand
@@ -96,7 +96,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         })
         
         // Create distance manager for automatic LOD switching
-        this.lodDistanceManager = new LodDistanceManagerDebug(this.lodArtworkRenderer)
+        this.lodDistanceManager = new LodDistanceManager(this.lodArtworkRenderer)
         
         GpuGameBoxRenderer.logger.lifecycle(`LOD atlas initialized (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
     }
