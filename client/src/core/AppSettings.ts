@@ -423,7 +423,7 @@ export class AppSettings {
             autoSave: true,
             
             // Steam Settings  
-            autoLoadProfile: isDev, // TD: should come from first-run setup flow, not env heuristic
+            autoLoadProfile: true,
             developmentMode: isDev // Default based on environment
         }
     }

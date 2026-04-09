@@ -51,6 +51,7 @@ export class GameFinder {
         return GameFinder.#instance ??= new GameFinder()
     }
 
+    // TODO: remove after GameSpotlight cleanup
     public static getScene(): THREE.Scene {
         return GameFinder.#current.scene
     }
@@ -81,9 +82,9 @@ export class GameFinder {
         const isLabel = meshName === INSTANCED_LABEL_MESH_NAME
         if (!isArtwork && !isLabel) return null
 
-        const dm = DataManager.getInstance()
+        const dataManager = DataManager.getInstance()
         const metaKey = isArtwork ? DataKey.InstancedArtworkMetadata : DataKey.InstancedLabelMetadata
-        const meta = dm.get<Map<number, InstanceMetadata>>(metaKey)?.get(instanceId)
+        const meta = dataManager.get<Map<number, InstanceMetadata>>(metaKey)?.get(instanceId)
         if (!meta?.appid) return null
 
         return {
@@ -155,9 +156,9 @@ export class GameFinder {
 
     private findInstancedGames(): GameSceneObject[] {
         const games: GameSceneObject[] = []
-        const dm = DataManager.getInstance()
+        const dataManager = DataManager.getInstance()
         try {
-            const artworkMetadata = dm.get<Map<number, InstanceMetadata>>(DataKey.InstancedArtworkMetadata)
+            const artworkMetadata = dataManager.get<Map<number, InstanceMetadata>>(DataKey.InstancedArtworkMetadata)
             if (artworkMetadata) {
                 GameFinder.logger.debug(`🔍 Instanced artwork metadata contains ${artworkMetadata.size} game(s)`)
                 for (const [instanceIndex, data] of artworkMetadata.entries()) {
@@ -171,7 +172,7 @@ export class GameFinder {
                     })
                 }
             }
-            const labelMetadata = dm.get<Map<number, InstanceMetadata>>(DataKey.InstancedLabelMetadata)
+            const labelMetadata = dataManager.get<Map<number, InstanceMetadata>>(DataKey.InstancedLabelMetadata)
             if (labelMetadata) {
                 GameFinder.logger.debug(`🔍 Instanced label metadata contains ${labelMetadata.size} game(s)`)
                 for (const [instanceIndex, data] of labelMetadata.entries()) {

@@ -4,7 +4,10 @@ Active bugs and issues that need investigation or fixing.
 
 ## High Priority
 
-### Uncached profile first load creates "cursed room"  
+### Uncached profile first load creates "cursed room"
+**Status**: 🔴 Open  
+**Reported**: 2026-01-16  
+**Description**: When loading an uncached profile for the first time, the room appears but games don't seem to load properly. A refresh fixes it.
 **Steps to Reproduce**:
 1. Load a Steam profile that has never been cached
 2. Observe the room appears but games may not display correctly

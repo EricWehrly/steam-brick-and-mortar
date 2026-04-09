@@ -12,7 +12,7 @@
 
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../core/EventManager'
-import { LightingEventTypes, type LightCreatedEvent, type LightingSystemReadyEvent } from '../types/InteractionEvents'
+import { LightingEventTypes, type LightCreatedEvent, type LightingSystemReadyEvent } from '../types/LightingEvents'
 import { AppSettings } from '../core/AppSettings'
 import { LightRegistry } from '../lighting/LightRegistry'
 import { Logger } from '../utils/Logger'

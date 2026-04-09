@@ -14,7 +14,8 @@ import graphicsSettingsPanelTemplate from '../../../templates/pause-menu/graphic
 import '../../../styles/pause-menu/graphics-settings-panel.css'
 import { AppSettings, LIGHTING_QUALITY, SettingCategory, type ApplicationSettings } from '../../../core/AppSettings'
 import { EventManager, EventSource } from '../../../core/EventManager'
-import { CeilingEventTypes, type CeilingToggleEvent } from '../../../types/InteractionEvents'
+import { CeilingEventTypes } from '../../../types/InteractionEvents'
+import { type CeilingToggleEvent } from '../../../types/LightingEvents'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 
 export class GraphicsSettingsPanel extends PauseMenuPanel {

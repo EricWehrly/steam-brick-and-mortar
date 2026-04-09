@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { LightingControlsPanel } from '../../../src/ui/LightingControlsPanel'
-import { LightingEventTypes } from '../../../src/types/InteractionEvents'
+import { LightingEventTypes } from '../../../src/types/LightingEvents'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { AppSettings } from '../../../src/core/AppSettings'
 

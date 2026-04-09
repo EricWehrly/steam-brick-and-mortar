@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../core/EventManager'
-import { LightingEventTypes } from '../types/InteractionEvents'
+import { LightingEventTypes } from '../types/LightingEvents'
 import { LightRegistry } from './LightRegistry'
 
 interface IManagedLight {

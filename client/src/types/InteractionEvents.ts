@@ -18,14 +18,6 @@ import * as THREE from 'three'
 import type { BaseInteractionEvent } from '../core/EventManager'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { SteamGame } from '../steam'
-import {
-    LightingEventTypes,
-    type LightingToggleEvent,
-    type LightingDebugToggleEvent,
-    type LightingQualityChangedEvent,
-    type LightCreatedEvent,
-    type LightingSystemReadyEvent,
-} from './LightingEvents'
 
 // =============================================================================
 // STEAM EVENTS
@@ -210,20 +202,6 @@ export interface GameSelectedEvent extends BaseInteractionEvent {
     /** App ID of the selected game */
     appid: number | string
 }
-
-// =============================================================================
-// LIGHTING EVENTS — defined in LightingEvents.ts, re-exported here for compat
-// =============================================================================
-export type {
-    LightingToggleEvent,
-    LightingDebugToggleEvent,
-    LightingQualityChangedEvent,
-    CeilingToggleEvent,
-    LightCreatedEvent,
-    PointLightRequestEvent,
-    LightingSystemReadyEvent,
-} from './LightingEvents'
-export { LightingEventTypes } from './LightingEvents'
 
 // =============================================================================
 // STORE PROPS EVENTS
@@ -471,13 +449,6 @@ export interface InteractionEventMap {
     [GameEventTypes.ShelfLayoutDetermined]: ShelfLayoutDeterminedEvent
     [GameEventTypes.SomeBatchesComplete]: SomeBatchesCompleteEvent
     [GameEventTypes.AllBatchesComplete]: AllBatchesCompleteEvent
-    
-    // Lighting events
-    [LightingEventTypes.Toggle]: LightingToggleEvent
-    [LightingEventTypes.DebugToggle]: LightingDebugToggleEvent
-    [LightingEventTypes.QualityChanged]: LightingQualityChangedEvent
-    [LightingEventTypes.Created]: LightCreatedEvent
-    [LightingEventTypes.SystemReady]: LightingSystemReadyEvent
     
     // App events
     [AppEventTypes.PhaseStarted]: PhaseCompletedEvent
