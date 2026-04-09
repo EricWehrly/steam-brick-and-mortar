@@ -38,21 +38,12 @@ vi.mock('../../../src/ui/coordinators/SystemUICoordinator', () => ({
 }))
 
 vi.mock('../../../src/lighting/LightingManager', () => ({
-    LightingManager: vi.fn().mockImplementation(function() { return {
-        getLightingStats: vi.fn().mockReturnValue({ lightCount: 0, quality: 'enhanced' })
-    } })
+    LightingManager: vi.fn().mockImplementation(function() { return {} })
 }))
 
 vi.mock('../../../src/scene/LightingRenderer', () => ({
     LightingRenderer: vi.fn().mockImplementation(function() { return {
-        getLightingStats: vi.fn().mockReturnValue({ 
-            lightCount: 0, 
-            shadowsEnabled: false,
-            quality: 'enhanced',
-            ambientIntensity: 0.3
-        }),
-        setupLighting: vi.fn().mockResolvedValue(undefined),
-        refreshShadows: vi.fn().mockResolvedValue(undefined)
+        setupLighting: vi.fn().mockResolvedValue(undefined)
     } })
 }))
 

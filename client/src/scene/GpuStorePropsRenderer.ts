@@ -611,10 +611,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         console.info('GpuStorePropsRenderer disposed')
     }
 
-    public getArtworkMemoryStats() {
-        return this.gameBoxRenderer?.getMemoryStats() ?? null
-    }
-
     public logMemoryStats(): void {
         this.gameBoxRenderer?.logMemoryStats()
     }
