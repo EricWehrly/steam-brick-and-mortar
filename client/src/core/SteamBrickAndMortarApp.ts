@@ -54,11 +54,9 @@ export class SteamBrickAndMortarApp {
     private webxrCoordinator: WebXRCoordinator
     private webxrEventHandler: WebXREventHandler
     // UI coordinators resolved from DI container
-    private steamUICoordinator: SteamUICoordinator
     private webxrUICoordinator: WebXRUICoordinator  
     private systemUICoordinator: SystemUICoordinator
     private uiManager: UIManager
-    private performanceMonitor: PerformanceMonitorUI
     private steamIntegration: SteamIntegration
     private debugStatsProvider: DebugStatsProvider
     private eventManager: EventManager
@@ -108,15 +106,6 @@ export class SteamBrickAndMortarApp {
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Setting up DI Container')
         this.container = new ServiceContainer()
         ServiceRegistration.configureServices(this.container, config, this.sceneManager, this.appSettings)
-        
-        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating PerformanceMonitor')
-        this.performanceMonitor = new PerformanceMonitorUI({
-            position: 'top-right',
-            showMemory: true,
-            showDrawCalls: true,
-            updateInterval: 100,
-            precision: 1
-        })
 
         const isDevelopmentMode = this.appSettings.getSetting('developmentMode')
         const defaultMaxGames = isDevelopmentMode ? 20 : 100
@@ -140,8 +129,7 @@ export class SteamBrickAndMortarApp {
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating DebugStatsProvider')
         this.debugStatsProvider = new DebugStatsProvider(
             this.sceneManager,
-            this.steamIntegration,
-            this.performanceMonitor
+            this.steamIntegration
         )
 
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating UIManager')
@@ -162,12 +150,9 @@ export class SteamBrickAndMortarApp {
             this.startupTracker.logEvent(StartupPhase.EngineStart, 'Registering SystemUICoordinator')
             ServiceRegistration.registerSystemUICoordinator(
                 this.container,
-                this.performanceMonitor,
                 this.debugStatsProvider,
                 EventManager.getInstance(), // Pass EventManager (not yet resolved from DI)
                 this.appSettings, // Pass AppSettings for panel DI
-                undefined, // cacheStatsProvider - no longer used, cache stats come from PixelDataCache
-                this.steamIntegration
             )
             
             // Initialize DI services
@@ -189,7 +174,6 @@ export class SteamBrickAndMortarApp {
             
             // Resolve UI coordinators from DI container
             this.startupTracker.logEvent(StartupPhase.EngineStart, 'Resolving UI coordinators')
-            this.steamUICoordinator = await this.container.resolve(ServiceKeys.SteamUICoordinator) as SteamUICoordinator
             this.webxrUICoordinator = await this.container.resolve(ServiceKeys.WebXRUICoordinator) as WebXRUICoordinator
             this.systemUICoordinator = await this.container.resolve(ServiceKeys.SystemUICoordinator) as SystemUICoordinator
             
@@ -297,8 +281,6 @@ export class SteamBrickAndMortarApp {
             return
         }
         
-        this.performanceMonitor.stop()
-        
         this.webxrEventHandler.dispose()
         this.eventManager.dispose()
         
@@ -391,8 +373,6 @@ export class SteamBrickAndMortarApp {
         
         // Start the render loop (all updates happen via registry)
         this.sceneManager.startRenderLoop()
-        
-        this.performanceMonitor.start()
     }
 
     // TODO: This method exists solely for testing purposes - remove or refactor
@@ -407,9 +387,5 @@ export class SteamBrickAndMortarApp {
 
     getSceneManager(): SceneManager {
         return this.sceneManager
-    }
-
-    getCurrentPerformanceStats(): PerformanceStats {
-        return this.performanceMonitor.getStats()
     }
 }

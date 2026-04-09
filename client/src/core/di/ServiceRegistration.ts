@@ -14,7 +14,6 @@ import { DataManager } from '../data/DataManager'
 import { EventManager } from '../EventManager'
 import { AppSettings } from '../AppSettings'
 import { SteamUICoordinator, WebXRUICoordinator, SystemUICoordinator } from '../../ui/coordinators'
-import { PerformanceMonitorUI } from '../../ui/PerformanceMonitor'
 import type { DebugStatsProvider } from '../DebugStatsProvider'
 
 export interface AppConfig {
@@ -183,17 +182,13 @@ export class ServiceRegistration {
    */
   public static registerSystemUICoordinator(
     container: ServiceContainer,
-    performanceMonitor: PerformanceMonitorUI,
     debugStatsProvider: DebugStatsProvider,
     eventManager: EventManager,
-    appSettings: AppSettings,
-    cacheStatsProvider?: () => Promise<any>,
-    steamIntegration?: any
+    appSettings: AppSettings
   ): void {
     container.registerInstance(
       ServiceKeys.SystemUICoordinator,
       new SystemUICoordinator(
-        performanceMonitor,
         debugStatsProvider,
         eventManager,
         appSettings
