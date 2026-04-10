@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CategoryAssigner, KNOWN_GENRES, sortByGenreThenPlaytime, type ShelfGroup } from './CategoryAssigner'
+import { CategoryAssigner, KNOWN_GENRES, sortByGenreThenPlaytime, primaryGenre, type ShelfGroup } from './CategoryAssigner'
 import { sortByNumericField, getRecentlyPlayedBucket, getBucketLabel, RecentlyPlayedBucket } from './GameSorter'
 import type { SteamGameData } from '../game-box/types/GameData'
 
@@ -105,12 +105,13 @@ describe('CategoryAssigner', () => {
 })
 
 describe('sortByGenreThenPlaytime', () => {
+    // Items use { genre } (pre-resolved) because genre resolution is primaryGenre()'s job,
+    // not the comparator's. In production, CategoryAssigner.assign() resolves via primaryGenre()
+    // before handing items off to sort.
     const game = (genre: string | null, playtime: number) => ({
-        appid: Math.random(),
-        name: `${genre}-${playtime}`,
+        genre: genre ?? 'Other',
         playtime_forever: playtime,
-        genres: genre ? [{ id: '1', description: genre }] : undefined,
-    } as any)
+    })
 
     it('groups same-genre games consecutively', () => {
         const games = [
@@ -120,11 +121,9 @@ describe('sortByGenreThenPlaytime', () => {
             game('Action', 200),
         ]
         const sorted = [...games].sort(sortByGenreThenPlaytime)
-        const genres = sorted.map(g => g.genres?.[0]?.description ?? 'Other')
-        // First two should be the same genre, last two should be the same genre
-        expect(genres[0]).toBe(genres[1])
-        expect(genres[2]).toBe(genres[3])
-        expect(genres[0]).not.toBe(genres[2])
+        expect(sorted[0].genre).toBe(sorted[1].genre)
+        expect(sorted[2].genre).toBe(sorted[3].genre)
+        expect(sorted[0].genre).not.toBe(sorted[2].genre)
     })
 
     it('sorts by playtime descending within a genre', () => {
@@ -139,16 +138,16 @@ describe('sortByGenreThenPlaytime', () => {
         expect(sorted[2].playtime_forever).toBe(100)
     })
 
-    it('puts Other/no-genre games last', () => {
+    it('puts Other/unrecognised games last', () => {
         const games = [
-            game(null, 1000),         // no genre
+            game('Other', 1000),
             game('Action', 50),
-            game('Acciï¿½n', 500),      // unrecognised genre -> Other
+            game('Other', 500),
             game('RPG', 100),
         ]
         const sorted = [...games].sort(sortByGenreThenPlaytime)
-        const lastTwo = sorted.slice(-2).map(g => g.genres?.[0]?.description ?? 'Other')
-        expect(lastTwo.every(g => g === 'Other' || g === 'Acciï¿½n')).toBe(true)
+        expect(sorted[sorted.length - 1].genre).toBe('Other')
+        expect(sorted[sorted.length - 2].genre).toBe('Other')
     })
 
     it('is stable for equal genre+playtime', () => {
@@ -301,5 +300,98 @@ describe('getBucketLabel', () => {
         expect(getBucketLabel(RecentlyPlayedBucket.ThisYear)).toBe('Played This Year')
         expect(getBucketLabel(RecentlyPlayedBucket.Before)).toBe('Played Before')
         expect(getBucketLabel(RecentlyPlayedBucket.Unplayed)).toBe('Never Played')
+    })
+})
+
+import { chainComparators, sortAlphabetically, sortByEnumIndex, groupByKey } from './GameSortFunctions'
+
+describe('chainComparators', () => {
+    it('uses first comparator when it returns non-zero', () => {
+        const byA = (a: {a: number}, b: {a: number}) => b.a - a.a
+        const byB = (a: {b: number}, b: {b: number}) => b.b - a.b
+        const chained = chainComparators<{a: number; b: number}>(byA, byB)
+        expect(chained({ a: 2, b: 1 }, { a: 1, b: 9 })).toBeGreaterThan(0)
+    })
+
+    it('falls through to second comparator on tie', () => {
+        const byA = (a: {a: number}, b: {a: number}) => b.a - a.a
+        const byB = (a: {b: number}, b: {b: number}) => b.b - a.b
+        const chained = chainComparators<{a: number; b: number}>(byA, byB)
+        // a is equal, so b decides
+        expect(chained({ a: 5, b: 1 }, { a: 5, b: 9 })).toBeGreaterThan(0)
+    })
+
+    it('composes three comparators', () => {
+        type Item = { x: number; y: number; z: number }
+        const items: Item[] = [
+            { x: 1, y: 2, z: 3 },
+            { x: 1, y: 2, z: 9 },
+            { x: 1, y: 5, z: 1 },
+        ]
+        const cmp = chainComparators<Item>(
+            (a, b) => b.x - a.x,
+            (a, b) => b.y - a.y,
+            (a, b) => b.z - a.z,
+        )
+        const sorted = [...items].sort(cmp)
+        expect(sorted[0]).toEqual({ x: 1, y: 5, z: 1 })
+        expect(sorted[1]).toEqual({ x: 1, y: 2, z: 9 })
+        expect(sorted[2]).toEqual({ x: 1, y: 2, z: 3 })
+    })
+})
+
+describe('sortAlphabetically', () => {
+    it('sorts strings case-insensitively ascending', () => {
+        const items = [{ name: 'Zelda' }, { name: 'action' }, { name: 'RPG' }]
+        const sorted = [...items].sort(sortAlphabetically<{ name?: string }>('name'))
+        expect(sorted.map(i => i.name)).toEqual(['action', 'RPG', 'Zelda'])
+    })
+
+    it('puts absent values last', () => {
+        const items = [{ name: undefined }, { name: 'Alpha' }]
+        const sorted = [...items].sort(sortAlphabetically<{ name?: string }>('name'))
+        expect(sorted[0].name).toBe('Alpha')
+    })
+})
+
+describe('sortByEnumIndex', () => {
+    const ORDER = ['A', 'B', 'C']
+
+    it('sorts by list position', () => {
+        const items = [{ v: 'C' }, { v: 'A' }, { v: 'B' }]
+        const sorted = [...items].sort(sortByEnumIndex<{ v?: string }>('v', ORDER))
+        expect(sorted.map(i => i.v)).toEqual(['A', 'B', 'C'])
+    })
+
+    it('puts unlisted values last', () => {
+        const items = [{ v: 'Z' }, { v: 'A' }, { v: 'X' }]
+        const sorted = [...items].sort(sortByEnumIndex<{ v?: string }>('v', ORDER))
+        expect(sorted[0].v).toBe('A')
+        // Z and X both unlisted — stable among themselves
+        expect(['Z', 'X']).toContain(sorted[1].v)
+        expect(['Z', 'X']).toContain(sorted[2].v)
+    })
+})
+
+describe('groupByKey', () => {
+    it('partitions into groups by key function', () => {
+        const items = [
+            { genre: 'Action', n: 1 },
+            { genre: 'RPG', n: 2 },
+            { genre: 'Action', n: 3 },
+        ]
+        const grouped = groupByKey(items, i => i.genre)
+        expect(grouped.get('Action')).toHaveLength(2)
+        expect(grouped.get('RPG')).toHaveLength(1)
+    })
+
+    it('preserves insertion order within groups', () => {
+        const items = [{ v: 'A', i: 1 }, { v: 'A', i: 2 }, { v: 'A', i: 3 }]
+        const grouped = groupByKey(items, i => i.v)
+        expect(grouped.get('A')!.map(x => x.i)).toEqual([1, 2, 3])
+    })
+
+    it('handles empty input', () => {
+        expect(groupByKey([], () => 'x').size).toBe(0)
     })
 })
