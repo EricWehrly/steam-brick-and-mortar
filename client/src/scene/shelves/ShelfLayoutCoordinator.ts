@@ -44,15 +44,10 @@ export class ShelfLayoutCoordinator {
         ShelfLayoutCoordinator.logger.debug('Subscribed to BatchReadyForPlacement')
     }
 
-    /** Reset for scene reload — allows layout to be recomputed on next load. */
-    public reset(): void {
+    public dispose(): void {
         this.layoutComputed = false
         this.shelvesByBatch.clear()
         this.emittedShelfIds.clear()
-    }
-
-    public dispose(): void {
-        this.reset()
     }
 
     private handleFirstBatch(detail: BatchReadyForPlacementEvent): void {

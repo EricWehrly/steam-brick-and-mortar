@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { GameEventTypes } from '../../types/InteractionEvents'
-import { RecentlyPlayedBucket } from './GameSorter'
+import { RecentlyPlayedBucket, getRecentlyPlayedBucket, getBucketLabel } from './GameSorter'
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -130,5 +130,59 @@ describe('GameSorter', () => {
 
         const [, payload] = mockEmit.mock.calls[0]
         expect((payload.buckets as ReadonlyMap<string, string>).size).toBe(0)
+    })
+})
+
+describe('getRecentlyPlayedBucket', () => {
+    const DAY = 24 * 60 * 60
+    const now = 1000000000
+
+    const game = (rtime: number | undefined) => ({
+        rtime_last_played: rtime,
+    } as SteamGameData)
+
+    it('returns "unplayed" for rtime_last_played = 0 or undefined', () => {
+        expect(getRecentlyPlayedBucket(game(0), now)).toBe(RecentlyPlayedBucket.Unplayed)
+        expect(getRecentlyPlayedBucket(game(undefined), now)).toBe(RecentlyPlayedBucket.Unplayed)
+    })
+
+    it('returns "today" for within 24h', () => {
+        expect(getRecentlyPlayedBucket(game(now - 1), now)).toBe(RecentlyPlayedBucket.Today)
+        expect(getRecentlyPlayedBucket(game(now - DAY + 1), now)).toBe(RecentlyPlayedBucket.Today)
+    })
+
+    it('returns "this-week" for within 7 days', () => {
+        expect(getRecentlyPlayedBucket(game(now - DAY), now)).toBe(RecentlyPlayedBucket.ThisWeek)
+        expect(getRecentlyPlayedBucket(game(now - 7 * DAY + 1), now)).toBe(RecentlyPlayedBucket.ThisWeek)
+    })
+
+    it('returns "this-month" for within 30 days', () => {
+        expect(getRecentlyPlayedBucket(game(now - 7 * DAY), now)).toBe(RecentlyPlayedBucket.ThisMonth)
+        expect(getRecentlyPlayedBucket(game(now - 30 * DAY + 1), now)).toBe(RecentlyPlayedBucket.ThisMonth)
+    })
+
+    it('returns "this-year" for within 365 days', () => {
+        expect(getRecentlyPlayedBucket(game(now - 30 * DAY), now)).toBe(RecentlyPlayedBucket.ThisYear)
+        expect(getRecentlyPlayedBucket(game(now - 365 * DAY + 1), now)).toBe(RecentlyPlayedBucket.ThisYear)
+    })
+
+    it('returns "before" for older than 365 days', () => {
+        expect(getRecentlyPlayedBucket(game(now - 365 * DAY), now)).toBe(RecentlyPlayedBucket.Before)
+        expect(getRecentlyPlayedBucket(game(now - 1000 * DAY), now)).toBe(RecentlyPlayedBucket.Before)
+    })
+
+    it('handles future dates as "today"', () => {
+        expect(getRecentlyPlayedBucket(game(now + 3600), now)).toBe(RecentlyPlayedBucket.Today)
+    })
+})
+
+describe('getBucketLabel', () => {
+    it('returns correct human-readable labels', () => {
+        expect(getBucketLabel(RecentlyPlayedBucket.Today)).toBe('Played Today')
+        expect(getBucketLabel(RecentlyPlayedBucket.ThisWeek)).toBe('Played This Week')
+        expect(getBucketLabel(RecentlyPlayedBucket.ThisMonth)).toBe('Played This Month')
+        expect(getBucketLabel(RecentlyPlayedBucket.ThisYear)).toBe('Played This Year')
+        expect(getBucketLabel(RecentlyPlayedBucket.Before)).toBe('Played Before')
+        expect(getBucketLabel(RecentlyPlayedBucket.Unplayed)).toBe('Never Played')
     })
 })

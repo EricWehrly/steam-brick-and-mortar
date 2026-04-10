@@ -11,7 +11,7 @@
  * Toggle shortcut: G (genre reference)
  */
 
-import { KNOWN_GENRES } from '../scene/categorization/CategoryAssigner'
+import { KNOWN_GENRES } from '../scene/categorization/GameSortFunctions'
 import '../styles/category-reference-panel.css'
 
 // ─── Static category data ──────────────────────────────────────────────────
