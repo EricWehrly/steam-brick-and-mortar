@@ -8,6 +8,7 @@ import {
     chainComparators,
     sortAlphabetically,
     sortByEnumIndex,
+    sortByNumericField,
     groupByKey,
 } from '../../../../src/scene/categorization/GameSortFunctions'
 import type { SteamGameData } from '../../../../src/scene/game-box/types/GameData'
@@ -178,6 +179,35 @@ describe('sortByGenreThenPlaytime', () => {
         const games = [game('Action', 100), game('Action', 100)]
         const sorted = [...games].sort(sortByGenreThenPlaytime)
         expect(sorted).toHaveLength(2)
+    })
+
+    it('keeps genre order even when cross-genre playtime would reorder', () => {
+        // Foo appears before Bar in KNOWN_GENRES (via sortByEnumIndex).
+        // A Bar game has higher playtime than some Foo games — it must still sort after all Foo.
+        // Uses fake genres so the test is decoupled from client genre list.
+        const ORDER = ['Foo', 'Bar']
+        const cmp = chainComparators(
+            sortByEnumIndex<{ genre?: string; playtime_forever?: number }>('genre', ORDER),
+            sortByNumericField<{ genre?: string; playtime_forever?: number }>('playtime_forever')
+        )
+        const games = [
+            { genre: 'Bar', playtime_forever: 9999 }, // high playtime but second genre
+            { genre: 'Foo', playtime_forever: 100 },
+            { genre: 'Foo', playtime_forever: 500 },
+            { genre: 'Bar', playtime_forever: 200 },
+        ]
+        const sorted = [...games].sort(cmp)
+        // All Foo before all Bar
+        expect(sorted[0].genre).toBe('Foo')
+        expect(sorted[1].genre).toBe('Foo')
+        expect(sorted[2].genre).toBe('Bar')
+        expect(sorted[3].genre).toBe('Bar')
+        // Within Foo: descending playtime
+        expect(sorted[0].playtime_forever).toBe(500)
+        expect(sorted[1].playtime_forever).toBe(100)
+        // Within Bar: descending playtime
+        expect(sorted[2].playtime_forever).toBe(9999)
+        expect(sorted[3].playtime_forever).toBe(200)
     })
 })
 

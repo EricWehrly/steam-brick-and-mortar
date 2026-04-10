@@ -100,7 +100,7 @@ export interface RoomCreatedEvent extends BaseInteractionEvent {
 export interface RoomResizedEvent extends BaseInteractionEvent {
     dimensions: { width: number; depth: number; height: number }
     centerOffset?: { x: number; y: number; z: number }
-    shelfLayout?: { rows: number; shelvesPerRow: number }
+    shelfLayout?: { rows: number; shelvesPerRow?: number }
 }
 
 // =============================================================================
@@ -188,7 +188,7 @@ export interface ShelfBounds {
 
 export interface ShelfLayoutDeterminedEvent extends BaseInteractionEvent {
     shelfBounds: ShelfBounds
-    shelfLayout: { rows: number; shelvesPerRow: number }
+    shelfLayout: { rows: number; shelvesPerRow?: number }
 }
 
 /**
@@ -446,9 +446,5 @@ export interface GameLoadingProgressEvent extends BaseInteractionEvent {
     total: number
 }
 
-// =============================================================================
 // EVENT TYPE MAPPINGS
-// =============================================================================
-
-// Map lives in EventTypeMap.ts — imported here for backward compatibility.
-export type { InteractionEventMap, InteractionEventName, InteractionEventDetail } from './EventTypeMap'
+// Import from EventTypeMap.ts directly — not re-exported from here.

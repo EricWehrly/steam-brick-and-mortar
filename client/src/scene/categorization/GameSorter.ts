@@ -82,11 +82,12 @@ export class GameSorter {
 
         const hasRecentlyPlayedData = games.some(g => (g.rtime_last_played ?? 0) > 0)
 
-        const sortedGames: ReadonlyArray<Readonly<SteamGameData>> = hasRecentlyPlayedData
-            ? [...games].sort(sortByNumericField<SteamGameData>('rtime_last_played', 'playtime_forever'))
-            : [...games]
+        // Always include all games. rtime_last_played === 0 means "never played" —
+        // those go to RecentlyPlayedBucket.Unplayed, not dropped.
+        const sortedGames: ReadonlyArray<Readonly<SteamGameData>> =
+            [...games].sort(sortByNumericField<SteamGameData>('rtime_last_played', 'playtime_forever'))
 
-        const buckets = this.buildBucketMap(sortedGames, hasRecentlyPlayedData)
+        const buckets = this.buildBucketMap(sortedGames)
 
         EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
             sortedGames,
@@ -100,15 +101,12 @@ export class GameSorter {
     }
 
     private buildBucketMap(
-        sortedGames: ReadonlyArray<Readonly<SteamGameData>>,
-        hasRecentlyPlayedData: boolean
+        sortedGames: ReadonlyArray<Readonly<SteamGameData>>
     ): ReadonlyMap<string, string> {
-        if (!hasRecentlyPlayedData) return new Map()
-
         const buckets = new Map<string, string>()
         for (const game of sortedGames) {
             const bucket = getRecentlyPlayedBucket(game as SteamGameData)
-            if (bucket !== RecentlyPlayedBucket.Unplayed && !buckets.has(bucket)) {
+            if (!buckets.has(bucket)) {
                 buckets.set(bucket, getBucketLabel(bucket))
             }
         }

@@ -1,6 +1,11 @@
 /**
  * Shelf Sticker Handler - Manages sticker lifecycle for shelf rendering
  * 
+ * TD: sticker-coordinator
+ * This class is a candidate for dissolution into a StickerCoordinator that
+ * self-subscribes to StickerSurfaceReady events (emitted per sideboard instance)
+ * rather than receiving mesh managers via setManagers(). See tech-debt.md.
+ *
  * Coordinates between:
  * - StickerManager (data/placement logic)
  * - ShelfStickerIntegration (shader/GPU attributes)

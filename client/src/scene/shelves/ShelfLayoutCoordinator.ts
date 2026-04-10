@@ -16,21 +16,25 @@ import { computeArcShelfLayout, type ArcLayoutConfig } from '../props/shared/Arc
  * Listens to the first BatchReadyForPlacement event. Uses totalBatches (known
  * immediately) to compute the full arc shelf layout without waiting for game
  * content or sort. Emits:
- *   - ShelfLayoutDetermined  once, with bounds for room/lighting systems
+ *   - ShelfLayoutDetermined  once, with shelfBounds for room/lighting systems
  *   - ShelfReady             one per shelf, with position + rotationY
  *
- * InstancedShelfRenderer self-subscribes to ShelfReady and handles GPU writes.
- * GpuStorePropsRenderer self-subscribes to ShelfReady and emits ShelfCreated.
+ * NOTE: ShelfReady is emitted once per BatchReadyForPlacement — progressively
+ * as batches arrive. This means 40+ events can fire back-to-back on load.
+ * A future ShelfLayoutBatch event could coalesce these if consumers need it.
  *
- * Knows nothing about games, batches, or GPU. Pure layout authority.
+ * Current assumption: 1 batch ≈ 1 shelf. This holds while shelves have a
+ * uniform game-slot count. Wall shelves or variable-capacity shelves will
+ * need a separate mapping from batch count → shelf count.
+ *
+ * Knows nothing about games, GPU, or rendering. Pure layout authority.
  */
 export class ShelfLayoutCoordinator {
     private static readonly logger = Logger.createLogFunctions(ShelfLayoutCoordinator.name)
 
-    private static readonly BATCH_SIZE = 18
-    private static readonly SHELF_WIDTH = 2.0
-    private static readonly SHELF_DEPTH = 1.0
-    private static readonly FIXED_ROWS_COUNT = 4 + 6 + 10 + 12 // 32 — row 0–3 fixed
+    private static readonly FIXED_ROWS_COUNT = 4 + 6 + 10 + 12 // 32 — rows 0–3 with fixed counts
+
+    /** Current assumption: totalBatches maps 1:1 to shelves. See class doc. */
 
     private layoutComputed = false
     private shelvesByBatch = new Map<number, { position: THREE.Vector3; rotationY: number }>()
@@ -54,7 +58,7 @@ export class ShelfLayoutCoordinator {
         if (!this.layoutComputed) {
             this.layoutComputed = true
 
-            const totalShelves = detail.totalBatches
+            const totalShelves = detail.totalBatches // 1 batch ≈ 1 shelf (current assumption)
             if (totalShelves === 0) {
                 ShelfLayoutCoordinator.logger.warn('totalBatches is 0 — no shelves to lay out')
                 return
@@ -69,8 +73,7 @@ export class ShelfLayoutCoordinator {
 
     private computeLayout(totalShelves: number): void {
         const arcConfig: ArcLayoutConfig = {
-            rows: 5,
-            shelvesPerRow: 10,
+            // Only override where we need non-default values; ArcLayoutUtils.DEFAULTS handle the rest.
             shelvesPerRowByRow: [
                 4,
                 6,
@@ -78,7 +81,6 @@ export class ShelfLayoutCoordinator {
                 12,
                 Math.max(1, totalShelves - ShelfLayoutCoordinator.FIXED_ROWS_COUNT),
             ],
-            halfAngle: Math.PI / 3,
             halfAngleByRow: [
                 Math.PI / 3.5,
                 Math.PI / 3.5,
@@ -87,17 +89,17 @@ export class ShelfLayoutCoordinator {
                 Math.PI / 2.6,
             ],
             minShelfGap: 1.0,
-            shelfWidthMetres: 2.0,
             rowRadiusStep: 4.0,
             firstRowRadius: 5.5,
         }
 
         const shelves = computeArcShelfLayout(totalShelves, arcConfig)
 
-        // Emit bounds for room/lighting systems
+        // Compute spatial bounds for room/lighting systems
         const bounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
-        const hw = ShelfLayoutCoordinator.SHELF_WIDTH / 2
-        const hd = ShelfLayoutCoordinator.SHELF_DEPTH / 2
+        // Use shelf width/depth from ArcLayoutUtils defaults rather than duplicating them here
+        const hw = 2.0 / 2  // default shelfWidthMetres / 2
+        const hd = 1.0 / 2  // default shelfDepth / 2
         for (const s of shelves) {
             bounds.minX = Math.min(bounds.minX, s.position.x - hw)
             bounds.maxX = Math.max(bounds.maxX, s.position.x + hw)
@@ -111,7 +113,7 @@ export class ShelfLayoutCoordinator {
                 shelfBounds: bounds,
                 shelfLayout: {
                     rows: (shelves[shelves.length - 1]?.row ?? 0) + 1,
-                    shelvesPerRow: 10,
+                    // shelvesPerRow omitted — it varies by row; consumers should not rely on it
                 },
             }
         )

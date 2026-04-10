@@ -764,3 +764,23 @@ Next step: identify which test file/suite is the memory culprit (run suites indi
 - Optional spike branch proving one vertical slice
 
 **Source:** User request 2026-04-09
+---
+
+## id: sticker-coordinator
+
+**StickerCoordinator — event-driven sticker architecture**
+
+**Status**: Planned (next pass on stickers or InstancedShelfRenderer carve)
+
+**Context**: ShelfStickerHandler currently receives sideboard mesh managers via setManagers() and subscribes to shelf-index toggle events internally. This couples sticker lifecycle to InstancedShelfRenderer's internals.
+
+**Goal**: Introduce a StickerCoordinator that:
+- Subscribes to a new StickerSurfaceReady event emitted by InstancedShelfRenderer when a sideboard instance is stamped. Payload: { meshManager, boardIndex, tileId, shelfId, isLeft }.
+- Receives layout/sort context via GamesSort to vary sticker selection by shelf type (genre, recency bucket, etc.)
+- Owns StickerManager and ShelfStickerIntegration (currently held by ShelfStickerHandler)
+- Handles EnableShelfIndices/DisableShelfIndices directly (currently wired inside ShelfStickerHandler)
+- ShelfStickerHandler dissolves into StickerCoordinator once surfaces arrive via event rather than via setManagers()
+
+**Mirrors**: The sign coordinator pattern (SceneSignManager reacting to ShelfReady/GamesSort).
+
+**Source**: April 2026 — discussed during InstancedShelfRenderer analysis

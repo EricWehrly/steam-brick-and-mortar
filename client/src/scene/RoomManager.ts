@@ -33,7 +33,7 @@ export interface RoomDimensions {
 interface RoomResizeEventData {
     dimensions?: RoomDimensions
     centerOffset?: { x: number; y: number; z: number }
-    shelfLayout?: { rows: number; shelvesPerRow: number }
+    shelfLayout?: { rows: number; shelvesPerRow?: number }
 }
 
 export class RoomManager {
