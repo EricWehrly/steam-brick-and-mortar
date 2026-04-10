@@ -24,9 +24,6 @@ import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { EventManager } from './EventManager'
 import { GameEventTypes, type GameStartEvent, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from './AppSettings'
-import { ServiceContainer } from './di/ServiceContainer'
-import { ServiceRegistration } from './di/ServiceRegistration'
-import { ServiceKeys } from './di/ServiceKeys'
 import type { AppConfig as DIAppConfig } from './di'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { RenderLoopDiagnostics } from '../debug/RenderLoopDiagnostics'
@@ -43,9 +40,7 @@ export interface AppConfig extends DIAppConfig {
 const BACKEND_URL = 'https://steam-api-dev.wehrly.com';
 
 export class SteamBrickAndMortarApp {
-    // DI Container - Phase 1: Core services
-    private container: ServiceContainer
-    private readonly config: AppConfig // Store config for container recreation
+    private readonly config: AppConfig // Store config for potential recreation
     
     // Services - will be resolved from container where available
     private sceneManager: SceneManager
@@ -67,6 +62,7 @@ export class SteamBrickAndMortarApp {
 
     // State
     private isInitialized: boolean = false
+    private initPromise: Promise<void> | null = null
     
     // GameStart prerequisite tracking
     private prerequisites = {
@@ -101,10 +97,7 @@ export class SteamBrickAndMortarApp {
             outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
         })
         
-        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Setting up DI Container')
-        this.container = new ServiceContainer()
-        // TODO: Just inline these creations probably
-        ServiceRegistration.configureServices(this.container, config, this.sceneManager, this.appSettings)
+        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Preparing core coordinators')
 
         const isDevelopmentMode = this.appSettings.getSetting('developmentMode')
         const defaultMaxGames = isDevelopmentMode ? 20 : 100
@@ -135,26 +128,33 @@ export class SteamBrickAndMortarApp {
         if (this.isInitialized) {
             return
         }
-        
+
+        if (this.initPromise) {
+            return this.initPromise
+        }
+
+        this.initPromise = this.initImpl()
+        try {
+            await this.initPromise
+        } finally {
+            this.initPromise = null
+        }
+    }
+
+    private async initImpl(): Promise<void> {
         try {
             this.startupTracker.phaseStart(StartupPhase.EngineStart, 'DI Container + coordinators initialization')
             
-            // Initialize DI services (SceneCoordinator has async deps)
-            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Initializing DI services')
-            await this.container.initialize()
-
-
-            // EventManager — already a singleton, no need to route through container
             this.eventManager = EventManager.getInstance()
-            
+
             // Set up prerequisite event listeners now that EventManager is available
             this.startupTracker.logEvent(StartupPhase.EngineStart, 'Setting up prerequisite event listeners')
             this.setupPrerequisiteEventListeners()
-            
-            // Resolve SceneCoordinator from DI container (async deps: SceneManager, AppSettings, DataManager, EventManager)
-            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Resolving SceneCoordinator')
-            this.sceneCoordinator = await this.container.resolve(ServiceKeys.SceneCoordinator) as SceneCoordinator
-            
+
+            // Construct SceneCoordinator directly (DI container removed)
+            this.startupTracker.logEvent(StartupPhase.EngineStart, 'Constructing SceneCoordinator')
+            this.sceneCoordinator = new SceneCoordinator(this.sceneManager)
+
             // Construct UI coordinators directly — no DI indirection needed
             this.startupTracker.logEvent(StartupPhase.EngineStart, 'Constructing UI coordinators')
             this.webxrUICoordinator = new WebXRUICoordinator()
@@ -275,16 +275,8 @@ export class SteamBrickAndMortarApp {
         this.sceneCoordinator.dispose()
         this.sceneManager.dispose()
         
-        // Recreate DI container for clean reinitialization
-        await this.container.dispose()
-        this.container = ServiceRegistration.configureServices(
-            new ServiceContainer(),
-            this.config,
-            this.sceneManager,
-            this.appSettings
-        )
-        
         this.isInitialized = false
+        this.initPromise = null
         console.debug('✅ Application disposed')
     }
 
