@@ -38,7 +38,7 @@ vi.mock('../../src/utils/TextureManager', async () => {
 })
 
 import { EventManager } from '../../src/core/EventManager'
-import { DataManager } from '../../src/core/data'
+import { DataDomain, DataKey, DataManager } from '../../src/core/data'
 import { GpuStorePropsRenderer } from '../../src/scene/GpuStorePropsRenderer'
 import { 
     SteamEventTypes, 
@@ -86,6 +86,10 @@ describe('Batch-to-Placement Flow Integration', () => {
         
         // Clear state
         dataManager.clear()
+        dataManager.set(DataKey.MainScene, scene, {
+            domain: DataDomain.Scene,
+            description: 'Integration test main scene'
+        })
         allBatchesCompleteReceived = false
         layoutDeterminedReceived = false
         completionEventData = null
