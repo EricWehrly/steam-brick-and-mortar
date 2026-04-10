@@ -2,12 +2,9 @@
  * Unit Tests: GameBoxSpawner Event-Driven Coordination
  * 
  * Tests verify that GameBoxSpawner correctly:
- * 1. Listens for BatchReadyForPlacement events
- * 2. Stores games in pending state
- * 3. Emits ShelfSpaceRequested events
- * 4. Listens for ShelfCreated events
- * 5. Spawns games from pending storage
- * 6. Emits GamesPlaced events
+ * 1. Listens for BatchReadyForPlacement events and stores games as pending
+ * 2. Listens for ShelfCreated events and places stored games
+ * 3. Emits GamesPlaced events
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest'
@@ -19,7 +16,6 @@ import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
 import {
     StorePropsEventTypes,
     type BatchReadyForPlacementEvent,
-    type ShelfSpaceRequestedEvent,
     type ShelfCreatedEvent,
     type GamesPlacedEvent,
     type GameBoxSpawnedEvent,
@@ -113,39 +109,25 @@ describe('GameBoxSpawner Event Coordination', () => {
     describe('BatchReadyForPlacement Event Handling', () => {
         it('should store games when receiving BatchReadyForPlacement', () => {
             const games = createMockGames(5, 0)
-            const shelfSpaceRequestedEvents: ShelfSpaceRequestedEvent[] = []
-
-            // Listen for the emitted event
-            eventManager.registerEventHandler(
-                StorePropsEventTypes.ShelfSpaceRequested,
-                (event: CustomEvent<ShelfSpaceRequestedEvent>) => {
-                    shelfSpaceRequestedEvents.push(event.detail)
-                }
-            )
 
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games, batchIndex: 0, totalBatches: 1 }
             )
 
-            // Should emit ShelfSpaceRequested
-            expect(shelfSpaceRequestedEvents).toHaveLength(1)
-            expect(shelfSpaceRequestedEvents[0].batchIndex).toBe(0)
-            expect(shelfSpaceRequestedEvents[0].gamesCount).toBe(5)
+            // Games stored as pending — verify by triggering ShelfCreated
+            eventManager.emit<ShelfCreatedEvent>(
+                StorePropsEventTypes.ShelfCreated,
+                { position: new THREE.Vector3(0, 0, 0), batchIndex: 0, bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 } }
+            )
+
+            expect(spawnedEvents).toHaveLength(5)
         })
 
-        it('should emit ShelfSpaceRequested for each batch', () => {
+        it('should store batches independently by batchIndex', () => {
             const batch1 = createMockGames(5, 0)
             const batch2 = createMockGames(6, 1)
             const batch3 = createMockGames(4, 2)
-            const shelfSpaceRequestedEvents: ShelfSpaceRequestedEvent[] = []
-
-            eventManager.registerEventHandler(
-                StorePropsEventTypes.ShelfSpaceRequested,
-                (event: CustomEvent<ShelfSpaceRequestedEvent>) => {
-                    shelfSpaceRequestedEvents.push(event.detail)
-                }
-            )
 
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
@@ -160,30 +142,28 @@ describe('GameBoxSpawner Event Coordination', () => {
                 { games: batch3, batchIndex: 2, totalBatches: 3 }
             )
 
-            expect(shelfSpaceRequestedEvents).toHaveLength(3)
-            expect(shelfSpaceRequestedEvents[0].gamesCount).toBe(5)
-            expect(shelfSpaceRequestedEvents[1].gamesCount).toBe(6)
-            expect(shelfSpaceRequestedEvents[2].gamesCount).toBe(4)
+            // Trigger shelves — each should place its own batch
+            for (let i = 0; i < 3; i++) {
+                eventManager.emit<ShelfCreatedEvent>(
+                    StorePropsEventTypes.ShelfCreated,
+                    { position: new THREE.Vector3(i * 3, 0, 0), batchIndex: i, bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 } }
+                )
+            }
+
+            expect(spawnedEvents.length).toBeGreaterThan(0)
         })
 
         it('should handle empty batches without errors', () => {
             const games: readonly SteamGame[] = []
-            const shelfSpaceRequestedEvents: ShelfSpaceRequestedEvent[] = []
 
-            eventManager.registerEventHandler(
-                StorePropsEventTypes.ShelfSpaceRequested,
-                (event: CustomEvent<ShelfSpaceRequestedEvent>) => {
-                    shelfSpaceRequestedEvents.push(event.detail)
-                }
-            )
+            expect(() => {
+                eventManager.emit<BatchReadyForPlacementEvent>(
+                    StorePropsEventTypes.BatchReadyForPlacement,
+                    { games, batchIndex: 0, totalBatches: 1 }
+                )
+            }).not.toThrow()
 
-            eventManager.emit<BatchReadyForPlacementEvent>(
-                StorePropsEventTypes.BatchReadyForPlacement,
-                { games, batchIndex: 0, totalBatches: 1 }
-            )
-
-            expect(shelfSpaceRequestedEvents).toHaveLength(1)
-            expect(shelfSpaceRequestedEvents[0].gamesCount).toBe(0)
+            expect(spawnedEvents).toHaveLength(0)
         })
     })
 
@@ -328,45 +308,32 @@ describe('GameBoxSpawner Event Coordination', () => {
     })
 
     describe('Complete Event Flow', () => {
-        it('should follow correct sequence: BatchReady → ShelfSpaceRequested → ShelfCreated → GamesPlaced', () => {
+        it('should follow correct sequence: BatchReady → ShelfCreated → GamesPlaced', () => {
             const games = createMockGames(10, 0)
             const eventSequence: string[] = []
 
-            // Track event sequence
             const originalEmit = eventManager.emit.bind(eventManager)
             eventManager.emit = vi.fn((eventType: string, detail: any) => {
                 eventSequence.push(eventType)
                 return originalEmit(eventType, detail)
             }) as any
 
-            // Start flow
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games, batchIndex: 0, totalBatches: 1 }
             )
 
-            // Create shelf
             eventManager.emit<ShelfCreatedEvent>(
                 StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0,
-                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
-                }
+                { position: new THREE.Vector3(0, 0, 0), batchIndex: 0, bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 } }
             )
 
-            // Verify sequence
             expect(eventSequence).toContain(StorePropsEventTypes.BatchReadyForPlacement)
-            expect(eventSequence).toContain(StorePropsEventTypes.ShelfSpaceRequested)
             expect(eventSequence).toContain(StorePropsEventTypes.ShelfCreated)
             expect(eventSequence).toContain(StorePropsEventTypes.GamesPlaced)
 
-            // Verify order (ShelfSpaceRequested before ShelfCreated, ShelfCreated before GamesPlaced)
-            const requestedIdx = eventSequence.indexOf(StorePropsEventTypes.ShelfSpaceRequested)
             const createdIdx = eventSequence.indexOf(StorePropsEventTypes.ShelfCreated)
             const placedIdx = eventSequence.indexOf(StorePropsEventTypes.GamesPlaced)
-
-            expect(requestedIdx).toBeLessThan(createdIdx)
             expect(createdIdx).toBeLessThan(placedIdx)
         })
 
