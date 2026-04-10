@@ -743,3 +743,24 @@ Next step: identify which test file/suite is the memory culprit (run suites indi
   GpuMemoryEstimator should also query DataManager.getMemoryConsumption() to include those
   registrations in its estimate, giving a unified picture in the Playwright memory snapshot test.
 **Source:** Cleanup branch review 2026-04-09
+
+### Architecture: DataManager memory concerns split-out review
+**Priority:** Medium
+**Effort:** 2-4 hours (design + impact review)
+**Context:** DataManager currently owns both general key/value domain state and memory accounting concerns (e.g., `addMemoryConsumption`, `getMemoryConsumption`). Before upcoming changes, review whether memory tracking should be separated into a dedicated class (e.g., `MemoryRegistry`/`MemoryManager`) or implemented as a DataManager extension/composition layer.
+
+**Goals:**
+- Clarify ownership boundaries between app state registry vs diagnostics/memory accounting
+- Reduce coupling for future DataManager refactors
+- Decide preferred design direction: inheritance (`extends DataManager`) vs composition (separate service used by DataManager consumers)
+
+**Design constraints to review:**
+- Preserve existing read/write call sites for non-memory DataManager usage
+- Keep memory instrumentation discoverable for debug tools and tests
+- Avoid introducing parallel competing state registries
+
+**Suggested outputs:**
+- Short design note (recommended shape + migration strategy)
+- Optional spike branch proving one vertical slice
+
+**Source:** User request 2026-04-09
