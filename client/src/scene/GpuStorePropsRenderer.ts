@@ -12,7 +12,6 @@
  *
  * DOES NOT OWN:
  * - Layout math (→ ShelfLayoutCoordinator)
- * - GPU shelf instancing (→ ShelfRenderer)
  * - Sign placement (→ SceneSignManager)
  * - Game sorting (→ GameSorter)
  */
@@ -33,7 +32,6 @@ import {
     type BatchReadyForPlacementEvent,
     type ShelfCreatedEvent,
     type ShelfReadyEvent,
-    type ShelfPlacementReadyEvent,
     type GameBoxSpawnedEvent,
 } from '../types/InteractionEvents'
 import { Logger } from '../utils/Logger'
@@ -41,8 +39,8 @@ import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import type { SteamGameData } from './game-box/types/GameData'
-import { ShelfRenderer } from './shelves/ShelfRenderer'
 import { ShelfLayoutCoordinator } from './shelves/ShelfLayoutCoordinator'
+import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private static readonly logger = Logger.createLogFunctions(GpuStorePropsRenderer.name)
@@ -75,7 +73,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
     private gameBoxSpawner?: GameBoxSpawner
 
-    private readonly shelfRenderer: ShelfRenderer
+    private readonly instancedShelfRenderer: InstancedShelfRenderer
     private readonly shelfLayoutCoordinator: ShelfLayoutCoordinator
 
     constructor(scene: THREE.Scene) {
@@ -86,7 +84,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.propsGroup.name = 'props-instanced'
         this.scene.add(this.propsGroup)
 
-        this.shelfRenderer = new ShelfRenderer()
+        this.instancedShelfRenderer = new InstancedShelfRenderer()
         this.shelfLayoutCoordinator = new ShelfLayoutCoordinator()
 
         this.setupEventListeners()
@@ -108,14 +106,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             }
         )
 
-        // Track total shelves from placement events (used for progress)
-        EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ShelfPlacementReady,
-            (event: CustomEvent<ShelfPlacementReadyEvent>) => {
-                this.totalShelves = event.detail.totalShelves
-            }
-        )
-
         // ShelfReady: GPU write done — emit ShelfCreated for GameBoxSpawner + SceneSignManager
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfReady,
@@ -133,6 +123,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private async handleInitialBatch(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
         const { totalBatches } = event.detail
+        this.totalShelves = totalBatches
 
         if (!this.batchCoordinator.isFirstBatchProcessing()) {
             return
@@ -196,8 +187,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     public async setupProps(config: PropsConfig = {}): Promise<void> {
         if (this.setupPhaseInitialized) return
 
-        this.shelfRenderer.initialize().catch(error => {
-            console.error('❌ Failed to initialize ShelfRenderer:', error)
+        this.instancedShelfRenderer.initialize().catch(error => {
+            console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
         })
 
         this.gameBoxSpawner = new GameBoxSpawner()
@@ -228,7 +219,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     public clearProps(): void {
-        this.shelfRenderer.reset()
+        this.instancedShelfRenderer.reset()
 
         while (this.propsGroup.children.length > 0) {
             const child = this.propsGroup.children[0]
@@ -249,7 +240,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.gameBoxSpawner = undefined
         this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = null
-        this.shelfRenderer.dispose()
+        this.instancedShelfRenderer.dispose()
         this.shelfLayoutCoordinator.dispose()
         this.scene.remove(this.propsGroup)
         GpuStorePropsRenderer.logger.info('GpuStorePropsRenderer disposed')

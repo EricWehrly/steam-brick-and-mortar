@@ -194,15 +194,34 @@ The deeper coupling — games assigned to shelves by batch index — is a separa
 
 ## Implementation Status (2026-04-10)
 
-**Branch is complete.** All items from the design above are implemented.
+**Branch status: merge-ready.**
 
-### Key deviations from design
+### Implemented in this branch
 
-- `ShelfCommissioner` deferred as planned; batch-order assignment remains.
-- `ShelfRenderer` expanded beyond the skeleton to own full `InstancedShelfRenderer` lifecycle (init, createShelf, reset, dispose). `GpuStorePropsRenderer` now delegates entirely.
-- `GamesSortEvent` / `AllBatchesCompleteEvent` moved to `EnvironmentEvents.ts` (not `InteractionEvents.ts`) following the `LightingEvents.ts` pattern.
-- `SceneSignManager` gained `SignKind` discriminant and `SignRecord` for type-safe multi-sign-type storage and geometry recycling.
-- `GameBoxSpawner` → `GpuGameBoxRenderer` coupling replaced with `GameBoxSpawned` event chain.
+- `GameSorter` emits `GameEventTypes.GamesSort` after `AllBatchesComplete`.
+- `SceneSignManager` reacts to `GamesSort` + shelf events (incremental placement, no bulk post-pass).
+- `ShelfLayoutCoordinator` now owns arc layout math and shelf bounds emission (`ShelfLayoutDetermined`).
+- **Progressive shelf spawn restored:** layout is computed on first `BatchReadyForPlacement` (using `totalBatches`), then each arriving batch index triggers its corresponding `ShelfReady` emission.
+- `InstancedShelfRenderer` now self-subscribes to `ShelfReady` and writes shelf instances directly.
+- `GpuStorePropsRenderer` no longer owns shelf placement math; it listens for `ShelfReady` and emits `ShelfCreated` for downstream consumers.
+- `ShelfRenderer` wrapper removed (deleted) to avoid redundant ownership layers.
+- `GameBoxSpawner` stays decoupled and batch-index driven (`BatchReadyForPlacement` store, `ShelfCreated` consume).
+- Event seams remain clean (`EnvironmentEvents.ts` + `EventTypeMap.ts`).
+
+### Current event model
+
+- **Layout/physical path:** `BatchReadyForPlacement` (first batch) → `ShelfLayoutCoordinator` computes layout + emits `ShelfLayoutDetermined`; each subsequent batch triggers `ShelfReady` for that shelf id.
+- **Shelf render path:** `ShelfReady` → `InstancedShelfRenderer` (GPU instance write).
+- **Placement/sign path:** `ShelfReady` → `GpuStorePropsRenderer` emits `ShelfCreated` → `GameBoxSpawner` places boxes + `SceneSignManager` places signs.
+- **Sorting/semantic path:** `AllBatchesComplete` → `GameSorter` emits `GamesSort` (labels/sign semantics and future reorder source).
+
+### Planned next branch
+
+1. **Explicit `LayoutChanged` event** (separate from initial `ShelfLayoutDetermined`) for runtime relayout and future layout modes.
+2. **Post-sort box reorder pass**: apply `GamesSort` ordering to already-instantiated shelves (reflow/reassign shelf slots).
+3. **Shelf reuse/update policy** for layout changes (idempotent shelfId updates, optional animation).
+4. **Sign math extraction** from `SceneSignManager` into focused helpers (bucket transition + anchor generation).
+5. **Optional UX polish**: animated shelf relayout and game-box reorder transitions.
 
 ### Multi-sign-type notes
 
@@ -211,7 +230,3 @@ Neon tube signs (`feat-neon-sign-v2` branch) can integrate when ready:
 - `SignRecord.mesh` is `THREE.Object3D`-compatible; no structural changes needed
 - Add `setNeonSign()` for neon-specific config (glow, text)
 - `clearByKind('neon-tube')` handles cleanup
-
-### Shelf spawning removal readiness
-
-Not ready. Arc layout position calculation is content-aware (genre distribution, total batch count). Future work: extract to `ShelfLayoutCoordinator` so position logic, GPU writes, and event coordination are all separately testable.

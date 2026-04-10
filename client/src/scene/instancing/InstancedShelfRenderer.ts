@@ -45,7 +45,7 @@ import type {
 } from './IInstancedRenderer'
 import { ShelfStickerHandler } from '../stickers/ShelfStickerHandler'
 import { EventManager } from '../../core/EventManager'
-import { GameEventTypes, StorePropsEventTypes, type RendererReadyEvent } from '../../types/InteractionEvents'
+import { GameEventTypes, StorePropsEventTypes, type RendererReadyEvent, type ShelfReadyEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import { MeshPrewarmer } from '../../utils/MeshPrewarmer'
 import { SystemCapabilitiesDetector } from '../../utils/SystemCapabilities'
@@ -123,6 +123,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     // Shelf unit template (computed ONCE, applied to each shelf position)
     private shelfUnitTemplate: ShelfPartTemplate[] = []
     private hasParallelShaderCompile = false
+    private pendingShelfReady = new Map<number, ShelfReadyEvent>()
     private meshesAddedToScene = false
     private sceneInsertCancelled = false
     
@@ -170,6 +171,11 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SomeBatchesComplete,
             this.updateGPU.bind(this)
+        )
+
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ShelfReady,
+            (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(event.detail)
         )
         
         InstancedShelfRenderer.logger.debug(`🏪 Created (max units: ${this.maxShelfUnits})`)
@@ -252,6 +258,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             }
             
             this.isInitialized = true
+            this.flushPendingShelfReady()
             
             // Emit RendererReady event (Phase 3: replace polling with events)
             EventManager.getInstance().emit<RendererReadyEvent>(
@@ -515,6 +522,32 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
     }
     
+    private handleShelfReady(detail: ShelfReadyEvent): void {
+        if (!this.isReady()) {
+            this.pendingShelfReady.set(detail.shelfId, detail)
+            return
+        }
+
+        const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, detail.rotationY, 0))
+        this.setInstance(detail.shelfId, {
+            position: detail.position as THREE.Vector3,
+            rotation,
+        })
+    }
+
+    private flushPendingShelfReady(): void {
+        if (!this.isReady() || this.pendingShelfReady.size === 0) {
+            return
+        }
+
+        const pending = Array.from(this.pendingShelfReady.values()).sort((a, b) => a.shelfId - b.shelfId)
+        this.pendingShelfReady.clear()
+
+        for (const detail of pending) {
+            this.handleShelfReady(detail)
+        }
+    }
+
     public updateGPU(): void {
         if (!this.isInitialized) {
             return
@@ -543,6 +576,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
         this.meshesAddedToScene = false
         this.sceneInsertCancelled = true
+        this.pendingShelfReady.clear()
         
         InstancedShelfRenderer.logger.debug('🔄 Reset')
     }
@@ -603,6 +637,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.meshesAddedToScene = false
         this.sceneInsertCancelled = true
         this.hasParallelShaderCompile = false
+        this.pendingShelfReady.clear()
         
         InstancedShelfRenderer.logger.debug('✅ Disposed')
     }
