@@ -10,7 +10,7 @@
  */
 
 import * as THREE from 'three'
-import { RecentlyPlayedBucket, getRecentlyPlayedBucket, getBucketLabel } from '../categorization/CategoryAssigner'
+import { RecentlyPlayedBucket, getRecentlyPlayedBucket, getBucketLabel } from '../categorization/GameSorter'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { RoomConstants } from '../RoomManager'
 

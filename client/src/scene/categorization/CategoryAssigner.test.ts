@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { CategoryAssigner, KNOWN_GENRES, sortByGenreThenPlaytime, sortByRecentlyPlayed, getRecentlyPlayedBucket, getBucketLabel, RecentlyPlayedBucket, type ShelfGroup } from './CategoryAssigner'
+import { CategoryAssigner, KNOWN_GENRES, sortByGenreThenPlaytime, type ShelfGroup } from './CategoryAssigner'
+import { sortByNumericField, getRecentlyPlayedBucket, getBucketLabel, RecentlyPlayedBucket } from './GameSorter'
 import type { SteamGameData } from '../game-box/types/GameData'
 
 describe('CategoryAssigner', () => {
@@ -207,14 +208,16 @@ describe('CategoryAssigner � genre policy', () => {
     })
 })
 
-describe('sortByRecentlyPlayed', () => {
+describe('sortByNumericField (rtime_last_played)', () => {
+    const sorter = sortByNumericField<{ rtime_last_played?: number; playtime_forever?: number }>('rtime_last_played', 'playtime_forever')
+
     it('sorts most-recently-played first', () => {
         const games = [
             { rtime_last_played: 100, playtime_forever: 50 },
             { rtime_last_played: 999, playtime_forever: 10 },
             { rtime_last_played: 200, playtime_forever: 30 },
         ]
-        const sorted = [...games].sort(sortByRecentlyPlayed)
+        const sorted = [...games].sort(sorter)
         expect(sorted.map(g => g.rtime_last_played)).toEqual([999, 200, 100])
     })
 
@@ -223,7 +226,7 @@ describe('sortByRecentlyPlayed', () => {
             { rtime_last_played: 0, playtime_forever: 100 },
             { rtime_last_played: 500, playtime_forever: 5 },
         ]
-        const sorted = [...games].sort(sortByRecentlyPlayed)
+        const sorted = [...games].sort(sorter)
         expect(sorted[0].rtime_last_played).toBe(500)
         expect(sorted[1].rtime_last_played).toBe(0)
     })
@@ -233,7 +236,7 @@ describe('sortByRecentlyPlayed', () => {
             { rtime_last_played: 100, playtime_forever: 30 },
             { rtime_last_played: 100, playtime_forever: 80 },
         ]
-        const sorted = [...games].sort(sortByRecentlyPlayed)
+        const sorted = [...games].sort(sorter)
         expect(sorted[0].playtime_forever).toBe(80)
     })
 
@@ -242,7 +245,7 @@ describe('sortByRecentlyPlayed', () => {
             { playtime_forever: 100 },
             { rtime_last_played: 50, playtime_forever: 10 },
         ]
-        const sorted = [...games].sort(sortByRecentlyPlayed)
+        const sorted = [...games].sort(sorter)
         expect(sorted[0].rtime_last_played).toBe(50)
     })
 })

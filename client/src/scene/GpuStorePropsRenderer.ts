@@ -245,7 +245,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     public dispose(): void {
         this.clearProps()
-        this.gameBoxSpawner = undefined
         this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = null
         this.instancedShelfRenderer.dispose()

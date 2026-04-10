@@ -27,7 +27,7 @@ import {
     type ShelfCreatedEvent,
 } from '../types/InteractionEvents'
 import type { GamesSortEvent } from '../types/EnvironmentEvents'
-import { RecentlyPlayedBucket } from './categorization/CategoryAssigner'
+import { RecentlyPlayedBucket } from './categorization/GameSorter'
 import type { SteamGameData } from './game-box/types/GameData'
 import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
 import {

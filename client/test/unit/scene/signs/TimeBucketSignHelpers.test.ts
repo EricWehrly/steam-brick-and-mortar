@@ -14,7 +14,7 @@ import {
     bucketDisplayLabel,
     SHELF_BATCH_SIZE,
 } from '../../../../src/scene/signs/TimeBucketSignHelpers'
-import { RecentlyPlayedBucket } from '../../../../src/scene/categorization/CategoryAssigner'
+import { RecentlyPlayedBucket } from '../../../../src/scene/categorization/GameSorter'
 import type { SteamGameData } from '../../../../src/scene/game-box/types/GameData'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
