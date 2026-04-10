@@ -11,9 +11,6 @@ import { CacheManagementPanel } from '../../src/ui/pause/panels/CacheManagementP
 import { HelpPanel } from '../../src/ui/pause/panels/HelpPanel'
 import { EventManager } from '../../src/core/EventManager'
 import { AppSettings } from '../../src/core/AppSettings'
-import { ServiceContainer } from '../utils/di/TestServiceContainer'
-import { ServiceKeys } from '../utils/di/TestServiceContainer'
-import { createSceneTestContainer } from '../utils/test-container-helpers'
 
 // Mock DOM environment
 function createMockDOM() {
@@ -54,7 +51,6 @@ function createMockDOM() {
 }
 
 describe('Pause Menu Integration Tests', () => {
-    let container: ServiceContainer
     let pauseMenuManager: PauseMenuManager
     let mockCallbacks: any
     let mockDOM: ReturnType<typeof createMockDOM>
@@ -62,9 +58,6 @@ describe('Pause Menu Integration Tests', () => {
     let appSettings: AppSettings
 
     beforeEach(async () => {
-        // Create isolated test container
-        container = await createSceneTestContainer()
-        
         // Setup DOM mocks
         mockDOM = createMockDOM()
         vi.stubGlobal('document', mockDOM.mockDocument)
@@ -106,10 +99,9 @@ describe('Pause Menu Integration Tests', () => {
             onMenuClose: vi.fn()
         }
 
-        // Resolve dependencies from container
-        eventManager = await container.resolve(ServiceKeys.EventManager)
-        appSettings = await container.resolve(ServiceKeys.AppSettings)
-        
+        eventManager = EventManager.getInstance()
+        appSettings = AppSettings.getInstance()
+
         const mockSystemDependencies = {
             performanceMonitor: null as any,
             renderer: null as any
@@ -126,13 +118,11 @@ describe('Pause Menu Integration Tests', () => {
         )
     })
 
-    afterEach(async () => {
+    afterEach(() => {
         pauseMenuManager?.dispose()
         vi.restoreAllMocks()
         vi.unstubAllGlobals()
-        
-        // Dispose container to clean up all services
-        await container.dispose()
+
     })
 
     describe('Initialization', () => {

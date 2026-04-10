@@ -17,8 +17,7 @@ import type {
     DataEntry, 
     DataMetadata, 
     DataProvider, 
-    DataManagerConfig,
-    DataChangeEvent 
+    DataManagerConfig
 } from './DataTypes'
 
 // Data-specific events that extend BaseInteractionEvent

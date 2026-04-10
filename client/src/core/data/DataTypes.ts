@@ -28,8 +28,7 @@ export enum DataKey {
     MainCamera = 'core.mainCamera',
     Renderer = 'core.renderer',
     InstancedArtworkMetadata = 'renderer.instancedArtworkMetadata',
-    InstancedLabelMetadata = 'renderer.instancedLabelMetadata',
-    PerformanceMonitor = 'core.performanceMonitor',
+    InstancedLabelMetadata = 'renderer.instancedLabelMetadata'
 }
 
 /**
