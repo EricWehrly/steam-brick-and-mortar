@@ -4,28 +4,85 @@
  * Listens for AllBatchesComplete, reads the full game list from DataManager,
  * sorts and buckets games, then emits GameEventTypes.GamesSort.
  *
- * Consumers (SceneSignManager, UI layers) subscribe to GamesSort instead of
- * re-running sort/bucket logic independently.
- *
- * TODO: Sorting logic should migrate to a utility class (e.g. GameSortUtils)
- * called by layout/coordinator classes (e.g. ShelfLayoutCoordinator) rather
- * than living directly in this event listener. Capture for future refactor.
+ * Owns all recently-played sort and bucket logic — this is explicitly GameSorter's
+ * responsibility, not CategoryAssigner's. CategoryAssigner handles genre grouping only.
  */
 
 import { EventManager } from '../../core/EventManager'
 import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
-import {
-    GameEventTypes,
-} from '../../types/InteractionEvents'
+import { GameEventTypes } from '../../types/InteractionEvents'
 import type { AllBatchesCompleteEvent, GamesSortEvent } from '../../types/EnvironmentEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
-import {
-    sortByRecentlyPlayed,
-    getRecentlyPlayedBucket,
-    getBucketLabel,
-    RecentlyPlayedBucket,
-} from './CategoryAssigner'
+
+// ─── Recently-played bucket types ─────────────────────────────────────────────
+
+export enum RecentlyPlayedBucket {
+    Today     = 'today',
+    ThisWeek  = 'this-week',
+    ThisMonth = 'this-month',
+    ThisYear  = 'this-year',
+    Before    = 'before',
+    Unplayed  = 'unplayed',
+}
+
+const BUCKET_LABELS: Record<RecentlyPlayedBucket, string> = {
+    [RecentlyPlayedBucket.Today]:     'Played Today',
+    [RecentlyPlayedBucket.ThisWeek]:  'Played This Week',
+    [RecentlyPlayedBucket.ThisMonth]: 'Played This Month',
+    [RecentlyPlayedBucket.ThisYear]:  'Played This Year',
+    [RecentlyPlayedBucket.Before]:    'Played Before',
+    [RecentlyPlayedBucket.Unplayed]:  'Never Played',
+}
+
+export function getBucketLabel(bucket: RecentlyPlayedBucket): string {
+    return BUCKET_LABELS[bucket]
+}
+
+export function getRecentlyPlayedBucket(game: SteamGameData, nowSeconds?: number): RecentlyPlayedBucket {
+    const now = nowSeconds ?? Math.floor(Date.now() / 1000)
+    const lastPlayed = game.rtime_last_played ?? 0
+    if (lastPlayed === 0) return RecentlyPlayedBucket.Unplayed
+    const diff = now - lastPlayed
+    if (diff < 0) return RecentlyPlayedBucket.Today
+    const DAY = 86_400
+    if (diff < DAY)       return RecentlyPlayedBucket.Today
+    if (diff < 7 * DAY)   return RecentlyPlayedBucket.ThisWeek
+    if (diff < 30 * DAY)  return RecentlyPlayedBucket.ThisMonth
+    if (diff < 365 * DAY) return RecentlyPlayedBucket.ThisYear
+    return RecentlyPlayedBucket.Before
+}
+
+// ─── Generic field-based sort ──────────────────────────────────────────────────
+
+/**
+ * Sort comparator factory: sort by a numeric field descending (higher = first).
+ * Items where the field is 0 or absent sort last.
+ * Ties fall back to a secondary numeric field, also descending.
+ *
+ * Example:
+ *   games.sort(sortByNumericField('rtime_last_played', 'playtime_forever'))
+ *
+ * The key constraints ensure only actual numeric properties of T can be passed.
+ */
+export function sortByNumericField<T>(
+    primaryKey: { [K in keyof T]: T[K] extends number | undefined ? K : never }[keyof T],
+    secondaryKey?: { [K in keyof T]: T[K] extends number | undefined ? K : never }[keyof T]
+): (a: Readonly<T>, b: Readonly<T>) => number {
+    return (a, b) => {
+        const aVal = (a[primaryKey] as number | undefined) ?? 0
+        const bVal = (b[primaryKey] as number | undefined) ?? 0
+        if (aVal !== bVal) return bVal - aVal
+        if (secondaryKey !== undefined) {
+            const aSecondary = (a[secondaryKey] as number | undefined) ?? 0
+            const bSecondary = (b[secondaryKey] as number | undefined) ?? 0
+            return bSecondary - aSecondary
+        }
+        return 0
+    }
+}
+
+// ─── GameSorter ────────────────────────────────────────────────────────────────
 
 export class GameSorter {
     private static readonly logger = Logger.createLogFunctions(GameSorter.name)
@@ -33,65 +90,51 @@ export class GameSorter {
     constructor() {
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.AllBatchesComplete,
-            (_event: CustomEvent<AllBatchesCompleteEvent>) => this.handleAllBatchesComplete()
+            (_event: CustomEvent<AllBatchesCompleteEvent>) => this.sortByRecentlyPlayed()
         )
         GameSorter.logger.debug('GameSorter initialized — subscribed to AllBatchesComplete')
     }
 
-    private handleAllBatchesComplete(): void {
+    private sortByRecentlyPlayed(): void {
         const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
 
         if (games.length === 0) {
-            GameSorter.logger.warn('GameSorter: AllBatchesComplete fired but no games in DataManager — skipping emit')
+            GameSorter.logger.warn('AllBatchesComplete fired but no games in DataManager — skipping emit')
             return
         }
 
         const hasRecentlyPlayedData = games.some(g => (g.rtime_last_played ?? 0) > 0)
 
         const sortedGames: ReadonlyArray<Readonly<SteamGameData>> = hasRecentlyPlayedData
-            ? [...games].sort(this.sortByRecentlyPlayed)
-            : [...games] // No recency data: leave in load order; unplayed sorts to end naturally
+            ? [...games].sort(sortByNumericField<SteamGameData>('rtime_last_played', 'playtime_forever'))
+            : [...games]
 
         const buckets = this.buildBucketMap(sortedGames, hasRecentlyPlayedData)
 
-        const payload: GamesSortEvent = {
+        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
             sortedGames,
             buckets,
             hasRecentlyPlayedData,
-        }
+        })
 
-        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, payload)
         GameSorter.logger.debug(
             `GamesSort emitted: ${sortedGames.length} games, ${buckets.size} buckets, hasRecentlyPlayed=${hasRecentlyPlayedData}`
         )
     }
 
-    private sortByRecentlyPlayed(
-        a: Readonly<SteamGameData>,
-        b: Readonly<SteamGameData>
-    ): number {
-        return sortByRecentlyPlayed(a, b)
-    }
-
-    /**
-     * Build a map from bucket key → display label.
-     * For recently-played stores: keys are RecentlyPlayedBucket enum values.
-     * For anonymous/curated stores (no rtime): returns an empty map.
-     */
     private buildBucketMap(
         sortedGames: ReadonlyArray<Readonly<SteamGameData>>,
         hasRecentlyPlayedData: boolean
-    ): ReadonlyMap<number | string, string> {
-        const buckets = new Map<number | string, string>()
-        if (!hasRecentlyPlayedData) return buckets
+    ): ReadonlyMap<string, string> {
+        if (!hasRecentlyPlayedData) return new Map()
 
+        const buckets = new Map<string, string>()
         for (const game of sortedGames) {
-            const bucket = getRecentlyPlayedBucket(game)
+            const bucket = getRecentlyPlayedBucket(game as SteamGameData)
             if (bucket !== RecentlyPlayedBucket.Unplayed && !buckets.has(bucket)) {
                 buckets.set(bucket, getBucketLabel(bucket))
             }
         }
-
         return buckets
     }
 }

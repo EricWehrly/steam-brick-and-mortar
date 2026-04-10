@@ -1,10 +1,8 @@
 import type { SteamGameData } from '../game-box/types/GameData'
 import { Logger } from '../../utils/Logger'
 
-
 /**
  * Well-known group names for category assignment.
- * Using an enum prevents magic string scatter and makes exhaustive checks possible.
  */
 export const CategoryGroupName = {
     Other: 'Other',
@@ -17,54 +15,12 @@ export interface ShelfGroup {
     games: SteamGameData[]
 }
 
-export enum RecentlyPlayedBucket {
-    Today = 'today',
-    ThisWeek = 'this-week',
-    ThisMonth = 'this-month',
-    ThisYear = 'this-year',
-    Before = 'before',
-    Unplayed = 'unplayed',
-}
-
-export function getRecentlyPlayedBucket(game: SteamGameData, nowSeconds?: number): RecentlyPlayedBucket {
-    const now = nowSeconds ?? Math.floor(Date.now() / 1000)
-    const lastPlayed = game.rtime_last_played ?? 0
-
-    if (lastPlayed === 0) return RecentlyPlayedBucket.Unplayed
-
-    const diff = now - lastPlayed
-    if (diff < 0) return RecentlyPlayedBucket.Today // Future? Treat as today.
-
-    const DAY = 24 * 60 * 60
-    if (diff < DAY) return RecentlyPlayedBucket.Today
-    if (diff < 7 * DAY) return RecentlyPlayedBucket.ThisWeek
-    if (diff < 30 * DAY) return RecentlyPlayedBucket.ThisMonth
-    if (diff < 365 * DAY) return RecentlyPlayedBucket.ThisYear
-    return RecentlyPlayedBucket.Before
-}
-
-export function getBucketLabel(bucket: RecentlyPlayedBucket): string {
-    switch (bucket) {
-        case RecentlyPlayedBucket.Today: return 'Played Today'
-        case RecentlyPlayedBucket.ThisWeek: return 'Played This Week'
-        case RecentlyPlayedBucket.ThisMonth: return 'Played This Month'
-        case RecentlyPlayedBucket.ThisYear: return 'Played This Year'
-        case RecentlyPlayedBucket.Before: return 'Played Before'
-        case RecentlyPlayedBucket.Unplayed: return 'Never Played'
-        default: {
-            const exhaustiveCheck: never = bucket
-            return exhaustiveCheck
-        }
-    }
-}
-
 /**
  * Hardcoded list of recognised genre names, in display-canonical casing.
  * Case-insensitive lookup so "Free to Play" / "Free To Play" both match.
  * Unrecognised genres fall into "Other".
  */
 // Note: 'Early Access' is intentionally excluded — it is a release state, not a content genre.
-// Games tagged only as Early Access land in Other.
 export const KNOWN_GENRES: ReadonlyArray<string> = [
     'Action', 'Adventure', 'RPG', 'Strategy', 'Simulation', 'Sports', 'Racing',
     'Casual', 'Indie', 'Massively Multiplayer', 'Free to Play',
@@ -77,11 +33,9 @@ const GENRE_LOOKUP: ReadonlyMap<string, string> = new Map(KNOWN_GENRES.map(g => 
  * Sort comparator: canonical genre index first, playtime descending within each genre.
  * Unrecognised genres sort last.
  *
- * Use as the sortFn option in SteamApiClient.loadGamesProgressively.
  * TD: generic-sort — replace with a generic sortByFields(['genre', 'playtime']) utility
  * once the sort-policy abstraction is designed.
  */
-// TD: generic-sort — this should be a generic sortByFields utility once sort policy is formalized
 export function sortByGenreThenPlaytime(
     a: { genres?: Array<{ description: string }>, playtime_forever?: number },
     b: { genres?: Array<{ description: string }>, playtime_forever?: number }
@@ -96,33 +50,14 @@ export function sortByGenreThenPlaytime(
         return (b.playtime_forever ?? 0) - (a.playtime_forever ?? 0)
     }
 
-    const idxA = KNOWN_GENRES.indexOf(genreA)
-    const idxB = KNOWN_GENRES.indexOf(genreB)
-    return idxA - idxB
+    return KNOWN_GENRES.indexOf(genreA) - KNOWN_GENRES.indexOf(genreB)
 }
 
 /**
  * Data transformer: maps a flat list of SteamGameData into ShelfGroup[] bucketed by genre.
- * Responsibility: grouping only. Sorting policy lives upstream (SteamApiClient sortFn)
- * and group ordering is a separate concern from the transform itself.
- * Tech debt link: docs/roadmaps/tech-debt.md → "Category System Tech Debt / CategoryAssigner is a temporary classification hack"
+ * Responsibility: grouping only. Sorting policy lives upstream (SteamApiClient sortFn).
+ * Tech debt link: docs/roadmaps/tech-debt.md → "Category System Tech Debt / CategoryAssigner"
  */
-
-/**
- * Sort comparator: most-recently-played first.
- * Games with rtime_last_played = 0 (never played) sort last.
- * Ties fall back to playtime descending.
- */
-export function sortByRecentlyPlayed(
-    a: { rtime_last_played?: number, playtime_forever?: number },
-    b: { rtime_last_played?: number, playtime_forever?: number }
-): number {
-    const rtimeA = a.rtime_last_played ?? 0
-    const rtimeB = b.rtime_last_played ?? 0
-    if (rtimeA !== rtimeB) return rtimeB - rtimeA
-    return (b.playtime_forever ?? 0) - (a.playtime_forever ?? 0)
-}
-
 export class CategoryAssigner {
     private static readonly logger = Logger.createLogFunctions(CategoryAssigner.name)
 
@@ -130,7 +65,6 @@ export class CategoryAssigner {
         if (!games || games.length === 0) return []
 
         const groupsMap = new Map<string, SteamGameData[]>()
-        const otherGroupName: string = CategoryGroupName.Other
         let noGenreCount = 0
 
         for (const game of games) {
@@ -138,13 +72,13 @@ export class CategoryAssigner {
             if (game.genres && game.genres.length > 0) {
                 const raw = game.genres[0].description
                 const canonical = GENRE_LOOKUP.get(raw.toLowerCase())
-                genre = canonical ?? otherGroupName
+                genre = canonical ?? CategoryGroupName.Other
                 if (!canonical) {
-                    CategoryAssigner.logger.warn(`[CAT-DEBUG] Unrecognized genre "${raw}" for "${game.name}" (appid ${game.appid}) -> Other`)
+                    CategoryAssigner.logger.warn(`Unrecognized genre "${raw}" for "${game.name}" (appid ${game.appid}) -> Other`)
                     noGenreCount++
                 }
             } else {
-                genre = otherGroupName
+                genre = CategoryGroupName.Other
                 noGenreCount++
             }
             if (!groupsMap.has(genre)) groupsMap.set(genre, [])
@@ -152,20 +86,19 @@ export class CategoryAssigner {
         }
 
         if (noGenreCount > 0) {
-            CategoryAssigner.logger.warn(`[CAT-DEBUG] ${noGenreCount}/${games.length} games had no recognised genre -> landed in "Other".`)
+            CategoryAssigner.logger.warn(`${noGenreCount}/${games.length} games had no recognised genre -> "Other"`)
         }
 
         const shelfGroups: ShelfGroup[] = Array.from(groupsMap.entries()).map(([genre, groupGames]) => ({
             genre,
             label: genre,
-            games: groupGames
+            games: groupGames,
         }))
 
-        // Sort groups by size desc, Other last. This sorts groups, not individual games;
-        // it is not redundant with sortByGenreThenPlaytime which sorts games within the pipeline.
+        // Sort groups: largest first, Other last
         shelfGroups.sort((a, b) => {
-            if (a.genre === otherGroupName) return 1
-            if (b.genre === otherGroupName) return -1
+            if (a.genre === CategoryGroupName.Other) return 1
+            if (b.genre === CategoryGroupName.Other) return -1
             return b.games.length - a.games.length
         })
 

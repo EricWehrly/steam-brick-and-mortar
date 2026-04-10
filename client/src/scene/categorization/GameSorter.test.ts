@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { GameEventTypes } from '../../types/InteractionEvents'
-import { RecentlyPlayedBucket } from './CategoryAssigner'
+import { RecentlyPlayedBucket } from './GameSorter'
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
