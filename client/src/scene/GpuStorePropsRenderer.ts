@@ -29,7 +29,7 @@ import * as THREE from 'three'
 import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
-import { VRLayoutUtils } from './props/SharedPropsUtils'
+import { VRLayoutUtils, ShelfSide } from './props/SharedPropsUtils'
 import { RoomConstants } from './RoomManager'
 
 import { EventManager } from '../core/EventManager'
@@ -43,7 +43,8 @@ import {
     type BatchReadyForPlacementEvent,
     type ShelfSpaceRequestedEvent,
     type ShelfCreatedEvent,
-    type RendererReadyEvent
+    type RendererReadyEvent,
+    type GameBoxSpawnedEvent,
 } from '../types/InteractionEvents'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
@@ -219,7 +220,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = new GpuGameBoxRenderer(estimatedGames + 100)
-        this.gameBoxSpawner?.setGameBoxRenderer(this.gameBoxRenderer)
 
         await this.waitForShelfRendererReady()
 
@@ -467,6 +467,18 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         // Bootstrap placement listeners before any batch data can enter the flow.
         this.gameBoxSpawner = new GameBoxSpawner()
+
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.GameBoxSpawned,
+            (event: CustomEvent<GameBoxSpawnedEvent>) => {
+                if (!this.gameBoxRenderer) {
+                    GpuStorePropsRenderer.logger.warn('GameBoxSpawned received before gameBoxRenderer was initialized')
+                    return
+                }
+                const { game, position, side, rotation } = event.detail
+                this.gameBoxRenderer.createGameBoxAuto(game as SteamGameData, position as THREE.Vector3, side as ShelfSide, rotation as THREE.Quaternion)
+            }
+        )
         this.setupPhaseInitialized = true
         
         this.config = { ...GpuStorePropsRenderer.DEFAULT_CONFIG, ...config }

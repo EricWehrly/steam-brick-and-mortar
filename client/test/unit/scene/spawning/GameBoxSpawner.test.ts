@@ -16,13 +16,13 @@ import { EventManager, EventSource } from '../../../../src/core/EventManager'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
 import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
-import { GpuGameBoxRenderer } from '../../../../src/scene/game-box/GpuGameBoxRenderer'
 import {
     StorePropsEventTypes,
     type BatchReadyForPlacementEvent,
     type ShelfSpaceRequestedEvent,
     type ShelfCreatedEvent,
-    type GamesPlacedEvent
+    type GamesPlacedEvent,
+    type GameBoxSpawnedEvent,
 } from '../../../../src/types/InteractionEvents'
 import type { SteamGame } from '../../../../src/steam'
 
@@ -50,8 +50,8 @@ const resetEventManager = () => (EventManager as unknown as { resetInstance: () 
 
 describe('GameBoxSpawner Event Coordination', () => {
     let eventManager: EventManager
-    let mockRenderer: GpuGameBoxRenderer
     let spawner: GameBoxSpawner
+    let spawnedEvents: GameBoxSpawnedEvent[]
 
     const createMockGames = (count: number, batchIndex: number): readonly SteamGame[] => {
         return Array.from({ length: count }, (_, i) => ({
@@ -94,16 +94,16 @@ describe('GameBoxSpawner Event Coordination', () => {
             return true
         })
 
-        // Create mock renderer with minimal implementation
-        mockRenderer = {
-            createGameBoxAuto: vi.fn(),
-            getDimensions: vi.fn(() => ({ width: 0.5, height: 0.7, depth: 0.1 })),
-            getMemoryStats: vi.fn(() => ({ totalVRAM: 0, textureCount: 0, instanceCount: 0 })),
-            dispose: vi.fn()
-        } as any
-
         // Create spawner (will register its own event handlers)
-        spawner = new GameBoxSpawner(mockRenderer)
+        spawner = new GameBoxSpawner()
+
+        spawnedEvents = []
+        eventManager.registerEventHandler(
+            StorePropsEventTypes.GameBoxSpawned,
+            (event: CustomEvent<GameBoxSpawnedEvent>) => {
+                spawnedEvents.push(event.detail)
+            }
+        )
     })
 
     afterEach(() => {
@@ -215,8 +215,8 @@ describe('GameBoxSpawner Event Coordination', () => {
                 }
             )
 
-            // Should have called createGameBoxAuto for each game
-            expect(mockRenderer.createGameBoxAuto).toHaveBeenCalledTimes(8)
+            // Should emit one GameBoxSpawned event per spawned game
+            expect(spawnedEvents).toHaveLength(8)
 
             // Should emit GamesPlaced
             expect(gamesPlacedEvents).toHaveLength(1)
@@ -242,10 +242,8 @@ describe('GameBoxSpawner Event Coordination', () => {
                 }
             )
 
-            expect(mockRenderer.createGameBoxAuto).toHaveBeenCalled()
-            const firstCall = (mockRenderer.createGameBoxAuto as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]
-            // args: (game, worldPosition, side, rotation)
-            expect(firstCall[2]).toBe('back')
+            expect(spawnedEvents.length).toBeGreaterThan(0)
+            expect(spawnedEvents[0].side).toBe('back')
         })
 
         it('should warn if no pending games found for batch', () => {
@@ -324,7 +322,7 @@ describe('GameBoxSpawner Event Coordination', () => {
             )
 
             // Should spawn all games
-            expect(mockRenderer.createGameBoxAuto).toHaveBeenCalledTimes(11)
+            expect(spawnedEvents).toHaveLength(11)
             expect(gamesPlacedEvents).toHaveLength(2)
         })
     })
@@ -426,7 +424,7 @@ describe('GameBoxSpawner Event Coordination', () => {
             )
 
             // All games should be spawned
-            expect(mockRenderer.createGameBoxAuto).toHaveBeenCalledTimes(15)
+            expect(spawnedEvents).toHaveLength(15)
             expect(gamesPlacedEvents).toHaveLength(3)
         })
 
@@ -457,7 +455,7 @@ describe('GameBoxSpawner Event Coordination', () => {
                 }
             )
 
-            const firstCallCount = (mockRenderer.createGameBoxAuto as any).mock.calls.length
+            const firstCallCount = spawnedEvents.length
 
             // Try to create shelf again (should warn, not spawn)
             const warnSpy = vi.spyOn(console, 'warn')
@@ -471,7 +469,7 @@ describe('GameBoxSpawner Event Coordination', () => {
             )
 
             // Should not spawn again
-            expect(mockRenderer.createGameBoxAuto).toHaveBeenCalledTimes(firstCallCount)
+            expect(spawnedEvents).toHaveLength(firstCallCount)
             expect(warnSpy).toHaveBeenCalled()
             const warnCall = warnSpy.mock.calls[0]
             const warnMessage = warnCall.join(' ')
@@ -507,8 +505,8 @@ describe('GameBoxSpawner Event Coordination', () => {
                 }
             )
 
-            // Should not call createGameBoxAuto
-            expect(mockRenderer.createGameBoxAuto).not.toHaveBeenCalled()
+            // Should not emit any GameBoxSpawned events
+            expect(spawnedEvents).toHaveLength(0)
 
             // Should still emit GamesPlaced for this batch
             expect(gamesPlacedEvents).toHaveLength(1)
@@ -544,9 +542,7 @@ describe('GameBoxSpawner Event Coordination', () => {
             )
 
             // Should spawn games (actual count depends on shelf layout constants)
-            // The important part is that createGameBoxAuto was called
-            expect(mockRenderer.createGameBoxAuto).toHaveBeenCalled()
-            const callCount = (mockRenderer.createGameBoxAuto as any).mock.calls.length
+            const callCount = spawnedEvents.length
             expect(callCount).toBeGreaterThan(0)
             expect(callCount).toBeLessThanOrEqual(100)
             

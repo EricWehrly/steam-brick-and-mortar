@@ -108,6 +108,7 @@ export interface CategorySignDescriptor {
 
 // ─── System ───────────────────────────────────────────────────────────────────
 
+// TODO(signage): split bucket-transition + anchor-placement helpers into dedicated modules when we do the SceneSignManager slimming pass.
 export class SceneSignManager {
     private static _instance: SceneSignManager | null = null
 
@@ -135,9 +136,7 @@ export class SceneSignManager {
     // - "Category System Tech Debt / SceneSignManager: scene access pattern / SceneManager"
     // - "Category System Tech Debt / SignageRenderer: singleton vs instance"
     constructor() {
-        const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
-        if (!scene) throw new Error('SceneSignManager: scene not registered in DataManager (DataKey.MainScene)')
-        this.scene = scene
+        this.scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
         this.renderer = new SignageRenderer()
 
         // Self-subscribe to shelf creation events to place end-cap labels automatically.
