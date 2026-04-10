@@ -42,7 +42,8 @@ describe('Pause Menu Tab Switching', () => {
             mockCallbacks,
             mockSystemDependencies,
             mockEventManager,
-            mockAppSettings
+            mockAppSettings,
+            null as any
         )
         pauseMenuManager.init()
 

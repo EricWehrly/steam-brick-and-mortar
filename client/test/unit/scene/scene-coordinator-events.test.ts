@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Scene Coordinator Event Registration Tests
  * 
  * Tests that the SceneCoordinator properly registers for the GameStart event
@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
+import { ServiceContainer } from '../../utils/di/TestServiceContainer'
 import { createSceneTestContainer } from '../../utils/test-container-helpers'
 
 // Mock other dependencies
@@ -63,6 +63,6 @@ describe('Scene Coordinator Event Registration', () => {
         
         // Note: Actual event emission testing would require mocking the async setup
         // The important part is that the event type constant is properly defined
-        console.log('✅ SceneReady event type validated:', GameEventTypes.SceneReady)
+        console.log('âœ… SceneReady event type validated:', GameEventTypes.SceneReady)
     })
 })

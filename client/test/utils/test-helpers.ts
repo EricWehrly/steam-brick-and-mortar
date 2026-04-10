@@ -1,12 +1,12 @@
-/**
+﻿/**
  * Test utilities for Steam API testing
  * Provides common mocks, fixtures, and test helpers
  */
 
 import { vi } from 'vitest'
 import type { SteamGame, SteamUser } from '../../src/steam/SteamApiClient'
-import { ServiceContainer, ServiceLifetime, type ServiceKey } from '../../src/core/di/ServiceContainer'
-import { ServiceKeys } from '../../src/core/di/ServiceKeys'
+import { TestServiceContainer as ServiceContainer, ServiceLifetime, type ServiceKey } from './di/TestServiceContainer'
+import { ServiceKeys } from './di/TestServiceContainer'
 
 export const mockGame: SteamGame = {
     appid: 220,
@@ -231,3 +231,4 @@ export class TestServiceContainer {
 export function createTestContainer(): TestServiceContainer {
     return new TestServiceContainer()
 }
+

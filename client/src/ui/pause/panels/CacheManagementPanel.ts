@@ -30,7 +30,7 @@ export interface CachedUser {
 export class CacheManagementPanel extends PauseMenuPanel {
     readonly id = 'cache-management'
     readonly title = 'Cache'
-    readonly icon = '🗂️'
+    readonly icon = '💾'
 
     private cacheStats: CacheStats = {
         imageCount: 0,
@@ -395,7 +395,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
         const btn = panel.querySelector('#refresh-cache-btn')
         if (!btn) return
 
-        btn.textContent = '🔄 Refreshing...'
+        btn.textContent = 'ðŸ”„ Refreshing...'
         btn.setAttribute('disabled', 'true')
 
         try {
@@ -407,7 +407,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
             console.error('Cache refresh failed:', error)
             this.showError('Failed to refresh cache')
         } finally {
-            btn.textContent = '🔄 Refresh Cache'
+            btn.textContent = 'ðŸ”„ Refresh Cache'
             btn.removeAttribute('disabled')
         }
     }
@@ -423,7 +423,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
         const btn = panel.querySelector('#validate-cache-btn')
         if (!btn) return
 
-        btn.textContent = '🔍 Validating...'
+        btn.textContent = 'ðŸ” Validating...'
         btn.setAttribute('disabled', 'true')
 
         try {
@@ -436,7 +436,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
             console.error('Cache validation failed:', error)
             this.showError('Failed to validate cache')
         } finally {
-            btn.textContent = '🔍 Validate Cache'
+            btn.textContent = 'ðŸ” Validate Cache'
             btn.removeAttribute('disabled')
         }
     }
@@ -454,7 +454,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
         const btn = panel.querySelector('#clear-cache-btn')
         if (!btn) return
 
-        btn.textContent = '🗑️ Clearing...'
+        btn.textContent = 'ðŸ—‘ï¸ Clearing...'
         btn.setAttribute('disabled', 'true')
 
         try {
@@ -471,7 +471,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
             console.error('Cache clear failed:', error)
             this.showError('Failed to clear cache')
         } finally {
-            btn.textContent = '🗑️ Clear Cache'
+            btn.textContent = 'ðŸ—‘ï¸ Clear Cache'
             btn.removeAttribute('disabled')
         }
     }
@@ -505,7 +505,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
 
         const selectedVanityUrl = select.value
 
-        loadBtn.textContent = '📋 Loading...'
+        loadBtn.textContent = 'ðŸ“‹ Loading...'
         loadBtn.disabled = true
 
         try {
@@ -520,7 +520,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
             console.error('Failed to load cached user:', error)
             this.showError('Failed to load cached user games')
         } finally {
-            loadBtn.textContent = '📋 Load Selected User'
+            loadBtn.textContent = 'ðŸ“‹ Load Selected User'
             loadBtn.disabled = !select.value
         }
     }
@@ -535,7 +535,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
         const btn = panel.querySelector('#download-missing-btn')
         if (!btn) return
 
-        btn.textContent = '📥 Downloading...'
+        btn.textContent = 'ðŸ“¥ Downloading...'
         btn.setAttribute('disabled', 'true')
 
         try {
@@ -548,7 +548,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
             console.error('Download failed:', error)
             this.showError('Failed to download missing images')
         } finally {
-            btn.textContent = '📥 Download Missing'
+            btn.textContent = 'ðŸ“¥ Download Missing'
             btn.removeAttribute('disabled')
         }
     }
@@ -739,7 +739,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
         imageElement.onload = () => {
             const sizeElement = panel.querySelector('#image-size')
             if (sizeElement) {
-                sizeElement.textContent = `${imageElement.naturalWidth} × ${imageElement.naturalHeight}`
+                sizeElement.textContent = `${imageElement.naturalWidth} Ã— ${imageElement.naturalHeight}`
             }
         }
     }

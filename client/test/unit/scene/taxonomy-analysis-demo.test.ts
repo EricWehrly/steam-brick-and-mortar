@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test to trigger Steam data loaded event and see taxonomy analysis
  * 
  * Migration: Updated to use createSceneTestContainer() for proper DI isolation
@@ -7,8 +7,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
-import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
-import { ServiceKeys } from '../../../src/core/di/ServiceKeys'
+import { ServiceContainer } from '../../utils/di/TestServiceContainer'
+import { ServiceKeys } from '../../utils/di/TestServiceContainer'
 import { createSceneTestContainer } from '../../utils/test-container-helpers'
 
 // Mock all dependencies
@@ -138,7 +138,7 @@ describe('Taxonomy Analysis Demo', () => {
     })
 
     it('should show comprehensive taxonomy analysis for sample games', () => {
-        console.log('\n🎮 === RUNNING TAXONOMY ANALYSIS DEMO ===\n')
+        console.log('\nðŸŽ® === RUNNING TAXONOMY ANALYSIS DEMO ===\n')
         
         // Emit the SteamDataLoaded event to trigger analysis
         eventManager.emit(SteamEventTypes.DataLoaded, {
@@ -151,14 +151,14 @@ describe('Taxonomy Analysis Demo', () => {
         // Test should complete without errors
         expect(true).toBe(true)
         
-        console.log('\n🎯 === DEMO COMPLETE ===\n')
+        console.log('\nðŸŽ¯ === DEMO COMPLETE ===\n')
     })
 
     it('should handle missing game data gracefully', () => {
         // Remove mock data to test fallback
         delete (window as any).app
         
-        console.log('\n📊 === TESTING FALLBACK ANALYSIS ===\n')
+        console.log('\nðŸ“Š === TESTING FALLBACK ANALYSIS ===\n')
         
         // Emit event without access to game data
         eventManager.emit(SteamEventTypes.DataLoaded, {
@@ -170,7 +170,7 @@ describe('Taxonomy Analysis Demo', () => {
 
         expect(true).toBe(true)
         
-        console.log('\n✅ === FALLBACK TEST COMPLETE ===\n')
+        console.log('\nâœ… === FALLBACK TEST COMPLETE ===\n')
     })
 
     afterEach(async () => {

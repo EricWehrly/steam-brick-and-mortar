@@ -1,4 +1,4 @@
-/**
+﻿/**
  * LightFactory Tests
  * 
  * Migration: Updated to use createLightingTestContainer() for proper DI isolation
@@ -8,8 +8,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { LightFactory } from '../../../src/lighting/LightFactory';
 import { EventManager } from '../../../src/core/EventManager';
-import { ServiceContainer } from '../../../src/core/di/ServiceContainer';
-import { ServiceKeys } from '../../../src/core/di/ServiceKeys';
+import { ServiceContainer } from '../../utils/di/TestServiceContainer';
+import { ServiceKeys } from '../../utils/di/TestServiceContainer';
 import { createLightingTestContainer } from '../../utils/test-container-helpers';
 
 describe('LightFactory', () => {
