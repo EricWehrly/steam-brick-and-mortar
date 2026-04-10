@@ -106,6 +106,29 @@ export interface CategorySignDescriptor {
     style?: SignStyle
 }
 
+// ─── Sign kind ───────────────────────────────────────────────────────────────
+
+/**
+ * Discriminates what role a sign plays in the scene.
+ * Used for targeted clear/query operations (e.g. clear only bucket signs).
+ * Future sign types (neon tube, end-of-aisle topper, etc.) extend this union.
+ */
+export type SignKind =
+    | 'category'    // generic named category label
+    | 'bucket'      // time-bucket section divider
+    | 'ceiling'     // ceiling-hung feature sign (e.g. Recently Played)
+    | 'end-cap'     // orientation end-cap label on a shelf unit
+
+// ─── Internal storage record ──────────────────────────────────────────────────
+
+interface SignRecord {
+    mesh: THREE.Mesh
+    kind: SignKind
+    /** Geometry dimensions — cached so we can skip geometry recreation on same-size updates. */
+    width: number
+    height: number
+}
+
 // ─── System ───────────────────────────────────────────────────────────────────
 
 // TODO(signage): split bucket-transition + anchor-placement helpers into dedicated modules when we do the SceneSignManager slimming pass.
@@ -122,7 +145,7 @@ export class SceneSignManager {
 
     private readonly renderer: SignageRenderer
     private readonly scene: THREE.Scene
-    private readonly signs: Map<string, THREE.Mesh> = new Map()
+    private readonly signs: Map<string, SignRecord> = new Map()
     private readonly shelfTransforms = new Map<number, { position: THREE.Vector3; rotationY: number }>()
     private readonly timeBucketSignLabels = new Set<string>()
     private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
@@ -178,18 +201,49 @@ export class SceneSignManager {
     }
 
     /**
-     * Create or update a category sign.
-     * If a sign with this label already exists, it is replaced.
+     * Create or update a named sign.
+     *
+     * If a sign with this label already exists:
+     * - Same geometry dimensions → texture is re-baked in place (geometry reused).
+     * - Different dimensions → geometry is replaced; old one disposed.
+     * - Position / rotation are always updated.
      */
-    public setSign(descriptor: CategorySignDescriptor): THREE.Mesh {
-        // Remove existing sign with same label if present
-        this.removeSign(descriptor.label)
-
+    public setSign(descriptor: CategorySignDescriptor, kind: SignKind = 'category'): THREE.Mesh {
         const style = descriptor.style ?? SignStyles.Category
         const signPos = this.resolvePosition(descriptor.anchorPosition, descriptor.mount)
+        const text = descriptor.text ?? descriptor.label
 
+        const existing = this.signs.get(descriptor.label)
+
+        if (existing) {
+            // ── Recycle path ─────────────────────────────────────────────────
+            const mesh = existing.mesh
+            const mat = mesh.material as THREE.MeshStandardMaterial
+
+            // Re-bake texture unconditionally (text or colors may have changed)
+            mat.map?.dispose()
+            mat.map = this.renderer.bakeTexture(text, style.backgroundColor, style.textColor)
+            mat.needsUpdate = true
+
+            // Replace geometry only if dimensions changed
+            if (existing.width !== style.width || existing.height !== style.height) {
+                mesh.geometry.dispose()
+                mesh.geometry = new THREE.PlaneGeometry(style.width, style.height)
+                existing.width = style.width
+                existing.height = style.height
+            }
+
+            mesh.position.copy(signPos)
+            if (descriptor.mount.signFacingY !== undefined) {
+                mesh.rotation.y = descriptor.mount.signFacingY
+            }
+
+            return mesh
+        }
+
+        // ── Create path ───────────────────────────────────────────────────────
         const config: SignageConfig = {
-            text: descriptor.text ?? descriptor.label,
+            text,
             position: signPos,
             backgroundColor: style.backgroundColor,
             textColor: style.textColor,
@@ -200,31 +254,38 @@ export class SceneSignManager {
         const mesh = this.renderer.createSign(config)
         mesh.userData.categoryLabel = descriptor.label
         mesh.userData.mountStyle = descriptor.mount.style
+        mesh.userData.signKind = kind
 
         if (descriptor.mount.signFacingY !== undefined) {
             mesh.rotation.y = descriptor.mount.signFacingY
         }
 
         this.scene.add(mesh)
-        this.signs.set(descriptor.label, mesh)
+        this.signs.set(descriptor.label, { mesh, kind, width: style.width, height: style.height })
 
         return mesh
     }
 
-    /** Remove a named sign from the scene. */
+    /** Remove a named sign from the scene, disposing all GPU resources. */
     public removeSign(label: string): void {
-        const existing = this.signs.get(label)
-        if (existing) {
-            this.scene.remove(existing)
-            const mat = existing.material as THREE.MeshStandardMaterial
+        const record = this.signs.get(label)
+        if (record) {
+            this.scene.remove(record.mesh)
+            const mat = record.mesh.material as THREE.MeshStandardMaterial
             mat.map?.dispose()
             mat.dispose()
-            existing.geometry.dispose()
+            record.mesh.geometry.dispose()
             this.signs.delete(label)
         }
     }
 
-    /** Remove all signs. */
+    /** Remove all signs of a given kind. */
+    public clearByKind(kind: SignKind): void {
+        for (const [label, record] of this.signs) {
+            if (record.kind === kind) this.removeSign(label)
+        }
+    }
+
     /**
      * Place FRONT/BACK orientation end-cap labels on a shelf unit.
      *
@@ -254,7 +315,7 @@ export class SceneSignManager {
             anchorPosition: frontPos,
             mount: { style: 'above-shelf', yOffset: 0, signFacingY: rotY },
             style: SignStyles.ShelfEndLabel
-        })
+        }, 'end-cap')
 
         const backPosLocal = new THREE.Vector3(labelX, labelY, topSurface.frontZ)
         const backPos = backPosLocal.clone().applyAxisAngle(yAxis, rotY).add(position)
@@ -264,7 +325,7 @@ export class SceneSignManager {
             anchorPosition: backPos,
             mount: { style: 'above-shelf', yOffset: 0, signFacingY: rotY + Math.PI },
             style: SignStyles.ShelfEndLabel
-        })
+        }, 'end-cap')
     }
 
     public clearAll(): void {
@@ -273,6 +334,15 @@ export class SceneSignManager {
         }
         this.timeBucketSignLabels.clear()
         this.lastPlacedBucket = null
+    }
+
+    /** Read-only snapshot of all signs, keyed by label. Useful for tests/debug. */
+    public getSignsByKind(kind: SignKind): ReadonlyMap<string, THREE.Mesh> {
+        const result = new Map<string, THREE.Mesh>()
+        for (const [label, record] of this.signs) {
+            if (record.kind === kind) result.set(label, record.mesh)
+        }
+        return result
     }
 
     public dispose(): void {
@@ -303,7 +373,7 @@ export class SceneSignManager {
                 width: 4.0,
                 height: 0.65,
             },
-        })
+        }, 'ceiling')
     }
 
     private replayTimeBucketSignsFromCreatedShelves(): void {
@@ -352,15 +422,13 @@ export class SceneSignManager {
                 signFacingY: shelfRotationY,
             },
             style: { ...SignStyles.Category, width: 1.8, height: 0.32 },
-        })
+        }, 'bucket')
         this.timeBucketSignLabels.add(label)
         this.lastPlacedBucket = bucket
     }
 
     private clearTimeBucketSigns(): void {
-        for (const label of this.timeBucketSignLabels) {
-            this.removeSign(label)
-        }
+        this.clearByKind('bucket')
         this.timeBucketSignLabels.clear()
     }
 

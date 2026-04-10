@@ -139,9 +139,17 @@ export class SignageRenderer {
     }
 
     /**
+     * Bake a texture snapshot for the given text + colors.
+     * Returns a new DataTexture; caller is responsible for disposing the old one.
+     */
+    public bakeTexture(text: string, backgroundColor: number, textColor: number): THREE.DataTexture {
+        return this.createTextTexture(text, backgroundColor, textColor)
+    }
+
+    /**
      * Create text texture using canvas
      */
-    private createTextTexture(text: string, backgroundColor: number, textColor: number): THREE.Texture {
+    private createTextTexture(text: string, backgroundColor: number, textColor: number): THREE.DataTexture {
         // Reuse a single working canvas, but freeze each sign texture into a separate
         // DataTexture snapshot so signs don't all update to the last rendered label.
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
