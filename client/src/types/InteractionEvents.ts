@@ -18,6 +18,7 @@ import * as THREE from 'three'
 import type { BaseInteractionEvent } from '../core/EventManager'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { SteamGame } from '../steam'
+import type { SteamGameData } from '../scene/game-box/types/GameData'
 
 // =============================================================================
 // STEAM EVENTS
@@ -198,6 +199,15 @@ export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
     // Pure terminal signal: all batches are complete.
 }
 
+export interface GamesSortEvent extends BaseInteractionEvent {
+    /** Full sorted game list after all batches have loaded. */
+    sortedGames: ReadonlyArray<Readonly<SteamGameData>>
+    /** Maps bucket key (RecentlyPlayedBucket value or genre string) to human-readable label. */
+    buckets: ReadonlyMap<number | string, string>
+    /** True if any game has rtime_last_played > 0 (i.e. recently-played data is available). */
+    hasRecentlyPlayedData: boolean
+}
+
 export interface GameSelectedEvent extends BaseInteractionEvent {
     /** App ID of the selected game */
     appid: number | string
@@ -325,7 +335,9 @@ export const GameEventTypes = {
     SomeBatchesComplete: 'game:some-batches-complete',
     AllBatchesComplete: 'game:all-batches-complete',
     /** Fired when a game is selected (e.g. clicked in scene) — opens detail panel */
-    Selected: 'game:selected'
+    Selected: 'game:selected',
+    /** Fired after all batches complete; carries the sorted game list and bucket map. */
+    GamesSort: 'game:games-sort'
 } as const
 
 export const CeilingEventTypes = {
@@ -449,6 +461,7 @@ export interface InteractionEventMap {
     [GameEventTypes.ShelfLayoutDetermined]: ShelfLayoutDeterminedEvent
     [GameEventTypes.SomeBatchesComplete]: SomeBatchesCompleteEvent
     [GameEventTypes.AllBatchesComplete]: AllBatchesCompleteEvent
+    [GameEventTypes.GamesSort]: GamesSortEvent
     
     // App events
     [AppEventTypes.PhaseStarted]: PhaseCompletedEvent
