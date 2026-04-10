@@ -402,8 +402,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             return
         }
 
-        // Initialize eagerly — ShelfRenderer emits RendererReady when GPU is ready
-        this.shelfRenderer.initialize()
+        // Initialize eagerly — InstancedShelfRenderer emits RendererReady when GPU is ready
+        this.shelfRenderer.initialize().catch(error => {
+            console.error('❌ Failed to initialize ShelfRenderer:', error)
+        })
 
         // Bootstrap placement listeners before any batch data can enter the flow.
         this.gameBoxSpawner = new GameBoxSpawner()

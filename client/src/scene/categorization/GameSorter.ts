@@ -2,10 +2,14 @@
  * GameSorter
  *
  * Listens for AllBatchesComplete, reads the full game list from DataManager,
- * sorts games and builds a bucket map, then emits GameEventTypes.GamesSort.
+ * sorts and buckets games, then emits GameEventTypes.GamesSort.
  *
- * Consumers (sign managers, UI layers) subscribe to GamesSort instead of
- * re-running the same sort/bucket logic independently.
+ * Consumers (SceneSignManager, UI layers) subscribe to GamesSort instead of
+ * re-running sort/bucket logic independently.
+ *
+ * TODO: Sorting logic should migrate to a utility class (e.g. GameSortUtils)
+ * called by layout/coordinator classes (e.g. ShelfLayoutCoordinator) rather
+ * than living directly in this event listener. Capture for future refactor.
  */
 
 import { EventManager } from '../../core/EventManager'
@@ -13,9 +17,8 @@ import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
 import {
     GameEventTypes,
-    type AllBatchesCompleteEvent,
-    type GamesSortEvent,
 } from '../../types/InteractionEvents'
+import type { AllBatchesCompleteEvent, GamesSortEvent } from '../../types/EnvironmentEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
 import {
     sortByRecentlyPlayed,
@@ -46,8 +49,8 @@ export class GameSorter {
         const hasRecentlyPlayedData = games.some(g => (g.rtime_last_played ?? 0) > 0)
 
         const sortedGames: ReadonlyArray<Readonly<SteamGameData>> = hasRecentlyPlayedData
-            ? [...games].sort(sortByRecentlyPlayed)
-            : [...games]
+            ? [...games].sort(this.sortByRecentlyPlayed)
+            : [...games] // No recency data: leave in load order; unplayed sorts to end naturally
 
         const buckets = this.buildBucketMap(sortedGames, hasRecentlyPlayedData)
 
@@ -61,6 +64,13 @@ export class GameSorter {
         GameSorter.logger.debug(
             `GamesSort emitted: ${sortedGames.length} games, ${buckets.size} buckets, hasRecentlyPlayed=${hasRecentlyPlayedData}`
         )
+    }
+
+    private sortByRecentlyPlayed(
+        a: Readonly<SteamGameData>,
+        b: Readonly<SteamGameData>
+    ): number {
+        return sortByRecentlyPlayed(a, b)
     }
 
     /**

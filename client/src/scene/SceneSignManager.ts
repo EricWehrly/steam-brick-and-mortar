@@ -23,10 +23,10 @@ import { EventManager } from '../core/EventManager'
 import { SignageRenderer, type SignageConfig } from './SignageRenderer'
 import {
     GameEventTypes,
-    type GamesSortEvent,
     StorePropsEventTypes,
     type ShelfCreatedEvent,
 } from '../types/InteractionEvents'
+import type { GamesSortEvent } from '../types/EnvironmentEvents'
 import {
     getRecentlyPlayedBucket,
     getBucketLabel,

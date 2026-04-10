@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
 import { EventManager } from '../core/EventManager'
-import { GameEventTypes, StorePropsEventTypes, type GamesSortEvent, type ShelfReadyEvent } from '../types/InteractionEvents'
+import { GameEventTypes, StorePropsEventTypes, type ShelfReadyEvent } from '../types/InteractionEvents'
+import type { GamesSortEvent } from '../types/EnvironmentEvents'
 import type { SteamGameData } from './game-box/types/GameData'
 
 const mockScene = new THREE.Scene()

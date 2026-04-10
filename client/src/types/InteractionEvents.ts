@@ -196,8 +196,7 @@ export interface SomeBatchesCompleteEvent extends BaseInteractionEvent {
     totalBatches: number
 }
 
-// Moved to EnvironmentEvents.ts — re-exported here for backward compatibility.
-export type { AllBatchesCompleteEvent, GamesSortEvent } from './EnvironmentEvents'
+// Moved to EnvironmentEvents.ts.
 
 export interface GameSelectedEvent extends BaseInteractionEvent {
     /** App ID of the selected game */

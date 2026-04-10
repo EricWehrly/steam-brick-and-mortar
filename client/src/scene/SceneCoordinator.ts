@@ -33,6 +33,7 @@ import type { SteamGameData } from './game-box/types/GameData'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 import { GameSorter } from './categorization/GameSorter'
+import { SceneSignManager } from './SceneSignManager'
 
 export interface SceneCoordinatorConfig {
     environment?: {
@@ -54,6 +55,7 @@ export class SceneCoordinator {
     private dataManager: DataManager
     private eventManager: EventManager
     private gameSorter: GameSorter
+    private sceneSignManager: SceneSignManager
 
     constructor(sceneManager?: SceneManager) {
         // TODO: DI tho?
@@ -72,6 +74,7 @@ export class SceneCoordinator {
         // Initialize room manager for event-driven room structure (retrieves scene from DataManager)
         this.roomManager = new RoomManager()
         this.gameSorter = new GameSorter()
+        this.sceneSignManager = SceneSignManager.instance
 
         // Track WorldBuild phase — opens here, closes when props complete
         const tracker = StartupEventTracker.getInstance()
