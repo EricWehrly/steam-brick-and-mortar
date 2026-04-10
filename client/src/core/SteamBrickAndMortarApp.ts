@@ -24,17 +24,31 @@ import { WebXREventHandler } from '../webxr/WebXREventHandler'
 import { EventManager } from './EventManager'
 import { GameEventTypes, type GameStartEvent, type SceneReadyEvent } from '../types/InteractionEvents'
 import { AppSettings } from './AppSettings'
-import type { AppConfig as DIAppConfig } from './di'
+
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { RenderLoopDiagnostics } from '../debug/RenderLoopDiagnostics'
 // Side-effect import: registers GpuMemoryEstimator to window for console debugging
 import '../debug/GpuMemoryEstimator'
 
-export interface AppConfig extends DIAppConfig {
+export interface AppConfig {
+    scene?: {
+        antialias?: boolean
+        outputColorSpace?: THREE.ColorSpace
+    }
+    input?: {
+        speed?: number
+        mouseSensitivity?: number
+    }
     steam?: {
         apiBaseUrl?: string
         maxGames?: number
     }
+    data?: {
+        enablePersistence?: boolean
+        defaultTTL?: number
+        maxEntries?: number
+    }
+    tests?: Record<string, string>
 }
 
 const BACKEND_URL = 'https://steam-api-dev.wehrly.com';

@@ -11,8 +11,8 @@ import { CacheManagementPanel } from '../../src/ui/pause/panels/CacheManagementP
 import { HelpPanel } from '../../src/ui/pause/panels/HelpPanel'
 import { EventManager } from '../../src/core/EventManager'
 import { AppSettings } from '../../src/core/AppSettings'
-import { ServiceContainer } from '../../src/core/di/ServiceContainer'
-import { ServiceKeys } from '../../src/core/di/ServiceKeys'
+import { ServiceContainer } from '../utils/di/TestServiceContainer'
+import { ServiceKeys } from '../utils/di/TestServiceContainer'
 import { createSceneTestContainer } from '../utils/test-container-helpers'
 
 // Mock DOM environment
@@ -121,7 +121,8 @@ describe('Pause Menu Integration Tests', () => {
             mockCallbacks,
             mockSystemDependencies,
             eventManager,
-            appSettings
+            appSettings,
+            null as any
         )
     })
 
@@ -253,7 +254,7 @@ describe('Pause Menu Integration Tests', () => {
             
             expect(cachePanel.id).toBe('cache-management')
             expect(cachePanel.title).toBe('Cache')
-            expect(cachePanel.icon).toBe('🗂️')
+            expect(cachePanel.icon).toBe('💾')
         })
 
         it('should create help panel with controls information', () => {
@@ -342,3 +343,4 @@ describe('Pause Menu Integration Tests', () => {
         })
     })
 })
+

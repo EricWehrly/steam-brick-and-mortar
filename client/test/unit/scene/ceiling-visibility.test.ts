@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test suite for ceiling visibility system
  * 
  * Migration: Updated to use createSceneTestContainer() for proper DI isolation
@@ -10,8 +10,8 @@ import { RoomManager } from '../../../src/scene/RoomManager'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { CeilingEventTypes } from '../../../src/types/InteractionEvents'
 import { DataManager } from '../../../src/core/data'
-import { ServiceContainer } from '../../../src/core/di/ServiceContainer'
-import { ServiceKeys } from '../../../src/core/di/ServiceKeys'
+import { ServiceContainer } from '../../utils/di/TestServiceContainer'
+import { ServiceKeys } from '../../utils/di/TestServiceContainer'
 import { createSceneTestContainer } from '../../utils/test-container-helpers'
 
 // Mock TextureManager to avoid external dependencies

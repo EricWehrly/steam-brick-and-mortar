@@ -160,6 +160,7 @@ vi.mock('../../../src/core/DebugStatsProvider', () => ({
 import { SteamBrickAndMortarApp } from '../../../src/core/SteamBrickAndMortarApp'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { GameEventTypes, type GameStartEvent } from '../../../src/types/InteractionEvents'
+import { SceneCoordinator } from '../../../src/scene/SceneCoordinator'
 
 describe('Application Initialization and Readiness', () => {
     let app: SteamBrickAndMortarApp
@@ -243,6 +244,19 @@ describe('Application Initialization and Readiness', () => {
         
         // App should still be disposable even after race condition
         expect(() => app.dispose()).not.toThrow()
+    })
+
+    it('constructs SceneCoordinator with existing SceneManager (no duplicate scene roots)', async () => {
+        await app.init()
+
+        const sceneCoordinatorCtor = vi.mocked(SceneCoordinator)
+        expect(sceneCoordinatorCtor.mock.calls.length).toBeGreaterThanOrEqual(1)
+
+        const ctorArgs = sceneCoordinatorCtor.mock.calls[sceneCoordinatorCtor.mock.calls.length - 1]
+        expect(ctorArgs.length).toBeGreaterThanOrEqual(1)
+        expect(ctorArgs[0]).toBeTruthy()
+        expect(typeof (ctorArgs[0] as any).getScene).toBe('function')
+        expect(typeof (ctorArgs[0] as any).getRenderer).toBe('function')
     })
 
     it('should handle multiple scene ready events', async () => {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Container Helpers for DI Migration
  * 
  * Provides specialized test container setup functions for different test categories.
@@ -19,8 +19,8 @@
 
 import { vi } from 'vitest'
 import * as THREE from 'three'
-import { ServiceContainer } from '../../src/core/di/ServiceContainer'
-import { ServiceKeys, type ServiceKeyType } from '../../src/core/di/ServiceKeys'
+import { TestServiceContainer as ServiceContainer } from './di/TestServiceContainer'
+import { ServiceKeys, type ServiceKeyType } from './di/TestServiceContainer'
 import { EventManager } from '../../src/core/EventManager'
 import { DataManager } from '../../src/core/data/DataManager'
 import { DataDomain, DataKey } from '../../src/core/data/DataTypes'
@@ -373,3 +373,4 @@ export async function verifySingleton<T>(
         throw new Error(`Service ${String(key)} is not a singleton! Got different instances.`)
     }
 }
+
