@@ -27,7 +27,6 @@
 
 import * as THREE from 'three'
 import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
-import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 import { VRLayoutUtils, ShelfSide } from './props/SharedPropsUtils'
 import { RoomConstants } from './RoomManager'
@@ -77,10 +76,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             frustumCullingEnabled: true // I don't think we have this? It's a nice to have, way post-features, for sure. but we should strip what we don't have
         })
     })
-
-    private instancedShelfRenderer?: InstancedShelfRenderer
-    private isShelfRendererReady: boolean = false
-    private initializationQueue: Array<() => void> = []
 
     // Track actual shelf bounds for room sizing
     private shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
@@ -133,26 +128,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.setupEventListeners()
     }
 
-    private handleRendererReady(event: CustomEvent<RendererReadyEvent>): void {
-        if (event.detail.rendererType !== 'shelf') return
-
-        this.isShelfRendererReady = true
-
-
-        // Process any queued initialization callbacks
-        while (this.initializationQueue.length > 0) {
-            const callback = this.initializationQueue.shift()
-            callback?.()
-        }
-    }
-
     private setupEventListeners(): void {
-        // Listen for renderer ready events (Phase 3: replace polling)
-        EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.RendererReady,
-            this.handleRendererReady.bind(this)
-        )
-
         // Listen for first batch to trigger initialization (creates GameBoxSpawner)
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
@@ -221,7 +197,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = new GpuGameBoxRenderer(estimatedGames + 100)
 
-        await this.waitForShelfRendererReady()
+        await this.shelfRenderer.waitUntilReady()
 
         this.shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         this.layoutDetermined = false  // reset so new layout emits when next initialized
@@ -232,25 +208,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.clearExistingShelves()
 
         this.preallocateArcLayout(totalBatches)
-    }
-
-    private async waitForShelfRendererReady(): Promise<void> {
-        if (!this.instancedShelfRenderer) {
-            console.error('❌ No shelf renderer instance')
-            return
-        }
-
-        // Fast path: Already ready
-        if (this.isShelfRendererReady || this.instancedShelfRenderer.isReady()) {
-            this.isShelfRendererReady = true
-            return
-        }
-
-        // Wait for RendererReady event
-        console.log('⚠️ Waiting for RendererReady event...')
-        return new Promise<void>((resolve) => {
-            this.initializationQueue.push(resolve)
-        })
     }
 
     private preallocateArcLayout(totalShelves: number): void {
@@ -378,14 +335,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private async createShelfForBatchIndex(batchIndex: number): Promise<void> {
-        const isReady = this.instancedShelfRenderer?.isReady()
-        if (!isReady) {
-            console.error(`❌ InstancedShelfRenderer not ready for batch ${batchIndex + 1}!`)
-            console.error('   Renderer state:', {
-                exists: !!this.instancedShelfRenderer,
-                isReady: isReady,
-                stats: this.instancedShelfRenderer?.getStats()
-            })
+        if (!this.shelfRenderer.isReady()) {
+            console.error(`❌ ShelfRenderer not ready for batch ${batchIndex + 1}!`, this.shelfRenderer.getStats())
             return
         }
 
@@ -412,15 +363,13 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const shelfIndex = batchIndex % this.maxShelvesPerRow
 
         // Create shelf without games (GameBoxSpawner will place them)
-        this.createInstancedShelf(shelfPosition, rowIndex, shelfIndex, batchIndex)
-        this.cumulativeShelfCount++
-
-        // Game accumulation for section planning happens in handleInitialBatch.
-        // Sign placement happens in planSections() after AllBatchesComplete.
-
-        // Emit ShelfCreated event for GameBoxSpawner to place games
         const shelfRotationY = this.shelfRotationsY[batchIndex] ?? (rowIndex % 2 === 1 ? Math.PI : 0)
 
+        // ShelfRenderer owns the GPU write + emits ShelfReady
+        this.shelfRenderer.createShelf(batchIndex, shelfPosition, shelfRotationY)
+        this.cumulativeShelfCount++
+
+        // Emit ShelfCreated for GameBoxSpawner (game placement) and SceneSignManager (signs)
         EventManager.getInstance().emit<ShelfCreatedEvent>(
             StorePropsEventTypes.ShelfCreated,
             {
@@ -434,7 +383,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 lastModified: Date.now()
             }
         )
-        this.shelfRenderer.emitShelfReady(batchIndex, shelfPosition, shelfRotationY)
         GpuStorePropsRenderer.logger.debug(`Emitted ShelfCreated for batch ${batchIndex + 1}`)
     }
 
@@ -454,16 +402,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             return
         }
 
-        // Create GPU instanced shelf renderer
-        this.instancedShelfRenderer = new InstancedShelfRenderer({
-            maxShelfUnits: 100 // Allow up to 100 shelf units (47+ batches need this)
-        })
-
-        // Initialize eagerly - emits RendererReady event when complete
-        this.instancedShelfRenderer.initialize().catch(error => {
-            console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
-            throw error
-        })
+        // Initialize eagerly — ShelfRenderer emits RendererReady when GPU is ready
+        this.shelfRenderer.initialize()
 
         // Bootstrap placement listeners before any batch data can enter the flow.
         this.gameBoxSpawner = new GameBoxSpawner()
@@ -490,40 +430,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private clearExistingShelves(): void {
-        // Clear instanced shelf renderer state
-        if (this.instancedShelfRenderer?.isReady()) {
-            this.instancedShelfRenderer.reset()
-        }
-    }
-
-    private createInstancedShelf(
-        position: THREE.Vector3,
-        rowIndex: number,
-        shelfIndex: number,
-        batchIndex?: number
-    ): void {
-        // Arc layout: batchIndex IS the direct index into shelfRotationsY.
-        // globalShelfIndex (row * maxPerRow + indexInRow) only matches for uniform-row-count grids.
-        const directIndex = batchIndex ?? (rowIndex * this.maxShelvesPerRow + shelfIndex)
-        const globalShelfIndex = rowIndex * this.maxShelvesPerRow + shelfIndex
-
-        // Use arc-computed rotation if available; fall back to flat-row toe logic
-        const storedRotY = this.shelfRotationsY[directIndex] ?? this.shelfRotationsY[globalShelfIndex]
-        const rotY = storedRotY !== undefined
-            ? storedRotY
-            : (rowIndex % 2 === 1 ? Math.PI : 0)
-
-        const rotation = new THREE.Quaternion().setFromEuler(
-            new THREE.Euler(0, rotY, 0)
-        )
-
-        this.instancedShelfRenderer.setInstance(directIndex, {
-            position,
-            rotation
-        })
-
-        // End-cap orientation labels are now placed by SceneSignManager
-        // on ShelfCreated events — no call needed here.
+        this.shelfRenderer.reset()
     }
 
     public clearProps(): void {
@@ -552,7 +459,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = null
 
-        this.instancedShelfRenderer?.dispose()
+        this.shelfRenderer.dispose()
 
         this.scene.remove(this.propsGroup)
 
