@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Steam Brick and Mortar Application Core
  * 
  * Main application orchestrator that coordinates high-level subsystems:
@@ -13,11 +13,10 @@
  */
 
 import * as THREE from 'three'
-import { PerformanceMonitorUI, type PerformanceStats, ToastManager, UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
+import { ToastManager, UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
 import { WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { SceneManagerDebug } from '../debug/SceneManagerDebug'
-import { DebugStatsProvider } from './DebugStatsProvider'
 import { CompassRose } from '../ui/debug/CompassRose'
 import { SteamIntegration } from '../steam-integration'
 import { WebXRCoordinator } from '../webxr/WebXRCoordinator'
@@ -58,7 +57,6 @@ export class SteamBrickAndMortarApp {
     private systemUICoordinator: SystemUICoordinator
     private uiManager: UIManager
     private steamIntegration: SteamIntegration
-    private debugStatsProvider: DebugStatsProvider
     private eventManager: EventManager
     private appSettings: AppSettings
     private compassRose?: CompassRose
@@ -126,12 +124,6 @@ export class SteamBrickAndMortarApp {
             }
         })
 
-        this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating DebugStatsProvider')
-        this.debugStatsProvider = new DebugStatsProvider(
-            this.sceneManager,
-            this.steamIntegration
-        )
-
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating UIManager')
         this.uiManager = new UIManager()
 
@@ -166,7 +158,6 @@ export class SteamBrickAndMortarApp {
             this.startupTracker.logEvent(StartupPhase.EngineStart, 'Constructing UI coordinators')
             this.webxrUICoordinator = new WebXRUICoordinator()
             this.systemUICoordinator = new SystemUICoordinator(
-                this.debugStatsProvider,
                 this.eventManager,
                 this.appSettings
             )

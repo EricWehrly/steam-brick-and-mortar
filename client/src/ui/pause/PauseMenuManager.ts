@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PauseMenuManager - Main orchestrator for the pause menu system
  * 
  * Handles menu state, panel switching, and integration with input system
@@ -24,7 +24,6 @@ import { LightingEventTypes } from '../../types/LightingEvents'
 import type { SteamDataLoadedEvent } from '../../types/InteractionEvents'
 import type { LightingToggleEvent, LightingDebugToggleEvent } from '../../types/LightingEvents'
 import { AppSettings, type ApplicationSettings } from '../../core/AppSettings'
-import type { DebugStatsProvider } from '../../core/DebugStatsProvider'
 import { DebugPanel } from './panels/DebugPanel'
 
 export interface PauseMenuState {
@@ -72,7 +71,6 @@ export class PauseMenuManager {
     private applicationPanel: ApplicationPanel | null = null
     private eventManager: EventManager
     private appSettings: AppSettings
-    private debugStatsProvider?: DebugStatsProvider
 
     constructor(
         config: PauseMenuConfig = {}, 
@@ -80,7 +78,7 @@ export class PauseMenuManager {
         systemDependencies: SystemDependencies | undefined,
         eventManager: EventManager,
         appSettings: AppSettings,
-        debugStatsProvider?: DebugStatsProvider
+        performanceMonitor: PerformanceMonitorUI
     ) {
         this.config = {
             displayName: 'Settings',
@@ -93,7 +91,7 @@ export class PauseMenuManager {
         this.systemDependencies = systemDependencies || null
         this.eventManager = eventManager
         this.appSettings = appSettings
-        this.debugStatsProvider = debugStatsProvider
+        this.performanceMonitor = performanceMonitor    
     }
 
     init(): void {
@@ -156,12 +154,9 @@ export class PauseMenuManager {
         // Register camera settings panel
         const cameraPanel = new CameraSettingsPanel({}, this.appSettings)
         this.registerPanel(cameraPanel)
-        
-        // Register debug panel if debugStatsProvider is available
-        if (this.debugStatsProvider) {
-            const debugPanel = new DebugPanel({}, this.debugStatsProvider)
-            this.registerPanel(debugPanel)
-        }
+    
+        const debugPanel = new DebugPanel({}, this.performanceMonitor)
+        this.registerPanel(debugPanel)
     }
 
     toggle(): void {
@@ -264,13 +259,13 @@ export class PauseMenuManager {
         // Check if pause menu structure already exists
         const existingOverlay = document.getElementById(this.config.containerId)
         if (existingOverlay) {
-            console.log('🔄 Found existing pause menu structure, reusing it')
+            console.log('ðŸ”„ Found existing pause menu structure, reusing it')
             this.overlay = existingOverlay
             this.menuContainer = existingOverlay.querySelector(`.${this.config.menuClass}`)
             
             // Verify required elements exist, if not recreate them
             if (!this.menuContainer || !existingOverlay.querySelector('#pause-menu-tabs')) {
-                console.log('⚠️ Existing structure incomplete, recreating...')
+                console.log('âš ï¸ Existing structure incomplete, recreating...')
                 existingOverlay.remove()
                 this.createNewMenuStructure()
             } else {
@@ -341,14 +336,14 @@ export class PauseMenuManager {
     private createPanelTab(panel: PauseMenuPanel): void {
         const tabsContainer = document.getElementById('pause-menu-tabs')
         if (!tabsContainer) {
-            console.warn(`⚠️ Cannot create tab for panel '${panel.id}': tabs container not found`)
+            console.warn(`âš ï¸ Cannot create tab for panel '${panel.id}': tabs container not found`)
             return
         }
 
         // Check if tab already exists (prevent duplicates)
         const existingTab = document.getElementById(`tab-${panel.id}`)
         if (existingTab) {
-            console.log(`🔄 Tab for panel '${panel.id}' already exists, skipping creation`)
+            console.log(`ðŸ”„ Tab for panel '${panel.id}' already exists, skipping creation`)
             return
         }
 
@@ -451,7 +446,7 @@ export class PauseMenuManager {
     }
 
     private handleSettingsChange(settings: Partial<ApplicationSettings>): void {
-        console.log('⚙️ Settings changed:', settings)
+        console.log('âš™ï¸ Settings changed:', settings)
 
         // Handle quality settings
         if (settings.qualityLevel !== undefined) {
@@ -460,7 +455,7 @@ export class PauseMenuManager {
 
         // Handle graphics settings
         if (settings.lightingQuality !== undefined || settings.shadowQuality !== undefined) {
-            console.log('🎨 Graphics settings changed, applying lighting update...')
+            console.log('ðŸŽ¨ Graphics settings changed, applying lighting update...')
             // Emit lighting quality change event
             if (settings.lightingQuality !== undefined) {
                 this.eventManager.emit(LightingEventTypes.QualityChanged, {
@@ -471,20 +466,20 @@ export class PauseMenuManager {
         }
 
         if (settings.ceilingHeight !== undefined) {
-            console.log(`📏 Ceiling height changed to ${settings.ceilingHeight}m`)
+            console.log(`ðŸ“ Ceiling height changed to ${settings.ceilingHeight}m`)
             // Note: Environment changes require SceneCoordinator integration (handled in next step)
         }
 
         // Handle lighting toggles (these can be applied immediately)
         if (settings.enableLighting !== undefined) {
-            console.log(`💡 Lighting ${settings.enableLighting ? 'enabled' : 'disabled'}`)
+            console.log(`ðŸ’¡ Lighting ${settings.enableLighting ? 'enabled' : 'disabled'}`)
             this.eventManager.emit(LightingEventTypes.Toggle, { 
                 enabled: settings.enableLighting 
             } as LightingToggleEvent)
         }
 
         if (settings.showLightingDebug !== undefined) {
-            console.log(`🔍 Lighting debug ${settings.showLightingDebug ? 'enabled' : 'disabled'}`)
+            console.log(`ðŸ” Lighting debug ${settings.showLightingDebug ? 'enabled' : 'disabled'}`)
             this.eventManager.emit(LightingEventTypes.DebugToggle, { 
                 enabled: settings.showLightingDebug 
             } as LightingDebugToggleEvent)
@@ -494,7 +489,7 @@ export class PauseMenuManager {
     // TODO: Quality enum
     private updateGraphicsQuality(quality: 'low' | 'medium' | 'high' | 'ultra'): void {
         if (!this.systemDependencies) {
-            console.warn('⚠️ System dependencies not provided - cannot update graphics quality')
+            console.warn('âš ï¸ System dependencies not provided - cannot update graphics quality')
             return
         }
 

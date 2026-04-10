@@ -25,11 +25,10 @@ import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { LightingRenderer } from './LightingRenderer'
 import { RoomManager } from './RoomManager'
 import { EventManager } from '../core/EventManager'
-import { GameEventTypes, type SceneReadyEvent } from '../types/InteractionEvents'
-import { AppSettings } from '../core/AppSettings'
+import { GameEventTypes } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
 // Initialize store props system (self-registering module with dedicated events)
-import { StorePropsEventTypes, type StorePropsSetupRequestEvent, type StorePropsSetupCompletedEvent } from './props'
+import { StorePropsEventTypes, type StorePropsSetupRequestEvent } from './props'
 import type { SteamGameData } from './game-box/types/GameData'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { SharedMaterialManager } from '../utils/SharedMaterialManager'
@@ -53,23 +52,14 @@ export class SceneCoordinator {
     private roomManager: RoomManager
     private dataManager: DataManager
     private eventManager: EventManager
-    // Enhanced functionality is added to eventManager via extensions
-    private config: SceneCoordinatorConfig
 
     constructor(
-        sceneManager: SceneManager, 
-        config: SceneCoordinatorConfig = {}, 
-        appSettings?: AppSettings,
-        dataManager?: DataManager,
-        eventManager?: EventManager
+        sceneManager: SceneManager
     ) {
-        // Store config for later use
-        this.config = config
-        
         // TODO: DI tho?
         this.sceneManager = sceneManager
-        this.dataManager = dataManager || DataManager.getInstance() // Fallback for backward compatibility
-        this.eventManager = eventManager || EventManager.getInstance() // DI injection with fallback
+        this.dataManager = DataManager.getInstance() // Fallback for backward compatibility
+        this.eventManager = EventManager.getInstance() // DI injection with fallback
         
         // Store props handlers are now self-registering via module import
         
@@ -101,29 +91,19 @@ export class SceneCoordinator {
 
         if(window) {
             (window as any).debugListSceneObjects = this.debugListSceneObjects.bind(this);
-            (window as any).toggleShelfIndices = this.toggleShelfIndices.bind(this);
         }
     }
     
-    /**
-     * Toggle shelf unit index display
-     * Call from console: toggleShelfIndices()
-     */
-    public toggleShelfIndices(): void {
-        // Emit event to toggle shelf unit indices
-        this.eventManager.emit('store-props:toggle-shelf-indices', {})
-        console.log('🔍 Shelf unit indices toggled')
-    }
-
     /**
      * Start scene setup asynchronously - call this AFTER controls are ready
      * This allows the user to move around while the world builds in the background
      */
     public startSceneSetup(): void {
+        // yo do an event registration instead?
         // Use setTimeout(0) to yield to main thread before starting heavy work
         // This ensures the render loop has started and user can see/interact
         setTimeout(() => {
-            this.loadEnhancedScene(this.config.environment)
+            this.loadEnhancedScene()
         }, 0)
     }
 

@@ -14,9 +14,10 @@ import { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { LightingControlsPanel } from '../LightingControlsPanel'
 import { CategoryReferencePanel } from '../CategoryReferencePanel'
 import { EventManager } from '../../core/EventManager'
-import type { DebugStatsProvider } from '../../core/DebugStatsProvider'
 import { AppSettings } from '../../core/AppSettings'
-import { UIEventTypes, InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type ShelfLayoutDeterminedEvent } from '../../types/InteractionEvents'
+import { DataManager } from '../../core/data/DataManager'
+import { DataKey, DataDomain } from '../../core/data/DataTypes'
+import { UIEventTypes, InputEventTypes, type SceneCanvasClickEvent } from '../../types/InteractionEvents'
 import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
 
@@ -35,7 +36,6 @@ export class SystemUICoordinator {
     private readonly performanceUpdateInterval = 1000 // Update every second
 
     constructor(
-        debugStatsProvider: DebugStatsProvider,
         eventManager: EventManager,
         appSettings: AppSettings
     ) {
@@ -52,7 +52,7 @@ export class SystemUICoordinator {
             precision: 1
         })
         
-        this.pauseMenuManager = new PauseMenuManager({}, {}, undefined, this.eventManager, this.appSettings, debugStatsProvider)
+        this.pauseMenuManager = new PauseMenuManager({}, {}, undefined, this.eventManager, this.appSettings, this.performanceMonitor)
     }
 
     public async init(
@@ -103,7 +103,7 @@ export class SystemUICoordinator {
 
     private updatePerformanceStats(now: number, _deltaTime: number): void {
         if (now - this.lastPerformanceUpdate > this.performanceUpdateInterval && this.renderer) {
-            this.updateRenderStats(this.renderer)
+            this.performanceMonitor.updateRenderStats(this.renderer)
             this.lastPerformanceUpdate = now
         }
     }
@@ -193,10 +193,6 @@ export class SystemUICoordinator {
 
     private readonly handleRendererContextMenu = (event: MouseEvent): void => {
         event.preventDefault()
-    }
-
-    public updateRenderStats(renderer: THREE.WebGLRenderer): void {
-        this.performanceMonitor.updateRenderStats(renderer)
     }
 
     public dispose(): void {

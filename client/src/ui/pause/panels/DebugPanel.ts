@@ -13,6 +13,7 @@ import { renderTemplate } from '../../../utils/TemplateEngine'
 import debugPanelTemplate from '../templates/debug-panel.html?raw'
 import '../../../styles/pause-menu/debug-panel.css'
 import { DebugStatsProvider } from '../../../core/DebugStatsProvider'
+import type { PerformanceMonitorUI } from '../../PerformanceMonitor'
 
 export interface DebugStats {
     // Three.js Scene Stats
@@ -67,10 +68,12 @@ export class DebugPanel extends PauseMenuPanel {
     private currentStats: DebugStats | null = null
     private debugStatsProvider: DebugStatsProvider
     private consoleVisible = false
+    private performanceMonitor: PerformanceMonitorUI
 
-    constructor(config: PauseMenuPanelConfig = {}, debugStatsProvider: DebugStatsProvider) {
+    constructor(config: PauseMenuPanelConfig = {}, performanceMonitor: PerformanceMonitorUI) {
         super(config)
-        this.debugStatsProvider = debugStatsProvider
+
+        this.debugStatsProvider = new DebugStatsProvider(performanceMonitor);
     }
 
     render(): string {

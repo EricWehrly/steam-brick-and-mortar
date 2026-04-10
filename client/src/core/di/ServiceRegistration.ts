@@ -125,26 +125,14 @@ export class ServiceRegistration {
       ServiceKeys.SceneCoordinator,
       async (container) => {
         const sceneManager = await container.resolve(ServiceKeys.SceneManager) as SceneManager
-        const appSettings = await container.resolve(ServiceKeys.AppSettings) as AppSettings
         const dataManager = await container.resolve(ServiceKeys.DataManager) as DataManager
         const eventManager = await container.resolve(ServiceKeys.EventManager) as EventManager
         
         console.debug('🎬 Creating SceneCoordinator with DI dependencies')
         
-        // Create SceneCoordinator with injected dependencies
-        const sceneCoordinator = new SceneCoordinator(sceneManager, {
-          props: {
-            // Props configuration - rendering shows all loaded games (no artificial limits)  
-          },
-          environment: {
-            skyboxPreset: 'aurora'
-          },
-          tests: config.tests
-        }, appSettings, dataManager, eventManager)
-        
-        return sceneCoordinator
+        return new SceneCoordinator(sceneManager, dataManager, eventManager)
       },
-      [ServiceKeys.SceneManager, ServiceKeys.AppSettings, ServiceKeys.DataManager, ServiceKeys.EventManager]
+      [ServiceKeys.SceneManager, ServiceKeys.DataManager, ServiceKeys.EventManager]
     )
 
     return container
