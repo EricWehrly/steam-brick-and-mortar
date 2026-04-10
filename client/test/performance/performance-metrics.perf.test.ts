@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { SteamBrickAndMortarApp } from '../../src/core/SteamBrickAndMortarApp'
+import { PerformanceMonitorUI } from '../../src/ui/PerformanceMonitor'
 
 // Mock all dependencies to focus on performance measurement
 vi.mock('../../src/scene/SceneManager', async () => {
@@ -115,6 +116,14 @@ Object.defineProperty(globalThis, 'performance', {
 describe.skip('Performance Measurements', () => {
     let app: SteamBrickAndMortarApp
 
+    const getCurrentPerformanceStats = () => {
+        // App no longer exposes test-only getCurrentPerformanceStats().
+        const monitor = new PerformanceMonitorUI({ showMemory: true })
+        const stats = monitor.getStats()
+        monitor.dispose()
+        return stats
+    }
+
     beforeEach(() => {
         vi.clearAllMocks()
     })
@@ -159,7 +168,7 @@ describe.skip('Performance Measurements', () => {
         
         for (let i = 0; i < iterations; i++) {
             const startTime = window.performance.now()
-            const stats = app.getCurrentPerformanceStats()
+            const stats = getCurrentPerformanceStats()
             const endTime = window.performance.now()
             
             measurements.push(endTime - startTime)
@@ -201,7 +210,7 @@ describe.skip('Performance Measurements', () => {
         console.log(`  Increase: ${(memoryIncrease / 1024 / 1024).toFixed(2)}MB`)
         
         // Get performance stats to see current readings
-        const perfStats = app.getCurrentPerformanceStats()
+        const perfStats = getCurrentPerformanceStats()
         if (perfStats.memoryUsed !== undefined) {
             console.log(`  Performance monitor reading: ${perfStats.memoryUsed.toFixed(2)}MB`)
         }
@@ -232,7 +241,7 @@ describe.skip('Performance Measurements', () => {
         await app.init()
         
         // Get baseline measurements
-        const stats = app.getCurrentPerformanceStats()
+        const stats = getCurrentPerformanceStats()
         
         console.log(`📈 Performance baseline:`)
         console.log(`  FPS: ${stats.fps.toFixed(1)}`)
