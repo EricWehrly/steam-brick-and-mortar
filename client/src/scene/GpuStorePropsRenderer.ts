@@ -29,7 +29,6 @@ import * as THREE from 'three'
 import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
-import { SceneSignManager } from './SceneSignManager'
 import { VRLayoutUtils } from './props/SharedPropsUtils'
 import { RoomConstants } from './RoomManager'
 
@@ -49,7 +48,6 @@ import {
 import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
-import { DataManager } from '../core/data/DataManager'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
@@ -228,22 +226,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private handleAllBatchesComplete(): void {
         this.finalizeProgressiveLoading()
-        this.calculateShelfBoundsAndLayout(this.shelfPositions.length)
-
-        const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
-        const hasRecentlyPlayedData = games.some(g => (g.rtime_last_played ?? 0) > 0)
-
-        // Only show recently-played signage when we actually have recency data.
-        // Anonymous/curated stores (no rtime_last_played) skip this path entirely.
-        if (hasRecentlyPlayedData) {
-            this.recentlyPlayedSign.place()
-            SceneSignManager.instance.placeTimeBucketSigns(
-                this.shelfPositions,
-                this.shelfRotationsY,
-                games,
-                this.recentlyPlayedSign.getPosition()
-            )
-        }
     }
 
     private async initializeForProgressiveLoading(totalBatches: number): Promise<void> {
