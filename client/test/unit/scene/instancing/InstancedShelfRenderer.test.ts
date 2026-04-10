@@ -476,21 +476,8 @@ describe('InstancedShelfRenderer', () => {
             expect(renderer.getStats().activeInstances).toBe(5)
         })
     })
-    describe('Aisle pairing row spacing', () => {
-        it('should place odd rows closer to previous even row to form back-to-back pairs', () => {
-            const scene = new THREE.Scene()
-            const gpuRenderer = new GpuStorePropsRenderer(scene)
-
-            const calcRowZ = (gpuRenderer as any).calculateShelfRowZ.bind(gpuRenderer) as (row: number) => number
-            const z0 = calcRowZ(0)
-            const z1 = calcRowZ(1)
-            const z2 = calcRowZ(2)
-
-            // Pair gap should be the configured back-to-back spacing (2.0m)
-            expect(Math.abs(z1 - z0)).toBeCloseTo(2.0, 2)
-            // Gap to next pair is larger (normal spacing plus pair-compression carryover)
-            expect(Math.abs(z2 - z1)).toBeCloseTo(4.0, 2)
-        })
-    })
+    // Aisle pairing row spacing was previously tested via GpuStorePropsRenderer.calculateShelfRowZ.
+    // That method was removed when layout logic moved to ShelfLayoutCoordinator (arc layout).
+    // Arc layout integration is covered by ShelfLayoutCoordinator tests.
 })
 

@@ -6,7 +6,6 @@ import {
     BatchProcessingStatus,
     StorePropsEventTypes, 
     type BatchReadyForPlacementEvent,
-    type ShelfSpaceRequestedEvent,
     type ShelfCreatedEvent,
     type GamesPlacedEvent,
     type GameBoxSpawnedEvent
@@ -18,8 +17,8 @@ import { Logger } from '../../utils/Logger'
  *
  * Responsible for spawning game boxes on shelves using the instanced renderer.
  * Event-driven flow:
- * - Observes BatchReadyForPlacement ? stores games, emits ShelfSpaceRequested
- * - Observes ShelfCreated ? places games on shelf, emits GamesPlaced
+ * - Observes BatchReadyForPlacement → stores games as pending
+ * - Observes ShelfCreated → places stored games on shelf, emits GamesPlaced
  *
  * Category assignment is NOT this class's responsibility. Signs are placed
  * by ShelfSectionPlanner after all batches complete.
@@ -44,21 +43,10 @@ export class GameBoxSpawner {
         const { games, batchIndex, totalBatches } = event.detail
 
         GameBoxSpawner.logger.debug(
-            `[EVENT PATH] BatchReadyForPlacement received: batch ${batchIndex + 1}/${totalBatches}, ${games.length} games.`
+            `[EVENT PATH] BatchReadyForPlacement received: batch ${batchIndex + 1}/${totalBatches}, ${games.length} games — stored as pending`
         )
 
         this.pendingGames.set(batchIndex, games)
-
-        EventManager.getInstance().emit<ShelfSpaceRequestedEvent>(
-            StorePropsEventTypes.ShelfSpaceRequested,
-            {
-                gamesCount: games.length,
-                batchIndex,
-                status: BatchProcessingStatus.ShelfRequested,
-                lastModified: Date.now()
-            }
-        )
-        GameBoxSpawner.logger.debug(`Emitted ShelfSpaceRequested for batch ${batchIndex + 1}`)
     }
 
     private handleShelfCreated(event: CustomEvent<ShelfCreatedEvent>): void {

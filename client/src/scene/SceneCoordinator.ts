@@ -34,6 +34,7 @@ import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 import { GameSorter } from './categorization/GameSorter'
 import { SceneSignManager } from './SceneSignManager'
+import { ShelfLayoutCoordinator } from './shelves/ShelfLayoutCoordinator'
 
 export interface SceneCoordinatorConfig {
     environment?: {
@@ -56,6 +57,7 @@ export class SceneCoordinator {
     private eventManager: EventManager
     private gameSorter: GameSorter
     private sceneSignManager: SceneSignManager
+    private shelfLayoutCoordinator: ShelfLayoutCoordinator
 
     constructor(sceneManager?: SceneManager) {
         // TODO: DI tho?
@@ -75,6 +77,7 @@ export class SceneCoordinator {
         this.roomManager = new RoomManager()
         this.gameSorter = new GameSorter()
         this.sceneSignManager = SceneSignManager.instance
+        this.shelfLayoutCoordinator = new ShelfLayoutCoordinator()
 
         // Track WorldBuild phase — opens here, closes when props complete
         const tracker = StartupEventTracker.getInstance()
