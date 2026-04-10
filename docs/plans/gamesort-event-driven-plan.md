@@ -215,13 +215,48 @@ The deeper coupling — games assigned to shelves by batch index — is a separa
 - **Placement/sign path:** `ShelfReady` → `GpuStorePropsRenderer` emits `ShelfCreated` → `GameBoxSpawner` places boxes + `SceneSignManager` places signs.
 - **Sorting/semantic path:** `AllBatchesComplete` → `GameSorter` emits `GamesSort` (labels/sign semantics and future reorder source).
 
-### Planned next branch
+### Build-now-for-later plan (upcoming work)
 
-1. **Explicit `LayoutChanged` event** (separate from initial `ShelfLayoutDetermined`) for runtime relayout and future layout modes.
-2. **Post-sort box reorder pass**: apply `GamesSort` ordering to already-instantiated shelves (reflow/reassign shelf slots).
-3. **Shelf reuse/update policy** for layout changes (idempotent shelfId updates, optional animation).
-4. **Sign math extraction** from `SceneSignManager` into focused helpers (bucket transition + anchor generation).
-5. **Optional UX polish**: animated shelf relayout and game-box reorder transitions.
+This branch intentionally adds seams now so follow-up work can land without re-opening architecture decisions.
+
+#### Build now (safe scaffolding)
+
+1. **Lock physical vs semantic event boundaries**
+   - Physical/layout: `ShelfLayoutDetermined`, `ShelfReady`, `ShelfCreated`
+   - Semantic/sort: `GamesSort`
+   - Rule: no class should consume both domains unless it is explicitly a join point (currently only `SceneSignManager`).
+
+2. **Reserve relayout seam**
+   - Introduce `LayoutChanged` event contract in the next branch (no behavior change at first).
+   - Keep payload shape aligned with `ShelfLayoutDetermined` so runtime relayout can reuse the same consumers.
+
+3. **Make shelf updates idempotent by shelfId**
+   - `InstancedShelfRenderer` should treat duplicate/updated `ShelfReady` for the same `shelfId` as update-safe.
+   - This enables future runtime relayout without re-instancing churn.
+
+4. **Extract sign decision helpers**
+   - Pull bucket-transition and anchor calculations out of `SceneSignManager` into small pure helpers.
+   - Keep manager as orchestration + object lifecycle only.
+
+5. **Document ownership constraints**
+   - `GpuStorePropsRenderer`: orchestrates shelf lifecycle events only.
+   - `InstancedShelfRenderer`: owns GPU shelf meshes.
+   - `ShelfLayoutCoordinator`: owns positions/rotations.
+   - `GameSorter`: owns sorted semantic order.
+
+#### Build later (feature behavior)
+
+1. **Runtime relayout modes** (genre density variants, aisle strategies) via `LayoutChanged`.
+2. **Post-sort reflow**: remap game boxes to shelves from `GamesSort` after initial progressive load.
+3. **Animated transitions** for shelf movement and box reordering.
+4. **Neon sign integration** as additional `SignKind` implementation.
+
+#### Acceptance gates for follow-up branch
+
+- No regression to progressive shelf appearance.
+- No direct layout math in renderer classes.
+- No direct sign placement calls from `GpuStorePropsRenderer`.
+- `GamesSort` can be consumed independently of shelf rendering.
 
 ### Multi-sign-type notes
 
