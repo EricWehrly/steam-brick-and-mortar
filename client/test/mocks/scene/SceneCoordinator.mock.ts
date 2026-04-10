@@ -8,7 +8,6 @@ export const SceneCoordinatorMock = vi.fn().mockImplementation(function() { retu
     setupCompleteScene: vi.fn().mockResolvedValue(undefined),
     updatePerformanceData: vi.fn(),
     getGameBoxRenderer: vi.fn().mockReturnValue({
-        updatePerformanceData: vi.fn(),
         cleanupOffScreenTextures: vi.fn(),
         getPerformanceStats: vi.fn()
     }),
