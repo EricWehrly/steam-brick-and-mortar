@@ -24,8 +24,8 @@ import {
     type BatchReadyForPlacementEvent,
     type GamesPlacedEvent,
     type SomeBatchesCompleteEvent,
-    type AllBatchesCompleteEvent
 } from '../../types/InteractionEvents'
+import type { AllBatchesCompleteEvent } from '../../types/EnvironmentEvents'
 
 export interface BatchItem<T> {
     batchIndex: number
