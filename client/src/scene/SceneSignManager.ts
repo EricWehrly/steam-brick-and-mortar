@@ -26,12 +26,10 @@ import {
     type GamesSortEvent,
     StorePropsEventTypes,
     type ShelfCreatedEvent,
-    type ShelfReadyEvent,
 } from '../types/InteractionEvents'
 import {
     getRecentlyPlayedBucket,
     getBucketLabel,
-    sortByRecentlyPlayed,
     RecentlyPlayedBucket,
 } from './categorization/CategoryAssigner'
 import type { SteamGameData } from './game-box/types/GameData'
@@ -125,8 +123,10 @@ export class SceneSignManager {
     private readonly scene: THREE.Scene
     private readonly signs: Map<string, THREE.Mesh> = new Map()
     private readonly shelfTransforms = new Map<number, { position: THREE.Vector3; rotationY: number }>()
+    private readonly timeBucketSignLabels = new Set<string>()
     private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
     private hasRecentlyPlayedData = false
+    private lastPlacedBucket: RecentlyPlayedBucket | null = null
 
     private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 0.6
     private static readonly SIGN_Z_FACE_PLAYER = 0.01 // slight forward push to avoid z-fighting
@@ -145,25 +145,23 @@ export class SceneSignManager {
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfCreated,
             (event: CustomEvent<ShelfCreatedEvent>) => {
-                const { position, shelfIndex, shelfRotationY } = event.detail
+                const { position, shelfIndex, shelfRotationY, batchIndex } = event.detail
                 const rotY = shelfRotationY ?? 0
                 const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
                 const topSurface = shelfSurfaces[0]
                 if (topSurface) {
                     this.placeShelfEndCapLabels(shelfIndex ?? 0, position as THREE.Vector3, rotY, topSurface)
                 }
-            }
-        )
 
-        EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ShelfReady,
-            (event: CustomEvent<ShelfReadyEvent>) => {
-                const { shelfId, position, rotationY } = event.detail
+                const shelfId = batchIndex ?? shelfIndex ?? 0
                 this.shelfTransforms.set(shelfId, {
                     position: (position as THREE.Vector3).clone(),
-                    rotationY,
+                    rotationY: rotY,
                 })
-                this.renderTimeBucketSignsIfReady()
+
+                if (this.hasRecentlyPlayedData && this.sortedGames.length > 0) {
+                    this.placeTimeBucketSignForShelf(shelfId, position as THREE.Vector3, rotY)
+                }
             }
         )
 
@@ -172,8 +170,10 @@ export class SceneSignManager {
             (event: CustomEvent<GamesSortEvent>) => {
                 this.sortedGames = event.detail.sortedGames
                 this.hasRecentlyPlayedData = event.detail.hasRecentlyPlayedData
+                this.lastPlacedBucket = null
+                this.clearTimeBucketSigns()
                 this.syncRecentlyPlayedCeilingSign()
-                this.renderTimeBucketSignsIfReady()
+                this.replayTimeBucketSignsFromCreatedShelves()
             }
         )
     }
@@ -272,6 +272,8 @@ export class SceneSignManager {
         for (const label of [...this.signs.keys()]) {
             this.removeSign(label)
         }
+        this.timeBucketSignLabels.clear()
+        this.lastPlacedBucket = null
     }
 
     public dispose(): void {
@@ -305,90 +307,62 @@ export class SceneSignManager {
         })
     }
 
-    private renderTimeBucketSignsIfReady(): void {
+    private replayTimeBucketSignsFromCreatedShelves(): void {
         if (!this.hasRecentlyPlayedData || this.sortedGames.length === 0 || this.shelfTransforms.size === 0) {
             return
         }
 
         const sortedShelves = [...this.shelfTransforms.entries()].sort((a, b) => a[0] - b[0])
-        const shelfPositions = sortedShelves.map(([, transform]) => transform.position)
-        const shelfRotationsY = sortedShelves.map(([, transform]) => transform.rotationY)
-
-        this.placeTimeBucketSigns(
-            shelfPositions,
-            shelfRotationsY,
-            this.sortedGames as SteamGameData[],
-            new THREE.Vector3(0, RoomConstants.STORE_CEILING_HEIGHT - 0.5, -6.4)
-        )
+        for (const [shelfId, transform] of sortedShelves) {
+            this.placeTimeBucketSignForShelf(shelfId, transform.position, transform.rotationY)
+        }
     }
 
-    /**
-     * Place time-bucket section signs ("This Week", "This Month", etc.) above shelves.
-     *
-     * Called after all batches complete, once shelf positions and rotations are known.
-     * Skipped automatically for buckets that don't appear in the game data.
-     *
-     * @param shelfPositions  World-space base positions for each shelf unit
-     * @param shelfRotationsY Y-rotation (radians) for each shelf
-     * @param games           Full sorted game list (same order as shelf layout)
-     * @param ceilingSignPos  Position of the "Recently Played" ceiling sign (signs too close are skipped)
-     */
-    public placeTimeBucketSigns(
-        shelfPositions: THREE.Vector3[],
-        shelfRotationsY: number[],
-        games: SteamGameData[],
-        ceilingSignPos: THREE.Vector3
-    ): void {
-        if (games.length === 0) return
-
-        const sortedGames = [...games].sort(sortByRecentlyPlayed)
-
-        // Shelf-mount signs sit ON TOP of the shelf unit, just inside the side brackets.
-        // shelfPos.y is the base of the unit. DEFAULT_SHELF_CONFIG.height (2.0m) is the top board.
-        // boardThickness (0.05m) × 2 subtracted from width (2.0m) = 1.9m interior span;
-        // use 1.8m to leave a small margin inside the bracket edges.
-        // ⚠️ Do not change SIGN_ANCHOR_Y_OFFSET without checking DEFAULT_SHELF_CONFIG.height.
-        const SIGN_ANCHOR_Y_OFFSET = 2.0  // shelf top (DEFAULT_SHELF_CONFIG.height)
-        const SIGN_Y_CLEARANCE = 0.02     // small lift so sign doesn't z-fight with top board
-        const SIGN_WIDTH = 1.8            // fits inside side brackets (interior = 1.9m)
-        const SIGN_HEIGHT = 0.32          // shelf-top label — slightly shorter than hanging sign
-        const MIN_DIST_FROM_CEILING_SIGN = 1.5
+    private placeTimeBucketSignForShelf(shelfId: number, shelfPosition: THREE.Vector3, shelfRotationY: number): void {
         const BATCH_SIZE = 18
-        const SIGN_FRONT_OFFSET = 0.28
-
-        let lastBucket: RecentlyPlayedBucket | null = null
-
-        for (let i = 0; i < shelfPositions.length; i++) {
-            const shelfPos = shelfPositions[i]
-            const firstGameIndex = i * BATCH_SIZE
-            if (firstGameIndex >= sortedGames.length) break
-
-            const firstGame = sortedGames[firstGameIndex]
-            const bucket = getRecentlyPlayedBucket(firstGame)
-
-            if (bucket !== RecentlyPlayedBucket.Unplayed && bucket !== lastBucket) {
-                const anchor = new THREE.Vector3(
-                    shelfPos.x,
-                    shelfPos.y + SIGN_ANCHOR_Y_OFFSET + SIGN_Y_CLEARANCE,
-                    shelfPos.z
-                )
-                if (ceilingSignPos.distanceTo(anchor) > MIN_DIST_FROM_CEILING_SIGN) {
-                    const facingY = shelfRotationsY[i] ?? (i % 2 === 1 ? Math.PI : 0)
-                    this.setSign({
-                        label: getBucketLabel(bucket),
-                        anchorPosition: anchor,
-                        mount: {
-                            style: 'above-shelf',
-                            yOffset: 0,           // anchor is already at shelf top
-                            frontOffset: SIGN_FRONT_OFFSET,
-                            signFacingY: facingY,
-                        },
-                        style: { ...SignStyles.Category, width: SIGN_WIDTH, height: SIGN_HEIGHT }
-                    })
-                }
-                lastBucket = bucket
-            }
+        const firstGameIndex = shelfId * BATCH_SIZE
+        if (firstGameIndex >= this.sortedGames.length) {
+            return
         }
+
+        const firstGame = this.sortedGames[firstGameIndex]
+        const bucket = getRecentlyPlayedBucket(firstGame as SteamGameData)
+        if (bucket === RecentlyPlayedBucket.Unplayed || bucket === this.lastPlacedBucket) {
+            return
+        }
+
+        const anchor = new THREE.Vector3(
+            shelfPosition.x,
+            shelfPosition.y + 2.0 + 0.02,
+            shelfPosition.z
+        )
+
+        const ceilingAnchor = new THREE.Vector3(0, RoomConstants.STORE_CEILING_HEIGHT - 0.5, -6.4)
+        if (ceilingAnchor.distanceTo(anchor) <= 1.5) {
+            return
+        }
+
+        const label = getBucketLabel(bucket)
+        this.setSign({
+            label,
+            anchorPosition: anchor,
+            mount: {
+                style: 'above-shelf',
+                yOffset: 0,
+                frontOffset: 0.28,
+                signFacingY: shelfRotationY,
+            },
+            style: { ...SignStyles.Category, width: 1.8, height: 0.32 },
+        })
+        this.timeBucketSignLabels.add(label)
+        this.lastPlacedBucket = bucket
+    }
+
+    private clearTimeBucketSigns(): void {
+        for (const label of this.timeBucketSignLabels) {
+            this.removeSign(label)
+        }
+        this.timeBucketSignLabels.clear()
     }
 
     // ─── Position resolution ──────────────────────────────────────────────────
