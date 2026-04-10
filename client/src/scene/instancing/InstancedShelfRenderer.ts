@@ -408,10 +408,19 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             if (this.shelfUnits.size === 0) {
                 this.ensureMeshesAddedToScene()
             }
-            
+
+            // Idempotent: if this shelfId already exists, reuse its instance slots.
+            // This lets runtime relayout update positions without allocating new GPU slots.
+            const existing = this.shelfUnits.get(index)
+            if (existing) {
+                this.updateShelfUnitTransform(index, existing, data.position, shelfConfig, data.rotation)
+                InstancedShelfRenderer.logger.debug(`🔄 Updated shelf unit ${index} at (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
+                return true
+            }
+
             const shelfUnit = this.applyShelfUnitTemplate(index, data.position, shelfConfig, data.rotation)
             this.shelfUnits.set(index, shelfUnit)
-            
+
             InstancedShelfRenderer.logger.debug(`🏪 Set shelf unit ${index} at position (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
             return true
             
@@ -522,12 +531,61 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
     }
     
+    /**
+     * Update the world-space matrices of an already-instanced shelf unit.
+     * Reuses the existing GPU instance slots rather than allocating new ones.
+     * Called by setInstance when the shelfId already exists.
+     */
+    private updateShelfUnitTransform(
+        _shelfUnitIndex: number,
+        existing: ShelfUnitInstance,
+        position: THREE.Vector3,
+        _config: Required<ShelfConfig>,
+        unitRotation?: THREE.Quaternion
+    ): void {
+        existing.position.copy(position)
+
+        const partsWithIndices = [
+            { type: ShelfGeometryType.AngledBoard,       indices: existing.instanceIndices.angledBoards,    manager: this.angledBoardManager },
+            { type: ShelfGeometryType.SideBoard,         indices: existing.instanceIndices.sideBoards,      manager: this.sideBoardManager },
+            { type: ShelfGeometryType.ShelfBoard,        indices: existing.instanceIndices.shelfBoards,     manager: this.shelfBoardManager },
+            { type: ShelfGeometryType.InteriorSurface,   indices: existing.instanceIndices.interiorSurfaces, manager: this.interiorSurfaceManager },
+        ]
+
+        let partIdx = 0
+        for (const part of this.shelfUnitTemplate) {
+            const rotatedOffset = unitRotation
+                ? part.offset.clone().applyQuaternion(unitRotation)
+                : part.offset.clone()
+            const worldPos = position.clone().add(rotatedOffset)
+
+            const entry = partsWithIndices.find(p => p.type === part.type)
+            if (!entry || partIdx >= entry.indices.length) continue
+
+            // Each geometry type has its own index cursor; use partIdx relative to type group
+            const typeIdx = partsWithIndices
+                .filter(p => p.type === part.type)
+                .indexOf(entry)
+            const instanceIndex = entry.indices[typeIdx] ?? entry.indices[0]
+
+            const finalRotation = unitRotation
+                ? (part.rotation ? unitRotation.clone().multiply(part.rotation) : unitRotation.clone())
+                : part.rotation
+            entry.manager.setInstanceMatrix(instanceIndex, worldPos, finalRotation, part.scale)
+
+            partIdx++
+        }
+    }
+
     private handleShelfReady(detail: ShelfReadyEvent): void {
         if (!this.isReady()) {
             this.pendingShelfReady.set(detail.shelfId, detail)
             return
         }
 
+        // Idempotent: if a shelf with this shelfId already exists, treat as a position update.
+        // This allows runtime relayout to reuse the same shelfId without re-instancing churn.
+        // Full matrix rewrite is safe because setInstance overwrites the instance slot.
         const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, detail.rotationY, 0))
         this.setInstance(detail.shelfId, {
             position: detail.position as THREE.Vector3,

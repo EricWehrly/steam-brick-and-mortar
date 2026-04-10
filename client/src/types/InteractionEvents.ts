@@ -191,6 +191,24 @@ export interface ShelfLayoutDeterminedEvent extends BaseInteractionEvent {
     shelfLayout: { rows: number; shelvesPerRow: number }
 }
 
+/**
+ * Emitted when an already-determined shelf layout is changed at runtime
+ * (e.g. layout mode switch, scene reload). Consumers that care about relayout
+ * (lighting, instanced renderers, sign placement) listen to this alongside
+ * ShelfLayoutDetermined.
+ *
+ * Payload mirrors ShelfLayoutDetermined so consumers can handle both with the
+ * same handler signature.
+ *
+ * Phase: reserved seam — no emitters exist yet. Wire behavior in the next branch.
+ */
+export interface LayoutChangedEvent extends BaseInteractionEvent {
+    shelfBounds: ShelfBounds
+    shelfLayout: { rows: number; shelvesPerRow: number }
+    /** Why the layout changed (for diagnostics / animation decisions). */
+    reason: 'reload' | 'mode-switch' | 'resize'
+}
+
 export interface SomeBatchesCompleteEvent extends BaseInteractionEvent {
     completedBatches: number
     totalBatches: number
@@ -339,6 +357,8 @@ export const GameEventTypes = {
     SceneReady: 'game:scene-ready',
     Start: 'game:start',
     ShelfLayoutDetermined: 'game:shelf-layout-determined',
+    /** Reserved seam: emitted when an existing layout changes at runtime. No emitters yet. */
+    LayoutChanged: 'game:layout-changed',
     SomeBatchesComplete: 'game:some-batches-complete',
     AllBatchesComplete: 'game:all-batches-complete',
     /** Fired when a game is selected (e.g. clicked in scene) — opens detail panel */

@@ -27,14 +27,16 @@ import {
     type ShelfCreatedEvent,
 } from '../types/InteractionEvents'
 import type { GamesSortEvent } from '../types/EnvironmentEvents'
-import {
-    getRecentlyPlayedBucket,
-    getBucketLabel,
-    RecentlyPlayedBucket,
-} from './categorization/CategoryAssigner'
+import { RecentlyPlayedBucket } from './categorization/CategoryAssigner'
 import type { SteamGameData } from './game-box/types/GameData'
 import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
-import { RoomConstants } from './RoomManager'
+import {
+    shelfBucket,
+    shouldPlaceBucketSign,
+    bucketSignAnchor,
+    recentlyPlayedCeilingAnchor,
+    bucketDisplayLabel,
+} from './signs/TimeBucketSignHelpers'
 
 // ─── Style definitions ────────────────────────────────────────────────────────
 
@@ -377,7 +379,7 @@ export class SceneSignManager {
 
         this.setSign({
             label,
-            anchorPosition: new THREE.Vector3(0, RoomConstants.STORE_CEILING_HEIGHT - 0.5, -6.4),
+            anchorPosition: recentlyPlayedCeilingAnchor(),
             mount: {
                 style: 'ceiling',
                 signFacingY: 0,
@@ -403,30 +405,17 @@ export class SceneSignManager {
     }
 
     private placeTimeBucketSignForShelf(shelfId: number, shelfPosition: THREE.Vector3, shelfRotationY: number): void {
-        const BATCH_SIZE = 18
-        const firstGameIndex = shelfId * BATCH_SIZE
-        if (firstGameIndex >= this.sortedGames.length) {
+        const bucket = shelfBucket(shelfId, this.sortedGames)
+        const ceilingAnchor = recentlyPlayedCeilingAnchor()
+
+        if (!shouldPlaceBucketSign(bucket, this.lastPlacedBucket, shelfPosition, ceilingAnchor)) {
             return
         }
 
-        const firstGame = this.sortedGames[firstGameIndex]
-        const bucket = getRecentlyPlayedBucket(firstGame as SteamGameData)
-        if (bucket === RecentlyPlayedBucket.Unplayed || bucket === this.lastPlacedBucket) {
-            return
-        }
+        // bucket is non-null here (shouldPlaceBucketSign guarantees it)
+        const label = bucketDisplayLabel(bucket!) ?? ''
+        const anchor = bucketSignAnchor(shelfPosition)
 
-        const anchor = new THREE.Vector3(
-            shelfPosition.x,
-            shelfPosition.y + 2.0 + 0.02,
-            shelfPosition.z
-        )
-
-        const ceilingAnchor = new THREE.Vector3(0, RoomConstants.STORE_CEILING_HEIGHT - 0.5, -6.4)
-        if (ceilingAnchor.distanceTo(anchor) <= 1.5) {
-            return
-        }
-
-        const label = getBucketLabel(bucket)
         this.setSign({
             label,
             anchorPosition: anchor,
@@ -439,7 +428,7 @@ export class SceneSignManager {
             style: { ...SignStyles.Category, width: 1.8, height: 0.32 },
         }, 'bucket')
         this.timeBucketSignLabels.add(label)
-        this.lastPlacedBucket = bucket
+        this.lastPlacedBucket = bucket!
     }
 
     private clearTimeBucketSigns(): void {
@@ -468,7 +457,7 @@ export class SceneSignManager {
             }
             case 'ceiling': {
                 // Ceiling mount: caller sets anchor.y directly to the desired sign height
-                // (e.g. RoomConstants.STORE_CEILING_HEIGHT - drop). yOffset is not applied here.
+                // (e.g. ceiling height minus drop). yOffset is not applied here.
                 const facingY = mount.signFacingY ?? 0
                 const frontOff = mount.frontOffset ?? 0
                 return new THREE.Vector3(

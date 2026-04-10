@@ -40,6 +40,7 @@ import type {
     SceneReadyEvent,
     GameStartEvent,
     ShelfLayoutDeterminedEvent,
+    LayoutChangedEvent,
     SomeBatchesCompleteEvent,
     AppEventTypes,
     PhaseCompletedEvent,
@@ -85,6 +86,8 @@ export interface InteractionEventMap {
     [GameEventTypes.SceneReady]: SceneReadyEvent
     [GameEventTypes.Start]: GameStartEvent
     [GameEventTypes.ShelfLayoutDetermined]: ShelfLayoutDeterminedEvent
+    /** Reserved seam — no emitter yet. Wire behavior in relayout branch. */
+    [GameEventTypes.LayoutChanged]: LayoutChangedEvent
     [GameEventTypes.SomeBatchesComplete]: SomeBatchesCompleteEvent
 
     // Environment events (from EnvironmentEvents.ts)
