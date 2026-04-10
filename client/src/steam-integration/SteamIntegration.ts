@@ -21,8 +21,7 @@ import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEve
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
-import { sortByGenreThenPlaytime } from '../scene/categorization/CategoryAssigner'
-import { sortByNumericField } from '../scene/categorization/GameSorter'
+import { sortByNumericField } from '../scene/categorization/GameSortFunctions'
 
 export interface SteamIntegrationConfig {
     apiBaseUrl?: string

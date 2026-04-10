@@ -1,11 +1,12 @@
 /**
  * GameSorter
  *
- * Listens for AllBatchesComplete, reads the full game list from DataManager,
- * sorts and buckets games, then emits GameEventTypes.GamesSort.
+ * Coordinator: listens for AllBatchesComplete, reads the full game list,
+ * applies the active sort policy, and emits GameEventTypes.GamesSort.
  *
- * Owns all recently-played sort and bucket logic — this is explicitly GameSorter's
- * responsibility, not CategoryAssigner's. CategoryAssigner handles genre grouping only.
+ * Sort primitives live in GameSortFunctions — import from there for custom
+ * sort or grouping work. Bucket classification (recently-played time windows)
+ * lives here because it is specific to the recency sort policy.
  */
 
 import { EventManager } from '../../core/EventManager'
@@ -14,6 +15,10 @@ import { Logger } from '../../utils/Logger'
 import { GameEventTypes } from '../../types/InteractionEvents'
 import type { AllBatchesCompleteEvent, GamesSortEvent } from '../../types/EnvironmentEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
+import { sortByNumericField } from './GameSortFunctions'
+
+// Re-export so callers don't need two imports for sort + bucket types
+export { sortByNumericField, sortAlphabetically, sortByEnumIndex, chainComparators, groupByKey } from './GameSortFunctions'
 
 // ─── Recently-played bucket types ─────────────────────────────────────────────
 
@@ -51,35 +56,6 @@ export function getRecentlyPlayedBucket(game: SteamGameData, nowSeconds?: number
     if (diff < 30 * DAY)  return RecentlyPlayedBucket.ThisMonth
     if (diff < 365 * DAY) return RecentlyPlayedBucket.ThisYear
     return RecentlyPlayedBucket.Before
-}
-
-// ─── Generic field-based sort ──────────────────────────────────────────────────
-
-/**
- * Sort comparator factory: sort by a numeric field descending (higher = first).
- * Items where the field is 0 or absent sort last.
- * Ties fall back to a secondary numeric field, also descending.
- *
- * Example:
- *   games.sort(sortByNumericField('rtime_last_played', 'playtime_forever'))
- *
- * The key constraints ensure only actual numeric properties of T can be passed.
- */
-export function sortByNumericField<T>(
-    primaryKey: { [K in keyof T]: T[K] extends number | undefined ? K : never }[keyof T],
-    secondaryKey?: { [K in keyof T]: T[K] extends number | undefined ? K : never }[keyof T]
-): (a: Readonly<T>, b: Readonly<T>) => number {
-    return (a, b) => {
-        const aVal = (a[primaryKey] as number | undefined) ?? 0
-        const bVal = (b[primaryKey] as number | undefined) ?? 0
-        if (aVal !== bVal) return bVal - aVal
-        if (secondaryKey !== undefined) {
-            const aSecondary = (a[secondaryKey] as number | undefined) ?? 0
-            const bSecondary = (b[secondaryKey] as number | undefined) ?? 0
-            return bSecondary - aSecondary
-        }
-        return 0
-    }
 }
 
 // ─── GameSorter ────────────────────────────────────────────────────────────────
