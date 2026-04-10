@@ -98,6 +98,17 @@ export interface SignMount {
 
 // ─── Category sign descriptor ─────────────────────────────────────────────────
 
+/** Geometry of the topmost surface of a shelf unit, used to anchor end-cap labels. */
+export interface ShelfTopSurface {
+    centerX: number
+    topY: number
+    /** Z extent furthest from the player (back face). */
+    backZ: number
+    /** Z extent closest to the player (front face). */
+    frontZ: number
+    width: number
+}
+
 export interface CategorySignDescriptor {
     label: string
     text?: string   // display text — defaults to label if omitted
@@ -189,15 +200,17 @@ export class SceneSignManager {
 
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.GamesSort,
-            (event: CustomEvent<GamesSortEvent>) => {
-                this.sortedGames = event.detail.sortedGames
-                this.hasRecentlyPlayedData = event.detail.hasRecentlyPlayedData
-                this.lastPlacedBucket = null
-                this.clearTimeBucketSigns()
-                this.syncRecentlyPlayedCeilingSign()
-                this.replayTimeBucketSignsFromCreatedShelves()
-            }
+            (event: CustomEvent<GamesSortEvent>) => this.handleGamesSort(event.detail)
         )
+    }
+
+    private handleGamesSort(detail: GamesSortEvent): void {
+        this.sortedGames = detail.sortedGames
+        this.hasRecentlyPlayedData = detail.hasRecentlyPlayedData
+        this.lastPlacedBucket = null
+        this.clearTimeBucketSigns()
+        this.syncRecentlyPlayedCeilingSign()
+        this.replayTimeBucketSignsFromCreatedShelves()
     }
 
     /**
@@ -288,42 +301,44 @@ export class SceneSignManager {
 
     /**
      * Place FRONT/BACK orientation end-cap labels on a shelf unit.
-     *
-     * Called from shelf construction (not game placement) so labels describe
-     * the shelf geometry, not the games on it.
-     *
-     * @param shelfIndex  Index of this shelf unit (used for stable sign labels)
-     * @param position    World-space base position of the shelf unit
-     * @param rotY        Y-rotation (radians) of the shelf unit
-     * @param topSurface  The top shelf surface — provides Z extents and centerX for placement
+     * Called on ShelfCreated so labels describe shelf geometry, not game content.
      */
     public placeShelfEndCapLabels(
         shelfIndex: number,
         position: THREE.Vector3,
         rotY: number,
-        topSurface: { centerX: number; topY: number; backZ: number; frontZ: number; width: number }
+        surface: ShelfTopSurface
     ): void {
-        const labelX = topSurface.centerX + (topSurface.width / 2) - 0.15
-        const labelY = topSurface.topY + 0.1
         const yAxis = new THREE.Vector3(0, 1, 0)
+        const labelX = surface.centerX + (surface.width / 2) - 0.15
+        const labelY = surface.topY + 0.1
 
-        const frontPosLocal = new THREE.Vector3(labelX, labelY, topSurface.backZ)
-        const frontPos = frontPosLocal.clone().applyAxisAngle(yAxis, rotY).add(position)
-        this.setSign({
-            label: `shelf-front-label-${shelfIndex}`,
-            text: 'FRONT',
-            anchorPosition: frontPos,
-            mount: { style: 'above-shelf', yOffset: 0, signFacingY: rotY },
-            style: SignStyles.ShelfEndLabel
-        }, 'end-cap')
+        this.placeEndCapLabel(
+            `shelf-front-label-${shelfIndex}`, 'FRONT',
+            new THREE.Vector3(labelX, labelY, surface.backZ),
+            position, rotY, yAxis
+        )
+        this.placeEndCapLabel(
+            `shelf-back-label-${shelfIndex}`, 'BACK',
+            new THREE.Vector3(labelX, labelY, surface.frontZ),
+            position, rotY + Math.PI, yAxis
+        )
+    }
 
-        const backPosLocal = new THREE.Vector3(labelX, labelY, topSurface.frontZ)
-        const backPos = backPosLocal.clone().applyAxisAngle(yAxis, rotY).add(position)
+    private placeEndCapLabel(
+        label: string,
+        text: string,
+        localPos: THREE.Vector3,
+        shelfOrigin: THREE.Vector3,
+        facingY: number,
+        yAxis: THREE.Vector3
+    ): void {
+        const worldPos = localPos.clone().applyAxisAngle(yAxis, facingY).add(shelfOrigin)
         this.setSign({
-            label: `shelf-back-label-${shelfIndex}`,
-            text: 'BACK',
-            anchorPosition: backPos,
-            mount: { style: 'above-shelf', yOffset: 0, signFacingY: rotY + Math.PI },
+            label,
+            text,
+            anchorPosition: worldPos,
+            mount: { style: 'above-shelf', yOffset: 0, signFacingY: facingY },
             style: SignStyles.ShelfEndLabel
         }, 'end-cap')
     }
