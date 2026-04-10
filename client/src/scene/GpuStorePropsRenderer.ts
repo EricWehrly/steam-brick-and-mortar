@@ -64,7 +64,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     })
 
     private shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
-    private shelfLayout: { rows: number; shelvesPerRow: number } = { rows: 0, shelvesPerRow: 0 }
+    private shelfLayout: { rows: number; shelvesPerRow?: number } = { rows: 0 }
     private cumulativeShelfCount = 0
     private totalShelves = 0
 

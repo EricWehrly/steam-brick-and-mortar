@@ -79,7 +79,7 @@ export class LightingRenderer {
     private config: LightingConfig = {}
     private eventManager: EventManager
     private lightFactory: LightFactory
-    private currentShelfLayout?: { rows: number; shelvesPerRow: number }
+    private currentShelfLayout?: { rows: number; shelvesPerRow?: number }
     public static logger = Logger.createLogFunctions(LightingRenderer.name)
 
     constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
@@ -396,7 +396,7 @@ export class LightingRenderer {
         LightingRenderer.logger.debug(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
 
-    private async setupFluorescentFixtures(shelfLayout?: { rows: number; shelvesPerRow: number }): Promise<void> {
+    private async setupFluorescentFixtures(shelfLayout?: { rows: number; shelvesPerRow?: number }): Promise<void> {
         const monitor = PerformanceMonitor.start('ceiling-fixtures-setup', LightingRenderer.logger)
         
         if (!this.propRenderer) {
@@ -505,7 +505,7 @@ export class LightingRenderer {
 
     private updateRoomDimensions(
         dimensions: { width: number; depth: number; height: number },
-        shelfLayout?: { rows: number; shelvesPerRow: number },
+        shelfLayout?: { rows: number; shelvesPerRow?: number },
         centerOffset?: { x: number; y: number; z: number }
     ): void {
         LightingRenderer.logger.debug(`💡 Updating lighting for room dimensions: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
@@ -625,3 +625,4 @@ export class LightingRenderer {
         this.scene.remove(this.lightingGroup)
     }
 }
+
