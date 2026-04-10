@@ -1,14 +1,15 @@
 /**
  * Debug Statistics Provider
- * 
+ *
  * Provides comprehensive debug statistics for the application.
- * Separated from main app class to reduce complexity.
+ * No constructor dependencies — reads scene and renderer from DataManager,
+ * and performance stats from the PerformanceMonitorUI registered there.
  */
 
 import * as THREE from 'three'
+import { DataManager } from './data/DataManager'
+import { DataKey } from './data/DataTypes'
 import type { PerformanceMonitorUI } from '../ui'
-import type { SteamIntegration } from '../steam-integration'
-import type { SceneManager } from '../scene'
 
 export interface DebugStats {
     sceneObjects: {
@@ -47,129 +48,110 @@ export interface DebugStats {
 }
 
 export class DebugStatsProvider {
-    private sceneManager: SceneManager
-    private steamIntegration: SteamIntegration
-    private performanceMonitor: PerformanceMonitorUI
+    private static instance: DebugStatsProvider | null = null
 
-    constructor(
-        sceneManager: SceneManager,
-        steamIntegration: SteamIntegration,
-        performanceMonitor: PerformanceMonitorUI
-    ) {
-        this.sceneManager = sceneManager
-        this.steamIntegration = steamIntegration
-        this.performanceMonitor = performanceMonitor
+    public static getInstance(): DebugStatsProvider {
+        if (!DebugStatsProvider.instance) {
+            DebugStatsProvider.instance = new DebugStatsProvider()
+        }
+        return DebugStatsProvider.instance
+    }
+
+    // Allow direct construction for DebugPanel — either path gives the same singleton
+    constructor(performanceMonitor: PerformanceMonitorUI) {
+        if (DebugStatsProvider.instance) {
+            return DebugStatsProvider.instance
+        }
+        DebugStatsProvider.instance = this
     }
 
     /**
      * Get comprehensive debug statistics
      */
     async getDebugStats(): Promise<DebugStats> {
-        const scene = this.sceneManager.getScene()
-        const renderer = this.sceneManager.getRenderer()
-        const info = renderer.info
+        const dm = DataManager.getInstance()
+        const scene = dm.get<THREE.Scene>(DataKey.MainScene)
+        const renderer = dm.get<THREE.WebGLRenderer>(DataKey.Renderer)
 
-        // Count scene objects
-        const sceneObjects = this.countSceneObjects(scene)
-        
-        // Get performance stats
-        const performanceStats = this.performanceMonitor.getStats()
-        
-        // Get cache stats from PixelDataCache (the active texture cache)
+        // Scene object counts
+        const sceneObjects = scene ? this.countSceneObjects(scene) : { meshes: 0, lights: 0, cameras: 0 }
+        const info = renderer?.info
+
+        // Performance stats — available once PerformanceMonitorUI registers itself
+        const perfStats = perfMonitor?.getStats() ?? { fps: 0, frameTime: 0, drawCalls: 0, triangles: 0 }
+
+        // Cache stats
         const { PixelDataCache } = await import('../scene/game-box/instancing/PixelDataCache')
-        const pixelCache = PixelDataCache.getInstance()
-        const pixelCacheStorage = await pixelCache.getStorageEstimate()
-        
-        // Get WebGL context info
-        const gl = renderer.getContext()
-        const debugInfo = renderer.debug
-        
-        // Get memory info if available
-        const memoryInfo = this.getMemoryInfo()
+        const pixelCacheStorage = await PixelDataCache.getInstance().getStorageEstimate()
 
-        // Get storage quota info
+        // WebGL info
+        const gl = renderer?.getContext()
+        const memoryInfo = this.getMemoryInfo()
         const storageInfo = await this.getStorageInfo()
 
         return {
             sceneObjects: {
-                total: scene.children.length,
+                total: scene?.children.length ?? 0,
                 meshes: sceneObjects.meshes,
                 lights: sceneObjects.lights,
                 cameras: sceneObjects.cameras,
-                textures: info.memory.textures,
-                materials: Object.keys(scene.userData.materials ?? {}).length,
-                geometries: info.memory.geometries
+                textures: info?.memory.textures ?? 0,
+                materials: Object.keys(scene?.userData.materials ?? {}).length,
+                geometries: info?.memory.geometries ?? 0
             },
             performance: {
-                fps: performanceStats.fps,
-                frameTime: performanceStats.frameTime,
+                fps: perfStats.fps,
+                frameTime: perfStats.frameTime,
                 memoryUsed: memoryInfo.usedJSHeapSize,
                 memoryTotal: memoryInfo.totalJSHeapSize,
-                triangles: info.render.triangles,
-                drawCalls: info.render.calls
+                triangles: info?.render.triangles ?? 0,
+                drawCalls: info?.render.calls ?? 0
             },
             cache: {
                 imageCount: pixelCacheStorage.count,
-                imageCacheSize: Math.round(pixelCacheStorage.estimatedMB * 1024 * 1024), // Convert MB to bytes
-                gameDataCount: 0, // TODO: Implement getGameDataCount in SteamIntegration
-                gameDataSize: 0, // TODO: Implement getGameDataSize in SteamIntegration
+                imageCacheSize: Math.round(pixelCacheStorage.estimatedMB * 1024 * 1024),
+                gameDataCount: 0,
+                gameDataSize: 0,
                 quotaUsed: storageInfo.quotaUsed,
                 quotaTotal: storageInfo.quotaTotal
             },
             system: {
                 userAgent: navigator.userAgent,
-                webxrSupported: 'xr' in navigator, // Simple check for WebXR support
-                webglVersion: renderer.capabilities.isWebGL2 ? 'WebGL 2.0' : 'WebGL 1.0',
-                maxTextureSize: renderer.capabilities.maxTextureSize,
-                vendor: debugInfo.checkShaderErrors ? 'Debug Mode' : gl.getParameter(gl.VENDOR) ?? 'Unknown',
-                renderer: gl.getParameter(gl.RENDERER) ?? 'Unknown'
+                webxrSupported: 'xr' in navigator,
+                webglVersion: renderer?.capabilities.isWebGL2 ? 'WebGL 2.0' : 'WebGL 1.0',
+                maxTextureSize: renderer?.capabilities.maxTextureSize ?? 0,
+                vendor: renderer?.debug.checkShaderErrors
+                    ? 'Debug Mode'
+                    : (gl?.getParameter(gl.VENDOR) ?? 'Unknown'),
+                renderer: gl?.getParameter(gl.RENDERER) ?? 'Unknown'
             }
         }
     }
 
     private countSceneObjects(scene: THREE.Scene): { meshes: number; lights: number; cameras: number } {
-        let meshCount = 0
-        let lightCount = 0
-        let cameraCount = 0
-
-        scene.traverse((object) => {
-            if (object instanceof THREE.Mesh) meshCount++
-            if (object instanceof THREE.Light) lightCount++
-            if (object instanceof THREE.Camera) cameraCount++
+        let meshes = 0, lights = 0, cameras = 0
+        scene.traverse((obj) => {
+            if (obj instanceof THREE.Mesh) meshes++
+            if (obj instanceof THREE.Light) lights++
+            if (obj instanceof THREE.Camera) cameras++
         })
-
-        return {
-            meshes: meshCount,
-            lights: lightCount,
-            cameras: cameraCount
-        }
+        return { meshes, lights, cameras }
     }
 
     private getMemoryInfo(): { usedJSHeapSize: number; totalJSHeapSize: number } {
-        const performanceObj = window.performance as unknown as { 
-            memory?: { usedJSHeapSize: number; totalJSHeapSize: number } 
+        const perf = window.performance as unknown as {
+            memory?: { usedJSHeapSize: number; totalJSHeapSize: number }
         }
-        
-        return performanceObj.memory ?? {
-            usedJSHeapSize: 0,
-            totalJSHeapSize: 0
-        }
+        return perf.memory ?? { usedJSHeapSize: 0, totalJSHeapSize: 0 }
     }
 
     private async getStorageInfo(): Promise<{ quotaUsed: number; quotaTotal: number }> {
-        let quotaUsed = 0
-        let quotaTotal = 0
-        
         try {
             if ('storage' in navigator && 'estimate' in navigator.storage) {
                 const estimate = await navigator.storage.estimate()
-                quotaUsed = estimate.usage ?? 0
-                quotaTotal = estimate.quota ?? 0
+                return { quotaUsed: estimate.usage ?? 0, quotaTotal: estimate.quota ?? 0 }
             }
-        } catch {
-            // Storage API not available
-        }
-
-        return { quotaUsed, quotaTotal }
+        } catch { /* Storage API not available */ }
+        return { quotaUsed: 0, quotaTotal: 0 }
     }
 }
