@@ -107,10 +107,8 @@ export class ServiceRegistration {
 
     // Scene services (Three.js context required)
     if (existingSceneManager) {
-      // Use existing SceneManager instance from the app
       container.registerInstance(ServiceKeys.SceneManager, existingSceneManager)
     } else {
-      // Create new SceneManager (for testing scenarios)
       container.registerSingleton(
         ServiceKeys.SceneManager,
         () => new SceneManager(config.scene || {}),
@@ -118,21 +116,14 @@ export class ServiceRegistration {
       )
     }
 
-    // SceneCoordinator (depends on SceneManager, AppSettings, DataManager, and EventManager)
-    // GameBoxRenderer removed - each props renderer creates its own instance (composition)
-    // StorePropsRenderer removed - handled by event-driven system now
+    // SceneCoordinator (depends on SceneManager)
     container.registerSingleton(
       ServiceKeys.SceneCoordinator,
       async (container) => {
         const sceneManager = await container.resolve(ServiceKeys.SceneManager) as SceneManager
-        const dataManager = await container.resolve(ServiceKeys.DataManager) as DataManager
-        const eventManager = await container.resolve(ServiceKeys.EventManager) as EventManager
-        
-        console.debug('🎬 Creating SceneCoordinator with DI dependencies')
-        
-        return new SceneCoordinator(sceneManager, dataManager, eventManager)
+        return new SceneCoordinator(sceneManager)
       },
-      [ServiceKeys.SceneManager, ServiceKeys.DataManager, ServiceKeys.EventManager]
+      [ServiceKeys.SceneManager]
     )
 
     return container

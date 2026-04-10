@@ -46,17 +46,22 @@ vi.mock('../../../src/ui/LightingControlsPanel', () => ({
 
 vi.mock('../../../src/ui/PerformanceMonitor', () => ({
     PerformanceMonitorUI: class {
+        start() {}
         dispose() {}
+        getStats() {
+            return { fps: 60, frameTime: 16.67, drawCalls: 0, triangles: 0 }
+        }
+        updateRenderStats() {}
     },
     // Backward-compat alias while imports transition
     PerformanceMonitor: class {
+        start() {}
         dispose() {}
     }
 }))
 
 describe('SystemUICoordinator Lighting Integration', () => {
     let systemCoordinator: SystemUICoordinator
-    let performanceMonitor: PerformanceMonitorUI
     let renderer: THREE.WebGLRenderer
 
     beforeEach(() => {
@@ -82,10 +87,7 @@ describe('SystemUICoordinator Lighting Integration', () => {
         const mockAppSettings = AppSettings.getInstance()
         
         // Create coordinator
-        performanceMonitor = new PerformanceMonitorUI()
         systemCoordinator = new SystemUICoordinator(
-            performanceMonitor,
-            { getDebugStats: () => ({}) } as any,
             mockEventManager,
             mockAppSettings
         )

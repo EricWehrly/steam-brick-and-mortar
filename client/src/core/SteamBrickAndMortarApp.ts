@@ -103,6 +103,7 @@ export class SteamBrickAndMortarApp {
         
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Setting up DI Container')
         this.container = new ServiceContainer()
+        // TODO: Just inline these creations probably
         ServiceRegistration.configureServices(this.container, config, this.sceneManager, this.appSettings)
 
         const isDevelopmentMode = this.appSettings.getSetting('developmentMode')

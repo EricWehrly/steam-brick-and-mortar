@@ -71,6 +71,7 @@ export class PauseMenuManager {
     private applicationPanel: ApplicationPanel | null = null
     private eventManager: EventManager
     private appSettings: AppSettings
+    private readonly performanceMonitor: PerformanceMonitorUI
 
     constructor(
         config: PauseMenuConfig = {}, 

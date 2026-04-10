@@ -53,11 +53,9 @@ export class SceneCoordinator {
     private dataManager: DataManager
     private eventManager: EventManager
 
-    constructor(
-        sceneManager: SceneManager
-    ) {
+    constructor(sceneManager?: SceneManager) {
         // TODO: DI tho?
-        this.sceneManager = sceneManager
+        this.sceneManager = sceneManager ?? new SceneManager()
         this.dataManager = DataManager.getInstance() // Fallback for backward compatibility
         this.eventManager = EventManager.getInstance() // DI injection with fallback
         
