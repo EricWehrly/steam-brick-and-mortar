@@ -1,38 +1,21 @@
-﻿/**
+/**
  * LightFactory Tests
- * 
- * Migration: Updated to use createLightingTestContainer() for proper DI isolation
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { LightFactory } from '../../../src/lighting/LightFactory';
 import { EventManager } from '../../../src/core/EventManager';
-import { ServiceContainer } from '../../utils/di/TestServiceContainer';
-import { ServiceKeys } from '../../utils/di/TestServiceContainer';
-import { createLightingTestContainer } from '../../utils/test-container-helpers';
 
 describe('LightFactory', () => {
-  let container: ServiceContainer;
   let scene: THREE.Scene;
   let eventManager: EventManager;
   let factory: LightFactory;
 
-  beforeEach(async () => {
-    // Create isolated test container for lighting
-    container = await createLightingTestContainer();
-    
+  beforeEach(() => {
     scene = new THREE.Scene();
-    
-    // Resolve EventManager from container
-    eventManager = await container.resolve(ServiceKeys.EventManager);
-    
+    eventManager = EventManager.getInstance();
     factory = new LightFactory(scene);
-  });
-
-  afterEach(async () => {
-    // Dispose container to clean up all services
-    await container.dispose();
   });
 
   describe('position parameter', () => {

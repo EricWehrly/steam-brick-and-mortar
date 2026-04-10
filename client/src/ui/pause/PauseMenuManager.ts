@@ -266,7 +266,7 @@ export class PauseMenuManager {
             
             // Verify required elements exist, if not recreate them
             if (!this.menuContainer || !existingOverlay.querySelector('#pause-menu-tabs')) {
-                console.log('âš ï¸ Existing structure incomplete, recreating...')
+                console.log('⚠️ Existing structure incomplete, recreating...')
                 existingOverlay.remove()
                 this.createNewMenuStructure()
             } else {
@@ -337,14 +337,14 @@ export class PauseMenuManager {
     private createPanelTab(panel: PauseMenuPanel): void {
         const tabsContainer = document.getElementById('pause-menu-tabs')
         if (!tabsContainer) {
-            console.warn(`âš ï¸ Cannot create tab for panel '${panel.id}': tabs container not found`)
+            console.warn(`⚠️ Cannot create tab for panel '${panel.id}': tabs container not found`)
             return
         }
 
         // Check if tab already exists (prevent duplicates)
         const existingTab = document.getElementById(`tab-${panel.id}`)
         if (existingTab) {
-            console.log(`ðŸ”„ Tab for panel '${panel.id}' already exists, skipping creation`)
+            console.log(`🔄 Tab for panel '${panel.id}' already exists, skipping creation`)
             return
         }
 
@@ -447,7 +447,7 @@ export class PauseMenuManager {
     }
 
     private handleSettingsChange(settings: Partial<ApplicationSettings>): void {
-        console.log('âš™ï¸ Settings changed:', settings)
+        console.log('⚙️ Settings changed:', settings)
 
         // Handle quality settings
         if (settings.qualityLevel !== undefined) {
@@ -456,7 +456,7 @@ export class PauseMenuManager {
 
         // Handle graphics settings
         if (settings.lightingQuality !== undefined || settings.shadowQuality !== undefined) {
-            console.log('ðŸŽ¨ Graphics settings changed, applying lighting update...')
+            console.log('🎨 Graphics settings changed, applying lighting update...')
             // Emit lighting quality change event
             if (settings.lightingQuality !== undefined) {
                 this.eventManager.emit(LightingEventTypes.QualityChanged, {
@@ -467,20 +467,20 @@ export class PauseMenuManager {
         }
 
         if (settings.ceilingHeight !== undefined) {
-            console.log(`ðŸ“ Ceiling height changed to ${settings.ceilingHeight}m`)
+            console.log(`📏 Ceiling height changed to ${settings.ceilingHeight}m`)
             // Note: Environment changes require SceneCoordinator integration (handled in next step)
         }
 
         // Handle lighting toggles (these can be applied immediately)
         if (settings.enableLighting !== undefined) {
-            console.log(`ðŸ’¡ Lighting ${settings.enableLighting ? 'enabled' : 'disabled'}`)
+            console.log(`💡 Lighting ${settings.enableLighting ? 'enabled' : 'disabled'}`)
             this.eventManager.emit(LightingEventTypes.Toggle, { 
                 enabled: settings.enableLighting 
             } as LightingToggleEvent)
         }
 
         if (settings.showLightingDebug !== undefined) {
-            console.log(`ðŸ” Lighting debug ${settings.showLightingDebug ? 'enabled' : 'disabled'}`)
+            console.log(`🔍 Lighting debug ${settings.showLightingDebug ? 'enabled' : 'disabled'}`)
             this.eventManager.emit(LightingEventTypes.DebugToggle, { 
                 enabled: settings.showLightingDebug 
             } as LightingDebugToggleEvent)
@@ -490,7 +490,7 @@ export class PauseMenuManager {
     // TODO: Quality enum
     private updateGraphicsQuality(quality: 'low' | 'medium' | 'high' | 'ultra'): void {
         if (!this.systemDependencies) {
-            console.warn('âš ï¸ System dependencies not provided - cannot update graphics quality')
+            console.warn('⚠️ System dependencies not provided - cannot update graphics quality')
             return
         }
 

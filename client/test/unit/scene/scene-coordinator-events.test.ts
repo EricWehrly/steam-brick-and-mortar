@@ -1,16 +1,15 @@
-﻿/**
+/**
  * Scene Coordinator Event Registration Tests
- * 
+ *
  * Tests that the SceneCoordinator properly registers for the GameStart event
  * using the correct event type constant.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
-import { ServiceContainer } from '../../utils/di/TestServiceContainer'
-import { createSceneTestContainer } from '../../utils/test-container-helpers'
+import { DataManager } from '../../../src/core/data/DataManager'
+import { DataKey, DataDomain } from '../../../src/core/data/DataTypes'
 
-// Mock other dependencies
 vi.mock('../../../src/scene/SceneManager', () => ({
     SceneManager: vi.fn()
 }))
@@ -31,38 +30,23 @@ import { SceneCoordinator } from '../../../src/scene/SceneCoordinator'
 import { GameEventTypes } from '../../../src/types/InteractionEvents'
 
 describe('Scene Coordinator Event Registration', () => {
-    let container: ServiceContainer
-
-    beforeEach(async () => {
+    beforeEach(() => {
         vi.clearAllMocks()
-        // Create test container which registers scene in DataManager
-        container = await createSceneTestContainer()
-    })
-
-    afterEach(async () => {
-        await container.dispose()
+        // SceneCoordinator creates SkyboxManager which reads MainScene from DataManager
+        const mockScene = new THREE.Scene()
+        const mockCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
+        DataManager.getInstance().set(DataKey.MainScene, mockScene, { domain: DataDomain.Scene })
+        DataManager.getInstance().set(DataKey.MainCamera, mockCamera, { domain: DataDomain.Scene })
     })
 
     it('should emit SceneReady event when basic environment is set up', () => {
-        // Mock scene manager with proper scene mock that includes add method
         const mockSceneManager = {
-            getScene: vi.fn().mockReturnValue({
-                add: vi.fn(), // Scene operations need this
-                remove: vi.fn() // For potential cleanup
-            }),
-            getRenderer: vi.fn().mockReturnValue({
-                shadowMap: { enabled: false }
-            })
+            getScene: vi.fn().mockReturnValue({ add: vi.fn(), remove: vi.fn() }),
+            getRenderer: vi.fn().mockReturnValue({ shadowMap: { enabled: false } })
         }
 
-        // Act: Create SceneCoordinator (should emit SceneReady after basic setup)
         new SceneCoordinator(mockSceneManager as any)
 
-        // Assert: Verify SceneReady event type constant exists and has correct value
         expect(GameEventTypes.SceneReady).toBe('game:scene-ready')
-        
-        // Note: Actual event emission testing would require mocking the async setup
-        // The important part is that the event type constant is properly defined
-        console.log('âœ… SceneReady event type validated:', GameEventTypes.SceneReady)
     })
 })

@@ -1,7 +1,5 @@
-﻿/**
+/**
  * Test suite for ceiling visibility system
- * 
- * Migration: Updated to use createSceneTestContainer() for proper DI isolation
  */
 
 import * as THREE from 'three'
@@ -9,10 +7,8 @@ import { vi, beforeEach, afterEach, describe, it, expect } from 'vitest'
 import { RoomManager } from '../../../src/scene/RoomManager'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { CeilingEventTypes } from '../../../src/types/InteractionEvents'
-import { DataManager } from '../../../src/core/data'
-import { ServiceContainer } from '../../utils/di/TestServiceContainer'
-import { ServiceKeys } from '../../utils/di/TestServiceContainer'
-import { createSceneTestContainer } from '../../utils/test-container-helpers'
+import { DataManager } from '../../../src/core/data/DataManager'
+import { DataKey, DataDomain } from '../../../src/core/data/DataTypes'
 
 // Mock TextureManager to avoid external dependencies
 vi.mock('../../../src/utils/TextureManager', () => ({
@@ -27,57 +23,49 @@ vi.mock('../../../src/utils/TextureManager', () => ({
 }))
 
 describe('RoomManager Ceiling Visibility System', () => {
-    let container: ServiceContainer
     let roomManager: RoomManager
     let mockScene: THREE.Scene
     let eventManager: EventManager
 
-    beforeEach(async () => {
-        // Create isolated test container (also registers scene in DataManager)
-        container = await createSceneTestContainer()
-        
+    beforeEach(() => {
         mockScene = new THREE.Scene()
-        
-        // Resolve EventManager from container
-        eventManager = await container.resolve(ServiceKeys.EventManager)
-        
+        eventManager = EventManager.getInstance()
+
+        // RoomManager pulls scene + camera from DataManager at construction time
+        const mockCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
+        mockCamera.position.set(0, 1.6, 3)
+        DataManager.getInstance().set(DataKey.MainScene, mockScene, { domain: DataDomain.Scene })
+        DataManager.getInstance().set(DataKey.MainCamera, mockCamera, { domain: DataDomain.Scene })
+
         roomManager = new RoomManager()
     })
 
-    afterEach(async () => {
+    afterEach(() => {
         roomManager.dispose()
-        
-        // Dispose container to clean up all services
-        await container.dispose()
     })
 
     describe('Ceiling Visibility Control', () => {
         it('should control ceiling visibility when ceiling exists', async () => {
-            // Create a room with ceiling via event
             eventManager.emit('room:resize', {
                 reason: 'test',
                 timestamp: Date.now(),
                 source: EventSource.System
             })
 
-            // Wait for ceiling to be created
             await new Promise(resolve => setTimeout(resolve, 10))
             
-            // Test event-driven visibility control
             eventManager.emit(CeilingEventTypes.Toggle, {
                 visible: false,
                 timestamp: Date.now(),
                 source: EventSource.UI
             })
             
-            // Find the ceiling in the scene
             const ceiling = mockScene.children.find(child => 
                 child.name === 'room-ceiling' || child.name.includes('ceiling')
             ) as THREE.Mesh
             
             if (ceiling) {
                 expect(ceiling.visible).toBe(false)
-                
                 eventManager.emit(CeilingEventTypes.Toggle, {
                     visible: true,
                     timestamp: Date.now(),
@@ -85,7 +73,6 @@ describe('RoomManager Ceiling Visibility System', () => {
                 })
                 expect(ceiling.visible).toBe(true)
             } else {
-                // If no ceiling found, just verify the events don't throw
                 expect(() => {
                     eventManager.emit(CeilingEventTypes.Toggle, {
                         visible: false,
@@ -102,7 +89,6 @@ describe('RoomManager Ceiling Visibility System', () => {
         })
 
         it('should handle ceiling visibility when no ceiling exists', () => {
-            // Test event-driven visibility control without creating a ceiling first
             expect(() => {
                 eventManager.emit(CeilingEventTypes.Toggle, {
                     visible: false,
@@ -118,24 +104,20 @@ describe('RoomManager Ceiling Visibility System', () => {
         })
 
         it('should handle ceiling visibility events correctly', async () => {
-            // Create a room with ceiling via event first
             eventManager.emit('room:resize', {
                 reason: 'test',
                 timestamp: Date.now(),
                 source: EventSource.System
             })
 
-            // Wait for room to be created
             await new Promise(resolve => setTimeout(resolve, 10))
             
-            // Test event-driven ceiling visibility toggle
             expect(() => {
                 eventManager.emit(CeilingEventTypes.Toggle, {
                     visible: false,
                     timestamp: Date.now(),
                     source: EventSource.UI
                 })
-                
                 eventManager.emit(CeilingEventTypes.Toggle, {
                     visible: true,
                     timestamp: Date.now(),
