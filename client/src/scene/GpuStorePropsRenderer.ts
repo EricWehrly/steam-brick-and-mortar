@@ -71,7 +71,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private progressiveInitializationPromise: Promise<void> | null = null
     private setupPhaseInitialized = false
     private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
-    private gameBoxSpawner?: GameBoxSpawner
+    private readonly gameBoxSpawner: GameBoxSpawner
 
     private readonly instancedShelfRenderer: InstancedShelfRenderer
     private readonly shelfLayoutCoordinator: ShelfLayoutCoordinator
@@ -86,6 +86,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         this.instancedShelfRenderer = new InstancedShelfRenderer()
         this.shelfLayoutCoordinator = new ShelfLayoutCoordinator()
+        // Construct immediately so it's subscribed to BatchReadyForPlacement
+        // before any batches can arrive. Previously constructed in setupProps()
+        // which could run after batches had already fired, causing all
+        // "No pending games" warnings.
+        this.gameBoxSpawner = new GameBoxSpawner()
 
         this.setupEventListeners()
     }
@@ -160,22 +165,27 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         this.cumulativeShelfCount++
 
-        // ShelfCreated carries the batchIndex (= shelfId) that GameBoxSpawner
-        // uses to look up which pending games go on this shelf.
-        EventManager.getInstance().emit<ShelfCreatedEvent>(
-            StorePropsEventTypes.ShelfCreated,
-            {
-                position: detail.position.clone(),
-                batchIndex: shelfId,
-                rowIndex: 0,   // not used downstream — consumers use batchIndex
-                shelfIndex: shelfId,
-                shelfRotationY: detail.rotationY,
-                bounds: { ...this.shelfBounds },
-                status: BatchProcessingStatus.ShelfCreated,
-                lastModified: Date.now(),
-            }
-        )
-        GpuStorePropsRenderer.logger.debug(`ShelfCreated for shelf ${shelfId + 1}`)
+        // Defer ShelfCreated emission to the next microtask.
+        // ShelfReady fires synchronously inside the BatchReadyForPlacement dispatch;
+        // GameBoxSpawner's BatchReadyForPlacement handler hasn't run yet at that point.
+        // queueMicrotask lets all BatchReadyForPlacement handlers complete first,
+        // so GameBoxSpawner has stored the pending games before ShelfCreated arrives.
+        queueMicrotask(() => {
+            EventManager.getInstance().emit<ShelfCreatedEvent>(
+                StorePropsEventTypes.ShelfCreated,
+                {
+                    position: detail.position.clone(),
+                    batchIndex: shelfId,
+                    rowIndex: 0,   // not used downstream — consumers use batchIndex
+                    shelfIndex: shelfId,
+                    shelfRotationY: detail.rotationY,
+                    bounds: { ...this.shelfBounds },
+                    status: BatchProcessingStatus.ShelfCreated,
+                    lastModified: Date.now(),
+                }
+            )
+            GpuStorePropsRenderer.logger.debug(`ShelfCreated for shelf ${shelfId + 1}`)
+        })
     }
 
     private handleAllBatchesComplete(): void {
@@ -190,8 +200,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.instancedShelfRenderer.initialize().catch(error => {
             console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
         })
-
-        this.gameBoxSpawner = new GameBoxSpawner()
 
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.GameBoxSpawned,
