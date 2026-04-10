@@ -12,7 +12,7 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import debugPanelTemplate from '../templates/debug-panel.html?raw'
 import '../../../styles/pause-menu/debug-panel.css'
-import { DebugStatsProvider } from '../../../core/DebugStatsProvider'
+import { DebugStatsProvider } from './DebugStatsProvider'
 import type { PerformanceMonitorUI } from '../../PerformanceMonitor'
 
 export interface DebugStats {
@@ -68,7 +68,6 @@ export class DebugPanel extends PauseMenuPanel {
     private currentStats: DebugStats | null = null
     private debugStatsProvider: DebugStatsProvider
     private consoleVisible = false
-    private performanceMonitor: PerformanceMonitorUI
 
     constructor(config: PauseMenuPanelConfig = {}, performanceMonitor: PerformanceMonitorUI) {
         super(config)

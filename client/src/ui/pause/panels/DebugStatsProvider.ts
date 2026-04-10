@@ -7,9 +7,9 @@
  */
 
 import * as THREE from 'three'
-import { DataManager } from './data/DataManager'
-import { DataKey } from './data/DataTypes'
-import type { PerformanceMonitorUI } from '../ui'
+import { DataManager } from '../../../core/data/DataManager'
+import { DataKey } from '../../../core/data/DataTypes'
+import type { PerformanceMonitorUI } from '../..'
 
 export interface DebugStats {
     sceneObjects: {
@@ -48,26 +48,12 @@ export interface DebugStats {
 }
 
 export class DebugStatsProvider {
-    private static instance: DebugStatsProvider | null = null
+    performanceMonitor: PerformanceMonitorUI
 
-    public static getInstance(): DebugStatsProvider {
-        if (!DebugStatsProvider.instance) {
-            DebugStatsProvider.instance = new DebugStatsProvider()
-        }
-        return DebugStatsProvider.instance
-    }
-
-    // Allow direct construction for DebugPanel — either path gives the same singleton
     constructor(performanceMonitor: PerformanceMonitorUI) {
-        if (DebugStatsProvider.instance) {
-            return DebugStatsProvider.instance
-        }
-        DebugStatsProvider.instance = this
+        this.performanceMonitor = performanceMonitor
     }
 
-    /**
-     * Get comprehensive debug statistics
-     */
     async getDebugStats(): Promise<DebugStats> {
         const dm = DataManager.getInstance()
         const scene = dm.get<THREE.Scene>(DataKey.MainScene)
@@ -77,11 +63,11 @@ export class DebugStatsProvider {
         const sceneObjects = scene ? this.countSceneObjects(scene) : { meshes: 0, lights: 0, cameras: 0 }
         const info = renderer?.info
 
-        // Performance stats — available once PerformanceMonitorUI registers itself
-        const perfStats = perfMonitor?.getStats() ?? { fps: 0, frameTime: 0, drawCalls: 0, triangles: 0 }
+        // TODO: maybe it makes sense to hoist this info somewhere statically accessible... (gotta think it through)
+        const perfStats = this.performanceMonitor.getStats() ?? { fps: 0, frameTime: 0, drawCalls: 0, triangles: 0 }
 
         // Cache stats
-        const { PixelDataCache } = await import('../scene/game-box/instancing/PixelDataCache')
+        const { PixelDataCache } = await import('../../../scene/game-box/instancing/PixelDataCache')
         const pixelCacheStorage = await PixelDataCache.getInstance().getStorageEstimate()
 
         // WebGL info
@@ -128,6 +114,7 @@ export class DebugStatsProvider {
         }
     }
 
+    // TODO: Scene manager debug wrapper?
     private countSceneObjects(scene: THREE.Scene): { meshes: number; lights: number; cameras: number } {
         let meshes = 0, lights = 0, cameras = 0
         scene.traverse((obj) => {
