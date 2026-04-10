@@ -18,7 +18,8 @@ import type { SteamGameData } from '../game-box/types/GameData'
 import { sortByNumericField } from './GameSortFunctions'
 
 // Re-export so callers don't need two imports for sort + bucket types
-export { sortByNumericField, sortAlphabetically, sortByEnumIndex, chainComparators, groupByKey } from './GameSortFunctions'
+export { sortByNumericField, sortAlphabetically, sortByEnumIndex, chainComparators, groupByKey, groupByGenre, KNOWN_GENRES, sortByGenreThenPlaytime, resolveGenre, primaryGenre } from './GameSortFunctions'
+export type { ShelfGroup } from './GameSortFunctions'
 
 // ─── Recently-played bucket types ─────────────────────────────────────────────
 

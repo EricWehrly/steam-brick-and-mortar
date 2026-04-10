@@ -44,6 +44,7 @@ import type {
     InstancedRendererStats
 } from './IInstancedRenderer'
 import { ShelfStickerHandler } from '../stickers/ShelfStickerHandler'
+import { buildShelfGeometryTemplates, buildShelfUnitTemplate, ShelfGeometryType, type ShelfPartTemplate } from './ShelfGeometryBuilder'
 import { EventManager } from '../../core/EventManager'
 import { GameEventTypes, StorePropsEventTypes, type RendererReadyEvent, type ShelfReadyEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
@@ -66,13 +67,6 @@ export interface ShelfInstanceData extends InstanceData {
     shelfConfig?: ShelfConfig
 }
 
-enum ShelfGeometryType {
-    AngledBoard = 'angledBoard',
-    SideBoard = 'sideBoard',
-    ShelfBoard = 'shelfBoard',
-    InteriorSurface = 'interior'
-}
-
 interface ShelfUnitInstance {
     position: THREE.Vector3
     config: ShelfConfig
@@ -82,16 +76,6 @@ interface ShelfUnitInstance {
         shelfBoards: number[]
         interiorSurfaces: number[]
     }
-}
-
-interface ShelfPartTemplate {
-    type: ShelfGeometryType
-    offset: THREE.Vector3
-    rotation?: THREE.Quaternion
-    scale?: THREE.Vector3
-    customAttributes?: { name: string; value: number | number[] }[]
-    isSideBoard?: boolean
-    sideboardIsLeft?: boolean
 }
 
 // TODO: Explore pre-baking shelf geometry as GLTF/FBX for faster load (after dynamic config needs are settled)
@@ -193,7 +177,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             const shelfInteriorMaterial = materialManager.getMaterial(MaterialType.ShelfInterior)
             const brandAccentMaterial = materialManager.getMaterial(MaterialType.BrandAccent)
             
-            this.createGeometryTemplates()
+            this.geometryTemplates = buildShelfGeometryTemplates(this.defaultShelfConfig)
             
             const angledBoardGeometry = this.geometryTemplates[ShelfGeometryType.AngledBoard]
             const sideBoardGeometry = this.geometryTemplates[ShelfGeometryType.SideBoard]
@@ -244,7 +228,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             this.setupInstanceAttributes()
             
             // Build shelf unit template (stamp pattern for creating shelves)
-            this.buildShelfUnitTemplate()
+            this.shelfUnitTemplate = buildShelfUnitTemplate(this.defaultShelfConfig, this.shelfYPositions, this.shelfDepthsAndOffsets)
 
             // Register meshes with MeshPrewarmer — it batches all registrations
             // across a debounce window and calls compileAsync once, non-blocking.
@@ -273,34 +257,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         }
     }
     
-    private createGeometryTemplates(): void {
-        const { width, height, depth, boardThickness } = this.defaultShelfConfig
-        
-        this.geometryTemplates[ShelfGeometryType.AngledBoard] = new THREE.BoxGeometry(
-            width,
-            height,
-            boardThickness
-        )
-        
-        this.geometryTemplates[ShelfGeometryType.SideBoard] = new THREE.BoxGeometry(
-            boardThickness,
-            height,
-            depth
-        )
-        
-        this.geometryTemplates[ShelfGeometryType.ShelfBoard] = new THREE.BoxGeometry(
-            width,
-            boardThickness,
-            depth
-        )
-        
-        this.geometryTemplates[ShelfGeometryType.InteriorSurface] = new THREE.BoxGeometry(
-            width * 0.98,
-            boardThickness * 0.1,
-            depth * 0.98
-        )
-    }
-    
     private setupInstanceAttributes(): void {
         this.angledBoardManager.addInstanceAttributes([
             { name: 'rotationAngle', itemSize: 1, defaultValue: 0 }
@@ -319,72 +275,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             stickerIntegration.setupInstanceAttributes(this.sideBoardManager)
         }
         this.stickerHandler.setManagers(this.sideBoardManager, this.shelfUnits)
-    }
-    
-    private buildShelfUnitTemplate(): void {
-        const config = this.defaultShelfConfig
-        const angleRad = (config.angle * Math.PI) / 180
-        const boardSeparation = config.depth * 0.8
-        
-        this.shelfUnitTemplate = []
-        
-        // Angled boards (front and back)
-        this.shelfUnitTemplate.push({
-            type: ShelfGeometryType.AngledBoard,
-            offset: new THREE.Vector3(0, config.height / 2, boardSeparation / 2),
-            rotation: new THREE.Quaternion().setFromEuler(new THREE.Euler(-angleRad, 0, 0)),
-            customAttributes: [{ name: 'rotationAngle', value: -config.angle }]
-        })
-        
-        this.shelfUnitTemplate.push({
-            type: ShelfGeometryType.AngledBoard,
-            offset: new THREE.Vector3(0, config.height / 2, -boardSeparation / 2),
-            rotation: new THREE.Quaternion().setFromEuler(new THREE.Euler(angleRad, 0, 0)),
-            customAttributes: [{ name: 'rotationAngle', value: config.angle }]
-        })
-        
-        // Side boards (left and right)
-        this.shelfUnitTemplate.push({
-            type: ShelfGeometryType.SideBoard,
-            offset: new THREE.Vector3(-config.width / 2 - config.boardThickness * 0.5, config.height / 2, 0),
-            isSideBoard: true,
-            sideboardIsLeft: true
-        })
-        
-        this.shelfUnitTemplate.push({
-            type: ShelfGeometryType.SideBoard,
-            offset: new THREE.Vector3(config.width / 2 + config.boardThickness * 0.5, config.height / 2, 0),
-            isSideBoard: true,
-            sideboardIsLeft: false
-        })
-        
-        // Horizontal shelves and interior surfaces
-        for (let i = 0; i < config.shelfCount; i++) {
-            const shelfY = this.shelfYPositions[i]
-            const widthAtHeight = config.width - 2 * (config.height - shelfY) * Math.tan(angleRad)
-            const { shelfDepth, forwardOffset } = this.shelfDepthsAndOffsets[i]
-            
-            const widthScale = widthAtHeight / config.width
-            const depthScale = shelfDepth / config.depth
-            
-            // Shelf board
-            this.shelfUnitTemplate.push({
-                type: ShelfGeometryType.ShelfBoard,
-                offset: new THREE.Vector3(0, shelfY, forwardOffset),
-                scale: new THREE.Vector3(widthScale, 1, depthScale),
-                customAttributes: [{ name: 'shelfScale', value: [widthScale, depthScale] }]
-            })
-            
-            // Interior surface
-            this.shelfUnitTemplate.push({
-                type: ShelfGeometryType.InteriorSurface,
-                offset: new THREE.Vector3(0, shelfY + config.boardThickness * 0.55, forwardOffset),
-                scale: new THREE.Vector3(widthScale, 1, depthScale),
-                customAttributes: [{ name: 'surfaceScale', value: [widthScale, depthScale] }]
-            })
-        }
-        
-        InstancedShelfRenderer.logger.debug(`📋 Built shelf unit template: ${this.shelfUnitTemplate.length} parts per shelf`)
     }
     
     public setInstance(index: number, data: ShelfInstanceData): boolean {

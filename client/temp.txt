@@ -1,0 +1,78 @@
+﻿    private buildShelfUnitTemplate(): void {
+        const config = this.defaultShelfConfig
+        const angleRad = (config.angle * Math.PI) / 180
+        const boardSeparation = config.depth * 0.8
+        
+        this.shelfUnitTemplate = []
+        
+        // Angled boards (front and back)
+        this.shelfUnitTemplate.push({
+            type: ShelfGeometryType.AngledBoard,
+            offset: new THREE.Vector3(0, config.height / 2, boardSeparation / 2),
+            rotation: new THREE.Quaternion().setFromEuler(new THREE.Euler(-angleRad, 0, 0)),
+            customAttributes: [{ name: 'rotationAngle', value: -config.angle }]
+        })
+        
+        this.shelfUnitTemplate.push({
+            type: ShelfGeometryType.AngledBoard,
+            offset: new THREE.Vector3(0, config.height / 2, -boardSeparation / 2),
+            rotation: new THREE.Quaternion().setFromEuler(new THREE.Euler(angleRad, 0, 0)),
+            customAttributes: [{ name: 'rotationAngle', value: config.angle }]
+        })
+        
+        // Side boards (left and right)
+        this.shelfUnitTemplate.push({
+            type: ShelfGeometryType.SideBoard,
+            offset: new THREE.Vector3(-config.width / 2 - config.boardThickness * 0.5, config.height / 2, 0),
+            isSideBoard: true,
+            sideboardIsLeft: true
+        })
+        
+        this.shelfUnitTemplate.push({
+            type: ShelfGeometryType.SideBoard,
+            offset: new THREE.Vector3(config.width / 2 + config.boardThickness * 0.5, config.height / 2, 0),
+            isSideBoard: true,
+            sideboardIsLeft: false
+        })
+        
+        // Horizontal shelves and interior surfaces
+        for (let i = 0; i < config.shelfCount; i++) {
+            const shelfY = this.shelfYPositions[i]
+            const widthAtHeight = config.width - 2 * (config.height - shelfY) * Math.tan(angleRad)
+            const { shelfDepth, forwardOffset } = this.shelfDepthsAndOffsets[i]
+            
+            const widthScale = widthAtHeight / config.width
+            const depthScale = shelfDepth / config.depth
+            
+            // Shelf board
+            this.shelfUnitTemplate.push({
+                type: ShelfGeometryType.ShelfBoard,
+                offset: new THREE.Vector3(0, shelfY, forwardOffset),
+                scale: new THREE.Vector3(widthScale, 1, depthScale),
+                customAttributes: [{ name: 'shelfScale', value: [widthScale, depthScale] }]
+            })
+            
+            // Interior surface
+            this.shelfUnitTemplate.push({
+                type: ShelfGeometryType.InteriorSurface,
+                offset: new THREE.Vector3(0, shelfY + config.boardThickness * 0.55, forwardOffset),
+                scale: new THREE.Vector3(widthScale, 1, depthScale),
+                customAttributes: [{ name: 'surfaceScale', value: [widthScale, depthScale] }]
+            })
+        }
+        
+        InstancedShelfRenderer.logger.debug(`ðŸ“‹ Built shelf unit template: ${this.shelfUnitTemplate.length} parts per shelf`)
+    }
+    
+    public setInstance(index: number, data: ShelfInstanceData): boolean {
+        if (!this.isInitialized) {
+            InstancedShelfRenderer.logger.warn('Not initialized')
+            return false
+        }
+        
+        if (index >= this.maxShelfUnits) {
+            InstancedShelfRenderer.logger.warn(`Shelf unit index ${index} exceeds max ${this.maxShelfUnits}`)
+            return false
+        }
+        
+        // Merge with default configuration

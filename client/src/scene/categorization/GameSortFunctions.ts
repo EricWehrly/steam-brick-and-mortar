@@ -1,41 +1,73 @@
 /**
  * GameSortFunctions
  *
- * Generic, composable sort and grouping primitives for game lists.
- * All functions are pure — no events, no state, no imports from scene or Steam layers.
+ * Genre-domain config plus generic, composable sort and grouping primitives for game lists.
+ * All functions are pure — no events, no state.
  *
- * ── Comparator factories ───────────────────────────────────────────────────────
+ * ── Genre config ──────────────────────────────────────────────────────────────
+ *
+ *   KNOWN_GENRES         Canonical genre list (controls shelf sort/display order)
+ *   ShelfGroup           Grouped game list type used by ShelfSectionPlanner
+ *   resolveGenre(raw)    Map a raw Steam genre string to canonical, or 'Other'
+ *   primaryGenre(game)   Extract and canonicalize genres[0].description
+ *   groupByGenre(games)  Partition games by primaryGenre
+ *   sortByGenreThenPlaytime  Ready-made chainComparators result
+ *
+ * ── Comparator factories ──────────────────────────────────────────────────────
  *
  *   sortByNumericField<T>(key, secondary?)
- *     Sort descending by a numeric property. 0/absent values sort last.
- *     Ties resolved by optional secondary key (also descending).
- *
  *   sortAlphabetically<T>(key)
- *     Sort ascending by a string property. Case-insensitive.
- *
  *   sortByEnumIndex<T>(key, orderedValues)
- *     Sort by position in an explicit ordered list.
- *     Items not in the list sort last (stable relative to each other).
  *
  * ── Chaining ──────────────────────────────────────────────────────────────────
  *
  *   chainComparators(...comparators)
- *     Compose multiple comparators left-to-right. Each comparator acts as a
- *     tiebreaker for the previous. Equivalent to SQL's ORDER BY a, b, c.
- *
- *     Example:
- *       games.sort(chainComparators(
- *         sortByEnumIndex('genre', KNOWN_GENRES),
- *         sortByNumericField('playtime_forever'),
- *         sortAlphabetically('name'),
- *       ))
  *
  * ── Grouping ──────────────────────────────────────────────────────────────────
  *
  *   groupByKey<T, K>(items, keyFn)
- *     Partition an array into a Map keyed by the result of keyFn.
- *     Insertion order within each group is preserved.
  */
+
+import type { SteamGameData } from '../game-box/types/GameData'
+
+// ─── Genre config ──────────────────────────────────────────────────────────────
+
+/**
+ * Canonical genre list. Order controls shelf section display order.
+ * Note: 'Early Access' intentionally absent — it's a release state, not a genre.
+ */
+export const KNOWN_GENRES: ReadonlyArray<string> = [
+    'Action', 'Adventure', 'RPG', 'Strategy', 'Simulation', 'Sports', 'Racing',
+    'Casual', 'Indie', 'Massively Multiplayer', 'Free to Play',
+    'Puzzle', 'Platformer', 'Shooter', 'Horror', 'Stealth', 'Fighting', 'Survival', 'Anime',
+]
+
+const GENRE_LOOKUP: ReadonlyMap<string, string> = new Map(KNOWN_GENRES.map(g => [g.toLowerCase(), g]))
+
+export interface ShelfGroup {
+    genre: string
+    label: string
+    games: SteamGameData[]
+}
+
+/** Map a raw genre description to its canonical form, or 'Other' if unrecognised. */
+export function resolveGenre(rawDescription: string): string {
+    return GENRE_LOOKUP.get(rawDescription.toLowerCase()) ?? 'Other'
+}
+
+/** Extract and canonicalize the primary genre from a SteamGameData entry. */
+export function primaryGenre(game: SteamGameData): string {
+    const raw = game.genres?.[0]?.description
+    return raw ? resolveGenre(raw) : 'Other'
+}
+
+/**
+ * Group a flat game list by primary genre.
+ * Returns a Map<string, SteamGameData[]>.
+ */
+export function groupByGenre(games: readonly SteamGameData[]): Map<string, SteamGameData[]> {
+    return groupByKey(games, primaryGenre)
+}
 
 // ─── Comparator factories ──────────────────────────────────────────────────────
 
@@ -126,6 +158,20 @@ export function chainComparators<T>(...comparators: Array<Comparator<T>>): Compa
         return 0
     }
 }
+
+/**
+ * Canonical genre index first, playtime descending within genre.
+ * Unrecognised genres sort last (not in KNOWN_GENRES → index Infinity).
+ *
+ * Built with chainComparators — extend by appending more comparators:
+ *   chainComparators(sortByEnumIndex('genre', KNOWN_GENRES), sortAlphabetically('name'))
+ */
+type GenrePlaytimeItem = { genre?: string; playtime_forever?: number }
+
+export const sortByGenreThenPlaytime = chainComparators<GenrePlaytimeItem>(
+    sortByEnumIndex<GenrePlaytimeItem>('genre', KNOWN_GENRES),
+    sortByNumericField<GenrePlaytimeItem>('playtime_forever')
+)
 
 // ─── Grouping ──────────────────────────────────────────────────────────────────
 

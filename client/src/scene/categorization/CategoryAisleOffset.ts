@@ -1,4 +1,4 @@
-import { KNOWN_GENRES } from './CategoryAssigner'
+import { KNOWN_GENRES } from './GameSortFunctions'
 
 type GenreLike = { description: string }
 type GameLike = { genres?: GenreLike[] }

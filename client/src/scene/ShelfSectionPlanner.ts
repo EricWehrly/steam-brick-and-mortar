@@ -11,7 +11,7 @@
 import * as THREE from 'three'
 import { EventManager } from '../core/EventManager'
 import { StorePropsEventTypes, type BatchReadyForPlacementEvent } from '../types/InteractionEvents'
-import { CategoryAssigner } from './categorization/CategoryAssigner'
+import { groupByGenre, KNOWN_GENRES, type ShelfGroup } from './categorization/GameSortFunctions'
 import { SceneSignManager, type SignMount } from './SceneSignManager'
 import type { SteamGameData } from './game-box/types/GameData'
 import { Logger } from '../utils/Logger'
@@ -27,7 +27,6 @@ const DEFAULT_MOUNT_STYLE: SignMount['style'] = 'above-shelf'
 export class ShelfSectionPlanner {
     private static readonly logger = Logger.createLogFunctions(ShelfSectionPlanner.name)
 
-    private readonly assigner = new CategoryAssigner()
     private get signSystem(): SceneSignManager { return SceneSignManager.instance }
     private readonly config: Required<ShelfSectionPlannerConfig>
 
@@ -77,7 +76,7 @@ export class ShelfSectionPlanner {
 
         this.signSystem.clearAll()
 
-        const groups = this.assigner.assign(this.games)
+        const groups = this.buildShelfGroups(this.games)
         ShelfSectionPlanner.logger.info(
             `[SIGN-DEBUG] planSections: ${groups.length} groups � ` +
             groups.map(g => `${g.label}(${g.games.length})`).join(', ')
@@ -122,6 +121,27 @@ export class ShelfSectionPlanner {
             `[SIGN-DEBUG] planSections complete: placed ${placed}/${groups.length} signs ` +
             `(${this.games.length} total games, ${shelfPositions.length} shelves)`
         )
+    }
+
+    private buildShelfGroups(games: SteamGameData[]): ShelfGroup[] {
+        if (games.length === 0) return []
+        const grouped = groupByGenre(games)
+        const shelfGroups: ShelfGroup[] = Array.from(grouped.entries()).map(([genre, groupGames]) => ({
+            genre,
+            label: genre,
+            games: groupGames,
+        }))
+        shelfGroups.sort((a, b) => {
+            const ai = KNOWN_GENRES.indexOf(a.genre)
+            const bi = KNOWN_GENRES.indexOf(b.genre)
+            if (a.genre === 'Other') return 1
+            if (b.genre === 'Other') return -1
+            if (ai !== -1 && bi !== -1) return ai - bi
+            if (ai !== -1) return -1
+            if (bi !== -1) return 1
+            return b.games.length - a.games.length
+        })
+        return shelfGroups
     }
 
     public reset(): void {
