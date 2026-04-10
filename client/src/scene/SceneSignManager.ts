@@ -21,7 +21,13 @@ import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
 import { EventManager } from '../core/EventManager'
 import { SignageRenderer, type SignageConfig } from './SignageRenderer'
-import { RoomEventTypes, type RoomResizedEvent, StorePropsEventTypes, type ShelfCreatedEvent } from '../types/InteractionEvents'
+import {
+    GameEventTypes,
+    type GamesSortEvent,
+    StorePropsEventTypes,
+    type ShelfCreatedEvent,
+    type ShelfReadyEvent,
+} from '../types/InteractionEvents'
 import {
     getRecentlyPlayedBucket,
     getBucketLabel,
@@ -30,6 +36,7 @@ import {
 } from './categorization/CategoryAssigner'
 import type { SteamGameData } from './game-box/types/GameData'
 import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
+import { RoomConstants } from './RoomManager'
 
 // ─── Style definitions ────────────────────────────────────────────────────────
 
@@ -117,6 +124,9 @@ export class SceneSignManager {
     private readonly renderer: SignageRenderer
     private readonly scene: THREE.Scene
     private readonly signs: Map<string, THREE.Mesh> = new Map()
+    private readonly shelfTransforms = new Map<number, { position: THREE.Vector3; rotationY: number }>()
+    private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
+    private hasRecentlyPlayedData = false
 
     private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 0.6
     private static readonly SIGN_Z_FACE_PLAYER = 0.01 // slight forward push to avoid z-fighting
@@ -142,6 +152,28 @@ export class SceneSignManager {
                 if (topSurface) {
                     this.placeShelfEndCapLabels(shelfIndex ?? 0, position as THREE.Vector3, rotY, topSurface)
                 }
+            }
+        )
+
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ShelfReady,
+            (event: CustomEvent<ShelfReadyEvent>) => {
+                const { shelfId, position, rotationY } = event.detail
+                this.shelfTransforms.set(shelfId, {
+                    position: (position as THREE.Vector3).clone(),
+                    rotationY,
+                })
+                this.renderTimeBucketSignsIfReady()
+            }
+        )
+
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.GamesSort,
+            (event: CustomEvent<GamesSortEvent>) => {
+                this.sortedGames = event.detail.sortedGames
+                this.hasRecentlyPlayedData = event.detail.hasRecentlyPlayedData
+                this.syncRecentlyPlayedCeilingSign()
+                this.renderTimeBucketSignsIfReady()
             }
         )
     }
@@ -244,7 +276,50 @@ export class SceneSignManager {
 
     public dispose(): void {
         this.clearAll()
+        this.shelfTransforms.clear()
+        this.sortedGames = []
+        this.hasRecentlyPlayedData = false
         this.renderer.dispose()
+    }
+
+    private syncRecentlyPlayedCeilingSign(): void {
+        const label = 'Recently Played'
+        if (!this.hasRecentlyPlayedData) {
+            this.removeSign(label)
+            return
+        }
+
+        this.setSign({
+            label,
+            anchorPosition: new THREE.Vector3(0, RoomConstants.STORE_CEILING_HEIGHT - 0.5, -6.4),
+            mount: {
+                style: 'ceiling',
+                signFacingY: 0,
+            },
+            style: {
+                backgroundColor: 0xd4a017,
+                textColor: 0x003087,
+                width: 4.0,
+                height: 0.65,
+            },
+        })
+    }
+
+    private renderTimeBucketSignsIfReady(): void {
+        if (!this.hasRecentlyPlayedData || this.sortedGames.length === 0 || this.shelfTransforms.size === 0) {
+            return
+        }
+
+        const sortedShelves = [...this.shelfTransforms.entries()].sort((a, b) => a[0] - b[0])
+        const shelfPositions = sortedShelves.map(([, transform]) => transform.position)
+        const shelfRotationsY = sortedShelves.map(([, transform]) => transform.rotationY)
+
+        this.placeTimeBucketSigns(
+            shelfPositions,
+            shelfRotationsY,
+            this.sortedGames as SteamGameData[],
+            new THREE.Vector3(0, RoomConstants.STORE_CEILING_HEIGHT - 0.5, -6.4)
+        )
     }
 
     /**
