@@ -284,6 +284,13 @@ export interface ShelfReadyEvent extends BaseInteractionEvent {
     rotationY: number
 }
 
+export interface GameBoxSpawnedEvent extends BaseInteractionEvent {
+    game: Readonly<SteamGameData>
+    position: Readonly<THREE.Vector3>
+    side: 'front' | 'back'
+    rotation?: Readonly<THREE.Quaternion>
+}
+
 export interface GamesPlacedEvent extends BaseInteractionEvent {
     batchIndex: number
     status: BatchProcessingStatus
@@ -369,6 +376,7 @@ export const StorePropsEventTypes = {
     ShelfSpaceRequested: 'store-props:shelf-space-requested',
     ShelfCreated: 'store-props:shelf-created',
     ShelfReady: 'store-props:shelf-ready',
+    GameBoxSpawned: 'store-props:game-box-spawned',
     GamesPlaced: 'store-props:games-placed',
     // Renderer initialization
     RendererReady: 'store-props:renderer-ready'

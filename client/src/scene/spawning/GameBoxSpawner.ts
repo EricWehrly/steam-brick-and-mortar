@@ -1,5 +1,4 @@
 import * as THREE from 'three'
-import type { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { ShelfSurfaceUtils, type ShelfSurface, ShelfSide, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
@@ -9,7 +8,8 @@ import {
     type BatchReadyForPlacementEvent,
     type ShelfSpaceRequestedEvent,
     type ShelfCreatedEvent,
-    type GamesPlacedEvent
+    type GamesPlacedEvent,
+    type GameBoxSpawnedEvent
 } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 
@@ -26,11 +26,9 @@ import { Logger } from '../../utils/Logger'
  */
 export class GameBoxSpawner {
     private static logger = Logger.createLogFunctions(GameBoxSpawner.name)
-    private gameBoxRenderer?: GpuGameBoxRenderer
     private pendingGames: Map<number, readonly SteamGameData[]> = new Map()
 
-    constructor(gameBoxRenderer?: GpuGameBoxRenderer) {
-        this.gameBoxRenderer = gameBoxRenderer
+    constructor() {
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.handleBatchReadyForPlacement.bind(this)
@@ -40,10 +38,6 @@ export class GameBoxSpawner {
             this.handleShelfCreated.bind(this)
         )
         GameBoxSpawner.logger.debug('Registered listeners for BatchReadyForPlacement and ShelfCreated events')
-    }
-
-    public setGameBoxRenderer(gameBoxRenderer: GpuGameBoxRenderer): void {
-        this.gameBoxRenderer = gameBoxRenderer
     }
 
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
@@ -146,11 +140,7 @@ export class GameBoxSpawner {
         side: ShelfSide,
         shelfRotationY: number
     ): void {
-        if (!this.gameBoxRenderer) {
-            GameBoxSpawner.logger.warn('GameBoxRenderer unavailable while creating game boxes')
-            return
-        }
-        const boxDimensions = this.gameBoxRenderer.getDimensions()
+        const boxDimensions = { width: 0.3, height: 0.4, depth: 0.08 }
         const gamePositions = GameBoxUtils.calculateGamePositions(
             shelfPosition, surface, games as SteamGameData[], side, boxDimensions, shelfRotationY
         )
@@ -166,11 +156,15 @@ export class GameBoxSpawner {
         _index: number,
         shelfRotationY: number
     ): void {
-        if (!this.gameBoxRenderer) {
-            GameBoxSpawner.logger.warn('GameBoxRenderer unavailable while creating a game box')
-            return
-        }
         const rotation = GameBoxUtils.calculateGameRotation(shelfRotationY, side)
-        this.gameBoxRenderer.createGameBoxAuto(game, worldPosition, side, rotation)
+        EventManager.getInstance().emit<GameBoxSpawnedEvent>(
+            StorePropsEventTypes.GameBoxSpawned,
+            {
+                game,
+                position: worldPosition.clone(),
+                side,
+                rotation,
+            }
+        )
     }
 }
