@@ -1,33 +1,50 @@
 import * as THREE from 'three'
-import { InstancedShelfRenderer } from '../instancing/InstancedShelfRenderer'
 import { EventManager } from '../../core/EventManager'
+import { Logger } from '../../utils/Logger'
+import { InstancedShelfRenderer } from '../instancing/InstancedShelfRenderer'
 import {
     StorePropsEventTypes,
+    type ShelfSpaceRequestedEvent,
     type ShelfReadyEvent,
 } from '../../types/InteractionEvents'
+
+export interface ShelfPlacement {
+    position: THREE.Vector3
+    rotationY: number
+    rowIndex: number
+    shelfIndex: number
+}
 
 /**
  * ShelfRenderer
  *
- * Thin coordinator that owns shelf transform placement and ShelfReady emission.
+ * Sealed shelf rendering coordinator.
  *
- * Wraps InstancedShelfRenderer for GPU instance writes. Does NOT replicate
- * InstancedShelfRenderer's RendererReady event or readiness tracking —
- * callers should use isReady() / waitUntilReady() directly on the underlying
- * InstancedShelfRenderer if they need to gate on GPU init.
+ * Self-subscribes to ShelfSpaceRequested. On each request, resolves the
+ * placement via the injected layout provider, writes the GPU instance
+ * transform, and emits ShelfReady.
  *
- * Responsibilities:
- * - createShelf(): write Quaternion-converted transform, emit ShelfReady
- * - reset() / dispose(): forward to InstancedShelfRenderer
- *
- * Layout position/rotation calculation stays in GpuStorePropsRenderer
- * until a ShelfLayoutCoordinator is introduced (see plans/gamesort-event-driven-plan.md).
+ * All layout position / rotation math lives in the caller (GpuStorePropsRenderer).
+ * This class knows nothing about batches, rows, or arc math — it only knows
+ * how to turn a resolved placement into a GPU write + event.
  */
 export class ShelfRenderer {
-    private readonly instancedShelfRenderer: InstancedShelfRenderer
+    private static readonly logger = Logger.createLogFunctions(ShelfRenderer.name)
 
-    constructor(maxShelfUnits = 100) {
+    private readonly instancedShelfRenderer: InstancedShelfRenderer
+    private readonly getPlacement: (batchIndex: number) => ShelfPlacement | undefined
+
+    constructor(
+        getPlacement: (batchIndex: number) => ShelfPlacement | undefined,
+        maxShelfUnits = 100
+    ) {
+        this.getPlacement = getPlacement
         this.instancedShelfRenderer = new InstancedShelfRenderer({ maxShelfUnits })
+
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ShelfSpaceRequested,
+            (event: CustomEvent<ShelfSpaceRequestedEvent>) => this.handleShelfSpaceRequested(event.detail.batchIndex)
+        )
     }
 
     public initialize(): Promise<void> {
@@ -40,26 +57,10 @@ export class ShelfRenderer {
 
     public waitUntilReady(): Promise<void> {
         if (this.isReady()) return Promise.resolve()
-        // InstancedShelfRenderer.initialize() already emits RendererReady;
-        // poll via isReady() on the next microtask to avoid double-subscribing.
         return new Promise<void>(resolve => {
             const check = () => this.isReady() ? resolve() : setTimeout(check, 16)
             check()
         })
-    }
-
-    /**
-     * Write a shelf instance transform and emit ShelfReady.
-     * Caller must ensure isReady() before calling.
-     */
-    public createShelf(shelfId: number, position: THREE.Vector3, rotationY: number): void {
-        const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rotationY, 0))
-        this.instancedShelfRenderer.setInstance(shelfId, { position, rotation })
-
-        EventManager.getInstance().emit<ShelfReadyEvent>(
-            StorePropsEventTypes.ShelfReady,
-            { shelfId, position: position.clone(), rotationY }
-        )
     }
 
     public reset(): void {
@@ -74,5 +75,30 @@ export class ShelfRenderer {
 
     public getStats() {
         return this.instancedShelfRenderer.getStats()
+    }
+
+    private handleShelfSpaceRequested(batchIndex: number): void {
+        if (!this.isReady()) {
+            ShelfRenderer.logger.error(`ShelfSpaceRequested for batch ${batchIndex} before renderer ready — skipping`)
+            return
+        }
+
+        const placement = this.getPlacement(batchIndex)
+        if (!placement) {
+            ShelfRenderer.logger.error(`No placement resolved for batch ${batchIndex} — skipping`)
+            return
+        }
+
+        const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, placement.rotationY, 0))
+        this.instancedShelfRenderer.setInstance(batchIndex, { position: placement.position, rotation })
+
+        EventManager.getInstance().emit<ShelfReadyEvent>(
+            StorePropsEventTypes.ShelfReady,
+            {
+                shelfId: batchIndex,
+                position: placement.position.clone(),
+                rotationY: placement.rotationY,
+            }
+        )
     }
 }

@@ -42,6 +42,7 @@ import {
     type BatchReadyForPlacementEvent,
     type ShelfSpaceRequestedEvent,
     type ShelfCreatedEvent,
+    type ShelfReadyEvent,
     type RendererReadyEvent,
     type GameBoxSpawnedEvent,
 } from '../types/InteractionEvents'
@@ -52,7 +53,7 @@ import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { getPrimaryGenreFromBatch } from './categorization/CategoryAisleOffset'
 import { computeArcShelfLayout, type ArcLayoutConfig } from './props/shared/ArcLayoutUtils'
 import type { SteamGameData } from './game-box/types/GameData'
-import { ShelfRenderer } from './shelves/ShelfRenderer'
+import { ShelfRenderer, type ShelfPlacement } from './shelves/ShelfRenderer'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private static readonly logger = Logger.createLogFunctions(GpuStorePropsRenderer.name)
@@ -123,7 +124,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.propsGroup.name = 'props-instanced'
         this.scene.add(this.propsGroup)
 
-        this.shelfRenderer = new ShelfRenderer()
+        this.shelfRenderer = new ShelfRenderer(
+            (batchIndex) => this.resolveShelfPlacement(batchIndex)
+        )
 
         this.setupEventListeners()
     }
@@ -135,10 +138,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             this.handleInitialBatch.bind(this)
         )
 
-        // Listen for shelf space requests from GameBoxSpawner
+                // Listen for ShelfReady to emit ShelfCreated (game placement + sign metadata)
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ShelfSpaceRequested,
-            this.handleShelfSpaceRequested.bind(this)
+            StorePropsEventTypes.ShelfReady,
+            (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(event.detail)
         )
 
         // Completion now comes from BatchCoordinator after GamesPlaced events
@@ -173,19 +176,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         await this.progressiveInitializationPromise
     }
 
-    private async handleShelfSpaceRequested(event: CustomEvent<ShelfSpaceRequestedEvent>): Promise<void> {
-        const { batchIndex } = event.detail
-
-        // Guard against same-tick event races: placement work starts only after init is complete.
-        if (this.progressiveInitializationPromise) {
-            await this.progressiveInitializationPromise
-        }
-
-        // Create shelf for the requested batch
-        const shelfMonitor = PerformanceMonitor.start('shelf-creation', GpuStorePropsRenderer.logger)
-        await this.createShelfForBatchIndex(batchIndex)
-        shelfMonitor.end({ batchIndex })
-    }
 
     private handleAllBatchesComplete(): void {
         this.finalizeProgressiveLoading()
@@ -334,22 +324,34 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.preallocateArcLayout(Math.max(progress.total, batchIndex + 1))
     }
 
-    private async createShelfForBatchIndex(batchIndex: number): Promise<void> {
-        if (!this.shelfRenderer.isReady()) {
-            console.error(`❌ ShelfRenderer not ready for batch ${batchIndex + 1}!`, this.shelfRenderer.getStats())
-            return
-        }
-
+    /**
+     * Layout provider injected into ShelfRenderer.
+     * Called by ShelfRenderer when it handles ShelfSpaceRequested.
+     * Returns the pre-calculated position/rotation for a given batch, or undefined
+     * if position allocation needs to expand (handled here via ensureAllocated).
+     */
+    private resolveShelfPlacement(batchIndex: number): ShelfPlacement | undefined {
         this.ensureShelfPositionAllocated(batchIndex)
-        const baseShelfPosition = this.shelfPositions[batchIndex]
-
-        if (!baseShelfPosition) {
-            console.error(`❌ CRITICAL: Shelf position ${batchIndex} is undefined even after allocation!`)
-            return
+        const position = this.shelfPositions[batchIndex]
+        if (!position) {
+            console.error(`❌ CRITICAL: Shelf position ${batchIndex} undefined even after allocation`)
+            return undefined
         }
+        const rowIndex = this.shelfRowIndices[batchIndex] ?? Math.floor(batchIndex / this.maxShelvesPerRow)
+        const shelfIndex = batchIndex % this.maxShelvesPerRow
+        const rotationY = this.shelfRotationsY[batchIndex] ?? (rowIndex % 2 === 1 ? Math.PI : 0)
+        return { position, rotationY, rowIndex, shelfIndex }
+    }
 
-        // Arc layout: shelf position already set from arc calculation, no X nudge needed
-        const shelfPosition = baseShelfPosition
+    /**
+     * Handles ShelfReady (emitted by ShelfRenderer after GPU write).
+     * Emits ShelfCreated with full placement metadata for GameBoxSpawner and SceneSignManager.
+     */
+    private handleShelfReady(detail: ShelfReadyEvent): void {
+        const batchIndex = detail.shelfId
+        const placement = this.resolveShelfPlacement(batchIndex)
+        if (!placement) return
+
         const progress = this.batchCoordinator.getProgress()
         EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
             step: 'shelves',
@@ -358,26 +360,16 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             detail: `Creating shelf ${batchIndex + 1}/${progress.total}`
         })
 
-        // Arc layout: use stored row index. Falls back to grid formula for legacy path.
-        const rowIndex = this.shelfRowIndices[batchIndex] ?? Math.floor(batchIndex / this.maxShelvesPerRow)
-        const shelfIndex = batchIndex % this.maxShelvesPerRow
-
-        // Create shelf without games (GameBoxSpawner will place them)
-        const shelfRotationY = this.shelfRotationsY[batchIndex] ?? (rowIndex % 2 === 1 ? Math.PI : 0)
-
-        // ShelfRenderer owns the GPU write + emits ShelfReady
-        this.shelfRenderer.createShelf(batchIndex, shelfPosition, shelfRotationY)
         this.cumulativeShelfCount++
 
-        // Emit ShelfCreated for GameBoxSpawner (game placement) and SceneSignManager (signs)
         EventManager.getInstance().emit<ShelfCreatedEvent>(
             StorePropsEventTypes.ShelfCreated,
             {
-                position: shelfPosition.clone(),
-                batchIndex: batchIndex,
-                rowIndex,
-                shelfIndex,
-                shelfRotationY,
+                position: placement.position.clone(),
+                batchIndex,
+                rowIndex: placement.rowIndex,
+                shelfIndex: placement.shelfIndex,
+                shelfRotationY: placement.rotationY,
                 bounds: { ...this.shelfBounds },
                 status: BatchProcessingStatus.ShelfCreated,
                 lastModified: Date.now()
