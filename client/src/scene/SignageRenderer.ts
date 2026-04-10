@@ -140,7 +140,12 @@ export class SignageRenderer {
 
     /**
      * Bake a texture snapshot for the given text + colors.
-     * Returns a new DataTexture; caller is responsible for disposing the old one.
+     * Returns a DataTexture; caller is responsible for disposing the old one.
+     *
+     * Returns DataTexture specifically (not the base Texture) because we snapshot
+     * raw pixel data via getImageData — the returned object is always a DataTexture
+     * at runtime. Correcting the return type makes that explicit and lets callers
+     * dispose/set mat.map without unsafe casts.
      */
     public bakeTexture(text: string, backgroundColor: number, textColor: number): THREE.DataTexture {
         return this.createTextTexture(text, backgroundColor, textColor)

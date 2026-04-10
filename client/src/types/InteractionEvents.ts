@@ -19,6 +19,7 @@ import type { BaseInteractionEvent } from '../core/EventManager'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { SteamGame } from '../steam'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
+import type { AllBatchesCompleteEvent, GamesSortEvent } from './EnvironmentEvents'
 
 // =============================================================================
 // STEAM EVENTS
@@ -195,18 +196,8 @@ export interface SomeBatchesCompleteEvent extends BaseInteractionEvent {
     totalBatches: number
 }
 
-export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
-    // Pure terminal signal: all batches are complete.
-}
-
-export interface GamesSortEvent extends BaseInteractionEvent {
-    /** Full sorted game list after all batches have loaded. */
-    sortedGames: ReadonlyArray<Readonly<SteamGameData>>
-    /** Maps bucket key (RecentlyPlayedBucket value or genre string) to human-readable label. */
-    buckets: ReadonlyMap<number | string, string>
-    /** True if any game has rtime_last_played > 0 (i.e. recently-played data is available). */
-    hasRecentlyPlayedData: boolean
-}
+// Moved to EnvironmentEvents.ts — re-exported here for backward compatibility.
+export type { AllBatchesCompleteEvent, GamesSortEvent } from './EnvironmentEvents'
 
 export interface GameSelectedEvent extends BaseInteractionEvent {
     /** App ID of the selected game */

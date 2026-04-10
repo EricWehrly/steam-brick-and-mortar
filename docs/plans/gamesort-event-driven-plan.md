@@ -189,3 +189,29 @@ The deeper coupling — games assigned to shelves by batch index — is a separa
 - Not changing shelf assignment logic yet (batch-order coupling remains)
 - Not changing arc layout math
 - Not introducing test infra changes
+
+---
+
+## Implementation Status (2026-04-10)
+
+**Branch is complete.** All items from the design above are implemented.
+
+### Key deviations from design
+
+- `ShelfCommissioner` deferred as planned; batch-order assignment remains.
+- `ShelfRenderer` expanded beyond the skeleton to own full `InstancedShelfRenderer` lifecycle (init, createShelf, reset, dispose). `GpuStorePropsRenderer` now delegates entirely.
+- `GamesSortEvent` / `AllBatchesCompleteEvent` moved to `EnvironmentEvents.ts` (not `InteractionEvents.ts`) following the `LightingEvents.ts` pattern.
+- `SceneSignManager` gained `SignKind` discriminant and `SignRecord` for type-safe multi-sign-type storage and geometry recycling.
+- `GameBoxSpawner` → `GpuGameBoxRenderer` coupling replaced with `GameBoxSpawned` event chain.
+
+### Multi-sign-type notes
+
+Neon tube signs (`feat-neon-sign-v2` branch) can integrate when ready:
+- Add `'neon-tube'` to `SignKind` union
+- `SignRecord.mesh` is `THREE.Object3D`-compatible; no structural changes needed
+- Add `setNeonSign()` for neon-specific config (glow, text)
+- `clearByKind('neon-tube')` handles cleanup
+
+### Shelf spawning removal readiness
+
+Not ready. Arc layout position calculation is content-aware (genre distribution, total batch count). Future work: extract to `ShelfLayoutCoordinator` so position logic, GPU writes, and event coordination are all separately testable.
