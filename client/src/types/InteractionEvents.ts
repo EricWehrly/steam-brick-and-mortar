@@ -265,20 +265,7 @@ export interface ShelfCreatedEvent extends BaseInteractionEvent {
 }
 
 /**
- * Full shelf placement descriptor emitted by ShelfLayoutCoordinator.
- * ShelfRenderer listens to this and writes the GPU instance + emits ShelfReady.
- */
-export interface ShelfPlacementReadyEvent extends BaseInteractionEvent {
-    shelfId: number
-    totalShelves: number
-    position: Readonly<THREE.Vector3>
-    rotationY: number
-    rowIndex: number
-    shelfIndex: number
-}
-
-/**
- * Authoritative shelf transform readiness emitted by ShelfRenderer.
+ * Authoritative shelf transform readiness emitted by ShelfLayoutCoordinator.
  * This is intentionally minimal and independent from batch orchestration details.
  */
 export interface ShelfReadyEvent extends BaseInteractionEvent {
@@ -379,7 +366,6 @@ export const StorePropsEventTypes = {
     ShelfSpaceRequested: 'store-props:shelf-space-requested',
     ShelfCreated: 'store-props:shelf-created',
     ShelfReady: 'store-props:shelf-ready',
-    ShelfPlacementReady: 'store-props:shelf-placement-ready',
     GameBoxSpawned: 'store-props:game-box-spawned',
     GamesPlaced: 'store-props:games-placed',
     // Renderer initialization
