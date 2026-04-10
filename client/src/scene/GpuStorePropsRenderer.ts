@@ -45,13 +45,10 @@ import {
     type ShelfCreatedEvent,
     type RendererReadyEvent
 } from '../types/InteractionEvents'
-import { TestMode, getEnabledTests, isTestEnabled } from '../types/TestMode'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
-import { ShelfSectionPlanner } from './ShelfSectionPlanner'
-import { RecentlyPlayedCeilingSign } from './RecentlyPlayedCeilingSign'
 import { getPrimaryGenreFromBatch } from './categorization/CategoryAisleOffset'
 import { computeArcShelfLayout, type ArcLayoutConfig } from './props/shared/ArcLayoutUtils'
 import type { SteamGameData } from './game-box/types/GameData'
@@ -64,6 +61,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private gameBoxRenderer: GpuGameBoxRenderer | null = null
     private propsGroup: THREE.Group
+    // TODO: wire in config values
     private config: PropsConfig = {}
 
     // Frozen default config shared across instances. Freeze nested `performance` as well.
@@ -75,8 +73,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             maxTextureSize: 1024,
             nearDistance: 2.0,
             farDistance: 10.0,
-            maxActiveTextures: 50,
-            frustumCullingEnabled: true
+            frustumCullingEnabled: true // I don't think we have this? It's a nice to have, way post-features, for sure. but we should strip what we don't have
         })
     })
 
@@ -115,8 +112,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private setupPhaseInitialized: boolean = false
     private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
     private gameBoxSpawner?: GameBoxSpawner
-    private readonly shelfSectionPlanner: ShelfSectionPlanner
-    private readonly recentlyPlayedSign: RecentlyPlayedCeilingSign
     private readonly shelfRenderer: ShelfRenderer
 
     constructor(scene: THREE.Scene) {
@@ -132,8 +127,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.propsGroup.name = 'props-instanced'
         this.scene.add(this.propsGroup)
 
-        this.shelfSectionPlanner = new ShelfSectionPlanner()
-        this.recentlyPlayedSign = new RecentlyPlayedCeilingSign()
         this.shelfRenderer = new ShelfRenderer()
 
         this.setupEventListeners()
@@ -235,8 +228,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.cumulativeShelfCount = 0
         this.batchPrimaryGenreByIndex.clear()
         this.shelfRotationsY = []
-        // batchGamesByIndex removed � games accumulated directly in shelfSectionPlanner
-        this.shelfSectionPlanner.reset()
+        // batchGamesByIndex removed — game sorting/sign placement is event-driven via GameSorter + SceneSignManager
         this.clearExistingShelves()
 
         this.preallocateArcLayout(totalBatches)
@@ -524,7 +516,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     public clearProps(): void {
         this.clearExistingShelves()
-        this.shelfSectionPlanner.reset()
 
         while (this.propsGroup.children.length > 0) {
             const child = this.propsGroup.children[0]
@@ -550,8 +541,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.gameBoxRenderer = null
 
         this.instancedShelfRenderer?.dispose()
-        this.shelfSectionPlanner.dispose()
-        this.recentlyPlayedSign.dispose()
 
         this.scene.remove(this.propsGroup)
 
