@@ -52,12 +52,10 @@ import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
 import { RecentlyPlayedCeilingSign } from './RecentlyPlayedCeilingSign'
-import {
-    computeAlternatingClusterXOffset,
-    getPrimaryGenreFromBatch,
-} from './categorization/CategoryAisleOffset'
+import { getPrimaryGenreFromBatch } from './categorization/CategoryAisleOffset'
 import { computeArcShelfLayout, type ArcLayoutConfig } from './props/shared/ArcLayoutUtils'
 import type { SteamGameData } from './game-box/types/GameData'
+import { ShelfRenderer } from './shelves/ShelfRenderer'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private static readonly logger = Logger.createLogFunctions(GpuStorePropsRenderer.name)
@@ -67,6 +65,20 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private gameBoxRenderer: GpuGameBoxRenderer | null = null
     private propsGroup: THREE.Group
     private config: PropsConfig = {}
+
+    // Frozen default config shared across instances. Freeze nested `performance` as well.
+    private static readonly DEFAULT_CONFIG: PropsConfig = Object.freeze({
+        enableShelves: true,
+        enableGameBoxes: true,
+        enableSignage: true,
+        performance: Object.freeze({
+            maxTextureSize: 1024,
+            nearDistance: 2.0,
+            farDistance: 10.0,
+            maxActiveTextures: 50,
+            frustumCullingEnabled: true
+        })
+    })
 
     private instancedShelfRenderer?: InstancedShelfRenderer
     private isShelfRendererReady: boolean = false
@@ -105,6 +117,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private gameBoxSpawner?: GameBoxSpawner
     private readonly shelfSectionPlanner: ShelfSectionPlanner
     private readonly recentlyPlayedSign: RecentlyPlayedCeilingSign
+    private readonly shelfRenderer: ShelfRenderer
 
     constructor(scene: THREE.Scene) {
         this.scene = scene
@@ -121,29 +134,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         this.shelfSectionPlanner = new ShelfSectionPlanner()
         this.recentlyPlayedSign = new RecentlyPlayedCeilingSign()
+        this.shelfRenderer = new ShelfRenderer()
 
         this.setupEventListeners()
-    }
-
-    private initializeSetupPhase(): void {
-        if (this.setupPhaseInitialized) {
-            return
-        }
-
-        // Create GPU instanced shelf renderer
-        this.instancedShelfRenderer = new InstancedShelfRenderer({
-            maxShelfUnits: 100 // Allow up to 100 shelf units (47+ batches need this)
-        })
-
-        // Initialize eagerly - emits RendererReady event when complete
-        this.instancedShelfRenderer.initialize().catch(error => {
-            console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
-            throw error
-        })
-
-        // Bootstrap placement listeners before any batch data can enter the flow.
-        this.gameBoxSpawner = new GameBoxSpawner()
-        this.setupPhaseInitialized = true
     }
 
     private handleRendererReady(event: CustomEvent<RendererReadyEvent>): void {
@@ -434,6 +427,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Sign placement happens in planSections() after AllBatchesComplete.
 
         // Emit ShelfCreated event for GameBoxSpawner to place games
+        const shelfRotationY = this.shelfRotationsY[batchIndex] ?? (rowIndex % 2 === 1 ? Math.PI : 0)
+
         EventManager.getInstance().emit<ShelfCreatedEvent>(
             StorePropsEventTypes.ShelfCreated,
             {
@@ -441,12 +436,13 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 batchIndex: batchIndex,
                 rowIndex,
                 shelfIndex,
-                shelfRotationY: this.shelfRotationsY[batchIndex] ?? (rowIndex % 2 === 1 ? Math.PI : 0),
+                shelfRotationY,
                 bounds: { ...this.shelfBounds },
                 status: BatchProcessingStatus.ShelfCreated,
                 lastModified: Date.now()
             }
         )
+        this.shelfRenderer.emitShelfReady(batchIndex, shelfPosition, shelfRotationY)
         GpuStorePropsRenderer.logger.debug(`Emitted ShelfCreated for batch ${batchIndex + 1}`)
     }
 
@@ -462,54 +458,31 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     public async setupProps(config: PropsConfig = {}): Promise<void> {
-        this.initializeSetupPhase()
-        this.config = { ...this.getDefaultConfig(), ...config }
-
-        // Initialize test objects if requested
-        if (this.config.tests) {
-            this.initializeTestObjects(this.config.tests)
+        if (this.setupPhaseInitialized) {
+            return
         }
-    }
 
-    private initializeTestObjects(testsConfig: unknown[] | Record<string, string>): void {
-        const testsSettings = Array.isArray(testsConfig) ? {} : testsConfig as Record<string, string>
-        const enabledTests = getEnabledTests(testsSettings)
+        // Create GPU instanced shelf renderer
+        this.instancedShelfRenderer = new InstancedShelfRenderer({
+            maxShelfUnits: 100 // Allow up to 100 shelf units (47+ batches need this)
+        })
 
-        if (enabledTests.length > 0 && isTestEnabled(testsSettings, TestMode.SPAWN_TEST_OBJECTS)) {
-            const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
-            const material = new THREE.MeshPhongMaterial({ color: 0x0099ff })
-            const cube = new THREE.Mesh(geometry, material)
-            cube.position.set(2, 0, -1)
-            cube.castShadow = true
-            cube.name = 'test-cube-gpu'
-            this.propsGroup.add(cube)
-        }
-    }
+        // Initialize eagerly - emits RendererReady event when complete
+        this.instancedShelfRenderer.initialize().catch(error => {
+            console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
+            throw error
+        })
 
-    private getDefaultConfig(): PropsConfig {
-        return {
-            enableShelves: true,
-            enableGameBoxes: true,
-            enableSignage: true,
-            performance: {
-                maxTextureSize: 1024,
-                nearDistance: 2.0,
-                farDistance: 10.0,
-                maxActiveTextures: 50,
-                frustumCullingEnabled: true
-            }
-        }
+        // Bootstrap placement listeners before any batch data can enter the flow.
+        this.gameBoxSpawner = new GameBoxSpawner()
+        this.setupPhaseInitialized = true
+        
+        this.config = { ...GpuStorePropsRenderer.DEFAULT_CONFIG, ...config }
     }
 
     public async addAtmosphericProps(): Promise<void> {
         // TODO: PropRenderer not instantiated - this method is currently non-functional
         console.warn('⚠️ addAtmosphericProps not implemented - PropRenderer not instantiated')
-    }
-
-    public updatePerformanceData(_camera: THREE.Camera): void {
-        if (this.instancedShelfRenderer?.isReady()) {
-            this.instancedShelfRenderer.updateGPU()
-        }
     }
 
     private clearExistingShelves(): void {
@@ -518,12 +491,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             this.instancedShelfRenderer.reset()
         }
     }
-
-    /**
-     * Shelf toe-out angle in degrees. 0 = straight rows.
-     * Kept plumbed for future layout patterns.
-     */
-    private readonly SHELF_TOE_DEGREES: number = 0
 
     private createInstancedShelf(
         position: THREE.Vector3,
@@ -554,8 +521,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // End-cap orientation labels are now placed by SceneSignManager
         // on ShelfCreated events — no call needed here.
     }
-
-
 
     public clearProps(): void {
         this.clearExistingShelves()

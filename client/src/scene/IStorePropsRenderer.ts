@@ -5,8 +5,6 @@
  * Provides consistent API for rendering interactive store objects and props.
  */
 
-import * as THREE from 'three'
-
 export interface PropsConfig {
     enableShelves?: boolean
     enableGameBoxes?: boolean
@@ -20,7 +18,6 @@ export interface PropsConfig {
         maxActiveTextures?: number
         frustumCullingEnabled?: boolean
     }
-    tests?: Record<string, string>
 }
 
 export interface IStorePropsRenderer {
@@ -33,11 +30,6 @@ export interface IStorePropsRenderer {
      * Add atmospheric props (wire racks, dividers, etc.)
      */
     addAtmosphericProps(): Promise<void>
-
-    /**
-     * Update performance data for camera-based optimizations
-     */
-    updatePerformanceData(camera: THREE.Camera): void
 
     /**
      * Clear all props from the scene

@@ -274,6 +274,16 @@ export interface ShelfCreatedEvent extends BaseInteractionEvent {
     lastModified?: number
 }
 
+/**
+ * Authoritative shelf transform readiness emitted by ShelfRenderer.
+ * This is intentionally minimal and independent from batch orchestration details.
+ */
+export interface ShelfReadyEvent extends BaseInteractionEvent {
+    shelfId: number
+    position: Readonly<THREE.Vector3>
+    rotationY: number
+}
+
 export interface GamesPlacedEvent extends BaseInteractionEvent {
     batchIndex: number
     status: BatchProcessingStatus
@@ -358,6 +368,7 @@ export const StorePropsEventTypes = {
     BatchReadyForPlacement: 'store-props:batch-ready-placement',
     ShelfSpaceRequested: 'store-props:shelf-space-requested',
     ShelfCreated: 'store-props:shelf-created',
+    ShelfReady: 'store-props:shelf-ready',
     GamesPlaced: 'store-props:games-placed',
     // Renderer initialization
     RendererReady: 'store-props:renderer-ready'
