@@ -26,18 +26,12 @@ import type { InstancedMeshManager } from '../instancing/InstancedMeshManager'
 // Toggle verbose sticker-system debug logging in this module
 const STICKERS_DEBUG = false
 
-interface ShelfUnitInstance {
-    position: unknown
-    config: unknown
-    instanceIndices: unknown
-}
-
 export class ShelfStickerHandler {
     private stickerManager: StickerManager | null = null
     private stickerIntegration: ShelfStickerIntegration | null = null
     private indexSystem: ShelfUnitIndexSystem | null = null
     private sideBoardManager?: InstancedMeshManager
-    private shelfUnits?: Map<number, ShelfUnitInstance>
+    private shelfUnitCount: number = 0
     
     private isStickersEnabled(): boolean {
         return AppSettings.get(Setting.EnableStickers)
@@ -58,9 +52,9 @@ export class ShelfStickerHandler {
         this.registerEventListeners()
     }
     
-    public setManagers(sideBoardManager: InstancedMeshManager, shelfUnits: Map<number, ShelfUnitInstance>): void {
+    public setManagers(sideBoardManager: InstancedMeshManager, shelfUnitCount: number): void {
         this.sideBoardManager = sideBoardManager
-        this.shelfUnits = shelfUnits
+        this.shelfUnitCount = shelfUnitCount
     }
     
     private registerEventListeners(): void {
@@ -74,16 +68,16 @@ export class ShelfStickerHandler {
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.EnableShelfIndices,
             () => {
-                if (this.sideBoardManager && this.shelfUnits) {
-                    this.enableIndices(this.sideBoardManager, this.shelfUnits)
+                if (this.sideBoardManager) {
+                    this.enableIndices(this.sideBoardManager, this.shelfUnitCount)
                 }
             }
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.DisableShelfIndices,
             () => {
-                if (this.sideBoardManager && this.shelfUnits) {
-                    this.disableIndices(this.sideBoardManager, this.shelfUnits)
+                if (this.sideBoardManager) {
+                    this.disableIndices(this.sideBoardManager, this.shelfUnitCount)
                 }
             }
         )
@@ -124,8 +118,8 @@ export class ShelfStickerHandler {
      */
     public populateStickersAfterGeneration(): void {
         if (!this.isStickersEnabled()) return
-        if (!this.sideBoardManager || !this.shelfUnits) return
-        this.populateRandomStickers(this.sideBoardManager, this.shelfUnits.size, 0.3)
+        if (!this.sideBoardManager) return
+        this.populateRandomStickers(this.sideBoardManager, this.shelfUnitCount, 0.3)
     }
     
     /**
@@ -157,11 +151,11 @@ export class ShelfStickerHandler {
      */
     public enableIndices(
         meshManager: InstancedMeshManager,
-        shelfUnits: Map<number, unknown>
+        shelfUnitCount: number
     ): void {
         if (!this.isStickersEnabled() || !this.indexSystem) return
         this.indexSystem.enable()
-        this.refreshAllIndices(meshManager, shelfUnits)
+        this.refreshAllIndices(meshManager, shelfUnitCount)
         if (STICKERS_DEBUG) console.debug('🔍 Shelf unit indices enabled')
     }
     
@@ -170,11 +164,11 @@ export class ShelfStickerHandler {
      */
     public disableIndices(
         meshManager: InstancedMeshManager,
-        shelfUnits: Map<number, unknown>
+        shelfUnitCount: number
     ): void {
         if (!this.isStickersEnabled() || !this.indexSystem) return
         this.indexSystem.disable()
-        this.refreshAllIndices(meshManager, shelfUnits)
+        this.refreshAllIndices(meshManager, shelfUnitCount)
         if (STICKERS_DEBUG) console.debug('🔍 Shelf unit indices disabled')
     }
     
@@ -183,47 +177,39 @@ export class ShelfStickerHandler {
      */
     public toggleIndices(
         meshManager: InstancedMeshManager,
-        shelfUnits: Map<number, unknown>
+        shelfUnitCount: number
     ): void {
         if (!this.isStickersEnabled() || !this.indexSystem) return
         this.indexSystem.toggle()
-        this.refreshAllIndices(meshManager, shelfUnits)
+        this.refreshAllIndices(meshManager, shelfUnitCount)
     }
     
     /**
      * Refresh indices for all shelf units
-     * Macro texture mode: Use boardIndex as tileId
+     * Macro texture mode: left board for shelf N is at boardIndex N*2
      */
     private refreshAllIndices(
         meshManager: InstancedMeshManager,
-        shelfUnits: Map<number, unknown>
+        shelfUnitCount: number
     ): void {
         if (!this.stickerManager || !this.stickerIntegration || !this.indexSystem) return
         
-        let sideboardIndex = 0
-        shelfUnits.forEach((_unit, shelfUnitIndex) => {
-            const leftBoardIndex = sideboardIndex
-            const leftTileId = leftBoardIndex  // Use boardIndex directly as tile ID
-            
-            // Clear existing stickers for this shelf (including indices)
+        for (let shelfUnitIndex = 0; shelfUnitIndex < shelfUnitCount; shelfUnitIndex++) {
+            const leftBoardIndex = shelfUnitIndex * 2
+            const leftTileId = leftBoardIndex
+
             this.stickerManager!.clearShelf(leftTileId)
-            
-            // Re-add indices if enabled
+
             if (this.indexSystem!.isEnabled()) {
                 this.indexSystem!.addIndexToSideboard(shelfUnitIndex, leftTileId)
             }
-            
-            // Update surface (will re-render whatever stickers are in the manager)
+
             this.stickerIntegration!.updateSurfaceStickers(meshManager, leftBoardIndex, leftTileId)
-            
-            sideboardIndex += 2  // Skip right board
-        })
-        
-        // Update macro texture with all changes
+        }
+
         this.stickerIntegration.getMacroTexture().updateTexture()
-        
         meshManager.updateGPU()
-        if (STICKERS_DEBUG) console.debug(`🔍 Refreshed indices for ${shelfUnits.size} shelf units`)
+        if (STICKERS_DEBUG) console.debug(`🔍 Refreshed indices for ${shelfUnitCount} shelf units`)
     }
     
     /**

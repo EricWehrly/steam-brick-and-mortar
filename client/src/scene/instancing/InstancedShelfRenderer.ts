@@ -69,7 +69,6 @@ export interface ShelfInstanceData extends InstanceData {
 
 interface ShelfUnitInstance {
     position: THREE.Vector3
-    config: ShelfConfig
     instanceIndices: {
         angledBoards: number[]
         sideBoards: number[]
@@ -274,7 +273,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         if (stickerIntegration) {
             stickerIntegration.setupInstanceAttributes(this.sideBoardManager)
         }
-        this.stickerHandler.setManagers(this.sideBoardManager, this.shelfUnits)
+        this.stickerHandler.setManagers(this.sideBoardManager, this.shelfUnits.size)
     }
     
     public setInstance(index: number, data: ShelfInstanceData): boolean {
@@ -303,13 +302,14 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             // This lets runtime relayout update positions without allocating new GPU slots.
             const existing = this.shelfUnits.get(index)
             if (existing) {
-                this.updateShelfUnitTransform(index, existing, data.position, shelfConfig, data.rotation)
+                this.updateShelfUnitTransform(index, existing, data.position, data.rotation)
                 InstancedShelfRenderer.logger.debug(`🔄 Updated shelf unit ${index} at (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
                 return true
             }
 
-            const shelfUnit = this.applyShelfUnitTemplate(index, data.position, shelfConfig, data.rotation)
+            const shelfUnit = this.applyShelfUnitTemplate(index, data.position, data.rotation)
             this.shelfUnits.set(index, shelfUnit)
+            this.stickerHandler.setManagers(this.sideBoardManager, this.shelfUnits.size)
 
             InstancedShelfRenderer.logger.debug(`🏪 Set shelf unit ${index} at position (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
             return true
@@ -347,7 +347,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     private applyShelfUnitTemplate(
         shelfUnitIndex: number,
         position: THREE.Vector3,
-        _config: Required<ShelfConfig>,
         unitRotation?: THREE.Quaternion
     ): ShelfUnitInstance {
         const instanceIndices = {
@@ -416,7 +415,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         
         return {
             position: position.clone(),
-            config: _config,
             instanceIndices
         }
     }
@@ -430,7 +428,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         _shelfUnitIndex: number,
         existing: ShelfUnitInstance,
         position: THREE.Vector3,
-        _config: Required<ShelfConfig>,
         unitRotation?: THREE.Quaternion
     ): void {
         existing.position.copy(position)
@@ -516,6 +513,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.interiorSurfaceManager.reset()
         
         this.shelfUnits.clear()
+        this.stickerHandler.setManagers(this.sideBoardManager, 0)
         this.nextInstanceIndex = {
             angledBoard: 0,
             sideBoard: 0,

@@ -5,7 +5,6 @@
  *
  * OWNS:
  * - GpuGameBoxRenderer allocation (deferred until game count is known)
- * - GameBoxSpawner wiring (GameBoxSpawned → createGameBoxAuto)
  * - ShelfCreated emission (translates ShelfReady into full placement metadata)
  * - Progress reporting
  * - Props group in scene
@@ -19,20 +18,17 @@
 import * as THREE from 'three'
 import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
-import { ShelfSide } from './props/SharedPropsUtils'
 
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
 import {
     StorePropsEventTypes,
     type BatchReadyForPlacementEvent,
-    type GameBoxSpawnedEvent,
 } from '../types/InteractionEvents'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
-import type { SteamGameData } from './game-box/types/GameData'
 import { ShelfLayoutCoordinator } from './shelves/ShelfLayoutCoordinator'
 import { ShelfPlacementCoordinator } from './shelves/ShelfPlacementCoordinator'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
@@ -135,23 +131,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.instancedShelfRenderer.initialize().catch(error => {
             console.error('❌ Failed to initialize InstancedShelfRenderer:', error)
         })
-
-        EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.GameBoxSpawned,
-            (event: CustomEvent<GameBoxSpawnedEvent>) => {
-                if (!this.gameBoxRenderer) {
-                    GpuStorePropsRenderer.logger.warn('GameBoxSpawned before gameBoxRenderer initialized')
-                    return
-                }
-                const { game, position, side, rotation } = event.detail
-                this.gameBoxRenderer.createGameBoxAuto(
-                    game as SteamGameData,
-                    position as THREE.Vector3,
-                    side as ShelfSide,
-                    rotation as THREE.Quaternion
-                )
-            }
-        )
 
         this.setupPhaseInitialized = true
         this.config = { ...GpuStorePropsRenderer.DEFAULT_CONFIG, ...config }

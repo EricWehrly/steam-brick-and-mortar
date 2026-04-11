@@ -50,6 +50,7 @@ import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { EventManager } from '../../core/EventManager'
 import { Logger } from '../../utils/Logger'
+import { StorePropsEventTypes, type GameBoxSpawnedEvent } from '../../types/InteractionEvents'
 import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
 // Steam capsule source dimensions (what CDN claims, though actual is ~460×690)
@@ -69,6 +70,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private readonly instancedLabelRenderer: InstancedLabelRenderer
     private readonly lodArtworkRenderer: ILodArtworkRendererDebug
     private readonly lodDistanceManager: LodDistanceManagerDebug
+    private readonly onGameBoxSpawned: (event: CustomEvent<GameBoxSpawnedEvent>) => void
 
     constructor(maxGames: number = 2000) {
         this.dimensions = { ...GpuGameBoxRenderer.DEFAULT_DIMENSIONS }
@@ -97,6 +99,23 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         // Create distance manager for automatic LOD switching
         this.lodDistanceManager = new LodDistanceManagerDebug(this.lodArtworkRenderer)
+
+        // Self-subscribe: renderer owns the GameBoxSpawned → createGameBoxAuto wiring.
+        // This removes the need for GpuStorePropsRenderer to hold a renderer reference
+        // and wire events on its behalf.
+        this.onGameBoxSpawned = (event: CustomEvent<GameBoxSpawnedEvent>) => {
+            const { game, position, side, rotation } = event.detail
+            this.createGameBoxAuto(
+                game as SteamGameData,
+                position as THREE.Vector3,
+                side as ShelfSide,
+                rotation as THREE.Quaternion
+            )
+        }
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.GameBoxSpawned,
+            this.onGameBoxSpawned
+        )
         
         GpuGameBoxRenderer.logger.lifecycle(`LOD atlas initialized (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
     }
@@ -215,6 +234,11 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     public dispose(): void {
         GpuGameBoxRenderer.logger.lifecycle('Disposing')
         
+        EventManager.getInstance().deregisterEventHandler(
+            StorePropsEventTypes.GameBoxSpawned,
+            this.onGameBoxSpawned
+        )
+
         this.lodDistanceManager.dispose()
         this.instancedLabelRenderer.dispose()
         this.lodArtworkRenderer.dispose()
