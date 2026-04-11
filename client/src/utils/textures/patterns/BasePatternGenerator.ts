@@ -98,7 +98,7 @@ export abstract class BasePatternGenerator {
         ctx.fillRect(0, 0, width, height)
         break
 
-      case 'gradient':
+      case 'gradient': {
         const gradient = ctx.createLinearGradient(0, 0, width, height)
         if (colors.length >= 2) {
           gradient.addColorStop(0, colors[0])
@@ -116,8 +116,9 @@ export abstract class BasePatternGenerator {
         ctx.fillStyle = gradient
         ctx.fillRect(0, 0, width, height)
         break
+      }
 
-      case 'noise':
+      case 'noise': {
         // Fill with base color first
         ctx.fillStyle = backgroundColor
         ctx.fillRect(0, 0, width, height)
@@ -137,6 +138,7 @@ export abstract class BasePatternGenerator {
         
         ctx.putImageData(imageData, 0, 0)
         break
+      }
     }
 
     ctx.restore()
