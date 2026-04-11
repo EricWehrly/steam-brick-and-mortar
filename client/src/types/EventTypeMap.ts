@@ -40,8 +40,6 @@ import type {
     SceneReadyEvent,
     GameStartEvent,
     ShelfLayoutDeterminedEvent,
-    LayoutChangedEvent,
-    SomeBatchesCompleteEvent,
     AppEventTypes,
     PhaseCompletedEvent,
     MilestoneEvent,
@@ -50,7 +48,7 @@ import type {
     GameLoadingPhaseChangedEvent,
     GameLoadingProgressEvent,
 } from './InteractionEvents'
-import type { AllBatchesCompleteEvent, GamesSortEvent } from './EnvironmentEvents'
+import type { AllBatchesCompleteEvent, GamesSortEvent, LayoutChangedEvent, SomeBatchesCompleteEvent } from './EnvironmentEvents'
 
 export interface InteractionEventMap {
     // Steam events

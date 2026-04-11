@@ -162,8 +162,13 @@ export class SceneSignManager {
     private readonly shelfTransforms = new Map<number, { position: THREE.Vector3; rotationY: number }>()
     private readonly timeBucketSignLabels = new Set<string>()
     private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
-    private hasRecentlyPlayedData = false
+    private buckets: ReadonlyMap<number | string, string> = new Map()
     private lastPlacedBucket: RecentlyPlayedBucket | null = null
+
+    /** True when any game has recent-play metadata (rtime_last_played > 0). */
+    private get hasRecentlyPlayedData(): boolean {
+        return this.sortedGames.some(game => (game.rtime_last_played ?? 0) > 0)
+    }
 
     private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 0.6
     private static readonly SIGN_Z_FACE_PLAYER = 0.01 // slight forward push to avoid z-fighting
@@ -179,25 +184,7 @@ export class SceneSignManager {
         // This keeps sign placement logic where it belongs — in the sign manager.
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfCreated,
-            (event: CustomEvent<ShelfCreatedEvent>) => {
-                const { position, shelfIndex, shelfRotationY, batchIndex } = event.detail
-                const rotY = shelfRotationY ?? 0
-                const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
-                const topSurface = shelfSurfaces[0]
-                if (topSurface) {
-                    this.placeShelfEndCapLabels(shelfIndex ?? 0, position as THREE.Vector3, rotY, topSurface)
-                }
-
-                const shelfId = batchIndex ?? shelfIndex ?? 0
-                this.shelfTransforms.set(shelfId, {
-                    position: (position as THREE.Vector3).clone(),
-                    rotationY: rotY,
-                })
-
-                if (this.hasRecentlyPlayedData && this.sortedGames.length > 0) {
-                    this.placeTimeBucketSignForShelf(shelfId, position as THREE.Vector3, rotY)
-                }
-            }
+            (event: CustomEvent<ShelfCreatedEvent>) => this.handleShelfCreated(event.detail)
         )
 
         EventManager.getInstance().registerEventHandler(
@@ -206,9 +193,28 @@ export class SceneSignManager {
         )
     }
 
+    private handleShelfCreated(detail: ShelfCreatedEvent): void {
+        const { position, shelfIndex, shelfRotationY, batchIndex } = detail
+        const rotY = shelfRotationY ?? 0
+        const shelfPos = position as THREE.Vector3
+        const shelfId = batchIndex ?? shelfIndex ?? 0
+
+        const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
+        const topSurface = shelfSurfaces[0]
+        if (topSurface) {
+            this.placeShelfEndCapLabels(shelfIndex ?? 0, shelfPos, rotY, topSurface)
+        }
+
+        this.shelfTransforms.set(shelfId, { position: shelfPos.clone(), rotationY: rotY })
+
+        if (this.hasRecentlyPlayedData && this.sortedGames.length > 0) {
+            this.placeTimeBucketSignForShelf(shelfId, shelfPos, rotY)
+        }
+    }
+
     private handleGamesSort(detail: GamesSortEvent): void {
         this.sortedGames = detail.sortedGames
-        this.hasRecentlyPlayedData = detail.hasRecentlyPlayedData
+        this.buckets = detail.buckets
         this.lastPlacedBucket = null
         this.clearTimeBucketSigns()
         this.syncRecentlyPlayedCeilingSign()
@@ -249,9 +255,7 @@ export class SceneSignManager {
             }
 
             mesh.position.copy(signPos)
-            if (descriptor.mount.signFacingY !== undefined) {
-                mesh.rotation.y = descriptor.mount.signFacingY
-            }
+            this.applySignFacing(mesh, descriptor.mount)
 
             return mesh
         }
@@ -271,9 +275,7 @@ export class SceneSignManager {
         mesh.userData.mountStyle = descriptor.mount.style
         mesh.userData.signKind = kind
 
-        if (descriptor.mount.signFacingY !== undefined) {
-            mesh.rotation.y = descriptor.mount.signFacingY
-        }
+        this.applySignFacing(mesh, descriptor.mount)
 
         this.scene.add(mesh)
         this.signs.set(descriptor.label, { mesh, kind, width: style.width, height: style.height })
@@ -345,6 +347,12 @@ export class SceneSignManager {
         }, 'end-cap')
     }
 
+    private applySignFacing(mesh: THREE.Mesh, mount: SignMount): void {
+        if (mount.signFacingY !== undefined) {
+            mesh.rotation.y = mount.signFacingY
+        }
+    }
+
     public clearAll(): void {
         for (const label of [...this.signs.keys()]) {
             this.removeSign(label)
@@ -366,7 +374,7 @@ export class SceneSignManager {
         this.clearAll()
         this.shelfTransforms.clear()
         this.sortedGames = []
-        this.hasRecentlyPlayedData = false
+        this.buckets = new Map()
         this.renderer.dispose()
     }
 
@@ -413,7 +421,7 @@ export class SceneSignManager {
         }
 
         // bucket is non-null here (shouldPlaceBucketSign guarantees it)
-        const label = bucketDisplayLabel(bucket!) ?? ''
+        const label = bucketDisplayLabel(bucket!)
         const anchor = bucketSignAnchor(shelfPosition)
 
         this.setSign({

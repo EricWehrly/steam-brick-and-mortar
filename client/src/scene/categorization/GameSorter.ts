@@ -72,15 +72,13 @@ export class GameSorter {
         GameSorter.logger.debug('GameSorter initialized — subscribed to AllBatchesComplete')
     }
 
-    private sortByRecentlyPlayed(): void {
+    public sortByRecentlyPlayed(): void {
         const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
 
         if (games.length === 0) {
             GameSorter.logger.warn('AllBatchesComplete fired but no games in DataManager — skipping emit')
             return
         }
-
-        const hasRecentlyPlayedData = games.some(g => (g.rtime_last_played ?? 0) > 0)
 
         // Always include all games. rtime_last_played === 0 means "never played" —
         // those go to RecentlyPlayedBucket.Unplayed, not dropped.
@@ -92,11 +90,10 @@ export class GameSorter {
         EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
             sortedGames,
             buckets,
-            hasRecentlyPlayedData,
         })
 
         GameSorter.logger.debug(
-            `GamesSort emitted: ${sortedGames.length} games, ${buckets.size} buckets, hasRecentlyPlayed=${hasRecentlyPlayedData}`
+            `GamesSort emitted: ${sortedGames.length} games, ${buckets.size} buckets`
         )
     }
 

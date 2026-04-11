@@ -23,9 +23,8 @@ import {
     type SteamGamesBatchEvent,
     type BatchReadyForPlacementEvent,
     type GamesPlacedEvent,
-    type SomeBatchesCompleteEvent,
 } from '../../types/InteractionEvents'
-import type { AllBatchesCompleteEvent } from '../../types/EnvironmentEvents'
+import type { AllBatchesCompleteEvent, SomeBatchesCompleteEvent } from '../../types/EnvironmentEvents'
 
 export interface BatchItem<T> {
     batchIndex: number
@@ -218,8 +217,6 @@ export class BatchCoordinator<T> {
                 games: batchData.games,
                 batchIndex,
                 totalBatches,
-                status: BatchProcessingStatus.Dispatched,
-                lastModified: Date.now()
             }
         )
         // TODO: Revisit whether this should be paired with a globally debounced

@@ -118,7 +118,7 @@ describe('GameBoxSpawner Event Coordination', () => {
             // Games stored as pending — verify by triggering ShelfCreated
             eventManager.emit<ShelfCreatedEvent>(
                 StorePropsEventTypes.ShelfCreated,
-                { position: new THREE.Vector3(0, 0, 0), batchIndex: 0, bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 } }
+                { position: new THREE.Vector3(0, 0, 0), batchIndex: 0 }
             )
 
             expect(spawnedEvents).toHaveLength(5)
@@ -146,7 +146,7 @@ describe('GameBoxSpawner Event Coordination', () => {
             for (let i = 0; i < 3; i++) {
                 eventManager.emit<ShelfCreatedEvent>(
                     StorePropsEventTypes.ShelfCreated,
-                    { position: new THREE.Vector3(i * 3, 0, 0), batchIndex: i, bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 } }
+                    { position: new THREE.Vector3(i * 3, 0, 0), batchIndex: i }
                 )
             }
 
@@ -190,8 +190,7 @@ describe('GameBoxSpawner Event Coordination', () => {
                 StorePropsEventTypes.ShelfCreated,
                 {
                     position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0,
-                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
+                    batchIndex: 0
                 }
             )
 
@@ -217,8 +216,7 @@ describe('GameBoxSpawner Event Coordination', () => {
                 {
                     position: new THREE.Vector3(0, 0, 0),
                     batchIndex: 0,
-                    shelfRotationY: Math.PI,
-                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
+                    shelfRotationY: Math.PI
                 }
             )
 
@@ -242,8 +240,7 @@ describe('GameBoxSpawner Event Coordination', () => {
                 StorePropsEventTypes.ShelfCreated,
                 {
                     position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 5,
-                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
+                    batchIndex: 5
                 }
             )
 
@@ -288,16 +285,14 @@ describe('GameBoxSpawner Event Coordination', () => {
                 StorePropsEventTypes.ShelfCreated,
                 {
                     position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0,
-                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
+                    batchIndex: 0
                 }
             )
             eventManager.emit<ShelfCreatedEvent>(
                 StorePropsEventTypes.ShelfCreated,
                 {
                     position: new THREE.Vector3(2, 0, 0),
-                    batchIndex: 1,
-                    bounds: { minX: 1, maxX: 3, minZ: -1, maxZ: 1 }
+                    batchIndex: 1
                 }
             )
 
@@ -325,7 +320,7 @@ describe('GameBoxSpawner Event Coordination', () => {
 
             eventManager.emit<ShelfCreatedEvent>(
                 StorePropsEventTypes.ShelfCreated,
-                { position: new THREE.Vector3(0, 0, 0), batchIndex: 0, bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 } }
+                { position: new THREE.Vector3(0, 0, 0), batchIndex: 0 }
             )
 
             expect(eventSequence).toContain(StorePropsEventTypes.BatchReadyForPlacement)
@@ -369,24 +364,21 @@ describe('GameBoxSpawner Event Coordination', () => {
                 StorePropsEventTypes.ShelfCreated,
                 {
                     position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 1,
-                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
+                    batchIndex: 1
                 }
             )
             eventManager.emit<ShelfCreatedEvent>(
                 StorePropsEventTypes.ShelfCreated,
                 {
                     position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0,
-                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
+                    batchIndex: 0
                 }
             )
             eventManager.emit<ShelfCreatedEvent>(
                 StorePropsEventTypes.ShelfCreated,
                 {
                     position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 2,
-                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
+                    batchIndex: 2
                 }
             )
 
@@ -417,8 +409,7 @@ describe('GameBoxSpawner Event Coordination', () => {
                 StorePropsEventTypes.ShelfCreated,
                 {
                     position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0,
-                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
+                    batchIndex: 0
                 }
             )
 
@@ -430,8 +421,7 @@ describe('GameBoxSpawner Event Coordination', () => {
                 StorePropsEventTypes.ShelfCreated,
                 {
                     position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0,
-                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
+                    batchIndex: 0
                 }
             )
 
@@ -467,8 +457,7 @@ describe('GameBoxSpawner Event Coordination', () => {
                 StorePropsEventTypes.ShelfCreated,
                 {
                     position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0,
-                    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 }
+                    batchIndex: 0
                 }
             )
 
@@ -503,8 +492,7 @@ describe('GameBoxSpawner Event Coordination', () => {
                 StorePropsEventTypes.ShelfCreated,
                 {
                     position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0,
-                    bounds: { minX: -10, maxX: 10, minZ: -10, maxZ: 10 }
+                    batchIndex: 0
                 }
             )
 
