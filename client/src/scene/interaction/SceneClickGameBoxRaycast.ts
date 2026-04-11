@@ -4,7 +4,7 @@ import { DataKey } from '../../core/data/DataTypes'
 import { EventManager } from '../../core/EventManager'
 import { InputEventTypes, GameEventTypes, type SceneCanvasClickEvent, type GameSelectedEvent } from '../../types/InteractionEvents'
 import { SceneLayer } from '../SceneLayers'
-import { GameFinder, type InstancedObject } from '../../debug/GameFinder'
+import { GameFinder } from '../../debug/GameFinder'
 import { Logger } from '../../utils/Logger'
 
 export interface SceneClickGameBoxRaycastOptions {

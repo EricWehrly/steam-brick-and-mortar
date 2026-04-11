@@ -118,7 +118,7 @@ export class GpuStorePropsEventHandler {
             })
             
             // Perform instanced setup
-            await this.renderer.setupProps(config as any)
+            await this.renderer.setupProps(config)
             
             const endTime = performance.now()
             const setupTimeMs = endTime - startTime
@@ -150,7 +150,7 @@ export class GpuStorePropsEventHandler {
     }
     
     // TODO: This wrapping is unnecessary
-    private async handleClearRequest(event: CustomEvent<StorePropsClearRequestEvent>): Promise<void> {
+    private async handleClearRequest(_event: CustomEvent<StorePropsClearRequestEvent>): Promise<void> {
         try {
             if (this.renderer) {
                 this.renderer.clearProps()
@@ -162,7 +162,7 @@ export class GpuStorePropsEventHandler {
         }
     }
     
-    private async handleAtmosphericRequest(event: CustomEvent<StorePropsAtmosphericRequestEvent>): Promise<void> {
+    private async handleAtmosphericRequest(_event: CustomEvent<StorePropsAtmosphericRequestEvent>): Promise<void> {
         try {
             if (this.renderer) {
                 await this.renderer.addAtmosphericProps()

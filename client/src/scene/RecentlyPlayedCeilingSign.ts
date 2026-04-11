@@ -10,7 +10,7 @@
  */
 
 import * as THREE from 'three'
-import { SceneSignManager, SignStyles, type SignMount } from './SceneSignManager'
+import { SceneSignManager, type SignMount } from './SceneSignManager'
 import { RoomConstants } from './RoomManager'
 
 export const RECENTLY_PLAYED_SIGN_LABEL = 'Recently Played'

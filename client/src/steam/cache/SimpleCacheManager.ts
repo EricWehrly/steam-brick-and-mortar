@@ -36,6 +36,7 @@ export interface CacheStats {
  * Generic caching layer that can wrap any method with caching functionality
  */
 export class CacheManager {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private cache: Map<string, CacheEntry<any>> = new Map()
     private readonly config: CacheConfig
     private pendingWrites: boolean = false
@@ -67,7 +68,7 @@ export class CacheManager {
     /**
      * Wrap any async function with caching
      */
-    withCache<TArgs extends any[], TResult>(
+    withCache<TArgs extends unknown[], TResult>(
         fn: (...args: TArgs) => Promise<TResult>,
         getCacheKey: (...args: TArgs) => string
     ): (...args: TArgs) => Promise<TResult> {
@@ -182,7 +183,7 @@ export class CacheManager {
             // Simple estimation using JSON string length
             const jsonString = JSON.stringify(data)
             return jsonString.length * 2 // UTF-16 characters are 2 bytes each
-        } catch (error) {
+        } catch {
             // Fallback for non-serializable data
             return 1024 // 1KB default estimate
         }
