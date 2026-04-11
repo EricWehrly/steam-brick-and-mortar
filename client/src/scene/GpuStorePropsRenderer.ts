@@ -26,7 +26,6 @@ import { GameEventTypes } from '../types/InteractionEvents'
 import {
     StorePropsEventTypes,
     type StorePropsProgressEvent,
-    type SteamGamesBatchEvent,
     type BatchReadyForPlacementEvent,
     type ShelfCreatedEvent,
     type ShelfReadyEvent,
@@ -66,14 +65,14 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private progressiveInitializationPromise: Promise<void> | null = null
     private setupPhaseInitialized = false
-    private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
 
     private readonly instancedShelfRenderer: InstancedShelfRenderer
     private readonly shelfLayoutCoordinator: ShelfLayoutCoordinator
 
     constructor(scene: THREE.Scene) {
         this.scene = scene
-        this.batchCoordinator = new BatchCoordinator<SteamGamesBatchEvent>()
+        // Owns GamesBatchReady -> BatchReadyForPlacement queueing + completion signaling.
+        new BatchCoordinator()
 
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props-instanced'
@@ -116,10 +115,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         const { totalBatches } = event.detail
         this.totalShelves = totalBatches
 
-        if (!this.batchCoordinator.isFirstBatchProcessing()) {
-            return
-        }
-
         if (!this.progressiveInitializationPromise) {
             this.progressiveInitializationPromise = (async () => {
                 const monitor = PerformanceMonitor.start('renderer-initialization', GpuStorePropsRenderer.logger, ASYNC_CONTEXT)
@@ -141,11 +136,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     private handleShelfReady(detail: ShelfReadyEvent): void {
         const shelfId = detail.shelfId
 
-        const progress = this.batchCoordinator.getProgress()
         EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
             step: 'shelves',
             current: shelfId + 1,
-            total: this.totalShelves || progress.total,
+            total: this.totalShelves,
             detail: `Placing shelf ${shelfId + 1}`,
         })
 
@@ -173,7 +167,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private handleAllBatchesComplete(): void {
         GpuStorePropsRenderer.logger.debug(`Progressive loading complete: ${this.cumulativeShelfCount} shelves`)
-        this.batchCoordinator.reset()
         this.progressiveInitializationPromise = null
     }
 
