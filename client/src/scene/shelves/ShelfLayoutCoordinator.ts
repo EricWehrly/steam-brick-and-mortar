@@ -7,8 +7,9 @@ import {
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
+    type StorePropsProgressEvent,
 } from '../../types/InteractionEvents'
-import { computeArcShelfLayout, type ArcLayoutConfig } from '../props/shared/ArcLayoutUtils'
+import { computeArcShelfLayout, type ArcLayoutConfig, type ArcShelfInfo } from '../props/shared/ArcLayoutUtils'
 
 /**
  * ShelfLayoutCoordinator
@@ -37,8 +38,9 @@ export class ShelfLayoutCoordinator {
     /** Current assumption: totalBatches maps 1:1 to shelves. See class doc. */
 
     private layoutComputed = false
-    private shelvesByBatch = new Map<number, { position: THREE.Vector3; rotationY: number }>()
+    private shelvesByBatch = new Map<number, { position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }>()
     private emittedShelfIds = new Set<number>()
+    private totalShelves = 0
 
     constructor() {
         EventManager.getInstance().registerEventHandler(
@@ -52,20 +54,21 @@ export class ShelfLayoutCoordinator {
         this.layoutComputed = false
         this.shelvesByBatch.clear()
         this.emittedShelfIds.clear()
+        this.totalShelves = 0
     }
 
     private handleFirstBatch(detail: BatchReadyForPlacementEvent): void {
         if (!this.layoutComputed) {
             this.layoutComputed = true
+            this.totalShelves = detail.totalBatches
 
-            const totalShelves = detail.totalBatches // 1 batch ≈ 1 shelf (current assumption)
-            if (totalShelves === 0) {
+            if (this.totalShelves === 0) {
                 ShelfLayoutCoordinator.logger.warn('totalBatches is 0 — no shelves to lay out')
                 return
             }
 
-            ShelfLayoutCoordinator.logger.debug(`Computing arc layout for ${totalShelves} shelves`)
-            this.computeLayout(totalShelves)
+            ShelfLayoutCoordinator.logger.debug(`Computing arc layout for ${this.totalShelves} shelves`)
+            this.computeLayout(this.totalShelves)
         }
 
         this.emitShelfForBatch(detail.batchIndex)
@@ -120,9 +123,12 @@ export class ShelfLayoutCoordinator {
 
         this.shelvesByBatch.clear()
         for (let i = 0; i < shelves.length; i++) {
+            const s: ArcShelfInfo = shelves[i]
             this.shelvesByBatch.set(i, {
-                position: shelves[i].position.clone(),
-                rotationY: shelves[i].rotationY,
+                position: s.position.clone(),
+                rotationY: s.rotationY,
+                row: s.row,
+                indexInRow: s.indexInRow,
             })
         }
 
@@ -139,13 +145,32 @@ export class ShelfLayoutCoordinator {
         }
 
         this.emittedShelfIds.add(batchIndex)
-        EventManager.getInstance().emit<ShelfReadyEvent>(
-            StorePropsEventTypes.ShelfReady,
-            {
-                shelfId: batchIndex,
-                position: shelf.position.clone(),
-                rotationY: shelf.rotationY,
-            }
-        )
+
+        // Emit progress synchronously so the progress bar updates immediately.
+        EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
+            step: 'shelves',
+            current: batchIndex + 1,
+            total: this.totalShelves,
+            detail: `Placing shelf ${batchIndex + 1}`,
+        })
+
+        // Defer ShelfReady to the next microtask.
+        // ShelfReady fires inside the BatchReadyForPlacement dispatch;
+        // GameBoxSpawner's BatchReadyForPlacement handler hasn't run yet at that point.
+        // queueMicrotask ensures all BatchReadyForPlacement handlers complete first,
+        // so GameBoxSpawner has stored the pending games before ShelfReady arrives.
+        queueMicrotask(() => {
+            EventManager.getInstance().emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                {
+                    shelfId: batchIndex,
+                    position: shelf.position.clone(),
+                    rotationY: shelf.rotationY,
+                    batchIndex,
+                    rowIndex: shelf.row,
+                    shelfIndex: shelf.indexInRow,
+                }
+            )
+        })
     }
 }

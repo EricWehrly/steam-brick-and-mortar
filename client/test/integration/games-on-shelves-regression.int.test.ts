@@ -41,7 +41,7 @@ import {
     GameEventTypes,
     BatchProcessingStatus,
     type SteamGamesBatchEvent,
-    type ShelfCreatedEvent,
+    type ShelfReadyEvent,
     type GamesPlacedEvent,
     type BatchReadyForPlacementEvent,
 } from '../../src/types/InteractionEvents'
@@ -100,7 +100,7 @@ afterEach(() => {
 
 // ─── Bug A: GameBoxSpawner constructed too late ───────────────────────────────
 
-describe('Bug A — GameBoxSpawner must store pending games before ShelfCreated fires', () => {
+describe('Bug A — GameBoxSpawner must store pending games before ShelfReady fires', () => {
     it('games placed count matches batches even when setup is awaited before batch arrives', async () => {
         const { GpuStorePropsRenderer } = await import('../../src/scene/GpuStorePropsRenderer')
 
@@ -124,19 +124,19 @@ describe('Bug A — GameBoxSpawner must store pending games before ShelfCreated 
     })
 })
 
-// ─── Bug B: ShelfCreated fires before GameBoxSpawner has stored games ─────────
+// ─── Bug B: ShelfReady fires before GameBoxSpawner has stored games ─────────
 
-describe('Bug B — ShelfCreated must not arrive before pending games are stored', () => {
-    it('every ShelfCreated event has a corresponding pending game entry', async () => {
+describe('Bug B — ShelfReady must not arrive before pending games are stored', () => {
+    it('every ShelfReady event has a corresponding pending game entry', async () => {
         const { GpuStorePropsRenderer } = await import('../../src/scene/GpuStorePropsRenderer')
         const renderer = new GpuStorePropsRenderer(scene)
         await renderer.setupProps()
 
-        // Capture order: BatchReadyForPlacement stores games; ShelfCreated consumes them.
-        // If ShelfCreated fires on the same synchronous tick as BatchReadyForPlacement
+        // Capture order: BatchReadyForPlacement stores games; ShelfReady consumes them.
+        // If ShelfReady fires on the same synchronous tick as BatchReadyForPlacement
         // but BEFORE GameBoxSpawner's handler runs, games will be missing.
         const batchStoredByTime: number[] = []
-        const shelfCreatedByTime: number[] = []
+        const shelfReadyByTime: number[] = []
 
         em.registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
@@ -145,9 +145,9 @@ describe('Bug B — ShelfCreated must not arrive before pending games are stored
             }
         )
         em.registerEventHandler(
-            StorePropsEventTypes.ShelfCreated,
-            (e: CustomEvent<ShelfCreatedEvent>) => {
-                shelfCreatedByTime.push(e.detail.batchIndex)
+            StorePropsEventTypes.ShelfReady,
+            (e: CustomEvent<ShelfReadyEvent>) => {
+                shelfReadyByTime.push(e.detail.batchIndex)
             }
         )
 
@@ -155,14 +155,14 @@ describe('Bug B — ShelfCreated must not arrive before pending games are stored
         emitBatch(em, 1, 2, makeGames(5, 1))
 
         await vi.waitFor(() => {
-            expect(shelfCreatedByTime.length).toBe(2)
+            expect(shelfReadyByTime.length).toBe(2)
         }, { timeout: 5000 })
 
-        // For each ShelfCreated, batch must have been stored first
-        for (const shelfBatch of shelfCreatedByTime) {
+        // For each ShelfReady, batch must have been stored first
+        for (const shelfBatch of shelfReadyByTime) {
             expect(batchStoredByTime).toContain(shelfBatch)
             const storedIdx = batchStoredByTime.indexOf(shelfBatch)
-            const createdIdx = shelfCreatedByTime.indexOf(shelfBatch)
+            const createdIdx = shelfReadyByTime.indexOf(shelfBatch)
             // batch stored (idx in batchStoredByTime) must have come no later than shelf created
             expect(storedIdx).toBeLessThanOrEqual(createdIdx)
         }

@@ -238,23 +238,23 @@ export interface BatchReadyForPlacementEvent extends BaseInteractionEvent {
     totalBatches: number
 }
 
-export interface ShelfCreatedEvent extends BaseInteractionEvent {
-    position: Readonly<THREE.Vector3>
-    batchIndex: number
-    rowIndex?: number
-    shelfIndex?: number
-    /** Y rotation of this shelf unit in radians (0 or PI for current aisle layout) */
-    shelfRotationY?: number
-}
-
 /**
- * Authoritative shelf transform readiness emitted by ShelfLayoutCoordinator.
- * This is intentionally minimal and independent from batch orchestration details.
+ * Authoritative shelf placement event emitted by ShelfLayoutCoordinator.
+ * Carries everything both the renderer (InstancedShelfRenderer) and
+ * game/sign placement subscribers (GameBoxSpawner, SceneSignManager) need.
+ *
+ * Replaces the old ShelfCreatedEvent. ShelfPlacementCoordinator is gone.
  */
 export interface ShelfReadyEvent extends BaseInteractionEvent {
     shelfId: number
     position: Readonly<THREE.Vector3>
     rotationY: number
+    /** Same as shelfId — the batch index this shelf maps to. */
+    batchIndex: number
+    /** Arc row index (0 = innermost). */
+    rowIndex: number
+    /** Index of this shelf within its arc row. */
+    shelfIndex: number
 }
 
 export interface GameBoxSpawnedEvent extends BaseInteractionEvent {
@@ -348,7 +348,6 @@ export const StorePropsEventTypes = {
     DisableShelfIndices: 'store-props:disable-shelf-indices',
     // Phase 3: Event-driven batch-to-placement flow
     BatchReadyForPlacement: 'store-props:batch-ready-placement',
-    ShelfCreated: 'store-props:shelf-created',
     ShelfReady: 'store-props:shelf-ready',
     GameBoxSpawned: 'store-props:game-box-spawned',
     GamesPlaced: 'store-props:games-placed',

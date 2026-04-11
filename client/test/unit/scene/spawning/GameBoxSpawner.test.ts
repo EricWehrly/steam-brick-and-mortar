@@ -3,7 +3,7 @@
  * 
  * Tests verify that GameBoxSpawner correctly:
  * 1. Listens for BatchReadyForPlacement events and stores games as pending
- * 2. Listens for ShelfCreated events and places stored games
+ * 2. Listens for ShelfReady events and places stored games
  * 3. Emits GamesPlaced events
  */
 
@@ -16,7 +16,7 @@ import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
 import {
     StorePropsEventTypes,
     type BatchReadyForPlacementEvent,
-    type ShelfCreatedEvent,
+    type ShelfReadyEvent,
     type GamesPlacedEvent,
     type GameBoxSpawnedEvent,
 } from '../../../../src/types/InteractionEvents'
@@ -43,6 +43,10 @@ vi.mock('../../../../src/core/EventManager', async (importOriginal) => {
 // Access mock's test helper
 const resetEventManager = () => (EventManager as unknown as { resetInstance: () => void }).resetInstance()
 
+/** Helper to build a minimal valid ShelfReadyEvent payload */
+function makeShelfReady(batchIndex: number, position = new THREE.Vector3(0, 0, 0), rotationY = 0): ShelfReadyEvent {
+    return { shelfId: batchIndex, batchIndex, position, rotationY, rowIndex: 0, shelfIndex: batchIndex }
+}
 
 describe('GameBoxSpawner Event Coordination', () => {
     let eventManager: EventManager
@@ -115,10 +119,10 @@ describe('GameBoxSpawner Event Coordination', () => {
                 { games, batchIndex: 0, totalBatches: 1 }
             )
 
-            // Games stored as pending — verify by triggering ShelfCreated
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                { position: new THREE.Vector3(0, 0, 0), batchIndex: 0 }
+            // Games stored as pending — verify by triggering ShelfReady
+            eventManager.emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                makeShelfReady(0)
             )
 
             expect(spawnedEvents).toHaveLength(5)
@@ -144,9 +148,9 @@ describe('GameBoxSpawner Event Coordination', () => {
 
             // Trigger shelves — each should place its own batch
             for (let i = 0; i < 3; i++) {
-                eventManager.emit<ShelfCreatedEvent>(
-                    StorePropsEventTypes.ShelfCreated,
-                    { position: new THREE.Vector3(i * 3, 0, 0), batchIndex: i }
+                eventManager.emit<ShelfReadyEvent>(
+                    StorePropsEventTypes.ShelfReady,
+                    makeShelfReady(i, new THREE.Vector3(i * 3, 0, 0))
                 )
             }
 
@@ -167,8 +171,8 @@ describe('GameBoxSpawner Event Coordination', () => {
         })
     })
 
-    describe('ShelfCreated Event Handling', () => {
-        it('should spawn games when shelf is created', () => {
+    describe('ShelfReady Event Handling', () => {
+        it('should spawn games when shelf is ready', () => {
             const games = createMockGames(8, 0)
             const gamesPlacedEvents: GamesPlacedEvent[] = []
 
@@ -185,13 +189,10 @@ describe('GameBoxSpawner Event Coordination', () => {
                 { games, batchIndex: 0, totalBatches: 1 }
             )
 
-            // Create shelf
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0
-                }
+            // Shelf ready
+            eventManager.emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                makeShelfReady(0)
             )
 
             // Should emit one GameBoxSpawned event per spawned game
@@ -211,13 +212,9 @@ describe('GameBoxSpawner Event Coordination', () => {
                 { games, batchIndex: 0, totalBatches: 1 }
             )
 
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0,
-                    shelfRotationY: Math.PI
-                }
+            eventManager.emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                makeShelfReady(0, new THREE.Vector3(0, 0, 0), Math.PI)
             )
 
             expect(spawnedEvents.length).toBeGreaterThan(0)
@@ -235,13 +232,10 @@ describe('GameBoxSpawner Event Coordination', () => {
                 }
             )
 
-            // Create shelf without storing games first
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 5
-                }
+            // Shelf ready without storing games first
+            eventManager.emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                makeShelfReady(5)
             )
 
             // Should warn about missing games (Logger outputs multiple args)
@@ -280,21 +274,9 @@ describe('GameBoxSpawner Event Coordination', () => {
                 { games: batch2, batchIndex: 1, totalBatches: 2 }
             )
 
-            // Create shelves
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0
-                }
-            )
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(2, 0, 0),
-                    batchIndex: 1
-                }
-            )
+            // Shelves ready
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(1, new THREE.Vector3(2, 0, 0)))
 
             // Should spawn all games
             expect(spawnedEvents).toHaveLength(11)
@@ -303,7 +285,7 @@ describe('GameBoxSpawner Event Coordination', () => {
     })
 
     describe('Complete Event Flow', () => {
-        it('should follow correct sequence: BatchReady → ShelfCreated → GamesPlaced', () => {
+        it('should follow correct sequence: BatchReady → ShelfReady → GamesPlaced', () => {
             const games = createMockGames(10, 0)
             const eventSequence: string[] = []
 
@@ -318,18 +300,18 @@ describe('GameBoxSpawner Event Coordination', () => {
                 { games, batchIndex: 0, totalBatches: 1 }
             )
 
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                { position: new THREE.Vector3(0, 0, 0), batchIndex: 0 }
+            eventManager.emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                makeShelfReady(0)
             )
 
             expect(eventSequence).toContain(StorePropsEventTypes.BatchReadyForPlacement)
-            expect(eventSequence).toContain(StorePropsEventTypes.ShelfCreated)
+            expect(eventSequence).toContain(StorePropsEventTypes.ShelfReady)
             expect(eventSequence).toContain(StorePropsEventTypes.GamesPlaced)
 
-            const createdIdx = eventSequence.indexOf(StorePropsEventTypes.ShelfCreated)
+            const readyIdx = eventSequence.indexOf(StorePropsEventTypes.ShelfReady)
             const placedIdx = eventSequence.indexOf(StorePropsEventTypes.GamesPlaced)
-            expect(createdIdx).toBeLessThan(placedIdx)
+            expect(readyIdx).toBeLessThan(placedIdx)
         })
 
         it('should maintain pending games across multiple shelf requests', () => {
@@ -359,28 +341,10 @@ describe('GameBoxSpawner Event Coordination', () => {
                 { games: batch3, batchIndex: 2, totalBatches: 3 }
             )
 
-            // Create shelves in different order
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 1
-                }
-            )
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0
-                }
-            )
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 2
-                }
-            )
+            // Shelves ready in different order
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(1))
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(2))
 
             // All games should be spawned
             expect(spawnedEvents).toHaveLength(15)
@@ -404,26 +368,14 @@ describe('GameBoxSpawner Event Coordination', () => {
                 { games, batchIndex: 0, totalBatches: 1 }
             )
 
-            // Create shelf (spawns games)
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0
-                }
-            )
+            // Shelf ready (spawns games)
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
 
             const firstCallCount = spawnedEvents.length
 
-            // Try to create shelf again (should warn, not spawn)
+            // Try to fire shelf ready again (should warn, not spawn)
             const warnSpy = vi.spyOn(console, 'warn')
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0
-                }
-            )
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
 
             // Should not spawn again
             expect(spawnedEvents).toHaveLength(firstCallCount)
@@ -453,13 +405,7 @@ describe('GameBoxSpawner Event Coordination', () => {
                 { games, batchIndex: 0, totalBatches: 1 }
             )
 
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0
-                }
-            )
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
 
             // Should not emit any GameBoxSpawned events
             expect(spawnedEvents).toHaveLength(0)
@@ -486,15 +432,8 @@ describe('GameBoxSpawner Event Coordination', () => {
                 { games, batchIndex: 0, totalBatches: 1 }
             )
 
-            // Create a shelf - this will spawn as many games as fit on one shelf
-            // (limited by shelf surfaces and GAMES_PER_SURFACE constant)
-            eventManager.emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: new THREE.Vector3(0, 0, 0),
-                    batchIndex: 0
-                }
-            )
+            // Shelf ready — will spawn as many games as fit on one shelf
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
 
             // Should spawn games (actual count depends on shelf layout constants)
             const callCount = spawnedEvents.length

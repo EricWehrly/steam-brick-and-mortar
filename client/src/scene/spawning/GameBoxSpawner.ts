@@ -6,7 +6,7 @@ import {
     BatchProcessingStatus,
     StorePropsEventTypes, 
     type BatchReadyForPlacementEvent,
-    type ShelfCreatedEvent,
+    type ShelfReadyEvent,
     type GamesPlacedEvent,
     type GameBoxSpawnedEvent
 } from '../../types/InteractionEvents'
@@ -18,7 +18,7 @@ import { Logger } from '../../utils/Logger'
  * Responsible for spawning game boxes on shelves using the instanced renderer.
  * Event-driven flow:
  * - Observes BatchReadyForPlacement → stores games as pending
- * - Observes ShelfCreated → places stored games on shelf, emits GamesPlaced
+ * - Observes ShelfReady → places stored games on shelf, emits GamesPlaced
  *
  * Category assignment is NOT this class's responsibility. Signs are placed
  * by ShelfSectionPlanner after all batches complete.
@@ -33,10 +33,10 @@ export class GameBoxSpawner {
             this.handleBatchReadyForPlacement.bind(this)
         )
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ShelfCreated,
-            this.handleShelfCreated.bind(this)
+            StorePropsEventTypes.ShelfReady,
+            this.handleShelfReady.bind(this)
         )
-        GameBoxSpawner.logger.debug('Registered listeners for BatchReadyForPlacement and ShelfCreated events')
+        GameBoxSpawner.logger.debug('Registered listeners for BatchReadyForPlacement and ShelfReady events')
     }
 
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
@@ -49,11 +49,11 @@ export class GameBoxSpawner {
         this.pendingGames.set(batchIndex, games)
     }
 
-    private handleShelfCreated(event: CustomEvent<ShelfCreatedEvent>): void {
-        const { position, batchIndex, rowIndex = 0, shelfIndex = 0, shelfRotationY = 0 } = event.detail
+    private handleShelfReady(event: CustomEvent<ShelfReadyEvent>): void {
+        const { position, batchIndex, rowIndex, shelfIndex, rotationY } = event.detail
 
         GameBoxSpawner.logger.debug(
-            `[EVENT PATH] ShelfCreated received for batch ${batchIndex + 1}. ` +
+            `[EVENT PATH] ShelfReady received for batch ${batchIndex + 1}. ` +
             `Spawning games at (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)})`
         )
 
@@ -67,7 +67,7 @@ export class GameBoxSpawner {
             return
         }
 
-        this.spawnGamesOnShelf(position, games, rowIndex, shelfIndex, shelfRotationY)
+        this.spawnGamesOnShelf(position, games, rowIndex, shelfIndex, rotationY)
         this.pendingGames.delete(batchIndex)
 
         EventManager.getInstance().emit<GamesPlacedEvent>(
