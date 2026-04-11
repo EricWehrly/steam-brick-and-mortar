@@ -50,7 +50,7 @@ export class GameBoxSpawner {
     }
 
     private handleShelfReady(event: CustomEvent<ShelfReadyEvent>): void {
-        const { position, batchIndex, rowIndex, rotationY } = event.detail
+        const { position, batchIndex, rotationY } = event.detail
 
         GameBoxSpawner.logger.debug(
             `[EVENT PATH] ShelfReady received for batch ${batchIndex + 1}. ` +
@@ -67,7 +67,7 @@ export class GameBoxSpawner {
             return
         }
 
-        this.spawnGamesOnShelf(position, games, rowIndex, rotationY)
+        this.spawnGamesOnShelf(position, games, rotationY)
         this.pendingGames.delete(batchIndex)
 
         EventManager.getInstance().emit<GamesPlacedEvent>(
@@ -80,37 +80,22 @@ export class GameBoxSpawner {
     spawnGamesOnShelf(
         shelfPosition: THREE.Vector3,
         games: readonly SteamGameData[],
-        rowIndex: number,
         shelfRotationY: number = 0
     ): void {
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         if (shelfSurfaces.length === 0) return
 
-        // ShelfSide naming note: 'Front' = local -Z face (away from player after arc rotation).
-        // 'Back' = local +Z face (toward origin = toward player spawn).
-        // We always populate the player-facing side (Back) first.
-        // The far side (Front) is suppressed on the back wall ring to avoid clipping.
-        // Note: ShelfSide.Front = far face (-localZ), ShelfSide.Back = near/player-facing face (+localZ).
-        // Names are counterintuitive for arc shelves. A comment clarifies intent; rename deferred.
+        // ShelfSide.Front = far face (-localZ), ShelfSide.Back = near/player-facing face (+localZ).
+        // Names are counterintuitive for arc shelves — rename deferred.
         let gameIndex = 0
         for (const surface of shelfSurfaces) {
             if (gameIndex >= games.length) break
-            // Near side = ShelfSide.Back (+localZ, faces origin/player)
             const nearGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
             if (nearGames.length > 0) {
                 this.createGameBoxes(shelfPosition, surface, nearGames, ShelfSide.Back, shelfRotationY)
                 gameIndex += nearGames.length
             }
             if (gameIndex < games.length) {
-                // Far side = ShelfSide.Front (-localZ, faces away from player)
-                // Suppress on back wall ring (row 4) to avoid clipping and overdensity.
-                // TD: formalize as layout policy from planner (not hardcoded row index).
-                const allowFarSide = rowIndex < 4
-                if (!allowFarSide) {
-                    continue
-                }
-
-                // TD: wall-shelf-back-side - wall-mounted shelves should not fill the far side.
                 const farGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
                 if (farGames.length > 0) {
                     this.createGameBoxes(shelfPosition, surface, farGames, ShelfSide.Front, shelfRotationY)

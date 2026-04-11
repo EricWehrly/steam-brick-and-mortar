@@ -45,7 +45,7 @@ const resetEventManager = () => (EventManager as unknown as { resetInstance: () 
 
 /** Helper to build a minimal valid ShelfReadyEvent payload */
 function makeShelfReady(batchIndex: number, position = new THREE.Vector3(0, 0, 0), rotationY = 0): ShelfReadyEvent {
-    return { batchIndex, position, rotationY, rowIndex: 0 }
+    return { batchIndex, position, rotationY }
 }
 
 describe('GameBoxSpawner Event Coordination', () => {
