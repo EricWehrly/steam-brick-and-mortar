@@ -146,6 +146,7 @@ jspm_packages/
 dist
 
 scripts/scratch.sh
+WORK.md
 
 # reference materials
 reference/
