@@ -194,15 +194,15 @@ export class SceneSignManager {
     }
 
     private handleShelfCreated(detail: ShelfReadyEvent): void {
-        const { position, shelfIndex, rotationY, batchIndex } = detail
+        const { position, rotationY, batchIndex } = detail
         const rotY = rotationY ?? 0
         const shelfPos = position as THREE.Vector3
-        const shelfId = batchIndex ?? shelfIndex ?? 0
+        const shelfId = batchIndex
 
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         const topSurface = shelfSurfaces[0]
         if (topSurface) {
-            this.placeShelfEndCapLabels(shelfIndex ?? 0, shelfPos, rotY, topSurface)
+            this.placeShelfEndCapLabels(batchIndex, shelfPos, rotY, topSurface)
         }
 
         this.shelfTransforms.set(shelfId, { position: shelfPos.clone(), rotationY: rotY })
