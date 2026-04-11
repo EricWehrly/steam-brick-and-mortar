@@ -41,9 +41,9 @@ describe('shelfBucket', () => {
         expect(shelfBucket(1, games)).toBeNull()
     })
 
-    it('returns null when first game is Unplayed', () => {
+    it('returns Unplayed when first game has never been played', () => {
         const games = Array.from({ length: SHELF_BATCH_SIZE }, () => makeGame(NEVER))
-        expect(shelfBucket(0, games)).toBeNull()
+        expect(shelfBucket(0, games)).toBe(RecentlyPlayedBucket.Unplayed)
     })
 
     it('returns a bucket when first game has recent play time', () => {
@@ -143,8 +143,8 @@ describe('recentlyPlayedCeilingAnchor', () => {
 // ─── bucketDisplayLabel ───────────────────────────────────────────────────────
 
 describe('bucketDisplayLabel', () => {
-    it('returns null for Unplayed bucket', () => {
-        expect(bucketDisplayLabel(RecentlyPlayedBucket.Unplayed)).toBeNull()
+    it('returns Never Played for Unplayed bucket', () => {
+        expect(bucketDisplayLabel(RecentlyPlayedBucket.Unplayed)).toBe('Never Played')
     })
 
     it('returns a non-empty string for played buckets', () => {

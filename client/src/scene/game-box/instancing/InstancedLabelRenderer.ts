@@ -20,10 +20,8 @@
 import * as THREE from 'three'
 import { LabelTextureArrayManager } from './LabelTextureArrayManager'
 import { EventManager } from '../../../core/EventManager'
-import {
-    GameEventTypes,
-    type SomeBatchesCompleteEvent,
-} from '../../../types/InteractionEvents'
+import { GameEventTypes } from '../../../types/InteractionEvents'
+import type { SomeBatchesCompleteEvent } from '../../../types/EnvironmentEvents'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { SceneLayer } from '../../SceneLayers'

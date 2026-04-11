@@ -78,8 +78,7 @@ describe('SceneSignManager above-shelf mount math', () => {
 
     events.emit<GamesSortEvent>(GameEventTypes.GamesSort, {
       sortedGames: [game],
-      buckets: new Map(),
-      hasRecentlyPlayedData: true,
+      buckets: new Map([[1, 'Played Today']]),
     })
 
     events.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {

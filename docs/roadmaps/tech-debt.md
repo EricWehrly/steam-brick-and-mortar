@@ -17,6 +17,12 @@ probably
 seems like we were kind of tearing it out but didn't finish
 need to move to newer and preferable patterns
 
+### Architecture: Split `GameSorter` event wiring from sort policy utilities
+**Priority**: Low  
+**Effort**: 1-2 hours  
+**Context**: `GameSorter` currently owns both event subscription/emission and recency sort orchestration. Longer-term shape should keep `GameSorter` as coordinator glue (event in/event out) while all pure policy logic (bucket derivation, sorting strategy composition, map construction) lives in reusable utility modules (`GameSortFunctions` + focused helpers). This keeps scene layout classes calling pure sort utilities directly where appropriate and preserves testability.
+**Source**: Apr 2026 â€” PR #47 review follow-up
+
 ### UI: Formalize z-index layering system
 **Priority**: Very Low  
 **Effort**: 1-2 hours  
@@ -768,7 +774,7 @@ Next step: identify which test file/suite is the memory culprit (run suites indi
 
 ## id: sticker-coordinator
 
-**StickerCoordinator — event-driven sticker architecture**
+**StickerCoordinator ï¿½ event-driven sticker architecture**
 
 **Status**: Planned (next pass on stickers or InstancedShelfRenderer carve)
 
@@ -783,4 +789,4 @@ Next step: identify which test file/suite is the memory culprit (run suites indi
 
 **Mirrors**: The sign coordinator pattern (SceneSignManager reacting to ShelfReady/GamesSort).
 
-**Source**: April 2026 — discussed during InstancedShelfRenderer analysis
+**Source**: April 2026 ï¿½ discussed during InstancedShelfRenderer analysis

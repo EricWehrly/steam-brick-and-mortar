@@ -76,7 +76,8 @@ describe('GameSorter', () => {
         const [eventType, payload] = mockEmit.mock.calls[0]
         expect(eventType).toBe(GameEventTypes.GamesSort)
         expect(payload.sortedGames).toHaveLength(2)
-        expect(payload.hasRecentlyPlayedData).toBe(false)
+        expect((payload.buckets as ReadonlyMap<string, string>).size).toBe(1)
+        expect((payload.buckets as ReadonlyMap<string, string>).get(RecentlyPlayedBucket.Unplayed)).toBe('Never Played')
     })
 
     it('does NOT emit GamesSort when there are no games', () => {
@@ -87,17 +88,17 @@ describe('GameSorter', () => {
         expect(mockEmit).not.toHaveBeenCalled()
     })
 
-    it('sets hasRecentlyPlayedData=true when any game has rtime_last_played > 0', () => {
+    it('builds non-empty bucket map when any game has rtime_last_played > 0', () => {
         const now = Math.floor(Date.now() / 1000)
         mockGames = [makeGame(1, now - 3600), makeGame(2, 0)]
         new GameSorter()
         fireAllBatchesComplete()
 
         const [, payload] = mockEmit.mock.calls[0]
-        expect(payload.hasRecentlyPlayedData).toBe(true)
+        expect((payload.buckets as ReadonlyMap<string, string>).size).toBeGreaterThan(0)
     })
 
-    it('sorts by recently played when hasRecentlyPlayedData is true', () => {
+    it('sorts by recently played when bucket data exists', () => {
         const now = Math.floor(Date.now() / 1000)
         const older = now - 60 * 60 * 24 * 10   // 10 days ago
         const newer = now - 3600                  // 1 hour ago
@@ -123,13 +124,14 @@ describe('GameSorter', () => {
         expect(buckets.get(RecentlyPlayedBucket.Today)).toBe('Played Today')
     })
 
-    it('emits an empty bucket map when hasRecentlyPlayedData is false', () => {
+    it('emits only the Unplayed bucket when no recently-played data exists', () => {
         mockGames = [makeGame(1, 0), makeGame(2, 0)]
         new GameSorter()
         fireAllBatchesComplete()
 
         const [, payload] = mockEmit.mock.calls[0]
-        expect((payload.buckets as ReadonlyMap<string, string>).size).toBe(0)
+        expect((payload.buckets as ReadonlyMap<string, string>).size).toBe(1)
+        expect((payload.buckets as ReadonlyMap<string, string>).get(RecentlyPlayedBucket.Unplayed)).toBe('Never Played')
     })
 })
 

@@ -14,10 +14,8 @@ import * as THREE from 'three'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { EventManager } from '../../../core/EventManager'
-import {
-    GameEventTypes,
-    type SomeBatchesCompleteEvent,
-} from '../../../types/InteractionEvents'
+import { GameEventTypes } from '../../../types/InteractionEvents'
+import type { SomeBatchesCompleteEvent } from '../../../types/EnvironmentEvents'
 import { Logger } from '../../../utils/Logger'
 import { GameArtworkProvider } from './GameArtworkProvider'
 import { LodTextureArrayManager, type LodTierConfig } from './LodTextureArrayManager'

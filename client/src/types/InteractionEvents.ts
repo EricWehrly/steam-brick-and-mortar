@@ -191,30 +191,7 @@ export interface ShelfLayoutDeterminedEvent extends BaseInteractionEvent {
     shelfLayout: { rows: number; shelvesPerRow?: number }
 }
 
-/**
- * Emitted when an already-determined shelf layout is changed at runtime
- * (e.g. layout mode switch, scene reload). Consumers that care about relayout
- * (lighting, instanced renderers, sign placement) listen to this alongside
- * ShelfLayoutDetermined.
- *
- * Payload mirrors ShelfLayoutDetermined so consumers can handle both with the
- * same handler signature.
- *
- * Phase: reserved seam — no emitters exist yet. Wire behavior in the next branch.
- */
-export interface LayoutChangedEvent extends BaseInteractionEvent {
-    shelfBounds: ShelfBounds
-    shelfLayout: { rows: number; shelvesPerRow: number }
-    /** Why the layout changed (for diagnostics / animation decisions). */
-    reason: 'reload' | 'mode-switch' | 'resize'
-}
-
-export interface SomeBatchesCompleteEvent extends BaseInteractionEvent {
-    completedBatches: number
-    totalBatches: number
-}
-
-// Moved to EnvironmentEvents.ts.
+// Moved to EnvironmentEvents.ts: LayoutChangedEvent, SomeBatchesCompleteEvent, AllBatchesCompleteEvent, GamesSortEvent
 
 export interface GameSelectedEvent extends BaseInteractionEvent {
     /** App ID of the selected game */
@@ -259,15 +236,6 @@ export interface BatchReadyForPlacementEvent extends BaseInteractionEvent {
     games: ReadonlyArray<Readonly<SteamGame>>
     batchIndex: number
     totalBatches: number
-    status?: BatchProcessingStatus
-    lastModified?: number
-}
-
-export interface ShelfSpaceRequestedEvent extends BaseInteractionEvent {
-    gamesCount: number
-    batchIndex: number
-    status?: BatchProcessingStatus
-    lastModified?: number
 }
 
 export interface ShelfCreatedEvent extends BaseInteractionEvent {
@@ -277,9 +245,6 @@ export interface ShelfCreatedEvent extends BaseInteractionEvent {
     shelfIndex?: number
     /** Y rotation of this shelf unit in radians (0 or PI for current aisle layout) */
     shelfRotationY?: number
-    bounds: ShelfBounds
-    status?: BatchProcessingStatus
-    lastModified?: number
 }
 
 /**
@@ -383,7 +348,6 @@ export const StorePropsEventTypes = {
     DisableShelfIndices: 'store-props:disable-shelf-indices',
     // Phase 3: Event-driven batch-to-placement flow
     BatchReadyForPlacement: 'store-props:batch-ready-placement',
-    ShelfSpaceRequested: 'store-props:shelf-space-requested',
     ShelfCreated: 'store-props:shelf-created',
     ShelfReady: 'store-props:shelf-ready',
     GameBoxSpawned: 'store-props:game-box-spawned',

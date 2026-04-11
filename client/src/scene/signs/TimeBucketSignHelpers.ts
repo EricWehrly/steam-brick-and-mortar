@@ -19,9 +19,8 @@ export const SHELF_BATCH_SIZE = 18
 
 /**
  * Determine which time bucket corresponds to the first game on a given shelf
- * (identified by batch index). Returns null if:
- * - The shelf index is out of range for the sorted games list
- * - The game maps to "Unplayed" (no recently-played data for this bucket)
+ * (identified by batch index). Returns null if the shelf index is out of range.
+ * Unplayed is a valid return value — it represents the final "Never Played" section.
  */
 export function shelfBucket(
     shelfId: number,
@@ -30,10 +29,7 @@ export function shelfBucket(
     const firstGameIndex = shelfId * SHELF_BATCH_SIZE
     if (firstGameIndex >= sortedGames.length) return null
 
-    const bucket = getRecentlyPlayedBucket(sortedGames[firstGameIndex] as SteamGameData)
-    if (bucket === RecentlyPlayedBucket.Unplayed) return null
-
-    return bucket
+    return getRecentlyPlayedBucket(sortedGames[firstGameIndex] as SteamGameData)
 }
 
 /**
@@ -81,10 +77,10 @@ export function recentlyPlayedCeilingAnchor(): THREE.Vector3 {
 }
 
 /**
- * Return the display label for a bucket, or null if the bucket is Unplayed.
- * Thin wrapper kept here so callers don't need to import CategoryAssigner directly.
+ * Return the display label for a bucket.
+ * Unplayed maps to "Never Played" (final section in a recency sort).
  */
-export function bucketDisplayLabel(bucket: RecentlyPlayedBucket): string | null {
-    if (bucket === RecentlyPlayedBucket.Unplayed) return null
+export function bucketDisplayLabel(bucket: RecentlyPlayedBucket): string {
+    if (bucket === RecentlyPlayedBucket.Unplayed) return 'Never Played'
     return getBucketLabel(bucket)
 }

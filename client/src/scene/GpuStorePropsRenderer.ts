@@ -24,11 +24,9 @@ import { ShelfSide } from './props/SharedPropsUtils'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
 import {
-    BatchProcessingStatus,
     StorePropsEventTypes,
     type StorePropsProgressEvent,
     type SteamGamesBatchEvent,
-    type ShelfLayoutDeterminedEvent,
     type BatchReadyForPlacementEvent,
     type ShelfCreatedEvent,
     type ShelfReadyEvent,
@@ -63,15 +61,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         })
     })
 
-    private shelfBounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
-    private shelfLayout: { rows: number; shelvesPerRow?: number } = { rows: 0 }
     private cumulativeShelfCount = 0
     private totalShelves = 0
 
     private progressiveInitializationPromise: Promise<void> | null = null
     private setupPhaseInitialized = false
     private batchCoordinator: BatchCoordinator<SteamGamesBatchEvent>
-    private readonly gameBoxSpawner: GameBoxSpawner
 
     private readonly instancedShelfRenderer: InstancedShelfRenderer
     private readonly shelfLayoutCoordinator: ShelfLayoutCoordinator
@@ -90,7 +85,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // before any batches can arrive. Previously constructed in setupProps()
         // which could run after batches had already fired, causing all
         // "No pending games" warnings.
-        this.gameBoxSpawner = new GameBoxSpawner()
+        new GameBoxSpawner()
 
         this.setupEventListeners()
     }
@@ -100,15 +95,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.handleInitialBatch.bind(this)
-        )
-
-        // Layout computed: cache bounds/layout for progress reporting and downstream use
-        EventManager.getInstance().registerEventHandler(
-            GameEventTypes.ShelfLayoutDetermined,
-            (event: CustomEvent<ShelfLayoutDeterminedEvent>) => {
-                this.shelfBounds = { ...event.detail.shelfBounds }
-                this.shelfLayout = { ...event.detail.shelfLayout }
-            }
         )
 
         // ShelfReady: GPU write done — emit ShelfCreated for GameBoxSpawner + SceneSignManager
@@ -179,9 +165,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                     rowIndex: 0,   // not used downstream — consumers use batchIndex
                     shelfIndex: shelfId,
                     shelfRotationY: detail.rotationY,
-                    bounds: { ...this.shelfBounds },
-                    status: BatchProcessingStatus.ShelfCreated,
-                    lastModified: Date.now(),
                 }
             )
             GpuStorePropsRenderer.logger.debug(`ShelfCreated for shelf ${shelfId + 1}`)
