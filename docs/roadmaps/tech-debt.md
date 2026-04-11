@@ -135,11 +135,19 @@ Add a reference doc or inline comments explaining when and why to adjust each.
 
 **Source**: Architecture review
 
-#### GpuStorePropsRenderer Event Untangling — Phase 4
-**Effort**: 1-2 hours
-**Context**: Phases 1-3 complete per `gpustoreprops-event-untangling.md`. Phase 4 is cleanup: simplify/remove `processOneBatch`, reduce GpuStorePropsRenderer to ~150 LOC pure coordinator.
+#### Gamesort continuation follow-ups (track soon)
+**Priority**: High  
+**Effort**: 1-2 days total  
+**Context**: Event-driven pipeline carve is mostly complete; these are intentionally deferred cleanup items to close in the next near-term pass.
 
-**See**: `docs/active/gpustoreprops-event-untangling.md` — Phase 4 section
+**Backlog (soon):**
+1. **Keep `ShelfSide` cleanup deferred** — not a current priority; revisit only after current event-pipeline stabilization.
+2. **Decide end-cap sign sidedness** — evaluate `THREE.DoubleSide` vs single-sided for readability/backface behavior.
+3. **Startup UI tracker vertical stacking** — support concurrent operations without overlap.
+4. **Verify ceiling lights with new layout flow** — ensure event-driven shelf layout updates don't regress lighting alignment/coverage.
+5. **Sticker coordinator carve-out** — migrate `ShelfStickerHandler` toward event-driven `StickerCoordinator` ownership model.
+
+**Note**: The old `gpustoreprops-event-untangling.md` plan was retired as stale after the coordinator carve work landed.
 
 ---
 
