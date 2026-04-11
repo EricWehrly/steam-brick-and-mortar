@@ -197,7 +197,7 @@ export class StartupProgressUI {
 
         // Signal for Playwright visual tools.
         if (import.meta.env.DEV) {
-            (window as any).__playwrightSceneReady = true
+            (window as unknown as Window & { __playwrightSceneReady?: boolean }).__playwrightSceneReady = true
         }
     }
 

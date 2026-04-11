@@ -8,6 +8,7 @@ interface IManagedLight {
     addToParent(parent: THREE.Object3D, scene: THREE.Scene, name?: string): this
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function managedLightMixin<T extends new (...args: any[]) => THREE.Light>(Base: T, lightType: string) {
     return class extends Base implements IManagedLight {
         private eventManager = EventManager.getInstance()

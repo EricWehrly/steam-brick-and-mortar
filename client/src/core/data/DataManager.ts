@@ -26,7 +26,7 @@ interface DataEvent extends BaseInteractionEvent {
     domain: DataDomain
 }
 
-interface DataChangeEventDetail<T = any> extends DataEvent {
+interface DataChangeEventDetail<T = unknown> extends DataEvent {
     oldValue?: T
     newValue: T
 }
@@ -90,7 +90,7 @@ export class DataManager {
         // Emit change event using DOM events
         const changeDetail: DataChangeEventDetail<T> = {
             key,
-            oldValue: oldEntry?.value,
+            oldValue: oldEntry?.value as T | undefined,
             newValue: value,
             domain: metadata.domain,
             timestamp: now,
@@ -195,7 +195,7 @@ export class DataManager {
     /**
      * Get all data for a specific domain
      */
-    public getDataByDomain<T = any>(domain: DataDomain): Record<string, T> {
+    public getDataByDomain<T = unknown>(domain: DataDomain): Record<string, T> {
         const keys = this.getKeysByDomain(domain)
         const result: Record<string, T> = {}
         

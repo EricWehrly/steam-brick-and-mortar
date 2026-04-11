@@ -26,7 +26,7 @@ export interface InstancedRendererStats {
     /** Maximum instances configured */
     maxInstances: number
     /** Renderer-specific additional stats */
-    [key: string]: any
+    [key: string]: unknown
 }
 
 export interface InstanceData {
@@ -37,7 +37,7 @@ export interface InstanceData {
     /** Optional scale (defaults to 1,1,1) */
     scale?: THREE.Vector3
     /** Renderer-specific configuration */
-    [key: string]: any
+    [key: string]: unknown
 }
 
 export interface IInstancedRenderer {
@@ -45,7 +45,7 @@ export interface IInstancedRenderer {
      * Initialize the renderer - creates geometry, materials, and instanced meshes
      * @param initData Optional initialization data specific to renderer type
      */
-    initialize(initData?: any): Promise<void> | void
+    initialize(initData?: unknown): Promise<void> | void
     
     /**
      * Set configuration for a specific instance

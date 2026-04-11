@@ -18,8 +18,8 @@ export interface LightFactoryOptions {
 }
 
 type ManagedLight = { 
-    addToParent(parent: THREE.Object3D, scene: THREE.Scene, name?: string): any
-    addToScene(scene: THREE.Scene, name?: string): any
+    addToParent(parent: THREE.Object3D, scene: THREE.Scene, name?: string): void
+    addToScene(scene: THREE.Scene, name?: string): void
     position: THREE.Vector3
 }
 

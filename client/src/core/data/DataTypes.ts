@@ -44,7 +44,7 @@ export interface DataMetadata {
 /**
  * Internal data entry structure
  */
-export interface DataEntry<T = any> {
+export interface DataEntry<T = unknown> {
     value: T
     metadata: DataMetadata
     timestamp: number
@@ -54,7 +54,7 @@ export interface DataEntry<T = any> {
 /**
  * Dynamic data provider for computed values
  */
-export interface DataProvider<T = any> {
+export interface DataProvider<T = unknown> {
     key: string
     domain: DataDomain
     compute: () => T | Promise<T>
@@ -74,7 +74,7 @@ export interface DataManagerConfig {
 /**
  * Event data for data change notifications
  */
-export interface DataChangeEvent<T = any> {
+export interface DataChangeEvent<T = unknown> {
     key: string
     oldValue?: T
     newValue: T

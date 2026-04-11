@@ -5,7 +5,7 @@ vi.mock('three', async (importOriginal) => {
   const actual = await importOriginal<typeof THREE>()
   return {
     ...actual,
-    DataTexture: vi.fn().mockImplementation(function (this: any, data: Uint8Array, width: number, height: number) {
+    DataTexture: vi.fn().mockImplementation(function (this: Record<string, unknown>, data: Uint8Array, width: number, height: number) {
       return {
         _data: data,
         _width: width,
@@ -15,15 +15,15 @@ vi.mock('three', async (importOriginal) => {
       }
     }),
     CanvasTexture: vi.fn().mockImplementation(function () { return { needsUpdate: false, dispose: vi.fn() } }),
-    MeshStandardMaterial: vi.fn().mockImplementation(function (this: any, params: object) {
+    MeshStandardMaterial: vi.fn().mockImplementation(function (this: Record<string, unknown>, params: Record<string, unknown>) {
       return {
         ...params,
-        map: (params as any).map,
+        map: params.map,
         dispose: vi.fn(),
       }
     }),
     PlaneGeometry: vi.fn().mockImplementation(function () { return { dispose: vi.fn() } }),
-    Mesh: vi.fn().mockImplementation(function (this: any, geometry: unknown, material: unknown) {
+    Mesh: vi.fn().mockImplementation(function (this: Record<string, unknown>, geometry: unknown, material: unknown) {
       return {
         geometry,
         material,
@@ -32,7 +32,7 @@ vi.mock('three', async (importOriginal) => {
       }
     }),
     Vector3: actual.Vector3,
-    RGBAFormat: (actual as any).RGBAFormat ?? 1023,
+    RGBAFormat: (actual as { RGBAFormat?: number }).RGBAFormat ?? 1023,
   }
 })
 

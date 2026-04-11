@@ -21,7 +21,7 @@ export class RateLimiter {
     /**
      * Wrap a method with rate limiting
      */
-    limited<TArgs extends any[], TReturn>(
+    limited<TArgs extends unknown[], TReturn>(
         method: (...args: TArgs) => Promise<TReturn>
     ) {
         return async (...args: TArgs): Promise<TReturn> => {

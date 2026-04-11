@@ -127,7 +127,7 @@ class PerformanceMonitorInstance {
         this.options = {
             consoleThreshold: options.consoleThreshold ?? DEFAULT_CONSOLE_THRESHOLD,
             blockingThreshold: options.blockingThreshold ?? DEFAULT_BLOCKING_THRESHOLD,
-            context: options.context ?? undefined as any,
+            context: options.context ?? undefined,
             metadata: options.metadata ?? {},
             level: options.level ?? 'debug'
         }
@@ -499,5 +499,5 @@ export class PerformanceMonitor {
 
 // Expose to window for console access
 if (typeof window !== 'undefined') {
-    (window as any).UnifiedPerformanceMonitor = PerformanceMonitor
+    (window as unknown as Window & Record<string, unknown>).UnifiedPerformanceMonitor = PerformanceMonitor
 }
