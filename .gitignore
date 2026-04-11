@@ -145,8 +145,5 @@ jspm_packages/
 .nuxt
 dist
 
-scripts/scratch.sh
-WORK.md
-
 # reference materials
 reference/
