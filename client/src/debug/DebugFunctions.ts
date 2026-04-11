@@ -5,9 +5,15 @@
  * Uses dependency injection to access renderers without tight coupling
  */
 
+export interface InstancedRendererHandle {
+    debugExportTextureArray(): void
+    debugLogTextureArrayState(): void
+    updateGPU(): void
+}
+
 export interface DebugRenderer {
-    getInstancedLabelRenderer(): any | undefined
-    getInstancedArtworkRenderer(): any | undefined
+    getInstancedLabelRenderer(): InstancedRendererHandle | undefined
+    getInstancedArtworkRenderer(): InstancedRendererHandle | undefined
     getLabelInstanceIndex(): number
     getArtworkInstanceIndex(): number
 }
@@ -85,7 +91,7 @@ export class DebugFunctions {
      */
     private exposeGlobalFunctions(): void {
         if (typeof window !== 'undefined') {
-            (window as any).steamDebug = {
+            (window as unknown as Window & Record<string, unknown>).steamDebug = {
                 exportTextureArray: () => this.exportTextureArray(),
                 logRendererState: () => this.logRendererState(),
                 forceGPUUpdate: () => this.forceGPUUpdate(),
@@ -105,7 +111,7 @@ export class DebugFunctions {
      */
     public dispose(): void {
         if (typeof window !== 'undefined') {
-            delete (window as any).steamDebug
+            delete (window as unknown as Window & Record<string, unknown>).steamDebug
             console.log('🧹 Global debug functions removed')
         }
     }

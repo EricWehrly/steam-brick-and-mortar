@@ -173,7 +173,7 @@ export class SharedMaterialManager {
         }
         ProceduralTextureWorker.getInstance()?.dispose?.()
         this.disposed = true
-        SharedMaterialManager.instance = null as any
+        SharedMaterialManager.instance = null as unknown as SharedMaterialManager
         console.log('🗑️ SharedMaterialManager disposed')
     }
 

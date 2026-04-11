@@ -142,7 +142,7 @@ export class InstancedMeshManager {
         // Set attribute values
         if (Array.isArray(value)) {
             for (let i = 0; i < value.length && i < attribute.itemSize; i++) {
-                (attribute as any).setComponent(index, i, value[i])
+                (attribute as THREE.InstancedBufferAttribute).setComponent(index, i, value[i])
             }
         } else {
             attribute.setX(index, value)
@@ -203,7 +203,7 @@ export class InstancedMeshManager {
             return
         }
         
-        const scene = DataManager.getInstance().get<any>('core.mainScene')
+        const scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
         if (!scene) {
             InstancedMeshManager.logger.warn(`⚠️ Cannot add to scene: main scene not available in DataManager`)
             return
@@ -218,7 +218,7 @@ export class InstancedMeshManager {
             return
         }
         
-        const scene = DataManager.getInstance().get<any>('core.mainScene')
+        const scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
         if (scene) {
             scene.remove(this.instancedMesh)
             InstancedMeshManager.logger.debug(`➖ ${this.debugName} removed from main scene`)
