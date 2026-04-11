@@ -21,19 +21,6 @@ Active bugs and issues that need investigation or fixing.
 
 ## Low Priority
 
-### Shelf End-Cap Signs Layout Issue
-**Status**: 🔴 Open  
-**Reported**: 2026-04-10  
-**Description**: Time-bucket signs generated on the ends of shelves have Z-positioning and padding/rotation issues when overlapping with adjacent shelf geometry.  
-**Steps to Reproduce**:
-1. Render a large game library spanning multiple connected shelves.
-2. Observe the end-cap signs on the outer edges of the shelf arc.
-
-**Expected**: Signs should be flush with the shelf end caps without clipping into the wood or floating too far off.  
-**Actual**: Padding and rotation are slightly off, causing minor visual overlap or gap issues.  
-**Impact**: Minor visual defect on the outer edges of the store layout.  
-**Next Steps**: Address sign rotation and Z-offset logic in `SceneSignManager` and/or `SignageRenderer` without breaking the core layout math.
-
 ### Unexpected cache clearing
 **Status**: 🔴 Open  
 **Reported**: 2026-01-16  
