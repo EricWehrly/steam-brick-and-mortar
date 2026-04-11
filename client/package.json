@@ -21,7 +21,8 @@
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "type-check": "tsc --noEmit",
-    "test:visual": "playwright test --config playwright.config.ts",
+    "validate": "yarn type-check && yarn lint",
+    "test:visual": "playwright test --config playwright.config.ts", 
     "test:visual:docker": "docker compose -f ../docker-compose.yml run --rm playwright"
   },
   "devDependencies": {
