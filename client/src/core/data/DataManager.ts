@@ -122,6 +122,20 @@ export class DataManager {
     }
 
     /**
+     * Retrieve data and throw if missing.
+     *
+     * Useful for required bootstrapped dependencies (scene, camera, managers)
+     * where `undefined` would indicate a startup contract violation.
+     */
+    public getOrThrow<T>(key: string, message?: string): T {
+        const value = this.get<T>(key)
+        if (value === undefined) {
+            throw new Error(message ?? `Required DataManager key missing: ${key}`)
+        }
+        return value
+    }
+
+    /**
      * Retrieve data with fallback value
      */
     public getOrDefault<T>(key: string, defaultValue: T): T {
