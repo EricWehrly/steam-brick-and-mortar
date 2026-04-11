@@ -106,8 +106,9 @@ export class BatchCoordinator<T> {
     }
 
     public enqueueBatch(batch: BatchItem<T>): void {
+        this.prepareForNewRun(batch)
         BatchCoordinator.logger.debug(`Enqueuing batch ${batch.batchIndex + 1}/${batch.totalBatches}`)
-        
+
         this.queue.push(batch)
         this.received++
         this.expectedTotal = batch.totalBatches
@@ -147,7 +148,25 @@ export class BatchCoordinator<T> {
 
     public reset(): void {
         BatchCoordinator.logger.debug('Resetting batch coordinator')
-        
+        this.clearRunState()
+    }
+
+    private prepareForNewRun(batch: BatchItem<T>): void {
+        if (!this.completionEmitted) {
+            return
+        }
+
+        const startsAtFirstBatch = batch.batchIndex === 0
+        const totalChanged = this.expectedTotal > 0 && batch.totalBatches !== this.expectedTotal
+        if (!startsAtFirstBatch && !totalChanged) {
+            return
+        }
+
+        BatchCoordinator.logger.debug('Detected new batch run boundary — clearing previous run state')
+        this.clearRunState()
+    }
+
+    private clearRunState(): void {
         this.queue = []
         this.received = 0
         this.expectedTotal = 0

@@ -1,44 +1,178 @@
-# Steam Tag Styling Research
+# Steam Tag Research
 
-## Summary
-Steam's game tags (genres and categories) are styled as interactive "pills" that provide visual metadata about a game. They are primarily found in the "Glance" section (sidebar) and the "All Tags" modal. The styling is consistent with Steam's dark, industrial aesthetic, using semi-transparent backgrounds and subtle hover effects.
+**Last updated:** April 2026  
+**Purpose:** Determine how to retrieve community ("popular user-defined") tags for games in a user's Steam library, for use in shelf categorization within Steam Brick and Mortar.
 
-## CSS Properties Observed
+---
 
-The primary container for tags in the sidebar is typically `.glance_tags` or `.app_tags`. Individual tags use the `.app_tag` class.
+## 1. The Question
 
-| Property | Value (Approximate) | Notes |
-| :--- | :--- | :--- |
-| **Element Type** | `<a>` (link) | Tags are functional links to tag-specific browse pages. |
-| **Background Color** | `rgba(103, 193, 245, 0.1)` | A very faint, semi-transparent blue/grey. |
-| **Text Color** | `#67c1f5` | The classic Steam "blue" link color. |
-| **Font Size** | `11px` to `12px` | Very compact. |
-| **Font Weight** | `normal` | Sometimes set to `400`. |
-| **Border Radius** | `2px` | Very slight rounding, almost square. |
-| **Padding** | `0 7px` | Horizontal padding; line-height usually handles vertical. |
-| **Height / Line-Height** | `19px` to `22px` | Fixed height look. |
-| **Margin** | `0 4px 4px 0` | Spacing between pills. |
-| **Display** | `inline-block` | Allows them to wrap naturally. |
-| **Text Transform** | `none` | Tags are usually title-case or as defined in DB. |
-| **Background (Hover)** | `rgba(103, 193, 245, 0.2)` | Becomes slightly more opaque/bright. |
-| **Text Color (Hover)** | `#ffffff` | Often transitions to white on hover. |
+The Steam Store shows "Popular user-defined tags for this product" on each game page (e.g., Dyson Sphere Program shows: `Automation`, `Base Building`, `Space`, `Open World`). We want to retrieve these tags via API to drive shelf organization.
 
-## Notable Variants
+---
 
-- **Genre vs. Feature Tags:** Visually, Steam does *not* significantly differentiate between a "Genre" tag (e.g., RPG) and a "Feature" tag (e.g., Single-player) in the main UI list. They are all rendered as `.app_tag`.
-- **"Add your own" (+ icon):** Usually styled with the same background but a dotted border or different icon opacity.
-- **Top Tags:** The first few tags in the list are treated as "High Information" tags but do not have unique CSS styles; they are simply ordered first.
+## 2. Does the Steam Store API Return Community Tags?
 
-## Recommendation for `UITag` Component
+**Short answer: No.**
 
-For the **Steam Brick and Mortar** project, we should replicate the "functional metadata" feel while adapting it for a 3D/VR space where 11px text might be unreadable.
+The Steam Store `appdetails` endpoint (`https://store.steampowered.com/api/appdetails?appids={appid}`) does **not** return community/user-defined tags.
 
-1.  **Replicate:**
-    *   **Semi-transparency:** Use a low-alpha background (e.g., `0.1` or `0.15`) to let the shelf/environment colors bleed through slightly, maintaining the "Steam" look.
-    *   **Subtle Rounding:** Stick to a small border-radius (`2px` - `4px`) rather than "pill" shapes (large radius) to keep the industrial aesthetic.
-    *   **Color Palette:** Use the `#67c1f5` blue for the primary text/border color.
+**Confirmed empirically** (April 2026, appid 1366540 — Dyson Sphere Program):
 
-2.  **Simplify/Modify:**
-    *   **Interaction:** In VR, we may want to skip the "link" behavior (opening a browser) and instead use them for filtering the current shelf view.
-    *   **Readability:** Increase font size for VR (minimum equivalent of 14-16px) and perhaps use a slightly bolder font weight (`500`) to ensure legibility against complex backgrounds.
-    *   **Hover State:** Since "hover" in VR (pointing) is a key feedback loop, the background should glow or increase in opacity significantly more than the 10% jump on the website.
+```
+Response keys: type, name, steam_appid, required_age, is_free, dlc,
+detailed_description, about_the_game, short_description,
+supported_languages, header_image, capsule_image, capsule_imagev5,
+website, pc_requirements, mac_requirements, linux_requirements,
+developers, publishers, price_overview, packages, package_groups,
+platforms, categories, genres, screenshots, movies, recommendations,
+achievements, release_date, support_info, background, background_raw,
+content_descriptors, ratings
+```
+
+No `tags` field. The endpoint does return:
+- `genres[]` — official Steam genres (e.g., `{id: "28", description: "Simulation"}`)
+- `categories[]` — feature flags (e.g., Single-player, Steam Achievements, Controller Support)
+
+These are developer-assigned at submission time and are more stable but less descriptive than community tags.
+
+**Note on previous research:** The `steam-categorization-research.md` doc (Aug 2025) listed "Steam Community Tags" under "Steam Store API (GetAppDetails endpoint)" — this was aspirational/incorrect. The field is not present in actual API responses.
+
+---
+
+## 3. SteamSpy API
+
+**SteamSpy** (steamspy.com) is a third-party stats service that scrapes and aggregates Steam data. Its public API **does** return community tags with vote counts.
+
+### Endpoint
+
+```
+GET https://steamspy.com/api.php?request=appdetails&appid={appid}
+```
+
+### Tag data returned
+
+Tags are returned as a JSON object with tag name → vote count:
+
+```json
+{
+  "name": "Dyson Sphere Program",
+  "tags": {
+    "Automation": 494,
+    "Space": 487,
+    "Base-Building": 479,
+    "Building": 379,
+    "Open World": 363,
+    "Resource Management": 355,
+    "Simulation": 337,
+    "Sci-fi": 316,
+    "Management": 303,
+    "Sandbox": 298,
+    "City Builder": 232,
+    "Strategy": 220,
+    "Singleplayer": 192,
+    "Space Sim": 179,
+    "3D": 159,
+    "Third Person": 143,
+    "Early Access": 106,
+    "Indie": 89,
+    "RTS": 46,
+    "Casual": 35
+  }
+}
+```
+
+This matches the "Popular user-defined tags" shown on the Steam store page.
+
+### Additional fields returned by `appdetails`
+
+- `appid`, `name`, `developer`, `publisher`
+- `owners` (range estimate), `score_rank`
+- `average_forever`, `average_2weeks`, `median_forever`, `median_2weeks` — playtime in minutes
+- `ccu` — peak CCU yesterday
+- `price`, `initialprice`, `discount`
+- `languages`, `genre`
+
+### Other useful endpoints
+
+| Endpoint | Description |
+|---|---|
+| `?request=tag&tag=Automation` | All games with a given tag |
+| `?request=genre&genre=Simulation` | All games in a genre |
+| `?request=top100in2weeks` | Top 100 by active players |
+| `?request=all&page=0` | All games, paginated (1000/page) |
+
+### Rate limits
+
+- **Standard requests** (appdetails, tag, genre, top100*): **1 request per second**
+- **`all` request**: **1 request per 60 seconds**
+- Data is refreshed once per day — no value in polling more than daily
+
+### Usage / ToS Policy
+
+SteamSpy has **no formal published Terms of Service** for its API. The about page describes it as a free service "designed to be helpful for indie developers, journalists, students and all parties interested in PC gaming." The API page itself lists no restrictions beyond the rate limits above.
+
+**Assessment:** The API is free, undocumented ToS-wise, and has been publicly accessible for years. It is widely used in the developer community. There is no authentication requirement and no API key. The main risk is that it's an unofficial third-party service — it could go down or change without notice.
+
+**Usage recommendation for this project:** SteamSpy is appropriate for personal-use tools and development projects. For a VR library browser running locally against a user's own library, this is a reasonable choice. Cache aggressively (data is stale within 24h anyway).
+
+---
+
+## 4. SteamDB and SteamPeek
+
+### SteamDB (steamdb.info)
+
+SteamDB scrapes and displays detailed Steam data including tags, but **does not offer a public API**. The site explicitly blocks scraping. Not viable.
+
+### SteamPeek (steampeak.com)
+
+SteamPeek is a discovery/recommendation tool. It does not expose a documented public API for per-game tag data. Not viable for programmatic access.
+
+---
+
+## 5. Recommended Approach
+
+For retrieving community tags per game:
+
+**Use SteamSpy `appdetails`.**
+
+```
+https://steamspy.com/api.php?request=appdetails&appid={appid}
+```
+
+Implementation notes:
+- Respect the 1 req/sec rate limit — serialize requests, don't batch/burst
+- Cache results with a 24-hour TTL (data only updates daily)
+- Tags come pre-sorted by vote count (highest = most agreed-upon)
+- Use the top 3–5 tags per game for shelf categorization; the list typically has ~20 entries
+- For a user's library of 50–200 games, this is ~50–200 requests spread over time — manageable
+
+For developer-assigned genre/feature data, the Steam Store API (`appdetails`) remains viable for `genres[]` and `categories[]` fields. These can complement community tags.
+
+---
+
+## 6. CSS Styling Reference (Steam Tag Pills)
+
+When rendering tags in the VR UI, the Steam web styling provides a useful baseline:
+
+### Steam's `.app_tag` styles
+
+| Property | Value | Notes |
+|---|---|---|
+| Element | `<a>` | Tags link to browse pages on Steam |
+| Background | `rgba(103, 193, 245, 0.1)` | Faint semi-transparent blue/grey |
+| Text color | `#67c1f5` | Steam blue |
+| Font size | `11–12px` | Compact |
+| Border radius | `2px` | Near-square, industrial feel |
+| Padding | `0 7px` | Horizontal only |
+| Line height | `19–22px` | Fixed height |
+| Hover background | `rgba(103, 193, 245, 0.2)` | Slightly more opaque |
+| Hover text | `#ffffff` | White |
+
+### VR adaptations
+
+- **Scale up:** 11px is illegible in VR — target 14–16px equivalent minimum
+- **Hover:** In VR (pointer/gaze), make the state change more pronounced (higher opacity jump, possible glow)
+- **Interaction:** Instead of linking to Steam browse, use tags for in-app shelf filtering
+- **Boldness:** Consider `font-weight: 500` for readability against complex 3D backgrounds
+- **Semi-transparency:** Retain the low-alpha background to let the shelf environment show through — maintains the Steam aesthetic

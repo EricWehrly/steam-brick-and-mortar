@@ -196,6 +196,35 @@ The deeper coupling — games assigned to shelves by batch index — is a separa
 
 **Branch status: merge-ready.**
 
+## Continuation Plan (2026-04-10, `openclaw/feat-gamesort-continuation`)
+
+Goal for this follow-up branch: finish pulling batch-lifecycle concerns out of `GpuStorePropsRenderer` so it is render lifecycle + bridge logic only.
+
+### Desired ownership after continuation
+
+- **BatchCoordinator owns**
+  - `GamesBatchReady` queueing/serialization
+  - `BatchReadyForPlacement` emission
+  - `SomeBatchesComplete`/`AllBatchesComplete` emission
+  - run-boundary reset behavior between consecutive loads
+
+- **GpuStorePropsRenderer owns**
+  - `GpuGameBoxRenderer` allocation/sizing on first `BatchReadyForPlacement`
+  - bridge from `ShelfReady` -> `ShelfCreated` (microtask deferred)
+  - shelf progress event emission (UI-facing)
+  - no batch queue state, no completion orchestration
+
+### Continuation implementation notes
+
+- Batch run reset now lives in `BatchCoordinator` (auto-clears state when a new run boundary is detected after completion).
+- `GpuStorePropsRenderer` no longer references coordinator progress or reset APIs.
+- First-batch allocation gating in `GpuStorePropsRenderer` now relies on local promise state (`progressiveInitializationPromise`) instead of coordinator internals.
+
+### Next carve after this branch
+
+- Optional: move `ShelfReady -> ShelfCreated` bridge into a dedicated `ShelfPlacementCoordinator` so `GpuStorePropsRenderer` can focus strictly on renderer lifecycles.
+- Optional: make `StorePropsEventTypes.Progress` emissions coordinator-owned if startup UI should be fully pipeline-driven.
+
 ### Implemented in this branch
 
 - `GameSorter` emits `GameEventTypes.GamesSort` after `AllBatchesComplete`.
