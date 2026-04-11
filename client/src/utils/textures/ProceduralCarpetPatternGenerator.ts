@@ -501,12 +501,15 @@ export class ProceduralCarpetPatternGenerator {
           const patternX = (x % patternScale) / patternScale
           const patternY = (y % patternScale) / patternScale
           
-          const patternHeight = style.variant === 'diamond'
+          if (style.variant === 'diamond') {
             // Diamond pattern creates subtle height variations
-            ? Math.abs(patternX - 0.5) + Math.abs(patternY - 0.5) - 0.5
-            // Rectangle pattern
-            : (patternX < 0.3 || patternX > 0.7) && (patternY < 0.3 || patternY > 0.7) ? 0.2 : -0.1
-          height += patternHeight * intensity * 0.2
+            height += (Math.abs(patternX - 0.5) + Math.abs(patternY - 0.5) - 0.5) * intensity * 0.2
+          } else {
+            const rectanglePatternHeight = (patternX < 0.3 || patternX > 0.7) && (patternY < 0.3 || patternY > 0.7)
+              ? 0.2
+              : -0.1
+            height += rectanglePatternHeight * intensity * 0.2
+          }
         }
         
         // Clamp and convert to 0-255
