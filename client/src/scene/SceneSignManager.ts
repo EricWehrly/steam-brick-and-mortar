@@ -177,7 +177,7 @@ export class SceneSignManager {
     // - "Category System Tech Debt / SceneSignManager: scene access pattern / SceneManager"
     // - "Category System Tech Debt / SignageRenderer: singleton vs instance"
     constructor() {
-        this.scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
+        this.scene = DataManager.getInstance().getOrThrow<THREE.Scene>(DataKey.MainScene)
         this.renderer = new SignageRenderer()
 
         // Self-subscribe to shelf creation events to place end-cap labels automatically.

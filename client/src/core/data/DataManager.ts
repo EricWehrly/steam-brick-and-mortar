@@ -127,10 +127,10 @@ export class DataManager {
      * Useful for required bootstrapped dependencies (scene, camera, managers)
      * where `undefined` would indicate a startup contract violation.
      */
-    public getOrThrow<T>(key: string, message?: string): T {
+    public getOrThrow<T>(key: string): T {
         const value = this.get<T>(key)
         if (value === undefined) {
-            throw new Error(message ?? `Required DataManager key missing: ${key}`)
+            throw new Error(`Required DataManager key missing: ${key}`)
         }
         return value
     }
