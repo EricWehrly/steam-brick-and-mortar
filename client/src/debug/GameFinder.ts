@@ -60,11 +60,10 @@ export class GameFinder {
     readonly scene: THREE.Scene
 
     private constructor() {
-        const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
-        if (!scene) {
-            throw new Error('GameFinder requires scene to be registered in DataManager')
-        }
-        this.scene = scene
+        this.scene = DataManager.getInstance().getOrThrow<THREE.Scene>(
+            DataKey.MainScene,
+            'GameFinder requires scene to be registered in DataManager'
+        )
     }
 
     /**

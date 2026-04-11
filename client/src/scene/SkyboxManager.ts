@@ -21,11 +21,10 @@ export class SkyboxManager {
     private textureLoader: THREE.TextureLoader
 
     constructor() {
-        const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
-        if (!scene) {
-            throw new Error('SkyboxManager requires scene to be registered in DataManager')
-        }
-        this.scene = scene
+        this.scene = DataManager.getInstance().getOrThrow<THREE.Scene>(
+            DataKey.MainScene,
+            'SkyboxManager requires scene to be registered in DataManager'
+        )
         this.textureLoader = new THREE.TextureLoader()
     }
 
