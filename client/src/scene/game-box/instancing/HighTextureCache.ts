@@ -699,7 +699,7 @@ export class HighTextureCache {
      */
     public markForEviction(gameIndex: number): void {
         const entry = this.games.get(gameIndex)
-        if (!entry || entry.state !== HighTextureState.LOADED) {
+        if (entry?.state !== HighTextureState.LOADED) {
             return
         }
         

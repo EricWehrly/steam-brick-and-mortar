@@ -110,11 +110,11 @@ export abstract class ManagedWorker<TIn extends WorkerMessage, TOut extends Work
     }
 
     /** Called for every inbound message. Override to observe or handle push-style messages. */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     protected handleMessage(_data: TOut): void { /* no-op */ }
 
     /** Called after all pending promises are rejected on a worker crash. Override for cleanup. */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     protected onWorkerCrash(_err: Error): void { /* no-op */ }
 
     public dispose(): void {

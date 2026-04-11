@@ -40,7 +40,7 @@ const LIGHT_NAMES = {
 } as const
 
 // Room dimensions - will be updated dynamically via room events
-let CURRENT_ROOM_DIMENSIONS = {
+const CURRENT_ROOM_DIMENSIONS = {
     WIDTH: 22,
     DEPTH: 16
 }

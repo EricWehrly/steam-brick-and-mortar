@@ -25,6 +25,8 @@ export default [
         clearTimeout: 'readonly',
         setInterval: 'readonly',
         clearInterval: 'readonly',
+        queueMicrotask: 'readonly',
+        CustomEvent: 'readonly',
         requestAnimationFrame: 'readonly',
         cancelAnimationFrame: 'readonly',
         localStorage: 'readonly',
@@ -71,7 +73,9 @@ export default [
       // TypeScript-specific issue catching
       '@typescript-eslint/no-explicit-any': 'warn', // Allow any but warn about it
       '@typescript-eslint/no-non-null-assertion': 'warn',
-      '@typescript-eslint/prefer-nullish-coalescing': 'warn',
+      // prefer-nullish-coalescing requires strictNullChecks; off until tsconfig strict is enabled.
+      // TD: re-enable once strictNullChecks is on
+      '@typescript-eslint/prefer-nullish-coalescing': 'off',
       '@typescript-eslint/prefer-optional-chain': 'warn',
       
       // Code quality without being overly strict

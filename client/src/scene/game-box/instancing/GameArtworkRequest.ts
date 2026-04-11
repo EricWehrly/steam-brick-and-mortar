@@ -57,8 +57,7 @@ export class GameArtworkRequest implements GameArtwork {
     
     async getPixelsAtSize(width: number, height: number): Promise<PixelDataResult> {
         // If we already loaded and it's the same size, return cached
-        if (this.cachedPixels && 
-            this.cachedPixels.width === width && 
+        if (this.cachedPixels?.width === width && 
             this.cachedPixels.height === height) {
             return this.cachedPixels
         }

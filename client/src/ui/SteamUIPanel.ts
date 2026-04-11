@@ -224,7 +224,7 @@ export class SteamUIPanel {
   
   updateCacheStats(stats: { totalEntries: number; cacheHits: number; cacheMisses: number }): void {
     // Update cache info if it's currently visible
-    if (this.cacheInfoDiv && this.cacheInfoDiv.style.display === 'block') {
+    if (this.cacheInfoDiv?.style.display === 'block') {
       this.showCacheStatsInfo(stats)
     }
     
