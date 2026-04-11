@@ -17,6 +17,13 @@ probably
 seems like we were kind of tearing it out but didn't finish
 need to move to newer and preferable patterns
 
+### Input Architecture: Review `WebXRCoordinator` scope/naming vs actual responsibilities
+**Priority**: High  
+**Effort**: 2-4 hours (audit + proposal)
+**Context**: `WebXRCoordinator` appears to own a wider input/control surface than XR session concerns alone. We should review whether responsibilities belong in a broader input coordinator (or `InputManager`) and keep XR-specific responsibilities explicitly scoped.
+**Why now**: upcoming input-layer cleanup and Phase 2 planning; avoid cementing misleading ownership boundaries.
+**Source**: Apr 2026 review follow-up
+
 ### Architecture: Split `GameSorter` event wiring from sort policy utilities
 **Priority**: Low  
 **Effort**: 1-2 hours  

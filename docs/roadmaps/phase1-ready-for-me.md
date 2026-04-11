@@ -766,4 +766,4 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 
 
 ## Transitional Glue Work (No New Phase Label)
-See docs/roadmaps/glue-work-before-phase2.md for short-run cleanup + scheduling work that happens after Phase 1 completion and before full Phase 2 execution.
+See docs/roadmaps/intermission-before-phase2.md for short-run cleanup + scheduling work that happens after Phase 1 completion and before full Phase 2 execution.

@@ -17,6 +17,7 @@ export class GeometricPatternGenerator extends BasePatternGenerator {
 
   generatePattern(context: PatternContext, options: PatternOptions): void {
     const geometricOptions = options as GeometricPatternOptions
+    // TODO(intermission): if we revive shape customization, thread shapeTypes/shapeCount through generators again.
     const {
       variant = 'standard',
       sharpness = 0.7

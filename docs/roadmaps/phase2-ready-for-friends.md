@@ -2,7 +2,7 @@
 
 ## Phase Overview
 
-**Pre-Phase-2 Glue Track:** see docs/roadmaps/glue-work-before-phase2.md for transition tasks (lint baseline, tech debt scheduling, branch polish).
+**Pre-Phase-2 Intermission Track:** see docs/roadmaps/intermission-before-phase2.md for transition tasks (lint baseline, tech debt scheduling, branch polish).
 
 **Goal**: Works for people standing next to you during conversation
 
