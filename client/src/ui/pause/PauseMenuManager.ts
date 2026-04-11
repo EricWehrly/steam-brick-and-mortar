@@ -108,7 +108,7 @@ export class PauseMenuManager {
         )
     }
 
-    private onSteamDataLoaded(event: CustomEvent<SteamDataLoadedEvent>): void {
+    private onSteamDataLoaded(_event: CustomEvent<SteamDataLoadedEvent>): void {
         // Refresh cache management panel if it exists and is visible
         if (this.cacheManagementPanel) {
             this.cacheManagementPanel.refreshTemplate()

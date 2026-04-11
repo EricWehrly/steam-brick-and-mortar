@@ -450,7 +450,7 @@ export class SteamIntegration {
         }
     }
 
-    private async handleRefreshCache(event: CustomEvent<SteamCacheRefreshEvent>): Promise<void> {
+    private async handleRefreshCache(_event: CustomEvent<SteamCacheRefreshEvent>): Promise<void> {
         try {
             const result = await this.refreshData()
             if (!result) {
@@ -468,7 +468,7 @@ export class SteamIntegration {
         }
     }
 
-    private async handleClearCache(event: CustomEvent<SteamCacheClearEvent>): Promise<void> {
+    private async handleClearCache(_event: CustomEvent<SteamCacheClearEvent>): Promise<void> {
         try {
             await this.clearCache()
             SteamIntegration.logger.info('Cache cleared')

@@ -19,7 +19,6 @@ import type { BaseInteractionEvent } from '../core/EventManager'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { SteamGame } from '../steam'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
-import type { AllBatchesCompleteEvent, GamesSortEvent } from './EnvironmentEvents'
 
 // =============================================================================
 // STEAM EVENTS

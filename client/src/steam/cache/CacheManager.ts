@@ -27,6 +27,7 @@ export interface CacheStats {
 }
 
 export class CacheManager {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private cache: Map<string, CacheEntry<any>> = new Map();
     private readonly config: CacheConfig;
 
@@ -46,7 +47,7 @@ export class CacheManager {
     /**
      * Wrap a method with caching
      */
-    cached<TArgs extends any[], TReturn>(
+    cached<TArgs extends unknown[], TReturn>(
         keyGenerator: (...args: TArgs) => string,
         method: (...args: TArgs) => Promise<TReturn>
     ) {
@@ -158,11 +159,11 @@ export class CacheManager {
         if (!state) return;
 
         try {
-            const entries = JSON.parse(state) as [string, CacheEntry<any>][];
+            const entries = JSON.parse(state) as [string, CacheEntry<unknown>][];
             for (const [key, entry] of entries) {
                 this.cache.set(key, entry);
             }
-        } catch (error) {
+        } catch {
             // Clear corrupted cache
             localStorage.removeItem(this.config.cachePrefix + 'state');
         }

@@ -284,7 +284,7 @@ export class InputManager {
     /**
      * Apply mouse movement to camera rotation (Y-axis only)
      */
-    updateCameraRotation(camera: THREE.Camera, deltaX: number, deltaY: number): void {
+    updateCameraRotation(camera: THREE.Camera, deltaX: number, _deltaY: number): void {
         // Mouse left/right only affects Y-axis rotation (yaw)
         camera.rotation.y -= deltaX * this.options.mouseSensitivity
         // Note: deltaY is ignored - pitch controls removed from mouse
@@ -293,7 +293,7 @@ export class InputManager {
     /**
      * Apply Q/E key roll rotation to a camera - DISABLED for better UX
      */
-    updateCameraRoll(camera: THREE.Camera): void {
+    updateCameraRoll(_camera: THREE.Camera): void {
         // Rotation controls disabled - they were difficult to work with
         // if (this.inputState.keys.q) camera.rotation.z += this.options.speed * 2 // Roll left
         // if (this.inputState.keys.e) camera.rotation.z -= this.options.speed * 2 // Roll right

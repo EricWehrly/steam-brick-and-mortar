@@ -19,7 +19,6 @@ import { WebXRUICoordinator } from '../ui/coordinators'
 import { Logger } from '../utils/Logger'
 import { ToastManager } from '../ui/ToastManager'
 import { WebXREventTypes, InputEventTypes, UIEventTypes } from '../types/InteractionEvents'
-import type { WebXRCapabilities } from './WebXRManager'
 import type {
     WebXRToggleEvent,
     WebXRSessionStartEvent,

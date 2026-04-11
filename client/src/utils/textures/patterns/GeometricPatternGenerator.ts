@@ -19,11 +19,11 @@ export class GeometricPatternGenerator extends BasePatternGenerator {
     const geometricOptions = options as GeometricPatternOptions
     const {
       variant = 'standard',
-      glowIntensity = 8,
-      shapeCount,
-      shapeTypes = ['circle', 'triangle', 'lightning', 'diamond'],
-      scale = 1.0,
-      distribution = 0.5,
+      _glowIntensity = 8,
+      _shapeCount,
+      _shapeTypes = ['circle', 'triangle', 'lightning', 'diamond'],
+      _scale = 1.0,
+      _distribution = 0.5,
       sharpness = 0.7
     } = geometricOptions
 
@@ -75,8 +75,6 @@ export class GeometricPatternGenerator extends BasePatternGenerator {
     const adjustedDensity = baseDensity / Math.max(0.1, densityMultiplier) // Avoid division by zero
     const shapeCount = options.shapeCount || Math.floor((width * height) / adjustedDensity)
     const shapeDistribution = [0.2, 0.3, 0.25, 0.25] // circle, triangle, lightning, diamond
-
-    const shapeIndex = 0
     
     for (let i = 0; i < shapeCount; i++) {
       // Select shape type based on distribution

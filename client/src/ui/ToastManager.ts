@@ -87,7 +87,7 @@ export class ToastManager {
         }, duration)
     }
     
-    private createToast(message: string, type: ToastType, options: ToastOptions): HTMLElement {
+    private createToast(message: string, type: ToastType, _options: ToastOptions): HTMLElement {
         const toast = document.createElement('div')
         toast.className = `toast toast-${type}`
         toast.dataset.id = (++this.toastCounter).toString()
