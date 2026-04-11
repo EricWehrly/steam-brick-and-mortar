@@ -166,7 +166,6 @@ export class ShelfLayoutCoordinator {
                     batchIndex,
                     position: shelf.position.clone(),
                     rotationY: shelf.rotationY,
-                    rowIndex: shelf.row,
                 }
             )
         })

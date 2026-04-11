@@ -250,8 +250,6 @@ export interface ShelfReadyEvent extends BaseInteractionEvent {
     batchIndex: number
     position: Readonly<THREE.Vector3>
     rotationY: number
-    /** Arc row index (0 = innermost). Used for layout policy (e.g. far-side suppression). */
-    rowIndex: number
 }
 
 export interface GameBoxSpawnedEvent extends BaseInteractionEvent {

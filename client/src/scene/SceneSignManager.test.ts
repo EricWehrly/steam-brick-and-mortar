@@ -85,7 +85,6 @@ describe('SceneSignManager above-shelf mount math', () => {
       batchIndex: 0,
       position: new THREE.Vector3(0, 0, -5),
       rotationY: 0,
-      rowIndex: 0,
     })
 
     expect(createSignMock.mock.calls.length).toBeGreaterThanOrEqual(2)
