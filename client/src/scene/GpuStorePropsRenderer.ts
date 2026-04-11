@@ -5,8 +5,6 @@
  *
  * OWNS:
  * - GpuGameBoxRenderer allocation (deferred until game count is known)
- * - ShelfCreated emission (translates ShelfReady into full placement metadata)
- * - Progress reporting
  * - Props group in scene
  *
  * DOES NOT OWN:
@@ -30,7 +28,6 @@ import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfLayoutCoordinator } from './shelves/ShelfLayoutCoordinator'
-import { ShelfPlacementCoordinator } from './shelves/ShelfPlacementCoordinator'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
@@ -76,8 +73,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // which could run after batches had already fired, causing all
         // "No pending games" warnings.
         new GameBoxSpawner()
-        // Bridges ShelfReady → ShelfCreated + Progress (not a renderer concern)
-        new ShelfPlacementCoordinator()
 
         this.setupEventListeners()
     }

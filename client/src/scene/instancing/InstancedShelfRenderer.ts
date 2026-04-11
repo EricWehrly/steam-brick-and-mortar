@@ -309,7 +309,6 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
 
             const shelfUnit = this.applyShelfUnitTemplate(index, data.position, data.rotation)
             this.shelfUnits.set(index, shelfUnit)
-            this.stickerHandler.setManagers(this.sideBoardManager, this.shelfUnits.size)
 
             InstancedShelfRenderer.logger.debug(`🏪 Set shelf unit ${index} at position (${data.position.x.toFixed(2)}, ${data.position.y.toFixed(2)}, ${data.position.z.toFixed(2)})`)
             return true

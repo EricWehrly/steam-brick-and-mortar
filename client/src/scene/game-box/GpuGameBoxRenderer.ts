@@ -70,7 +70,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private readonly instancedLabelRenderer: InstancedLabelRenderer
     private readonly lodArtworkRenderer: ILodArtworkRendererDebug
     private readonly lodDistanceManager: LodDistanceManagerDebug
-    private readonly onGameBoxSpawned: (event: CustomEvent<GameBoxSpawnedEvent>) => void
 
     constructor(maxGames: number = 2000) {
         this.dimensions = { ...GpuGameBoxRenderer.DEFAULT_DIMENSIONS }
@@ -101,23 +100,22 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         this.lodDistanceManager = new LodDistanceManagerDebug(this.lodArtworkRenderer)
 
         // Self-subscribe: renderer owns the GameBoxSpawned → createGameBoxAuto wiring.
-        // This removes the need for GpuStorePropsRenderer to hold a renderer reference
-        // and wire events on its behalf.
-        this.onGameBoxSpawned = (event: CustomEvent<GameBoxSpawnedEvent>) => {
-            const { game, position, side, rotation } = event.detail
-            this.createGameBoxAuto(
-                game as SteamGameData,
-                position as THREE.Vector3,
-                side as ShelfSide,
-                rotation as THREE.Quaternion
-            )
-        }
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.GameBoxSpawned,
-            this.onGameBoxSpawned
+            this.handleGameBoxSpawned.bind(this)
         )
         
         GpuGameBoxRenderer.logger.lifecycle(`LOD atlas initialized (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
+    }
+
+    private handleGameBoxSpawned(event: CustomEvent<GameBoxSpawnedEvent>): void {
+        const { game, position, side, rotation } = event.detail
+        this.createGameBoxAuto(
+            game as SteamGameData,
+            position as THREE.Vector3,
+            side as ShelfSide,
+            rotation as THREE.Quaternion
+        )
     }
 
     /**
@@ -236,7 +234,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         EventManager.getInstance().deregisterEventHandler(
             StorePropsEventTypes.GameBoxSpawned,
-            this.onGameBoxSpawned
+            this.handleGameBoxSpawned.bind(this)
         )
 
         this.lodDistanceManager.dispose()

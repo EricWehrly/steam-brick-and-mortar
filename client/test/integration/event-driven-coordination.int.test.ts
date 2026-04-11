@@ -7,8 +7,8 @@
  * Event Flow:
  * 1. BatchCoordinator emits BatchReadyForPlacement
  * 2. GameBoxSpawner receives BatchReadyForPlacement → stores pending games
- * 3. ShelfLayoutCoordinator emits ShelfReady → GpuStorePropsRenderer emits ShelfCreated
- * 4. GameBoxSpawner receives ShelfCreated → finds pending games → spawns them → emits GamesPlaced
+ * 3. ShelfLayoutCoordinator emits ShelfReady (deferred via queueMicrotask)
+ * 4. GameBoxSpawner receives ShelfReady → finds pending games → spawns them → emits GamesPlaced
  * 5. BatchCoordinator emits AllBatchesComplete when all batches processed
  * 
  * This test validates that:
@@ -40,7 +40,7 @@ import {
     GameEventTypes, 
     type SteamGamesBatchEvent,
     type BatchReadyForPlacementEvent,
-    type ShelfCreatedEvent,
+    type ShelfReadyEvent,
     type GamesPlacedEvent
 } from '../../src/types/InteractionEvents'
 import type { SteamGame } from '../../src/steam'
@@ -53,7 +53,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
     
     // Event tracking
     let batchReadyEvents: BatchReadyForPlacementEvent[] = []
-    let shelfCreatedEvents: ShelfCreatedEvent[] = []
+    let shelfReadyEvents: ShelfReadyEvent[] = []
     let gamesPlacedEvents: GamesPlacedEvent[] = []
     let allBatchesCompleteReceived: boolean = false
     
@@ -88,7 +88,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
         // Clear state
         dataManager.clear()
         batchReadyEvents = []
-                shelfCreatedEvents = []
+        shelfReadyEvents = []
         gamesPlacedEvents = []
         allBatchesCompleteReceived = false
         eventTimeline.length = 0
@@ -108,15 +108,15 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
         )
         
         eventManager.registerEventHandler(
-            StorePropsEventTypes.ShelfCreated,
-            (event: CustomEvent<ShelfCreatedEvent>) => {
-                shelfCreatedEvents.push(event.detail)
+            StorePropsEventTypes.ShelfReady,
+            (event: CustomEvent<ShelfReadyEvent>) => {
+                shelfReadyEvents.push(event.detail)
                 eventTimeline.push({ 
-                    event: 'ShelfCreated', 
+                    event: 'ShelfReady', 
                     batchIndex: event.detail.batchIndex,
                     timestamp: Date.now() 
                 })
-                console.log(`[EVENT] ShelfCreated: batch ${event.detail.batchIndex}`)
+                console.log(`[EVENT] ShelfReady: batch ${event.detail.batchIndex}`)
             }
         )
         
@@ -160,7 +160,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
     })
 
     describe('Single Batch Flow', () => {
-        it('should emit events in correct sequence: BatchReady → ShelfRequested → ShelfCreated → GamesPlaced', async () => {
+        it('should emit events in correct sequence: BatchReady → ShelfReady → GamesPlaced', async () => {
             const games = createMockGames(5, 0)
             
             // Emit batch event
@@ -181,19 +181,19 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             
             // Verify all events fired
             expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0])
-            expect(shelfCreatedEvents).toHaveLength(1)
+            expect(shelfReadyEvents).toHaveLength(1)
             expect(gamesPlacedEvents).toHaveLength(1)
             expect(allBatchesCompleteReceived).toBe(true)
             
             // Verify event sequence for batch 0
             const batchReadyIdx = findTimelineIndex('BatchReadyForPlacement', 0)
-            const shelfCreatedIdx = findTimelineIndex('ShelfCreated', 0)
+            const shelfReadyIdx = findTimelineIndex('ShelfReady', 0)
             const gamesPlacedIdx = findTimelineIndex('GamesPlaced', 0)
             const completeIdx = eventTimeline.findIndex((entry) => entry.event === 'AllBatchesComplete')
 
             expect(batchReadyIdx).toBeGreaterThanOrEqual(0)
-            expect(shelfCreatedIdx).toBeGreaterThan(batchReadyIdx)
-            expect(gamesPlacedIdx).toBeGreaterThan(shelfCreatedIdx)
+            expect(shelfReadyIdx).toBeGreaterThan(batchReadyIdx)
+            expect(gamesPlacedIdx).toBeGreaterThan(shelfReadyIdx)
             expect(completeIdx).toBeGreaterThan(gamesPlacedIdx)
             
             console.log('Event Timeline:', eventTimeline.map(e => `${e.event}[${e.batchIndex}]`).join(' → '))
@@ -217,7 +217,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             
             // All events should reference the same batch index
             expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0])
-            expect(shelfCreatedEvents[0].batchIndex).toBe(0)
+            expect(shelfReadyEvents[0].batchIndex).toBe(0)
             expect(gamesPlacedEvents[0].batchIndex).toBe(0)
         })
 
@@ -303,12 +303,10 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             
             // Verify all events fired for each batch
             expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0, 1, 2])
-            expect(shelfCreatedEvents).toHaveLength(3)
+            expect(shelfReadyEvents).toHaveLength(3)
             expect(gamesPlacedEvents).toHaveLength(3)
             
-            // Verify batch indices are in order
-            expect(uniqueBatchIndices(batchReadyEvents)).toEqual([0, 1, 2])
-            expect(shelfCreatedEvents.map(e => e.batchIndex)).toEqual([0, 1, 2])
+            expect(shelfReadyEvents.map(e => e.batchIndex)).toEqual([0, 1, 2])
             expect(gamesPlacedEvents.map(e => e.batchIndex)).toEqual([0, 1, 2])
         })
 
@@ -346,7 +344,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
     })
 
     describe('Event Timing Validation', () => {
-        it('should have ShelfCreated after BatchReadyForPlacement', async () => {
+        it('should have ShelfReady after BatchReadyForPlacement', async () => {
             const games = createMockGames(5, 0)
             
             eventManager.emit<SteamGamesBatchEvent>(
@@ -359,13 +357,13 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             }, { timeout: 8000, interval: 100 })
             
             const batchReadyIdx = findTimelineIndex('BatchReadyForPlacement', 0)
-            const shelfCreatedIdx = findTimelineIndex('ShelfCreated', 0)
+            const shelfReadyIdx = findTimelineIndex('ShelfReady', 0)
 
             expect(batchReadyIdx).toBeGreaterThanOrEqual(0)
-            expect(shelfCreatedIdx).toBeGreaterThan(batchReadyIdx)
+            expect(shelfReadyIdx).toBeGreaterThan(batchReadyIdx)
         })
 
-        it('should have GamesPlaced shortly after ShelfCreated', async () => {
+        it('should have GamesPlaced shortly after ShelfReady', async () => {
             const games = createMockGames(5, 0)
             
             eventManager.emit<SteamGamesBatchEvent>(
@@ -377,14 +375,14 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
                 expect(gamesPlacedEvents.length).toBeGreaterThan(0)
             }, { timeout: 8000, interval: 100 })
             
-            const shelfCreatedIdx = findTimelineIndex('ShelfCreated', 0)
+            const shelfReadyIdx = findTimelineIndex('ShelfReady', 0)
             const gamesPlacedIdx = findTimelineIndex('GamesPlaced', 0)
             
-            // GamesPlaced should come right after ShelfCreated
-            expect(gamesPlacedIdx).toBe(shelfCreatedIdx + 1)
+            // GamesPlaced should come right after ShelfReady
+            expect(gamesPlacedIdx).toBe(shelfReadyIdx + 1)
             
             // Time delta should be minimal
-            const timeDelta = eventTimeline[gamesPlacedIdx].timestamp - eventTimeline[shelfCreatedIdx].timestamp
+            const timeDelta = eventTimeline[gamesPlacedIdx].timestamp - eventTimeline[shelfReadyIdx].timestamp
             expect(timeDelta).toBeLessThan(100)
         })
     })
