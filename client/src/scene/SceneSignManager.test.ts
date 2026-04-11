@@ -82,12 +82,10 @@ describe('SceneSignManager above-shelf mount math', () => {
     })
 
     events.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
-      shelfId: 0,
+      batchIndex: 0,
       position: new THREE.Vector3(0, 0, -5),
       rotationY: 0,
-      batchIndex: 0,
       rowIndex: 0,
-      shelfIndex: 0,
     })
 
     expect(createSignMock.mock.calls.length).toBeGreaterThanOrEqual(2)

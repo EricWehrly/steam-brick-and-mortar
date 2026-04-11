@@ -246,15 +246,12 @@ export interface BatchReadyForPlacementEvent extends BaseInteractionEvent {
  * Replaces the old ShelfCreatedEvent. ShelfPlacementCoordinator is gone.
  */
 export interface ShelfReadyEvent extends BaseInteractionEvent {
-    shelfId: number
+    /** Batch index this shelf maps to — used as unique shelf identifier. */
+    batchIndex: number
     position: Readonly<THREE.Vector3>
     rotationY: number
-    /** Same as shelfId — the batch index this shelf maps to. */
-    batchIndex: number
-    /** Arc row index (0 = innermost). */
+    /** Arc row index (0 = innermost). Used for layout policy (e.g. far-side suppression). */
     rowIndex: number
-    /** Index of this shelf within its arc row. */
-    shelfIndex: number
 }
 
 export interface GameBoxSpawnedEvent extends BaseInteractionEvent {

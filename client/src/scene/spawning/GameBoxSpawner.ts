@@ -50,7 +50,7 @@ export class GameBoxSpawner {
     }
 
     private handleShelfReady(event: CustomEvent<ShelfReadyEvent>): void {
-        const { position, batchIndex, rowIndex, shelfIndex, rotationY } = event.detail
+        const { position, batchIndex, rowIndex, rotationY } = event.detail
 
         GameBoxSpawner.logger.debug(
             `[EVENT PATH] ShelfReady received for batch ${batchIndex + 1}. ` +
@@ -67,7 +67,7 @@ export class GameBoxSpawner {
             return
         }
 
-        this.spawnGamesOnShelf(position, games, rowIndex, shelfIndex, rotationY)
+        this.spawnGamesOnShelf(position, games, rowIndex, rotationY)
         this.pendingGames.delete(batchIndex)
 
         EventManager.getInstance().emit<GamesPlacedEvent>(
@@ -81,7 +81,6 @@ export class GameBoxSpawner {
         shelfPosition: THREE.Vector3,
         games: readonly SteamGameData[],
         rowIndex: number,
-        _shelfIndex: number,
         shelfRotationY: number = 0
     ): void {
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)

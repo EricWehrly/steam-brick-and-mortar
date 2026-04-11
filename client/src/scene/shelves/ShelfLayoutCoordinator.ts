@@ -163,12 +163,10 @@ export class ShelfLayoutCoordinator {
             EventManager.getInstance().emit<ShelfReadyEvent>(
                 StorePropsEventTypes.ShelfReady,
                 {
-                    shelfId: batchIndex,
+                    batchIndex,
                     position: shelf.position.clone(),
                     rotationY: shelf.rotationY,
-                    batchIndex,
                     rowIndex: shelf.row,
-                    shelfIndex: shelf.indexInRow,
                 }
             )
         })

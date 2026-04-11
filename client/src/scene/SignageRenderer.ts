@@ -22,9 +22,8 @@ export interface SignageConfig {
 export class SignageRenderer {
     private static readonly DEFAULT_SIGN_WIDTH = 2.0
     private static readonly DEFAULT_SIGN_HEIGHT = 0.4
-    private static readonly DEFAULT_FONT_SIZE = 64
+    private static readonly DEFAULT_FONT_SIZE = 48
     private static readonly DEFAULT_FONT_FAMILY = 'Arial, sans-serif'
-    private static readonly LETTER_SPACING = '0.05em'
 
     private canvas: HTMLCanvasElement
     private context: CanvasRenderingContext2D
@@ -34,7 +33,7 @@ export class SignageRenderer {
         // Create canvas for text rendering
         this.canvas = document.createElement('canvas')
         this.canvas.width = 512
-        this.canvas.height = 96   // tighter — reduces visual vertical padding
+        this.canvas.height = 128
         
         const context = this.canvas.getContext('2d')
         if (!context) {
@@ -167,7 +166,6 @@ export class SignageRenderer {
         this.context.font = `bold ${SignageRenderer.DEFAULT_FONT_SIZE}px ${SignageRenderer.DEFAULT_FONT_FAMILY}`
         this.context.textAlign = 'center'
         this.context.textBaseline = 'middle'
-        ;(this.context as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = SignageRenderer.LETTER_SPACING
         this.context.shadowColor = 'rgba(0, 0, 0, 0.5)'
         this.context.shadowBlur = 4
         this.context.shadowOffsetX = 2
