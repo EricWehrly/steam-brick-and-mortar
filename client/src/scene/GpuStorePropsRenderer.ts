@@ -25,10 +25,7 @@ import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
 import {
     StorePropsEventTypes,
-    type StorePropsProgressEvent,
     type BatchReadyForPlacementEvent,
-    type ShelfCreatedEvent,
-    type ShelfReadyEvent,
     type GameBoxSpawnedEvent,
 } from '../types/InteractionEvents'
 import { Logger } from '../utils/Logger'
@@ -37,6 +34,7 @@ import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import type { SteamGameData } from './game-box/types/GameData'
 import { ShelfLayoutCoordinator } from './shelves/ShelfLayoutCoordinator'
+import { ShelfPlacementCoordinator } from './shelves/ShelfPlacementCoordinator'
 import { InstancedShelfRenderer } from './instancing/InstancedShelfRenderer'
 
 export class GpuStorePropsRenderer implements IStorePropsRenderer {
@@ -60,9 +58,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         })
     })
 
-    private cumulativeShelfCount = 0
-    private totalShelves = 0
-
     private progressiveInitializationPromise: Promise<void> | null = null
     private setupPhaseInitialized = false
 
@@ -85,6 +80,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // which could run after batches had already fired, causing all
         // "No pending games" warnings.
         new GameBoxSpawner()
+        // Bridges ShelfReady → ShelfCreated + Progress (not a renderer concern)
+        new ShelfPlacementCoordinator()
 
         this.setupEventListeners()
     }
@@ -94,12 +91,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.handleInitialBatch.bind(this)
-        )
-
-        // ShelfReady: GPU write done — emit ShelfCreated for GameBoxSpawner + SceneSignManager
-        EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ShelfReady,
-            (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(event.detail)
         )
 
         // AllBatchesComplete: finalize
@@ -113,7 +104,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private async handleInitialBatch(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
         const { totalBatches } = event.detail
-        this.totalShelves = totalBatches
 
         if (!this.progressiveInitializationPromise) {
             this.progressiveInitializationPromise = (async () => {
@@ -126,47 +116,16 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         await this.progressiveInitializationPromise
     }
 
+    // we know the number of games by the time this happens, and should wire that in instead
+    // either through an earlier-raised event, or by re-aligning this one
     private async initializeGameBoxRenderer(totalBatches: number): Promise<void> {
         const estimatedGames = totalBatches * 18
         this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = new GpuGameBoxRenderer(estimatedGames + 100)
-        this.cumulativeShelfCount = 0
-    }
-
-    private handleShelfReady(detail: ShelfReadyEvent): void {
-        const shelfId = detail.shelfId
-
-        EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
-            step: 'shelves',
-            current: shelfId + 1,
-            total: this.totalShelves,
-            detail: `Placing shelf ${shelfId + 1}`,
-        })
-
-        this.cumulativeShelfCount++
-
-        // Defer ShelfCreated emission to the next microtask.
-        // ShelfReady fires synchronously inside the BatchReadyForPlacement dispatch;
-        // GameBoxSpawner's BatchReadyForPlacement handler hasn't run yet at that point.
-        // queueMicrotask lets all BatchReadyForPlacement handlers complete first,
-        // so GameBoxSpawner has stored the pending games before ShelfCreated arrives.
-        queueMicrotask(() => {
-            EventManager.getInstance().emit<ShelfCreatedEvent>(
-                StorePropsEventTypes.ShelfCreated,
-                {
-                    position: detail.position.clone(),
-                    batchIndex: shelfId,
-                    rowIndex: 0,   // not used downstream — consumers use batchIndex
-                    shelfIndex: shelfId,
-                    shelfRotationY: detail.rotationY,
-                }
-            )
-            GpuStorePropsRenderer.logger.debug(`ShelfCreated for shelf ${shelfId + 1}`)
-        })
     }
 
     private handleAllBatchesComplete(): void {
-        GpuStorePropsRenderer.logger.debug(`Progressive loading complete: ${this.cumulativeShelfCount} shelves`)
+        GpuStorePropsRenderer.logger.debug('Progressive loading complete')
         this.progressiveInitializationPromise = null
     }
 
