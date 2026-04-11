@@ -67,14 +67,8 @@ export class RoomManager {
 
     constructor() {
         const dataManager = DataManager.getInstance()
-        this.scene = dataManager.getOrThrow<THREE.Scene>(
-            DataKey.MainScene,
-            'RoomManager requires scene to be registered in DataManager'
-        )
-        this.camera = dataManager.getOrThrow<THREE.PerspectiveCamera>(
-            DataKey.MainCamera,
-            'RoomManager requires camera to be registered in DataManager'
-        )
+        this.scene = dataManager.getOrThrow<THREE.Scene>(DataKey.MainScene)
+        this.camera = dataManager.getOrThrow<THREE.PerspectiveCamera>(DataKey.MainCamera)
         
         this.materialManager = SharedMaterialManager.getInstance()
         this.eventManager = EventManager.getInstance()
