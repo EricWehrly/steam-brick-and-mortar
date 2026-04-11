@@ -24,7 +24,7 @@ import { SignageRenderer, type SignageConfig } from './SignageRenderer'
 import {
     GameEventTypes,
     StorePropsEventTypes,
-    type ShelfCreatedEvent,
+    type ShelfReadyEvent,
 } from '../types/InteractionEvents'
 import type { GamesSortEvent } from '../types/EnvironmentEvents'
 import { RecentlyPlayedBucket } from './categorization/GameSorter'
@@ -183,8 +183,8 @@ export class SceneSignManager {
         // Self-subscribe to shelf creation events to place end-cap labels automatically.
         // This keeps sign placement logic where it belongs — in the sign manager.
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ShelfCreated,
-            (event: CustomEvent<ShelfCreatedEvent>) => this.handleShelfCreated(event.detail)
+            StorePropsEventTypes.ShelfReady,
+            (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfCreated(event.detail)
         )
 
         EventManager.getInstance().registerEventHandler(
@@ -193,9 +193,9 @@ export class SceneSignManager {
         )
     }
 
-    private handleShelfCreated(detail: ShelfCreatedEvent): void {
-        const { position, shelfIndex, shelfRotationY, batchIndex } = detail
-        const rotY = shelfRotationY ?? 0
+    private handleShelfCreated(detail: ShelfReadyEvent): void {
+        const { position, shelfIndex, rotationY, batchIndex } = detail
+        const rotY = rotationY ?? 0
         const shelfPos = position as THREE.Vector3
         const shelfId = batchIndex ?? shelfIndex ?? 0
 
@@ -305,7 +305,7 @@ export class SceneSignManager {
 
     /**
      * Place FRONT/BACK orientation end-cap labels on a shelf unit.
-     * Called on ShelfCreated so labels describe shelf geometry, not game content.
+     * Called on ShelfReady so labels describe shelf geometry, not game content.
      */
     public placeShelfEndCapLabels(
         shelfIndex: number,
@@ -323,14 +323,16 @@ export class SceneSignManager {
         this.placeEndCapLabel(
             `shelf-front-label-${shelfIndex}`, 'FRONT',
             new THREE.Vector3(labelX, labelY, surface.backZ),
-            position, rotY, yAxis,
-            rotY           // sign face matches shelf facing
+            position, rotY,
+            rotY,          // sign face matches shelf facing
+            yAxis
         )
         this.placeEndCapLabel(
             `shelf-back-label-${shelfIndex}`, 'BACK',
             new THREE.Vector3(labelX, labelY, surface.frontZ),
-            position, rotY, yAxis,
-            rotY + Math.PI // sign faces the opposite direction (back side)
+            position, rotY,
+            rotY + Math.PI, // sign faces the opposite direction (back side)
+            yAxis
         )
     }
 
