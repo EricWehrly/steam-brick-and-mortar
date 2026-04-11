@@ -131,16 +131,20 @@ dynamic to attempt to maintain framerate
 
 ## Current Status
 
-**Active Phase**: Phase 1 - "Ready for Me"  
-**Current Milestone**: Milestone 6 - Level Layout and Spatial Design  
-**Current Feature**: Enhanced shelf visuals and smart game population  
-**Next Task**: Enhanced lighting/materials for shelf visuals and smart game layout algorithms
+**Active Phase**: Phase 1 → Intermission (entering cleanup/stabilization before Phase 2)
+**Active Branch**: `openclaw/feat-neon-ui-intermission`
+**Current Milestone**: Milestone 6 complete (core implementation done)
+**Next**: Intermission tasks per `intermission-before-phase2.md`, then Phase 2
 
-**Recent Completions**:
-- ✅ CDN Access Strategy Research (Task 5.1.1.1) - Delivered `docs/cdn-access-strategy.md`
-- ✅ Comprehensive Steam API integration with caching and offline capability
-- ✅ Progressive game loading with rate limiting (4 games/second)
-- ✅ Feature 5.5 Analysis - Confirmed excellent cache infrastructure, identified missing UI enhancements
-- ✅ **Event-driven prerequisite system** - Implemented granular SceneReady → GameStart event flow with proper idempotency
+**Recent Completions (since last update)**:
+- ✅ Event-driven shelf spawning (ShelfReady → GameBoxSpawner)
+- ✅ ShelfLayoutCoordinator extracted from GpuStorePropsRenderer
+- ✅ GameSorter + GameSortFunctions (composable sort pipeline)
+- ✅ CategoryAssigner + CategoryAisleOffset (genre → aisle mapping)
+- ✅ InstancedShelfRenderer + ShelfGeometryBuilder (GPU-instanced shelves)
+- ✅ SignageRenderer + SceneSignManager (end-cap and ceiling signs)
+- ✅ ProceduralTextureWorker → ManagedWorker (WebWorker texture generation)
+- ✅ LOD artwork system (LodArtworkOrchestrator, HighTextureCache, pixel-cache worker)
+- ✅ Lint pass 1 + 2 (explicit-any, unused-vars, no-case-declarations)
 
-**Phase 1 Completion**: ~85% complete - solid foundation, working Steam integration with excellent caching, pause menu system complete, now focusing on level layout and enhanced visuals
+**Phase 1 Completion**: ~95% — all core systems implemented. See `phase1-ready-for-me.md` for slim remaining-work list.
