@@ -1,7 +1,7 @@
-# Glue Work Roadmap (After Phase 1, Before Full Phase 2 Ramp)
+# Intermission Roadmap (After Phase 1, Before Full Phase 2 Ramp)
 
 Purpose: consolidate cleanup + debt scheduling + tooling stabilization without inventing a new formal phase.
-Think of this as a short transition lane while Phase 2 planning firms up.
+Think of this as a short intermission lane while Phase 2 planning firms up.
 
 ## Goals
 1. Stabilize current branch quality for merge and handoff
@@ -11,7 +11,7 @@ Think of this as a short transition lane while Phase 2 planning firms up.
 
 ---
 
-## Glue Work Buckets
+## Intermission Buckets
 
 ### A. Quality / Tooling (Central Focus)
 - Lint pass strategy and baseline cleanup
@@ -64,7 +64,7 @@ Think of this as a short transition lane while Phase 2 planning firms up.
 
 ---
 
-## Exit Criteria for Glue Work
+## Exit Criteria for Intermission Work
 - Lint baseline agreed and applied (at least to touched files)
 - suppressEmit pattern resolved
 - Tech debt has explicit schedule/defer labels
@@ -73,5 +73,5 @@ Think of this as a short transition lane while Phase 2 planning firms up.
 ---
 
 ## Notes
-- This is intentionally not a new phase label.
+- This is intentionally not a new formal phase label.
 - Active background items live in docs/plans/open-subagent-threads.md.

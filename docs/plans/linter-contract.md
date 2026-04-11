@@ -5,20 +5,27 @@
 
 ---
 
-## Current State After Auto-Fix Pass
+## Current State (Updated)
 
-Starting from 348 violations. After config corrections and auto-fixes:
+Started at **348** findings. Current state on `openclaw/feat-linter-wip`:
 
 | Rule | Count | Category |
 |------|-------|----------|
-| `@typescript-eslint/no-unused-vars` | 34 | Cleanup |
-| `@typescript-eslint/no-explicit-any` | 44 | Type safety |
 | `@typescript-eslint/no-non-null-assertion` | 36 | Type safety |
-| `@typescript-eslint/prefer-optional-chain` | 3 | Style (auto-fixable) |
-| `no-case-declarations` | 4 | Correctness |
-| `no-useless-assignment` | 1 | Correctness |
+| `@typescript-eslint/no-explicit-any` | 8 | Type safety |
+| `@typescript-eslint/no-unused-vars` | 4 | Cleanup |
+| `@typescript-eslint/prefer-optional-chain` | 3 | Style |
 | `prefer-const` | 1 | Style |
-| **Total** | **123** | |
+| **Total** | **52** | |
+
+### What already landed in this branch
+- Auto-fix baseline + config corrections (`queueMicrotask`/`CustomEvent` globals)
+- Disabled `prefer-nullish-coalescing` until strictNullChecks is enabled
+- `no-case-declarations` fixed
+- `no-useless-assignment` fixed
+- Bulk pass on easy `no-unused-vars` + `no-explicit-any`
+- Added `DataManager.getOrThrow()` and migrated representative call sites
+- Removed unused legacy `client/src/steam/cache/CacheManager.ts`
 
 ---
 
@@ -161,6 +168,30 @@ In priority order — these are the judgment-call fixes, not auto-fixable:
 
 ---
 
-## Script
+## Strict Mode Enablement Checklist (Hard vs Soft)
 
-`lint-stats.js` in repo root (untracked scratch file) — run with `node lint-stats.js` for a current count-by-rule summary.
+We currently have `"strict": false` in `tsconfig.json`.
+
+### Hard requirements (must do)
+1. **Enable `strictNullChecks`** (either directly or via `strict: true`) and fix resulting type errors.
+2. **Keep `noImplicitAny` on** (comes with strict) and remove remaining implicit any sites.
+3. **Fix constructor/initializer definite assignment issues** (`strictPropertyInitialization`) in classes that currently rely on runtime init ordering.
+4. **Fix index access assumptions** where values can be undefined under stricter checks.
+5. **Stabilize build + tests under strict tsconfig** (tsc must pass in CI).
+
+### Soft requirements (can be staged with temporary exceptions)
+1. Introduce `getOrThrow` migration incrementally instead of all-at-once.
+2. Keep a few targeted `eslint-disable-next-line @typescript-eslint/no-explicit-any` at known type-system boundaries (constructor-forwarding mixins, debug globals) with comments.
+3. Delay strict lint rules that depend on strict mode (`prefer-nullish-coalescing`, `no-floating-promises`, `no-unsafe-*`) until strict compile is green.
+4. Use localized `// @ts-expect-error` only when truly blocked, and track each one with a TD note.
+
+### Recommended rollout order
+1. Add a **strict-check tsconfig** (`tsconfig.strict.json`) and run it in CI as non-blocking.
+2. Burn down errors category-by-category (DataManager callers, scene init, cache/indexing).
+3. Flip strict CI gate to required.
+4. Re-enable strict-dependent lint rules.
+
+## Notes
+
+- This document should be updated as counts change; keep it as the source of truth for lint policy status.
+- Phase labels: we now refer to cleanup/glue effort as **Intermission**.

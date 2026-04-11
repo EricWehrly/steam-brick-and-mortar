@@ -343,7 +343,7 @@ const matrix = new THREE.Matrix4()
             return
         }
         
-        const scene = DataManager.getInstance().get<any>('core.mainScene')
+        const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
         if (!scene) {
             console.warn('⚠️ Cannot add to scene: main scene not available in DataManager')
             return
@@ -356,7 +356,7 @@ const matrix = new THREE.Matrix4()
         console.debug('🧹 Disposing InstancedLabelRenderer')
         
         if (this.instancedMesh) {
-            const scene = DataManager.getInstance().get<any>('core.mainScene')
+            const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
             if (scene) {
                 scene.remove(this.instancedMesh)
             }
