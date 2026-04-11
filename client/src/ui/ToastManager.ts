@@ -72,7 +72,7 @@ export class ToastManager {
             return
         }
 
-        const toast = this.createToast(message, type, options)
+        const toast = this.createToast(message, type)
         this.container.appendChild(toast)
 
         // Trigger enter animation
@@ -87,7 +87,7 @@ export class ToastManager {
         }, duration)
     }
     
-    private createToast(message: string, type: ToastType, _options: ToastOptions): HTMLElement {
+    private createToast(message: string, type: ToastType): HTMLElement {
         const toast = document.createElement('div')
         toast.className = `toast toast-${type}`
         toast.dataset.id = (++this.toastCounter).toString()

@@ -36,8 +36,7 @@ export interface CacheStats {
  * Generic caching layer that can wrap any method with caching functionality
  */
 export class CacheManager {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private cache: Map<string, CacheEntry<any>> = new Map()
+    private cache: Map<string, CacheEntry<unknown>> = new Map()
     private readonly config: CacheConfig
     private pendingWrites: boolean = false
     private writeTimeout: TimeoutHandle | null = null
@@ -112,7 +111,7 @@ export class CacheManager {
         // Update access time for LRU tracking
         entry.lastAccessed = performance.now()
         
-        return entry.data
+        return entry.data as T | null
     }
 
     /**

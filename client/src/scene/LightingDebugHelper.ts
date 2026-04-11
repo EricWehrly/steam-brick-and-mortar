@@ -134,7 +134,7 @@ export class LightingDebugHelper {
         
         const groupedLights = this.registry.getLightsGroupedByType()
         
-        for (const [_type, lights] of groupedLights) {
+        for (const lights of groupedLights.values()) {
             for (const light of lights) {
                 // Skip if already has attached geometry (debug helper)
                 if (this.registry.getAttachedGeometry(light)) continue

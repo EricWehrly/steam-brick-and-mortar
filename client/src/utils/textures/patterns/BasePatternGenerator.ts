@@ -44,8 +44,7 @@ export abstract class BasePatternGenerator {
     const {
       width = 512,
       height = 512,
-      seed = Date.now(),
-      _backgroundColor = '#8B0000'
+      seed = Date.now()
     } = options
 
     // Set up seeded random for consistent results

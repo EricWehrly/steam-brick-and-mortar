@@ -25,7 +25,7 @@ export class ClassicCarpetPatternGenerator extends BasePatternGenerator {
       sharpness = 0.7
     } = classicOptions
 
-    const { ctx, width: _width, height: _height, random: _random } = context
+    const { ctx } = context
 
     // Apply sharpness effects
     this.applySharpnessEffect(ctx, sharpness)

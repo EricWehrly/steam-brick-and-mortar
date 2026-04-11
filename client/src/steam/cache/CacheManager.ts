@@ -27,8 +27,7 @@ export interface CacheStats {
 }
 
 export class CacheManager {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private cache: Map<string, CacheEntry<any>> = new Map();
+    private cache: Map<string, CacheEntry<unknown>> = new Map();
     private readonly config: CacheConfig;
 
     constructor(config: Partial<CacheConfig> = {}) {
@@ -98,7 +97,7 @@ export class CacheManager {
             return null;
         }
 
-        return entry.data;
+        return entry.data as T;
     }
 
     /**

@@ -19,11 +19,6 @@ export class GeometricPatternGenerator extends BasePatternGenerator {
     const geometricOptions = options as GeometricPatternOptions
     const {
       variant = 'standard',
-      _glowIntensity = 8,
-      _shapeCount,
-      _shapeTypes = ['circle', 'triangle', 'lightning', 'diamond'],
-      _scale = 1.0,
-      _distribution = 0.5,
       sharpness = 0.7
     } = geometricOptions
 
