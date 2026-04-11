@@ -201,7 +201,7 @@ async function getPixelData(url: string, version: number): Promise<CachedPixelDa
         request.onsuccess = () => {
             const cached = request.result as CachedPixelData | undefined
             
-            if (!cached || cached.version !== version) {
+            if (cached?.version !== version) {
                 resolve(null)
                 return
             }

@@ -450,7 +450,7 @@ export class HighTextureCacheDebug extends HighTextureCache {
             // Reset - evict all textures first
             for (const gameIndex of gameIndices) {
                 const entry = games.get(gameIndex)
-                if (entry && entry.state === HighTextureState.LOADED) {
+                if (entry?.state === HighTextureState.LOADED) {
                     this.evictGame(gameIndex)
                 }
             }
