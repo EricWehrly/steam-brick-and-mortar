@@ -317,15 +317,20 @@ export class SceneSignManager {
         const labelX = surface.centerX + (surface.width / 2) - 0.15
         const labelY = surface.topY + 0.1
 
+        // Both local positions are rotated by the shelf's own rotY (not the sign facing)
+        // so they correctly map to world space regardless of shelf orientation.
+        // signFacingY controls which direction the sign face points.
         this.placeEndCapLabel(
             `shelf-front-label-${shelfIndex}`, 'FRONT',
             new THREE.Vector3(labelX, labelY, surface.backZ),
-            position, rotY, yAxis
+            position, rotY, yAxis,
+            rotY           // sign face matches shelf facing
         )
         this.placeEndCapLabel(
             `shelf-back-label-${shelfIndex}`, 'BACK',
             new THREE.Vector3(labelX, labelY, surface.frontZ),
-            position, rotY + Math.PI, yAxis
+            position, rotY, yAxis,
+            rotY + Math.PI // sign faces the opposite direction (back side)
         )
     }
 
@@ -334,15 +339,16 @@ export class SceneSignManager {
         text: string,
         localPos: THREE.Vector3,
         shelfOrigin: THREE.Vector3,
-        facingY: number,
+        shelfRotY: number,
+        signFacingY: number,
         yAxis: THREE.Vector3
     ): void {
-        const worldPos = localPos.clone().applyAxisAngle(yAxis, facingY).add(shelfOrigin)
+        const worldPos = localPos.clone().applyAxisAngle(yAxis, shelfRotY).add(shelfOrigin)
         this.setSign({
             label,
             text,
             anchorPosition: worldPos,
-            mount: { style: 'above-shelf', yOffset: 0, signFacingY: facingY },
+            mount: { style: 'above-shelf', yOffset: 0, signFacingY },
             style: SignStyles.ShelfEndLabel
         }, 'end-cap')
     }
