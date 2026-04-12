@@ -8,10 +8,8 @@
  * directly. The canvas renderer measures the rendered text width and adds padding to
  * compute PlaneGeometry dimensions.
  *
- * Recycling behaviour:
- *   - Same derived dimensions → re-bake texture in place, geometry reused.
- *   - Different derived dimensions → dispose old geometry, create fresh PlaneGeometry.
- *   - Position and facingY are always applied on every update.
+ * On repeated setSign() calls for the same uniqueIdentifier, recycleSign() rebakes the
+ * texture in place and only rebuilds geometry when dimensions change.
  */
 
 import * as THREE from 'three'
@@ -57,56 +55,70 @@ export class CanvasSignRenderer implements ISignRenderer {
     }
 
     setSign(request: SignRequest, scene: THREE.Scene): THREE.Object3D {
-        const text = request.text ?? ''
-        const style         = request.style ?? {}
-        const fontSize      = style.fontSize ?? DEFAULT_FONT_SIZE
-        const padding       = parsePadding(style.padding)
+        const text            = request.text ?? ''
+        const style           = request.style ?? {}
+        const fontSize        = style.fontSize ?? DEFAULT_FONT_SIZE
+        const padding         = parsePadding(style.padding)
         const backgroundColor = style.backgroundColor ?? DEFAULT_BG_COLOR
-        const textColor     = style.textColor ?? DEFAULT_TEXT_COLOR
-        const { width, height } = deriveSignDimensions(text, fontSize, padding)
+        const textColor       = style.textColor ?? DEFAULT_TEXT_COLOR
+        const dimensions      = deriveSignDimensions(text, fontSize, padding)
 
         const existing = this.signs.get(request.uniqueIdentifier)
-
         if (existing) {
-            // ── Recycle path ─────────────────────────────────────────────────
-            const { mesh } = existing
-            const mat = mesh.material as THREE.MeshStandardMaterial
+            return this.recycleSign(existing, request, text, backgroundColor, textColor, dimensions)
+        }
+        return this.createSign(request, scene, text, backgroundColor, textColor, dimensions)
+    }
 
-            mat.map?.dispose()
-            mat.map = this.renderer.bakeTexture(text, backgroundColor, textColor)
-            mat.needsUpdate = true
+    private recycleSign(
+        existing: SignEntry,
+        request: SignRequest,
+        text: string,
+        backgroundColor: number,
+        textColor: number,
+        dimensions: { width: number; height: number },
+    ): THREE.Mesh {
+        const { mesh } = existing
+        const mat = mesh.material as THREE.MeshStandardMaterial
 
-            if (existing.width !== width || existing.height !== height) {
-                mesh.geometry.dispose()
-                mesh.geometry = new THREE.PlaneGeometry(width, height)
-                existing.width = width
-                existing.height = height
-            }
+        mat.map?.dispose()
+        mat.map = this.renderer.bakeTexture(text, backgroundColor, textColor)
+        mat.needsUpdate = true
 
-            mesh.position.copy(request.position)
-            if (request.facingY !== undefined) {
-                mesh.rotation.y = request.facingY
-            }
-
-            return mesh
+        if (existing.width !== dimensions.width || existing.height !== dimensions.height) {
+            mesh.geometry.dispose()
+            mesh.geometry = new THREE.PlaneGeometry(dimensions.width, dimensions.height)
+            existing.width = dimensions.width
+            existing.height = dimensions.height
         }
 
-        // ── Create path ───────────────────────────────────────────────────────
+        mesh.position.copy(request.position)
+        if (request.facingY !== undefined) mesh.rotation.y = request.facingY
+
+        return mesh
+    }
+
+    private createSign(
+        request: SignRequest,
+        scene: THREE.Scene,
+        text: string,
+        backgroundColor: number,
+        textColor: number,
+        dimensions: { width: number; height: number },
+    ): THREE.Mesh {
         const mesh = this.renderer.createSign({
             text,
             position: request.position,
             backgroundColor,
             textColor,
-            width,
-            height,
+            width:  dimensions.width,
+            height: dimensions.height,
         })
 
-        if (request.facingY !== undefined) {
-            mesh.rotation.y = request.facingY
-        }
+        if (request.facingY !== undefined) mesh.rotation.y = request.facingY
 
         scene.add(mesh)
-        this.signs.set(request.uniqueIdentifier, { mesh, width, height })
+        this.signs.set(request.uniqueIdentifier, { mesh, width: dimensions.width, height: dimensions.height })
         return mesh
     }
 
