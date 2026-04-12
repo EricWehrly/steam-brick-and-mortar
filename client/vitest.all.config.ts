@@ -8,12 +8,14 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
     watch: false,
-    // Include all non-live tests (unit, integration, performance)
-    // Live tests hit real external APIs and must be run explicitly via yarn test:live
+    // Include unit + integration + performance tests.
+    // Live tests hit real external APIs: run explicitly via yarn test:live
+    // Visual/Playwright tests are opt-in tools: run explicitly via yarn test:visual
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
-      '**/live/**'
+      '**/live/**',
+      '**/visual/**'
     ],
     testTimeout: 30000, // Higher timeout for performance and live tests
     hookTimeout: 30000,
