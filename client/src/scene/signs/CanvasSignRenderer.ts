@@ -58,13 +58,13 @@ export class CanvasSignRenderer implements ISignRenderer {
     }
 
     setSign(request: SignRequest, scene: THREE.Scene): THREE.Object3D {
-        const text            = request.text ?? ''
-        const style           = request.style ?? {}
-        const fontSize        = style.fontSize        ?? CanvasSignRenderer.defaults.fontSize
-        const padding         = parsePadding(style.padding ?? CanvasSignRenderer.defaults.padding)
-        const backgroundColor = style.backgroundColor ?? CanvasSignRenderer.defaults.backgroundColor
-        const textColor       = style.textColor        ?? CanvasSignRenderer.defaults.textColor
-        const dimensions      = deriveSignDimensions(text, fontSize, padding)
+        const text = request.text ?? ''
+        const style = { ...CanvasSignRenderer.defaults, ...(request.style ?? {}) }
+        const padding = parsePadding(style.padding)
+        const dimensions = deriveSignDimensions(text, style.fontSize, padding)
+
+        const backgroundColor = style.backgroundColor
+        const textColor = style.textColor
 
         const existing = this.signs.get(request.uniqueIdentifier)
         if (existing) {

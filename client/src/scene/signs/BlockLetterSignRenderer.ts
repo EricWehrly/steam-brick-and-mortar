@@ -53,9 +53,10 @@ export class BlockLetterSignRenderer implements ISignRenderer {
         this.removeSign(request.uniqueIdentifier, scene)
 
         const text = request.text ?? ''
-        const color    = request.style?.color    ?? BlockLetterSignRenderer.defaults.color
-        const fontSize = request.style?.fontSize ?? BlockLetterSignRenderer.defaults.fontSize
-        const depth    = request.style?.depth    ?? BlockLetterSignRenderer.defaults.depth
+        const style = { ...BlockLetterSignRenderer.defaults, ...(request.style ?? {}) }
+        const color = style.color
+        const fontSize = style.fontSize
+        const depth = style.depth
 
         const group = new THREE.Group()
         group.position.copy(request.position)
