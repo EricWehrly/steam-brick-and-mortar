@@ -87,7 +87,7 @@ export class SceneSignManager {
         return this.sortedGames.some(game => (game.rtime_last_played ?? 0) > 0)
     }
 
-    private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 2.0
+    private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 0.6
     private static readonly SIGN_Z_FACE_PLAYER = 0.01
 
     // Tech debt: docs/roadmaps/tech-debt.md → SceneSignManager scene access pattern
@@ -329,7 +329,7 @@ export class SceneSignManager {
         this.placeSign('canvas', {
             uniqueIdentifier,
             anchorPosition: shelfPosition,
-            mount: { style: 'above-shelf', yOffset: 2.62, frontOffset: 0.28, signFacingY: shelfRotationY },
+            mount: { style: 'above-shelf', yOffset: 2.02, frontOffset: 0.28, signFacingY: shelfRotationY },
             style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
         })
         this.bucketIdentifiers.add(uniqueIdentifier)
