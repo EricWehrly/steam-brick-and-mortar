@@ -46,7 +46,8 @@ export class NeonTubeSignRenderer implements ISignRenderer {
     setSign(request: SignRequest, scene: THREE.Scene): THREE.Object3D {
         this.removeSign(request.uniqueIdentifier, scene)
 
-        const color = request.style?.color ?? NeonTubeSignRenderer.defaults.color
+        const style = { ...NeonTubeSignRenderer.defaults, ...(request.style ?? {}) }
+        const color = style.color
 
         const group = new THREE.Group()
         group.position.copy(request.position)
@@ -75,7 +76,7 @@ export class NeonTubeSignRenderer implements ISignRenderer {
             }
         )
 
-        const buildPromise = this.buildGeometry(request, group, material, color)
+        const buildPromise = this.buildGeometry(request, group, material, color, style.fontSize)
 
         this.entries.set(request.uniqueIdentifier, { group, material, buildPromise })
         return group
@@ -86,9 +87,9 @@ export class NeonTubeSignRenderer implements ISignRenderer {
         group: THREE.Group,
         material: THREE.MeshStandardMaterial,
         color: number,
+        fontSize: number,
     ): Promise<void> {
         const text = request.text ?? ''
-        const fontSize = request.style?.fontSize ?? NeonTubeSignRenderer.defaults.fontSize
         let result: Awaited<ReturnType<NeonGeometryWorker['buildTubes']>>
         try {
             result = await this.worker.buildTubes(text, {
