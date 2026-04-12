@@ -16,13 +16,15 @@ export default defineConfig({
     testTimeout: 30000,  // Generous ceiling for slow material/shelf generation tests
     hookTimeout: 15000,
 
-    // Default config excludes live tests, performance tests, and integration tests
+    // Default config excludes live tests, performance tests, integration, and visual/Playwright tests.
+    // Visual tests are opt-in tools — run explicitly via yarn test:visual
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
       '**/live/**',
       '**/performance/**',
-      '**/integration/**'
+      '**/integration/**',
+      '**/visual/**'
     ]
   },
 })
