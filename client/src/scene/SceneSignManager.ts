@@ -17,7 +17,9 @@ import type { ISignRenderer, SignRequest, SignStyleConfig } from './signs/ISignR
 import {
     GameEventTypes,
     StorePropsEventTypes,
+    RoomEventTypes,
     type ShelfReadyEvent,
+    type RoomResizedEvent,
 } from '../types/InteractionEvents'
 import type { GamesSortEvent } from '../types/EnvironmentEvents'
 import { RecentlyPlayedBucket } from './categorization/GameSorter'
@@ -154,6 +156,13 @@ export class SceneSignManager {
             GameEventTypes.GamesSort,
             (event: CustomEvent<GamesSortEvent>) => this.handleGamesSort(event.detail)
         )
+        // TODO(layout): sign positions should be driven by a layout coordinator, not
+        // computed here from RoomConstants. When that refactor lands, this handler
+        // becomes a layout invalidation signal rather than a direct re-place.
+        EventManager.getInstance().registerEventHandler(
+            RoomEventTypes.Resized,
+            (_event: CustomEvent<RoomResizedEvent>) => this.handleRoomResized()
+        )
     }
 
     private handleShelfCreated(detail: ShelfReadyEvent): void {
@@ -173,13 +182,19 @@ export class SceneSignManager {
         }
     }
 
+    private handleRoomResized(): void {
+        // Re-place signs whose positions derive from room/ceiling dimensions.
+        // TODO(layout): replace with layout coordinator invalidation.
+        this.syncRecentlyPlayedCeilingSign()
+        this.syncSteamLibraryBlockSign()
+    }
+
     private handleGamesSort(detail: GamesSortEvent): void {
         this.sortedGames = detail.sortedGames
         this.buckets = detail.buckets
         this.lastPlacedBucket = null
         this.clearByKind('bucket')
         this.syncRecentlyPlayedCeilingSign()
-        this.syncSteamLibraryBlockSign()
         this.replayTimeBucketSignsFromCreatedShelves()
     }
 
@@ -320,16 +335,14 @@ export class SceneSignManager {
     /**
      * Font: helvetiker_bold.typeface.json (MgOpen license — see THIRD_PARTY_LICENSES.md)
      * TD: add helvetiker copyright to credits UI before public release (phase 3).
+     * TODO(layout): position should come from a layout coordinator, not be hardcoded here.
+     * TODO(layout): sort-driven signs (bucket, ceiling) should similarly be driven by
+     *               layout events rather than responding to GamesSort directly.
      */
     private syncSteamLibraryBlockSign(): void {
-        const uniqueIdentifier = 'steam-library-title'
-        if (!this.hasRecentlyPlayedData) {
-            this.removeSign(uniqueIdentifier)
-            return
-        }
         const anchor = recentlyPlayedCeilingAnchor()
         this.placeSign('block-letter', {
-            uniqueIdentifier,
+            uniqueIdentifier: 'steam-library-title',
             text: 'STEAM LIBRARY',
             anchorPosition: new THREE.Vector3(anchor.x, anchor.y - 0.6, anchor.z + 1.5),
             style: {
