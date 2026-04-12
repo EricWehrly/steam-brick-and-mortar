@@ -1,6 +1,11 @@
 /**
  * NeonTubeSign
  *
+ * TD: neon-worker-migration — this class is superseded by NeonTubeSignRenderer
+ * (client/src/scene/signs/NeonTubeSignRenderer.ts) which builds geometry in a
+ * NeonGeometryWorker instead of requestIdleCallback/setTimeout. Delete this file
+ * once SceneSignManager is fully migrated to ISignRenderer.
+ *
  * 3D neon-style text sign using TubeGeometry along font outline paths.
  * Renders glowing, rounded neon tubing for a realistic appearance.
  *
