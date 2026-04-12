@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
 import { EventManager } from '../../../src/core/EventManager'
-import { GameEventTypes, StorePropsEventTypes, type ShelfReadyEvent } from '../../../src/types/InteractionEvents'
+import { GameEventTypes, StorePropsEventTypes, RoomEventTypes, type ShelfReadyEvent, type RoomResizedEvent } from '../../../src/types/InteractionEvents'
 import type { GamesSortEvent } from '../../../src/types/EnvironmentEvents'
 import type { SteamGameData } from '../../../src/scene/game-box/types/GameData'
 
@@ -232,7 +232,7 @@ describe('SceneSignManager — lifecycle', () => {
         blockSetSignSpy.mockImplementation(() => new THREE.Group())
     })
 
-    it('places recently-played ceiling sign and neon entrance on GamesSort', () => {
+    it('places recently-played ceiling sign on GamesSort (block sign is room-driven, not sort-driven)', () => {
         const manager = new SceneSignManager()
 
         const game: SteamGameData = {
@@ -249,18 +249,58 @@ describe('SceneSignManager — lifecycle', () => {
             buckets: new Map([[1, 'Played Today']]),
         })
 
-        // Canvas ceiling sign + block letter sign; neon entrance is disabled
+        // Canvas ceiling sign only on sort — block sign is room-driven
         expect(canvasSetSignSpy).toHaveBeenCalledOnce()
         expect(neonSetSignSpy).not.toHaveBeenCalled()
-        expect(blockSetSignSpy).toHaveBeenCalledOnce()
+        expect(blockSetSignSpy).not.toHaveBeenCalled()
 
-        // Ceiling sign text
         const [ceilingRequest] = canvasSetSignSpy.mock.calls[0]
         expect(ceilingRequest.text).toBe('Recently Played')
 
-        // Block letter sign text
+        manager.dispose()
+    })
+
+    it('places block letter sign on RoomResized', () => {
+        const manager = new SceneSignManager()
+
+        EventManager.getInstance().emit<RoomResizedEvent>(RoomEventTypes.Resized, {
+            dimensions: { width: 22, depth: 16, height: 3.2 },
+        })
+
+        expect(blockSetSignSpy).toHaveBeenCalledOnce()
         const [blockRequest] = blockSetSignSpy.mock.calls[0]
         expect(blockRequest.text).toBe('STEAM LIBRARY')
+        expect(blockRequest.uniqueIdentifier).toBe('steam-library-title')
+
+        manager.dispose()
+    })
+
+    it('re-places block letter sign and ceiling sign on repeated RoomResized', () => {
+        const manager = new SceneSignManager()
+        const game: SteamGameData = {
+            appid: 1,
+            name: 'Portal',
+            playtime_forever: 60,
+            rtime_last_played: Math.floor(Date.now() / 1000) - 3600,
+            img_icon_url: '',
+            img_logo_url: '',
+        } as SteamGameData
+
+        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
+            sortedGames: [game],
+            buckets: new Map([[1, 'Played Today']]),
+        })
+        vi.clearAllMocks()
+        canvasSetSignSpy.mockImplementation(() => makeMesh())
+        blockSetSignSpy.mockImplementation(() => new THREE.Group())
+
+        EventManager.getInstance().emit<RoomResizedEvent>(RoomEventTypes.Resized, {
+            dimensions: { width: 22, depth: 16, height: 3.2 },
+        })
+
+        // Both ceiling (canvas) and block sign should be updated
+        expect(canvasSetSignSpy).toHaveBeenCalledOnce()
+        expect(blockSetSignSpy).toHaveBeenCalledOnce()
 
         manager.dispose()
     })
