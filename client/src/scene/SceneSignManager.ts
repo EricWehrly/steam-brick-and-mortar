@@ -29,7 +29,6 @@ import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
 import {
     shelfBucket,
     shouldPlaceBucketSign,
-    bucketSignAnchor,
     recentlyPlayedCeilingAnchor,
     bucketDisplayLabel,
 } from './signs/TimeBucketSignHelpers'
@@ -88,7 +87,7 @@ export class SceneSignManager {
         return this.sortedGames.some(game => (game.rtime_last_played ?? 0) > 0)
     }
 
-    private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 0.6
+    private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 2.0
     private static readonly SIGN_Z_FACE_PLAYER = 0.01
 
     // Tech debt: docs/roadmaps/tech-debt.md → SceneSignManager scene access pattern
@@ -294,7 +293,7 @@ export class SceneSignManager {
     private syncSteamLibraryBlockSign(): void {
         // Position relative to the ceiling sign: drop below it, push toward entrance.
         // These offsets are intentional art direction, not physics — adjust when room dimensions change.
-        const DROP_BELOW_CEILING_SIGN = 0.6
+        const DROP_BELOW_CEILING_SIGN = 0.0
         const PUSH_TOWARD_ENTRANCE = 1.5
         const ceilingAnchor = recentlyPlayedCeilingAnchor()
         this.placeSign('block-letter', {
@@ -329,7 +328,7 @@ export class SceneSignManager {
         const uniqueIdentifier = bucketDisplayLabel(bucket!)
         this.placeSign('canvas', {
             uniqueIdentifier,
-            anchorPosition: bucketSignAnchor(shelfPosition),
+            anchorPosition: shelfPosition,
             mount: { style: 'above-shelf', yOffset: 2.62, frontOffset: 0.28, signFacingY: shelfRotationY },
             style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
         })
