@@ -20,7 +20,8 @@ import * as THREE from 'three'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
 import { EventManager } from '../core/EventManager'
-import { SignageRenderer, type SignageConfig } from './SignageRenderer'
+import { SignageRenderer } from './SignageRenderer'
+import { CanvasSignRenderer } from './signs/CanvasSignRenderer'
 import { NeonTubeSign, type NeonTubeSignConfig } from './NeonTubeSign'
 import {
     GameEventTypes,
@@ -159,6 +160,7 @@ export class SceneSignManager {
     }
 
     private readonly renderer: SignageRenderer
+    private readonly canvasRenderer: CanvasSignRenderer
     private readonly scene: THREE.Scene
     private readonly signs: Map<string, SignRecord> = new Map()
     private readonly neonSigns: Map<string, NeonTubeSign> = new Map()
@@ -182,6 +184,7 @@ export class SceneSignManager {
     constructor() {
         this.scene = DataManager.getInstance().getOrThrow<THREE.Scene>(DataKey.MainScene)
         this.renderer = new SignageRenderer()
+        this.canvasRenderer = new CanvasSignRenderer()
 
         // Self-subscribe to shelf creation events to place end-cap labels automatically.
         // This keeps sign placement logic where it belongs — in the sign manager.
@@ -238,66 +241,44 @@ export class SceneSignManager {
         const signPos = this.resolvePosition(descriptor.anchorPosition, descriptor.mount)
         const text = descriptor.text ?? descriptor.label
 
-        const existing = this.signs.get(descriptor.label)
+        const mesh = this.canvasRenderer.setSign(
+            {
+                label: descriptor.label,
+                position: signPos,
+                text,
+                facingY: descriptor.mount.signFacingY,
+                style: {
+                    backgroundColor: style.backgroundColor,
+                    textColor: style.textColor,
+                    width: style.width,
+                    height: style.height,
+                },
+            },
+            this.scene
+        ) as THREE.Mesh
 
-        if (existing) {
-            // ── Recycle path ─────────────────────────────────────────────────
-            const mesh = existing.mesh
-            const mat = mesh.material as THREE.MeshStandardMaterial
-
-            // Re-bake texture unconditionally (text or colors may have changed)
-            mat.map?.dispose()
-            mat.map = this.renderer.bakeTexture(text, style.backgroundColor, style.textColor)
-            mat.needsUpdate = true
-
-            // Replace geometry only if dimensions changed
-            if (existing.width !== style.width || existing.height !== style.height) {
-                mesh.geometry.dispose()
-                mesh.geometry = new THREE.PlaneGeometry(style.width, style.height)
-                existing.width = style.width
-                existing.height = style.height
-            }
-
-            mesh.position.copy(signPos)
-            this.applySignFacing(mesh, descriptor.mount)
-
-            return mesh
-        }
-
-        // ── Create path ───────────────────────────────────────────────────────
-        const config: SignageConfig = {
-            text,
-            position: signPos,
-            backgroundColor: style.backgroundColor,
-            textColor: style.textColor,
-            width: style.width,
-            height: style.height,
-        }
-
-        const mesh = this.renderer.createSign(config)
         mesh.userData.categoryLabel = descriptor.label
         mesh.userData.mountStyle = descriptor.mount.style
         mesh.userData.signKind = kind
 
-        this.applySignFacing(mesh, descriptor.mount)
-
-        this.scene.add(mesh)
-        this.signs.set(descriptor.label, { mesh, kind, width: style.width, height: style.height })
+        // Keep the signs Map in sync for getSignsByKind / removeSign / clearByKind
+        const existing = this.signs.get(descriptor.label)
+        if (existing) {
+            existing.mesh = mesh
+            existing.kind = kind
+            existing.width = style.width
+            existing.height = style.height
+        } else {
+            this.signs.set(descriptor.label, { mesh, kind, width: style.width, height: style.height })
+        }
 
         return mesh
     }
 
     /** Remove a named sign from the scene, disposing all GPU resources. */
     public removeSign(label: string): void {
-        const record = this.signs.get(label)
-        if (record) {
-            this.scene.remove(record.mesh)
-            const mat = record.mesh.material as THREE.MeshStandardMaterial
-            mat.map?.dispose()
-            mat.dispose()
-            record.mesh.geometry.dispose()
-            this.signs.delete(label)
-        }
+        this.canvasRenderer.removeSign(label, this.scene)
+        this.signs.delete(label)
     }
 
     /** Remove all signs of a given kind. */
@@ -359,12 +340,6 @@ export class SceneSignManager {
         }, 'end-cap')
     }
 
-    private applySignFacing(mesh: THREE.Mesh, mount: SignMount): void {
-        if (mount.signFacingY !== undefined) {
-            mesh.rotation.y = mount.signFacingY
-        }
-    }
-
     public clearAll(): void {
         for (const label of [...this.signs.keys()]) {
             this.removeSign(label)
@@ -389,6 +364,7 @@ export class SceneSignManager {
         this.shelfTransforms.clear()
         this.sortedGames = []
         this.buckets = new Map()
+        this.canvasRenderer.dispose(this.scene)
         this.renderer.dispose()
     }
 
