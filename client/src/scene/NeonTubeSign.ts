@@ -99,6 +99,7 @@ export class NeonTubeSign {
                     this.mesh.add(mesh)
 
                     if (typeof requestIdleCallback !== 'undefined') {
+                        // eslint-disable-next-line no-undef -- TD: neon-worker-migration
                         requestIdleCallback(() => buildNext(index + 1), { timeout: 2000 })
                     } else {
                         setTimeout(() => buildNext(index + 1), 0)
@@ -109,6 +110,7 @@ export class NeonTubeSign {
             }
 
             if (typeof requestIdleCallback !== 'undefined') {
+                // eslint-disable-next-line no-undef -- TD: neon-worker-migration
                 requestIdleCallback(buildSign, { timeout: 2000 })
             } else {
                 setTimeout(buildSign, 0)
