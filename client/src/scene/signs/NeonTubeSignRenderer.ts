@@ -59,6 +59,19 @@ export class NeonTubeSignRenderer implements ISignRenderer {
             metalness:         0.0,
         })
 
+        // Emit point light immediately — position and color are known now,
+        // no need to wait for worker geometry to complete.
+        EventManager.getInstance().emit<PointLightRequestEvent>(
+            LightingEventTypes.PointLightRequested,
+            {
+                color,
+                intensity: 1.5,
+                distance:  2.0,
+                position:  group.position.clone(),
+                name:      `neon-sign-${request.label}`,
+            }
+        )
+
         const buildPromise = this.buildGeometry(request, group, material, color)
 
         this.entries.set(request.label, { group, material, buildPromise })
@@ -97,17 +110,6 @@ export class NeonTubeSignRenderer implements ISignRenderer {
             group.add(new THREE.Mesh(tubeGeo, material))
         }
 
-        // Request point light via event — keeps lighting concerns out of this renderer
-        EventManager.getInstance().emit<PointLightRequestEvent>(
-            LightingEventTypes.PointLightRequested,
-            {
-                color,
-                intensity: 1.5,
-                distance:  2.0,
-                position:  group.position.clone(),
-                name:      `neon-sign-${request.label}`,
-            }
-        )
     }
 
     removeSign(label: string, scene: THREE.Scene): boolean {
