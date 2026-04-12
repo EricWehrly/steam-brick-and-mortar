@@ -22,7 +22,7 @@ export interface ShelfSectionPlannerConfig {
     signMountStyle?: SignMount['style']
 }
 
-const DEFAULT_SIGN_Y_OFFSET = 2.2
+const DEFAULT_SIGN_Y_OFFSET = 0.2
 const DEFAULT_MOUNT_STYLE: SignMount['style'] = 'above-shelf'
 
 export class ShelfSectionPlanner {
