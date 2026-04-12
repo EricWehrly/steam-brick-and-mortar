@@ -12,6 +12,7 @@ vi.mock('../core/data/DataManager', () => ({
   DataManager: {
     getInstance: () => ({
       get: () => mockScene,
+      getOrThrow: () => mockScene,
     }),
   },
 }))

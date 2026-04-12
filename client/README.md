@@ -42,7 +42,7 @@ yarn test
 - `yarn lint:fix` - Fix automatically fixable issues
 - `yarn clean` - Clean build artifacts and dependencies
 - `yarn type-check` - Type check without building
-- `yarn validate` - Review-ready gate (type-check + lint)
+- `yarn validate` - Full pre-review gate (type-check + unit/integration tests + lint). Run before opening a PR, not necessarily before every commit.
 
 ## Project Structure
 
