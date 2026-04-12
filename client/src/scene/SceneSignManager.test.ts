@@ -45,8 +45,8 @@ describe('SceneSignManager above-shelf mount math', () => {
     const signFacingY = Math.PI / 2
     const frontOffset = 0.3
 
-    const mesh = manager.setSign({
-      label: 'Played This Week',
+    const mesh = manager.placeSign('category', {
+      uniqueIdentifier: 'Played This Week',
       anchorPosition: anchor,
       mount: {
         style: 'above-shelf',
@@ -54,7 +54,7 @@ describe('SceneSignManager above-shelf mount math', () => {
         frontOffset,
         signFacingY,
       },
-    })
+    }) as THREE.Mesh
 
     expect(mesh.position.x).toBeCloseTo(anchor.x + Math.sin(signFacingY) * frontOffset, 6)
     expect(mesh.position.y).toBeCloseTo(anchor.y + 0.2, 6)
