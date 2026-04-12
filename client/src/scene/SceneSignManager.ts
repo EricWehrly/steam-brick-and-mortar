@@ -427,23 +427,25 @@ export class SceneSignManager {
      * Place a block-letter "Steam Library" sign at the store entrance.
      * Sits behind the recently-played ceiling sign, visible from the entrance.
      *
-     * DISABLED: depends on /fonts/helvetiker_bold.typeface.json at runtime.
-     * Re-enable or replace once the font asset decision is resolved.
-     * See: docs/plans/neon-stroke-skeleton-plan.md (Font file concern section)
+     * Font: helvetiker_bold.typeface.json (MgOpen license — permissive, see THIRD_PARTY_LICENSES.md)
+     * TD: add helvetiker copyright to credits UI before public release (phase 3).
      */
     private syncSteamLibraryBlockSign(): void {
-        // TD(block-letter-font): re-enable when font asset decision is resolved
-        // const anchor = recentlyPlayedCeilingAnchor()
-        // this.placeSign('block-letter', {
-        //     uniqueIdentifier: 'steam-library-title',
-        //     text: 'Steam Library',
-        //     anchorPosition: new THREE.Vector3(anchor.x, anchor.y - 0.6, anchor.z + 1.5),
-        //     style: {
-        //         color: 0xc7d5e0,   // Steam blue-grey
-        //         fontSize: 0.35,
-        //         depth: 0.08,
-        //     },
-        // })
+        if (!this.hasRecentlyPlayedData) {
+            this.removeSign('steam-library-title')
+            return
+        }
+        const anchor = recentlyPlayedCeilingAnchor()
+        this.placeSign('block-letter', {
+            uniqueIdentifier: 'steam-library-title',
+            text: 'Steam Library',
+            anchorPosition: new THREE.Vector3(anchor.x, anchor.y - 0.6, anchor.z + 1.5),
+            style: {
+                color: 0xc7d5e0,   // Steam blue-grey
+                fontSize: 0.35,
+                depth: 0.08,
+            },
+        })
     }
 
     private replayTimeBucketSignsFromCreatedShelves(): void {

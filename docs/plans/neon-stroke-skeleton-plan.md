@@ -90,9 +90,10 @@ Options if we want to eliminate it:
   Three.js shapes. Works in the main thread but not in workers.
 - **Hershey:** as above — different file, but smaller and unambiguously public domain
 
-Recommended: keep helvetiker for now (it's MIT, ships with Three.js), document the
-licensing in a `THIRD_PARTY_LICENSES` file, and revisit if the font file becomes a
-compliance concern.
+Recommended: keep helvetiker for now (it uses the MgOpen license — permissive for
+software distribution but NOT the same as MIT; the font cannot be sold standalone).
+Document the license in `THIRD_PARTY_LICENSES.md` (already done), note it in credits,
+and revisit if the font file becomes a compliance concern at public release.
 
 ---
 

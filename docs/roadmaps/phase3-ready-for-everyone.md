@@ -36,7 +36,7 @@ extraction needs to be replaced.
 ### Story 10.1.2: Re-enable neon entrance sign and Steam Library block sign
 - **Task 10.1.2.1**: Un-comment `syncNeonEntranceSign` spawn in `SceneSignManager`
 - **Task 10.1.2.2**: Resolve font asset licensing; un-comment `syncSteamLibraryBlockSign`
-- **Task 10.1.2.3**: Add `THIRD_PARTY_LICENSES` if keeping helvetiker (MIT, ships with Three.js)
+- **Task 10.1.2.3**: Document font license in `THIRD_PARTY_LICENSES.md` (done); add helvetiker copyright to credits UI before public release (MgOpen license, not MIT — permissive but not identical)
 
 **Expected Deliverable**: Neon sign renders as solid stroke tubes; "Steam Library" block sign visible at store entrance.
 

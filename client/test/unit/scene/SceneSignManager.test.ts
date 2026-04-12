@@ -56,6 +56,24 @@ vi.mock('../../../src/scene/signs/NeonTubeSignRenderer', () => ({
     }),
 }))
 
+// ─── BlockLetterSignRenderer stub ─────────────────────────────────────────────
+
+const blockSetSignSpy = vi.fn()
+const blockRemoveSignSpy = vi.fn().mockReturnValue(false)
+const blockClearAllSpy = vi.fn()
+const blockDisposeSpy = vi.fn()
+
+vi.mock('../../../src/scene/signs/BlockLetterSignRenderer', () => ({
+    BlockLetterSignRenderer: vi.fn().mockImplementation(function () {
+        return {
+            setSign: blockSetSignSpy,
+            removeSign: blockRemoveSignSpy,
+            clearAll: blockClearAllSpy,
+            dispose: blockDisposeSpy,
+        }
+    }),
+}))
+
 // ─── SignageRenderer stub (used internally by CanvasSignRenderer in prod) ─────
 
 vi.mock('../../../src/scene/SignageRenderer', () => ({
@@ -82,6 +100,7 @@ describe('SceneSignManager — text resolution', () => {
         vi.clearAllMocks()
         canvasSetSignSpy.mockImplementation(() => makeMesh())
         neonSetSignSpy.mockImplementation(() => new THREE.Group())
+        blockSetSignSpy.mockImplementation(() => new THREE.Group())
     })
 
     it('passes uniqueIdentifier as text when descriptor.text is omitted (canvas)', () => {
@@ -165,6 +184,7 @@ describe('SceneSignManager — mount math', () => {
         vi.clearAllMocks()
         canvasSetSignSpy.mockImplementation(() => makeMesh())
         neonSetSignSpy.mockImplementation(() => new THREE.Group())
+        blockSetSignSpy.mockImplementation(() => new THREE.Group())
     })
 
     it('applies frontOffset along signFacingY', () => {
@@ -209,6 +229,7 @@ describe('SceneSignManager — lifecycle', () => {
         vi.clearAllMocks()
         canvasSetSignSpy.mockImplementation(() => makeMesh())
         neonSetSignSpy.mockImplementation(() => new THREE.Group())
+        blockSetSignSpy.mockImplementation(() => new THREE.Group())
     })
 
     it('places recently-played ceiling sign and neon entrance on GamesSort', () => {
@@ -228,13 +249,18 @@ describe('SceneSignManager — lifecycle', () => {
             buckets: new Map([[1, 'Played Today']]),
         })
 
-        // Canvas ceiling sign only � neon entrance sign is disabled pending stroke-skeleton rendering
+        // Canvas ceiling sign + block letter sign; neon entrance is disabled
         expect(canvasSetSignSpy).toHaveBeenCalledOnce()
         expect(neonSetSignSpy).not.toHaveBeenCalled()
+        expect(blockSetSignSpy).toHaveBeenCalledOnce()
 
-        // The ceiling sign text should be 'Recently Played'
+        // Ceiling sign text
         const [ceilingRequest] = canvasSetSignSpy.mock.calls[0]
         expect(ceilingRequest.text).toBe('Recently Played')
+
+        // Block letter sign text
+        const [blockRequest] = blockSetSignSpy.mock.calls[0]
+        expect(blockRequest.text).toBe('Steam Library')
 
         manager.dispose()
     })
