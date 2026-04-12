@@ -19,7 +19,6 @@ import { LightingEventTypes, type PointLightRequestEvent } from '../../types/Lig
 import { NeonGeometryWorker } from './NeonGeometryWorker'
 import type { ISignRenderer, SignRequest } from './ISignRenderer'
 
-const DEFAULT_FONT_SIZE   = 0.3
 const TUBE_RADIUS         = 0.015
 const SEGMENTS            = 12
 const EMISSIVE_INTENSITY  = 2.5
@@ -32,6 +31,11 @@ interface NeonSignEntry {
 }
 
 export class NeonTubeSignRenderer implements ISignRenderer {
+    static readonly defaults = {
+        color:    0xff6600,
+        fontSize: 0.3,
+    } as const
+
     private readonly entries = new Map<string, NeonSignEntry>()
     private readonly worker: NeonGeometryWorker
 
@@ -42,7 +46,7 @@ export class NeonTubeSignRenderer implements ISignRenderer {
     setSign(request: SignRequest, scene: THREE.Scene): THREE.Object3D {
         this.removeSign(request.uniqueIdentifier, scene)
 
-        const color = request.style?.color ?? 0xff6600
+        const color = request.style?.color ?? NeonTubeSignRenderer.defaults.color
 
         const group = new THREE.Group()
         group.position.copy(request.position)
@@ -84,7 +88,7 @@ export class NeonTubeSignRenderer implements ISignRenderer {
         color: number,
     ): Promise<void> {
         const text = request.text ?? ''
-        const fontSize = request.style?.fontSize ?? DEFAULT_FONT_SIZE
+        const fontSize = request.style?.fontSize ?? NeonTubeSignRenderer.defaults.fontSize
         let result: Awaited<ReturnType<NeonGeometryWorker['buildTubes']>>
         try {
             result = await this.worker.buildTubes(text, {

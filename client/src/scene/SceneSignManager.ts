@@ -13,7 +13,8 @@ import { EventManager } from '../core/EventManager'
 import { CanvasSignRenderer } from './signs/CanvasSignRenderer'
 import { NeonTubeSignRenderer } from './signs/NeonTubeSignRenderer'
 import { BlockLetterSignRenderer } from './signs/BlockLetterSignRenderer'
-import type { ISignRenderer, SignRequest, SignStyleConfig } from './signs/ISignRenderer'
+import type { ISignRenderer, SignRequest } from './signs/ISignRenderer'
+import type { RenderKind, SignDescriptor, SignMount, ShelfTopSurface } from './SignTypes'
 import {
     GameEventTypes,
     StorePropsEventTypes,
@@ -63,75 +64,6 @@ export const SignStyles = {
     } satisfies SignStyle,
 } as const
 
-export type SignMountStyle = 'above-shelf' | 'wall' | 'ceiling'
-
-/**
- * Describes how a sign attaches to its anchor point in the scene.
- *
- * The anchor is a semantic reference position (shelf top, ceiling plane, etc.).
- * Mount style + offsets determine the sign's final world position by offsetting
- * from that anchor.
- *
- * Attachment intent (not yet implemented — TODO(layout)):
- *   Signs have a natural attachment edge that connects to the anchor surface:
- *   - 'ceiling': top edge of the sign connects to the bottom of the ceiling.
- *     Final position = ceiling Y minus half sign height.
- *   - 'above-shelf': bottom edge connects to the top face of the shelf bracket.
- *     Final position = shelf-face Y plus half sign height (derived from font size + padding).
- *   - 'wall': face of sign flush with the wall surface.
- *
- *   Once sign dimensions are computed by renderers (ISignRenderer.measure() or similar),
- *   the mount resolver can use them to place signs edge-to-surface rather than
- *   anchor-to-centre. Until then, yOffset carries the full manual offset.
- */
-export interface SignMount {
-    style: SignMountStyle
-    yOffset?: number
-    frontOffset?: number
-    signFacingY?: number
-}
-
-export interface ShelfTopSurface {
-    centerX: number
-    topY: number
-    backZ: number
-    frontZ: number
-    width: number
-}
-
-export interface SignDescriptor {
-    uniqueIdentifier: string
-    text?: string
-    anchorPosition: THREE.Vector3
-    mount?: SignMount
-    style?: SignStyleConfig
-    scale?: number
-    facingY?: number
-}
-
-/**
- * Semantic role of a sign — used for targeted clear/query operations.
- * Canvas-rendered: category, bucket, ceiling, end-cap.
- * 3D-rendered: neon-tube, block-letter.
- */
-export type SignKind =
-    | 'category'
-    | 'bucket'
-    | 'ceiling'
-    | 'end-cap'
-    | 'neon-tube'     // disabled — see docs/plans/neon-stroke-skeleton-plan.md
-    | 'block-letter'
-
-type RenderKind = 'canvas' | 'neon-tube' | 'block-letter'
-
-const RENDER_KIND_BY_SIGN_KIND: Record<SignKind, RenderKind> = {
-    category:       'canvas',
-    bucket:         'canvas',
-    ceiling:        'canvas',
-    'end-cap':      'canvas',
-    'neon-tube':    'neon-tube',
-    'block-letter': 'block-letter',
-}
 
 export class SceneSignManager {
     private static _instance: SceneSignManager | null = null
@@ -145,8 +77,9 @@ export class SceneSignManager {
 
     private readonly rendererByKind: Record<RenderKind, ISignRenderer>
     private readonly scene: THREE.Scene
-    private readonly signKindsByIdentifier = new Map<string, SignKind>()
+    private readonly rendererByIdentifier = new Map<string, RenderKind>()
     private readonly shelfTransforms = new Map<number, { position: THREE.Vector3; rotationY: number }>()
+    private readonly bucketIdentifiers = new Set<string>()
     private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
     private buckets: ReadonlyMap<number | string, string> = new Map()
     private lastPlacedBucket: RecentlyPlayedBucket | null = null
@@ -212,16 +145,15 @@ export class SceneSignManager {
         this.sortedGames = detail.sortedGames
         this.buckets = detail.buckets
         this.lastPlacedBucket = null
-        this.clearByKind('bucket')
+        this.removeBucketSigns()
         this.syncRecentlyPlayedCeilingSign()
         this.replayTimeBucketSignsFromCreatedShelves()
     }
 
-    public placeSign(kind: SignKind, descriptor: SignDescriptor): THREE.Object3D {
-        const renderKind = RENDER_KIND_BY_SIGN_KIND[kind]
+    public placeSign(renderKind: RenderKind, descriptor: SignDescriptor): THREE.Object3D {
         const renderer = this.rendererByKind[renderKind]
         const signObject = renderer.setSign(this.buildSignRequest(renderKind, descriptor), this.scene)
-        this.signKindsByIdentifier.set(descriptor.uniqueIdentifier, kind)
+        this.rendererByIdentifier.set(descriptor.uniqueIdentifier, renderKind)
         return signObject
     }
 
@@ -240,38 +172,28 @@ export class SceneSignManager {
         }
 
         const mount = descriptor.mount ?? { style: 'above-shelf' }
-        const defaults = SignStyles.Category
         return {
             uniqueIdentifier: descriptor.uniqueIdentifier,
             text,
             position: this.resolvePosition(descriptor.anchorPosition, mount),
             facingY: mount.signFacingY,
-            style: {
-                backgroundColor: descriptor.style?.backgroundColor ?? defaults.backgroundColor,
-                textColor:       descriptor.style?.textColor       ?? defaults.textColor,
-                fontSize:        descriptor.style?.fontSize        ?? defaults.fontSize,
-                padding:         descriptor.style?.padding         ?? defaults.padding,
-            },
+            style: descriptor.style,
         }
     }
 
     private removeSign(uniqueIdentifier: string): void {
-        const signKind = this.signKindsByIdentifier.get(uniqueIdentifier)
-        if (!signKind) return
+        const renderKind = this.rendererByIdentifier.get(uniqueIdentifier)
+        if (!renderKind) return
 
-        const renderKind = RENDER_KIND_BY_SIGN_KIND[signKind]
         this.rendererByKind[renderKind].removeSign(uniqueIdentifier, this.scene)
-        this.signKindsByIdentifier.delete(uniqueIdentifier)
+        this.rendererByIdentifier.delete(uniqueIdentifier)
     }
 
-    private clearByKind(kind: SignKind): void {
-        const toRemove: string[] = []
-        for (const [uniqueIdentifier, signKind] of this.signKindsByIdentifier) {
-            if (signKind === kind) toRemove.push(uniqueIdentifier)
-        }
-        for (const uniqueIdentifier of toRemove) {
+    private removeBucketSigns(): void {
+        for (const uniqueIdentifier of this.bucketIdentifiers) {
             this.removeSign(uniqueIdentifier)
         }
+        this.bucketIdentifiers.clear()
     }
 
     private placeShelfEndCapLabels(
@@ -301,7 +223,7 @@ export class SceneSignManager {
         const worldPos = new THREE.Vector3(labelX, labelY, localZ)
             .applyAxisAngle(yAxis, shelfRotY)
             .add(shelfOrigin)
-        this.placeSign('end-cap', {
+        this.placeSign('canvas', {
             uniqueIdentifier,
             text,
             anchorPosition: worldPos,
@@ -314,7 +236,8 @@ export class SceneSignManager {
         for (const renderer of new Set(Object.values(this.rendererByKind))) {
             renderer.clearAll(this.scene)
         }
-        this.signKindsByIdentifier.clear()
+        this.rendererByIdentifier.clear()
+        this.bucketIdentifiers.clear()
         this.lastPlacedBucket = null
     }
 
@@ -322,7 +245,8 @@ export class SceneSignManager {
         for (const renderer of new Set(Object.values(this.rendererByKind))) {
             renderer.dispose(this.scene)
         }
-        this.signKindsByIdentifier.clear()
+        this.rendererByIdentifier.clear()
+        this.bucketIdentifiers.clear()
         this.shelfTransforms.clear()
         this.sortedGames = []
         this.buckets = new Map()
@@ -335,7 +259,7 @@ export class SceneSignManager {
             this.removeSign(uniqueIdentifier)
             return
         }
-        this.placeSign('ceiling', {
+        this.placeSign('canvas', {
             uniqueIdentifier,
             anchorPosition: recentlyPlayedCeilingAnchor(),
             mount: { style: 'ceiling', signFacingY: 0 },
@@ -403,12 +327,13 @@ export class SceneSignManager {
         if (!shouldPlaceBucketSign(bucket, this.lastPlacedBucket, shelfPosition, recentlyPlayedCeilingAnchor())) return
 
         const uniqueIdentifier = bucketDisplayLabel(bucket!)
-        this.placeSign('bucket', {
+        this.placeSign('canvas', {
             uniqueIdentifier,
             anchorPosition: bucketSignAnchor(shelfPosition),
             mount: { style: 'above-shelf', yOffset: 2.62, frontOffset: 0.28, signFacingY: shelfRotationY },
             style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
         })
+        this.bucketIdentifiers.add(uniqueIdentifier)
         this.lastPlacedBucket = bucket!
     }
 

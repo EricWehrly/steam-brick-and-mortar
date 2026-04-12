@@ -15,8 +15,6 @@ import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
 import type { ISignRenderer, SignRequest } from './ISignRenderer'
 
 const FONT_URL        = '/fonts/helvetiker_bold.typeface.json'
-const DEFAULT_FONT_SIZE  = 0.28   // metres — slightly smaller than neon for legibility at extrude depth
-const DEFAULT_DEPTH      = 0.06   // how far letters poke out
 const BEVEL_SIZE         = 0.008
 const BEVEL_THICKNESS    = 0.004
 
@@ -26,9 +24,15 @@ interface BlockSignEntry {
 }
 
 export class BlockLetterSignRenderer implements ISignRenderer {
+    static readonly defaults = {
+        color:    0xffffff,
+        fontSize: 0.28,
+        depth:    0.06,
+    } as const
+
     private readonly entries = new Map<string, BlockSignEntry>()
     private font: Font | null = null
-    private fontLoadPromise: Promise<Font> | null = null
+    private fontLoadPromise: Promise<Font> | null = null    // temporary until font is loaded; prevents multiple concurrent loads
 
     private loadFont(): Promise<Font> {
         if (this.font) return Promise.resolve(this.font)
@@ -49,9 +53,9 @@ export class BlockLetterSignRenderer implements ISignRenderer {
         this.removeSign(request.uniqueIdentifier, scene)
 
         const text = request.text ?? ''
-        const color    = request.style?.color ?? 0xffffff
-        const fontSize = request.style?.fontSize ?? DEFAULT_FONT_SIZE
-        const depth    = request.style?.depth   ?? DEFAULT_DEPTH
+        const color    = request.style?.color    ?? BlockLetterSignRenderer.defaults.color
+        const fontSize = request.style?.fontSize ?? BlockLetterSignRenderer.defaults.fontSize
+        const depth    = request.style?.depth    ?? BlockLetterSignRenderer.defaults.depth
 
         const group = new THREE.Group()
         group.position.copy(request.position)
