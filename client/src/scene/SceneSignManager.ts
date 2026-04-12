@@ -21,7 +21,7 @@ import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
 import { EventManager } from '../core/EventManager'
 import { SignageRenderer, type SignageConfig } from './SignageRenderer'
-import { NeonTubeSign } from './NeonTubeSign'
+import { NeonTubeSign, type NeonTubeSignConfig } from './NeonTubeSign'
 import {
     GameEventTypes,
     StorePropsEventTypes,
@@ -221,6 +221,7 @@ export class SceneSignManager {
         this.lastPlacedBucket = null
         this.clearTimeBucketSigns()
         this.syncRecentlyPlayedCeilingSign()
+        this.syncNeonEntranceSign()
         this.replayTimeBucketSignsFromCreatedShelves()
     }
 
@@ -396,7 +397,7 @@ export class SceneSignManager {
      * Neon signs are 3D geometry (Groups), not flat canvas planes,
      * so they live in a separate registry from SignRecord.
      */
-    public setNeonSign(label: string, config: import('./NeonTubeSign').NeonTubeSignConfig): void {
+    public setNeonSign(label: string, config: NeonTubeSignConfig): void {
         this.removeNeonSign(label)
         const sign = new NeonTubeSign(config)
         this.scene.add(sign.mesh)
@@ -433,6 +434,27 @@ export class SceneSignManager {
                 height: 0.65,
             },
         }, 'ceiling')
+    }
+
+    /**
+     * Place (or remove) a neon "steam" entrance sign above the recently-played section.
+     * Only shown when the user has played anything — same gate as the ceiling label.
+     */
+    private syncNeonEntranceSign(): void {
+        const label = 'neon-entrance'
+        if (!this.hasRecentlyPlayedData) {
+            this.removeNeonSign(label)
+            return
+        }
+        // Positioned slightly above and in front of the ceiling sign anchor,
+        // at eye-catching height above the recently-played section.
+        const anchor = recentlyPlayedCeilingAnchor()
+        this.setNeonSign(label, {
+            color: 0xff6a00,   // warm orange — classic neon
+            position: new THREE.Vector3(anchor.x, anchor.y + 0.4, anchor.z + 0.5),
+            scale: 1.2,
+            text: 'steam',
+        })
     }
 
     private replayTimeBucketSignsFromCreatedShelves(): void {
