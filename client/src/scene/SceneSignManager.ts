@@ -410,7 +410,7 @@ export class SceneSignManager {
         const anchor = recentlyPlayedCeilingAnchor()
         this.placeSign('neon-tube', {
             uniqueIdentifier,
-            anchorPosition: new THREE.Vector3(anchor.x, anchor.y + 0.4, anchor.z + 0.5),
+            anchorPosition: new THREE.Vector3(anchor.x, anchor.y - 0.4, anchor.z + 0.5),
             text: 'steam',
             scale: 1.2,
             style: {

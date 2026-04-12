@@ -6,6 +6,21 @@
  * Builds a flat Float32Array of tube vertex positions per glyph path and posts them
  * back as Transferables (zero-copy).
  *
+ * Current rendering approach — outline tracing:
+ *   Each glyph contour (outer edge + inner holes) becomes a separate tube loop.
+ *   This produces a "hollow letters" look: tubes running along the perimeter of each
+ *   stroke rather than through its centre. Letters read as outlines, not solid neon.
+ *
+ * TD: stroke-skeleton rendering
+ *   Real neon signs bend a single continuous tube along the *medial axis* of each
+ *   stroke (the centreline, equidistant from both edges). To pursue that:
+ *   - Use a font with explicit stroke/skeleton data (Hershey fonts are defined as
+ *     polylines rather than outlines and are a natural fit), or
+ *   - Extract the medial axis by thinning the filled glyph shape (Voronoi / straight
+ *     skeleton algorithm). opentype.js + potrace is one documented path.
+ *   Either approach eliminates the seam artifact at contour start/end and produces
+ *   single unbroken tube paths per letter stroke.
+ *
  * Message protocol:
  *   IN:  NeonGeometryRequest
  *   OUT: NeonGeometryResponse | NeonGeometryError
