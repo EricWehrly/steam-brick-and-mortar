@@ -125,10 +125,11 @@ describe('NeonTubeSignRenderer', () => {
         expect((group as { children: object[] }).children.length).toBeGreaterThan(0)
     })
 
-    it('emits PointLightRequested after geometry is built', async () => {
+    it('emits PointLightRequested immediately (not deferred to worker completion)', () => {
         const scene = makeScene()
         renderer.setSign(makeRequest(), scene)
-        await vi.waitFor(() => expect(mockEmit).toHaveBeenCalled())
+        // Emit must fire synchronously in setSign() — position/color are known upfront.
+        expect(mockEmit).toHaveBeenCalledOnce()
         const [eventType, payload] = mockEmit.mock.calls[0]
         expect(eventType).toBe('lighting:point-light-requested')
         expect(payload.color).toBe(0xff6600)

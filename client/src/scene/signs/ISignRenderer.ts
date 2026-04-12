@@ -16,12 +16,10 @@
  *   Each renderer owns its own GPU resources and dispose() lifecycle.
  *
  * Worker note:
- *   Geometry-heavy renderers (NeonTube, BlockLetter) should build in a Worker
- *   and upload to GPU on completion. ManagedWorker is the preferred vehicle.
- *   The current NeonTubeSign implementation uses requestIdleCallback as a
- *   temporary approximation of this; it should migrate to ManagedWorker
- *   once the worker message protocol for geometry transfer is settled.
- *   TD: neon-worker-migration
+ *   Geometry-heavy renderers (NeonTube, BlockLetter) build geometry off the main
+ *   thread via ManagedWorker subclasses (see NeonGeometryWorker). The root Object3D
+ *   is added to the scene immediately on setSign(); geometry and lighting are applied
+ *   asynchronously on worker completion.
  */
 
 import type * as THREE from 'three'
