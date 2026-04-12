@@ -250,10 +250,14 @@ export class SceneSignManager {
     }
 
     private buildSignRequest(kind: SignKind, descriptor: SignDescriptor): SignRequest {
+        // When text is omitted, fall back to uniqueIdentifier as the display label.
+        // Callers that want a sign with no visible text must pass text: '' explicitly.
+        const text = descriptor.text ?? descriptor.uniqueIdentifier
+
         if (kind === 'neon-tube') {
             return {
                 uniqueIdentifier: descriptor.uniqueIdentifier,
-                text: descriptor.text,
+                text,
                 position: descriptor.anchorPosition,
                 facingY: descriptor.facingY,
                 scale: descriptor.scale,
@@ -272,7 +276,7 @@ export class SceneSignManager {
 
         return {
             uniqueIdentifier: descriptor.uniqueIdentifier,
-            text: descriptor.text,
+            text,
             position: this.resolvePosition(descriptor.anchorPosition, mount),
             facingY: mount.signFacingY,
             style,
