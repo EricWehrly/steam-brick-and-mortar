@@ -260,7 +260,7 @@ describe('SceneSignManager — lifecycle', () => {
 
         // Block letter sign text
         const [blockRequest] = blockSetSignSpy.mock.calls[0]
-        expect(blockRequest.text).toBe('Steam Library')
+        expect(blockRequest.text).toBe('STEAM LIBRARY')
 
         manager.dispose()
     })
