@@ -106,7 +106,7 @@ describe('SceneSignManager — text resolution', () => {
     it('passes uniqueIdentifier as text when descriptor.text is omitted (canvas)', () => {
         const manager = new SceneSignManager()
 
-        manager.placeSign('category', {
+        manager.placeSign('canvas', {
             uniqueIdentifier: 'Action',
             anchorPosition: new THREE.Vector3(0, 2, -5),
         })
@@ -120,7 +120,7 @@ describe('SceneSignManager — text resolution', () => {
     it('passes explicit text when provided, ignores uniqueIdentifier (canvas)', () => {
         const manager = new SceneSignManager()
 
-        manager.placeSign('category', {
+        manager.placeSign('canvas', {
             uniqueIdentifier: 'section-42',
             text: 'RPGs & Adventures',
             anchorPosition: new THREE.Vector3(0, 2, -5),
@@ -135,7 +135,7 @@ describe('SceneSignManager — text resolution', () => {
     it('passes uniqueIdentifier as text when descriptor.text is omitted (ceiling)', () => {
         const manager = new SceneSignManager()
 
-        manager.placeSign('ceiling', {
+        manager.placeSign('canvas', {
             uniqueIdentifier: 'Recently Played',
             anchorPosition: new THREE.Vector3(0, 3.5, -6),
             mount: { style: 'ceiling', signFacingY: 0 },
@@ -193,7 +193,7 @@ describe('SceneSignManager — mount math', () => {
         const signFacingY = Math.PI / 2
         const frontOffset = 0.3
 
-        manager.placeSign('category', {
+        manager.placeSign('canvas', {
             uniqueIdentifier: 'Played This Week',
             anchorPosition: anchor,
             mount: { style: 'above-shelf', yOffset: 0.2, frontOffset, signFacingY },
@@ -212,7 +212,7 @@ describe('SceneSignManager — mount math', () => {
         const manager = new SceneSignManager()
         const anchor = new THREE.Vector3(0, 2, -5)
 
-        manager.placeSign('category', { uniqueIdentifier: 'RPG', anchorPosition: anchor })
+        manager.placeSign('canvas', { uniqueIdentifier: 'RPG', anchorPosition: anchor })
         manager.placeSign('neon-tube', { uniqueIdentifier: 'neon-entrance', anchorPosition: anchor })
 
         expect(canvasSetSignSpy).toHaveBeenCalledOnce()

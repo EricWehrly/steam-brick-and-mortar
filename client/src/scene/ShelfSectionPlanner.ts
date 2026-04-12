@@ -12,7 +12,8 @@ import * as THREE from 'three'
 import { EventManager } from '../core/EventManager'
 import { StorePropsEventTypes, type BatchReadyForPlacementEvent } from '../types/InteractionEvents'
 import { groupByGenre, KNOWN_GENRES, type ShelfGroup } from './categorization/GameSortFunctions'
-import { SceneSignManager, type SignMount } from './SceneSignManager'
+import { SceneSignManager } from './SceneSignManager'
+import type { SignMount } from './SignTypes'
 import type { SteamGameData } from './game-box/types/GameData'
 import { Logger } from '../utils/Logger'
 
@@ -108,7 +109,7 @@ export class ShelfSectionPlanner {
                 continue
             }
 
-            this.signSystem.placeSign('category', {
+            this.signSystem.placeSign('canvas', {
                 uniqueIdentifier: group.label,
                 anchorPosition: anchorPos,
                 mount: { style: this.config.signMountStyle, yOffset: this.config.signYOffset }

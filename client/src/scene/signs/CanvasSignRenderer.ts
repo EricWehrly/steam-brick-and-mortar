@@ -25,10 +25,6 @@ interface SignEntry {
     height: number
 }
 
-const DEFAULT_FONT_SIZE   = 0.18   // metres — readable at arm's length in VR
-const DEFAULT_BG_COLOR    = 0x1a3a5c
-const DEFAULT_TEXT_COLOR  = 0xffffff
-
 /**
  * Estimate physical sign dimensions from fontSize and padding.
  * Character width is approximated at 0.6× fontSize (typical for bold sans-serif).
@@ -47,6 +43,13 @@ function deriveSignDimensions(
 }
 
 export class CanvasSignRenderer implements ISignRenderer {
+    static readonly defaults = {
+        fontSize:        0.18,
+        backgroundColor: 0x1a3a5c,
+        textColor:       0xffffff,
+        padding:         '0.10 0.18',
+    } as const
+
     private readonly renderer: SignageRenderer
     private readonly signs = new Map<string, SignEntry>()
 
@@ -57,10 +60,10 @@ export class CanvasSignRenderer implements ISignRenderer {
     setSign(request: SignRequest, scene: THREE.Scene): THREE.Object3D {
         const text            = request.text ?? ''
         const style           = request.style ?? {}
-        const fontSize        = style.fontSize ?? DEFAULT_FONT_SIZE
-        const padding         = parsePadding(style.padding)
-        const backgroundColor = style.backgroundColor ?? DEFAULT_BG_COLOR
-        const textColor       = style.textColor ?? DEFAULT_TEXT_COLOR
+        const fontSize        = style.fontSize        ?? CanvasSignRenderer.defaults.fontSize
+        const padding         = parsePadding(style.padding ?? CanvasSignRenderer.defaults.padding)
+        const backgroundColor = style.backgroundColor ?? CanvasSignRenderer.defaults.backgroundColor
+        const textColor       = style.textColor        ?? CanvasSignRenderer.defaults.textColor
         const dimensions      = deriveSignDimensions(text, fontSize, padding)
 
         const existing = this.signs.get(request.uniqueIdentifier)

@@ -10,7 +10,7 @@
  *   BlockLetterSignRenderer  — extruded TextGeometry letters (3D, font-loaded async)
  *
  * Usage:
- *   SceneSignManager selects a renderer per SignKind and delegates to it.
+ *   SceneSignManager selects a renderer and delegates to it.
  *   Each renderer owns its own GPU resources and lifecycle.
  *
  * Worker note:
