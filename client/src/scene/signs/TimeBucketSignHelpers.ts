@@ -57,15 +57,12 @@ export function shouldPlaceBucketSign(
 }
 
 /**
- * Compute the world-space anchor position for a time-bucket sign above a shelf.
- * The sign floats slightly above the default shelf-sign height (extra 0.02 m headroom).
+ * Compute the world-space anchor for a time-bucket sign above a shelf.
+ * This is the raw shelf position — mount resolution in SceneSignManager adds the
+ * vertical offset to produce the final sign position.
  */
 export function bucketSignAnchor(shelfPosition: THREE.Vector3): THREE.Vector3 {
-    return new THREE.Vector3(
-        shelfPosition.x,
-        shelfPosition.y + 2.0 + 0.02,
-        shelfPosition.z
-    )
+    return shelfPosition.clone()
 }
 
 /**

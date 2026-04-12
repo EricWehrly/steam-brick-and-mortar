@@ -340,11 +340,19 @@ export class SceneSignManager {
      *               layout events rather than responding to GamesSort directly.
      */
     private syncSteamLibraryBlockSign(): void {
-        const anchor = recentlyPlayedCeilingAnchor()
+        // Position relative to the ceiling sign: drop below it, push toward entrance.
+        // These offsets are intentional art direction, not physics — adjust when room dimensions change.
+        const DROP_BELOW_CEILING_SIGN = 0.6
+        const PUSH_TOWARD_ENTRANCE = 1.5
+        const ceilingAnchor = recentlyPlayedCeilingAnchor()
         this.placeSign('block-letter', {
             uniqueIdentifier: 'steam-library-title',
             text: 'STEAM LIBRARY',
-            anchorPosition: new THREE.Vector3(anchor.x, anchor.y - 0.6, anchor.z + 1.5),
+            anchorPosition: new THREE.Vector3(
+                ceilingAnchor.x,
+                ceilingAnchor.y - DROP_BELOW_CEILING_SIGN,
+                ceilingAnchor.z + PUSH_TOWARD_ENTRANCE
+            ),
             style: {
                 color: 0x003087,
                 fontSize: 0.35,
@@ -370,7 +378,7 @@ export class SceneSignManager {
         this.placeSign('bucket', {
             uniqueIdentifier,
             anchorPosition: bucketSignAnchor(shelfPosition),
-            mount: { style: 'above-shelf', yOffset: 0, frontOffset: 0.28, signFacingY: shelfRotationY },
+            mount: { style: 'above-shelf', yOffset: 2.62, frontOffset: 0.28, signFacingY: shelfRotationY },
             style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
         })
         this.lastPlacedBucket = bucket!

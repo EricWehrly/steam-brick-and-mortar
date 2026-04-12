@@ -97,10 +97,11 @@ describe('shouldPlaceBucketSign', () => {
     })
 
     it('returns false when sign anchor collides with ceiling sign', () => {
-        // Put shelfPosition directly under the ceiling anchor
+        // Shelf at XZ matching ceiling anchor — bucketSignAnchor returns shelf position
+        // directly, so collision check uses the shelf position itself.
         const shelfUnderCeiling = new THREE.Vector3(
             ceilingAnchor.x,
-            ceilingAnchor.y - 2.0 - 0.02, // bucketSignAnchor adds this back
+            ceilingAnchor.y,
             ceilingAnchor.z
         )
         expect(shouldPlaceBucketSign(
@@ -115,12 +116,13 @@ describe('shouldPlaceBucketSign', () => {
 // ─── bucketSignAnchor ────────────────────────────────────────────────────────
 
 describe('bucketSignAnchor', () => {
-    it('positions sign above shelf by 2.02 m', () => {
+    it('returns the shelf position (mount resolution in SceneSignManager applies the offset)', () => {
         const shelfPos = new THREE.Vector3(3, 0, -5)
         const anchor = bucketSignAnchor(shelfPos)
         expect(anchor.x).toBe(shelfPos.x)
+        expect(anchor.y).toBe(shelfPos.y)
         expect(anchor.z).toBe(shelfPos.z)
-        expect(anchor.y).toBeCloseTo(2.02, 5)
+        expect(anchor).not.toBe(shelfPos) // returns a clone, not the original
     })
 })
 
