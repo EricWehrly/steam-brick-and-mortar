@@ -27,6 +27,8 @@ export default [
         clearInterval: 'readonly',
         queueMicrotask: 'readonly',
         CustomEvent: 'readonly',
+        requestIdleCallback: 'readonly',
+        cancelIdleCallback: 'readonly',
         requestAnimationFrame: 'readonly',
         cancelAnimationFrame: 'readonly',
         localStorage: 'readonly',
