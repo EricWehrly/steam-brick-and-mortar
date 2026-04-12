@@ -67,37 +67,47 @@ export class BlockLetterSignRenderer implements ISignRenderer {
 
         this.entries.set(request.uniqueIdentifier, { group, material })
 
-        // Build geometry async (font may need to load first)
-        void this.loadFont().then((font) => {
-            // Sign may have been removed while font was loading
-            if (!this.entries.has(request.uniqueIdentifier)) return
-
-            const geometry = new TextGeometry(text, {
-                font,
-                size:           fontSize,
-                depth,
-                bevelEnabled:   true,
-                bevelSize:      BEVEL_SIZE,
-                bevelThickness: BEVEL_THICKNESS,
-                bevelSegments:  2,
-            })
-
-            // Center horizontally and vertically
-            geometry.computeBoundingBox()
-            const box = geometry.boundingBox
-            if (box) {
-                const offsetX = -(box.max.x + box.min.x) / 2
-                const offsetY = -(box.max.y + box.min.y) / 2
-                geometry.translate(offsetX, offsetY, 0)
-            }
-
-            const mesh = new THREE.Mesh(geometry, material)
-            group.add(mesh)
-        }).catch((err) => {
-            console.error(`[BlockLetterSignRenderer] Failed to build "${request.uniqueIdentifier}":`, err)
-        })
+        void this.loadFont()
+            .then((font) => this.onFontLoaded(font, request.uniqueIdentifier, text, fontSize, depth))
+            .catch((err) => this.onFontLoadFailed(request.uniqueIdentifier, err))
 
         return group
+    }
+
+    private buildLetterGeometry(font: Font, text: string, fontSize: number, depth: number): THREE.BufferGeometry {
+        const geometry = new TextGeometry(text, {
+            font,
+            size:           fontSize,
+            depth,
+            bevelEnabled:   true,
+            bevelSize:      BEVEL_SIZE,
+            bevelThickness: BEVEL_THICKNESS,
+            bevelSegments:  2,
+        })
+        geometry.computeBoundingBox()
+        const box = geometry.boundingBox
+        if (box) {
+            const offsetX = -(box.max.x + box.min.x) / 2
+            const offsetY = -(box.max.y + box.min.y) / 2
+            geometry.translate(offsetX, offsetY, 0)
+        }
+        return geometry
+    }
+
+    private onFontLoaded(font: Font, uniqueIdentifier: string, text: string, fontSize: number, depth: number): void {
+        const entry = this.entries.get(uniqueIdentifier)
+        if (!entry) return  // removed while font was loading
+        entry.group.add(new THREE.Mesh(this.buildLetterGeometry(font, text, fontSize, depth), entry.material))
+    }
+
+    private onFontLoadFailed(uniqueIdentifier: string, err: unknown): void {
+        console.error(`[BlockLetterSignRenderer] Failed to build "${uniqueIdentifier}":`, err)
+    }
+
+    private disposeEntryGeometry(entry: BlockSignEntry): void {
+        entry.group.traverse((child) => {
+            if (child instanceof THREE.Mesh) child.geometry.dispose()
+        })
     }
 
     removeSign(uniqueIdentifier: string, scene: THREE.Scene): boolean {
@@ -105,11 +115,7 @@ export class BlockLetterSignRenderer implements ISignRenderer {
         if (!entry) return false
         this.entries.delete(uniqueIdentifier)
         scene.remove(entry.group)
-        entry.group.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-                child.geometry.dispose()
-            }
-        })
+        this.disposeEntryGeometry(entry)
         entry.material.dispose()
         return true
     }
