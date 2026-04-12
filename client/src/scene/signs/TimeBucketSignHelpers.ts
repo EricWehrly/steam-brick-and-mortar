@@ -50,19 +50,10 @@ export function shouldPlaceBucketSign(
     if (bucket === null) return false
     if (bucket === lastPlacedBucket) return false
 
-    const signAnchor = bucketSignAnchor(shelfPosition)
+    const signAnchor = shelfPosition
     if (ceilingSignAnchor.distanceTo(signAnchor) <= collisionRadius) return false
 
     return true
-}
-
-/**
- * Compute the world-space anchor for a time-bucket sign above a shelf.
- * This is the raw shelf position — mount resolution in SceneSignManager adds the
- * vertical offset to produce the final sign position.
- */
-export function bucketSignAnchor(shelfPosition: THREE.Vector3): THREE.Vector3 {
-    return shelfPosition.clone()
 }
 
 /**

@@ -7,30 +7,39 @@
 
 ## Must-Have for Demo
 
-### Feature 6.1 — Shelf Visual Polish *(visible, but skippable)*
+- None. Current remaining items are non-blocking.
+
+---
+
+## Early Phase 2
+
+### Feature 6.1 — Shelf Visual Polish
 - MDF veneer / improved shelf materials
 - Brand-consistent blue accent applied to shelf components
-- **Status:** Not started. Current gray shelf is functional; this is a polish gap.
+- **Status:** Deferred to early Phase 2.
 
----
-
-## Nice-to-Have (demo works without these)
-
-### Feature 5.5 — Load from Cache UI
-- "Load from Cache" button in Steam Account panel
-- Lightweight game-list cache for instant availability checks
-- **Status:** Infrastructure is solid (IndexedDB, `SimpleCacheManager`). UI trigger not wired.
-
-### Feature 6.3 — Lighting Settings *(stretch goal)*
+### Feature 6.3 — Lighting Settings
 - Tiered lighting quality selector (basic/standard/high)
-- **Status:** Basic lighting functional for personal demo. Full settings deferred.
+- **Status:** Deferred to early Phase 2.
+
+### Advanced categorization / user Steam categories
+- Already planned for Phase 2; prioritize as an early milestone.
 
 ---
 
-## Not Blocking Phase 1
+## Tracking Buckets
 
-The following are tracked but not required before the personal demo:
+Use these four categories for planning hygiene:
 
-- End-cap sign layout polish (tracked in `docs/roadmaps/bugs.md`)
-- Disconnected settings checkboxes (tracked in tech-debt)
-- Advanced categorization / user Steam categories (Phase 2)
+- **Roadmap** = planned feature work
+- **Tech debt** = quality/architecture fixes we should make
+- **Polish** = nice-to-have presentation quality improvements
+- **Bugs** = incorrect behavior (shippable and non-shippable)
+
+---
+
+## Notes
+
+- **Feature 5.5 — Load from Cache UI** appears implemented (`loadFromCacheButton` in `client/src/ui/SteamUIPanel.ts`).
+  Keep this out of remaining-work unless a specific bug is found.
+- Disconnected settings checkboxes: track under tech debt / UI revamp plan (borderline bug).
