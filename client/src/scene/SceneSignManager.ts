@@ -65,6 +65,25 @@ export const SignStyles = {
 
 export type SignMountStyle = 'above-shelf' | 'wall' | 'ceiling'
 
+/**
+ * Describes how a sign attaches to its anchor point in the scene.
+ *
+ * The anchor is a semantic reference position (shelf top, ceiling plane, etc.).
+ * Mount style + offsets determine the sign's final world position by offsetting
+ * from that anchor.
+ *
+ * Attachment intent (not yet implemented — TODO(layout)):
+ *   Signs have a natural attachment edge that connects to the anchor surface:
+ *   - 'ceiling': top edge of the sign connects to the bottom of the ceiling.
+ *     Final position = ceiling Y minus half sign height.
+ *   - 'above-shelf': bottom edge connects to the top face of the shelf bracket.
+ *     Final position = shelf-face Y plus half sign height (derived from font size + padding).
+ *   - 'wall': face of sign flush with the wall surface.
+ *
+ *   Once sign dimensions are computed by renderers (ISignRenderer.measure() or similar),
+ *   the mount resolver can use them to place signs edge-to-surface rather than
+ *   anchor-to-centre. Until then, yOffset carries the full manual offset.
+ */
 export interface SignMount {
     style: SignMountStyle
     yOffset?: number
@@ -264,22 +283,31 @@ export class SceneSignManager {
         const yAxis = new THREE.Vector3(0, 1, 0)
         const labelX = surface.centerX + (surface.width / 2) - 0.15
         const labelY = surface.topY + 0.1
+        this.placeEndCapLabel(`shelf-front-label-${shelfIndex}`, 'FRONT', surface.backZ,  rotY,           labelX, labelY, position, rotY, yAxis)
+        this.placeEndCapLabel(`shelf-back-label-${shelfIndex}`,  'BACK',  surface.frontZ, rotY + Math.PI, labelX, labelY, position, rotY, yAxis)
+    }
 
-        const placeEndCap = (identifier: string, text: string, localZ: number, facingY: number) => {
-            const worldPos = new THREE.Vector3(labelX, labelY, localZ)
-                .applyAxisAngle(yAxis, rotY)
-                .add(position)
-            this.placeSign('end-cap', {
-                uniqueIdentifier: identifier,
-                text,
-                anchorPosition: worldPos,
-                mount: { style: 'above-shelf', yOffset: 0, signFacingY: facingY },
-                style: SignStyles.ShelfEndLabel,
-            })
-        }
-
-        placeEndCap(`shelf-front-label-${shelfIndex}`, 'FRONT', surface.backZ,  rotY)
-        placeEndCap(`shelf-back-label-${shelfIndex}`,  'BACK',  surface.frontZ, rotY + Math.PI)
+    private placeEndCapLabel(
+        uniqueIdentifier: string,
+        text: string,
+        localZ: number,
+        signFacingY: number,
+        labelX: number,
+        labelY: number,
+        shelfOrigin: THREE.Vector3,
+        shelfRotY: number,
+        yAxis: THREE.Vector3,
+    ): void {
+        const worldPos = new THREE.Vector3(labelX, labelY, localZ)
+            .applyAxisAngle(yAxis, shelfRotY)
+            .add(shelfOrigin)
+        this.placeSign('end-cap', {
+            uniqueIdentifier,
+            text,
+            anchorPosition: worldPos,
+            mount: { style: 'above-shelf', yOffset: 0, signFacingY },
+            style: SignStyles.ShelfEndLabel,
+        })
     }
 
     public clearAll(): void {
