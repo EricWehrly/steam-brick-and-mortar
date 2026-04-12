@@ -21,6 +21,7 @@ import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
 import { EventManager } from '../core/EventManager'
 import { SignageRenderer, type SignageConfig } from './SignageRenderer'
+import { NeonTubeSign } from './NeonTubeSign'
 import {
     GameEventTypes,
     StorePropsEventTypes,
@@ -131,6 +132,7 @@ export type SignKind =
     | 'bucket'      // time-bucket section divider
     | 'ceiling'     // ceiling-hung feature sign (e.g. Recently Played)
     | 'end-cap'     // orientation end-cap label on a shelf unit
+    | 'neon-tube'   // 3D TubeGeometry neon sign
 
 // ─── Internal storage record ──────────────────────────────────────────────────
 
@@ -159,6 +161,7 @@ export class SceneSignManager {
     private readonly renderer: SignageRenderer
     private readonly scene: THREE.Scene
     private readonly signs: Map<string, SignRecord> = new Map()
+    private readonly neonSigns: Map<string, NeonTubeSign> = new Map()
     private readonly shelfTransforms = new Map<number, { position: THREE.Vector3; rotationY: number }>()
     private readonly timeBucketSignLabels = new Set<string>()
     private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
@@ -380,10 +383,33 @@ export class SceneSignManager {
 
     public dispose(): void {
         this.clearAll()
+        for (const sign of this.neonSigns.values()) sign.dispose()
+        this.neonSigns.clear()
         this.shelfTransforms.clear()
         this.sortedGames = []
         this.buckets = new Map()
         this.renderer.dispose()
+    }
+
+    /**
+     * Place or replace a NeonTubeSign at a labelled position.
+     * Neon signs are 3D geometry (Groups), not flat canvas planes,
+     * so they live in a separate registry from SignRecord.
+     */
+    public setNeonSign(label: string, config: import('./NeonTubeSign').NeonTubeSignConfig): void {
+        this.removeNeonSign(label)
+        const sign = new NeonTubeSign(config)
+        this.scene.add(sign.mesh)
+        this.neonSigns.set(label, sign)
+    }
+
+    public removeNeonSign(label: string): void {
+        const existing = this.neonSigns.get(label)
+        if (existing) {
+            this.scene.remove(existing.mesh)
+            existing.dispose()
+            this.neonSigns.delete(label)
+        }
     }
 
     private syncRecentlyPlayedCeilingSign(): void {
