@@ -13,7 +13,7 @@ import * as THREE from 'three'
 import { SceneSignManager, type SignMount } from './SceneSignManager'
 import { RoomConstants } from './RoomManager'
 
-export const RECENTLY_PLAYED_SIGN_LABEL = 'Recently Played'
+export const RECENTLY_PLAYED_SIGN_UNIQUE_IDENTIFIER = 'Recently Played'
 
 /** Z-position (depth into store) where the sign is anchored. 0 = entrance. */
 // Z midpoint between first arc row (r=5, z=-5) and second (r=7.8, z=-7.8) at centre angle
@@ -51,18 +51,18 @@ export class RecentlyPlayedCeilingSign {
             signFacingY: 0,
         }
 
-        this.signSystem.setSign({
-            label: RECENTLY_PLAYED_SIGN_LABEL,
+        this.signSystem.placeSign('ceiling', {
+            uniqueIdentifier: RECENTLY_PLAYED_SIGN_UNIQUE_IDENTIFIER,
             anchorPosition: this.position,
             mount,
-            // Blue text on gold � matches the store theme direction.
+            // Blue text on gold — matches the store theme direction.
             // TD: align with UI design tokens once store theme is finalised
             //     docs/roadmaps/tech-debt.md -> "UI design tokens"
             style: {
                 backgroundColor: 0xd4a017, // gold
-                textColor: 0x003087,        // deep blue
-                width: 4.0,
-                height: 0.65,
+                textColor: 0x003087,       // deep blue
+                fontSize: 0.30,
+                padding: '0.15 0.28',
             },
         })
     }

@@ -19,10 +19,10 @@ import { LightingEventTypes, type PointLightRequestEvent } from '../../types/Lig
 import { NeonGeometryWorker } from './NeonGeometryWorker'
 import type { ISignRenderer, SignRequest } from './ISignRenderer'
 
-const FONT_SIZE   = 0.3
-const TUBE_RADIUS = 0.015
-const SEGMENTS    = 12
-const EMISSIVE_INTENSITY = 2.5
+const DEFAULT_FONT_SIZE   = 0.3
+const TUBE_RADIUS         = 0.015
+const SEGMENTS            = 12
+const EMISSIVE_INTENSITY  = 2.5
 
 interface NeonSignEntry {
     group: THREE.Group
@@ -40,8 +40,7 @@ export class NeonTubeSignRenderer implements ISignRenderer {
     }
 
     setSign(request: SignRequest, scene: THREE.Scene): THREE.Object3D {
-        // Remove any previous sign with this label
-        this.removeSign(request.label, scene)
+        this.removeSign(request.uniqueIdentifier, scene)
 
         const color = request.style?.color ?? 0xff6600
 
@@ -68,13 +67,13 @@ export class NeonTubeSignRenderer implements ISignRenderer {
                 intensity: 1.5,
                 distance:  2.0,
                 position:  group.position.clone(),
-                name:      `neon-sign-${request.label}`,
+                name:      `neon-sign-${request.uniqueIdentifier}`,
             }
         )
 
         const buildPromise = this.buildGeometry(request, group, material, color)
 
-        this.entries.set(request.label, { group, material, buildPromise })
+        this.entries.set(request.uniqueIdentifier, { group, material, buildPromise })
         return group
     }
 
@@ -84,20 +83,22 @@ export class NeonTubeSignRenderer implements ISignRenderer {
         material: THREE.MeshStandardMaterial,
         color: number,
     ): Promise<void> {
+        const text = request.text ?? ''
+        const fontSize = request.style?.fontSize ?? DEFAULT_FONT_SIZE
         let result: Awaited<ReturnType<NeonGeometryWorker['buildTubes']>>
         try {
-            result = await this.worker.buildTubes(request.text, {
-                fontSize:   FONT_SIZE,
+            result = await this.worker.buildTubes(text, {
+                fontSize,
                 tubeRadius: TUBE_RADIUS,
                 segments:   SEGMENTS,
             })
         } catch (err) {
-            console.error(`[NeonTubeSignRenderer] Worker error for label "${request.label}":`, err)
+            console.error(`[NeonTubeSignRenderer] Worker error for "${request.uniqueIdentifier}":`, err)
             return
         }
 
-        // Worker may have been disposed while the request was in flight (e.g. removeSign called)
-        if (!this.entries.has(request.label)) return
+        // Worker may have been disposed while the request was in flight
+        if (!this.entries.has(request.uniqueIdentifier)) return
 
         for (const tubePts of result.tubes) {
             const pts3d: THREE.Vector3[] = []
@@ -112,25 +113,29 @@ export class NeonTubeSignRenderer implements ISignRenderer {
 
     }
 
-    removeSign(label: string, scene: THREE.Scene): boolean {
-        const entry = this.entries.get(label)
+    removeSign(uniqueIdentifier: string, scene: THREE.Scene): boolean {
+        const entry = this.entries.get(uniqueIdentifier)
         if (!entry) return false
-        this.entries.delete(label)
+        this.entries.delete(uniqueIdentifier)
         scene.remove(entry.group)
         entry.group.traverse((child) => {
             if (child instanceof THREE.Mesh) {
                 child.geometry.dispose()
-                // material is shared — disposed in dispose() below
+                // material is shared — disposed below
             }
         })
         entry.material.dispose()
         return true
     }
 
-    dispose(scene: THREE.Scene): void {
-        for (const label of [...this.entries.keys()]) {
-            this.removeSign(label, scene)
+    clearAll(scene: THREE.Scene): void {
+        for (const uniqueIdentifier of [...this.entries.keys()]) {
+            this.removeSign(uniqueIdentifier, scene)
         }
+    }
+
+    dispose(scene: THREE.Scene): void {
+        this.clearAll(scene)
         this.worker.dispose()
     }
 }

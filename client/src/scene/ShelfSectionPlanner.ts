@@ -108,8 +108,8 @@ export class ShelfSectionPlanner {
                 continue
             }
 
-            this.signSystem.setSign({
-                label: group.label,
+            this.signSystem.placeSign('category', {
+                uniqueIdentifier: group.label,
                 anchorPosition: anchorPos,
                 mount: { style: this.config.signMountStyle, yOffset: this.config.signYOffset }
             })

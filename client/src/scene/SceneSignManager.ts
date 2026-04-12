@@ -20,9 +20,9 @@ import * as THREE from 'three'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
 import { EventManager } from '../core/EventManager'
-import { SignageRenderer } from './SignageRenderer'
 import { CanvasSignRenderer } from './signs/CanvasSignRenderer'
 import { NeonTubeSignRenderer } from './signs/NeonTubeSignRenderer'
+import type { ISignRenderer, SignRequest, SignStyleConfig } from './signs/ISignRenderer'
 import {
     GameEventTypes,
     StorePropsEventTypes,
@@ -45,8 +45,8 @@ import {
 export interface SignStyle {
     backgroundColor: number
     textColor: number
-    width: number
-    height: number
+    fontSize: number
+    padding?: string
 }
 
 export const SignStyles = {
@@ -54,24 +54,24 @@ export const SignStyles = {
     Category: {
         backgroundColor: 0x1a3a5c,
         textColor: 0xffffff,
-        width: 2.2,
-        height: 0.38,
+        fontSize: 0.18,
+        padding: '0.10 0.18',
     } satisfies SignStyle,
 
     /** Accent color — for featured/highlighted sections */
     Featured: {
         backgroundColor: 0x8b0000,
         textColor: 0xffffff,
-        width: 2.2,
-        height: 0.38,
+        fontSize: 0.18,
+        padding: '0.10 0.18',
     } satisfies SignStyle,
 
     /** Small orientation/debug label */
     ShelfEndLabel: {
         backgroundColor: 0x2a2a2a,
         textColor: 0xffffff,
-        width: 0.4,
-        height: 0.25,
+        fontSize: 0.12,
+        padding: '0.04 0.06',
     } satisfies SignStyle,
 } as const
 
@@ -122,21 +122,14 @@ export interface ShelfTopSurface {
  *   mount is ignored (no flat-plane offset logic applies).
  */
 export interface SignDescriptor {
-    label: string
-    text?: string           // display text — defaults to label if omitted
+    uniqueIdentifier: string
+    text?: string
     anchorPosition: THREE.Vector3
-    mount?: SignMount       // required for canvas kinds; ignored for 3D kinds
-    style?: SignStyle       // canvas style (colors, dimensions)
-    /** 3D sign style: color for neon/block-letter kinds */
-    color?: number
-    /** Uniform scale multiplier — for 3D sign kinds */
+    mount?: SignMount
+    style?: SignStyleConfig
     scale?: number
-    /** Yaw override for 3D sign kinds (radians) */
     facingY?: number
 }
-
-/** @deprecated Use SignDescriptor. Kept for internal call sites during migration. */
-export type CategorySignDescriptor = SignDescriptor & { mount: SignMount }
 
 // ─── Sign kind ───────────────────────────────────────────────────────────────
 
@@ -152,16 +145,6 @@ export type SignKind =
     | 'end-cap'     // orientation end-cap label on a shelf unit
     | 'neon-tube'   // 3D TubeGeometry neon sign — rendered via NeonTubeSignRenderer
 
-// ─── Internal storage record ──────────────────────────────────────────────────
-
-interface SignRecord {
-    mesh: THREE.Mesh
-    kind: SignKind
-    /** Geometry dimensions — cached so we can skip geometry recreation on same-size updates. */
-    width: number
-    height: number
-}
-
 // ─── System ───────────────────────────────────────────────────────────────────
 
 // TODO(signage): split bucket-transition + anchor-placement helpers into dedicated modules when we do the SceneSignManager slimming pass.
@@ -176,11 +159,11 @@ export class SceneSignManager {
         return SceneSignManager._instance
     }
 
-    private readonly renderer: SignageRenderer
     private readonly canvasRenderer: CanvasSignRenderer
     private readonly neonRenderer: NeonTubeSignRenderer
+    private readonly rendererByKind: Record<SignKind, ISignRenderer>
     private readonly scene: THREE.Scene
-    private readonly signs: Map<string, SignRecord> = new Map()
+    private readonly signKindsByIdentifier = new Map<string, SignKind>()
     private readonly shelfTransforms = new Map<number, { position: THREE.Vector3; rotationY: number }>()
     private readonly timeBucketSignLabels = new Set<string>()
     private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
@@ -200,9 +183,15 @@ export class SceneSignManager {
     // - "Category System Tech Debt / SignageRenderer: singleton vs instance"
     constructor() {
         this.scene = DataManager.getInstance().getOrThrow<THREE.Scene>(DataKey.MainScene)
-        this.renderer = new SignageRenderer()
         this.canvasRenderer = new CanvasSignRenderer()
         this.neonRenderer = new NeonTubeSignRenderer()
+        this.rendererByKind = {
+            category: this.canvasRenderer,
+            bucket: this.canvasRenderer,
+            ceiling: this.canvasRenderer,
+            'end-cap': this.canvasRenderer,
+            'neon-tube': this.neonRenderer,
+        }
 
         // Self-subscribe to shelf creation events to place end-cap labels automatically.
         // This keeps sign placement logic where it belongs — in the sign manager.
@@ -249,111 +238,66 @@ export class SceneSignManager {
     /**
      * Place or update a sign of any kind.
      *
-     * Dispatches to the appropriate ISignRenderer based on kind:
-     * - Canvas kinds (category, bucket, ceiling, end-cap): anchorPosition is
-     *   resolved through the mount descriptor before being passed to CanvasSignRenderer.
-     * - 3D kinds (neon-tube): anchorPosition is used directly as world position;
-     *   mount is ignored.
-     *
-     * Returns the root Object3D placed in the scene (Mesh for canvas, Group for 3D).
+     * Canvas kinds resolve mount-position from anchorPosition before delegation.
+     * 3D kinds use anchorPosition directly as world position.
      */
     public placeSign(kind: SignKind, descriptor: SignDescriptor): THREE.Object3D {
+        const renderer = this.rendererByKind[kind]
+        const signRequest = this.buildSignRequest(kind, descriptor)
+        const signObject = renderer.setSign(signRequest, this.scene)
+        this.signKindsByIdentifier.set(descriptor.uniqueIdentifier, kind)
+        return signObject
+    }
+
+    private buildSignRequest(kind: SignKind, descriptor: SignDescriptor): SignRequest {
         if (kind === 'neon-tube') {
-            return this.placeNeonSign(descriptor)
-        }
-        return this.placeCanvasSign(kind, descriptor as CategorySignDescriptor)
-    }
-
-    private placeCanvasSign(kind: SignKind, descriptor: CategorySignDescriptor): THREE.Mesh {
-        const mount = descriptor.mount ?? { style: 'above-shelf' }
-        const style = descriptor.style ?? SignStyles.Category
-        const signPos = this.resolvePosition(descriptor.anchorPosition, mount)
-        const text = descriptor.text ?? descriptor.label
-
-        const mesh = this.canvasRenderer.setSign(
-            {
-                label: descriptor.label,
-                position: signPos,
-                text,
-                facingY: mount.signFacingY,
-                style: {
-                    backgroundColor: style.backgroundColor,
-                    textColor: style.textColor,
-                    width: style.width,
-                    height: style.height,
-                },
-            },
-            this.scene
-        ) as THREE.Mesh
-
-        mesh.userData.categoryLabel = descriptor.label
-        mesh.userData.mountStyle = mount.style
-        mesh.userData.signKind = kind
-
-        // Keep the signs Map in sync for getSignsByKind / removeSign / clearByKind
-        const existing = this.signs.get(descriptor.label)
-        if (existing) {
-            existing.mesh = mesh
-            existing.kind = kind
-            existing.width = style.width
-            existing.height = style.height
-        } else {
-            this.signs.set(descriptor.label, { mesh, kind, width: style.width, height: style.height })
-        }
-
-        return mesh
-    }
-
-    private placeNeonSign(descriptor: SignDescriptor): THREE.Object3D {
-        return this.neonRenderer.setSign(
-            {
-                label: descriptor.label,
+            return {
+                uniqueIdentifier: descriptor.uniqueIdentifier,
+                text: descriptor.text,
                 position: descriptor.anchorPosition,
-                text: descriptor.text ?? descriptor.label,
                 facingY: descriptor.facingY,
                 scale: descriptor.scale,
-                style: descriptor.color !== undefined ? { color: descriptor.color } : undefined,
-            },
-            this.scene
-        )
-    }
+                style: descriptor.style,
+            }
+        }
 
-    /**
-     * Remove a sign of any kind by label.
-     * For canvas signs, disposes GPU resources.
-     * For neon signs, delegates to neonRenderer.
-     */
-    public removeSign(label: string): void {
-        // Try canvas first (most common), then neon.
-        if (this.signs.has(label)) {
-            this.canvasRenderer.removeSign(label, this.scene)
-            this.signs.delete(label)
-        } else {
-            this.neonRenderer.removeSign(label, this.scene)
+        const mount = descriptor.mount ?? { style: 'above-shelf' }
+        const defaultStyle = SignStyles.Category
+        const style = {
+            backgroundColor: descriptor.style?.backgroundColor ?? defaultStyle.backgroundColor,
+            textColor: descriptor.style?.textColor ?? defaultStyle.textColor,
+            fontSize: descriptor.style?.fontSize ?? defaultStyle.fontSize,
+            padding: descriptor.style?.padding ?? defaultStyle.padding,
+        }
+
+        return {
+            uniqueIdentifier: descriptor.uniqueIdentifier,
+            text: descriptor.text,
+            position: this.resolvePosition(descriptor.anchorPosition, mount),
+            facingY: mount.signFacingY,
+            style,
         }
     }
 
-    // ─── Legacy convenience shims (kept for call sites not yet migrated) ──────
+    /** Remove a sign of any kind by uniqueIdentifier. */
+    public removeSign(uniqueIdentifier: string): void {
+        const signKind = this.signKindsByIdentifier.get(uniqueIdentifier)
+        if (!signKind) {
+            return
+        }
 
-    /** @deprecated Use placeSign('neon-tube', descriptor) */
-    public setNeonSign(label: string, request: Omit<import('./signs/ISignRenderer').SignRequest, 'label'>): void {
-        this.neonRenderer.setSign({ label, ...request }, this.scene)
-    }
-
-    /** @deprecated Use removeSign(label) */
-    public removeNeonSign(label: string): void {
-        this.neonRenderer.removeSign(label, this.scene)
-    }
-
-    /** @deprecated Use placeSign(kind, descriptor) */
-    public setSign(descriptor: CategorySignDescriptor, kind: SignKind = 'category'): THREE.Mesh {
-        return this.placeCanvasSign(kind, descriptor)
+        this.rendererByKind[signKind].removeSign(uniqueIdentifier, this.scene)
+        this.signKindsByIdentifier.delete(uniqueIdentifier)
     }
 
     /** Remove all signs of a given kind. */
     public clearByKind(kind: SignKind): void {
-        for (const [label, record] of this.signs) {
-            if (record.kind === kind) this.removeSign(label)
+        const identifiersToRemove: string[] = []
+        for (const [uniqueIdentifier, signKind] of this.signKindsByIdentifier) {
+            if (signKind === kind) identifiersToRemove.push(uniqueIdentifier)
+        }
+        for (const uniqueIdentifier of identifiersToRemove) {
+            this.removeSign(uniqueIdentifier)
         }
     }
 
@@ -391,7 +335,7 @@ export class SceneSignManager {
     }
 
     private placeEndCapLabel(
-        label: string,
+        uniqueIdentifier: string,
         text: string,
         localPos: THREE.Vector3,
         shelfOrigin: THREE.Vector3,
@@ -401,7 +345,7 @@ export class SceneSignManager {
     ): void {
         const worldPos = localPos.clone().applyAxisAngle(yAxis, shelfRotY).add(shelfOrigin)
         this.placeSign('end-cap', {
-            label,
+            uniqueIdentifier,
             text,
             anchorPosition: worldPos,
             mount: { style: 'above-shelf', yOffset: 0, signFacingY },
@@ -410,42 +354,31 @@ export class SceneSignManager {
     }
 
     public clearAll(): void {
-        for (const label of [...this.signs.keys()]) {
-            this.canvasRenderer.removeSign(label, this.scene)
-        }
-        this.signs.clear()
+        this.canvasRenderer.clearAll(this.scene)
+        this.neonRenderer.clearAll(this.scene)
+        this.signKindsByIdentifier.clear()
         this.timeBucketSignLabels.clear()
         this.lastPlacedBucket = null
     }
 
-    /** Read-only snapshot of all signs, keyed by label. Useful for tests/debug. */
-    public getSignsByKind(kind: SignKind): ReadonlyMap<string, THREE.Mesh> {
-        const result = new Map<string, THREE.Mesh>()
-        for (const [label, record] of this.signs) {
-            if (record.kind === kind) result.set(label, record.mesh)
-        }
-        return result
-    }
-
     public dispose(): void {
         this.clearAll()
-        this.neonRenderer.dispose(this.scene)
         this.shelfTransforms.clear()
         this.sortedGames = []
         this.buckets = new Map()
         this.canvasRenderer.dispose(this.scene)
-        this.renderer.dispose()
+        this.neonRenderer.dispose(this.scene)
     }
 
     private syncRecentlyPlayedCeilingSign(): void {
-        const label = 'Recently Played'
+        const uniqueIdentifier = 'Recently Played'
         if (!this.hasRecentlyPlayedData) {
-            this.removeSign(label)
+            this.removeSign(uniqueIdentifier)
             return
         }
 
         this.placeSign('ceiling', {
-            label,
+            uniqueIdentifier,
             anchorPosition: recentlyPlayedCeilingAnchor(),
             mount: {
                 style: 'ceiling',
@@ -454,8 +387,8 @@ export class SceneSignManager {
             style: {
                 backgroundColor: 0xd4a017,
                 textColor: 0x003087,
-                width: 4.0,
-                height: 0.65,
+                fontSize: 0.30,
+                padding: '0.15 0.28',
             },
         })
     }
@@ -465,18 +398,21 @@ export class SceneSignManager {
      * Only shown when the user has played anything — same gate as the ceiling label.
      */
     private syncNeonEntranceSign(): void {
-        const label = 'neon-entrance'
+        const uniqueIdentifier = 'neon-entrance'
         if (!this.hasRecentlyPlayedData) {
-            this.removeSign(label)
+            this.removeSign(uniqueIdentifier)
             return
         }
         const anchor = recentlyPlayedCeilingAnchor()
         this.placeSign('neon-tube', {
-            label,
+            uniqueIdentifier,
             anchorPosition: new THREE.Vector3(anchor.x, anchor.y + 0.4, anchor.z + 0.5),
             text: 'steam',
             scale: 1.2,
-            color: 0xff6a00,  // warm orange — classic neon
+            style: {
+                color: 0xff6a00,  // warm orange — classic neon
+                fontSize: 0.3,
+            },
         })
     }
 
@@ -500,11 +436,11 @@ export class SceneSignManager {
         }
 
         // bucket is non-null here (shouldPlaceBucketSign guarantees it)
-        const label = bucketDisplayLabel(bucket!)
+        const uniqueIdentifier = bucketDisplayLabel(bucket!)
         const anchor = bucketSignAnchor(shelfPosition)
 
         this.placeSign('bucket', {
-            label,
+            uniqueIdentifier,
             anchorPosition: anchor,
             mount: {
                 style: 'above-shelf',
@@ -512,9 +448,9 @@ export class SceneSignManager {
                 frontOffset: 0.28,
                 signFacingY: shelfRotationY,
             },
-            style: { ...SignStyles.Category, width: 1.8, height: 0.32 },
+            style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
         })
-        this.timeBucketSignLabels.add(label)
+        this.timeBucketSignLabels.add(uniqueIdentifier)
         this.lastPlacedBucket = bucket!
     }
 
