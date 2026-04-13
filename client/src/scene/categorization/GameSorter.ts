@@ -23,6 +23,37 @@ import type { GameSortMode } from '../../types/EnvironmentEvents'
 export { sortByNumericField, sortAlphabetically, sortByEnumIndex, chainComparators, groupByKey, groupByGenre, KNOWN_GENRES, sortByGenreThenPlaytime, resolveGenre, primaryGenre } from './GameSortFunctions'
 export type { ShelfGroup } from './GameSortFunctions'
 
+// ─── Playtime bucket types ───────────────────────────────────────────────────
+
+export enum PlaytimeBucket {
+    Heavy    = 'heavy',
+    Moderate = 'moderate',
+    Light    = 'light',
+    Minimal  = 'minimal',
+    Unplayed = 'unplayed',
+}
+
+const PLAYTIME_BUCKET_LABELS: Record<PlaytimeBucket, string> = {
+    [PlaytimeBucket.Heavy]:    '100+ Hours',
+    [PlaytimeBucket.Moderate]: '10–100 Hours',
+    [PlaytimeBucket.Light]:    '1–10 Hours',
+    [PlaytimeBucket.Minimal]:  'Under an Hour',
+    [PlaytimeBucket.Unplayed]: 'Never Played',
+}
+
+export function getPlaytimeBucketLabel(bucket: PlaytimeBucket): string {
+    return PLAYTIME_BUCKET_LABELS[bucket]
+}
+
+export function getPlaytimeBucket(game: SteamGameData): PlaytimeBucket {
+    const minutes = game.playtime_forever ?? 0
+    if (minutes === 0)     return PlaytimeBucket.Unplayed
+    if (minutes <   60)   return PlaytimeBucket.Minimal
+    if (minutes <   600)  return PlaytimeBucket.Light
+    if (minutes <  6_000) return PlaytimeBucket.Moderate
+    return PlaytimeBucket.Heavy
+}
+
 // ─── Recently-played bucket types ─────────────────────────────────────────────
 
 export enum RecentlyPlayedBucket {
@@ -128,8 +159,8 @@ export class GameSorter {
 
         EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
             sortedGames,
-            buckets: new Map<string, string>(),
-            sortMode: 'by-playtime',
+            buckets: this.buildPlaytimeBucketMap(sortedGames),
+            sortMode: GameSortModes.ByPlaytime,
         })
 
         GameSorter.logger.debug(`GamesSort emitted (by playtime): ${sortedGames.length} games`)
@@ -159,6 +190,19 @@ export class GameSorter {
         GameSorter.logger.debug(
             `GamesSort emitted: ${sortedGames.length} games, ${buckets.size} buckets`
         )
+    }
+
+    private buildPlaytimeBucketMap(
+        sortedGames: ReadonlyArray<Readonly<SteamGameData>>
+    ): ReadonlyMap<string, string> {
+        const buckets = new Map<string, string>()
+        for (const game of sortedGames) {
+            const bucket = getPlaytimeBucket(game as SteamGameData)
+            if (!buckets.has(bucket)) {
+                buckets.set(bucket, getPlaytimeBucketLabel(bucket))
+            }
+        }
+        return buckets
     }
 
     private buildBucketMap(
