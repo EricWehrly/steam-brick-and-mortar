@@ -12,6 +12,11 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
+### Possible memory leak in high LOD textures
+User suspects there could be a memory leak
+Are we releasing high LOD textures when we're done with them? Or are those staying in memory?
+Seems worth checking, and maybe we could check other likely culprits while we're of a mind for it.
+
 ### Re-sort does not reorder game boxes or shelves
 **Priority**: High (feature gap — sort UI exists but games don't move)  
 **Effort**: 1-2 days  
@@ -25,11 +30,6 @@
 **Better long-term**: Sign ownership should be explicit and declarative. Options: (a) each coordinator holds a "sign group" token and clearAll scoped to that token, (b) `SceneSignManager` tracks ownership by registrant and provides `clearGroup(owner)`, (c) layout-driven sign placement where a single coordinator owns the full sign lifecycle per layout pass.  
 **Deferred because**: (a) and (b) require `SceneSignManager` interface changes; (c) requires layout coordinator refactor. Neither fits the current scope.  
 **Files**: `ShelfSectionPlanner.ts`, `SceneSignManager.ts`
-
-### Possible memory leak in high LOD textures
-User suspects there could be a memory leak
-Are we releasing high LOD textures when we're done with them? Or are those staying in memory?
-Seems worth checking, and maybe we could check other likely culprits while we're of a mind for it.
 
 ### Input Architecture: Review `WebXRCoordinator` scope/naming vs actual responsibilities
 **Priority**: High  

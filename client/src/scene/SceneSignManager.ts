@@ -20,7 +20,6 @@ import {
 } from '../types/InteractionEvents'
 import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
 import { RoomConstants } from './RoomManager'
-import { recentlyPlayedCeilingAnchor } from './signs/TimeBucketSignHelpers'
 
 export interface SignStyle {
     backgroundColor: number

@@ -9,10 +9,8 @@
  * They can be unit-tested without a scene or EventManager.
  */
 
-import * as THREE from 'three'
 import { RecentlyPlayedBucket, getRecentlyPlayedBucket, getBucketLabel } from '../categorization/GameSorter'
 import type { SteamGameData } from '../game-box/types/GameData'
-import { RoomConstants } from '../RoomManager'
 
 /** Number of games packed onto a single shelf unit. */
 export const SHELF_BATCH_SIZE = 18
@@ -38,30 +36,14 @@ export function shelfBucket(
  * A sign is placed when:
  * - The shelf has a non-null bucket (see shelfBucket)
  * - The bucket differs from the last placed bucket (transition boundary)
- * - The sign anchor doesn't collide with the ceiling sign anchor
  */
 export function shouldPlaceBucketSign(
     bucket: RecentlyPlayedBucket | null,
     lastPlacedBucket: RecentlyPlayedBucket | null,
-    shelfPosition: THREE.Vector3,
-    ceilingSignAnchor: THREE.Vector3,
-    collisionRadius = 1.5
 ): boolean {
     if (bucket === null) return false
     if (bucket === lastPlacedBucket) return false
-
-    const signAnchor = shelfPosition
-    if (ceilingSignAnchor.distanceTo(signAnchor) <= collisionRadius) return false
-
     return true
-}
-
-/**
- * Compute the world-space anchor for the ceiling "Recently Played" feature sign.
- * Kept here so both SceneSignManager and any future tests use the same source of truth.
- */
-export function recentlyPlayedCeilingAnchor(): THREE.Vector3 {
-    return new THREE.Vector3(0, RoomConstants.STORE_CEILING_HEIGHT - 0.5, -6.4)
 }
 
 /**
