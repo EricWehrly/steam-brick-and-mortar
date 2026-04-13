@@ -33,9 +33,11 @@
 
 > Real work we intend to make a serious attempt at. Not blockers. We punt when stuck.
 
-- [Steam Tag Pipeline](../features/steam-tag-pipeline.md) — SteamSpy tags via background Lambda + S3 snapshot; active in separate branch; feeds tag-sorting north star
-- [Local File Investigation](../features/local-file-investigation.md) — user categories from Steam local files; complementary to SteamSpy tags; non-tentpole
-- [Layout Variations](../features/layout-variations.md) — arc layout exists; square rows + dynamic switching + grouping parameter are the remaining work
+- [Steam Tag Pipeline](../features/steam-tag-pipeline.md) — SteamSpy tags via background Lambda + S3 snapshot; active in separate branch; invest to try, not required
+- [Local File Investigation](../features/local-file-investigation.md) — user categories from Steam local files; research done, implementation is the experiment; invest to try, not required
+- [Layout Variations](../features/layout-variations.md) — arc exists; square rows + dynamic switching are the open work; grouping is Encore
+- [Game Detail Screen](../features/game-detail-screen.md) — design pass tied to VR; do once with VR in mind rather than twice
+- [Room Variants](../features/room-variants.md) — room structure cleanup first, then variant system; Cozy Basement is the target variant
 - [Lighting and Atmosphere](../features/lighting-and-atmosphere.md) — tone presets (corporate → dank), dongle switch panel; core lighting is done, this is the experiential layer
 - [Procedural Texture Quality Pass](../features/procedural-texture-quality.md) — MDF veneer, popcorn ceiling, wood plank walls, carpet; carried from Act 1
 - [UI Standardization](../features/ui-standardization.md) — in-scene omnibar, 3D sign elements, component tokens (started in intermission, may extend into Act 2)

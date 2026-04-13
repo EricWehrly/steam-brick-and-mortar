@@ -42,5 +42,5 @@
 
 ## Act 1 Completed Infrastructure (for reference)
 
-These shipped during Act 1 and are done. Captured here so nothing is lost when Act 1 gets its own doc:
-- [Worker Infrastructure](../features/worker-infrastructure.md) — `ManagedWorker` base class; all workers migrated; `WorkerErrorUtils` deleted; main-thread hitch reduction
+These shipped during Act 1 and are largely done. Captured here so nothing is lost when Act 1 gets its own doc:
+- [Worker Infrastructure](../features/worker-infrastructure.md) — `ManagedWorker` base class; all workers migrated; `WorkerErrorUtils` deleted; main-thread hitch reduction. **One item pending** (carpet worker off-thread); check-in during Key Metrics work.
