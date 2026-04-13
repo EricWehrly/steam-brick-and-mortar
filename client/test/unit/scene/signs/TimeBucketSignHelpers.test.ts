@@ -3,79 +3,76 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-    shelfBucket,
+    shelfBucketKey,
     shouldPlaceBucketSign,
-    bucketDisplayLabel,
 } from '../../../../src/scene/signs/TimeBucketSignHelpers'
-import { RecentlyPlayedBucket } from '../../../../src/scene/categorization/GameSorter'
+import { RecentlyPlayedBucket, PlaytimeBucket } from '../../../../src/scene/categorization/GameSorter'
 import type { SteamGameData } from '../../../../src/scene/game-box/types/GameData'
 
 const NOW = Math.floor(Date.now() / 1000)
 const DAY = 24 * 60 * 60
 
-function gameWithLastPlayed(unixSeconds: number): SteamGameData {
+function gameWithLastPlayed(unixSeconds: number, playtimeMinutes = 60): SteamGameData {
     return {
         appid: Math.floor(Math.random() * 1e6),
         name: 'Game',
-        playtime_forever: 60,
+        playtime_forever: playtimeMinutes,
         rtime_last_played: unixSeconds,
         genres: [{ id: '1', description: 'Action' }],
     } as SteamGameData
 }
 
-describe('shelfBucket', () => {
+describe('shelfBucketKey — recently-played', () => {
     it('returns null when shelf index is out of range', () => {
         const games = [gameWithLastPlayed(NOW - DAY)]
-        expect(shelfBucket(1, games)).toBeNull()
+        expect(shelfBucketKey(1, games, 'recently-played')).toBeNull()
     })
 
-    it('maps shelf to first game in that shelf batch', () => {
-        const games: SteamGameData[] = []
-        for (let i = 0; i < 18; i++) {
-            games.push(gameWithLastPlayed(NOW - DAY))
-        }
+    it('returns the recency bucket key for the first game on the shelf', () => {
+        const games: SteamGameData[] = Array.from({ length: 18 }, () => gameWithLastPlayed(NOW - DAY))
         games.push(gameWithLastPlayed(0))
 
-        expect(shelfBucket(0, games)).not.toBeNull()
-        expect(shelfBucket(1, games)).toBe(RecentlyPlayedBucket.Unplayed)
+        expect(shelfBucketKey(0, games, 'recently-played')).toBe(RecentlyPlayedBucket.ThisWeek)
+        expect(shelfBucketKey(1, games, 'recently-played')).toBe(RecentlyPlayedBucket.Unplayed)
+    })
+})
+
+describe('shelfBucketKey — by-playtime', () => {
+    it('returns null when shelf index is out of range', () => {
+        const games = [gameWithLastPlayed(NOW, 600)]
+        expect(shelfBucketKey(1, games, 'by-playtime')).toBeNull()
+    })
+
+    it('returns the playtime bucket key for the first game on the shelf', () => {
+        const games: SteamGameData[] = Array.from({ length: 18 }, () => gameWithLastPlayed(NOW, 6_001))
+        games.push(gameWithLastPlayed(NOW, 0))
+
+        expect(shelfBucketKey(0, games, 'by-playtime')).toBe(PlaytimeBucket.Heavy)
+        expect(shelfBucketKey(1, games, 'by-playtime')).toBe(PlaytimeBucket.Unplayed)
+    })
+})
+
+describe('shelfBucketKey — by-genre', () => {
+    it('returns null for genre sort (no bucket concept)', () => {
+        const games = [gameWithLastPlayed(NOW)]
+        expect(shelfBucketKey(0, games, 'by-genre')).toBeNull()
     })
 })
 
 describe('shouldPlaceBucketSign', () => {
-    it('returns false when bucket is null', () => {
+    it('returns false when key is null', () => {
         expect(shouldPlaceBucketSign(null, null)).toBe(false)
     })
 
-    it('returns false when bucket equals lastPlacedBucket (no transition)', () => {
-        const bucket = RecentlyPlayedBucket.ThisWeek
-        expect(shouldPlaceBucketSign(bucket, bucket)).toBe(false)
+    it('returns false when key equals lastPlacedKey (no transition)', () => {
+        expect(shouldPlaceBucketSign('this-week', 'this-week')).toBe(false)
     })
 
-    it('returns true when bucket transitions', () => {
-        expect(shouldPlaceBucketSign(
-            RecentlyPlayedBucket.ThisWeek,
-            RecentlyPlayedBucket.ThisMonth,
-        )).toBe(true)
+    it('returns true when key transitions', () => {
+        expect(shouldPlaceBucketSign('this-week', 'this-month')).toBe(true)
     })
 
     it('returns true when transitioning from null', () => {
-        expect(shouldPlaceBucketSign(RecentlyPlayedBucket.ThisWeek, null)).toBe(true)
-    })
-})
-
-describe('bucketDisplayLabel', () => {
-    it('returns Never Played for Unplayed bucket', () => {
-        expect(bucketDisplayLabel(RecentlyPlayedBucket.Unplayed)).toBe('Never Played')
-    })
-
-    it('returns a non-empty string for played buckets', () => {
-        for (const bucket of [
-            RecentlyPlayedBucket.ThisWeek,
-            RecentlyPlayedBucket.ThisMonth,
-            RecentlyPlayedBucket.ThisYear,
-            RecentlyPlayedBucket.Before,
-        ]) {
-            expect(bucketDisplayLabel(bucket).length).toBeGreaterThan(0)
-        }
+        expect(shouldPlaceBucketSign('this-week', null)).toBe(true)
     })
 })

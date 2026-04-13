@@ -21,15 +21,10 @@ import {
 } from '../types/InteractionEvents'
 import type { GamesSortEvent, GameSortMode } from '../types/EnvironmentEvents'
 import { groupByGenre, KNOWN_GENRES, type ShelfGroup } from './categorization/GameSortFunctions'
-import { RecentlyPlayedBucket } from './categorization/GameSorter'
 import { SceneSignManager, SignStyles } from './SceneSignManager'
+import { shelfBucketKey, shouldPlaceBucketSign } from './signs/TimeBucketSignHelpers'
 import type { SignMount } from './SignTypes'
 import type { SteamGameData } from './game-box/types/GameData'
-import {
-    shelfBucket,
-    shouldPlaceBucketSign,
-    bucketDisplayLabel,
-} from './signs/TimeBucketSignHelpers'
 import { Logger } from '../utils/Logger'
 
 export interface ShelfSectionPlannerConfig {
@@ -48,10 +43,11 @@ export class ShelfSectionPlanner {
     private readonly config: Required<ShelfSectionPlannerConfig>
 
     private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
+    private buckets: ReadonlyMap<number | string, string> = new Map()
     private shelfPositions: THREE.Vector3[] = []
     private shelfRotations: number[] = []
     private sortMode: GameSortMode = 'recently-played'
-    private lastPlacedBucket: RecentlyPlayedBucket | null = null
+    private lastPlacedBucketKey: string | null = null
     private readonly placedBucketIdentifiers = new Set<string>()
     private readonly placedSectionIdentifiers = new Set<string>()
 
@@ -72,8 +68,9 @@ export class ShelfSectionPlanner {
 
     private handleGamesSort(detail: GamesSortEvent): void {
         this.sortedGames = detail.sortedGames
+        this.buckets = detail.buckets
         this.sortMode = detail.sortMode
-        this.lastPlacedBucket = null
+        this.lastPlacedBucketKey = null
 
         this.removeBucketSigns()
         this.removeSectionSigns()
@@ -131,11 +128,10 @@ export class ShelfSectionPlanner {
     }
 
     private placeTimeBucketSignForShelf(shelfId: number, shelfPosition: THREE.Vector3, shelfRotationY: number): void {
-        const bucket = shelfBucket(shelfId, this.sortedGames)
-        if (!shouldPlaceBucketSign(bucket, this.lastPlacedBucket)) return
-        if (bucket === null) return
+        const bucketKey = shelfBucketKey(shelfId, this.sortedGames, this.sortMode)
+        if (!shouldPlaceBucketSign(bucketKey, this.lastPlacedBucketKey)) return
 
-        const uniqueIdentifier = bucketDisplayLabel(bucket)
+        const uniqueIdentifier = this.buckets.get(bucketKey!) ?? bucketKey!
         this.signSystem.placeSign('canvas', {
             uniqueIdentifier,
             anchorPosition: shelfPosition,
@@ -143,7 +139,7 @@ export class ShelfSectionPlanner {
             style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
         })
         this.placedBucketIdentifiers.add(uniqueIdentifier)
-        this.lastPlacedBucket = bucket
+        this.lastPlacedBucketKey = bucketKey
     }
 
     /**
@@ -254,7 +250,7 @@ export class ShelfSectionPlanner {
         this.shelfPositions = []
         this.shelfRotations = []
         this.sortMode = 'recently-played'
-        this.lastPlacedBucket = null
+        this.lastPlacedBucketKey = null
         this.placedBucketIdentifiers.clear()
         this.placedSectionIdentifiers.clear()
         this.signSystem.clearAll()
