@@ -94,9 +94,8 @@ export class GameSorter {
 
         EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
             sortedGames,
-            buckets: new Map<string, string>(),
+            buckets: this.buildGenreBucketMap(sortedGames),
         })
-
         GameSorter.logger.debug(`GamesSort emitted (by genre): ${sortedGames.length} games`)
     }
 
@@ -152,6 +151,19 @@ export class GameSorter {
             const bucket = getRecentlyPlayedBucket(game as SteamGameData)
             if (!buckets.has(bucket)) {
                 buckets.set(bucket, getBucketLabel(bucket))
+            }
+        }
+        return buckets
+    }
+
+    private buildGenreBucketMap(
+        sortedGames: ReadonlyArray<Readonly<SteamGameData>>
+    ): ReadonlyMap<string, string> {
+        const buckets = new Map<string, string>()
+        for (const game of sortedGames) {
+            const genre = primaryGenre(game as SteamGameData)
+            if (!buckets.has(genre)) {
+                buckets.set(genre, genre)
             }
         }
         return buckets
