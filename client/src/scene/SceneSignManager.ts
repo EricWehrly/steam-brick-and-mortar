@@ -19,6 +19,7 @@ import {
     type RoomResizedEvent,
 } from '../types/InteractionEvents'
 import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
+import { RoomConstants } from './RoomManager'
 import { recentlyPlayedCeilingAnchor } from './signs/TimeBucketSignHelpers'
 
 export interface SignStyle {
@@ -212,19 +213,16 @@ export class SceneSignManager {
      * TODO(layout): position should come from a layout coordinator, not be hardcoded here.
      */
     private syncSteamLibraryBlockSign(): void {
-        // Position relative to the ceiling sign: drop below it, push toward entrance.
-        // These offsets are intentional art direction, not physics — adjust when room dimensions change.
-        const DROP_BELOW_CEILING_SIGN = 0.0
-        const PUSH_TOWARD_ENTRANCE = 1.5
-        const ceilingAnchor = recentlyPlayedCeilingAnchor()
+        // Mounted high on the back wall, facing the player at the entrance.
+        // Z approximates the back wall (room depth is dynamic — TODO(layout): use RoomResized dimensions).
+        // Height is near the ceiling for visibility from the entrance.
+        const BACK_WALL_Z    = -9
+        const SIGN_HEIGHT_Y  = RoomConstants.STORE_CEILING_HEIGHT - 0.5
         this.placeSign('block-letter', {
             uniqueIdentifier: 'steam-library-title',
             text: 'STEAM LIBRARY',
-            anchorPosition: new THREE.Vector3(
-                ceilingAnchor.x,
-                ceilingAnchor.y - DROP_BELOW_CEILING_SIGN,
-                ceilingAnchor.z + PUSH_TOWARD_ENTRANCE
-            ),
+            anchorPosition: new THREE.Vector3(0, SIGN_HEIGHT_Y, BACK_WALL_Z),
+            facingY: Math.PI,  // face player (entrance is at +z)
             style: {
                 color: 0x003087,
                 fontSize: 0.35,
