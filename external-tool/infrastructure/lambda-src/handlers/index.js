@@ -159,6 +159,10 @@ async function handleGetOwnedGames(steamId) {
       };
     }
 
+    // Since we fetched a user's library, wake up the background hydrator
+    // to sweep S3 and attach SteamSpy tags to any games missing them.
+    triggerHydrator();
+
     return {
       success: true,
       game_count: gamesData.game_count,
@@ -226,10 +230,6 @@ async function handleBatchAppDetails(event) {
   
   if (uncachedAppids.length > 0) {
     console.log(`Fetching ${uncachedAppids.length} uncached games from Steam API`);
-    
-    // Fire-and-forget the hydrator logic in the background if we're fetching new data
-    // It'll sweep S3 after we write the cache out
-    triggerHydrator();
 
     for (let i = 0; i < uncachedAppids.length; i += STEAM_API_BATCH_SIZE) {
       const batch = uncachedAppids.slice(i, i + STEAM_API_BATCH_SIZE);
