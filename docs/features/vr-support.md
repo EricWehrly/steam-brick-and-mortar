@@ -1,0 +1,41 @@
+# Feature: VR Support
+
+**Act**: 2 (Gate 2 — required for Act 2 completion)
+**Status**: Not Started
+**Priority**: High
+
+## Goal
+
+The full store experience works in a VR headset via WebXR — navigation, browsing, and UI interaction all functional in headset. This is the "impressor" that defines Act 2 done.
+
+## Context
+
+The project was designed WebXR-first from the beginning (see `docs/architecture/webxr-architecture.md`), and the `WebXRCoordinator` and `WebXREventHandler` infrastructure exists. Act 2's desktop-first stance was intentional — get the experience solid on flat screens, stabilize infrastructure, start sharing with friends — then land VR as the Act 2 capstone.
+
+VR is sequenced late in Act 2 deliberately: after Gate 1 infrastructure is stable and after initial friend feedback on the desktop experience has been incorporated. It's a required deliverable, not a stretch goal.
+
+## Acceptance Criteria
+
+- WebXR session initializes correctly on supported hardware (Quest, PCVR)
+- Player can navigate the store via VR locomotion (teleport or smooth locomotion TBD)
+- Game boxes are selectable/interactable via VR controller input
+- UI panels are accessible and usable from inside VR (spatial or overlay approach TBD)
+- Comfortable default experience with appropriate scale, speed, and IPD handling
+- Graceful fallback to flat screen if WebXR session fails or hardware is absent
+
+## Stories / Tasks
+
+- **Audit existing WebXR infrastructure** — review `WebXRCoordinator`, `WebXREventHandler`, `WebXRUICoordinator`; identify gaps vs. current state of the codebase
+- **VR locomotion** — decide teleport vs. smooth movement; implement and tune; configurable for comfort
+- **Controller input** — wire VR controller events into the input abstraction (from Input System feature); raycast-based interaction for game boxes and UI
+- **Spatial UI** — determine approach for UI panels in VR (world-space vs. HUD overlay); implement
+- **Comfort pass** — scale, movement speed, snap turn options; VR comfort best practices
+- **Hardware testing** — validate on at least one standalone headset (Quest) and one PCVR setup
+
+## Notes / Open Questions
+
+- Locomotion model is TBD — teleport is safer for comfort/accessibility, smooth movement is more immersive. Consider offering both.
+- UI in VR is a design question: world-space panels feel more immersive but are harder to read; HUD overlays are easier but feel flat. May need a prototype to decide.
+- The input abstraction from the Input System feature must exist first — VR controller events should route through the same layer as mouse/keyboard and gamepad.
+- VR controller interaction and raycasting connects to the raycast drag suppression work already in the subagent threads.
+- See `docs/architecture/webxr-architecture.md` for the foundational design decisions.

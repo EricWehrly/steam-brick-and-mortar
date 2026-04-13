@@ -131,8 +131,9 @@ dynamic to attempt to maintain framerate
 
 ## Current Status
 
-**Active Phase**: Phase 1 → Intermission (entering cleanup/stabilization before Phase 2)
+**Active Phase**: Act 1 → Intermission (Technical Stewardship)
 **Active Branch**: `openclaw/feat-neon-ui-intermission`
+**Current Act Doc**: `docs/acts/intermission-technical-stewardship.md`
 **Current Milestone**: Milestone 6 complete (core implementation done)
 **Next**: Intermission tasks per `intermission-before-phase2.md`, then Phase 2
 
