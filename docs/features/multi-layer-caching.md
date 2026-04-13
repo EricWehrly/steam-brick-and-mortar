@@ -1,7 +1,7 @@
 # Feature: Multi-Layer Caching
 
 **Act**: 2
-**Status**: Not Started
+**Status**: In Progress (browser/IndexedDB layer exists; Lambda, CloudFront, and S3 layers not started)
 **Priority**: High
 
 ## Goal
