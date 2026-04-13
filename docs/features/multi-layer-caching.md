@@ -1,7 +1,7 @@
 # Feature: Multi-Layer Caching
 
-**Act**: 2
-**Status**: In Progress (browser/IndexedDB layer exists; Lambda, CloudFront, and S3 layers not started)
+**Act**: 2 (Gate 1)
+**Status**: In Progress (browser/IndexedDB layer + Lambda L1 in-memory + Lambda L2/S3 all exist; CloudFront layer is the remaining gap; AppDetailsCache has no TTL; no in-flight request deduplication)
 **Priority**: High
 
 ## Goal

@@ -18,8 +18,8 @@
 
 - [Static Hosting](../features/static-hosting.md) — public HTTPS URL, repeatable deploy, CORS wired to Lambda; **the** prerequisite for sharing anything; CloudFront is the likely choice (cost projection discussion to happen early Act 2)
 - [First Load Experience](../features/first-load-experience.md) — anonymous store is coherent and inviting; new user is guided to connect their library; performance on first load is acceptable; definition of "correct" pinned before sign-off
-- [Network Rate Limiting](../features/network-rate-limiting.md) — client-side rate limiter, batched artwork loading, Lambda hardening; must land before any multi-user testing
-- [Multi-Layer Caching](../features/multi-layer-caching.md) — browser layer exists; Lambda + CloudFront + S3 layers needed before multi-user
+- [Network Rate Limiting](../features/network-rate-limiting.md) — substantially implemented (client `RateLimiter`, batching, backoff, circuit breaker; server-side 429 handling); client-side 429 handling and concurrency cap are the remaining gaps
+- [Multi-Layer Caching](../features/multi-layer-caching.md) — browser, Lambda L1, and S3/Lambda L2 all exist; CloudFront layer and AppDetailsCache TTL are the remaining gaps
 - [Input System](../features/input-system.md) — mouse/keyboard solid, gamepad support, keyboard accessibility for all menus; VR controllers are Gate 2
 
 ## Gate 2: Act 2 Complete
