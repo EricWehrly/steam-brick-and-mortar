@@ -19,14 +19,20 @@ export interface SomeBatchesCompleteEvent extends BaseInteractionEvent {
     totalBatches: number
 }
 
+export type GameSortMode = 'recently-played' | 'by-genre' | 'by-playtime'
+
 export interface GamesSortEvent extends BaseInteractionEvent {
     /** Full sorted game list after all batches have loaded. */
     sortedGames: ReadonlyArray<Readonly<SteamGameData>>
     /**
-     * Maps bucket key (RecentlyPlayedBucket value) to human-readable label.
-     * Empty map when no games have rtime_last_played > 0.
+     * Maps bucket key to human-readable label.
+     * For recency sort: time-window keys (RecentlyPlayedBucket values).
+     * For genre sort: genre name keys.
+     * Empty for playtime sort (no meaningful sections).
      */
     buckets: ReadonlyMap<number | string, string>
+    /** Which sort policy produced this event. */
+    sortMode: GameSortMode
 }
 
 /**

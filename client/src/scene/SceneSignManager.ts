@@ -216,8 +216,9 @@ export class SceneSignManager {
      */
     private syncSteamLibraryBlockSign(): void {
         // Mounted high on the back wall, facing the player at the entrance.
-        // Z uses the actual room depth from RoomResized; fallback to DEFAULT_ROOM_DEPTH before first resize.
-        const backWallZ   = -(this.roomDepth / 2)
+        // Offset by half the sign depth so letters sit flush against the wall surface.
+        const SIGN_DEPTH = 0.08
+        const backWallZ   = -(this.roomDepth / 2) + SIGN_DEPTH / 2
         const signHeightY = RoomConstants.STORE_CEILING_HEIGHT - 0.5
         this.placeSign('block-letter', {
             uniqueIdentifier: 'steam-library-title',
@@ -226,7 +227,7 @@ export class SceneSignManager {
             style: {
                 color: 0x003087,
                 fontSize: 0.35,
-                depth: 0.08,
+                depth: SIGN_DEPTH,
             },
         })
     }

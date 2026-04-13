@@ -16,6 +16,7 @@ import { GameEventTypes } from '../../types/InteractionEvents'
 import type { AllBatchesCompleteEvent, GamesSortEvent } from '../../types/EnvironmentEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { sortByNumericField, primaryGenre, KNOWN_GENRES } from './GameSortFunctions'
+import type { GameSortMode } from '../../types/EnvironmentEvents'
 
 // Re-export so callers don't need two imports for sort + bucket types
 export { sortByNumericField, sortAlphabetically, sortByEnumIndex, chainComparators, groupByKey, groupByGenre, KNOWN_GENRES, sortByGenreThenPlaytime, resolveGenre, primaryGenre } from './GameSortFunctions'
@@ -95,6 +96,7 @@ export class GameSorter {
         EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
             sortedGames,
             buckets: this.buildGenreBucketMap(sortedGames),
+            sortMode: 'by-genre',
         })
         GameSorter.logger.debug(`GamesSort emitted (by genre): ${sortedGames.length} games`)
     }
@@ -113,6 +115,7 @@ export class GameSorter {
         EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
             sortedGames,
             buckets: new Map<string, string>(),
+            sortMode: 'by-playtime',
         })
 
         GameSorter.logger.debug(`GamesSort emitted (by playtime): ${sortedGames.length} games`)
@@ -136,6 +139,7 @@ export class GameSorter {
         EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
             sortedGames,
             buckets,
+            sortMode: 'recently-played',
         })
 
         GameSorter.logger.debug(
