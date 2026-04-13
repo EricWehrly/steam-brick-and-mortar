@@ -66,6 +66,7 @@ export class SceneSignManager {
     private readonly rendererByKind: Record<RenderKind, ISignRenderer>
     private readonly scene: THREE.Scene
     private readonly rendererByIdentifier = new Map<string, RenderKind>()
+    private roomDepth: number = RoomConstants.DEFAULT_ROOM_DEPTH
 
     private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 0.6
     private static readonly SIGN_Z_FACE_PLAYER = 0.01
@@ -88,7 +89,7 @@ export class SceneSignManager {
         // becomes a layout invalidation signal rather than a direct re-place.
         EventManager.getInstance().registerEventHandler(
             RoomEventTypes.Resized,
-            (_event: CustomEvent<RoomResizedEvent>) => this.handleRoomResized()
+            (event: CustomEvent<RoomResizedEvent>) => this.handleRoomResized(event.detail)
         )
     }
 
@@ -103,7 +104,8 @@ export class SceneSignManager {
         }
     }
 
-    private handleRoomResized(): void {
+    private handleRoomResized(detail: RoomResizedEvent): void {
+        this.roomDepth = detail.dimensions.depth
         // TODO(layout): replace with layout coordinator invalidation.
         this.syncSteamLibraryBlockSign()
     }
@@ -214,15 +216,13 @@ export class SceneSignManager {
      */
     private syncSteamLibraryBlockSign(): void {
         // Mounted high on the back wall, facing the player at the entrance.
-        // Z approximates the back wall (room depth is dynamic — TODO(layout): use RoomResized dimensions).
-        // Height is near the ceiling for visibility from the entrance.
-        const BACK_WALL_Z    = -9
-        const SIGN_HEIGHT_Y  = RoomConstants.STORE_CEILING_HEIGHT - 0.5
+        // Z uses the actual room depth from RoomResized; fallback to DEFAULT_ROOM_DEPTH before first resize.
+        const backWallZ   = -(this.roomDepth / 2)
+        const signHeightY = RoomConstants.STORE_CEILING_HEIGHT - 0.5
         this.placeSign('block-letter', {
             uniqueIdentifier: 'steam-library-title',
             text: 'STEAM LIBRARY',
-            anchorPosition: new THREE.Vector3(0, SIGN_HEIGHT_Y, BACK_WALL_Z),
-            facingY: Math.PI,  // face player (entrance is at +z)
+            anchorPosition: new THREE.Vector3(0, signHeightY, backWallZ),
             style: {
                 color: 0x003087,
                 fontSize: 0.35,

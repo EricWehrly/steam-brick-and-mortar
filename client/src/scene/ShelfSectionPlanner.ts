@@ -52,6 +52,7 @@ export class ShelfSectionPlanner {
 
     private games: SteamGameData[] = []
     private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
+    private shelfPositions: THREE.Vector3[] = []
     private lastPlacedBucket: RecentlyPlayedBucket | null = null
     private readonly placedBucketIdentifiers = new Set<string>()
 
@@ -91,6 +92,9 @@ export class ShelfSectionPlanner {
         this.lastPlacedBucket = null
         this.removeBucketSigns()
         this.syncRecentlyPlayedCeilingSign()
+        if (this.shelfPositions.length > 0) {
+            this.planSections(this.shelfPositions)
+        }
     }
 
     private syncRecentlyPlayedCeilingSign(): void {
@@ -113,9 +117,11 @@ export class ShelfSectionPlanner {
     }
 
     private handleShelfReady(detail: ShelfReadyEvent): void {
-        if (!this.hasRecentlyPlayedData || this.sortedGames.length === 0) return
         const shelfPos = detail.position as THREE.Vector3
         const rotY = detail.rotationY ?? 0
+        this.shelfPositions[detail.batchIndex] = shelfPos.clone()
+
+        if (!this.hasRecentlyPlayedData || this.sortedGames.length === 0) return
         this.placeTimeBucketSignForShelf(detail.batchIndex, shelfPos, rotY)
     }
 
@@ -235,6 +241,7 @@ export class ShelfSectionPlanner {
     public reset(): void {
         this.games = []
         this.sortedGames = []
+        this.shelfPositions = []
         this.lastPlacedBucket = null
         this.placedBucketIdentifiers.clear()
         this.signSystem.clearAll()

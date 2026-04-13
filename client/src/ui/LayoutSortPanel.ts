@@ -164,28 +164,11 @@ export class LayoutSortPanel {
 
     private registerKeyboardHandler(): void {
         this.keyboardHandler = (event: KeyboardEvent) => {
-            if (
-                document.activeElement instanceof HTMLInputElement ||
-                document.activeElement instanceof HTMLTextAreaElement ||
-                document.activeElement instanceof HTMLSelectElement
-            ) {
-                return
-            }
-
-            if (event.ctrlKey || event.metaKey || event.altKey) {
-                return
-            }
-
-            if (event.key === 'L' && event.shiftKey) {
+            if (event.ctrlKey || event.metaKey || event.altKey) return
+            if (event.key === 'L') {
                 this.toggleControlsVisibility()
-                return
-            }
-
-            if (event.key === 'l' && !event.shiftKey) {
-                this.cycleSortOption()
             }
         }
-
         document.addEventListener('keydown', this.keyboardHandler)
     }
 
