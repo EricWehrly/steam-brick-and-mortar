@@ -1,80 +1,77 @@
-# Implementation Plan: SteamSpy Tags via Lambda
+# Implementation Plan: SteamSpy Tags via Secondary Hydration Lambda
 
 ## Context and Goals
-We need to enrich our Steam library data with community tags to provide better sorting and categorization in the WebXR VR environment. SteamSpy provides these tags sorted by vote count via a public API.
+We want to enrich our Steam library data with community tags (and potentially other metadata) from SteamSpy. SteamSpy provides this data via a public API, but enforces a strict **1 request per second** rate limit.
 
-**Key Constraints:**
-- SteamSpy has a strict **1 request per second** rate limit.
-- We process a user's library of 50–500 games, meaning we need to spread requests over time to avoid hitting the rate limit.
-- Tags change rarely — heavy caching is preferred; refresh is a future concern.
-- **No new client-side API calls.** Tags are included inline in existing library responses. The client type definition expands; the call pattern does not.
+Instead of modifying the primary Steam proxy Lambda to handle this synchronously or using DynamoDB, we will use an S3-to-S3 hydration pattern with a secondary background Lambda.
 
-## Phase 1 - MVP (Current Scope)
-The MVP focuses on flowing tags into the existing game data response, caching them server-side, and wiring them into the type system.
+## The Architecture
+- **Storage:** The existing S3 cache bucket.
+- **Old Data:** Stored at `appdetails/${appid}.json.gz` (populated by the main Lambda).
+- **New Data (Hydrated):** Stored at `appDetailsWithTags/${appid}.json.gz` (populated by the new Hydrator Lambda).
+- **Compute:** A new secondary AWS Lambda function (`steamspy-hydrator`) that fetches SteamSpy data, merges it with the base Steam API data, and writes the new file.
 
-### 1. Augment the Existing Library Response
-Rather than a new `/tags` endpoint the client must call separately, tags are folded into the existing game data responses the Lambda already returns. The client receives enriched game objects — it does not need to know about SteamSpy at all.
+---
 
-**Approach:** When the Lambda processes a batch of games, it checks the SteamSpy tag cache for each `appid`. Cache hits attach `tags` directly to the game object in the response. Cache misses are queued for background fill (see §2 below).
+## Phase 1: Manual Invocation MVP
+**Goal:** Verify the data fetching, merging, and S3 writing logic works end-to-end for a single app before we automate anything.
 
-### 2. Background Tag Fetcher (Sequential, 1 req/s)
-Tags for cache-missing games are fetched after the main response returns, or on a subsequent warm invocation (via a scheduled Lambda or the next library load). Requests to SteamSpy *must* be sequential:
+1. **Create the Hydrator Lambda (Terraform & Code):**
+   - Provision a new Lambda function in Terraform with access to the S3 bucket.
+   - Code the handler to accept a manual payload containing an `appid` (e.g., `{"appid": 10}`).
+2. **Resilient Fetching (Rate Limit & Noise):**
+   - Implement **exponential backoff and retry** for SteamSpy requests. Since exit IPs might be shared or noisy, a simple 1.1s delay isn't enough; we need to catch HTTP 429s and wait longer.
+3. **Execution Flow:**
+   - Read `appdetails/${appid}.json.gz` from S3.
+   - Fetch data from `https://steamspy.com/api.php?request=appdetails&appid=${appid}`.
+   - Merge the SteamSpy data (specifically `tags`, and optionally review scores/owners) into the original JSON object.
+   - **Handling Failures/Missing Data:**
+     - If SteamSpy returns a non-retryable error (e.g., 404) or missing data, log the full response message and URI to CloudWatch.
+     - In these cases, **still write** the original Steam API contents to `appDetailsWithTags/${appid}.json.gz`. This "marks it as processed" so the deduper doesn't try it again.
+   - Compress and write the merged (or fallback) object to `appDetailsWithTags/${appid}.json.gz`.
+4. **Validation:**
+   - Manually invoke the Lambda via the AWS Console or CLI.
+   - Verify we can easily retrieve and parse the execution logs from CloudWatch.
+   - Download the resulting file from S3 and verify the schema looks correct.
 
-```javascript
-// Conceptual — runs as background/async fill, not blocking main response
-for (const appid of appidsToFetch) {
-  const data = await fetchFromSteamSpy(appid);
-  await saveToCache(appid, data);
-  // Delay between calls to respect the 1 req/s hard limit
-  await new Promise(resolve => setTimeout(resolve, 1000));
-}
-```
+## Phase 2: Automated Batch Hydration
+**Goal:** Automate the hydrator to sweep the bucket and process missing games in batches, respecting the 1 request/second rate limit.
 
-MVP simplification: fetch a fixed small ceiling (e.g. 5 games) per invocation. This keeps Lambda execution time bounded (~5s for 5 misses) and builds the cache incrementally over repeated loads.
+1. **Triggering Mechanism:**
+   - Trigger the Hydrator Lambda asynchronously. This could be done by the primary Lambda when the `batch-appdetails` endpoint is hit, or run on a cron schedule via EventBridge.
+2. **Bucket Traversal & Deduping:**
+   - The Hydrator calls `ListObjectsV2` on the S3 bucket for the `appdetails/` prefix.
+   - The Hydrator calls `ListObjectsV2` for the `appDetailsWithTags/` prefix.
+   - It compares the two lists to find `appids` that exist in the base folder but are missing from the hydrated folder.
+3. **Sequential Fetching:**
+   - Take a batch of missing `appids` (e.g., up to 200).
+   - Loop through them sequentially.
+   - For each: Fetch from S3 -> Fetch from SteamSpy -> Merge -> Write to S3.
+   - **Crucial:** Implement a strict `await sleep(1100)` (1.1 seconds) between SteamSpy requests.
+   - At 1.1s per request, a batch of 200 will take roughly 3.6 - 4 minutes, fitting comfortably inside a standard 5-minute or 15-minute Lambda timeout.
 
-### 3. Cache Strategy & Schema
-Tags go into a **DynamoDB table** — lightweight, fast key-value lookup, DynamoDB TTL handles expiry automatically.
+## Phase 3: Recursive Queueing (Optional/Advanced)
+**Goal:** Fully automate the hydration of a massive library without hitting Lambda timeout limits.
 
-**Table:** `SteamSpyTags`
-- **Partition Key:** `appid` (Number)
-- **Attributes:**
-  - `tags` (Map) — e.g., `{"Action": 500, "Sci-fi": 200}` (tag name → vote count)
-  - `updatedAt` (String/ISO-8601)
-  - `expiresAt` (Number/epoch) — TTL, set to `now() + 30 days`
+- At the end of a batch execution, if the Hydrator detects there are still remaining unhydrated `appids` in its deduplicated list, it asynchronously invokes itself (passing the remaining list in the event payload, or just telling itself to run again).
+- This creates a self-winding loop that eventually finishes when `appdetails/` and `appDetailsWithTags/` are synchronized.
 
-**Flow per library load:**
-1. `BatchGetItem` against `SteamSpyTags` for all `appids` in the request.
-2. Attach cached tags directly to matching game objects in response.
-3. Collect cache-miss `appids` (capped at 5 for MVP).
-4. Fetch them sequentially from SteamSpy with 1s delays; write to cache.
-5. Attach freshly-fetched tags to remaining game objects before returning (if within Lambda budget), otherwise they arrive on next load.
+## Phase 4: Read from the Hydrated Cache
+**Goal:** Serve the enriched data back to the client.
 
-### 4. Type Definition Update (Client)
-The only client change needed is expanding the `SteamGameData` interface to make `tags` an optional field. No new fetch logic, no new API calls:
+1. **Update Primary Lambda (`services/cache.js`):**
+   - Modify `getFromCache(appid)` to check `appDetailsWithTags/${appid}.json.gz` first.
+   - If found, return it.
+   - If not found, fall back to fetching `appdetails/${appid}.json.gz`.
+2. **Client-Side Buildout:**
+   - Once data is flowing, update the `SteamGameData` TypeScript interfaces on the client.
+   - We can then implement the UI sorting/filtering based on the new `tags` property without having made any new client-side API requests.
 
-```typescript
-// client/src/scene/game-box/types/GameData.ts
-export interface SteamGameData extends SteamGameMetadata {
-    // ... existing fields ...
-    /** Community tags from SteamSpy, keyed by tag name → vote count. Present when cached. */
-    tags?: Record<string, number>;
-}
-```
+---
 
-`GameSortFunctions.ts` can then add a `groupByPrimaryTag` strategy that reads this field and falls back to genre when absent — no code changes needed until we actually want to expose that sort option in the UI.
+## Watch-Outs and Clarifications
 
-### 5. Infrastructure
-- **DynamoDB table** provisioned in Terraform (`infrastructure/modules/lambda`).
-- **IAM policy** updated to grant the Lambda `dynamodb:BatchGetItem`, `dynamodb:PutItem` on the new table.
-- Existing S3-based app details cache is unchanged.
-
-## Out of Scope for MVP
-- **Refresh mechanisms** — TTL handles expiry; no forced refreshes.
-- **Client-visible tag sort mode** — type def arrives now, UI wiring is a future branch.
-- **Admin tooling** for cache inspection or rate-limit monitoring.
-
-## Next Steps
-1. Add DynamoDB `SteamSpyTags` table to Terraform.
-2. Add `BatchGetItem` tag lookup + sequential SteamSpy fill to the existing Lambda handler.
-3. Expand `SteamGameData` type def with optional `tags` field.
-4. Add `groupByPrimaryTag` stub to `GameSortFunctions.ts` (no UI wiring yet).
+1. **S3 List Pagination:** `ListObjectsV2` returns a maximum of 1,000 keys per page. We will need to handle pagination (using `ContinuationToken`) to get the full list of both directories if the user has more than 1,000 cached games.
+2. **Missing SteamSpy Data (The "Infinite Loop" Risk):** Some obscure or delisted games exist on Steam but have no data on SteamSpy. If SteamSpy returns a 404 or empty data for an `appid`, we **must still write** a file to `appDetailsWithTags/${appid}.json.gz` (containing the original base Steam data). This prevents the deduper from repeatedly attempting to fetch dead apps. We will log the URI and error message for these cases to facilitate manual review.
+3. **Trigger Architecture:** You mentioned having the primary lambda trigger the hydrator. We should use asynchronous invocation (e.g., `lambda.invoke({ InvocationType: 'Event' })`) so the primary Lambda can immediately return data to the user without waiting for the hydration sweep to finish.
+4. **Data Merge Schema:** We should decide what exactly to merge. SteamSpy provides `tags`, but also `positive`/`negative` review counts, `owners`, and `ccu` (concurrent users). We should probably grab the tags and maybe the review ratio while we're at it, but keep the schema clean.

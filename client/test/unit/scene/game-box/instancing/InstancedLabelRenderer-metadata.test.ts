@@ -10,13 +10,13 @@
  * on construction, and reset() also clears it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { DataKey } from '../../../core/data/DataTypes'
+import { DataKey } from '../../../../../src/core/data/DataTypes'
 
 // ---- mocks ----
 
 const mockStore = new Map<string, unknown>()
 
-vi.mock('../../../core/data/DataManager', () => ({
+vi.mock('../../../../../src/core/data/DataManager', () => ({
     DataManager: {
         getInstance: () => ({
             get: vi.fn((key: string) => mockStore.get(key) ?? null),
@@ -59,7 +59,7 @@ beforeEach(() => {
     mockStore.clear()
 })
 
-import { InstancedLabelRenderer } from './InstancedLabelRenderer'
+import { InstancedLabelRenderer } from '../../../../../src/scene/game-box/instancing/InstancedLabelRenderer'
 
 describe('InstancedLabelRenderer metadata lifecycle', () => {
     it('registers a fresh metadata map in DataManager on construction', () => {

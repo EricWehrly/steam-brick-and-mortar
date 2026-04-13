@@ -16,6 +16,34 @@
 
 ---
 
+## Feature 10.1: Neon Sign Stroke-Skeleton Rendering 🔮
+**Context**: Polish — make the neon entrance sign look like real neon tube lighting
+
+The current `NeonTubeSignRenderer` traces glyph *outline contours* as tube loops, producing
+a rough "macaroni" look (disjoint segments, visible seams, hollow outlines). The infrastructure
+(worker, renderer, sign manager integration) is complete and tested. Only the geometry
+extraction needs to be replaced.
+
+**Plan doc**: `docs/plans/neon-stroke-skeleton-plan.md`
+
+### Story 10.1.1: Implement medial axis geometry in NeonGeometryWorker
+- **Task 10.1.1.1**: Rasterize glyph outlines to a binary pixel grid in the worker (scanline fill, no new runtime deps)
+- **Task 10.1.1.2**: Apply Zhang-Suen thinning to produce a 1-pixel skeleton
+- **Task 10.1.1.3**: Trace skeleton pixels into ordered polylines, splitting at branch points
+- **Task 10.1.1.4**: Smooth + resample; hand off to existing CatmullRomCurve3 + TubeGeometry path
+- **Task 10.1.1.5**: Prototype Hershey fonts as a lower-effort alternative; compare visual quality
+
+### Story 10.1.2: Re-enable neon entrance sign and Steam Library block sign
+- **Task 10.1.2.1**: Un-comment `syncNeonEntranceSign` spawn in `SceneSignManager`
+- **Task 10.1.2.2**: Resolve font asset licensing; un-comment `syncSteamLibraryBlockSign`
+- **Task 10.1.2.3**: Add `THIRD_PARTY_LICENSES` if keeping helvetiker (MIT, ships with Three.js)
+
+**Expected Deliverable**: Neon sign renders as solid stroke tubes; "Steam Library" block sign visible at store entrance.
+
+**Acceptance**: One continuous tube per letter stroke, no seam artifacts, no new runtime deps, existing worker tests still pass.
+
+---
+
 ## Feature 5.6: Steam API Compliance Research 🔮
 **Context**: Research compliance requirements for Steam API usage before public release
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ShelfSurfaceUtils } from './ShelfSurfaceUtils'
+import { ShelfSurfaceUtils } from '../../../../../src/scene/props/shared/ShelfSurfaceUtils'
 
 describe('ShelfSurfaceUtils', () => {
   it('returns standard shelf surfaces sorted top-to-bottom', () => {

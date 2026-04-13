@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
-import { EventManager } from '../core/EventManager'
-import { GameEventTypes, StorePropsEventTypes, type ShelfReadyEvent } from '../types/InteractionEvents'
-import type { GamesSortEvent } from '../types/EnvironmentEvents'
-import type { SteamGameData } from './game-box/types/GameData'
+import { EventManager } from '../../../src/core/EventManager'
+import { GameEventTypes, StorePropsEventTypes, type ShelfReadyEvent } from '../../../src/types/InteractionEvents'
+import type { GamesSortEvent } from '../../../src/types/EnvironmentEvents'
+import type { SteamGameData } from '../../../src/scene/game-box/types/GameData'
 
 // ─── Scene / DataManager mock ─────────────────────────────────────────────────
 
 const mockScene = new THREE.Scene()
 
-vi.mock('../core/data/DataManager', () => ({
+vi.mock('../../../src/core/data/DataManager', () => ({
     DataManager: {
         getInstance: () => ({
             get: () => mockScene,
@@ -27,7 +27,7 @@ const canvasRemoveSignSpy = vi.fn().mockReturnValue(true)
 const canvasClearAllSpy = vi.fn()
 const canvasDisposeSpy = vi.fn()
 
-vi.mock('./signs/CanvasSignRenderer', () => ({
+vi.mock('../../../src/scene/signs/CanvasSignRenderer', () => ({
     CanvasSignRenderer: vi.fn().mockImplementation(function () {
         return {
             setSign: canvasSetSignSpy,
@@ -45,7 +45,7 @@ const neonRemoveSignSpy = vi.fn().mockReturnValue(false)
 const neonClearAllSpy = vi.fn()
 const neonDisposeSpy = vi.fn()
 
-vi.mock('./signs/NeonTubeSignRenderer', () => ({
+vi.mock('../../../src/scene/signs/NeonTubeSignRenderer', () => ({
     NeonTubeSignRenderer: vi.fn().mockImplementation(function () {
         return {
             setSign: neonSetSignSpy,
@@ -58,14 +58,14 @@ vi.mock('./signs/NeonTubeSignRenderer', () => ({
 
 // ─── SignageRenderer stub (used internally by CanvasSignRenderer in prod) ─────
 
-vi.mock('./SignageRenderer', () => ({
+vi.mock('../../../src/scene/SignageRenderer', () => ({
     SignageRenderer: class {
         createSign() { return new THREE.Mesh() }
         dispose() {}
     },
 }))
 
-import { SceneSignManager } from './SceneSignManager'
+import { SceneSignManager } from '../../../src/scene/SceneSignManager'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -228,9 +228,9 @@ describe('SceneSignManager — lifecycle', () => {
             buckets: new Map([[1, 'Played Today']]),
         })
 
-        // One canvas sign (ceiling) + one neon sign (entrance)
+        // Canvas ceiling sign only � neon entrance sign is disabled pending stroke-skeleton rendering
         expect(canvasSetSignSpy).toHaveBeenCalledOnce()
-        expect(neonSetSignSpy).toHaveBeenCalledOnce()
+        expect(neonSetSignSpy).not.toHaveBeenCalled()
 
         // The ceiling sign text should be 'Recently Played'
         const [ceilingRequest] = canvasSetSignSpy.mock.calls[0]

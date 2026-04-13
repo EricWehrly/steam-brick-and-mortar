@@ -36,7 +36,7 @@ vi.mock('three', async (importOriginal) => {
   }
 })
 
-import { SignageRenderer } from './SignageRenderer'
+import { SignageRenderer } from '../../../src/scene/SignageRenderer'
 
 describe('SignageRenderer', () => {
   const makeConfig = (text: string) => ({

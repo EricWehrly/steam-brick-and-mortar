@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { paintCeilingPopcorn, paintCeilingPopcornNormal } from './ceiling-popcorn'
+import { paintCeilingPopcorn, paintCeilingPopcornNormal } from '../../../../../src/utils/textures/painters/ceiling-popcorn'
 
 describe('ceiling-popcorn', () => {
     const width = 128

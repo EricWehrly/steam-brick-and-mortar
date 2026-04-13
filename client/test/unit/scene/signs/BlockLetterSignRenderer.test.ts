@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
-import { BlockLetterSignRenderer } from './BlockLetterSignRenderer'
-import type { SignRequest } from './ISignRenderer'
+import { BlockLetterSignRenderer } from '../../../../src/scene/signs/BlockLetterSignRenderer'
+import type { SignRequest } from '../../../../src/scene/signs/ISignRenderer'
 
 vi.mock('three/examples/jsm/loaders/FontLoader.js', () => ({
     FontLoader: vi.fn().mockImplementation(function () {

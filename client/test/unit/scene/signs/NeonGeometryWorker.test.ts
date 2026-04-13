@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { NeonGeometryWorker } from './NeonGeometryWorker'
-import type { NeonGeometryResponse, NeonGeometryError } from '../../utils/workers/neon-geometry.worker'
+import { NeonGeometryWorker } from '../../../../src/scene/signs/NeonGeometryWorker'
+import type { NeonGeometryResponse, NeonGeometryError } from '../../../../src/utils/workers/neon-geometry.worker'
 
 // ─── Fake Worker ──────────────────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ class FakeWorker implements EventTarget {
 
 let fakeWorker: FakeWorker
 
-vi.mock('../../utils/workers/neon-geometry.worker?worker', () => ({
+vi.mock('../../../../src/utils/workers/neon-geometry.worker?worker', () => ({
     default: function () { return fakeWorker },
 }))
 

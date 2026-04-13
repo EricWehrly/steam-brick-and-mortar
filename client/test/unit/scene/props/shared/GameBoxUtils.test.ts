@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import { GameBoxUtils } from './GameBoxUtils'
-import { ShelfSide } from './SharedPropsTypes'
+import { GameBoxUtils } from '../../../../../src/scene/props/shared/GameBoxUtils'
+import { ShelfSide } from '../../../../../src/scene/props/shared/SharedPropsTypes'
 
 const SURFACE = { topY: 0.5, frontZ: 0.3, backZ: -0.3, centerX: 0, width: 2.0 }
 const DIMS = { width: 0.25, height: 0.35, depth: 0.05 }
