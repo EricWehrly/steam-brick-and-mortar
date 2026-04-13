@@ -22,7 +22,7 @@ async function streamToBuffer(stream) {
 }
 
 /**
- * Get game data from cache (L1 memory, then L2 S3)
+ * Get game data from cache (L1 memory, then L2 S3 hydrated, then L2 S3 base)
  * 
  * @param {number} appid - Steam application ID
  * @returns {Promise<Object|null>} Cached game data or null if not found
@@ -40,27 +40,39 @@ async function getFromCache(appid) {
     return null;
   }
 
-  try {
-    const command = new GetObjectCommand({
-      Bucket: CACHE_BUCKET_NAME,
-      Key: `appdetails/${appid}.json.gz`
-    });
-
+  // Helper for S3 fetch
+  const fetchFromS3 = async (key) => {
+    const command = new GetObjectCommand({ Bucket: CACHE_BUCKET_NAME, Key: key });
     const response = await s3Client.send(command);
     const compressed = await streamToBuffer(response.Body);
     const decompressed = gunzipSync(compressed);
-    const data = JSON.parse(decompressed.toString('utf-8'));
-    
-    // Populate memory cache
+    return JSON.parse(decompressed.toString('utf-8'));
+  };
+
+  try {
+    // Try hydrated cache first
+    const data = await fetchFromS3(`appDetailsWithTags/${appid}.json.gz`);
     memoryCache.set(appid, data);
-    console.log(`S3 cache HIT for appid ${appid}`);
-    
+    console.log(`S3 hydrated cache HIT for appid ${appid}`);
+    return data;
+  } catch (error) {
+    if (error.name !== 'NoSuchKey') {
+      console.error(`S3 hydrated cache error for appid ${appid}:`, error.message);
+    }
+    // Fallthrough to base cache
+  }
+
+  try {
+    // Fall back to base cache
+    const data = await fetchFromS3(`appdetails/${appid}.json.gz`);
+    memoryCache.set(appid, data);
+    console.log(`S3 base cache HIT for appid ${appid}`);
     return data;
   } catch (error) {
     if (error.name === 'NoSuchKey') {
       console.log(`Cache MISS for appid ${appid}`);
     } else {
-      console.error(`S3 cache error for appid ${appid}:`, error.message);
+      console.error(`S3 base cache error for appid ${appid}:`, error.message);
     }
     return null;
   }
