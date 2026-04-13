@@ -50,6 +50,24 @@ module "lambda" {
   depends_on = [module.s3_cache]
 }
 
+# Hydrator Lambda module - Background task for SteamSpy data
+module "lambda_hydrator" {
+  source = "./modules/lambda-hydrator"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  timeout             = 300 # 5 minutes for batch mode headroom
+  memory_size         = var.lambda_memory_size
+  log_retention_days  = var.cloudwatch_log_retention_days
+  lambda_source_dir   = "${path.module}/lambda-hydrator-src"
+  cache_bucket_name   = module.s3_cache.bucket_name
+  cache_bucket_arn    = module.s3_cache.bucket_arn
+
+  tags = local.common_tags
+
+  depends_on = [module.s3_cache]
+}
+
 # API Gateway module - Phase 3: API Gateway integration
 module "api_gateway" {
   source = "./modules/api-gateway"
