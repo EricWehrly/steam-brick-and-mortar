@@ -133,8 +133,9 @@ export class ShelfSectionPlanner {
     private placeTimeBucketSignForShelf(shelfId: number, shelfPosition: THREE.Vector3, shelfRotationY: number): void {
         const bucket = shelfBucket(shelfId, this.sortedGames)
         if (!shouldPlaceBucketSign(bucket, this.lastPlacedBucket)) return
+        if (bucket === null) return
 
-        const uniqueIdentifier = bucketDisplayLabel(bucket!)
+        const uniqueIdentifier = bucketDisplayLabel(bucket)
         this.signSystem.placeSign('canvas', {
             uniqueIdentifier,
             anchorPosition: shelfPosition,
@@ -142,7 +143,7 @@ export class ShelfSectionPlanner {
             style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
         })
         this.placedBucketIdentifiers.add(uniqueIdentifier)
-        this.lastPlacedBucket = bucket!
+        this.lastPlacedBucket = bucket
     }
 
     /**

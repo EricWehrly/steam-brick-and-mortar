@@ -222,12 +222,20 @@ describe('GameSorter.sortByPlaytime', () => {
         expect(mockEmit).not.toHaveBeenCalled()
     })
 
-    it('emits an empty buckets map', () => {
-        mockGames = [makeGame(1, 0, 200)]
+    it('emits a playtime bucket map with labels', () => {
+        mockGames = [
+            makeGame(1, 0, 6_001),  // Heavy: 100+ hours
+            makeGame(2, 0, 600),    // Moderate: 10-100 hours
+            makeGame(3, 0, 0),      // Unplayed
+        ]
         const sorter = new GameSorter()
         sorter.sortByPlaytime()
         const [, payload] = mockEmit.mock.calls[0]
-        expect((payload.buckets as ReadonlyMap<string, string>).size).toBe(0)
+        const buckets = payload.buckets as ReadonlyMap<string, string>
+        expect(buckets.size).toBeGreaterThan(0)
+        expect(buckets.get('heavy')).toBe('100+ Hours')
+        expect(buckets.get('moderate')).toBe('10–100 Hours')
+        expect(buckets.get('unplayed')).toBe('Never Played')
     })
 })
 
