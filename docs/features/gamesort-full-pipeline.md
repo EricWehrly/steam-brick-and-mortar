@@ -35,3 +35,13 @@ The current sort system updates signage (neon signs per genre/category) but does
 - "Sort by" in-scene affordance and sort mode switch UI is a related intake item from Apr 6-7 session dossier.
 - Multi-instance genre sections (same game appearing in multiple thematic views) is out of scope here — that's Encore.
 - Coordinate with `SignageRenderer` singleton/static-method evaluation (also in the dossier).
+- Related plan (archived): `docs/archive/gamesort-event-driven-plan.md` — event-driven sort architecture; `GameSorter`, `ShelfLayoutCoordinator`, `InstancedShelfRenderer` wiring is substantially implemented.
+- Related plan: `docs/plans/resort-game-placement-plan.md` — implementation plan for re-sort game box repositioning (the actual remaining gap).
+- Related plan: `docs/plans/texture-placement-split-plan.md` — decouples texture prefetch from instance placement; enables clean re-sort without re-fetching artwork.
+- Related plan: `docs/plans/layout-sign-responsibility-plan.md` — migrates bucket sign placement out of `SceneSignManager` into `ShelfSectionPlanner`.
+- Related plan: `docs/plans/sign-system-simplification-plan.md` — reduces `SceneSignManager` to a pure sign dispatch service; drops `SignKind` semantic tracking.
+- Related plan: `docs/plans/sign-placement-rules-plan.md` — pluggable rules for sign placement (row boundary, interval) with a pipeline toward designated areas and artistic layouts.
+- Related plan: `docs/plans/canvas-sign-renderer-plan.md` — wraps canvas sign path in `ISignRenderer` making `SceneSignManager` renderer-agnostic.
+
+
+**Related debt**: `sticker-coordinator`

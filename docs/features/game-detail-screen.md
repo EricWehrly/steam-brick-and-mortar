@@ -40,3 +40,4 @@ This makes the game detail screen a branch off the VR work, not a standalone fea
 - The `GameSelected` event → `BinderGameDetailPanel` flow already exists; the implementation work is the design and data richness, not the wiring
 - Directly tied to VR Support: do not fully commit to the desktop layout until the VR design is at least sketched, to avoid doing the work twice
 - z-index layering tech debt (panel sits at 2000 above binder at 1500) should be resolved as part of this work
+- Related plan: `docs/plans/feature-priority-spec.md` — Steam category priority system (co-op/VR/controller shown first; trading cards/cloud hidden); initial consumer is this panel's tag display.

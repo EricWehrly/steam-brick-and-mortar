@@ -32,3 +32,4 @@ Without caching, every session re-fetches all artwork and metadata. At 800+ game
 
 - Steam CDN usage policies need explicit research — check for domain restrictions or API key requirements before building around it.
 - Self-hosted fallback (Docker-based local cache) is worth designing even if not the default path.
+- Related plan: `docs/plans/texture-cache-refactor-plan.md` — refactor to eliminate redundant blob cache (`ImageManager`), add MED texture caching to `PixelDataCache`, and unify the texture storage layer.
