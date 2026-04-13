@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { SteamGameData } from '../game-box/types/GameData'
-import { GameEventTypes } from '../../types/InteractionEvents'
-import { RecentlyPlayedBucket, getRecentlyPlayedBucket, getBucketLabel } from './GameSorter'
+import type { SteamGameData } from '../../../../src/scene/game-box/types/GameData'
+import { GameEventTypes } from '../../../../src/types/InteractionEvents'
+import { RecentlyPlayedBucket, getRecentlyPlayedBucket, getBucketLabel } from '../../../../src/scene/categorization/GameSorter'
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
 const mockHandlers = new Map<string, Array<(e: CustomEvent) => void>>()
 const mockEmit = vi.fn()
 
-vi.mock('../../core/EventManager', () => ({
+vi.mock('../../../../src/core/EventManager', () => ({
     EventManager: {
         getInstance: () => ({
             registerEventHandler: vi.fn((type: string, fn: (e: CustomEvent) => void) => {
@@ -23,7 +23,7 @@ vi.mock('../../core/EventManager', () => ({
 
 let mockGames: SteamGameData[] = []
 
-vi.mock('../../core/data/DataManager', () => ({
+vi.mock('../../../../src/core/data/DataManager', () => ({
     DataManager: {
         getInstance: () => ({
             get: () => mockGames,
@@ -32,7 +32,7 @@ vi.mock('../../core/data/DataManager', () => ({
 }))
 
 // Import after mocks are hoisted
-import { GameSorter } from './GameSorter'
+import { GameSorter } from '../../../../src/scene/categorization/GameSorter'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

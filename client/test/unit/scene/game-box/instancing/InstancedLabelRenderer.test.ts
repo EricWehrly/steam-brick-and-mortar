@@ -17,9 +17,9 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import { ShelfSide } from '../../props/shared/SharedPropsTypes'
+import { ShelfSide } from '../../../../../src/scene/props/shared/SharedPropsTypes'
 
-import { GameBoxUtils } from '../../props/shared/GameBoxUtils'
+import { GameBoxUtils } from '../../../../../src/scene/props/shared/GameBoxUtils'
 
 // Helper: extract Y rotation angle from a quaternion (returns value in [0, 2PI))
 function yRotationFromQuaternion(q: THREE.Quaternion): number {

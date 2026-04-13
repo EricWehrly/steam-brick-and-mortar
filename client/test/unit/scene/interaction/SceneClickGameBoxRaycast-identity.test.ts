@@ -10,8 +10,8 @@
  * before consulting each map, so the correct game is always returned.
  */
 import { describe, it, expect } from 'vitest'
-import { INSTANCED_LABEL_MESH_NAME } from '../../scene/game-box/instancing/InstancedLabelRenderer'
-import { LOD_ARTWORK_MESH_NAME } from '../../scene/game-box/instancing/LodGameArtworkRenderer'
+import { INSTANCED_LABEL_MESH_NAME } from '../../../../src/scene/game-box/instancing/InstancedLabelRenderer'
+import { LOD_ARTWORK_MESH_NAME } from '../../../../src/scene/game-box/instancing/LodGameArtworkRenderer'
 
 // Inline the minimal metadata type to avoid cross-module import in test
 interface InstanceMetadata { name: string; appid?: number | string; position: any }

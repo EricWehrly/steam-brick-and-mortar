@@ -38,7 +38,7 @@ vi.mock('three', async (importOriginal) => {
 const mockBuildTubes = vi.fn()
 const mockWorkerDispose = vi.fn()
 
-vi.mock('./NeonGeometryWorker', () => ({
+vi.mock('../../../../src/scene/signs/NeonGeometryWorker', () => ({
     NeonGeometryWorker: vi.fn().mockImplementation(function () {
         return {
             buildTubes: mockBuildTubes,
@@ -48,16 +48,16 @@ vi.mock('./NeonGeometryWorker', () => ({
 }))
 
 const mockEmit = vi.fn()
-vi.mock('../../core/EventManager', () => ({
+vi.mock('../../../../src/core/EventManager', () => ({
     EventManager: {
         getInstance: vi.fn(() => ({ emit: mockEmit })),
     },
 }))
 
-vi.mock('../../utils/workers/neon-geometry.worker?worker', () => ({ default: function () {} }))
+vi.mock('../../../../src/utils/workers/neon-geometry.worker?worker', () => ({ default: function () {} }))
 
-import { NeonTubeSignRenderer } from './NeonTubeSignRenderer'
-import type { SignRequest } from './ISignRenderer'
+import { NeonTubeSignRenderer } from '../../../../src/scene/signs/NeonTubeSignRenderer'
+import type { SignRequest } from '../../../../src/scene/signs/ISignRenderer'
 
 function makeScene() {
     return {

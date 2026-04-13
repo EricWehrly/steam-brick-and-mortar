@@ -6,7 +6,7 @@ import * as THREE from 'three'
 const createSignMock = vi.fn()
 const bakeTextureMock = vi.fn()
 
-vi.mock('../SignageRenderer', () => ({
+vi.mock('../../../../src/scene/SignageRenderer', () => ({
     SignageRenderer: class {
         createSign(config: { position: THREE.Vector3 }) {
             return createSignMock(config)
@@ -19,7 +19,7 @@ vi.mock('../SignageRenderer', () => ({
 }))
 
 // Import after mock is registered
-import { CanvasSignRenderer } from './CanvasSignRenderer'
+import { CanvasSignRenderer } from '../../../../src/scene/signs/CanvasSignRenderer'
 
 function makeScene() {
     return new THREE.Scene()

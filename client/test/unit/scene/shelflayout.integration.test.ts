@@ -15,9 +15,9 @@
 
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import { computeArcShelfLayout } from '../scene/props/shared/ArcLayoutUtils'
-import { GameBoxUtils } from '../scene/props/shared/GameBoxUtils'
-import { ShelfSide } from '../scene/props/shared/SharedPropsTypes'
+import { computeArcShelfLayout } from '../../../src/scene/props/shared/ArcLayoutUtils'
+import { GameBoxUtils } from '../../../src/scene/props/shared/GameBoxUtils'
+import { ShelfSide } from '../../../src/scene/props/shared/SharedPropsTypes'
 
 // Match production config exactly
 const TOTAL_BATCHES = 47

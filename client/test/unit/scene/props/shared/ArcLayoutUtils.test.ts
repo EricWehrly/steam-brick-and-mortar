@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeArcShelfLayout } from './ArcLayoutUtils'
+import { computeArcShelfLayout } from '../../../../../src/scene/props/shared/ArcLayoutUtils'
 
 describe('computeArcShelfLayout', () => {
     it('generates the correct number of shelf positions', () => {

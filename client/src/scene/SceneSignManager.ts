@@ -22,6 +22,7 @@ import { DataKey } from '../core/data/DataTypes'
 import { EventManager } from '../core/EventManager'
 import { CanvasSignRenderer } from './signs/CanvasSignRenderer'
 import { NeonTubeSignRenderer } from './signs/NeonTubeSignRenderer'
+import { BlockLetterSignRenderer } from './signs/BlockLetterSignRenderer'
 import type { ISignRenderer, SignRequest, SignStyleConfig } from './signs/ISignRenderer'
 import {
     GameEventTypes,
@@ -139,11 +140,12 @@ export interface SignDescriptor {
  * Future sign types (neon tube, end-of-aisle topper, etc.) extend this union.
  */
 export type SignKind =
-    | 'category'    // generic named category label
-    | 'bucket'      // time-bucket section divider
-    | 'ceiling'     // ceiling-hung feature sign (e.g. Recently Played)
-    | 'end-cap'     // orientation end-cap label on a shelf unit
-    | 'neon-tube'   // 3D TubeGeometry neon sign — rendered via NeonTubeSignRenderer
+    | 'category'      // generic named category label
+    | 'bucket'        // time-bucket section divider
+    | 'ceiling'       // ceiling-hung feature sign (e.g. Recently Played)
+    | 'end-cap'       // orientation end-cap label on a shelf unit
+    | 'neon-tube'     // 3D TubeGeometry neon sign — disabled pending stroke-skeleton rendering (see docs/plans/neon-stroke-skeleton-plan.md)
+    | 'block-letter'  // extruded 3D block letters — disabled pending font asset decision (see docs/plans/neon-stroke-skeleton-plan.md)
 
 // ─── System ───────────────────────────────────────────────────────────────────
 
@@ -161,6 +163,7 @@ export class SceneSignManager {
 
     private readonly canvasRenderer: CanvasSignRenderer
     private readonly neonRenderer: NeonTubeSignRenderer
+    private readonly blockLetterRenderer: BlockLetterSignRenderer
     private readonly rendererByKind: Record<SignKind, ISignRenderer>
     private readonly scene: THREE.Scene
     private readonly signKindsByIdentifier = new Map<string, SignKind>()
@@ -185,12 +188,14 @@ export class SceneSignManager {
         this.scene = DataManager.getInstance().getOrThrow<THREE.Scene>(DataKey.MainScene)
         this.canvasRenderer = new CanvasSignRenderer()
         this.neonRenderer = new NeonTubeSignRenderer()
+        this.blockLetterRenderer = new BlockLetterSignRenderer()
         this.rendererByKind = {
             category: this.canvasRenderer,
             bucket: this.canvasRenderer,
             ceiling: this.canvasRenderer,
             'end-cap': this.canvasRenderer,
             'neon-tube': this.neonRenderer,
+            'block-letter': this.blockLetterRenderer,
         }
 
         // Self-subscribe to shelf creation events to place end-cap labels automatically.
@@ -372,6 +377,7 @@ export class SceneSignManager {
         this.buckets = new Map()
         this.canvasRenderer.dispose(this.scene)
         this.neonRenderer.dispose(this.scene)
+        this.blockLetterRenderer.dispose(this.scene)
     }
 
     private syncRecentlyPlayedCeilingSign(): void {
@@ -400,24 +406,44 @@ export class SceneSignManager {
     /**
      * Place (or remove) a neon "steam" entrance sign above the recently-played section.
      * Only shown when the user has played anything — same gate as the ceiling label.
+     *
+     * DISABLED: neon tube rendering produces outline-tracing artifacts (macaroni seams).
+     * Re-enable once stroke-skeleton rendering is implemented.
+     * See: docs/plans/neon-stroke-skeleton-plan.md
      */
     private syncNeonEntranceSign(): void {
-        const uniqueIdentifier = 'neon-entrance'
-        if (!this.hasRecentlyPlayedData) {
-            this.removeSign(uniqueIdentifier)
-            return
-        }
-        const anchor = recentlyPlayedCeilingAnchor()
-        this.placeSign('neon-tube', {
-            uniqueIdentifier,
-            anchorPosition: new THREE.Vector3(anchor.x, anchor.y - 0.4, anchor.z + 0.5),
-            text: 'steam',
-            scale: 1.2,
-            style: {
-                color: 0xff6a00,  // warm orange — classic neon
-                fontSize: 0.3,
-            },
-        })
+        // TD(neon-skeleton): re-enable when stroke-skeleton rendering is ready
+        // this.placeSign('neon-tube', {
+        //     uniqueIdentifier: 'neon-entrance',
+        //     anchorPosition: new THREE.Vector3(anchor.x, anchor.y - 0.4, anchor.z + 0.5),
+        //     text: 'steam',
+        //     scale: 1.2,
+        //     style: { color: 0xff6a00, fontSize: 0.3 },
+        // })
+        this.syncSteamLibraryBlockSign()
+    }
+
+    /**
+     * Place a block-letter "Steam Library" sign at the store entrance.
+     * Sits behind the recently-played ceiling sign, visible from the entrance.
+     *
+     * DISABLED: depends on /fonts/helvetiker_bold.typeface.json at runtime.
+     * Re-enable or replace once the font asset decision is resolved.
+     * See: docs/plans/neon-stroke-skeleton-plan.md (Font file concern section)
+     */
+    private syncSteamLibraryBlockSign(): void {
+        // TD(block-letter-font): re-enable when font asset decision is resolved
+        // const anchor = recentlyPlayedCeilingAnchor()
+        // this.placeSign('block-letter', {
+        //     uniqueIdentifier: 'steam-library-title',
+        //     text: 'Steam Library',
+        //     anchorPosition: new THREE.Vector3(anchor.x, anchor.y - 0.6, anchor.z + 1.5),
+        //     style: {
+        //         color: 0xc7d5e0,   // Steam blue-grey
+        //         fontSize: 0.35,
+        //         depth: 0.08,
+        //     },
+        // })
     }
 
     private replayTimeBucketSignsFromCreatedShelves(): void {

@@ -3,7 +3,7 @@ import {
     getPrimaryGenreFromBatch,
     computeGenreClusterIndex,
     computeAlternatingClusterXOffset,
-} from './CategoryAisleOffset'
+} from '../../../../src/scene/categorization/CategoryAisleOffset'
 
 describe('CategoryAisleOffset', () => {
     it('gets first recognized primary genre from batch games', () => {

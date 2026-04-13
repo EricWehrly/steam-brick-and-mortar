@@ -12,16 +12,16 @@
  * in its own constructor and calls syncInstances + startAutoUpdate when it fires.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { GameEventTypes } from '../../types/InteractionEvents'
+import { GameEventTypes } from '../../../../src/types/InteractionEvents'
 
 // ---- minimal mocks ----
-vi.mock('../../core/AppSettings', () => ({
+vi.mock('../../../../src/core/AppSettings', () => ({
     AppSettings: { get: vi.fn().mockReturnValue(undefined) },
     Setting: new Proxy({}, { get: (_t, k) => k }),
 }))
 
 const mockEventHandlers = new Map<string, (() => void)[]>()
-vi.mock('../../core/EventManager', () => ({
+vi.mock('../../../../src/core/EventManager', () => ({
     EventManager: {
         getInstance: () => ({
             registerEventHandler: vi.fn((type: string, fn: () => void) => {
@@ -36,7 +36,7 @@ vi.mock('../../core/EventManager', () => ({
 const mockSyncInstances = vi.fn()
 const mockStartAutoUpdate = vi.fn()
 
-vi.mock('./instancing/LodDistanceManagerDebug', () => ({
+vi.mock('../../../../src/scene/game-box/instancing/LodDistanceManagerDebug', () => ({
     // Simulate self-subscription: the real LodDistanceManager registers for
     // AllBatchesComplete in its constructor and calls syncInstances/startAutoUpdate.
     LodDistanceManagerDebug: vi.fn().mockImplementation(function(this: Record<string, unknown>) {
@@ -54,7 +54,7 @@ vi.mock('./instancing/LodDistanceManagerDebug', () => ({
         return instance
     }),
 }))
-vi.mock('./instancing/LodArtworkOrchestratorDebug', () => ({
+vi.mock('../../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug', () => ({
     LodArtworkOrchestratorDebug: vi.fn().mockImplementation(function() {
         return {
             setArtworkInstanceFromUrl: vi.fn(),
@@ -65,7 +65,7 @@ vi.mock('./instancing/LodArtworkOrchestratorDebug', () => ({
         }
     }),
 }))
-vi.mock('./instancing/InstancedLabelRenderer', () => ({
+vi.mock('../../../../src/scene/game-box/instancing/InstancedLabelRenderer', () => ({
     InstancedLabelRenderer: vi.fn().mockImplementation(function() {
         return {
             addLabelInstance: vi.fn(),
@@ -75,7 +75,7 @@ vi.mock('./instancing/InstancedLabelRenderer', () => ({
     }),
 }))
 
-import { GpuGameBoxRenderer } from './GpuGameBoxRenderer'
+import { GpuGameBoxRenderer } from '../../../../src/scene/game-box/GpuGameBoxRenderer'
 
 describe('GpuGameBoxRenderer - LOD distance manager lifecycle', () => {
     beforeEach(() => {

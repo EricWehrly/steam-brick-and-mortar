@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeArcShelfLayout } from '../props/shared/ArcLayoutUtils'
+import { computeArcShelfLayout } from '../../../../src/scene/props/shared/ArcLayoutUtils'
 
 /**
  * Regression: arc rowIndex must be taken from ArcShelfInfo.row, not derived from

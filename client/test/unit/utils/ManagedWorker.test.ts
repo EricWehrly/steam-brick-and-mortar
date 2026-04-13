@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ManagedWorker, type WorkerMessage } from './ManagedWorker'
+import { ManagedWorker, type WorkerMessage } from '../../../src/utils/ManagedWorker'
 
 // Fake Worker that wires itself up so tests can trigger responses/crashes
 class FakeWorker implements EventTarget {
