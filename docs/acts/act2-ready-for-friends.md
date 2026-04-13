@@ -4,31 +4,51 @@
 
 **Goal**: Works for people standing next to you during conversation.
 
-**Scope**: Infrastructure hardening and multi-user capability. Desktop/flatscreen-first — VR work is gated to low-risk spikes only until core stability milestones land.
+**Scope**: Infrastructure hardening, multi-user capability, and VR support. Desktop/flatscreen is the initial delivery target; VR is a required Act 2 deliverable but intentionally sequenced late — after infrastructure stability and initial friend playtesting.
 
 **Entry Criteria**: Act 1 complete — all imagined functionality demonstrated with personal demo capability.
 
-**Key requirements**: Handle 800+ game libraries efficiently, AWS Lambda rate limit mitigation, comprehensive caching, error recovery, multi-user testing capability.
+**Key requirements**: Handle 800+ game libraries efficiently, AWS Lambda rate limit mitigation, comprehensive caching, error recovery, multi-user capability, full VR support.
 
-## Features
+---
 
-**Intermission (in progress — see `docs/roadmaps/intermission-before-phase2.md`):**
-- [Key Metrics Instrumentation](../features/key-metrics-instrumentation.md) — frame time, memory, hitch detection, Playwright perf reports
-- [Background Resource Reduction](../features/background-resource-reduction.md) — Page Visibility API, LOD disable on blur, frame throttle
-- [UI Standardization](../features/ui-standardization.md) — design tokens, component library, VR-ready architecture
+## Gate 1: Ready to Start Sharing
 
-**Core Act 2:**
-- [Network Rate Limiting](../features/network-rate-limiting.md) — client-side rate limiter, batched artwork loading, Lambda hardening
-- [Multi-Layer Caching](../features/multi-layer-caching.md) — browser + Lambda + CloudFront + S3 caching infrastructure
-- [Input System](../features/input-system.md) — mouse/keyboard, gamepad, VR controller abstraction layer
-- [GameSort Full Pipeline](../features/gamesort-full-pipeline.md) — re-sort reorders game boxes and shelves, not just signs
+> Features that need to be solid before we hand this to anyone. Bugs here are embarrassing. Scope creep here is a trap.
+
+- [Network Rate Limiting](../features/network-rate-limiting.md) — client-side rate limiter, batched artwork loading, Lambda hardening; must land before any multi-user testing
+- [Multi-Layer Caching](../features/multi-layer-caching.md) — browser + Lambda + CloudFront + S3; pairs with rate limiting as the "safe to share" infrastructure baseline
+- [Input System](../features/input-system.md) — mouse/keyboard solid, gamepad support, keyboard accessibility for all menus; VR controllers are Gate 2
+
+## Gate 2: Act 2 Complete
+
+> Features that must land before Act 2 is done. VR support lives here — it's a delivery goal, not a stretch goal.
+
+- [VR Support](../features/vr-support.md) — full WebXR implementation; the whole store works in headset; this is the "impressor" that defines Act 2 done
+- [GameSort Full Pipeline](../features/gamesort-full-pipeline.md) — re-sort reorders game boxes and shelves in the scene, not just signs; sub-feature of the tag-sorting north star
+
+## Also In Act 2 (Best Effort)
+
+> Real work we intend to make a serious attempt at. Not blockers. We punt when stuck.
+
+- [Local File Investigation](../features/local-file-investigation.md) — user categories from Steam local files; ties into sort-by-user-tags north star; non-tentpole
+- [Lighting and Atmosphere](../features/lighting-and-atmosphere.md) — tone presets (corporate → dank), dongle switch panel, dust motes, spotlight shimmer; core lighting is done, this is the experiential layer
+- [Procedural Texture Quality Pass](../features/procedural-texture-quality.md) — MDF veneer, popcorn ceiling, wood plank walls, carpet; carried from Act 1
+- [UI Standardization](../features/ui-standardization.md) — in-scene omnibar, 3D sign elements, component tokens (started in intermission, may extend into Act 2)
+- Enhanced error handling — robust recovery for rate limits, invalid Steam IDs, timeouts, partial failures
+- Infrastructure monitoring — CloudWatch metrics, client telemetry, cache performance dashboards
+- Test network isolation — automatic blocking of external calls in tests; MSW integration; eliminates 5+ second timeout delays
 
 ## Completion Criteria
 
-- Can handle 800+ game libraries without rate limiting issues
+- 800+ game libraries load reliably without rate limiting failures
 - Graceful degradation when rate limits are hit
-- Multi-layer caching prevents origin server overload
-- Comprehensive error handling and recovery
-- Multiple users can use system simultaneously without shared rate limiting
-- Comprehensive input support (mouse/keyboard, gamepad, VR)
-- System works reliably for multiple concurrent users with large Steam libraries
+- Multi-layer caching prevents repeated origin hits
+- Multiple users can use simultaneously without shared rate limit interference
+- All core navigation accessible via keyboard without mouse dependency
+- Full VR session works: navigation, game browsing, UI interaction in headset
+- Sort mode change reorders game boxes and shelves in the scene
+
+## Notes
+
+- When actively working on a feature, check whether related items on the Encore list are plausibly quick. If so, pull them forward rather than leaving them for later — "while we're here" is the right time to try.
