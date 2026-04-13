@@ -7,8 +7,34 @@ const { getAppDetails } = require('../services/steam-api');
 const { getFromCache } = require('../services/cache');
 const { isValidSteamId } = require('../services/http-utils');
 const { STEAM_API_BASE_URL } = require('../services/config');
+const { LambdaClient, InvokeCommand } = require('@aws-sdk/client-lambda');
+
+const lambdaClient = new LambdaClient({});
+const HYDRATOR_LAMBDA_NAME = process.env.HYDRATOR_LAMBDA_NAME;
 
 /**
+ * Trigger the background hydrator lambda asynchronously
+ */
+async function triggerHydrator() {
+  if (!HYDRATOR_LAMBDA_NAME) {
+    console.log('HYDRATOR_LAMBDA_NAME not set, skipping background hydration trigger');
+    return;
+  }
+  
+  try {
+    console.log(`Triggering background hydrator: ${HYDRATOR_LAMBDA_NAME}`);
+    const command = new InvokeCommand({
+      FunctionName: HYDRATOR_LAMBDA_NAME,
+      InvocationType: 'Event', // Asynchronous execution
+      Payload: JSON.stringify({}) // Empty payload triggers the automated sweep
+    });
+    await lambdaClient.send(command);
+  } catch (error) {
+    // We swallow this error because we don't want to break the main user response
+    // if the background hydrator trigger fails
+    console.error('Failed to trigger background hydrator:', error.message);
+  }
+}
  * Handle health check endpoint (/health)
  */
 async function handleHealth() {
@@ -199,6 +225,10 @@ async function handleBatchAppDetails(event) {
   if (uncachedAppids.length > 0) {
     console.log(`Fetching ${uncachedAppids.length} uncached games from Steam API`);
     
+    // Fire-and-forget the hydrator logic in the background if we're fetching new data
+    // It'll sweep S3 after we write the cache out
+    triggerHydrator();
+
     for (let i = 0; i < uncachedAppids.length; i += STEAM_API_BATCH_SIZE) {
       const batch = uncachedAppids.slice(i, i + STEAM_API_BATCH_SIZE);
       const batchResults = await Promise.allSettled(

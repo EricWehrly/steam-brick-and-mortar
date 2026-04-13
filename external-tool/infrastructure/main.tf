@@ -44,10 +44,11 @@ module "lambda" {
   enable_function_url = false  # We'll use API Gateway instead
   cache_bucket_name   = module.s3_cache.bucket_name
   cache_bucket_arn    = module.s3_cache.bucket_arn
+  hydrator_lambda_name = module.lambda_hydrator.function_name
 
   tags = local.common_tags
 
-  depends_on = [module.s3_cache]
+  depends_on = [module.s3_cache, module.lambda_hydrator]
 }
 
 # Hydrator Lambda module - Background task for SteamSpy data
