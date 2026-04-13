@@ -107,7 +107,10 @@ async function processAppId(appid) {
   }
 
   // 4. Write back to S3 hydrated path
-  const targetKey = `appDetailsWithTags/${appid}.json.gz`;
+  // If the environment provides a specific prefix (e.g. appDetailsWithTags/), use it;
+  // otherwise default to appDetailsWithTags/
+  const hydratedPrefix = process.env.HYDRATED_PREFIX || 'appDetailsWithTags/';
+  const targetKey = `${hydratedPrefix}${appid}.json.gz`;
   const compressedFinalData = gzipSync(JSON.stringify(finalData));
   
   const putCommand = new PutObjectCommand({
@@ -167,56 +170,25 @@ async function releaseLock() {
   await s3Client.send(putCmd);
 }
 
-async function listAllKeys(prefix) {
+async function listAllKeys() {
   const keys = new Set();
   let continuationToken;
   do {
+    // List everything in the bucket, then we will categorize by prefix locally
     const listCmd = new ListObjectsV2Command({
       Bucket: CACHE_BUCKET_NAME,
-      Prefix: prefix,
       ContinuationToken: continuationToken
     });
     const res = await s3Client.send(listCmd);
     (res.Contents || []).forEach(item => {
-      // e.g. "appdetails/440.json.gz" -> "440"
-      const match = item.Key.match(/(\d+)\.json\.gz$/);
-      if (match) {
-        keys.add(match[1]);
-      }
+      keys.add(item.Key);
     });
     continuationToken = res.NextContinuationToken;
   } while (continuationToken);
   return keys;
 }
 
-exports.handler = async (event, context) => {
-  console.log("SteamSpy Hydrator Lambda invoked", JSON.stringify(event));
-
-  if (!CACHE_BUCKET_NAME) {
-    throw new Error("CACHE_BUCKET_NAME environment variable is not set");
-  }
-
-  // Handle Phase 1 MVP Payload: Accept a manual payload { "appid": 10 }
-  if (event.appid) {
-    try {
-      const result = await processAppId(event.appid);
-      return {
-        statusCode: 200,
-        body: JSON.stringify(result)
-      };
-    } catch (error) {
-      console.error(`[AppID ${event.appid}] Hydration failed critically:`, error);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ message: error.message, stack: error.stack })
-      };
-    }
-  }
-
-  // ------------------------------------------
-  // Phase 2: Automated Batch Sweep
-  // ------------------------------------------
-  
+async function runAutomatedBatchSweep(context) {
   // 1. Enforce Singleton Execution
   const hasLock = await acquireLock();
   if (!hasLock) {
@@ -229,16 +201,29 @@ exports.handler = async (event, context) => {
 
   try {
     // 2. Discover missing hydrated apps
-    console.log("Listing base keys from 'appdetails/'...");
-    const baseKeys = await listAllKeys('appdetails/');
-    console.log(`Found ${baseKeys.size} base apps.`);
+    console.log("Listing all keys to find unhydrated apps...");
+    const allKeys = await listAllKeys();
+    
+    const hydratedPrefix = process.env.HYDRATED_PREFIX || 'appDetailsWithTags/';
+    const basePrefix = 'appdetails/';
 
-    console.log("Listing hydrated keys from 'appDetailsWithTags/'...");
-    const hydratedKeys = await listAllKeys('appDetailsWithTags/');
-    console.log(`Found ${hydratedKeys.size} hydrated apps.`);
+    const baseAppIds = new Set();
+    const hydratedAppIds = new Set();
+
+    for (const key of allKeys) {
+      if (key.startsWith(basePrefix)) {
+        const match = key.match(/(\d+)\.json\.gz$/);
+        if (match) baseAppIds.add(match[1]);
+      } else if (key.startsWith(hydratedPrefix)) {
+        const match = key.match(/(\d+)\.json\.gz$/);
+        if (match) hydratedAppIds.add(match[1]);
+      }
+    }
+
+    console.log(`Found ${baseAppIds.size} base apps and ${hydratedAppIds.size} hydrated apps.`);
 
     // Set difference: apps in base but not in hydrated
-    const missingApps = Array.from(baseKeys).filter(appid => !hydratedKeys.has(appid));
+    const missingApps = Array.from(baseAppIds).filter(appid => !hydratedAppIds.has(appid));
     console.log(`Need to hydrate ${missingApps.length} apps.`);
 
     if (missingApps.length === 0) {
@@ -297,4 +282,35 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ error: err.message })
     };
   }
+}
+
+exports.handler = async (event, context) => {
+  console.log("SteamSpy Hydrator Lambda invoked", JSON.stringify(event));
+
+  if (!CACHE_BUCKET_NAME) {
+    throw new Error("CACHE_BUCKET_NAME environment variable is not set");
+  }
+
+  // Handle Phase 1 MVP Payload: Accept a manual payload { "appid": 10 }
+  if (event.appid) {
+    try {
+      const result = await processAppId(event.appid);
+      return {
+        statusCode: 200,
+        body: JSON.stringify(result)
+      };
+    } catch (error) {
+      console.error(`[AppID ${event.appid}] Hydration failed critically:`, error);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ message: error.message, stack: error.stack })
+      };
+    }
+  }
+
+  // ------------------------------------------
+  // Phase 2: Automated Batch Sweep
+  // ------------------------------------------
+  
+  return await runAutomatedBatchSweep(context);
 };
