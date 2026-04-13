@@ -22,6 +22,8 @@ The concentric-arc layout was built during Act 1 as the primary spatial arrangem
 
 ## Grouping
 
+> **Encore / stretch goal** — try if layout switching lands cleanly and time allows; not a blocker.
+
 Layouts should support a "group size" concept: a shape (arc, square, etc.) applies to a group of N shelves, then repeats or transitions. For example: arcs of 4 shelves, spaced to form natural browsing aisles. This enables richer spatial organization without requiring a fully custom algorithm per layout.
 
 ## Dynamic Switching

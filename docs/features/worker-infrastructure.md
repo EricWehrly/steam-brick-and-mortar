@@ -1,7 +1,8 @@
 # Feature: Worker Infrastructure (ManagedWorker)
 
-**Act**: 1 (Complete)
-**Status**: Done
+**Act**: 1 (Mostly Complete — one known pending item)
+**Status**: In Progress (pending carpet worker off-thread; otherwise done)
+**Priority**: Low — check-in deliberately during Key Metrics work
 
 ## Goal
 
@@ -22,6 +23,7 @@ The main thread locking improvement was a direct performance benefit — workers
 - `WorkerErrorUtils` deleted (functionality absorbed into `ManagedWorker`)
 - Error handling standardized across all workers
 - `WorkerErrorUtils` fold-into-ManagedWorker reviewer note from PR #39 resolved
+- **Pending**: carpet texture generation is still on the main thread (`prewarmCarpet` in `SharedMaterialManager`); tracked in `tech-debt.md` as `carpet-worker-offload`. Check-in on this during Key Metrics instrumentation work to understand its frame cost.
 
 ## Notes
 

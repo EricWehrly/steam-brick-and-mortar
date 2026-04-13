@@ -1,8 +1,10 @@
 # Feature: Steam Tag Pipeline
 
-**Act**: 2 (Best Effort — active work in separate branch)
+**Act**: 2 (Best Effort — active work in separate branch; invest to try, not required to complete)
 **Status**: In Progress (branch active; not yet reconciled with main)
-**Priority**: Medium–High
+**Priority**: Medium
+
+> **Ways of working note**: This is the kind of feature we want to make a real attempt at and pursue until we get somewhere interesting — but we won't hang up on completion. The SteamSpy branch is actively running this experiment. When it's ready, we reconcile and integrate.
 
 ## Goal
 
