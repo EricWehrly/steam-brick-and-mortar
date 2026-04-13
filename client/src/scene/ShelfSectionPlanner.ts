@@ -37,10 +37,9 @@ export interface ShelfSectionPlannerConfig {
     signMountStyle?: SignMount['style']
 }
 
-const DEFAULT_SIGN_Y_OFFSET = 0.2
-const DEFAULT_MOUNT_STYLE: SignMount['style'] = 'above-shelf'
-const BUCKET_SIGN_Y_OFFSET = 2.02
-const BUCKET_SIGN_FRONT_OFFSET = 0.28
+const SHELF_SIGN_Y_OFFSET = 2.02
+const SHELF_SIGN_MOUNT_STYLE: SignMount['style'] = 'above-shelf'
+const SHELF_SIGN_FRONT_OFFSET = 0.28
 
 export class ShelfSectionPlanner {
     private static readonly logger = Logger.createLogFunctions(ShelfSectionPlanner.name)
@@ -58,8 +57,8 @@ export class ShelfSectionPlanner {
 
     constructor(config: ShelfSectionPlannerConfig = {}) {
         this.config = {
-            signYOffset: config.signYOffset ?? DEFAULT_SIGN_Y_OFFSET,
-            signMountStyle: config.signMountStyle ?? DEFAULT_MOUNT_STYLE,
+            signYOffset: config.signYOffset ?? SHELF_SIGN_Y_OFFSET,
+            signMountStyle: config.signMountStyle ?? SHELF_SIGN_MOUNT_STYLE,
         }
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.GamesSort,
@@ -139,7 +138,7 @@ export class ShelfSectionPlanner {
         this.signSystem.placeSign('canvas', {
             uniqueIdentifier,
             anchorPosition: shelfPosition,
-            mount: { style: 'above-shelf', yOffset: BUCKET_SIGN_Y_OFFSET, frontOffset: BUCKET_SIGN_FRONT_OFFSET, signFacingY: shelfRotationY },
+            mount: { style: 'above-shelf', yOffset: SHELF_SIGN_Y_OFFSET, frontOffset: SHELF_SIGN_FRONT_OFFSET, signFacingY: shelfRotationY },
             style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
         })
         this.placedBucketIdentifiers.add(uniqueIdentifier)
@@ -205,10 +204,17 @@ export class ShelfSectionPlanner {
                 continue
             }
 
+            const shelfRotationY = this.shelfRotations[anchorIndex] ?? 0
+
             this.signSystem.placeSign('canvas', {
                 uniqueIdentifier: group.label,
                 anchorPosition: anchorPos,
-                mount: { style: this.config.signMountStyle, yOffset: this.config.signYOffset },
+                mount: {
+                    style: this.config.signMountStyle,
+                    yOffset: this.config.signYOffset,
+                    frontOffset: SHELF_SIGN_FRONT_OFFSET,
+                    signFacingY: shelfRotationY,
+                },
             })
             this.placedSectionIdentifiers.add(group.label)
             placed++
