@@ -1,5 +1,7 @@
 # Phase 1: "Ready for Me" - Personal Demo Readiness
 
+> Phase 1 is complete. This document is retained as historical record. See acts/act2-ready-for-friends.md for active work.
+
 ## Phase Overview
 
 **Goal**: Demonstrate all imagined functionality with competency - personal demo-ready
@@ -11,7 +13,7 @@
 - Rate limiting acceptable for single-user testing
 - Basic error handling sufficient
 
-**Phase 1 Completion Status**: ~95% complete — all core systems implemented. See `docs/roadmaps/phase1-remaining-work.md` for the 3 genuinely open items.
+**Phase 1 Completion Status**: ✅ Complete — all core systems implemented and milestones closed.
 
 ---
 
@@ -82,7 +84,7 @@
 - **Task 3.0.1.1**: Create `client/` folder with TypeScript configuration ✅
 - **Task 3.0.1.2**: Set up Vite for fast development and building ✅
 - **Task 3.0.1.3**: Configure Vitest for unit testing ✅
-- **Task 3.0.1.4**: Add ESLint configuration focused on issue-catching 🔄 **IMPLEMENTED** (not tested)
+- **Task 3.0.1.4**: Add ESLint configuration focused on issue-catching ✅ **Done and enforced**
 - **Task 3.0.1.5**: Create Yarn PnP setup for package management ✅
 - **Task 3.0.1.6**: Add build scripts (`yarn build`, `yarn serve`, `yarn test`) ✅
 
@@ -404,7 +406,9 @@
 
 ---
 
-## 🔄 Milestone 6: Level Layout and Spatial Design - **PHASE 1 COMPLETION**
+## ✅ Milestone 6: Level Layout and Spatial Design - **LARGELY COMPLETE**
+
+> Milestone 6 is largely complete: Features 6.5, 6.6, and 6.7 (partial) are done. Layout shapes (circle, concentric) and UI theme system remain future work.
 *Goal: Design and implement the 3D environment layout for optimal game browsing*
 
 ### Feature 6.0: Event-Driven Startup Flow 🔄 
@@ -551,8 +555,10 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 
 ---
 
-## Milestone 6.5: Game Categorization and Shelf Organization 🔮 **NEXT MAJOR FEATURE**
+## ✅ Milestone 6.5: Game Categorization and Shelf Organization
 *Goal: Replace hardcoded categories with Steam-native genre/category data, enabling dynamic shelf organization*
+
+**Status**: ✅ Implemented — `GameSorter`, `ShelfSectionPlanner`, `GameSortMode` all done. Sort-by-genre and sort-by-playtime modes working. Genre groups, signs, bucket tracking, and section planning complete.
 
 **Sequencing note (2026-04-05)**: This is the next major feature after Phase 1 proper work completes. Research is complete in `docs/steam-categorization-research.md`.
 
@@ -613,8 +619,10 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 
 ---
 
-## Milestone 6.6: UI System Normalization and Theming 🔮 **PARALLEL-ELIGIBLE**
+## ✅ Milestone 6.6: UI System Normalization and Theming — **PARTIALLY DONE**
 *Goal: Establish a consistent, reusable, themeable UI component system before further UI construction*
+
+**Status**: ✅ Partially done — `tokens.css` created, panels migrated to CSS variables, `LayoutSortPanel` added with sort mode UI, `SystemUICoordinator` manages panel ordering. Remaining polish tracked in intermission.
 
 **Sequencing note (2026-04-05)**: This should happen **before** building any new UI widgets or panels. Normalizing first means all subsequent UI work inherits consistent components. Well-suited for sub-agent parallelization when starting a new work block.
 
@@ -661,8 +669,10 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 
 ---
 
-## Milestone 6.7: Layout System 🔮 **POST-CATEGORIZATION**
+## ✅ Milestone 6.7: Layout System — **PARTIALLY DONE**
 *Goal: Multiple configurable room layout modes for game browsing*
+
+**Status**: ✅ Partially done — `LayoutSortPanel` UI implemented, sort mode switching (recently-played / by-genre / by-playtime) wired. Layout shapes (circle, concentric) are still future work.
 
 **Prerequisite**: Steam categorization (6.5) + faceted filtering/sorting must exist first so layouts are meaningful. This milestone sits at the intersection of categorization + layout and depends on both being sufficiently implemented. UI theme system (6.6) should precede this so the layout selector widget is styled correctly.
 
@@ -676,6 +686,12 @@ Games need to spawn onto shelves before we can "optimize" the process of doing s
 - **Rectangle (current)**: Columns configurable, dynamically adjustable in UI
 - **Circle**: Radius configurable, games arranged in arc/ring
 - **Concentric Circles**: Multiple rings (the "Dreamcast logo" pattern), radius per ring, games spread outward
+- **Encircling Games**: Shelves themselves are hidden; game tiles encircle the user in tighter, vertically stacked rows above and below eye level. Spacing is compact by default, with a gaze-aware soft expansion that pushes the focused game slightly farther out (~10%) and its neighbors partially outward (~5%) to create a spongey dynamic effect.
+Maybe the games spin as they encircle you (except where you're targeting?)
+This might be a fun "room" to connect by interacting with a computer at the counter to "Enter Cyberspace"
+
+- **Insect Collection**: Use each game's _Icon_ and lay them out like pins in little diorama boxes. The user can open the boxes and pull the pins to see the game details
+Diorama boxes / trays can be picked up, carried around, and set down or mounted
 - Each layout defined by a simple data structure; layouts are pluggable
 
 ### Feature 6.7.3: Sorting & Filtering Prerequisites
