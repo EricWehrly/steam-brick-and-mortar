@@ -16,6 +16,7 @@
 
 > Features that need to be solid before we hand this to anyone. Bugs here are embarrassing. Scope creep here is a trap.
 
+- [Static Hosting](../features/static-hosting.md) — public HTTPS URL, repeatable deploy, CORS wired to Lambda; **the** prerequisite for sharing anything
 - [Network Rate Limiting](../features/network-rate-limiting.md) — client-side rate limiter, batched artwork loading, Lambda hardening; must land before any multi-user testing
 - [Multi-Layer Caching](../features/multi-layer-caching.md) — browser + Lambda + CloudFront + S3; pairs with rate limiting as the "safe to share" infrastructure baseline
 - [Input System](../features/input-system.md) — mouse/keyboard solid, gamepad support, keyboard accessibility for all menus; VR controllers are Gate 2
@@ -37,10 +38,11 @@
 - [UI Standardization](../features/ui-standardization.md) — in-scene omnibar, 3D sign elements, component tokens (started in intermission, may extend into Act 2)
 - Enhanced error handling — robust recovery for rate limits, invalid Steam IDs, timeouts, partial failures
 - Infrastructure monitoring — CloudWatch metrics, client telemetry, cache performance dashboards
-- Test network isolation — automatic blocking of external calls in tests; MSW integration; eliminates 5+ second timeout delays
+- ~~Test network isolation~~ — automatic blocking of external calls in tests is **done** (implemented via global fetch intercept in unit/integration test setup)
 
 ## Completion Criteria
 
+- Client is publicly hosted at a stable HTTPS URL
 - 800+ game libraries load reliably without rate limiting failures
 - Graceful degradation when rate limits are hit
 - Multi-layer caching prevents repeated origin hits
