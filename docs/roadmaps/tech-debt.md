@@ -12,10 +12,24 @@
 ## Intake Queue
 *New items requiring triage and prioritization*
 
-### Remove ServiceRegistry?
-probably
-seems like we were kind of tearing it out but didn't finish
-need to move to newer and preferable patterns
+### Re-sort does not reorder game boxes or shelves
+**Priority**: High (feature gap — sort UI exists but games don't move)  
+**Effort**: 1-2 days  
+**Context**: `GamesSort` is only consumed by `ShelfSectionPlanner` (for signs). `GameBoxSpawner` and `ShelfLayoutCoordinator` both listen to initial-load events (`BatchReadyForPlacement`, `AllBatchesComplete`) only — neither reacts to `GamesSort`. So changing sort mode moves signs but leaves game boxes and shelves exactly where they were placed on first load.  
+**Documented approach**: `docs/plans/texture-placement-split-plan.md` — split texture loading from instance placement so that `GamesSort` can drive a position reassignment pass without re-fetching artwork. Key change: `GpuGameBoxRenderer.placeInstance()` called on `GamesSort` with new sorted positions, shelf layout re-runs from the new game order.  
+**Files**: `GameBoxSpawner.ts`, `GpuGameBoxRenderer.ts`, `ShelfLayoutCoordinator.ts`, `GpuStorePropsRenderer.ts`
+
+**Priority**: Medium  
+**Effort**: 3-5 hours  
+**Context**: `ShelfSectionPlanner` previously called `signSystem.clearAll()` inside `planSections()`, which silently nuked signs owned by other subsystems (bucket signs, ceiling sign, block letter). Fixed by splitting into per-type tracked sets (`placedSectionIdentifiers`, `placedBucketIdentifiers`) with `removeSectionSigns()` / `removeBucketSigns()`. This works but requires each coordinator to know what others own — fragile as sign types proliferate.  
+**Better long-term**: Sign ownership should be explicit and declarative. Options: (a) each coordinator holds a "sign group" token and clearAll scoped to that token, (b) `SceneSignManager` tracks ownership by registrant and provides `clearGroup(owner)`, (c) layout-driven sign placement where a single coordinator owns the full sign lifecycle per layout pass.  
+**Deferred because**: (a) and (b) require `SceneSignManager` interface changes; (c) requires layout coordinator refactor. Neither fits the current scope.  
+**Files**: `ShelfSectionPlanner.ts`, `SceneSignManager.ts`
+
+### Possible memory leak in high LOD textures
+User suspects there could be a memory leak
+Are we releasing high LOD textures when we're done with them? Or are those staying in memory?
+Seems worth checking, and maybe we could check other likely culprits while we're of a mind for it.
 
 ### Input Architecture: Review `WebXRCoordinator` scope/naming vs actual responsibilities
 **Priority**: High  
