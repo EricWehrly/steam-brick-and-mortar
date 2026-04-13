@@ -35,6 +35,10 @@ export interface GamesSortEvent extends BaseInteractionEvent {
     sortMode: GameSortMode
 }
 
+export interface SortRequestedEvent extends BaseInteractionEvent {
+    sortMode: GameSortMode
+}
+
 /**
  * LayoutChangedEvent
  *

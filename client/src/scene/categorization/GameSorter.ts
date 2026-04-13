@@ -12,8 +12,8 @@
 import { EventManager } from '../../core/EventManager'
 import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
-import { GameEventTypes } from '../../types/InteractionEvents'
-import type { AllBatchesCompleteEvent, GamesSortEvent } from '../../types/EnvironmentEvents'
+import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
+import type { AllBatchesCompleteEvent, GamesSortEvent, SortRequestedEvent } from '../../types/EnvironmentEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { sortByNumericField, primaryGenre, KNOWN_GENRES } from './GameSortFunctions'
 import type { GameSortMode } from '../../types/EnvironmentEvents'
@@ -70,7 +70,19 @@ export class GameSorter {
             GameEventTypes.AllBatchesComplete,
             (_event: CustomEvent<AllBatchesCompleteEvent>) => this.sortByRecentlyPlayed()
         )
-        GameSorter.logger.debug('GameSorter initialized — subscribed to AllBatchesComplete')
+        EventManager.getInstance().registerEventHandler(
+            UIEventTypes.SortRequested,
+            (event: CustomEvent<SortRequestedEvent>) => this.handleSortRequested(event.detail)
+        )
+        GameSorter.logger.debug('GameSorter initialized — subscribed to AllBatchesComplete + SortRequested')
+    }
+
+    private handleSortRequested(detail: SortRequestedEvent): void {
+        switch (detail.sortMode) {
+            case 'recently-played': this.sortByRecentlyPlayed(); break
+            case 'by-genre':        this.sortByGenre();          break
+            case 'by-playtime':     this.sortByPlaytime();       break
+        }
     }
 
     public sortByGenre(): void {

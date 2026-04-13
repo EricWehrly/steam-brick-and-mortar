@@ -309,7 +309,8 @@ export const InputEventTypes = {
 export const UIEventTypes = {
     MenuOpen: 'ui:menu-open',
     MenuClose: 'ui:menu-close',
-    ImageCacheStatsRequest: 'ui:image-cache-stats-request'
+    ImageCacheStatsRequest: 'ui:image-cache-stats-request',
+    SortRequested: 'ui:sort-requested',
 } as const
 
 export const GameEventTypes = {
