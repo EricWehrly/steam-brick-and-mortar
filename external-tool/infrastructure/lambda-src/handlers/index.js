@@ -35,6 +35,8 @@ async function triggerHydrator() {
     console.error('Failed to trigger background hydrator:', error.message);
   }
 }
+
+/**
  * Handle health check endpoint (/health)
  */
 async function handleHealth() {
