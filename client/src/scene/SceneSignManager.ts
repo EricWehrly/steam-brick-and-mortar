@@ -1,9 +1,6 @@
 /**
  * SceneSignManager
  * Tech debt link: docs/roadmaps/tech-debt.md → "Category System Tech Debt / SceneSignManager rename"
- *
- * TODO(signage): split bucket-transition + anchor-placement helpers into dedicated modules
- *               when we do the SceneSignManager slimming pass.
  */
 
 import * as THREE from 'three'
@@ -16,22 +13,13 @@ import { BlockLetterSignRenderer } from './signs/BlockLetterSignRenderer'
 import type { ISignRenderer, SignRequest } from './signs/ISignRenderer'
 import type { RenderKind, SignDescriptor, SignMount, ShelfTopSurface } from './SignTypes'
 import {
-    GameEventTypes,
     StorePropsEventTypes,
     RoomEventTypes,
     type ShelfReadyEvent,
     type RoomResizedEvent,
 } from '../types/InteractionEvents'
-import type { GamesSortEvent } from '../types/EnvironmentEvents'
-import { RecentlyPlayedBucket } from './categorization/GameSorter'
-import type { SteamGameData } from './game-box/types/GameData'
 import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
-import {
-    shelfBucket,
-    shouldPlaceBucketSign,
-    recentlyPlayedCeilingAnchor,
-    bucketDisplayLabel,
-} from './signs/TimeBucketSignHelpers'
+import { recentlyPlayedCeilingAnchor } from './signs/TimeBucketSignHelpers'
 
 export interface SignStyle {
     backgroundColor: number
@@ -77,15 +65,6 @@ export class SceneSignManager {
     private readonly rendererByKind: Record<RenderKind, ISignRenderer>
     private readonly scene: THREE.Scene
     private readonly rendererByIdentifier = new Map<string, RenderKind>()
-    private readonly shelfTransforms = new Map<number, { position: THREE.Vector3; rotationY: number }>()
-    private readonly bucketIdentifiers = new Set<string>()
-    private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
-    private buckets: ReadonlyMap<number | string, string> = new Map()
-    private lastPlacedBucket: RecentlyPlayedBucket | null = null
-
-    private get hasRecentlyPlayedData(): boolean {
-        return this.sortedGames.some(game => (game.rtime_last_played ?? 0) > 0)
-    }
 
     private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 0.6
     private static readonly SIGN_Z_FACE_PLAYER = 0.01
@@ -102,10 +81,6 @@ export class SceneSignManager {
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfReady,
             (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfCreated(event.detail)
-        )
-        EventManager.getInstance().registerEventHandler(
-            GameEventTypes.GamesSort,
-            (event: CustomEvent<GamesSortEvent>) => this.handleGamesSort(event.detail)
         )
         // TODO(layout): sign positions should be driven by a layout coordinator, not
         // computed here from RoomConstants. When that refactor lands, this handler
@@ -125,28 +100,11 @@ export class SceneSignManager {
         if (topSurface) {
             this.placeShelfEndCapLabels(batchIndex, shelfPos, rotY, topSurface)
         }
-
-        this.shelfTransforms.set(batchIndex, { position: shelfPos.clone(), rotationY: rotY })
-
-        if (this.hasRecentlyPlayedData && this.sortedGames.length > 0) {
-            this.placeTimeBucketSignForShelf(batchIndex, shelfPos, rotY)
-        }
     }
 
     private handleRoomResized(): void {
-        // Re-place signs whose positions derive from room/ceiling dimensions.
         // TODO(layout): replace with layout coordinator invalidation.
-        this.syncRecentlyPlayedCeilingSign()
         this.syncSteamLibraryBlockSign()
-    }
-
-    private handleGamesSort(detail: GamesSortEvent): void {
-        this.sortedGames = detail.sortedGames
-        this.buckets = detail.buckets
-        this.lastPlacedBucket = null
-        this.removeBucketSigns()
-        this.syncRecentlyPlayedCeilingSign()
-        this.replayTimeBucketSignsFromCreatedShelves()
     }
 
     public placeSign(renderKind: RenderKind, descriptor: SignDescriptor): THREE.Object3D {
@@ -154,6 +112,11 @@ export class SceneSignManager {
         const signObject = renderer.setSign(this.buildSignRequest(renderKind, descriptor), this.scene)
         this.rendererByIdentifier.set(descriptor.uniqueIdentifier, renderKind)
         return signObject
+    }
+
+    /** Remove a sign by identifier. Called by layout coordinators (e.g. ShelfSectionPlanner). */
+    public removeSignById(uniqueIdentifier: string): void {
+        this.removeSign(uniqueIdentifier)
     }
 
     private buildSignRequest(renderKind: RenderKind, descriptor: SignDescriptor): SignRequest {
@@ -186,13 +149,6 @@ export class SceneSignManager {
 
         this.rendererByKind[renderKind].removeSign(uniqueIdentifier, this.scene)
         this.rendererByIdentifier.delete(uniqueIdentifier)
-    }
-
-    private removeBucketSigns(): void {
-        for (const uniqueIdentifier of this.bucketIdentifiers) {
-            this.removeSign(uniqueIdentifier)
-        }
-        this.bucketIdentifiers.clear()
     }
 
     private placeShelfEndCapLabels(
@@ -236,8 +192,6 @@ export class SceneSignManager {
             renderer.clearAll(this.scene)
         }
         this.rendererByIdentifier.clear()
-        this.bucketIdentifiers.clear()
-        this.lastPlacedBucket = null
     }
 
     public dispose(): void {
@@ -245,50 +199,17 @@ export class SceneSignManager {
             renderer.dispose(this.scene)
         }
         this.rendererByIdentifier.clear()
-        this.bucketIdentifiers.clear()
-        this.shelfTransforms.clear()
-        this.sortedGames = []
-        this.buckets = new Map()
-        this.lastPlacedBucket = null
     }
 
-    private syncRecentlyPlayedCeilingSign(): void {
-        const uniqueIdentifier = 'Recently Played'
-        if (!this.hasRecentlyPlayedData) {
-            this.removeSign(uniqueIdentifier)
-            return
-        }
-        this.placeSign('canvas', {
-            uniqueIdentifier,
-            anchorPosition: recentlyPlayedCeilingAnchor(),
-            mount: { style: 'ceiling', signFacingY: 0 },
-            style: {
-                backgroundColor: 0xd4a017,
-                textColor: 0x003087,
-                fontSize: 0.30,
-                padding: '0.15 0.28',
-            },
-        })
-    }
 
     /**
      * TD(neon-skeleton): neon entrance sign disabled — stroke-skeleton rendering not yet implemented.
      * See docs/plans/neon-stroke-skeleton-plan.md to re-enable.
-     *
-     * this.placeSign('neon-tube', {
-     *     uniqueIdentifier: 'neon-entrance',
-     *     anchorPosition: new THREE.Vector3(anchor.x, anchor.y - 0.4, anchor.z + 0.5),
-     *     text: 'steam', scale: 1.2,
-     *     style: { color: 0xff6a00, fontSize: 0.3 },
-     * })
      */
-
     /**
      * Font: helvetiker_bold.typeface.json (MgOpen license — see THIRD_PARTY_LICENSES.md)
      * TD: add helvetiker copyright to credits UI before public release (phase 3).
      * TODO(layout): position should come from a layout coordinator, not be hardcoded here.
-     * TODO(layout): sort-driven signs (bucket, ceiling) should similarly be driven by
-     *               layout events rather than responding to GamesSort directly.
      */
     private syncSteamLibraryBlockSign(): void {
         // Position relative to the ceiling sign: drop below it, push toward entrance.
@@ -310,30 +231,6 @@ export class SceneSignManager {
                 depth: 0.08,
             },
         })
-    }
-
-    private replayTimeBucketSignsFromCreatedShelves(): void {
-        if (!this.hasRecentlyPlayedData || this.sortedGames.length === 0 || this.shelfTransforms.size === 0) return
-
-        const sortedShelves = [...this.shelfTransforms.entries()].sort((a, b) => a[0] - b[0])
-        for (const [shelfId, transform] of sortedShelves) {
-            this.placeTimeBucketSignForShelf(shelfId, transform.position, transform.rotationY)
-        }
-    }
-
-    private placeTimeBucketSignForShelf(shelfId: number, shelfPosition: THREE.Vector3, shelfRotationY: number): void {
-        const bucket = shelfBucket(shelfId, this.sortedGames)
-        if (!shouldPlaceBucketSign(bucket, this.lastPlacedBucket, shelfPosition, recentlyPlayedCeilingAnchor())) return
-
-        const uniqueIdentifier = bucketDisplayLabel(bucket!)
-        this.placeSign('canvas', {
-            uniqueIdentifier,
-            anchorPosition: shelfPosition,
-            mount: { style: 'above-shelf', yOffset: 2.02, frontOffset: 0.28, signFacingY: shelfRotationY },
-            style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
-        })
-        this.bucketIdentifiers.add(uniqueIdentifier)
-        this.lastPlacedBucket = bucket!
     }
 
     private resolvePosition(anchor: THREE.Vector3, mount: SignMount): THREE.Vector3 {
