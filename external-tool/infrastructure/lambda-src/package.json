@@ -11,13 +11,14 @@
     "start": "yarn local-server"
   },
   "dependencies": {
-    "@aws-sdk/client-secrets-manager": "^3.450.0",
+    "@aws-sdk/client-lambda": "^3.1029.0",
     "@aws-sdk/client-s3": "^3.450.0",
+    "@aws-sdk/client-secrets-manager": "^3.450.0",
     "axios": "^1.6.0"
   },
   "devDependencies": {
-    "express": "^4.18.0",
-    "dotenv": "^16.3.0"
+    "dotenv": "^16.3.0",
+    "express": "^4.18.0"
   },
   "engines": {
     "node": ">=22.0.0"

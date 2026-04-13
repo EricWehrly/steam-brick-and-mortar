@@ -1,6 +1,9 @@
 # Lambda function for Steam API proxy
 
 # IAM role for Lambda execution
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+
 resource "aws_iam_role" "lambda_execution" {
   name = "${var.project_name}-${var.environment}-lambda-role"
 
@@ -73,6 +76,26 @@ resource "aws_iam_role_policy" "lambda_s3_policy" {
   })
 }
 
+# Custom policy for invoking hydrator lambda
+resource "aws_iam_role_policy" "lambda_invoke_policy" {
+  count = var.hydrator_lambda_name != "" ? 1 : 0
+  name  = "${var.project_name}-${var.environment}-lambda-invoke-policy"
+  role  = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:InvokeFunction"
+        ]
+        Resource = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.hydrator_lambda_name}"
+      }
+    ]
+  })
+}
+
 # Secrets Manager secret for Steam API key
 resource "aws_secretsmanager_secret" "steam_api_key" {
   name        = "${var.project_name}-${var.environment}-steam-api-key"
@@ -122,6 +145,7 @@ resource "aws_lambda_function" "steam_proxy" {
       ENVIRONMENT                 = var.environment
       ALLOWED_ORIGINS            = jsonencode(var.allowed_origins)
       CACHE_BUCKET_NAME          = var.cache_bucket_name
+      HYDRATOR_LAMBDA_NAME       = var.hydrator_lambda_name
     }
   }
 

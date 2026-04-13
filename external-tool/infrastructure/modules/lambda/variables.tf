@@ -63,6 +63,12 @@ variable "cache_bucket_arn" {
   default     = ""
 }
 
+variable "hydrator_lambda_name" {
+  description = "Name of the steamspy hydrator lambda for async triggering"
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)
