@@ -40,12 +40,8 @@ async function fetchSteamSpyData(appid, retryCount = 0, maxRetries = 3) {
   }
 }
 
-async function processAppId(appid) {
-  console.log(`[AppID ${appid}] Starting hydration...`);
-  
-  // 1. Read base data from S3
+async function getBaseDataFromS3(appid) {
   const sourceKey = `appdetails/${appid}.json.gz`;
-  let baseData;
   try {
     const getCommand = new GetObjectCommand({
       Bucket: CACHE_BUCKET_NAME,
@@ -53,62 +49,14 @@ async function processAppId(appid) {
     });
     const { Body } = await s3Client.send(getCommand);
     const compressedData = await streamToBuffer(Body);
-    baseData = JSON.parse(gunzipSync(compressedData).toString('utf-8'));
+    return JSON.parse(gunzipSync(compressedData).toString('utf-8'));
   } catch (err) {
     console.error(`[AppID ${appid}] Failed to read base data from S3 (${sourceKey}):`, err);
     throw err;
   }
+}
 
-  // 2. Fetch SteamSpy Data
-  let steamSpyData = null;
-  let mergeFailed = false;
-  try {
-    steamSpyData = await fetchSteamSpyData(appid);
-    // If the tags object is empty/missing, treat it as unavailable.
-    // Sometimes SteamSpy returns an empty array for tags or just an object with { appid: 0, name: null }.
-    if (!steamSpyData || !steamSpyData.appid || steamSpyData.appid === 0) {
-      console.warn(`[AppID ${appid}] SteamSpy returned empty/invalid data.`);
-      mergeFailed = true;
-    }
-  } catch (err) {
-    console.error(`[AppID ${appid}] Error fetching SteamSpy data:`, err.message);
-    mergeFailed = true;
-  }
-
-  // 3. Merge Succeeded/Failed Data
-  let finalData = baseData;
-  if (!mergeFailed && steamSpyData) {
-    // Determine where to merge
-    const targetMerge = baseData.data && baseData.data.full_data ? baseData.data.full_data : baseData;
-    
-    // Create the merged object prioritizing Steam data over SteamSpy data.
-    // This naturally attaches SteamSpy fields (like tags, positive, negative)
-    // without custom prefixes, while letting Steam's official data win any collisions.
-    const mergedFullData = {
-      ...steamSpyData,
-      ...targetMerge
-    };
-
-    // If we have a nested data.full_data structure (typical appdetails response), reconstruct it safely
-    if (baseData.data && baseData.data.full_data) {
-      finalData = {
-        ...baseData,
-        data: {
-          ...baseData.data,
-          full_data: mergedFullData
-        }
-      };
-    } else {
-      finalData = mergedFullData;
-    }
-    console.log(`[AppID ${appid}] Successfully merged SteamSpy data.`);
-  } else {
-    console.log(`[AppID ${appid}] Writing unhydrated base data as fallback.`);
-  }
-
-  // 4. Write back to S3 hydrated path
-  // If the environment provides a specific prefix (e.g. appDetailsWithTags/), use it;
-  // otherwise default to appDetailsWithTags/
+async function writeHydratedDataToS3(appid, finalData) {
   const hydratedPrefix = process.env.HYDRATED_PREFIX || 'appDetailsWithTags/';
   const targetKey = `${hydratedPrefix}${appid}.json.gz`;
   const compressedFinalData = gzipSync(JSON.stringify(finalData));
@@ -123,6 +71,55 @@ async function processAppId(appid) {
   
   await s3Client.send(putCommand);
   console.log(`[AppID ${appid}] Finished. Wrote to ${targetKey}`);
+  return targetKey;
+}
+
+function mergeData(baseData, steamSpyData) {
+  const targetMerge = baseData.data && baseData.data.full_data ? baseData.data.full_data : baseData;
+  
+  // Prioritize Steam data over SteamSpy data.
+  // This logically follows the `const finalData = steamSpyData && baseData` fallback approach.
+  const mergedFullData = {
+    ...steamSpyData,
+    ...targetMerge
+  };
+
+  if (baseData.data && baseData.data.full_data) {
+    return {
+      ...baseData,
+      data: {
+        ...baseData.data,
+        full_data: mergedFullData
+      }
+    };
+  }
+  return mergedFullData;
+}
+
+async function processAppId(appid) {
+  // 1. Read base data from S3
+  const baseData = await getBaseDataFromS3(appid);
+
+  // 2. Fetch SteamSpy Data
+  let steamSpyData = null;
+  let mergeFailed = false;
+  try {
+    steamSpyData = await fetchSteamSpyData(appid);
+    if (!steamSpyData || !steamSpyData.appid || steamSpyData.appid === 0) {
+      mergeFailed = true;
+    }
+  } catch (err) {
+    mergeFailed = true;
+  }
+
+  // 3. Merge Succeeded/Failed Data
+  let finalData = baseData;
+  if (!mergeFailed && steamSpyData) {
+    finalData = mergeData(baseData, steamSpyData);
+  }
+
+  // 4. Write back to S3 hydrated path
+  const targetKey = await writeHydratedDataToS3(appid, finalData);
   return { success: true, appid, targetKey, merged: !mergeFailed };
 }
 
