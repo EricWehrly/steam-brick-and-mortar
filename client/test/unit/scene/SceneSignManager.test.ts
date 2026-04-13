@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
 import { EventManager } from '../../../src/core/EventManager'
-import { GameEventTypes, StorePropsEventTypes, RoomEventTypes, type ShelfReadyEvent, type RoomResizedEvent } from '../../../src/types/InteractionEvents'
-import type { GamesSortEvent } from '../../../src/types/EnvironmentEvents'
-import type { SteamGameData } from '../../../src/scene/game-box/types/GameData'
+import { RoomEventTypes, type RoomResizedEvent } from '../../../src/types/InteractionEvents'
 
 // ─── Scene / DataManager mock ─────────────────────────────────────────────────
 
@@ -19,8 +17,6 @@ vi.mock('../../../src/core/data/DataManager', () => ({
 }))
 
 // ─── CanvasSignRenderer spy ───────────────────────────────────────────────────
-// We spy at the CanvasSignRenderer level so we can assert the SignRequest that
-// SceneSignManager passes through — including the resolved text value.
 
 const canvasSetSignSpy = vi.fn()
 const canvasRemoveSignSpy = vi.fn().mockReturnValue(true)
@@ -38,43 +34,19 @@ vi.mock('../../../src/scene/signs/CanvasSignRenderer', () => ({
     }),
 }))
 
-// ─── NeonTubeSignRenderer stub ────────────────────────────────────────────────
-
 const neonSetSignSpy = vi.fn()
-const neonRemoveSignSpy = vi.fn().mockReturnValue(false)
-const neonClearAllSpy = vi.fn()
-const neonDisposeSpy = vi.fn()
-
 vi.mock('../../../src/scene/signs/NeonTubeSignRenderer', () => ({
     NeonTubeSignRenderer: vi.fn().mockImplementation(function () {
-        return {
-            setSign: neonSetSignSpy,
-            removeSign: neonRemoveSignSpy,
-            clearAll: neonClearAllSpy,
-            dispose: neonDisposeSpy,
-        }
+        return { setSign: neonSetSignSpy, removeSign: vi.fn().mockReturnValue(false), clearAll: vi.fn(), dispose: vi.fn() }
     }),
 }))
-
-// ─── BlockLetterSignRenderer stub ─────────────────────────────────────────────
 
 const blockSetSignSpy = vi.fn()
-const blockRemoveSignSpy = vi.fn().mockReturnValue(false)
-const blockClearAllSpy = vi.fn()
-const blockDisposeSpy = vi.fn()
-
 vi.mock('../../../src/scene/signs/BlockLetterSignRenderer', () => ({
     BlockLetterSignRenderer: vi.fn().mockImplementation(function () {
-        return {
-            setSign: blockSetSignSpy,
-            removeSign: blockRemoveSignSpy,
-            clearAll: blockClearAllSpy,
-            dispose: blockDisposeSpy,
-        }
+        return { setSign: blockSetSignSpy, removeSign: vi.fn().mockReturnValue(false), clearAll: vi.fn(), dispose: vi.fn() }
     }),
 }))
-
-// ─── SignageRenderer stub (used internally by CanvasSignRenderer in prod) ─────
 
 vi.mock('../../../src/scene/SignageRenderer', () => ({
     SignageRenderer: class {
@@ -85,13 +57,11 @@ vi.mock('../../../src/scene/SignageRenderer', () => ({
 
 import { SceneSignManager } from '../../../src/scene/SceneSignManager'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function makeMesh(): THREE.Mesh {
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial())
-    mesh.position.set(0, 0, 0)
-    return mesh
+    return new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial())
 }
+
+// ─── Text resolution ──────────────────────────────────────────────────────────
 
 describe('SceneSignManager — text resolution', () => {
     beforeEach(() => {
@@ -105,77 +75,34 @@ describe('SceneSignManager — text resolution', () => {
 
     it('passes uniqueIdentifier as text when descriptor.text is omitted (canvas)', () => {
         const manager = new SceneSignManager()
-
-        manager.placeSign('canvas', {
-            uniqueIdentifier: 'Action',
-            anchorPosition: new THREE.Vector3(0, 2, -5),
-        })
-
-        const [request] = canvasSetSignSpy.mock.calls[0]
-        expect(request.text).toBe('Action')
-
+        manager.placeSign('canvas', { uniqueIdentifier: 'Action', anchorPosition: new THREE.Vector3(0, 2, -5) })
+        expect(canvasSetSignSpy.mock.calls[0][0].text).toBe('Action')
         manager.dispose()
     })
 
-    it('passes explicit text when provided, ignores uniqueIdentifier (canvas)', () => {
+    it('passes explicit text when provided (canvas)', () => {
         const manager = new SceneSignManager()
-
-        manager.placeSign('canvas', {
-            uniqueIdentifier: 'section-42',
-            text: 'RPGs & Adventures',
-            anchorPosition: new THREE.Vector3(0, 2, -5),
-        })
-
-        const [request] = canvasSetSignSpy.mock.calls[0]
-        expect(request.text).toBe('RPGs & Adventures')
-
+        manager.placeSign('canvas', { uniqueIdentifier: 'section-42', text: 'RPGs & Adventures', anchorPosition: new THREE.Vector3(0, 2, -5) })
+        expect(canvasSetSignSpy.mock.calls[0][0].text).toBe('RPGs & Adventures')
         manager.dispose()
     })
 
-    it('passes uniqueIdentifier as text when descriptor.text is omitted (ceiling)', () => {
+    it('passes uniqueIdentifier as text for neon-tube', () => {
         const manager = new SceneSignManager()
-
-        manager.placeSign('canvas', {
-            uniqueIdentifier: 'Recently Played',
-            anchorPosition: new THREE.Vector3(0, 3.5, -6),
-            mount: { style: 'ceiling', signFacingY: 0 },
-        })
-
-        const [request] = canvasSetSignSpy.mock.calls[0]
-        expect(request.text).toBe('Recently Played')
-
+        manager.placeSign('neon-tube', { uniqueIdentifier: 'steam', anchorPosition: new THREE.Vector3(0, 4, -6) })
+        expect(neonSetSignSpy.mock.calls[0][0].text).toBe('steam')
         manager.dispose()
     })
 
-    it('passes uniqueIdentifier as text when descriptor.text is omitted (neon-tube)', () => {
+    it('passes explicit text to neon renderer', () => {
         const manager = new SceneSignManager()
-
-        manager.placeSign('neon-tube', {
-            uniqueIdentifier: 'steam',
-            anchorPosition: new THREE.Vector3(0, 4, -6),
-        })
-
-        const [request] = neonSetSignSpy.mock.calls[0]
-        expect(request.text).toBe('steam')
-
-        manager.dispose()
-    })
-
-    it('passes explicit text to neon renderer when provided', () => {
-        const manager = new SceneSignManager()
-
-        manager.placeSign('neon-tube', {
-            uniqueIdentifier: 'entrance-neon',
-            text: 'OPEN',
-            anchorPosition: new THREE.Vector3(0, 4, -6),
-        })
-
-        const [request] = neonSetSignSpy.mock.calls[0]
-        expect(request.text).toBe('OPEN')
-
+        manager.placeSign('neon-tube', { uniqueIdentifier: 'entrance-neon', text: 'OPEN', anchorPosition: new THREE.Vector3(0, 4, -6) })
+        expect(neonSetSignSpy.mock.calls[0][0].text).toBe('OPEN')
         manager.dispose()
     })
 })
+
+// ─── Mount math ───────────────────────────────────────────────────────────────
 
 describe('SceneSignManager — mount math', () => {
     beforeEach(() => {
@@ -187,7 +114,7 @@ describe('SceneSignManager — mount math', () => {
         blockSetSignSpy.mockImplementation(() => new THREE.Group())
     })
 
-    it('applies frontOffset along signFacingY', () => {
+    it('applies frontOffset along signFacingY for above-shelf mount', () => {
         const manager = new SceneSignManager()
         const anchor = new THREE.Vector3(10, 2, -5)
         const signFacingY = Math.PI / 2
@@ -199,7 +126,7 @@ describe('SceneSignManager — mount math', () => {
             mount: { style: 'above-shelf', yOffset: 0.2, frontOffset, signFacingY },
         })
 
-        const [request] = canvasSetSignSpy.mock.calls[0]
+        const request = canvasSetSignSpy.mock.calls[0][0]
         expect(request.position.x).toBeCloseTo(anchor.x + Math.sin(signFacingY) * frontOffset, 6)
         expect(request.position.y).toBeCloseTo(anchor.y + 0.2, 6)
         expect(request.position.z).toBeCloseTo(anchor.z + Math.cos(signFacingY) * frontOffset, 6)
@@ -208,19 +135,18 @@ describe('SceneSignManager — mount math', () => {
         manager.dispose()
     })
 
-    it('routes canvas kinds through canvasRenderer and neon kinds through neonRenderer', () => {
+    it('routes canvas and neon to their respective renderers', () => {
         const manager = new SceneSignManager()
         const anchor = new THREE.Vector3(0, 2, -5)
-
         manager.placeSign('canvas', { uniqueIdentifier: 'RPG', anchorPosition: anchor })
         manager.placeSign('neon-tube', { uniqueIdentifier: 'neon-entrance', anchorPosition: anchor })
-
         expect(canvasSetSignSpy).toHaveBeenCalledOnce()
         expect(neonSetSignSpy).toHaveBeenCalledOnce()
-
         manager.dispose()
     })
 })
+
+// ─── Lifecycle ────────────────────────────────────────────────────────────────
 
 describe('SceneSignManager — lifecycle', () => {
     beforeEach(() => {
@@ -232,107 +158,24 @@ describe('SceneSignManager — lifecycle', () => {
         blockSetSignSpy.mockImplementation(() => new THREE.Group())
     })
 
-    it('places recently-played ceiling sign on GamesSort (block sign is room-driven, not sort-driven)', () => {
-        const manager = new SceneSignManager()
-
-        const game: SteamGameData = {
-            appid: 42,
-            name: 'Half-Life 3',
-            playtime_forever: 120,
-            rtime_last_played: Math.floor(Date.now() / 1000) - 3600,
-            img_icon_url: '',
-            img_logo_url: '',
-        } as SteamGameData
-
-        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
-            sortedGames: [game],
-            buckets: new Map([[1, 'Played Today']]),
-        })
-
-        // Canvas ceiling sign only on sort — block sign is room-driven
-        expect(canvasSetSignSpy).toHaveBeenCalledOnce()
-        expect(neonSetSignSpy).not.toHaveBeenCalled()
-        expect(blockSetSignSpy).not.toHaveBeenCalled()
-
-        const [ceilingRequest] = canvasSetSignSpy.mock.calls[0]
-        expect(ceilingRequest.text).toBe('Recently Played')
-
-        manager.dispose()
-    })
-
     it('places block letter sign on RoomResized', () => {
         const manager = new SceneSignManager()
-
         EventManager.getInstance().emit<RoomResizedEvent>(RoomEventTypes.Resized, {
             dimensions: { width: 22, depth: 16, height: 3.2 },
         })
-
         expect(blockSetSignSpy).toHaveBeenCalledOnce()
-        const [blockRequest] = blockSetSignSpy.mock.calls[0]
-        expect(blockRequest.text).toBe('STEAM LIBRARY')
-        expect(blockRequest.uniqueIdentifier).toBe('steam-library-title')
-
+        const request = blockSetSignSpy.mock.calls[0][0]
+        expect(request.text).toBe('STEAM LIBRARY')
+        expect(request.uniqueIdentifier).toBe('steam-library-title')
         manager.dispose()
     })
 
-    it('re-places block letter sign and ceiling sign on repeated RoomResized', () => {
+    it('does not place canvas signs on RoomResized (those are data-driven via ShelfSectionPlanner)', () => {
         const manager = new SceneSignManager()
-        const game: SteamGameData = {
-            appid: 1,
-            name: 'Portal',
-            playtime_forever: 60,
-            rtime_last_played: Math.floor(Date.now() / 1000) - 3600,
-            img_icon_url: '',
-            img_logo_url: '',
-        } as SteamGameData
-
-        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
-            sortedGames: [game],
-            buckets: new Map([[1, 'Played Today']]),
-        })
-        vi.clearAllMocks()
-        canvasSetSignSpy.mockImplementation(() => makeMesh())
-        blockSetSignSpy.mockImplementation(() => new THREE.Group())
-
         EventManager.getInstance().emit<RoomResizedEvent>(RoomEventTypes.Resized, {
             dimensions: { width: 22, depth: 16, height: 3.2 },
         })
-
-        // Both ceiling (canvas) and block sign should be updated
-        expect(canvasSetSignSpy).toHaveBeenCalledOnce()
-        expect(blockSetSignSpy).toHaveBeenCalledOnce()
-
-        manager.dispose()
-    })
-
-    it('places a bucket sign on ShelfReady when recently-played data is present', () => {
-        const manager = new SceneSignManager()
-
-        const game: SteamGameData = {
-            appid: 42,
-            name: 'Half-Life 3',
-            playtime_forever: 120,
-            rtime_last_played: Math.floor(Date.now() / 1000) - 3600,
-            img_icon_url: '',
-            img_logo_url: '',
-        } as SteamGameData
-
-        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
-            sortedGames: [game],
-            buckets: new Map([[1, 'Played Today']]),
-        })
-
-        vi.clearAllMocks()
-        canvasSetSignSpy.mockImplementation(() => makeMesh())
-
-        EventManager.getInstance().emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
-            batchIndex: 0,
-            position: new THREE.Vector3(0, 0, -5),
-            rotationY: 0,
-        })
-
-        expect(canvasSetSignSpy).toHaveBeenCalled()
-
+        expect(canvasSetSignSpy).not.toHaveBeenCalled()
         manager.dispose()
     })
 })

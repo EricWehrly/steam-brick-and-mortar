@@ -1,20 +1,37 @@
 /**
  * ShelfSectionPlanner
  *
- * Accumulates game data across progressive batches, then places
- * category signs in one pass after all batches complete.
+ * Accumulates game data across progressive batches, then places category signs
+ * in one pass after all batches complete.
  *
- * Signs appear only after planSections() � no provisional signs during load.
+ * Also owns time-bucket sign placement: listens for GamesSort to cache sorted
+ * game data, then reacts to each ShelfReady event to place bucket transition
+ * signs at the correct shelf boundary.
+ *
+ * Signs appear only after planSections() — no provisional signs during load.
  * planSections() is re-runnable: safe to call after filter/sort changes.
  */
 
 import * as THREE from 'three'
 import { EventManager } from '../core/EventManager'
-import { StorePropsEventTypes, type BatchReadyForPlacementEvent } from '../types/InteractionEvents'
+import {
+    GameEventTypes,
+    StorePropsEventTypes,
+    type BatchReadyForPlacementEvent,
+    type ShelfReadyEvent,
+} from '../types/InteractionEvents'
+import type { GamesSortEvent } from '../types/EnvironmentEvents'
 import { groupByGenre, KNOWN_GENRES, type ShelfGroup } from './categorization/GameSortFunctions'
-import { SceneSignManager } from './SceneSignManager'
+import { RecentlyPlayedBucket } from './categorization/GameSorter'
+import { SceneSignManager, SignStyles } from './SceneSignManager'
 import type { SignMount } from './SignTypes'
 import type { SteamGameData } from './game-box/types/GameData'
+import {
+    shelfBucket,
+    shouldPlaceBucketSign,
+    recentlyPlayedCeilingAnchor,
+    bucketDisplayLabel,
+} from './signs/TimeBucketSignHelpers'
 import { Logger } from '../utils/Logger'
 
 export interface ShelfSectionPlannerConfig {
@@ -24,6 +41,8 @@ export interface ShelfSectionPlannerConfig {
 
 const DEFAULT_SIGN_Y_OFFSET = 0.2
 const DEFAULT_MOUNT_STYLE: SignMount['style'] = 'above-shelf'
+const BUCKET_SIGN_Y_OFFSET = 2.02
+const BUCKET_SIGN_FRONT_OFFSET = 0.28
 
 export class ShelfSectionPlanner {
     private static readonly logger = Logger.createLogFunctions(ShelfSectionPlanner.name)
@@ -32,26 +51,94 @@ export class ShelfSectionPlanner {
     private readonly config: Required<ShelfSectionPlannerConfig>
 
     private games: SteamGameData[] = []
+    private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
+    private lastPlacedBucket: RecentlyPlayedBucket | null = null
+    private readonly placedBucketIdentifiers = new Set<string>()
+
+    private get hasRecentlyPlayedData(): boolean {
+        return this.sortedGames.some(game => (game.rtime_last_played ?? 0) > 0)
+    }
 
     constructor(config: ShelfSectionPlannerConfig = {}) {
         this.config = {
             signYOffset: config.signYOffset ?? DEFAULT_SIGN_Y_OFFSET,
             signMountStyle: config.signMountStyle ?? DEFAULT_MOUNT_STYLE,
         }
-        // Self-register for batch events so callers don't need to invoke onBatchPlaced
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.handleBatchReady.bind(this)
         )
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.GamesSort,
+            (event: CustomEvent<GamesSortEvent>) => this.handleGamesSort(event.detail)
+        )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ShelfReady,
+            (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(event.detail)
+        )
     }
 
-    /** Accumulate games from one batch. Called from event handler; private by design. */
     private onBatchPlaced(games: readonly SteamGameData[]): void {
         this.games.push(...games)
     }
 
     private handleBatchReady(event: CustomEvent<BatchReadyForPlacementEvent>): void {
         this.onBatchPlaced(event.detail.games as readonly SteamGameData[])
+    }
+
+    private handleGamesSort(detail: GamesSortEvent): void {
+        this.sortedGames = detail.sortedGames
+        this.lastPlacedBucket = null
+        this.removeBucketSigns()
+        this.syncRecentlyPlayedCeilingSign()
+    }
+
+    private syncRecentlyPlayedCeilingSign(): void {
+        const uniqueIdentifier = 'Recently Played'
+        if (!this.hasRecentlyPlayedData) {
+            this.signSystem.removeSignById(uniqueIdentifier)
+            return
+        }
+        this.signSystem.placeSign('canvas', {
+            uniqueIdentifier,
+            anchorPosition: recentlyPlayedCeilingAnchor(),
+            mount: { style: 'ceiling', signFacingY: 0 },
+            style: {
+                backgroundColor: 0xd4a017,
+                textColor: 0x003087,
+                fontSize: 0.30,
+                padding: '0.15 0.28',
+            },
+        })
+    }
+
+    private handleShelfReady(detail: ShelfReadyEvent): void {
+        if (!this.hasRecentlyPlayedData || this.sortedGames.length === 0) return
+        const shelfPos = detail.position as THREE.Vector3
+        const rotY = detail.rotationY ?? 0
+        this.placeTimeBucketSignForShelf(detail.batchIndex, shelfPos, rotY)
+    }
+
+    private removeBucketSigns(): void {
+        for (const uniqueIdentifier of this.placedBucketIdentifiers) {
+            this.signSystem.removeSignById(uniqueIdentifier)
+        }
+        this.placedBucketIdentifiers.clear()
+    }
+
+    private placeTimeBucketSignForShelf(shelfId: number, shelfPosition: THREE.Vector3, shelfRotationY: number): void {
+        const bucket = shelfBucket(shelfId, this.sortedGames)
+        if (!shouldPlaceBucketSign(bucket, this.lastPlacedBucket, shelfPosition, recentlyPlayedCeilingAnchor())) return
+
+        const uniqueIdentifier = bucketDisplayLabel(bucket!)
+        this.signSystem.placeSign('canvas', {
+            uniqueIdentifier,
+            anchorPosition: shelfPosition,
+            mount: { style: 'above-shelf', yOffset: BUCKET_SIGN_Y_OFFSET, frontOffset: BUCKET_SIGN_FRONT_OFFSET, signFacingY: shelfRotationY },
+            style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
+        })
+        this.placedBucketIdentifiers.add(uniqueIdentifier)
+        this.lastPlacedBucket = bucket!
     }
 
     /**
@@ -67,11 +154,11 @@ export class ShelfSectionPlanner {
      */
     public planSections(shelfPositions: THREE.Vector3[]): void {
         if (this.games.length === 0) {
-            ShelfSectionPlanner.logger.warn('planSections called with no games � skipping')
+            ShelfSectionPlanner.logger.warn('planSections called with no games — skipping')
             return
         }
         if (shelfPositions.length === 0) {
-            ShelfSectionPlanner.logger.warn('planSections called with no shelf positions � skipping')
+            ShelfSectionPlanner.logger.warn('planSections called with no shelf positions — skipping')
             return
         }
 
@@ -79,7 +166,7 @@ export class ShelfSectionPlanner {
 
         const groups = this.buildShelfGroups(this.games)
         ShelfSectionPlanner.logger.info(
-            `[SIGN-DEBUG] planSections: ${groups.length} groups � ` +
+            `[SIGN-DEBUG] planSections: ${groups.length} groups — ` +
             groups.map(g => `${g.label}(${g.games.length})`).join(', ')
         )
         let placed = 0
@@ -88,7 +175,7 @@ export class ShelfSectionPlanner {
         let lastUsedAnchor = -1  // ensures each genre gets a unique shelf position
 
         for (const group of groups) {
-            // Skip 'Other' � catch-all for tools/servers, not useful as a section sign
+            // Skip 'Other' — catch-all for tools/servers, not useful as a section sign
             if (group.label === 'Other') {
                 gameOffset += group.games.length
                 continue
@@ -147,6 +234,9 @@ export class ShelfSectionPlanner {
 
     public reset(): void {
         this.games = []
+        this.sortedGames = []
+        this.lastPlacedBucket = null
+        this.placedBucketIdentifiers.clear()
         this.signSystem.clearAll()
     }
 
