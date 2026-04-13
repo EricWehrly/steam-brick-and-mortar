@@ -20,7 +20,7 @@ import {
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
 } from '../types/InteractionEvents'
-import type { GamesSortEvent } from '../types/EnvironmentEvents'
+import type { GamesSortEvent, GameSortMode } from '../types/EnvironmentEvents'
 import { groupByGenre, KNOWN_GENRES, type ShelfGroup } from './categorization/GameSortFunctions'
 import { RecentlyPlayedBucket } from './categorization/GameSorter'
 import { SceneSignManager, SignStyles } from './SceneSignManager'
@@ -53,8 +53,11 @@ export class ShelfSectionPlanner {
     private games: SteamGameData[] = []
     private sortedGames: ReadonlyArray<Readonly<SteamGameData>> = []
     private shelfPositions: THREE.Vector3[] = []
+    private shelfRotations: number[] = []
+    private sortMode: GameSortMode = 'recently-played'
     private lastPlacedBucket: RecentlyPlayedBucket | null = null
     private readonly placedBucketIdentifiers = new Set<string>()
+    private readonly placedSectionIdentifiers = new Set<string>()
 
     private get hasRecentlyPlayedData(): boolean {
         return this.sortedGames.some(game => (game.rtime_last_played ?? 0) > 0)
@@ -89,11 +92,34 @@ export class ShelfSectionPlanner {
 
     private handleGamesSort(detail: GamesSortEvent): void {
         this.sortedGames = detail.sortedGames
+        this.sortMode = detail.sortMode
         this.lastPlacedBucket = null
         this.removeBucketSigns()
+        this.removeSectionSigns()
         this.syncRecentlyPlayedCeilingSign()
-        if (this.shelfPositions.length > 0) {
+        if (this.shelfPositions.length === 0) return
+
+        if (this.sortMode === 'by-genre') {
             this.planSections(this.shelfPositions)
+        } else {
+            this.replayBucketSigns()
+        }
+    }
+
+    private removeSectionSigns(): void {
+        for (const uniqueIdentifier of this.placedSectionIdentifiers) {
+            this.signSystem.removeSignById(uniqueIdentifier)
+        }
+        this.placedSectionIdentifiers.clear()
+    }
+
+    private replayBucketSigns(): void {
+        const sortedEntries = [...this.shelfPositions.entries()]
+            .filter(([, pos]) => pos !== undefined)
+            .sort(([indexA], [indexB]) => indexA - indexB)
+        for (const [shelfId, shelfPosition] of sortedEntries) {
+            const rotY = this.shelfRotations[shelfId] ?? 0
+            this.placeTimeBucketSignForShelf(shelfId, shelfPosition, rotY)
         }
     }
 
@@ -120,8 +146,10 @@ export class ShelfSectionPlanner {
         const shelfPos = detail.position as THREE.Vector3
         const rotY = detail.rotationY ?? 0
         this.shelfPositions[detail.batchIndex] = shelfPos.clone()
+        this.shelfRotations[detail.batchIndex] = rotY
 
-        if (!this.hasRecentlyPlayedData || this.sortedGames.length === 0) return
+        if (this.sortMode === 'by-genre' || this.sortedGames.length === 0) return
+        if (!this.hasRecentlyPlayedData) return
         this.placeTimeBucketSignForShelf(detail.batchIndex, shelfPos, rotY)
     }
 
@@ -168,8 +196,6 @@ export class ShelfSectionPlanner {
             return
         }
 
-        this.signSystem.clearAll()
-
         const groups = this.buildShelfGroups(this.games)
         ShelfSectionPlanner.logger.info(
             `[SIGN-DEBUG] planSections: ${groups.length} groups — ` +
@@ -207,6 +233,7 @@ export class ShelfSectionPlanner {
                 anchorPosition: anchorPos,
                 mount: { style: this.config.signMountStyle, yOffset: this.config.signYOffset }
             })
+            this.placedSectionIdentifiers.add(group.label)
             placed++
             gameOffset += group.games.length
         }
@@ -242,8 +269,11 @@ export class ShelfSectionPlanner {
         this.games = []
         this.sortedGames = []
         this.shelfPositions = []
+        this.shelfRotations = []
+        this.sortMode = 'recently-played'
         this.lastPlacedBucket = null
         this.placedBucketIdentifiers.clear()
+        this.placedSectionIdentifiers.clear()
         this.signSystem.clearAll()
     }
 
