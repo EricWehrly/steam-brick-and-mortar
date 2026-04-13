@@ -91,14 +91,14 @@ export class SystemUICoordinator {
         // Setup Lighting Controls button
         this.setupLightingControlsButton()
 
+        // Sort/layout controls panel — initialized first to appear at the top of the UI group
+        this.initializeLayoutSortPanel()
+
         // Initialize integrated lighting controls panel
         this.initializeLightingControls()
 
         // Category reference panel (dev/debug tool)
         this.initializeCategoryReferencePanel()
-
-        // Sort/layout controls panel
-        this.initializeLayoutSortPanel()
 
         this.renderLoopRegistry.register(this.constructor.name, this.updatePerformanceStats.bind(this))
     }

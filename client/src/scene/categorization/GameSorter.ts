@@ -13,6 +13,7 @@ import { EventManager } from '../../core/EventManager'
 import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
 import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
+import { GameSortModes } from '../../types/EnvironmentEvents'
 import type { AllBatchesCompleteEvent, GamesSortEvent, SortRequestedEvent } from '../../types/EnvironmentEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { sortByNumericField, primaryGenre, KNOWN_GENRES } from './GameSortFunctions'
@@ -79,9 +80,9 @@ export class GameSorter {
 
     private handleSortRequested(detail: SortRequestedEvent): void {
         switch (detail.sortMode) {
-            case 'recently-played': this.sortByRecentlyPlayed(); break
-            case 'by-genre':        this.sortByGenre();          break
-            case 'by-playtime':     this.sortByPlaytime();       break
+            case GameSortModes.RecentlyPlayed: this.sortByRecentlyPlayed(); break
+            case GameSortModes.ByGenre:        this.sortByGenre();          break
+            case GameSortModes.ByPlaytime:     this.sortByPlaytime();       break
         }
     }
 
@@ -95,12 +96,13 @@ export class GameSorter {
 
         const sortedGames: ReadonlyArray<Readonly<SteamGameData>> =
             [...games].sort((firstGame, secondGame) => {
-                const firstGenreIndex = KNOWN_GENRES.indexOf(primaryGenre(firstGame as SteamGameData))
-                const secondGenreIndex = KNOWN_GENRES.indexOf(primaryGenre(secondGame as SteamGameData))
-                const normalizedFirstIndex = firstGenreIndex === -1 ? Infinity : firstGenreIndex
-                const normalizedSecondIndex = secondGenreIndex === -1 ? Infinity : secondGenreIndex
-                if (normalizedFirstIndex !== normalizedSecondIndex) {
-                    return normalizedFirstIndex - normalizedSecondIndex
+                const firstGenreRank  = KNOWN_GENRES.indexOf(primaryGenre(firstGame as SteamGameData))
+                const secondGenreRank = KNOWN_GENRES.indexOf(primaryGenre(secondGame as SteamGameData))
+                const normalizedFirst  = firstGenreRank  === -1 ? Infinity : firstGenreRank
+                const normalizedSecond = secondGenreRank === -1 ? Infinity : secondGenreRank
+
+                if (normalizedFirst !== normalizedSecond) {
+                    return normalizedFirst - normalizedSecond
                 }
                 return (secondGame.playtime_forever ?? 0) - (firstGame.playtime_forever ?? 0)
             })

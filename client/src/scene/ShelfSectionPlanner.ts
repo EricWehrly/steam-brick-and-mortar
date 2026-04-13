@@ -56,10 +56,6 @@ export class ShelfSectionPlanner {
     private readonly placedBucketIdentifiers = new Set<string>()
     private readonly placedSectionIdentifiers = new Set<string>()
 
-    private get hasRecentlyPlayedData(): boolean {
-        return this.sortedGames.some(game => (game.rtime_last_played ?? 0) > 0)
-    }
-
     constructor(config: ShelfSectionPlannerConfig = {}) {
         this.config = {
             signYOffset: config.signYOffset ?? DEFAULT_SIGN_Y_OFFSET,
@@ -125,7 +121,6 @@ export class ShelfSectionPlanner {
         this.shelfRotations[detail.batchIndex] = rotY
 
         if (this.sortMode === 'by-genre' || this.sortedGames.length === 0) return
-        if (!this.hasRecentlyPlayedData) return
         this.placeTimeBucketSignForShelf(detail.batchIndex, shelfPos, rotY)
     }
 

@@ -87,14 +87,15 @@ describe('ShelfSectionPlanner — bucket signs (recently-played sort)', () => {
         expect(placeSignSpy).toHaveBeenCalled()
     })
 
-    it('does not place bucket sign when no recently-played data', () => {
+    it('places a "Never Played" bucket sign for unplayed games in recently-played sort', () => {
         new ShelfSectionPlanner()
+        // Games with rtime_last_played=0 are in the Unplayed bucket — still get a sign
         emitGamesSort([makeGame(0)], 'recently-played')
         vi.clearAllMocks()
 
         emitShelfReady(0)
 
-        expect(placeSignSpy).not.toHaveBeenCalled()
+        expect(placeSignSpy).toHaveBeenCalled()
     })
 
     it('replays bucket signs across accumulated shelf positions on re-sort', () => {

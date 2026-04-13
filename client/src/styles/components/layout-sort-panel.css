@@ -1,12 +1,13 @@
 /**
  * Layout/Sort Panel Styles
+ * Uses tokens from tokens.css.
  */
 
 .layout-sort-toggle-btn {
-    background: rgba(30, 30, 40, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: rgba(255, 255, 255, 0.85);
-    border-radius: 6px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    color: var(--panel-text);
+    border-radius: var(--panel-border-radius);
     width: 36px;
     height: 36px;
     font-size: 18px;
@@ -14,33 +15,33 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.15s, border-color 0.15s;
+    transition: background-color var(--panel-transition), border-color var(--panel-transition);
     line-height: 1;
     padding: 0;
     flex-shrink: 0;
 }
 
 .layout-sort-toggle-btn:hover {
-    background: rgba(60, 60, 80, 0.9);
-    border-color: rgba(255, 255, 255, 0.3);
+    background: var(--panel-hover-bg);
+    border-color: var(--panel-accent);
 }
 
 .layout-sort-toggle-btn.active {
-    background: rgba(80, 80, 120, 0.9);
-    border-color: rgba(180, 180, 255, 0.5);
+    background: var(--panel-header-bg);
+    border-color: var(--panel-accent);
 }
 
 .layout-sort-controls {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 10px;
-    background: rgba(20, 20, 30, 0.88);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    padding: 6px 12px;
+    gap: var(--panel-space-12);
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--panel-border-radius);
+    padding: var(--panel-space-6) var(--panel-space-12);
     backdrop-filter: blur(4px);
-    transition: opacity 0.2s, transform 0.2s;
+    transition: opacity var(--panel-transition), transform var(--panel-transition);
 }
 
 .layout-sort-controls.hidden {
@@ -51,12 +52,13 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 6px;
+    gap: var(--panel-space-6);
 }
 
 .layout-sort-label {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.55);
+    font-size: var(--panel-font-size-xs);
+    color: var(--panel-text-muted);
+    font-family: var(--panel-font);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     white-space: nowrap;
@@ -64,23 +66,25 @@
 }
 
 .layout-sort-select {
-    background: rgba(40, 40, 55, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    color: rgba(255, 255, 255, 0.9);
-    border-radius: 4px;
-    padding: 3px 6px;
-    font-size: 12px;
+    background: var(--panel-item-bg);
+    border: 1px solid var(--panel-border);
+    color: var(--panel-text);
+    border-radius: var(--panel-radius-md);
+    padding: var(--panel-space-3) var(--panel-space-6);
+    font-size: var(--panel-font-size-sm);
+    font-family: var(--panel-font);
     cursor: pointer;
     outline: none;
     appearance: auto;
+    transition: border-color var(--panel-transition);
 }
 
 .layout-sort-select:hover:not(:disabled) {
-    border-color: rgba(255, 255, 255, 0.35);
+    border-color: var(--panel-accent);
 }
 
 .layout-sort-select:focus:not(:disabled) {
-    border-color: rgba(140, 140, 255, 0.6);
+    border-color: var(--panel-accent);
 }
 
 .layout-sort-select:disabled {
@@ -91,6 +95,6 @@
 .layout-sort-divider {
     width: 1px;
     height: 22px;
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--panel-border);
     flex-shrink: 0;
 }
