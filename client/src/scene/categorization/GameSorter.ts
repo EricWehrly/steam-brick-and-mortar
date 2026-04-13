@@ -15,7 +15,7 @@ import { Logger } from '../../utils/Logger'
 import { GameEventTypes } from '../../types/InteractionEvents'
 import type { AllBatchesCompleteEvent, GamesSortEvent } from '../../types/EnvironmentEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
-import { sortByNumericField } from './GameSortFunctions'
+import { sortByNumericField, primaryGenre, KNOWN_GENRES } from './GameSortFunctions'
 
 // Re-export so callers don't need two imports for sort + bucket types
 export { sortByNumericField, sortAlphabetically, sortByEnumIndex, chainComparators, groupByKey, groupByGenre, KNOWN_GENRES, sortByGenreThenPlaytime, resolveGenre, primaryGenre } from './GameSortFunctions'
@@ -70,6 +70,53 @@ export class GameSorter {
             (_event: CustomEvent<AllBatchesCompleteEvent>) => this.sortByRecentlyPlayed()
         )
         GameSorter.logger.debug('GameSorter initialized — subscribed to AllBatchesComplete')
+    }
+
+    public sortByGenre(): void {
+        const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
+
+        if (games.length === 0) {
+            GameSorter.logger.warn('sortByGenre called but no games in DataManager — skipping emit')
+            return
+        }
+
+        const sortedGames: ReadonlyArray<Readonly<SteamGameData>> =
+            [...games].sort((firstGame, secondGame) => {
+                const firstGenreIndex = KNOWN_GENRES.indexOf(primaryGenre(firstGame as SteamGameData))
+                const secondGenreIndex = KNOWN_GENRES.indexOf(primaryGenre(secondGame as SteamGameData))
+                const normalizedFirstIndex = firstGenreIndex === -1 ? Infinity : firstGenreIndex
+                const normalizedSecondIndex = secondGenreIndex === -1 ? Infinity : secondGenreIndex
+                if (normalizedFirstIndex !== normalizedSecondIndex) {
+                    return normalizedFirstIndex - normalizedSecondIndex
+                }
+                return (secondGame.playtime_forever ?? 0) - (firstGame.playtime_forever ?? 0)
+            })
+
+        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
+            sortedGames,
+            buckets: new Map<string, string>(),
+        })
+
+        GameSorter.logger.debug(`GamesSort emitted (by genre): ${sortedGames.length} games`)
+    }
+
+    public sortByPlaytime(): void {
+        const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
+
+        if (games.length === 0) {
+            GameSorter.logger.warn('sortByPlaytime called but no games in DataManager — skipping emit')
+            return
+        }
+
+        const sortedGames: ReadonlyArray<Readonly<SteamGameData>> =
+            [...games].sort(sortByNumericField<SteamGameData>('playtime_forever'))
+
+        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
+            sortedGames,
+            buckets: new Map<string, string>(),
+        })
+
+        GameSorter.logger.debug(`GamesSort emitted (by playtime): ${sortedGames.length} games`)
     }
 
     public sortByRecentlyPlayed(): void {

@@ -1,0 +1,96 @@
+/**
+ * Layout/Sort Panel Styles
+ */
+
+.layout-sort-toggle-btn {
+    background: rgba(30, 30, 40, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.85);
+    border-radius: 6px;
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s, border-color 0.15s;
+    line-height: 1;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.layout-sort-toggle-btn:hover {
+    background: rgba(60, 60, 80, 0.9);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.layout-sort-toggle-btn.active {
+    background: rgba(80, 80, 120, 0.9);
+    border-color: rgba(180, 180, 255, 0.5);
+}
+
+.layout-sort-controls {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    background: rgba(20, 20, 30, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 6px 12px;
+    backdrop-filter: blur(4px);
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.layout-sort-controls.hidden {
+    display: none;
+}
+
+.layout-sort-control-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+}
+
+.layout-sort-label {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.55);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.layout-sort-select {
+    background: rgba(40, 40, 55, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.9);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+    appearance: auto;
+}
+
+.layout-sort-select:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.layout-sort-select:focus:not(:disabled) {
+    border-color: rgba(140, 140, 255, 0.6);
+}
+
+.layout-sort-select:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.layout-sort-divider {
+    width: 1px;
+    height: 22px;
+    background: rgba(255, 255, 255, 0.12);
+    flex-shrink: 0;
+}

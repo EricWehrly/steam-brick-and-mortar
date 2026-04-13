@@ -33,6 +33,7 @@ import type { SteamGameData } from './game-box/types/GameData'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 import { GameSorter } from './categorization/GameSorter'
+import { LayoutSortPanel } from '../ui/LayoutSortPanel'
 import { SceneSignManager } from './SceneSignManager'
 import { ShelfSectionPlanner } from './ShelfSectionPlanner'
 
@@ -56,6 +57,7 @@ export class SceneCoordinator {
     private dataManager: DataManager
     private eventManager: EventManager
     private gameSorter: GameSorter
+    private layoutSortPanel: LayoutSortPanel
     private sceneSignManager: SceneSignManager
     private shelfSectionPlanner: ShelfSectionPlanner
 
@@ -76,6 +78,8 @@ export class SceneCoordinator {
         // Initialize room manager for event-driven room structure (retrieves scene from DataManager)
         this.roomManager = new RoomManager()
         this.gameSorter = new GameSorter()
+        this.layoutSortPanel = new LayoutSortPanel(this.gameSorter)
+        this.layoutSortPanel.init()
         this.sceneSignManager = SceneSignManager.instance
         this.shelfSectionPlanner = new ShelfSectionPlanner()
 
@@ -186,6 +190,7 @@ export class SceneCoordinator {
         this.lightingRenderer.dispose()
         this.roomManager.dispose()
         this.shelfSectionPlanner.dispose()
+        this.layoutSortPanel.dispose()
     }
 
     private analyzeTaxonomies(): void {

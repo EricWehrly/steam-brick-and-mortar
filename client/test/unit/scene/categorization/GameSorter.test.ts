@@ -36,14 +36,15 @@ import { GameSorter } from '../../../../src/scene/categorization/GameSorter'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeGame(appid: number, rtime_last_played = 0): SteamGameData {
+function makeGame(appid: number, rtime_last_played = 0, playtime_forever = 0, genreDescription?: string): SteamGameData {
     return {
         appid,
         name: `Game ${appid}`,
-        playtime_forever: 0,
+        playtime_forever,
         rtime_last_played,
         img_icon_url: '',
         img_logo_url: '',
+        ...(genreDescription ? { genres: [{ id: '1', description: genreDescription }] } : {}),
     } as SteamGameData
 }
 
@@ -186,5 +187,96 @@ describe('getBucketLabel', () => {
         expect(getBucketLabel(RecentlyPlayedBucket.ThisYear)).toBe('Played This Year')
         expect(getBucketLabel(RecentlyPlayedBucket.Before)).toBe('Played Before')
         expect(getBucketLabel(RecentlyPlayedBucket.Unplayed)).toBe('Never Played')
+    })
+})
+
+describe('GameSorter.sortByPlaytime', () => {
+    beforeEach(() => {
+        mockHandlers.clear()
+        mockEmit.mockReset()
+        mockGames = []
+    })
+
+    it('emits GamesSort sorted descending by playtime_forever', () => {
+        mockGames = [
+            makeGame(1, 0, 100),
+            makeGame(2, 0, 500),
+            makeGame(3, 0, 50),
+        ]
+        const sorter = new GameSorter()
+        sorter.sortByPlaytime()
+
+        expect(mockEmit).toHaveBeenCalledOnce()
+        const [eventType, payload] = mockEmit.mock.calls[0]
+        expect(eventType).toBe(GameEventTypes.GamesSort)
+        const sorted = payload.sortedGames as SteamGameData[]
+        expect(sorted[0].appid).toBe(2)  // 500 minutes
+        expect(sorted[1].appid).toBe(1)  // 100 minutes
+        expect(sorted[2].appid).toBe(3)  // 50 minutes
+    })
+
+    it('does not emit when no games present', () => {
+        mockGames = []
+        const sorter = new GameSorter()
+        sorter.sortByPlaytime()
+        expect(mockEmit).not.toHaveBeenCalled()
+    })
+
+    it('emits an empty buckets map', () => {
+        mockGames = [makeGame(1, 0, 200)]
+        const sorter = new GameSorter()
+        sorter.sortByPlaytime()
+        const [, payload] = mockEmit.mock.calls[0]
+        expect((payload.buckets as ReadonlyMap<string, string>).size).toBe(0)
+    })
+})
+
+describe('GameSorter.sortByGenre', () => {
+    beforeEach(() => {
+        mockHandlers.clear()
+        mockEmit.mockReset()
+        mockGames = []
+    })
+
+    it('emits GamesSort grouped by genre in KNOWN_GENRES order', () => {
+        mockGames = [
+            makeGame(1, 0, 10, 'RPG'),
+            makeGame(2, 0, 10, 'Action'),
+            makeGame(3, 0, 10, 'Strategy'),
+        ]
+        const sorter = new GameSorter()
+        sorter.sortByGenre()
+
+        expect(mockEmit).toHaveBeenCalledOnce()
+        const [eventType, payload] = mockEmit.mock.calls[0]
+        expect(eventType).toBe(GameEventTypes.GamesSort)
+        const sorted = payload.sortedGames as SteamGameData[]
+        // Action (index 0) < RPG (index 2) < Strategy (index 3)
+        expect(sorted[0].appid).toBe(2)  // Action
+        expect(sorted[1].appid).toBe(1)  // RPG
+        expect(sorted[2].appid).toBe(3)  // Strategy
+    })
+
+    it('sorts by playtime descending within the same genre', () => {
+        mockGames = [
+            makeGame(1, 0, 30, 'Action'),
+            makeGame(2, 0, 100, 'Action'),
+            makeGame(3, 0, 10, 'Action'),
+        ]
+        const sorter = new GameSorter()
+        sorter.sortByGenre()
+
+        const [, payload] = mockEmit.mock.calls[0]
+        const sorted = payload.sortedGames as SteamGameData[]
+        expect(sorted[0].appid).toBe(2)  // 100 min
+        expect(sorted[1].appid).toBe(1)  // 30 min
+        expect(sorted[2].appid).toBe(3)  // 10 min
+    })
+
+    it('does not emit when no games present', () => {
+        mockGames = []
+        const sorter = new GameSorter()
+        sorter.sortByGenre()
+        expect(mockEmit).not.toHaveBeenCalled()
     })
 })
