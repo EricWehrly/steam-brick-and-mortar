@@ -9,48 +9,40 @@
  * They can be unit-tested without a scene or EventManager.
  */
 
-import { RecentlyPlayedBucket, getRecentlyPlayedBucket, getBucketLabel } from '../categorization/GameSorter'
+import { getRecentlyPlayedBucket, getBucketLabel, getPlaytimeBucket } from '../categorization/GameSorter'
+import type { GameSortMode } from '../../types/EnvironmentEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
 
 /** Number of games packed onto a single shelf unit. */
 export const SHELF_BATCH_SIZE = 18
 
 /**
- * Determine which time bucket corresponds to the first game on a given shelf
- * (identified by batch index). Returns null if the shelf index is out of range.
- * Unplayed is a valid return value — it represents the final "Never Played" section.
+ * Return the bucket key for the first game on a given shelf, using the
+ * appropriate classifier for the active sort mode.
+ * Returns null if the shelf index is out of range.
  */
-export function shelfBucket(
+export function shelfBucketKey(
     shelfId: number,
-    sortedGames: ReadonlyArray<Readonly<SteamGameData>>
-): RecentlyPlayedBucket | null {
+    sortedGames: ReadonlyArray<Readonly<SteamGameData>>,
+    sortMode: GameSortMode,
+): string | null {
     const firstGameIndex = shelfId * SHELF_BATCH_SIZE
     if (firstGameIndex >= sortedGames.length) return null
-
-    return getRecentlyPlayedBucket(sortedGames[firstGameIndex] as SteamGameData)
+    const game = sortedGames[firstGameIndex] as SteamGameData
+    switch (sortMode) {
+        case 'recently-played': return getRecentlyPlayedBucket(game)
+        case 'by-playtime':     return getPlaytimeBucket(game)
+        default:                return null
+    }
 }
 
 /**
- * Determine whether a time-bucket sign should be placed at this shelf.
- *
- * A sign is placed when:
- * - The shelf has a non-null bucket (see shelfBucket)
- * - The bucket differs from the last placed bucket (transition boundary)
+ * Determine whether a bucket sign should be placed at this shelf.
+ * A sign is placed when the bucket key differs from the last placed key.
  */
 export function shouldPlaceBucketSign(
-    bucket: RecentlyPlayedBucket | null,
-    lastPlacedBucket: RecentlyPlayedBucket | null,
+    bucketKey: string | null,
+    lastPlacedKey: string | null,
 ): boolean {
-    if (bucket === null) return false
-    if (bucket === lastPlacedBucket) return false
-    return true
-}
-
-/**
- * Return the display label for a bucket.
- * Unplayed maps to "Never Played" (final section in a recency sort).
- */
-export function bucketDisplayLabel(bucket: RecentlyPlayedBucket): string {
-    if (bucket === RecentlyPlayedBucket.Unplayed) return 'Never Played'
-    return getBucketLabel(bucket)
+    return bucketKey !== null && bucketKey !== lastPlacedKey
 }
