@@ -39,3 +39,8 @@
 - The old detailed bucket breakdown lives in `docs/roadmaps/intermission-before-phase2.md` (legacy; this doc supersedes it for planning purposes).
 - The intermission is intentionally not a formal act. It does not have a user-facing delivery goal.
 - When working on a feature, check whether related Encore items are plausibly quick — if so, pull them forward rather than leaving them for later. That's the intent of the Encore list.
+
+## Act 1 Completed Infrastructure (for reference)
+
+These shipped during Act 1 and are done. Captured here so nothing is lost when Act 1 gets its own doc:
+- [Worker Infrastructure](../features/worker-infrastructure.md) — `ManagedWorker` base class; all workers migrated; `WorkerErrorUtils` deleted; main-thread hitch reduction
