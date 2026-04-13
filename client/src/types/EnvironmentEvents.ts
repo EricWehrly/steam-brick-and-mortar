@@ -19,7 +19,13 @@ export interface SomeBatchesCompleteEvent extends BaseInteractionEvent {
     totalBatches: number
 }
 
-export type GameSortMode = 'recently-played' | 'by-genre' | 'by-playtime'
+export const GameSortModes = {
+    RecentlyPlayed: 'recently-played',
+    ByGenre:        'by-genre',
+    ByPlaytime:     'by-playtime',
+} as const
+
+export type GameSortMode = typeof GameSortModes[keyof typeof GameSortModes]
 
 export interface GamesSortEvent extends BaseInteractionEvent {
     /** Full sorted game list after all batches have loaded. */
