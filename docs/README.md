@@ -3,7 +3,7 @@
 This directory is structured specifically as a knowledge base and entrypoint for AI agents (like Vex) working on the project.
 
 ## Where to start
-1. Read `roadmaps/current-status.md` — what we are working on right now and which act/branch is active.
+1. Read `acts/current-status.md` — what we are working on right now and which act/branch is active.
 2. Read the current act doc in `acts/` (linked from current-status.md) — goals, feature list, completion criteria.
 3. Read the relevant feature doc(s) in `features/` for the specific work at hand.
 4. Read `agent-context/startup-sequence.md` to understand the 5-phase startup architecture.
@@ -39,11 +39,10 @@ import { ... }
 ### 📋 agent-context/
 High-value, fast-load architectural rules and interaction maps. **Read these to understand how the codebase works.**
 
-### 🗺️ roadmaps/
-**Active tracking.**
-- `current-status.md` — immediate focus and active branch
+### 🗺️ Root tracking docs
 - `bugs.md` — active bugs
 - `tech-debt.md` — known technical debt sorted by Fix Now / Act 2 / Later (keyed by TD tag IDs)
+- `README.md` — this file; entry point for agents
 
 ### 📝 plans/
 **Implementation plans and design proposals.**
