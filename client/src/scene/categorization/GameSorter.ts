@@ -34,10 +34,10 @@ export enum PlaytimeBucket {
 }
 
 const PLAYTIME_BUCKET_LABELS: Record<PlaytimeBucket, string> = {
-    [PlaytimeBucket.Heavy]:    '100+ Hours',
-    [PlaytimeBucket.Moderate]: '10–100 Hours',
-    [PlaytimeBucket.Light]:    '1–10 Hours',
-    [PlaytimeBucket.Minimal]:  'Under an Hour',
+    [PlaytimeBucket.Heavy]:    'Played 100+ Hours',
+    [PlaytimeBucket.Moderate]: 'Played 10–100 Hours',
+    [PlaytimeBucket.Light]:    'Played 1–10 Hours',
+    [PlaytimeBucket.Minimal]:  'Played Under an Hour',
     [PlaytimeBucket.Unplayed]: 'Never Played',
 }
 
