@@ -1,3 +1,4 @@
+// TD: legacy-atlas-removal
 /**
  * GpuGameBoxRenderer
  * 

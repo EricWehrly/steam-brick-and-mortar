@@ -21,7 +21,7 @@
 - [UI Standardization](../features/ui-standardization.md) — design tokens, component library, VR-ready architecture
 
 **Nice to Have (best effort, punt when stuck):**
-- Lint baseline pass — max-params rule, TD ID convention enforcement, encoding regression fixes
+- Lint baseline pass — max-params rule, TD ID convention enforcement, encoding regression fixes. See `docs/plans/linter-contract.md` for detailed rules, current violation counts, and strict-mode enablement checklist.
 - suppressEmit refactor in `GpuStorePropsRenderer` — single dedicated call site
 - `GpuStorePropsRenderer` split — extract layout-related functionality to its own class
 - Tech debt triage session — review `tech-debt.md`, assign Do Now / Act 2 / Later / Drop to each item

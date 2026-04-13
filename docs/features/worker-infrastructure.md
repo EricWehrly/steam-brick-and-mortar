@@ -27,5 +27,9 @@ The main thread locking improvement was a direct performance benefit — workers
 
 ## Notes
 
+- Related plan (archived): `docs/archive/neon-tube-worker-plan.md` — ManagedWorker pattern applied to NeonGeometryWorker; work is complete.
 - `ManagedWorker` is infrastructure, not a user-facing feature. It is complete and should not need significant revisiting unless a new worker type emerges with requirements outside the current base class.
 - The performance benefit (reduced main-thread locking) feeds into the Key Metrics Instrumentation story — startup time improvements are partly attributable to this work.
+
+
+**Related debt**: `carpet-worker-offload`

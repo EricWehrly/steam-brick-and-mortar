@@ -44,3 +44,5 @@ This is a non-tentpole feature for Act 2: we want to make a real attempt at it, 
 - This investigation also ties into the SteamSpy tags pipeline (active in a separate branch) — user categories and SteamSpy tags are complementary data sources for the sort north star.
 - Cross-platform paths differ significantly: Windows uses `%LOCALAPPDATA%/Steam/userdata/`, macOS uses `~/Library/Application Support/Steam/userdata/`, Linux uses `~/.local/share/Steam/userdata/`. Discovery needs to handle all three (or ask the user).
 - Related plan docs: `docs/plans/steam-user-categories-feasibility.md`, `docs/plans/steam-user-categories-filesystem-plan.md`.
+- `steam-user-categories-feasibility.md`: VDF/local-file approach confirmed non-viable for modern Steam; user collections now stored in Steam Cloud, not local VDF. The `cloud-storage-namespace-1.json` file in the Steam cloud sync folder is the viable source.
+- `steam-user-categories-filesystem-plan.md`: Concrete plan for reading `cloud-storage-namespace-1.json` via File System Access API (`showOpenFilePicker`); parsing is straightforward JSON (no VDF needed).
