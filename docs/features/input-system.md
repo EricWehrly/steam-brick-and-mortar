@@ -1,7 +1,7 @@
 # Feature: Input System
 
-**Act**: 2 (Gate 1 — keyboard/mouse solid; Gate 2 — VR controllers)
-**Status**: Not Started (current controls are ad-hoc mouse/keyboard, no abstraction layer)
+**Act**: 2 (Gate 1)
+**Status**: In Progress (InputManager exists handling keys/mouse/movement; IInputSource abstraction, gamepad support, and VR routing are the remaining work)
 **Priority**: High
 
 ## Goal

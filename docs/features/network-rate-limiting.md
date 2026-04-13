@@ -1,7 +1,7 @@
 # Feature: Network Rate Limiting
 
-**Act**: 2
-**Status**: Not Started
+**Act**: 2 (Gate 1)
+**Status**: Substantially Implemented (client + server rate limiting exist; explicit client-side 429 handling and concurrency cap are gaps)
 **Priority**: High
 
 ## Goal

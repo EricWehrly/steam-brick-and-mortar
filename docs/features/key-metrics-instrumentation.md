@@ -1,7 +1,7 @@
 # Feature: Key Metrics Instrumentation
 
 **Act**: 2 (Intermission — top priority)
-**Status**: Not Started
+**Status**: In Progress (startup tracking, hitch detection, and Playwright memory pulse exist; systematic frame time logging and formal perf report artifact are the gaps)
 **Priority**: High
 
 ## Goal
