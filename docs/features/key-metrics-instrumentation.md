@@ -37,3 +37,4 @@ We have `PerformanceMonitor`, `StartupEventTracker`, and `RenderLoopDiagnostics`
 - Hitch detection requires care: **detecting** that a frame ran long is cheap and appropriate for dev mode. **Instrumenting individual methods within a frame** to find the offender is inescapably expensive and must be an explicit opt-in (e.g. `?profile-frame=1` URL param or a dedicated dev overlay toggle) — never on by default, even in dev mode.
 - Playwright perf reports: consider whether these go into `playwright-report/` alongside visual snapshots, or into a dedicated `perf-report/` artifact directory.
 - Keep this lightweight — the goal is a baseline, not a full APM stack.
+- **Future spike**: `docs/plans/occlusion-culling-future.md` describes a 2D line-of-sight sweep-line approach for culling off-screen geometry. Revisit when frame time data shows this is a meaningful bottleneck (likely at 800+ game libraries or under VR perf budget pressure).
