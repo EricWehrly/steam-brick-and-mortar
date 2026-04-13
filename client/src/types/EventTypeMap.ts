@@ -48,7 +48,7 @@ import type {
     GameLoadingPhaseChangedEvent,
     GameLoadingProgressEvent,
 } from './InteractionEvents'
-import type { AllBatchesCompleteEvent, GamesSortEvent, LayoutChangedEvent, SomeBatchesCompleteEvent } from './EnvironmentEvents'
+import type { AllBatchesCompleteEvent, GamesSortEvent, LayoutChangedEvent, SomeBatchesCompleteEvent, SortRequestedEvent } from './EnvironmentEvents'
 
 export interface InteractionEventMap {
     // Steam events
@@ -79,6 +79,7 @@ export interface InteractionEventMap {
     [UIEventTypes.MenuOpen]: MenuOpenEvent
     [UIEventTypes.MenuClose]: MenuCloseEvent
     [UIEventTypes.ImageCacheStatsRequest]: ImageCacheStatsRequestEvent
+    [UIEventTypes.SortRequested]: SortRequestedEvent
 
     // Game events
     [GameEventTypes.SceneReady]: SceneReadyEvent

@@ -1,6 +1,6 @@
 /**
  * System UI Coordinator - System-level UI management
- * 
+ *
  * This coordinator handles system-level UI operations including:
  * - Pause menu management
  * - Performance monitoring
@@ -13,6 +13,7 @@ import { PauseMenuManager } from '../pause/PauseMenuManager'
 import { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { LightingControlsPanel } from '../LightingControlsPanel'
 import { CategoryReferencePanel } from '../CategoryReferencePanel'
+import { LayoutSortPanel } from '../LayoutSortPanel'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings } from '../../core/AppSettings'
 import { UIEventTypes, InputEventTypes, type SceneCanvasClickEvent } from '../../types/InteractionEvents'
@@ -24,6 +25,7 @@ export class SystemUICoordinator {
     private performanceMonitor: PerformanceMonitorUI
     private lightingControlsPanel?: LightingControlsPanel
     private categoryReferencePanel?: CategoryReferencePanel
+    private layoutSortPanel?: LayoutSortPanel
     private eventManager: EventManager
     private appSettings: AppSettings
     private renderLoopRegistry: RenderLoopRegistry
@@ -38,7 +40,7 @@ export class SystemUICoordinator {
         appSettings: AppSettings
     ) {
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
-        
+
         this.eventManager = eventManager
         this.appSettings = appSettings
 
@@ -49,7 +51,7 @@ export class SystemUICoordinator {
             updateInterval: 100,
             precision: 1
         })
-        
+
         this.pauseMenuManager = new PauseMenuManager({}, {}, undefined, this.eventManager, this.appSettings, this.performanceMonitor)
     }
 
@@ -67,35 +69,37 @@ export class SystemUICoordinator {
         }
 
         this.sceneClickGameBoxRaycast = new SceneClickGameBoxRaycast({})
-        
+
         // Initialize pause menu system
         this.pauseMenuManager.init()
-        
+
         // Provide system dependencies for settings management
         this.pauseMenuManager.setSystemDependencies({
             performanceMonitor: this.performanceMonitor,
             renderer: renderer
         })
-        
+
         // Register all default panels with event emissions
         this.pauseMenuManager.registerDefaultPanels()
 
         // Setup event handlers
         this.registerEventHandlers()
-        
+
         // Setup Settings button click handler
         this.setupSettingsButton()
-        
+
         // Setup Lighting Controls button
         this.setupLightingControlsButton()
-        
+
         // Initialize integrated lighting controls panel
         this.initializeLightingControls()
 
         // Category reference panel (dev/debug tool)
         this.initializeCategoryReferencePanel()
-        
-        // Register update method with render loop
+
+        // Sort/layout controls panel
+        this.initializeLayoutSortPanel()
+
         this.renderLoopRegistry.register(this.constructor.name, this.updatePerformanceStats.bind(this))
     }
 
@@ -126,7 +130,7 @@ export class SystemUICoordinator {
             this.initializeLightingControls()
             return
         }
-        
+
         this.lightingControlsPanel.toggle()
     }
 
@@ -142,6 +146,13 @@ export class SystemUICoordinator {
         if (!this.categoryReferencePanel) {
             this.categoryReferencePanel = new CategoryReferencePanel()
             this.categoryReferencePanel.init()
+        }
+    }
+
+    private initializeLayoutSortPanel(): void {
+        if (!this.layoutSortPanel) {
+            this.layoutSortPanel = new LayoutSortPanel()
+            this.layoutSortPanel.init()
         }
     }
 
@@ -207,12 +218,13 @@ export class SystemUICoordinator {
         this.pauseMenuManager?.dispose()
         this.performanceMonitor?.dispose()
         this.lightingControlsPanel?.dispose()
-        
+        this.layoutSortPanel?.dispose()
+
         // Remove lighting controls button
         const lightingButton = document.getElementById('lighting-controls-button')
         if (lightingButton?.parentNode) {
             lightingButton.parentNode.removeChild(lightingButton)
         }
-        
+
     }
 }

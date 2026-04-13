@@ -7,16 +7,21 @@
  *   - A toggle button (⚏) to show/hide the control bar
  *
  * Hotkeys:
- *   L — cycle through Sort options in order
- *   Shift+L — toggle the control bar visible/hidden
+ *   L — toggle the control bar visible/hidden
+ *
+ * Emits UIEventTypes.SortRequested when the user changes sort mode.
+ * GameSorter subscribes to SortRequested and drives GamesSort from there.
  */
 
-import { GameSorter } from '../scene/categorization/GameSorter'
+import { EventManager } from '../core/EventManager'
+import { UIEventTypes } from '../types/InteractionEvents'
+import type { SortRequestedEvent } from '../types/EnvironmentEvents'
+import type { GameSortMode } from '../types/EnvironmentEvents'
 import '../styles/components/layout-sort-panel.css'
 
 // ─── Sort option definitions ───────────────────────────────────────────────────
 
-type SortOptionKey = 'recently-played' | 'by-genre' | 'by-playtime'
+type SortOptionKey = GameSortMode
 
 interface SortOption {
     key: SortOptionKey
@@ -32,7 +37,6 @@ const SORT_OPTIONS: ReadonlyArray<SortOption> = [
 // ─── LayoutSortPanel ───────────────────────────────────────────────────────────
 
 export class LayoutSortPanel {
-    private gameSorter: GameSorter
     private toggleButton: HTMLElement | null = null
     private controlsContainer: HTMLElement | null = null
     private sortSelect: HTMLSelectElement | null = null
@@ -40,9 +44,7 @@ export class LayoutSortPanel {
     private isControlsVisible = true
     private keyboardHandler: ((e: KeyboardEvent) => void) | null = null
 
-    constructor(gameSorter: GameSorter) {
-        this.gameSorter = gameSorter
-    }
+    constructor() {}
 
     public init(): void {
         const slot = document.getElementById('ui-right-center-group') ?? document.body
@@ -137,23 +139,9 @@ export class LayoutSortPanel {
             this.sortSelect.value = sortKey
         }
 
-        switch (sortKey) {
-            case 'recently-played':
-                this.gameSorter.sortByRecentlyPlayed()
-                break
-            case 'by-genre':
-                this.gameSorter.sortByGenre()
-                break
-            case 'by-playtime':
-                this.gameSorter.sortByPlaytime()
-                break
-        }
-    }
-
-    private cycleSortOption(): void {
-        const currentIndex = SORT_OPTIONS.findIndex(option => option.key === this.activeSortKey)
-        const nextIndex = (currentIndex + 1) % SORT_OPTIONS.length
-        this.applySort(SORT_OPTIONS[nextIndex].key)
+        EventManager.getInstance().emit<SortRequestedEvent>(UIEventTypes.SortRequested, {
+            sortMode: sortKey,
+        })
     }
 
     private toggleControlsVisibility(): void {
