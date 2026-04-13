@@ -16,9 +16,10 @@
 
 > Features that need to be solid before we hand this to anyone. Bugs here are embarrassing. Scope creep here is a trap.
 
-- [Static Hosting](../features/static-hosting.md) — public HTTPS URL, repeatable deploy, CORS wired to Lambda; **the** prerequisite for sharing anything
+- [Static Hosting](../features/static-hosting.md) — public HTTPS URL, repeatable deploy, CORS wired to Lambda; **the** prerequisite for sharing anything; CloudFront is the likely choice (cost projection discussion to happen early Act 2)
+- [First Load Experience](../features/first-load-experience.md) — anonymous store is coherent and inviting; new user is guided to connect their library; performance on first load is acceptable; definition of "correct" pinned before sign-off
 - [Network Rate Limiting](../features/network-rate-limiting.md) — client-side rate limiter, batched artwork loading, Lambda hardening; must land before any multi-user testing
-- [Multi-Layer Caching](../features/multi-layer-caching.md) — browser + Lambda + CloudFront + S3; pairs with rate limiting as the "safe to share" infrastructure baseline
+- [Multi-Layer Caching](../features/multi-layer-caching.md) — browser layer exists; Lambda + CloudFront + S3 layers needed before multi-user
 - [Input System](../features/input-system.md) — mouse/keyboard solid, gamepad support, keyboard accessibility for all menus; VR controllers are Gate 2
 
 ## Gate 2: Act 2 Complete
@@ -32,8 +33,10 @@
 
 > Real work we intend to make a serious attempt at. Not blockers. We punt when stuck.
 
-- [Local File Investigation](../features/local-file-investigation.md) — user categories from Steam local files; ties into sort-by-user-tags north star; non-tentpole
-- [Lighting and Atmosphere](../features/lighting-and-atmosphere.md) — tone presets (corporate → dank), dongle switch panel, dust motes, spotlight shimmer; core lighting is done, this is the experiential layer
+- [Steam Tag Pipeline](../features/steam-tag-pipeline.md) — SteamSpy tags via background Lambda + S3 snapshot; active in separate branch; feeds tag-sorting north star
+- [Local File Investigation](../features/local-file-investigation.md) — user categories from Steam local files; complementary to SteamSpy tags; non-tentpole
+- [Layout Variations](../features/layout-variations.md) — arc layout exists; square rows + dynamic switching + grouping parameter are the remaining work
+- [Lighting and Atmosphere](../features/lighting-and-atmosphere.md) — tone presets (corporate → dank), dongle switch panel; core lighting is done, this is the experiential layer
 - [Procedural Texture Quality Pass](../features/procedural-texture-quality.md) — MDF veneer, popcorn ceiling, wood plank walls, carpet; carried from Act 1
 - [UI Standardization](../features/ui-standardization.md) — in-scene omnibar, 3D sign elements, component tokens (started in intermission, may extend into Act 2)
 - Enhanced error handling — robust recovery for rate limits, invalid Steam IDs, timeouts, partial failures
