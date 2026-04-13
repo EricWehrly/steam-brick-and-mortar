@@ -1,8 +1,10 @@
 # Feature: Local File Investigation
 
-**Act**: 2 (Intermission — non-tentpole)
-**Status**: Not Started
-**Priority**: Low–Medium
+**Act**: 2 (Best Effort — invest to try, not required to complete)
+**Status**: Not Started (research done; implementation is the experiment)
+**Priority**: Medium
+
+> **Ways of working note**: We've done enough research to have a concrete first thing to try (read `localconfig.vdf` / `sharedconfig.vdf` via File System Access API). The goal is to wire it up, see how smooth it can be made, and report back. We won't hang up on completion if the UX friction is too high.
 
 ## Goal
 
