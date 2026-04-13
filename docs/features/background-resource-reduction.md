@@ -1,7 +1,7 @@
 # Feature: Background Resource Reduction
 
 **Act**: 2 (Intermission)
-**Status**: Not Started
+**Status**: In Progress (visibility detection exists in PerformanceMonitor; full render loop throttling and centralized LOD drop on blur not yet implemented)
 **Priority**: Medium
 
 ## Goal

@@ -1,7 +1,7 @@
 # Feature: GameSort Full Pipeline
 
-**Act**: 2
-**Status**: Not Started
+**Act**: 2 (Gate 2)
+**Status**: Not Started (sort pipeline and GameSorter are substantially done — see Notes; box/shelf repositioning on re-sort is the actual remaining gap)
 **Priority**: Medium
 
 ## Goal
@@ -31,6 +31,7 @@ The current sort system updates signage (neon signs per genre/category) but does
 
 ## Notes / Open Questions
 
+- **What's already done**: `GameSorter` is fully implemented and emits `GamesSortEvent` with sorted games. `ShelfSectionPlanner` listens and receives `sortedGames`. Sort policy has been moved out of `SteamApiClient`. Sort modes (genre, recently-played, playtime) exist. `LayoutSortPanel` wired to `SortRequested` → `GameSorter`. The remaining gap is specifically box/shelf repositioning — games don't move in the scene when sort mode changes.
 - "Sort by" in-scene affordance and sort mode switch UI is a related intake item from Apr 6-7 session dossier.
-- Multi-instance genre sections (same game appearing in multiple thematic views) is out of scope here — that's Act 4.
+- Multi-instance genre sections (same game appearing in multiple thematic views) is out of scope here — that's Encore.
 - Coordinate with `SignageRenderer` singleton/static-method evaluation (also in the dossier).
