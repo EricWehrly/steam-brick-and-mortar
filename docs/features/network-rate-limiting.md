@@ -32,3 +32,4 @@ Current network behavior is acceptable for solo testing but unsafe for multi-use
 
 - Lambda IP pool sharing risk — AWS Lambda IPs are shared; rate limits could be hit by other users of the same pool. Research NAT Gateway options.
 - Active implementation deferred until after Milestones 7/8 (input/UX stabilization).
+- Related plan: `docs/plans/network-fetch-optimization-plan.md` — phased approach; Phase 1 (cached/uncached separation) done; Phases 2–4 (bad-game tracking, metadata backfill, retry/backoff) are future work.

@@ -34,3 +34,6 @@ The UI has grown organically and lacks a unified design token system. Inconsiste
 
 - This overlaps with the intermission's third goal. Get the token system and component audit done in the intermission; deeper VR-ready architecture can extend into Act 2.
 - The dongle switch panel (Feature 8.5.1) is blocked on this landing first.
+- Related plan: `docs/plans/ui-design-tokens.md` — CSS custom property token spec (palette, spacing, typography).
+- Related plan: `docs/plans/ui-normalization-audit.md` — inventory of hardcoded values and inconsistencies across all UI components.
+- Related plan: `docs/plans/ui-normalization-plan.md` — phased migration plan (audit → base components → panel migration → tag components).

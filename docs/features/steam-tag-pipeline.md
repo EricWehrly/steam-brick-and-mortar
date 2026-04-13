@@ -38,5 +38,6 @@ This work is actively underway in a separate branch. The branch will be reconcil
 - Rate limit is ~1 req/sec to SteamSpy; the background Lambda must respect this and schedule accordingly
 - S3 snapshot format needs to be defined — probably a flat JSON map of `appid → string[]`
 - SteamSpy research was done; see `docs/plans/steamspy-tags-lambda-plan.md` for the infrastructure design
+- See also `docs/plans/steam-tag-research.md` for SteamSpy API analysis, rate limits, ToS assessment, and Steam tag pill CSS styling reference.
 - This is complementary to local file investigation (user categories) — SteamSpy provides community tags, local files provide personal categories; both feed the tag-sorting north star
 - Branch reconciliation with main is pending; do not attempt to merge until the main branch stabilizes post-intermission

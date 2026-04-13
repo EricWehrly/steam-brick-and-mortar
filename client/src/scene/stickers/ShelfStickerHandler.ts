@@ -1,3 +1,4 @@
+// TD: sticker-coordinator
 /**
  * Shelf Sticker Handler - Manages sticker lifecycle for shelf rendering
  * 
