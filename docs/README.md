@@ -3,7 +3,7 @@
 This directory is structured specifically as a knowledge base and entrypoint for AI agents (like Vex) working on the project.
 
 ## Where to start
-1. Read `acts/current-status.md` — what we are working on right now and which act/branch is active.
+1. Read `acts/current-status.md` — single source of truth for active branch + current act.
 2. Read the current act doc in `acts/` (linked from current-status.md) — goals, feature list, completion criteria.
 3. Read the relevant feature doc(s) in `features/` for the specific work at hand.
 4. Read `agent-context/startup-sequence.md` to understand the 5-phase startup architecture.
@@ -14,7 +14,7 @@ This directory is structured specifically as a knowledge base and entrypoint for
 Source files may contain one or more `// TD: <tag-id>` comments near the top. These signal that the file is affected by a tracked tech debt item.
 
 - **Tag format**: `// TD: kebab-case-name` — one line per item, in the file's top comment block or just below imports
-- **Lookup**: Find the tag as an `## id: <tag-id>` section in `roadmaps/tech-debt.md`
+- **Lookup**: Find the tag as an `## id: <tag-id>` section in `tech-debt.md`
 - **Meaning**: "This file needs attention when working on this debt item, but it is NOT a blocker for unrelated work"
 
 Example in a source file:
@@ -52,10 +52,6 @@ These are detailed "how to build it" docs for specific features. Check these bef
 **Deep-dive technical design documents.**
 Read these when touching specific complex systems (WebXR, instancing, event-driven patterns, data management).
 
-### 📏 guidelines/
-**Conventions and rules.**
-- `code-conventions.md` — JSDoc hygiene, file size, naming, TD tags ("clean as you go" rules)
-- `test-guidelines.md`, `ui-guidelines.md` — domain-specific rules
 
 ### 🔬 research/ & 📦 archive/
 **Historical context.**

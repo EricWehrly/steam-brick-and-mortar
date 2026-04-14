@@ -95,5 +95,5 @@ The orchestrator caches decoded textures keyed by `appid`. `placeInstance` looks
 ## Related
 
 - `docs/plans/gamesort-event-driven-plan.md` — parent plan
-- `docs/roadmaps/tech-debt.md` — DataManager memory tracking (related cleanup opportunity)
+- `docs/tech-debt.md` — DataManager/memory tracking related cleanup opportunity
 - Current `GameBoxSpawner` + `BatchCoordinator` will be primary deletion targets

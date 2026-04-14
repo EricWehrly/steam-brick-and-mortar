@@ -45,7 +45,7 @@ Check line count with: `wc -l <file>` or `Get-Content <file> | Measure-Object -L
 
 ## TD tags
 
-Source files may have `// TD: <tag-id>` comments at the file top (not per-method). These link to entries in `docs/roadmaps/tech-debt.md`. See `docs/README.md` for the full convention.
+Source files may have `// TD: <tag-id>` comments at the file top (not per-method). These link to entries in `docs/tech-debt.md`. See `docs/README.md` for the full convention.
 
 ---
 
