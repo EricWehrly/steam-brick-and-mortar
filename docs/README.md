@@ -40,6 +40,7 @@ import { ... }
 
 ### 📋 agent-context/
 High-value, fast-load architectural rules and interaction maps. **Read these to understand how the codebase works.**
+- `performance-metrics.md` — what metrics we track, current targets, how to measure, known gaps. Non-mandatory; read when asked about metrics or setting up measurement.
 
 ### 🗺️ Root tracking docs
 - `bugs.md` — active bugs

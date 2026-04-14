@@ -39,6 +39,10 @@ interface FrameStats {
     peakCallbackTimes: Map<string, number>
     /** How many frames exceeded frameTimeWarnThreshold */
     slowFrameCount: number
+    /** How many long tasks (> 50ms between frames) were detected via PerformanceObserver */
+    longTaskCount: number
+    /** Peak long task duration in ms */
+    maxLongTaskDuration: number
 }
 
 export class RenderLoopDiagnostics {
@@ -50,6 +54,8 @@ export class RenderLoopDiagnostics {
         callbackTimeWarnThreshold: 5
     }
     
+    private static longTaskObserver: PerformanceObserver | null = null
+
     private static stats: FrameStats = {
         frameCount: 0,
         totalFrameTime: 0,
@@ -59,6 +65,8 @@ export class RenderLoopDiagnostics {
         peakFrameTime: 0,
         peakCallbackTimes: new Map(),
         slowFrameCount: 0,
+        longTaskCount: 0,
+        maxLongTaskDuration: 0,
     }
     
     private static isFirstCallbackInFrame = true
@@ -87,10 +95,30 @@ export class RenderLoopDiagnostics {
             wrapCallback: this.instrumentCallback.bind(this),
             onAfterFrame: this.endFrame.bind(this),
         })
-        
+
+        // PerformanceObserver catches long tasks that happen between frames
+        // (click handlers, event callbacks, etc.) — invisible to RenderLoopRegistry.
+        // These are the source of "opens fine, but subsequent frames run slow" bugs.
+        if (typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
+            const observer = new PerformanceObserver((list) => {
+                for (const entry of list.getEntries()) {
+                    this.stats.longTaskCount++
+                    this.stats.maxLongTaskDuration = Math.max(this.stats.maxLongTaskDuration, entry.duration)
+                    console.warn(
+                        `⚠️ [RenderLoopDiagnostics] Long task between frames: ${entry.duration.toFixed(1)}ms` +
+                        (entry.attribution?.length
+                            ? ` (${entry.attribution.map((a: PerformanceEntry & { containerName?: string; containerSrc?: string }) => a.containerName || a.containerSrc || 'unknown').join(', ')})`
+                            : '')
+                    )
+                }
+            })
+            observer.observe({ type: 'longtask', buffered: true })
+            this.longTaskObserver = observer
+        }
+
         this.isInitialized = true;
 
-        (window as any).renderLoopDiagnostics = this
+        ;(window as any).renderLoopDiagnostics = this
     }
 
     /**
@@ -224,6 +252,8 @@ export class RenderLoopDiagnostics {
         maxFrameTime: number
         peakFrameTime: number
         slowFrameCount: number
+        longTaskCount: number
+        maxLongTaskDuration: number
         callbackAvgs: Record<string, { avg: number; peak: number }>
     } {
         const callbackAvgs: Record<string, { avg: number; peak: number }> = {}
@@ -242,6 +272,8 @@ export class RenderLoopDiagnostics {
             maxFrameTime: this.stats.maxFrameTime,
             peakFrameTime: this.stats.peakFrameTime,
             slowFrameCount: this.stats.slowFrameCount,
+            longTaskCount: this.stats.longTaskCount,
+            maxLongTaskDuration: this.stats.maxLongTaskDuration,
             callbackAvgs,
         }
     }
@@ -273,6 +305,8 @@ export class RenderLoopDiagnostics {
             frameTimeWarnThreshold: 16.67,
             callbackTimeWarnThreshold: 5
         }
+        this.longTaskObserver?.disconnect()
+        this.longTaskObserver = null
         this.stats = {
             frameCount: 0,
             totalFrameTime: 0,
@@ -282,6 +316,8 @@ export class RenderLoopDiagnostics {
             peakFrameTime: 0,
             peakCallbackTimes: new Map(),
             slowFrameCount: 0,
+            longTaskCount: 0,
+            maxLongTaskDuration: 0,
         }
     }
 }
