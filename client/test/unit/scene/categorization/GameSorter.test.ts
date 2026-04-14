@@ -239,6 +239,65 @@ describe('GameSorter.sortByPlaytime', () => {
     })
 })
 
+describe('GameSorter.sortByRating', () => {
+    beforeEach(() => {
+        mockHandlers.clear()
+        mockEmit.mockReset()
+        mockGames = []
+    })
+
+    it('emits GamesSort sorted descending by userscore, breaking ties with playtime', () => {
+        const g1 = makeGame(1, 0, 100)
+        g1.userscore = 95
+        
+        const g2 = makeGame(2, 0, 500)
+        g2.userscore = 95 // same score as g1, but more playtime
+        
+        const g3 = makeGame(3, 0, 50)
+        g3.userscore = 85
+        
+        const g4 = makeGame(4, 0, 1000)
+        // g4 missing userscore (treated as 0)
+
+        mockGames = [g1, g2, g3, g4]
+        
+        const sorter = new GameSorter()
+        sorter.sortByRating()
+
+        expect(mockEmit).toHaveBeenCalledOnce()
+        const [eventType, payload] = mockEmit.mock.calls[0]
+        expect(eventType).toBe(GameEventTypes.GamesSort)
+        const sorted = payload.sortedGames as SteamGameData[]
+        
+        expect(sorted[0].appid).toBe(2) // 95 score, 500 playtime
+        expect(sorted[1].appid).toBe(1) // 95 score, 100 playtime
+        expect(sorted[2].appid).toBe(3) // 85 score
+        expect(sorted[3].appid).toBe(4) // 0 score
+    })
+
+    it('emits a rating bucket map with human-readable labels', () => {
+        const g1 = makeGame(1, 0, 100); g1.userscore = 92
+        const g2 = makeGame(2, 0, 100); g2.userscore = 85
+        const g3 = makeGame(3, 0, 100); g3.userscore = 75
+        const g4 = makeGame(4, 0, 100); g4.userscore = 50
+        const g5 = makeGame(5, 0, 100)  // unrated
+
+        mockGames = [g1, g2, g3, g4, g5]
+        
+        const sorter = new GameSorter()
+        sorter.sortByRating()
+
+        const [, payload] = mockEmit.mock.calls[0]
+        const buckets = payload.buckets as ReadonlyMap<string, string>
+        
+        expect(buckets.get('overwhelmingly-positive')).toBe('Overwhelmingly Positive (90%+)')
+        expect(buckets.get('very-positive')).toBe('Very Positive (80-89%)')
+        expect(buckets.get('mostly-positive')).toBe('Mostly Positive (70-79%)')
+        expect(buckets.get('mixed')).toBe('Mixed or Lower (<70%)')
+        expect(buckets.get('unrated')).toBe('Unrated')
+    })
+})
+
 describe('GameSorter.sortByGenre', () => {
     beforeEach(() => {
         mockHandlers.clear()

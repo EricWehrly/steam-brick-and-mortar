@@ -23,6 +23,7 @@ export const GameSortModes = {
     RecentlyPlayed: 'recently-played',
     ByGenre:        'by-genre',
     ByPlaytime:     'by-playtime',
+    ByRating:       'by-rating',
 } as const
 
 export type GameSortMode = typeof GameSortModes[keyof typeof GameSortModes]

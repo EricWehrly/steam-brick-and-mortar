@@ -250,6 +250,12 @@ export class SteamApiClient {
             publishers: data.publishers || (fullData?.publishers as string[]),
             release_date: data.release_date || (fullData?.release_date as AppDetailsData['release_date']),
             metacritic: data.metacritic || (fullData?.metacritic as AppDetailsData['metacritic']),
+            // Lift SteamSpy fields if present in full_data
+            steamspy_tags: data.steamspy_tags || (fullData?.tags as Record<string, number>),
+            positive: data.positive || (fullData?.positive as number),
+            negative: data.negative || (fullData?.negative as number),
+            userscore: data.userscore || (fullData?.userscore as number),
+            owners: data.owners || (fullData?.owners as string)
         }
     }
 
@@ -264,6 +270,8 @@ export class SteamApiClient {
 
         return {
             ...game,
+            // Use SteamSpy name if base name is empty or missing
+            name: appDetails?.name && appDetails.name !== 'Unknown Game' ? appDetails.name : game.name,
             artwork: {
                 icon: game.img_icon_url 
                     ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
@@ -280,7 +288,12 @@ export class SteamApiClient {
             publishers: appDetails?.publishers,
             release_date: appDetails?.release_date,
             metacritic: appDetails?.metacritic,
-            short_description: appDetails?.short_description
+            short_description: appDetails?.short_description,
+            steamspy_tags: appDetails?.steamspy_tags,
+            positive: appDetails?.positive,
+            negative: appDetails?.negative,
+            userscore: appDetails?.userscore,
+            owners: appDetails?.owners
         }
     }
 

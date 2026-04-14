@@ -38,4 +38,11 @@ export interface SteamGameMetadata {
     release_date?: SteamReleaseDate | null
     metacritic?: SteamMetacriticInfo | null
     short_description?: string
+    
+    // SteamSpy Hydrator Data
+    steamspy_tags?: Record<string, number>
+    positive?: number
+    negative?: number
+    userscore?: number
+    owners?: string
 }
