@@ -233,8 +233,8 @@ describe('GameSorter.sortByPlaytime', () => {
         const [, payload] = mockEmit.mock.calls[0]
         const buckets = payload.buckets as ReadonlyMap<string, string>
         expect(buckets.size).toBeGreaterThan(0)
-        expect(buckets.get('heavy')).toBe('100+ Hours')
-        expect(buckets.get('moderate')).toBe('10–100 Hours')
+        expect(buckets.get('heavy')).toBe('Played 100+ Hours')
+        expect(buckets.get('moderate')).toBe('Played 10–100 Hours')
         expect(buckets.get('unplayed')).toBe('Never Played')
     })
 })

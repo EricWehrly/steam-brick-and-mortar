@@ -444,7 +444,13 @@ export class SteamApiClient {
             // Normalize and cache fetched metadata
             const fetchedAppDetails = new Map<number, AppDetailsData>()
             for (const [appid, response] of batchResponses.entries()) {
-                fetchedAppDetails.set(appid, this.normalizeBatchData(response.data))
+                // If it's a successful response but the game itself is unlisted, the response IS the data shell
+                // For a normal Steam game, response.data holds the actual metadata
+                const dataToNormalize = response.success === false && response.unlisted 
+                    ? (response as unknown as AppDetailsData) 
+                    : response.data;
+                    
+                fetchedAppDetails.set(appid, this.normalizeBatchData(dataToNormalize))
             }
             
             const cacheMonitor = PerformanceMonitor.start('cache-metadata', SteamApiClient.logger, ASYNC_CONTEXT)
