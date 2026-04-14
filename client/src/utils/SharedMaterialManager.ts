@@ -2,7 +2,6 @@
  * Shared Material Manager - Material Resource Pooling
  *
  * TD: singleton-pattern-refactor
- * TD: carpet-worker-offload
  *
  * Provides centralized management of shared material instances to reduce
  * material duplication and enable effective batching.
