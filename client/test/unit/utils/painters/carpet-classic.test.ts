@@ -40,12 +40,11 @@ class OffscreenCanvasStub {
 }
 
 beforeAll(() => {
-    // @ts-expect-error — stub for worker API not present in JSDOM
-    globalThis.OffscreenCanvas = OffscreenCanvasStub
+    globalThis.OffscreenCanvas = OffscreenCanvasStub as unknown as typeof OffscreenCanvas
 })
 afterAll(() => {
-    // @ts-expect-error
-    delete globalThis.OffscreenCanvas
+    // restore undefined so other test files aren't affected
+    ;(globalThis as Record<string, unknown>).OffscreenCanvas = undefined
 })
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
