@@ -24,7 +24,8 @@ export class StartupProgressUI {
 
     /**
      * Phase weights determine how much each phase contributes to the 0-100 progress bar.
-     * Ordered to match the new 5-phase architecture.
+     * The first 80% is driven by the five blocking phases; the final 20% is driven by
+     * game-loading sub-progress (see updateGameLoadingProgress).
      */
     private readonly phaseWeights = new Map<StartupPhase, number>([
         [StartupPhase.CoreInit,        10],
@@ -32,9 +33,10 @@ export class StartupProgressUI {
         [StartupPhase.WorldBuild,      40],
         [StartupPhase.ControlsReady,    5],
         [StartupPhase.Interactive,     10],
-        [StartupPhase.PrewarmEncore,    5],
-        [StartupPhase.PostSetupEncore, 15],
     ])
+
+    private readonly GAME_LOADING_START_PROGRESS = 80
+    private readonly GAME_LOADING_WEIGHT = 20
 
     private currentProgress: number = 0
 
@@ -133,15 +135,9 @@ export class StartupProgressUI {
         this.detailText.style.display = 'none'
     }
 
-    private startGameLoading(totalGames: number, phase: StartupPhase = StartupPhase.PostSetupEncore): void {
+    private startGameLoading(totalGames: number, _phase?: StartupPhase): void {
         if (!this.isVisible) return
-
-        let cumulativeProgress = 0
-        for (const [p, weight] of this.phaseWeights.entries()) {
-            if (p === phase) break
-            cumulativeProgress += weight
-        }
-        this.gameLoadingStartWeight = cumulativeProgress
+        this.gameLoadingStartWeight = this.GAME_LOADING_START_PROGRESS
         this.gameLoadingProgress = { current: 0, total: totalGames }
     }
 
@@ -153,11 +149,10 @@ export class StartupProgressUI {
             this.gameLoadingProgress.total = total
         }
 
-        const phaseWeight = this.phaseWeights.get(StartupPhase.PostSetupEncore) || 15
         const progressRatio = this.gameLoadingProgress.total > 0
             ? this.gameLoadingProgress.current / this.gameLoadingProgress.total
             : 0
-        const subProgress = this.gameLoadingStartWeight + (phaseWeight * progressRatio)
+        const subProgress = this.GAME_LOADING_START_PROGRESS + (this.GAME_LOADING_WEIGHT * progressRatio)
 
         this.updateProgressBar(subProgress)
     }
