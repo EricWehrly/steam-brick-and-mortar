@@ -1,7 +1,9 @@
 # Enhanced Textures
 
 **Status:** In progress (carpet and ceiling complete off-thread; wood and wall complete off-thread)  
-**Theme:** Procedurally generated PBR materials for the store environment, generated off the main thread via Web Workers.
+**Theme:** Procedurally generated PBR materials for the store environment, generated off the main thread via Web Workers.  
+**Feature:** `docs/features/procedural-texture-quality.md`  
+**Act:** 2 (Intermission — nice to have)
 
 ---
 

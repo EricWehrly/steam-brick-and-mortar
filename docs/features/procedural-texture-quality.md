@@ -1,8 +1,9 @@
 # Feature: Procedural Texture Quality Pass
 
-**Act**: 2 (Intermission — nice to have)
-**Status**: In Progress (carried from Act 1)
-**Priority**: Low–Medium
+**Act**: 2 (Intermission — nice to have)  
+**Status**: In Progress (carried from Act 1)  
+**Priority**: Low–Medium  
+**Implementation Plan**: See `docs/plans/enhanced-textures.md` — current parameter values, worker types, hardcoded knobs for future exposure.
 
 ## Goal
 
