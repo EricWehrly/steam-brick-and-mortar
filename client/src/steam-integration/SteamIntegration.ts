@@ -117,7 +117,7 @@ export class SteamIntegration {
     /**
      * Load Steam games for a user with progressive loading
      */
-    async loadGamesForUser(userInput: string, callbacks: ProgressCallbacks = {}, forceRefresh = false): Promise<GameLibraryState> {
+    async loadGamesForUser(userInput: string, callbacks: ProgressCallbacks = {}, ignoreCache = false): Promise<GameLibraryState> {
         const parsedInput = ValidationUtils.parseSteamUserInput(userInput)
         let steamId: string | undefined
         let vanityUrl: string
@@ -127,7 +127,7 @@ export class SteamIntegration {
             callbacks.onStatusUpdate?.('Loading Steam games...', 'loading')
             callbacks.onProgress?.(0, 100, 'Fetching game library...')
             
-            SteamIntegration.logger.info(`Loading games for Steam user: ${parsedInput.value} (type: ${parsedInput.type}${forceRefresh ? ', forced refresh' : ''})`)
+            SteamIntegration.logger.info(`Loading games for Steam user: ${parsedInput.value} (type: ${parsedInput.type}${ignoreCache ? ', ignoring cache' : ''})`)
             
             if (parsedInput.type === 'steamid') {
                 // Direct steamID - no resolution needed
@@ -135,7 +135,7 @@ export class SteamIntegration {
                 vanityUrl = `steamid:${steamId}` // Use a placeholder since we don't know the actual custom URL
             } else {
                 // Custom URL - resolve to get steamID
-                const resolveResponse = await this.steamClient.resolveVanityUrl(parsedInput.value, forceRefresh)
+                const resolveResponse = await this.steamClient.resolveVanityUrl(parsedInput.value, ignoreCache)
                 steamId = resolveResponse.steamid
                 vanityUrl = resolveResponse.vanity_url
             }
@@ -145,7 +145,7 @@ export class SteamIntegration {
                 throw new Error('Failed to obtain valid Steam ID')
             }
             
-            const userGames = await this.steamClient.getUserGames(steamId, forceRefresh)
+            const userGames = await this.steamClient.getUserGames(steamId, ignoreCache)
             
             // Add the vanity URL to the userGames for reference
             userGames.vanity_url = vanityUrl
