@@ -73,11 +73,15 @@ export class RenderLoopDiagnostics {
         
         const registry = RenderLoopRegistry.getInstance()
         
-        // Set instrumentation wrapper - registry owns the iteration
-        registry.setInstrumentation(this.instrumentCallback.bind(this))
+        // Set instrumentation hooks - registry owns the iteration
+        registry.setInstrumentation({
+            wrapCallback: this.instrumentCallback.bind(this),
+            onAfterFrame: this.endFrame.bind(this),
+        })
         
-        
-        this.isInitialized = true
+        this.isInitialized = true;
+
+        (window as any).renderLoopDiagnostics = this
     }
 
     /**
