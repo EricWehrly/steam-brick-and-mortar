@@ -32,11 +32,11 @@
         <div class="detail-artwork-grid">
             <div class="detail-artwork-item">
                 <div class="detail-artwork-label">Header</div>
-                <img src="{{headerUrl}}" class="detail-artwork-img" onerror="this.style.display='none'">
+                <img src="{{headerUrl}}" class="detail-artwork-img" loading="lazy" onerror="this.style.display='none'">
             </div>
             <div class="detail-artwork-item library">
                 <div class="detail-artwork-label">Library</div>
-                <img src="{{libraryUrl}}" class="detail-artwork-img" onerror="this.src=''; this.style.background='#333'; this.style.aspectRatio='2/3';">
+                <img src="{{libraryUrl}}" class="detail-artwork-img" loading="lazy" onerror="this.src=''; this.style.background='#333'; this.style.aspectRatio='2/3';">
             </div>
         </div>
     </div>
