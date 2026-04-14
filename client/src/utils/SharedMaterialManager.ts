@@ -187,12 +187,17 @@ export class SharedMaterialManager {
     }
 
     private async prewarmCarpet(worker: ProceduralTextureWorker): Promise<void> {
-        const carpetBitmap = await worker.generate('carpet_enhanced', {
+        const carpetBitmap = await worker.generate('carpet_classic', {
             width: 512,
             height: 512,
             color: '#8B0000',
+            accentColor: '#722F37',
             fiberDensity: 0.4,
             roughness: 0.9,
+            geometricIntensity: 0.1,
+            variant: 'diamond',
+            scale: 1.0,
+            seed: 12345,
         })
         const diffuse = this.bitmapToTexture(carpetBitmap, 4, 4)
 
