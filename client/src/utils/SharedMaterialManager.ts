@@ -187,23 +187,40 @@ export class SharedMaterialManager {
     }
 
     private async prewarmCarpet(worker: ProceduralTextureWorker): Promise<void> {
-        const carpetBitmap = await worker.generate('carpet_classic', {
-            width: 512,
-            height: 512,
-            color: '#8B0000',
-            accentColor: '#722F37',
-            fiberDensity: 0.4,
-            roughness: 0.9,
-            geometricIntensity: 0.1,
-            variant: 'diamond',
-            scale: 1.0,
-            seed: 12345,
-        })
-        const diffuse = this.bitmapToTexture(carpetBitmap, 4, 4)
+        const normalMapIntensity = 0.3  // was 0 (unset) in old config — now intentional
+        const [diffuseBitmap, normalBitmap] = await Promise.all([
+            worker.generate('carpet_classic', {
+                width: 512,
+                height: 512,
+                color: '#8B0000',
+                accentColor: '#722F37',
+                fiberDensity: 0.4,
+                roughness: 0.9,
+                geometricIntensity: 0.1,
+                variant: 'diamond',
+                scale: 1.0,
+                seed: 12345,
+            }),
+            worker.generate('carpet_normal', {
+                width: 512,
+                height: 512,
+                intensity: normalMapIntensity,
+                pileHeight: 0.3,
+                fiberVariation: 0.2,
+            }),
+        ])
+        const diffuse    = this.bitmapToTexture(diffuseBitmap, 4, 4)
+        const normalMap  = this.bitmapToTexture(normalBitmap,  4, 4)
+        const boostedScale = normalMapIntensity * 9.6
 
         FrameBudgetScheduler.getInstance().schedule(
-            () => this.upsertMaterial(MaterialType.Carpet,
-                new THREE.MeshStandardMaterial({ map: diffuse, roughness: 0.9, metalness: 0.0 })),
+            () => this.upsertMaterial(MaterialType.Carpet, new THREE.MeshStandardMaterial({
+                map: diffuse,
+                normalMap,
+                normalScale: new THREE.Vector2(boostedScale, boostedScale),
+                roughness: 0.9,
+                metalness: 0.0,
+            })),
             { priority: 'normal', estimatedMs: 5, maxDeferMs: 0 }
         )
     }
