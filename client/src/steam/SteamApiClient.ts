@@ -238,7 +238,10 @@ export class SteamApiClient {
      * Normalize batch response data (lift nested fields to top level)
      */
     private normalizeBatchData(data: AppDetailsData): AppDetailsData {
-        const fullData = data?.full_data as Record<string, unknown> | undefined
+        // Handle negative caching shells gracefully (data might be undefined or missing fields)
+        if (!data) return {} as AppDetailsData;
+        
+        const fullData = data.full_data as Record<string, unknown> | undefined
         return {
             ...data,
             categories: data.categories || (fullData?.categories as AppDetailsData['categories']),

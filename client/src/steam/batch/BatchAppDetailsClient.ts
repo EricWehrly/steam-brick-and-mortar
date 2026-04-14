@@ -138,9 +138,16 @@ export class BatchAppDetailsClient {
                 lastBatchDuration = batchMonitor.getElapsed();
                 
                 // Process successful results
-                for (const game of batchResult.results) {
-                    results.set(game.appid, game);
-                    onGameData?.(game.appid, game.data);
+                for (const result of batchResult.results) {
+                    results.set(result.appid, result);
+                    // Pass the data or a minimal shell if the data object is missing (negative cache hit)
+                    onGameData?.(result.appid, result.data || { 
+                        appid: result.appid, 
+                        success: false, 
+                        unlisted: true,
+                        name: 'Unknown Game',
+                        type: 'game'
+                    } as unknown as AppDetailsData);
                 }
 
                 totalFetched += batchResult.total_successful;
