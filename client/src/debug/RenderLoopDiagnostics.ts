@@ -92,8 +92,10 @@ export class RenderLoopDiagnostics {
         
         // Set instrumentation hooks - registry owns the iteration
         registry.setInstrumentation({
+            onBeforeFrame: this.beginFrame.bind(this),
             wrapCallback: this.instrumentCallback.bind(this),
-            onAfterFrame: this.endFrame.bind(this),
+            onAfterFrame: this.endCallbacks.bind(this),
+            onAfterRender: this.endFrame.bind(this),
         })
 
         // PerformanceObserver catches long tasks that happen between frames
@@ -122,6 +124,15 @@ export class RenderLoopDiagnostics {
     }
 
     /**
+     * Called at the very start of each frame (onBeforeFrame hook).
+     * Stamps the wall-clock time before any callbacks or render work.
+     */
+    private static beginFrame(): void {
+        this.stats.frameStartTime = performance.now()
+        this.isFirstCallbackInFrame = true
+    }
+
+    /**
      * Instrumentation wrapper called by RenderLoopRegistry for each callback
      */
     private static instrumentCallback(
@@ -130,11 +141,7 @@ export class RenderLoopDiagnostics {
         now: number,
         deltaTime: number
     ): void {
-        // Track frame start on first callback
-        if (this.isFirstCallbackInFrame) {
-            this.stats.frameStartTime = performance.now()
-            this.isFirstCallbackInFrame = false
-        }
+        this.isFirstCallbackInFrame = false
         
         const callbackStart = performance.now()
         try {
@@ -169,12 +176,19 @@ export class RenderLoopDiagnostics {
     }
     
     /**
-     * Called at end of each frame to finalize stats
-     * Must be called by the render loop after executeAll()
+     * Called after all callbacks execute (onAfterFrame). Resets callback guard.
+     */
+    private static endCallbacks(): void {
+        this.isFirstCallbackInFrame = false
+    }
+
+    /**
+     * Called after renderer.render() (onAfterRender).
+     * Measures the FULL frame: callbacks + GPU submission.
      */
     public static endFrame(): void {
-        if (!this.config.enabled || this.isFirstCallbackInFrame) {
-            return // No callbacks executed this frame
+        if (!this.config.enabled || this.stats.frameStartTime === 0) {
+            return
         }
         
         const frameTime = performance.now() - this.stats.frameStartTime
@@ -187,7 +201,7 @@ export class RenderLoopDiagnostics {
             this.stats.peakFrameTime = frameTime
         }
 
-        this.isFirstCallbackInFrame = true // Reset for next frame
+        this.stats.frameStartTime = 0 // Reset sentinel
         
         // Warn on individual slow frames — this fires regardless of logStats() clearing
         if (frameTime > this.config.frameTimeWarnThreshold) {
