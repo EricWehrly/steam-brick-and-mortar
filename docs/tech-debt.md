@@ -82,20 +82,6 @@
 
 ---
 
-## Act 2-Linked Technical Debt (keep small; details live in feature docs)
-
-### Input architecture boundary cleanup
-`WebXRCoordinator` currently carries broader input concerns than XR session management. Keep this tracked in:
-- `docs/features/input-system.md`
-
-### UI normalization + token consistency
-Tokenization/component consistency work is tracked in:
-- `docs/features/ui-standardization.md`
-
-### Memory/frame observability hardening
-Metric visibility and collection direction is tracked in:
-- `docs/features/key-metrics-instrumentation.md`
-
 ---
 
 ## Later (only true debt, not feature wish-list)
@@ -105,13 +91,3 @@ Keep reducing expensive overlap in tests (prefer cheaper deterministic coverage 
 
 ### Conventions codification
 Capture Logger/EventManager/DataManager conventions in one durable technical reference to reduce repeat review feedback.
-
----
-
-## Removed from tech debt during cleanup
-
-These were intentionally extracted to feature or act docs because they are product scope, not debt:
-- atmosphere/particle ideas -> `docs/features/lighting-and-atmosphere.md`
-- layout mode/shape ideas -> `docs/features/layout-variations.md`
-- museum/share room concept -> `docs/features/room-variants.md` + Encore
-- broad infrastructure deliverables (hosting, rate limiting, caching) -> act/feature docs
