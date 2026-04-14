@@ -290,10 +290,10 @@ describe('GameSorter.sortByRating', () => {
         const [, payload] = mockEmit.mock.calls[0]
         const buckets = payload.buckets as ReadonlyMap<string, string>
         
-        expect(buckets.get('overwhelmingly-positive')).toBe('Overwhelmingly Positive (90%+)')
-        expect(buckets.get('very-positive')).toBe('Very Positive (80-89%)')
-        expect(buckets.get('mostly-positive')).toBe('Mostly Positive (70-79%)')
-        expect(buckets.get('mixed')).toBe('Mixed or Lower (<70%)')
+        expect(buckets.get('overwhelmingly-positive')).toBe('Overwhelmingly Positive')
+        expect(buckets.get('very-positive')).toBe('Very Positive')
+        expect(buckets.get('mostly-positive')).toBe('Mostly Positive')
+        expect(buckets.get('mixed')).toBe('Mixed or Lower')
         expect(buckets.get('unrated')).toBe('Unrated')
     })
 })

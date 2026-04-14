@@ -175,16 +175,8 @@ export class GameSorter {
             return
         }
 
-        // Sort by userscore (descending), falling back to 0 if missing. 
-        // Break ties with playtime.
-        const sortedGames: ReadonlyArray<Readonly<SteamGameData>> = [...games].sort((a, b) => {
-            const scoreA = a.userscore ?? 0
-            const scoreB = b.userscore ?? 0
-            if (scoreA !== scoreB) {
-                return scoreB - scoreA
-            }
-            return (b.playtime_forever ?? 0) - (a.playtime_forever ?? 0)
-        })
+        const sortedGames: ReadonlyArray<Readonly<SteamGameData>> =
+            [...games].sort(sortByNumericField<SteamGameData>('userscore', 'playtime_forever'))
 
         EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
             sortedGames,
@@ -237,32 +229,20 @@ export class GameSorter {
     private buildRatingBucketMap(
         sortedGames: ReadonlyArray<Readonly<SteamGameData>>
     ): ReadonlyMap<string, string> {
+        const thresholds: ReadonlyArray<{ minScore: number; key: string; label: string }> = [
+            { minScore: 90, key: 'overwhelmingly-positive', label: 'Overwhelmingly Positive' },
+            { minScore: 80, key: 'very-positive',           label: 'Very Positive' },
+            { minScore: 70, key: 'mostly-positive',         label: 'Mostly Positive' },
+            { minScore:  1, key: 'mixed',                   label: 'Mixed or Lower' },
+            { minScore:  0, key: 'unrated',                 label: 'Unrated' },
+        ]
+
         const buckets = new Map<string, string>()
         for (const game of sortedGames) {
             const score = game.userscore ?? 0
-            
-            let bucketKey: string
-            let label: string
-            
-            if (score >= 90) {
-                bucketKey = 'overwhelmingly-positive'
-                label = 'Overwhelmingly Positive (90%+)'
-            } else if (score >= 80) {
-                bucketKey = 'very-positive'
-                label = 'Very Positive (80-89%)'
-            } else if (score >= 70) {
-                bucketKey = 'mostly-positive'
-                label = 'Mostly Positive (70-79%)'
-            } else if (score > 0) {
-                bucketKey = 'mixed'
-                label = 'Mixed or Lower (<70%)'
-            } else {
-                bucketKey = 'unrated'
-                label = 'Unrated'
-            }
-
-            if (!buckets.has(bucketKey)) {
-                buckets.set(bucketKey, label)
+            const tier = thresholds.find(t => score >= t.minScore)!
+            if (!buckets.has(tier.key)) {
+                buckets.set(tier.key, tier.label)
             }
         }
         return buckets
