@@ -32,7 +32,21 @@
 
 ---
 
-## id: legacy-atlas-removal
+## id: system-events-split
+**Priority**: Low  
+**Effort**: ~1-2 hours  
+**Context**: `InteractionEvents.ts` already has a `// TD` noting it conflates user interaction events with system lifecycle events. The new `AppEventTypes` entries (`WorldDetailEnhanced`, `StoreFirstContentReady`, `StoreFullyPopulated`) are system events masquerading as app/UI events because there's nowhere better to put them yet.
+
+**Done when**:
+- A dedicated `SystemEvents.ts` (or `LifecycleEvents.ts`) exists for system-to-system pipeline signals
+- `WorldDetailEnhanced`, `StoreFirstContentReady`, `StoreFullyPopulated` (and similar future entries) live there
+- `InteractionEvents.ts` is scoped to user-facing and UI-driven events
+- `LightingEvents.ts` precedent is followed
+
+**Source tags**:  
+- `// TD: system-events-split` in `client/src/types/InteractionEvents.ts`
+
+---
 **Priority**: High  
 **Effort**: ~1 day  
 **Context**: `GpuGameBoxRenderer` still carries legacy atlas renderer paths and settings flags that are no longer part of the intended steady-state architecture.
