@@ -2,7 +2,7 @@
 
 **Status**: Planned  
 **Branch**: TBD (new branch from `openclaw/feat-layout-enhancements` after current PR merges)  
-**Related**: `docs/plans/texture-placement-split-plan.md`, `docs/roadmaps/tech-debt.md` → "Re-sort does not reorder game boxes or shelves"
+**Related**: `docs/plans/texture-placement-split-plan.md`, `docs/tech-debt.md` → Act 2-linked sorting/layout debt context
 
 ---
 

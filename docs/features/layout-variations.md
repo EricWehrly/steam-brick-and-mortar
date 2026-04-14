@@ -18,6 +18,7 @@ The concentric-arc layout was built during Act 1 as the primary spatial arrangem
 
 - **Arc / concentric rings** — current implementation; shelves arranged in arcs radiating from the player
 - **Square rows** — traditional grid rows; simpler, more "video store" feeling; the pre-arc default
+- **Alternating toe-out aisles** — neighboring shelf groups rotate outward (e.g., ~15° toe-out with wider aisle openings) to improve readability and navigation
 - **Other simple shapes** — spokes, chevron, etc.; TBD based on what feels good
 
 ## Grouping

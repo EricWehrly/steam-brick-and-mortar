@@ -25,11 +25,10 @@
 
 ---
 
-## Unsorted Ideas (inbox — move to Encore or feature docs when ready)
+## Notes
 
-- Rotate shelves alternatingly (15° toe-out, 30° opening) to make navigation easier — probably already partly done
-- Smoke / atmosphere particles in the store
-- Movie-theater lit walkways; Tron-like lights along shelf edges
-- Pixellate-at-distance obscuring shader
-- User-defined CSS driving scene colors
-- Museum mode: curate and share a collection via URL code
+- Idea backlog has been moved to feature docs and Encore:
+  - [Layout Variations](../features/layout-variations.md)
+  - [Room Variants](../features/room-variants.md)
+  - [Lighting and Atmosphere](../features/lighting-and-atmosphere.md)
+  - [Act 4 Encore](../acts/act4-encore-someday-maybe.md)

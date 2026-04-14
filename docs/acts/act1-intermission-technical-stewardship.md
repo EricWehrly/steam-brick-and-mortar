@@ -36,7 +36,7 @@
 
 - Active background items and open threads live in `docs/plans/open-subagent-threads.md`.
 - The categorization work (GameSorter, ShelfSectionPlanner, sort modes) is pull-forward eligible if bandwidth allows — it doesn't need to wait for full Act 2 ramp.
-- The old detailed bucket breakdown lives in `docs/roadmaps/intermission-before-phase2.md` (legacy; this doc supersedes it for planning purposes).
+- The old detailed bucket breakdown is archived at `docs/archive/intermission-before-phase2.md` (superseded by this doc).
 - The intermission is intentionally not a formal act. It does not have a user-facing delivery goal.
 - When working on a feature, check whether related Encore items are plausibly quick — if so, pull them forward rather than leaving them for later. That's the intent of the Encore list.
 

@@ -23,7 +23,7 @@ The store currently has one room. There are several distinct variant ideas that 
 
 **Museum Mode** — longer-term / Encore:
 - Cool neutral overhead spots, minimal ambient, clean gallery feel
-- Shared with the "Museum" feature idea from current-status.md where a user can build and share a curated collection
+- Includes a curation/share concept: user can build a collection and share via URL/code (product + infra scope; likely post-Act 2)
 
 ## What's Needed First
 

@@ -35,6 +35,7 @@ There's also a longer-term design where lighting presets and room variants (base
 - **Dongle switch panel**: design and implement retro rocker-switch UI (blocked on UI normalization baseline from intermission); requires tone presets to exist first
 - **Dust mote system**: particle system for ambient dust; tuned for VR performance; visible in light beam columns
 - **Animated spotlight shimmer**: edge feathering, subtle pulse; shader-based; builds on dust motes for beam visibility
+- **Walkway and shelf-edge accent lighting**: optional theatrical aisle guidance (movie-theater walkways / subtle neon edge cues) layered on top of base presets
 
 ## Notes / Open Questions
 
@@ -43,4 +44,4 @@ There's also a longer-term design where lighting presets and room variants (base
 - Lighting presets and room variants should be loosely coupled — design the preset system so any preset works in any room.
 - Blacklight / UV atmosphere (glowing accents, dark ambient) is on the Encore list paired with the basement room variant; it's not in scope here but the preset architecture should make adding it easy.
 - Dust motes and animated spotlights were previously on the Encore list — graduating them here as stretch goals because the scope is reasonable (1-3 days each) and they're high-impact for atmosphere.
-- Related: `docs/roadmaps/phase2-ready-for-friends.md` Feature 8.5.0 and 8.5.1 have the original design notes.
+- Related: archived source notes in `docs/archive/phase2-ready-for-friends.md` (Feature 8.5.0 / 8.5.1).
