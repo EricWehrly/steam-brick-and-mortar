@@ -86,7 +86,7 @@ export class SteamApiClient {
      * @param vanityUrl - The custom URL part (e.g., "SpiteMonger")
      * @returns Promise<SteamResolveResponse> - Contains steamid and vanity_url
      */
-    public async resolveVanityUrl(vanityUrl: string): Promise<SteamResolveResponse> {
+    public async resolveVanityUrl(vanityUrl: string, forceRefresh = false): Promise<SteamResolveResponse> {
         if (!vanityUrl || vanityUrl.trim().length === 0) {
             throw new Error('Vanity URL cannot be empty')
         }
@@ -94,15 +94,17 @@ export class SteamApiClient {
         const cleanVanityUrl = vanityUrl.trim().toLowerCase()
         const cacheKey = `resolve_${cleanVanityUrl}`
         
-        // Check cache first
-        const cached = this.cache.get<SteamResolveResponse>(cacheKey)
-        if (cached) {
-            SteamApiClient.logger.debug(`Using cached vanity URL resolution for: ${cleanVanityUrl}`)
-            return cached
+        // Check cache first if not forcing refresh
+        if (!forceRefresh) {
+            const cached = this.cache.get<SteamResolveResponse>(cacheKey)
+            if (cached) {
+                SteamApiClient.logger.debug(`Using cached vanity URL resolution for: ${cleanVanityUrl}`)
+                return cached
+            }
         }
         
         // Make API request
-        const endpoint = `/resolve/${encodeURIComponent(cleanVanityUrl)}`
+        const endpoint = `/resolve/${encodeURIComponent(cleanVanityUrl)}${forceRefresh ? '?force_refresh=true' : ''}`
         SteamApiClient.logger.debug(`Resolving vanity URL: "${vanityUrl}" -> "${cleanVanityUrl}"`)
         
         const rawResponse = await this.http.makeRequest<unknown>(endpoint)
@@ -147,22 +149,24 @@ export class SteamApiClient {
      * @param steamId - The 17-digit Steam ID
      * @returns Promise<SteamUser> - Contains games list and user info
      */
-    public async getUserGames(steamId: string): Promise<SteamUser> {
+    public async getUserGames(steamId: string, forceRefresh = false): Promise<SteamUser> {
         if (!steamId || steamId.trim().length === 0) {
             throw new Error('Steam ID cannot be empty')
         }
 
         const cacheKey = `games_${steamId}`
         
-        // Check cache first
-        const cached = this.cache.get<SteamUser>(cacheKey)
-        if (cached) {
-            SteamApiClient.logger.debug(`Using cached games data for Steam ID: ${steamId}`)
-            return cached
+        // Check cache first if not forcing refresh
+        if (!forceRefresh) {
+            const cached = this.cache.get<SteamUser>(cacheKey)
+            if (cached) {
+                SteamApiClient.logger.debug(`Using cached games data for Steam ID: ${steamId}`)
+                return cached
+            }
         }
         
         // Make API request
-        const endpoint = `/games/${encodeURIComponent(steamId)}`
+        const endpoint = `/games/${encodeURIComponent(steamId)}${forceRefresh ? '?force_refresh=true' : ''}`
         SteamApiClient.logger.debug(`Fetching games for Steam ID: ${steamId}`)
         
         try {
