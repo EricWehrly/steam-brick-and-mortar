@@ -9,7 +9,7 @@
 **Entry Criteria**: Act 1 complete — all imagined functionality demonstrated with personal demo capability.
 
 **Exit Criteria**: All three goals met:
-1. Key metrics instrumented and hitting targets (memory, frame time, time-to-interactive, hitches tracked and understood)
+1. Key metrics instrumented and hitting targets (memory, frame time, draw calls, time-to-interactive, hitches tracked and understood)
 2. Background tab measurably drops resource usage (frame rate and LOD)
 3. UI standardization complete (remaining panels token-ified, LayoutSortPanel polished, no layout regressions)
 
