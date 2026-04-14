@@ -52,7 +52,30 @@ async function getAppDetails(appid, retryCount = 0, maxRetries = 3) {
     }
 
     if (!appData.success) {
-      throw new Error('App not found or data unavailable');
+      // Create a negative shell for delisted/hidden games
+      const negativeResult = {
+        success: false,
+        appid: numericAppid,
+        unlisted: true,
+        data: {
+          name: "Unknown Game",
+          type: "game",
+          artwork: {
+            header: null,
+            capsule: null,
+            capsule_v5: null,
+            background: null,
+            background_raw: null
+          },
+          full_data: {}
+        },
+        retrieved_at: new Date().toISOString()
+      };
+      
+      // Cache the negative result so we stop hitting Steam API for it
+      await saveToCache(numericAppid, negativeResult);
+      
+      return negativeResult;
     }
 
     // Extract useful artwork URLs for easier client consumption
