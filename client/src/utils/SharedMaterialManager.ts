@@ -23,7 +23,7 @@ import { EventManager } from '../core/EventManager'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 import { FrameBudgetScheduler } from './FrameBudgetScheduler'
 
-import { ProceduralCarpetPatternGenerator, type CarpetStyleConfig } from './textures/ProceduralCarpetPatternGenerator'
+
 
 export enum MaterialType {
     FallbackGameBox = 'fallbackGameBox',
@@ -57,18 +57,7 @@ export class SharedMaterialManager {
     private poolHits     = 0
     private disposed     = false
 
-    private proceduralCarpetPatternGenerator: ProceduralCarpetPatternGenerator
-    private currentCarpetStyle: CarpetStyleConfig = {
-        patternType: 'classic',
-        variant: 'diamond',
-        colors: ['#8B0000', '#800020', '#722F37'],
-        scale: 1.0,
-        density: 0.4
-    }
-
     private constructor() {
-        this.proceduralCarpetPatternGenerator = new ProceduralCarpetPatternGenerator()
-        // Lightweight — no sync texture generation here.
 
         // Observe SetupRequest to trigger prewarm. Use plain registerEventHandler
         // so this fires even when GpuStorePropsEventHandler holds the normal handler slot.
@@ -198,29 +187,19 @@ export class SharedMaterialManager {
         )
     }
 
-    private async prewarmCarpet(_worker: ProceduralTextureWorker): Promise<void> {
-        // TD: carpet-worker-offload
-        // Currently runs synchronously on the main thread. Should be moved to
-        // ProceduralTextureWorker (add a 'carpet_enhanced' type) like the other
-        // procedural textures. See tech-debt.md for tracking.
-        const config = {
+    private async prewarmCarpet(worker: ProceduralTextureWorker): Promise<void> {
+        const carpetBitmap = await worker.generate('carpet_enhanced', {
             width: 512,
             height: 512,
-            style: this.currentCarpetStyle,
+            color: '#8B0000',
+            fiberDensity: 0.4,
             roughness: 0.9,
-            metalness: 0.0,
-            repeat: { x: 4, y: 4 }
-        }
+        })
+        const diffuse = this.bitmapToTexture(carpetBitmap, 4, 4)
 
-        performance.mark('carpet-generate-start')
-        const material = this.proceduralCarpetPatternGenerator.createCarpetMaterial(config)
-        performance.mark('carpet-generate-end')
-        performance.measure('carpet-generate (main thread)', 'carpet-generate-start', 'carpet-generate-end')
-        const carpetMs = performance.getEntriesByName('carpet-generate (main thread)').at(-1)?.duration ?? 0
-        SharedMaterialManager.logger.warn(`carpet texture generated on main thread: ${carpetMs.toFixed(0)}ms — TD: carpet-worker-offload`)
-        
         FrameBudgetScheduler.getInstance().schedule(
-            () => this.upsertMaterial(MaterialType.Carpet, material),
+            () => this.upsertMaterial(MaterialType.Carpet,
+                new THREE.MeshStandardMaterial({ map: diffuse, roughness: 0.9, metalness: 0.0 })),
             { priority: 'normal', estimatedMs: 5, maxDeferMs: 0 }
         )
     }
