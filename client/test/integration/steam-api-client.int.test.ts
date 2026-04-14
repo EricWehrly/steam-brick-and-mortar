@@ -104,6 +104,30 @@ describe('SteamApiClient Integration Tests', () => {
             expect(fetchMock).toHaveBeenCalledTimes(1) // Only one actual HTTP call
         })
 
+        it('should bypass cache and fetch new data when ignoreCache is true', async () => {
+            const mockResponse1 = { steamid: '12345', vanity_url: 'testuser', resolved_at: new Date().toISOString() }
+            const mockResponse2 = { steamid: '12345', vanity_url: 'testuser', resolved_at: new Date().toISOString() }
+            
+            fetchMock
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () => Promise.resolve(mockResponse1)
+                })
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () => Promise.resolve(mockResponse2)
+                })
+
+            // First call caches the data
+            await client.resolveVanityUrl('testuser')
+            
+            // Second call with ignoreCache=true forces network fetch
+            await client.resolveVanityUrl('testuser', true)
+            
+            expect(fetchMock).toHaveBeenCalledTimes(2)
+            expect(fetchMock.mock.calls[1][0]).toContain('ignore_cache=true')
+        })
+
         it('should clear cache when requested', () => {
             client.clearCache()
             
@@ -202,7 +226,9 @@ describe('SteamApiClient Integration Tests', () => {
             
             expect(result).toHaveLength(0)
             expect(loadedGames).toHaveLength(1)
-            expect(loadedGames[0]).toMatchObject(mockGame)
+            // The batch mock in integration tests returns 'Game {appid}' as the name for uncached apps.
+            const expectedGame = { ...mockGame, name: `Game ${mockGame.appid}` }
+            expect(loadedGames[0]).toMatchObject(expectedGame)
         })
 
         it('should not call fetch when loading games without artwork', async () => {
