@@ -4,7 +4,17 @@ Active bugs and issues that need investigation or fixing.
 
 ## High Priority
 
-### Draw call count regression - ~17 → 50-70 after game detail panel
+### Unnamed meshes inflating draw calls — PropRenderer atmospheric props
+**Status**: 🔴 Open  
+**Reported**: 2026-04-14  
+**Description**: `window.sceneManager.drawCallReport()` shows many entries of `{ name: "(unnamed)", type: "Mesh", visible: true, triangles: 2, material: "MeshStandardMaterial" }`. These are individual non-instanced meshes produced by `PropRenderer.ts` for atmospheric store props (wire rack wires/posts, floor mat lines, category divider posts, floor marker lines, entrance mat center/left/right lines). The parent groups are named but the child meshes are not, making them hard to identify or audit.  
+**Impact**: Each unnamed mesh is a separate draw call. With 12+ ceiling fixtures replaced by `InstancedMesh` but wire racks and floor props still individual meshes, these are a significant portion of the draw call budget. They also make `drawCallReport()` output unreadable.  
+**Fix**: Two parts:  
+1. Add `.name` to every `Mesh` created in `PropRenderer.ts` (e.g. `wire-rack-post`, `wire-rack-horizontal`, `floor-mat-center-line`, etc.) — cheap, no behavior change.  
+2. Evaluate whether the wire rack and floor props should be instanced or batched given how many of them there are.  
+**Files**: `client/src/scene/PropRenderer.ts`
+
+---
 **Status**: 🔴 Open
 **Reported**: 2026-04-14
 **Description**: Draw calls were ~17 at initial instancing implementation. Now 50-70 in normal use and the count persists elevated after opening the game detail panel. Visible in the perf widget (top-right "DC" counter).
@@ -16,12 +26,12 @@ Active bugs and issues that need investigation or fixing.
 ---
 
 ### Frame-time spike after opening/closing game detail panel (persistent, not one-shot)
-**Status**: 🔴 Open  
-**Reported**: 2026-04-14  
-**Description**: After clicking a game box to open the detail panel (and even after closing it), the perf widget shows sustained frame-time increases — sometimes 70-80ms. `RenderLoopDiagnostics` does not catch this because it measures within render-loop callbacks only.  
-**Suspected cause**: The detail panel eagerly fetches `library_600x900.jpg` (large portrait JPEG) via an `<img>` tag. JPEG decode on the main thread can take 40-80ms and fires as a browser long-task in the frames following the fetch — including after the panel is closed if the image response arrives late. The `NS_BINDING_ABORTED` for this URL is visible in the console logs, suggesting the panel closes before decode completes, then decode fires in a subsequent frame.  
-**Mitigation applied**: `loading="lazy"` added to both `<img>` tags in `detail-panel.html`. This hints to the browser not to decode until visible, but doesn't fully prevent background decode.  
-**To confirm**: With `?diagnostics=1` and the `PerformanceObserver` long-task wiring now in place, open the detail panel and watch for `⚠️ Long task between frames` warnings. The attribution and timing will confirm or rule out image decode.  
+**Status**: 🔴 Open
+**Reported**: 2026-04-14
+**Description**: After clicking a game box to open the detail panel (and even after closing it), the perf widget shows sustained frame-time increases - sometimes 70-80ms. `RenderLoopDiagnostics` does not catch this because it measures within render-loop callbacks only.
+**Suspected cause**: The detail panel eagerly fetches `library_600x900.jpg` (large portrait JPEG) via an `<img>` tag. JPEG decode on the main thread can take 40-80ms and fires as a browser long-task in the frames following the fetch - including after the panel is closed if the image response arrives late. The `NS_BINDING_ABORTED` for this URL is visible in the console logs, suggesting the panel closes before decode completes, then decode fires in a subsequent frame.
+**Mitigation applied**: `loading="lazy"` added to both `<img>` tags in `detail-panel.html`. This hints to the browser not to decode until visible, but doesn't fully prevent background decode.
+**To confirm**: With `?diagnostics=1` and the `PerformanceObserver` long-task wiring now in place, open the detail panel and watch for `⚠️ Long task between frames` warnings. The attribution and timing will confirm or rule out image decode.
 **Proper fix**: Don't put the library portrait in the panel at all (it's not in the local artwork cache and requires a CORS-blocked external fetch), or move artwork loading to a separate deferred step that doesn't block the main thread.
 
 ---
