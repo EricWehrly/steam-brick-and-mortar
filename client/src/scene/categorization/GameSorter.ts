@@ -114,6 +114,7 @@ export class GameSorter {
             case GameSortModes.RecentlyPlayed: this.sortByRecentlyPlayed(); break
             case GameSortModes.ByGenre:        this.sortByGenre();          break
             case GameSortModes.ByPlaytime:     this.sortByPlaytime();       break
+            case GameSortModes.ByRating:       this.sortByRating();         break
         }
     }
 
@@ -166,6 +167,34 @@ export class GameSorter {
         GameSorter.logger.debug(`GamesSort emitted (by playtime): ${sortedGames.length} games`)
     }
 
+    public sortByRating(): void {
+        const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
+
+        if (games.length === 0) {
+            GameSorter.logger.warn('sortByRating called but no games in DataManager — skipping emit')
+            return
+        }
+
+        // Sort by userscore (descending), falling back to 0 if missing. 
+        // Break ties with playtime.
+        const sortedGames: ReadonlyArray<Readonly<SteamGameData>> = [...games].sort((a, b) => {
+            const scoreA = a.userscore ?? 0
+            const scoreB = b.userscore ?? 0
+            if (scoreA !== scoreB) {
+                return scoreB - scoreA
+            }
+            return (b.playtime_forever ?? 0) - (a.playtime_forever ?? 0)
+        })
+
+        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
+            sortedGames,
+            buckets: this.buildRatingBucketMap(sortedGames),
+            sortMode: GameSortModes.ByRating,
+        })
+
+        GameSorter.logger.debug(`GamesSort emitted (by rating): ${sortedGames.length} games`)
+    }
+
     public sortByRecentlyPlayed(): void {
         const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
 
@@ -200,6 +229,40 @@ export class GameSorter {
             const bucket = getPlaytimeBucket(game as SteamGameData)
             if (!buckets.has(bucket)) {
                 buckets.set(bucket, getPlaytimeBucketLabel(bucket))
+            }
+        }
+        return buckets
+    }
+
+    private buildRatingBucketMap(
+        sortedGames: ReadonlyArray<Readonly<SteamGameData>>
+    ): ReadonlyMap<string, string> {
+        const buckets = new Map<string, string>()
+        for (const game of sortedGames) {
+            const score = game.userscore ?? 0
+            
+            let bucketKey: string
+            let label: string
+            
+            if (score >= 90) {
+                bucketKey = 'overwhelmingly-positive'
+                label = 'Overwhelmingly Positive (90%+)'
+            } else if (score >= 80) {
+                bucketKey = 'very-positive'
+                label = 'Very Positive (80-89%)'
+            } else if (score >= 70) {
+                bucketKey = 'mostly-positive'
+                label = 'Mostly Positive (70-79%)'
+            } else if (score > 0) {
+                bucketKey = 'mixed'
+                label = 'Mixed or Lower (<70%)'
+            } else {
+                bucketKey = 'unrated'
+                label = 'Unrated'
+            }
+
+            if (!buckets.has(bucketKey)) {
+                buckets.set(bucketKey, label)
             }
         }
         return buckets

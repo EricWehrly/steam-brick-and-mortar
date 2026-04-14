@@ -32,6 +32,7 @@ const SORT_OPTIONS: ReadonlyArray<SortOption> = [
     { key: 'recently-played', label: 'By Last Played' },
     { key: 'by-genre',        label: 'By Genre'       },
     { key: 'by-playtime',     label: 'By Playtime'    },
+    { key: 'by-rating',       label: 'By User Rating' },
 ]
 
 // ─── LayoutSortPanel ───────────────────────────────────────────────────────────
