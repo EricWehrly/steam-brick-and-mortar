@@ -38,17 +38,13 @@ export interface BatchAppDetailsOptions {
      * Callback for batch progress
      */
     onProgress?: (fetched: number, total: number) => void;
-
-    /**
-     * Callback for individual game data received
-     */
-    onGameData?: (appid: number, data: AppDetailsData) => void;
 }
 
 export interface AppDetailsResponse {
     success: boolean;
     appid: number;
-    data: AppDetailsData;
+    data?: AppDetailsData;
+    unlisted?: boolean;
     retrieved_at: string;
 }
 
@@ -90,8 +86,7 @@ export class BatchAppDetailsClient {
     ): Promise<Map<number, AppDetailsResponse>> {
         const {
             batchSize = 100, // Increased: Lambda handles cached games instantly
-            onProgress,
-            onGameData
+            onProgress
         } = options;
 
         const results = new Map<number, AppDetailsResponse>();
@@ -140,14 +135,6 @@ export class BatchAppDetailsClient {
                 // Process successful results
                 for (const result of batchResult.results) {
                     results.set(result.appid, result);
-                    // Pass the data or a minimal shell if the data object is missing (negative cache hit)
-                    onGameData?.(result.appid, result.data || { 
-                        appid: result.appid, 
-                        success: false, 
-                        unlisted: true,
-                        name: 'Unknown Game',
-                        type: 'game'
-                    } as unknown as AppDetailsData);
                 }
 
                 totalFetched += batchResult.total_successful;
