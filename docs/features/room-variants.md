@@ -48,5 +48,5 @@ The room structure has known duplication across multiple creation classes (`room
 
 - The room structure refactor (`docs/architecture/room-structure-refactor-plan.md`) is the technical prerequisite — don't build the variant system on top of the current tangled state
 - Blacklight / UV atmosphere is an Encore lighting preset that pairs with the basement variant; the two can be developed independently but curated together
-- "Museum Mode" as a standalone shareable experience (from current-status.md ideas) is a much larger scope and probably belongs in Encore; the museum room *aesthetic* could be an early variant though
+- "Museum Mode" as a standalone shareable experience is a much larger scope and probably belongs in Encore; the museum room *aesthetic* could be an early variant though
 - Room variant architecture should also inform how layout variations (arc vs square rows) interact with room geometry at a macro level

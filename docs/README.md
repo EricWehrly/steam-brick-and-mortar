@@ -2,12 +2,14 @@
 
 This directory is structured specifically as a knowledge base and entrypoint for AI agents (like Vex) working on the project.
 
+## Current status
+**Intermission** — `openclaw/feat-neon-ui-intermission` — see [`acts/act1-intermission-technical-stewardship.md`](acts/act1-intermission-technical-stewardship.md)
+
 ## Where to start
-1. Read `acts/current-status.md` — single source of truth for active branch + current act.
-2. Read the current act doc in `acts/` (linked from current-status.md) — goals, feature list, completion criteria.
-3. Read the relevant feature doc(s) in `features/` for the specific work at hand.
-4. Read `agent-context/startup-sequence.md` to understand the 5-phase startup architecture.
-5. Read `agent-context/component-interaction-map.md` **only when touching the DI/event layer** — deep-dive reference (~1700 lines), not required reading for every task.
+1. Read the current act doc above — goals, feature list, completion criteria.
+2. Read the relevant feature doc(s) in `features/` for the specific work at hand.
+3. Read `agent-context/startup-sequence.md` to understand the 5-phase startup architecture.
+4. Read `agent-context/component-interaction-map.md` **only when touching the DI/event layer** — deep-dive reference (~1700 lines), not required reading for every task.
 
 ## Tech Debt Tags
 
@@ -41,7 +43,7 @@ High-value, fast-load architectural rules and interaction maps. **Read these to 
 
 ### 🗺️ Root tracking docs
 - `bugs.md` — active bugs
-- `tech-debt.md` — known technical debt sorted by Fix Now / Act 2 / Later (keyed by TD tag IDs)
+- `tech-debt.md` — tagged architectural debt (keyed by TD tag IDs)
 - `README.md` — this file; entry point for agents
 
 ### 📝 plans/
