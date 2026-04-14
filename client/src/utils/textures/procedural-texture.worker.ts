@@ -12,6 +12,7 @@
 import { paintWoodEnhanced, type WoodEnhancedOptions } from './painters/wood-enhanced'
 import { paintWoodPlanks, type WoodPlanksOptions } from './painters/wood-planks'
 import { paintWoodNormal, type WoodNormalOptions } from './painters/wood-normal'
+import { paintCarpetClassic, type CarpetClassicOptions } from './painters/carpet-classic'
 import { paintCarpetEnhanced, type CarpetEnhancedOptions } from './painters/carpet-enhanced'
 import { paintCeilingPopcorn, paintCeilingPopcornNormal, type CeilingPopcornOptions, type CeilingPopcornNormalOptions } from './painters/ceiling-popcorn'
 import { paintCeilingEnhanced, type CeilingEnhancedOptions } from './painters/ceiling-enhanced'
@@ -27,6 +28,7 @@ export type ProceduralTextureType =
     | 'wood_enhanced'
     | 'wood_planks'
     | 'wood_normal'
+    | 'carpet_classic'
     | 'carpet_enhanced'
     | 'ceiling_popcorn'
     | 'ceiling_popcorn_normal'
@@ -76,6 +78,9 @@ async function handleGenerate(msg: GenerateTextureMessage): Promise<void> {
             break
         case 'wood_normal':
             paintWoodNormal(data, width, height, options as WoodNormalOptions)
+            break
+        case 'carpet_classic':
+            paintCarpetClassic(data, width, height, options as CarpetClassicOptions)
             break
         case 'carpet_enhanced':
             paintCarpetEnhanced(data, width, height, options as CarpetEnhancedOptions)
