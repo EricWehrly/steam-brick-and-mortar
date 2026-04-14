@@ -14,6 +14,19 @@
 
 ## Fix Now (Intermission)
 
+## id: debug-window-consolidation
+**Priority**: Low  
+**Effort**: ~1-2 hours  
+**Context**: Debug classes self-register onto `window` in their own module files (`GpuMemoryEstimator`, `StartupEventTracker`, etc.). This scatters debug setup across the codebase and makes it harder to audit what's exposed in production builds.
+
+**Done when**:
+- A single `debug/DebugRegistry.ts` (or similar) imports all debug classes and attaches them to `window`
+- Individual class files no longer contain `window.*` assignments
+- The registry is only imported from the debug side-effect import site in `SteamBrickAndMortarApp` (already has `import '../debug/GpuMemoryEstimator'`)
+- Easy to tree-shake or gate behind a dev flag if desired
+
+---
+
 ## id: carpet-worker-offload
 **Status**: ✅ Resolved 2026-04-13 — carpet texture generation moved to `ProceduralTextureWorker` (`carpet_enhanced` type). ~700ms main-thread startup hitch eliminated.
 
