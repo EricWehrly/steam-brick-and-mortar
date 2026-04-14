@@ -14,9 +14,8 @@
  * (CoreInit) through StartupComplete. If the gap between two rAF ticks exceeds
  * 100ms the tracker logs "Main Thread Hitch Detected: Xms" — intentionally
  * formatted so that our Playwright console-capture tests can find it.
- * The detector stays alive through async encores (PrewarmEncore, PostSetupEncore)
- * because those run off-thread work that can still hitch the main thread, and stops
- * only when StartupComplete fires.
+ * The detector stays alive until StartupComplete fires — async work (texture
+ * workers, network fetches, batch processing) can still hitch the main thread.
  */
 
 import { EventManager } from '../core/EventManager'
@@ -45,7 +44,7 @@ const getPerformanceNow = (): number => {
 }
 
 // ---------------------------------------------------------------------------
-// Phase enum — aligned to the 5-phase startup architecture doc
+// Phase enum
 // ---------------------------------------------------------------------------
 
 export enum StartupPhase {
@@ -55,10 +54,6 @@ export enum StartupPhase {
     WorldBuild     = 'WorldBuild',
     ControlsReady  = 'ControlsReady',
     Interactive    = 'Interactive',
-
-    // Post-interactive async encores
-    PrewarmEncore    = 'PrewarmEncore',
-    PostSetupEncore  = 'PostSetupEncore',
 }
 
 // Phases considered "blocking" for the purpose of hitch detection.
@@ -116,7 +111,7 @@ export class StartupEventTracker {
     public get enabled(): boolean { return this._enabled }
     public set enabled(value: boolean) { this._enabled = !!value }
 
-    // Game loading progress tracking (for PostSetupEncore)
+    // Game loading progress tracking
     private totalGames = 0
     private loadedGames = 0
     private cachedBatchesComplete = false
@@ -161,6 +156,9 @@ export class StartupEventTracker {
         eventManager.registerEventHandler(SteamEventTypes.GamesBatchReady, this.handleGamesBatchReady.bind(this))
         eventManager.registerEventHandler(SteamEventTypes.NetworkFetchProgress, this.handleNetworkFetchProgress.bind(this))
         eventManager.registerEventHandler(GameEventTypes.AllBatchesComplete, this.handleAllBatchesComplete.bind(this))
+        eventManager.registerEventHandler(AppEventTypes.StoreFirstContentReady, () => this.printTimer('Store first content visible'))
+        eventManager.registerEventHandler(AppEventTypes.StoreFullyPopulated, () => this.printTimer('Store fully populated'))
+        eventManager.registerEventHandler(AppEventTypes.WorldDetailEnhanced, () => this.printTimer('World detail enhanced (textures)'))
     }
 
     private handleStorePropsProgress(event: CustomEvent<StorePropsProgressEvent>): void {
@@ -177,7 +175,7 @@ export class StartupEventTracker {
             this.totalGames = totalBatches * games.length
             EventManager.getInstance().emit<GameLoadingStartedEvent>(AppEventTypes.GameLoadingStarted, {
                 totalGames: this.totalGames,
-                phase: StartupPhase.PostSetupEncore
+                phase: StartupPhase.Interactive
             })
         }
 
@@ -288,6 +286,10 @@ export class StartupEventTracker {
                 timestamp,
                 duration: phaseMetrics.duration
             })
+
+            if (phase === StartupPhase.ControlsReady) {
+                this.printTimer('Player can move (controls ready)')
+            }
         }
 
         // Stop hitch detector when all *blocking* phases are done as a fallback.
@@ -351,24 +353,24 @@ export class StartupEventTracker {
         }
     }
 
-    public logAsyncStart(phase: StartupPhase, operation: string): number {
-        if (!this.enabled) return 0
-        const timestamp = getPerformanceNow()
-        this.logEvent(phase, `${operation} (started)`)
-        return timestamp
-    }
-
-    public logAsyncEnd(phase: StartupPhase, operation: string, startTimestamp: number): void {
-        if (!this.enabled) return
-        const timestamp = getPerformanceNow()
-        const duration = timestamp - startTimestamp
-        this.logEvent(phase, `${operation} (completed)`, { duration })
-    }
-
     public milestone(phase: StartupPhase, description: string, metadata?: Record<string, unknown>): void {
         if (!this.enabled) return
         this.logEvent(phase, `MILESTONE: ${description}`, metadata)
         EventManager.getInstance().emit<MilestoneEvent>(AppEventTypes.Milestone, { description })
+    }
+
+    // ---------------------------------------------------------------------------
+    // Wall-clock timer prints
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Print a labelled wall-clock timestamp relative to __APP_START_TIME.
+     * Fired at semantic moments rather than on demand, so the log tells the
+     * real story even when nobody calls printSummary().
+     */
+    private printTimer(label: string): void {
+        const elapsed = ((getPerformanceNow() - this.startTime) / 1000).toFixed(2)
+        console.log(`⏱️  [T+${elapsed}s]  ${label}`)
     }
 
     // ---------------------------------------------------------------------------
@@ -391,7 +393,8 @@ export class StartupEventTracker {
 
     public printSummary(): void {
         const summary = this.getSummary()
-        console.log(`\n📊 Startup complete: ${summary.totalTime.toFixed(0)}ms`)
+        const elapsed = (summary.totalTime / 1000).toFixed(2)
+        console.log(`\n📊 Startup phase summary (wall clock T+${elapsed}s):`)
         console.table(
             summary.phases.map(p => ({
                 phase: p.phase,
@@ -399,5 +402,8 @@ export class StartupEventTracker {
                 events: p.eventCount
             }))
         )
+        console.log('  Note: phase durations reflect synchronous spans only.')
+        console.log('  Async work (texture workers, network, batch processing) is captured')
+        console.log('  by the ⏱️ timer lines above.')
     }
 }

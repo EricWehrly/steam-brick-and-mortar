@@ -20,6 +20,7 @@ import {
     GameEventTypes,
     SteamEventTypes, 
     StorePropsEventTypes,
+    AppEventTypes,
     type SteamGamesBatchEvent,
     type BatchReadyForPlacementEvent,
     type GamesPlacedEvent,
@@ -59,6 +60,7 @@ export class BatchCoordinator<T> {
     private isScheduled: boolean = false  // Track if processQueue is scheduled
     private isFirstBatch: boolean = true
     private completionEmitted: boolean = false
+    private firstContentEmitted: boolean = false
     private batchStatuses: Map<number, BatchStatusState> = new Map()
     private pendingSomeBatchesTimeout: ReturnType<typeof setTimeout> | null = null
     private readonly someBatchesDebounceMs: number = 50
@@ -174,6 +176,7 @@ export class BatchCoordinator<T> {
         this.isScheduled = false
         this.isFirstBatch = true
         this.completionEmitted = false
+        this.firstContentEmitted = false
         this.batchStatuses.clear()
         if (this.pendingSomeBatchesTimeout) {
             clearTimeout(this.pendingSomeBatchesTimeout)
@@ -296,6 +299,7 @@ export class BatchCoordinator<T> {
             GameEventTypes.AllBatchesComplete,
             {}
         )
+        EventManager.getInstance().emit(AppEventTypes.StoreFullyPopulated, {})
     }
 
     private scheduleSomeBatchesCompleteEvent(): void {
@@ -313,6 +317,11 @@ export class BatchCoordinator<T> {
         const totalBatches = this.expectedTotal
         if (totalBatches <= 0) {
             return
+        }
+
+        if (!this.firstContentEmitted) {
+            this.firstContentEmitted = true
+            EventManager.getInstance().emit(AppEventTypes.StoreFirstContentReady, {})
         }
 
         EventManager.getInstance().emit<SomeBatchesCompleteEvent>(

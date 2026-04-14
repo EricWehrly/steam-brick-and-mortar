@@ -371,6 +371,15 @@ export const AppEventTypes = {
     GameLoadingProgress:   'app:game-loading-progress',
     /** Fired when startup is fully complete and UI should fade out */
     StartupComplete:       'app:startup-complete',
+    /**
+     * Fired when off-thread procedural texture generation finishes and materials
+     * have been applied to the scene — the world now has full surface detail.
+     */
+    WorldDetailEnhanced:   'app:world-detail-enhanced',
+    /** Fired when the first meaningful batch of game boxes is placed in the store. */
+    StoreFirstContentReady: 'app:store-first-content-ready',
+    /** Fired when all game boxes are placed and the store is fully populated. */
+    StoreFullyPopulated:   'app:store-fully-populated',
 } as const
 
 export interface PhaseCompletedEvent extends BaseInteractionEvent {

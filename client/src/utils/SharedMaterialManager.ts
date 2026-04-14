@@ -20,6 +20,7 @@ import { Logger } from './Logger'
 import { ProceduralTextureWorker } from './textures/ProceduralTextureWorker'
 import { EventManager } from '../core/EventManager'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
+import { AppEventTypes } from '../types/InteractionEvents'
 import { FrameBudgetScheduler } from './FrameBudgetScheduler'
 
 
@@ -114,6 +115,7 @@ export class SharedMaterialManager {
             SharedMaterialManager.logger.debug(
                 `✨ Material prewarm complete in ${(performance.now() - t0).toFixed(2)}ms`
             )
+            EventManager.getInstance().emit(AppEventTypes.WorldDetailEnhanced, {})
         })().catch(err => {
             SharedMaterialManager.logger.warn('Material prewarm failed, continuing with fallback materials:', err)
         })
