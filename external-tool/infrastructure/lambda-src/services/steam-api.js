@@ -53,22 +53,12 @@ async function getAppDetails(appid, retryCount = 0, maxRetries = 3) {
 
     if (!appData.success) {
       // Create a negative shell for delisted/hidden games
+      // We keep this minimal so the background hydrator's merge logic
+      // allows SteamSpy's rich data (like the real game name) to shine through.
       const negativeResult = {
         success: false,
         appid: numericAppid,
         unlisted: true,
-        data: {
-          name: "Unknown Game",
-          type: "game",
-          artwork: {
-            header: null,
-            capsule: null,
-            capsule_v5: null,
-            background: null,
-            background_raw: null
-          },
-          full_data: {}
-        },
         retrieved_at: new Date().toISOString()
       };
       
