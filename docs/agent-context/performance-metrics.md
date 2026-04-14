@@ -89,6 +89,6 @@ Also printed automatically at end of batch loading. Three.js `renderer.info.memo
 ## Known gaps
 
 1. **Draw call regression test** — no automated assertion on DC count. Adding one is the highest-value next step for catching regressions.
-2. **Long-task / inter-frame hitch detection** — `RenderLoopDiagnostics` is blind to click-handler work. `PerformanceObserver({ type: 'longtask' })` would close this gap and is automatable.
+- **Long-task / inter-frame hitch detection** — `RenderLoopDiagnostics` is blind to click-handler work. `PerformanceObserver({ type: 'longtask' })` is wired when `?diagnostics=1` is set, but **Firefox does not support the `longtask` entry type** — Chrome only. For Firefox, use the DevTools Performance tab.
 3. **Memory** — intentionally deferred. `docs/features/key-metrics-instrumentation.md` tracks when to revisit.
 4. **DC breakdown by source** — `drawCallReport()` exists but isn't wired to any automated check.

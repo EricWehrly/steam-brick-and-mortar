@@ -155,6 +155,7 @@ export class SceneManager {
             this.renderLoopRegistry.executeAll(now, deltaTime)
             
             this.renderer.render(this.scene, this.camera)
+            this.renderLoopRegistry.afterRender()
         })
     }
 
