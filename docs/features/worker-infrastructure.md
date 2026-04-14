@@ -23,7 +23,8 @@ The main thread locking improvement was a direct performance benefit — workers
 - `WorkerErrorUtils` deleted (functionality absorbed into `ManagedWorker`)
 - Error handling standardized across all workers
 - `WorkerErrorUtils` fold-into-ManagedWorker reviewer note from PR #39 resolved
-- **Pending**: carpet texture generation is still on the main thread (`prewarmCarpet` in `SharedMaterialManager`); tracked in `tech-debt.md` as `carpet-worker-offload`. Check-in on this during Key Metrics instrumentation work to understand its frame cost.
+- **Done**: carpet texture generation moved off main thread (`carpet-worker-offload` resolved — 2026-04-13).
+- **Pending**: one future quality gap — the off-thread `carpet_enhanced` painter produces a diffuse-only texture; the main-thread `ProceduralCarpetPatternGenerator` path also generated a normal map and supported richer style variants. Normal map support can be added to the worker painter in a future pass if the visual difference is noticeable.
 
 ## Notes
 
@@ -32,4 +33,4 @@ The main thread locking improvement was a direct performance benefit — workers
 - The performance benefit (reduced main-thread locking) feeds into the Key Metrics Instrumentation story — startup time improvements are partly attributable to this work.
 
 
-**Related debt**: `carpet-worker-offload`
+**Related debt**: ~~`carpet-worker-offload`~~ (resolved 2026-04-13)

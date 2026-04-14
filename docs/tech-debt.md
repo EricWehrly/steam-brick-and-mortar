@@ -15,16 +15,7 @@
 ## Fix Now (Intermission)
 
 ## id: carpet-worker-offload
-**Priority**: High  
-**Effort**: 2-4 hours  
-**Context**: `SharedMaterialManager` still generates carpet textures on the main thread. All other procedural texture paths have moved to worker-backed flow.
-
-**Done when**:
-- `carpet_enhanced` generation runs through `ProceduralTextureWorker`
-- `SharedMaterialManager` no longer blocks main thread in `prewarmCarpet`
-- Existing texture quality and visual output are preserved
-
-**Source tag**: `// TD: carpet-worker-offload` in `client/src/utils/SharedMaterialManager.ts`
+**Status**: ✅ Resolved 2026-04-13 — carpet texture generation moved to `ProceduralTextureWorker` (`carpet_enhanced` type). ~700ms main-thread startup hitch eliminated.
 
 ---
 
