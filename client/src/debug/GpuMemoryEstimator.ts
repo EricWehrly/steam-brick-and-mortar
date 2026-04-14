@@ -55,7 +55,6 @@
 import * as THREE from 'three'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
-import { StartupEventTracker } from '../utils/StartupEventTracker'
 
 export interface GpuMemoryBreakdown {
     textures: {
@@ -343,5 +342,4 @@ if (typeof window !== 'undefined') {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const w = window as any
     w.GpuMemoryEstimator = GpuMemoryEstimator
-    w.StartupEventTracker = StartupEventTracker
 }

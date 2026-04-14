@@ -407,3 +407,9 @@ export class StartupEventTracker {
         console.log('  by the ⏱️ timer lines above.')
     }
 }
+
+// Expose singleton to window for console debugging
+if (typeof window !== 'undefined') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).StartupEventTracker = StartupEventTracker
+}
