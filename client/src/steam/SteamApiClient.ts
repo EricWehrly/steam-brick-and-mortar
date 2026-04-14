@@ -104,7 +104,7 @@ export class SteamApiClient {
         }
         
         // Make API request
-        const endpoint = `/resolve/${encodeURIComponent(cleanVanityUrl)}${ignoreCache ? '?ignore_cache=true' : ''}`
+        const endpoint = `/resolve/${encodeURIComponent(cleanVanityUrl)}`
         SteamApiClient.logger.debug(`Resolving vanity URL: "${vanityUrl}" -> "${cleanVanityUrl}"`)
         
         const rawResponse = await this.http.makeRequest<unknown>(endpoint)
@@ -166,7 +166,7 @@ export class SteamApiClient {
         }
         
         // Make API request
-        const endpoint = `/games/${encodeURIComponent(steamId)}${ignoreCache ? '?ignore_cache=true' : ''}`
+        const endpoint = `/games/${encodeURIComponent(steamId)}`
         SteamApiClient.logger.debug(`Fetching games for Steam ID: ${steamId}`)
         
         try {
