@@ -211,8 +211,13 @@ export class SharedMaterialManager {
             metalness: 0.0,
             repeat: { x: 4, y: 4 }
         }
-        
+
+        performance.mark('carpet-generate-start')
         const material = this.proceduralCarpetPatternGenerator.createCarpetMaterial(config)
+        performance.mark('carpet-generate-end')
+        performance.measure('carpet-generate (main thread)', 'carpet-generate-start', 'carpet-generate-end')
+        const carpetMs = performance.getEntriesByName('carpet-generate (main thread)').at(-1)?.duration ?? 0
+        SharedMaterialManager.logger.warn(`carpet texture generated on main thread: ${carpetMs.toFixed(0)}ms — TD: carpet-worker-offload`)
         
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.Carpet, material),

@@ -55,6 +55,7 @@
 import * as THREE from 'three'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
+import { StartupEventTracker } from '../utils/StartupEventTracker'
 
 export interface GpuMemoryBreakdown {
     textures: {
@@ -126,7 +127,7 @@ export class GpuMemoryEstimator {
                 // Check for InstancedMesh
                 if (object instanceof THREE.InstancedMesh) {
                     const mesh = object as THREE.InstancedMesh
-                    const maxCount = mesh.instanceMatrix.count / 16
+                    const maxCount = mesh.instanceMatrix.count
                     const activeCount = mesh.count
                     
                     // Matrix4 per instance + color attribute if present
@@ -340,5 +341,7 @@ export class GpuMemoryEstimator {
 // Expose globally for debugging
 if (typeof window !== 'undefined') {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).GpuMemoryEstimator = GpuMemoryEstimator
+    const w = window as any
+    w.GpuMemoryEstimator = GpuMemoryEstimator
+    w.StartupEventTracker = StartupEventTracker
 }
