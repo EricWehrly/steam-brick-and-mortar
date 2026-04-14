@@ -171,9 +171,9 @@ describe('SteamIntegration Unit Tests', () => {
             expect(result).toBeDefined()
             expect(callbacks.onStatusUpdate).toHaveBeenCalledWith('Loading Steam games...', 'loading')
             // @ts-expect-error - Accessing private member for testing
-            expect(steamIntegration.steamClient.resolveVanityUrl).toHaveBeenCalledWith('testuser')
+            expect(steamIntegration.steamClient.resolveVanityUrl).toHaveBeenCalledWith('testuser', false)
             // @ts-expect-error - Accessing private member for testing
-            expect(steamIntegration.steamClient.getUserGames).toHaveBeenCalledWith('76561198000000000')
+            expect(steamIntegration.steamClient.getUserGames).toHaveBeenCalledWith('76561198000000000', false)
         })
 
         test('should handle errors during loading', async () => {
