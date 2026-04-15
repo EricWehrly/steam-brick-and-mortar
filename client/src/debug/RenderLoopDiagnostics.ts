@@ -39,10 +39,6 @@ interface FrameStats {
     peakCallbackTimes: Map<string, number>
     /** How many frames exceeded frameTimeWarnThreshold */
     slowFrameCount: number
-    /** How many long tasks (> 50ms between frames) were detected via PerformanceObserver */
-    longTaskCount: number
-    /** Peak long task duration in ms */
-    maxLongTaskDuration: number
 }
 
 export class RenderLoopDiagnostics {
@@ -65,8 +61,6 @@ export class RenderLoopDiagnostics {
         peakFrameTime: 0,
         peakCallbackTimes: new Map(),
         slowFrameCount: 0,
-        longTaskCount: 0,
-        maxLongTaskDuration: 0,
     }
     
     private static isFirstCallbackInFrame = true
@@ -94,7 +88,7 @@ export class RenderLoopDiagnostics {
         registry.setInstrumentation({
             onBeforeFrame: this.beginFrame.bind(this),
             wrapCallback: this.instrumentCallback.bind(this),
-            onAfterFrame: this.endFrame.bind(this),
+            onAfterRender: this.endFrame.bind(this),
         })
 
         // PerformanceObserver catches long tasks that happen between frames
@@ -103,13 +97,8 @@ export class RenderLoopDiagnostics {
         if (typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
             const observer = new PerformanceObserver((list) => {
                 for (const entry of list.getEntries()) {
-                    this.stats.longTaskCount++
-                    this.stats.maxLongTaskDuration = Math.max(this.stats.maxLongTaskDuration, entry.duration)
                     console.warn(
-                        `⚠️ [RenderLoopDiagnostics] Long task between frames: ${entry.duration.toFixed(1)}ms` +
-                        (entry.attribution?.length
-                            ? ` (${entry.attribution.map((a: PerformanceEntry & { containerName?: string; containerSrc?: string }) => a.containerName || a.containerSrc || 'unknown').join(', ')})`
-                            : '')
+                        `⚠️ [RenderLoopDiagnostics] Long task between frames: ${entry.duration.toFixed(1)}ms`
                     )
                 }
             })
@@ -254,12 +243,8 @@ export class RenderLoopDiagnostics {
      */
     public static getStats(): {
         frameCount: number
-        totalFrameTime: number
-        maxFrameTime: number
         peakFrameTime: number
         slowFrameCount: number
-        longTaskCount: number
-        maxLongTaskDuration: number
         callbackAvgs: Record<string, { avg: number; peak: number }>
     } {
         const callbackAvgs: Record<string, { avg: number; peak: number }> = {}
@@ -274,12 +259,8 @@ export class RenderLoopDiagnostics {
         }
         return {
             frameCount: this.stats.frameCount,
-            totalFrameTime: this.stats.totalFrameTime,
-            maxFrameTime: this.stats.maxFrameTime,
             peakFrameTime: this.stats.peakFrameTime,
             slowFrameCount: this.stats.slowFrameCount,
-            longTaskCount: this.stats.longTaskCount,
-            maxLongTaskDuration: this.stats.maxLongTaskDuration,
             callbackAvgs,
         }
     }
@@ -322,8 +303,6 @@ export class RenderLoopDiagnostics {
             peakFrameTime: 0,
             peakCallbackTimes: new Map(),
             slowFrameCount: 0,
-            longTaskCount: 0,
-            maxLongTaskDuration: 0,
         }
     }
 }
