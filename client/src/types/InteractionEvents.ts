@@ -39,7 +39,7 @@ export interface SteamCacheClearEvent extends BaseInteractionEvent {
 }
 
 export interface SteamCacheRefreshEvent extends BaseInteractionEvent {
-    // No additional data needed
+    userInput: string
 }
 
 export interface SteamCacheForceUpdateEvent extends BaseInteractionEvent {

@@ -389,18 +389,28 @@ export class CacheManagementPanel extends PauseMenuPanel {
     /**
      * Force update cache from network
      */
-    private async forceUpdateCache(): Promise<void> {
+        private async forceUpdateCache(): Promise<void> {
         const panel = this.getPanelElement()
         if (!panel) return
 
         const btn = panel.querySelector('#force-update-cache-btn')
         if (!btn) return
+        
+        // Always try to get the active user explicitly from the dropdown
+        const select = panel.querySelector('#cached-users-select') as HTMLSelectElement
+        const targetUser = select?.value
+        
+        if (!targetUser) {
+            this.showError('No user selected in dropdown to update.')
+            return
+        }
 
         btn.textContent = '?? Updating...'
         btn.setAttribute('disabled', 'true')
 
         try {
             this.eventManager.emit(SteamEventTypes.CacheForceUpdate, {
+                userInput: targetUser,
                 source: EventSource.UI
             })
             
@@ -418,17 +428,32 @@ export class CacheManagementPanel extends PauseMenuPanel {
     /**
      * Refresh cache by re-downloading recent items
      */
-    private async refreshCache(): Promise<void> {
+        private async refreshCache(): Promise<void> {
         const panel = this.getPanelElement()
         if (!panel) return
 
         const btn = panel.querySelector('#refresh-cache-btn')
         if (!btn) return
+        
+        // Always try to get the active user explicitly from the dropdown
+        const select = panel.querySelector('#cached-users-select') as HTMLSelectElement
+        const targetUser = select?.value
+        
+        if (!targetUser) {
+            this.showError('No user selected in dropdown to refresh.')
+            return
+        }
 
-        btn.textContent = 'ðŸ”„ Refreshing...'
+        btn.textContent = '?? Refreshing...'
         btn.setAttribute('disabled', 'true')
 
         try {
+            // First emit the event so SteamIntegration can do its thing
+            this.eventManager.emit(SteamEventTypes.CacheRefresh, {
+                userInput: targetUser,
+                source: EventSource.UI
+            })
+            
             // Refresh stats from PixelDataCache
             await this.updateCacheStats()
             
@@ -437,7 +462,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
             console.error('Cache refresh failed:', error)
             this.showError('Failed to refresh cache')
         } finally {
-            btn.textContent = 'ðŸ”„ Refresh Cache'
+            btn.textContent = '?? Refresh UI Stats'
             btn.removeAttribute('disabled')
         }
     }

@@ -107,7 +107,7 @@ describe('SteamIntegration Unit Tests', () => {
             const result = await steamIntegration.refreshData(callbacks)
             
             expect(result).toBeNull()
-            expect(callbacks.onStatusUpdate).toHaveBeenCalledWith('No data to refresh', 'error')
+            expect(callbacks.onStatusUpdate).toHaveBeenCalledWith('No target user specified to refresh', 'error')
         })
     })
 
