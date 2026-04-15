@@ -28,6 +28,7 @@ import { AppSettings } from './AppSettings'
 
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { RenderLoopDiagnostics } from '../debug/RenderLoopDiagnostics'
+import { GpuMemoryReporter } from '../debug/GpuMemoryReporter'
 // Side-effect import: registers GpuMemoryEstimator to window for console debugging
 import '../debug/GpuMemoryEstimator'
 
@@ -72,6 +73,7 @@ export class SteamBrickAndMortarApp {
     private compassRose?: CompassRose
     private gameLibraryBinder?: GameLibraryBinderUI
     private focusCoordinator?: FocusCoordinator
+    private gpuMemoryReporter?: GpuMemoryReporter
     
     // Startup tracking
     private startupTracker: StartupEventTracker
@@ -258,6 +260,13 @@ export class SteamBrickAndMortarApp {
             this.focusCoordinator = new FocusCoordinator()
             this.focusCoordinator.init()
 
+            // GPU memory leak detection (dev mode only — no-op in production)
+            this.gpuMemoryReporter = new GpuMemoryReporter(this.sceneManager.getRenderer())
+            this.gpuMemoryReporter.start()
+            if (typeof window !== 'undefined') {
+                (window as unknown as Record<string, unknown>).dumpGpuMemory = () => this.gpuMemoryReporter?.snapshot()
+            }
+
             // Initialize system UI coordinator (lighting panel, debug panels, etc.)
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())
 
@@ -278,6 +287,7 @@ export class SteamBrickAndMortarApp {
         
         this.systemUICoordinator.dispose()
         this.focusCoordinator?.dispose()
+        this.gpuMemoryReporter?.stop()
         this.webxrCoordinator.dispose()
         this.sceneCoordinator.dispose()
         this.sceneManager.dispose()
