@@ -201,13 +201,9 @@ export class SteamIntegration {
         }
     }
 
-        async refreshData(callbacks: ProgressCallbacks = {}, ignoreCache = false, fallbackUserInput?: string): Promise<GameLibraryState | null> {
-        const currentState = this.gameLibrary.getState()
-        
-        const targetUser = currentState.userData?.vanity_url || fallbackUserInput
-
+            async refreshData(callbacks: ProgressCallbacks = {}, ignoreCache = false, targetUser?: string): Promise<GameLibraryState | null> {
         if (!targetUser) {
-            callbacks.onStatusUpdate?.('No data to refresh', 'error')
+            callbacks.onStatusUpdate?.('No target user specified to refresh', 'error')
             return null
         }
         
@@ -452,9 +448,10 @@ export class SteamIntegration {
         }
     }
 
-    private async handleRefreshCache(_event: CustomEvent<SteamCacheRefreshEvent>): Promise<void> {
+        private async handleRefreshCache(event: CustomEvent<SteamCacheRefreshEvent>): Promise<void> {
+        const { userInput } = event.detail
         try {
-            const result = await this.refreshData()
+            const result = await this.refreshData({}, false, userInput)
             if (!result) {
                 SteamIntegration.logger.warn('No data to refresh')
                 return
