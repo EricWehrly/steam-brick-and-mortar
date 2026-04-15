@@ -113,7 +113,9 @@ export class NeonTubeSignRenderer implements ISignRenderer {
             if (pts3d.length < 2) continue
             const curve   = new THREE.CatmullRomCurve3(pts3d, true)
             const tubeGeo = new THREE.TubeGeometry(curve, pts3d.length * 2, TUBE_RADIUS, 8, true)
-            group.add(new THREE.Mesh(tubeGeo, material))
+            const tubeMesh = new THREE.Mesh(tubeGeo, material)
+            tubeMesh.name = `neon-tube-${request.uniqueIdentifier}-${group.children.length}`
+            group.add(tubeMesh)
         }
 
     }
