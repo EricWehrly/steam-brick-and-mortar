@@ -1,29 +1,42 @@
-import * as THREE from 'three'
 import { AppSettings } from '../core/AppSettings'
 import { GpuMemoryEstimator } from './GpuMemoryEstimator'
 import { RenderLoopRegistry } from '../scene/RenderLoopRegistry'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
-import { DataManager } from '../core/data/DataManager'
 import type { AllBatchesCompleteEvent } from '../types/EnvironmentEvents'
+import type * as THREE from 'three'
 
 // Sample every N frames. At 60 fps this is ~67 s; naturally pauses with the render loop.
 const FRAMES_PER_SAMPLE = 4_000
-const GROWTH_THRESHOLD = 5
+// Warn if JS heap has grown by more than this many MB since the last sample.
+const HEAP_GROWTH_THRESHOLD_MB = 50
 const REGISTRY_ID = 'GpuMemoryReporter'
 
-interface MemorySample {
-    geometries: number
-    textures: number
-    programs: number
-    drawCalls: number
-    triangles: number
-    registeredMb: number
+interface PerformanceWithMemory extends Performance {
+    memory?: {
+        usedJSHeapSize: number
+        totalJSHeapSize: number
+        jsHeapSizeLimit: number
+    }
 }
 
-// Dev-mode reporter that samples renderer.info.memory every FRAMES_PER_SAMPLE frames.
-// Starts counting from AllBatchesComplete so early-startup churn is excluded from the baseline.
-// Naturally pauses with the render loop (no interval to cancel on blur).
+interface MemorySample {
+    usedHeapMb: number
+    totalHeapMb: number
+}
+
+function readHeap(): MemorySample | null {
+    const memory = (performance as PerformanceWithMemory).memory
+    if (!memory) return null
+    return {
+        usedHeapMb: memory.usedJSHeapSize / 1048576,
+        totalHeapMb: memory.totalJSHeapSize / 1048576,
+    }
+}
+
+// Dev-mode reporter that samples JS heap size every FRAMES_PER_SAMPLE frames.
+// Starts counting from AllBatchesComplete so startup churn is excluded from baseline.
+// Naturally pauses with the render loop — no interval to cancel on blur.
 // Zero overhead in production — init() is a no-op when developmentMode is false.
 export class GpuMemoryReporter {
     private readonly renderer: THREE.WebGLRenderer
@@ -37,6 +50,9 @@ export class GpuMemoryReporter {
 
     init(): void {
         if (!AppSettings.get('developmentMode')) return
+        if (!(performance as PerformanceWithMemory).memory) {
+            console.debug('[GpuMemoryReporter] performance.memory not available (Chrome only). Use window.dumpGpuMemory() for manual snapshots.')
+        }
 
         EventManager.getInstance().registerEventHandler<AllBatchesCompleteEvent>(
             GameEventTypes.AllBatchesComplete,
@@ -47,7 +63,7 @@ export class GpuMemoryReporter {
             (window as unknown as Record<string, unknown>).dumpGpuMemory = () => this.snapshot()
         }
 
-        console.debug('[GpuMemoryReporter] Waiting for AllBatchesComplete to begin sampling.')
+        console.debug('[GpuMemoryReporter] Waiting for AllBatchesComplete to begin heap sampling.')
     }
 
     dispose(): void {
@@ -61,18 +77,24 @@ export class GpuMemoryReporter {
 
     private onStoreReady(): void {
         if (this.registered) return
-        this.lastSample = this.takeSample()
+        this.lastSample = readHeap()
         this.frameCount = 0
         this.registered = true
 
         RenderLoopRegistry.getInstance().register(REGISTRY_ID, () => this.onFrame())
 
-        console.debug(
-            `[GpuMemoryReporter] Baseline — geometries: ${this.lastSample.geometries}, textures: ${this.lastSample.textures}, ` +
-            `programs: ${this.lastSample.programs}, draw calls: ${this.lastSample.drawCalls}, ` +
-            `triangles: ${this.lastSample.triangles.toLocaleString()}, registered VRAM: ${this.lastSample.registeredMb.toFixed(0)} MB. ` +
-            `Sampling every ${FRAMES_PER_SAMPLE} frames. window.dumpGpuMemory() for full breakdown.`
-        )
+        if (this.lastSample) {
+            console.debug(
+                `[GpuMemoryReporter] Baseline — heap: ${this.lastSample.usedHeapMb.toFixed(1)} MB used / ` +
+                `${this.lastSample.totalHeapMb.toFixed(1)} MB total. ` +
+                `Sampling every ${FRAMES_PER_SAMPLE} frames. window.dumpGpuMemory() for full VRAM breakdown.`
+            )
+        } else {
+            console.debug(
+                `[GpuMemoryReporter] Started (no performance.memory). ` +
+                `window.dumpGpuMemory() for full VRAM breakdown.`
+            )
+        }
     }
 
     private onFrame(): void {
@@ -82,36 +104,25 @@ export class GpuMemoryReporter {
         this.report()
     }
 
-    private takeSample(): MemorySample {
-        const { geometries, textures } = this.renderer.info.memory
-        const programs = this.renderer.info.programs?.length ?? 0
-        const { calls: drawCalls, triangles } = this.renderer.info.render
-        const registeredMb = [...DataManager.getInstance().getMemoryConsumption().values()]
-            .reduce((sum, mb) => sum + mb, 0)
-        return { geometries, textures, programs, drawCalls, triangles, registeredMb }
-    }
-
     private report(): void {
-        const current = this.takeSample()
-        const prev = this.lastSample!
+        const current = readHeap()
+        const prev = this.lastSample
 
-        const geometryDelta = current.geometries - prev.geometries
-        const textureDelta = current.textures - prev.textures
-        const programDelta = current.programs - prev.programs
-        const hasGrowth = geometryDelta >= GROWTH_THRESHOLD || textureDelta >= GROWTH_THRESHOLD || programDelta >= 1
+        if (!current) return
 
-        const summary =
-            `geometries: ${current.geometries} (${geometryDelta >= 0 ? '+' : ''}${geometryDelta}), ` +
-            `textures: ${current.textures} (${textureDelta >= 0 ? '+' : ''}${textureDelta}), ` +
-            `programs: ${current.programs} (${programDelta >= 0 ? '+' : ''}${programDelta}), ` +
-            `draw calls: ${current.drawCalls}, ` +
-            `triangles: ${current.triangles.toLocaleString()}, ` +
-            `registered VRAM: ${current.registeredMb.toFixed(0)} MB`
+        if (prev) {
+            const deltaMb = current.usedHeapMb - prev.usedHeapMb
+            const hasGrowth = deltaMb >= HEAP_GROWTH_THRESHOLD_MB
 
-        if (hasGrowth) {
-            console.warn(`[GpuMemoryReporter] Growth — ${summary}`)
-        } else {
-            console.debug(`[GpuMemoryReporter] Stable — ${summary}`)
+            const summary =
+                `heap: ${current.usedHeapMb.toFixed(1)} MB used / ${current.totalHeapMb.toFixed(1)} MB total ` +
+                `(${deltaMb >= 0 ? '+' : ''}${deltaMb.toFixed(1)} MB since last sample)`
+
+            if (hasGrowth) {
+                console.warn(`[GpuMemoryReporter] Heap growth — ${summary}`)
+            } else {
+                console.debug(`[GpuMemoryReporter] Stable — ${summary}`)
+            }
         }
 
         this.lastSample = current
