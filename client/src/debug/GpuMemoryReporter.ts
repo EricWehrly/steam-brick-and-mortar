@@ -49,7 +49,10 @@ export class GpuMemoryReporter {
     }
 
     init(): void {
-        if (!AppSettings.get('developmentMode')) return
+        if (!AppSettings.get('developmentMode')) {
+            console.debug('[GpuMemoryReporter] Disabled (developmentMode is off). Toggle in Settings or AppSettings.get(\'developmentMode\') to enable.')
+            return
+        }
         if (!(performance as PerformanceWithMemory).memory) {
             console.debug('[GpuMemoryReporter] performance.memory not available (Chrome only). Use window.dumpGpuMemory() for manual snapshots.')
         }
