@@ -21,6 +21,7 @@
 - [UI Standardization](../features/ui-standardization.md) — design tokens, component library, VR-ready architecture
 
 **Nice to Have (best effort, punt when stuck):**
+- [GPU Memory Leak Investigation](../features/gpu-memory-investigation.md) — periodic `renderer.info.memory` reporter (dev mode), baseline counts, leak identification
 - Lint baseline pass — max-params rule, TD ID convention enforcement, encoding regression fixes. See `docs/plans/linter-contract.md` for detailed rules, current violation counts, and strict-mode enablement checklist.
 - suppressEmit refactor in `GpuStorePropsRenderer` — single dedicated call site
 - `GpuStorePropsRenderer` split — extract layout-related functionality to its own class

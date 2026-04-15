@@ -139,11 +139,13 @@ export class SceneManager {
         })
     }
 
+    private renderLoopCallback: (() => void) | null = null
+
     public startRenderLoop() {
         let lastTime = performance.now()
         const scheduler = FrameBudgetScheduler.getInstance()
-        
-        this.renderer.setAnimationLoop(() => {
+
+        this.renderLoopCallback = () => {
             const now = performance.now()
             const deltaTime = now - lastTime
             lastTime = now
@@ -156,11 +158,20 @@ export class SceneManager {
 
             this.renderer.render(this.scene, this.camera)
             this.renderLoopRegistry.afterRender()
-        })
+        }
+        this.renderer.setAnimationLoop(this.renderLoopCallback)
     }
 
-    public stopRenderLoop() {
+    public pauseRenderLoop(): void {
         this.renderer.setAnimationLoop(null)
+        console.debug('[SceneManager] Render loop paused')
+    }
+
+    public resumeRenderLoop(): void {
+        if (this.renderLoopCallback) {
+            this.renderer.setAnimationLoop(this.renderLoopCallback)
+            console.debug('[SceneManager] Render loop resumed')
+        }
     }
 
     // Atmospheric Props Methods (Phase 2.4)
@@ -189,7 +200,8 @@ export class SceneManager {
     }
 
     public dispose() {
-        this.stopRenderLoop()
+        this.renderer.setAnimationLoop(null)
+        this.renderLoopCallback = null
         this.skyboxManager.dispose()
         if (this.propRenderer) {
             this.propRenderer.dispose()

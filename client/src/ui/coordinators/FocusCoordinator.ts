@@ -1,48 +1,49 @@
 /**
- * VisibilityCoordinator
+ * FocusCoordinator
  *
  * Tracks browser tab/window focus state via the Page Visibility API and
- * window focus/blur events. Emits AppEventTypes visibility events and logs
- * focus changes. Exposes a window.toggleSceneBlur() debug helper that
- * applies a CSS glass/blur overlay over the Three.js canvas.
+ * window focus/blur events. On focus loss: pauses the render loop and
+ * optionally shows a blur overlay. On focus gain: resumes. Emits
+ * AppEventTypes.VisibilityChanged for any other systems that care.
  *
- * This is the foundation for background resource reduction (render throttle,
- * LOD drop on blur). The throttle/LOD logic lives in separate coordinators
- * that subscribe to the events this class fires.
+ * Exposes window.toggleSceneBlur() as a dev-console debug helper.
  */
 
 import { EventManager } from '../../core/EventManager'
 import { AppEventTypes } from '../../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../../types/InteractionEvents'
+import type { SceneManager } from '../../scene/SceneManager'
 
 const BLUR_OVERLAY_ID = 'scene-blur-overlay'
 
-export class VisibilityCoordinator {
+export class FocusCoordinator {
     private readonly eventManager: EventManager
-    private isVisible: boolean = !document.hidden
+    private readonly sceneManager: SceneManager
+    private isFocused: boolean = !document.hidden
     private blurOverlay: HTMLElement | null = null
 
     private readonly onVisibilityChange = (): void => {
-        const nowVisible = !document.hidden
-        if (nowVisible === this.isVisible) return
-        this.isVisible = nowVisible
-        this.handleVisibilityChanged(nowVisible, 'visibilitychange')
+        const nowFocused = !document.hidden
+        if (nowFocused === this.isFocused) return
+        this.isFocused = nowFocused
+        this.handleFocusChanged(nowFocused, 'visibilitychange')
     }
 
     private readonly onWindowFocus = (): void => {
-        if (this.isVisible) return  // already tracked as visible
-        this.isVisible = true
-        this.handleVisibilityChanged(true, 'window-focus')
+        if (this.isFocused) return
+        this.isFocused = true
+        this.handleFocusChanged(true, 'window-focus')
     }
 
     private readonly onWindowBlur = (): void => {
-        if (!this.isVisible) return  // already tracked as hidden
-        this.isVisible = false
-        this.handleVisibilityChanged(false, 'window-blur')
+        if (!this.isFocused) return
+        this.isFocused = false
+        this.handleFocusChanged(false, 'window-blur')
     }
 
-    constructor(eventManager: EventManager) {
+    constructor(eventManager: EventManager, sceneManager: SceneManager) {
         this.eventManager = eventManager
+        this.sceneManager = sceneManager
     }
 
     init(): void {
@@ -52,7 +53,7 @@ export class VisibilityCoordinator {
 
         this.registerDebugHelpers()
 
-        console.debug('[VisibilityCoordinator] Initialized — tab is currently', this.isVisible ? 'visible' : 'hidden')
+        console.debug('[FocusCoordinator] Initialized — tab is currently', this.isFocused ? 'focused' : 'blurred')
     }
 
     dispose(): void {
@@ -63,8 +64,8 @@ export class VisibilityCoordinator {
         this.setBlurOverlay(false)
     }
 
-    isTabVisible(): boolean {
-        return this.isVisible
+    isAppFocused(): boolean {
+        return this.isFocused
     }
 
     // -------------------------------------------------------------------------
@@ -73,7 +74,7 @@ export class VisibilityCoordinator {
 
     setBlurOverlay(enabled: boolean): void {
         if (enabled) {
-            if (this.blurOverlay) return  // already shown
+            if (this.blurOverlay) return
             const overlay = document.createElement('div')
             overlay.id = BLUR_OVERLAY_ID
             overlay.className = 'scene-blur-overlay'
@@ -95,13 +96,20 @@ export class VisibilityCoordinator {
     // Private
     // -------------------------------------------------------------------------
 
-    private handleVisibilityChanged(visible: boolean, source: 'visibilitychange' | 'window-focus' | 'window-blur'): void {
-        const label = visible ? 'VISIBLE (focus)' : 'HIDDEN (blur)'
-        console.debug(`[VisibilityCoordinator] Tab ${label} — source: ${source}`)
+    private handleFocusChanged(focused: boolean, source: 'visibilitychange' | 'window-focus' | 'window-blur'): void {
+        if (focused) {
+            console.debug(`[FocusCoordinator] Focus GAINED — source: ${source}`)
+            this.sceneManager.resumeRenderLoop()
+            this.setBlurOverlay(false)
+        } else {
+            console.debug(`[FocusCoordinator] Focus LOST — source: ${source}`)
+            this.sceneManager.pauseRenderLoop()
+            this.setBlurOverlay(true)
+        }
 
         this.eventManager.emit<VisibilityChangedEvent>(
             AppEventTypes.VisibilityChanged,
-            { visible, visibilitySource: source }
+            { visible: focused, visibilitySource: source }
         )
     }
 
@@ -110,7 +118,7 @@ export class VisibilityCoordinator {
         const self = this
         ;(window as unknown as Record<string, unknown>).toggleSceneBlur = () => {
             const active = self.toggleBlurOverlay()
-            console.debug(`[VisibilityCoordinator] Blur overlay ${active ? 'ON' : 'OFF'}`)
+            console.debug(`[FocusCoordinator] Blur overlay ${active ? 'ON' : 'OFF'}`)
             return active
         }
     }
