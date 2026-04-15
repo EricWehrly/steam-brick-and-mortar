@@ -40,11 +40,8 @@ export interface SteamCacheClearEvent extends BaseInteractionEvent {
 
 export interface SteamCacheRefreshEvent extends BaseInteractionEvent {
     userInput: string
-}
-
-export interface SteamCacheForceUpdateEvent extends BaseInteractionEvent {
-    userInput: string
-    // Triggered when explicitly bypassing cache to fetch latest from Steam
+    /** If true, ignore local db and re-fetch from network */
+    forceUpdate?: boolean
 }
 
 export interface SteamCacheStatsEvent extends BaseInteractionEvent {
@@ -281,7 +278,6 @@ export const SteamEventTypes = {
     LoadFromCache: 'steam:load-from-cache',
     CacheClear: 'steam:cache-clear',
     CacheRefresh: 'steam:cache-refresh',
-    CacheForceUpdate: 'steam:cache-force-update',
     CacheStats: 'steam:cache-stats',
     ImageCacheClear: 'steam:image-cache-clear',
     DevModeToggle: 'steam:dev-mode-toggle',
