@@ -19,6 +19,8 @@ export interface InstrumentationHooks {
     onBeforeFrame?: () => void
     /** Called after all callbacks have executed */
     onAfterFrame?: () => void
+    /** Called after renderer.render() — full frame cost including GPU submission */
+    onAfterRender?: () => void
     /** Wraps each callback execution for individual timing */
     wrapCallback?: (
         id: string,
@@ -97,6 +99,14 @@ export class RenderLoopRegistry {
         
         // Call frame end hook if set
         this.instrumentation?.onAfterFrame?.()
+    }
+
+    /**
+     * Called by SceneManager after renderer.render().
+     * Allows diagnostics to measure the full frame including GPU submission.
+     */
+    public afterRender(): void {
+        this.instrumentation?.onAfterRender?.()
     }
 
     /**

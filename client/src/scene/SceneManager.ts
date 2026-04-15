@@ -153,8 +153,9 @@ export class SceneManager {
             
             // Execute all registered render loop callbacks
             this.renderLoopRegistry.executeAll(now, deltaTime)
-            
+
             this.renderer.render(this.scene, this.camera)
+            this.renderLoopRegistry.afterRender()
         })
     }
 
