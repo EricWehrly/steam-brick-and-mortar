@@ -3,8 +3,10 @@ import { GpuMemoryEstimator } from './GpuMemoryEstimator'
 import { RenderLoopRegistry } from '../scene/RenderLoopRegistry'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
-import type { AllBatchesCompleteEvent } from '../types/EnvironmentEvents'
+import { DataManager } from '../core/data/DataManager'
+import { DataKey } from '../core/data/DataTypes'
 import type * as THREE from 'three'
+import type { AllBatchesCompleteEvent } from '../types/EnvironmentEvents'
 
 // Sample every N frames. At 60 fps this is ~67 s; naturally pauses with the render loop.
 const FRAMES_PER_SAMPLE = 4_000
@@ -39,13 +41,12 @@ function readHeap(): MemorySample | null {
 // Naturally pauses with the render loop — no interval to cancel on blur.
 // Zero overhead in production — init() is a no-op when developmentMode is false.
 export class HeapMemoryReporter {
-    private readonly renderer: THREE.WebGLRenderer
     private frameCount = 0
     private lastSample: MemorySample | null = null
     private registered = false
 
-    constructor(renderer: THREE.WebGLRenderer) {
-        this.renderer = renderer
+    private get renderer(): THREE.WebGLRenderer {
+        return DataManager.getInstance().getOrThrow<THREE.WebGLRenderer>(DataKey.Renderer)
     }
 
     init(force = false): void {

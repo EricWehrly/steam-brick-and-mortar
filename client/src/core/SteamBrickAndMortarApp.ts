@@ -262,7 +262,7 @@ export class SteamBrickAndMortarApp {
             this.focusCoordinator.init()
 
             // GPU memory leak detection (dev mode only — no-op in production)
-            this.heapMemoryReporter = new HeapMemoryReporter(this.sceneManager.getRenderer())
+            this.heapMemoryReporter = new HeapMemoryReporter()
             this.heapMemoryReporter.init(this.diagnosticsEnabled)
 
             // Initialize system UI coordinator (lighting panel, debug panels, etc.)
