@@ -396,11 +396,11 @@ export class SteamIntegration {
             const totalBatches = Math.ceil(games.length / BATCH_SIZE)
 
 
-            // Anonymous store: do not populate a Steam user identity
-            // this.gameLibrary.setUserData(demoUser) - omitted so UI shows no profile
+            // Populate library so the binder and detail panel can look up games by appid.
+            // We intentionally skip setting a user identity (vanity_url etc.) so the UI
+            // shows no Steam profile — this is an anonymous browse experience.
+            this.gameLibrary.setUserData({ ...demoUser, vanity_url: '', steamid: '' })
             // Emit games directly as batch events — no Steam API network calls.
-            // Strip artwork so game boxes render as text labels immediately, without
-            // waiting for CDN fetches that will CORS-fail in test/anonymous contexts.
             for (let i = 0; i < totalBatches; i++) {
                 const batchGames = games.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE).map(g => ({
                     ...g

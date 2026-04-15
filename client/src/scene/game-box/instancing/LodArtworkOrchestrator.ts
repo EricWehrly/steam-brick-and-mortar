@@ -322,16 +322,24 @@ export class LodArtworkOrchestrator {
 
     // === Delegated methods to renderer ===
 
+    public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {
+        return this.renderer.setInstanceLod(instanceIndex, lodLevel)
+    }
+
+    public getInstanceCount(): number {
+        return this.renderer.getInstanceCount()
+    }
+
+    public getInstanceData(): ReadonlyMap<number, { position: THREE.Vector3; lodLevel: LodLevel }> {
+        return this.renderer.getAllInstances() as ReadonlyMap<number, { position: THREE.Vector3; lodLevel: LodLevel }>
+    }
+
     private updateGPU(): void {
         this.textureManager.flushToGpu()
         this.renderer.flushToGpu()
     }
 
-    protected getInstanceCount(): number {
-        return this.renderer.getInstanceCount()
-    }
-
-    protected clearFailureCache(): void {
+    public clearFailureCache(): void {
         this.failedArtwork.clear()
         this.artworkProvider.clearCaches()
         LodArtworkOrchestrator.logger.info('Cleared artwork caches - all URLs will be retried on next load')

@@ -45,10 +45,6 @@ export interface InstanceLodData {
  * Implemented by LodArtworkOrchestrator.
  */
 export interface ILodArtworkRenderer {
-    /**
-     * Set artwork for an instance from a URL.
-     * This is the primary method for adding game artwork.
-     */
     setArtworkInstanceFromUrl(
         position: THREE.Vector3,
         gameName: string,
@@ -57,68 +53,9 @@ export interface ILodArtworkRenderer {
         rotation?: THREE.Quaternion
     ): Promise<SetArtworkResult>
 
-    /**
-     * Set the LOD level for a specific instance.
-     * Used by LodDistanceManager for distance-based LOD switching.
-     */
     setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean
-
-    /**
-     * Set LOD level for all instances.
-     */
-    setGlobalLod(lodLevel: LodLevel): void
-
-    /**
-     * Get the current LOD level for an instance.
-     */
-    getInstanceLod(instanceIndex: number): LodLevel | null
-
-    /**
-     * Get the total number of active instances.
-     */
     getInstanceCount(): number
-
-    /**
-     * Get per-instance data (position and LOD level).
-     * Used by LodDistanceManager for distance calculations.
-     */
     getInstanceData(): ReadonlyMap<number, InstanceLodData>
-
-    /**
-     * Check if HIGH texture is loaded for an instance.
-     * Used to know if an instance can be promoted to HIGH LOD.
-     */
-    isHighTextureLoaded(instanceIndex: number): boolean
-
-    /**
-     * Get the HIGH texture cache (if lazy loading is enabled).
-     * Returns null if lazy HIGH textures are disabled.
-     */
-    getHighTextureCache(): HighTextureCache | null
-
-    /**
-     * Start spatial pre-warming of HIGH textures.
-     */
-    startPrewarming(): void
-
-    /**
-     * Stop spatial pre-warming.
-     */
-    stopPrewarming(): void
-
-    /**
-     * Clear the failure cache to allow retrying failed URLs.
-     */
-    clearFailureCache(): void
-
-    /**
-     * Check if the renderer is ready to accept instances.
-     */
-    isReady(): boolean
-
-    /**
-     * Clean up all resources.
-     */
     dispose(): void
 }
 

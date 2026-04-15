@@ -468,11 +468,15 @@ export class LodGameArtworkRenderer {
     public getInstanceCount(): number {
         return this.currentInstanceCount
     }
-    
+
+    public getAllInstances(): ReadonlyMap<number, InstanceData> {
+        return this.instanceData
+    }
+
     public isReady(): boolean {
         return this.instancedMesh !== null
     }
-    
+
     public getHighTextureCache(): HighTextureCache | null {
         return this.highTextureCache
     }
