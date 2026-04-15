@@ -201,17 +201,18 @@ export class SteamIntegration {
         }
     }
 
-    async refreshData(callbacks: ProgressCallbacks = {}, ignoreCache = false): Promise<GameLibraryState | null> {
+        async refreshData(callbacks: ProgressCallbacks = {}, ignoreCache = false, fallbackUserInput?: string): Promise<GameLibraryState | null> {
         const currentState = this.gameLibrary.getState()
         
-        // TODO: Support refresh without vanity url
-        if (!currentState.userData?.vanity_url) {
+        const targetUser = currentState.userData?.vanity_url || fallbackUserInput
+
+        if (!targetUser) {
             callbacks.onStatusUpdate?.('No data to refresh', 'error')
             return null
         }
         
-        callbacks.onStatusUpdate?.('🔄 Reloading data...', 'loading')
-        return this.loadGamesForUser(currentState.userData.vanity_url, callbacks, ignoreCache)
+        callbacks.onStatusUpdate?.('?? Reloading data...', 'loading')
+        return this.loadGamesForUser(targetUser, callbacks, ignoreCache)
     }
 
     async clearCache(): Promise<void> {
@@ -469,9 +470,10 @@ export class SteamIntegration {
         }
     }
 
-    private async handleForceUpdateCache(_event: CustomEvent<SteamCacheForceUpdateEvent>): Promise<void> {
+    private async handleForceUpdateCache(event: CustomEvent<SteamCacheForceUpdateEvent>): Promise<void> {
+        const { userInput } = event.detail
         try {
-            const result = await this.refreshData({}, true)
+            const result = await this.refreshData({}, true, userInput)
             if (!result) {
                 SteamIntegration.logger.warn('No data to force update')
                 return

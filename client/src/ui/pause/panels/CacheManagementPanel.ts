@@ -13,6 +13,7 @@ import { EventManager, EventSource } from '../../../core/EventManager'
 import { SteamEventTypes } from '../../../types/InteractionEvents'
 import '../../../styles/pause-menu/cache-management-panel.css'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
+import { DataManager } from '../../../core/data/DataManager'
 
 export interface CacheStats {
     imageCount: number
