@@ -305,11 +305,6 @@ describe('LodArtworkOrchestrator', () => {
             orchestrator = new LodArtworkOrchestrator()
         })
 
-        it('should report ready state', () => {
-            // Without scene initialization, renderer isn't ready
-            expect(orchestrator.isReady()).toBe(false)
-        })
-
         it('should report instance count', () => {
             expect(orchestrator.getInstanceCount()).toBe(0)
         })

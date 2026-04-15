@@ -16,6 +16,7 @@ import { DataManager } from '../../../core/data/DataManager'
 import { GpuMemoryEstimator } from '../../../debug/GpuMemoryEstimator'
 import { DataKey } from '../../../core/data/DataTypes'
 import * as THREE from 'three'
+import type { HighTextureCache } from './HighTextureCache'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Re-export for consumers
@@ -80,27 +81,6 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
             return stats
         }
 
-        // Loading experiments
-        ;(window as any).experimentLoadingStrategies = (count = 9) => {
-            const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
-            if (!cache) return console.log('❌ No HIGH texture cache available')
-            const gameIndices: number[] = []
-            for (let i = 0; i < this.maxGames && gameIndices.length < count; i++) {
-                if (cache.getState(i) !== 'loaded') gameIndices.push(i)
-            }
-            console.log(`Testing with game indices: ${gameIndices.join(', ')}`)
-            cache.experimentLoadingStrategies(gameIndices)
-        }
-        ;(window as any).experimentBatch = (count = 9) => {
-            const cache = this.getHighTextureCache() as HighTextureCacheDebug | null
-            if (!cache) return console.log('❌ No HIGH texture cache available')
-            const gameIndices: number[] = []
-            for (let i = 0; i < this.maxGames && gameIndices.length < count; i++) {
-                if (cache.getState(i) !== 'loaded') gameIndices.push(i)
-            }
-            cache.experimentLoadingStrategies(gameIndices, [{ name: 'batch', maxConcurrent: 8 }])
-        }
-
         // Frame Budget Scheduler
         ;(window as any).diagnoseScheduler = async () => {
             const { FrameBudgetScheduler } = await import('../../../utils/FrameBudgetScheduler')
@@ -130,6 +110,10 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         }
 
         console.log('🔧 LOD debug exports registered. Try: lodCacheStats(), diagnoseArtworkFailures()')
+    }
+
+    private getHighTextureCache(): HighTextureCache | null {
+        return this.renderer.getHighTextureCache()
     }
 
     public getMemoryStats(): {

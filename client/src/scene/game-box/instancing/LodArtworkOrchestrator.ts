@@ -28,7 +28,6 @@ import {
     type LodTextureArrays
 } from './LodGameArtworkRenderer'
 import { LOD_TIER_NAME } from './ILodArtworkRenderer'
-import { HighTextureCache } from './HighTextureCache'
 import type { PrewarmingConfig } from './SpatialPrewarmingManager'
 import type { InstanceMetadata } from '../../../debug/GameFinder'
 
@@ -80,7 +79,7 @@ export class LodArtworkOrchestrator {
     public static logger = Logger.createLogFunctions(LodArtworkOrchestrator.name)
     private artworkProvider: GameArtworkProvider
     private textureManager: LodTextureArrayManager
-    private renderer: LodGameArtworkRenderer
+    protected renderer: LodGameArtworkRenderer
 
     private readonly maxTextures: number
     private readonly lodConfigs: LodConfig[]
@@ -97,8 +96,6 @@ export class LodArtworkOrchestrator {
     // Prevent log spam when atlas is full
     private atlasFullLogged: boolean = false
 
-    // Focus-loss spin-down: evict HIGH textures after 5s of being unfocused
-    private spinDownTimerId: ReturnType<typeof setTimeout> | null = null
     private readonly onFocusChanged: (e: CustomEvent<VisibilityChangedEvent>) => void
 
     constructor(config: LodArtworkConfig = {}) {
@@ -157,27 +154,6 @@ export class LodArtworkOrchestrator {
             this.compactMidTierAfterLoad.bind(this)
         )
 
-        // Spin down HIGH texture cache 5s after focus loss to release GPU memory.
-        // On focus gain, cancel the timer — no need to evict if the user returned quickly.
-        // HIGH textures reload from pixel cache (fast) on next player approach.
-        this.onFocusChanged = (e: CustomEvent<VisibilityChangedEvent>) => {
-            if (e.detail.visible) {
-                if (this.spinDownTimerId !== null) {
-                    clearTimeout(this.spinDownTimerId)
-                    this.spinDownTimerId = null
-                }
-            } else {
-                this.spinDownTimerId = setTimeout(() => {
-                    this.spinDownTimerId = null
-                    this.renderer.spinDownHighTextures()
-                }, 5_000)
-            }
-        }
-        EventManager.getInstance().registerEventHandler(
-            AppEventTypes.VisibilityChanged,
-            this.onFocusChanged
-        )
-
         this.logConfig()
     }
 
@@ -232,9 +208,6 @@ export class LodArtworkOrchestrator {
         LodArtworkOrchestrator.logger.lifecycle(`LOD VRAM: ${lodInfo.join(', ')} | Total: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
     }
 
-    /**
-     * Main entry point - matches old LodArtworkRenderer API
-     */
     public async setArtworkInstanceFromUrl(
         position: THREE.Vector3,
         gameName: string,
@@ -349,53 +322,16 @@ export class LodArtworkOrchestrator {
 
     // === Delegated methods to renderer ===
 
-    public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {
-        return this.renderer.setInstanceLod(instanceIndex, lodLevel)
-    }
-
-    public setGlobalLod(lodLevel: LodLevel): void {
-        this.renderer.setGlobalLod(lodLevel)
-    }
-
-    public getInstanceLod(instanceIndex: number): LodLevel | null {
-        const data = this.renderer.getInstance(instanceIndex)
-        return data?.lodLevel ?? null
-    }
-
     private updateGPU(): void {
         this.textureManager.flushToGpu()
         this.renderer.flushToGpu()
     }
 
-    public isReady(): boolean {
-        return this.renderer.isReady()
-    }
-
-    public getInstanceCount(): number {
+    protected getInstanceCount(): number {
         return this.renderer.getInstanceCount()
     }
 
-    public getInstanceData(): ReadonlyMap<number, { position: THREE.Vector3; lodLevel: LodLevel }> {
-        return this.renderer.getAllInstances() as ReadonlyMap<number, { position: THREE.Vector3; lodLevel: LodLevel }>
-    }
-
-    public isHighTextureLoaded(instanceIndex: number): boolean {
-        return this.renderer.isHighTextureLoaded(instanceIndex)
-    }
-
-    public getHighTextureCache(): HighTextureCache | null {
-        return this.renderer.getHighTextureCache()
-    }
-
-    public startPrewarming(): void {
-        this.renderer.startPrewarming()
-    }
-
-    public stopPrewarming(): void {
-        this.renderer.stopPrewarming()
-    }
-
-    public clearFailureCache(): void {
+    protected clearFailureCache(): void {
         this.failedArtwork.clear()
         this.artworkProvider.clearCaches()
         LodArtworkOrchestrator.logger.info('Cleared artwork caches - all URLs will be retried on next load')
@@ -416,10 +352,6 @@ export class LodArtworkOrchestrator {
     }
 
     public dispose(): void {
-        if (this.spinDownTimerId !== null) {
-            clearTimeout(this.spinDownTimerId)
-            this.spinDownTimerId = null
-        }
         EventManager.getInstance().removeEventListener(
             AppEventTypes.VisibilityChanged,
             this.onFocusChanged
