@@ -14,7 +14,7 @@
 | **Main-thread hitches** | No frame > 50ms | Single-frame freezes break immersion |
 | **Persistent slowdowns** | No sustained frame-time increase after UI interactions | Indicates new scene objects or compositor layers added permanently |
 | **VRAM (est.)** | < 200MB tracked; actual higher | Texture arrays are our biggest consumer |
-| **Memory** | Deferred — evaluate after codebase growth | Too early to set targets meaningfully |
+| **Memory (JS heap)** | Stable across sort cycles (no monotonic growth) | Leak canary; JS heap is the measurable proxy for GPU-side disposal failures |
 
 ---
 
@@ -65,11 +65,21 @@ window.sceneManager.drawCallReport()   // full breakdown by object
   ```
   We should wire this into `RenderLoopDiagnostics` when `enabled: true` so it shows up in the same log stream.
 
-### VRAM (estimated)
+### JS heap / memory leak detection
+`GpuMemoryReporter` runs automatically in dev mode (`developmentMode: true` in Settings).
+Baseline is captured at `AllBatchesComplete`; samples every ~4000 frames (~67s at 60fps).
+Logged to console at `debug` level — enable verbose logs in Chrome to see them.
+
+On-demand:
 ```js
-GpuMemoryEstimator.logMemoryStats()
+window.dumpGpuMemory()   // full GpuMemoryEstimator breakdown (texture sizes, registered VRAM)
 ```
-Also printed automatically at end of batch loading. Three.js `renderer.info.memory` gives geometry counts; texture VRAM is estimated since WebGL doesn't expose actual GPU-side allocations.
+
+**Finding (2026-04-15)**: JS heap shows an initial decrease after store load (GC collecting startup
+allocations), then stable utilization. No monotonic growth detected across sort cycles. The
+original suspicion of a GPU-side leak is not confirmed by the JS heap proxy — actual VRAM
+would require Chrome Task Manager (Shift+Esc → GPU Process row) or CDP tooling.
+
 
 ---
 
@@ -81,7 +91,8 @@ Also printed automatically at end of batch loading. Three.js `renderer.info.memo
 | Frame-time diagnostics | `client/src/debug/RenderLoopDiagnostics.ts` |
 | DC widget (live) | `PerformanceMonitor.ts` — rendered by `SystemUICoordinator` |
 | DC scene breakdown | `SceneManagerDebug.drawCallReport()` → `window.sceneManager.drawCallReport()` |
-| VRAM estimates | `GpuMemoryEstimator` — `window.GpuMemoryEstimator` |
+| VRAM estimates / on-demand | `GpuMemoryEstimator` — `window.dumpGpuMemory()` |
+| Heap trend reporter | `GpuMemoryReporter` — auto-runs in dev mode, logs every ~4000 frames |
 | Startup phase table | `StartupEventTracker` — `window.StartupEventTracker.instance.printSummary()` |
 
 ---
@@ -90,5 +101,5 @@ Also printed automatically at end of batch loading. Three.js `renderer.info.memo
 
 1. **Draw call regression test** — no automated assertion on DC count. Adding one is the highest-value next step for catching regressions.
 - **Long-task / inter-frame hitch detection** — `RenderLoopDiagnostics` is blind to click-handler work. `PerformanceObserver({ type: 'longtask' })` is wired when `?diagnostics=1` is set, but **Firefox does not support the `longtask` entry type** — Chrome only. For Firefox, use the DevTools Performance tab.
-3. **Memory** — intentionally deferred. `docs/features/key-metrics-instrumentation.md` tracks when to revisit.
+3. **Memory** — `GpuMemoryReporter` now gives JS heap trends in dev mode. Confirmed stable (no leak) as of 2026-04-15. Actual VRAM growth would require Chrome Task Manager or CDP; not yet automated.
 4. **DC breakdown by source** — `drawCallReport()` exists but isn't wired to any automated check.
