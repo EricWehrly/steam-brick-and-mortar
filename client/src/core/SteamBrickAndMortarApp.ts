@@ -262,10 +262,7 @@ export class SteamBrickAndMortarApp {
 
             // GPU memory leak detection (dev mode only — no-op in production)
             this.gpuMemoryReporter = new GpuMemoryReporter(this.sceneManager.getRenderer())
-            this.gpuMemoryReporter.start()
-            if (typeof window !== 'undefined') {
-                (window as unknown as Record<string, unknown>).dumpGpuMemory = () => this.gpuMemoryReporter?.snapshot()
-            }
+            this.gpuMemoryReporter.init()
 
             // Initialize system UI coordinator (lighting panel, debug panels, etc.)
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())
@@ -287,7 +284,7 @@ export class SteamBrickAndMortarApp {
         
         this.systemUICoordinator.dispose()
         this.focusCoordinator?.dispose()
-        this.gpuMemoryReporter?.stop()
+        this.gpuMemoryReporter?.dispose()
         this.webxrCoordinator.dispose()
         this.sceneCoordinator.dispose()
         this.sceneManager.dispose()
