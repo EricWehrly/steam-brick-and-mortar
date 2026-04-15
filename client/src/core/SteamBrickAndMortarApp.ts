@@ -28,7 +28,7 @@ import { AppSettings } from './AppSettings'
 
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { RenderLoopDiagnostics } from '../debug/RenderLoopDiagnostics'
-import { GpuMemoryReporter } from '../debug/GpuMemoryReporter'
+import { HeapMemoryReporter } from '../debug/HeapMemoryReporter'
 // Side-effect import: registers GpuMemoryEstimator to window for console debugging
 import '../debug/GpuMemoryEstimator'
 
@@ -73,7 +73,8 @@ export class SteamBrickAndMortarApp {
     private compassRose?: CompassRose
     private gameLibraryBinder?: GameLibraryBinderUI
     private focusCoordinator?: FocusCoordinator
-    private gpuMemoryReporter?: GpuMemoryReporter
+    private heapMemoryReporter?: HeapMemoryReporter
+    private diagnosticsEnabled = false
     
     // Startup tracking
     private startupTracker: StartupEventTracker
@@ -261,8 +262,8 @@ export class SteamBrickAndMortarApp {
             this.focusCoordinator.init()
 
             // GPU memory leak detection (dev mode only — no-op in production)
-            this.gpuMemoryReporter = new GpuMemoryReporter(this.sceneManager.getRenderer())
-            this.gpuMemoryReporter.init()
+            this.heapMemoryReporter = new HeapMemoryReporter(this.sceneManager.getRenderer())
+            this.heapMemoryReporter.init(this.diagnosticsEnabled)
 
             // Initialize system UI coordinator (lighting panel, debug panels, etc.)
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())
@@ -284,7 +285,7 @@ export class SteamBrickAndMortarApp {
         
         this.systemUICoordinator.dispose()
         this.focusCoordinator?.dispose()
-        this.gpuMemoryReporter?.dispose()
+        this.heapMemoryReporter?.dispose()
         this.webxrCoordinator.dispose()
         this.sceneCoordinator.dispose()
         this.sceneManager.dispose()
@@ -356,6 +357,7 @@ export class SteamBrickAndMortarApp {
         // TODO: set appsettings from url, have diagnostics class set up at this phase?
         const urlParams = new URLSearchParams(window.location.search)
         const diagnosticsEnabled = urlParams.get('diagnostics') === '1'
+        this.diagnosticsEnabled = diagnosticsEnabled
         RenderLoopDiagnostics.initialize({ 
             enabled: diagnosticsEnabled,
             logInterval: 60,  // Log every ~1 second at 60fps
