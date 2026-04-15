@@ -19,8 +19,6 @@ export interface InstrumentationHooks {
     onBeforeFrame?: () => void
     /** Called after all callbacks have executed */
     onAfterFrame?: () => void
-    /** Called after renderer.render() — measures full frame including GPU submission */
-    onAfterRender?: () => void
     /** Wraps each callback execution for individual timing */
     wrapCallback?: (
         id: string,
@@ -99,14 +97,6 @@ export class RenderLoopRegistry {
         
         // Call frame end hook if set
         this.instrumentation?.onAfterFrame?.()
-    }
-
-    /**
-     * Called by SceneManager after renderer.render() to close the full-frame timing window.
-     * This is the only point where GPU submission cost is included in measurements.
-     */
-    public afterRender(): void {
-        this.instrumentation?.onAfterRender?.()
     }
 
     /**
