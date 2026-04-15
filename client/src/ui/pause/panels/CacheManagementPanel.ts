@@ -120,6 +120,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
         if (!panel) return
 
         UIComponentUtils.setupButtons(panel, [
+            { buttonId: 'force-update-cache-btn', onClick: this.forceUpdateCache.bind(this) },
             { buttonId: 'refresh-cache-btn', onClick: this.refreshCache.bind(this) },
             { buttonId: 'validate-cache-btn', onClick: this.validateCache.bind(this) },
             { buttonId: 'clear-cache-btn', onClick: this.clearCache.bind(this) },
@@ -384,7 +385,35 @@ export class CacheManagementPanel extends PauseMenuPanel {
                 : 'Never'
         }
     }
+    /**
+     * Force update cache from network
+     */
+    private async forceUpdateCache(): Promise<void> {
+        const panel = this.getPanelElement()
+        if (!panel) return
 
+        const btn = panel.querySelector('#force-update-cache-btn')
+        if (!btn) return
+
+        btn.textContent = '?? Updating...'
+        btn.setAttribute('disabled', 'true')
+
+        try {
+            this.eventManager.emit(SteamEventTypes.CacheForceUpdate, {
+                source: EventSource.UI
+            })
+            
+            // The actual success message comes from the workflow completion,
+            // but we can acknowledge the click immediately
+            this.showSuccess('Force update requested...')
+        } catch (error) {
+            console.error('Force update failed:', error)
+            this.showError('Failed to request force update')
+        } finally {
+            btn.textContent = '?? Force Update Cache'
+            btn.removeAttribute('disabled')
+        }
+    }
     /**
      * Refresh cache by re-downloading recent items
      */

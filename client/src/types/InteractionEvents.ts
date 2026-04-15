@@ -42,6 +42,10 @@ export interface SteamCacheRefreshEvent extends BaseInteractionEvent {
     // No additional data needed
 }
 
+export interface SteamCacheForceUpdateEvent extends BaseInteractionEvent {
+    // Triggered when explicitly bypassing cache to fetch latest from Steam
+}
+
 export interface SteamCacheStatsEvent extends BaseInteractionEvent {
     // No additional data needed
 }
@@ -276,6 +280,7 @@ export const SteamEventTypes = {
     LoadFromCache: 'steam:load-from-cache',
     CacheClear: 'steam:cache-clear',
     CacheRefresh: 'steam:cache-refresh',
+    CacheForceUpdate: 'steam:cache-force-update',
     CacheStats: 'steam:cache-stats',
     ImageCacheClear: 'steam:image-cache-clear',
     DevModeToggle: 'steam:dev-mode-toggle',

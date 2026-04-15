@@ -17,7 +17,7 @@ import type { SteamGameData } from '../scene'
 import { SteamErrorMessages, type SteamErrorContext } from '../utils/SteamErrorMessages'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes, AppSettingsEventTypes, GameEventTypes } from '../types/InteractionEvents'
-import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamGamesBatchEvent, SteamDataLoadedEvent } from '../types/InteractionEvents'
+import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheForceUpdateEvent, SteamCacheClearEvent, SteamGamesBatchEvent, SteamDataLoadedEvent } from '../types/InteractionEvents'
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
@@ -79,6 +79,7 @@ export class SteamIntegration {
         this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.handleLoadGames.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.LoadFromCache, this.handleLoadFromCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.handleRefreshCache.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.CacheForceUpdate, this.handleForceUpdateCache.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.handleClearCache.bind(this))
         this.eventManager.registerEventHandler(AppSettingsEventTypes.Changed, this.handleSettingsChange.bind(this))
         this.eventManager.registerEventHandler(GameEventTypes.Start, this.handleGameStart.bind(this))
@@ -200,7 +201,7 @@ export class SteamIntegration {
         }
     }
 
-    async refreshData(callbacks: ProgressCallbacks = {}): Promise<GameLibraryState | null> {
+    async refreshData(callbacks: ProgressCallbacks = {}, ignoreCache = false): Promise<GameLibraryState | null> {
         const currentState = this.gameLibrary.getState()
         
         // TODO: Support refresh without vanity url
@@ -210,7 +211,7 @@ export class SteamIntegration {
         }
         
         callbacks.onStatusUpdate?.('🔄 Reloading data...', 'loading')
-        return this.loadGamesForUser(currentState.userData.vanity_url, callbacks, true)
+        return this.loadGamesForUser(currentState.userData.vanity_url, callbacks, ignoreCache)
     }
 
     async clearCache(): Promise<void> {
@@ -465,6 +466,24 @@ export class SteamIntegration {
             SteamIntegration.logger.info('Cache refreshed')
         } catch (error) {
             SteamIntegration.logger.error('Cache refresh failed:', error)
+        }
+    }
+
+    private async handleForceUpdateCache(_event: CustomEvent<SteamCacheForceUpdateEvent>): Promise<void> {
+        try {
+            const result = await this.refreshData({}, true)
+            if (!result) {
+                SteamIntegration.logger.warn('No data to force update')
+                return
+            }
+            
+            const gameState = this.getGameLibraryState()
+            if (gameState.userData?.vanity_url) {
+                this.storeSteamDataAndEmitEvent(gameState.userData.vanity_url)
+            }
+            SteamIntegration.logger.info('Cache force updated from network')
+        } catch (error) {
+            SteamIntegration.logger.error('Cache force update failed:', error)
         }
     }
 
