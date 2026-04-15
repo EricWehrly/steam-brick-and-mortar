@@ -94,8 +94,7 @@ export class RenderLoopDiagnostics {
         registry.setInstrumentation({
             onBeforeFrame: this.beginFrame.bind(this),
             wrapCallback: this.instrumentCallback.bind(this),
-            onAfterFrame: this.endCallbacks.bind(this),
-            onAfterRender: this.endFrame.bind(this),
+            onAfterFrame: this.endFrame.bind(this),
         })
 
         // PerformanceObserver catches long tasks that happen between frames
@@ -176,14 +175,7 @@ export class RenderLoopDiagnostics {
     }
     
     /**
-     * Called after all callbacks execute (onAfterFrame). Resets callback guard.
-     */
-    private static endCallbacks(): void {
-        this.isFirstCallbackInFrame = false
-    }
-
-    /**
-     * Called after renderer.render() (onAfterRender).
+     * Called after renderer.render() (onAfterFrame).
      * Measures the FULL frame: callbacks + GPU submission.
      */
     public static endFrame(): void {
