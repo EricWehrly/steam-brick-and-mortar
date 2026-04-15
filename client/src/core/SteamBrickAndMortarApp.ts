@@ -255,7 +255,7 @@ export class SteamBrickAndMortarApp {
             this.gameLibraryBinder.init()
 
             // Focus tracking: pause render loop on blur, resume on focus, + window.toggleSceneBlur()
-            this.focusCoordinator = new FocusCoordinator(this.eventManager, this.sceneManager)
+            this.focusCoordinator = new FocusCoordinator()
             this.focusCoordinator.init()
 
             // Initialize system UI coordinator (lighting panel, debug panels, etc.)

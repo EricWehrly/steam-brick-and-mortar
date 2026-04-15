@@ -4,6 +4,29 @@ These are "clean as you go" rules — not separate tasks, but quick checks when 
 
 ---
 
+## Event-driven coupling
+
+**Prefer events over direct calls between coordinators and managers.** When one system needs to react to a state change in another, emit an event and subscribe — don't hold a reference and call methods directly.
+
+Direct calls create import cycles, make testing harder, and violate the coordinator pattern. New coupling via direct method calls is a red flag.
+
+**Bad** (FocusCoordinator holding a SceneManager reference to pause/resume it):
+```typescript
+const focusCoordinator = new FocusCoordinator(eventManager, sceneManager)
+// ...
+this.sceneManager.pauseRenderLoop()
+```
+
+**Good** (emit an event; SceneManager subscribes internally):
+```typescript
+this.eventManager.emit<VisibilityChangedEvent>(AppEventTypes.VisibilityChanged, { visible: false, ... })
+// SceneManager.constructor registers its own handler
+```
+
+Singletons like `EventManager` don't need to be injected — call `EventManager.getInstance()` directly.
+
+---
+
 ## JSDoc hygiene
 
 **Remove JSDoc that just restates the signature.** TypeScript types already document parameters and return types. A comment like:
