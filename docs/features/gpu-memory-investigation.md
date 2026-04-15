@@ -1,8 +1,8 @@
 # Feature: GPU Memory Leak Investigation
 
 **Act**: Intermission  
-**Status**: Not Started  
-**Priority**: Low (investigate before Act 2 ramp; don't block background reduction work)
+**Status**: Investigated — no leak confirmed  
+**Priority**: Low
 
 ## Goal
 
@@ -16,6 +16,13 @@ Killing the browser GPU process recovers most RAM, suggesting a genuine GPU-side
 - Geometry not disposed when shelves or game boxes are replaced
 - Render targets or framebuffers held by Three.js internals (e.g., shadow maps, environment maps)
 - Browser holding GPU resources after JS objects are GC'd (`.dispose()` not called before dereferencing)
+
+## Findings (2026-04-15)
+
+- JS heap shows an initial decrease after store load (GC collecting startup allocations), then stable utilization across sort cycles
+- No monotonic growth detected — the original suspicion of a GPU-side leak is not confirmed by the JS heap proxy
+- Actual VRAM growth would require Chrome Task Manager (`Shift+Esc` → GPU Process) or CDP tooling — not yet automated
+- `GpuMemoryReporter` (dev mode) and `window.dumpGpuMemory()` remain available for future regression checks
 
 ## Acceptance Criteria
 
