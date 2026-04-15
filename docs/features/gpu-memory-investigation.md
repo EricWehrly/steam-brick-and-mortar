@@ -22,7 +22,7 @@ Killing the browser GPU process recovers most RAM, suggesting a genuine GPU-side
 - JS heap shows an initial decrease after store load (GC collecting startup allocations), then stable utilization across sort cycles
 - No monotonic growth detected — the original suspicion of a GPU-side leak is not confirmed by the JS heap proxy
 - Actual VRAM growth would require Chrome Task Manager (`Shift+Esc` → GPU Process) or CDP tooling — not yet automated
-- `GpuMemoryReporter` (dev mode) and `window.dumpGpuMemory()` remain available for future regression checks
+- `HeapMemoryReporter` (dev mode) and `window.dumpGpuMemory()` remain available for future regression checks
 
 ## Acceptance Criteria
 
@@ -98,4 +98,4 @@ These should be stable after startup. Any growth during idle is a leak.
 - `bugs.md` — "Unexpected cache clearing" (separate, but cache behaviour affects memory)
 - `docs/agent-context/performance-metrics.md` — measurement reference
 - `docs/tech-debt.md` — `shelf-end-cap-signs` (canvas signs are a disposal risk)
-- Option 1 implementation: `src/debug/GpuMemoryReporter.ts` (to be created)
+- Option 1 implementation: `src/debug/HeapMemoryReporter.ts` (to be created)

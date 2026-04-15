@@ -10,7 +10,7 @@
 |---|---|---|
 | **Startup wall-clock** | < 5s to store populated (warm cache) | First impression; regression risk as we add content |
 | **Frame time** | < 16.67ms avg (60fps budget) | Smoothness during browsing and interaction |
-| **Draw calls (DC)** | ≤ 20 idle (was 17; now ~50–70, regressed) | GPU submission overhead; instancing is supposed to keep this low |
+| **Draw calls (DC)** | ≤ 20 idle | GPU submission overhead; per-shelf signs were the main culprit (disabled, see TD: shelf-end-cap-signs); instancing keeps geometry low |
 | **Main-thread hitches** | No frame > 50ms | Single-frame freezes break immersion |
 | **Persistent slowdowns** | No sustained frame-time increase after UI interactions | Indicates new scene objects or compositor layers added permanently |
 | **VRAM (est.)** | < 200MB tracked; actual higher | Texture arrays are our biggest consumer |
@@ -66,7 +66,7 @@ window.sceneManager.drawCallReport()   // full breakdown by object
   We should wire this into `RenderLoopDiagnostics` when `enabled: true` so it shows up in the same log stream.
 
 ### JS heap / memory leak detection
-`GpuMemoryReporter` runs automatically in dev mode (`developmentMode: true` in Settings).
+`HeapMemoryReporter` runs automatically in dev mode (`developmentMode: true` in Settings).
 Baseline is captured at `AllBatchesComplete`; samples every ~4000 frames (~67s at 60fps).
 Logged to console at `debug` level — enable verbose logs in Chrome to see them.
 
@@ -92,7 +92,7 @@ would require Chrome Task Manager (Shift+Esc → GPU Process row) or CDP tooling
 | DC widget (live) | `PerformanceMonitor.ts` — rendered by `SystemUICoordinator` |
 | DC scene breakdown | `SceneManagerDebug.drawCallReport()` → `window.sceneManager.drawCallReport()` |
 | VRAM estimates / on-demand | `GpuMemoryEstimator` — `window.dumpGpuMemory()` |
-| Heap trend reporter | `GpuMemoryReporter` — auto-runs in dev mode, logs every ~4000 frames |
+| Heap trend reporter | `HeapMemoryReporter` — auto-runs in dev mode, logs every ~4000 frames |
 | Startup phase table | `StartupEventTracker` — `window.StartupEventTracker.instance.printSummary()` |
 
 ---
@@ -101,5 +101,5 @@ would require Chrome Task Manager (Shift+Esc → GPU Process row) or CDP tooling
 
 1. **Draw call regression test** — no automated assertion on DC count. Adding one is the highest-value next step for catching regressions.
 - **Long-task / inter-frame hitch detection** — `RenderLoopDiagnostics` is blind to click-handler work. `PerformanceObserver({ type: 'longtask' })` is wired when `?diagnostics=1` is set, but **Firefox does not support the `longtask` entry type** — Chrome only. For Firefox, use the DevTools Performance tab.
-3. **Memory** — `GpuMemoryReporter` now gives JS heap trends in dev mode. Confirmed stable (no leak) as of 2026-04-15. Actual VRAM growth would require Chrome Task Manager or CDP; not yet automated.
+3. **Memory** — `HeapMemoryReporter` now gives JS heap trends in dev mode. Confirmed stable (no leak) as of 2026-04-15. Actual VRAM growth would require Chrome Task Manager or CDP; not yet automated.
 4. **DC breakdown by source** — `drawCallReport()` exists but isn't wired to any automated check.

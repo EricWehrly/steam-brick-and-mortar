@@ -16,12 +16,13 @@ Active bugs and issues that need investigation or fixing.
 
 ---
 **Status**: 🔴 Open
-**Reported**: 2026-04-14
-**Description**: Draw calls were ~17 at initial instancing implementation. Now 50-70 in normal use and the count persists elevated after opening the game detail panel. Visible in the perf widget (top-right "DC" counter).
-**Suspected cause**: `.detail-content` has `overflow-y: auto` inside a `position: fixed` panel, which creates a new compositor layer. Firefox composites this layer every frame alongside Three.js's render, inflating the reported draw call count for the duration the panel is open - or permanently if something in the layout isn't being cleaned up on close. CSS note in `binder.css`: `/* TODO: Convert binder to a proper modal (backdrop, focus trap, body scroll-lock) */`
-**Also needed**: Automated test asserting `renderer.info.render.calls <= 25` in idle state (no detail panel open). This is the DC regression gate — without it, any future change that inflates draw calls is invisible until noticed manually. The test should run in the Playwright scene-health collector (one load, grab DC count after `AllBatchesComplete`). See `docs/agent-context/performance-metrics.md`.
-**Steps to Reproduce**: Open `?diagnostics=1`, note DC in perf widget, click any game box, observe DC jump, close panel, observe whether DC returns to baseline.
-**Impact**: Elevated GPU submission cost every frame; masks future regressions.
+### Draw call regression — signs inflating DC count
+**Status**: 🟡 Partially resolved  
+**Reported**: 2026-04-14  
+**Description**: Draw calls were ~17 at initial instancing implementation. Jumped to 50–70 because each shelf had 2 individual canvas signs attached (end-cap labels), and sign rendering was 1 draw call per sign instance.  
+**Resolution so far**: Per-shelf end-cap signs disabled in `SceneSignManager` (TD: `shelf-end-cap-signs`). DC returned toward baseline.  
+**Remaining**: Sign draw calls should be revisited once layout work matures — the path to 1 DC per sign type is instanced/atlased text rendering. Tracked in `docs/tech-debt.md` under `shelf-end-cap-signs`.  
+**Also needed**: Automated test asserting `renderer.info.render.calls <= 25` in idle state (no detail panel open). See `docs/agent-context/performance-metrics.md`.
 
 ---
 

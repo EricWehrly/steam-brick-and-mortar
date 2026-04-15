@@ -10,7 +10,7 @@ import type * as THREE from 'three'
 const FRAMES_PER_SAMPLE = 4_000
 // Warn if JS heap has grown by more than this many MB since the last sample.
 const HEAP_GROWTH_THRESHOLD_MB = 50
-const REGISTRY_ID = 'GpuMemoryReporter'
+const REGISTRY_ID = 'HeapMemoryReporter'
 
 interface PerformanceWithMemory extends Performance {
     memory?: {
@@ -38,7 +38,7 @@ function readHeap(): MemorySample | null {
 // Starts counting from AllBatchesComplete so startup churn is excluded from baseline.
 // Naturally pauses with the render loop — no interval to cancel on blur.
 // Zero overhead in production — init() is a no-op when developmentMode is false.
-export class GpuMemoryReporter {
+export class HeapMemoryReporter {
     private readonly renderer: THREE.WebGLRenderer
     private frameCount = 0
     private lastSample: MemorySample | null = null
@@ -48,13 +48,13 @@ export class GpuMemoryReporter {
         this.renderer = renderer
     }
 
-    init(): void {
-        if (!AppSettings.get('developmentMode')) {
-            console.debug('[GpuMemoryReporter] Disabled (developmentMode is off). Toggle in Settings or AppSettings.get(\'developmentMode\') to enable.')
+    init(force = false): void {
+        if (!force && !AppSettings.get('developmentMode')) {
+            console.debug('[HeapMemoryReporter] Disabled (developmentMode is off). Toggle in Settings or pass diagnostics=1.')
             return
         }
         if (!(performance as PerformanceWithMemory).memory) {
-            console.debug('[GpuMemoryReporter] performance.memory not available (Chrome only). Use window.dumpGpuMemory() for manual snapshots.')
+            console.debug('[HeapMemoryReporter] performance.memory not available (Chrome only). Use window.dumpGpuMemory() for manual snapshots.')
         }
 
         EventManager.getInstance().registerEventHandler<AllBatchesCompleteEvent>(
@@ -66,7 +66,7 @@ export class GpuMemoryReporter {
             (window as unknown as Record<string, unknown>).dumpGpuMemory = () => this.snapshot()
         }
 
-        console.debug('[GpuMemoryReporter] Waiting for AllBatchesComplete to begin heap sampling.')
+        console.debug('[HeapMemoryReporter] Waiting for AllBatchesComplete to begin heap sampling.')
     }
 
     dispose(): void {
@@ -88,13 +88,13 @@ export class GpuMemoryReporter {
 
         if (this.lastSample) {
             console.debug(
-                `[GpuMemoryReporter] Baseline — heap: ${this.lastSample.usedHeapMb.toFixed(1)} MB used / ` +
+                `[HeapMemoryReporter] Baseline — heap: ${this.lastSample.usedHeapMb.toFixed(1)} MB used / ` +
                 `${this.lastSample.totalHeapMb.toFixed(1)} MB total. ` +
                 `Sampling every ${FRAMES_PER_SAMPLE} frames. window.dumpGpuMemory() for full VRAM breakdown.`
             )
         } else {
             console.debug(
-                `[GpuMemoryReporter] Started (no performance.memory). ` +
+                `[HeapMemoryReporter] Started (no performance.memory). ` +
                 `window.dumpGpuMemory() for full VRAM breakdown.`
             )
         }
@@ -122,9 +122,9 @@ export class GpuMemoryReporter {
                 `(${deltaMb >= 0 ? '+' : ''}${deltaMb.toFixed(1)} MB since last sample)`
 
             if (hasGrowth) {
-                console.warn(`[GpuMemoryReporter] Heap growth — ${summary}`)
+                console.warn(`[HeapMemoryReporter] Heap growth — ${summary}`)
             } else {
-                console.debug(`[GpuMemoryReporter] Stable — ${summary}`)
+                console.debug(`[HeapMemoryReporter] Stable — ${summary}`)
             }
         }
 
