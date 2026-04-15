@@ -202,8 +202,9 @@ export class PropRenderer {
       new THREE.Vector3(width/2, height/2, depth/2)
     ]
 
-    posts.forEach(postPos => {
+    posts.forEach((postPos, index) => {
       const post = new THREE.Mesh(postGeometry, wireMaterial)
+      post.name = `wire-rack-post-${index}`
       post.position.copy(postPos)
       rackGroup.add(post)
     })
@@ -216,18 +217,20 @@ export class PropRenderer {
       // Front-to-back wires
       const wireGeometry = new THREE.CylinderGeometry(wireThickness/2, wireThickness/2, depth)
       const leftWire = new THREE.Mesh(wireGeometry, wireMaterial)
+      leftWire.name = `wire-rack-wire-left-${i}`
       leftWire.rotation.x = Math.PI / 2
       leftWire.position.set(-width/2, shelfY, 0)
       rackGroup.add(leftWire)
 
       const rightWire = new THREE.Mesh(wireGeometry, wireMaterial)
+      rightWire.name = `wire-rack-wire-right-${i}`
       rightWire.rotation.x = Math.PI / 2
       rightWire.position.set(width/2, shelfY, 0)
       rackGroup.add(rightWire)
 
-      // Side-to-side support wires
       const sideWireGeometry = new THREE.CylinderGeometry(wireThickness/2, wireThickness/2, width)
       const backWire = new THREE.Mesh(sideWireGeometry, wireMaterial)
+      backWire.name = `wire-rack-wire-back-${i}`
       backWire.rotation.z = Math.PI / 2
       backWire.position.set(0, shelfY, depth/2)
       rackGroup.add(backWire)
@@ -256,12 +259,14 @@ export class PropRenderer {
     })
 
     const post = new THREE.Mesh(postGeometry, postMaterial)
+    post.name = 'category-divider-post'
     post.position.set(0, height / 2, 0)
     dividerGroup.add(post)
 
     // Small top cap
     const capGeometry = new THREE.BoxGeometry(0.1, 0.02, 0.1)
     const cap = new THREE.Mesh(capGeometry, postMaterial)
+    cap.name = 'category-divider-cap'
     cap.position.set(0, height + 0.01, 0)
     dividerGroup.add(cap)
 
@@ -318,17 +323,20 @@ export class PropRenderer {
 
     // Main center aisle marker
     const centerLine = new THREE.Mesh(lineGeometry, lineMaterial)
+    centerLine.name = 'floor-marker-center'
     centerLine.rotation.x = -Math.PI / 2
-    centerLine.position.set(0, 0.01, 0) // Slightly above floor
+    centerLine.position.set(0, 0.01, 0)
     markersGroup.add(centerLine)
 
     // Side aisle markers
     const leftLine = new THREE.Mesh(lineGeometry, lineMaterial)
+    leftLine.name = 'floor-marker-left'
     leftLine.rotation.x = -Math.PI / 2
     leftLine.position.set(-roomWidth * 0.3, 0.01, 0)
     markersGroup.add(leftLine)
 
     const rightLine = new THREE.Mesh(lineGeometry, lineMaterial)
+    rightLine.name = 'floor-marker-right'
     rightLine.rotation.x = -Math.PI / 2
     rightLine.position.set(roomWidth * 0.3, 0.01, 0)
     markersGroup.add(rightLine)

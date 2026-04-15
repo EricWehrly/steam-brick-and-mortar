@@ -102,7 +102,9 @@ export class BlockLetterSignRenderer implements ISignRenderer {
     private onFontLoaded(font: Font, uniqueIdentifier: string, text: string, fontSize: number, depth: number): void {
         const entry = this.entries.get(uniqueIdentifier)
         if (!entry) return  // removed while font was loading
-        entry.group.add(new THREE.Mesh(this.buildLetterGeometry(font, text, fontSize, depth), entry.material))
+        const letterMesh = new THREE.Mesh(this.buildLetterGeometry(font, text, fontSize, depth), entry.material)
+        letterMesh.name = `sign-block-letter-${uniqueIdentifier.toLowerCase().replace(/\s+/g, '-').slice(0, 32)}`
+        entry.group.add(letterMesh)
     }
 
     private onFontLoadFailed(uniqueIdentifier: string, err: unknown): void {

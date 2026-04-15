@@ -126,6 +126,7 @@ export class SignageRenderer {
         })
         
         const sign = new THREE.Mesh(signGeometry, signMaterial)
+        sign.name = `sign-canvas-${config.text.toLowerCase().replace(/\s+/g, '-').slice(0, 32)}`
         sign.position.copy(config.position)
         
         // Mark as signage for identification

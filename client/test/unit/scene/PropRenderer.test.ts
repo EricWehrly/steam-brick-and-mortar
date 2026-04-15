@@ -168,4 +168,42 @@ describe('PropRenderer', () => {
       expect(scene.children).not.toContain(propsGroup)
     })
   })
+
+  describe('mesh naming (drawCallReport readability)', () => {
+    it('all meshes created by createWireRackDisplay have non-empty names', () => {
+      propRenderer.createWireRackDisplay(new THREE.Vector3(0, 0, 0))
+      const unnamed: string[] = []
+      scene.traverse(obj => {
+        if ((obj as THREE.Mesh).isMesh && !obj.name) unnamed.push(obj.type)
+      })
+      expect(unnamed).toEqual([])
+    })
+
+    it('all meshes created by createCategoryDivider have non-empty names', () => {
+      propRenderer.createCategoryDivider(new THREE.Vector3(0, 0, 0))
+      const unnamed: string[] = []
+      scene.traverse(obj => {
+        if ((obj as THREE.Mesh).isMesh && !obj.name) unnamed.push(obj.type)
+      })
+      expect(unnamed).toEqual([])
+    })
+
+    it('all meshes created by createFloorMarkers have non-empty names', () => {
+      propRenderer.createFloorMarkers(10, 10)
+      const unnamed: string[] = []
+      scene.traverse(obj => {
+        if ((obj as THREE.Mesh).isMesh && !obj.name) unnamed.push(obj.type)
+      })
+      expect(unnamed).toEqual([])
+    })
+
+    it('entrance mat mesh has a name', () => {
+      const group = propRenderer.createEntranceFloorMat(10, 10)
+      const unnamed: string[] = []
+      group.traverse(obj => {
+        if ((obj as THREE.Mesh).isMesh && !obj.name) unnamed.push(obj.type)
+      })
+      expect(unnamed).toEqual([])
+    })
+  })
 })

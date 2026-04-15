@@ -24,12 +24,14 @@ vi.mock('three', async (importOriginal) => {
     }),
     PlaneGeometry: vi.fn().mockImplementation(function () { return { dispose: vi.fn() } }),
     Mesh: vi.fn().mockImplementation(function (this: Record<string, unknown>, geometry: unknown, material: unknown) {
-      return {
+      const obj: Record<string, unknown> = {
         geometry,
         material,
+        name: '',
         position: { copy: vi.fn() },
         userData: {} as Record<string, unknown>,
       }
+      return obj
     }),
     Vector3: actual.Vector3,
     RGBAFormat: (actual as { RGBAFormat?: number }).RGBAFormat ?? 1023,
@@ -72,5 +74,20 @@ describe('SignageRenderer', () => {
     const calls = DataTextureMock.mock.calls as [Uint8Array, number, number][]
     const [d1, d2] = calls.slice(-2).map(([data]) => data)
     expect(d1).not.toBe(d2)
+  })
+
+  it('names the mesh with sign-canvas- prefix and text slug', () => {
+    const renderer = new SignageRenderer()
+    const sign = renderer.createSign(makeConfig('Recently Played'))
+    expect((sign as unknown as { name: string }).name).toMatch(/^sign-canvas-recently-played/)
+  })
+
+  it('produces unique non-empty names for distinct sign texts', () => {
+    const renderer = new SignageRenderer()
+    const labels = ['Action', 'RPG', 'Strategy']
+    const signs = labels.map(l => renderer.createSign(makeConfig(l)))
+    const names = signs.map(s => (s as unknown as { name: string }).name)
+    expect(names.every(n => n.length > 0)).toBe(true)
+    expect(new Set(names).size).toBe(labels.length)
   })
 })
