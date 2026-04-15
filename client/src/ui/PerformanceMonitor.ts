@@ -1,13 +1,16 @@
 /**
  * TD: raf-loop-migration
  * Performance Statistics Display
- * 
+ *
  * A lightweight performance monitoring component that displays FPS, memory usage,
  * and render time statistics. This is inspired by the popular stats.js library
  * but implemented using browser APIs to avoid external dependencies.
  */
 
 import * as THREE from 'three'
+import { EventManager } from '../core/EventManager'
+import { AppEventTypes } from '../types/InteractionEvents'
+import type { VisibilityChangedEvent } from '../types/InteractionEvents'
 
 export interface PerformanceStats {
     fps: number
@@ -43,16 +46,17 @@ export class PerformanceMonitorUI {
     private frameTimeDisplay: HTMLElement | null = null
     private memoryDisplay: HTMLElement | null = null
     private drawCallsDisplay: HTMLElement | null = null
-    
+
     private frameCount = 0
     private lastTime = window.performance.now()
     private lastFpsUpdate = window.performance.now()
     private frameTimeHistory: number[] = []
     private animationId: number | null = null
     private uiInitialized = false
-    
+    private readonly onFocusChanged: (e: CustomEvent<VisibilityChangedEvent>) => void
+
     private config: Required<PerformanceConfig>
-    
+
     constructor(config: PerformanceConfig = {}) {
         this.config = {
             updateInterval: config.updateInterval ?? 100,
@@ -61,29 +65,42 @@ export class PerformanceMonitorUI {
             showDrawCalls: config.showDrawCalls ?? false,
             position: config.position ?? 'top-left'
         }
-        
+
+        this.onFocusChanged = (e: CustomEvent<VisibilityChangedEvent>) => {
+            if (e.detail.visible) {
+                this.start()
+            } else {
+                this.stop()
+            }
+        }
+
+        EventManager.getInstance().registerEventHandler(
+            AppEventTypes.VisibilityChanged,
+            this.onFocusChanged
+        )
+
         // Don't create UI elements yet - defer until first use
         // This avoids blocking startup with DOM manipulation
     }
-    
+
     /**
      * Initialize UI elements (deferred from constructor to avoid blocking startup)
      */
     private ensureUIInitialized(): void {
         if (this.uiInitialized) return
-        
+
         this.container = this.createContainer()
         this.fpsDisplay = this.createDisplay('FPS', '0')
         this.frameTimeDisplay = this.createDisplay('MS', '0')
-        
+
         if (this.config.showMemory && this.isMemoryAPISupported()) {
             this.memoryDisplay = this.createDisplay('MB', '0')
         }
-        
+
         if (this.config.showDrawCalls) {
             this.drawCallsDisplay = this.createDisplay('DC', '0')
         }
-        
+
         this.setupStyles()
         const slot = document.getElementById('ui-slot-top-right')
         if (slot) {
@@ -93,7 +110,7 @@ export class PerformanceMonitorUI {
         }
         this.uiInitialized = true
     }
-    
+
     private createContainer(): HTMLElement {
         const container = document.createElement('div')
         container.id = 'performance-monitor'
@@ -106,7 +123,7 @@ export class PerformanceMonitorUI {
         container.style.userSelect = 'none'
         return container
     }
-    
+
     private createDisplay(label: string, initialValue: string): HTMLElement {
         const display = document.createElement('div')
         display.style.padding = '2px 4px'
@@ -119,7 +136,7 @@ export class PerformanceMonitorUI {
         this.container.appendChild(display)
         return display
     }
-    
+
     private setupStyles(): void {
         const { position } = this.config
 
@@ -129,7 +146,7 @@ export class PerformanceMonitorUI {
         this.container.style.left = ''
         this.container.style.margin = '0'
         this.container.style.alignSelf = ''
-        
+
         switch (position) {
             case 'top-left':
                 this.container.style.alignSelf = 'flex-start'
@@ -147,33 +164,33 @@ export class PerformanceMonitorUI {
                 break
         }
     }
-    
+
     private isMemoryAPISupported(): boolean {
         const perf = window.performance as PerformanceWithMemory
         return 'memory' in perf && perf.memory !== undefined && 'usedJSHeapSize' in perf.memory
     }
-    
+
     /**
      * Start monitoring performance (creates UI if needed)
      */
     public start(): void {
         if (this.animationId !== null) return
-        
+
         this.ensureUIInitialized()
-        
+
         this.lastTime = window.performance.now()
         this.lastFpsUpdate = window.performance.now()
         this.frameCount = 0
         this.frameTimeHistory = []
-        
+
         const update = () => {
             this.update()
             this.animationId = window.requestAnimationFrame(update)
         }
-        
+
         this.animationId = window.requestAnimationFrame(update)
     }
-    
+
     /**
      * Stop monitoring performance
      */
@@ -183,7 +200,7 @@ export class PerformanceMonitorUI {
             this.animationId = null
         }
     }
-    
+
     /**
      * Update performance statistics
      */
@@ -191,35 +208,35 @@ export class PerformanceMonitorUI {
         const now = window.performance.now()
         const deltaTime = now - this.lastTime
         this.lastTime = now
-        
+
         // Track frame time
         this.frameTimeHistory.push(deltaTime)
         if (this.frameTimeHistory.length > 60) {
             this.frameTimeHistory.shift()
         }
-        
+
         this.frameCount++
-        
+
         // Update displays at specified interval
         if (now - this.lastFpsUpdate >= this.config.updateInterval) {
             this.updateDisplays(now)
             this.lastFpsUpdate = now
         }
     }
-    
+
     private updateDisplays(now: number): void {
         if (!this.fpsDisplay || !this.frameTimeDisplay) return // UI not initialized yet
-        
+
         const deltaTime = now - this.lastFpsUpdate
-        
+
         // Calculate FPS
         const fps = (this.frameCount * 1000) / deltaTime
         this.updateDisplay(this.fpsDisplay, 'FPS', fps.toFixed(this.config.precision))
-        
+
         // Calculate average frame time
         const avgFrameTime = this.frameTimeHistory.reduce((a, b) => a + b, 0) / this.frameTimeHistory.length
         this.updateDisplay(this.frameTimeDisplay, 'MS', avgFrameTime.toFixed(this.config.precision))
-        
+
         // Update memory display if supported
         if (this.memoryDisplay && this.isMemoryAPISupported()) {
             const perf = window.performance as PerformanceWithMemory
@@ -229,14 +246,14 @@ export class PerformanceMonitorUI {
                 this.updateDisplay(this.memoryDisplay, 'MB', memoryUsed.toFixed(this.config.precision))
             }
         }
-        
+
         // Reset frame count for next interval
         this.frameCount = 0
     }
-    
+
     private updateDisplay(element: HTMLElement, label: string, value: string): void {
         element.innerHTML = `<span style="color: #fff">${label}:</span> ${value}`
-        
+
         // Color coding for FPS
         if (label === 'FPS') {
             const fpsValue = parseFloat(value)
@@ -249,33 +266,33 @@ export class PerformanceMonitorUI {
             }
         }
     }
-    
+
     /**
      * Update render statistics from Three.js renderer
      */
     public updateRenderStats(renderer: THREE.WebGLRenderer): void {
         if (!this.drawCallsDisplay) return
-        
+
         const info = renderer.info
         if (info?.render) {
             const drawCalls = info.render.calls
             this.updateDisplay(this.drawCallsDisplay, 'DC', drawCalls.toString())
         }
     }
-    
+
     /**
      * Get current performance statistics
      */
     public getStats(): PerformanceStats {
-        const avgFrameTime = this.frameTimeHistory.length > 0 
-            ? this.frameTimeHistory.reduce((a, b) => a + b, 0) / this.frameTimeHistory.length 
+        const avgFrameTime = this.frameTimeHistory.length > 0
+            ? this.frameTimeHistory.reduce((a, b) => a + b, 0) / this.frameTimeHistory.length
             : 0
-        
+
         const stats: PerformanceStats = {
             fps: avgFrameTime > 0 ? 1000 / avgFrameTime : 0,
             frameTime: avgFrameTime
         }
-        
+
         if (this.isMemoryAPISupported()) {
             const perf = window.performance as PerformanceWithMemory
             const memInfo = perf.memory
@@ -284,10 +301,10 @@ export class PerformanceMonitorUI {
                 stats.memoryTotal = memInfo.totalJSHeapSize / 1048576
             }
         }
-        
+
         return stats
     }
-    
+
     /**
      * Hide the performance monitor
      */
@@ -295,7 +312,7 @@ export class PerformanceMonitorUI {
         if (!this.container) return
         this.container.style.display = 'none'
     }
-    
+
     /**
      * Show the performance monitor (creates UI if needed)
      */
@@ -304,14 +321,14 @@ export class PerformanceMonitorUI {
         if (!this.container) return
         this.container.style.display = 'block'
     }
-    
+
     /**
      * Toggle visibility of the performance monitor (creates UI if needed)
      */
     public toggle(): void {
         this.ensureUIInitialized()
         if (!this.container) return
-        
+
         const isVisible = this.container.style.display !== 'none'
         if (isVisible) {
             this.hide()
@@ -319,12 +336,16 @@ export class PerformanceMonitorUI {
             this.show()
         }
     }
-    
+
     /**
      * Remove the performance monitor from the DOM and stop monitoring
      */
     public dispose(): void {
         this.stop()
+        EventManager.getInstance().removeEventListener(
+            AppEventTypes.VisibilityChanged,
+            this.onFocusChanged
+        )
         if (this.container?.parentNode) {
             this.container.parentNode.removeChild(this.container)
         }

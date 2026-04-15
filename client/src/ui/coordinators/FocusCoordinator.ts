@@ -2,11 +2,16 @@
  * FocusCoordinator
  *
  * Tracks browser tab/window focus state via the Page Visibility API and
- * window focus/blur events. On focus loss: pauses the render loop and
- * optionally shows a blur overlay. On focus gain: resumes. Emits
- * AppEventTypes.VisibilityChanged for any other systems that care.
+ * window focus/blur events. On focus loss: pauses the render loop. On focus
+ * gain: resumes. Emits AppEventTypes.VisibilityChanged for any other systems
+ * that need to respond (e.g. PerformanceMonitorUI pausing its own RAF loop).
  *
- * Exposes window.toggleSceneBlur() as a dev-console debug helper.
+ * Visual feedback on blur:
+ * A frosted-glass / VHS-scanline overlay over the Three.js canvas could go here.
+ * The CSS hook point is setBlurOverlay(true/false); window.toggleSceneBlur()
+ * toggles it from the console. Currently no overlay is shown on focus loss —
+ * add the visual treatment to .scene-blur-overlay in scene-blur-overlay.css,
+ * or hook a Three.js post-processing pass off isAppFocused() for a VHS look.
  */
 
 import { EventManager } from '../../core/EventManager'
@@ -100,11 +105,9 @@ export class FocusCoordinator {
         if (focused) {
             console.debug(`[FocusCoordinator] Focus GAINED — source: ${source}`)
             this.sceneManager.resumeRenderLoop()
-            this.setBlurOverlay(false)
         } else {
             console.debug(`[FocusCoordinator] Focus LOST — source: ${source}`)
             this.sceneManager.pauseRenderLoop()
-            this.setBlurOverlay(true)
         }
 
         this.eventManager.emit<VisibilityChangedEvent>(

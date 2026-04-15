@@ -71,7 +71,7 @@ export class SteamBrickAndMortarApp {
     private appSettings: AppSettings
     private compassRose?: CompassRose
     private gameLibraryBinder?: GameLibraryBinderUI
-    private visibilityCoordinator?: FocusCoordinator
+    private focusCoordinator?: FocusCoordinator
     
     // Startup tracking
     private startupTracker: StartupEventTracker
@@ -255,8 +255,8 @@ export class SteamBrickAndMortarApp {
             this.gameLibraryBinder.init()
 
             // Focus tracking: pause render loop on blur, resume on focus, + window.toggleSceneBlur()
-            this.visibilityCoordinator = new FocusCoordinator(this.eventManager, this.sceneManager)
-            this.visibilityCoordinator.init()
+            this.focusCoordinator = new FocusCoordinator(this.eventManager, this.sceneManager)
+            this.focusCoordinator.init()
 
             // Initialize system UI coordinator (lighting panel, debug panels, etc.)
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())
@@ -277,7 +277,7 @@ export class SteamBrickAndMortarApp {
         this.eventManager.dispose()
         
         this.systemUICoordinator.dispose()
-        this.visibilityCoordinator?.dispose()
+        this.focusCoordinator?.dispose()
         this.webxrCoordinator.dispose()
         this.sceneCoordinator.dispose()
         this.sceneManager.dispose()
