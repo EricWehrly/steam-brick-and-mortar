@@ -452,9 +452,6 @@ export class LodGameArtworkRenderer {
         return true
     }
     
-    /**
-     * Set LOD level for all instances.
-     */
     public setGlobalLod(lodLevel: LodLevel): void {
         if (!this.lodLevels) return
         
@@ -468,61 +465,16 @@ export class LodGameArtworkRenderer {
         LodGameArtworkRenderer.logger.debug(`Set global LOD to ${lodLevel} for ${this.currentInstanceCount} instances`)
     }
     
-    /**
-     * Get instance data for a specific instance.
-     */
-    public getInstance(instanceIndex: number): InstanceData | undefined {
-        return this.instanceData.get(instanceIndex)
-    }
-    
-    /**
-     * Get all instance data (readonly).
-     */
-    public getAllInstances(): ReadonlyMap<number, InstanceData> {
-        return this.instanceData
-    }
-    
     public getInstanceCount(): number {
         return this.currentInstanceCount
-    }
-    
-    public getMaxInstances(): number {
-        return this.config.maxInstances
     }
     
     public isReady(): boolean {
         return this.instancedMesh !== null
     }
     
-    public getMesh(): THREE.InstancedMesh | null {
-        return this.instancedMesh
-    }
-    
     public getHighTextureCache(): HighTextureCache | null {
         return this.highTextureCache
-    }
-    
-    public startPrewarming(): void {
-        this.spatialPrewarming?.start()
-    }
-    
-    public stopPrewarming(): void {
-        this.spatialPrewarming?.stop()
-    }
-
-    /**
-     * Evict all loaded HIGH textures, downgrading all instances to MID LOD.
-     * Called after extended focus loss to release GPU memory.
-     * HIGH textures will reload from pixel cache on next player approach.
-     */
-    public spinDownHighTextures(): void {
-        if (!this.highTextureCache || !this.lodLevels) return
-        const evicted = this.highTextureCache.evictAll()
-        if (evicted === 0) return
-        // Eviction fires onHighSlotChange for each game, which already sets lodLevel to MID.
-        // Force a GPU flush so the shader sees the slot reset before the next render.
-        this.pendingAttributeUpdate = true
-        LodGameArtworkRenderer.logger.info(`spinDownHighTextures: evicted ${evicted} HIGH textures, all instances downgraded to MID`)
     }
     
     public isHighTextureLoaded(instanceIndex: number): boolean {
