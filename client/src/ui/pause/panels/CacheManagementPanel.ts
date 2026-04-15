@@ -389,7 +389,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
     /**
      * Force update cache from network
      */
-        private async forceUpdateCache(): Promise<void> {
+            private async forceUpdateCache(): Promise<void> {
         const panel = this.getPanelElement()
         if (!panel) return
 
@@ -409,8 +409,9 @@ export class CacheManagementPanel extends PauseMenuPanel {
         btn.setAttribute('disabled', 'true')
 
         try {
-            this.eventManager.emit(SteamEventTypes.CacheForceUpdate, {
+            this.eventManager.emit(SteamEventTypes.CacheRefresh, {
                 userInput: targetUser,
+                forceUpdate: true,
                 source: EventSource.UI
             })
             
