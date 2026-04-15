@@ -4,6 +4,7 @@ import { GpuMemoryEstimator } from './GpuMemoryEstimator'
 import { RenderLoopRegistry } from '../scene/RenderLoopRegistry'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
+import { DataManager } from '../core/data/DataManager'
 import type { AllBatchesCompleteEvent } from '../types/EnvironmentEvents'
 
 // Sample every N frames. At 60 fps this is ~67 s; naturally pauses with the render loop.
@@ -14,6 +15,10 @@ const REGISTRY_ID = 'GpuMemoryReporter'
 interface MemorySample {
     geometries: number
     textures: number
+    programs: number
+    drawCalls: number
+    triangles: number
+    registeredMb: number
 }
 
 // Dev-mode reporter that samples renderer.info.memory every FRAMES_PER_SAMPLE frames.
@@ -63,7 +68,9 @@ export class GpuMemoryReporter {
         RenderLoopRegistry.getInstance().register(REGISTRY_ID, () => this.onFrame())
 
         console.debug(
-            `[GpuMemoryReporter] Baseline — geometries: ${this.lastSample.geometries}, textures: ${this.lastSample.textures}. ` +
+            `[GpuMemoryReporter] Baseline — geometries: ${this.lastSample.geometries}, textures: ${this.lastSample.textures}, ` +
+            `programs: ${this.lastSample.programs}, draw calls: ${this.lastSample.drawCalls}, ` +
+            `triangles: ${this.lastSample.triangles.toLocaleString()}, registered VRAM: ${this.lastSample.registeredMb.toFixed(0)} MB. ` +
             `Sampling every ${FRAMES_PER_SAMPLE} frames. window.dumpGpuMemory() for full breakdown.`
         )
     }
@@ -77,7 +84,11 @@ export class GpuMemoryReporter {
 
     private takeSample(): MemorySample {
         const { geometries, textures } = this.renderer.info.memory
-        return { geometries, textures }
+        const programs = this.renderer.info.programs?.length ?? 0
+        const { calls: drawCalls, triangles } = this.renderer.info.render
+        const registeredMb = [...DataManager.getInstance().getMemoryConsumption().values()]
+            .reduce((sum, mb) => sum + mb, 0)
+        return { geometries, textures, programs, drawCalls, triangles, registeredMb }
     }
 
     private report(): void {
@@ -86,17 +97,21 @@ export class GpuMemoryReporter {
 
         const geometryDelta = current.geometries - prev.geometries
         const textureDelta = current.textures - prev.textures
-        const hasGrowth = geometryDelta >= GROWTH_THRESHOLD || textureDelta >= GROWTH_THRESHOLD
+        const programDelta = current.programs - prev.programs
+        const hasGrowth = geometryDelta >= GROWTH_THRESHOLD || textureDelta >= GROWTH_THRESHOLD || programDelta >= 1
+
+        const summary =
+            `geometries: ${current.geometries} (${geometryDelta >= 0 ? '+' : ''}${geometryDelta}), ` +
+            `textures: ${current.textures} (${textureDelta >= 0 ? '+' : ''}${textureDelta}), ` +
+            `programs: ${current.programs} (${programDelta >= 0 ? '+' : ''}${programDelta}), ` +
+            `draw calls: ${current.drawCalls}, ` +
+            `triangles: ${current.triangles.toLocaleString()}, ` +
+            `registered VRAM: ${current.registeredMb.toFixed(0)} MB`
 
         if (hasGrowth) {
-            console.warn(
-                `[GpuMemoryReporter] Growth — geometries: ${prev.geometries} → ${current.geometries} (+${geometryDelta}), ` +
-                `textures: ${prev.textures} → ${current.textures} (+${textureDelta})`
-            )
+            console.warn(`[GpuMemoryReporter] Growth — ${summary}`)
         } else {
-            console.debug(
-                `[GpuMemoryReporter] Stable — geometries: ${current.geometries}, textures: ${current.textures}`
-            )
+            console.debug(`[GpuMemoryReporter] Stable — ${summary}`)
         }
 
         this.lastSample = current
