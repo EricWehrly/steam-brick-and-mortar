@@ -43,6 +43,7 @@ export interface SteamCacheRefreshEvent extends BaseInteractionEvent {
 }
 
 export interface SteamCacheForceUpdateEvent extends BaseInteractionEvent {
+    userInput: string
     // Triggered when explicitly bypassing cache to fetch latest from Steam
 }
 
