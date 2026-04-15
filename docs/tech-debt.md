@@ -32,7 +32,19 @@
 
 ---
 
-## id: system-events-split
+## id: shelf-end-cap-signs
+**Priority**: Low  
+**Effort**: Medium (requires instanced/batched text rendering)  
+**Context**: Shelf end-cap labels ("FRONT" / "BACK" per shelf) are disabled in `SceneSignManager.handleShelfCreated` because at 47 shelves they add ~94 draw calls (2 canvas sign DCs × 47). Canvas signs can't be instanced as-is because each bakes a unique texture.
+
+**Done when**:
+- Sign rendering supports instanced or atlased text so repeated labels (same text, many positions) cost 1-2 DCs total instead of N
+- OR a deliberate decision is made that end-cap labels aren't needed and the dead code is removed
+
+**Source tags**:  
+- `// TD: shelf-end-cap-signs` in `client/src/scene/SceneSignManager.ts`
+
+---
 **Priority**: Low  
 **Effort**: ~1-2 hours  
 **Context**: `InteractionEvents.ts` already has a `// TD` noting it conflates user interaction events with system lifecycle events. The new `AppEventTypes` entries (`WorldDetailEnhanced`, `StoreFirstContentReady`, `StoreFullyPopulated`) are system events masquerading as app/UI events because there's nowhere better to put them yet.

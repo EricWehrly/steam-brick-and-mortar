@@ -98,9 +98,12 @@ export class SceneSignManager {
         const shelfPos = position as THREE.Vector3
 
         const topSurface = ShelfSurfaceUtils.findShelfSurfaces(null, true)[0]
-        if (topSurface) {
-            this.placeShelfEndCapLabels(batchIndex, shelfPos, rotY, topSurface)
-        }
+        // TD: shelf-end-cap-signs — end-cap FRONT/BACK labels disabled until sign
+        // rendering is efficient enough to absorb the DC cost (~2 DCs per shelf).
+        // Re-enable when instanced/batched text rendering is in place.
+        // if (topSurface) {
+        //     this.placeShelfEndCapLabels(batchIndex, shelfPos, rotY, topSurface)
+        // }
     }
 
     private handleRoomResized(detail: RoomResizedEvent): void {
