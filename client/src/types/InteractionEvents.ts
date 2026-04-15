@@ -390,6 +390,11 @@ export const AppEventTypes = {
      * TD: system-events-split
      */
     StoreFullyPopulated:   'app:store-fully-populated',
+    /**
+     * Fired when the browser tab gains or loses visibility.
+     * Subscribers use this to throttle the render loop or drop LOD when hidden.
+     */
+    VisibilityChanged:     'app:visibility-changed',
 } as const
 
 export interface PhaseCompletedEvent extends BaseInteractionEvent {
@@ -421,6 +426,13 @@ export interface GameLoadingPhaseChangedEvent extends BaseInteractionEvent {
 export interface GameLoadingProgressEvent extends BaseInteractionEvent {
     current: number
     total: number
+}
+
+export interface VisibilityChangedEvent extends BaseInteractionEvent {
+    /** true = tab visible / focused; false = tab hidden / blurred */
+    visible: boolean
+    /** Which browser event triggered the change */
+    visibilitySource: 'visibilitychange' | 'window-focus' | 'window-blur'
 }
 
 // EVENT TYPE MAPPINGS

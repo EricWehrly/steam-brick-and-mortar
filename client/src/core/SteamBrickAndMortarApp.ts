@@ -15,6 +15,7 @@
 import * as THREE from 'three'
 import { ToastManager, UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
 import { WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
+import { VisibilityCoordinator } from '../ui/coordinators/VisibilityCoordinator'
 import { SceneManager, SceneCoordinator } from '../scene'
 import { SceneManagerDebug } from '../debug/SceneManagerDebug'
 import { CompassRose } from '../ui/debug/CompassRose'
@@ -70,6 +71,7 @@ export class SteamBrickAndMortarApp {
     private appSettings: AppSettings
     private compassRose?: CompassRose
     private gameLibraryBinder?: GameLibraryBinderUI
+    private visibilityCoordinator?: VisibilityCoordinator
     
     // Startup tracking
     private startupTracker: StartupEventTracker
@@ -252,6 +254,10 @@ export class SteamBrickAndMortarApp {
             this.gameLibraryBinder = GameLibraryBinderUI.getInstance()
             this.gameLibraryBinder.init()
 
+            // Visibility tracking: focus/blur logging + window.toggleSceneBlur() debug helper
+            this.visibilityCoordinator = new VisibilityCoordinator(this.eventManager)
+            this.visibilityCoordinator.init()
+
             // Initialize system UI coordinator (lighting panel, debug panels, etc.)
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())
 
@@ -271,6 +277,7 @@ export class SteamBrickAndMortarApp {
         this.eventManager.dispose()
         
         this.systemUICoordinator.dispose()
+        this.visibilityCoordinator?.dispose()
         this.webxrCoordinator.dispose()
         this.sceneCoordinator.dispose()
         this.sceneManager.dispose()
