@@ -509,6 +509,21 @@ export class LodGameArtworkRenderer {
     public stopPrewarming(): void {
         this.spatialPrewarming?.stop()
     }
+
+    /**
+     * Evict all loaded HIGH textures, downgrading all instances to MID LOD.
+     * Called after extended focus loss to release GPU memory.
+     * HIGH textures will reload from pixel cache on next player approach.
+     */
+    public spinDownHighTextures(): void {
+        if (!this.highTextureCache || !this.lodLevels) return
+        const evicted = this.highTextureCache.evictAll()
+        if (evicted === 0) return
+        // Eviction fires onHighSlotChange for each game, which already sets lodLevel to MID.
+        // Force a GPU flush so the shader sees the slot reset before the next render.
+        this.pendingAttributeUpdate = true
+        LodGameArtworkRenderer.logger.info(`spinDownHighTextures: evicted ${evicted} HIGH textures, all instances downgraded to MID`)
+    }
     
     public isHighTextureLoaded(instanceIndex: number): boolean {
         if (!this.lazyHighTextures || !this.highTextureCache) {

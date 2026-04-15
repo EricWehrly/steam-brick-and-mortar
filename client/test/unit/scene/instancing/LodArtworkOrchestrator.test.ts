@@ -37,7 +37,8 @@ vi.mock('../../../../src/core/EventManager', () => ({
     EventManager: {
         getInstance: vi.fn().mockReturnValue({
             registerEventHandler: vi.fn(),
-            unregisterEventHandler: vi.fn()
+            unregisterEventHandler: vi.fn(),
+            removeEventListener: vi.fn()
         })
     }
 }))
@@ -74,6 +75,7 @@ vi.mock('../../../../src/scene/game-box/instancing/HighTextureCache', () => ({
         requestHighTexture: vi.fn().mockReturnValue(-1),
         isLoaded: vi.fn().mockReturnValue(false),
         flushToGpu: vi.fn().mockReturnValue(false),
+        evictAll: vi.fn().mockReturnValue(0),
         dispose: vi.fn()
     } })
 }))

@@ -863,6 +863,33 @@ export class HighTextureCache {
     }
 
     /**
+     * Evict all currently loaded HIGH textures, freeing all slots.
+     * Called when the app loses focus for an extended period to release GPU memory.
+     * Games will reload from pixel cache (fast) or network (slow) on next request.
+     */
+    public evictAll(): number {
+        let evictedCount = 0
+        for (const entry of this.games.values()) {
+            if (entry.state === HighTextureState.LOADED && entry.highSlot >= 0) {
+                this.slotToGame[entry.highSlot] = -1
+                entry.state = HighTextureState.EMPTY
+                entry.highSlot = -1
+                this.stats.evictions++
+                evictedCount++
+                if (this.onSlotChange) {
+                    this.onSlotChange(entry.gameIndex, -1)
+                }
+            }
+        }
+        // Cancel any pending loads — no point loading while unfocused
+        this.loadQueue = []
+        if (evictedCount > 0) {
+            HighTextureCache.logger.info(`evictAll: released ${evictedCount} HIGH texture slots`)
+        }
+        return evictedCount
+    }
+
+    /**
      * Force-evict a specific game's HIGH texture
      */
     public evictGame(gameIndex: number): boolean {

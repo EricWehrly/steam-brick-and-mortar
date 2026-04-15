@@ -1,11 +1,11 @@
 /**
  * LOD Artwork Orchestrator - Coordinates artwork loading pipeline
- * 
+ *
  * This orchestrator wires together:
  * - GameArtworkProvider: URL strategy and fetch coordination
  * - LodTextureArrayManager: Texture array creation and population
  * - LodGameArtworkRenderer: GPU rendering with LOD support
- * 
+ *
  * Provides the primary API for game artwork loading (setArtworkInstanceFromUrl)
  * and implements ILodArtworkRenderer for consumers like LodDistanceManager.
  */
@@ -14,15 +14,16 @@ import * as THREE from 'three'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { EventManager } from '../../../core/EventManager'
-import { GameEventTypes } from '../../../types/InteractionEvents'
+import { GameEventTypes, AppEventTypes } from '../../../types/InteractionEvents'
+import type { VisibilityChangedEvent } from '../../../types/InteractionEvents'
 import type { SomeBatchesCompleteEvent } from '../../../types/EnvironmentEvents'
 import { Logger } from '../../../utils/Logger'
 import { GameArtworkProvider } from './GameArtworkProvider'
 import { LodTextureArrayManager, type LodTierConfig } from './LodTextureArrayManager'
-import { 
-    LodGameArtworkRenderer, 
-    LOD_LEVEL, 
-    type LodLevel, 
+import {
+    LodGameArtworkRenderer,
+    LOD_LEVEL,
+    type LodLevel,
     type LodGameArtworkRendererConfig,
     type LodTextureArrays
 } from './LodGameArtworkRenderer'
@@ -80,30 +81,34 @@ export class LodArtworkOrchestrator {
     private artworkProvider: GameArtworkProvider
     private textureManager: LodTextureArrayManager
     private renderer: LodGameArtworkRenderer
-    
+
     private readonly maxTextures: number
     private readonly lodConfigs: LodConfig[]
     private readonly lazyHighTextures: boolean
-    
+
     // Track game names to texture indices
     private gameNameToTextureIndex: Map<string, number> = new Map()
     private textureIndexToGameName: Map<number, string> = new Map()
     private instanceMetadata: Map<number, InstanceMetadata> = new Map()
-    
+
     // Track failed artwork (for backward compat)
     private failedArtwork: Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> = new Map()
-    
+
     // Prevent log spam when atlas is full
     private atlasFullLogged: boolean = false
-    
+
+    // Focus-loss spin-down: evict HIGH textures after 5s of being unfocused
+    private spinDownTimerId: ReturnType<typeof setTimeout> | null = null
+    private readonly onFocusChanged: (e: CustomEvent<VisibilityChangedEvent>) => void
+
     constructor(config: LodArtworkConfig = {}) {
         this.maxTextures = config.maxTextures ?? 512
         this.lodConfigs = config.lodConfigs ?? DEFAULT_LOD_CONFIGS
         this.lazyHighTextures = config.lazyHighTextures ?? false
-        
+
         // Get singleton provider
         this.artworkProvider = GameArtworkProvider.getInstance()
-        
+
         // Create texture array manager
         const tierConfigs: LodTierConfig[] = this.lodConfigs.map(lc => ({
             name: lc.name,
@@ -112,7 +117,7 @@ export class LodArtworkOrchestrator {
             maxDepth: lc.maxDepth ?? this.maxTextures
         }))
         this.textureManager = new LodTextureArrayManager({ tiers: tierConfigs })
-        
+
         // Create renderer
         const highConfig = this.lodConfigs.find(c => c.level === LOD_LEVEL.HIGH)
         const rendererConfig: LodGameArtworkRendererConfig = {
@@ -124,7 +129,7 @@ export class LodArtworkOrchestrator {
             lazyHighTextures: this.lazyHighTextures,
             gpuUpdateInterval: 10
         }
-        
+
         if (this.lazyHighTextures) {
             rendererConfig.highTextureCacheConfig = {
                 totalSlots: highConfig?.maxDepth ?? 64,
@@ -134,9 +139,9 @@ export class LodArtworkOrchestrator {
             }
             rendererConfig.prewarmingConfig = config.prewarmingConfig
         }
-        
+
         this.renderer = this.createRenderer(rendererConfig)
-        
+
         // Initialize with texture arrays
         const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
         if (scene) {
@@ -151,7 +156,28 @@ export class LodArtworkOrchestrator {
             GameEventTypes.AllBatchesComplete,
             this.compactMidTierAfterLoad.bind(this)
         )
-        
+
+        // Spin down HIGH texture cache 5s after focus loss to release GPU memory.
+        // On focus gain, cancel the timer — no need to evict if the user returned quickly.
+        // HIGH textures reload from pixel cache (fast) on next player approach.
+        this.onFocusChanged = (e: CustomEvent<VisibilityChangedEvent>) => {
+            if (e.detail.visible) {
+                if (this.spinDownTimerId !== null) {
+                    clearTimeout(this.spinDownTimerId)
+                    this.spinDownTimerId = null
+                }
+            } else {
+                this.spinDownTimerId = setTimeout(() => {
+                    this.spinDownTimerId = null
+                    this.renderer.spinDownHighTextures()
+                }, 5_000)
+            }
+        }
+        EventManager.getInstance().registerEventHandler(
+            AppEventTypes.VisibilityChanged,
+            this.onFocusChanged
+        )
+
         this.logConfig()
     }
 
@@ -162,26 +188,26 @@ export class LodArtworkOrchestrator {
     private compactMidTierAfterLoad(): void {
         this.textureManager.compactMidTier()
     }
-    
+
     /** Factory method - override in debug subclass */
     protected createRenderer(config: LodGameArtworkRendererConfig): LodGameArtworkRenderer {
         return new LodGameArtworkRenderer(config)
     }
-    
+
     private initialize(scene: THREE.Scene): void {
         const highTexture = this.textureManager.getTextureArray(LOD_TIER_NAME.HIGH)
         const midTexture = this.textureManager.getTextureArray(LOD_TIER_NAME.MID)
-        
+
         if (!highTexture || !midTexture) {
             throw new Error(`Failed to get texture arrays - expected tiers '${LOD_TIER_NAME.HIGH}' and '${LOD_TIER_NAME.MID}'`)
         }
-        
+
         const textureArrays: LodTextureArrays = {
             high: highTexture,
             mid: midTexture
         }
         this.renderer.initialize(textureArrays, scene)
-        
+
         // Register instance metadata map for downstream systems (raycast, diagnostics)
         DataManager.getInstance().set(
             DataKey.InstancedArtworkMetadata,
@@ -189,11 +215,11 @@ export class LodArtworkOrchestrator {
             { domain: DataDomain.Renderer }
         )
     }
-    
+
     private logConfig(): void {
         let totalVRAM = 0
         const lodInfo: string[] = []
-        
+
         for (const tierName of this.textureManager.getTierNames()) {
             const config = this.textureManager.getTierConfig(tierName)
             if (config) {
@@ -202,10 +228,10 @@ export class LodArtworkOrchestrator {
                 lodInfo.push(`${tierName}: ${config.maxDepth} slots × ${config.width}×${config.height}px = ${(vram / (1024 * 1024)).toFixed(1)}MB`)
             }
         }
-        
+
         LodArtworkOrchestrator.logger.lifecycle(`LOD VRAM: ${lodInfo.join(', ')} | Total: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
     }
-    
+
     /**
      * Main entry point - matches old LodArtworkRenderer API
      */
@@ -221,7 +247,7 @@ export class LodArtworkOrchestrator {
         if (existingIndex !== undefined) {
             return { success: true, instanceIndex: existingIndex }
         }
-        
+
         // Only skip known permanent failures. Non-permanent historical failures
         // (UNKNOWN/TIMEOUT/NETWORK) should be retried.
         if (this.artworkProvider.isPermanentFailure(appid ?? 0, 'library')) {
@@ -229,7 +255,7 @@ export class LodArtworkOrchestrator {
             LodArtworkOrchestrator.logger.debug(`Skipping "${gameName}": permanent failure (${reason})`)
             return { success: false, instanceIndex: -1 }
         }
-        
+
         // Allocate texture slot
         const textureIndex = this.textureManager.allocateSlot()
         if (textureIndex < 0) {
@@ -239,7 +265,7 @@ export class LodArtworkOrchestrator {
             }
             return { success: false, instanceIndex: -1 }
         }
-        
+
         try {
             // Get artwork handle
             const artwork = this.artworkProvider.getArtwork(
@@ -248,31 +274,31 @@ export class LodArtworkOrchestrator {
                 'library',
                 artworkUrl
             )
-            
+
             // Load MID texture (always needed)
             const midConfig = this.lodConfigs.find(c => c.level === LOD_LEVEL.MID)
             const midWidth = midConfig?.textureWidth ?? midConfig?.textureSize ?? 150
             const midHeight = midConfig?.textureHeight ?? midConfig?.textureSize ?? 225
-            
+
             const midResult = await artwork.getPixelsAtSize(midWidth, midHeight)
             this.textureManager.setSlotPixels(LOD_TIER_NAME.MID, textureIndex, midResult.pixels, midWidth, midHeight)
-            
+
             // For non-lazy mode, also load HIGH
             if (!this.lazyHighTextures) {
                 const highConfig = this.lodConfigs.find(c => c.level === LOD_LEVEL.HIGH)
                 const highWidth = highConfig?.textureWidth ?? STEAM_CAPSULE_WIDTH
                 const highHeight = highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT
-                
+
                 const highResult = await artwork.getPixelsAtSize(highWidth, highHeight)
                 this.textureManager.setSlotPixels(LOD_TIER_NAME.HIGH, textureIndex, highResult.pixels, highWidth, highHeight)
             }
-            
+
             // Flush texture to GPU immediately after pixel data is ready.
             // Without this, MID textures only reach the GPU on the next SomeBatchesComplete
-            // event — which may have already fired in a single-batch load (e.g. demo store).
+            // event - which may have already fired in a single-batch load (e.g. demo store).
             // TODO: tear this back out and probably force a gpu update when we get an event after SomeBatchesComplete
             this.updateGPU()
-            
+
             // Create instance
             const resolvedUrl = artwork.getUrl()
             const instanceIndex = this.renderer.addInstance({
@@ -283,11 +309,11 @@ export class LodArtworkOrchestrator {
                 lodLevel: this.lazyHighTextures ? LOD_LEVEL.MID : LOD_LEVEL.HIGH,
                 rotation,
             })
-            
+
             if (instanceIndex < 0) {
                 return { success: false, instanceIndex: -1 }
             }
-            
+
             // Track mapping
             this.gameNameToTextureIndex.set(gameName, textureIndex)
             this.textureIndexToGameName.set(textureIndex, gameName)
@@ -296,9 +322,9 @@ export class LodArtworkOrchestrator {
                 appid,
                 position: position.clone()
             })
-            
+
             return { success: true, instanceIndex }
-            
+
         } catch (error) {
             const reason = error instanceof Error ? error.message : String(error)
             this.failedArtwork.set(gameName, {
@@ -311,7 +337,7 @@ export class LodArtworkOrchestrator {
             return { success: false, instanceIndex: -1 }
         }
     }
-    
+
     private categorizeFailure(msg: string): string {
         const lower = msg.toLowerCase()
         if (lower.includes('cors')) return 'CORS'
@@ -320,83 +346,91 @@ export class LodArtworkOrchestrator {
         if (lower.includes('network') || lower.includes('failed to fetch')) return 'NETWORK'
         return 'UNKNOWN'
     }
-    
+
     // === Delegated methods to renderer ===
-    
+
     public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {
         return this.renderer.setInstanceLod(instanceIndex, lodLevel)
     }
-    
+
     public setGlobalLod(lodLevel: LodLevel): void {
         this.renderer.setGlobalLod(lodLevel)
     }
-    
+
     public getInstanceLod(instanceIndex: number): LodLevel | null {
         const data = this.renderer.getInstance(instanceIndex)
         return data?.lodLevel ?? null
     }
-    
+
     private updateGPU(): void {
         this.textureManager.flushToGpu()
         this.renderer.flushToGpu()
     }
-    
+
     public isReady(): boolean {
         return this.renderer.isReady()
     }
-    
+
     public getInstanceCount(): number {
         return this.renderer.getInstanceCount()
     }
-    
+
     public getInstanceData(): ReadonlyMap<number, { position: THREE.Vector3; lodLevel: LodLevel }> {
         return this.renderer.getAllInstances() as ReadonlyMap<number, { position: THREE.Vector3; lodLevel: LodLevel }>
     }
-    
+
     public isHighTextureLoaded(instanceIndex: number): boolean {
         return this.renderer.isHighTextureLoaded(instanceIndex)
     }
-    
+
     public getHighTextureCache(): HighTextureCache | null {
         return this.renderer.getHighTextureCache()
     }
-    
+
     public startPrewarming(): void {
         this.renderer.startPrewarming()
     }
-    
+
     public stopPrewarming(): void {
         this.renderer.stopPrewarming()
     }
-    
+
     public clearFailureCache(): void {
         this.failedArtwork.clear()
         this.artworkProvider.clearCaches()
         LodArtworkOrchestrator.logger.info('Cleared artwork caches - all URLs will be retried on next load')
     }
-    
+
     // === Protected accessors for debug subclass ===
-    
+
     protected getTextureManager(): LodTextureArrayManager {
         return this.textureManager
     }
-    
+
     protected getInternalRenderer(): LodGameArtworkRenderer {
         return this.renderer
     }
-    
+
     protected getFailedArtwork(): Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> {
         return this.failedArtwork
     }
-    
+
     public dispose(): void {
+        if (this.spinDownTimerId !== null) {
+            clearTimeout(this.spinDownTimerId)
+            this.spinDownTimerId = null
+        }
+        EventManager.getInstance().removeEventListener(
+            AppEventTypes.VisibilityChanged,
+            this.onFocusChanged
+        )
         this.renderer.dispose()
         this.textureManager.dispose()
         this.gameNameToTextureIndex.clear()
         this.textureIndexToGameName.clear()
         this.instanceMetadata.clear()
         this.failedArtwork.clear()
-        
+
         LodArtworkOrchestrator.logger.lifecycle('Disposed')
     }
 }
