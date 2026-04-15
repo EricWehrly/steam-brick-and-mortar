@@ -23,6 +23,9 @@ import { DataDomain, DataKey } from '../core/data/DataTypes'
 import { RenderLoopRegistry } from './RenderLoopRegistry'
 import { FrameBudgetScheduler } from '../utils/FrameBudgetScheduler'
 import { ThreeWebGLRendererDebug } from '../debug/ThreeWebGLRendererDebug'
+import { EventManager } from '../core/EventManager'
+import { AppEventTypes } from '../types/InteractionEvents'
+import type { VisibilityChangedEvent } from '../types/InteractionEvents'
 
 export interface SceneManagerOptions {
     antialias?: boolean
@@ -38,16 +41,11 @@ export class SceneManager {
     private renderLoopRegistry: RenderLoopRegistry
 
     constructor(options: SceneManagerOptions = {}) {
-        // Initialize RectAreaLight uniforms (required for RectAreaLight to work)
         RectAreaLightUniformsLib.init()
-        
-        // Initialize Three.js components
+
         this.scene = new THREE.Scene()
-        
-        DataManager.getInstance().set('core.mainScene', this.scene, {
-            domain: DataDomain.Scene
-        })
-        
+        DataManager.getInstance().set('core.mainScene', this.scene, { domain: DataDomain.Scene })
+
         // Camera Configuration
         // FOV (Field of View): Vertical angle in degrees
         //   - Narrow (45-60°): Telephoto effect, less distortion, focused view
@@ -64,46 +62,33 @@ export class SceneManager {
         // 70 deg: good flatscreen default. VR headsets use 90-110 but that causes
         // fisheye edge distortion on a flat monitor. When WebXR is active, the
         // headset takes over projection entirely so this value only affects desktop view.
-        const CAMERA_FOV = 70;
-        const CAMERA_ASPECT = window.innerWidth / window.innerHeight;
-        const CAMERA_NEAR_DIST = 0.1;
-        const CAMERA_FAR_DIST = 1000;
+        const CAMERA_FOV = 70
+        const CAMERA_ASPECT = window.innerWidth / window.innerHeight
+        const CAMERA_NEAR_DIST = 0.1
+        const CAMERA_FAR_DIST = 1000
         this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, CAMERA_ASPECT, CAMERA_NEAR_DIST, CAMERA_FAR_DIST)
-        
-        // Store camera in DataManager for access by other systems (e.g., camera settings panel)
-        DataManager.getInstance().set(DataKey.MainCamera, this.camera, {
-            domain: DataDomain.Scene
-        })
-        
+        DataManager.getInstance().set(DataKey.MainCamera, this.camera, { domain: DataDomain.Scene })
+
         // Swap ThreeWebGLRendererDebug ↔ THREE.WebGLRenderer to toggle shader-compile
         // logging and slow-frame warnings. Both are identical at the type level.
         this.renderer = new ThreeWebGLRendererDebug({ antialias: options.antialias ?? true })
         // this.renderer = new THREE.WebGLRenderer({ antialias: options.antialias ?? true })
+        DataManager.getInstance().set(DataKey.Renderer, this.renderer, { domain: DataDomain.Scene })
 
-        DataManager.getInstance().set(DataKey.Renderer, this.renderer, {
-            domain: DataDomain.Scene
-        })
-
-        // PropRenderer creation deferred to avoid blocking startup
-        // Will be created on first use by LightingRenderer
-
-        // Initialize skybox manager (retrieves scene from DataManager)
         this.skyboxManager = new SkyboxManager()
-        
-        // Initialize render loop registry
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
 
         this.setupRenderer(options)
         this.setupCamera()
         this.setupEventListeners()
-        
-        // Initialize skybox asynchronously (non-blocking)
         this.initializeSkybox()
+
+        EventManager.getInstance().registerEventHandler<VisibilityChangedEvent>(
+            AppEventTypes.VisibilityChanged,
+            this.handleVisibilityChanged.bind(this)
+        )
     }
 
-    /**
-     * Initialize skybox asynchronously - called during construction
-     */
     private async initializeSkybox(): Promise<void> {
         try {
             await this.skyboxManager.applySkybox(SkyboxPresets.aurora)
@@ -162,21 +147,26 @@ export class SceneManager {
         this.renderer.setAnimationLoop(this.renderLoopCallback)
     }
 
-    public pauseRenderLoop(): void {
+    private pauseRenderLoop(): void {
         this.renderer.setAnimationLoop(null)
         console.debug('[SceneManager] Render loop paused')
     }
 
-    public resumeRenderLoop(): void {
+    private resumeRenderLoop(): void {
         if (this.renderLoopCallback) {
             this.renderer.setAnimationLoop(this.renderLoopCallback)
             console.debug('[SceneManager] Render loop resumed')
         }
     }
 
-    // Atmospheric Props Methods (Phase 2.4)
+    private handleVisibilityChanged(event: CustomEvent<VisibilityChangedEvent>): void {
+        if (event.detail.visible) {
+            this.resumeRenderLoop()
+        } else {
+            this.pauseRenderLoop()
+        }
+    }
 
-    // Getters for accessing Three.js components
     public getScene(): THREE.Scene {
         return this.scene
     }
@@ -189,9 +179,6 @@ export class SceneManager {
         return this.renderer
     }
 
-    /**
-     * Get PropRenderer (creates it if needed)
-     */
     public getPropRenderer(): PropRenderer {
         if (!this.propRenderer) {
             this.propRenderer = new PropRenderer(this.scene)

@@ -4,6 +4,7 @@
 @import './components/steam-ui.css';
 @import './components/lighting-controls.css';
 @import './components/game-artwork-inspector.css';
+@import './components/scene-blur-overlay.css';
 
 /* ===== Global Color Scheme ===== */
 :root {

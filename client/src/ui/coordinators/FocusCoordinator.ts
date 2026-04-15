@@ -17,15 +17,14 @@
 import { EventManager } from '../../core/EventManager'
 import { AppEventTypes } from '../../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../../types/InteractionEvents'
-import type { SceneManager } from '../../scene/SceneManager'
 
+const BLUR_CLASS = 'scene-blurred'
 const BLUR_OVERLAY_ID = 'scene-blur-overlay'
 
 export class FocusCoordinator {
-    private readonly eventManager: EventManager
-    private readonly sceneManager: SceneManager
+    private readonly eventManager = EventManager.getInstance()
     private isFocused: boolean = !document.hidden
-    private blurOverlay: HTMLElement | null = null
+    private readonly blurOverlay: HTMLElement
 
     private readonly onVisibilityChange = (): void => {
         const nowFocused = !document.hidden
@@ -46,9 +45,12 @@ export class FocusCoordinator {
         this.handleFocusChanged(false, 'window-blur')
     }
 
-    constructor(eventManager: EventManager, sceneManager: SceneManager) {
-        this.eventManager = eventManager
-        this.sceneManager = sceneManager
+    constructor() {
+        const overlay = document.createElement('div')
+        overlay.id = BLUR_OVERLAY_ID
+        overlay.className = 'scene-blur-overlay'
+        document.body.appendChild(overlay)
+        this.blurOverlay = overlay
     }
 
     init(): void {
@@ -66,50 +68,12 @@ export class FocusCoordinator {
         window.removeEventListener('focus', this.onWindowFocus)
         window.removeEventListener('blur', this.onWindowBlur)
 
-        this.setBlurOverlay(false)
+        this.blurOverlay.classList.remove(BLUR_CLASS)
     }
-
-    isAppFocused(): boolean {
-        return this.isFocused
-    }
-
-    // -------------------------------------------------------------------------
-    // Blur overlay — glass/frosted effect over the Three.js canvas
-    // -------------------------------------------------------------------------
-
-    setBlurOverlay(enabled: boolean): void {
-        if (enabled) {
-            if (this.blurOverlay) return
-            const overlay = document.createElement('div')
-            overlay.id = BLUR_OVERLAY_ID
-            overlay.className = 'scene-blur-overlay'
-            document.body.appendChild(overlay)
-            this.blurOverlay = overlay
-        } else {
-            this.blurOverlay?.remove()
-            this.blurOverlay = null
-        }
-    }
-
-    toggleBlurOverlay(): boolean {
-        const next = !this.blurOverlay
-        this.setBlurOverlay(next)
-        return next
-    }
-
-    // -------------------------------------------------------------------------
-    // Private
-    // -------------------------------------------------------------------------
 
     private handleFocusChanged(focused: boolean, source: 'visibilitychange' | 'window-focus' | 'window-blur'): void {
-        if (focused) {
-            console.debug(`[FocusCoordinator] Focus GAINED — source: ${source}`)
-            this.sceneManager.resumeRenderLoop()
-        } else {
-            console.debug(`[FocusCoordinator] Focus LOST — source: ${source}`)
-            this.sceneManager.pauseRenderLoop()
-        }
-
+        console.debug(`[FocusCoordinator] Focus ${focused ? 'GAINED' : 'LOST'} — source: ${source}`)
+        this.blurOverlay.classList.toggle(BLUR_CLASS, !focused)
         this.eventManager.emit<VisibilityChangedEvent>(
             AppEventTypes.VisibilityChanged,
             { visible: focused, visibilitySource: source }
@@ -120,7 +84,7 @@ export class FocusCoordinator {
         if (typeof window === 'undefined') return
         const self = this
         ;(window as unknown as Record<string, unknown>).toggleSceneBlur = () => {
-            const active = self.toggleBlurOverlay()
+            const active = self.blurOverlay.classList.toggle(BLUR_CLASS)
             console.debug(`[FocusCoordinator] Blur overlay ${active ? 'ON' : 'OFF'}`)
             return active
         }
