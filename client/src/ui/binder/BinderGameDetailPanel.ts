@@ -1,4 +1,5 @@
 import { GameSpotlight } from '../../debug/GameSpotlight'
+import { GameArtworkProvider } from '../../scene/game-box/instancing/GameArtworkProvider'
 import type { SteamGameData } from '../../scene/game-box/types/GameData'
 import detailPanelTemplate from './detail-panel.html?raw'
 
@@ -19,10 +20,19 @@ export class BinderGameDetailPanel {
     public show(game: SteamGameData, options: BinderGameDetailPanelOptions = {}): void {
         this.hide()
 
+        const appid = game.appid
+        const artworkProvider = GameArtworkProvider.getInstance()
+
         const headerUrl = game.artwork?.header
-            || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
-        const libraryUrl = game.artwork?.library
-            || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
+            || `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`
+
+        // Only render the library image if we don't already know it's a permanent failure.
+        // A failed img with onerror="this.src=''" creates an infinite fetch/error loop
+        // that forces style recalculation every rAF tick, permanently poisoning frame time.
+        const libraryKnownBad = typeof appid === 'number' && artworkProvider.isPermanentFailure(appid, 'library')
+        const libraryUrl = libraryKnownBad
+            ? null
+            : (game.artwork?.library || `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`)
         const playtimeHours = Math.round((game.playtime_forever || 0) / 60)
         const playtime2Weeks = Math.round((game.playtime_2weeks || 0) / 60)
 
@@ -51,11 +61,15 @@ export class BinderGameDetailPanel {
 
         const jsonBlob = JSON.stringify(game, null, 2)
 
+        const libraryBlock = libraryUrl
+            ? `<img src="${libraryUrl}" class="detail-artwork-img" loading="lazy" onerror="this.style.display='none'">`
+            : `<div class="detail-artwork-missing">Not available</div>`
+
         const html = detailPanelTemplate
             .replace(/\{\{headerUrl\}\}/g, headerUrl)
-            .replace(/\{\{libraryUrl\}\}/g, libraryUrl)
+            .replace(/\{\{libraryBlock\}\}/g, libraryBlock)
             .replace(/\{\{gameName\}\}/g, this.escapeHtml(game.name))
-            .replace(/\{\{appid\}\}/g, String(game.appid))
+            .replace(/\{\{appid\}\}/g, String(appid))
             .replace(/\{\{playtimeHours\}\}/g, String(playtimeHours))
             .replace(/\{\{playtime2WeeksBlock\}\}/g, playtime2WeeksBlock)
             .replace(/\{\{categoriesBlock\}\}/g, categoriesBlock)
