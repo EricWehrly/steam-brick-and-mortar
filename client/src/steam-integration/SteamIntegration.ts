@@ -79,7 +79,7 @@ export class SteamIntegration {
         this.eventManager.registerEventHandler(GameEventTypes.Start, this.handleGameStart.bind(this))
     }
 
-    private storeSteamDataAndEmitEvent(): void {
+    private storeSteamDataAndEmitEvent(userInput: string | null): void {
         const gameLibraryState = this.getGameLibraryState()
         const games: SteamGameData[] = gameLibraryState.userData?.games || []
         this.steamId = gameLibraryState.userData?.steamid
@@ -90,8 +90,18 @@ export class SteamIntegration {
         dataManager.set<SteamGameData[]>('steam.games', games, {
             domain: DataDomain.SteamIntegration
         })
+        if (userInput) {
+            dataManager.set<string>('steam.userInput', userInput, {
+                domain: DataDomain.SteamIntegration
+            })
+        }
 
         this.eventManager.emit<SteamDataLoadedEvent>(SteamEventTypes.DataLoaded)
+    }
+
+    /** Returns true when no user identity has been established (anonymous/demo browse). */
+    public isAnonymous(): boolean {
+        return !DataManager.getInstance().get<string>('steam.userInput')
     }
 
     async loadGamesForUser(userInput: string, ignoreCache = false): Promise<GameLibraryState> {
@@ -230,7 +240,7 @@ export class SteamIntegration {
                 }
             }
 
-            this.storeSteamDataAndEmitEvent()
+            this.storeSteamDataAndEmitEvent(null)
             SteamIntegration.logger.info(`Demo store loaded: ${games.length} games in ${totalBatches} batches`)
         } catch (error) {
             SteamIntegration.logger.error('Failed to load demo games:', error)
@@ -242,7 +252,7 @@ export class SteamIntegration {
 
         try {
             await this.loadGamesForUser(userInput)
-            this.storeSteamDataAndEmitEvent()
+            this.storeSteamDataAndEmitEvent(userInput)
             SteamIntegration.logger.info('Load games completed')
         } catch (error) {
             SteamIntegration.logger.error('Load games failed:', error)
@@ -258,7 +268,7 @@ export class SteamIntegration {
         }
 
         await this.loadGamesForUser(vanityUrl, false)
-        this.storeSteamDataAndEmitEvent()
+        this.storeSteamDataAndEmitEvent(vanityUrl)
         SteamIntegration.logger.info('Loaded from cache')
     }
 
@@ -274,7 +284,7 @@ export class SteamIntegration {
             
             const gameState = this.getGameLibraryState()
             if (gameState.userData?.steamid) {
-                this.storeSteamDataAndEmitEvent()
+                this.storeSteamDataAndEmitEvent(this.steamId ?? null)
             }
             SteamIntegration.logger.info(forceUpdate ? 'Cache force updated from network' : 'Cache refreshed')
         } catch (error) {
