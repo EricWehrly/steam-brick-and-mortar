@@ -20,6 +20,23 @@ import { LOD_TIER_NAME } from './ILodArtworkRenderer'
 
 // Class-scoped logger will be added inside the class
 
+/**
+ * Debug mode: paint a solid-color band across the bottom 20% of each texture slot
+ * so LOD tier is visible at a glance in-headset.
+ *
+ * MID tier → blue  (#33 55 FF)
+ * HIGH tier → green (#33 FF 55)
+ *
+ * Set to true and reload to enable. No runtime toggle — this is a dev tool.
+ */
+const LOD_DEBUG_STRIPE = false
+
+/** Stripe colors per tier name (RGBA). Add entries for any custom tiers. */
+const LOD_STRIPE_COLORS: Record<string, [number, number, number, number]> = {
+    [LOD_TIER_NAME.MID]:  [51, 85, 255, 255],   // blue
+    [LOD_TIER_NAME.HIGH]: [51, 255, 85,  255],   // green
+}
+
 /** Configuration for a single LOD tier */
 export interface LodTierConfig {
     name: string
@@ -168,10 +185,31 @@ export class LodTextureArrayManager {
             }
         }
         
-        // Copy to texture array backing data
+        // Copy to texture array backing data, optionally painting the debug stripe
         const offset = slotIndex * expectedSize
         const arrayData = tier.dataArrayTexture.image.data as Uint8Array
-        arrayData.set(pixelData, offset)
+
+        if (LOD_DEBUG_STRIPE) {
+            const stripeColor = LOD_STRIPE_COLORS[tierName]
+            const stripeRows = Math.floor(height * 0.2)
+            const stripeStart = (height - stripeRows) * width * 4  // bottom N rows
+
+            // Write artwork pixels then overwrite the stripe band
+            arrayData.set(pixelData, offset)
+            const stripeColor32 = stripeColor ?? [128, 128, 128, 255]
+            for (let row = 0; row < stripeRows; row++) {
+                const rowOffset = offset + stripeStart + row * width * 4
+                for (let col = 0; col < width; col++) {
+                    const pixelOffset = rowOffset + col * 4
+                    arrayData[pixelOffset]     = stripeColor32[0]
+                    arrayData[pixelOffset + 1] = stripeColor32[1]
+                    arrayData[pixelOffset + 2] = stripeColor32[2]
+                    arrayData[pixelOffset + 3] = stripeColor32[3]
+                }
+            }
+        } else {
+            arrayData.set(pixelData, offset)
+        }
         
         // Mark layer as pending GPU update
         tier.pendingUpdates.add(slotIndex)

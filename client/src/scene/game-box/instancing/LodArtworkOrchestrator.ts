@@ -333,7 +333,23 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
     }
 
     public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {
-        return this.renderer.setInstanceLod(instanceIndex, lodLevel)
+        const previousLod = this.renderer.getInstanceLod(instanceIndex)
+        const accepted = this.renderer.setInstanceLod(instanceIndex, lodLevel)
+        const effectiveLod = this.renderer.getInstanceLod(instanceIndex)
+
+        if (previousLod !== effectiveLod) {
+            const gameName = this.textureIndexToGameName.get(instanceIndex) ?? `instance #${instanceIndex}`
+            const tierName = effectiveLod === LOD_LEVEL.HIGH ? 'HIGH' : 'MID'
+            const requestedName = lodLevel === LOD_LEVEL.HIGH ? 'HIGH' : 'MID'
+            if (accepted) {
+                LodArtworkOrchestrator.logger.debug(`LOD ${gameName}: ${previousLod === LOD_LEVEL.HIGH ? 'HIGH' : 'MID'} → ${tierName}`)
+            } else {
+                // Requested HIGH but got MID (texture not yet ready)
+                LodArtworkOrchestrator.logger.debug(`LOD ${gameName}: requested ${requestedName}, stayed MID (texture not ready)`)
+            }
+        }
+
+        return accepted
     }
 
     public getInstanceData(): ReadonlyMap<number, InstanceLodData> {
