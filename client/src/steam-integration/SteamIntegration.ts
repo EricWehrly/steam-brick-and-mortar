@@ -88,7 +88,7 @@ export class SteamIntegration {
      * Store Steam data in DataManager and emit event
      * CRITICAL: Data ownership - store data before emitting events that depend on it
      */
-    private storeSteamDataAndEmitEvent(userInput: string | null): void {
+    private storeSteamDataAndEmitEvent(userInput: string): void {
         const gameLibraryState = this.getGameLibraryState()
         const games: SteamGameData[] = gameLibraryState.userData?.games || []
         
@@ -112,11 +112,6 @@ export class SteamIntegration {
 
     static getInstance(): SteamIntegration | null {
         return SteamIntegration._instance
-    }
-
-    /** Returns true when no user identity has been established (anonymous/demo browse). */
-    isAnonymous(): boolean {
-        return !DataManager.getInstance().get<string>('steam.userInput')
     }
 
     /**
@@ -419,7 +414,7 @@ export class SteamIntegration {
                 }
             }
 
-            this.storeSteamDataAndEmitEvent(null)
+            this.storeSteamDataAndEmitEvent('demo-user')
             SteamIntegration.logger.info(`Demo store loaded: ${games.length} games in ${totalBatches} batches`)
         } catch (error) {
             SteamIntegration.logger.error('Failed to load demo games:', error)

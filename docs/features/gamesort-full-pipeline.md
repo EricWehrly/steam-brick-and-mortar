@@ -32,6 +32,7 @@ The current sort system updates signage (neon signs per genre/category) but does
 ## Notes / Open Questions
 
 - **What's already done**: `GameSorter` is fully implemented and emits `GamesSortEvent` with sorted games. `ShelfSectionPlanner` listens and receives `sortedGames`. Sort policy has been moved out of `SteamApiClient`. Sort modes (genre, recently-played, playtime) exist. `LayoutSortPanel` wired to `SortRequested` → `GameSorter`. The remaining gap is specifically box/shelf repositioning — games don't move in the scene when sort mode changes.
+- **Initial sort mode intent (parked, 2026-04-16)**: Initial sort should fork on login state — logged-in user gets Recently Played, anonymous/demo gets By Genre. Once SteamSpy popularity data is wired (player counts / review scores), anonymous default should switch to a popularity sort instead. Implementation was drafted but reverted because `SteamIntegration` is undergoing a major rewrite in a parallel branch; re-apply after that lands. The canonical check should be `SteamIntegration.isAnonymous()` reading `steam.userInput` from `DataManager` (absent = anonymous). // TD: steamspy-initial-sort
 - "Sort by" in-scene affordance and sort mode switch UI is a related intake item from Apr 6-7 session dossier.
 - Multi-instance genre sections (same game appearing in multiple thematic views) is out of scope here — that's Encore.
 - Coordinate with `SignageRenderer` singleton/static-method evaluation (also in the dossier).
