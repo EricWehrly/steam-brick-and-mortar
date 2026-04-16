@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest'
 import * as THREE from 'three'
 import { LodDistanceManager } from '../../../../src/scene/game-box/instancing/LodDistanceManager'
 import { LOD_LEVEL, type ILodArtworkRenderer } from '../../../../src/scene/game-box/instancing/ILodArtworkRenderer'
@@ -48,7 +48,7 @@ vi.mock('../../../../src/core/AppSettings', () => ({
 
 describe('LodDistanceManager', () => {
     let distanceManager: LodDistanceManager
-    let mockRenderer: vi.Mocked<ILodArtworkRenderer>
+    let mockRenderer: Mocked<ILodArtworkRenderer>
     let mockCamera: THREE.PerspectiveCamera
     let mockDataManager: ReturnType<typeof DataManager.getInstance>
 
@@ -85,7 +85,7 @@ describe('LodDistanceManager', () => {
             getInstanceLod: vi.fn().mockReturnValue(LOD_LEVEL.MID),
             setArtworkInstanceFromUrl: vi.fn(),
             dispose: vi.fn()
-        } as unknown as vi.Mocked<ILodArtworkRenderer>
+        } as unknown as Mocked<ILodArtworkRenderer>
 
         distanceManager = new LodDistanceManager(mockRenderer, {
             updateFrequency: 1, // Update every frame for easy testing
