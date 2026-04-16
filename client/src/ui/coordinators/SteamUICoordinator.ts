@@ -25,7 +25,7 @@ export class SteamUICoordinator {
             const stats = cacheManager.getStats()
             
             if (stats) {
-                this.updateCacheStats(stats)
+                UIManager.getInstance().steamUIPanel.updateCacheStats(stats)
             }
         } catch (error) {
             console.error('Failed to get cache stats:', error)
@@ -40,9 +40,5 @@ export class SteamUICoordinator {
         } catch (error) {
             console.error('Failed to clear texture cache:', error)
         }
-    }
-
-    updateCacheStats(stats: { totalEntries: number; cacheHits: number; cacheMisses: number }): void {
-        UIManager.getInstance().steamUIPanel.updateCacheStats(stats)
     }
 }
