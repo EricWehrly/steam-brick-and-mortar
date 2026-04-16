@@ -39,7 +39,6 @@ export interface SteamCacheClearEvent extends BaseInteractionEvent {
 }
 
 export interface SteamCacheRefreshEvent extends BaseInteractionEvent {
-    userInput: string
     /** If true, ignore local db and re-fetch from network */
     forceUpdate?: boolean
 }

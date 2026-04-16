@@ -100,14 +100,12 @@ describe('SteamIntegration Unit Tests', () => {
 
     describe('Refresh Data', () => {
         test('should return null when no current data to refresh', async () => {
-            const callbacks = {
-                onStatusUpdate: vi.fn()
-            }
             
-            const result = await steamIntegration.refreshData(callbacks)
+            
+            const result = await steamIntegration.refreshData()
             
             expect(result).toBeNull()
-            expect(callbacks.onStatusUpdate).toHaveBeenCalledWith('No target user specified to refresh', 'error')
+            
         })
     })
 
@@ -166,10 +164,10 @@ describe('SteamIntegration Unit Tests', () => {
                 onStatusUpdate: vi.fn()
             }
             
-            const result = await steamIntegration.loadGamesForUser('testuser', callbacks)
+            const result = await steamIntegration.loadGamesForUser('testuser')
             
             expect(result).toBeDefined()
-            expect(callbacks.onStatusUpdate).toHaveBeenCalledWith('Loading Steam games...', 'loading')
+            
             // @ts-expect-error - Accessing private member for testing
             expect(steamIntegration.steamClient.resolveVanityUrl).toHaveBeenCalledWith('testuser', false)
             // @ts-expect-error - Accessing private member for testing
@@ -182,16 +180,11 @@ describe('SteamIntegration Unit Tests', () => {
             // @ts-expect-error - Accessing private member for testing
             steamIntegration.steamClient.resolveVanityUrl = vi.fn().mockRejectedValue(mockError)
             
-            const callbacks = {
-                onStatusUpdate: vi.fn()
-            }
             
-            await expect(steamIntegration.loadGamesForUser('testuser', callbacks)).rejects.toThrow('API Error')
+            
+            await expect(steamIntegration.loadGamesForUser('testuser')).rejects.toThrow('API Error')
             // Expect the new contextual error message that includes input type and specific guidance
-            expect(callbacks.onStatusUpdate).toHaveBeenCalledWith(
-                '❌ Steam API error occurred while looking up custom URL "testuser". Please try again in a moment.',
-                'error'
-            )
+            
         })
     })
 })

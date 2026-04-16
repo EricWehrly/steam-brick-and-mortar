@@ -6,7 +6,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SteamBrickAndMortarApp } from '../../src/core/SteamBrickAndMortarApp'
 import type { SteamGame, SteamUser } from '../../src/steam'
-import type { ProgressCallbacks } from '../../src/steam-integration/SteamIntegration'
 
 // Mock IndexedDB for image cache
 vi.mock('fake-indexeddb', () => ({
@@ -116,7 +115,7 @@ describe('Steam Data to Texture Integration', () => {
             
             // Mock the public loadGamesForUser method to simulate real behavior
             vi.spyOn(steamIntegration, 'loadGamesForUser').mockImplementation(
-                async (vanityUrl: string, callbacks: ProgressCallbacks = {}) => {
+                async (vanityUrl: string) => {
                     // Simulate the real loading process by calling the callbacks
                     callbacks.onStatusUpdate?.('Loading Steam games...', 'loading')
                     callbacks.onProgress?.(0, 100, 'Fetching game library...')
@@ -194,7 +193,7 @@ describe('Steam Data to Texture Integration', () => {
 
             // Mock the Steam integration to capture callback behavior
             vi.spyOn(steamIntegration, 'loadGamesForUser').mockImplementation(
-                async (vanityUrl: string, callbacks: ProgressCallbacks = {}) => {
+                async (vanityUrl: string) => {
                     // Simulate initial status
                     callbacks.onStatusUpdate?.('Loading Steam games...', 'loading')
                     statusUpdates.push({message: 'Loading Steam games...', type: 'loading'})
@@ -258,8 +257,7 @@ describe('Steam Data to Texture Integration', () => {
 
             // Mock partial failure scenario
             vi.spyOn(steamIntegration, 'loadGamesForUser').mockImplementation(
-                async (vanityUrl: string, callbacks: ProgressCallbacks = {}) => {
-                    callbacks.onStatusUpdate?.('Loading Steam games...', 'loading')
+                async (vanityUrl: string) => {
                     
                     const currentState = steamIntegration.getGameLibraryState()
                     

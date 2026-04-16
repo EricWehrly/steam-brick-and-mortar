@@ -171,6 +171,11 @@ export class SteamApiClient {
         
         try {
             const response = await this.http.makeRequest<SteamUser>(endpoint)
+            
+            // The Lambda doesn't return the steamid in the payload, so we inject it here
+            // to ensure it is always available in the local cache.
+            response.steamid = steamId
+            
             SteamApiClient.logger.info(`Fetched ${response.game_count} games for ${response.vanity_url || steamId}`)
             
             if (response.game_count === 0) {
