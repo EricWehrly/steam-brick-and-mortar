@@ -325,7 +325,7 @@ export class SteamApiClient {
             sortFn?: (a: SteamGame, b: SteamGame) => number
         } = {}
     ): Promise<SteamGame[]> {
-        const { maxGames = 10, sortFn } = options
+        const { maxGames = 9999, sortFn } = options
         const BATCH_SIZE = 18 // One shelf's worth
         
         const sortedGames = this.sortAndLimitGames(steamUser.games, maxGames, sortFn)
