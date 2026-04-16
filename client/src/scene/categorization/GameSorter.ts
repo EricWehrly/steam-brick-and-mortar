@@ -18,6 +18,7 @@ import type { AllBatchesCompleteEvent, GamesSortEvent, SortRequestedEvent } from
 import type { SteamGameData } from '../game-box/types/GameData'
 import { sortByNumericField, primaryGenre, KNOWN_GENRES, sortByGenreThenPlaytime } from './GameSortFunctions'
 import type { GameSortMode } from '../../types/EnvironmentEvents'
+import { SteamIntegration } from '../../steam-integration/SteamIntegration'
 
 // Re-export so callers don't need two imports for sort + bucket types
 export { sortByNumericField, sortAlphabetically, sortByEnumIndex, chainComparators, groupByKey, groupByGenre, KNOWN_GENRES, sortByGenreThenPlaytime, resolveGenre, primaryGenre } from './GameSortFunctions'
@@ -112,8 +113,7 @@ export class GameSorter {
     // TD: steamspy-initial-sort — replace ByGenre anonymous fallback with a popularity sort
     // once SteamSpy data (player counts / review scores) is available in the batch pipeline.
     private sortInitial(): void {
-        const userInput = DataManager.getInstance().get<string>('steam.userInput')
-        const isAnonymous = !userInput || userInput === 'demo-user'
+        const isAnonymous = SteamIntegration.getInstance()?.isAnonymous() ?? true
         if (isAnonymous) {
             this.sortByGenre()
         } else {
