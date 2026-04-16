@@ -135,14 +135,17 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
     }
 
     /**
-     * Get cached pixel data for a URL (runs off main thread)
+     * Get cached pixel data for a URL at specific dimensions (runs off main thread).
+     * The key is url+dimensions so stale cache entries from a different resolution
+     * are never served to a consumer expecting a different size.
      */
-    public async get(url: string): Promise<CachedPixelResult | null> {
+    public async get(url: string, width?: number, height?: number): Promise<CachedPixelResult | null> {
         await this.ensureReady()
+        const key = width !== undefined && height !== undefined ? `${url}@${width}x${height}` : url
         try {
             const result = await this.send<GetResult>({
                 type: 'GET',
-                url,
+                url: key,
                 version: this.version,
                 messageId: this.nextId()
             })
@@ -159,7 +162,8 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
     }
 
     /**
-     * Store pixel data for a URL (runs off main thread, zero-copy transfer)
+     * Store pixel data for a URL at specific dimensions (runs off main thread, zero-copy transfer).
+     * The key is url+dimensions — see get() for rationale.
      */
     public async put(
         url: string,
@@ -168,9 +172,10 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
         height: number
     ): Promise<boolean> {
         await this.ensureReady()
+        const key = `${url}@${width}x${height}`
         return this.send<PutResult>({
             type: 'PUT',
-            url,
+            url: key,
             pixels,
             width,
             height,
