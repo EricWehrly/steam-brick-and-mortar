@@ -348,7 +348,6 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
                 LodArtworkOrchestrator.logger.debug(`LOD ${gameName}: requested ${requestedName}, stayed MID (texture not ready)`)
             }
         }
-
         return accepted
     }
 

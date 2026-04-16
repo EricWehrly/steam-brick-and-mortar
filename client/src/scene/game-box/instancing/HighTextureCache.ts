@@ -23,6 +23,8 @@ import { Logger } from '../../../utils/Logger'
 import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 import { FrameBudgetScheduler } from '../../../utils/FrameBudgetScheduler'
+import { LOD_DEBUG_STRIPE, LOD_STRIPE_COLORS } from './LodTextureArrayManager'
+import { LOD_TIER_NAME } from './ILodArtworkRenderer'
 
 // Logger will be attached to the class below
 
@@ -621,6 +623,25 @@ export class HighTextureCache {
             const doTextureCompletion = () => {
                 const copyStart = window.performance.now()
                 arrayData.set(imageData, offset)
+
+                if (LOD_DEBUG_STRIPE) {
+                    const stripeColor = LOD_STRIPE_COLORS[LOD_TIER_NAME.HIGH]
+                    const width = this.config.textureWidth
+                    const height = this.config.textureHeight
+                    const stripeRows = Math.floor(height * 0.2)
+                    const stripeStart = (height - stripeRows) * width * 4
+                    for (let row = 0; row < stripeRows; row++) {
+                        const rowOffset = offset + stripeStart + row * width * 4
+                        for (let col = 0; col < width; col++) {
+                            const px = rowOffset + col * 4
+                            arrayData[px]     = stripeColor[0]
+                            arrayData[px + 1] = stripeColor[1]
+                            arrayData[px + 2] = stripeColor[2]
+                            arrayData[px + 3] = stripeColor[3]
+                        }
+                    }
+                }
+
                 const copyTime = window.performance.now() - copyStart
                 
                 // Mark this specific slot as dirty for partial GPU upload
