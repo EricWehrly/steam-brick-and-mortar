@@ -17,6 +17,8 @@
  * - For 800 games: ~432MB IndexedDB storage
  */
 
+import { EventManager } from '../../../core/EventManager'
+import { SteamEventTypes } from '../../../types/InteractionEvents'
 import { Logger } from '../../../utils/Logger'
 import { ManagedWorker } from '../../../utils/ManagedWorker'
 import type {
@@ -71,18 +73,21 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
         workerReady: false
     }
 
-    private constructor(config: PixelDataCacheConfig = {}) {
-        super(PixelCacheWorker as unknown as new () => Worker, 'PixelDataCache')
-        this.dbName = config.dbName ?? 'SteamTexturePixels'
-        this.storeName = config.storeName ?? 'pixels'
-        this.version = config.version ?? CACHE_VERSION
-    }
-
     public static getInstance(): PixelDataCache {
         if (!PixelDataCache.instance) {
             PixelDataCache.instance = new PixelDataCache()
         }
         return PixelDataCache.instance
+    }
+
+    private constructor(config: PixelDataCacheConfig = {}) {
+        super(PixelCacheWorker as unknown as new () => Worker, 'PixelDataCache')
+        this.dbName = config.dbName ?? 'SteamTexturePixels'
+        this.storeName = config.storeName ?? 'pixels'
+        this.version = config.version ?? CACHE_VERSION
+
+        const eventManager = EventManager.getInstance()
+        eventManager.registerEventHandler(SteamEventTypes.ImageCacheClear, this.clear.bind(this))
     }
 
     protected override onWorkerCrash(_err: Error): void {
@@ -180,9 +185,6 @@ export class PixelDataCache extends ManagedWorker<WorkerInMessage, WorkerOutMess
         })
     }
 
-    /**
-     * Clear all cached data
-     */
     public async clear(): Promise<boolean> {
         await this.ensureReady()
         try {
