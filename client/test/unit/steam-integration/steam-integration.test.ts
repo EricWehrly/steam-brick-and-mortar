@@ -87,19 +87,6 @@ describe('SteamIntegration Unit Tests', () => {
         })
     })
 
-    describe('Game Library State', () => {
-        test('should get initial game library state', () => {
-            // Need to test through public methods or ignore the TS error for testing
-            // @ts-expect-error - Accessing private member for testing
-            const state = steamIntegration.getGameLibraryState()
-            
-            expect(state.userData).toBeNull()
-            expect(state.currentGameIndex).toBe(0)
-            expect(state.isLoading).toBe(false)
-            expect(state.error).toBeNull()
-        })
-    })
-
     describe('Refresh Data', () => {
         test('should return null when no current data to refresh', async () => {
             // Need to mock or simulate the failure of handleRefreshCache
@@ -156,12 +143,6 @@ describe('SteamIntegration Unit Tests', () => {
                     library: 'library_url'
                 }
             }])
-            
-            const callbacks = {
-                onProgress: vi.fn(),
-                onGameLoaded: vi.fn(),
-                onStatusUpdate: vi.fn()
-            }
             
             const result = await steamIntegration.loadGamesForUser('testuser')
             

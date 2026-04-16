@@ -104,6 +104,7 @@ export class SteamIntegration {
         ({ steamId, vanityUrl } = await this.getSteamIdAndVanityUrl(parsedInput, steamId, vanityUrl, ignoreCache))
 
         const userGames = await this.steamClient.getUserGames(steamId, ignoreCache)
+        userGames.steamid = steamId
         userGames.vanity_url = vanityUrl
         this.gameLibrary.setUserData(userGames)
         
