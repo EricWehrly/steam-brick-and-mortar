@@ -389,6 +389,10 @@ export class HighTextureCache {
     /**
      * Get current state of a game's HIGH texture
      */
+    public getTextureArrayRef(): THREE.DataArrayTexture | null {
+        return this.dataArrayTexture
+    }
+
     public getState(gameIndex: number): HighTextureState {
         return this.games.get(gameIndex)?.state ?? HighTextureState.EMPTY
     }
