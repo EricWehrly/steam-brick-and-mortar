@@ -28,8 +28,8 @@ export class UIManager {
     this.progressDisplay.init()
     this.webxrUIPanel.init()
 
-    this.showSteamUI()
-    this.showControlsHelp()
+    this.steamUIPanel.show()
+    this.webxrUIPanel.showControlsHelp()
 
     const eventManager = EventManager.getInstance()
     eventManager.registerEventHandler(SteamEventTypes.CacheStats, this.showCacheStats.bind(this))
@@ -41,19 +41,11 @@ export class UIManager {
       const stats = cacheManager.getStats()
 
       if (stats) {
-        UIManager.getInstance().steamUIPanel.updateCacheStats(stats)
+        this.steamUIPanel.updateCacheStats(stats)
       }
     } catch (error) {
       console.error('Failed to get cache stats:', error)
     }
-  }
-
-  private showSteamUI(): void {
-    this.steamUIPanel.show()
-  }
-
-  private showControlsHelp(): void {
-    this.webxrUIPanel.showControlsHelp()
   }
 
   hideLoading(): void {

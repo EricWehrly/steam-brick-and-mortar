@@ -107,13 +107,13 @@ export class SteamIntegration {
         userGames.vanity_url = vanityUrl
         this.gameLibrary.setUserData(userGames)
         
-        // Progressive loading via events - GameLibraryManager listens to GamesBatchReady
         await this.steamClient.loadGamesProgressively(userGames, {
-            maxGames: this.config.maxGames,
+            // TD: TODO: Reinstate max games
+            // maxGames: this.config.maxGames,
             sortFn: sortByNumericField('rtime_last_played', 'playtime_forever'),
         })
         
-        SteamIntegration.logger.debug(`Progressive loading complete for ${userGames.game_count} games (max: ${this.config.maxGames})`)
+        SteamIntegration.logger.debug(`Progressive loading complete for ${userGames.game_count} games`)
 
         return this.gameLibrary.getState()
     }
@@ -149,7 +149,7 @@ export class SteamIntegration {
      * single-pass cache check or result memoization if this becomes a performance bottleneck.
      * See docs/active/tech-debt.md for detailed analysis.
      */
-    private hasCachedData(userInput: string): boolean {
+    hasCachedData(userInput: string): boolean {
         const parsedInput = ValidationUtils.parseSteamUserInput(userInput)
 
         if (parsedInput.type === 'steamid') {
@@ -171,67 +171,8 @@ export class SteamIntegration {
         }
     }
 
-    private getCachedUsers(): Array<{ vanityUrl: string, displayName: string, gameCount: number, steamId: string }> {
-        // Use the optimized implementation from SteamApiClient
-        return this.steamClient.getCachedUsers()
-    }
-
-    private async loadGamesFromCache(userInput: string, clearExisting = true): Promise<GameLibraryState> {
-        const parsedInput = ValidationUtils.parseSteamUserInput(userInput)
-        
-        try {
-            SteamIntegration.logger.info(`Loading cached games for Steam user: ${parsedInput.value} (type: ${parsedInput.type})`)
-
-            if (clearExisting) {
-                this.gameLibrary.clear()
-            }
-
-            // Get steamID (either directly or from cache)
-            let steamId: string
-            if (parsedInput.type === 'steamid') {
-                steamId = parsedInput.value
-            } else {
-                const cachedSteamId = await this.getCachedSteamId(parsedInput.value)
-                if (!cachedSteamId) {
-                    throw new Error('No cached resolve data found for custom URL')
-                }
-                steamId = cachedSteamId
-            }
-
-
-            const cachedGames = this.steamClient.getCached<SteamUser>(`games_${steamId}`)
-            if (!cachedGames) {
-                throw new Error('No cached games data found')
-            }
-
-            // Update game library state with cached data
-            this.gameLibrary.setUserData(cachedGames)
-            
-            // Progressive loading via events - GameLibraryManager listens to GamesBatchReady  
-            await this.steamClient.loadGamesProgressively(cachedGames, {
-                maxGames: cachedGames.game_count,
-                sortFn: sortByNumericField('rtime_last_played', 'playtime_forever'),
-            })
-            
-            // NOTE: Don't call storeSteamDataAndEmitEvent here - let the caller handle it
-            // to avoid double-triggering shelf generation (maintains consistency with loadGamesForUser)
-            
-            return this.gameLibrary.getState()
-            
-        } catch (error) {
-            SteamIntegration.logger.error('Failed to load games from cache:', error)
-            throw error
-        }
-    }
-
-    private async getCachedSteamId(vanityUrl: string): Promise<string | null> {
-        const resolveKey = `resolve_${vanityUrl.toLowerCase()}`
-        const cachedResolve = this.steamClient.getCached<SteamResolveResponse>(resolveKey)
-        return cachedResolve?.steamid || null
-    }
-
     private async handleGameStart(): Promise<void> {
-        const cachedUsers = this.getCachedUsers()
+        const cachedUsers = this.steamClient.getCachedUsers()
 
         // Dev/test fallback: load demo games when no cached user exists, regardless of
         // autoLoadProfile (which defaults false and won't be set in a fresh test env)
@@ -310,29 +251,26 @@ export class SteamIntegration {
     private async handleLoadFromCache(event: CustomEvent<SteamLoadFromCacheEvent>): Promise<void> {
         const { userInput: vanityUrl } = event.detail
 
-        try {
-            if (!this.hasCachedData(vanityUrl)) {
-                SteamIntegration.logger.warn('No cached data found')
-                return
-            }
-
-            await this.loadGamesFromCache(vanityUrl)
-            this.storeSteamDataAndEmitEvent()
-            SteamIntegration.logger.info('Loaded from cache')
-        } catch (error) {
-            SteamIntegration.logger.error('Load from cache failed:', error)
+        if (!this.hasCachedData(vanityUrl)) {
+            SteamIntegration.logger.warn('No cached data found')
+            return
         }
+
+        await this.loadGamesForUser(vanityUrl, false)
+        this.storeSteamDataAndEmitEvent()
+        SteamIntegration.logger.info('Loaded from cache')
     }
 
     private async handleRefreshCache(event: CustomEvent<SteamCacheRefreshEvent>): Promise<void> {
         const { forceUpdate } = event.detail
         try {
-            const result = await this.loadGamesForUser(this.steamId, forceUpdate)
-            if (!result) {
-                SteamIntegration.logger.warn(forceUpdate ? 'No data to force update' : 'No data to refresh')
+            if (!this.steamId) {
+                SteamIntegration.logger.warn('No user currently loaded, cannot refresh')
                 return
             }
-
+            
+            await this.loadGamesForUser(this.steamId, forceUpdate)
+            
             const gameState = this.getGameLibraryState()
             if (gameState.userData?.steamid) {
                 this.storeSteamDataAndEmitEvent()

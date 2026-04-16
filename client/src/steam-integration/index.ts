@@ -7,7 +7,6 @@
 export {
     SteamIntegration,
     type SteamIntegrationConfig,
-    type ProgressCallbacks,
     type LoadGamesOptions
 } from './SteamIntegration'
 

@@ -87,7 +87,7 @@ describe('SteamIntegration Event Integration', () => {
         })
         
         // Load games for user
-        const result = await steamIntegration.loadGamesForUser('testuser', {})
+        const result = await steamIntegration.loadGamesForUser('testuser')
         
         // Wait for any microtasks to complete
         await new Promise(resolve => setTimeout(resolve, 0))
@@ -108,40 +108,20 @@ describe('SteamIntegration Event Integration', () => {
         })
         
         // Mock cache data
-        mockSteamClient.getCached = vi.fn().mockImplementation((key) => {
-            if (key === 'resolve_testuser') {
-                return { steamid: '123456789', vanity_url: 'testuser' }
-            }
-            if (key === 'games_123456789') {
-                return {
-                    game_count: 1,
-                    games: [{ appid: 730, name: 'Counter-Strike 2' }],
-                    vanity_url: 'testuser'
-                }
-            }
-            if (key === 'game_730') {
-                return {
-                    appid: 730,
-                    name: 'Counter-Strike 2',
-                    artwork: {
-                        icon: 'icon-url',
-                        logo: 'logo-url', 
-                        header: 'header-url',
-                        library: 'library-url'
-                    }
-                }
-            }
-            return null
+        mockSteamClient.getUserGames = vi.fn().mockResolvedValue({
+            game_count: 1,
+            games: [{ appid: 730, name: 'Counter-Strike 2' }],
+            vanity_url: 'testuser'
         })
         
         // Load games from cache
-        const result = await steamIntegration.loadGamesFromCache('testuser', {})
+        const result = await steamIntegration.loadGamesForUser('testuser', false)
         
         // Wait for any microtasks to complete
         await new Promise(resolve => setTimeout(resolve, 0))
         
         // Verify that games were loaded from cache
-        expect(mockSteamClient.getCached).toHaveBeenCalled()
+        expect(mockSteamClient.getUserGames).toHaveBeenCalled()
         
         // Verify result structure
         expect(result).toBeDefined()
