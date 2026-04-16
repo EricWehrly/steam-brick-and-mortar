@@ -80,6 +80,12 @@ export class Logger {
     Logger.setContextLevel('SteamApiClient', LogLevel.INFO)
     Logger.setContextLevel('BatchAppDetailsClient', LogLevel.INFO)
     Logger.setContextLevel('GameArtworkInspector', LogLevel.INFO)
+
+    // Current development focus - force debug on
+    Logger.setContextLevel('LodArtworkOrchestrator', LogLevel.DEBUG)
+    Logger.setContextLevel('LodDistanceManager', LogLevel.DEBUG)
+    Logger.setContextLevel('LodGameArtworkRenderer', LogLevel.DEBUG)
+    Logger.setContextLevel('HighTextureCache', LogLevel.DEBUG)
   }
 
   /**
