@@ -468,7 +468,10 @@ export class LodGameArtworkRenderer {
     public getInstanceCount(): number {
         return this.currentInstanceCount
     }
-    
+
+    public getInstanceLod(instanceIndex: number): LodLevel | null {
+        return this.instanceData.get(instanceIndex)?.lodLevel ?? null
+    }
     public isReady(): boolean {
         return this.instancedMesh !== null
     }

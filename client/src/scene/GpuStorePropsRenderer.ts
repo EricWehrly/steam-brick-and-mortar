@@ -161,8 +161,4 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         this.scene.remove(this.propsGroup)
         GpuStorePropsRenderer.logger.info('GpuStorePropsRenderer disposed')
     }
-
-    public logMemoryStats(): void {
-        this.gameBoxRenderer?.logMemoryStats()
-    }
 }

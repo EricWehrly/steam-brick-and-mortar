@@ -27,7 +27,7 @@ import {
     type LodGameArtworkRendererConfig,
     type LodTextureArrays
 } from './LodGameArtworkRenderer'
-import { LOD_TIER_NAME } from './ILodArtworkRenderer'
+import { LOD_TIER_NAME, type InstanceLodData, type ILodArtworkRenderer } from './ILodArtworkRenderer'
 import type { PrewarmingConfig } from './SpatialPrewarmingManager'
 import type { InstanceMetadata } from '../../../debug/GameFinder'
 
@@ -75,7 +75,7 @@ export interface LodArtworkConfig {
  * Orchestrates the complete artwork loading and rendering pipeline.
  * Implements ILodArtworkRenderer for use by LodDistanceManager.
  */
-export class LodArtworkOrchestrator {
+export class LodArtworkOrchestrator implements ILodArtworkRenderer {
     public static logger = Logger.createLogFunctions(LodArtworkOrchestrator.name)
     private artworkProvider: GameArtworkProvider
     private textureManager: LodTextureArrayManager
@@ -86,6 +86,7 @@ export class LodArtworkOrchestrator {
     private readonly lazyHighTextures: boolean
 
     // Track game names to texture indices
+    // TD: Why use names and not appIds?
     private gameNameToTextureIndex: Map<string, number> = new Map()
     private textureIndexToGameName: Map<number, string> = new Map()
     private instanceMetadata: Map<number, InstanceMetadata> = new Map()
@@ -327,11 +328,26 @@ export class LodArtworkOrchestrator {
         this.renderer.flushToGpu()
     }
 
-    protected getInstanceCount(): number {
+    public getInstanceCount(): number {
         return this.renderer.getInstanceCount()
     }
 
-    protected clearFailureCache(): void {
+    public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {
+        return this.renderer.setInstanceLod(instanceIndex, lodLevel)
+    }
+
+    public getInstanceData(): ReadonlyMap<number, InstanceLodData> {
+        const result = new Map<number, InstanceLodData>()
+        for (const [index, meta] of this.instanceMetadata) {
+            result.set(index, {
+                position: meta.position,
+                lodLevel: this.renderer.getInstanceLod(index) ?? LOD_LEVEL.MID
+            })
+        }
+        return result
+    }
+
+    public clearFailureCache(): void {
         this.failedArtwork.clear()
         this.artworkProvider.clearCaches()
         LodArtworkOrchestrator.logger.info('Cleared artwork caches - all URLs will be retried on next load')
