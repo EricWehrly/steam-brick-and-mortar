@@ -499,13 +499,14 @@ export class HighTextureCache {
         this.backgroundCachingGames.add(entry.gameIndex)
         HighTextureCache.logger.debug(`BACKGROUND CACHE START ${entry.gameIndex} "${entry.gameName.slice(0, 15)}"`)
         
-        // Fire and forget - fetch, decode, and store in pixel cache
+        // Fire and forget - fetch, decode to target size, and store in pixel cache
         this.textureWorker.fetchAndProcessWithOptions(
             entry.artworkUrl,
             entry.gameIndex,
             entry.gameName,
             {
-                useNativeSize: true,
+                textureWidth: this.config.textureWidth,
+                textureHeight: this.config.textureHeight,
                 timeout: 15000
             }
         ).then(async (result) => {
