@@ -18,6 +18,7 @@ import type { AllBatchesCompleteEvent, GamesSortEvent, SortRequestedEvent } from
 import type { SteamGameData } from '../game-box/types/GameData'
 import { sortByNumericField, primaryGenre, KNOWN_GENRES, sortByGenreThenPlaytime } from './GameSortFunctions'
 import type { GameSortMode } from '../../types/EnvironmentEvents'
+import { SteamIntegration } from '../../steam-integration/SteamIntegration'
 
 // Re-export so callers don't need two imports for sort + bucket types
 export { sortByNumericField, sortAlphabetically, sortByEnumIndex, chainComparators, groupByKey, groupByGenre, KNOWN_GENRES, sortByGenreThenPlaytime, resolveGenre, primaryGenre } from './GameSortFunctions'
@@ -100,13 +101,23 @@ export class GameSorter {
     constructor() {
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.AllBatchesComplete,
-            (_event: CustomEvent<AllBatchesCompleteEvent>) => this.sortByRecentlyPlayed()
+            (_event: CustomEvent<AllBatchesCompleteEvent>) => this.sortInitial()
         )
         EventManager.getInstance().registerEventHandler(
             UIEventTypes.SortRequested,
             (event: CustomEvent<SortRequestedEvent>) => this.handleSortRequested(event.detail)
         )
         GameSorter.logger.debug('GameSorter initialized — subscribed to AllBatchesComplete + SortRequested')
+    }
+
+    // TD: steamspy-initial-sort — replace ByGenre anonymous fallback with a popularity sort
+    // once SteamSpy data (player counts / review scores) is available in the batch pipeline.
+    private sortInitial(): void {
+        if (SteamIntegration.getInstance().isAnonymous()) {
+            this.sortByGenre()
+        } else {
+            this.sortByRecentlyPlayed()
+        }
     }
 
     private handleSortRequested(detail: SortRequestedEvent): void {
