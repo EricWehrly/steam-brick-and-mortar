@@ -25,6 +25,12 @@ export class BinderGameDetailPanel {
         const playtimeHours = Math.round((game.playtime_forever || 0) / 60)
         const playtime2Weeks = Math.round((game.playtime_2weeks || 0) / 60)
 
+        const playtimeBlock = playtimeHours > 0 ? `
+            <div class="detail-stat">
+                <div class="detail-stat-label">Total Playtime</div>
+                <div class="detail-stat-value playtime">${playtimeHours} hours</div>
+            </div>` : ''
+
         const playtime2WeeksBlock = playtime2Weeks > 0 ? `
             <div class="detail-stat">
                 <div class="detail-stat-label">Last 2 Weeks</div>
@@ -54,7 +60,7 @@ export class BinderGameDetailPanel {
             .replace(/\{\{headerUrl\}\}/g, headerUrl)
             .replace(/\{\{gameName\}\}/g, this.escapeHtml(game.name))
             .replace(/\{\{appid\}\}/g, String(appid))
-            .replace(/\{\{playtimeHours\}\}/g, String(playtimeHours))
+            .replace(/\{\{playtimeBlock\}\}/g, playtimeBlock)
             .replace(/\{\{playtime2WeeksBlock\}\}/g, playtime2WeeksBlock)
             .replace(/\{\{categoriesBlock\}\}/g, categoriesBlock)
             .replace(/\{\{jsonBlob\}\}/g, this.escapeHtml(jsonBlob))
