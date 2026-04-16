@@ -42,4 +42,32 @@ This is the readiness signal. If `validate` passes, the code is ready for human 
 
 ---
 
+## Logging convention
+
+Use `Logger.createLogFunctions(ClassName.name)` — not `console.log/debug/warn/error`.
+
+```ts
+import { Logger } from '../../utils/Logger'
+
+export class MyCoordinator {
+    private static readonly logger = Logger.createLogFunctions(MyCoordinator.name)
+
+    someMethod(): void {
+        MyCoordinator.logger.debug('detail only useful in dev')
+        MyCoordinator.logger.info('normal operational message')
+        MyCoordinator.logger.warn('unexpected but non-fatal condition')
+        MyCoordinator.logger.error('something went wrong')
+        MyCoordinator.logger.lifecycle('constructor/init/dispose milestones')
+    }
+}
+```
+
+**Rules:**
+- The field is `private static readonly logger` — static so it's shared across instances, readonly so it's never replaced.
+- Use `ClassName.name` (not a string literal) so renames stay accurate automatically.
+- `lifecycle` is for constructor/init/dispose milestones. `debug` for fine-grained operational detail. `info` for normal events worth surfacing. `warn`/`error` for anomalies.
+- Never leave commented-out `console.*` calls — convert them or delete them.
+
+---
+
 For more context see `docs/plans/linter-contract.md` and `docs/roadmaps/tech-debt.md`.

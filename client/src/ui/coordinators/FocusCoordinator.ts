@@ -14,6 +14,7 @@
  * or hook a Three.js post-processing pass off isAppFocused() for a VHS look.
  */
 
+import { Logger } from '../../utils/Logger'
 import { EventManager } from '../../core/EventManager'
 import { AppEventTypes } from '../../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../../types/InteractionEvents'
@@ -22,6 +23,8 @@ const BLUR_CLASS = 'scene-blurred'
 const BLUR_OVERLAY_ID = 'scene-blur-overlay'
 
 export class FocusCoordinator {
+    private static readonly logger = Logger.createLogFunctions(FocusCoordinator.name)
+
     private readonly eventManager = EventManager.getInstance()
     private isFocused: boolean = !document.hidden
     private readonly blurOverlay: HTMLElement
@@ -60,7 +63,7 @@ export class FocusCoordinator {
 
         this.registerDebugHelpers()
 
-        // console.debug('[FocusCoordinator] Initialized — tab is currently', this.isFocused ? 'focused' : 'blurred')
+        FocusCoordinator.logger.lifecycle(`Initialized — tab is currently ${this.isFocused ? 'focused' : 'blurred'}`)
     }
 
     dispose(): void {
@@ -72,8 +75,7 @@ export class FocusCoordinator {
     }
 
     private handleFocusChanged(focused: boolean, source: 'visibilitychange' | 'window-focus' | 'window-blur'): void {
-        // put to logger
-        // console.debug(`[FocusCoordinator] Focus ${focused ? 'GAINED' : 'LOST'} — source: ${source}`)
+        FocusCoordinator.logger.debug(`Focus ${focused ? 'GAINED' : 'LOST'} — source: ${source}`)
         this.blurOverlay.classList.toggle(BLUR_CLASS, !focused)
         this.eventManager.emit<VisibilityChangedEvent>(
             AppEventTypes.VisibilityChanged,
@@ -86,7 +88,7 @@ export class FocusCoordinator {
         const self = this
         ;(window as unknown as Record<string, unknown>).toggleSceneBlur = () => {
             const active = self.blurOverlay.classList.toggle(BLUR_CLASS)
-            // console.debug(`[FocusCoordinator] Blur overlay ${active ? 'ON' : 'OFF'}`)
+            FocusCoordinator.logger.debug(`Blur overlay ${active ? 'ON' : 'OFF'}`)
             return active
         }
     }
