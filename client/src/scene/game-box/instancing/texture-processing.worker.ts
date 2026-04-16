@@ -164,6 +164,13 @@ async function processBlobWithDimensions(
         width = imageBitmap.width
         height = imageBitmap.height
     }
+
+    // Most Steam library_600x900.jpg images are physically 300x450 on the CDN.
+    // Log genuine high-res images so we can track which titles actually ship at full res.
+    // Reference: https://steamcommunity.com/discussions/forum/1/4202490864582293420/
+    if (imageBitmap.width > 300) {
+        console.debug(`[TextureWorker] High-res CDN image detected: native ${imageBitmap.width}×${imageBitmap.height} (most titles are 300×450)`)
+    }
     
     ensureCanvas(width, height)
     

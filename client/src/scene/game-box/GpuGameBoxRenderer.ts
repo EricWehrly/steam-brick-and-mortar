@@ -55,8 +55,28 @@ import { StorePropsEventTypes, type GameBoxSpawnedEvent } from '../../types/Inte
 import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
 // Steam capsule source dimensions (what CDN claims, though actual is ~460×690)
-const STEAM_SOURCE_WIDTH = 600
-const STEAM_SOURCE_HEIGHT = 900
+/**
+ * Steam library image CDN reality check
+ *
+ * The URL path is `library_600x900.jpg` but the CDN actually serves 300×450 pixels
+ * for the vast majority of titles (older games that were never re-uploaded at full
+ * resolution). Only a minority of newer titles genuinely ship at 600×900.
+ *
+ * Source: https://steamcommunity.com/discussions/forum/1/4202490864582293420/
+ * Quote: "the ones that appear in librarycache are labelled as 600x900
+ *          but are 300x450px big."
+ *
+ * NORMALIZATION DECISION: we treat 300×450 as the effective source ceiling.
+ * Going above it with lodHighReductionRatio > 0.5 produces bilinear upscaling
+ * artefacts and wastes VRAM. Going to exactly 0.5 gives 1:1 pixels for most
+ * games, which is the true maximum fidelity available.
+ *
+ * If you change this, read the comment above first.
+ */
+const STEAM_SOURCE_WIDTH = 600   // Nominal — see comment above
+const STEAM_SOURCE_HEIGHT = 900  // Nominal — see comment above
+const STEAM_EFFECTIVE_MAX_WIDTH = 300   // Actual CDN resolution (majority of titles)
+const STEAM_EFFECTIVE_MAX_HEIGHT = 450  // Actual CDN resolution (majority of titles)
 
 export class GpuGameBoxRenderer implements IGameBoxRenderer {
     public static logger = Logger.createLogFunctions(GpuGameBoxRenderer.name)
@@ -258,11 +278,24 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         const medRatio = AppSettings.get(Setting.LodMedReductionRatio)
         const maxHighSlots = AppSettings.get(Setting.LodMaxHighSlots)
         
-        // Calculate dimensions from ratios
-        const highWidth = Math.floor(STEAM_SOURCE_WIDTH * highRatio)
-        const highHeight = Math.floor(STEAM_SOURCE_HEIGHT * highRatio)
+        // Calculate dimensions from ratios, then clamp HIGH to the effective CDN ceiling.
+        // Most Steam library images are physically 300×450 despite the "600x900" URL path.
+        // Requesting above that produces bilinear upscaling artefacts, not extra detail.
+        // See STEAM_EFFECTIVE_MAX_WIDTH/HEIGHT for the source and rationale.
+        const highWidthRaw = Math.floor(STEAM_SOURCE_WIDTH * highRatio)
+        const highHeightRaw = Math.floor(STEAM_SOURCE_HEIGHT * highRatio)
+        const highWidth = Math.min(highWidthRaw, STEAM_EFFECTIVE_MAX_WIDTH)
+        const highHeight = Math.min(highHeightRaw, STEAM_EFFECTIVE_MAX_HEIGHT)
         const medWidth = Math.floor(STEAM_SOURCE_WIDTH * medRatio)
         const medHeight = Math.floor(STEAM_SOURCE_HEIGHT * medRatio)
+
+        if (highWidthRaw > STEAM_EFFECTIVE_MAX_WIDTH || highHeightRaw > STEAM_EFFECTIVE_MAX_HEIGHT) {
+            GpuGameBoxRenderer.logger.warn(
+                `LOD HIGH ratio ${highRatio} would produce ${highWidthRaw}×${highHeightRaw} ` +
+                `— clamped to ${highWidth}×${highHeight} (CDN effective max). ` +
+                `Upscaling above this wastes VRAM without adding detail for most titles.`
+            )
+        }
         
         GpuGameBoxRenderer.logger.info(`LOD config: HIGH ${highWidth}×${highHeight} (${maxHighSlots} slots), MED ${medWidth}×${medHeight}`)
         
