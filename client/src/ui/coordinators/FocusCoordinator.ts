@@ -60,7 +60,7 @@ export class FocusCoordinator {
 
         this.registerDebugHelpers()
 
-        console.debug('[FocusCoordinator] Initialized — tab is currently', this.isFocused ? 'focused' : 'blurred')
+        // console.debug('[FocusCoordinator] Initialized — tab is currently', this.isFocused ? 'focused' : 'blurred')
     }
 
     dispose(): void {
@@ -72,7 +72,8 @@ export class FocusCoordinator {
     }
 
     private handleFocusChanged(focused: boolean, source: 'visibilitychange' | 'window-focus' | 'window-blur'): void {
-        console.debug(`[FocusCoordinator] Focus ${focused ? 'GAINED' : 'LOST'} — source: ${source}`)
+        // put to logger
+        // console.debug(`[FocusCoordinator] Focus ${focused ? 'GAINED' : 'LOST'} — source: ${source}`)
         this.blurOverlay.classList.toggle(BLUR_CLASS, !focused)
         this.eventManager.emit<VisibilityChangedEvent>(
             AppEventTypes.VisibilityChanged,
@@ -85,7 +86,7 @@ export class FocusCoordinator {
         const self = this
         ;(window as unknown as Record<string, unknown>).toggleSceneBlur = () => {
             const active = self.blurOverlay.classList.toggle(BLUR_CLASS)
-            console.debug(`[FocusCoordinator] Blur overlay ${active ? 'ON' : 'OFF'}`)
+            // console.debug(`[FocusCoordinator] Blur overlay ${active ? 'ON' : 'OFF'}`)
             return active
         }
     }

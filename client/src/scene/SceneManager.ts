@@ -149,13 +149,11 @@ export class SceneManager {
 
     private pauseRenderLoop(): void {
         this.renderer.setAnimationLoop(null)
-        console.debug('[SceneManager] Render loop paused')
     }
 
     private resumeRenderLoop(): void {
         if (this.renderLoopCallback) {
             this.renderer.setAnimationLoop(this.renderLoopCallback)
-            console.debug('[SceneManager] Render loop resumed')
         }
     }
 

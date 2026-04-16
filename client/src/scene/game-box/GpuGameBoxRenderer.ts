@@ -44,7 +44,7 @@ import type {
 } from './types/GameBoxOptions'
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { LOD_LEVEL, LOD_TIER_NAME, type LodLevel } from './instancing/ILodArtworkRenderer'
-import type { ILodArtworkRendererDebug } from './instancing/ILodArtworkRenderer'
+import type { ILodArtworkRenderer } from './instancing/ILodArtworkRenderer'
 import { LodArtworkOrchestratorDebug, type LodConfig } from './instancing/LodArtworkOrchestratorDebug'
 import { LodDistanceManagerDebug } from './instancing/LodDistanceManagerDebug'
 import { ShelfSide } from '../props/SharedPropsUtils'
@@ -69,7 +69,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
 
     private readonly dimensions: GameBoxDimensions
     private readonly instancedLabelRenderer: InstancedLabelRenderer
-    private readonly lodArtworkRenderer: ILodArtworkRendererDebug
+    private readonly lodArtworkRenderer: ILodArtworkRenderer
     private readonly lodDistanceManager: LodDistanceManagerDebug
 
     constructor(maxGames: number = 2000) {
@@ -247,14 +247,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         ;(window as any).lodArtworkRenderer = null
         
         GpuGameBoxRenderer.logger.lifecycle('Disposed')
-    }
-    
-    public getMemoryStats() {
-        return this.lodArtworkRenderer.getMemoryStats()
-    }
-    
-    public logMemoryStats(): void {
-        this.lodArtworkRenderer.logMemoryStats()
     }
     
     /**
