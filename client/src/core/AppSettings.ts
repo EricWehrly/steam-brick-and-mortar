@@ -405,8 +405,8 @@ export class AppSettings {
             // LOD Settings - distances in meters for texture quality switching
             lodHighDistance: 3.0,  // Within 3m = HIGH quality textures
             lodMedDistance: 8.0,   // Within 8m = MED quality, beyond = LOW
-            lodMaxHighSlots: 128,  // Max HIGH texture slots (128 × 600×900 = ~264MB VRAM — TEMP: testing full res)
-            lodHighReductionRatio: 1.0,  // HIGH = 100% of source (600×900) — TEMP: was 0.5 → 300×450
+            lodMaxHighSlots: 128,  // Max HIGH texture slots (128 × 450×675 = ~148MB VRAM)
+            lodHighReductionRatio: 0.75,  // HIGH = 75% of source (600×900 → 450×675)
             lodMedReductionRatio: 0.25,  // MED = 25% of source (600×900 → 150×225)
             
             // Interface Settings

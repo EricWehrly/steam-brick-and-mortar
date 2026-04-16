@@ -556,7 +556,7 @@ export class HighTextureCache {
             
             // First, check the pixel cache for decoded RGBA data
             const fetchStart = window.performance.now()
-            const cachedPixels = await this.pixelCache.get(entry.artworkUrl)
+            const cachedPixels = await this.pixelCache.get(entry.artworkUrl, this.config.textureWidth, this.config.textureHeight)
             workerRoundTrip = window.performance.now() - fetchStart
             
             let imageData: Uint8ClampedArray
