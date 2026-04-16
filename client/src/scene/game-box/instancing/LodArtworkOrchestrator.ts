@@ -378,6 +378,10 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
         return this.renderer
     }
 
+    protected getGameNameToTextureIndex(): ReadonlyMap<string, number> {
+        return this.gameNameToTextureIndex
+    }
+
     protected getFailedArtwork(): Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> {
         return this.failedArtwork
     }
