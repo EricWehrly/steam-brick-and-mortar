@@ -13,7 +13,6 @@ import { EventManager, EventSource } from '../../../core/EventManager'
 import { SteamEventTypes } from '../../../types/InteractionEvents'
 import '../../../styles/pause-menu/cache-management-panel.css'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
-import { DataManager } from '../../../core/data/DataManager'
 
 export interface CacheStats {
     imageCount: number
@@ -121,7 +120,6 @@ export class CacheManagementPanel extends PauseMenuPanel {
         if (!panel) return
 
         UIComponentUtils.setupButtons(panel, [
-            { buttonId: 'force-update-cache-btn', onClick: this.forceUpdateCache.bind(this) },
             { buttonId: 'refresh-cache-btn', onClick: this.refreshCache.bind(this) },
             { buttonId: 'validate-cache-btn', onClick: this.validateCache.bind(this) },
             { buttonId: 'clear-cache-btn', onClick: this.clearCache.bind(this) },
@@ -386,75 +384,21 @@ export class CacheManagementPanel extends PauseMenuPanel {
                 : 'Never'
         }
     }
-    /**
-     * Force update cache from network
-     */
-            private async forceUpdateCache(): Promise<void> {
-        const panel = this.getPanelElement()
-        if (!panel) return
 
-        const btn = panel.querySelector('#force-update-cache-btn')
-        if (!btn) return
-        
-        // Always try to get the active user explicitly from the dropdown
-        const select = panel.querySelector('#cached-users-select') as HTMLSelectElement
-        const targetUser = select?.value
-        
-        if (!targetUser) {
-            this.showError('No user selected in dropdown to update.')
-            return
-        }
-
-        btn.textContent = '?? Updating...'
-        btn.setAttribute('disabled', 'true')
-
-        try {
-            this.eventManager.emit(SteamEventTypes.CacheRefresh, {
-                userInput: targetUser,
-                forceUpdate: true,
-                source: EventSource.UI
-            })
-            
-            // The actual success message comes from the workflow completion,
-            // but we can acknowledge the click immediately
-            this.showSuccess('Force update requested...')
-        } catch (error) {
-            console.error('Force update failed:', error)
-            this.showError('Failed to request force update')
-        } finally {
-            btn.textContent = '?? Force Update Cache'
-            btn.removeAttribute('disabled')
-        }
-    }
     /**
      * Refresh cache by re-downloading recent items
      */
-        private async refreshCache(): Promise<void> {
+    private async refreshCache(): Promise<void> {
         const panel = this.getPanelElement()
         if (!panel) return
 
         const btn = panel.querySelector('#refresh-cache-btn')
         if (!btn) return
-        
-        // Always try to get the active user explicitly from the dropdown
-        const select = panel.querySelector('#cached-users-select') as HTMLSelectElement
-        const targetUser = select?.value
-        
-        if (!targetUser) {
-            this.showError('No user selected in dropdown to refresh.')
-            return
-        }
 
-        btn.textContent = '?? Refreshing...'
+        btn.textContent = 'ðŸ”„ Refreshing...'
         btn.setAttribute('disabled', 'true')
 
         try {
-            // First emit the event so SteamIntegration can do its thing
-            this.eventManager.emit(SteamEventTypes.CacheRefresh, {
-                userInput: targetUser,
-                source: EventSource.UI
-            })
-            
             // Refresh stats from PixelDataCache
             await this.updateCacheStats()
             
@@ -463,7 +407,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
             console.error('Cache refresh failed:', error)
             this.showError('Failed to refresh cache')
         } finally {
-            btn.textContent = '?? Refresh UI Stats'
+            btn.textContent = 'ðŸ”„ Refresh Cache'
             btn.removeAttribute('disabled')
         }
     }
