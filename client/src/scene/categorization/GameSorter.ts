@@ -100,13 +100,25 @@ export class GameSorter {
     constructor() {
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.AllBatchesComplete,
-            (_event: CustomEvent<AllBatchesCompleteEvent>) => this.sortByRecentlyPlayed()
+            (_event: CustomEvent<AllBatchesCompleteEvent>) => this.sortInitial()
         )
         EventManager.getInstance().registerEventHandler(
             UIEventTypes.SortRequested,
             (event: CustomEvent<SortRequestedEvent>) => this.handleSortRequested(event.detail)
         )
         GameSorter.logger.debug('GameSorter initialized — subscribed to AllBatchesComplete + SortRequested')
+    }
+
+    // TD: steamspy-initial-sort — replace ByGenre anonymous fallback with a popularity sort
+    // once SteamSpy data (player counts / review scores) is available in the batch pipeline.
+    private sortInitial(): void {
+        const userInput = DataManager.getInstance().get<string>('steam.userInput')
+        const isAnonymous = !userInput || userInput === 'demo-user'
+        if (isAnonymous) {
+            this.sortByGenre()
+        } else {
+            this.sortByRecentlyPlayed()
+        }
     }
 
     private handleSortRequested(detail: SortRequestedEvent): void {
