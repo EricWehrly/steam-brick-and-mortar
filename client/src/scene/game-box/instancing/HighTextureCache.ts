@@ -23,6 +23,7 @@ import { Logger } from '../../../utils/Logger'
 import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 import { FrameBudgetScheduler } from '../../../utils/FrameBudgetScheduler'
+import { ManagedTextureArray } from './ManagedTextureArray'
 import { LOD_DEBUG_STRIPE, LOD_STRIPE_COLORS } from './LodTextureArrayManager'
 import { LOD_TIER_NAME } from './ILodArtworkRenderer'
 
@@ -102,15 +103,13 @@ export class HighTextureCache {
     private readonly textureWorker: TextureWorker
     private readonly pixelCache: PixelDataCache
     
-    // TD: Replace dataArrayTexture + isDirty + dirtySlots with ManagedTextureArray (see LodTextureArrayManager.ts)
-    /** The GPU texture array (reference - owned by LodArtworkRenderer) */
-    private dataArrayTexture: THREE.DataArrayTexture | null = null
-    
-    /** Dirty flag: texture data changed, needs GPU upload */
-    private isDirty: boolean = false
-    
-    /** Track which specific slots (layers) need GPU upload - enables partial updates */
-    private dirtySlots: Set<number> = new Set()
+    // TD resolved: dataArrayTexture + isDirty + dirtySlots → ManagedTextureArray
+    /**
+     * Managed texture array for HIGH slots.
+     * Constructed lazily in setTextureArray() once the caller provides the
+     * DataArrayTexture (owned by LodGameArtworkRenderer).
+     */
+    private managedArray: ManagedTextureArray | null = null
     
     /** Game entries by game index */
     private games: Map<number, GameEntry> = new Map()
@@ -196,45 +195,39 @@ export class HighTextureCache {
     }
     
     /**
-     * Set the GPU texture array reference (called by LodArtworkRenderer during init)
+     * Set the GPU texture array reference (called by LodArtworkRenderer during init).
+     * Wraps it in a ManagedTextureArray so HighTextureCache and LodTextureArrayManager
+     * use the same pixel-write and GPU-flush path.
      */
     public setTextureArray(texture: THREE.DataArrayTexture): void {
-        this.dataArrayTexture = texture
+        const debugStripe = LOD_DEBUG_STRIPE ? LOD_STRIPE_COLORS[LOD_TIER_NAME.HIGH] : undefined
+        this.managedArray = new ManagedTextureArray({
+            width: this.config.textureWidth,
+            height: this.config.textureHeight,
+            depth: this.config.totalSlots,
+            debugStripe
+        })
+        this.managedArray.adoptTexture(texture)
         HighTextureCache.logger.lifecycle('Texture array reference set')
     }
-    
-    /**
-     * Check if texture data has changed and needs GPU upload
-     */
+
+    /** Check if texture data has changed and needs GPU upload */
     public needsGpuUpdate(): boolean {
-        return this.isDirty
+        return this.managedArray?.hasPendingUpdates() ?? false
     }
-    
+
     /**
-     * Flush dirty texture data to GPU using PARTIAL layer updates
-     * Instead of uploading all 64 slots (~34MB), only uploads changed slots (~540KB each)
-     * Call this periodically (e.g., every N frames) instead of on every texture load
-     * Returns true if an update was performed
+     * Flush dirty texture data to GPU using PARTIAL layer updates.
+     * Returns true if an update was performed.
      */
     public flushToGpu(): boolean {
-        if (!this.isDirty || !this.dataArrayTexture || this.dirtySlots.size === 0) {
-            return false
+        if (!this.managedArray?.hasPendingUpdates()) return false
+        const count = this.managedArray.pendingCount
+        const flushed = this.managedArray.flushPendingToGpu()
+        if (flushed) {
+            HighTextureCache.logger.debug(`GPU flush: ${count} slot(s) → ~${(count * this.config.textureWidth * this.config.textureHeight * 4 / 1024).toFixed(0)}KB upload`)
         }
-        
-        // Use partial layer updates instead of full texture upload
-        // This is MUCH faster: ~540KB per slot vs ~34MB for all 64 slots
-        for (const slot of this.dirtySlots) {
-            this.dataArrayTexture.addLayerUpdate(slot)
-        }
-        
-        // needsUpdate triggers the actual upload, but now only marked layers are sent
-        this.dataArrayTexture.needsUpdate = true
-        
-        HighTextureCache.logger.debug(`GPU flush: ${this.dirtySlots.size} slot(s) → ~${(this.dirtySlots.size * 540).toFixed(0)}KB upload`)
-        
-        this.dirtySlots.clear()
-        this.isDirty = false
-        return true
+        return flushed
     }
     
     /**
@@ -391,7 +384,7 @@ export class HighTextureCache {
      * Get current state of a game's HIGH texture
      */
     public getTextureArrayRef(): THREE.DataArrayTexture | null {
-        return this.dataArrayTexture
+        return this.managedArray?.texture ?? null
     }
 
     public getState(gameIndex: number): HighTextureState {
@@ -541,7 +534,7 @@ export class HighTextureCache {
      * Actually load a HIGH texture - first checks pixel cache, defers to background on miss
      */
     private async loadHighTexture(entry: GameEntry): Promise<boolean> {
-        if (!this.dataArrayTexture) {
+        if (!this.managedArray) {
             HighTextureCache.logger.warn('Cannot load HIGH texture: texture array not set')
             entry.state = HighTextureState.FAILED
             return false
@@ -615,45 +608,16 @@ export class HighTextureCache {
             }
             
             // Schedule the texture copy to run when we have frame budget
-            // This is the main optimization - spreads work across frames when
-            // multiple worker responses arrive simultaneously
-            const sliceSize = this.config.textureWidth * this.config.textureHeight * 4
-            const offset = entry.highSlot * sliceSize
-            const arrayData = this.dataArrayTexture.image.data as Uint8Array
             const capturedGameIndex = entry.gameIndex
             const capturedSlot = entry.highSlot
             const capturedGameName = entry.gameName
             
             // Schedule entire completion: copy + state update + callback
-            // This ensures we don't flood the main thread when many textures complete at once
             const doTextureCompletion = () => {
                 const copyStart = window.performance.now()
-                arrayData.set(imageData, offset)
-
-                if (LOD_DEBUG_STRIPE) {
-                    const stripeColor = LOD_STRIPE_COLORS[LOD_TIER_NAME.HIGH]
-                    const width = this.config.textureWidth
-                    const height = this.config.textureHeight
-                    const stripeRows = Math.floor(height * 0.2)
-                    const stripeStart = (height - stripeRows) * width * 4
-                    for (let row = 0; row < stripeRows; row++) {
-                        const rowOffset = offset + stripeStart + row * width * 4
-                        for (let col = 0; col < width; col++) {
-                            const px = rowOffset + col * 4
-                            arrayData[px]     = stripeColor[0]
-                            arrayData[px + 1] = stripeColor[1]
-                            arrayData[px + 2] = stripeColor[2]
-                            arrayData[px + 3] = stripeColor[3]
-                        }
-                    }
-                }
-
+                // Pixel write + dirty-slot tracking + optional debug stripe via ManagedTextureArray
+                this.managedArray!.setSlotPixels(capturedSlot, imageData)
                 const copyTime = window.performance.now() - copyStart
-                
-                // Mark this specific slot as dirty for partial GPU upload
-                // This enables uploading just ~540KB per slot instead of ~34MB for all slots
-                this.isDirty = true
-                this.dirtySlots.add(capturedSlot)
                 
                 // State updates happen in the scheduled task
                 entry.state = HighTextureState.LOADED
@@ -858,7 +822,7 @@ export class HighTextureCache {
     }
 
     protected getDataArrayTexture(): THREE.DataArrayTexture | null {
-        return this.dataArrayTexture
+        return this.managedArray?.texture ?? null
     }
 
     protected getTimingSamples(): typeof this.timingSamples {
