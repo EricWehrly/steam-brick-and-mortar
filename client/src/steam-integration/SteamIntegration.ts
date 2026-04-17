@@ -283,7 +283,6 @@ export class SteamIntegration {
             SteamIntegration.logger.info('Emitted ClearRequest before cached library load')
         }
 
-        await this.loadGamesFromCache(vanityUrl)
         await this.loadGamesForUser(vanityUrl, false)
         this.storeSteamDataAndEmitEvent(vanityUrl)
         SteamIntegration.logger.info('Loaded from cache')
