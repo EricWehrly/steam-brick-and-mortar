@@ -119,7 +119,7 @@ export class SteamBrickAndMortarApp {
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Preparing core coordinators')
 
         const isDevelopmentMode = this.appSettings.getSetting('developmentMode')
-        const defaultMaxGames = isDevelopmentMode ? 20 : 100
+        const defaultMaxGames = isDevelopmentMode ? 20 : 9999
         const maxGames = config.steam?.maxGames ?? defaultMaxGames
 
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating SteamIntegration')
