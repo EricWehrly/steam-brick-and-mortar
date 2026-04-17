@@ -108,7 +108,8 @@ If labels are still needed as fallback:
 - `client/src/scene/game-box/instancing/InstancedLabelRenderer.ts` — pool sizing logic
 - `client/src/scene/game-box/instancing/LabelTextureArrayManager.ts` — growable array or demand-based allocation
 
-### Size: Small if Issue 1 is fixed first (becomes a non-issue). Medium standalone.
+### Size: Small if Issue 1 is fixed first (label count drops dramatically). Medium standalone.
+### Note: WebGL `DataArrayTexture` depth cannot be resized in-place — dispose+recreate is the correct pattern. `InstancedLabelRenderer` already implements this in `dispose()`. For re-draws (Issue 3), the renderer should be disposed and recreated with the new game count, which naturally right-sizes the label pool.
 
 ---
 
