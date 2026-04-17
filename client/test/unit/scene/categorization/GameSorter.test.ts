@@ -31,6 +31,16 @@ vi.mock('../../../../src/core/data/DataManager', () => ({
     },
 }))
 
+// Mock SteamIntegration to avoid instantiating SteamApiClient
+let mockIsAnonymous = false
+vi.mock('../../../../src/steam-integration/SteamIntegration', () => ({
+    SteamIntegration: {
+        getInstance: () => ({
+            isAnonymous: () => mockIsAnonymous,
+        }),
+    },
+}))
+
 // Import after mocks are hoisted
 import { GameSorter } from '../../../../src/scene/categorization/GameSorter'
 
