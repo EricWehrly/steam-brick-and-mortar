@@ -13,6 +13,20 @@ import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
 import { GameArtworkProvider } from './GameArtworkProvider'
 import { DataManager } from '../../../core/data/DataManager'
+
+/** Result of queryLodState() — structured pixel data for both LOD tiers */
+export interface LodTierData {
+    pixels: Uint8ClampedArray | null  // null if not yet loaded
+    width: number
+    height: number
+}
+
+export interface LodQueryResult {
+    gameName: string
+    textureIndex: number
+    mid: LodTierData
+    high: LodTierData & { slot: number; state: string | null }
+}
 import { GpuMemoryEstimator } from '../../../debug/GpuMemoryEstimator'
 import { DataKey } from '../../../core/data/DataTypes'
 import * as THREE from 'three'
@@ -109,9 +123,8 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
             console.log('✅ Pixel cache cleared')
         }
 
-        // Side-by-side LOD visual comparison tool
-        // Usage: compareLod("Baldur's Gate 3")  or  compareLod("baldur") for fuzzy match
-        ;(window as any).compareLod = (nameFragment: string) => this.showLodComparison(nameFragment)
+        // Side-by-side LOD visual comparison is now integrated into window.inspectGameArtwork()
+        // No separate compareLod() command needed.
 
         console.log('🔧 LOD debug exports registered. Try: lodCacheStats(), diagnoseArtworkFailures()')
     }
@@ -327,147 +340,60 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         console.groupEnd()
     }
 
+ 
     /**
-     * Visual side-by-side comparison of MID vs HIGH texture for a single game.
-     * Opens a floating overlay in the browser window.
-     *
-     * Usage (from browser console):
-     *   compareLod("Baldur's Gate 3")   // exact or prefix match
-     *   compareLod("baldur")             // case-insensitive substring match
+     * Query LOD state for a game by name (case-insensitive substring match).
+     * Returns structured pixel data and tier state for use by debug UIs.
+     * Returns null if the game is not in the texture atlas.
      */
-    private showLodComparison(nameFragment: string): void {
+    public queryLodState(nameFragment: string): LodQueryResult | null {
         const nameMap = this.getGameNameToTextureIndex()
         const lowerFragment = nameFragment.toLowerCase()
 
-        // Find best match (exact first, then case-insensitive substring)
         let matchedName: string | undefined
         let textureIndex: number | undefined
         for (const [name, index] of nameMap) {
-            if (name.toLowerCase() === lowerFragment) {
-                matchedName = name
-                textureIndex = index
-                break
-            }
-            if (matchedName === undefined && name.toLowerCase().includes(lowerFragment)) {
-                matchedName = name
-                textureIndex = index
-            }
+            if (name.toLowerCase() === lowerFragment) { matchedName = name; textureIndex = index; break }
+            if (!matchedName && name.toLowerCase().includes(lowerFragment)) { matchedName = name; textureIndex = index }
         }
+        if (textureIndex === undefined || !matchedName) return null
 
-        if (textureIndex === undefined || matchedName === undefined) {
-            console.warn(`compareLod: no game matching "${nameFragment}" found in texture atlas`)
-            return
-        }
-
-        console.log(`compareLod: found "${matchedName}" at texture index ${textureIndex}`)
-
-        // --- Extract MID pixels ---
         const textureManager = this.getTextureManager()
         const midTexture = textureManager.getTextureArray('mid')
         const midConfig = textureManager.getTierConfig('mid')
-        if (!midTexture || !midConfig) {
-            console.warn('compareLod: MID texture array not available')
-            return
-        }
-        const midW = midConfig.width
-        const midH = midConfig.height
-        const midSliceBytes = midW * midH * 4
-        const midSrcData = midTexture.image.data as Uint8Array
-        const midPixels = new Uint8ClampedArray(midSrcData.buffer, textureIndex * midSliceBytes, midSliceBytes)
+        const highConfig = textureManager.getTierConfig('high')
 
-        // --- Extract HIGH pixels (if loaded) ---
+        let midPixels: Uint8ClampedArray | null = null
+        let midWidth = 0, midHeight = 0
+        if (midTexture && midConfig) {
+            midWidth = midConfig.width; midHeight = midConfig.height
+            const sliceBytes = midWidth * midHeight * 4
+            const src = midTexture.image.data as Uint8Array
+            midPixels = new Uint8ClampedArray(src.buffer, textureIndex * sliceBytes, sliceBytes)
+        }
+
         const highCache = this.getHighTextureCache()
         const highSlot = highCache?.getHighSlot(textureIndex) ?? -1
         const highTexture = highCache?.getTextureArrayRef() ?? null
-        const highConfig = textureManager.getTierConfig('high')  // dimensions live here
+        const highState = highCache?.getState(textureIndex) ?? null
+
         let highPixels: Uint8ClampedArray | null = null
-        let highW = 0
-        let highH = 0
-        let highLabel = 'HIGH (not loaded)'
-
+        let highWidth = 0, highHeight = 0
         if (highSlot >= 0 && highTexture && highConfig) {
-            highW = highConfig.width
-            highH = highConfig.height
-            const highSliceBytes = highW * highH * 4
-            const highSrcData = highTexture.image.data as Uint8Array
-            highPixels = new Uint8ClampedArray(highSrcData.buffer, highSlot * highSliceBytes, highSliceBytes)
-            highLabel = `HIGH (slot ${highSlot}, ${highW}×${highH})`
-        } else if (highCache) {
-            const state = highCache.getState(textureIndex)
-            highLabel = `HIGH (${state})`
+            highWidth = highConfig.width; highHeight = highConfig.height
+            const sliceBytes = highWidth * highHeight * 4
+            const src = highTexture.image.data as Uint8Array
+            highPixels = new Uint8ClampedArray(src.buffer, highSlot * sliceBytes, sliceBytes)
+        } else if (highConfig) {
+            highWidth = highConfig.width; highHeight = highConfig.height
         }
 
-        // --- Build overlay ---
-        const existingOverlay = document.getElementById('lod-compare-overlay')
-        existingOverlay?.remove()
-
-        const overlay = document.createElement('div')
-        overlay.id = 'lod-compare-overlay'
-        Object.assign(overlay.style, {
-            position: 'fixed', top: '10px', right: '10px', zIndex: '99999',
-            background: '#111', border: '2px solid #555', borderRadius: '8px',
-            padding: '10px', color: '#eee', fontFamily: 'monospace', fontSize: '12px',
-            display: 'flex', flexDirection: 'column', gap: '8px', userSelect: 'none'
-        })
-
-        const title = document.createElement('div')
-        title.textContent = `🔍 ${matchedName} (index ${textureIndex})`
-        Object.assign(title.style, { fontWeight: 'bold', marginBottom: '4px' })
-        overlay.appendChild(title)
-
-        const row = document.createElement('div')
-        Object.assign(row.style, { display: 'flex', gap: '12px', alignItems: 'flex-start' })
-        overlay.appendChild(row)
-
-        const makePanel = (label: string, pixels: Uint8ClampedArray | null, w: number, h: number): HTMLElement => {
-            const panel = document.createElement('div')
-            Object.assign(panel.style, { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' })
-
-            const lbl = document.createElement('div')
-            lbl.textContent = label
-            panel.appendChild(lbl)
-
-            const canvas = document.createElement('canvas')
-            const displayScale = Math.max(1, Math.floor(200 / Math.max(w, 1)))
-            canvas.width = w
-            canvas.height = h
-            Object.assign(canvas.style, {
-                width: `${w * displayScale}px`,
-                height: `${h * displayScale}px`,
-                imageRendering: 'pixelated',
-                border: '1px solid #444'
-            })
-
-            if (pixels && w > 0 && h > 0) {
-                const ctx2d = canvas.getContext('2d')!
-                const imgData = new ImageData(new Uint8ClampedArray(pixels), w, h)
-                ctx2d.putImageData(imgData, 0, 0)
-            } else {
-                Object.assign(canvas.style, { background: '#333' })
-                const ctx2d = canvas.getContext('2d')!
-                ctx2d.fillStyle = '#888'
-                ctx2d.font = '10px monospace'
-                ctx2d.fillText('N/A', 4, 14)
-            }
-
-            panel.appendChild(canvas)
-            return panel
+        return {
+            gameName: matchedName,
+            textureIndex,
+            mid: { pixels: midPixels, width: midWidth, height: midHeight },
+            high: { pixels: highPixels, width: highWidth, height: highHeight, slot: highSlot, state: highState }
         }
-
-        row.appendChild(makePanel(`MID (${midW}×${midH})`, midPixels, midW, midH))
-        row.appendChild(makePanel(highLabel, highPixels, highW, highH))
-
-        const closeBtn = document.createElement('button')
-        closeBtn.textContent = '× close'
-        Object.assign(closeBtn.style, {
-            background: '#333', color: '#eee', border: '1px solid #555',
-            borderRadius: '4px', cursor: 'pointer', padding: '2px 8px', alignSelf: 'flex-end'
-        })
-        closeBtn.onclick = () => overlay.remove()
-        overlay.appendChild(closeBtn)
-
-        document.body.appendChild(overlay)
-        console.log(`compareLod: overlay opened. MID ${midW}×${midH}, ${highLabel}. Run compareLod() again to refresh after HIGH loads.`)
     }
 
     public override dispose(): void {
