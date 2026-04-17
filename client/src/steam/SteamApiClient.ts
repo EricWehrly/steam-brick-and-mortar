@@ -361,6 +361,13 @@ export class SteamApiClient {
             pendingGames.push(enhanced)
             await flush()
         }
+        // Flush any partial remainder from the cached phase before uncached games start.
+        // Without this, leftover games in the buffer mix with uncached games and the
+        // batchIndex sequence diverges from totalBatchCount, leaving BatchCoordinator
+        // waiting for a batch that never arrives ("Placing shelf N" stuck UI).
+        if (uncachedAppids.length > 0) {
+            await flush(true)
+        }
         buildMonitor.end({ count: cachedGames.length })
 
         // Emit network fetch progress so the UI can show a loading indicator

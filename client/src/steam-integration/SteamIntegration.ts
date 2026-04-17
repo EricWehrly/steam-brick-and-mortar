@@ -317,7 +317,7 @@ export class SteamIntegration {
 
         if (key !== 'developmentMode') return
 
-        const maxGames = value ? 20 : 100        
+        const maxGames = value ? 20 : 9999        
         this.config.maxGames = maxGames
     }
 }
