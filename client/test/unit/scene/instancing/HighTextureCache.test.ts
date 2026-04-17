@@ -68,10 +68,9 @@ describe('HighTextureCache LRU', () => {
         onSlotChange = vi.fn()
         cache.setSlotChangeCallback(onSlotChange)
         
-        // Setup mock GPU array
-        const mockArray = new THREE.DataArrayTexture(new Uint8Array(2 * 600 * 900 * 4), 600, 900, 2)
+        // Setup mock GPU array (mocking the internal DataArrayTexture)
+        const mockArray = cache.getTexture()
         mockArray.addLayerUpdate = vi.fn()
-        cache.setTextureArray(mockArray)
 
         // Get access to the mock worker instance
         // @ts-expect-error accessing private property for test verification

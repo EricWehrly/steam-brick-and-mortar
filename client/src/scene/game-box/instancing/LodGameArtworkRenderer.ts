@@ -59,8 +59,13 @@ export interface LodGameArtworkRendererConfig {
 
 /** Texture arrays for each LOD level, passed in from upstream */
 export interface LodTextureArrays {
-    high: THREE.DataArrayTexture
+    /** MID tier — always required. */
     mid: THREE.DataArrayTexture
+    /**
+     * HIGH tier — required in non-lazy mode (owned by LodTextureArrayManager).
+     * In lazy mode this is omitted; HighTextureCache creates and owns it.
+     */
+    high?: THREE.DataArrayTexture
 }
 
 /** Per-instance data for external tracking */
@@ -168,7 +173,9 @@ export class LodGameArtworkRenderer {
                 ...highConfig
             })
             this.highTextureCache.setSlotChangeCallback(this.onHighSlotChange.bind(this))
-            this.highTextureCache.setTextureArray(textureArrays.high)
+            // HighTextureCache owns its DataArrayTexture from construction.
+            // We grab it here so the shader can reference it.
+            textureArrays = { ...textureArrays, high: this.highTextureCache.getTexture() }
             
             // Initialize spatial pre-warming
             this.spatialPrewarming = new SpatialPrewarmingManager(
@@ -180,7 +187,7 @@ export class LodGameArtworkRenderer {
         // Create material referencing the texture arrays
         this.material = new THREE.ShaderMaterial({
             uniforms: {
-                textureArrayHigh: { value: textureArrays.high },
+                textureArrayHigh: { value: textureArrays.high ?? textureArrays.mid }, // fallback gracefully
                 textureArrayMid: { value: textureArrays.mid }
             },
             vertexShader,

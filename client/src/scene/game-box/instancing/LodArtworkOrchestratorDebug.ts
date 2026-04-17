@@ -374,7 +374,7 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
 
         const highCache = this.getHighTextureCache()
         const highSlot = highCache?.getHighSlot(textureIndex) ?? -1
-        const highTexture = highCache?.getTextureArrayRef() ?? null
+        const highTexture = highCache?.getTexture() ?? null
         const highState = highCache?.getState(textureIndex) ?? null
 
         let highPixels: Uint8ClampedArray | null = null

@@ -180,6 +180,16 @@ export class HighTextureCache {
         // Initialize slot allocation array - all slots start free (-1)
         this.slotToGame = new Array(this.config.totalSlots).fill(-1)
         
+        // Create and own the HIGH texture array from the start.
+        // The DataArrayTexture is exposed via getTexture() for the shader.
+        const debugStripe = LOD_DEBUG_STRIPE ? LOD_STRIPE_COLORS[LOD_TIER_NAME.HIGH] : undefined
+        this.managedArray = new ManagedTextureArray({
+            width: this.config.textureWidth,
+            height: this.config.textureHeight,
+            depth: this.config.totalSlots,
+            debugStripe
+        })
+        
         this.textureWorker = new TextureWorker()
         this.pixelCache = PixelDataCache.getInstance()
         this.scheduler = FrameBudgetScheduler.getInstance()
@@ -195,25 +205,16 @@ export class HighTextureCache {
     }
     
     /**
-     * Set the GPU texture array reference (called by LodArtworkRenderer during init).
-     * Wraps it in a ManagedTextureArray so HighTextureCache and LodTextureArrayManager
-     * use the same pixel-write and GPU-flush path.
+     * Get the HIGH texture array for passing to the shader uniform.
+     * HighTextureCache owns this texture from construction.
      */
-    public setTextureArray(texture: THREE.DataArrayTexture): void {
-        const debugStripe = LOD_DEBUG_STRIPE ? LOD_STRIPE_COLORS[LOD_TIER_NAME.HIGH] : undefined
-        this.managedArray = new ManagedTextureArray({
-            width: this.config.textureWidth,
-            height: this.config.textureHeight,
-            depth: this.config.totalSlots,
-            debugStripe
-        })
-        this.managedArray.adoptTexture(texture)
-        HighTextureCache.logger.lifecycle('Texture array reference set')
+    public getTexture(): THREE.DataArrayTexture {
+        return this.managedArray!.texture
     }
 
     /** Check if texture data has changed and needs GPU upload */
     public needsGpuUpdate(): boolean {
-        return this.managedArray?.hasPendingUpdates() ?? false
+        return this.managedArray!.hasPendingUpdates()
     }
 
     /**
@@ -221,9 +222,9 @@ export class HighTextureCache {
      * Returns true if an update was performed.
      */
     public flushToGpu(): boolean {
-        if (!this.managedArray?.hasPendingUpdates()) return false
-        const count = this.managedArray.pendingCount
-        const flushed = this.managedArray.flushPendingToGpu()
+        const count = this.managedArray!.pendingCount
+        if (count === 0) return false
+        const flushed = this.managedArray!.flushPendingToGpu()
         if (flushed) {
             HighTextureCache.logger.debug(`GPU flush: ${count} slot(s) → ~${(count * this.config.textureWidth * this.config.textureHeight * 4 / 1024).toFixed(0)}KB upload`)
         }
@@ -383,10 +384,6 @@ export class HighTextureCache {
     /**
      * Get current state of a game's HIGH texture
      */
-    public getTextureArrayRef(): THREE.DataArrayTexture | null {
-        return this.managedArray?.texture ?? null
-    }
-
     public getState(gameIndex: number): HighTextureState {
         return this.games.get(gameIndex)?.state ?? HighTextureState.EMPTY
     }
@@ -821,8 +818,8 @@ export class HighTextureCache {
         return this.stats
     }
 
-    protected getDataArrayTexture(): THREE.DataArrayTexture | null {
-        return this.managedArray?.texture ?? null
+    protected getDataArrayTexture(): THREE.DataArrayTexture {
+        return this.managedArray!.texture
     }
 
     protected getTimingSamples(): typeof this.timingSamples {
