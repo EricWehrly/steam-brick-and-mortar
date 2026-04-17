@@ -56,11 +56,13 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private readonly instancedShelfRenderer: InstancedShelfRenderer
     private readonly shelfLayoutCoordinator: ShelfLayoutCoordinator
+    private readonly batchCoordinator: BatchCoordinator<unknown>
+    private readonly gameBoxSpawner: GameBoxSpawner
 
     constructor(scene: THREE.Scene) {
         this.scene = scene
         // Owns GamesBatchReady -> BatchReadyForPlacement queueing + completion signaling.
-        new BatchCoordinator()
+        this.batchCoordinator = new BatchCoordinator()
 
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'props-instanced'
@@ -72,7 +74,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // before any batches can arrive. Previously constructed in setupProps()
         // which could run after batches had already fired, causing all
         // "No pending games" warnings.
-        new GameBoxSpawner()
+        this.gameBoxSpawner = new GameBoxSpawner()
 
         this.setupEventListeners()
     }

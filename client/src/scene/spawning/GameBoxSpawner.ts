@@ -44,10 +44,6 @@ export class GameBoxSpawner {
         GameBoxSpawner.logger.debug('Reset pending games')
     }
 
-    public setGameBoxRenderer(gameBoxRenderer: GpuGameBoxRenderer): void {
-        this.gameBoxRenderer = gameBoxRenderer
-    }
-    
     /**
      * Handle BatchReadyForPlacement event
      * Stores games and requests shelf space via event
