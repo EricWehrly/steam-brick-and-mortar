@@ -304,14 +304,14 @@ export class SteamApiClient {
 
     /**
      * Load games with single-pass cache check and fetch
-     * 
-     * Optimized for fast cached loads:
-     * 1. Single IndexedDB read for all games
-     * 2. Only fetch games missing complete metadata
-     * 3. Build enhanced game objects directly
-     * 
-     * @param steamUser - Steam user data with games list
-     * @param options - maxGames limits display, onProgress for UI updates, onBatchReady for progressive batches
+     *
+     * Games are emitted progressively as they become available:
+     * - Cached games are enhanced and emitted immediately
+     * - Uncached games are fetched from the network and emitted as each
+     *   network batch (100 games) resolves
+     *
+     * Both paths feed the same progressive emitter so there is no
+     * bifurcation of batch emission logic.
      */
     public async loadGamesProgressively(
         steamUser: SteamUser,
@@ -323,37 +323,102 @@ export class SteamApiClient {
     ): Promise<SteamGame[]> {
         const { maxGames = 9999, sortFn } = options
         const BATCH_SIZE = 18 // One shelf's worth
-        
+
         const sortedGames = this.sortAndLimitGames(steamUser.games, maxGames, sortFn)
         const appids = sortedGames.map(g => g.appid)
-        
+
         const { cachedAppids, uncachedAppids, cachedAppDetails } = await this.partitionByCache(appids)
-        
-        // Calculate total batches using per-phase rounding to match actual emission
-        // This prevents off-by-one errors when cached+uncached rounds differently than total
+
         const cachedBatchCount = Math.ceil(cachedAppids.length / BATCH_SIZE)
         const uncachedBatchCount = Math.ceil(uncachedAppids.length / BATCH_SIZE)
         const totalBatchCount = cachedBatchCount + uncachedBatchCount
-        
-        // PHASE 1: Emit cached games immediately (cache-first for fast startup)
-        let results: SteamGame[] = []
-        if (cachedAppids.length > 0) {
-            const cachedGames = await this.emitCachedGameBatches(
-                sortedGames, cachedAppids, cachedAppDetails,
-                totalBatchCount, BATCH_SIZE
-            )
-            results = cachedGames
+
+        // Shared progressive emitter — both paths push games through this.
+        // It accumulates games, flushes full shelves (BATCH_SIZE), and yields
+        // between each flush so the render pipeline can process before the next arrives.
+        let pendingGames: SteamGame[] = []
+        let renderBatchIndex = 0
+
+        const flush = async (force = false) => {
+            while (pendingGames.length >= BATCH_SIZE || (force && pendingGames.length > 0)) {
+                const batch = pendingGames.splice(0, BATCH_SIZE)
+                EventManager.getInstance().emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
+                    games: batch as ReadonlyArray<Readonly<SteamGame>>,
+                    batchIndex: renderBatchIndex,
+                    totalBatches: totalBatchCount
+                })
+                renderBatchIndex++
+                await new Promise(resolve => setTimeout(resolve, 0))
+            }
         }
-        
-        // PHASE 2: Fetch uncached games in background (emit when ready)
+
+        // PHASE 1: Cached games — build and feed immediately
+        const buildMonitor = PerformanceMonitor.start('build-cached-games', SteamApiClient.logger, MAIN_THREAD_CONTEXT)
+        const cachedGames = sortedGames.filter(g => cachedAppids.includes(g.appid))
+        for (const game of cachedGames) {
+            const enhanced = this.buildEnhancedGame(game, cachedAppDetails.get(game.appid))
+            this.cache.set(`game_${game.appid}`, enhanced)
+            pendingGames.push(enhanced)
+            await flush()
+        }
+        buildMonitor.end({ count: cachedGames.length })
+
+        // Emit network fetch progress so the UI can show a loading indicator
         if (uncachedAppids.length > 0) {
-            await this.fetchUncachedGamesInBackground(
-                sortedGames, uncachedAppids, cachedAppids.length, totalBatchCount, BATCH_SIZE
-            )
+            EventManager.getInstance().emit<SteamNetworkFetchProgressEvent>(SteamEventTypes.NetworkFetchProgress, {
+                fetched: cachedAppids.length,
+                total: sortedGames.length
+            })
         }
-        
-        SteamApiClient.logger.info(`Loaded ${results.length} cached games, ${uncachedAppids.length} fetching in background`)
-        return results
+
+        // PHASE 2: Uncached games — fire-and-forget; feeds the same emitter as each
+        // network batch resolves so games appear progressively without a blank wall.
+        if (uncachedAppids.length > 0) {
+            const gameByAppid = new Map<number, SteamGame>(sortedGames.map(g => [g.appid, g]))
+            const fetchedAppDetails = new Map<number, AppDetailsData>()
+
+            // Run in background; unhandled rejection is caught and logged
+            this.batchClient.fetchBatch(uncachedAppids, { batchSize: 100 })
+                .then(async (batchResponses) => {
+                    for (const [appid, response] of batchResponses.entries()) {
+                        const dataToNormalize = response.success === false && response.unlisted
+                            ? (response as unknown as AppDetailsData)
+                            : response.data
+                        const normalized = this.normalizeBatchData(dataToNormalize)
+                        fetchedAppDetails.set(appid, normalized)
+
+                        const baseGame = gameByAppid.get(appid)
+                        if (!baseGame) continue
+
+                        const enhanced = this.buildEnhancedGame(baseGame, normalized)
+                        this.cache.set(`game_${appid}`, enhanced)
+                        pendingGames.push(enhanced)
+                        await flush()
+                    }
+
+                    // Flush any remaining partial shelf
+                    await flush(true)
+
+                    if (fetchedAppDetails.size > 0) {
+                        const cacheMonitor = PerformanceMonitor.start('cache-metadata', SteamApiClient.logger, ASYNC_CONTEXT)
+                        await this.appDetailsCache.setMany(fetchedAppDetails)
+                        cacheMonitor.end({ count: fetchedAppDetails.size })
+                    }
+
+                    SteamApiClient.logger.info(
+                        `[ASYNC] Emitted ${fetchedAppDetails.size} uncached games progressively in ${renderBatchIndex - cachedBatchCount} rendering batches`
+                    )
+                })
+                .catch(error => {
+                    SteamApiClient.logger.error('[ASYNC] Background metadata fetch failed:', error)
+                })
+        } else {
+            // All games were cached — flush remainder now
+            await flush(true)
+        }
+
+        SteamApiClient.logger.info(`Loaded ${cachedGames.length} cached games, ${uncachedAppids.length} fetching in background`)
+        return cachedGames
     }
 
     private sortAndLimitGames(games: SteamGame[], maxGames: number, sortFn?: (a: SteamGame, b: SteamGame) => number): SteamGame[] {
@@ -379,154 +444,6 @@ export class SteamApiClient {
         }
         
         return { cachedAppids, uncachedAppids, cachedAppDetails }
-    }
-
-    private async emitCachedGameBatches(
-        sortedGames: SteamGame[],
-        cachedAppids: number[],
-        cachedAppDetails: Map<number, AppDetailsData>,
-        totalBatchCount: number,
-        BATCH_SIZE: number
-    ): Promise<SteamGame[]> {
-        const buildMonitor = PerformanceMonitor.start('build-cached-games', SteamApiClient.logger, MAIN_THREAD_CONTEXT)
-        const cachedGames = sortedGames.filter(g => cachedAppids.includes(g.appid))
-        const cachedEnhanced: SteamGame[] = []
-        
-        // Build all cached games with metadata
-        for (const game of cachedGames) {
-            const enhancedGame = this.buildEnhancedGame(game, cachedAppDetails.get(game.appid))
-            this.cache.set(`game_${game.appid}`, enhancedGame)
-            cachedEnhanced.push(enhancedGame)
-        }
-        
-        buildMonitor.end({ count: cachedEnhanced.length })
-        
-        // Emit cached games in batches with yielding
-        // Note: Subscribers (GpuStorePropsRenderer.processOneBatch, etc.) are already instrumented
-        const cachedBatches = Math.ceil(cachedEnhanced.length / BATCH_SIZE)
-        
-        for (let i = 0; i < cachedBatches; i++) {
-            const batchGames = cachedEnhanced.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
-            const isLastCachedBatch = i === cachedBatches - 1
-            
-            EventManager.getInstance().emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
-                games: batchGames as ReadonlyArray<Readonly<SteamGame>>,
-                batchIndex: i,
-                totalBatches: totalBatchCount
-            })
-            
-            // Yield to main thread between batches
-            if (!isLastCachedBatch) {
-                await new Promise(resolve => setTimeout(resolve, 0))
-            }
-        }
-        SteamApiClient.logger.info(`Emitted ${cachedEnhanced.length} cached games in ${cachedBatches} batches`)
-        
-        EventManager.getInstance().emit<SteamNetworkFetchProgressEvent>(SteamEventTypes.NetworkFetchProgress, {
-            fetched: cachedAppids.length,
-            total: sortedGames.length
-        })
-        
-        return cachedEnhanced
-    }
-
-    private async fetchUncachedGamesInBackground(
-        sortedGames: SteamGame[],
-        uncachedAppids: number[],
-        cachedAppidsCount: number,
-        totalBatchCount: number,
-        BATCH_SIZE: number
-    ): Promise<void> {
-        // Fetch metadata in background and emit events when ready
-        this.fetchMetadataBackground(uncachedAppids, sortedGames, cachedAppidsCount, totalBatchCount, BATCH_SIZE)
-            .catch(error => {
-                SteamApiClient.logger.error('Background metadata fetch failed:', error)
-            })
-    }
-
-    private async fetchMetadataBackground(
-        uncachedAppids: number[],
-        sortedGames: SteamGame[],
-        cachedAppidsCount: number,
-        totalBatchCount: number,
-        BATCH_SIZE: number
-    ): Promise<void> {
-        try {
-            // Build a lookup of base game data by appid for quick access in the callback
-            const gameByAppid = new Map<number, SteamGame>(sortedGames.map(g => [g.appid, g]))
-
-            // Track which rendering-batch index to emit next (picks up after cached batches)
-            const startBatchIndex = Math.ceil(cachedAppidsCount / BATCH_SIZE)
-            let renderBatchIndex = startBatchIndex
-
-            // Buffer for games that have been fetched but not yet emitted (partial rendering batch)
-            let pendingGames: SteamGame[] = []
-
-            const emitPendingAsRenderBatch = async () => {
-                if (pendingGames.length === 0) return
-                EventManager.getInstance().emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
-                    games: pendingGames as ReadonlyArray<Readonly<SteamGame>>,
-                    batchIndex: renderBatchIndex,
-                    totalBatches: totalBatchCount
-                })
-                renderBatchIndex++
-                pendingGames = []
-                // Yield to let the render pipeline process this batch before the next one arrives
-                await new Promise(resolve => setTimeout(resolve, 0))
-            }
-
-            const fetchedAppDetails = new Map<number, AppDetailsData>()
-
-            await this.batchClient.fetchBatch(uncachedAppids, {
-                batchSize: 100,
-                onNetworkBatchReady: async (_networkBatchIndex, _totalNetworkBatches, batchResultMap) => {
-                    // Build enhanced games for this network batch and buffer them
-                    for (const [appid, response] of batchResultMap.entries()) {
-                        // If it's a successful response but the game itself is unlisted, the response IS the data shell
-                        // For a normal Steam game, response.data holds the actual metadata
-                        const dataToNormalize = response.success === false && response.unlisted 
-                            ? (response as unknown as AppDetailsData) 
-                            : response.data
-                        const normalized = this.normalizeBatchData(dataToNormalize)
-                        fetchedAppDetails.set(appid, normalized)
-
-                        const baseGame = gameByAppid.get(appid)
-                        if (!baseGame) continue
-
-                        const enhancedGame = this.buildEnhancedGame(baseGame, normalized)
-                        this.cache.set(`game_${appid}`, enhancedGame)
-                        pendingGames.push(enhancedGame)
-
-                        // Flush a full rendering batch (BATCH_SIZE games) as soon as it's ready
-                        if (pendingGames.length >= BATCH_SIZE) {
-                            await emitPendingAsRenderBatch()
-                        }
-                    }
-
-                    // Emit whatever is buffered after each network batch so games appear
-                    // progressively even when a network batch doesn't fill a full rendering batch
-                    await emitPendingAsRenderBatch()
-                }
-            })
-
-            // Flush any remaining partial batch after all network batches complete
-            await emitPendingAsRenderBatch()
-
-            // Persist all fetched metadata to IndexedDB in one pass
-            if (fetchedAppDetails.size > 0) {
-                const cacheMonitor = PerformanceMonitor.start('cache-metadata', SteamApiClient.logger, ASYNC_CONTEXT)
-                await this.appDetailsCache.setMany(fetchedAppDetails)
-                cacheMonitor.end({ count: fetchedAppDetails.size })
-            }
-
-            SteamApiClient.logger.info(
-                `[ASYNC] Emitted ${fetchedAppDetails.size} uncached games progressively in ${renderBatchIndex - startBatchIndex} rendering batches`
-            )
-
-        } catch (error) {
-            SteamApiClient.logger.error('[ASYNC] Background metadata fetch failed:', error)
-            throw error
-        }
     }
 
     /**

@@ -133,7 +133,11 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private handleAllBatchesComplete(): void {
         GpuStorePropsRenderer.logger.debug('Progressive loading complete')
-        this.progressiveInitializationPromise = null
+        // Do not null progressiveInitializationPromise here. With progressive emission,
+        // network batches can still be in-flight when AllBatchesComplete fires for
+        // earlier batches. Nulling here would cause handleInitialBatch to create a
+        // new renderer and dispose the one actively loading textures.
+        // clearProps() is the only correct place to reset this.
     }
 
     public async setupProps(config: PropsConfig = {}): Promise<void> {
