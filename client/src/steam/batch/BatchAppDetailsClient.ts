@@ -38,6 +38,13 @@ export interface BatchAppDetailsOptions {
      * Callback for batch progress
      */
     onProgress?: (fetched: number, total: number) => void;
+
+    /**
+     * Callback invoked after each network batch completes with that batch's results.
+     * Enables progressive emission — callers can process each batch as it arrives
+     * rather than waiting for all batches to finish.
+     */
+    onNetworkBatchReady?: (batchIndex: number, totalBatches: number, results: Map<number, AppDetailsResponse>) => Promise<void> | void;
 }
 
 export interface AppDetailsResponse {
@@ -86,7 +93,8 @@ export class BatchAppDetailsClient {
     ): Promise<Map<number, AppDetailsResponse>> {
         const {
             batchSize = 100, // Increased: Lambda handles cached games instantly
-            onProgress
+            onProgress,
+            onNetworkBatchReady
         } = options;
 
         const results = new Map<number, AppDetailsResponse>();
@@ -133,11 +141,16 @@ export class BatchAppDetailsClient {
                 lastBatchDuration = batchMonitor.getElapsed();
                 
                 // Process successful results
+                const batchResultMap = new Map<number, AppDetailsResponse>()
                 for (const result of batchResult.results) {
-                    results.set(result.appid, result);
+                    results.set(result.appid, result)
+                    batchResultMap.set(result.appid, result)
                 }
 
                 totalFetched += batchResult.total_successful;
+
+                // Notify caller that this network batch is ready for progressive processing
+                await onNetworkBatchReady?.(batchIndex, batches.length, batchResultMap)
                 
                 // Calculate total work: if fetching N games in parallel, total work ≈ N × elapsed
                 // (Each game's metadata fetch would take ~elapsed ms if done sequentially)
