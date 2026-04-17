@@ -236,7 +236,7 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
         artworkUrl: string,
         appid?: number,
         rotation?: THREE.Quaternion
-    ): Promise<{ success: boolean; instanceIndex: number }> {
+    ): Promise<{ success: boolean; instanceIndex: number; permanent?: boolean }> {
         // Check if already loaded
         const existingIndex = this.gameNameToTextureIndex.get(gameName)
         if (existingIndex !== undefined) {
@@ -248,7 +248,7 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
         if (this.artworkProvider.isPermanentFailure(appid ?? 0, 'library')) {
             const reason = this.artworkProvider.getFailureReason(appid ?? 0, 'library')
             LodArtworkOrchestrator.logger.debug(`Skipping "${gameName}": permanent failure (${reason})`)
-            return { success: false, instanceIndex: -1 }
+            return { success: false, instanceIndex: -1, permanent: true }
         }
 
         // Allocate texture slot
@@ -329,7 +329,8 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
                 timestamp: Date.now()
             })
             LodArtworkOrchestrator.logger.debug(`Artwork failed for "${gameName}": ${reason}`)
-            return { success: false, instanceIndex: -1 }
+            const isPermanent = this.artworkProvider.isPermanentFailure(appid ?? 0, 'library')
+            return { success: false, instanceIndex: -1, permanent: isPermanent }
         }
     }
 

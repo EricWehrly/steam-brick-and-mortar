@@ -159,16 +159,15 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             typeof game.appid === 'number' ? game.appid : undefined,
             rotation
         ).then((result) => {
-            if (!result.success && AppSettings.get(Setting.EnableLabels)) {
+            if (!result.success && result.permanent && AppSettings.get(Setting.EnableLabels)) {
                 this.createLabelGameBox(game, position, side, rotation)
             }
         }).catch((error) => {
             if (!(error instanceof Error && error.message.includes('Maximum'))) {
                 GpuGameBoxRenderer.logger.debug(`Artwork fetch failed for "${game.name}": ${error}`)
             }
-            if (AppSettings.get(Setting.EnableLabels)) {
-                this.createLabelGameBox(game, position, side, rotation)
-            }
+            // Don't create label on transient/unexpected errors — only on permanent failures
+            // which are surfaced via result.permanent in the .then() path above
         })
     }
     
