@@ -300,8 +300,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         GpuGameBoxRenderer.logger.info(`LOD config: HIGH ${highWidth}×${highHeight} (${maxHighSlots} slots), MED ${medWidth}×${medHeight}`)
         
         return [
-            { level: LOD_LEVEL.HIGH, textureWidth: highWidth, textureHeight: highHeight, name: LOD_TIER_NAME.HIGH, maxDepth: maxHighSlots },
-            { level: LOD_LEVEL.MID, textureWidth: medWidth, textureHeight: medHeight, name: LOD_TIER_NAME.MID }
+            { level: LOD_LEVEL.HIGH, textureWidth: highWidth, textureHeight: highHeight, tierName: LOD_TIER_NAME.HIGH, name: LOD_TIER_NAME.HIGH, maxDepth: maxHighSlots },
+            { level: LOD_LEVEL.MID, textureWidth: medWidth, textureHeight: medHeight, tierName: LOD_TIER_NAME.MID, name: LOD_TIER_NAME.MID }
         ]
     }
 }

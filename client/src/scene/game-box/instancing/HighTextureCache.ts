@@ -24,8 +24,9 @@ import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 import { FrameBudgetScheduler } from '../../../utils/FrameBudgetScheduler'
 import { ManagedTextureArray } from './ManagedTextureArray'
-import { LOD_DEBUG_STRIPE, LOD_STRIPE_COLORS } from './LodTextureArrayManager'
 import { LOD_TIER_NAME } from './ILodArtworkRenderer'
+import { LOD_DEBUG_SETTINGS } from './LodDebugSettings'
+import { HighSlotAllocator } from './HighSlotAllocator'
 
 // Logger will be attached to the class below
 
@@ -102,19 +103,14 @@ export class HighTextureCache {
     private readonly config: HighTextureCacheConfig
     private readonly textureWorker: TextureWorker
     private readonly pixelCache: PixelDataCache
-    
-    // TD resolved: dataArrayTexture + isDirty + dirtySlots → ManagedTextureArray
-    /**
-     * Managed texture array for HIGH slots.
-     * Constructed lazily in setTextureArray() once the caller provides the
-     * DataArrayTexture (owned by LodGameArtworkRenderer).
-     */
+
     private managedArray: ManagedTextureArray | null = null
+    private readonly slotAllocator: HighSlotAllocator
     
     /** Game entries by game index */
     private games: Map<number, GameEntry> = new Map()
     
-    /** Slot allocation: slot index → game index (or -1 if free) */
+    /** Slot allocation snapshot for debug output */
     private slotToGame: number[]
     
     /** Currently loading game indices (to prevent duplicate loads) */
@@ -177,12 +173,10 @@ export class HighTextureCache {
             maxConcurrentLoads: config.maxConcurrentLoads ?? 2
         }
         
-        // Initialize slot allocation array - all slots start free (-1)
-        this.slotToGame = new Array(this.config.totalSlots).fill(-1)
-        
-        // Create and own the HIGH texture array from the start.
-        // The DataArrayTexture is exposed via getTexture() for the shader.
-        const debugStripe = LOD_DEBUG_STRIPE ? LOD_STRIPE_COLORS[LOD_TIER_NAME.HIGH] : undefined
+        this.slotAllocator = new HighSlotAllocator(this.config.totalSlots)
+        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
+
+        const debugStripe = LOD_DEBUG_SETTINGS.stripeEnabled ? LOD_DEBUG_SETTINGS.stripeColors[LOD_TIER_NAME.HIGH] : undefined
         this.managedArray = new ManagedTextureArray({
             width: this.config.textureWidth,
             height: this.config.textureHeight,
@@ -444,22 +438,34 @@ export class HighTextureCache {
      * @returns slot index (0-63), or -1 if allocation failed
      */
     private allocateSlot(gameIndex: number): number {
-        // First, try to find a free slot
-        for (let slot = 0; slot < this.config.totalSlots; slot++) {
-            if (this.slotToGame[slot] === -1) {
-                this.slotToGame[slot] = gameIndex
-                return slot
+        const loadedEntries = Array.from(this.games.values())
+            .filter(entry => entry.state === HighTextureState.LOADED)
+            .map(entry => ({
+                gameIndex: entry.gameIndex,
+                highSlot: entry.highSlot,
+                lastAccessTime: entry.lastAccessTime,
+            }))
+
+        const { slot, evictedGameIndex } = this.slotAllocator.allocate(gameIndex, loadedEntries)
+        if (slot < 0) {
+            return -1
+        }
+
+        if (evictedGameIndex >= 0 && evictedGameIndex !== gameIndex) {
+            const evictedEntry = this.games.get(evictedGameIndex)
+            if (evictedEntry && evictedEntry.highSlot >= 0) {
+                evictedEntry.state = HighTextureState.EMPTY
+                evictedEntry.highSlot = -1
+                this.stats.evictions++
+                if (this.onSlotChange) {
+                    this.onSlotChange(evictedGameIndex, -1)
+                }
+                HighTextureCache.logger.runtime(`Evicted game ${evictedEntry.gameIndex} from slot ${slot} "${evictedEntry.gameName.slice(0, 20)}"`)
             }
         }
-        
-        // All slots full - evict LRU
-        const evictedSlot = this.evictLru()
-        if (evictedSlot >= 0) {
-            this.slotToGame[evictedSlot] = gameIndex
-            return evictedSlot
-        }
-        
-        return -1 // Should not happen
+
+        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
+        return slot
     }
     
     /**
@@ -582,7 +588,8 @@ export class HighTextureCache {
                 
                 // Release the allocated slot
                 if (entry.highSlot >= 0) {
-                    this.slotToGame[entry.highSlot] = -1
+                    this.slotAllocator.clearSlot(entry.highSlot)
+                    this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
                     entry.highSlot = -1
                 }
                 
@@ -674,7 +681,8 @@ export class HighTextureCache {
             entry.state = HighTextureState.FAILED
             // Free the slot since we failed
             if (entry.highSlot >= 0) {
-                this.slotToGame[entry.highSlot] = -1
+                this.slotAllocator.clearSlot(entry.highSlot)
+                this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
                 entry.highSlot = -1
             }
             return false
@@ -696,49 +704,8 @@ export class HighTextureCache {
         HighTextureCache.logger.debug(`Marked for eviction: game ${gameIndex} slot ${entry.highSlot} "${entry.gameName.slice(0, 20)}"`)
     }
     
-    /**
-     * Evict the least-recently-used loaded HIGH texture
-     * @returns the freed slot index, or -1 if nothing to evict
-     */
-    private evictLru(): number {
-        let lruEntry: GameEntry | null = null
-        let lruTime = Infinity
-        
-        for (const entry of this.games.values()) {
-            if (entry.state === HighTextureState.LOADED && entry.lastAccessTime < lruTime) {
-                lruTime = entry.lastAccessTime
-                lruEntry = entry
-            }
-        }
-        
-        if (!lruEntry || lruEntry.highSlot < 0) {
-            return -1
-        }
-        
-        const freedSlot = lruEntry.highSlot
-        
-        // Clear the slot assignment
-        this.slotToGame[freedSlot] = -1
-        
-        // Reset entry state
-        lruEntry.state = HighTextureState.EMPTY
-        lruEntry.highSlot = -1
-        this.stats.evictions++
-        
-        // Notify callback so renderer can update highTextureSlot attribute to -1
-        if (this.onSlotChange) {
-            this.onSlotChange(lruEntry.gameIndex, -1)
-        }
-        
-        HighTextureCache.logger.runtime(`Evicted game ${lruEntry.gameIndex} from slot ${freedSlot} "${lruEntry.gameName.slice(0, 20)}"`)
-        return freedSlot
-    }
-    
-    /**
-     * Count used slots
-     */
     private getUsedSlotCount(): number {
-        return this.slotToGame.filter(g => g >= 0).length
+        return this.slotAllocator.getUsedSlotCount()
     }
     
     /**
@@ -859,7 +826,7 @@ export class HighTextureCache {
         let evictedCount = 0
         for (const entry of this.games.values()) {
             if (entry.state === HighTextureState.LOADED && entry.highSlot >= 0) {
-                this.slotToGame[entry.highSlot] = -1
+                this.slotAllocator.clearSlot(entry.highSlot)
                 entry.state = HighTextureState.EMPTY
                 entry.highSlot = -1
                 this.stats.evictions++
@@ -871,6 +838,7 @@ export class HighTextureCache {
         }
         // Cancel any pending loads — no point loading while unfocused
         this.loadQueue = []
+        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
         if (evictedCount > 0) {
             HighTextureCache.logger.info(`evictAll: released ${evictedCount} HIGH texture slots`)
         }
@@ -887,7 +855,7 @@ export class HighTextureCache {
         }
         
         const freedSlot = entry.highSlot
-        this.slotToGame[freedSlot] = -1
+        this.slotAllocator.clearSlot(freedSlot)
         entry.state = HighTextureState.EMPTY
         entry.highSlot = -1
         this.stats.evictions++
@@ -895,7 +863,8 @@ export class HighTextureCache {
         if (this.onSlotChange) {
             this.onSlotChange(entry.gameIndex, -1)
         }
-        
+        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
+
         return true
     }
 
@@ -903,7 +872,8 @@ export class HighTextureCache {
         this.games.clear()
         this.loadingPromises.clear()
         this.loadQueue = []
-        this.slotToGame = []
+        this.slotAllocator.clearAll()
+        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
         this.textureWorker.dispose()
         HighTextureCache.logger.lifecycle('Disposed')
     }

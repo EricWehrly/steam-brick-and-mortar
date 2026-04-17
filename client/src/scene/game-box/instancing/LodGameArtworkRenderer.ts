@@ -21,6 +21,7 @@ import { SceneLayer } from '../../SceneLayers'
 import { Logger } from '../../../utils/Logger'
 import { HighTextureCache, type HighTextureCacheConfig } from './HighTextureCache'
 import { SpatialPrewarmingManager, type PrewarmingConfig } from './SpatialPrewarmingManager'
+import type { RendererTextureSources } from './LodTypes'
 import vertexShader from './shaders/instanced-artwork-lod.vert?raw'
 import fragmentShader from './shaders/instanced-artwork-lod.frag?raw'
 
@@ -57,16 +58,7 @@ export interface LodGameArtworkRendererConfig {
     prewarmingConfig?: Partial<PrewarmingConfig>
 }
 
-/** Texture arrays for each LOD level, passed in from upstream */
-export interface LodTextureArrays {
-    /** MID tier — always required. */
-    mid: THREE.DataArrayTexture
-    /**
-     * HIGH tier — required in non-lazy mode (owned by LodTextureArrayManager).
-     * In lazy mode this is omitted; HighTextureCache creates and owns it.
-     */
-    high?: THREE.DataArrayTexture
-}
+export type LodTextureArrays = RendererTextureSources
 
 /** Per-instance data for external tracking */
 export interface InstanceData {
@@ -99,8 +91,8 @@ export class LodGameArtworkRenderer {
     private geometry: THREE.BoxGeometry | null = null
     private material: THREE.ShaderMaterial | null = null
     
-    // Texture arrays (owned externally, referenced here)
-    private textureArrays: LodTextureArrays | null = null
+    // Texture arrays referenced by shader uniforms
+    private textureArrays: { mode: 'lazy' | 'eager'; mid: THREE.DataArrayTexture; high: THREE.DataArrayTexture } | null = null
     
     // Per-instance GPU attributes
     private lodLevels: Float32Array | null = null
@@ -154,16 +146,19 @@ export class LodGameArtworkRenderer {
      * Initialize the renderer with texture arrays.
      * Must be called before adding instances.
      */
-    public initialize(textureArrays: LodTextureArrays, scene: THREE.Scene): void {
+    public initialize(textureSources: LodTextureArrays, scene: THREE.Scene): void {
         if (this.instancedMesh) {
             LodGameArtworkRenderer.logger.warn('Already initialized')
             return
         }
-        
-        this.textureArrays = textureArrays
-        
-        // Initialize HIGH texture cache if lazy loading enabled
-        if (this.lazyHighTextures) {
+
+        let highTexture: THREE.DataArrayTexture
+        const midTexture = textureSources.mid
+
+        const isExplicitLazy = 'mode' in textureSources && textureSources.mode === 'lazy'
+        const isLegacyLazy = !('mode' in textureSources) && this.lazyHighTextures
+
+        if (isExplicitLazy || isLegacyLazy) {
             const highConfig = this.config.highTextureCacheConfig ?? {}
             this.highTextureCache = new HighTextureCache({
                 totalSlots: highConfig.totalSlots ?? 64,
@@ -173,22 +168,26 @@ export class LodGameArtworkRenderer {
                 ...highConfig
             })
             this.highTextureCache.setSlotChangeCallback(this.onHighSlotChange.bind(this))
-            // HighTextureCache owns its DataArrayTexture from construction.
-            // We grab it here so the shader can reference it.
-            textureArrays = { ...textureArrays, high: this.highTextureCache.getTexture() }
-            
-            // Initialize spatial pre-warming
+            highTexture = this.highTextureCache.getTexture()
+
             this.spatialPrewarming = new SpatialPrewarmingManager(
                 this.highTextureCache,
                 this.config.prewarmingConfig ?? {}
             )
+        } else {
+            const providedHighTexture = 'high' in textureSources ? textureSources.high : undefined
+            if (!providedHighTexture) {
+                throw new Error('Expected HIGH texture source in eager mode')
+            }
+            highTexture = providedHighTexture
         }
-        
-        // Create material referencing the texture arrays
+
+        this.textureArrays = { mode: isExplicitLazy || isLegacyLazy ? 'lazy' : 'eager', mid: midTexture, high: highTexture }
+
         this.material = new THREE.ShaderMaterial({
             uniforms: {
-                textureArrayHigh: { value: textureArrays.high ?? textureArrays.mid }, // fallback gracefully
-                textureArrayMid: { value: textureArrays.mid }
+                textureArrayHigh: { value: highTexture },
+                textureArrayMid: { value: midTexture }
             },
             vertexShader,
             fragmentShader,

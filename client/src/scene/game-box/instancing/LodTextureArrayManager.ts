@@ -1,63 +1,32 @@
-/**
- * LOD Texture Array Manager
- * 
- * Manages the creation and population of texture arrays for LOD rendering.
- * This class owns the texture arrays and handles:
- * - Creating ManagedTextureArrays at appropriate resolutions (one per tier)
- * - Copying pixel data into texture array slots
- * - Flushing changed layers to GPU efficiently
- * 
- * Decoupled from:
- * - URL fetching (handled by upstream texture loading)
- * - Rendering (handled by LodGameArtworkRenderer)
- */
+/** Owns and updates GPU texture arrays by LOD tier. */
 
 import * as THREE from 'three'
 import { Logger } from '../../../utils/Logger'
 import { DataManager } from '../../../core/data/DataManager'
 import { LOD_TIER_NAME } from './ILodArtworkRenderer'
 import { ManagedTextureArray } from './ManagedTextureArray'
+import { LOD_DEBUG_SETTINGS } from './LodDebugSettings'
 
-/**
- * Debug mode: paint a solid-color band across the bottom 20% of each texture slot
- * so LOD tier is visible at a glance in-headset.
- *
- * MID tier → blue  (#33 55 FF)
- * HIGH tier → green (#33 FF 55)
- *
- * Set to true and reload to enable. No runtime toggle — this is a dev tool.
- */
-const LOD_DEBUG_STRIPE = false
-export { LOD_DEBUG_STRIPE }
-
-/** Stripe colors per tier name (RGBA). Add entries for any custom tiers. */
-export const LOD_STRIPE_COLORS: Record<string, [number, number, number, number]> = {
-    [LOD_TIER_NAME.MID]:  [51, 85, 255, 255],   // blue
-    [LOD_TIER_NAME.HIGH]: [51, 255, 85,  255],   // green
-}
-
-/** Configuration for a single LOD tier */
+/** Runtime tier allocation config. */
 export interface LodTierConfig {
     name: string
     width: number
     height: number
-    maxDepth: number  // How many texture slots in this array
+    maxDepth: number
 }
 
-/** Configuration for the texture array manager */
+/** Texture array manager config. */
 export interface LodTextureArrayManagerConfig {
     tiers: LodTierConfig[]
 }
 
-/** Internal state for one LOD tier: the managed array + its config. */
+/** Internal state for one tier. */
 interface TierState {
     config: LodTierConfig
     array: ManagedTextureArray
 }
 
-/**
- * Manages LOD texture arrays - creation, population, and GPU updates.
- */
+/** Handles per-tier pixel writes and partial GPU uploads. */
 export class LodTextureArrayManager {
     public static logger = Logger.createLogFunctions(LodTextureArrayManager.name)
     private tiers: Map<string, TierState> = new Map()
@@ -76,7 +45,7 @@ export class LodTextureArrayManager {
         for (const tierConfig of tierConfigs) {
             const { name, width, height, maxDepth } = tierConfig
 
-            const debugStripe = LOD_DEBUG_STRIPE ? LOD_STRIPE_COLORS[name] : undefined
+            const debugStripe = LOD_DEBUG_SETTINGS.stripeEnabled ? LOD_DEBUG_SETTINGS.stripeColors[name] : undefined
             const array = new ManagedTextureArray({ width, height, depth: maxDepth, debugStripe })
             
             this.tiers.set(name, { config: tierConfig, array })
