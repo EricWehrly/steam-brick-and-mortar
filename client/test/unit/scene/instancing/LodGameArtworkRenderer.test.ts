@@ -33,7 +33,7 @@ vi.mock('../../../../src/scene/RenderLoopRegistry', () => ({
 vi.mock('../../../../src/scene/game-box/instancing/HighTextureCache', () => ({
     HighTextureCache: vi.fn().mockImplementation(function() { return {
         setSlotChangeCallback: vi.fn(),
-        setTextureArray: vi.fn(),
+        getTexture: vi.fn().mockReturnValue({}), // Return mock texture
         registerGame: vi.fn(),
         requestHighTexture: vi.fn().mockReturnValue(-1),
         isLoaded: vi.fn().mockReturnValue(false),

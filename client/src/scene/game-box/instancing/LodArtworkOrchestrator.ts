@@ -108,12 +108,19 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
         this.artworkProvider = GameArtworkProvider.getInstance()
 
         // Create texture array manager
-        const tierConfigs: LodTierConfig[] = this.lodConfigs.map(lc => ({
+        let tierConfigs: LodTierConfig[] = this.lodConfigs.map(lc => ({
             name: lc.name,
             width: lc.textureWidth ?? lc.textureSize ?? 128,
             height: lc.textureHeight ?? lc.textureSize ?? 128,
             maxDepth: lc.maxDepth ?? this.maxTextures
         }))
+        
+        if (this.lazyHighTextures) {
+            // HighTextureCache owns the HIGH tier texture when lazy loading is enabled.
+            // Do not pre-allocate it in the base texture manager.
+            tierConfigs = tierConfigs.filter(c => c.name !== LOD_TIER_NAME.HIGH)
+        }
+        
         this.textureManager = new LodTextureArrayManager({ tiers: tierConfigs })
 
         // Create renderer
@@ -172,17 +179,24 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
     }
 
     private initialize(scene: THREE.Scene): void {
-        const highTexture = this.textureManager.getTextureArray(LOD_TIER_NAME.HIGH)
         const midTexture = this.textureManager.getTextureArray(LOD_TIER_NAME.MID)
 
-        if (!highTexture || !midTexture) {
-            throw new Error(`Failed to get texture arrays - expected tiers '${LOD_TIER_NAME.HIGH}' and '${LOD_TIER_NAME.MID}'`)
+        if (!midTexture) {
+            throw new Error(`Failed to get texture array - expected tier '${LOD_TIER_NAME.MID}'`)
         }
 
         const textureArrays: LodTextureArrays = {
-            high: highTexture,
             mid: midTexture
         }
+        
+        if (!this.lazyHighTextures) {
+            const highTexture = this.textureManager.getTextureArray(LOD_TIER_NAME.HIGH)
+            if (!highTexture) {
+                throw new Error(`Failed to get texture array - expected tier '${LOD_TIER_NAME.HIGH}' (non-lazy mode)`)
+            }
+            textureArrays.high = highTexture
+        }
+
         this.renderer.initialize(textureArrays, scene)
 
         // Register instance metadata map for downstream systems (raycast, diagnostics)

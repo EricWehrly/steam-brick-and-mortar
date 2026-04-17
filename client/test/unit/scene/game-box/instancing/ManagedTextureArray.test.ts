@@ -182,18 +182,4 @@ describe('ManagedTextureArray', () => {
         })
     })
 
-    describe('adoptTexture', () => {
-        it('replaces the internal texture and clears pending slots', () => {
-            array.setSlotPixels(0, new Uint8ClampedArray(SLICE))
-            expect(array.hasPendingUpdates()).toBe(true)
-
-            const replacement = new THREE.DataArrayTexture(
-                new Uint8Array(WIDTH * HEIGHT * DEPTH * 4), WIDTH, HEIGHT, DEPTH
-            )
-            array.adoptTexture(replacement)
-
-            expect(array.texture).toBe(replacement)
-            expect(array.hasPendingUpdates()).toBe(false)
-        })
-    })
 })

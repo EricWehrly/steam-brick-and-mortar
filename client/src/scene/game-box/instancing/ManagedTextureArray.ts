@@ -5,8 +5,8 @@
  * Owns the DataArrayTexture lifecycle, dirty-slot tracking, and GPU flush logic.
  *
  * Used by:
- * - LodTextureArrayManager (one instance per LOD tier, texture created internally)
- * - HighTextureCache        (one instance, texture provided externally via adopt())
+ * - LodTextureArrayManager (owns MID tier)
+ * - HighTextureCache       (owns HIGH tier slots)
  */
 
 import * as THREE from 'three'
@@ -58,17 +58,6 @@ export class ManagedTextureArray {
         return this._texture
     }
 
-    /**
-     * Replace the internal texture with an externally-created one.
-     * Used by HighTextureCache, whose DataArrayTexture is created by LodGameArtworkRenderer
-     * and handed in after construction.
-     *
-     * The previous texture is NOT disposed here — the caller owns that lifetime.
-     */
-    adoptTexture(texture: THREE.DataArrayTexture): void {
-        this._texture = texture
-        this.pendingSlots.clear()
-    }
 
     /**
      * Copy pixel data into a slot and mark it dirty.
