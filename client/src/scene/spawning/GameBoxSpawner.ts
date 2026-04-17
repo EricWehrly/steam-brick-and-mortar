@@ -39,6 +39,19 @@ export class GameBoxSpawner {
         GameBoxSpawner.logger.debug('Registered listeners for BatchReadyForPlacement and ShelfReady events')
     }
 
+    public reset(): void {
+        this.pendingGames.clear()
+        GameBoxSpawner.logger.debug('Reset pending games')
+    }
+
+    public setGameBoxRenderer(gameBoxRenderer: GpuGameBoxRenderer): void {
+        this.gameBoxRenderer = gameBoxRenderer
+    }
+    
+    /**
+     * Handle BatchReadyForPlacement event
+     * Stores games and requests shelf space via event
+     */
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
         const { games, batchIndex, totalBatches } = event.detail
 
