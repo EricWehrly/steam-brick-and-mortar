@@ -102,6 +102,7 @@ export class HighTextureCache {
     private readonly textureWorker: TextureWorker
     private readonly pixelCache: PixelDataCache
     
+    // TD: Replace dataArrayTexture + isDirty + dirtySlots with ManagedTextureArray (see LodTextureArrayManager.ts)
     /** The GPU texture array (reference - owned by LodArtworkRenderer) */
     private dataArrayTexture: THREE.DataArrayTexture | null = null
     
