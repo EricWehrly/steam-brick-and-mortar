@@ -109,7 +109,7 @@ If labels are still needed as fallback:
 - `client/src/scene/game-box/instancing/LabelTextureArrayManager.ts` — growable array or demand-based allocation
 
 ### Size: Small if Issue 1 is fixed first (label count drops dramatically). Medium standalone.
-### Note: WebGL `DataArrayTexture` depth cannot be resized in-place — dispose+recreate is the correct pattern. `InstancedLabelRenderer` already implements this in `dispose()`. For re-draws (Issue 3), the renderer should be disposed and recreated with the new game count, which naturally right-sizes the label pool.
+### Note: WebGL `DataArrayTexture` depth cannot be resized in-place — dispose+recreate is the correct pattern. `InstancedLabelRenderer` already implements this in `dispose()`. For re-draws (Issue 3), the renderer should be disposed and recreated with the new game count, which naturally right-sizes the label pool. **Issue 4 fix should be bundled into the Issue 3 branch** — the re-draw pipeline is the natural moment to right-size all GPU allocations.
 
 ---
 
