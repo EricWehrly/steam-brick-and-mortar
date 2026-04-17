@@ -17,6 +17,7 @@ import { DataManager } from '../core/data/DataManager'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
 import type { SteamGame } from '../steam'
+import type { LodQueryResult } from '../scene/game-box/instancing/LodArtworkOrchestratorDebug'
 
 interface PixelCacheEntry {
     pixelData: Uint8ClampedArray
@@ -36,6 +37,7 @@ interface ArtworkInfo {
 export class GameArtworkInspector {
     private modalElement: HTMLElement | null = null
     private pixelCache: PixelDataCache
+    private pendingLodState: LodQueryResult | null = null
 
     constructor() {
         this.pixelCache = PixelDataCache.getInstance()
@@ -60,7 +62,12 @@ export class GameArtworkInspector {
         console.log(`   Scene Status: ${sceneGame ? `✅ In scene (${sceneGame.rendererType})` : '❌ Not in scene'}`)
 
         const artworkInfo = await this.gatherArtworkInfo(steamGame, sceneGame?.name)
-        this.showModal(steamGame, artworkInfo, !!sceneGame)
+
+        // Query LOD renderer state if available
+        const lodRenderer = (window as unknown as { lodArtworkRenderer?: { queryLodState?: (name: string) => LodQueryResult | null } }).lodArtworkRenderer
+        const lodState = lodRenderer?.queryLodState?.(steamGame.name) ?? null
+
+        this.showModal(steamGame, artworkInfo, !!sceneGame, lodState)
     }
 
     private async findSteamGameData(identifier: string | number | undefined): Promise<SteamGame | null> {
@@ -94,7 +101,8 @@ export class GameArtworkInspector {
                 continue
             }
 
-            // Check PixelDataCache for cached pixel data
+            // PixelDataCache is keyed by url@WxH for LOD textures; plain URL lookup
+            // here covers any non-LOD cached entries (icon/logo/header from older paths).
             const cacheEntry = await this.pixelCache.get(url)
             const cached = !!cacheEntry
             
@@ -149,22 +157,24 @@ export class GameArtworkInspector {
         return false
     }
 
-    private showModal(steamGame: SteamGame, artworkInfo: ArtworkInfo[], inScene: boolean): void {
+    private showModal(steamGame: SteamGame, artworkInfo: ArtworkInfo[], inScene: boolean, lodState: LodQueryResult | null): void {
         if (this.modalElement) {
             this.close()
         }
 
         this.modalElement = document.createElement('div')
         this.modalElement.className = 'game-artwork-inspector-modal'
-        this.modalElement.innerHTML = this.buildModalHTML(steamGame, artworkInfo, inScene)
+        this.modalElement.innerHTML = this.buildModalHTML(steamGame, artworkInfo, inScene, lodState)
+        this.pendingLodState = lodState
 
         document.body.appendChild(this.modalElement)
 
         this.attachEventListeners()
     }
 
-    private buildModalHTML(steamGame: SteamGame, artworkInfo: ArtworkInfo[], inScene: boolean): string {
+    private buildModalHTML(steamGame: SteamGame, artworkInfo: ArtworkInfo[], inScene: boolean, lodState: LodQueryResult | null): string {
         const artworkHTML = artworkInfo.map(info => this.buildArtworkItemHTML(info)).join('')
+        const lodHTML = this.buildLodSectionHTML(lodState)
         const sceneStatus = inScene 
             ? '<span class="badge badge-success">IN SCENE</span>' 
             : '<span class="badge badge-warning">NOT IN SCENE</span>'
@@ -187,6 +197,7 @@ export class GameArtworkInspector {
                     <div class="artwork-list">
                         ${artworkHTML}
                     </div>
+                    ${lodHTML}
                 </div>
                 <div class="modal-footer">
                     <button class="btn-secondary" data-action="close">Close</button>
@@ -235,8 +246,63 @@ export class GameArtworkInspector {
         `
     }
 
+    private buildLodSectionHTML(lodState: LodQueryResult | null): string {
+        if (!lodState) {
+            return `<div class="lod-section"><h4>🎮 LOD Render State</h4><p class="lod-unavailable">LOD renderer not active (game not in scene or renderer not initialized)</p></div>`
+        }
+
+        const highStatus = lodState.high.slot >= 0
+            ? `loaded — slot ${lodState.high.slot}`
+            : (lodState.high.state ?? 'not loaded')
+
+        return `
+            <div class="lod-section">
+                <h4>🎮 LOD Render State — texture index ${lodState.textureIndex}</h4>
+                <div class="lod-tiers">
+                    <div class="lod-tier">
+                        <div class="lod-tier-label">MID &mdash; ${lodState.mid.width}&times;${lodState.mid.height}px</div>
+                        <canvas data-lod="mid" width="${lodState.mid.width}" height="${lodState.mid.height}"
+                            style="width:${lodState.mid.width * 2}px;height:${lodState.mid.height * 2}px;image-rendering:pixelated;border:1px solid #444"></canvas>
+                    </div>
+                    <div class="lod-tier">
+                        <div class="lod-tier-label">HIGH &mdash; ${lodState.high.width}&times;${lodState.high.height}px &mdash; ${this.escapeHtml(highStatus)}</div>
+                        <canvas data-lod="high" width="${lodState.high.width || 1}" height="${lodState.high.height || 1}"
+                            style="width:${(lodState.high.width || 1) * 2}px;height:${(lodState.high.height || 1) * 2}px;image-rendering:pixelated;border:1px solid #444"></canvas>
+                    </div>
+                </div>
+            </div>
+        `
+    }
+
+    private paintLodCanvases(lodState: LodQueryResult | null): void {
+        if (!lodState || !this.modalElement) return
+
+        const paint = (selector: string, pixels: Uint8ClampedArray | null, w: number, h: number): void => {
+            const canvas = this.modalElement!.querySelector(selector) as HTMLCanvasElement | null
+            if (!canvas) return
+            const ctx = canvas.getContext('2d')
+            if (!ctx) return
+            if (pixels && w > 0 && h > 0) {
+                ctx.putImageData(new ImageData(new Uint8ClampedArray(pixels), w, h), 0, 0)
+            } else {
+                ctx.fillStyle = '#2a2a2a'
+                ctx.fillRect(0, 0, canvas.width, canvas.height)
+                ctx.fillStyle = '#666'
+                ctx.font = '10px monospace'
+                ctx.fillText('not loaded', 4, 14)
+            }
+        }
+
+        paint('[data-lod="mid"]', lodState.mid.pixels, lodState.mid.width, lodState.mid.height)
+        paint('[data-lod="high"]', lodState.high.pixels, lodState.high.width, lodState.high.height)
+    }
+
     private attachEventListeners(): void {
         if (!this.modalElement) return
+
+        // Paint LOD canvases now that the DOM is attached
+        this.paintLodCanvases(this.pendingLodState)
+        this.pendingLodState = null
 
         this.modalElement.querySelectorAll('[data-action="close"]').forEach(btn => {
             btn.addEventListener('click', () => this.close())
