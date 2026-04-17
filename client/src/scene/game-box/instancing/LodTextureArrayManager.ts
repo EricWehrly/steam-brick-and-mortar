@@ -52,6 +52,7 @@ export interface LodTextureArrayManagerConfig {
 }
 
 /** State for a single LOD texture array */
+// TD: Extract shared pixel-write + dirty-slot + GPU-flush logic into ManagedTextureArray base class
 interface TextureArrayState {
     config: LodTierConfig
     dataArrayTexture: THREE.DataArrayTexture
