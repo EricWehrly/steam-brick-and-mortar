@@ -70,6 +70,7 @@ vi.mock('../../../../src/scene/game-box/instancing/InstancedLabelRenderer', () =
         return {
             addLabelInstance: vi.fn(),
             isReady: vi.fn().mockReturnValue(true),
+            compact: vi.fn(),
             dispose: vi.fn(),
         }
     }),
@@ -98,8 +99,10 @@ describe('GpuGameBoxRenderer - LOD distance manager lifecycle', () => {
     it('syncs instances and starts auto-update when AllBatchesComplete fires', () => {
         new GpuGameBoxRenderer()
         const handlers = mockEventHandlers.get(GameEventTypes.AllBatchesComplete) ?? []
-        expect(handlers).toHaveLength(1)
-        handlers[0]()
+        expect(handlers.length).toBeGreaterThan(0)
+        // Find the handler that starts auto-update by looking at its side effects,
+        // or just call all of them since that's what the event manager does.
+        handlers.forEach(h => (h as any)({} as any))
         expect(mockSyncInstances).toHaveBeenCalledOnce()
         expect(mockStartAutoUpdate).toHaveBeenCalledOnce()
     })
