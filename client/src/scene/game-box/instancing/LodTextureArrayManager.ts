@@ -29,7 +29,7 @@ import { LOD_TIER_NAME } from './ILodArtworkRenderer'
  *
  * Set to true and reload to enable. No runtime toggle — this is a dev tool.
  */
-const LOD_DEBUG_STRIPE = true
+const LOD_DEBUG_STRIPE = false
 export { LOD_DEBUG_STRIPE }
 
 /** Stripe colors per tier name (RGBA). Add entries for any custom tiers. */
