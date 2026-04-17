@@ -69,6 +69,16 @@ export class ShelfLayoutCoordinator {
 
             ShelfLayoutCoordinator.logger.debug(`Computing arc layout for ${this.totalShelves} shelves`)
             this.computeLayout(this.totalShelves)
+        } else if (detail.totalBatches !== this.totalShelves) {
+            // New load with different batch count (e.g. anonymous → real user).
+            // Reset and recompute so all batches get valid shelf positions.
+            ShelfLayoutCoordinator.logger.debug(
+                `Batch count changed (${this.totalShelves} → ${detail.totalBatches}) — resetting layout`
+            )
+            this.dispose()
+            this.layoutComputed = true
+            this.totalShelves = detail.totalBatches
+            this.computeLayout(this.totalShelves)
         }
 
         this.emitShelfForBatch(detail.batchIndex)
