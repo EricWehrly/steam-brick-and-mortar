@@ -120,8 +120,7 @@ export class SteamIntegration {
         this.gameLibrary.setUserData(userGames)
         
         await this.steamClient.loadGamesProgressively(userGames, {
-            // TD: TODO: Reinstate max games
-            // maxGames: this.config.maxGames,
+            maxGames: this.config.maxGames,
             sortFn: sortByNumericField('rtime_last_played', 'playtime_forever'),
         })
         

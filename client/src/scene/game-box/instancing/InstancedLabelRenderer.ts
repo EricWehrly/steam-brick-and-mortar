@@ -57,7 +57,7 @@ export class InstancedLabelRenderer {
 
     // Deferred allocation: buffer label requests until all batches are known,
     // then allocate the texture array at exactly the right size.
-    private deferLabels: boolean = true
+    private deferLabels: boolean = false
     private pendingLabels: Array<{ gameName: string; appid?: number; position: THREE.Vector3; side: ShelfSide; rotation?: THREE.Quaternion }> = []
     private static readonly DEFERRED_OVERFLOW = 32  // Extra slots for late-arriving failures
 
