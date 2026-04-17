@@ -93,6 +93,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         GpuStorePropsRenderer.logger.debug('Event listeners registered')
     }
 
+    private lastTotalBatches: number = 0
+
     private async handleInitialBatch(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
         const { totalBatches } = event.detail
 
@@ -111,6 +113,18 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     // either through an earlier-raised event, or by re-aligning this one
     private async initializeGameBoxRenderer(totalBatches: number): Promise<void> {
         const estimatedGames = totalBatches * 18
+
+        // Reset shelf renderer when starting a new load (e.g. anonymous → real user).
+        // Without this, shelf 0's pre-existing instance uses the flawed updateShelfUnitTransform
+        // path instead of applyShelfUnitTemplate, leaving horizontal shelf boards in wrong state.
+        if (this.lastTotalBatches > 0 && totalBatches !== this.lastTotalBatches) {
+            GpuStorePropsRenderer.logger.debug(
+                `Batch count changed (${this.lastTotalBatches} → ${totalBatches}) — resetting shelf renderer`
+            )
+            this.instancedShelfRenderer.reset()
+        }
+        this.lastTotalBatches = totalBatches
+
         this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = new GpuGameBoxRenderer(estimatedGames + 100)
     }

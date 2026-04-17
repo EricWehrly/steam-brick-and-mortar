@@ -17,6 +17,8 @@ export type LodTierName = typeof LOD_TIER_NAME[keyof typeof LOD_TIER_NAME]
 export interface SetArtworkResult {
     success: boolean
     instanceIndex: number
+    /** True when the failure is permanent (CORS, 404, NO_ARTWORK, DECODE) and no retry will help. */
+    permanent?: boolean
 }
 
 export interface InstanceLodData {

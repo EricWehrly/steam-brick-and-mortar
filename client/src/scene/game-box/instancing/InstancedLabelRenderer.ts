@@ -60,6 +60,10 @@ export class InstancedLabelRenderer {
     private deferLabels: boolean = true
     private pendingLabels: Array<{ gameName: string; appid?: number; position: THREE.Vector3; side: ShelfSide; rotation?: THREE.Quaternion }> = []
     private static readonly DEFERRED_OVERFLOW = 32  // Extra slots for late-arriving failures
+
+    // Bound handler references — stored so dispose() can deregister the exact same functions.
+    private readonly boundHandleSomeBatchesComplete: (event: CustomEvent<SomeBatchesCompleteEvent>) => void
+    private readonly boundMaterializeLabels: () => void
     
     // Constant quaternion for no rotation (performance optimization)
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion() // Identity quaternion (0,0,0,1)
@@ -74,13 +78,17 @@ export class InstancedLabelRenderer {
             this.maxInstances
         )
 
+        this.boundHandleSomeBatchesComplete = this.handleSomeBatchesComplete.bind(this)
+        this.boundMaterializeLabels = this.materializeLabels.bind(this)
+
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SomeBatchesComplete,
-            this.handleSomeBatchesComplete.bind(this)
+            this.boundHandleSomeBatchesComplete
         )
+
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.AllBatchesComplete,
-            () => this.materializeLabels()
+            this.boundMaterializeLabels
         )
 
         // Register a fresh metadata map immediately so stale data from a previous
@@ -105,7 +113,7 @@ export class InstancedLabelRenderer {
         if (this.isInitialized) return
         if (this.pendingLabels.length === 0) return
 
-        const count = this.pendingLabels.length + InstancedLabelRenderer.DEFERRED_OVERFLOW
+        const count = this.pendingLabels.length + Math.max(InstancedLabelRenderer.DEFERRED_OVERFLOW, this.maxInstances)
         this.maxInstances = count
         this.textureArrayManager = new LabelTextureArrayManager(this.textureSize, count)
 
@@ -354,6 +362,21 @@ const matrix = new THREE.Matrix4()
     
     public dispose(): void {
         console.debug('🧹 Disposing InstancedLabelRenderer')
+
+        // Deregister event handlers using the stored bound references.
+        // Without this, disposed renderers still fire on AllBatchesComplete / SomeBatchesComplete.
+        EventManager.getInstance().deregisterEventHandler(
+            GameEventTypes.SomeBatchesComplete,
+            this.boundHandleSomeBatchesComplete
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            this.boundMaterializeLabels
+        )
+
+        // Clear deferred state so a stale disposed renderer can't materialize ghost labels.
+        this.pendingLabels = []
+        this.deferLabels = false
         
         if (this.instancedMesh) {
             const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)

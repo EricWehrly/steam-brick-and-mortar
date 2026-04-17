@@ -121,13 +121,17 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         this.lodDistanceManager = new LodDistanceManagerDebug(this.lodArtworkRenderer)
 
         // Self-subscribe: renderer owns the GameBoxSpawned → createGameBoxAuto wiring.
+        // Bound once and stored so dispose() can deregister the exact same reference.
+        this.boundHandleGameBoxSpawned = this.handleGameBoxSpawned.bind(this)
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.GameBoxSpawned,
-            this.handleGameBoxSpawned.bind(this)
+            this.boundHandleGameBoxSpawned
         )
         
         GpuGameBoxRenderer.logger.lifecycle(`LOD atlas initialized (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
     }
+
+    private boundHandleGameBoxSpawned!: (event: CustomEvent<GameBoxSpawnedEvent>) => void
 
     private handleGameBoxSpawned(event: CustomEvent<GameBoxSpawnedEvent>): void {
         const { game, position, side, rotation } = event.detail
@@ -254,7 +258,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         EventManager.getInstance().deregisterEventHandler(
             StorePropsEventTypes.GameBoxSpawned,
-            this.handleGameBoxSpawned.bind(this)
+            this.boundHandleGameBoxSpawned
         )
 
         this.lodDistanceManager.dispose()
