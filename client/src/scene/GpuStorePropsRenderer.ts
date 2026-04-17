@@ -150,7 +150,21 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     public clearProps(): void {
+        // Clear shelf geometry
         this.instancedShelfRenderer.reset()
+
+        // Dispose game box renderer (removes artwork + label instanced meshes from scene)
+        if (this.gameBoxRenderer) {
+            this.gameBoxRenderer.dispose()
+            this.gameBoxRenderer = null
+        }
+
+        // Clear any pending games buffered by the spawner
+        this.gameBoxSpawner?.reset()
+
+        // Reset progressive init state so next load starts clean
+        this.progressiveInitializationPromise = null
+        this.batchCoordinator.reset()
 
         while (this.propsGroup.children.length > 0) {
             const child = this.propsGroup.children[0]
@@ -164,6 +178,8 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
                 }
             }
         }
+
+        GpuStorePropsRenderer.logger.info('Store props cleared')
     }
 
     public dispose(): void {

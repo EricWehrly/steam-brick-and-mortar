@@ -21,6 +21,7 @@ import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
 import { sortByNumericField } from '../scene/categorization/GameSortFunctions'
+import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 
 export interface SteamIntegrationConfig {
     apiBaseUrl?: string
@@ -252,6 +253,14 @@ export class SteamIntegration {
         const { userInput } = event.detail
 
         try {
+            // If a store is already loaded, clear it before the new user's data arrives.
+            // This removes the anonymous (or previous user's) shelf geometry, game boxes,
+            // and labels so they don't ghost behind the incoming library.
+            if (this.gameLibrary.getState().userData?.games?.length) {
+                this.eventManager.emit(StorePropsEventTypes.ClearRequest, {})
+                SteamIntegration.logger.info('Emitted ClearRequest before user library load')
+            }
+
             await this.loadGamesForUser(userInput)
             this.storeSteamDataAndEmitEvent(userInput)
             SteamIntegration.logger.info('Load games completed')
@@ -268,6 +277,13 @@ export class SteamIntegration {
             return
         }
 
+        // If a store is already loaded, clear it before the new user's data arrives
+        if (this.gameLibrary.getState().userData?.games?.length) {
+            this.eventManager.emit(StorePropsEventTypes.ClearRequest, {})
+            SteamIntegration.logger.info('Emitted ClearRequest before cached library load')
+        }
+
+        await this.loadGamesFromCache(vanityUrl)
         await this.loadGamesForUser(vanityUrl, false)
         this.storeSteamDataAndEmitEvent(vanityUrl)
         SteamIntegration.logger.info('Loaded from cache')
