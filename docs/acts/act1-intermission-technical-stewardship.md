@@ -20,6 +20,13 @@
 - [Background Resource Reduction](../features/background-resource-reduction.md) — Page Visibility API, LOD disable on blur, frame throttle
 - [UI Standardization](../features/ui-standardization.md) — design tokens, component library, VR-ready architecture
 
+**First-Start Follow-Up (must land — game rendering pipeline):**
+- [First-Start Follow-Up Plan](../plans/first-start-followup-plan.md) — four issues surfaced during anonymous→logged-in user transition:
+  1. **Double-allocation fix** — don't materialize game boxes until artwork resolves; remove eager label creation (P1, small)
+  2. **Progressive batch loading** — emit rendering batches as network batches complete, not all-at-once after 25s (P2, medium)
+  3. **Re-sort on user change** — split texture loading from instance placement so `GamesSort` can reposition boxes (P3, large, own branch). See also `resort-game-placement-plan.md` and `texture-placement-split-plan.md`.
+  4. **Label slot exhaustion** — effectively resolved by #1; standalone fix is pool sizing (P4, small)
+
 **Nice to Have (best effort, punt when stuck):**
 - [GPU Memory Leak Investigation](../features/gpu-memory-investigation.md) — periodic `renderer.info.memory` reporter (dev mode), baseline counts, leak identification
 - Lint baseline pass — max-params rule, TD ID convention enforcement, encoding regression fixes. See `docs/plans/linter-contract.md` for detailed rules, current violation counts, and strict-mode enablement checklist.
