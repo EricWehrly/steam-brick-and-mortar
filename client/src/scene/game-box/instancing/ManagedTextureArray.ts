@@ -1,13 +1,4 @@
-/**
- * ManagedTextureArray
- *
- * Shared base for GPU-backed texture array management.
- * Owns the DataArrayTexture lifecycle, dirty-slot tracking, and GPU flush logic.
- *
- * Used by:
- * - LodTextureArrayManager (owns MID tier)
- * - HighTextureCache       (owns HIGH tier slots)
- */
+/** Shared DataArrayTexture wrapper with pending-layer tracking. */
 
 import * as THREE from 'three'
 
@@ -15,11 +6,7 @@ export interface ManagedTextureArrayConfig {
     width: number
     height: number
     depth: number
-    /**
-     * Optional debug stripe: paint the bottom 20% of every written slot with
-     * this RGBA color so LOD tiers are visually distinguishable in-headset.
-     * Omit (or leave undefined) to disable.
-     */
+    /** Optional RGBA stripe painted on the bottom 20% of written slots. */
     debugStripe?: readonly [number, number, number, number]
 }
 
@@ -32,9 +19,7 @@ export class ManagedTextureArray {
     private readonly pendingSlots: Set<number> = new Set()
     private readonly debugStripe: readonly [number, number, number, number] | undefined
 
-    /**
-     * Create a new ManagedTextureArray and allocate its backing DataArrayTexture.
-     */
+    /** Allocate the backing DataArrayTexture. */
     constructor(config: ManagedTextureArrayConfig) {
         this.width = config.width
         this.height = config.height
@@ -53,7 +38,7 @@ export class ManagedTextureArray {
         this._texture = texture
     }
 
-    /** The underlying DataArrayTexture — pass to ShaderMaterial uniforms or HighTextureCache. */
+    /** Underlying texture for shader uniforms. */
     get texture(): THREE.DataArrayTexture {
         return this._texture
     }
@@ -100,7 +85,7 @@ export class ManagedTextureArray {
         return true
     }
 
-    /** True if any slot has been written but not yet flushed to the GPU. */
+    /** True when there are pending layer uploads. */
     hasPendingUpdates(): boolean {
         return this.pendingSlots.size > 0
     }
@@ -120,7 +105,7 @@ export class ManagedTextureArray {
         return true
     }
 
-    /** Number of pending slots (for diagnostics). */
+    /** Pending layer count. */
     get pendingCount(): number {
         return this.pendingSlots.size
     }

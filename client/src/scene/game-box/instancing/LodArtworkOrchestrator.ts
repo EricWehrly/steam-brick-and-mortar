@@ -25,9 +25,15 @@ import {
     LOD_LEVEL,
     type LodLevel,
     type LodGameArtworkRendererConfig,
-    type LodTextureArrays
 } from './LodGameArtworkRenderer'
 import { LOD_TIER_NAME, type InstanceLodData, type ILodArtworkRenderer } from './ILodArtworkRenderer'
+import {
+    buildRuntimeTierSpecs,
+    findTierByLevel,
+    getDefaultLodTierSpecs,
+    type LodTierSpec,
+    type RendererTextureSources,
+} from './LodTypes'
 import type { PrewarmingConfig } from './SpatialPrewarmingManager'
 import type { InstanceMetadata } from '../../../debug/GameFinder'
 
@@ -43,25 +49,18 @@ export const STEAM_CAPSULE_HEIGHT = 450
 export const DEFAULT_BOX_WIDTH = 0.2
 export const DEFAULT_BOX_HEIGHT = 0.3
 
-/** LOD configuration - matches old interface */
-export interface LodConfig {
-    level: LodLevel
-    textureSize?: number
-    textureWidth?: number
-    textureHeight?: number
-    name: string
-    maxDepth?: number
-}
+export type LodConfig = LodTierSpec
 
-export const DEFAULT_LOD_CONFIGS: LodConfig[] = [
-    { level: LOD_LEVEL.HIGH, textureWidth: STEAM_CAPSULE_WIDTH, textureHeight: STEAM_CAPSULE_HEIGHT, name: LOD_TIER_NAME.HIGH, maxDepth: 128 },
-    { level: LOD_LEVEL.MID, textureWidth: 150, textureHeight: 225, name: LOD_TIER_NAME.MID }
-]
+export const DEFAULT_LOD_CONFIGS: LodConfig[] = getDefaultLodTierSpecs().map(spec => ({
+    ...spec,
+    textureWidth: spec.level === LOD_LEVEL.HIGH ? STEAM_CAPSULE_WIDTH : spec.textureWidth,
+    textureHeight: spec.level === LOD_LEVEL.HIGH ? STEAM_CAPSULE_HEIGHT : spec.textureHeight,
+}))
 
 /** Config matching old LodArtworkConfig */
 export interface LodArtworkConfig {
     maxTextures?: number
-    lodConfigs?: LodConfig[]
+    lodConfigs?: LodTierSpec[]
     boxWidth?: number
     boxHeight?: number
     boxDepth?: number
@@ -82,7 +81,7 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
     protected renderer: LodGameArtworkRenderer
 
     private readonly maxTextures: number
-    private readonly lodConfigs: LodConfig[]
+    private readonly lodConfigs: LodTierSpec[]
     private readonly lazyHighTextures: boolean
 
     // Track game names to texture indices
@@ -108,11 +107,12 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
         this.artworkProvider = GameArtworkProvider.getInstance()
 
         // Create texture array manager
-        let tierConfigs: LodTierConfig[] = this.lodConfigs.map(lc => ({
-            name: lc.name,
-            width: lc.textureWidth ?? lc.textureSize ?? 128,
-            height: lc.textureHeight ?? lc.textureSize ?? 128,
-            maxDepth: lc.maxDepth ?? this.maxTextures
+        const runtimeSpecs = buildRuntimeTierSpecs(this.lodConfigs, this.maxTextures)
+        let tierConfigs: LodTierConfig[] = runtimeSpecs.map(spec => ({
+            name: spec.tierName,
+            width: spec.textureWidth,
+            height: spec.textureHeight,
+            maxDepth: spec.maxDepth,
         }))
         
         if (this.lazyHighTextures) {
@@ -124,7 +124,7 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
         this.textureManager = new LodTextureArrayManager({ tiers: tierConfigs })
 
         // Create renderer
-        const highConfig = this.lodConfigs.find(c => c.level === LOD_LEVEL.HIGH)
+        const highConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.HIGH)
         const rendererConfig: LodGameArtworkRendererConfig = {
             maxInstances: this.maxTextures,
             boxWidth: config.boxWidth ?? DEFAULT_BOX_WIDTH,
@@ -185,16 +185,23 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
             throw new Error(`Failed to get texture array - expected tier '${LOD_TIER_NAME.MID}'`)
         }
 
-        const textureArrays: LodTextureArrays = {
-            mid: midTexture
-        }
-        
-        if (!this.lazyHighTextures) {
+        let textureArrays: RendererTextureSources
+
+        if (this.lazyHighTextures) {
+            textureArrays = {
+                mode: 'lazy',
+                mid: midTexture,
+            }
+        } else {
             const highTexture = this.textureManager.getTextureArray(LOD_TIER_NAME.HIGH)
             if (!highTexture) {
                 throw new Error(`Failed to get texture array - expected tier '${LOD_TIER_NAME.HIGH}' (non-lazy mode)`)
             }
-            textureArrays.high = highTexture
+            textureArrays = {
+                mode: 'eager',
+                mid: midTexture,
+                high: highTexture,
+            }
         }
 
         this.renderer.initialize(textureArrays, scene)
@@ -264,16 +271,16 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
             )
 
             // Load MID texture (always needed)
-            const midConfig = this.lodConfigs.find(c => c.level === LOD_LEVEL.MID)
-            const midWidth = midConfig?.textureWidth ?? midConfig?.textureSize ?? 150
-            const midHeight = midConfig?.textureHeight ?? midConfig?.textureSize ?? 225
+            const midConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.MID)
+            const midWidth = midConfig?.textureWidth ?? 150
+            const midHeight = midConfig?.textureHeight ?? 225
 
             const midResult = await artwork.getPixelsAtSize(midWidth, midHeight)
             this.textureManager.setSlotPixels(LOD_TIER_NAME.MID, textureIndex, midResult.pixels, midWidth, midHeight)
 
             // For non-lazy mode, also load HIGH
             if (!this.lazyHighTextures) {
-                const highConfig = this.lodConfigs.find(c => c.level === LOD_LEVEL.HIGH)
+                const highConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.HIGH)
                 const highWidth = highConfig?.textureWidth ?? STEAM_CAPSULE_WIDTH
                 const highHeight = highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT
 

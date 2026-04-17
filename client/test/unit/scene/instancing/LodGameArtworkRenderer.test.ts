@@ -90,7 +90,9 @@ describe('LodGameArtworkRenderer', () => {
 
     afterEach(() => {
         renderer?.dispose()
-        mockTextureArrays.high.dispose()
+        if ('high' in mockTextureArrays && mockTextureArrays.high) {
+            mockTextureArrays.high.dispose()
+        }
         mockTextureArrays.mid.dispose()
     })
 
