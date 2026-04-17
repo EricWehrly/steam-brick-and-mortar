@@ -159,15 +159,12 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             typeof game.appid === 'number' ? game.appid : undefined,
             rotation
         ).then((result) => {
-            if (!result.success && AppSettings.get(Setting.EnableLabels)) {
-                this.createLabelGameBox(game, position, side, rotation)
+            if (!result.success) {
+                GpuGameBoxRenderer.logger.debug(`Artwork not placed for "${game.name}" — no fallback label`)
             }
         }).catch((error) => {
             if (!(error instanceof Error && error.message.includes('Maximum'))) {
                 GpuGameBoxRenderer.logger.debug(`Artwork fetch failed for "${game.name}": ${error}`)
-            }
-            if (AppSettings.get(Setting.EnableLabels)) {
-                this.createLabelGameBox(game, position, side, rotation)
             }
         })
     }
@@ -207,8 +204,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         if (artworkUrl) {
             this.createGameBoxFromUrl(game, position, artworkUrl, side, rotation)
-        } else if (AppSettings.get(Setting.EnableLabels)) {
-            this.createLabelGameBox(game, position, side, rotation)
+        } else {
+            GpuGameBoxRenderer.logger.debug(`No artwork URL for "${game.name}" — game will not materialize`)
         }
     }
     
