@@ -55,15 +55,8 @@ export class InstancedLabelRenderer {
     private nextInstanceIndex: number = 0
     private gameNameToTextureIndex: Map<string, number> = new Map()
 
-    // Deferred allocation: buffer label requests until all batches are known,
-    // then allocate the texture array at exactly the right size.
-    private deferLabels: boolean = false
-    private pendingLabels: Array<{ gameName: string; appid?: number; position: THREE.Vector3; side: ShelfSide; rotation?: THREE.Quaternion }> = []
-    private static readonly DEFERRED_OVERFLOW = 32  // Extra slots for late-arriving failures
-
-    // Bound handler references — stored so dispose() can deregister the exact same functions.
+    // Bound handler reference — stored so dispose() can deregister the exact same function.
     private readonly boundHandleSomeBatchesComplete: (event: CustomEvent<SomeBatchesCompleteEvent>) => void
-    private readonly boundMaterializeLabels: () => void
     
     // Constant quaternion for no rotation (performance optimization)
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion() // Identity quaternion (0,0,0,1)
@@ -79,16 +72,10 @@ export class InstancedLabelRenderer {
         )
 
         this.boundHandleSomeBatchesComplete = this.handleSomeBatchesComplete.bind(this)
-        this.boundMaterializeLabels = this.materializeLabels.bind(this)
 
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SomeBatchesComplete,
             this.boundHandleSomeBatchesComplete
-        )
-
-        EventManager.getInstance().registerEventHandler(
-            GameEventTypes.AllBatchesComplete,
-            this.boundMaterializeLabels
         )
 
         // Register a fresh metadata map immediately so stale data from a previous
@@ -104,32 +91,6 @@ export class InstancedLabelRenderer {
     }
 
     /**
-     * Materialize all deferred labels at exact size.
-     * Call once after all game batches are known (on AllBatchesComplete).
-     * Allocates the texture array and InstancedMesh sized to actual label count
-     * rather than the max-games estimate, saving ~900 MB+ for a typical library.
-     */
-    public materializeLabels(): void {
-        if (this.isInitialized) return
-        if (this.pendingLabels.length === 0) return
-
-        const count = this.pendingLabels.length + Math.max(InstancedLabelRenderer.DEFERRED_OVERFLOW, this.maxInstances)
-        this.maxInstances = count
-        this.textureArrayManager = new LabelTextureArrayManager(this.textureSize, count)
-
-        this.deferLabels = false
-        this.initialize()
-
-        for (const { gameName, appid, position, side, rotation } of this.pendingLabels) {
-            this.addLabelInstance(position, gameName, appid, side, rotation)
-        }
-        this.pendingLabels = []
-
-        this.updateGPU()
-        console.log(`✅ Labels materialized: ${this.currentCount} labels, ${this.textureSize}×${this.textureSize}×${count} = ${(this.textureSize * this.textureSize * count * 4 / (1024 * 1024)).toFixed(1)} MB`)
-    }
-    
-    /**
      * Initialize renderer infrastructure (lazy initialization for progressive loading)
      * Creates instanced mesh and texture array without requiring game data upfront
      */
@@ -140,8 +101,8 @@ export class InstancedLabelRenderer {
         }
         
         try {
-            // Create pre-allocated texture array for dynamic population
-            const textureArray = this.textureArrayManager.initializeEmptyTextureArray()
+            // Bind the pre-allocated texture array to the shader material
+            const textureArray = this.textureArrayManager.texture
             
             this.material = this.createLabelMaterial(textureArray)
             
@@ -197,13 +158,7 @@ export class InstancedLabelRenderer {
         side: ShelfSide = ShelfSide.Front,
         rotation?: THREE.Quaternion
     ): boolean {
-        // Deferred path: buffer until materializeLabels() is called
-        if (this.deferLabels) {
-            this.pendingLabels.push({ gameName, appid, position: position.clone(), side, rotation })
-            return true
-        }
-
-        // Lazy initialization - initialize on first use to avoid blocking startup
+        // Lazy initialization — initialize on first use to avoid blocking startup
         if (!this.isInitialized) {
             this.initialize()
         }
@@ -243,7 +198,7 @@ export class InstancedLabelRenderer {
                 : InstancedLabelRenderer.DEFAULT_ROTATION
         )
 
-const matrix = new THREE.Matrix4()
+        const matrix = new THREE.Matrix4()
         matrix.compose(position, effectiveRotation, new THREE.Vector3(1, 1, 1))
         this.instancedMesh.setMatrixAt(index, matrix)
         
@@ -281,8 +236,8 @@ const matrix = new THREE.Matrix4()
             return
         }
         
-        // Batch update: mark texture array dirty (uploads to GPU)
-        this.textureArrayManager.markDirty()
+        // Flush pending label textures to GPU
+        this.textureArrayManager.flushToGpu()
         
         this.instancedMesh.instanceMatrix.needsUpdate = true
         this.instancedMesh.count = this.currentCount
@@ -300,6 +255,24 @@ const matrix = new THREE.Matrix4()
         this.updateGPU()
     }
     
+    /**
+     * Compact the label texture array down to the actual number of labels written.
+     * Call once after all artwork failures have settled (e.g. debounced after
+     * AllBatchesComplete + an artwork-settle window in GpuGameBoxRenderer).
+     * Frees ~55 MB → ~1 MB for a typical library where few games need labels.
+     */
+    public compact(): void {
+        if (!this.isInitialized) return
+
+        const newTexture = this.textureArrayManager.compact()
+
+        // Re-bind the compacted texture in the shader uniform
+        if (this.material) {
+            this.material.uniforms['textureArray'].value = newTexture
+            this.material.needsUpdate = true
+        }
+    }
+
     public getStats(): {
         isInitialized: boolean
         activeInstances: number
@@ -369,14 +342,6 @@ const matrix = new THREE.Matrix4()
             GameEventTypes.SomeBatchesComplete,
             this.boundHandleSomeBatchesComplete
         )
-        EventManager.getInstance().deregisterEventHandler(
-            GameEventTypes.AllBatchesComplete,
-            this.boundMaterializeLabels
-        )
-
-        // Clear deferred state so a stale disposed renderer can't materialize ghost labels.
-        this.pendingLabels = []
-        this.deferLabels = false
         
         if (this.instancedMesh) {
             const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)

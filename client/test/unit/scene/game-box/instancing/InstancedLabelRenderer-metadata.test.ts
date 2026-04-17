@@ -21,6 +21,8 @@ vi.mock('../../../../../src/core/data/DataManager', () => ({
         getInstance: () => ({
             get: vi.fn((key: string) => mockStore.get(key) ?? null),
             set: vi.fn((key: string, value: unknown) => { mockStore.set(key, value) }),
+            addMemoryConsumption: vi.fn(),
+            removeMemoryConsumption: vi.fn(),
         }),
     },
     DataDomain: { Renderer: 'renderer' },
@@ -37,10 +39,11 @@ vi.mock('../../../core/AppSettings', () => ({
 
 vi.mock('../LabelTextureArrayManager', () => ({
     LabelTextureArrayManager: vi.fn().mockImplementation(() => ({
-        initializeEmptyTextureArray: vi.fn().mockReturnValue({ isTexture: true }),
+        texture: { isTexture: true },
         addTextLabel: vi.fn().mockReturnValue(0),
-        markDirty: vi.fn(),
-        getTextureArray: vi.fn().mockReturnValue(null),
+        flushToGpu: vi.fn(),
+        compact: vi.fn().mockReturnValue({ isTexture: true }),
+        getStats: vi.fn().mockReturnValue({ textureSize: 128, allocatedLayers: 32, usedLayers: 0, memoryEstimate: '0 MB' }),
         dispose: vi.fn(),
     })),
 }))

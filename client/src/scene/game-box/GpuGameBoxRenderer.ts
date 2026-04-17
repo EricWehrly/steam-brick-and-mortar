@@ -52,6 +52,7 @@ import { AppSettings, Setting } from '../../core/AppSettings'
 import { EventManager } from '../../core/EventManager'
 import { Logger } from '../../utils/Logger'
 import { StorePropsEventTypes, type GameBoxSpawnedEvent } from '../../types/InteractionEvents'
+import { GameEventTypes } from '../../types/InteractionEvents'
 import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
 // Steam capsule source dimensions (what CDN claims, though actual is ~460×690)
@@ -123,15 +124,25 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         // Self-subscribe: renderer owns the GameBoxSpawned → createGameBoxAuto wiring.
         // Bound once and stored so dispose() can deregister the exact same reference.
         this.boundHandleGameBoxSpawned = this.handleGameBoxSpawned.bind(this)
+        this.boundHandleAllBatchesComplete = this.handleAllBatchesComplete.bind(this)
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.GameBoxSpawned,
             this.boundHandleGameBoxSpawned
+        )
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            this.boundHandleAllBatchesComplete
         )
         
         GpuGameBoxRenderer.logger.lifecycle(`LOD atlas initialized (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
     }
 
     private boundHandleGameBoxSpawned!: (event: CustomEvent<GameBoxSpawnedEvent>) => void
+    private boundHandleAllBatchesComplete!: () => void
+
+    // Tracks in-flight artwork fetches so compact() fires only after all settle.
+    private pendingArtworkCount: number = 0
+    private allBatchesDone: boolean = false
 
     private handleGameBoxSpawned(event: CustomEvent<GameBoxSpawnedEvent>): void {
         const { game, position, side, rotation } = event.detail
@@ -155,7 +166,9 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         rotation?: THREE.Quaternion
     ): void {
         GpuGameBoxRenderer.logger.debug(`[LOD] Loading artwork for "${game.name}"`)
-        
+
+        this.pendingArtworkCount++
+
         this.lodArtworkRenderer.setArtworkInstanceFromUrl(
             position,
             game.name,
@@ -170,9 +183,21 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             if (!(error instanceof Error && error.message.includes('Maximum'))) {
                 GpuGameBoxRenderer.logger.debug(`Artwork fetch failed for "${game.name}": ${error}`)
             }
-            // Don't create label on transient/unexpected errors — only on permanent failures
-            // which are surfaced via result.permanent in the .then() path above
+        }).finally(() => {
+            this.pendingArtworkCount--
+            this.tryCompactLabels()
         })
+    }
+
+    private handleAllBatchesComplete(): void {
+        this.allBatchesDone = true
+        this.tryCompactLabels()
+    }
+
+    /** Compact the label texture array once all batches are placed and all artwork has settled. */
+    private tryCompactLabels(): void {
+        if (!this.allBatchesDone || this.pendingArtworkCount > 0) return
+        this.instancedLabelRenderer.compact()
     }
     
     public createLabelGameBox(
@@ -259,6 +284,10 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         EventManager.getInstance().deregisterEventHandler(
             StorePropsEventTypes.GameBoxSpawned,
             this.boundHandleGameBoxSpawned
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            this.boundHandleAllBatchesComplete
         )
 
         this.lodDistanceManager.dispose()
