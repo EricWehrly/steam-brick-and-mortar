@@ -95,6 +95,7 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
 
     // Prevent log spam when atlas is full
     private atlasFullLogged: boolean = false
+    private inFlightArtworkCount: number = 0
 
     private readonly onFocusChanged: (e: CustomEvent<VisibilityChangedEvent>) => void
 
@@ -251,7 +252,24 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
             return { success: false, instanceIndex: -1, permanent: true }
         }
 
-        // Allocate texture slot
+        this.inFlightArtworkCount++
+        try {
+            return await this.fetchAndPlaceArtwork(position, gameName, artworkUrl, appid, rotation)
+        } finally {
+            this.inFlightArtworkCount--
+            if (this.inFlightArtworkCount === 0) {
+                EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
+            }
+        }
+    }
+
+    private async fetchAndPlaceArtwork(
+        position: THREE.Vector3,
+        gameName: string,
+        artworkUrl: string,
+        appid?: number,
+        rotation?: THREE.Quaternion
+    ): Promise<{ success: boolean; instanceIndex: number; permanent?: boolean }> {
         const textureIndex = this.textureManager.allocateSlot()
         if (textureIndex < 0) {
             if (!this.atlasFullLogged) {
