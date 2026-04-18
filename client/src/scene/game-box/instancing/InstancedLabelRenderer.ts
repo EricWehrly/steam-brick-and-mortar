@@ -55,8 +55,16 @@ export class InstancedLabelRenderer {
     private nextInstanceIndex: number = 0
     private gameNameToTextureIndex: Map<string, number> = new Map()
 
-    // Bound handler reference — stored so dispose() can deregister the exact same function.
+    // Bound handler references — stored so dispose() can deregister the exact same functions.
     private readonly boundHandleSomeBatchesComplete: (event: CustomEvent<SomeBatchesCompleteEvent>) => void
+    private readonly boundHandleAllBatchesComplete: () => void
+
+    // Compaction: fire once after all batches are placed and label writes quiet down.
+    // Each new label added post-AllBatchesComplete resets the timer so we wait for
+    // in-flight artwork failures to settle before freeing the over-allocated VRAM.
+    private allBatchesDone: boolean = false
+    private compactTimer: ReturnType<typeof setTimeout> | null = null
+    private static readonly COMPACT_SETTLE_MS = 3000
     
     // Constant quaternion for no rotation (performance optimization)
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion() // Identity quaternion (0,0,0,1)
@@ -72,10 +80,15 @@ export class InstancedLabelRenderer {
         )
 
         this.boundHandleSomeBatchesComplete = this.handleSomeBatchesComplete.bind(this)
+        this.boundHandleAllBatchesComplete = this.handleAllBatchesComplete.bind(this)
 
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SomeBatchesComplete,
             this.boundHandleSomeBatchesComplete
+        )
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            this.boundHandleAllBatchesComplete
         )
 
         // Register a fresh metadata map immediately so stale data from a previous
@@ -209,7 +222,10 @@ export class InstancedLabelRenderer {
         this.currentCount = Math.max(this.currentCount, index + 1)
         
         this.storeLabelMetadata(index, gameName, position, appid)
-        
+        // If batches are already done, reset the compaction settle timer — this label
+        // is a late-arriving artwork failure, and we want to wait for it to quiet down.
+        if (this.allBatchesDone) this.scheduleCompact()
+
         return true
     }
     
@@ -254,19 +270,31 @@ export class InstancedLabelRenderer {
     private handleSomeBatchesComplete(_event: CustomEvent<SomeBatchesCompleteEvent>): void {
         this.updateGPU()
     }
-    
+
+    private handleAllBatchesComplete(): void {
+        this.allBatchesDone = true
+        this.scheduleCompact()
+    }
+
     /**
-     * Compact the label texture array down to the actual number of labels written.
-     * Call once after all artwork failures have settled (e.g. debounced after
-     * AllBatchesComplete + an artwork-settle window in GpuGameBoxRenderer).
-     * Frees ~55 MB → ~1 MB for a typical library where few games need labels.
+     * Schedule a compaction after a settle window.
+     * Called both when AllBatchesComplete fires and after each label added post-complete,
+     * so in-flight artwork failures that arrive late reset the timer.
      */
-    public compact(): void {
+    private scheduleCompact(): void {
+        if (this.compactTimer !== null) clearTimeout(this.compactTimer)
+        this.compactTimer = setTimeout(() => {
+            this.compactTimer = null
+            this.runCompact()
+        }, InstancedLabelRenderer.COMPACT_SETTLE_MS)
+    }
+
+    private runCompact(): void {
         if (!this.isInitialized) return
 
         const newTexture = this.textureArrayManager.compact()
 
-        // Re-bind the compacted texture in the shader uniform
+        // Re-bind compacted texture in shader uniform
         if (this.material) {
             this.material.uniforms['textureArray'].value = newTexture
             this.material.needsUpdate = true
@@ -342,6 +370,15 @@ export class InstancedLabelRenderer {
             GameEventTypes.SomeBatchesComplete,
             this.boundHandleSomeBatchesComplete
         )
+        EventManager.getInstance().deregisterEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            this.boundHandleAllBatchesComplete
+        )
+
+        if (this.compactTimer !== null) {
+            clearTimeout(this.compactTimer)
+            this.compactTimer = null
+        }
         
         if (this.instancedMesh) {
             const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
