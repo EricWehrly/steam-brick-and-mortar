@@ -1,37 +1,47 @@
 /**
  * InstancedShelfRenderer
- * 
+ *
  * ROLE: GPU-instanced rendering of shelf units. Handles geometry, materials,
  * and efficient batch rendering of multiple shelf instances.
- * 
+ *
  * OWNS:
  * - Shelf geometry templates (angled boards, side boards, shelf boards, interior surfaces)
  * - InstancedMesh managers for each geometry type
  * - Shelf unit instances (position + config)
  * - GPU buffer updates
- * 
+ *
  * RECEIVES:
  * - setInstance(index, data) → Creates/updates shelf at index
  * - updateGPU() → Flushes instance changes to GPU
  * - SomeBatchesComplete event → Triggers coalesced GPU update
- * 
- * EMITS:
- * - RendererReady → When initialize() completes (Phase 3: replaces polling)
- * 
+ *
  * DELEGATES TO:
  * - InstancedMeshManager: Per-geometry-type instancing
  * - SharedMaterialManager: Material acquisition
  * - ShelfStickerHandler: Sticker placement on side boards
- * 
+ *
  * DOES NOT:
  * - Calculate shelf positions (that's layout's job)
  * - Know about games or batches (pure rendering)
- * - Handle events for shelf creation (receives method calls currently)
- * 
+ *
  * INITIALIZATION:
- * - initialize() is async and emits RendererReady event when complete
- * - Callers can await promise OR listen for event (dual-mode for backward compat)
- * - Legacy isReady() polling still available but deprecated
+ * - initialize() is async; callers should await the returned promise.
+ * - isReady() polling is still available but discouraged.
+ *
+ * TD: no-gpu-fallback
+ * There is no CPU / non-instanced fallback for any of the GPU-instanced
+ * rendering systems (shelves, game box artwork, labels, shelf stickers).
+ * StorePropsCoordinator registers unconditionally; if the runtime lacks
+ * WebGL2 or ANGLE_instanced_arrays the store will silently produce nothing.
+ *
+ * A proper fallback would need to cover:
+ *   - InstancedShelfRenderer → individual Mesh objects per shelf unit
+ *   - LodGameArtworkRenderer → one PlaneGeometry + canvas texture per box
+ *   - InstancedLabelRenderer → individual Sprite or canvas label per box
+ *   - ShelfStickerHandler   → individual Mesh per sticker
+ *
+ * Given that Steam / WebXR is effectively a WebGL2-required platform this
+ * is low priority, but the gap should be explicit.
  */
 
 import * as THREE from 'three'
