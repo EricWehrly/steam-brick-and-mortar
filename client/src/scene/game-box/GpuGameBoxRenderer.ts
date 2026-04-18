@@ -13,7 +13,10 @@
  * - Box instance state (positions, orientations, LOD levels)
  * 
  * RECEIVES:
- * - createGameBox(request) → Creates box instance at position
+ * - prefetchArtwork(appid, url, name) → Phase 1: load texture into atlas
+ * - placeArtworkInstance(appid, name, position) → Phase 2: stamp artwork GPU instance
+ * - placeLabelBox(game, position, side) → Phase 2: stamp label GPU instance
+ * - clearPlacements() → wipe all GPU instances before re-sort
  * - addToScene(scene) → Attaches instanced meshes to scene
  * - updateLODForCamera(camera) → Adjusts detail levels based on distance
  * - dispose() → Cleans up GPU resources
@@ -29,6 +32,8 @@
  * DOES NOT:
  * - Know about shelves or layout (receives positions)
  * - Decide which games to display (told what to render)
+ * - Decide whether a game gets artwork or a label — that is GameBoxSpawner's job
+ * - Select or construct artwork URLs from game metadata
  * - Handle batch processing (receives individual requests)
  * 
  * RELATED:
@@ -89,12 +94,9 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private readonly instancedLabelRenderer: InstancedLabelRenderer
     private readonly lodArtworkRenderer: IGameArtworkPipeline
     private readonly lodDistanceManager: LodDistanceManagerDebug
-    /** Resolved once at construction; avoids repeated AppSettings lookups on every game. */
-    private readonly labelsEnabled: boolean
 
     constructor(maxGames: number = 2000) {
         this.dimensions = { ...GpuGameBoxRenderer.DEFAULT_DIMENSIONS }
-        this.labelsEnabled = AppSettings.get(Setting.EnableLabels)
         
         // Create label renderer (fallback for missing/failed artwork)
         this.instancedLabelRenderer = new InstancedLabelRenderer({
@@ -122,106 +124,44 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         GpuGameBoxRenderer.logger.lifecycle(`LOD atlas initialized (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
     }
 
-    // Games that should render as label boxes once a world position is known.
-    // This is populated during prewarm and consumed during placement.
-    private pendingLabelGames: Map<number, { game: SteamGameData; side: ShelfSide }> = new Map()
-
     /**
      * Phase 1: fetch and cache artwork for a game without placing a GPU instance.
-     * Call as batches arrive. Idempotent — subsequent calls for the same game are no-ops.
-     * Permanent artwork failures are tracked here; the label box is created in placeGame()
-     * once a world position is available.
+     * Call as batches arrive. Idempotent — calling again for the same game is a no-op.
+     *
+     * Callers are responsible for resolving the artwork URL and for deciding whether
+     * this game should get artwork at all. Pass the resolved URL directly.
      */
-    public async prewarmGame(game: SteamGameData, side: ShelfSide = ShelfSide.Front): Promise<void> {
-        const artworkUrl = this.selectBestArtworkUrl(game)
-        const appid = typeof game.appid === 'number' ? game.appid : 0
-
-        if (!artworkUrl) {
-            this.queuePendingLabelGame(appid, game, side)
-            return
-        }
-
-        const result = await this.lodArtworkRenderer.prefetchArtwork(appid, artworkUrl, game.name)
-        if (result === 'permanent-failure' || result === 'error') {
-            this.queuePendingLabelGame(appid, game, side)
-        }
-    }
-
-    /**
-     * Phase 2: resolve renderable at a world position for a prewarmed game.
-     * Artwork/label intent is determined during prewarm; this method only materializes
-     * that intent at the provided position.
-     */
-    public placeGame(
-        game: SteamGameData,
-        position: THREE.Vector3,
-        side: ShelfSide = ShelfSide.Front,
-        rotation?: THREE.Quaternion
-    ): void {
-        const appid = typeof game.appid === 'number' ? game.appid : 0
-
-        if (this.consumePendingLabelGame(appid)) {
-            this.createLabelGameBox(game, position, side, rotation)
-            return
-        }
-
-        const instanceIndex = this.lodArtworkRenderer.placeInstance(appid, game.name, position, rotation)
-        if (instanceIndex < 0) {
-            // Guard rail: if placement cannot proceed, fallback to label path.
-            this.createLabelGameBox(game, position, side, rotation)
-        }
-    }
-
-    /**
-     * Clear all GPU instance placements without releasing texture atlas slots.
-     * Call before re-sorting; follow with placeGame() for each game in the new order.
-     */
-    public clearPlacements(): void {
-        this.lodArtworkRenderer.clearPlacements()
-        this.instancedLabelRenderer.clear()
-        this.pendingLabelGames.clear()
-    }
-
-    /**
-     * Create game box with artwork by URL - entire fetch+process happens in worker
-     * This is the preferred path - keeps main thread completely free
-     */
-    public createGameBoxFromUrl(
-        game: SteamGameData,
-        position: THREE.Vector3,
+    public async prefetchArtwork(
+        appid: number,
         artworkUrl: string,
-        side: ShelfSide = ShelfSide.Front,
-        rotation?: THREE.Quaternion
-    ): void {
-        GpuGameBoxRenderer.logger.debug(`[LOD] Loading artwork for "${game.name}"`)
-
-        this.lodArtworkRenderer.setArtworkInstanceFromUrl(
-            position,
-            game.name,
-            artworkUrl,
-            typeof game.appid === 'number' ? game.appid : undefined,
-            rotation
-        ).then((result) => {
-            if (!result.success && result.permanent) {
-                this.createLabelGameBox(game, position, side, rotation)
-            }
-        }).catch((error) => {
-            if (!(error instanceof Error && error.message.includes('Maximum'))) {
-                GpuGameBoxRenderer.logger.debug(`Artwork fetch failed for "${game.name}": ${error}`)
-            }
-        })
+        gameName: string
+    ): Promise<'prefetched' | 'cached' | 'permanent-failure' | 'error'> {
+        return this.lodArtworkRenderer.prefetchArtwork(appid, artworkUrl, gameName)
     }
-    
-    public createLabelGameBox(
+
+    /**
+     * Phase 2a: materialise a previously prefetched artwork texture at a world position.
+     * Returns the GPU instance index, or -1 if the texture is not in the atlas.
+     */
+    public placeArtworkInstance(
+        appid: number,
+        gameName: string,
+        position: THREE.Vector3,
+        rotation?: THREE.Quaternion
+    ): number {
+        return this.lodArtworkRenderer.placeInstance(appid, gameName, position, rotation)
+    }
+
+    /**
+     * Phase 2b: place a text-label box at a world position.
+     * No artwork fetch is triggered. This is a pure GPU-instancing call.
+     */
+    public placeLabelBox(
         game: SteamGameData,
         position: THREE.Vector3,
         side: ShelfSide = ShelfSide.Front,
         rotation?: THREE.Quaternion
     ): void {
-        if (!this.labelsEnabled) {
-            return
-        }
-
         const success = this.instancedLabelRenderer.addLabelInstance(
             position,
             game.name,
@@ -229,82 +169,23 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             side,
             rotation
         )
-
         if (!success) {
             GpuGameBoxRenderer.logger.debug(`Failed to add label box for "${game.name}"`)
         }
     }
 
-    private queuePendingLabelGame(appid: number, game: SteamGameData, side: ShelfSide): void {
-        if (!this.labelsEnabled) {
-            return
-        }
-
-        this.pendingLabelGames.set(appid, { game, side })
-    }
-
-    private consumePendingLabelGame(appid: number): boolean {
-        if (!this.pendingLabelGames.has(appid)) {
-            return false
-        }
-
-        this.pendingLabelGames.delete(appid)
-        return true
-    }
-    
     /**
-     * Create game box with automatic artwork/label decision
-     * This is the preferred entry point - consolidates artwork decision here
+     * Clear all GPU instance placements without releasing texture atlas slots.
+     * Call before re-sorting; follow with placeArtworkInstance()/placeLabelBox() for each game.
      */
-    public createGameBoxAuto(
-        game: SteamGameData,
-        position: THREE.Vector3,
-        side: ShelfSide = ShelfSide.Front,
-        rotation?: THREE.Quaternion
-    ): void {
-        const artworkUrl = this.selectBestArtworkUrl(game)
-        
-        GpuGameBoxRenderer.logger.debug(`createGameBoxAuto "${game.name}": artwork=${!!artworkUrl}`)
-        
-        if (artworkUrl) {
-            this.createGameBoxFromUrl(game, position, artworkUrl, side, rotation)
-        } else {
-            this.createLabelGameBox(game, position, side, rotation)
-        }
-    }
-    
-    /**
-     * Select best artwork URL from game metadata
-     * Prioritizes portrait format (library_600x900.jpg) for consistent LOD rendering
-     */
-    private selectBestArtworkUrl(game: SteamGameData): string | undefined {
-        // Priority 1: Use library URL from metadata (portrait format - ideal for game boxes)
-        if (game.artwork?.library) {
-            return game.artwork.library
-        }
-        
-        // Priority 2: Use header URL from metadata (landscape - fallback)
-        if (game.artwork?.header) {
-            return game.artwork.header
-        }
-        
-        // Priority 3: Construct portrait URL as last resort
-        if (game.appid) {
-            GpuGameBoxRenderer.logger.debug(`No artwork URLs in metadata for "${game.name}" - using constructed URL`)
-            return `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
-        }
-        
-        return undefined
+    public clearPlacements(): void {
+        this.lodArtworkRenderer.clearPlacements()
+        this.instancedLabelRenderer.clear()
     }
 
-    public createBatchGameBoxes(requests: GameBoxRequest[]) {
-        requests.forEach(request => {
-            this.createGameBoxAuto(
-                request.game,
-                request.position,
-                request.side
-            )
-        })
+    /** @deprecated Use the two-phase prewarm/place flow via GameBoxSpawner instead. */
+    public createBatchGameBoxes(_requests: GameBoxRequest[]): void {
+        GpuGameBoxRenderer.logger.warn('createBatchGameBoxes called — this legacy path is no longer supported. Use GameBoxSpawner.')
     }
 
     public getDimensions(): GameBoxDimensions {

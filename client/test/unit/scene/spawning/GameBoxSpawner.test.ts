@@ -2,9 +2,9 @@
  * Unit Tests: GameBoxSpawner — Two-Phase Load/Place
  *
  * Tests verify the refactored GameBoxSpawner correctly:
- * 1. Phase 1 (BatchReadyForPlacement): calls renderer.prewarmGame() for each game
+ * 1. Phase 1 (BatchReadyForPlacement): calls renderer.prefetchArtwork() for each game with a URL
  * 2. ShelfReady: caches shelf positions for later use by GamesSort
- * 3. Phase 2 (GamesSort): calls clearPlacements() + placeGame() in sorted order
+ * 3. Phase 2 (GamesSort): calls clearPlacements() + placeArtworkInstance()/placeLabelBox() in sorted order
  * 4. Emits GamesPlaced events on GamesSort
  */
 
@@ -25,21 +25,37 @@ import type { GamesSortEvent } from '../../../../src/types/EnvironmentEvents'
 import type { SteamGame } from '../../../../src/steam'
 
 // Mock GpuGameBoxRenderer so the spawner never touches real GPU code
-const mockPrewarmGame = vi.fn().mockResolvedValue(undefined)
-const mockPlaceGame = vi.fn()
+const mockPrefetchArtwork = vi.fn().mockResolvedValue('prefetched')
+const mockPlaceArtworkInstance = vi.fn(() => 0) // 0 = success
+const mockPlaceLabelBox = vi.fn()
 const mockClearPlacements = vi.fn()
 const mockRendererDispose = vi.fn()
 
 vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', () => ({
     GpuGameBoxRenderer: vi.fn().mockImplementation(function() {
-        this.prewarmGame = mockPrewarmGame
-        this.placeGame = mockPlaceGame
+        this.prefetchArtwork = mockPrefetchArtwork
+        this.placeArtworkInstance = mockPlaceArtworkInstance
+        this.placeLabelBox = mockPlaceLabelBox
         this.clearPlacements = mockClearPlacements
         this.dispose = mockRendererDispose
         this.addToScene = vi.fn()
         this.updateLODForCamera = vi.fn()
     })
 }))
+
+// Mock AppSettings so GameBoxSpawner can read EnableLabels at construction
+vi.mock('../../../../src/core/AppSettings', () => {
+    const Setting = {
+        EnableLabels: 'enableLabels',
+    }
+    const AppSettings = {
+        get: vi.fn((key: string) => {
+            if (key === Setting.EnableLabels) return true
+            return undefined
+        })
+    }
+    return { AppSettings, Setting }
+})
 
 // Mock EventManager with test helper
 vi.mock('../../../../src/core/EventManager', async (importOriginal) => {
@@ -76,7 +92,18 @@ function createMockGames(count: number, batchIndex: number): readonly SteamGame[
         playtime_forever: 120,
         img_icon_url: '',
         img_logo_url: '',
-        artwork: undefined
+        artwork: undefined  // No artwork URL → will be routed to label path
+    }))
+}
+
+function createMockGamesWithArtwork(count: number, batchIndex: number): readonly SteamGame[] {
+    return Array.from({ length: count }, (_, i) => ({
+        appid: batchIndex * 100 + i,
+        name: `Batch ${batchIndex} Game ${i}`,
+        playtime_forever: 120,
+        img_icon_url: '',
+        img_logo_url: '',
+        artwork: { library: `https://example.com/${batchIndex * 100 + i}.jpg`, icon: '', logo: '', header: '' }
     }))
 }
 
@@ -113,24 +140,23 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
     afterEach(() => {
         vi.clearAllMocks()
-        mockPrewarmGame.mockResolvedValue(undefined)
+        mockPrefetchArtwork.mockResolvedValue('prefetched')
     })
 
     // -------------------------------------------------------------------------
     // Phase 1: Prewarm
 
-    describe('Phase 1 — BatchReadyForPlacement → prewarmGame()', () => {
-        it('calls prewarmGame for each game in a batch', async () => {
-            const games = createMockGames(5, 0)
+    describe('Phase 1 — BatchReadyForPlacement → prefetchArtwork()', () => {
+        it('calls prefetchArtwork for each game that has an artwork URL', async () => {
+            const games = createMockGamesWithArtwork(5, 0)
 
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games, batchIndex: 0, totalBatches: 1 }
             )
 
-            // prewarmGame is fire-and-forget; wait a tick for async
             await Promise.resolve()
-            expect(mockPrewarmGame).toHaveBeenCalledTimes(5)
+            expect(mockPrefetchArtwork).toHaveBeenCalledTimes(5)
         })
 
         it('handles empty batches without errors', async () => {
@@ -142,12 +168,12 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             }).not.toThrow()
 
             await Promise.resolve()
-            expect(mockPrewarmGame).not.toHaveBeenCalled()
+            expect(mockPrefetchArtwork).not.toHaveBeenCalled()
         })
 
         it('prewarns multiple batches independently', async () => {
-            const batch0 = createMockGames(5, 0)
-            const batch1 = createMockGames(3, 1)
+            const batch0 = createMockGamesWithArtwork(5, 0)
+            const batch1 = createMockGamesWithArtwork(3, 1)
 
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
@@ -159,11 +185,11 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             )
 
             await Promise.resolve()
-            expect(mockPrewarmGame).toHaveBeenCalledTimes(8)
+            expect(mockPrefetchArtwork).toHaveBeenCalledTimes(8)
         })
 
-        it('does not call placeGame during prewarm phase', async () => {
-            const games = createMockGames(10, 0)
+        it('does not call placeArtworkInstance or placeLabelBox during prewarm phase', async () => {
+            const games = createMockGamesWithArtwork(10, 0)
 
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
@@ -171,7 +197,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             )
 
             await Promise.resolve()
-            expect(mockPlaceGame).not.toHaveBeenCalled()
+            expect(mockPlaceArtworkInstance).not.toHaveBeenCalled()
+            expect(mockPlaceLabelBox).not.toHaveBeenCalled()
         })
     })
 
@@ -185,7 +212,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
                 makeShelfReady(0, new THREE.Vector3(3, 0, 0))
             )
 
-            expect(mockPlaceGame).not.toHaveBeenCalled()
+            expect(mockPlaceArtworkInstance).not.toHaveBeenCalled()
+            expect(mockPlaceLabelBox).not.toHaveBeenCalled()
             expect(mockClearPlacements).not.toHaveBeenCalled()
         })
     })
@@ -193,11 +221,10 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
     // -------------------------------------------------------------------------
     // Phase 2: GamesSort → place
 
-    describe('Phase 2 — GamesSort → placeGame()', () => {
-        it('calls clearPlacements then placeGame for each sorted game', () => {
-            const games = createMockGames(6, 0) as any[]
+    describe('Phase 2 — GamesSort → placeArtworkInstance() or placeLabelBox()', () => {
+        it('calls clearPlacements then places each sorted game', () => {
+            const games = createMockGamesWithArtwork(6, 0) as any[]
 
-            // Trigger renderer construction, then cache shelf position
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games, batchIndex: 0, totalBatches: 1 }
@@ -210,11 +237,26 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: games, buckets: new Map(), sortMode: 'recently-played' })
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
-            expect(mockPlaceGame).toHaveBeenCalledTimes(6)
+            const totalPlacements = mockPlaceArtworkInstance.mock.calls.length + mockPlaceLabelBox.mock.calls.length
+            expect(totalPlacements).toBe(6)
+        })
+
+        it('skips prefetchArtwork for games with no appid and no artwork metadata', async () => {
+            // Only games with no appid AND no artwork metadata get no URL at all.
+            const games = [{ appid: 0, name: 'No ID Game', playtime_forever: 0, img_icon_url: '', img_logo_url: '', artwork: undefined }]
+
+            eventManager.emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                { games, batchIndex: 0, totalBatches: 1 }
+            )
+
+            await Promise.resolve()
+            // appid=0 is falsy so no CDN URL is constructed — prefetchArtwork not called.
+            expect(mockPrefetchArtwork).not.toHaveBeenCalled()
         })
 
         it('emits GamesPlaced per shelf on GamesSort', () => {
-            const games = createMockGames(6, 0) as any[]
+            const games = createMockGamesWithArtwork(6, 0) as any[]
             const gamesPlacedEvents: GamesPlacedEvent[] = []
 
             eventManager.registerEventHandler(
@@ -234,7 +276,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         })
 
         it('distributes sorted games across multiple cached shelves', () => {
-            const games = createMockGames(20, 0) as any[]
+            const games = createMockGamesWithArtwork(20, 0) as any[]
 
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
@@ -246,11 +288,12 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: games, buckets: new Map(), sortMode: 'recently-played' })
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
-            expect(mockPlaceGame).toHaveBeenCalledTimes(20)
+            const totalPlacements = mockPlaceArtworkInstance.mock.calls.length + mockPlaceLabelBox.mock.calls.length
+            expect(totalPlacements).toBe(20)
         })
 
         it('re-sort triggers a fresh clearPlacements call each time', () => {
-            const games = createMockGames(4, 0) as any[]
+            const games = createMockGamesWithArtwork(4, 0) as any[]
 
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
@@ -266,7 +309,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         it('handles empty sorted list gracefully', () => {
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
-                { games: createMockGames(1, 0), batchIndex: 0, totalBatches: 1 }
+                { games: createMockGamesWithArtwork(1, 0), batchIndex: 0, totalBatches: 1 }
             )
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
 
@@ -275,13 +318,13 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             }).not.toThrow()
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
-            expect(mockPlaceGame).not.toHaveBeenCalled()
+            expect(mockPlaceArtworkInstance).not.toHaveBeenCalled()
+            expect(mockPlaceLabelBox).not.toHaveBeenCalled()
         })
 
         it('does not place games if no shelf positions are cached', () => {
-            const games = createMockGames(5, 0) as any[]
+            const games = createMockGamesWithArtwork(5, 0) as any[]
 
-            // Emit batch to construct renderer but no ShelfReady
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games, batchIndex: 0, totalBatches: 1 }
@@ -289,7 +332,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: games, buckets: new Map(), sortMode: 'recently-played' })
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
-            expect(mockPlaceGame).not.toHaveBeenCalled()
+            expect(mockPlaceArtworkInstance).not.toHaveBeenCalled()
+            expect(mockPlaceLabelBox).not.toHaveBeenCalled()
         })
     })
 
@@ -298,9 +342,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
     describe('reset()', () => {
         it('clears pending games, shelf positions, and disposes renderer', async () => {
-            const games = createMockGames(5, 0) as any[]
+            const games = createMockGamesWithArtwork(5, 0) as any[]
 
-            // Trigger renderer construction and cache a shelf position
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games, batchIndex: 0, totalBatches: 1 }
@@ -313,28 +356,25 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
             // After reset, GamesSort should not use old shelf positions (renderer gone)
             eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: games, buckets: new Map(), sortMode: 'recently-played' })
-            expect(mockPlaceGame).not.toHaveBeenCalled()
+            expect(mockPlaceArtworkInstance).not.toHaveBeenCalled()
+            expect(mockPlaceLabelBox).not.toHaveBeenCalled()
         })
     })
 
     describe('setRenderer(null)', () => {
         it('does not throw when renderer is cleared and GamesSort fires', () => {
-            // Trigger renderer construction
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
-                { games: createMockGames(2, 0), batchIndex: 0, totalBatches: 1 }
+                { games: createMockGamesWithArtwork(2, 0), batchIndex: 0, totalBatches: 1 }
             )
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
 
-            // reset() disposes the renderer; subsequent GamesSort should not throw
             spawner.reset()
             expect(mockRendererDispose).toHaveBeenCalled()
 
             expect(() => {
-                eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: createMockGames(3, 0) as any[], buckets: new Map(), sortMode: 'recently-played' })
+                eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: createMockGamesWithArtwork(3, 0) as any[], buckets: new Map(), sortMode: 'recently-played' })
             }).not.toThrow()
         })
     })
 })
-
-
