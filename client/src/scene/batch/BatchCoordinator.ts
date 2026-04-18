@@ -328,7 +328,9 @@ export class BatchCoordinator<T> {
 
     private getTerminalBatchCount(): number {
         return [...this.batchStatuses.values()].filter(({ status }) =>
-            status === BatchProcessingStatus.GamesPlaced || status === BatchProcessingStatus.Failed
+            status === BatchProcessingStatus.GamesPlaced ||
+            status === BatchProcessingStatus.Dispatched ||
+            status === BatchProcessingStatus.Failed
         ).length
     }
 }

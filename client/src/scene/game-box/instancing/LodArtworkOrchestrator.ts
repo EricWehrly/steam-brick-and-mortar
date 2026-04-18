@@ -18,7 +18,7 @@ import { GameEventTypes, AppEventTypes } from '../../../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../../../types/InteractionEvents'
 import type { SomeBatchesCompleteEvent } from '../../../types/EnvironmentEvents'
 import { Logger } from '../../../utils/Logger'
-import { GameArtworkProvider } from './GameArtworkProvider'
+import { GameArtworkProvider, type GameArtwork } from './GameArtworkProvider'
 import { LodTextureArrayManager, type LodTierConfig } from './LodTextureArrayManager'
 import {
     LodGameArtworkRenderer,
@@ -265,28 +265,10 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             }
 
             const artwork = this.artworkProvider.getArtwork(appid, gameName, 'library', artworkUrl)
+            const resolvedUrl = await this.fetchAndCachePixels(artwork, textureIndex)
 
-            const midConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.MID)
-            const midWidth = midConfig?.textureWidth ?? 150
-            const midHeight = midConfig?.textureHeight ?? 225
-            const midResult = await artwork.getPixelsAtSize(midWidth, midHeight)
-            this.textureManager.setSlotPixels(LOD_TIER_NAME.MID, textureIndex, midResult.pixels, midWidth, midHeight)
-
-            if (!this.lazyHighTextures) {
-                const highConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.HIGH)
-                const highWidth = highConfig?.textureWidth ?? STEAM_CAPSULE_WIDTH
-                const highHeight = highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT
-                const highResult = await artwork.getPixelsAtSize(highWidth, highHeight)
-                this.textureManager.setSlotPixels(LOD_TIER_NAME.HIGH, textureIndex, highResult.pixels, highWidth, highHeight)
-            }
-
-            this.updateGPU()
-
-            // Store the resolved URL on the artwork handle so placeInstance can pass it along.
-            const resolvedUrl = artwork.getUrl()
             this.gameNameToTextureIndex.set(gameName, textureIndex)
             this.textureIndexToGameName.set(textureIndex, gameName)
-            // Store url for later placeInstance lookup
             this.prefetchedArtworkUrl.set(gameName, resolvedUrl)
 
             LodArtworkOrchestrator.logger.debug(`Prefetched artwork for "${gameName}" → slot ${textureIndex}`)
@@ -307,6 +289,28 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
                 EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
             }
         }
+    }
+
+    private async fetchAndCachePixels(
+        artwork: GameArtwork,
+        textureIndex: number
+    ): Promise<string> {
+        const midConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.MID)
+        const midWidth = midConfig?.textureWidth ?? 150
+        const midHeight = midConfig?.textureHeight ?? 225
+        const midResult = await artwork.getPixelsAtSize(midWidth, midHeight)
+        this.textureManager.setSlotPixels(LOD_TIER_NAME.MID, textureIndex, midResult.pixels, midWidth, midHeight)
+
+        if (!this.lazyHighTextures) {
+            const highConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.HIGH)
+            const highWidth = highConfig?.textureWidth ?? STEAM_CAPSULE_WIDTH
+            const highHeight = highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT
+            const highResult = await artwork.getPixelsAtSize(highWidth, highHeight)
+            this.textureManager.setSlotPixels(LOD_TIER_NAME.HIGH, textureIndex, highResult.pixels, highWidth, highHeight)
+        }
+
+        this.updateGPU()
+        return artwork.getUrl()
     }
 
     /**
