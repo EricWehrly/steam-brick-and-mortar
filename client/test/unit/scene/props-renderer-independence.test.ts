@@ -10,7 +10,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { EventManager, EventSource, type BaseInteractionEvent } from '../../../src/core/EventManager'
 import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
-import type { PropsConfig } from '../../../src/scene/IStorePropsRenderer'
 
 // Import props module to ensure handlers register themselves
 import '../../../src/scene/props'
@@ -43,7 +42,7 @@ describe('Store Props Renderer Independence - Event System', () => {
             expect(eventManager).toBeDefined()
             
             // When: We request store props setup
-            const config: PropsConfig = {
+            const config = {
                 enableShelves: true,
                 enableGameBoxes: false,
                 enableSignage: false

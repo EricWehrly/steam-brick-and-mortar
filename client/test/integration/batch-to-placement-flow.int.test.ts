@@ -39,7 +39,7 @@ vi.mock('../../src/utils/TextureManager', async () => {
 
 import { EventManager } from '../../src/core/EventManager'
 import { DataDomain, DataKey, DataManager } from '../../src/core/data'
-import { GpuStorePropsRenderer } from '../../src/scene/GpuStorePropsRenderer'
+import { createStorePropsTestHarness, type StorePropsTestHarness } from '../helpers/StorePropsTestHarness'
 import { 
     SteamEventTypes, 
     StorePropsEventTypes,
@@ -55,7 +55,7 @@ describe('Batch-to-Placement Flow Integration', () => {
     let scene: THREE.Scene
     let eventManager: EventManager
     let dataManager: DataManager
-    let renderer: GpuStorePropsRenderer
+    let harness: StorePropsTestHarness
     let allBatchesCompleteReceived: boolean
     let layoutDeterminedReceived: boolean
     let completionEventData: any
@@ -133,13 +133,12 @@ describe('Batch-to-Placement Flow Integration', () => {
             }
         )
         
-        // Create renderer AFTER listener is registered
-        renderer = new GpuStorePropsRenderer(scene)
-        await renderer.setupProps()
+        // Create subsystems AFTER listeners are registered
+        harness = createStorePropsTestHarness(scene)
     })
 
     afterEach(() => {
-        renderer?.dispose()
+        harness?.dispose()
         eventManager.removeAllListeners()
         dataManager.clear()
         scene.clear()

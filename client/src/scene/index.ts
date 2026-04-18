@@ -25,4 +25,3 @@ export {
     type PerformanceStats
 } from './game-box/types/PerformanceTypes'
 export { SignageRenderer, type SignageConfig } from './SignageRenderer'
-export type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'

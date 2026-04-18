@@ -129,8 +129,8 @@ export class LightingRenderer {
         })
 
         // Observe store-props lifecycle to drive lighting phases.
-        // Use plain registerEventHandler (not default) so these fire even when
-        // GpuStorePropsEventHandler / LegacyStorePropsHandler hold the normal handler slot.
+        // Use plain registerEventHandler (not override) so these fire alongside
+        // StorePropsCoordinator which holds the override slot.
         // Lighting is a side-effect observer of the scene lifecycle, not the owner.
         this.eventManager.registerEventHandler(
             StorePropsEventTypes.SetupRequest,

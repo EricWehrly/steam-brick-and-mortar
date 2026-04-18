@@ -2,25 +2,26 @@
  * Store Props Module
  *
  * Self-contained event-driven system for store props (shelves, game boxes, signage).
- * Simply importing this module activates the GPU props handler via side-effect import:
+ * Simply importing this module activates the GPU props coordinator via side-effect:
  *
- *   import './props'  // triggers GpuStorePropsEventHandler self-registration
+ *   import './props'  // triggers StorePropsCoordinator self-registration
  *
- * Architecture: GpuStorePropsEventHandler listens for StorePropsEvents and drives
- * the instanced GPU rendering pipeline. No explicit initialization needed.
+ * Architecture: StorePropsCoordinator registers as an override handler for
+ * StorePropsEvents and drives the instanced GPU rendering pipeline.
+ * No explicit initialization needed.
  */
 
-// Import handler (triggers self-registration)
-import './GpuStorePropsEventHandler'
+// Side-effect import — triggers StorePropsCoordinator self-registration
+import './StorePropsCoordinator'
 
 // Export events and types for external use
 export * from './PropsEvents'
 
 // Export shared utilities for renderers that need them
-export { 
-    GameLayoutConstants, 
-    ArtworkUtils, 
-    VRLayoutUtils, 
+export {
+    GameLayoutConstants,
+    ArtworkUtils,
+    VRLayoutUtils,
     GameBoxUtils,
     ShelfSurfaceUtils,
     type ShelfSurface

@@ -35,6 +35,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { EventManager } from '../../src/core/EventManager'
 import { DataDomain, DataKey, DataManager } from '../../src/core/data'
+import { createStorePropsTestHarness } from '../helpers/StorePropsTestHarness'
 import {
     StorePropsEventTypes,
     SteamEventTypes,
@@ -102,10 +103,7 @@ afterEach(() => {
 
 describe('Bug A — GameBoxSpawner must store pending games before ShelfReady fires', () => {
     it('games placed count matches batches even when setup is awaited before batch arrives', async () => {
-        const { GpuStorePropsRenderer } = await import('../../src/scene/GpuStorePropsRenderer')
-
-        const renderer = new GpuStorePropsRenderer(scene)
-        await renderer.setupProps()
+        const harness = createStorePropsTestHarness(scene)
 
         const placed: GamesPlacedEvent[] = []
         em.registerEventHandler(
@@ -128,9 +126,7 @@ describe('Bug A — GameBoxSpawner must store pending games before ShelfReady fi
 
 describe('Bug B — ShelfReady must not arrive before pending games are stored', () => {
     it('every ShelfReady event has a corresponding pending game entry', async () => {
-        const { GpuStorePropsRenderer } = await import('../../src/scene/GpuStorePropsRenderer')
-        const renderer = new GpuStorePropsRenderer(scene)
-        await renderer.setupProps()
+        const harness = createStorePropsTestHarness(scene)
 
         // Capture order: BatchReadyForPlacement stores games; ShelfReady consumes them.
         // If ShelfReady fires on the same synchronous tick as BatchReadyForPlacement
@@ -169,9 +165,7 @@ describe('Bug B — ShelfReady must not arrive before pending games are stored',
     })
 
     it('GamesPlaced status is GamesPlaced (not Failed) for all batches', async () => {
-        const { GpuStorePropsRenderer } = await import('../../src/scene/GpuStorePropsRenderer')
-        const renderer = new GpuStorePropsRenderer(scene)
-        await renderer.setupProps()
+        const harness = createStorePropsTestHarness(scene)
 
         const placed: GamesPlacedEvent[] = []
         em.registerEventHandler(
@@ -198,11 +192,9 @@ describe('Bug B — ShelfReady must not arrive before pending games are stored',
 
 describe('Bug C — all batches placed even when init is async and batches arrive fast', () => {
     it('no batch is skipped when multiple batches arrive before init completes', async () => {
-        const { GpuStorePropsRenderer } = await import('../../src/scene/GpuStorePropsRenderer')
-        const renderer = new GpuStorePropsRenderer(scene)
-        // Do NOT await setupProps — simulate real-world where batches can arrive
-        // while async setup is in flight
-        const setupPromise = renderer.setupProps()
+        const harness = createStorePropsTestHarness(scene)
+        // Subsystems are constructed synchronously — no async gap to test against,
+        // which is exactly the fix: everything is subscribed before batches can arrive.
 
         const placed: GamesPlacedEvent[] = []
         em.registerEventHandler(
@@ -215,8 +207,6 @@ describe('Bug C — all batches placed even when init is async and batches arriv
         for (let i = 0; i < N; i++) {
             emitBatch(em, i, N, makeGames(5, i))
         }
-
-        await setupPromise
 
         await vi.waitFor(() => {
             expect(placed.length).toBe(N)

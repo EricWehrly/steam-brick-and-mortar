@@ -12,7 +12,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
 import { InstancedShelfRenderer, type InstancedShelfConfig } from '../../../../src/scene/instancing/InstancedShelfRenderer'
-import { GpuStorePropsRenderer } from '../../../../src/scene/GpuStorePropsRenderer'
 import type { ShelfConfig } from '../../../../src/scene/props/SharedPropsUtils'
 import { SharedMaterialManager, MaterialType } from '../../../../src/utils/SharedMaterialManager'
 import { DataManager } from '../../../../src/core/data/DataManager'
