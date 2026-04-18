@@ -322,6 +322,12 @@ export const GameEventTypes = {
     LayoutChanged: 'game:layout-changed',
     SomeBatchesComplete: 'game:some-batches-complete',
     AllBatchesComplete: 'game:all-batches-complete',
+    /**
+     * Fired by LodArtworkOrchestrator when all in-flight artwork fetches have resolved
+     * (success or permanent failure). Signals that label compaction can safely run,
+     * since no further label-creating failures are expected.
+     */
+    ArtworkSettled: 'game:artwork-settled',
     /** Fired when a game is selected (e.g. clicked in scene) — opens detail panel */
     Selected: 'game:selected',
     /** Fired after all batches complete; carries the sorted game list and bucket map. */
