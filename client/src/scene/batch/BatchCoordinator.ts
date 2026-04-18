@@ -2,7 +2,6 @@
  * Batch Coordinator
  * 
  * Manages queued batch processing with serialization guarantees.
- * Extracts batch queue management logic from GpuStorePropsRenderer.
  * 
  * Features:
  * - Automatic queue sorting by batch index

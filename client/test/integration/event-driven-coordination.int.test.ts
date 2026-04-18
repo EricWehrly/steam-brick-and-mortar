@@ -33,7 +33,7 @@ vi.mock('../../src/utils/TextureManager', async () => {
 
 import { EventManager } from '../../src/core/EventManager'
 import { DataManager } from '../../src/core/data'
-import { GpuStorePropsRenderer } from '../../src/scene/GpuStorePropsRenderer'
+import { createStorePropsTestHarness, type StorePropsTestHarness } from '../helpers/StorePropsTestHarness'
 import { 
     SteamEventTypes, 
     StorePropsEventTypes,
@@ -49,7 +49,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
     let scene: THREE.Scene
     let eventManager: EventManager
     let dataManager: DataManager
-    let renderer: GpuStorePropsRenderer
+    let harness: StorePropsTestHarness
     
     // Event tracking
     let batchReadyEvents: BatchReadyForPlacementEvent[] = []
@@ -146,13 +146,12 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             }
         )
         
-        // Create renderer AFTER listeners are registered
-        renderer = new GpuStorePropsRenderer(scene)
-        await renderer.setupProps()
+        // Create subsystems AFTER listeners are registered
+        harness = createStorePropsTestHarness(scene)
     })
 
     afterEach(() => {
-        renderer?.dispose()
+        harness?.dispose()
         eventManager.removeAllListeners()
         dataManager.clear()
         scene.clear()
