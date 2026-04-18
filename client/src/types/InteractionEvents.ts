@@ -104,7 +104,7 @@ export interface RoomResizedEvent extends BaseInteractionEvent {
 }
 
 // =============================================================================
-// WEBXR EVENTS  
+// WEBXR EVENTS
 // =============================================================================
 
 export interface WebXRToggleEvent extends BaseInteractionEvent {
@@ -201,72 +201,21 @@ export interface GameSelectedEvent extends BaseInteractionEvent {
 // =============================================================================
 // STORE PROPS EVENTS
 // =============================================================================
+// Interfaces, enums, and StorePropsEventTypes now live in PropsEvents.ts.
+// Re-exported below for backward-compatible imports from InteractionEvents.
 
-export enum BatchProcessingStatus {
-    Queued = 'queued',
-    Dispatched = 'dispatched',
-    ShelfRequested = 'shelf-requested',
-    ShelfCreated = 'shelf-created',
-    GamesPlaced = 'games-placed',
-    Failed = 'failed',
-    Complete = 'complete'
-}
-
-export interface StorePropsProgressEvent extends BaseInteractionEvent {
-    step: 'room' | 'shelves' | 'games'
-    current?: number
-    total?: number
-    detail: string
-}
-
-export interface StorePropsSetupRequestEvent extends BaseInteractionEvent {
-    config?: {
-        enableShelves?: boolean
-        enableGameBoxes?: boolean
-        enableSignage?: boolean
-    }
-}
-
-export interface StorePropsSetupCompletedEvent extends BaseInteractionEvent {
-    // No additional data needed
-}
-
-// Phase 3: Event-driven batch-to-placement flow
-export interface BatchReadyForPlacementEvent extends BaseInteractionEvent {
-    games: ReadonlyArray<Readonly<SteamGame>>
-    batchIndex: number
-    totalBatches: number
-}
-
-/**
- * Authoritative shelf placement event emitted by ShelfLayoutCoordinator.
- * Carries everything both the renderer (InstancedShelfRenderer) and
- * game/sign placement subscribers (GameBoxSpawner, SceneSignManager) need.
- *
- * Replaces the old ShelfCreatedEvent. ShelfPlacementCoordinator is gone.
- */
-export interface ShelfReadyEvent extends BaseInteractionEvent {
-    /** Batch index this shelf maps to — used as unique shelf identifier. */
-    batchIndex: number
-    position: Readonly<THREE.Vector3>
-    rotationY: number
-}
-
-export interface GameBoxSpawnedEvent extends BaseInteractionEvent {
-    game: Readonly<SteamGameData>
-    position: Readonly<THREE.Vector3>
-    side: 'front' | 'back'
-    rotation?: Readonly<THREE.Quaternion>
-}
-
-export interface GamesPlacedEvent extends BaseInteractionEvent {
-    batchIndex: number
-    status: BatchProcessingStatus
-}
-
-export interface RendererReadyEvent extends BaseInteractionEvent {
-    rendererType: 'shelf' | 'gamebox'
-}
+// Store props event interfaces and StorePropsEventTypes live in PropsEvents.ts.
+// Re-exported here so existing imports from InteractionEvents continue to work.
+export type {
+    StorePropsSetupRequestEvent,
+    StorePropsSetupCompletedEvent,
+    StorePropsClearRequestEvent,
+    BatchReadyForPlacementEvent,
+    ShelfReadyEvent,
+    GamesPlacedEvent,
+    StorePropsProgressEvent,
+} from '../scene/props/PropsEvents'
+export { StorePropsEventTypes, BatchProcessingStatus } from '../scene/props/PropsEvents'
 
 // =============================================================================
 // EVENT TYPE CONSTANTS
@@ -328,7 +277,7 @@ export const GameEventTypes = {
      * since no further label-creating failures are expected.
      */
     ArtworkSettled: 'game:artwork-settled',
-    /** Fired when a game is selected (e.g. clicked in scene) — opens detail panel */
+    /** Fired when a game is selected (e.g. clicked in scene) - opens detail panel */
     Selected: 'game:selected',
     /** Fired after all batches complete; carries the sorted game list and bucket map. */
     GamesSort: 'game:games-sort'
@@ -340,21 +289,6 @@ export const CeilingEventTypes = {
 
 export const AppSettingsEventTypes = {
     Changed: 'app-settings:changed'
-} as const
-
-export const StorePropsEventTypes = {
-    Progress: 'store-props:progress',
-    SetupRequest: 'store-props:setup-request',
-    SetupCompleted: 'store-props:setup-completed',
-    EnableShelfIndices: 'store-props:enable-shelf-indices',
-    DisableShelfIndices: 'store-props:disable-shelf-indices',
-    // Phase 3: Event-driven batch-to-placement flow
-    BatchReadyForPlacement: 'store-props:batch-ready-placement',
-    ShelfReady: 'store-props:shelf-ready',
-    GameBoxSpawned: 'store-props:game-box-spawned',
-    GamesPlaced: 'store-props:games-placed',
-    // Renderer initialization
-    RendererReady: 'store-props:renderer-ready'
 } as const
 
 // =============================================================================
@@ -380,9 +314,9 @@ export const AppEventTypes = {
     StartupComplete:       'app:startup-complete',
     /**
      * Fired when off-thread procedural texture generation finishes and materials
-     * have been applied to the scene — the world now has full surface detail.
+     * have been applied to the scene - the world now has full surface detail.
      *
-     * TD: system-events-split — this is a system lifecycle event, not an app/UI event.
+     * TD: system-events-split - this is a system lifecycle event, not an app/UI event.
      * Should live in a dedicated SystemEvents.ts alongside StoreFullyPopulated once that split happens.
      */
     WorldDetailEnhanced:   'app:world-detail-enhanced',
@@ -437,4 +371,4 @@ export interface VisibilityChangedEvent extends BaseInteractionEvent {
 }
 
 // EVENT TYPE MAPPINGS
-// Import from EventTypeMap.ts directly — not re-exported from here.
+// Import from EventTypeMap.ts directly - not re-exported from here.

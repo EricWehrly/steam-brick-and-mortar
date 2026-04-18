@@ -46,7 +46,7 @@ import type {
 import { ShelfStickerHandler } from '../stickers/ShelfStickerHandler'
 import { buildShelfGeometryTemplates, buildShelfUnitTemplate, ShelfGeometryType, type ShelfPartTemplate } from './ShelfGeometryBuilder'
 import { EventManager } from '../../core/EventManager'
-import { GameEventTypes, StorePropsEventTypes, type RendererReadyEvent, type ShelfReadyEvent } from '../../types/InteractionEvents'
+import { GameEventTypes, StorePropsEventTypes, type ShelfReadyEvent } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import { MeshPrewarmer } from '../../utils/MeshPrewarmer'
 import { SystemCapabilitiesDetector } from '../../utils/SystemCapabilities'
@@ -242,13 +242,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             
             this.isInitialized = true
             this.flushPendingShelfReady()
-            
-            // Emit RendererReady event (Phase 3: replace polling with events)
-            EventManager.getInstance().emit<RendererReadyEvent>(
-                StorePropsEventTypes.RendererReady,
-                { rendererType: 'shelf' }
-            )
-            InstancedShelfRenderer.logger.debug('✅ Initialized, emitted RendererReady event')
+            InstancedShelfRenderer.logger.debug('✅ Initialized')
             
         } catch (err) {
             InstancedShelfRenderer.logger.error('❌ Failed to initialize:', err)
