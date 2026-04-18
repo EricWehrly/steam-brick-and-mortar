@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { LOD_LEVEL, LOD_TIER_NAME, type LodLevel } from './ILodArtworkRenderer'
+import { LOD_LEVEL, LOD_TIER_NAME, type LodLevel } from './IGameArtworkPipeline'
 
 export interface LodTierSpec {
     level: LodLevel
@@ -55,3 +55,4 @@ export function getDefaultLodTierSpecs(): LodTierSpec[] {
         { level: LOD_LEVEL.MID, tierName: LOD_TIER_NAME.MID, name: LOD_TIER_NAME.MID, textureWidth: 150, textureHeight: 225 },
     ]
 }
+

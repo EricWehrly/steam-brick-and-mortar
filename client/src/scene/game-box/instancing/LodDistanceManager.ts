@@ -12,7 +12,7 @@
  */
 
 import * as THREE from 'three'
-import { type ILodArtworkRenderer, LOD_LEVEL, type LodLevel } from './ILodArtworkRenderer'
+import { type IGameArtworkPipeline, LOD_LEVEL, type LodLevel } from './IGameArtworkPipeline'
 import { RenderLoopRegistry } from '../../RenderLoopRegistry'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey } from '../../../core/data/DataTypes'
@@ -55,7 +55,7 @@ interface DiagnosticStats {
 
 export class LodDistanceManager {
     public static logger = Logger.createLogFunctions(LodDistanceManager.name)
-    private readonly renderer: ILodArtworkRenderer
+    private readonly renderer: IGameArtworkPipeline
     private config: LodDistanceConfig
     private readonly renderLoopRegistry: RenderLoopRegistry
     private readonly dataManager: DataManager
@@ -86,7 +86,7 @@ export class LodDistanceManager {
     }
     private lastFrameTime: number = 0
 
-    constructor(renderer: ILodArtworkRenderer, config: Partial<LodDistanceConfig> = {}) {
+    constructor(renderer: IGameArtworkPipeline, config: Partial<LodDistanceConfig> = {}) {
         this.renderer = renderer
         
         // Initialize config from AppSettings with fallback to provided config/defaults
@@ -468,3 +468,6 @@ export class LodDistanceManager {
         LodDistanceManager.logger.lifecycle('Disposed')
     }
 }
+
+
+

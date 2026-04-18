@@ -7,7 +7,7 @@
  * - LodGameArtworkRenderer: GPU rendering with LOD support
  *
  * Provides the primary API for game artwork loading (setArtworkInstanceFromUrl)
- * and implements ILodArtworkRenderer for consumers like LodDistanceManager.
+ * and implements IGameArtworkPipeline for consumers like LodDistanceManager.
  */
 
 import * as THREE from 'three'
@@ -26,7 +26,7 @@ import {
     type LodLevel,
     type LodGameArtworkRendererConfig,
 } from './LodGameArtworkRenderer'
-import { LOD_TIER_NAME, type InstanceLodData, type ILodArtworkRenderer } from './ILodArtworkRenderer'
+import { LOD_TIER_NAME, type InstanceLodData, type IGameArtworkPipeline } from './IGameArtworkPipeline'
 import {
     buildRuntimeTierSpecs,
     findTierByLevel,
@@ -72,9 +72,9 @@ export interface LodArtworkConfig {
 
 /**
  * Orchestrates the complete artwork loading and rendering pipeline.
- * Implements ILodArtworkRenderer for use by LodDistanceManager.
+ * Implements IGameArtworkPipeline for use by LodDistanceManager.
  */
-export class LodArtworkOrchestrator implements ILodArtworkRenderer {
+export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     public static logger = Logger.createLogFunctions(LodArtworkOrchestrator.name)
     private artworkProvider: GameArtworkProvider
     private textureManager: LodTextureArrayManager
@@ -566,3 +566,6 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
         LodArtworkOrchestrator.logger.lifecycle('Disposed')
     }
 }
+
+
+
