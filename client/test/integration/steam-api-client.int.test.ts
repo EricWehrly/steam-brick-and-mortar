@@ -131,7 +131,7 @@ describe('SteamApiClient Integration Tests', () => {
         it('should clear cache when requested', () => {
             client.clearCache()
             
-            const stats = client.getCacheStats()
+            const stats = client.getCacheManager().getStats()
             expect(stats.totalEntries).toBe(0)
         })
     })

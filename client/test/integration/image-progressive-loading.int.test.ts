@@ -141,7 +141,7 @@ describe('Progressive Loading Integration Tests', () => {
         it('should provide cache management methods', () => {
             // These methods should exist on the client for metadata caching
             expect(typeof steamClient.clearCache).toBe('function')
-            expect(typeof steamClient.getCacheStats).toBe('function')
+            expect(typeof steamClient.getCacheManager).toBe('function')
         })
     })
 })

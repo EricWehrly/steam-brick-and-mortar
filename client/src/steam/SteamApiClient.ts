@@ -1,7 +1,3 @@
-/**
- * Simplified Steam API Client using composition layers
- */
-
 import { HttpClient } from './http/HttpClient'
 import { CacheManager } from './cache/SimpleCacheManager'
 import { RateLimiter } from './rate-limit/RateLimiter'
@@ -49,9 +45,8 @@ export interface SteamApiError {
 }
 
 /**
- * Simplified Steam API Client using layered composition
- * 
- * All public methods include explicit caching logic for transparency and easier debugging.
+ * Steam API client. Public surface kept intentionally small — heavy lifting
+ * (progressive game loading, batch fetching, caching) lives in GamesLoader.
  */
 export class SteamApiClient {
     private static readonly logger = Logger.createLogFunctions(SteamApiClient.name)
@@ -62,9 +57,8 @@ export class SteamApiClient {
     private appDetailsCache: AppDetailsCache
     private gamesLoader: GamesLoader
 
-    // TODO: Tear this out of history, and resolve the value from terraform outputs
+    // TODO: resolve apiBaseUrl from terraform outputs
     constructor(apiBaseUrl = 'https://steam-api-dev.wehrly.com') {
-        // Initialize all layers
         this.http = new HttpClient({ baseUrl: apiBaseUrl })
         this.cache = new CacheManager({ cachePrefix: 'steam_api_' })
         this.rateLimiter = new RateLimiter({ requestsPerSecond: 4 })
@@ -84,12 +78,6 @@ export class SteamApiClient {
         )
     }
 
-    /**
-     * Resolve Steam vanity URL to Steam ID with caching
-     * 
-     * @param vanityUrl - The custom URL part (e.g., "SpiteMonger")
-     * @returns Promise<SteamResolveResponse> - Contains steamid and vanity_url
-     */
     public async resolveVanityUrl(vanityUrl: string, ignoreCache = false): Promise<SteamResolveResponse> {
         if (!vanityUrl || vanityUrl.trim().length === 0) {
             throw new Error('Vanity URL cannot be empty')
@@ -97,17 +85,12 @@ export class SteamApiClient {
 
         const cleanVanityUrl = vanityUrl.trim().toLowerCase()
         const cacheKey = `resolve_${cleanVanityUrl}`
-        
-        // Check cache first if not ignoring cache
+
         if (!ignoreCache) {
             const cached = this.cache.get<SteamResolveResponse>(cacheKey)
-            if (cached) {
-                SteamApiClient.logger.debug(`Using cached vanity URL resolution for: ${cleanVanityUrl}`)
-                return cached
-            }
+            if (cached) return cached
         }
-        
-        // Make API request
+
         const endpoint = `/resolve/${encodeURIComponent(cleanVanityUrl)}`
         SteamApiClient.logger.debug(`Resolving vanity URL: "${vanityUrl}" -> "${cleanVanityUrl}"`)
         
@@ -115,9 +98,7 @@ export class SteamApiClient {
         const response = this.normalizeResolveResponse(rawResponse, cleanVanityUrl)
         SteamApiClient.logger.info(`Vanity URL resolved: ${response.vanity_url || cleanVanityUrl}`)
         
-        // Cache the result
         this.cache.set(cacheKey, response)
-        
         return response
     }
 
@@ -147,44 +128,31 @@ export class SteamApiClient {
         }
     }
 
-    /**
-     * Get user's Steam games with caching
-     * 
-     * @param steamId - The 17-digit Steam ID
-     * @returns Promise<SteamUser> - Contains games list and user info
-     */
     public async getUserGames(steamId: string, ignoreCache = false): Promise<SteamUser> {
         if (!steamId || steamId.trim().length === 0) {
             throw new Error('Steam ID cannot be empty')
         }
 
         const cacheKey = `games_${steamId}`
-        
-        // Check cache first if not ignoring cache
+
         if (!ignoreCache) {
             const cached = this.cache.get<SteamUser>(cacheKey)
-            if (cached) {
-                SteamApiClient.logger.debug(`Using cached games data for Steam ID: ${steamId}`)
-                return cached
-            }
+            if (cached) return cached
         }
         
-        // Make API request
         const endpoint = `/games/${encodeURIComponent(steamId)}`
         SteamApiClient.logger.debug(`Fetching games for Steam ID: ${steamId}`)
-        
+
         try {
             const response = await this.http.makeRequest<SteamUser>(endpoint)
-            
+
             SteamApiClient.logger.info(`Fetched ${response.game_count} games for ${response.vanity_url || steamId}`)
-            
+
             if (response.game_count === 0) {
-                SteamApiClient.logger.warn('User has 0 games - this might indicate privacy settings or an empty library')
+                SteamApiClient.logger.warn('User has 0 games — may indicate privacy settings or an empty library')
             }
-            
-            // Cache the result
+
             this.cache.set(cacheKey, response)
-            
             return response
         } catch (error) {
             SteamApiClient.logger.error('Failed to fetch user games:', error)
@@ -192,14 +160,10 @@ export class SteamApiClient {
         }
     }
 
-    /**
-     * Load games with single-pass cache check and fetch
-     */
     public async loadGamesProgressively(
         steamUser: SteamUser,
         options: {
             maxGames?: number
-            /** Optional comparator to override default playtime-descending sort. */
             sortFn?: (a: SteamGame, b: SteamGame) => number
         } = {}
     ): Promise<SteamGame[]> {
@@ -211,21 +175,11 @@ export class SteamApiClient {
         await this.appDetailsCache.clear()
     }
 
-    public getCacheStats() {
-        return this.cache.getStats()
-    }
+    public getCacheManager(): CacheManager { return this.cache }
 
-    public getCacheManager(): CacheManager {
-        return this.cache
-    }
-    
-    public hasCached(key: string): boolean {
-        return this.cache.get(key) !== null
-    }
-    
-    public getCached<T>(key: string): T | null {
-        return this.cache.get<T>(key)
-    }
+    public hasCached(key: string): boolean { return this.cache.get(key) !== null }
+
+    public getCached<T>(key: string): T | null { return this.cache.get<T>(key) }
 
     public getCachedUsers(): Array<{ vanityUrl: string, displayName: string, gameCount: number, steamId: string }> {
         const cachedUsers: Array<{ vanityUrl: string, displayName: string, gameCount: number, steamId: string }> = []
