@@ -89,11 +89,12 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     private readonly instancedLabelRenderer: InstancedLabelRenderer
     private readonly lodArtworkRenderer: IGameArtworkPipeline
     private readonly lodDistanceManager: LodDistanceManagerDebug
+    /** Resolved once at construction; avoids repeated AppSettings lookups on every game. */
+    private readonly labelsEnabled: boolean
 
     constructor(maxGames: number = 2000) {
         this.dimensions = { ...GpuGameBoxRenderer.DEFAULT_DIMENSIONS }
-        
-        GpuGameBoxRenderer.logger.debug(`Constructor: using LOD atlas (max ${maxGames})`)
+        this.labelsEnabled = AppSettings.get(Setting.EnableLabels)
         
         // Create label renderer (fallback for missing/failed artwork)
         this.instancedLabelRenderer = new InstancedLabelRenderer({
@@ -121,7 +122,8 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         GpuGameBoxRenderer.logger.lifecycle(`LOD atlas initialized (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
     }
 
-    // Games whose artwork permanently failed prefetch; label box deferred until placeGame() provides a position.
+    // Games that should render as label boxes once a world position is known.
+    // This is populated during prewarm and consumed during placement.
     private pendingLabelGames: Map<number, { game: SteamGameData; side: ShelfSide }> = new Map()
 
     /**
@@ -135,22 +137,20 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         const appid = typeof game.appid === 'number' ? game.appid : 0
 
         if (!artworkUrl) {
-            if (AppSettings.get(Setting.EnableLabels)) {
-                this.pendingLabelGames.set(appid, { game, side })
-            }
+            this.queuePendingLabelGame(appid, game, side)
             return
         }
 
         const result = await this.lodArtworkRenderer.prefetchArtwork(appid, artworkUrl, game.name)
-        if ((result === 'permanent-failure' || result === 'error') && AppSettings.get(Setting.EnableLabels)) {
-            this.pendingLabelGames.set(appid, { game, side })
+        if (result === 'permanent-failure' || result === 'error') {
+            this.queuePendingLabelGame(appid, game, side)
         }
     }
 
     /**
-     * Phase 2: assign a world position to a prewarmed game.
-     * If artwork prefetch succeeded the GPU instance is placed immediately.
-     * If it failed permanently a label box is created instead.
+     * Phase 2: resolve renderable at a world position for a prewarmed game.
+     * Artwork/label intent is determined during prewarm; this method only materializes
+     * that intent at the provided position.
      */
     public placeGame(
         game: SteamGameData,
@@ -160,14 +160,14 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     ): void {
         const appid = typeof game.appid === 'number' ? game.appid : 0
 
-        if (this.pendingLabelGames.has(appid)) {
-            this.pendingLabelGames.delete(appid)
+        if (this.consumePendingLabelGame(appid)) {
             this.createLabelGameBox(game, position, side, rotation)
             return
         }
 
         const instanceIndex = this.lodArtworkRenderer.placeInstance(appid, game.name, position, rotation)
-        if (instanceIndex < 0 && AppSettings.get(Setting.EnableLabels)) {
+        if (instanceIndex < 0) {
+            // Guard rail: if placement cannot proceed, fallback to label path.
             this.createLabelGameBox(game, position, side, rotation)
         }
     }
@@ -202,7 +202,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             typeof game.appid === 'number' ? game.appid : undefined,
             rotation
         ).then((result) => {
-            if (!result.success && result.permanent && AppSettings.get(Setting.EnableLabels)) {
+            if (!result.success && result.permanent) {
                 this.createLabelGameBox(game, position, side, rotation)
             }
         }).catch((error) => {
@@ -218,6 +218,10 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         side: ShelfSide = ShelfSide.Front,
         rotation?: THREE.Quaternion
     ): void {
+        if (!this.labelsEnabled) {
+            return
+        }
+
         const success = this.instancedLabelRenderer.addLabelInstance(
             position,
             game.name,
@@ -225,10 +229,27 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
             side,
             rotation
         )
-        
+
         if (!success) {
             GpuGameBoxRenderer.logger.debug(`Failed to add label box for "${game.name}"`)
         }
+    }
+
+    private queuePendingLabelGame(appid: number, game: SteamGameData, side: ShelfSide): void {
+        if (!this.labelsEnabled) {
+            return
+        }
+
+        this.pendingLabelGames.set(appid, { game, side })
+    }
+
+    private consumePendingLabelGame(appid: number): boolean {
+        if (!this.pendingLabelGames.has(appid)) {
+            return false
+        }
+
+        this.pendingLabelGames.delete(appid)
+        return true
     }
     
     /**
@@ -247,7 +268,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         
         if (artworkUrl) {
             this.createGameBoxFromUrl(game, position, artworkUrl, side, rotation)
-        } else if (AppSettings.get(Setting.EnableLabels)) {
+        } else {
             this.createLabelGameBox(game, position, side, rotation)
         }
     }
@@ -340,6 +361,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         ]
     }
 }
+
 
 
 
