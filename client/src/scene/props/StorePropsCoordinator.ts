@@ -16,7 +16,6 @@
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../../core/EventManager'
 import { Logger } from '../../utils/Logger'
-import { hasWebGL2, hasInstancedArrays, hasHardwareRenderer, supportsLargeTextures } from '../../utils/SystemCapabilities'
 import { GameEventTypes, RoomEventTypes, StorePropsEventTypes } from '../../types/InteractionEvents'
 import type {
     StorePropsSetupRequestEvent,
@@ -56,12 +55,6 @@ class StorePropsCoordinator {
     private constructor() {
         this.eventManager = EventManager.getInstance()
 
-        const capable = this.checkCapabilities()
-        if (!capable) {
-            StorePropsCoordinator.logger.info('System lacks required GPU capabilities — store props coordinator not registered')
-            return
-        }
-
         this.eventManager.registerOverrideHandler(
             StorePropsEventTypes.SetupRequest,
             this.handleSetupRequest.bind(this)
@@ -80,24 +73,7 @@ class StorePropsCoordinator {
             this.handleRoomResized.bind(this)
         )
 
-        StorePropsCoordinator.logger.info('Registered — system is GPU capable')
-    }
-
-    private checkCapabilities(): boolean {
-        const capable = hasWebGL2() && hasInstancedArrays() && hasHardwareRenderer()
-
-        StorePropsCoordinator.logger.debug('Capability check:', {
-            hasWebGL2: hasWebGL2(),
-            hasInstancedArrays: hasInstancedArrays(),
-            hasHardwareRenderer: hasHardwareRenderer(),
-            supportsLargeTextures: supportsLargeTextures(),
-        })
-
-        if (capable && !supportsLargeTextures()) {
-            StorePropsCoordinator.logger.warn('Large texture support missing — proceeding with potential performance impact')
-        }
-
-        return capable
+        StorePropsCoordinator.logger.info('Registered')
     }
 
     private async handleSetupRequest(_event: CustomEvent<StorePropsSetupRequestEvent>): Promise<void> {
