@@ -20,6 +20,16 @@ interface ShelfPosition {
     rotationY: number
 }
 
+/** Placement intent: where a game should appear once its artwork is ready. */
+interface PlacementIntent {
+    game: SteamGameData
+    position: THREE.Vector3
+    side: ShelfSide
+    rotation: THREE.Quaternion
+}
+
+type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
+
 /**
  * GameBoxSpawner
  *
@@ -28,34 +38,40 @@ interface ShelfPosition {
  * Phase 1 — Prewarm (BatchReadyForPlacement):
  *   Constructs the renderer on the first batch (deferred until maxGames is known).
  *   Triggers artwork prefetch for each game — no GPU instances placed yet.
+ *   When a prefetch settles, calls tryPlace() which places immediately if a
+ *   position intent is already known.
  *
  * Phase 2 — Place (GamesSort):
- *   Clears all existing placements, then places each game at its shelf position
- *   in sorted order. Re-sorts are cheap: textures are already in the atlas.
+ *   Clears all existing placements, populates placement intents in sorted order,
+ *   and calls tryPlace() for any game whose prefetch has already settled.
+ *   Games still in-flight are placed by their prefetch .then() when it resolves.
  *
  * ShelfReady:
  *   Caches shelf positions indexed by batchIndex for Phase 2 lookup.
+ *
+ * The artwork/label decision is NOT made here. GpuGameBoxRenderer.placeGame()
+ * checks the atlas and falls through to a label box on miss. GameBoxSpawner
+ * only knows "game X goes at position Y".
  */
 export class GameBoxSpawner {
     private static logger = Logger.createLogFunctions(GameBoxSpawner.name)
 
     // Owned renderer — constructed on first BatchReadyForPlacement
     private renderer: GpuGameBoxRenderer | null = null
-    // Guards against re-creating the renderer mid-load (same as old progressiveInitializationPromise)
     private rendererInitialized = false
-    // Track last batch count to detect library switches (anonymous → real user)
     private lastTotalBatches = 0
 
     // Games stored by batch index for prewarm tracking
     private pendingGames: Map<number, readonly SteamGameData[]> = new Map()
-    // Shelf world positions indexed by batchIndex, populated from ShelfReady events
+    // Shelf world positions indexed by batchIndex
     private shelfPositions: Map<number, ShelfPosition> = new Map()
 
-    // Artwork intent decided at prewarm time: games with no artwork URL or a
-    // permanently-failed fetch are queued here so placeGame() can route them
-    // to placeLabelBox() without re-querying the atlas.
+    // Rendezvous state: prefetch result per appid (populated when prefetch settles)
+    private prefetchResults: Map<number, PrefetchResult> = new Map()
+    // Rendezvous state: placement intent per appid (populated during GamesSort)
+    private placementIntents: Map<number, PlacementIntent> = new Map()
+
     private readonly labelsEnabled: boolean
-    private pendingLabelGameIds: Set<number> = new Set()
 
     /** Expose the current renderer for external consumers (e.g. addToScene, updateLODForCamera). */
     public getRenderer(): GpuGameBoxRenderer | null {
@@ -94,8 +110,9 @@ export class GameBoxSpawner {
         this.rendererInitialized = false
         this.pendingGames.clear()
         this.shelfPositions.clear()
-        this.pendingLabelGameIds.clear()
-        GameBoxSpawner.logger.debug('Reset: renderer disposed, pending games and shelf positions cleared')
+        this.prefetchResults.clear()
+        this.placementIntents.clear()
+        GameBoxSpawner.logger.debug('Reset: renderer disposed, state cleared')
     }
 
     public dispose(): void {
@@ -121,8 +138,6 @@ export class GameBoxSpawner {
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
         const { games, batchIndex, totalBatches } = event.detail
 
-        // Construct renderer on first batch (deferred until maxGames is known).
-        // Re-construct if batch count changes (anonymous → real-user library switch).
         if (!this.rendererInitialized || totalBatches !== this.lastTotalBatches) {
             if (this.renderer) {
                 GameBoxSpawner.logger.debug(
@@ -147,17 +162,21 @@ export class GameBoxSpawner {
             const artworkUrl = this.selectBestArtworkUrl(game as SteamGameData)
 
             if (!artworkUrl) {
-                if (this.labelsEnabled) this.pendingLabelGameIds.add(appid)
+                // No URL possible — record as permanent failure so tryPlace falls through to label
+                this.prefetchResults.set(appid, 'permanent-failure')
+                this.tryPlace(appid)
                 continue
             }
 
             this.renderer!.prefetchArtwork(appid, artworkUrl, game.name).then((result) => {
-                if ((result === 'permanent-failure' || result === 'error') && this.labelsEnabled) {
-                    this.pendingLabelGameIds.add(appid)
-                }
+                this.prefetchResults.set(appid, result)
+                this.tryPlace(appid)
             }).catch((error) => {
                 GameBoxSpawner.logger.warn(`prefetchArtwork failed for "${game.name}": ${error}`)
+                this.prefetchResults.set(appid, 'error')
+                this.tryPlace(appid)
             })
+            // Promise reference is not stored — it GCs after .then() is attached.
         }
     }
 
@@ -177,12 +196,12 @@ export class GameBoxSpawner {
     }
 
     // -------------------------------------------------------------------------
-    // Phase 2: place all games in sorted order
+    // Phase 2: assign placement intents in sorted order, place what's already ready
 
     private handleGamesSort(event: CustomEvent<GamesSortEvent>): void {
         const { sortedGames } = event.detail
 
-        GameBoxSpawner.logger.debug(`GamesSort: placing ${sortedGames.length} games in sorted order`)
+        GameBoxSpawner.logger.debug(`GamesSort: assigning placement intents for ${sortedGames.length} games`)
 
         if (!this.renderer) {
             GameBoxSpawner.logger.warn('GamesSort: renderer not yet constructed — no batches received yet')
@@ -190,26 +209,23 @@ export class GameBoxSpawner {
         }
 
         this.renderer.clearPlacements()
+        this.placementIntents.clear()
 
-        // Distribute sortedGames across cached shelf positions in the same layout
-        // logic used by the original spawner.
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         if (shelfSurfaces.length === 0) {
             GameBoxSpawner.logger.warn('GamesSort: no shelf surfaces found')
             return
         }
 
-        // Walk shelf positions in batchIndex order; assign sorted games sequentially.
         const sortedBatchIndices = [...this.shelfPositions.keys()].sort((a, b) => a - b)
         const gameQueue = [...sortedGames] as SteamGameData[]
 
-        let placed = 0
         for (const batchIndex of sortedBatchIndices) {
             if (gameQueue.length === 0) break
             const shelfPos = this.shelfPositions.get(batchIndex)!
             const gamesForShelf = this.gamesPerShelf(shelfSurfaces)
             const batch = gameQueue.splice(0, gamesForShelf)
-            placed += this.placeGamesOnShelf(this.renderer, shelfPos, shelfSurfaces, batch)
+            this.assignIntentsOnShelf(shelfPos, shelfSurfaces, batch)
 
             EventManager.getInstance().emit<GamesPlacedEvent>(
                 StorePropsEventTypes.GamesPlaced,
@@ -217,72 +233,86 @@ export class GameBoxSpawner {
             )
         }
 
-        GameBoxSpawner.logger.debug(`GamesSort: placed ${placed} games across ${sortedBatchIndices.length} shelves`)
+        GameBoxSpawner.logger.debug(
+            `GamesSort: ${this.placementIntents.size} intents assigned across ${sortedBatchIndices.length} shelves`
+        )
     }
 
-    private gamesPerShelf(surfaces: ShelfSurface[]): number {
-        return surfaces.length * GameLayoutConstants.GAMES_PER_SURFACE * 2
+    /**
+     * Attempt to place a game. Succeeds only when both conditions are met:
+     * - prefetch has settled (result in prefetchResults)
+     * - a placement intent exists (position assigned by GamesSort)
+     *
+     * Called from both sides of the rendezvous — whichever arrives last wins.
+     */
+    private tryPlace(appid: number): void {
+        if (!this.renderer) return
+        const result = this.prefetchResults.get(appid)
+        if (result === undefined) return // prefetch not yet settled
+        const intent = this.placementIntents.get(appid)
+        if (!intent) return // no position assigned yet
+
+        this.placementIntents.delete(appid) // consume the intent
+        this.renderer.placeGame(intent.game, intent.position, intent.side, intent.rotation)
     }
 
-    private placeGamesOnShelf(
-        renderer: GpuGameBoxRenderer,
+    // -------------------------------------------------------------------------
+    // Intent assignment helpers
+
+    private assignIntentsOnShelf(
         shelf: ShelfPosition,
         surfaces: ShelfSurface[],
         games: SteamGameData[]
-    ): number {
+    ): void {
         const boxDimensions = { width: 0.3, height: 0.4, depth: 0.08 }
         let gameIndex = 0
-        let placed = 0
 
         for (const surface of surfaces) {
             if (gameIndex >= games.length) break
 
             const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
             if (backGames.length > 0) {
-                placed += this.placeRow(renderer, shelf, surface, backGames, ShelfSide.Back, boxDimensions)
+                this.assignIntentsForRow(shelf, surface, backGames, ShelfSide.Back, boxDimensions)
                 gameIndex += backGames.length
             }
 
             if (gameIndex < games.length) {
                 const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
                 if (frontGames.length > 0) {
-                    placed += this.placeRow(renderer, shelf, surface, frontGames, ShelfSide.Front, boxDimensions)
+                    this.assignIntentsForRow(shelf, surface, frontGames, ShelfSide.Front, boxDimensions)
                     gameIndex += frontGames.length
                 }
             }
         }
-
-        return placed
     }
 
-    private placeRow(
-        renderer: GpuGameBoxRenderer,
+    private assignIntentsForRow(
         shelf: ShelfPosition,
         surface: ShelfSurface,
         games: SteamGameData[],
         side: ShelfSide,
         boxDimensions: { width: number; height: number; depth: number }
-    ): number {
+    ): void {
         const positions = GameBoxUtils.calculateGamePositions(
             shelf.position, surface, games, side, boxDimensions, shelf.rotationY
         )
+        const rotation = GameBoxUtils.calculateGameRotation(shelf.rotationY, side)
+
         for (let i = 0; i < games.length; i++) {
             const game = games[i]
             const appid = typeof game.appid === 'number' ? game.appid : 0
-            const rotation = GameBoxUtils.calculateGameRotation(shelf.rotationY, side)
-
-            if (this.pendingLabelGameIds.has(appid)) {
-                this.pendingLabelGameIds.delete(appid)
-                renderer.placeLabelBox(game, positions[i], side, rotation)
-            } else {
-                const instanceIndex = renderer.placeArtworkInstance(appid, game.name, positions[i], rotation)
-                if (instanceIndex < 0 && this.labelsEnabled) {
-                    // Atlas miss at placement time — render as label rather than leaving a gap.
-                    renderer.placeLabelBox(game, positions[i], side, rotation)
-                }
-            }
+            this.placementIntents.set(appid, {
+                game,
+                position: positions[i],
+                side,
+                rotation,
+            })
+            this.tryPlace(appid)
         }
-        return games.length
+    }
+
+    private gamesPerShelf(surfaces: ShelfSurface[]): number {
+        return surfaces.length * GameLayoutConstants.GAMES_PER_SURFACE * 2
     }
 
     /**
@@ -301,6 +331,4 @@ export class GameBoxSpawner {
         }
         return undefined
     }
-
-
 }

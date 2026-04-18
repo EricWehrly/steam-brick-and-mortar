@@ -153,6 +153,24 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     }
 
     /**
+     * Unified placement: try artwork instance first; fall through to label box on atlas miss.
+     * This is the preferred placement path — callers do not need to know which renderer
+     * handles the game. The artwork/label decision lives here, not upstream.
+     */
+    public placeGame(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        side: ShelfSide,
+        rotation?: THREE.Quaternion
+    ): void {
+        const appid = typeof game.appid === 'number' ? game.appid : 0
+        const instanceIndex = this.lodArtworkRenderer.placeInstance(appid, game.name, position, rotation)
+        if (instanceIndex >= 0) return
+        // Atlas miss — fall through to label
+        this.placeLabelBox(game, position, side, rotation)
+    }
+
+    /**
      * Phase 2b: place a text-label box at a world position.
      * No artwork fetch is triggered. This is a pure GPU-instancing call.
      */
