@@ -18,10 +18,8 @@ import { EventManager, EventSource } from '../../core/EventManager'
 import { Logger } from '../../utils/Logger'
 import { hasWebGL2, hasInstancedArrays, hasHardwareRenderer, supportsLargeTextures } from '../../utils/SystemCapabilities'
 import { GameEventTypes, RoomEventTypes, StorePropsEventTypes } from '../../types/InteractionEvents'
-import { StorePropsEventTypes as StorePropsLifecycleEventTypes } from './PropsEvents'
 import type {
     StorePropsSetupRequestEvent,
-    StorePropsSetupStartedEvent,
     StorePropsSetupCompletedEvent,
     StorePropsClearRequestEvent,
 } from './PropsEvents'
@@ -43,7 +41,6 @@ class StorePropsCoordinator {
     private gameBoxSpawner: GameBoxSpawner | null = null
     private shelfLayoutCoordinator: ShelfLayoutCoordinator | null = null
     private instancedShelfRenderer: InstancedShelfRenderer | null = null
-    private propsGroup: THREE.Group | null = null
     private scene: THREE.Scene | null = null
 
     // Entrance mat — recreated on each RoomResized
@@ -66,21 +63,17 @@ class StorePropsCoordinator {
         }
 
         this.eventManager.registerOverrideHandler(
-            StorePropsLifecycleEventTypes.SetupRequest,
+            StorePropsEventTypes.SetupRequest,
             this.handleSetupRequest.bind(this)
         )
         this.eventManager.registerOverrideHandler(
-            StorePropsLifecycleEventTypes.ClearRequest,
+            StorePropsEventTypes.ClearRequest,
             this.handleClearRequest.bind(this)
         )
 
         this.eventManager.registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.handleBatchReadyForPlacement.bind(this)
-        )
-        this.eventManager.registerEventHandler(
-            GameEventTypes.AllBatchesComplete,
-            this.handleAllBatchesComplete.bind(this)
         )
         this.eventManager.registerEventHandler(
             RoomEventTypes.Resized,
@@ -110,11 +103,6 @@ class StorePropsCoordinator {
     private async handleSetupRequest(_event: CustomEvent<StorePropsSetupRequestEvent>): Promise<void> {
         const startTime = performance.now()
 
-        this.eventManager.emit<StorePropsSetupStartedEvent>(StorePropsLifecycleEventTypes.SetupStarted, {
-            timestamp: Date.now(),
-            source: EventSource.System,
-        })
-
         // Resolve scene on first setup; reuse on subsequent calls (re-sort, etc.)
         if (!this.scene) {
             const { DataManager } = await import('../../core/data')
@@ -133,10 +121,6 @@ class StorePropsCoordinator {
             this.shelfLayoutCoordinator = new ShelfLayoutCoordinator()
             this.instancedShelfRenderer = new InstancedShelfRenderer()
 
-            this.propsGroup = new THREE.Group()
-            this.propsGroup.name = 'props-instanced'
-            this.scene.add(this.propsGroup)
-
             this.instancedShelfRenderer.initialize().catch(error => {
                 StorePropsCoordinator.logger.warn('InstancedShelfRenderer initialization failed:', error)
             })
@@ -144,7 +128,7 @@ class StorePropsCoordinator {
 
         StorePropsCoordinator.logger.info(`Store props setup completed in ${(performance.now() - startTime).toFixed(2)}ms`)
 
-        this.eventManager.emit<StorePropsSetupCompletedEvent>(StorePropsLifecycleEventTypes.SetupCompleted, {
+        this.eventManager.emit<StorePropsSetupCompletedEvent>(StorePropsEventTypes.SetupCompleted, {
             timestamp: Date.now(),
             source: EventSource.System,
         })
@@ -155,21 +139,6 @@ class StorePropsCoordinator {
         this.gameBoxSpawner?.reset()
         this.batchCoordinator?.reset()
         this.lastTotalBatches = 0
-
-        if (this.propsGroup && this.scene) {
-            while (this.propsGroup.children.length > 0) {
-                const child = this.propsGroup.children[0]
-                this.propsGroup.remove(child)
-                if (child instanceof THREE.Mesh) {
-                    child.geometry?.dispose()
-                    if (child.material instanceof THREE.Material) {
-                        child.material.dispose()
-                    } else if (Array.isArray(child.material)) {
-                        child.material.forEach(m => m.dispose())
-                    }
-                }
-            }
-        }
 
         StorePropsCoordinator.logger.info('Store props cleared')
     }
@@ -185,10 +154,6 @@ class StorePropsCoordinator {
             this.instancedShelfRenderer?.reset()
         }
         this.lastTotalBatches = totalBatches
-    }
-
-    private handleAllBatchesComplete(): void {
-        StorePropsCoordinator.logger.debug('All batches complete')
     }
 
     private async handleRoomResized(event: CustomEvent<RoomResizedEvent>): Promise<void> {
@@ -223,9 +188,6 @@ class StorePropsCoordinator {
         this.instancedShelfRenderer?.dispose()
         this.shelfLayoutCoordinator?.dispose()
 
-        if (this.propsGroup && this.scene) {
-            this.scene.remove(this.propsGroup)
-        }
         if (this.entranceMat && this.scene) {
             this.scene.remove(this.entranceMat)
         }
