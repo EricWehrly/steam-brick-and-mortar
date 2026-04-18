@@ -3,6 +3,7 @@ import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { ShelfSurfaceUtils, type ShelfSurface, ShelfSide, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
+import { AppSettings, Setting } from '../../core/AppSettings'
 import { 
     BatchProcessingStatus,
     StorePropsEventTypes, 
@@ -50,6 +51,12 @@ export class GameBoxSpawner {
     // Shelf world positions indexed by batchIndex, populated from ShelfReady events
     private shelfPositions: Map<number, ShelfPosition> = new Map()
 
+    // Artwork intent decided at prewarm time: games with no artwork URL or a
+    // permanently-failed fetch are queued here so placeGame() can route them
+    // to placeLabelBox() without re-querying the atlas.
+    private readonly labelsEnabled: boolean
+    private pendingLabelGameIds: Set<number> = new Set()
+
     /** Expose the current renderer for external consumers (e.g. addToScene, updateLODForCamera). */
     public getRenderer(): GpuGameBoxRenderer | null {
         return this.renderer
@@ -60,6 +67,7 @@ export class GameBoxSpawner {
     private readonly boundHandleGamesSort: (e: CustomEvent<GamesSortEvent>) => void
 
     constructor() {
+        this.labelsEnabled = AppSettings.get(Setting.EnableLabels)
         this.boundHandleBatchReady = this.handleBatchReadyForPlacement.bind(this)
         this.boundHandleShelfReady = this.handleShelfReady.bind(this)
         this.boundHandleGamesSort = this.handleGamesSort.bind(this)
@@ -86,6 +94,7 @@ export class GameBoxSpawner {
         this.rendererInitialized = false
         this.pendingGames.clear()
         this.shelfPositions.clear()
+        this.pendingLabelGameIds.clear()
         GameBoxSpawner.logger.debug('Reset: renderer disposed, pending games and shelf positions cleared')
     }
 
@@ -134,8 +143,20 @@ export class GameBoxSpawner {
         this.pendingGames.set(batchIndex, games)
 
         for (const game of games) {
-            this.renderer!.prewarmGame(game as SteamGameData).catch((error) => {
-                GameBoxSpawner.logger.warn(`prewarmGame failed for "${game.name}": ${error}`)
+            const appid = typeof game.appid === 'number' ? game.appid : 0
+            const artworkUrl = this.selectBestArtworkUrl(game as SteamGameData)
+
+            if (!artworkUrl) {
+                if (this.labelsEnabled) this.pendingLabelGameIds.add(appid)
+                continue
+            }
+
+            this.renderer!.prefetchArtwork(appid, artworkUrl, game.name).then((result) => {
+                if ((result === 'permanent-failure' || result === 'error') && this.labelsEnabled) {
+                    this.pendingLabelGameIds.add(appid)
+                }
+            }).catch((error) => {
+                GameBoxSpawner.logger.warn(`prefetchArtwork failed for "${game.name}": ${error}`)
             })
         }
     }
@@ -246,11 +267,40 @@ export class GameBoxSpawner {
             shelf.position, surface, games, side, boxDimensions, shelf.rotationY
         )
         for (let i = 0; i < games.length; i++) {
+            const game = games[i]
+            const appid = typeof game.appid === 'number' ? game.appid : 0
             const rotation = GameBoxUtils.calculateGameRotation(shelf.rotationY, side)
-            renderer.placeGame(games[i], positions[i], side, rotation)
+
+            if (this.pendingLabelGameIds.has(appid)) {
+                this.pendingLabelGameIds.delete(appid)
+                renderer.placeLabelBox(game, positions[i], side, rotation)
+            } else {
+                const instanceIndex = renderer.placeArtworkInstance(appid, game.name, positions[i], rotation)
+                if (instanceIndex < 0 && this.labelsEnabled) {
+                    // Atlas miss at placement time — render as label rather than leaving a gap.
+                    renderer.placeLabelBox(game, positions[i], side, rotation)
+                }
+            }
         }
         return games.length
     }
 
-}
+    /**
+     * Resolve the best available artwork URL for a game.
+     *
+     * Priority:
+     *  1. Metadata library URL (portrait, ideal for game boxes)
+     *  2. Metadata header URL (landscape, fallback)
+     *  3. Constructed CDN portrait URL (last resort when metadata is absent)
+     */
+    private selectBestArtworkUrl(game: SteamGameData): string | undefined {
+        if (game.artwork?.library) return game.artwork.library
+        if (game.artwork?.header) return game.artwork.header
+        if (game.appid) {
+            return `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
+        }
+        return undefined
+    }
 
+
+}

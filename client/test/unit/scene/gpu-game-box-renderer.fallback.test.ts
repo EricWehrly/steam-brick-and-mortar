@@ -3,7 +3,6 @@ import * as THREE from 'three'
 import { GpuGameBoxRenderer } from '../../../src/scene/game-box/GpuGameBoxRenderer'
 
 const labelAddInstanceSpy = vi.fn((..._args: any[]) => true)
-const artworkSetFromUrlSpy = vi.fn(() => Promise.resolve({ success: true }))
 
 vi.mock('../../../src/scene/game-box/instancing/InstancedLabelRenderer', () => {
     class MockInstancedLabelRenderer {
@@ -12,6 +11,7 @@ vi.mock('../../../src/scene/game-box/instancing/InstancedLabelRenderer', () => {
         public addLabelInstance = labelAddInstanceSpy
         public setLabelInstance = vi.fn(() => true)
         public isReady = vi.fn(() => true)
+        public clear = vi.fn()
         public dispose = vi.fn()
     }
 
@@ -21,7 +21,10 @@ vi.mock('../../../src/scene/game-box/instancing/InstancedLabelRenderer', () => {
 vi.mock('../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug', () => {
     class MockLodArtworkOrchestratorDebug {
         constructor(_config?: unknown) {}
-        public setArtworkInstanceFromUrl = artworkSetFromUrlSpy
+        public setArtworkInstanceFromUrl = vi.fn(() => Promise.resolve({ success: true }))
+        public prefetchArtwork = vi.fn(() => Promise.resolve('prefetched'))
+        public placeInstance = vi.fn(() => 0)
+        public clearPlacements = vi.fn()
         public dispose = vi.fn()
         public getMemoryStats = vi.fn(() => ({}))
         public logMemoryStats = vi.fn()
@@ -59,50 +62,37 @@ vi.mock('../../../src/core/AppSettings', () => {
     return { AppSettings, Setting }
 })
 
-describe('GpuGameBoxRenderer fallback behavior', () => {
+describe('GpuGameBoxRenderer — pure execution surface', () => {
     beforeEach(() => {
         labelAddInstanceSpy.mockClear()
-        artworkSetFromUrlSpy.mockClear()
     })
 
-    it('uses a unique label instance index for each fallback label', () => {
+    it('placeLabelBox forwards directly to InstancedLabelRenderer', () => {
         const renderer = new GpuGameBoxRenderer(10)
-        const position = new THREE.Vector3(0, 0, 0)
+        const game = { appid: 1, name: 'Game A' } as any
 
-        renderer.createLabelGameBox({ appid: 1, name: 'Game A' } as any, position)
-        renderer.createLabelGameBox({ appid: 2, name: 'Game B' } as any, position)
-
-        expect(labelAddInstanceSpy).toHaveBeenCalledTimes(2)
-        const firstCall = labelAddInstanceSpy.mock.calls[0] as any[]
-        const secondCall = labelAddInstanceSpy.mock.calls[1] as any[]
-
-        expect(firstCall[1]).toBe('Game A')
-        expect(secondCall[1]).toBe('Game B')
-    })
-
-    it('always attempts artwork when artwork metadata is available', () => {
-        const renderer = new GpuGameBoxRenderer(10)
-        const game = {
-            appid: 10,
-            name: 'Game With Artwork',
-            artwork: { library: 'https://example.com/library.jpg' },
-        } as any
-
-        renderer.createGameBoxAuto(game, new THREE.Vector3(1, 2, 3))
-
-        expect(artworkSetFromUrlSpy).toHaveBeenCalledTimes(1)
-        expect(labelAddInstanceSpy).not.toHaveBeenCalled()
-    })
-
-    it('falls back to label when artwork metadata is unavailable', () => {
-        const renderer = new GpuGameBoxRenderer(10)
-        const game = {
-            name: 'No Artwork Game',
-            artwork: undefined,
-        } as any
-
-        renderer.createGameBoxAuto(game, new THREE.Vector3(1, 2, 3))
+        renderer.placeLabelBox(game, new THREE.Vector3(0, 0, 0))
 
         expect(labelAddInstanceSpy).toHaveBeenCalledTimes(1)
+        expect(labelAddInstanceSpy.mock.calls[0][1]).toBe('Game A')
+    })
+
+    it('placeLabelBox uses a unique call per game', () => {
+        const renderer = new GpuGameBoxRenderer(10)
+
+        renderer.placeLabelBox({ appid: 1, name: 'Game A' } as any, new THREE.Vector3(0, 0, 0))
+        renderer.placeLabelBox({ appid: 2, name: 'Game B' } as any, new THREE.Vector3(1, 0, 0))
+
+        expect(labelAddInstanceSpy).toHaveBeenCalledTimes(2)
+        expect(labelAddInstanceSpy.mock.calls[0][1]).toBe('Game A')
+        expect(labelAddInstanceSpy.mock.calls[1][1]).toBe('Game B')
+    })
+
+    it('clearPlacements resets instanced label renderer', () => {
+        const renderer = new GpuGameBoxRenderer(10)
+        renderer.placeLabelBox({ appid: 1, name: 'Game A' } as any, new THREE.Vector3(0, 0, 0))
+
+        // clearPlacements should not throw even after label boxes placed
+        expect(() => renderer.clearPlacements()).not.toThrow()
     })
 })
