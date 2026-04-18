@@ -38,7 +38,8 @@ vi.mock('../../../../src/core/EventManager', () => ({
         getInstance: vi.fn().mockReturnValue({
             registerEventHandler: vi.fn(),
             unregisterEventHandler: vi.fn(),
-            removeEventListener: vi.fn()
+            removeEventListener: vi.fn(),
+            emit: vi.fn()
         })
     }
 }))
