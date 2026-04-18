@@ -156,7 +156,6 @@ export class StartupEventTracker {
         eventManager.registerEventHandler(SteamEventTypes.GamesBatchReady, this.handleGamesBatchReady.bind(this))
         eventManager.registerEventHandler(SteamEventTypes.NetworkFetchProgress, this.handleNetworkFetchProgress.bind(this))
         eventManager.registerEventHandler(GameEventTypes.AllBatchesComplete, this.handleAllBatchesComplete.bind(this))
-        eventManager.registerEventHandler(AppEventTypes.StoreFirstContentReady, () => this.printTimer('Store first content visible'))
         eventManager.registerEventHandler(AppEventTypes.StoreFullyPopulated, () => this.printTimer('Store fully populated'))
         eventManager.registerEventHandler(AppEventTypes.WorldDetailEnhanced, () => this.printTimer('World detail enhanced (textures)'))
     }

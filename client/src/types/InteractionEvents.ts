@@ -377,15 +377,9 @@ export const AppEventTypes = {
      * have been applied to the scene — the world now has full surface detail.
      *
      * TD: system-events-split — this is a system lifecycle event, not an app/UI event.
-     * Should live in a dedicated SystemEvents.ts alongside StoreFirstContentReady
-     * and StoreFullyPopulated once that split happens.
+     * Should live in a dedicated SystemEvents.ts alongside StoreFullyPopulated once that split happens.
      */
     WorldDetailEnhanced:   'app:world-detail-enhanced',
-    /**
-     * Fired when the first meaningful batch of game boxes is placed in the store.
-     * TD: system-events-split
-     */
-    StoreFirstContentReady: 'app:store-first-content-ready',
     /**
      * Fired when all game boxes are placed and the store is fully populated.
      * TD: system-events-split
