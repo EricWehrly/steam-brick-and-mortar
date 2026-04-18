@@ -27,21 +27,17 @@ export class GamesLoader {
     }
 
     /**
-     * Load games with single-pass cache check and fetch
+     * Load games with single-pass cache check and fetch.
      *
-     * Games are emitted progressively as they become available:
-     * - Cached games are enhanced and emitted immediately
-     * - Uncached games are fetched from the network and emitted as each
-     *   network batch (100 games) resolves
-     *
-     * Both paths feed the same progressive emitter so there is no
-     * bifurcation of batch emission logic.
+     * Cached games are enhanced and emitted immediately in shelf-sized batches.
+     * Uncached games are fetched from the network in the background and emitted
+     * as their responses arrive, using the same emitter so batch indices are
+     * perfectly sequential.
      */
     public async loadGamesProgressively(
         steamUser: SteamUser,
         options: {
             maxGames?: number
-            /** Optional comparator to override default playtime-descending sort. */
             sortFn?: (a: SteamGame, b: SteamGame) => number
         } = {}
     ): Promise<SteamGame[]> {
@@ -57,67 +53,45 @@ export class GamesLoader {
         const uncachedBatchCount = Math.ceil(uncachedAppids.length / BATCH_SIZE)
         const totalBatchCount = cachedBatchCount + uncachedBatchCount
 
-        // Shared progressive emitter — both paths push games through this.
-        let pendingGames: SteamGame[] = []
-        let renderBatchIndex = 0
+        const emitter = new BatchEmitter(BATCH_SIZE, totalBatchCount)
 
-        const flush = async (force = false) => {
-            while (pendingGames.length >= BATCH_SIZE || (force && pendingGames.length > 0)) {
-                const batch = pendingGames.splice(0, BATCH_SIZE)
-                EventManager.getInstance().emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
-                    games: batch as ReadonlyArray<Readonly<SteamGame>>,
-                    batchIndex: renderBatchIndex,
-                    totalBatches: totalBatchCount
-                })
-                renderBatchIndex++
-                await new Promise(resolve => setTimeout(resolve, 0))
-            }
-        }
+        const cachedGames = await this.emitCachedGames(sortedGames, cachedAppids, cachedAppDetails, emitter)
 
-        const cachedGames = await this.buildCachedEnhancedGames(sortedGames, cachedAppids, cachedAppDetails, pendingGames, flush)
-
-        // Flush any partial remainder from the cached phase before uncached games start.
+        // Flush any partial remainder before uncached games start — keeps batch
+        // indices perfectly sequential when the two phases interleave.
         if (uncachedAppids.length > 0) {
-            await flush(true)
+            await emitter.flush()
         }
 
-        // Emit network fetch progress so the UI can show a loading indicator
         if (uncachedAppids.length > 0) {
             EventManager.getInstance().emit<SteamNetworkFetchProgressEvent>(SteamEventTypes.NetworkFetchProgress, {
                 fetched: cachedAppids.length,
                 total: sortedGames.length
             })
-        }
-
-        // PHASE 2: Uncached games
-        if (uncachedAppids.length > 0) {
             const gameByAppid = new Map<number, SteamGame>(sortedGames.map(g => [g.appid, g]))
-            this.fetchAndEmitUncached(uncachedAppids, gameByAppid, cachedBatchCount, renderBatchIndex, pendingGames, flush)
+            this.fetchAndEmitUncached(uncachedAppids, gameByAppid, cachedBatchCount, emitter)
         } else {
-            // All games were cached — flush remainder now
-            await flush(true)
+            await emitter.flush()
         }
 
         this.logger.info(`Loaded ${cachedGames.length} cached games, ${uncachedAppids.length} fetching in background`)
         return cachedGames
     }
 
-    private async buildCachedEnhancedGames(
+    private async emitCachedGames(
         sortedGames: SteamGame[],
         cachedAppids: number[],
         cachedAppDetails: Map<number, AppDetailsData>,
-        pendingGames: SteamGame[],
-        flush: (force?: boolean) => Promise<void>
+        emitter: BatchEmitter
     ): Promise<SteamGame[]> {
-        const buildMonitor = PerformanceMonitor.start('build-cached-games', this.logger, MAIN_THREAD_CONTEXT)
+        const monitor = PerformanceMonitor.start('build-cached-games', this.logger, MAIN_THREAD_CONTEXT)
         const cachedGames = sortedGames.filter(g => cachedAppids.includes(g.appid))
         for (const game of cachedGames) {
             const enhanced = this.buildEnhancedGame(game, cachedAppDetails.get(game.appid))
             this.cache.set(`game_${game.appid}`, enhanced)
-            pendingGames.push(enhanced)
-            await flush()
+            await emitter.push(enhanced)
         }
-        buildMonitor.end({ count: cachedGames.length })
+        monitor.end({ count: cachedGames.length })
         return cachedGames
     }
 
@@ -125,20 +99,17 @@ export class GamesLoader {
         uncachedAppids: number[],
         gameByAppid: Map<number, SteamGame>,
         cachedBatchCount: number,
-        renderBatchIndex: number,
-        pendingGames: SteamGame[],
-        flush: (force?: boolean) => Promise<void>
+        emitter: BatchEmitter
     ): void {
         const fetchedAppDetails = new Map<number, AppDetailsData>()
 
-        // Run in background; unhandled rejection is caught and logged
         this.batchClient.fetchBatch(uncachedAppids, { batchSize: 100 })
             .then(async (batchResponses) => {
                 for (const [appid, response] of batchResponses.entries()) {
-                    const dataToNormalize = response.success === false && response.unlisted
+                    const rawData = response.success === false && response.unlisted
                         ? (response as unknown as AppDetailsData)
                         : response.data
-                    const normalized = this.normalizeBatchData(dataToNormalize)
+                    const normalized = this.normalizeBatchData(rawData)
                     fetchedAppDetails.set(appid, normalized)
 
                     const baseGame = gameByAppid.get(appid)
@@ -146,12 +117,10 @@ export class GamesLoader {
 
                     const enhanced = this.buildEnhancedGame(baseGame, normalized)
                     this.cache.set(`game_${appid}`, enhanced)
-                    pendingGames.push(enhanced)
-                    await flush()
+                    await emitter.push(enhanced)
                 }
 
-                // Flush any remaining partial shelf
-                await flush(true)
+                await emitter.flush()
 
                 if (fetchedAppDetails.size > 0) {
                     const cacheMonitor = PerformanceMonitor.start('cache-metadata', this.logger, ASYNC_CONTEXT)
@@ -160,7 +129,7 @@ export class GamesLoader {
                 }
 
                 this.logger.info(
-                    `[ASYNC] Emitted ${fetchedAppDetails.size} uncached games progressively in ${renderBatchIndex - cachedBatchCount} rendering batches`
+                    `[ASYNC] Emitted ${fetchedAppDetails.size} uncached games in ${emitter.batchIndex - cachedBatchCount} rendering batches`
                 )
             })
             .catch(error => {
@@ -183,13 +152,13 @@ export class GamesLoader {
         const cachedAppDetails = await this.appDetailsCache.getMany(appids)
         const cachedAppids = appids.filter(id => this.isMetadataComplete(cachedAppDetails.get(id)))
         const uncachedAppids = appids.filter(id => !this.isMetadataComplete(cachedAppDetails.get(id)))
-        
+
         if (uncachedAppids.length === 0) {
             this.logger.debug(`All ${appids.length} games have complete metadata in cache`)
         } else {
             this.logger.info(`Loading ${appids.length} games: ${cachedAppids.length} cached, ${uncachedAppids.length} to fetch`)
         }
-        
+
         return { cachedAppids, uncachedAppids, cachedAppDetails }
     }
 
@@ -201,9 +170,7 @@ export class GamesLoader {
     }
 
     private normalizeBatchData(data: AppDetailsData): AppDetailsData {
-        // Handle negative caching shells gracefully (data might be undefined or missing fields)
-        if (!data) return {} as AppDetailsData;
-        
+        if (!data) return {} as AppDetailsData
         const fullData = data.full_data as Record<string, unknown> | undefined
         return {
             ...data,
@@ -213,7 +180,6 @@ export class GamesLoader {
             publishers: data.publishers || (fullData?.publishers as string[]),
             release_date: data.release_date || (fullData?.release_date as AppDetailsData['release_date']),
             metacritic: data.metacritic || (fullData?.metacritic as AppDetailsData['metacritic']),
-            // Lift SteamSpy fields if present in full_data
             steamspy_tags: data.steamspy_tags || (fullData?.tags as Record<string, number>),
             positive: data.positive || (fullData?.positive as number),
             negative: data.negative || (fullData?.negative as number),
@@ -223,20 +189,19 @@ export class GamesLoader {
     }
 
     private buildEnhancedGame(game: SteamGame, appDetails: AppDetailsData | undefined): SteamGame {
-        const headerUrl = appDetails?.artwork?.header 
-            || appDetails?.artwork?.capsule_v5 
+        const headerUrl = appDetails?.artwork?.header
+            || appDetails?.artwork?.capsule_v5
             || appDetails?.artwork?.capsule
             || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
 
         return {
             ...game,
-            // Use SteamSpy name if base name is empty or missing
             name: appDetails?.name && appDetails.name !== 'Unknown Game' ? appDetails.name : game.name,
             artwork: {
-                icon: game.img_icon_url 
+                icon: game.img_icon_url
                     ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
                     : '',
-                logo: game.img_logo_url 
+                logo: game.img_logo_url
                     ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`
                     : '',
                 header: headerUrl,
@@ -255,5 +220,59 @@ export class GamesLoader {
             userscore: appDetails?.userscore,
             owners: appDetails?.owners
         }
+    }
+}
+
+/**
+ * Accumulates games and emits `GamesBatchReady` events in shelf-sized batches.
+ *
+ * `push(game)` adds a game; if the buffer hits `batchSize`, a batch is emitted
+ * and the main thread yielded before returning.
+ * `flush()` drains any remainder as a final partial batch.
+ *
+ * Both are async only because of the yield-to-main-thread between batches —
+ * not because emission itself is async.
+ */
+class BatchEmitter {
+    private readonly buffer: SteamGame[] = []
+    private readonly batchSize: number
+    private readonly totalBatches: number
+    private _batchIndex: number = 0
+
+    constructor(batchSize: number, totalBatches: number) {
+        this.batchSize = batchSize
+        this.totalBatches = totalBatches
+    }
+
+    /** Current number of batches emitted (readable by callers for logging). */
+    get batchIndex(): number {
+        return this._batchIndex
+    }
+
+    /** Add a game. Emits a batch and yields the main thread if the buffer is full. */
+    async push(game: SteamGame): Promise<void> {
+        this.buffer.push(game)
+        if (this.buffer.length >= this.batchSize) {
+            await this.emitBatch()
+        }
+    }
+
+    /** Drain any remaining games as a partial batch. No-op if buffer is empty. */
+    async flush(): Promise<void> {
+        if (this.buffer.length > 0) {
+            await this.emitBatch()
+        }
+    }
+
+    private async emitBatch(): Promise<void> {
+        const batch = this.buffer.splice(0, this.batchSize)
+        EventManager.getInstance().emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
+            games: batch as ReadonlyArray<Readonly<SteamGame>>,
+            batchIndex: this._batchIndex,
+            totalBatches: this.totalBatches
+        })
+        this._batchIndex++
+        // Yield the main thread between batches so rendering isn't starved.
+        await new Promise(resolve => setTimeout(resolve, 0))
     }
 }
