@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { ShelfSurfaceUtils, type ShelfSurface, ShelfSide, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
@@ -11,7 +12,6 @@ import {
     type GamesPlacedEvent,
 } from '../../types/InteractionEvents'
 import type { GamesSortEvent } from '../../types/EnvironmentEvents'
-import type { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import { Logger } from '../../utils/Logger'
 
 interface ShelfPosition {
@@ -22,33 +22,37 @@ interface ShelfPosition {
 /**
  * GameBoxSpawner
  *
- * Coordinates the two-phase load/place split for game boxes:
+ * Owns the GpuGameBoxRenderer lifecycle and coordinates the two-phase load/place split:
  *
  * Phase 1 — Prewarm (BatchReadyForPlacement):
- *   Triggers artwork prefetch for each game as batches arrive.
- *   No GPU instances placed yet — positions not known.
+ *   Constructs the renderer on the first batch (deferred until maxGames is known).
+ *   Triggers artwork prefetch for each game — no GPU instances placed yet.
  *
  * Phase 2 — Place (GamesSort):
- *   Clears all existing instance placements, then iterates the sorted game
- *   list and places each game at its shelf position.
- *   This is the single moment that arranges boxes; re-sorts are free because
- *   textures are already in the atlas.
+ *   Clears all existing placements, then places each game at its shelf position
+ *   in sorted order. Re-sorts are cheap: textures are already in the atlas.
  *
  * ShelfReady:
- *   Caches shelf positions indexed by batchIndex so Phase 2 can look them up.
+ *   Caches shelf positions indexed by batchIndex for Phase 2 lookup.
  */
 export class GameBoxSpawner {
     private static logger = Logger.createLogFunctions(GameBoxSpawner.name)
+
+    // Owned renderer — constructed on first BatchReadyForPlacement
+    private renderer: GpuGameBoxRenderer | null = null
+    // Guards against re-creating the renderer mid-load (same as old progressiveInitializationPromise)
+    private rendererInitialized = false
+    // Track last batch count to detect library switches (anonymous → real user)
+    private lastTotalBatches = 0
 
     // Games stored by batch index for prewarm tracking
     private pendingGames: Map<number, readonly SteamGameData[]> = new Map()
     // Shelf world positions indexed by batchIndex, populated from ShelfReady events
     private shelfPositions: Map<number, ShelfPosition> = new Map()
-    // Set by GpuStorePropsRenderer after renderer construction
-    private renderer: GpuGameBoxRenderer | null = null
 
-    public setRenderer(renderer: GpuGameBoxRenderer | null): void {
-        this.renderer = renderer
+    /** Expose the current renderer for external consumers (e.g. addToScene, updateLODForCamera). */
+    public getRenderer(): GpuGameBoxRenderer | null {
+        return this.renderer
     }
 
     private readonly boundHandleBatchReady: (e: CustomEvent<BatchReadyForPlacementEvent>) => void
@@ -77,9 +81,12 @@ export class GameBoxSpawner {
     }
 
     public reset(): void {
+        this.renderer?.dispose()
+        this.renderer = null
+        this.rendererInitialized = false
         this.pendingGames.clear()
         this.shelfPositions.clear()
-        GameBoxSpawner.logger.debug('Reset pending games and shelf positions')
+        GameBoxSpawner.logger.debug('Reset: renderer disposed, pending games and shelf positions cleared')
     }
 
     public dispose(): void {
@@ -95,6 +102,8 @@ export class GameBoxSpawner {
             GameEventTypes.GamesSort,
             this.boundHandleGamesSort
         )
+        this.renderer?.dispose()
+        this.renderer = null
     }
 
     // -------------------------------------------------------------------------
@@ -103,18 +112,29 @@ export class GameBoxSpawner {
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
         const { games, batchIndex, totalBatches } = event.detail
 
+        // Construct renderer on first batch (deferred until maxGames is known).
+        // Re-construct if batch count changes (anonymous → real-user library switch).
+        if (!this.rendererInitialized || totalBatches !== this.lastTotalBatches) {
+            if (this.renderer) {
+                GameBoxSpawner.logger.debug(
+                    `Batch count changed (${this.lastTotalBatches} → ${totalBatches}) — replacing renderer`
+                )
+                this.renderer.dispose()
+            }
+            const estimatedGames = totalBatches * 18
+            this.renderer = new GpuGameBoxRenderer(estimatedGames + 100)
+            this.rendererInitialized = true
+            this.lastTotalBatches = totalBatches
+        }
+
         GameBoxSpawner.logger.debug(
             `BatchReadyForPlacement: batch ${batchIndex + 1}/${totalBatches}, ${games.length} games — prewarming artwork`
         )
 
         this.pendingGames.set(batchIndex, games)
 
-        const renderer = this.getRenderer()
-        if (!renderer) return
-
         for (const game of games) {
-            // Fire-and-forget: prewarm does not need to complete before placement.
-            renderer.prewarmGame(game as SteamGameData).catch((error) => {
+            this.renderer!.prewarmGame(game as SteamGameData).catch((error) => {
                 GameBoxSpawner.logger.warn(`prewarmGame failed for "${game.name}": ${error}`)
             })
         }
@@ -143,13 +163,12 @@ export class GameBoxSpawner {
 
         GameBoxSpawner.logger.debug(`GamesSort: placing ${sortedGames.length} games in sorted order`)
 
-        const renderer = this.getRenderer()
-        if (!renderer) {
-            GameBoxSpawner.logger.warn('GamesSort: no renderer available, skipping placement')
+        if (!this.renderer) {
+            GameBoxSpawner.logger.warn('GamesSort: renderer not yet constructed — no batches received yet')
             return
         }
 
-        renderer.clearPlacements()
+        this.renderer.clearPlacements()
 
         // Distribute sortedGames across cached shelf positions in the same layout
         // logic used by the original spawner.
@@ -169,7 +188,7 @@ export class GameBoxSpawner {
             const shelfPos = this.shelfPositions.get(batchIndex)!
             const gamesForShelf = this.gamesPerShelf(shelfSurfaces)
             const batch = gameQueue.splice(0, gamesForShelf)
-            placed += this.placeGamesOnShelf(renderer, shelfPos, shelfSurfaces, batch)
+            placed += this.placeGamesOnShelf(this.renderer, shelfPos, shelfSurfaces, batch)
 
             EventManager.getInstance().emit<GamesPlacedEvent>(
                 StorePropsEventTypes.GamesPlaced,
@@ -233,13 +252,5 @@ export class GameBoxSpawner {
         return games.length
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-
-    private getRenderer(): GpuGameBoxRenderer | null {
-        if (!this.renderer) {
-            GameBoxSpawner.logger.warn('Renderer not set — call setRenderer() before events arrive')
-        }
-        return this.renderer
-    }
 }
+

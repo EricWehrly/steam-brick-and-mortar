@@ -3,7 +3,7 @@
 import * as THREE from 'three'
 import { Logger } from '../../../utils/Logger'
 import { DataManager } from '../../../core/data/DataManager'
-import { LOD_TIER_NAME } from './ILodArtworkRenderer'
+import { LOD_TIER_NAME } from './IGameArtworkPipeline'
 import { ManagedTextureArray } from './ManagedTextureArray'
 import { LOD_DEBUG_SETTINGS } from './LodDebugSettings'
 
@@ -226,3 +226,4 @@ export class LodTextureArrayManager {
         LodTextureArrayManager.logger.lifecycle('Disposed')
     }
 }
+

@@ -26,7 +26,7 @@ export interface InstanceLodData {
     lodLevel: LodLevel
 }
 
-export interface ILodArtworkRenderer {
+export interface IGameArtworkPipeline {
     setArtworkInstanceFromUrl(
         position: THREE.Vector3,
         gameName: string,

@@ -43,8 +43,8 @@ import type {
     GameBoxTextureOptions
 } from './types/GameBoxOptions'
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
-import { LOD_LEVEL, LOD_TIER_NAME, type LodLevel } from './instancing/ILodArtworkRenderer'
-import type { ILodArtworkRenderer } from './instancing/ILodArtworkRenderer'
+import { LOD_LEVEL, LOD_TIER_NAME, type LodLevel } from './instancing/IGameArtworkPipeline'
+import type { IGameArtworkPipeline } from './instancing/IGameArtworkPipeline'
 import { LodArtworkOrchestratorDebug, type LodConfig } from './instancing/LodArtworkOrchestratorDebug'
 import { LodDistanceManagerDebug } from './instancing/LodDistanceManagerDebug'
 import { ShelfSide } from '../props/SharedPropsUtils'
@@ -87,7 +87,7 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
 
     private readonly dimensions: GameBoxDimensions
     private readonly instancedLabelRenderer: InstancedLabelRenderer
-    private readonly lodArtworkRenderer: ILodArtworkRenderer
+    private readonly lodArtworkRenderer: IGameArtworkPipeline
     private readonly lodDistanceManager: LodDistanceManagerDebug
 
     constructor(maxGames: number = 2000) {
@@ -340,3 +340,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         ]
     }
 }
+
+
+

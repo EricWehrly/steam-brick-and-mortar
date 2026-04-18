@@ -24,7 +24,7 @@ import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 import { FrameBudgetScheduler } from '../../../utils/FrameBudgetScheduler'
 import { ManagedTextureArray } from './ManagedTextureArray'
-import { LOD_TIER_NAME } from './ILodArtworkRenderer'
+import { LOD_TIER_NAME } from './IGameArtworkPipeline'
 import { LOD_DEBUG_SETTINGS } from './LodDebugSettings'
 import { HighSlotAllocator } from './HighSlotAllocator'
 
@@ -911,3 +911,4 @@ export class HighTextureCache {
         }
     }
 }
+

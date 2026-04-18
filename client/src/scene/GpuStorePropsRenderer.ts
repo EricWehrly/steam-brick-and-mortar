@@ -4,27 +4,26 @@
  * Lifecycle coordinator for the GPU-instanced store.
  *
  * OWNS:
- * - GpuGameBoxRenderer allocation (deferred until game count is known)
  * - Props group in scene
+ * - Shelf renderer and layout coordinator
+ * - GameBoxSpawner (which owns GpuGameBoxRenderer)
  *
  * DOES NOT OWN:
+ * - GpuGameBoxRenderer directly (delegated to GameBoxSpawner)
  * - Layout math (→ ShelfLayoutCoordinator)
  * - Sign placement (→ SceneSignManager)
  * - Game sorting (→ GameSorter)
  */
 
 import * as THREE from 'three'
-import { GpuGameBoxRenderer } from './game-box/GpuGameBoxRenderer'
 import type { IStorePropsRenderer, PropsConfig } from './IStorePropsRenderer'
 
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
 import {
     StorePropsEventTypes,
-    type BatchReadyForPlacementEvent,
 } from '../types/InteractionEvents'
 import { Logger } from '../utils/Logger'
-import { PerformanceMonitor, ASYNC_CONTEXT } from '../utils/PerformanceMonitor'
 import { BatchCoordinator } from './batch/BatchCoordinator'
 import { GameBoxSpawner } from './spawning/GameBoxSpawner'
 import { ShelfLayoutCoordinator } from './shelves/ShelfLayoutCoordinator'
@@ -35,7 +34,6 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private scene: THREE.Scene
 
-    private gameBoxRenderer: GpuGameBoxRenderer | null = null
     private propsGroup: THREE.Group
     private config: PropsConfig = {}
 
@@ -51,9 +49,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         })
     })
 
-    private progressiveInitializationPromise: Promise<void> | null = null
     private setupPhaseInitialized = false
-
     private readonly instancedShelfRenderer: InstancedShelfRenderer
     private readonly shelfLayoutCoordinator: ShelfLayoutCoordinator
     private readonly batchCoordinator: BatchCoordinator<unknown>
@@ -80,7 +76,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
     }
 
     private setupEventListeners(): void {
-        // First batch: allocate game box renderer sized to the library
+        // Shelf renderer reset: detect batch count change (e.g. anonymous → real user).
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.handleInitialBatch.bind(this)
@@ -97,28 +93,12 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     private lastTotalBatches: number = 0
 
-    private async handleInitialBatch(event: CustomEvent<BatchReadyForPlacementEvent>): Promise<void> {
+    private handleInitialBatch(event: CustomEvent<{ totalBatches: number }>): void {
         const { totalBatches } = event.detail
 
-        if (!this.progressiveInitializationPromise) {
-            this.progressiveInitializationPromise = (async () => {
-                const monitor = PerformanceMonitor.start('renderer-initialization', GpuStorePropsRenderer.logger, ASYNC_CONTEXT)
-                await this.initializeGameBoxRenderer(totalBatches)
-                monitor.end({ totalBatches })
-            })()
-        }
-
-        await this.progressiveInitializationPromise
-    }
-
-    // we know the number of games by the time this happens, and should wire that in instead
-    // either through an earlier-raised event, or by re-aligning this one
-    private async initializeGameBoxRenderer(totalBatches: number): Promise<void> {
-        const estimatedGames = totalBatches * 18
-
-        // Reset shelf renderer when starting a new load (e.g. anonymous → real user).
-        // Without this, shelf 0's pre-existing instance uses the flawed updateShelfUnitTransform
-        // path instead of applyShelfUnitTemplate, leaving horizontal shelf boards in wrong state.
+        // Reset shelf renderer when library switches (e.g. anonymous → real user).
+        // Without this, shelf 0's pre-existing instance uses the wrong path, leaving
+        // horizontal shelf boards in the wrong state.
         if (this.lastTotalBatches > 0 && totalBatches !== this.lastTotalBatches) {
             GpuStorePropsRenderer.logger.debug(
                 `Batch count changed (${this.lastTotalBatches} → ${totalBatches}) — resetting shelf renderer`
@@ -126,19 +106,10 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
             this.instancedShelfRenderer.reset()
         }
         this.lastTotalBatches = totalBatches
-
-        this.gameBoxRenderer?.dispose()
-        this.gameBoxRenderer = new GpuGameBoxRenderer(estimatedGames + 100)
-        this.gameBoxSpawner.setRenderer(this.gameBoxRenderer)
     }
 
     private handleAllBatchesComplete(): void {
         GpuStorePropsRenderer.logger.debug('Progressive loading complete')
-        // Do not null progressiveInitializationPromise here. With progressive emission,
-        // network batches can still be in-flight when AllBatchesComplete fires for
-        // earlier batches. Nulling here would cause handleInitialBatch to create a
-        // new renderer and dispose the one actively loading textures.
-        // clearProps() is the only correct place to reset this.
     }
 
     public async setupProps(config: PropsConfig = {}): Promise<void> {
@@ -160,18 +131,9 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         // Clear shelf geometry
         this.instancedShelfRenderer.reset()
 
-        // Dispose game box renderer (removes artwork + label instanced meshes from scene)
-        if (this.gameBoxRenderer) {
-            this.gameBoxRenderer.dispose()
-            this.gameBoxRenderer = null
-            this.gameBoxSpawner.setRenderer(null)
-        }
+        // Reset the spawner — disposes the renderer it owns and clears state
+        this.gameBoxSpawner.reset()
 
-        // Clear any pending games buffered by the spawner
-        this.gameBoxSpawner?.reset()
-
-        // Reset progressive init state so next load starts clean
-        this.progressiveInitializationPromise = null
         this.batchCoordinator.reset()
 
         while (this.propsGroup.children.length > 0) {
@@ -192,8 +154,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
     public dispose(): void {
         this.clearProps()
-        this.gameBoxRenderer?.dispose()
-        this.gameBoxRenderer = null
+        this.gameBoxSpawner.dispose()
         this.instancedShelfRenderer.dispose()
         this.shelfLayoutCoordinator.dispose()
         this.scene.remove(this.propsGroup)

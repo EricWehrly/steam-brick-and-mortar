@@ -1,4 +1,4 @@
-import { LOD_TIER_NAME } from './ILodArtworkRenderer'
+import { LOD_TIER_NAME } from './IGameArtworkPipeline'
 
 export const LOD_DEBUG_SETTINGS = {
     stripeEnabled: false,
@@ -7,3 +7,4 @@ export const LOD_DEBUG_SETTINGS = {
         [LOD_TIER_NAME.HIGH]: [51, 255, 85, 255],
     } as Record<string, [number, number, number, number]>,
 } as const
+

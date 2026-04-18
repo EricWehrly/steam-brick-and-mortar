@@ -1,12 +1,12 @@
 import { LodDistanceManager } from './LodDistanceManager'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
-import type { ILodArtworkRenderer } from './ILodArtworkRenderer'
+import type { IGameArtworkPipeline } from './IGameArtworkPipeline'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export class LodDistanceManagerDebug extends LodDistanceManager {
-    constructor(renderer: ILodArtworkRenderer) {
+    constructor(renderer: IGameArtworkPipeline) {
         super(renderer)
         this.registerConsoleCommands()
         this.registerEventListeners()
@@ -52,3 +52,6 @@ export class LodDistanceManagerDebug extends LodDistanceManager {
 }
 
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+
+
