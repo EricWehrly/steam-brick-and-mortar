@@ -49,9 +49,7 @@ import { LodArtworkOrchestratorDebug, type LodConfig } from './instancing/LodArt
 import { LodDistanceManagerDebug } from './instancing/LodDistanceManagerDebug'
 import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
-import { EventManager } from '../../core/EventManager'
 import { Logger } from '../../utils/Logger'
-import { StorePropsEventTypes, type GameBoxSpawnedEvent } from '../../types/InteractionEvents'
 import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
 // Steam capsule source dimensions (what CDN claims, though actual is ~460×690)
@@ -120,27 +118,68 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
         // Create distance manager for automatic LOD switching
         this.lodDistanceManager = new LodDistanceManagerDebug(this.lodArtworkRenderer)
 
-        // Self-subscribe: renderer owns the GameBoxSpawned → createGameBoxAuto wiring.
-        // Bound once and stored so dispose() can deregister the exact same reference.
-        this.boundHandleGameBoxSpawned = this.handleGameBoxSpawned.bind(this)
-        EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.GameBoxSpawned,
-            this.boundHandleGameBoxSpawned
-        )
-        
         GpuGameBoxRenderer.logger.lifecycle(`LOD atlas initialized (max ${maxGames}, HIGH slots: ${maxHighSlots}, lazy HIGH enabled)`)
     }
 
-    private boundHandleGameBoxSpawned!: (event: CustomEvent<GameBoxSpawnedEvent>) => void
+    // Games whose artwork permanently failed prefetch; label box deferred until placeGame() provides a position.
+    private pendingLabelGames: Map<number, { game: SteamGameData; side: ShelfSide }> = new Map()
 
-    private handleGameBoxSpawned(event: CustomEvent<GameBoxSpawnedEvent>): void {
-        const { game, position, side, rotation } = event.detail
-        this.createGameBoxAuto(
-            game as SteamGameData,
-            position as THREE.Vector3,
-            side as ShelfSide,
-            rotation as THREE.Quaternion
-        )
+    /**
+     * Phase 1: fetch and cache artwork for a game without placing a GPU instance.
+     * Call as batches arrive. Idempotent — subsequent calls for the same game are no-ops.
+     * Permanent artwork failures are tracked here; the label box is created in placeGame()
+     * once a world position is available.
+     */
+    public async prewarmGame(game: SteamGameData, side: ShelfSide = ShelfSide.Front): Promise<void> {
+        const artworkUrl = this.selectBestArtworkUrl(game)
+        const appid = typeof game.appid === 'number' ? game.appid : 0
+
+        if (!artworkUrl) {
+            if (AppSettings.get(Setting.EnableLabels)) {
+                this.pendingLabelGames.set(appid, { game, side })
+            }
+            return
+        }
+
+        const result = await this.lodArtworkRenderer.prefetchArtwork(appid, artworkUrl, game.name)
+        if ((result === 'permanent-failure' || result === 'error') && AppSettings.get(Setting.EnableLabels)) {
+            this.pendingLabelGames.set(appid, { game, side })
+        }
+    }
+
+    /**
+     * Phase 2: assign a world position to a prewarmed game.
+     * If artwork prefetch succeeded the GPU instance is placed immediately.
+     * If it failed permanently a label box is created instead.
+     */
+    public placeGame(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        side: ShelfSide = ShelfSide.Front,
+        rotation?: THREE.Quaternion
+    ): void {
+        const appid = typeof game.appid === 'number' ? game.appid : 0
+
+        if (this.pendingLabelGames.has(appid)) {
+            this.pendingLabelGames.delete(appid)
+            this.createLabelGameBox(game, position, side, rotation)
+            return
+        }
+
+        const instanceIndex = this.lodArtworkRenderer.placeInstance(appid, game.name, position, rotation)
+        if (instanceIndex < 0 && AppSettings.get(Setting.EnableLabels)) {
+            this.createLabelGameBox(game, position, side, rotation)
+        }
+    }
+
+    /**
+     * Clear all GPU instance placements without releasing texture atlas slots.
+     * Call before re-sorting; follow with placeGame() for each game in the new order.
+     */
+    public clearPlacements(): void {
+        this.lodArtworkRenderer.clearPlacements()
+        this.instancedLabelRenderer.clear()
+        this.pendingLabelGames.clear()
     }
 
     /**
@@ -253,11 +292,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
 
     public dispose(): void {
         GpuGameBoxRenderer.logger.lifecycle('Disposing')
-        
-        EventManager.getInstance().deregisterEventHandler(
-            StorePropsEventTypes.GameBoxSpawned,
-            this.boundHandleGameBoxSpawned
-        )
 
         this.lodDistanceManager.dispose()
         this.instancedLabelRenderer.dispose()

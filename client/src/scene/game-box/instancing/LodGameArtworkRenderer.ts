@@ -475,6 +475,27 @@ export class LodGameArtworkRenderer {
         return this.currentInstanceCount
     }
 
+    /**
+     * Reset all instance positions without releasing texture slots.
+     * Hides all boxes by moving them off-screen; texture data remains intact
+     * so a subsequent placeInstance() call can reuse the same atlas entries.
+     */
+    public clearPlacements(): void {
+        if (!this.instancedMesh) return
+        const hidden = new THREE.Matrix4().setPosition(0, -10000, 0)
+        for (let i = 0; i < this.currentInstanceCount; i++) {
+            this.instancedMesh.setMatrixAt(i, hidden)
+        }
+        this.currentInstanceCount = 0
+        this.instanceData.clear()
+        this.textureIndexToInstance.clear()
+        if (this.instancedMesh.instanceMatrix) {
+            this.instancedMesh.instanceMatrix.needsUpdate = true
+        }
+        this.pendingAttributeUpdate = true
+        LodGameArtworkRenderer.logger.debug('Cleared all instance placements (texture slots retained)')
+    }
+
     public getInstanceLod(instanceIndex: number): LodLevel | null {
         return this.instanceData.get(instanceIndex)?.lodLevel ?? null
     }

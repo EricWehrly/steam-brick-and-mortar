@@ -129,6 +129,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
 
         this.gameBoxRenderer?.dispose()
         this.gameBoxRenderer = new GpuGameBoxRenderer(estimatedGames + 100)
+        this.gameBoxSpawner.setRenderer(this.gameBoxRenderer)
     }
 
     private handleAllBatchesComplete(): void {
@@ -163,6 +164,7 @@ export class GpuStorePropsRenderer implements IStorePropsRenderer {
         if (this.gameBoxRenderer) {
             this.gameBoxRenderer.dispose()
             this.gameBoxRenderer = null
+            this.gameBoxSpawner.setRenderer(null)
         }
 
         // Clear any pending games buffered by the spawner
