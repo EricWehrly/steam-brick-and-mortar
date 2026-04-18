@@ -124,10 +124,21 @@ export class InstancedLabelRenderer {
         return true
     }
 
+    /**
+     * Reset all label instance placements without disposing textures.
+     * Call before re-sorting so new label boxes can be placed in the new order.
+     */
+    public clear(): void {
+        this.currentCount = 0
+        this.nextInstanceIndex = 0
+        this.gameNameToTextureIndex.clear()
+        if (this.instancedMesh) {
+            this.instancedMesh.count = 0
+        }
+    }
+
     public updateGPU(): void {
         if (!this.isInitialized || !this.instancedMesh || !this.geometry) return
-
-        this.textureArrayManager.flushToGpu()
 
         this.instancedMesh.instanceMatrix.needsUpdate = true
         this.instancedMesh.count = this.currentCount

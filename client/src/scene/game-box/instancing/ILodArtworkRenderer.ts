@@ -38,5 +38,21 @@ export interface ILodArtworkRenderer {
     setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean
     getInstanceCount(): number
     getInstanceData(): ReadonlyMap<number, InstanceLodData>
+
+    prefetchArtwork(
+        appid: number,
+        artworkUrl: string,
+        gameName: string
+    ): Promise<'prefetched' | 'cached' | 'permanent-failure' | 'error'>
+
+    placeInstance(
+        appid: number,
+        gameName: string,
+        position: THREE.Vector3,
+        rotation?: THREE.Quaternion
+    ): number
+
+    clearPlacements(): void
+
     dispose(): void
 }

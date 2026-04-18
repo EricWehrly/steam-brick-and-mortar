@@ -93,6 +93,10 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
     // Track failed artwork (for backward compat)
     private failedArtwork: Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> = new Map()
 
+    // Resolved artwork URLs for prefetched games, keyed by game name.
+    // Used by placeInstance() to pass the final CDN URL to the renderer.
+    private prefetchedArtworkUrl: Map<string, string> = new Map()
+
     // Prevent log spam when atlas is full
     private atlasFullLogged: boolean = false
     private inFlightArtworkCount: number = 0
@@ -229,6 +233,126 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
         }
 
         LodArtworkOrchestrator.logger.lifecycle(`LOD VRAM: ${lodInfo.join(', ')} | Total: ${(totalVRAM / (1024 * 1024)).toFixed(0)}MB`)
+    }
+
+    /**
+     * Phase 1 of the load/place split: fetch and cache artwork for a game without
+     * placing a GPU instance. Safe to call as batches arrive, before shelf positions
+     * are known. Idempotent — calling again for the same appId is a no-op.
+     *
+     * @returns 'prefetched' when texture was freshly loaded, 'cached' if already done,
+     *          'permanent-failure' if the artwork URL is known-bad, 'error' on unexpected failure.
+     */
+    public async prefetchArtwork(
+        appid: number,
+        artworkUrl: string,
+        gameName: string
+    ): Promise<'prefetched' | 'cached' | 'permanent-failure' | 'error'> {
+        // Already in the texture atlas — nothing to do.
+        if (this.gameNameToTextureIndex.has(gameName)) return 'cached'
+
+        if (this.artworkProvider.isPermanentFailure(appid, 'library')) return 'permanent-failure'
+
+        this.inFlightArtworkCount++
+        try {
+            const textureIndex = this.textureManager.allocateSlot()
+            if (textureIndex < 0) {
+                if (!this.atlasFullLogged) {
+                    LodArtworkOrchestrator.logger.warn(`Atlas full (${this.maxTextures} configured) — further games will not have artwork`)
+                    this.atlasFullLogged = true
+                }
+                return 'error'
+            }
+
+            const artwork = this.artworkProvider.getArtwork(appid, gameName, 'library', artworkUrl)
+
+            const midConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.MID)
+            const midWidth = midConfig?.textureWidth ?? 150
+            const midHeight = midConfig?.textureHeight ?? 225
+            const midResult = await artwork.getPixelsAtSize(midWidth, midHeight)
+            this.textureManager.setSlotPixels(LOD_TIER_NAME.MID, textureIndex, midResult.pixels, midWidth, midHeight)
+
+            if (!this.lazyHighTextures) {
+                const highConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.HIGH)
+                const highWidth = highConfig?.textureWidth ?? STEAM_CAPSULE_WIDTH
+                const highHeight = highConfig?.textureHeight ?? STEAM_CAPSULE_HEIGHT
+                const highResult = await artwork.getPixelsAtSize(highWidth, highHeight)
+                this.textureManager.setSlotPixels(LOD_TIER_NAME.HIGH, textureIndex, highResult.pixels, highWidth, highHeight)
+            }
+
+            this.updateGPU()
+
+            // Store the resolved URL on the artwork handle so placeInstance can pass it along.
+            const resolvedUrl = artwork.getUrl()
+            this.gameNameToTextureIndex.set(gameName, textureIndex)
+            this.textureIndexToGameName.set(textureIndex, gameName)
+            // Store url for later placeInstance lookup
+            this.prefetchedArtworkUrl.set(gameName, resolvedUrl)
+
+            LodArtworkOrchestrator.logger.debug(`Prefetched artwork for "${gameName}" → slot ${textureIndex}`)
+            return 'prefetched'
+        } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error)
+            this.failedArtwork.set(gameName, {
+                reason: this.categorizeFailure(reason),
+                url: artworkUrl,
+                urlsTried: [artworkUrl],
+                timestamp: Date.now()
+            })
+            LodArtworkOrchestrator.logger.debug(`Prefetch failed for "${gameName}": ${reason}`)
+            return 'error'
+        } finally {
+            this.inFlightArtworkCount--
+            if (this.inFlightArtworkCount === 0) {
+                EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
+            }
+        }
+    }
+
+    /**
+     * Phase 2 of the load/place split: assign a world position to a prefetched game.
+     * Must be called after prefetchArtwork() has resolved for this game.
+     * On re-sort, call clearPlacements() first, then call placeInstance() for every
+     * game in the new sorted order.
+     *
+     * @returns instanceIndex on success, -1 if texture was not prefetched or slot unavailable.
+     */
+    public placeInstance(
+        appid: number,
+        gameName: string,
+        position: THREE.Vector3,
+        rotation?: THREE.Quaternion
+    ): number {
+        const textureIndex = this.gameNameToTextureIndex.get(gameName)
+        if (textureIndex === undefined) {
+            LodArtworkOrchestrator.logger.warn(`placeInstance: no prefetched texture for "${gameName}" (appId ${appid})`)
+            return -1
+        }
+
+        const resolvedUrl = this.prefetchedArtworkUrl.get(gameName)
+        const instanceIndex = this.renderer.addInstance({
+            position,
+            textureIndex,
+            gameName,
+            artworkUrl: resolvedUrl,
+            lodLevel: this.lazyHighTextures ? LOD_LEVEL.MID : LOD_LEVEL.HIGH,
+            rotation,
+        })
+
+        if (instanceIndex < 0) return -1
+
+        this.instanceMetadata.set(instanceIndex, { name: gameName, appid, position: position.clone() })
+        return instanceIndex
+    }
+
+    /**
+     * Reset all GPU instance placements without releasing texture slots.
+     * Call before re-sorting so placeInstance() can repopulate positions.
+     */
+    public clearPlacements(): void {
+        this.instanceMetadata.clear()
+        this.renderer.clearPlacements()
+        LodArtworkOrchestrator.logger.debug('Cleared instance placements; texture slots retained')
     }
 
     public async setArtworkInstanceFromUrl(
@@ -436,6 +560,7 @@ export class LodArtworkOrchestrator implements ILodArtworkRenderer {
         this.gameNameToTextureIndex.clear()
         this.textureIndexToGameName.clear()
         this.instanceMetadata.clear()
+        this.prefetchedArtworkUrl.clear()
         this.failedArtwork.clear()
 
         LodArtworkOrchestrator.logger.lifecycle('Disposed')
