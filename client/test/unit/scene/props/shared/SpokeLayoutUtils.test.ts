@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
 import {
     computeSpokeShelfLayout,
+    SpokeStockStrategy,
     type SpokeLayoutConfig,
 } from '../../../../../src/scene/props/shared/SpokeLayoutUtils'
-import { SpokeStockStrategy, type BoardSurfacePair } from '../../../../../src/scene/props/shared/StockStrategy'
+import type { BoardSurfacePair } from '../../../../../src/scene/props/shared/StockStrategy'
 import type { StockSurface } from '../../../../../src/types/LayoutTypes'
 
 function makeSurface(id: string): StockSurface {

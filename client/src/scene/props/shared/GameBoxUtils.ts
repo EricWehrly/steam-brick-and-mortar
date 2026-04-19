@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import type { SteamGameData } from '../../game-box/types/GameData'
 import type { GameBoxDimensions } from '../../game-box/types/GameBoxOptions'
 import type { StockSurface } from '../../../types/LayoutTypes'
-import { ArcStockStrategy, type BoardSurfacePair, type IStockStrategy } from './StockStrategy'
+import { ArcStockStrategy } from './ArcLayoutUtils'
+import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
 import { ShelfFace, type ShelfSurface } from './SharedPropsTypes'
 
 // TD: approximated-placement-tripwire
@@ -93,16 +94,18 @@ export class GameBoxUtils {
      *
      * Each ShelfSurface (one board) is resolved into a Near/Far pair. The strategy
      * then decides the fill order — defaulting to ArcStockStrategy (Near-first, Far overflow).
-     *
-     * Pass a different strategy for row layouts (RowStockStrategy: Near-only).
      */
     static buildStockSurfaces(
         shelfPosition: THREE.Vector3,
         shelfRotationY: number,
         boardSurfaces: ShelfSurface[],
-        boxDimensions: GameBoxDimensions = { width: 0.3, height: 0.4, depth: 0.08 },
-        strategy: IStockStrategy = new ArcStockStrategy()
+        options: {
+            boxDimensions?: GameBoxDimensions
+            strategy?: IStockStrategy
+        } = {}
     ): StockSurface[] {
+        const boxDimensions = options.boxDimensions ?? { width: 0.3, height: 0.4, depth: 0.08 }
+        const strategy = options.strategy ?? new ArcStockStrategy()
         const shelfAngleRad = (SHELF_ANGLE_DEGREES * Math.PI) / 180
         const gameHalfDepth = boxDimensions.depth / 2
         const hasRotation = Math.abs(shelfRotationY) > 1e-6

@@ -15,6 +15,22 @@
  */
 
 import * as THREE from 'three'
+import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
+import type { StockSurface } from '../../../types/LayoutTypes'
+
+/**
+ * RowStockStrategy
+ *
+ * Fills Near faces only — no back side. In a row layout the shelf behind you
+ * is a different unit facing the other aisle, not the back of this one.
+ *
+ *   board[0].near, board[1].near, board[2].near
+ */
+export class RowStockStrategy implements IStockStrategy {
+    order(boards: BoardSurfacePair[]): StockSurface[] {
+        return boards.map(b => b.near)
+    }
+}
 
 export interface RowLayoutConfig {
     /**

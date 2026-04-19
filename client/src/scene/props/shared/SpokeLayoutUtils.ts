@@ -23,13 +23,32 @@
  */
 
 import * as THREE from 'three'
+import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
+import type { StockSurface } from '../../../types/LayoutTypes'
+
+/**
+ * SpokeStockStrategy
+ *
+ * Near-only per unit — the Far face of each spoke shelf faces away from the aisle.
+ * Cross-row interleaving is a layout-level concern driven by ShelfReady emit order.
+ *
+ *   board[0].near, board[1].near, board[2].near
+ */
+export class SpokeStockStrategy implements IStockStrategy {
+    order(boards: BoardSurfacePair[]): StockSurface[] {
+        return boards.map(b => b.near)
+    }
+}
 
 export interface SpokeLayoutConfig {
     /** Number of spokes (one per section). Default: 4. */
     spokeCount?: number
     /**
      * Angle offset for the first spoke in radians.
-     * Default: -PI/2 (first spoke points toward -Z, straight ahead).
+     * Default: -PI/2 + PI/8 — first spoke points slightly off -X so 4 spokes
+     * land at 22.5°, 112.5°, 202.5°, 292.5° instead of cardinal 0/90/180/270.
+     * This makes it obvious shelves are rotated relative to their aisles rather
+     * than appearing stuck at 0° and 90°.
      */
     firstSpokeAngleOffset?: number
     /**
@@ -56,7 +75,7 @@ export interface SpokeLayoutConfig {
 
 const SPOKE_DEFAULTS: Required<SpokeLayoutConfig> = {
     spokeCount: 4,
-    firstSpokeAngleOffset: -Math.PI / 2,
+    firstSpokeAngleOffset: -Math.PI / 2 + Math.PI / 8, // 22.5° bias off cardinal axes
     hubClearanceMetres: 4,
     shelvesPerSpoke: 6,
     shelfSpacingMetres: 2.5,

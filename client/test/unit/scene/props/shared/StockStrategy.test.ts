@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import { ArcStockStrategy, RowStockStrategy, type BoardSurfacePair } from '../../../../../src/scene/props/shared/StockStrategy'
+import { ArcStockStrategy } from '../../../../../src/scene/props/shared/ArcLayoutUtils'
+import { RowStockStrategy } from '../../../../../src/scene/props/shared/RowLayoutUtils'
+import type { BoardSurfacePair } from '../../../../../src/scene/props/shared/StockStrategy'
 import type { StockSurface } from '../../../../../src/types/LayoutTypes'
 
 function makeSurface(id: string): StockSurface {

@@ -58,6 +58,17 @@ export default [
       '@typescript-eslint': tseslint,
     },
     rules: {
+      // Discourage inline dynamic imports in favour of top-of-file static imports.
+      // Dynamic import() is fine for code-splitting; using it just to defer a
+      // module that could be imported statically is an antipattern.
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector: 'ImportExpression',
+          message: 'Prefer static top-of-file imports over inline import(). Use dynamic import only for genuine code-splitting.',
+        },
+      ],
+
       // Error prevention (the important stuff)
       'no-unused-vars': 'off', // TypeScript handles this better
       '@typescript-eslint/no-unused-vars': ['warn', { 
