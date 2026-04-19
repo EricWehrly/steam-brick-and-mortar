@@ -24,7 +24,6 @@ interface ShelfPosition {
 interface PlacementIntent {
     game: SteamGameData
     position: THREE.Vector3
-    side: ShelfSide
     rotation: THREE.Quaternion
 }
 
@@ -253,7 +252,7 @@ export class GameBoxSpawner {
         if (!intent) return // no position assigned yet
 
         this.placementIntents.delete(appid) // consume the intent
-        this.renderer.placeGame(intent.game, intent.position, intent.side, intent.rotation)
+        this.renderer.placeGame(intent.game, intent.position, intent.rotation)
     }
 
     // -------------------------------------------------------------------------
@@ -304,7 +303,6 @@ export class GameBoxSpawner {
             this.placementIntents.set(appid, {
                 game,
                 position: positions[i],
-                side,
                 rotation,
             })
             this.tryPlace(appid)

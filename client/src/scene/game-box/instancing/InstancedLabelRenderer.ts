@@ -6,7 +6,6 @@ import type { SomeBatchesCompleteEvent } from '../../../types/EnvironmentEvents'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { SceneLayer } from '../../SceneLayers'
-import { ShelfSide } from '../../props/SharedPropsUtils'
 import vertexShader from './shaders/instanced-label.vert?raw'
 import fragmentShader from './shaders/instanced-label.frag?raw'
 
@@ -71,7 +70,6 @@ export class InstancedLabelRenderer {
         position: THREE.Vector3,
         gameName: string,
         appid?: number,
-        side: ShelfSide = ShelfSide.Front,
         rotation?: THREE.Quaternion
     ): boolean {
         if (!this.isInitialized) {
@@ -101,14 +99,9 @@ export class InstancedLabelRenderer {
             }
         }
 
-        // Rotation: Front=rotY+PI so the -Z face (reversed UVs) faces the player and
-        // the pre-mirrored canvas texture reads correctly. Back uses identity; DoubleSide
-        // material ensures the player always sees a readable face.
-        const effectiveRotation = rotation ?? (
-            side === ShelfSide.Front
-                ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI)
-                : InstancedLabelRenderer.DEFAULT_ROTATION
-        )
+        // rotation encodes shelf orientation and front/back side — always passed by callers.
+        // Fallback to identity if somehow called without rotation (shouldn't happen in practice).
+        const effectiveRotation = rotation ?? InstancedLabelRenderer.DEFAULT_ROTATION
 
         const matrix = new THREE.Matrix4()
         matrix.compose(position, effectiveRotation, new THREE.Vector3(1, 1, 1))

@@ -14,8 +14,8 @@
  * 
  * RECEIVES:
  * - prefetchArtwork(appid, url, name) → Phase 1: load texture into atlas
- * - placeArtworkInstance(appid, name, position) → Phase 2: stamp artwork GPU instance
- * - placeLabelBox(game, position, side) → Phase 2: stamp label GPU instance
+ * - placeArtworkInstance(appid, name, position, rotation) → Phase 2: stamp artwork GPU instance
+ * - placeGame(game, position, rotation) → unified placement (artwork or label fallback)
  * - clearPlacements() → wipe all GPU instances before re-sort
  * - addToScene(scene) → Attaches instanced meshes to scene
  * - updateLODForCamera(camera) → Adjusts detail levels based on distance
@@ -52,10 +52,8 @@ import { LOD_LEVEL, LOD_TIER_NAME, type LodLevel } from './instancing/IGameArtwo
 import type { IGameArtworkPipeline } from './instancing/IGameArtworkPipeline'
 import { LodArtworkOrchestratorDebug, type LodConfig } from './instancing/LodArtworkOrchestratorDebug'
 import { LodDistanceManagerDebug } from './instancing/LodDistanceManagerDebug'
-import { ShelfSide } from '../props/SharedPropsUtils'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { Logger } from '../../utils/Logger'
-import type { IGameBoxRenderer, GameBoxRequest } from '../IGameBoxRenderer'
 
 // Steam capsule source dimensions (what CDN claims, though actual is ~460×690)
 /**
@@ -81,7 +79,7 @@ const STEAM_SOURCE_HEIGHT = 900  // Nominal — see comment above
 const STEAM_EFFECTIVE_MAX_WIDTH = 300   // Actual CDN resolution (majority of titles)
 const STEAM_EFFECTIVE_MAX_HEIGHT = 450  // Actual CDN resolution (majority of titles)
 
-export class GpuGameBoxRenderer implements IGameBoxRenderer {
+export class GpuGameBoxRenderer {
     public static logger = Logger.createLogFunctions(GpuGameBoxRenderer.name)
 
     private static readonly DEFAULT_DIMENSIONS: GameBoxDimensions = {
@@ -156,35 +154,36 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
      * Unified placement: try artwork instance first; fall through to label box on atlas miss.
      * This is the preferred placement path — callers do not need to know which renderer
      * handles the game. The artwork/label decision lives here, not upstream.
+     *
+     * rotation encodes both shelf orientation and front/back side — no separate side param needed.
      */
     public placeGame(
         game: SteamGameData,
         position: THREE.Vector3,
-        side: ShelfSide,
-        rotation?: THREE.Quaternion
+        rotation: THREE.Quaternion
     ): void {
         const appid = typeof game.appid === 'number' ? game.appid : 0
         const instanceIndex = this.lodArtworkRenderer.placeInstance(appid, game.name, position, rotation)
         if (instanceIndex >= 0) return
         // Atlas miss — fall through to label
-        this.placeLabelBox(game, position, side, rotation)
+        this.placeLabelBox(game, position, rotation)
     }
 
     /**
-     * Phase 2b: place a text-label box at a world position.
+     * Place a text-label box at a world position.
      * No artwork fetch is triggered. This is a pure GPU-instancing call.
+     *
+     * rotation encodes both shelf orientation and front/back side.
      */
     public placeLabelBox(
         game: SteamGameData,
         position: THREE.Vector3,
-        side: ShelfSide = ShelfSide.Front,
-        rotation?: THREE.Quaternion
+        rotation: THREE.Quaternion
     ): void {
         const success = this.instancedLabelRenderer.addLabelInstance(
             position,
             game.name,
             typeof game.appid === 'number' ? game.appid : undefined,
-            side,
             rotation
         )
         if (!success) {
@@ -199,11 +198,6 @@ export class GpuGameBoxRenderer implements IGameBoxRenderer {
     public clearPlacements(): void {
         this.lodArtworkRenderer.clearPlacements()
         this.instancedLabelRenderer.clear()
-    }
-
-    /** @deprecated Use the two-phase prewarm/place flow via GameBoxSpawner instead. */
-    public createBatchGameBoxes(_requests: GameBoxRequest[]): void {
-        GpuGameBoxRenderer.logger.warn('createBatchGameBoxes called — this legacy path is no longer supported. Use GameBoxSpawner.')
     }
 
     public getDimensions(): GameBoxDimensions {
