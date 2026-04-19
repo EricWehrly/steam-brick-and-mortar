@@ -14,7 +14,6 @@
  * 
  * RECEIVES:
  * - prefetchArtwork(appid, url, name) → Phase 1: load texture into atlas
- * - placeArtworkInstance(appid, name, position, rotation) → Phase 2: stamp artwork GPU instance
  * - placeGame(game, position, rotation) → unified placement (artwork or label fallback)
  * - clearPlacements() → wipe all GPU instances before re-sort
  * - addToScene(scene) → Attaches instanced meshes to scene
@@ -32,7 +31,6 @@
  * DOES NOT:
  * - Know about shelves or layout (receives positions)
  * - Decide which games to display (told what to render)
- * - Decide whether a game gets artwork or a label — that is GameBoxSpawner's job
  * - Select or construct artwork URLs from game metadata
  * - Handle batch processing (receives individual requests)
  * 
@@ -43,7 +41,6 @@
 
 import * as THREE from 'three'
 import type { SteamGameData } from './types/GameData'
-import type { GameBoxDimensions } from './types/GameBoxOptions'
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { LodArtworkOrchestratorDebug } from './instancing/LodArtworkOrchestratorDebug'
 import type { IGameArtworkPipeline } from './instancing/IGameArtworkPipeline'
@@ -52,19 +49,10 @@ import { Logger } from '../../utils/Logger'
 export class GpuGameBoxRenderer {
     public static logger = Logger.createLogFunctions(GpuGameBoxRenderer.name)
 
-    private static readonly DEFAULT_DIMENSIONS: GameBoxDimensions = {
-        width: 0.3,
-        height: 0.4,
-        depth: 0.08
-    }
-
-    private readonly dimensions: GameBoxDimensions
     private readonly instancedLabelRenderer: InstancedLabelRenderer
     private readonly lodArtworkRenderer: IGameArtworkPipeline
 
     constructor(maxGames: number = 2000) {
-        this.dimensions = { ...GpuGameBoxRenderer.DEFAULT_DIMENSIONS }
-
         this.instancedLabelRenderer = new InstancedLabelRenderer({ maxInstances: maxGames })
         this.lodArtworkRenderer = LodArtworkOrchestratorDebug.fromAppSettings(maxGames)
 
@@ -84,19 +72,6 @@ export class GpuGameBoxRenderer {
         gameName: string
     ): Promise<'prefetched' | 'cached' | 'permanent-failure' | 'error'> {
         return this.lodArtworkRenderer.prefetchArtwork(appid, artworkUrl, gameName)
-    }
-
-    /**
-     * Phase 2a: materialise a previously prefetched artwork texture at a world position.
-     * Returns the GPU instance index, or -1 if the texture is not in the atlas.
-     */
-    public placeArtworkInstance(
-        appid: number,
-        gameName: string,
-        position: THREE.Vector3,
-        rotation?: THREE.Quaternion
-    ): number {
-        return this.lodArtworkRenderer.placeInstance(appid, gameName, position, rotation)
     }
 
     /**
@@ -147,10 +122,6 @@ export class GpuGameBoxRenderer {
     public clearPlacements(): void {
         this.lodArtworkRenderer.clearPlacements()
         this.instancedLabelRenderer.clear()
-    }
-
-    public getDimensions(): GameBoxDimensions {
-        return { ...this.dimensions }
     }
 
     public dispose(): void {

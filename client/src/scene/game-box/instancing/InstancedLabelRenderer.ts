@@ -119,12 +119,13 @@ export class InstancedLabelRenderer {
 
     /**
      * Reset all label instance placements without disposing textures.
+     * Retains the gameNameToTextureIndex map so re-sorts reuse already-baked
+     * texture slots rather than re-allocating them.
      * Call before re-sorting so new label boxes can be placed in the new order.
      */
     public clear(): void {
         this.currentCount = 0
         this.nextInstanceIndex = 0
-        this.gameNameToTextureIndex.clear()
         if (this.instancedMesh) {
             this.instancedMesh.count = 0
         }
