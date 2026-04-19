@@ -276,24 +276,27 @@ export class GameBoxSpawner {
         const boxDimensions = { width: 0.3, height: 0.4, depth: 0.08 }
         let gameIndex = 0
 
-        // Fill all front rows top-to-bottom first, then all back rows.
-        // This makes the shelf readable face-first: top-left → top-right,
-        // then next row, all the way down before touching the back side.
+        // Fill all back rows (player-facing side) top-to-bottom first, then front rows.
+        //
+        // Naming note: ShelfSide.Back uses backZ (+0.5 in local space), which is the
+        // inward-facing side of the shelf arc — i.e., the side the player sees.
+        // ShelfSide.Front uses frontZ (-0.5), which faces outward away from the player.
+        // Fill order: top-left → top-right down the player-facing face, then overflow to back.
         for (const surface of surfaces) {
             if (gameIndex >= games.length) break
-            const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
-            if (frontGames.length > 0) {
-                this.assignIntentsForRow(shelf, surface, frontGames, ShelfSide.Front, boxDimensions)
-                gameIndex += frontGames.length
+            const playerFacingGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
+            if (playerFacingGames.length > 0) {
+                this.assignIntentsForRow(shelf, surface, playerFacingGames, ShelfSide.Back, boxDimensions)
+                gameIndex += playerFacingGames.length
             }
         }
 
         for (const surface of surfaces) {
             if (gameIndex >= games.length) break
-            const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
-            if (backGames.length > 0) {
-                this.assignIntentsForRow(shelf, surface, backGames, ShelfSide.Back, boxDimensions)
-                gameIndex += backGames.length
+            const overflowGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
+            if (overflowGames.length > 0) {
+                this.assignIntentsForRow(shelf, surface, overflowGames, ShelfSide.Front, boxDimensions)
+                gameIndex += overflowGames.length
             }
         }
     }
