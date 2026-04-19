@@ -165,7 +165,7 @@ export class GamesLoader {
                 continue
             }
 
-            const normalizedCachedData = this.normalizeBatchData(cachedResult.data)
+            const normalizedCachedData = this.normalizeBatchData(cachedResult)
             if (this.isMetadataComplete(normalizedCachedData)) {
                 renderableAppids.push(appid)
                 renderableAppDetails.set(appid, normalizedCachedData)
