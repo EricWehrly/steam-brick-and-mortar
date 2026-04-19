@@ -23,6 +23,7 @@ export interface CacheEntry<T> {
     timestamp: number
     lastAccessed: number
     size?: number // Estimated size in bytes
+    ttlMs?: number // Per-entry override for TTL
 }
 
 export interface CacheStats {
@@ -102,32 +103,58 @@ export class CacheManager {
         }
         
         // Check expiration
-        const age = performance.now() - entry.timestamp
-        if (age > this.config.cacheDuration) {
+        const age = Date.now() - entry.timestamp
+        const duration = entry.ttlMs ?? this.config.cacheDuration
+        if (age > duration) {
             this.cache.delete(fullKey)
             return null
         }
         
         // Update access time for LRU tracking
-        entry.lastAccessed = performance.now()
+        entry.lastAccessed = Date.now()
         
+        return entry.data as T | null
+    }
+
+    /**
+     * Get stale cache entry if it exists (even if expired).
+     * Used for stale-while-revalidate patterns.
+     */
+    getStale<T>(key: string): T | null {
+        if (!this.config.enableCache) {
+            return null
+        }
+        
+        const fullKey = this.config.cachePrefix + key
+        const entry = this.cache.get(fullKey)
+        if (!entry) {
+            return null
+        }
+
+        // We don't check expiration here because we explicitly want stale data
+        // We also don't delete it; the caller is responsible for replacing it.
+
+        // Update access time for LRU tracking
+        entry.lastAccessed = Date.now()
+
         return entry.data as T | null
     }
 
     /**
      * Set cache entry
      */
-    set<T>(key: string, data: T): void {
+    set<T>(key: string, data: T, options?: { ttlMs?: number }): void {
         if (!this.config.enableCache) {
             return
         }
         
-        const now = performance.now()
+        const now = Date.now()
         const entry: CacheEntry<T> = {
             data,
             timestamp: now,
             lastAccessed: now,
-            size: this.estimateSize(data)
+            size: this.estimateSize(data),
+            ttlMs: options?.ttlMs
         }
         
         const fullKey = this.config.cachePrefix + key
