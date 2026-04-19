@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { SteamGameData } from '../../game-box/types/GameData'
 import type { GameBoxDimensions } from '../../game-box/types/GameBoxOptions'
 import type { StockSurface } from '../../../types/LayoutTypes'
+import { ArcStockStrategy, type BoardSurfacePair, type IStockStrategy } from './StockStrategy'
 import { ShelfFace, type ShelfSurface } from './SharedPropsTypes'
 
 // TD: approximated-placement-tripwire
@@ -90,18 +91,17 @@ export class GameBoxUtils {
     /**
      * Build an ordered list of StockSurfaces from shelf board surfaces.
      *
-     * Each ShelfSurface (one board) becomes two StockSurface entries — Near first, then Far.
-     * The returned list is ordered so Near faces fill before Far faces across all boards:
-     *   [board0.Near, board1.Near, board2.Near, board0.Far, board1.Far, board2.Far]
+     * Each ShelfSurface (one board) is resolved into a Near/Far pair. The strategy
+     * then decides the fill order — defaulting to ArcStockStrategy (Near-first, Far overflow).
      *
-     * This ordering is the default arc stocking strategy. A different strategy would
-     * return these in a different order (or omit Far faces entirely for row layouts).
+     * Pass a different strategy for row layouts (RowStockStrategy: Near-only).
      */
     static buildStockSurfaces(
         shelfPosition: THREE.Vector3,
         shelfRotationY: number,
         boardSurfaces: ShelfSurface[],
-        boxDimensions: GameBoxDimensions = { width: 0.3, height: 0.4, depth: 0.08 }
+        boxDimensions: GameBoxDimensions = { width: 0.3, height: 0.4, depth: 0.08 },
+        strategy: IStockStrategy = new ArcStockStrategy()
     ): StockSurface[] {
         const shelfAngleRad = (SHELF_ANGLE_DEGREES * Math.PI) / 180
         const gameHalfDepth = boxDimensions.depth / 2
@@ -146,9 +146,11 @@ export class GameBoxUtils {
             return { originPosition: worldOrigin, rotation, slotStep, capacity: GameLayoutConstants.GAMES_PER_SURFACE }
         }
 
-        const nearSurfaces = boardSurfaces.map(b => buildSurface(b, ShelfFace.Near))
-        const farSurfaces  = boardSurfaces.map(b => buildSurface(b, ShelfFace.Far))
-        return [...nearSurfaces, ...farSurfaces]
+        const boards: BoardSurfacePair[] = boardSurfaces.map(b => ({
+            near: buildSurface(b, ShelfFace.Near),
+            far:  buildSurface(b, ShelfFace.Far),
+        }))
+        return strategy.order(boards)
     }
 
     /**
