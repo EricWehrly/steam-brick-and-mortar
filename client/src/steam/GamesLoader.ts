@@ -47,35 +47,37 @@ export class GamesLoader {
         const sortedGames = this.sortAndLimitGames(steamUser.games, maxGames, sortFn)
         const appids = sortedGames.map(g => g.appid)
 
-        const { cachedAppids, uncachedAppids, cachedAppDetails } = await this.partitionByCache(appids)
+        const { renderableAppids, refreshAppids, renderableAppDetails, staleAppids } = await this.partitionByCache(appids)
 
-        const cachedBatchCount = Math.ceil(cachedAppids.length / BATCH_SIZE)
-        const uncachedBatchCount = Math.ceil(uncachedAppids.length / BATCH_SIZE)
-        const totalBatchCount = cachedBatchCount + uncachedBatchCount
+        const renderableBatchCount = Math.ceil(renderableAppids.length / BATCH_SIZE)
+        const refreshBatchCount = Math.ceil(refreshAppids.length / BATCH_SIZE)
+        const totalBatchCount = renderableBatchCount + refreshBatchCount
 
         const emitter = new BatchEmitter(BATCH_SIZE, totalBatchCount)
 
-        const cachedGames = await this.emitCachedGames(sortedGames, cachedAppids, cachedAppDetails, emitter)
+        const renderableGames = await this.emitCachedGames(sortedGames, renderableAppids, renderableAppDetails, emitter)
 
-        // Flush any partial remainder before uncached games start — keeps batch
+        // Flush any partial remainder before refresh fetches start — keeps batch
         // indices perfectly sequential when the two phases interleave.
-        if (uncachedAppids.length > 0) {
+        if (refreshAppids.length > 0) {
             await emitter.flush()
         }
 
-        if (uncachedAppids.length > 0) {
+        if (refreshAppids.length > 0) {
             EventManager.getInstance().emit<SteamNetworkFetchProgressEvent>(SteamEventTypes.NetworkFetchProgress, {
-                fetched: cachedAppids.length,
+                fetched: renderableAppids.length,
                 total: sortedGames.length
             })
             const gameByAppid = new Map<number, SteamGame>(sortedGames.map(g => [g.appid, g]))
-            this.fetchAndEmitUncached(uncachedAppids, gameByAppid, cachedBatchCount, emitter)
+            this.fetchAndEmitUncached(refreshAppids, gameByAppid, renderableBatchCount, emitter)
         } else {
             await emitter.flush()
         }
 
-        this.logger.info(`Loaded ${cachedGames.length} cached games, ${uncachedAppids.length} fetching in background`)
-        return cachedGames
+        this.logger.info(
+            `Loaded ${renderableGames.length} renderable games (${staleAppids.length} stale), ${refreshAppids.length} refreshing in background`
+        )
+        return renderableGames
     }
 
     private async emitCachedGames(
@@ -145,21 +147,47 @@ export class GamesLoader {
     }
 
     private async partitionByCache(appids: number[]): Promise<{
-        cachedAppids: number[]
-        uncachedAppids: number[]
-        cachedAppDetails: Map<number, AppDetailsData>
+        renderableAppids: number[]
+        refreshAppids: number[]
+        renderableAppDetails: Map<number, AppDetailsData>
+        staleAppids: number[]
     }> {
         const cachedAppDetails = await this.appDetailsCache.getMany(appids)
-        const cachedAppids = appids.filter(id => this.isMetadataComplete(cachedAppDetails.get(id)))
-        const uncachedAppids = appids.filter(id => !this.isMetadataComplete(cachedAppDetails.get(id)))
+        const renderableAppDetails = new Map<number, AppDetailsData>()
+        const renderableAppids: number[] = []
+        const staleAppids: number[] = []
+        const refreshAppids: number[] = []
 
-        if (uncachedAppids.length === 0) {
-            this.logger.debug(`All ${appids.length} games have complete metadata in cache`)
-        } else {
-            this.logger.info(`Loading ${appids.length} games: ${cachedAppids.length} cached, ${uncachedAppids.length} to fetch`)
+        for (const appid of appids) {
+            const cachedResult = cachedAppDetails.get(appid)
+            if (!cachedResult) {
+                refreshAppids.push(appid)
+                continue
+            }
+
+            const normalizedCachedData = this.normalizeBatchData(cachedResult.data)
+            if (this.isMetadataComplete(normalizedCachedData)) {
+                renderableAppids.push(appid)
+                renderableAppDetails.set(appid, normalizedCachedData)
+
+                if (cachedResult.isStale) {
+                    staleAppids.push(appid)
+                    refreshAppids.push(appid)
+                }
+            } else {
+                refreshAppids.push(appid)
+            }
         }
 
-        return { cachedAppids, uncachedAppids, cachedAppDetails }
+        if (refreshAppids.length === 0) {
+            this.logger.debug(`All ${appids.length} games have complete metadata in cache (0 stale)`)
+        } else {
+            this.logger.info(
+                `Loading ${appids.length} games: ${renderableAppids.length} renderable (${staleAppids.length} stale), ${refreshAppids.length} to refresh`
+            )
+        }
+
+        return { renderableAppids, refreshAppids, renderableAppDetails, staleAppids }
     }
 
     private isMetadataComplete(cached: AppDetailsData | undefined): boolean {
