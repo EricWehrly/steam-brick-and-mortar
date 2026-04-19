@@ -17,6 +17,8 @@
 import * as THREE from 'three'
 import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
 import type { StockSurface } from '../../../types/LayoutTypes'
+import type { ILayoutDefinition } from './ILayoutDefinition'
+import type { ShelfInfo } from '../../../types/LayoutTypes'
 
 /**
  * RowStockStrategy
@@ -110,4 +112,10 @@ export function computeRowShelfLayout(
     }
 
     return result
+}
+
+export const RowLayout: ILayoutDefinition = {
+    mode: 'row',
+    createStockStrategy: () => new RowStockStrategy(),
+    computeShelves: (totalShelves): ShelfInfo[] => computeRowShelfLayout(totalShelves),
 }

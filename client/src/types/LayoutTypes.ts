@@ -3,7 +3,10 @@
  *
  * Domain types for the layout pipeline: Layout → Sections → Sort → Placement.
  * These are data shapes, not events. Import from here when you need Section,
- * StockSurface, or related types without pulling in event definitions.
+ * StockSurface, ShelfInfo, or LayoutMode without pulling in event definitions.
+ *
+ * Note: ILayoutDefinition lives in scene/props/shared/ILayoutDefinition.ts to
+ * avoid a circular import chain (ILayoutDefinition → IStockStrategy → StockSurface → here).
  */
 
 import * as THREE from 'three'
@@ -18,8 +21,8 @@ import type { GameSortMode } from './EnvironmentEvents'
  */
 export const LayoutModes = {
     Arc:   'arc',
-    Spoke: 'spoke',
     Row:   'row',
+    Spoke: 'spoke',
 } as const
 
 export type LayoutMode = typeof LayoutModes[keyof typeof LayoutModes]
@@ -64,4 +67,17 @@ export interface StockSurface {
     slotStep: THREE.Vector3
     /** Maximum number of game slots on this surface. */
     capacity: number
+}
+
+/**
+ * ShelfInfo
+ *
+ * Minimal shelf descriptor returned by all layout computers (computeShelves).
+ * World-space position and rotation for a single shelf unit.
+ */
+export interface ShelfInfo {
+    position: THREE.Vector3
+    rotationY: number
+    row: number
+    indexInRow: number
 }

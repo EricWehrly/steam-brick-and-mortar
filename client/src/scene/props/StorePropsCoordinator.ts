@@ -10,6 +10,17 @@
  * - Batch sequencing (BatchCoordinator)
  * - Entrance floor mat (PropRenderer)
  *
+ * ## Coordinator lifecycle model
+ *
+ * Pure coordinators (event wiring + plain data) are singletons with reset():
+ *   ShelfLayoutCoordinator, BatchCoordinator, GameBoxSpawner
+ *
+ * GPU resource owners are disposable — reconstructed when GPU state must be fresh:
+ *   InstancedShelfRenderer (owns InstancedMesh allocations)
+ *
+ * On layout switch: reset pure coordinators, dispose+reconstruct GPU owner.
+ * On sort/filter switch: reset pure coordinators only (no GPU teardown needed).
+ *
  * Activation is a side-effect of importing this module. No explicit init needed.
  */
 
@@ -26,7 +37,7 @@ import type { RoomResizedEvent } from '../../types/InteractionEvents'
 import type { BatchReadyForPlacementEvent } from '../../types/InteractionEvents'
 import type { SteamLoadLibraryEvent } from '../../types/InteractionEvents'
 import { type LayoutRequestedEvent } from '../../types/EnvironmentEvents'
-import { type LayoutMode, LayoutModes } from '../../types/LayoutTypes'
+import { type LayoutMode } from '../../types/LayoutTypes'
 import { DataManager } from '../../core/data'
 import { BatchCoordinator } from '../batch/BatchCoordinator'
 import { GameBoxSpawner } from '../spawning/GameBoxSpawner'
@@ -39,14 +50,15 @@ class StorePropsCoordinator {
 
     private readonly eventManager: EventManager
 
-    // Owned subsystems — null until SetupRequest fires
+    // Singleton pure coordinators — always present after first SetupRequest
     private batchCoordinator: BatchCoordinator<unknown> | null = null
     private gameBoxSpawner: GameBoxSpawner | null = null
     private shelfLayoutCoordinator: ShelfLayoutCoordinator | null = null
-    private instancedShelfRenderer: InstancedShelfRenderer | null = null
-    private scene: THREE.Scene | null = null
 
-    // Entrance mat — recreated on each RoomResized
+    // GPU resource owner — disposed and reconstructed on layout switch
+    private instancedShelfRenderer: InstancedShelfRenderer | null = null
+
+    private scene: THREE.Scene | null = null
     private entranceMat: THREE.Group | null = null
 
     // Tracks last-seen batch count to detect library switches
@@ -73,7 +85,6 @@ class StorePropsCoordinator {
             StorePropsEventTypes.ClearRequest,
             this.handleClearRequest.bind(this)
         )
-
         this.eventManager.registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.handleBatchReadyForPlacement.bind(this)
@@ -93,9 +104,7 @@ class StorePropsCoordinator {
     private async handleSetupRequest(_event: CustomEvent<StorePropsSetupRequestEvent>): Promise<void> {
         const startTime = performance.now()
 
-        // Resolve scene on first setup; reuse on subsequent calls (re-sort, etc.)
         if (!this.scene) {
-            const { DataManager } = await import('../../core/data')
             this.scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
             if (!this.scene) {
                 StorePropsCoordinator.logger.warn('Main scene not available — store props setup aborted')
@@ -103,14 +112,16 @@ class StorePropsCoordinator {
             }
         }
 
-        // Initialise subsystems exactly once. GameBoxSpawner is constructed early so it is
-        // subscribed to BatchReadyForPlacement before any batches can arrive.
-        if (!this.gameBoxSpawner) {
+        // Pure coordinators: create once, reset on subsequent calls
+        if (!this.shelfLayoutCoordinator) {
+            this.shelfLayoutCoordinator = ShelfLayoutCoordinator.getInstance(this.activeLayoutMode)
             this.batchCoordinator = new BatchCoordinator()
-            this.shelfLayoutCoordinator = new ShelfLayoutCoordinator(this.activeLayoutMode)
             this.gameBoxSpawner = new GameBoxSpawner(this.shelfLayoutCoordinator.stockStrategy)
-            this.instancedShelfRenderer = new InstancedShelfRenderer()
+        }
 
+        // GPU owner: create fresh each setup (disposed on layout switch or clear)
+        if (!this.instancedShelfRenderer) {
+            this.instancedShelfRenderer = new InstancedShelfRenderer()
             this.instancedShelfRenderer.initialize().catch(error => {
                 StorePropsCoordinator.logger.warn('InstancedShelfRenderer initialization failed:', error)
             })
@@ -125,8 +136,6 @@ class StorePropsCoordinator {
     }
 
     private handleClearRequest(_event: CustomEvent<StorePropsClearRequestEvent>): void {
-        // During a layout switch we've already torn down manually; ignore this ClearRequest
-        // to avoid resetting the freshly-initialized subsystems.
         if (this.layoutSwitchInProgress) {
             StorePropsCoordinator.logger.debug('ClearRequest suppressed during layout switch')
             return
@@ -134,6 +143,7 @@ class StorePropsCoordinator {
         this.instancedShelfRenderer?.reset()
         this.gameBoxSpawner?.reset()
         this.batchCoordinator?.reset()
+        this.shelfLayoutCoordinator?.reset()
         this.lastTotalBatches = 0
 
         StorePropsCoordinator.logger.info('Store props cleared')
@@ -142,7 +152,6 @@ class StorePropsCoordinator {
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
         const { totalBatches } = event.detail
 
-        // Detect library switch (e.g. anonymous → real user) and reset shelf geometry.
         if (this.lastTotalBatches > 0 && totalBatches !== this.lastTotalBatches) {
             StorePropsCoordinator.logger.debug(
                 `Batch count changed (${this.lastTotalBatches} → ${totalBatches}) — resetting shelf renderer`
@@ -156,8 +165,6 @@ class StorePropsCoordinator {
         const { dimensions } = event.detail
 
         if (!this.scene) {
-            // Scene may not be ready yet if room resizes before first SetupRequest
-            const { DataManager } = await import('../../core/data')
             this.scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
         }
 
@@ -184,21 +191,21 @@ class StorePropsCoordinator {
         this.activeLayoutMode = detail.layoutMode
         StorePropsCoordinator.logger.info(`Layout mode → ${detail.layoutMode}; triggering scene rebuild`)
 
-        // Guard against the ClearRequest that SteamIntegration emits mid-reload
-        // resetting the subsystems we're about to build.
         this.layoutSwitchInProgress = true
 
-        this.instancedShelfRenderer?.dispose()
-        this.gameBoxSpawner?.dispose()
-        this.batchCoordinator?.dispose()
-        this.shelfLayoutCoordinator?.dispose()
-        this.shelfLayoutCoordinator = null
-        this.gameBoxSpawner = null
-        this.batchCoordinator = null
-        this.instancedShelfRenderer = null
+        // Reset pure coordinators — keeps handlers, clears accumulated state
+        this.shelfLayoutCoordinator?.reset(detail.layoutMode)
+        this.batchCoordinator?.reset()
+        this.gameBoxSpawner?.resetWithStrategy(
+            this.shelfLayoutCoordinator?.stockStrategy ?? (() => { throw new Error('ShelfLayoutCoordinator not initialised') })()
+        )
         this.lastTotalBatches = 0
 
-        // Build fresh subsystems under the new layout mode.
+        // GPU owner must be fully torn down — InstancedMesh slots can't be partially reused
+        this.instancedShelfRenderer?.dispose()
+        this.instancedShelfRenderer = null
+
+        // Rebuild GPU owner under new layout
         this.eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, {
             source: EventSource.System,
         })
@@ -210,12 +217,11 @@ class StorePropsCoordinator {
             userInput: userInput ?? undefined,
             forceUpdate: false,
         })
-        // Clear the guard once the event has been dispatched
+
         this.layoutSwitchInProgress = false
     }
 
     public dispose(): void {
-        this.gameBoxSpawner?.dispose()
         this.instancedShelfRenderer?.dispose()
         this.shelfLayoutCoordinator?.dispose()
 

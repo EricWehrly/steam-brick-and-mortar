@@ -72,7 +72,7 @@ export class GameBoxSpawner {
     private placementIntents: Map<number, PlacementIntent> = new Map()
 
     private readonly labelsEnabled: boolean
-    private readonly stockStrategy: IStockStrategy
+    private stockStrategy: IStockStrategy
 
     /** Expose the current renderer for external consumers (e.g. addToScene, updateLODForCamera). */
     public getRenderer(): GpuGameBoxRenderer | null {
@@ -115,6 +115,12 @@ export class GameBoxSpawner {
         this.prefetchResults.clear()
         this.placementIntents.clear()
         GameBoxSpawner.logger.debug('Reset: renderer disposed, state cleared')
+    }
+
+    /** Reset state and adopt a new stock strategy (e.g. on layout mode switch). */
+    public resetWithStrategy(stockStrategy: IStockStrategy): void {
+        this.stockStrategy = stockStrategy
+        this.reset()
     }
 
     public dispose(): void {

@@ -25,6 +25,8 @@
 import * as THREE from 'three'
 import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
 import type { StockSurface } from '../../../types/LayoutTypes'
+import type { ILayoutDefinition } from './ILayoutDefinition'
+import type { ShelfInfo } from '../../../types/LayoutTypes'
 
 /**
  * SpokeStockStrategy
@@ -147,4 +149,16 @@ export function computeSpokeShelfLayout(
     }
 
     return result
+}
+
+export const SpokeLayout: ILayoutDefinition = {
+    mode: 'spoke',
+    createStockStrategy: () => new SpokeStockStrategy(),
+    computeShelves: (_totalShelves): ShelfInfo[] =>
+        computeSpokeShelfLayout().map((s, i) => ({
+            position: s.position,
+            rotationY: s.rotationY,
+            row: s.spokeIndex,
+            indexInRow: i,
+        })),
 }

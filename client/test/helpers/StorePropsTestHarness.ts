@@ -24,7 +24,7 @@ export interface StorePropsTestHarness {
 export function createStorePropsTestHarness(scene: THREE.Scene): StorePropsTestHarness {
     const batchCoordinator = new BatchCoordinator()
     const gameBoxSpawner = new GameBoxSpawner()
-    const shelfLayoutCoordinator = new ShelfLayoutCoordinator()
+    const shelfLayoutCoordinator = ShelfLayoutCoordinator.getInstance()
     const instancedShelfRenderer = new InstancedShelfRenderer()
 
     const propsGroup = new THREE.Group()
