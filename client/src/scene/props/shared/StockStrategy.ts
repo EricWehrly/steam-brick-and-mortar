@@ -59,3 +59,22 @@ export class RowStockStrategy implements IStockStrategy {
         return boards.map(b => b.near)
     }
 }
+
+/**
+ * SpokeStockStrategy
+ *
+ * Strategy for spoke layout shelf units. Each shelf unit in a spoke is part of
+ * one of two flanking rows; only its Near face (the one facing the aisle) is
+ * used. The Far face belongs to an outer aisle that this unit does not serve.
+ *
+ * Cross-row interleaving (left row pos 0, right row pos 0, left pos 1, …) is
+ * a layout-level concern handled by the order in which the layout emits
+ * ShelfReady events and GameBoxSpawner processes them — not by this strategy.
+ *
+ *   board[0].near, board[1].near, board[2].near
+ */
+export class SpokeStockStrategy implements IStockStrategy {
+    order(boards: BoardSurfacePair[]): StockSurface[] {
+        return boards.map(b => b.near)
+    }
+}
