@@ -12,6 +12,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SteamBrickAndMortarApp } from '../../src/core/SteamBrickAndMortarApp'
+import { SteamEventTypes } from '../../src/types/InteractionEvents'
+import type { SteamLoadLibraryEvent } from '../../src/types/InteractionEvents'
 import type { SteamUser } from '../../src/steam'
 
 // Mock IndexedDB for image cache
@@ -108,11 +110,21 @@ describe('Steam Data to Texture Integration', () => {
 
             const steamIntegration = app.getSteamIntegration()
 
-            vi.spyOn(steamIntegration, 'loadGamesForUser').mockRejectedValue(
+            const steamClient = steamIntegration['steamClient']
+            
+            vi.spyOn(steamClient, 'getUserGames').mockRejectedValue(
                 new Error('Steam API unavailable')
             )
 
-            await expect(steamIntegration.loadGamesForUser('testuser')).rejects.toThrow('Steam API unavailable')
+            // Emit the event to trigger the load
+            const loggerSpy = vi.spyOn(steamIntegration['logger'], 'error').mockImplementation(() => {})
+            app['eventManager'].emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, { userInput: 'testuser' })
+            
+            // Wait for microtasks to clear
+            await new Promise(resolve => setTimeout(resolve, 0))
+            
+            expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('Library load failed'), expect.any(Error))
+            loggerSpy.mockRestore()
 
             // App should remain in a valid state after failure
             expect(app.getSceneManager()).toBeDefined()

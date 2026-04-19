@@ -5,6 +5,7 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { SteamIntegration } from '../../../src/steam-integration/SteamIntegration'
 import { SteamEventTypes, GameEventTypes, AppSettingsEventTypes } from '../../../src/types/InteractionEvents'
+import type { SteamLoadLibraryEvent } from '../../../src/types/InteractionEvents'
 
 // Mock the EventManager
 vi.mock('../../../src/core/EventManager', () => ({
@@ -96,7 +97,7 @@ describe('SteamIntegration Unit Tests', () => {
     })
 
     describe('Load Games Integration', () => {
-        test('should handle loadGamesForUser with minimal callbacks', async () => {
+        test('should handle loadLibrary events with minimal callbacks', async () => {
             // Mock the Steam API responses
             const mockResolveResponse = {
                 vanity_url: 'testuser',
@@ -144,9 +145,18 @@ describe('SteamIntegration Unit Tests', () => {
                 }
             }])
             
-            const result = await steamIntegration.loadGamesForUser('testuser')
-            
-            expect(result).toBeDefined()
+            const loadedPromise = new Promise(resolve => {
+                steamIntegration['eventManager'].registerEventHandler(SteamEventTypes.DataLoaded, resolve)
+            })
+
+            await steamIntegration['handleLoadLibrary'](new CustomEvent(SteamEventTypes.LoadLibrary, {
+                detail: { userInput: 'testuser', forceUpdate: false } as SteamLoadLibraryEvent
+            }))
+
+            // Verify Steam integration fetched and stored the user's library correctly
+            const state = steamIntegration['getGameLibraryState']()
+            expect(state.userData).toBeDefined()
+            expect(state.userData?.steamid).toBe('76561198000000000')
             
             // @ts-expect-error - Accessing private member for testing
             expect(steamIntegration.steamClient.resolveVanityUrl).toHaveBeenCalledWith('testuser', false)
@@ -154,17 +164,22 @@ describe('SteamIntegration Unit Tests', () => {
             expect(steamIntegration.steamClient.getUserGames).toHaveBeenCalledWith('76561198000000000', false)
         })
 
-        test('should handle errors during loading', async () => {
+        test('should gracefully surface errors during loading without crashing', async () => {
             // Mock an error
             const mockError = new Error('API Error')
             // @ts-expect-error - Accessing private member for testing
             steamIntegration.steamClient.resolveVanityUrl = vi.fn().mockRejectedValue(mockError)
             
+            // Watch for error logging
+            // @ts-expect-error - Accessing protected static member
+            const loggerSpy = vi.spyOn(SteamIntegration.logger, 'error').mockImplementation(() => {})
+
+            await steamIntegration['handleLoadLibrary'](new CustomEvent(SteamEventTypes.LoadLibrary, {
+                detail: { userInput: 'testuser', forceUpdate: false } as SteamLoadLibraryEvent
+            }))
             
-            
-            await expect(steamIntegration.loadGamesForUser('testuser')).rejects.toThrow('API Error')
-            // Expect the new contextual error message that includes input type and specific guidance
-            
+            expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('Library load failed'), mockError)
+            loggerSpy.mockRestore()
         })
     })
 })
