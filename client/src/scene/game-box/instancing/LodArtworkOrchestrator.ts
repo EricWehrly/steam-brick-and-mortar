@@ -50,9 +50,7 @@ export const STEAM_CAPSULE_HEIGHT = 450
 export const DEFAULT_BOX_WIDTH = 0.2
 export const DEFAULT_BOX_HEIGHT = 0.3
 
-export type LodConfig = LodTierSpec
-
-export const DEFAULT_LOD_CONFIGS: LodConfig[] = getDefaultLodTierSpecs().map(spec => ({
+export const DEFAULT_LOD_CONFIGS: LodTierSpec[] = getDefaultLodTierSpecs().map(spec => ({
     ...spec,
     textureWidth: spec.level === LOD_LEVEL.HIGH ? STEAM_CAPSULE_WIDTH : spec.textureWidth,
     textureHeight: spec.level === LOD_LEVEL.HIGH ? STEAM_CAPSULE_HEIGHT : spec.textureHeight,
