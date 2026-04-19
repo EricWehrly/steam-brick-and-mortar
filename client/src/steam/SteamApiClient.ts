@@ -44,6 +44,8 @@ export interface SteamApiError {
     timestamp: string
 }
 
+const CACHED_USER_TTL = 48 * 60 * 60 * 1000 // 48 hours in milliseconds
+
 /**
  * Steam API client. Public surface kept intentionally small — heavy lifting
  * (progressive game loading, batch fetching, caching) lives in GamesLoader.
@@ -143,7 +145,7 @@ export class SteamApiClient {
             // Cache expired but we have stale data. Use it, but trigger background refresh.
             const stale = this.cache.getStale<SteamUser>(cacheKey)
             if (stale) {
-                SteamApiClient.logger.info(`Cache for ${steamId} is stale (older than 48h). Returning stale data while fetching update...`)
+                SteamApiClient.logger.info(`Cache for ${steamId} is stale (older than ${CACHED_USER_TTL / (60 * 60 * 1000)}h). Returning stale data while fetching update...`)
                 // Fire and forget
                 this.fetchAndCacheUserGames(steamId, cacheKey).catch(err => {
                     SteamApiClient.logger.error(`Background refresh for ${steamId} failed:`, err)
@@ -169,7 +171,7 @@ export class SteamApiClient {
             }
 
             // 48 hour TTL for game lists
-            this.cache.set(cacheKey, response, { ttlMs: 48 * 60 * 60 * 1000 })
+            this.cache.set(cacheKey, response, { ttlMs: CACHED_USER_TTL })
             return response
         } catch (error) {
             SteamApiClient.logger.error('Failed to fetch user games:', error)
