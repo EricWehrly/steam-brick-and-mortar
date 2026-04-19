@@ -53,6 +53,9 @@ class StorePropsCoordinator {
     // Active layout mode — drives ShelfLayoutCoordinator strategy on next setup
     private activeLayoutMode: LayoutMode = 'arc'
 
+    // True while a layout-switch rebuild is in progress; suppresses spurious ClearRequest handling
+    private layoutSwitchInProgress = false
+
     static {
         new StorePropsCoordinator()
     }
@@ -120,6 +123,12 @@ class StorePropsCoordinator {
     }
 
     private handleClearRequest(_event: CustomEvent<StorePropsClearRequestEvent>): void {
+        // During a layout switch we've already torn down manually; ignore this ClearRequest
+        // to avoid resetting the freshly-initialized subsystems.
+        if (this.layoutSwitchInProgress) {
+            StorePropsCoordinator.logger.debug('ClearRequest suppressed during layout switch')
+            return
+        }
         this.instancedShelfRenderer?.reset()
         this.gameBoxSpawner?.reset()
         this.batchCoordinator?.reset()
@@ -173,7 +182,10 @@ class StorePropsCoordinator {
         this.activeLayoutMode = detail.layoutMode
         StorePropsCoordinator.logger.info(`Layout mode → ${detail.layoutMode}; triggering scene rebuild`)
 
-        // Reload-gated: tear down existing subsystems so next SetupRequest rebuilds with the new mode.
+        // Guard against the ClearRequest that SteamIntegration emits mid-reload
+        // resetting the subsystems we're about to build.
+        this.layoutSwitchInProgress = true
+
         this.instancedShelfRenderer?.reset()
         this.gameBoxSpawner?.reset()
         this.batchCoordinator?.reset()
@@ -184,19 +196,21 @@ class StorePropsCoordinator {
         this.instancedShelfRenderer = null
         this.lastTotalBatches = 0
 
-        // Re-trigger setup with the new layout mode, then re-run the game loading pipeline.
+        // Build fresh subsystems under the new layout mode.
         this.eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, {
             source: EventSource.System,
         })
 
-        // Re-emit SteamLoadLibraryEvent so BatchCoordinator gets new batches and ShelfLayoutCoordinator
-        // receives BatchReadyForPlacement events under the new layout.
+        // Re-emit LoadLibrary so the batch pipeline runs under the new layout.
+        // SteamIntegration will emit ClearRequest internally, which we suppress via the flag.
         import('../../core/data').then(({ DataManager }) => {
             const userInput = DataManager.getInstance().get<string>('steam.userInput')
             this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
                 userInput: userInput ?? undefined,
                 forceUpdate: false,
             })
+            // Clear the guard once the event has been dispatched synchronously
+            this.layoutSwitchInProgress = false
         })
     }
 
