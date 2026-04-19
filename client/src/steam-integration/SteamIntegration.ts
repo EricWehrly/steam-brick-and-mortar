@@ -72,9 +72,15 @@ export class SteamIntegration {
     }
 
     private registerEventHandlers(): void {
-        this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.handleLoadGames.bind(this))
-        this.eventManager.registerEventHandler(SteamEventTypes.LoadFromCache, this.handleLoadFromCache.bind(this))
-        this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.handleRefreshCache.bind(this))
+        // TD: redundant-steam-events
+        // These three events currently trigger the exact same tear-down-and-load flow
+        // and should be collapsed into a single LoadLibrary/ReloadLibrary event structure.
+        // For now, we point them all at the unified handler so the caching/staleness logic 
+        // can live in one place.
+        this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.handleLoadLibrary.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.LoadFromCache, this.handleLoadLibrary.bind(this))
+        this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.handleLoadLibrary.bind(this))
+        
         this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.handleClearCache.bind(this))
         this.eventManager.registerEventHandler(AppSettingsEventTypes.Changed, this.handleSettingsChange.bind(this))
         this.eventManager.registerEventHandler(GameEventTypes.Start, this.handleGameStart.bind(this))
@@ -248,62 +254,36 @@ export class SteamIntegration {
         }
     }
 
-    private async handleLoadGames(event: CustomEvent<SteamLoadGamesEvent>): Promise<void> {
-        const { userInput } = event.detail
+    private async handleLoadLibrary(event: CustomEvent<any>): Promise<void> {
+        // TD: caching-staleness-heuristic
+        // 1. Determine if we should force an update based on staleness of cached data
+        // 2. Or, if this is a manual "Refresh Cache Now" request from the UI panel (to be built)
+        // 3. Determine the userInput (either passed from event, or use this.steamId if reloading)
 
-        try {
-            // If a store is already loaded, clear it before the new user's data arrives.
-            // This removes the anonymous (or previous user's) shelf geometry, game boxes,
-            // and labels so they don't ghost behind the incoming library.
-            if (this.gameLibrary.getState().userData?.games?.length) {
-                this.eventManager.emit(StorePropsEventTypes.ClearRequest, {})
-                SteamIntegration.logger.info('Emitted ClearRequest before user library load')
-            }
+        // TD: background-refresh-and-update
+        // After we load the cached data, we need a mechanism to fetch updated game data 
+        // in the background and gracefully inject any new games into the scene.
 
-            await this.loadGamesForUser(userInput)
-            this.storeSteamDataAndEmitEvent(userInput)
-            SteamIntegration.logger.info('Load games completed')
-        } catch (error) {
-            SteamIntegration.logger.error('Load games failed:', error)
-        }
-    }
+        const { userInput, forceUpdate } = event.detail
+        const targetInput = userInput || this.steamId
 
-    private async handleLoadFromCache(event: CustomEvent<SteamLoadFromCacheEvent>): Promise<void> {
-        const { userInput: vanityUrl } = event.detail
-
-        if (!this.hasCachedData(vanityUrl)) {
-            SteamIntegration.logger.warn('No cached data found')
+        if (!targetInput) {
+            SteamIntegration.logger.warn('No user input or current user provided, cannot load library')
             return
         }
 
-        // If a store is already loaded, clear it before the new user's data arrives
-        if (this.gameLibrary.getState().userData?.games?.length) {
-            this.eventManager.emit(StorePropsEventTypes.ClearRequest, {})
-            SteamIntegration.logger.info('Emitted ClearRequest before cached library load')
-        }
-
-        await this.loadGamesForUser(vanityUrl, false)
-        this.storeSteamDataAndEmitEvent(vanityUrl)
-        SteamIntegration.logger.info('Loaded from cache')
-    }
-
-    private async handleRefreshCache(event: CustomEvent<SteamCacheRefreshEvent>): Promise<void> {
-        const { forceUpdate } = event.detail
         try {
-            if (!this.steamId) {
-                SteamIntegration.logger.warn('No user currently loaded, cannot refresh')
-                return
+            // If a store is already loaded, clear it before the new user's data arrives.
+            if (this.gameLibrary.getState().userData?.games?.length) {
+                this.eventManager.emit(StorePropsEventTypes.ClearRequest, {})
+                SteamIntegration.logger.info('Emitted ClearRequest before library load')
             }
-            
-            await this.loadGamesForUser(this.steamId, forceUpdate)
-            
-            const gameState = this.getGameLibraryState()
-            if (gameState.userData?.steamid) {
-                this.storeSteamDataAndEmitEvent(this.steamId ?? null)
-            }
-            SteamIntegration.logger.info(forceUpdate ? 'Cache force updated from network' : 'Cache refreshed')
+
+            await this.loadGamesForUser(targetInput, forceUpdate)
+            this.storeSteamDataAndEmitEvent(targetInput)
+            SteamIntegration.logger.info(forceUpdate ? 'Library load (forced update) completed' : 'Library load completed')
         } catch (error) {
-            SteamIntegration.logger.error(forceUpdate ? 'Cache force update failed:' : 'Cache refresh failed:', error)
+            SteamIntegration.logger.error('Library load failed:', error)
         }
     }
 
