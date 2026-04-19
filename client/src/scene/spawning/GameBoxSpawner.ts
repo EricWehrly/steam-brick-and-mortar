@@ -276,21 +276,24 @@ export class GameBoxSpawner {
         const boxDimensions = { width: 0.3, height: 0.4, depth: 0.08 }
         let gameIndex = 0
 
+        // Fill all front rows top-to-bottom first, then all back rows.
+        // This makes the shelf readable face-first: top-left → top-right,
+        // then next row, all the way down before touching the back side.
         for (const surface of surfaces) {
             if (gameIndex >= games.length) break
+            const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
+            if (frontGames.length > 0) {
+                this.assignIntentsForRow(shelf, surface, frontGames, ShelfSide.Front, boxDimensions)
+                gameIndex += frontGames.length
+            }
+        }
 
+        for (const surface of surfaces) {
+            if (gameIndex >= games.length) break
             const backGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
             if (backGames.length > 0) {
                 this.assignIntentsForRow(shelf, surface, backGames, ShelfSide.Back, boxDimensions)
                 gameIndex += backGames.length
-            }
-
-            if (gameIndex < games.length) {
-                const frontGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
-                if (frontGames.length > 0) {
-                    this.assignIntentsForRow(shelf, surface, frontGames, ShelfSide.Front, boxDimensions)
-                    gameIndex += frontGames.length
-                }
             }
         }
     }
