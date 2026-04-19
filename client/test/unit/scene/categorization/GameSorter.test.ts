@@ -31,7 +31,6 @@ vi.mock('../../../../src/core/data/DataManager', () => ({
     },
 }))
 
-// Mock SteamIntegration to avoid instantiating SteamApiClient
 let mockIsAnonymous = false
 vi.mock('../../../../src/steam-integration/SteamIntegration', () => ({
     SteamIntegration: {
@@ -41,7 +40,6 @@ vi.mock('../../../../src/steam-integration/SteamIntegration', () => ({
     },
 }))
 
-// Import after mocks are hoisted
 import { GameSorter } from '../../../../src/scene/categorization/GameSorter'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -78,71 +76,59 @@ describe('GameSorter', () => {
         expect(mockHandlers.has(GameEventTypes.AllBatchesComplete)).toBe(true)
     })
 
-    it('emits GamesSort when AllBatchesComplete fires with games', () => {
+    it('emits SectionsReady when AllBatchesComplete fires with games', () => {
         mockGames = [makeGame(1), makeGame(2)]
         new GameSorter()
         fireAllBatchesComplete()
 
         expect(mockEmit).toHaveBeenCalledOnce()
         const [eventType, payload] = mockEmit.mock.calls[0]
-        expect(eventType).toBe(GameEventTypes.GamesSort)
-        expect(payload.sortedGames).toHaveLength(2)
-        expect((payload.buckets as ReadonlyMap<string, string>).size).toBe(1)
-        expect((payload.buckets as ReadonlyMap<string, string>).get(RecentlyPlayedBucket.Unplayed)).toBe('Never Played')
+        expect(eventType).toBe(GameEventTypes.SectionsReady)
+        const totalGames = payload.sections.reduce((sum: number, s: any) => sum + s.games.length, 0)
+        expect(totalGames).toBe(2)
     })
 
-    it('does NOT emit GamesSort when there are no games', () => {
+    it('does NOT emit when there are no games', () => {
         mockGames = []
         new GameSorter()
         fireAllBatchesComplete()
-
         expect(mockEmit).not.toHaveBeenCalled()
     })
 
-    it('builds non-empty bucket map when any game has rtime_last_played > 0', () => {
-        const now = Math.floor(Date.now() / 1000)
-        mockGames = [makeGame(1, now - 3600), makeGame(2, 0)]
-        new GameSorter()
-        fireAllBatchesComplete()
-
-        const [, payload] = mockEmit.mock.calls[0]
-        expect((payload.buckets as ReadonlyMap<string, string>).size).toBeGreaterThan(0)
-    })
-
-    it('sorts by recently played when bucket data exists', () => {
-        const now = Math.floor(Date.now() / 1000)
-        const older = now - 60 * 60 * 24 * 10   // 10 days ago
-        const newer = now - 3600                  // 1 hour ago
-        mockGames = [makeGame(1, older), makeGame(2, newer)]
-        new GameSorter()
-        fireAllBatchesComplete()
-
-        const [, payload] = mockEmit.mock.calls[0]
-        // newer played first (most-recently-played = first)
-        expect((payload.sortedGames[0] as SteamGameData).appid).toBe(2)
-        expect((payload.sortedGames[1] as SteamGameData).appid).toBe(1)
-    })
-
-    it('builds a bucket map with labels for recently-played games', () => {
-        const now = Math.floor(Date.now() / 1000)
-        mockGames = [makeGame(1, now - 3600)] // played today
-        new GameSorter()
-        fireAllBatchesComplete()
-
-        const [, payload] = mockEmit.mock.calls[0]
-        const buckets: ReadonlyMap<string, string> = payload.buckets
-        expect(buckets.has(RecentlyPlayedBucket.Today)).toBe(true)
-        expect(buckets.get(RecentlyPlayedBucket.Today)).toBe('Played Today')
-    })
-
-    it('emits only the Unplayed bucket when no recently-played data exists', () => {
+    it('produces only Unplayed section when no recently-played data exists', () => {
         mockGames = [makeGame(1, 0), makeGame(2, 0)]
         new GameSorter()
         fireAllBatchesComplete()
 
         const [, payload] = mockEmit.mock.calls[0]
-        expect((payload.buckets as ReadonlyMap<string, string>).size).toBe(1)
-        expect((payload.buckets as ReadonlyMap<string, string>).get(RecentlyPlayedBucket.Unplayed)).toBe('Never Played')
+        expect(payload.sections).toHaveLength(1)
+        expect(payload.sections[0].name).toBe('Never Played')
+        expect(payload.sections[0].games).toHaveLength(2)
+    })
+
+    it('sorts by recently played — most recent section first', () => {
+        const now = Math.floor(Date.now() / 1000)
+        const older = now - 60 * 60 * 24 * 10
+        const newer = now - 3600
+        mockGames = [makeGame(1, older), makeGame(2, newer)]
+        new GameSorter()
+        fireAllBatchesComplete()
+
+        const [, payload] = mockEmit.mock.calls[0]
+        const allGames = payload.sections.flatMap((s: any) => s.games)
+        expect(allGames[0].appid).toBe(2)
+        expect(allGames[1].appid).toBe(1)
+    })
+
+    it('produces a Today section for recently-played games', () => {
+        const now = Math.floor(Date.now() / 1000)
+        mockGames = [makeGame(1, now - 3600)]
+        new GameSorter()
+        fireAllBatchesComplete()
+
+        const [, payload] = mockEmit.mock.calls[0]
+        const sectionNames: string[] = payload.sections.map((s: any) => s.name)
+        expect(sectionNames).toContain('Played Today')
     })
 })
 
@@ -207,22 +193,18 @@ describe('GameSorter.sortByPlaytime', () => {
         mockGames = []
     })
 
-    it('emits GamesSort sorted descending by playtime_forever', () => {
-        mockGames = [
-            makeGame(1, 0, 100),
-            makeGame(2, 0, 500),
-            makeGame(3, 0, 50),
-        ]
+    it('emits SectionsReady sorted descending by playtime_forever', () => {
+        mockGames = [makeGame(1, 0, 100), makeGame(2, 0, 500), makeGame(3, 0, 50)]
         const sorter = new GameSorter()
         sorter.sortByPlaytime()
 
         expect(mockEmit).toHaveBeenCalledOnce()
         const [eventType, payload] = mockEmit.mock.calls[0]
-        expect(eventType).toBe(GameEventTypes.GamesSort)
-        const sorted = payload.sortedGames as SteamGameData[]
-        expect(sorted[0].appid).toBe(2)  // 500 minutes
-        expect(sorted[1].appid).toBe(1)  // 100 minutes
-        expect(sorted[2].appid).toBe(3)  // 50 minutes
+        expect(eventType).toBe(GameEventTypes.SectionsReady)
+        const allGames = payload.sections.flatMap((s: any) => s.games)
+        expect(allGames[0].appid).toBe(2)  // 500 minutes
+        expect(allGames[1].appid).toBe(1)  // 100 minutes
+        expect(allGames[2].appid).toBe(3)  // 50 minutes
     })
 
     it('does not emit when no games present', () => {
@@ -232,20 +214,15 @@ describe('GameSorter.sortByPlaytime', () => {
         expect(mockEmit).not.toHaveBeenCalled()
     })
 
-    it('emits a playtime bucket map with labels', () => {
-        mockGames = [
-            makeGame(1, 0, 6_001),  // Heavy: 100+ hours
-            makeGame(2, 0, 600),    // Moderate: 10-100 hours
-            makeGame(3, 0, 0),      // Unplayed
-        ]
+    it('emits sections with playtime bucket names', () => {
+        mockGames = [makeGame(1, 0, 6_001), makeGame(2, 0, 600), makeGame(3, 0, 0)]
         const sorter = new GameSorter()
         sorter.sortByPlaytime()
         const [, payload] = mockEmit.mock.calls[0]
-        const buckets = payload.buckets as ReadonlyMap<string, string>
-        expect(buckets.size).toBeGreaterThan(0)
-        expect(buckets.get('heavy')).toBe('Played 100+ Hours')
-        expect(buckets.get('moderate')).toBe('Played 10–100 Hours')
-        expect(buckets.get('unplayed')).toBe('Never Played')
+        const sectionNames: string[] = payload.sections.map((s: any) => s.name)
+        expect(sectionNames).toContain('Played 100+ Hours')
+        expect(sectionNames).toContain('Played 10\u2013100 Hours')
+        expect(sectionNames).toContain('Never Played')
     })
 })
 
@@ -256,55 +233,51 @@ describe('GameSorter.sortByRating', () => {
         mockGames = []
     })
 
-    it('emits GamesSort sorted descending by userscore, breaking ties with playtime', () => {
-        const g1 = makeGame(1, 0, 100)
-        g1.userscore = 95
-        
-        const g2 = makeGame(2, 0, 500)
-        g2.userscore = 95 // same score as g1, but more playtime
-        
-        const g3 = makeGame(3, 0, 50)
-        g3.userscore = 85
-        
+    it('emits SectionsReady sorted descending by userscore, breaking ties with playtime', () => {
+        const g1 = makeGame(1, 0, 100); g1.userscore = 95
+        const g2 = makeGame(2, 0, 500); g2.userscore = 95
+        const g3 = makeGame(3, 0, 50);  g3.userscore = 85
         const g4 = makeGame(4, 0, 1000)
-        // g4 missing userscore (treated as 0)
 
         mockGames = [g1, g2, g3, g4]
-        
         const sorter = new GameSorter()
         sorter.sortByRating()
 
         expect(mockEmit).toHaveBeenCalledOnce()
         const [eventType, payload] = mockEmit.mock.calls[0]
-        expect(eventType).toBe(GameEventTypes.GamesSort)
-        const sorted = payload.sortedGames as SteamGameData[]
-        
-        expect(sorted[0].appid).toBe(2) // 95 score, 500 playtime
-        expect(sorted[1].appid).toBe(1) // 95 score, 100 playtime
-        expect(sorted[2].appid).toBe(3) // 85 score
-        expect(sorted[3].appid).toBe(4) // 0 score
+        expect(eventType).toBe(GameEventTypes.SectionsReady)
+        const allGames = payload.sections.flatMap((s: any) => s.games)
+        expect(allGames[0].appid).toBe(2)
+        expect(allGames[1].appid).toBe(1)
+        expect(allGames[2].appid).toBe(3)
+        expect(allGames[3].appid).toBe(4)
     })
 
-    it('emits a rating bucket map with human-readable labels', () => {
+    it('does not emit when no games present', () => {
+        mockGames = []
+        const sorter = new GameSorter()
+        sorter.sortByRating()
+        expect(mockEmit).not.toHaveBeenCalled()
+    })
+
+    it('emits sections with rating tier names', () => {
         const g1 = makeGame(1, 0, 100); g1.userscore = 92
         const g2 = makeGame(2, 0, 100); g2.userscore = 85
         const g3 = makeGame(3, 0, 100); g3.userscore = 75
         const g4 = makeGame(4, 0, 100); g4.userscore = 50
-        const g5 = makeGame(5, 0, 100)  // unrated
+        const g5 = makeGame(5, 0, 100)
 
         mockGames = [g1, g2, g3, g4, g5]
-        
         const sorter = new GameSorter()
         sorter.sortByRating()
 
         const [, payload] = mockEmit.mock.calls[0]
-        const buckets = payload.buckets as ReadonlyMap<string, string>
-        
-        expect(buckets.get('overwhelmingly-positive')).toBe('Overwhelmingly Positive')
-        expect(buckets.get('very-positive')).toBe('Very Positive')
-        expect(buckets.get('mostly-positive')).toBe('Mostly Positive')
-        expect(buckets.get('mixed')).toBe('Mixed or Lower')
-        expect(buckets.get('unrated')).toBe('Unrated')
+        const sectionNames: string[] = payload.sections.map((s: any) => s.name)
+        expect(sectionNames).toContain('Overwhelmingly Positive')
+        expect(sectionNames).toContain('Very Positive')
+        expect(sectionNames).toContain('Mostly Positive')
+        expect(sectionNames).toContain('Mixed or Lower')
+        expect(sectionNames).toContain('Unrated')
     })
 })
 
@@ -315,7 +288,7 @@ describe('GameSorter.sortByGenre', () => {
         mockGames = []
     })
 
-    it('emits GamesSort grouped by genre in KNOWN_GENRES order', () => {
+    it('emits SectionsReady grouped by genre in KNOWN_GENRES order', () => {
         mockGames = [
             makeGame(1, 0, 10, 'RPG'),
             makeGame(2, 0, 10, 'Action'),
@@ -326,15 +299,13 @@ describe('GameSorter.sortByGenre', () => {
 
         expect(mockEmit).toHaveBeenCalledOnce()
         const [eventType, payload] = mockEmit.mock.calls[0]
-        expect(eventType).toBe(GameEventTypes.GamesSort)
-        const sorted = payload.sortedGames as SteamGameData[]
-        // Action (index 0) < RPG (index 2) < Strategy (index 3)
-        expect(sorted[0].appid).toBe(2)  // Action
-        expect(sorted[1].appid).toBe(1)  // RPG
-        expect(sorted[2].appid).toBe(3)  // Strategy
+        expect(eventType).toBe(GameEventTypes.SectionsReady)
+        const sectionNames: string[] = payload.sections.map((s: any) => s.name)
+        expect(sectionNames.indexOf('Action')).toBeLessThan(sectionNames.indexOf('RPG'))
+        expect(sectionNames.indexOf('RPG')).toBeLessThan(sectionNames.indexOf('Strategy'))
     })
 
-    it('sorts by playtime descending within the same genre', () => {
+    it('sorts by playtime descending within the same genre section', () => {
         mockGames = [
             makeGame(1, 0, 30, 'Action'),
             makeGame(2, 0, 100, 'Action'),
@@ -344,10 +315,11 @@ describe('GameSorter.sortByGenre', () => {
         sorter.sortByGenre()
 
         const [, payload] = mockEmit.mock.calls[0]
-        const sorted = payload.sortedGames as SteamGameData[]
-        expect(sorted[0].appid).toBe(2)  // 100 min
-        expect(sorted[1].appid).toBe(1)  // 30 min
-        expect(sorted[2].appid).toBe(3)  // 10 min
+        const actionSection = payload.sections.find((s: any) => s.name === 'Action')
+        expect(actionSection).toBeDefined()
+        expect(actionSection.games[0].appid).toBe(2)  // 100 min
+        expect(actionSection.games[1].appid).toBe(1)  // 30 min
+        expect(actionSection.games[2].appid).toBe(3)  // 10 min
     })
 
     it('does not emit when no games present', () => {

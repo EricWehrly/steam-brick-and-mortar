@@ -280,7 +280,9 @@ export const GameEventTypes = {
     /** Fired when a game is selected (e.g. clicked in scene) - opens detail panel */
     Selected: 'game:selected',
     /** Fired after all batches complete; carries the sorted game list and bucket map. */
-    GamesSort: 'game:games-sort'
+    GamesSort: 'game:games-sort',
+    /** Fired after grouping + sorting; carries sections ready for placement. */
+    SectionsReady: 'game:sections-ready'
 } as const
 
 export const CeilingEventTypes = {

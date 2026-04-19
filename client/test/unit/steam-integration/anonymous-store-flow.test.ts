@@ -92,7 +92,7 @@ describe('Anonymous Store Data Storage (Bug Fix)', () => {
 
         // Listen for sort result
         const sortHandler = vi.fn()
-        eventManager.registerEventHandler(GameEventTypes.GamesSort, sortHandler)
+        eventManager.registerEventHandler(GameEventTypes.SectionsReady, sortHandler)
 
         // Emit AllBatchesComplete to trigger GameSorter.sortInitial()
         eventManager.emit(GameEventTypes.AllBatchesComplete, {})
@@ -101,6 +101,7 @@ describe('Anonymous Store Data Storage (Bug Fix)', () => {
         expect(sortHandler).toHaveBeenCalledOnce()
         const sortEvent = sortHandler.mock.calls[0][0] as CustomEvent
         expect(sortEvent.detail.sortMode).toBe('by-genre')
-        expect(sortEvent.detail.sortedGames.length).toBe(2)
+        const totalGames = sortEvent.detail.sections.reduce((sum: number, s: any) => sum + s.games.length, 0)
+        expect(totalGames).toBe(2)
     })
 })
