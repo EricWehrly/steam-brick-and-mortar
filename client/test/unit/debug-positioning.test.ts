@@ -27,7 +27,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { GameBoxUtils, ShelfSurfaceUtils, ShelfSide } from '../../src/scene/props/SharedPropsUtils';
+import { GameBoxUtils, ShelfSurfaceUtils, ShelfFace } from '../../src/scene/props/SharedPropsUtils';
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData';
 import type { GameBoxDimensions } from '../../src/scene/game-box/types/GameBoxOptions';
 import * as THREE from 'three';
@@ -52,11 +52,11 @@ describe('🔥 DEBUGGING: Position Validation', () => {
             const shelfName = index === 0 ? 'BOTTOM' : index === 1 ? 'MIDDLE' : 'TOP';
             
             const frontPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS
+                shelfPosition, surface, mockGames, ShelfFace.Far, TEST_BOX_DIMENSIONS
             );
             
             const backPositions = GameBoxUtils.calculateGamePositions(
-                shelfPosition, surface, mockGames, ShelfSide.Back, TEST_BOX_DIMENSIONS
+                shelfPosition, surface, mockGames, ShelfFace.Near, TEST_BOX_DIMENSIONS
             );
             
             console.warn(`🔥 ${shelfName} SHELF (surface.topY=${surface.topY.toFixed(3)}):`);

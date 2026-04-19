@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
-import { ShelfSurfaceUtils, type ShelfSurface, ShelfSide, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
+import { ShelfSurfaceUtils, type ShelfSurface, ShelfFace, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { 
@@ -276,17 +276,14 @@ export class GameBoxSpawner {
         const boxDimensions = { width: 0.3, height: 0.4, depth: 0.08 }
         let gameIndex = 0
 
-        // Fill all back rows (player-facing side) top-to-bottom first, then front rows.
-        //
-        // Naming note: ShelfSide.Back uses backZ (+0.5 in local space), which is the
-        // inward-facing side of the shelf arc — i.e., the side the player sees.
-        // ShelfSide.Front uses frontZ (-0.5), which faces outward away from the player.
-        // Fill order: top-left → top-right down the player-facing face, then overflow to back.
+        // Fill all Near rows (player-facing) top-to-bottom first, then Far rows (overflow).
+        // Near = inward-facing side the player sees (backZ = +0.5 local).
+        // Far  = outward-facing side away from the player (frontZ = -0.5 local).
         for (const surface of surfaces) {
             if (gameIndex >= games.length) break
             const playerFacingGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
             if (playerFacingGames.length > 0) {
-                this.assignIntentsForRow(shelf, surface, playerFacingGames, ShelfSide.Back, boxDimensions)
+                this.assignIntentsForRow(shelf, surface, playerFacingGames, ShelfFace.Near, boxDimensions)
                 gameIndex += playerFacingGames.length
             }
         }
@@ -295,7 +292,7 @@ export class GameBoxSpawner {
             if (gameIndex >= games.length) break
             const overflowGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
             if (overflowGames.length > 0) {
-                this.assignIntentsForRow(shelf, surface, overflowGames, ShelfSide.Front, boxDimensions)
+                this.assignIntentsForRow(shelf, surface, overflowGames, ShelfFace.Far, boxDimensions)
                 gameIndex += overflowGames.length
             }
         }
@@ -305,13 +302,13 @@ export class GameBoxSpawner {
         shelf: ShelfPosition,
         surface: ShelfSurface,
         games: SteamGameData[],
-        side: ShelfSide,
+        face: ShelfFace,
         boxDimensions: { width: number; height: number; depth: number }
     ): void {
         const positions = GameBoxUtils.calculateGamePositions(
-            shelf.position, surface, games, side, boxDimensions, shelf.rotationY
+            shelf.position, surface, games, face, boxDimensions, shelf.rotationY
         )
-        const rotation = GameBoxUtils.calculateGameRotation(shelf.rotationY, side)
+        const rotation = GameBoxUtils.calculateGameRotation(shelf.rotationY, face)
 
         for (let i = 0; i < games.length; i++) {
             const game = games[i]

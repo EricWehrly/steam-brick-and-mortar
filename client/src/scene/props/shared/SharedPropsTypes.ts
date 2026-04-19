@@ -1,6 +1,13 @@
-export enum ShelfSide {
-    Front = 'front',
-    Back = 'back'
+/**
+ * ShelfFace identifies which side of a shelf board a game occupies.
+ *
+ * Named from the player's perspective, not the furniture's:
+ *   Near — the inward-facing side the player sees (backZ = +0.5 local)
+ *   Far  — the outward-facing side away from the player (frontZ = -0.5 local)
+ */
+export enum ShelfFace {
+    Near = 'near',
+    Far  = 'far',
 }
 
 export interface ShelfConfig {

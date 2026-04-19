@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import { GameBoxUtils, GameLayoutConstants, type ShelfSurface, ShelfSide } from '../../../src/scene/props/SharedPropsUtils'
+import { GameBoxUtils, GameLayoutConstants, type ShelfSurface, ShelfFace } from '../../../src/scene/props/SharedPropsUtils'
 import type { SteamGameData } from '../../../src/scene/game-box/types/GameData'
 import type { GameBoxDimensions } from '../../../src/scene/game-box/types/GameBoxOptions'
 
@@ -31,7 +31,7 @@ describe('SharedPropsUtils - Game Positioning Fixes', () => {
                 width: 2.0
             }
             
-            const positions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS)
+            const positions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, mockGames, ShelfFace.Far, TEST_BOX_DIMENSIONS)
             
             // Verify we get 3 positions
             expect(positions).toHaveLength(3)
@@ -74,8 +74,8 @@ describe('SharedPropsUtils - Game Positioning Fixes', () => {
                 width: 2.0
             }
             
-            const frontPositions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, [mockGames[0]], ShelfSide.Front, TEST_BOX_DIMENSIONS)
-            const backPositions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, [mockGames[0]], ShelfSide.Back, TEST_BOX_DIMENSIONS)
+            const frontPositions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, [mockGames[0]], ShelfFace.Far, TEST_BOX_DIMENSIONS)
+            const backPositions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, [mockGames[0]], ShelfFace.Near, TEST_BOX_DIMENSIONS)
             
             // Front and back should have different Z positions (using actual implementation formula)
             const shelfAngleDegrees = 6
@@ -104,7 +104,7 @@ describe('SharedPropsUtils - Game Positioning Fixes', () => {
                 width: 1.8
             }
             
-            const positions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, [mockGames[0]], ShelfSide.Front, TEST_BOX_DIMENSIONS)
+            const positions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, [mockGames[0]], ShelfFace.Far, TEST_BOX_DIMENSIONS)
             
             // None of the coordinates should be zero (games at origin bug)
             expect(positions[0].x).not.toBe(0)
@@ -127,7 +127,7 @@ describe('SharedPropsUtils - Game Positioning Fixes', () => {
                 width: 3.0
             }
             
-            const positions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS)
+            const positions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, mockGames, ShelfFace.Far, TEST_BOX_DIMENSIONS)
             
             // Check spacing between adjacent games
             for (let i = 1; i < positions.length; i++) {
@@ -150,7 +150,7 @@ describe('SharedPropsUtils - Game Positioning Fixes', () => {
                 shelfPosition,
                 surface,
                 [mockGames[0]],
-                ShelfSide.Front,
+                ShelfFace.Far,
                 TEST_BOX_DIMENSIONS,
                 0
             )
@@ -159,7 +159,7 @@ describe('SharedPropsUtils - Game Positioning Fixes', () => {
                 shelfPosition,
                 surface,
                 [mockGames[0]],
-                ShelfSide.Front,
+                ShelfFace.Far,
                 TEST_BOX_DIMENSIONS,
                 Math.PI
             )
@@ -193,8 +193,8 @@ describe('SharedPropsUtils - Game Positioning Fixes', () => {
                 width: 4.0
             }
             
-            const narrowPositions = GameBoxUtils.calculateGamePositions(shelfPosition, narrowSurface, mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS)
-            const widePositions = GameBoxUtils.calculateGamePositions(shelfPosition, wideSurface, mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS)
+            const narrowPositions = GameBoxUtils.calculateGamePositions(shelfPosition, narrowSurface, mockGames, ShelfFace.Far, TEST_BOX_DIMENSIONS)
+            const widePositions = GameBoxUtils.calculateGamePositions(shelfPosition, wideSurface, mockGames, ShelfFace.Far, TEST_BOX_DIMENSIONS)
             
             // Games should be centered on both shelves (middle game at centerX)
             const narrowMiddleX = narrowPositions[1].x // middle game
@@ -218,7 +218,7 @@ describe('SharedPropsUtils - Game Positioning Fixes', () => {
                 width: 2.0
             }
             
-            const positions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, [mockGames[0]], ShelfSide.Front, TEST_BOX_DIMENSIONS)
+            const positions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, [mockGames[0]], ShelfFace.Far, TEST_BOX_DIMENSIONS)
             
             // Game should be positioned so its bottom sits on the shelf surface
             // Game center Y should be: surface.topY + boxHeight/2
@@ -244,7 +244,7 @@ describe('SharedPropsUtils - Game Positioning Fixes', () => {
                 width: 1.5
             }
             
-            const positions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, [mockGames[0]], ShelfSide.Front, TEST_BOX_DIMENSIONS)
+            const positions = GameBoxUtils.calculateGamePositions(shelfPosition, surface, [mockGames[0]], ShelfFace.Far, TEST_BOX_DIMENSIONS)
             
             // Games should NOT be at origin
             expect(positions[0].x).not.toBe(0)

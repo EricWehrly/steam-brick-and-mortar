@@ -1,8 +1,8 @@
 /**
  * Regression: InstancedLabelRenderer fallback rotation was 180° wrong.
  *
- * Bug: When no explicit rotation is supplied, ShelfSide.Back got Math.PI
- * and ShelfSide.Front got identity — opposite of the GameBoxUtils convention
+ * Bug: When no explicit rotation is supplied, ShelfFace.Near got Math.PI
+ * and ShelfFace.Far got identity — opposite of the GameBoxUtils convention
  * (Back=identity, Front=PI). Label boxes appeared backwards on all shelves.
  *
  * Convention (matches GameBoxUtils.calculateGameRotation):
@@ -17,7 +17,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import { ShelfSide } from '../../../../../src/scene/props/shared/SharedPropsTypes'
+import { ShelfFace } from '../../../../../src/scene/props/shared/SharedPropsTypes'
 
 import { GameBoxUtils } from '../../../../../src/scene/props/shared/GameBoxUtils'
 
@@ -32,8 +32,8 @@ function yRotationFromQuaternion(q: THREE.Quaternion): number {
  * Kept in sync manually — if the source changes, this test should catch the drift
  * because the behaviour test below will fail.
  */
-function fallbackRotation(side: ShelfSide): THREE.Quaternion {
-    if (side === ShelfSide.Front) {
+function fallbackRotation(side: ShelfFace): THREE.Quaternion {
+    if (side === ShelfFace.Far) {
         return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI)
     }
     return new THREE.Quaternion() // identity
@@ -41,24 +41,24 @@ function fallbackRotation(side: ShelfSide): THREE.Quaternion {
 
 describe('InstancedLabelRenderer fallback rotation convention', () => {
     it('Back side should have rotY=0 (identity — label -Z face already faces player)', () => {
-        const q = fallbackRotation(ShelfSide.Back)
+        const q = fallbackRotation(ShelfFace.Near)
         expect(yRotationFromQuaternion(q)).toBeCloseTo(0, 5)
     })
 
     it('Front side should have rotY=PI (label -Z face flipped to face player)', () => {
-        const q = fallbackRotation(ShelfSide.Front)
+        const q = fallbackRotation(ShelfFace.Far)
         expect(yRotationFromQuaternion(q)).toBeCloseTo(Math.PI, 5)
     })
 
     it('fallback convention matches GameBoxUtils.calculateGameRotation for axis-aligned shelf', () => {
         // For shelfRotationY=0 (axis-aligned shelf), both should agree.
         // Import GameBoxUtils here to verify they stay in sync.
-        const backFromUtils = GameBoxUtils.calculateGameRotation(0, ShelfSide.Back)
-        const frontFromUtils = GameBoxUtils.calculateGameRotation(0, ShelfSide.Front)
+        const backFromUtils = GameBoxUtils.calculateGameRotation(0, ShelfFace.Near)
+        const frontFromUtils = GameBoxUtils.calculateGameRotation(0, ShelfFace.Far)
 
-        expect(yRotationFromQuaternion(fallbackRotation(ShelfSide.Back)))
+        expect(yRotationFromQuaternion(fallbackRotation(ShelfFace.Near)))
             .toBeCloseTo(yRotationFromQuaternion(backFromUtils), 5)
-        expect(yRotationFromQuaternion(fallbackRotation(ShelfSide.Front)))
+        expect(yRotationFromQuaternion(fallbackRotation(ShelfFace.Far)))
             .toBeCloseTo(yRotationFromQuaternion(frontFromUtils), 5)
     })
 })
