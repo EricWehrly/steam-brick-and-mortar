@@ -13,8 +13,6 @@ import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
 import { GameArtworkProvider } from './GameArtworkProvider'
 import { DataManager } from '../../../core/data/DataManager'
-import { AppSettings, Setting } from '../../../core/AppSettings'
-import { LOD_LEVEL, LOD_TIER_NAME } from './IGameArtworkPipeline'
 import { LodDistanceManagerDebug } from './LodDistanceManagerDebug'
 
 /** Result of queryLodState() — structured pixel data for both LOD tiers */
@@ -40,64 +38,20 @@ import type { HighTextureCache } from './HighTextureCache'
 export type { LodConfig }
 
 export interface LodArtworkOrchestratorDebugConfig extends LodArtworkConfig {
-    maxGames?: number
 }
 
-// Steam capsule CDN reality: URL says 600×900 but most titles serve 300×450.
-// See GpuGameBoxRenderer for full rationale.
-const STEAM_SOURCE_WIDTH = 600
-const STEAM_SOURCE_HEIGHT = 900
-const STEAM_EFFECTIVE_MAX_WIDTH = 300
-const STEAM_EFFECTIVE_MAX_HEIGHT = 450
-
 export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
-    private readonly maxGames: number
     private readonly lodDistanceManager: LodDistanceManagerDebug
 
     /**
-     * Factory: construct with LOD config derived from AppSettings.
-     * Reads LodHighReductionRatio, LodMedReductionRatio, LodMaxHighSlots.
+     * Override: returns a debug instance, inheriting AppSettings config logic from base.
      */
-    public static fromAppSettings(maxGames: number): LodArtworkOrchestratorDebug {
-        const highRatio = AppSettings.get(Setting.LodHighReductionRatio)
-        const medRatio = AppSettings.get(Setting.LodMedReductionRatio)
-        const maxHighSlots = AppSettings.get(Setting.LodMaxHighSlots)
-
-        const highWidthRaw = Math.floor(STEAM_SOURCE_WIDTH * highRatio)
-        const highHeightRaw = Math.floor(STEAM_SOURCE_HEIGHT * highRatio)
-        const highWidth = Math.min(highWidthRaw, STEAM_EFFECTIVE_MAX_WIDTH)
-        const highHeight = Math.min(highHeightRaw, STEAM_EFFECTIVE_MAX_HEIGHT)
-        const medWidth = Math.floor(STEAM_SOURCE_WIDTH * medRatio)
-        const medHeight = Math.floor(STEAM_SOURCE_HEIGHT * medRatio)
-
-        if (highWidthRaw > STEAM_EFFECTIVE_MAX_WIDTH || highHeightRaw > STEAM_EFFECTIVE_MAX_HEIGHT) {
-            LodArtworkOrchestrator.logger.warn(
-                `LOD HIGH ratio ${highRatio} would produce ${highWidthRaw}×${highHeightRaw} ` +
-                `— clamped to ${highWidth}×${highHeight} (CDN effective max). ` +
-                `Upscaling above this wastes VRAM without adding detail for most titles.`
-            )
-        }
-
-        LodArtworkOrchestrator.logger.info(`LOD config: HIGH ${highWidth}×${highHeight} (${maxHighSlots} slots), MED ${medWidth}×${medHeight}`)
-
-        return new LodArtworkOrchestratorDebug({
-            maxTextures: maxGames,
-            maxGames,
-            lazyHighTextures: true,
-            boxWidth: 0.3,
-            boxHeight: 0.4,
-            boxDepth: 0.08,
-            lodConfigs: [
-                { level: LOD_LEVEL.HIGH, textureWidth: highWidth, textureHeight: highHeight, tierName: LOD_TIER_NAME.HIGH, name: LOD_TIER_NAME.HIGH, maxDepth: maxHighSlots },
-                { level: LOD_LEVEL.MID, textureWidth: medWidth, textureHeight: medHeight, tierName: LOD_TIER_NAME.MID, name: LOD_TIER_NAME.MID },
-            ],
-            maxHighTextureCache: maxHighSlots,
-        })
+    public static override fromAppSettings(maxTextures: number): LodArtworkOrchestratorDebug {
+        return new LodArtworkOrchestratorDebug(LodArtworkOrchestrator.buildAppSettingsConfig(maxTextures))
     }
 
     constructor(config: LodArtworkOrchestratorDebugConfig = {}) {
         super(config)
-        this.maxGames = config.maxGames ?? 2000
         this.lodDistanceManager = new LodDistanceManagerDebug(this)
         this.registerConsoleCommands()
         this.registerEventListeners()

@@ -18,6 +18,7 @@ import { GameEventTypes, AppEventTypes } from '../../../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../../../types/InteractionEvents'
 import type { SomeBatchesCompleteEvent } from '../../../types/EnvironmentEvents'
 import { Logger } from '../../../utils/Logger'
+import { AppSettings, Setting } from '../../../core/AppSettings'
 import { GameArtworkProvider, type GameArtwork } from './GameArtworkProvider'
 import { LodTextureArrayManager, type LodTierConfig } from './LodTextureArrayManager'
 import {
@@ -71,11 +72,76 @@ export interface LodArtworkConfig {
 }
 
 /**
+ * Steam library image CDN reality check
+ *
+ * The URL path is `library_600x900.jpg` but the CDN actually serves 300×450 pixels
+ * for the vast majority of titles. Only a minority of newer titles genuinely ship
+ * at 600×900.
+ *
+ * Source: https://steamcommunity.com/discussions/forum/1/4202490864582293420/
+ *
+ * NORMALIZATION DECISION: treat 300×450 as the effective source ceiling.
+ * Going above it produces bilinear upscaling artefacts and wastes VRAM.
+ */
+const STEAM_SOURCE_WIDTH = 600
+const STEAM_SOURCE_HEIGHT = 900
+const STEAM_EFFECTIVE_MAX_WIDTH = 300
+const STEAM_EFFECTIVE_MAX_HEIGHT = 450
+
+/**
  * Orchestrates the complete artwork loading and rendering pipeline.
  * Implements IGameArtworkPipeline for use by LodDistanceManager.
  */
 export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     public static logger = Logger.createLogFunctions(LodArtworkOrchestrator.name)
+
+    /**
+     * Factory: construct with LOD config derived from AppSettings.
+     * Reads LodHighReductionRatio, LodMedReductionRatio, LodMaxHighSlots.
+     */
+    public static fromAppSettings(maxTextures: number): LodArtworkOrchestrator {
+        return new LodArtworkOrchestrator(LodArtworkOrchestrator.buildAppSettingsConfig(maxTextures))
+    }
+
+    /**
+     * Builds a LodArtworkConfig from AppSettings.
+     * Extracted so debug subclasses can reuse it in their own fromAppSettings override.
+     */
+    protected static buildAppSettingsConfig(maxTextures: number): LodArtworkConfig {
+        const highRatio = AppSettings.get(Setting.LodHighReductionRatio)
+        const medRatio = AppSettings.get(Setting.LodMedReductionRatio)
+        const maxHighSlots = AppSettings.get(Setting.LodMaxHighSlots)
+
+        const highWidthRaw = Math.floor(STEAM_SOURCE_WIDTH * highRatio)
+        const highHeightRaw = Math.floor(STEAM_SOURCE_HEIGHT * highRatio)
+        const highWidth = Math.min(highWidthRaw, STEAM_EFFECTIVE_MAX_WIDTH)
+        const highHeight = Math.min(highHeightRaw, STEAM_EFFECTIVE_MAX_HEIGHT)
+        const medWidth = Math.floor(STEAM_SOURCE_WIDTH * medRatio)
+        const medHeight = Math.floor(STEAM_SOURCE_HEIGHT * medRatio)
+
+        if (highWidthRaw > STEAM_EFFECTIVE_MAX_WIDTH || highHeightRaw > STEAM_EFFECTIVE_MAX_HEIGHT) {
+            LodArtworkOrchestrator.logger.warn(
+                `LOD HIGH ratio ${highRatio} would produce ${highWidthRaw}×${highHeightRaw} ` +
+                `— clamped to ${highWidth}×${highHeight} (CDN effective max). ` +
+                `Upscaling above this wastes VRAM without adding detail for most titles.`
+            )
+        }
+
+        LodArtworkOrchestrator.logger.info(`LOD config: HIGH ${highWidth}×${highHeight} (${maxHighSlots} slots), MED ${medWidth}×${medHeight}`)
+
+        return {
+            maxTextures,
+            lazyHighTextures: true,
+            boxWidth: 0.3,
+            boxHeight: 0.4,
+            boxDepth: 0.08,
+            lodConfigs: [
+                { level: LOD_LEVEL.HIGH, textureWidth: highWidth, textureHeight: highHeight, tierName: LOD_TIER_NAME.HIGH, name: LOD_TIER_NAME.HIGH, maxDepth: maxHighSlots },
+                { level: LOD_LEVEL.MID, textureWidth: medWidth, textureHeight: medHeight, tierName: LOD_TIER_NAME.MID, name: LOD_TIER_NAME.MID },
+            ],
+            maxHighTextureCache: maxHighSlots,
+        }
+    }
     private artworkProvider: GameArtworkProvider
     private textureManager: LodTextureArrayManager
     protected renderer: LodGameArtworkRenderer
