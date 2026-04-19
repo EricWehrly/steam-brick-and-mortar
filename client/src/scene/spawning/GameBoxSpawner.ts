@@ -233,7 +233,7 @@ export class GameBoxSpawner {
                 const batchIndex = sortedBatchIndices[batchIndexCursor]
                 const shelfPos = this.shelfPositions.get(batchIndex)!
                 const stockSurfaces = GameBoxUtils.buildStockSurfaces(
-                    shelfPos.position, shelfPos.rotationY, shelfSurfaces, undefined, this.stockStrategy
+                    shelfPos.position, shelfPos.rotationY, shelfSurfaces, { strategy: this.stockStrategy }
                 )
                 const shelfCapacity = stockSurfaces.reduce((sum, s) => sum + s.capacity, 0)
                 const batch = gameQueue.splice(0, shelfCapacity)

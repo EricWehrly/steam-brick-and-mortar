@@ -9,10 +9,11 @@ import {
     type ShelfLayoutDeterminedEvent,
     type StorePropsProgressEvent,
 } from '../../types/InteractionEvents'
-import { computeArcShelfLayout, type ArcLayoutConfig, type ArcShelfInfo } from '../props/shared/ArcLayoutUtils'
+import { computeStoreArcShelfLayout, type ArcShelfInfo } from '../props/shared/ArcLayoutUtils'
 import { computeSpokeShelfLayout } from '../props/shared/SpokeLayoutUtils'
 import { computeRowShelfLayout } from '../props/shared/RowLayoutUtils'
-import { ArcStockStrategy, RowStockStrategy, SpokeStockStrategy, type IStockStrategy } from '../props/shared/StockStrategy'
+import type { IStockStrategy } from '../props/shared/StockStrategy'
+import { createStockStrategy } from '../props/shared/StockStrategyRegistry'
 import { type LayoutMode } from '../../types/LayoutTypes'
 
 /**
@@ -37,8 +38,6 @@ import { type LayoutMode } from '../../types/LayoutTypes'
 export class ShelfLayoutCoordinator {
     private static readonly logger = Logger.createLogFunctions(ShelfLayoutCoordinator.name)
 
-    private static readonly FIXED_ROWS_COUNT = 4 + 6 + 10 + 12 // 32 — rows 0–3 with fixed counts
-
     /** The stock strategy matching the current layout mode. Consumed by GameBoxSpawner. */
     public readonly stockStrategy: IStockStrategy
 
@@ -54,7 +53,7 @@ export class ShelfLayoutCoordinator {
 
     constructor(layoutMode: LayoutMode = 'arc') {
         this.layoutMode = layoutMode
-        this.stockStrategy = ShelfLayoutCoordinator.strategyFor(layoutMode)
+        this.stockStrategy = createStockStrategy(layoutMode)
         this.boundHandleFirstBatch = (event: CustomEvent<BatchReadyForPlacementEvent>) =>
             this.handleFirstBatch(event.detail)
         EventManager.getInstance().registerEventHandler(
@@ -102,21 +101,17 @@ export class ShelfLayoutCoordinator {
         this.emitShelfForBatch(detail.batchIndex)
     }
 
-    private static strategyFor(layoutMode: LayoutMode): IStockStrategy {
-        switch (layoutMode) {
-            case 'spoke': return new SpokeStockStrategy()
-            case 'row':   return new RowStockStrategy()
-            case 'arc':
-            default:      return new ArcStockStrategy()
-        }
+    private static readonly layoutComputers: Record<LayoutMode, (coordinator: ShelfLayoutCoordinator, totalShelves: number) => Array<{ position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }>> = {
+        arc: (coordinator, totalShelves) => coordinator.computeArcLayout(totalShelves),
+        row: (coordinator, totalShelves) => coordinator.computeRowLayout(totalShelves),
+        spoke: (coordinator) => coordinator.computeSpokeLayout(),
     }
 
     private computeLayout(totalShelves: number): void {
-        const shelves = this.layoutMode === 'spoke'
-            ? this.computeSpokeLayout()
-            : this.layoutMode === 'row'
-                ? this.computeRowLayout(totalShelves)
-                : this.computeArcLayout(totalShelves)
+        const shelves = (ShelfLayoutCoordinator.layoutComputers[this.layoutMode] ?? ShelfLayoutCoordinator.layoutComputers.arc)(
+            this,
+            totalShelves
+        )
 
         // Compute spatial bounds for room/lighting systems
         const bounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
@@ -155,26 +150,7 @@ export class ShelfLayoutCoordinator {
     }
 
     private computeArcLayout(totalShelves: number): ArcShelfInfo[] {
-        const arcConfig: ArcLayoutConfig = {
-            shelvesPerRowByRow: [
-                4,
-                6,
-                10,
-                12,
-                Math.max(1, totalShelves - ShelfLayoutCoordinator.FIXED_ROWS_COUNT),
-            ],
-            halfAngleByRow: [
-                Math.PI / 3.5,
-                Math.PI / 3.5,
-                Math.PI / 3,
-                Math.PI / 3,
-                Math.PI / 2.6,
-            ],
-            minShelfGap: 1.0,
-            rowRadiusStep: 4.0,
-            firstRowRadius: 5.5,
-        }
-        return computeArcShelfLayout(totalShelves, arcConfig)
+        return computeStoreArcShelfLayout(totalShelves)
     }
 
     private computeRowLayout(totalShelves: number): Array<{ position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }> {

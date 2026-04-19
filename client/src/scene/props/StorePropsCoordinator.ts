@@ -27,6 +27,7 @@ import type { BatchReadyForPlacementEvent } from '../../types/InteractionEvents'
 import type { SteamLoadLibraryEvent } from '../../types/InteractionEvents'
 import { type LayoutRequestedEvent } from '../../types/EnvironmentEvents'
 import { type LayoutMode, LayoutModes } from '../../types/LayoutTypes'
+import { DataManager } from '../../core/data'
 import { BatchCoordinator } from '../batch/BatchCoordinator'
 import { GameBoxSpawner } from '../spawning/GameBoxSpawner'
 import { ShelfLayoutCoordinator } from '../shelves/ShelfLayoutCoordinator'
@@ -204,15 +205,13 @@ class StorePropsCoordinator {
 
         // Re-emit LoadLibrary so the batch pipeline runs under the new layout.
         // SteamIntegration will emit ClearRequest internally, which we suppress via the flag.
-        import('../../core/data').then(({ DataManager }) => {
-            const userInput = DataManager.getInstance().get<string>('steam.userInput')
-            this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
-                userInput: userInput ?? undefined,
-                forceUpdate: false,
-            })
-            // Clear the guard once the event has been dispatched synchronously
-            this.layoutSwitchInProgress = false
+        const userInput = DataManager.getInstance().get<string>('steam.userInput')
+        this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
+            userInput: userInput ?? undefined,
+            forceUpdate: false,
         })
+        // Clear the guard once the event has been dispatched
+        this.layoutSwitchInProgress = false
     }
 
     public dispose(): void {

@@ -16,7 +16,26 @@
  */
 
 import * as THREE from 'three'
+import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
+import type { StockSurface } from '../../../types/LayoutTypes'
 
+/**
+ * ArcStockStrategy
+ *
+ * Fills all Near faces top-to-bottom first, then all Far faces as overflow.
+ * This gives a contiguous readable face before wrapping to the back side.
+ *
+ *   board[0].near, board[1].near, board[2].near,
+ *   board[0].far,  board[1].far,  board[2].far
+ */
+export class ArcStockStrategy implements IStockStrategy {
+    order(boards: BoardSurfacePair[]): StockSurface[] {
+        return [
+            ...boards.map(b => b.near),
+            ...boards.map(b => b.far),
+        ]
+    }
+}
 export interface ArcLayoutConfig {
     /** Number of concentric arc rows. Default 5. */
     rows?: number
@@ -133,4 +152,36 @@ export function computeArcShelfLayout(
     }
 
     return result
+}
+
+/**
+ * Tuned arc layout for the Steam Brick and Mortar store.
+ *
+ * Encapsulates the store-specific row/angle config so ShelfLayoutCoordinator
+ * doesn't need to know the details. Call this instead of computeArcShelfLayout
+ * directly when laying out the store.
+ */
+export const STORE_ARC_FIXED_ROWS_COUNT = 4 + 6 + 10 + 12 // 32 — rows 0–3 with fixed counts
+
+export function computeStoreArcShelfLayout(totalShelves: number): ArcShelfInfo[] {
+    const config: ArcLayoutConfig = {
+        shelvesPerRowByRow: [
+            4,
+            6,
+            10,
+            12,
+            Math.max(1, totalShelves - STORE_ARC_FIXED_ROWS_COUNT),
+        ],
+        halfAngleByRow: [
+            Math.PI / 3.5,
+            Math.PI / 3.5,
+            Math.PI / 3,
+            Math.PI / 3,
+            Math.PI / 2.6,
+        ],
+        minShelfGap: 1.0,
+        rowRadiusStep: 4.0,
+        firstRowRadius: 5.5,
+    }
+    return computeArcShelfLayout(totalShelves, config)
 }
