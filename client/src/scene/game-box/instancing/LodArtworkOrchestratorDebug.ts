@@ -7,7 +7,7 @@
  * - Failure tracking and auditing
  */
 
-import { LodArtworkOrchestrator, type LodArtworkConfig, type LodConfig } from './LodArtworkOrchestrator'
+import { LodArtworkOrchestrator, type LodArtworkConfig } from './LodArtworkOrchestrator'
 import { HighTextureCacheDebug } from './HighTextureCacheDebug'
 import { EventManager } from '../../../core/EventManager'
 import { GameEventTypes } from '../../../types/InteractionEvents'
@@ -34,23 +34,14 @@ import * as THREE from 'three'
 import type { HighTextureCache } from './HighTextureCache'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// Re-export for consumers
-export type { LodConfig }
-
-export interface LodArtworkOrchestratorDebugConfig extends LodArtworkConfig {
-}
-
 export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
     private readonly lodDistanceManager: LodDistanceManagerDebug
 
-    /**
-     * Override: returns a debug instance, inheriting AppSettings config logic from base.
-     */
     public static override fromAppSettings(maxTextures: number): LodArtworkOrchestratorDebug {
         return new LodArtworkOrchestratorDebug(LodArtworkOrchestrator.buildAppSettingsConfig(maxTextures))
     }
 
-    constructor(config: LodArtworkOrchestratorDebugConfig = {}) {
+    constructor(config: LodArtworkConfig = {}) {
         super(config)
         this.lodDistanceManager = new LodDistanceManagerDebug(this)
         this.registerConsoleCommands()
