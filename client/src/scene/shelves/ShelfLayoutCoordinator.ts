@@ -11,8 +11,9 @@ import {
 } from '../../types/InteractionEvents'
 import { computeArcShelfLayout, type ArcLayoutConfig, type ArcShelfInfo } from '../props/shared/ArcLayoutUtils'
 import { computeSpokeShelfLayout } from '../props/shared/SpokeLayoutUtils'
+import { computeRowShelfLayout } from '../props/shared/RowLayoutUtils'
 import { ArcStockStrategy, RowStockStrategy, SpokeStockStrategy, type IStockStrategy } from '../props/shared/StockStrategy'
-import { type LayoutMode } from '../../types/EnvironmentEvents'
+import { type LayoutMode } from '../../types/LayoutTypes'
 
 /**
  * ShelfLayoutCoordinator
@@ -49,17 +50,25 @@ export class ShelfLayoutCoordinator {
     private totalShelves = 0
     private readonly layoutMode: LayoutMode
 
+    private readonly boundHandleFirstBatch: (event: CustomEvent<BatchReadyForPlacementEvent>) => void
+
     constructor(layoutMode: LayoutMode = 'arc') {
         this.layoutMode = layoutMode
         this.stockStrategy = ShelfLayoutCoordinator.strategyFor(layoutMode)
+        this.boundHandleFirstBatch = (event: CustomEvent<BatchReadyForPlacementEvent>) =>
+            this.handleFirstBatch(event.detail)
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
-            (event: CustomEvent<BatchReadyForPlacementEvent>) => this.handleFirstBatch(event.detail)
+            this.boundHandleFirstBatch
         )
         ShelfLayoutCoordinator.logger.debug('Subscribed to BatchReadyForPlacement')
     }
 
     public dispose(): void {
+        EventManager.getInstance().deregisterEventHandler(
+            StorePropsEventTypes.BatchReadyForPlacement,
+            this.boundHandleFirstBatch
+        )
         this.layoutComputed = false
         this.shelvesByBatch.clear()
         this.emittedShelfIds.clear()
@@ -96,6 +105,7 @@ export class ShelfLayoutCoordinator {
     private static strategyFor(layoutMode: LayoutMode): IStockStrategy {
         switch (layoutMode) {
             case 'spoke': return new SpokeStockStrategy()
+            case 'row':   return new RowStockStrategy()
             case 'arc':
             default:      return new ArcStockStrategy()
         }
@@ -104,7 +114,9 @@ export class ShelfLayoutCoordinator {
     private computeLayout(totalShelves: number): void {
         const shelves = this.layoutMode === 'spoke'
             ? this.computeSpokeLayout()
-            : this.computeArcLayout(totalShelves)
+            : this.layoutMode === 'row'
+                ? this.computeRowLayout(totalShelves)
+                : this.computeArcLayout(totalShelves)
 
         // Compute spatial bounds for room/lighting systems
         const bounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
@@ -163,6 +175,10 @@ export class ShelfLayoutCoordinator {
             firstRowRadius: 5.5,
         }
         return computeArcShelfLayout(totalShelves, arcConfig)
+    }
+
+    private computeRowLayout(totalShelves: number): Array<{ position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }> {
+        return computeRowShelfLayout(totalShelves)
     }
 
     private computeSpokeLayout(): Array<{ position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }> {

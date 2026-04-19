@@ -17,7 +17,8 @@ import { EventManager } from '../core/EventManager'
 import { UIEventTypes } from '../types/InteractionEvents'
 import type { SortRequestedEvent } from '../types/EnvironmentEvents'
 import type { LayoutRequestedEvent } from '../types/EnvironmentEvents'
-import type { GameSortMode, LayoutMode } from '../types/EnvironmentEvents'
+import type { GameSortMode } from '../types/EnvironmentEvents'
+import type { LayoutMode } from '../types/LayoutTypes'
 import '../styles/components/layout-sort-panel.css'
 
 // ─── Layout option definitions ───────────────────────────────────────────────
@@ -29,6 +30,7 @@ interface LayoutOption {
 
 const LAYOUT_OPTIONS: ReadonlyArray<LayoutOption> = [
     { key: 'arc',   label: 'Arc'   },
+    { key: 'row',   label: 'Row'   },
     { key: 'spoke', label: 'Spoke' },
 ]
 
