@@ -6,7 +6,8 @@ import {
     StorePropsEventTypes,
     type ShelfReadyEvent,
 } from '../../../src/types/InteractionEvents'
-import type { SectionsReadyEvent, Section } from '../../../src/types/EnvironmentEvents'
+import type { SectionsReadyEvent } from '../../../src/types/EnvironmentEvents'
+import type { Section } from '../../../src/types/LayoutTypes'
 import type { SteamGameData } from '../../../src/scene/game-box/types/GameData'
 
 const placeSignSpy = vi.fn().mockReturnValue(new THREE.Group())

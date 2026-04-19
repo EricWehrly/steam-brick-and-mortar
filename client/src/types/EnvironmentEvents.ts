@@ -9,6 +9,7 @@
 import type { BaseInteractionEvent } from '../core/EventManager'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
 import type { ShelfBounds } from './InteractionEvents'
+import type { Section } from './LayoutTypes'
 
 export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
     // Pure terminal signal: all batches are complete.
@@ -39,24 +40,6 @@ export interface GamesSortEvent extends BaseInteractionEvent {
      */
     buckets: ReadonlyMap<number | string, string>
     /** Which sort policy produced this event. */
-    sortMode: GameSortMode
-}
-
-/**
- * A named partition of games produced by grouping + sorting.
- *
- * Ungrouped layouts produce one section (name: '') containing all games.
- * Grouped layouts produce N sections, one per group (genre, tag, rating tier, etc.).
- *
- * Games in a section are already sorted. Spatial allocation is assigned later by
- * the layout system and is absent until SectionsReady fires.
- */
-export interface Section {
-    /** Human-readable label — used for sign placement. Empty string for ungrouped. */
-    name: string
-    /** Sorted games belonging to this section. */
-    games: ReadonlyArray<Readonly<SteamGameData>>
-    /** Which sort mode was applied within this section. */
     sortMode: GameSortMode
 }
 
