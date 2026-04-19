@@ -16,7 +16,7 @@ import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
 import type { SteamGameData } from '../scene'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes, AppSettingsEventTypes, GameEventTypes } from '../types/InteractionEvents'
-import type { SteamLoadGamesEvent, SteamLoadFromCacheEvent, SteamCacheRefreshEvent, SteamCacheClearEvent, SteamGamesBatchEvent, SteamDataLoadedEvent } from '../types/InteractionEvents'
+import type { SteamLoadLibraryEvent, SteamCacheClearEvent, SteamGamesBatchEvent, SteamDataLoadedEvent } from '../types/InteractionEvents'
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
@@ -72,15 +72,7 @@ export class SteamIntegration {
     }
 
     private registerEventHandlers(): void {
-        // TD: redundant-steam-events
-        // These three events currently trigger the exact same tear-down-and-load flow
-        // and should be collapsed into a single LoadLibrary/ReloadLibrary event structure.
-        // For now, we point them all at the unified handler so the caching/staleness logic 
-        // can live in one place.
-        this.eventManager.registerEventHandler(SteamEventTypes.LoadGames, this.handleLoadLibrary.bind(this))
-        this.eventManager.registerEventHandler(SteamEventTypes.LoadFromCache, this.handleLoadLibrary.bind(this))
-        this.eventManager.registerEventHandler(SteamEventTypes.CacheRefresh, this.handleLoadLibrary.bind(this))
-        
+        this.eventManager.registerEventHandler(SteamEventTypes.LoadLibrary, this.handleLoadLibrary.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.handleClearCache.bind(this))
         this.eventManager.registerEventHandler(AppSettingsEventTypes.Changed, this.handleSettingsChange.bind(this))
         this.eventManager.registerEventHandler(GameEventTypes.Start, this.handleGameStart.bind(this))
@@ -212,7 +204,7 @@ export class SteamIntegration {
         const user = cachedUsers[0]
         SteamIntegration.logger.info(`Auto-load: ${user.displayName} (${user.vanityUrl})`)
 
-        this.eventManager.emit<SteamLoadFromCacheEvent>(SteamEventTypes.LoadFromCache, {
+        this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
             userInput: user.vanityUrl
         })
     }
@@ -254,7 +246,7 @@ export class SteamIntegration {
         }
     }
 
-    private async handleLoadLibrary(event: CustomEvent<any>): Promise<void> {
+    private async handleLoadLibrary(event: CustomEvent<SteamLoadLibraryEvent>): Promise<void> {
         // TD: caching-staleness-heuristic
         // 1. Determine if we should force an update based on staleness of cached data
         // 2. Or, if this is a manual "Refresh Cache Now" request from the UI panel (to be built)

@@ -481,7 +481,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
 
         try {
             // Emit event to load cached user - this is a complex workflow
-            this.eventManager.emit(SteamEventTypes.LoadFromCache, {
+            this.eventManager.emit(SteamEventTypes.LoadLibrary, {
                 userInput: selectedVanityUrl,
                 source: EventSource.UI
             })

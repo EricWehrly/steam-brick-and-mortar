@@ -12,10 +12,8 @@
 import type { BaseInteractionEvent } from '../core/EventManager'
 import type {
     SteamEventTypes,
-    SteamLoadGamesEvent,
-    SteamLoadFromCacheEvent,
+    SteamLoadLibraryEvent,
     SteamCacheClearEvent,
-    SteamCacheRefreshEvent,
     SteamCacheStatsEvent,
     SteamImageCacheClearEvent,
     SteamDevModeToggleEvent,
@@ -52,10 +50,8 @@ import type { AllBatchesCompleteEvent, GamesSortEvent, LayoutChangedEvent, SomeB
 
 export interface InteractionEventMap {
     // Steam events
-    [SteamEventTypes.LoadGames]: SteamLoadGamesEvent
-    [SteamEventTypes.LoadFromCache]: SteamLoadFromCacheEvent
+    [SteamEventTypes.LoadLibrary]: SteamLoadLibraryEvent
     [SteamEventTypes.CacheClear]: SteamCacheClearEvent
-    [SteamEventTypes.CacheRefresh]: SteamCacheRefreshEvent
     [SteamEventTypes.CacheStats]: SteamCacheStatsEvent
     [SteamEventTypes.ImageCacheClear]: SteamImageCacheClearEvent
     [SteamEventTypes.DevModeToggle]: SteamDevModeToggleEvent
