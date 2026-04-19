@@ -1,36 +1,25 @@
 # WORK.md
 
 ## Task
-High-value LOD stack simplifications (1-5):
-1. Split tier config from runtime texture sources
-2. Make lazy/eager HIGH path explicit via type-level mode
-3. Extract HIGH slot/LRU allocation policy
-4. Centralize LOD debug toggles
-5. Prune interface surface and redundant docs/comments
+Capture post-PR architectural intent and bootstrap next branch work for layout pipeline cleanup.
 
 ## Branch
-openclaw/runtime-fixes
+`openclaw/feat-layout-registry`
 
 ## Approach
-- Introduce canonical tier spec types and conversion helper.
-- Introduce discriminated union for renderer texture sources.
-- Extract pure `HighSlotAllocator` from `HighTextureCache`.
-- Add centralized `LodDebugSettings` module.
-- Trim non-value-add JSDoc while preserving ownership/invariants.
-- Update tests/mocks for new interfaces.
+- Start new branch from `origin/act1-intermission` (default target branch available in remote).
+- Capture future architecture in planning doc:
+  - `ILayoutDefinition` + `LayoutRegistry` barrel as single source of truth.
+  - Coordinator lifecycle split (resettable singleton coordinators vs disposable GPU owners).
+  - Keep section-per-layout plan and UI gating item.
+- Mark immediate technical debt at call sites with `TD` comments.
 
-## Files (planned)
-- client/src/scene/game-box/instancing/ILodArtworkRenderer.ts
-- client/src/scene/game-box/instancing/LodArtworkOrchestrator.ts
-- client/src/scene/game-box/instancing/LodGameArtworkRenderer.ts
-- client/src/scene/game-box/instancing/LodTextureArrayManager.ts
-- client/src/scene/game-box/instancing/HighTextureCache.ts
-- client/src/scene/game-box/instancing/ManagedTextureArray.ts
-- client/src/scene/game-box/instancing/LodDebugSettings.ts (new)
-- client/src/scene/game-box/instancing/LodTypes.ts (new)
-- client/src/scene/game-box/instancing/HighSlotAllocator.ts (new)
-- related tests/mocks
+## Files touched
+- [x] `docs/plans/layout-variations-next-steps.md`
+- [x] `client/src/scene/shelves/ShelfLayoutCoordinator.ts`
+- [x] `client/src/scene/props/StorePropsCoordinator.ts`
+- [x] `WORK.md`
 
 ## Open questions
-- Keep legacy `LodConfig` name for compatibility or fully rename callers now?
-- Keep low-risk optional fallback for `textureArrayHigh` uniform in lazy mode?
+- Whether to execute lifecycle model changes in same branch as section-per-layout or split into a prep branch.
+- Whether `GameBoxSpawner` remains data-only enough for singleton+reset, or should stay per-rebuild instance.

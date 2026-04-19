@@ -9,69 +9,80 @@ import {
     type ShelfLayoutDeterminedEvent,
     type StorePropsProgressEvent,
 } from '../../types/InteractionEvents'
-import { computeStoreArcShelfLayout, type ArcShelfInfo } from '../props/shared/ArcLayoutUtils'
-import { computeSpokeShelfLayout } from '../props/shared/SpokeLayoutUtils'
-import { computeRowShelfLayout } from '../props/shared/RowLayoutUtils'
 import type { IStockStrategy } from '../props/shared/StockStrategy'
-import { createStockStrategy } from '../props/shared/StockStrategyRegistry'
+import { LayoutRegistry } from '../props/shared/LayoutRegistry'
 import { type LayoutMode } from '../../types/LayoutTypes'
 
 /**
  * ShelfLayoutCoordinator
  *
- * Listens to the first BatchReadyForPlacement event. Uses totalBatches (known
- * immediately) to compute the full arc shelf layout without waiting for game
- * content or sort. Emits:
- *   - ShelfLayoutDetermined  once, with shelfBounds for room/lighting systems
+ * Singleton coordinator — owns shelf layout computation for the lifetime of the app.
+ * On layout switch, call reset(newLayoutMode) rather than dispose+reconstruct.
+ *
+ * Listens to BatchReadyForPlacement. Uses totalBatches to compute the full shelf
+ * layout without waiting for game content or sort. Emits:
+ *   - ShelfLayoutDetermined  once per layout, with shelfBounds for room/lighting
  *   - ShelfReady             one per shelf, with position + rotationY
- *
- * NOTE: ShelfReady is emitted once per BatchReadyForPlacement — progressively
- * as batches arrive. This means 40+ events can fire back-to-back on load.
- * A future ShelfLayoutBatch event could coalesce these if consumers need it.
- *
- * Current assumption: 1 batch ≈ 1 shelf. This holds while shelves have a
- * uniform game-slot count. Wall shelves or variable-capacity shelves will
- * need a separate mapping from batch count → shelf count.
  *
  * Knows nothing about games, GPU, or rendering. Pure layout authority.
  */
 export class ShelfLayoutCoordinator {
     private static readonly logger = Logger.createLogFunctions(ShelfLayoutCoordinator.name)
+    private static instance: ShelfLayoutCoordinator | null = null
 
     /** The stock strategy matching the current layout mode. Consumed by GameBoxSpawner. */
-    public readonly stockStrategy: IStockStrategy
+    public stockStrategy: IStockStrategy
 
-    /** Current assumption: totalBatches maps 1:1 to shelves. See class doc. */
-
+    private layoutMode: LayoutMode
     private layoutComputed = false
     private shelvesByBatch = new Map<number, { position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }>()
     private emittedShelfIds = new Set<number>()
     private totalShelves = 0
-    private readonly layoutMode: LayoutMode
 
     private readonly boundHandleFirstBatch: (event: CustomEvent<BatchReadyForPlacementEvent>) => void
 
-    constructor(layoutMode: LayoutMode = 'arc') {
+    static getInstance(initialLayoutMode: LayoutMode = 'arc'): ShelfLayoutCoordinator {
+        if (!ShelfLayoutCoordinator.instance) {
+            ShelfLayoutCoordinator.instance = new ShelfLayoutCoordinator(initialLayoutMode)
+        }
+        return ShelfLayoutCoordinator.instance
+    }
+
+    private constructor(layoutMode: LayoutMode) {
         this.layoutMode = layoutMode
-        this.stockStrategy = createStockStrategy(layoutMode)
+        this.stockStrategy = LayoutRegistry[layoutMode].createStockStrategy()
         this.boundHandleFirstBatch = (event: CustomEvent<BatchReadyForPlacementEvent>) =>
             this.handleFirstBatch(event.detail)
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.boundHandleFirstBatch
         )
-        ShelfLayoutCoordinator.logger.debug('Subscribed to BatchReadyForPlacement')
+        ShelfLayoutCoordinator.logger.debug(`Constructed in ${layoutMode} mode`)
     }
 
+    /**
+     * Switch to a new layout mode and clear accumulated layout state.
+     * Event handler registration is preserved — no re-subscribe needed.
+     */
+    public reset(layoutMode: LayoutMode = this.layoutMode): void {
+        this.layoutMode = layoutMode
+        this.stockStrategy = LayoutRegistry[layoutMode].createStockStrategy()
+        this.layoutComputed = false
+        this.shelvesByBatch.clear()
+        this.emittedShelfIds.clear()
+        this.totalShelves = 0
+        ShelfLayoutCoordinator.logger.debug(`Reset to ${layoutMode} mode`)
+    }
+
+    /** Full teardown — deregisters handler. Only needed at app shutdown. */
     public dispose(): void {
         EventManager.getInstance().deregisterEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             this.boundHandleFirstBatch
         )
-        this.layoutComputed = false
-        this.shelvesByBatch.clear()
-        this.emittedShelfIds.clear()
-        this.totalShelves = 0
+        this.reset()
+        ShelfLayoutCoordinator.instance = null
+        ShelfLayoutCoordinator.logger.debug('Disposed')
     }
 
     private handleFirstBatch(detail: BatchReadyForPlacementEvent): void {
@@ -87,12 +98,10 @@ export class ShelfLayoutCoordinator {
             ShelfLayoutCoordinator.logger.debug(`Computing ${this.layoutMode} layout for ${this.totalShelves} shelves`)
             this.computeLayout(this.totalShelves)
         } else if (detail.totalBatches !== this.totalShelves) {
-            // New load with different batch count (e.g. anonymous → real user).
-            // Reset and recompute so all batches get valid shelf positions.
             ShelfLayoutCoordinator.logger.debug(
                 `Batch count changed (${this.totalShelves} → ${detail.totalBatches}) — resetting layout`
             )
-            this.dispose()
+            this.reset(this.layoutMode)
             this.layoutComputed = true
             this.totalShelves = detail.totalBatches
             this.computeLayout(this.totalShelves)
@@ -101,19 +110,9 @@ export class ShelfLayoutCoordinator {
         this.emitShelfForBatch(detail.batchIndex)
     }
 
-    private static readonly layoutComputers: Record<LayoutMode, (coordinator: ShelfLayoutCoordinator, totalShelves: number) => Array<{ position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }>> = {
-        arc: (coordinator, totalShelves) => coordinator.computeArcLayout(totalShelves),
-        row: (coordinator, totalShelves) => coordinator.computeRowLayout(totalShelves),
-        spoke: (coordinator) => coordinator.computeSpokeLayout(),
-    }
-
     private computeLayout(totalShelves: number): void {
-        const shelves = (ShelfLayoutCoordinator.layoutComputers[this.layoutMode] ?? ShelfLayoutCoordinator.layoutComputers.arc)(
-            this,
-            totalShelves
-        )
+        const shelves = LayoutRegistry[this.layoutMode].computeShelves(totalShelves)
 
-        // Compute spatial bounds for room/lighting systems
         const bounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         const hw = 2.0 / 2
         const hd = 1.0 / 2
@@ -130,7 +129,6 @@ export class ShelfLayoutCoordinator {
                 shelfBounds: bounds,
                 shelfLayout: {
                     rows: (shelves[shelves.length - 1]?.row ?? 0) + 1,
-                    // shelvesPerRow omitted — it varies by row; consumers should not rely on it
                 },
             }
         )
@@ -141,30 +139,12 @@ export class ShelfLayoutCoordinator {
             this.shelvesByBatch.set(i, {
                 position: s.position.clone(),
                 rotationY: s.rotationY,
-                row: 'row' in s ? (s as ArcShelfInfo).row : i,
-                indexInRow: 'indexInRow' in s ? (s as ArcShelfInfo).indexInRow : i,
+                row: s.row,
+                indexInRow: s.indexInRow,
             })
         }
 
         ShelfLayoutCoordinator.logger.debug(`Layout determined for ${shelves.length} shelves`)
-    }
-
-    private computeArcLayout(totalShelves: number): ArcShelfInfo[] {
-        return computeStoreArcShelfLayout(totalShelves)
-    }
-
-    private computeRowLayout(totalShelves: number): Array<{ position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }> {
-        return computeRowShelfLayout(totalShelves)
-    }
-
-    private computeSpokeLayout(): Array<{ position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }> {
-        const spokeShelfInfos = computeSpokeShelfLayout()
-        return spokeShelfInfos.map((s, i) => ({
-            position: s.position,
-            rotationY: s.rotationY,
-            row: s.spokeIndex,
-            indexInRow: i,
-        }))
     }
 
     private emitShelfForBatch(batchIndex: number): void {
@@ -178,7 +158,6 @@ export class ShelfLayoutCoordinator {
 
         this.emittedShelfIds.add(batchIndex)
 
-        // Emit progress synchronously so the progress bar updates immediately.
         EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
             step: 'shelves',
             current: batchIndex + 1,
@@ -186,11 +165,8 @@ export class ShelfLayoutCoordinator {
             detail: `Placing shelf ${batchIndex + 1}`,
         })
 
-        // Defer ShelfReady to the next microtask.
-        // ShelfReady fires inside the BatchReadyForPlacement dispatch;
-        // GameBoxSpawner's BatchReadyForPlacement handler hasn't run yet at that point.
-        // queueMicrotask ensures all BatchReadyForPlacement handlers complete first,
-        // so GameBoxSpawner has stored the pending games before ShelfReady arrives.
+        // Defer to next microtask so all BatchReadyForPlacement handlers complete
+        // before ShelfReady fires — GameBoxSpawner must have stored its pending games first.
         queueMicrotask(() => {
             EventManager.getInstance().emit<ShelfReadyEvent>(
                 StorePropsEventTypes.ShelfReady,

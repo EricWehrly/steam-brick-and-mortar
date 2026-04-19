@@ -18,6 +18,8 @@
 import * as THREE from 'three'
 import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
 import type { StockSurface } from '../../../types/LayoutTypes'
+import type { ILayoutDefinition } from './ILayoutDefinition'
+import type { ShelfInfo } from '../../../types/LayoutTypes'
 
 /**
  * ArcStockStrategy
@@ -184,4 +186,10 @@ export function computeStoreArcShelfLayout(totalShelves: number): ArcShelfInfo[]
         firstRowRadius: 5.5,
     }
     return computeArcShelfLayout(totalShelves, config)
+}
+
+export const ArcLayout: ILayoutDefinition = {
+    mode: 'arc',
+    createStockStrategy: () => new ArcStockStrategy(),
+    computeShelves: (totalShelves): ShelfInfo[] => computeStoreArcShelfLayout(totalShelves),
 }

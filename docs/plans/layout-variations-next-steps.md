@@ -30,11 +30,32 @@ Things small enough to land before PR closes:
 
 ---
 
-## Next branch — section-per-layout
+## Next branch — section-per-layout + architecture cleanup
 
 The core feature: each named Section gets its own spatial territory in the layout.
+In parallel, we should land the registry/lifecycle cleanup that removes obvious coordinator complexity.
 
 ### What this requires
+
+0. **Layout registry + definition interface (architectural intent)**
+   `LayoutMode` should remain the discriminant key, but behavior should live behind a single
+   `ILayoutDefinition` interface implemented by each layout module.
+
+   Proposed shape:
+   ```typescript
+   export interface ILayoutDefinition {
+       readonly mode: LayoutMode
+       createStockStrategy(): IStockStrategy
+       computeShelves(totalShelves: number): ShelfInfo[]
+   }
+   ```
+
+   Then a barrel registry owns the mapping:
+   ```typescript
+   export const LayoutRegistry: Record<LayoutMode, ILayoutDefinition>
+   ```
+
+   This collapses multiple maps (`layoutComputers`, strategy registry) into one source of truth.
 
 1. **Layout knows section count before shelves emit**
    Currently `ShelfLayoutCoordinator` sizes itself from `totalBatches` (which equals shelf count,
@@ -69,6 +90,23 @@ The core feature: each named Section gets its own spatial territory in the layou
    Prevent re-entrant UI requests during teardown/rebuild (`LayoutRequested`, `SortRequested`).
    Re-enable once setup + first shelf/game placement readiness signal arrives.
    This should reduce user-visible race conditions and avoid redundant reload churn.
+
+### Coordinator lifecycle model (architectural intent)
+
+For simplicity and obviousness, split by ownership type:
+
+- **Resettable singleton coordinators** (event wiring + plain data only)
+  - `ShelfLayoutCoordinator`
+  - `BatchCoordinator`
+  - `GameBoxSpawner` (if kept data-only)
+  These should expose `reset()` and keep stable object identity.
+
+- **Disposable render/resource owners** (GPU assets, textures, meshes)
+  - `InstancedShelfRenderer`
+  - `GpuGameBoxRenderer`
+  These should keep `dispose()` and be reconstructed when needed.
+
+This removes most nullable lifecycle plumbing in `StorePropsCoordinator` and reduces event-handler leak risk.
 
 ### Spoke-specific: aisle entrance sign placement
    Each spoke's hub-proximal shelf is the sign anchor point. Section name → sign label.
