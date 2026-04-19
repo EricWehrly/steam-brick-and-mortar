@@ -187,8 +187,8 @@ class StorePropsCoordinator {
         this.layoutSwitchInProgress = true
 
         this.instancedShelfRenderer?.reset()
-        this.gameBoxSpawner?.reset()
-        this.batchCoordinator?.reset()
+        this.gameBoxSpawner?.dispose()
+        this.batchCoordinator?.dispose()
         this.shelfLayoutCoordinator?.dispose()
         this.shelfLayoutCoordinator = null
         this.gameBoxSpawner = null
