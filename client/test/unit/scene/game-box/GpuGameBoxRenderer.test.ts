@@ -1,109 +1,110 @@
 /**
- * Regression test: LodDistanceManager must start after AllBatchesComplete.
+ * GpuGameBoxRenderer — unit tests
  *
- * Bug: GpuGameBoxRenderer created LodDistanceManager but never called
- * startAutoUpdate() or syncInstances(), so distance-based LOD switching
- * never ran. Games stayed at MID and only upgraded when spatial pre-warmer
- * happened to kick in (i.e., only on close approach).
+ * GpuGameBoxRenderer is now a thin coordinator: it constructs
+ * LodArtworkOrchestratorDebug (via fromAppSettings) and InstancedLabelRenderer,
+ * and provides placeGame() / clearPlacements() / dispose().
  *
- * Fix (bc7d955): The subscription was moved INTO LodDistanceManager itself
- * (self-subscription pattern). GpuGameBoxRenderer no longer drives this;
- * LodDistanceManager registers for AllBatchesComplete
- * in its own constructor and calls syncInstances + startAutoUpdate when it fires.
+ * The LodDistanceManager lifecycle tests that previously lived here have moved:
+ * LodDistanceManager is now owned by LodArtworkOrchestratorDebug and
+ * self-subscribes in its own constructor. Tests for that contract belong in
+ * LodArtworkOrchestratorDebug tests.
+ *
+ * TD: add LodArtworkOrchestratorDebug-level test for AllBatchesComplete → LOD start.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { GameEventTypes } from '../../../../src/types/InteractionEvents'
+import * as THREE from 'three'
 
-// ---- minimal mocks ----
+// ---- mocks ----
+
 vi.mock('../../../../src/core/AppSettings', () => ({
-    AppSettings: { get: vi.fn().mockReturnValue(undefined) },
+    AppSettings: { get: vi.fn().mockReturnValue(0.5) },
     Setting: new Proxy({}, { get: (_t, k) => k }),
 }))
 
-const mockEventHandlers = new Map<string, (() => void)[]>()
 vi.mock('../../../../src/core/EventManager', () => ({
     EventManager: {
         getInstance: () => ({
-            registerEventHandler: vi.fn((type: string, fn: () => void) => {
-                const list = mockEventHandlers.get(type) ?? []
-                list.push(fn)
-                mockEventHandlers.set(type, list)
-            }),
+            registerEventHandler: vi.fn(),
+            emit: vi.fn(),
         }),
     },
 }))
 
-const mockSyncInstances = vi.fn()
-const mockStartAutoUpdate = vi.fn()
+const mockPlaceInstance = vi.fn(() => 0)
+const mockPrefetchArtwork = vi.fn(() => Promise.resolve('prefetched'))
+const mockClearPlacements = vi.fn()
+const mockOrchestratorDispose = vi.fn()
 
-vi.mock('../../../../src/scene/game-box/instancing/LodDistanceManagerDebug', () => ({
-    // Simulate self-subscription: the real LodDistanceManager registers for
-    // AllBatchesComplete in its constructor and calls syncInstances/startAutoUpdate.
-    LodDistanceManagerDebug: vi.fn().mockImplementation(function(this: Record<string, unknown>) {
-        const instance = {
-            syncInstances: mockSyncInstances,
-            startAutoUpdate: mockStartAutoUpdate,
-            dispose: vi.fn(),
-        }
-        const handlers = mockEventHandlers.get(GameEventTypes.AllBatchesComplete) ?? []
-        handlers.push(() => {
-            instance.syncInstances()
-            instance.startAutoUpdate()
-        })
-        mockEventHandlers.set(GameEventTypes.AllBatchesComplete, handlers)
-        return instance
-    }),
-}))
-vi.mock('../../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug', () => ({
-    LodArtworkOrchestratorDebug: vi.fn().mockImplementation(function() {
-        return {
-            setArtworkInstanceFromUrl: vi.fn(),
-            getInstanceData: vi.fn().mockReturnValue(new Map()),
-            getInstanceCount: vi.fn().mockReturnValue(0),
-            dispose: vi.fn(),
-            isReady: vi.fn().mockReturnValue(true),
-        }
-    }),
-}))
+vi.mock('../../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug', () => {
+    class MockOrchestrator {
+        placeInstance = mockPlaceInstance
+        prefetchArtwork = mockPrefetchArtwork
+        clearPlacements = mockClearPlacements
+        dispose = mockOrchestratorDispose
+        getInstanceCount = vi.fn(() => 0)
+        static fromAppSettings(_maxGames?: number) { return new MockOrchestrator() }
+    }
+    return { LodArtworkOrchestratorDebug: MockOrchestrator }
+})
+
+const mockAddLabelInstance = vi.fn(() => true)
+const mockLabelClear = vi.fn()
+const mockLabelDispose = vi.fn()
+
 vi.mock('../../../../src/scene/game-box/instancing/InstancedLabelRenderer', () => ({
     InstancedLabelRenderer: vi.fn().mockImplementation(function() {
-        return {
-            addLabelInstance: vi.fn(),
-            isReady: vi.fn().mockReturnValue(true),
-            compact: vi.fn(),
-            dispose: vi.fn(),
-        }
+        this.addLabelInstance = mockAddLabelInstance
+        this.clear = mockLabelClear
+        this.dispose = mockLabelDispose
     }),
 }))
 
 import { GpuGameBoxRenderer } from '../../../../src/scene/game-box/GpuGameBoxRenderer'
 
-describe('GpuGameBoxRenderer - LOD distance manager lifecycle', () => {
+const makeGame = (appid: number) => ({
+    appid,
+    name: `Game ${appid}`,
+    playtime_forever: 0,
+    img_icon_url: '',
+    img_logo_url: '',
+})
+
+describe('GpuGameBoxRenderer', () => {
+    let renderer: GpuGameBoxRenderer
+
     beforeEach(() => {
-        mockEventHandlers.clear()
-        mockSyncInstances.mockClear()
-        mockStartAutoUpdate.mockClear()
+        vi.clearAllMocks()
+        renderer = new GpuGameBoxRenderer(100)
     })
 
-    it('registers for AllBatchesComplete in constructor', () => {
-        new GpuGameBoxRenderer()
-        expect(mockEventHandlers.has(GameEventTypes.AllBatchesComplete)).toBe(true)
+    it('constructs without throwing', () => {
+        expect(renderer).toBeDefined()
     })
 
-    it('does NOT start LOD distance manager before AllBatchesComplete fires', () => {
-        new GpuGameBoxRenderer()
-        expect(mockStartAutoUpdate).not.toHaveBeenCalled()
-        expect(mockSyncInstances).not.toHaveBeenCalled()
+    it('placeGame: uses artwork instance when atlas hit (placeInstance returns ≥ 0)', () => {
+        mockPlaceInstance.mockReturnValueOnce(0)
+        renderer.placeGame(makeGame(1) as any, new THREE.Vector3(), new THREE.Quaternion())
+        expect(mockPlaceInstance).toHaveBeenCalledTimes(1)
+        expect(mockAddLabelInstance).not.toHaveBeenCalled()
     })
 
-    it('syncs instances and starts auto-update when AllBatchesComplete fires', () => {
-        new GpuGameBoxRenderer()
-        const handlers = mockEventHandlers.get(GameEventTypes.AllBatchesComplete) ?? []
-        expect(handlers.length).toBeGreaterThan(0)
-        // Find the handler that starts auto-update by looking at its side effects,
-        // or just call all of them since that's what the event manager does.
-        handlers.forEach(h => (h as any)({} as any))
-        expect(mockSyncInstances).toHaveBeenCalledOnce()
-        expect(mockStartAutoUpdate).toHaveBeenCalledOnce()
+    it('placeGame: falls through to label when atlas miss (placeInstance returns -1)', () => {
+        mockPlaceInstance.mockReturnValueOnce(-1)
+        renderer.placeGame(makeGame(1) as any, new THREE.Vector3(), new THREE.Quaternion())
+        expect(mockPlaceInstance).toHaveBeenCalledTimes(1)
+        expect(mockAddLabelInstance).toHaveBeenCalledTimes(1)
+    })
+
+    it('clearPlacements: clears both artwork and label renderers', () => {
+        renderer.clearPlacements()
+        expect(mockClearPlacements).toHaveBeenCalledTimes(1)
+        expect(mockLabelClear).toHaveBeenCalledTimes(1)
+    })
+
+    it('dispose: disposes both renderers', () => {
+        renderer.dispose()
+        expect(mockOrchestratorDispose).toHaveBeenCalledTimes(1)
+        expect(mockLabelDispose).toHaveBeenCalledTimes(1)
     })
 })
