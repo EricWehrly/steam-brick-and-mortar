@@ -184,11 +184,12 @@ into `SectionsReady` with per-section sorted game lists.*
 - `GameBoxUtils.stockSurfaces()` places games onto an ordered surface list, returning placement intents.
 - `GameBoxSpawner` no longer knows about `ShelfFace` or local Z offsets — just iterates surfaces.
 
-**Step 3 — `IStockStrategy` interface** (next)
+**Step 3 — `IStockStrategy` interface** ✅
 - Interface: given board surfaces + shelf geometry, return an ordered `StockSurface[]`.
 - `ArcStockStrategy`: Near-first, then Far. Current behavior, now explicit.
 - `RowStockStrategy`: Near-only (no back side in a row — the next row's front is behind you).
 - Strategy selected at store init time. No live switching required.
+- 6 unit tests covering both strategies.
 
 **Step 4 — Row layout (reload-gated)**
 - Second shelf position algorithm alongside the arc.
