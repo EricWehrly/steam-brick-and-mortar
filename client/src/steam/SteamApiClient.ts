@@ -60,7 +60,8 @@ export class SteamApiClient {
     // TODO: resolve apiBaseUrl from terraform outputs
     constructor(apiBaseUrl = 'https://steam-api-dev.wehrly.com') {
         this.http = new HttpClient({ baseUrl: apiBaseUrl })
-        this.cache = new CacheManager({ cachePrefix: 'steam_api_' })
+        // Make the global cache duration infinite so items stay forever unless given a specific TTL
+        this.cache = new CacheManager({ cachePrefix: 'steam_api_', cacheDuration: Infinity })
         this.rateLimiter = new RateLimiter({ requestsPerSecond: 4 })
         this.batchClient = new BatchAppDetailsClient(apiBaseUrl)
         this.appDetailsCache = new AppDetailsCache()
@@ -138,8 +139,23 @@ export class SteamApiClient {
         if (!ignoreCache) {
             const cached = this.cache.get<SteamUser>(cacheKey)
             if (cached) return cached
+
+            // Cache expired but we have stale data. Use it, but trigger background refresh.
+            const stale = this.cache.getStale<SteamUser>(cacheKey)
+            if (stale) {
+                SteamApiClient.logger.info(`Cache for ${steamId} is stale (older than 48h). Returning stale data while fetching update...`)
+                // Fire and forget
+                this.fetchAndCacheUserGames(steamId, cacheKey).catch(err => {
+                    SteamApiClient.logger.error(`Background refresh for ${steamId} failed:`, err)
+                })
+                return stale
+            }
         }
         
+        return this.fetchAndCacheUserGames(steamId, cacheKey)
+    }
+
+    private async fetchAndCacheUserGames(steamId: string, cacheKey: string): Promise<SteamUser> {
         const endpoint = `/games/${encodeURIComponent(steamId)}`
         SteamApiClient.logger.debug(`Fetching games for Steam ID: ${steamId}`)
 
@@ -152,7 +168,8 @@ export class SteamApiClient {
                 SteamApiClient.logger.warn('User has 0 games — may indicate privacy settings or an empty library')
             }
 
-            this.cache.set(cacheKey, response)
+            // 48 hour TTL for game lists
+            this.cache.set(cacheKey, response, { ttlMs: 48 * 60 * 60 * 1000 })
             return response
         } catch (error) {
             SteamApiClient.logger.error('Failed to fetch user games:', error)
