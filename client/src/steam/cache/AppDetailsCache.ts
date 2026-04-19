@@ -14,10 +14,6 @@ interface CachedAppDetails {
     schema_version?: number
 }
 
-export interface AppDetailsCacheResult {
-    data: AppDetailsData
-    isStale: boolean
-}
 
 export class AppDetailsCache {
     private static readonly DB_NAME = 'steam-app-details-cache'
@@ -82,7 +78,7 @@ export class AppDetailsCache {
      * Get cached app details for a single game.
      * Returns stale entries too, marked with isStale=true.
      */
-    async get(appid: number): Promise<AppDetailsCacheResult | null> {
+    async get(appid: number): Promise<AppDetailsData & { isStale: boolean } | null> {
         await this.init()
         if (!this.db) return null
 
@@ -99,7 +95,7 @@ export class AppDetailsCache {
                 }
 
                 resolve({
-                    data: cached.data,
+                    ...cached.data,
                     isStale: cached.schema_version !== AppDetailsCache.CURRENT_SCHEMA_VERSION
                 })
             }
@@ -115,9 +111,9 @@ export class AppDetailsCache {
      * Get cached app details for multiple games.
      * Returns stale entries too, marked with isStale=true.
      */
-    async getMany(appids: number[]): Promise<Map<number, AppDetailsCacheResult>> {
+    async getMany(appids: number[]): Promise<Map<number, AppDetailsData & { isStale: boolean }>> {
         await this.init()
-        const results = new Map<number, AppDetailsCacheResult>()
+        const results = new Map<number, AppDetailsData & { isStale: boolean }>()
 
         if (!this.db) return results
 
@@ -145,7 +141,7 @@ export class AppDetailsCache {
                         if (isStale) {
                             staleCount++
                         }
-                        results.set(appid, { data: cached.data, isStale })
+                        results.set(appid, { ...cached.data, isStale })
                     }
 
                     completed++
