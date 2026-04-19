@@ -6,7 +6,7 @@ import {
     StorePropsEventTypes,
     type ShelfReadyEvent,
 } from '../../../src/types/InteractionEvents'
-import type { GamesSortEvent, GameSortMode } from '../../../src/types/EnvironmentEvents'
+import type { SectionsReadyEvent, Section } from '../../../src/types/EnvironmentEvents'
 import type { SteamGameData } from '../../../src/scene/game-box/types/GameData'
 
 const placeSignSpy = vi.fn().mockReturnValue(new THREE.Group())
@@ -30,34 +30,32 @@ vi.mock('../../../src/scene/SceneSignManager', () => ({
     },
 }))
 
-vi.mock('../../../src/scene/props/shared/ShelfSurfaceUtils', () => ({
-    ShelfSurfaceUtils: { findShelfSurfaces: vi.fn().mockReturnValue([]) },
-}))
-
 import { ShelfSectionPlanner } from '../../../src/scene/ShelfSectionPlanner'
 
-const NOW = Math.floor(Date.now() / 1000)
-const PLAYED_TODAY = NOW - 3600
 const FAR_POSITION = new THREE.Vector3(10, 0, -20)
 
-function makeGame(
-    rtimeLastPlayed: number,
-    genreDescription?: string,
-    appid = Math.floor(Math.random() * 1e6)
-): SteamGameData {
+function makeGame(appid = 1): SteamGameData {
     return {
         appid,
-        name: 'Test Game',
+        name: `Game ${appid}`,
         playtime_forever: 60,
-        rtime_last_played: rtimeLastPlayed,
-        genres: genreDescription ? [{ id: '1', description: genreDescription }] : undefined,
+        rtime_last_played: 0,
+        img_icon_url: '',
+        img_logo_url: '',
     } as SteamGameData
 }
 
-function emitGamesSort(games: SteamGameData[], sortMode: GameSortMode = 'recently-played'): void {
-    EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
-        sortedGames: games as unknown as ReadonlyArray<Readonly<SteamGameData>>,
-        buckets: new Map(),
+function makeSection(name: string, gameCount = 18): Section {
+    return {
+        name,
+        games: Array.from({ length: gameCount }, (_, i) => makeGame(i + 1)),
+        sortMode: 'recently-played',
+    }
+}
+
+function emitSectionsReady(sections: Section[], sortMode: SectionsReadyEvent['sortMode'] = 'recently-played'): void {
+    EventManager.getInstance().emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+        sections,
         sortMode,
     })
 }
@@ -70,107 +68,85 @@ function emitShelfReady(batchIndex: number, position = FAR_POSITION, rotationY =
     })
 }
 
-describe('ShelfSectionPlanner — bucket signs (recently-played sort)', () => {
+describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     beforeEach(() => {
         EventManager.getInstance().removeAllListeners()
         vi.clearAllMocks()
     })
 
-    it('places a bucket sign on ShelfReady when recently-played data is present', () => {
+    it('places a sign for each named section when shelf positions are known', () => {
         new ShelfSectionPlanner()
-        const games = Array.from({ length: 18 }, () => makeGame(PLAYED_TODAY))
-        emitGamesSort(games, 'recently-played')
-        vi.clearAllMocks()
+        emitShelfReady(0, FAR_POSITION)
+        emitShelfReady(1, new THREE.Vector3(5, 0, -20))
 
+        emitSectionsReady([
+            makeSection('Played Today'),
+            makeSection('Played This Week'),
+        ])
+
+        const placedIds = placeSignSpy.mock.calls.map(([, d]) => d.uniqueIdentifier)
+        expect(placedIds).toContain('Played Today')
+        expect(placedIds).toContain('Played This Week')
+    })
+
+    it('does not place a sign for unnamed (empty name) sections', () => {
+        new ShelfSectionPlanner()
         emitShelfReady(0, FAR_POSITION)
 
-        expect(placeSignSpy).toHaveBeenCalled()
-    })
-
-    it('places a "Never Played" bucket sign for unplayed games in recently-played sort', () => {
-        new ShelfSectionPlanner()
-        // Games with rtime_last_played=0 are in the Unplayed bucket — still get a sign
-        emitGamesSort([makeGame(0)], 'recently-played')
-        vi.clearAllMocks()
-
-        emitShelfReady(0)
-
-        expect(placeSignSpy).toHaveBeenCalled()
-    })
-
-    it('replays bucket signs across accumulated shelf positions on re-sort', () => {
-        new ShelfSectionPlanner()
-        const games = Array.from({ length: 18 }, () => makeGame(PLAYED_TODAY))
-
-        emitShelfReady(0, FAR_POSITION)
-        emitGamesSort(games, 'recently-played')
-        vi.clearAllMocks()
-
-        emitGamesSort(games, 'recently-played')
-        expect(placeSignSpy).toHaveBeenCalled()
-    })
-
-    it('clears bucket signs before re-sort', () => {
-        new ShelfSectionPlanner()
-        const games = Array.from({ length: 18 }, () => makeGame(PLAYED_TODAY))
-
-        emitGamesSort(games, 'recently-played')
-        emitShelfReady(0, FAR_POSITION)
-        vi.clearAllMocks()
-
-        emitGamesSort(games, 'recently-played')
-        expect(removeSignByIdSpy).toHaveBeenCalled()
-    })
-})
-
-describe('ShelfSectionPlanner — section signs (genre sort)', () => {
-    beforeEach(() => {
-        EventManager.getInstance().removeAllListeners()
-        vi.clearAllMocks()
-    })
-
-    it('does not place bucket signs during genre sort ShelfReady', () => {
-        new ShelfSectionPlanner()
-        const games = Array.from({ length: 18 }, () => makeGame(PLAYED_TODAY, 'Action'))
-        emitGamesSort(games, 'by-genre')
-        vi.clearAllMocks()
-
-        emitShelfReady(0, FAR_POSITION)
+        emitSectionsReady([makeSection('')])
 
         expect(placeSignSpy).not.toHaveBeenCalled()
     })
 
-    it('places genre section signs when switching to by-genre using sortedGames payload', () => {
+    it('does not place a sign for "Other" sections', () => {
         new ShelfSectionPlanner()
         emitShelfReady(0, FAR_POSITION)
 
-        const genreSortedGames = [
-            makeGame(PLAYED_TODAY, 'Action', 1),
-            makeGame(PLAYED_TODAY, 'Action', 2),
-            makeGame(PLAYED_TODAY, 'Strategy', 3),
-            makeGame(PLAYED_TODAY, 'Strategy', 4),
-        ]
+        emitSectionsReady([makeSection('Other')])
 
-        emitGamesSort(genreSortedGames, 'by-genre')
-
-        const placedIdentifiers = placeSignSpy.mock.calls.map(([, descriptor]) => descriptor.uniqueIdentifier)
-        expect(placedIdentifiers).toContain('Action')
-        expect(placedIdentifiers).toContain('Strategy')
+        expect(placeSignSpy).not.toHaveBeenCalled()
     })
 
-    it('clears section signs when switching sort modes', () => {
+    it('clears previous signs before placing new ones on re-sort', () => {
         new ShelfSectionPlanner()
         emitShelfReady(0, FAR_POSITION)
+        emitShelfReady(1, new THREE.Vector3(5, 0, -20))
 
-        const genreSortedGames = [
-            makeGame(PLAYED_TODAY, 'Action', 1),
-            makeGame(PLAYED_TODAY, 'Action', 2),
-        ]
-
-        emitGamesSort(genreSortedGames, 'by-genre')
+        emitSectionsReady([makeSection('Action'), makeSection('RPG')])
         vi.clearAllMocks()
 
-        emitGamesSort(genreSortedGames, 'recently-played')
+        emitSectionsReady([makeSection('Played Today')])
         expect(removeSignByIdSpy).toHaveBeenCalledWith('Action')
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('RPG')
+        expect(placeSignSpy).toHaveBeenCalledWith('canvas', expect.objectContaining({
+            uniqueIdentifier: 'Played Today',
+        }))
+    })
+
+    it('anchors sections to shelf positions in order', () => {
+        new ShelfSectionPlanner()
+        const pos0 = new THREE.Vector3(0, 0, -5)
+        const pos1 = new THREE.Vector3(5, 0, -5)
+        emitShelfReady(0, pos0)
+        emitShelfReady(1, pos1)
+
+        emitSectionsReady([makeSection('First', 18), makeSection('Second', 18)])
+
+        const firstCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'First')
+        const secondCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second')
+        expect(firstCall).toBeDefined()
+        expect(secondCall).toBeDefined()
+        // First section anchors at shelf 0
+        expect(firstCall[1].anchorPosition).toEqual(pos0)
+        // Second section anchors at shelf 1
+        expect(secondCall[1].anchorPosition).toEqual(pos1)
+    })
+
+    it('does not throw if SectionsReady fires before any ShelfReady', () => {
+        new ShelfSectionPlanner()
+        expect(() => {
+            emitSectionsReady([makeSection('Action')])
+        }).not.toThrow()
+        expect(placeSignSpy).not.toHaveBeenCalled()
     })
 })

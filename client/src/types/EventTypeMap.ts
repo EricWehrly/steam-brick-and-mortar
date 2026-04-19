@@ -48,7 +48,7 @@ import type {
     GameLoadingPhaseChangedEvent,
     GameLoadingProgressEvent,
 } from './InteractionEvents'
-import type { AllBatchesCompleteEvent, GamesSortEvent, LayoutChangedEvent, SomeBatchesCompleteEvent, SortRequestedEvent } from './EnvironmentEvents'
+import type { AllBatchesCompleteEvent, GamesSortEvent, LayoutChangedEvent, SomeBatchesCompleteEvent, SortRequestedEvent, SectionsReadyEvent } from './EnvironmentEvents'
 
 export interface InteractionEventMap {
     // Steam events
@@ -92,6 +92,7 @@ export interface InteractionEventMap {
     // Environment events (from EnvironmentEvents.ts)
     [GameEventTypes.AllBatchesComplete]: AllBatchesCompleteEvent
     [GameEventTypes.GamesSort]: GamesSortEvent
+    [GameEventTypes.SectionsReady]: SectionsReadyEvent
 
     // App events
     [AppEventTypes.PhaseStarted]: PhaseCompletedEvent

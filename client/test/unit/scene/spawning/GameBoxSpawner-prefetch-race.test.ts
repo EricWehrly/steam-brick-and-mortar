@@ -22,7 +22,7 @@ import {
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
 } from '../../../../src/types/InteractionEvents'
-import type { GamesSortEvent } from '../../../../src/types/EnvironmentEvents'
+import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
 
 // --- Mocks ---
 
@@ -74,7 +74,10 @@ function makeGame(appid: number, name: string) {
     return {
         appid,
         name,
-        artwork: { library: `https://cdn.example.com/${appid}.jpg` },
+        playtime_forever: 0,
+        img_icon_url: '',
+        img_logo_url: '',
+        artwork: { library: `https://cdn.example.com/${appid}.jpg`, icon: '', logo: '', header: '' },
     }
 }
 
@@ -122,11 +125,10 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
             rotationY: 0,
         })
 
-        // GamesSort fires before prefetch resolves — assigns intents only
-        emit<GamesSortEvent>(GameEventTypes.GamesSort, {
-            sortedGames: games,
+        // SectionsReady fires before prefetch resolves — assigns intents only
+        emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+            sections: [{ name: 'Test', games, sortMode: 'recently-played' }],
             sortMode: 'recently-played',
-            buckets: new Map(),
         })
 
         expect(mockClearPlacements).toHaveBeenCalledTimes(1)
@@ -163,10 +165,9 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
         })
 
         // Prefetch already settled — placeGame fires synchronously during intent assignment
-        emit<GamesSortEvent>(GameEventTypes.GamesSort, {
-            sortedGames: games,
+        emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+            sections: [{ name: 'Test', games, sortMode: 'recently-played' }],
             sortMode: 'recently-played',
-            buckets: new Map(),
         })
 
         expect(mockPlaceGame).toHaveBeenCalledTimes(games.length)

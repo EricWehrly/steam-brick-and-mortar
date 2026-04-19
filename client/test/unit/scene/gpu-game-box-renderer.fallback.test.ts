@@ -71,7 +71,7 @@ describe('GpuGameBoxRenderer — pure execution surface', () => {
         const renderer = new GpuGameBoxRenderer(10)
         const game = { appid: 1, name: 'Game A' } as any
 
-        renderer.placeLabelBox(game, new THREE.Vector3(0, 0, 0))
+        renderer.placeLabelBox(game, new THREE.Vector3(0, 0, 0), new THREE.Quaternion())
 
         expect(labelAddInstanceSpy).toHaveBeenCalledTimes(1)
         expect(labelAddInstanceSpy.mock.calls[0][1]).toBe('Game A')
@@ -80,8 +80,8 @@ describe('GpuGameBoxRenderer — pure execution surface', () => {
     it('placeLabelBox uses a unique call per game', () => {
         const renderer = new GpuGameBoxRenderer(10)
 
-        renderer.placeLabelBox({ appid: 1, name: 'Game A' } as any, new THREE.Vector3(0, 0, 0))
-        renderer.placeLabelBox({ appid: 2, name: 'Game B' } as any, new THREE.Vector3(1, 0, 0))
+        renderer.placeLabelBox({ appid: 1, name: 'Game A' } as any, new THREE.Vector3(0, 0, 0), new THREE.Quaternion())
+        renderer.placeLabelBox({ appid: 2, name: 'Game B' } as any, new THREE.Vector3(1, 0, 0), new THREE.Quaternion())
 
         expect(labelAddInstanceSpy).toHaveBeenCalledTimes(2)
         expect(labelAddInstanceSpy.mock.calls[0][1]).toBe('Game A')
@@ -90,7 +90,7 @@ describe('GpuGameBoxRenderer — pure execution surface', () => {
 
     it('clearPlacements resets instanced label renderer', () => {
         const renderer = new GpuGameBoxRenderer(10)
-        renderer.placeLabelBox({ appid: 1, name: 'Game A' } as any, new THREE.Vector3(0, 0, 0))
+        renderer.placeLabelBox({ appid: 1, name: 'Game A' } as any, new THREE.Vector3(0, 0, 0), new THREE.Quaternion())
 
         // clearPlacements should not throw even after label boxes placed
         expect(() => renderer.clearPlacements()).not.toThrow()

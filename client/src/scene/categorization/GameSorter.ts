@@ -14,9 +14,9 @@ import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
 import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import { GameSortModes } from '../../types/EnvironmentEvents'
-import type { AllBatchesCompleteEvent, GamesSortEvent, SortRequestedEvent } from '../../types/EnvironmentEvents'
+import type { AllBatchesCompleteEvent, SortRequestedEvent, SectionsReadyEvent, Section } from '../../types/EnvironmentEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
-import { sortByNumericField, primaryGenre, KNOWN_GENRES, sortByGenreThenPlaytime } from './GameSortFunctions'
+import { sortByNumericField, primaryGenre, KNOWN_GENRES, sortByGenreThenPlaytime, groupByGenre } from './GameSortFunctions'
 import type { GameSortMode } from '../../types/EnvironmentEvents'
 import { SteamIntegration } from '../../steam-integration/SteamIntegration'
 
@@ -131,156 +131,163 @@ export class GameSorter {
 
     public sortByGenre(): void {
         const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
-
         if (games.length === 0) {
             GameSorter.logger.warn('sortByGenre called but no games in DataManager — skipping emit')
             return
         }
 
-        const sortedGames: ReadonlyArray<Readonly<SteamGameData>> =
-            [...games].sort((a, b) => {
-                const ga = primaryGenre(a as SteamGameData)
-                const gb = primaryGenre(b as SteamGameData)
-                // Use the shared comparator but construct items on the fly
-                // since 'genre' is a computed property, not a primitive on SteamGameData
-                return sortByGenreThenPlaytime(
-                    { genre: ga, playtime_forever: a.playtime_forever },
-                    { genre: gb, playtime_forever: b.playtime_forever }
-                )
+        // Group by genre, sort within each group by playtime descending.
+        const grouped = groupByGenre([...games] as SteamGameData[])
+        const sections: Section[] = []
+        for (const genre of KNOWN_GENRES) {
+            const group = grouped.get(genre)
+            if (!group || group.length === 0) continue
+            sections.push({
+                name: genre,
+                games: [...group].sort((a, b) =>
+                    (b.playtime_forever ?? 0) - (a.playtime_forever ?? 0)
+                ),
+                sortMode: GameSortModes.ByGenre,
             })
+        }
+        // Append 'Other' at end if present
+        const other = grouped.get('Other')
+        if (other && other.length > 0) {
+            sections.push({
+                name: 'Other',
+                games: [...other].sort((a, b) =>
+                    (b.playtime_forever ?? 0) - (a.playtime_forever ?? 0)
+                ),
+                sortMode: GameSortModes.ByGenre,
+            })
+        }
 
-        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
-            sortedGames,
-            buckets: this.buildGenreBucketMap(sortedGames),
-            sortMode: 'by-genre',
+        EventManager.getInstance().emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+            sections,
+            sortMode: GameSortModes.ByGenre,
         })
-        GameSorter.logger.debug(`GamesSort emitted (by genre): ${sortedGames.length} games`)
+        GameSorter.logger.debug(`SectionsReady emitted (by genre): ${sections.length} sections, ${games.length} games`)
     }
 
     public sortByPlaytime(): void {
         const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
-
         if (games.length === 0) {
             GameSorter.logger.warn('sortByPlaytime called but no games in DataManager — skipping emit')
             return
         }
 
-        const sortedGames: ReadonlyArray<Readonly<SteamGameData>> =
-            [...games].sort(sortByNumericField<SteamGameData>('playtime_forever'))
+        const sorted = [...games].sort(sortByNumericField<SteamGameData>('playtime_forever'))
+        const sections: Section[] = this.buildPlaytimeSections(sorted)
 
-        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
-            sortedGames,
-            buckets: this.buildPlaytimeBucketMap(sortedGames),
+        EventManager.getInstance().emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+            sections,
             sortMode: GameSortModes.ByPlaytime,
         })
-
-        GameSorter.logger.debug(`GamesSort emitted (by playtime): ${sortedGames.length} games`)
+        GameSorter.logger.debug(`SectionsReady emitted (by playtime): ${sections.length} sections, ${games.length} games`)
     }
 
     public sortByRating(): void {
         const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
-
         if (games.length === 0) {
             GameSorter.logger.warn('sortByRating called but no games in DataManager — skipping emit')
             return
         }
 
-        const sortedGames: ReadonlyArray<Readonly<SteamGameData>> =
-            [...games].sort(sortByNumericField<SteamGameData>('userscore', 'playtime_forever'))
+        const sorted = [...games].sort(sortByNumericField<SteamGameData>('userscore', 'playtime_forever'))
+        const sections: Section[] = this.buildRatingSections(sorted)
 
-        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
-            sortedGames,
-            buckets: this.buildRatingBucketMap(sortedGames),
+        EventManager.getInstance().emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+            sections,
             sortMode: GameSortModes.ByRating,
         })
-
-        GameSorter.logger.debug(`GamesSort emitted (by rating): ${sortedGames.length} games`)
+        GameSorter.logger.debug(`SectionsReady emitted (by rating): ${sections.length} sections, ${games.length} games`)
     }
 
     public sortByRecentlyPlayed(): void {
         const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
-
         if (games.length === 0) {
             GameSorter.logger.warn('AllBatchesComplete fired but no games in DataManager — skipping emit')
             return
         }
 
-        // Always include all games. rtime_last_played === 0 means "never played" —
-        // those go to RecentlyPlayedBucket.Unplayed, not dropped.
-        const sortedGames: ReadonlyArray<Readonly<SteamGameData>> =
-            [...games].sort(sortByNumericField<SteamGameData>('rtime_last_played', 'playtime_forever'))
+        const sorted = [...games].sort(sortByNumericField<SteamGameData>('rtime_last_played', 'playtime_forever'))
+        const sections: Section[] = this.buildRecentlyPlayedSections(sorted)
 
-        const buckets = this.buildBucketMap(sortedGames)
-
-        EventManager.getInstance().emit<GamesSortEvent>(GameEventTypes.GamesSort, {
-            sortedGames,
-            buckets,
-            sortMode: 'recently-played',
+        EventManager.getInstance().emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+            sections,
+            sortMode: GameSortModes.RecentlyPlayed,
         })
-
-        GameSorter.logger.debug(
-            `GamesSort emitted: ${sortedGames.length} games, ${buckets.size} buckets`
-        )
+        GameSorter.logger.debug(`SectionsReady emitted (recently played): ${sections.length} sections, ${games.length} games`)
     }
 
-    private buildPlaytimeBucketMap(
-        sortedGames: ReadonlyArray<Readonly<SteamGameData>>
-    ): ReadonlyMap<string, string> {
-        const buckets = new Map<string, string>()
-        for (const game of sortedGames) {
-            const bucket = getPlaytimeBucket(game as SteamGameData)
-            if (!buckets.has(bucket)) {
-                buckets.set(bucket, getPlaytimeBucketLabel(bucket))
-            }
+    private buildPlaytimeSections(sorted: SteamGameData[]): Section[] {
+        const bucketOrder = [
+            PlaytimeBucket.Heavy,
+            PlaytimeBucket.Moderate,
+            PlaytimeBucket.Light,
+            PlaytimeBucket.Minimal,
+            PlaytimeBucket.Unplayed,
+        ]
+        const groups = new Map<PlaytimeBucket, SteamGameData[]>()
+        for (const game of sorted) {
+            const bucket = getPlaytimeBucket(game)
+            if (!groups.has(bucket)) groups.set(bucket, [])
+            groups.get(bucket)!.push(game)
         }
-        return buckets
+        return bucketOrder
+            .filter(b => groups.has(b))
+            .map(b => ({
+                name: getPlaytimeBucketLabel(b),
+                games: groups.get(b)!,
+                sortMode: GameSortModes.ByPlaytime,
+            }))
     }
 
-    private buildRatingBucketMap(
-        sortedGames: ReadonlyArray<Readonly<SteamGameData>>
-    ): ReadonlyMap<string, string> {
-        const thresholds: ReadonlyArray<{ minScore: number; key: string; label: string }> = [
+    private buildRatingSections(sorted: SteamGameData[]): Section[] {
+        const tiers = [
             { minScore: 90, key: 'overwhelmingly-positive', label: 'Overwhelmingly Positive' },
             { minScore: 80, key: 'very-positive',           label: 'Very Positive' },
             { minScore: 70, key: 'mostly-positive',         label: 'Mostly Positive' },
             { minScore:  1, key: 'mixed',                   label: 'Mixed or Lower' },
             { minScore:  0, key: 'unrated',                 label: 'Unrated' },
-        ]
-
-        const buckets = new Map<string, string>()
-        for (const game of sortedGames) {
+        ] as const
+        const groups = new Map<string, SteamGameData[]>()
+        for (const game of sorted) {
             const score = game.userscore ?? 0
-            const tier = thresholds.find(t => score >= t.minScore)!
-            if (!buckets.has(tier.key)) {
-                buckets.set(tier.key, tier.label)
-            }
+            const tier = tiers.find(t => score >= t.minScore)!
+            if (!groups.has(tier.key)) groups.set(tier.key, [])
+            groups.get(tier.key)!.push(game)
         }
-        return buckets
+        return tiers
+            .filter(t => groups.has(t.key))
+            .map(t => ({
+                name: t.label,
+                games: groups.get(t.key)!,
+                sortMode: GameSortModes.ByRating,
+            }))
     }
 
-    private buildBucketMap(
-        sortedGames: ReadonlyArray<Readonly<SteamGameData>>
-    ): ReadonlyMap<string, string> {
-        const buckets = new Map<string, string>()
-        for (const game of sortedGames) {
-            const bucket = getRecentlyPlayedBucket(game as SteamGameData)
-            if (!buckets.has(bucket)) {
-                buckets.set(bucket, getBucketLabel(bucket))
-            }
+    private buildRecentlyPlayedSections(sorted: SteamGameData[]): Section[] {
+        const bucketOrder = [
+            RecentlyPlayedBucket.Today,
+            RecentlyPlayedBucket.ThisWeek,
+            RecentlyPlayedBucket.ThisMonth,
+            RecentlyPlayedBucket.ThisYear,
+            RecentlyPlayedBucket.Before,
+            RecentlyPlayedBucket.Unplayed,
+        ]
+        const groups = new Map<RecentlyPlayedBucket, SteamGameData[]>()
+        for (const game of sorted) {
+            const bucket = getRecentlyPlayedBucket(game)
+            if (!groups.has(bucket)) groups.set(bucket, [])
+            groups.get(bucket)!.push(game)
         }
-        return buckets
-    }
-
-    private buildGenreBucketMap(
-        sortedGames: ReadonlyArray<Readonly<SteamGameData>>
-    ): ReadonlyMap<string, string> {
-        const buckets = new Map<string, string>()
-        for (const game of sortedGames) {
-            const genre = primaryGenre(game as SteamGameData)
-            if (!buckets.has(genre)) {
-                buckets.set(genre, genre)
-            }
-        }
-        return buckets
+        return bucketOrder
+            .filter(b => groups.has(b))
+            .map(b => ({
+                name: getBucketLabel(b),
+                games: groups.get(b)!,
+                sortMode: GameSortModes.RecentlyPlayed,
+            }))
     }
 }

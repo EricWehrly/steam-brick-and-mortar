@@ -21,7 +21,7 @@ import {
     type ShelfReadyEvent,
     type GamesPlacedEvent,
 } from '../../../../src/types/InteractionEvents'
-import type { GamesSortEvent } from '../../../../src/types/EnvironmentEvents'
+import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
 import type { SteamGame } from '../../../../src/steam'
 
 // Mock GpuGameBoxRenderer so the spawner never touches real GPU code
@@ -232,7 +232,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
                 makeShelfReady(0, new THREE.Vector3(0, 0, 0))
             )
 
-            eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: games, buckets: new Map(), sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
             expect(mockPlaceGame).toHaveBeenCalledTimes(6)
@@ -266,7 +266,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
                 { games, batchIndex: 0, totalBatches: 1 }
             )
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
-            eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: games, buckets: new Map(), sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
 
             expect(gamesPlacedEvents.length).toBeGreaterThan(0)
             expect(gamesPlacedEvents[0].status).toBe('games-placed')
@@ -283,7 +283,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0, new THREE.Vector3(0, 0, 0)))
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(1, new THREE.Vector3(3, 0, 0)))
 
-            eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: games, buckets: new Map(), sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
             expect(mockPlaceGame).toHaveBeenCalledTimes(20)
@@ -297,8 +297,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
                 { games, batchIndex: 0, totalBatches: 1 }
             )
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
-            eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: games, buckets: new Map(), sortMode: 'recently-played' })
-            eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: [...games].reverse(), buckets: new Map(), sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games: [...games].reverse() as any, sortMode: 'recently-played' }], sortMode: 'recently-played' })
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(2)
         })
@@ -311,7 +311,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
 
             expect(() => {
-                eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: [], buckets: new Map(), sortMode: 'recently-played' })
+                eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games: [], sortMode: 'recently-played' }], sortMode: 'recently-played' })
             }).not.toThrow()
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
@@ -325,7 +325,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games, batchIndex: 0, totalBatches: 1 }
             )
-            eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: games, buckets: new Map(), sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
             expect(mockPlaceGame).not.toHaveBeenCalled()
@@ -349,8 +349,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             spawner.reset()
             expect(mockRendererDispose).toHaveBeenCalled()
 
-            // After reset, GamesSort should not use old shelf positions (renderer gone)
-            eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: games, buckets: new Map(), sortMode: 'recently-played' })
+            // After reset, SectionsReady should not use old shelf positions (renderer gone)
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
             expect(mockPlaceGame).not.toHaveBeenCalled()
         })
     })
@@ -367,7 +367,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             expect(mockRendererDispose).toHaveBeenCalled()
 
             expect(() => {
-                eventManager.emit<GamesSortEvent>(GameEventTypes.GamesSort, { sortedGames: createMockGamesWithArtwork(3, 0) as any[], buckets: new Map(), sortMode: 'recently-played' })
+                eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games: createMockGamesWithArtwork(3, 0) as any[], sortMode: 'recently-played' }], sortMode: 'recently-played' })
             }).not.toThrow()
         })
     })
