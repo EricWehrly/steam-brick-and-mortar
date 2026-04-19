@@ -25,7 +25,8 @@ import type {
 import type { RoomResizedEvent } from '../../types/InteractionEvents'
 import type { BatchReadyForPlacementEvent } from '../../types/InteractionEvents'
 import type { SteamLoadLibraryEvent } from '../../types/InteractionEvents'
-import { type LayoutMode, type LayoutRequestedEvent } from '../../types/EnvironmentEvents'
+import { type LayoutRequestedEvent } from '../../types/EnvironmentEvents'
+import { type LayoutMode, LayoutModes } from '../../types/LayoutTypes'
 import { BatchCoordinator } from '../batch/BatchCoordinator'
 import { GameBoxSpawner } from '../spawning/GameBoxSpawner'
 import { ShelfLayoutCoordinator } from '../shelves/ShelfLayoutCoordinator'
@@ -186,7 +187,7 @@ class StorePropsCoordinator {
         // resetting the subsystems we're about to build.
         this.layoutSwitchInProgress = true
 
-        this.instancedShelfRenderer?.reset()
+        this.instancedShelfRenderer?.dispose()
         this.gameBoxSpawner?.dispose()
         this.batchCoordinator?.dispose()
         this.shelfLayoutCoordinator?.dispose()

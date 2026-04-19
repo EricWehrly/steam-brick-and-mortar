@@ -11,6 +11,20 @@ import type { SteamGameData } from '../scene/game-box/types/GameData'
 import type { GameSortMode } from './EnvironmentEvents'
 
 /**
+ * LayoutMode
+ *
+ * Identifies which macro-level shelf arrangement the store uses.
+ * Player-selectable via the Layout dropdown in LayoutSortPanel.
+ */
+export const LayoutModes = {
+    Arc:   'arc',
+    Spoke: 'spoke',
+    Row:   'row',
+} as const
+
+export type LayoutMode = typeof LayoutModes[keyof typeof LayoutModes]
+
+/**
  * A named partition of games produced by grouping + sorting.
  *
  * Ungrouped layouts produce one section (name: '') containing all games.

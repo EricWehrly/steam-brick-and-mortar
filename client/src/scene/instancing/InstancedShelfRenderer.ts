@@ -119,6 +119,9 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     private pendingShelfReady = new Map<number, ShelfReadyEvent>()
     private meshesAddedToScene = false
     private sceneInsertCancelled = false
+
+    private readonly boundUpdateGPU: () => void
+    private readonly boundHandleShelfReady: (event: CustomEvent<ShelfReadyEvent>) => void
     
     // TODO: Consider making sticker system fully pluggable (dependency injection or optional feature)
     private readonly stickerHandler: ShelfStickerHandler
@@ -161,14 +164,18 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.shelfBoardManager = new InstancedMeshManager('InstancedShelf-ShelfBoards')
         this.interiorSurfaceManager = new InstancedMeshManager('InstancedShelf-InteriorSurfaces')
         
+        this.boundUpdateGPU = this.updateGPU.bind(this)
+        this.boundHandleShelfReady = (event: CustomEvent<ShelfReadyEvent>) =>
+            this.handleShelfReady(event.detail)
+
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SomeBatchesComplete,
-            this.updateGPU.bind(this)
+            this.boundUpdateGPU
         )
 
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfReady,
-            (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(event.detail)
+            this.boundHandleShelfReady
         )
         
         InstancedShelfRenderer.logger.debug(`🏪 Created (max units: ${this.maxShelfUnits})`)
@@ -568,6 +575,15 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
 
     public dispose(): void {
         InstancedShelfRenderer.logger.debug('🧹 Disposing')
+
+        EventManager.getInstance().deregisterEventHandler(
+            GameEventTypes.SomeBatchesComplete,
+            this.boundUpdateGPU
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            StorePropsEventTypes.ShelfReady,
+            this.boundHandleShelfReady
+        )
         
         // Dispose all managers
         this.angledBoardManager.dispose()
