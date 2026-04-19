@@ -69,18 +69,36 @@ export class BatchCoordinator<T> {
         loadStart: 0
     }
 
+    private readonly boundHandleBatchEvent: (e: CustomEvent<SteamGamesBatchEvent>) => void
+    private readonly boundHandleGamesPlaced: (e: CustomEvent<GamesPlacedEvent>) => void
+
     constructor() {
-        
+        this.boundHandleBatchEvent = this.handleBatchEvent.bind(this)
+        this.boundHandleGamesPlaced = this.handleGamesPlaced.bind(this)
+
         // Self-register for GamesBatchReady events
         EventManager.getInstance().registerEventHandler(
             SteamEventTypes.GamesBatchReady,
-            this.handleBatchEvent.bind(this)
+            this.boundHandleBatchEvent
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.GamesPlaced,
-            this.handleGamesPlaced.bind(this)
+            this.boundHandleGamesPlaced
         )
         BatchCoordinator.logger.debug('Self-registered for GamesBatchReady events')
+    }
+
+    public dispose(): void {
+        EventManager.getInstance().deregisterEventHandler(
+            SteamEventTypes.GamesBatchReady,
+            this.boundHandleBatchEvent
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            StorePropsEventTypes.GamesPlaced,
+            this.boundHandleGamesPlaced
+        )
+        this.clearRunState()
+        BatchCoordinator.logger.debug('Disposed')
     }
     
     /**
