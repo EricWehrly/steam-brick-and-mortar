@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
-import { ShelfSurfaceUtils, type ShelfSurface, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
+import { ShelfSurfaceUtils, type ShelfSurface, GameBoxUtils, GameLayoutConstants, ArcStockStrategy, type IStockStrategy } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { 
@@ -72,6 +72,7 @@ export class GameBoxSpawner {
     private placementIntents: Map<number, PlacementIntent> = new Map()
 
     private readonly labelsEnabled: boolean
+    private readonly stockStrategy: IStockStrategy
 
     /** Expose the current renderer for external consumers (e.g. addToScene, updateLODForCamera). */
     public getRenderer(): GpuGameBoxRenderer | null {
@@ -82,8 +83,9 @@ export class GameBoxSpawner {
     private readonly boundHandleShelfReady: (e: CustomEvent<ShelfReadyEvent>) => void
     private readonly boundHandleSectionsReady: (e: CustomEvent<SectionsReadyEvent>) => void
 
-    constructor() {
+    constructor(stockStrategy: IStockStrategy = new ArcStockStrategy()) {
         this.labelsEnabled = AppSettings.get(Setting.EnableLabels)
+        this.stockStrategy = stockStrategy
         this.boundHandleBatchReady = this.handleBatchReadyForPlacement.bind(this)
         this.boundHandleShelfReady = this.handleShelfReady.bind(this)
         this.boundHandleSectionsReady = this.handleSectionsReady.bind(this)
@@ -231,7 +233,7 @@ export class GameBoxSpawner {
                 const batchIndex = sortedBatchIndices[batchIndexCursor]
                 const shelfPos = this.shelfPositions.get(batchIndex)!
                 const stockSurfaces = GameBoxUtils.buildStockSurfaces(
-                    shelfPos.position, shelfPos.rotationY, shelfSurfaces
+                    shelfPos.position, shelfPos.rotationY, shelfSurfaces, undefined, this.stockStrategy
                 )
                 const shelfCapacity = stockSurfaces.reduce((sum, s) => sum + s.capacity, 0)
                 const batch = gameQueue.splice(0, shelfCapacity)

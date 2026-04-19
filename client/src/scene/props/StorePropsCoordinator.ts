@@ -24,6 +24,8 @@ import type {
 } from './PropsEvents'
 import type { RoomResizedEvent } from '../../types/InteractionEvents'
 import type { BatchReadyForPlacementEvent } from '../../types/InteractionEvents'
+import { UIEventTypes } from '../../types/InteractionEvents'
+import { type LayoutMode, type LayoutRequestedEvent } from '../../types/EnvironmentEvents'
 import { BatchCoordinator } from '../batch/BatchCoordinator'
 import { GameBoxSpawner } from '../spawning/GameBoxSpawner'
 import { ShelfLayoutCoordinator } from '../shelves/ShelfLayoutCoordinator'
@@ -47,6 +49,9 @@ class StorePropsCoordinator {
 
     // Tracks last-seen batch count to detect library switches
     private lastTotalBatches = 0
+
+    // Active layout mode — drives ShelfLayoutCoordinator strategy on next setup
+    private activeLayoutMode: LayoutMode = 'arc'
 
     static {
         new StorePropsCoordinator()
@@ -72,6 +77,10 @@ class StorePropsCoordinator {
             RoomEventTypes.Resized,
             this.handleRoomResized.bind(this)
         )
+        this.eventManager.registerEventHandler(
+            UIEventTypes.LayoutRequested,
+            (event: CustomEvent<LayoutRequestedEvent>) => this.handleLayoutRequested(event.detail)
+        )
 
         StorePropsCoordinator.logger.info('Registered')
     }
@@ -93,8 +102,8 @@ class StorePropsCoordinator {
         // subscribed to BatchReadyForPlacement before any batches can arrive.
         if (!this.gameBoxSpawner) {
             this.batchCoordinator = new BatchCoordinator()
-            this.gameBoxSpawner = new GameBoxSpawner()
-            this.shelfLayoutCoordinator = new ShelfLayoutCoordinator()
+            this.shelfLayoutCoordinator = new ShelfLayoutCoordinator(this.activeLayoutMode)
+            this.gameBoxSpawner = new GameBoxSpawner(this.shelfLayoutCoordinator.stockStrategy)
             this.instancedShelfRenderer = new InstancedShelfRenderer()
 
             this.instancedShelfRenderer.initialize().catch(error => {
@@ -157,6 +166,28 @@ class StorePropsCoordinator {
         this.scene.add(this.entranceMat)
 
         StorePropsCoordinator.logger.debug('Entrance mat placed at origin')
+    }
+
+    private handleLayoutRequested(detail: LayoutRequestedEvent): void {
+        if (detail.layoutMode === this.activeLayoutMode) return
+        this.activeLayoutMode = detail.layoutMode
+        StorePropsCoordinator.logger.info(`Layout mode → ${detail.layoutMode}; triggering scene rebuild`)
+
+        // Reload-gated: tear down existing subsystems so next SetupRequest rebuilds with the new mode.
+        this.instancedShelfRenderer?.reset()
+        this.gameBoxSpawner?.reset()
+        this.batchCoordinator?.reset()
+        this.shelfLayoutCoordinator?.dispose()
+        this.shelfLayoutCoordinator = null
+        this.gameBoxSpawner = null
+        this.batchCoordinator = null
+        this.instancedShelfRenderer = null
+        this.lastTotalBatches = 0
+
+        // Re-trigger setup with the new layout mode.
+        this.eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, {
+            source: EventSource.System,
+        })
     }
 
     public dispose(): void {

@@ -60,6 +60,17 @@ export interface SortRequestedEvent extends BaseInteractionEvent {
     sortMode: GameSortMode
 }
 
+export const LayoutModes = {
+    Arc:   'arc',
+    Spoke: 'spoke',
+} as const
+
+export type LayoutMode = typeof LayoutModes[keyof typeof LayoutModes]
+
+export interface LayoutRequestedEvent extends BaseInteractionEvent {
+    layoutMode: LayoutMode
+}
+
 /**
  * LayoutChangedEvent
  *
