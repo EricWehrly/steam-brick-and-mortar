@@ -24,21 +24,9 @@ import type { SteamGameData } from '../scene/game-box/types/GameData'
 // STEAM EVENTS
 // =============================================================================
 
-export interface SteamLoadGamesEvent extends BaseInteractionEvent {
-    userInput: string
-}
-
-export interface SteamLoadFromCacheEvent extends BaseInteractionEvent {
-    userInput: string
-}
-
-
-
-export interface SteamCacheClearEvent extends BaseInteractionEvent {
-    // No additional data needed
-}
-
-export interface SteamCacheRefreshEvent extends BaseInteractionEvent {
+export interface SteamLoadLibraryEvent extends BaseInteractionEvent {
+    /** Vanity URL, SteamID, or profile URL. Optional if reloading the current user. */
+    userInput?: string
     /** If true, ignore local db and re-fetch from network */
     forceUpdate?: boolean
 }
@@ -221,11 +209,13 @@ export { StorePropsEventTypes, BatchProcessingStatus } from '../scene/props/Prop
 // EVENT TYPE CONSTANTS
 // =============================================================================
 
+export interface SteamCacheClearEvent extends BaseInteractionEvent {
+    // No additional data needed
+}
+
 export const SteamEventTypes = {
-    LoadGames: 'steam:load-games',
-    LoadFromCache: 'steam:load-from-cache',
+    LoadLibrary: 'steam:load-library',
     CacheClear: 'steam:cache-clear',
-    CacheRefresh: 'steam:cache-refresh',
     CacheStats: 'steam:cache-stats',
     ImageCacheClear: 'steam:image-cache-clear',
     DevModeToggle: 'steam:dev-mode-toggle',

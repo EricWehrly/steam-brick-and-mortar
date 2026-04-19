@@ -24,7 +24,7 @@ describe('EventManager Unit Tests', () => {
     describe('Event Emission', () => {
         it('should emit events with proper structure', () => {
             const mockHandler = vi.fn()
-            const eventType = SteamEventTypes.LoadGames
+            const eventType = SteamEventTypes.LoadLibrary
             const testDetail = { vanityUrl: 'testuser', timestamp: Date.now(), source: EventSource.UI }
             
             eventManager.registerEventHandler(eventType, mockHandler)
@@ -39,7 +39,7 @@ describe('EventManager Unit Tests', () => {
         it('should handle multiple handlers', () => {
             const mockHandler1 = vi.fn()
             const mockHandler2 = vi.fn()
-            const eventType = SteamEventTypes.LoadGames
+            const eventType = SteamEventTypes.LoadLibrary
             const testDetail = { vanityUrl: 'test', timestamp: Date.now(), source: EventSource.UI }
             
             eventManager.registerEventHandler(eventType, mockHandler1)
@@ -52,7 +52,7 @@ describe('EventManager Unit Tests', () => {
 
         it('should deregister handlers', () => {
             const mockHandler = vi.fn()
-            const eventType = SteamEventTypes.LoadGames
+            const eventType = SteamEventTypes.LoadLibrary
             const testDetail = { vanityUrl: 'test', timestamp: Date.now(), source: EventSource.UI }
             
             eventManager.registerEventHandler(eventType, mockHandler)
