@@ -170,13 +170,35 @@ into `SectionsReady` with per-section sorted game lists.*
 - Signs derived from section names rather than bucket-key heuristics
 - `by-rating` gets sign support for free (section name = rating tier)
 
-### Phase 2: Layout strategy abstraction
+### Phase 2: Layout strategy abstraction (current branch: `openclaw/feat-stock-strategy`)
 
-- Extract arc layout into `ILayoutStrategy`
-- Add row layout as second strategy
-- Layout assigns spatial allocations to sections
-- Dynamic switching (live shelf repositioning)
-- Chunking logic for large sections
+**Step 1 — `ShelfFace` rename** ✅
+- `ShelfSide.Front/Back` → `ShelfFace.Near/Far` (player-relative naming)
+- Near = inward-facing, player-visible. Far = outward, overflow.
+
+**Step 2 — `StockSurface` as the atomic stocking unit** ✅
+- `StockSurface` defined in `LayoutTypes.ts`: originPosition, rotation, slotStep, capacity — all pre-resolved to world space.
+- Each `ShelfSurface` (one board, two sides) splits into two `StockSurface` entries.
+- Default ordering: all Near surfaces top-to-bottom, then Far surfaces (overflow). This is the arc stocking order.
+- `GameBoxUtils.buildStockSurfaces()` performs the split and resolves world-space geometry.
+- `GameBoxUtils.stockSurfaces()` places games onto an ordered surface list, returning placement intents.
+- `GameBoxSpawner` no longer knows about `ShelfFace` or local Z offsets — just iterates surfaces.
+
+**Step 3 — `IStockStrategy` interface** (next)
+- Interface: given board surfaces + shelf geometry, return an ordered `StockSurface[]`.
+- `ArcStockStrategy`: Near-first, then Far. Current behavior, now explicit.
+- `RowStockStrategy`: Near-only (no back side in a row — the next row's front is behind you).
+- Strategy selected at store init time. No live switching required.
+
+**Step 4 — Row layout (reload-gated)**
+- Second shelf position algorithm alongside the arc.
+- Selected by config/URL param; switching triggers scene teardown + rebuild (instanced meshes are cheap to rebuild; atlas stays warm).
+- No engineered in-place repositioning needed.
+
+Open questions carried forward:
+- Chunking granularity (currently SHELF_BATCH_SIZE = 18, now derived from StockSurface capacity sum)
+- Section transitions (gap in shelves, sign, or both?)
+- Computed vs. fixed layout boundary (when do sections need stable, persistent locations?)
 
 ### Phase 3: Multi-instance placement
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
-import { ShelfSurfaceUtils, type ShelfSurface, ShelfFace, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
+import { ShelfSurfaceUtils, type ShelfSurface, GameBoxUtils, GameLayoutConstants } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { 
@@ -230,9 +230,12 @@ export class GameBoxSpawner {
             while (gameQueue.length > 0 && batchIndexCursor < sortedBatchIndices.length) {
                 const batchIndex = sortedBatchIndices[batchIndexCursor]
                 const shelfPos = this.shelfPositions.get(batchIndex)!
-                const gamesForShelf = this.gamesPerShelf(shelfSurfaces)
-                const batch = gameQueue.splice(0, gamesForShelf)
-                this.assignIntentsOnShelf(shelfPos, shelfSurfaces, batch)
+                const stockSurfaces = GameBoxUtils.buildStockSurfaces(
+                    shelfPos.position, shelfPos.rotationY, shelfSurfaces
+                )
+                const shelfCapacity = stockSurfaces.reduce((sum, s) => sum + s.capacity, 0)
+                const batch = gameQueue.splice(0, shelfCapacity)
+                this.assignIntentsFromStock(stockSurfaces, batch)
 
                 EventManager.getInstance().emit<GamesPlacedEvent>(
                     StorePropsEventTypes.GamesPlaced,
@@ -268,62 +271,16 @@ export class GameBoxSpawner {
     // -------------------------------------------------------------------------
     // Intent assignment helpers
 
-    private assignIntentsOnShelf(
-        shelf: ShelfPosition,
-        surfaces: ShelfSurface[],
+    private assignIntentsFromStock(
+        stockSurfaces: import('../../types/LayoutTypes').StockSurface[],
         games: SteamGameData[]
     ): void {
-        const boxDimensions = { width: 0.3, height: 0.4, depth: 0.08 }
-        let gameIndex = 0
-
-        // Fill all Near rows (player-facing) top-to-bottom first, then Far rows (overflow).
-        // Near = inward-facing side the player sees (backZ = +0.5 local).
-        // Far  = outward-facing side away from the player (frontZ = -0.5 local).
-        for (const surface of surfaces) {
-            if (gameIndex >= games.length) break
-            const playerFacingGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
-            if (playerFacingGames.length > 0) {
-                this.assignIntentsForRow(shelf, surface, playerFacingGames, ShelfFace.Near, boxDimensions)
-                gameIndex += playerFacingGames.length
-            }
-        }
-
-        for (const surface of surfaces) {
-            if (gameIndex >= games.length) break
-            const overflowGames = games.slice(gameIndex, gameIndex + GameLayoutConstants.GAMES_PER_SURFACE)
-            if (overflowGames.length > 0) {
-                this.assignIntentsForRow(shelf, surface, overflowGames, ShelfFace.Far, boxDimensions)
-                gameIndex += overflowGames.length
-            }
-        }
-    }
-
-    private assignIntentsForRow(
-        shelf: ShelfPosition,
-        surface: ShelfSurface,
-        games: SteamGameData[],
-        face: ShelfFace,
-        boxDimensions: { width: number; height: number; depth: number }
-    ): void {
-        const positions = GameBoxUtils.calculateGamePositions(
-            shelf.position, surface, games, face, boxDimensions, shelf.rotationY
-        )
-        const rotation = GameBoxUtils.calculateGameRotation(shelf.rotationY, face)
-
-        for (let i = 0; i < games.length; i++) {
-            const game = games[i]
+        const intents = GameBoxUtils.stockSurfaces(stockSurfaces, games)
+        for (const { game, position, rotation } of intents) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
-            this.placementIntents.set(appid, {
-                game,
-                position: positions[i],
-                rotation,
-            })
+            this.placementIntents.set(appid, { game, position, rotation })
             this.tryPlace(appid)
         }
-    }
-
-    private gamesPerShelf(surfaces: ShelfSurface[]): number {
-        return surfaces.length * GameLayoutConstants.GAMES_PER_SURFACE * 2
     }
 
     /**

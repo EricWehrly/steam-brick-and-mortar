@@ -53,19 +53,30 @@ vi.mock('../../../../src/core/AppSettings', () => {
 vi.mock('../../../../src/scene/props/SharedPropsUtils', () => ({
     ShelfSurfaceUtils: {
         findShelfSurfaces: vi.fn(() => [
-            { y: 0.5, zMin: -1, zMax: 1, label: 'surface-0' },
+            { topY: 0.5, frontZ: -0.5, backZ: 0.5, centerX: 0, width: 2.0 },
         ])
     },
     GameBoxUtils: {
-        calculateGamePositions: vi.fn((_shelf, _surface, games) =>
-            games.map(() => new THREE.Vector3(0, 0, 0))
+        buildStockSurfaces: vi.fn((_pos, _rot, _boards) => [
+            {
+                originPosition: new THREE.Vector3(0, 0, 0),
+                rotation: new THREE.Quaternion(),
+                slotStep: new THREE.Vector3(0.55, 0, 0),
+                capacity: 9,
+            },
+        ]),
+        stockSurfaces: vi.fn((surfaces, games) =>
+            games.map((game: any) => ({
+                game,
+                position: new THREE.Vector3(0, 0, 0),
+                rotation: new THREE.Quaternion(),
+            }))
         ),
-        calculateGameRotation: vi.fn(() => new THREE.Quaternion()),
     },
     GameLayoutConstants: {
         GAMES_PER_SURFACE: 9,
     },
-    ShelfFace: { Back: 'Back', Front: 'Front' },
+    ShelfFace: { Near: 'near', Far: 'far' },
 }))
 
 // --- Helpers ---
