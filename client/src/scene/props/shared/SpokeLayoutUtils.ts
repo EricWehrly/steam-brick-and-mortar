@@ -109,10 +109,12 @@ export function computeSpokeShelfLayout(
                 const shelfCentre = centrePoint.clone()
                     .addScaledVector(perpDir, lateralSign * cfg.aisleHalfWidthMetres)
 
-                // Shelf Near face must face the aisle (toward centreline)
-                // Left row faces right (-perpDir), right row faces left (+perpDir)
+                // Shelf Near face must face the aisle (toward centreline).
+                // Left row faces right (-perpDir), right row faces left (+perpDir).
+                // atan2(x, z) gives the angle that makes the +Z axis point in facingDir.
+                // Add PI to flip so the shelf model's -Z front faces the aisle.
                 const facingDir = perpDir.clone().multiplyScalar(-lateralSign)
-                const rotationY = Math.atan2(facingDir.x, facingDir.z)
+                const rotationY = Math.atan2(facingDir.x, facingDir.z) + Math.PI
 
                 result.push({
                     position: shelfCentre.clone(),
