@@ -14,6 +14,11 @@ interface CachedAppDetails {
     schema_version?: number
 }
 
+export interface AppDetailsCacheResult {
+    data: AppDetailsData
+    isStale: boolean
+}
+
 export class AppDetailsCache {
     private static readonly DB_NAME = 'steam-app-details-cache'
     private static readonly DB_VERSION = 1
@@ -74,9 +79,10 @@ export class AppDetailsCache {
     }
 
     /**
-     * Get cached app details for a single game
+     * Get cached app details for a single game.
+     * Returns stale entries too, marked with isStale=true.
      */
-    async get(appid: number): Promise<AppDetailsData | null> {
+    async get(appid: number): Promise<AppDetailsCacheResult | null> {
         await this.init()
         if (!this.db) return null
 
@@ -87,17 +93,15 @@ export class AppDetailsCache {
 
             request.onsuccess = () => {
                 const cached = request.result as CachedAppDetails | undefined
-                
-                if (cached) {
-                    // Treat missing or old schema versions as a cache miss
-                    if (cached.schema_version === AppDetailsCache.CURRENT_SCHEMA_VERSION) {
-                        resolve(cached.data)
-                    } else {
-                        resolve(null)
-                    }
-                } else {
+                if (!cached) {
                     resolve(null)
+                    return
                 }
+
+                resolve({
+                    data: cached.data,
+                    isStale: cached.schema_version !== AppDetailsCache.CURRENT_SCHEMA_VERSION
+                })
             }
 
             request.onerror = () => {
@@ -108,11 +112,12 @@ export class AppDetailsCache {
     }
 
     /**
-     * Get cached app details for multiple games
+     * Get cached app details for multiple games.
+     * Returns stale entries too, marked with isStale=true.
      */
-    async getMany(appids: number[]): Promise<Map<number, AppDetailsData>> {
+    async getMany(appids: number[]): Promise<Map<number, AppDetailsCacheResult>> {
         await this.init()
-        const results = new Map<number, AppDetailsData>()
+        const results = new Map<number, AppDetailsCacheResult>()
 
         if (!this.db) return results
 
@@ -122,22 +127,31 @@ export class AppDetailsCache {
 
             let completed = 0
             const total = appids.length
+            let staleCount = 0
+
+            if (total === 0) {
+                resolve(results)
+                return
+            }
 
             for (const appid of appids) {
                 const request = store.get(appid)
 
                 request.onsuccess = () => {
                     const cached = request.result as CachedAppDetails | undefined
-                    
-                    // Add cached data if it exists and schema version matches
-                    if (cached && cached.schema_version === AppDetailsCache.CURRENT_SCHEMA_VERSION) {
-                        results.set(appid, cached.data)
+
+                    if (cached) {
+                        const isStale = cached.schema_version !== AppDetailsCache.CURRENT_SCHEMA_VERSION
+                        if (isStale) {
+                            staleCount++
+                        }
+                        results.set(appid, { data: cached.data, isStale })
                     }
 
                     completed++
                     if (completed === total) {
                         if (results.size > 0 && results.size < total) {
-                            console.log(`📋 [AppDetailsCache] Cache: ${results.size}/${total} games`);
+                            console.log(`📋 [AppDetailsCache] Cache: ${results.size}/${total} games (${staleCount} stale)`)
                         }
                         resolve(results)
                     }
