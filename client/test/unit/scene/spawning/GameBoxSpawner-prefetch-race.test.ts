@@ -65,7 +65,7 @@ vi.mock('../../../../src/scene/props/SharedPropsUtils', () => ({
     GameLayoutConstants: {
         GAMES_PER_SURFACE: 9,
     },
-    ShelfSide: { Back: 'Back', Front: 'Front' },
+    ShelfFace: { Back: 'Back', Front: 'Front' },
 }))
 
 // --- Helpers ---

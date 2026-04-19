@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { SteamGameData } from '../../game-box/types/GameData'
 import type { GameBoxDimensions } from '../../game-box/types/GameBoxOptions'
-import { ShelfSide, type ShelfSurface } from './SharedPropsTypes'
+import { ShelfFace, type ShelfSurface } from './SharedPropsTypes'
 
 // TD: approximated-placement-tripwire
 // NOTE: Game positions are approximated from DEFAULT_SHELF_CONFIG (width, shelfCount, etc.).
@@ -24,16 +24,16 @@ export const GameLayoutConstants = {
 const SHELF_ANGLE_DEGREES = 6
 
 export class GameBoxUtils {
-    static generateGameBoxName(game: SteamGameData, side: ShelfSide, index: number, rendererType: 'gpu' | 'legacy'): string {
+    static generateGameBoxName(game: SteamGameData, face: ShelfFace, index: number, rendererType: 'gpu' | 'legacy'): string {
         const safeName = game.name?.replace(/[^a-zA-Z0-9]/g, '-') ?? 'unknown'
-        return `${rendererType}-game-${safeName}-${side}-${index}`
+        return `${rendererType}-game-${safeName}-${face}-${index}`
     }
 
     static calculateGamePositions(
         shelfPosition: THREE.Vector3,
         surface: ShelfSurface,
         games: SteamGameData[],
-        side: ShelfSide,
+        face: ShelfFace,
         boxDimensions: GameBoxDimensions,
         shelfRotationY: number = 0
     ): THREE.Vector3[] {
@@ -48,10 +48,10 @@ export class GameBoxUtils {
         
         const gameHalfDepth = boxDimensions.depth / 2
         
-        const localZ = (side === ShelfSide.Front
+        const localZ = (face === ShelfFace.Far
             ? surface.frontZ + (gameHalfDepth * 3)
             : surface.backZ - (gameHalfDepth * 3))
-        const localZWithAngle = localZ + (side === ShelfSide.Front ? angleOffset : -angleOffset)
+        const localZWithAngle = localZ + (face === ShelfFace.Far ? angleOffset : -angleOffset)
 
         const totalWidth = (games.length - 1) * GameLayoutConstants.GAME_SPACING
         // Center games on surface. If the span exceeds shelf width, the games will overflow
@@ -87,21 +87,21 @@ export class GameBoxUtils {
     }
 
     /**
-     * Calculate world-space quaternion for a game box given shelf orientation and side.
+     * Calculate world-space quaternion for a game box given shelf orientation and face.
      *
      * Convention: game box artwork is on the -Z face of the model.
      * Arc shelves have rotationY = atan2(x,z) + PI so their +Z side faces inward (toward player).
      *
-     * ShelfSide naming is from the furniture's frame, not the player's:
-     *   Back  (backZ = +0.5 local) = inward-facing = player-visible side
-     *   Front (frontZ = -0.5 local) = outward-facing = away from player
+     * ShelfFace is player-relative:
+     *   Near (backZ = +0.5 local)  — inward-facing, player-visible. No extra rotation needed.
+     *   Far  (frontZ = -0.5 local) — outward-facing, away from player. Flip by PI.
      *
-     * Back:  totalY = shelfRotationY         → -Z artwork face points inward → player sees it
-     * Front: totalY = shelfRotationY + PI    → -Z artwork face flipped to point outward
+     * Near: totalY = shelfRotationY         → -Z artwork face points inward → player sees it
+     * Far:  totalY = shelfRotationY + PI    → -Z artwork face flipped to point outward
      */
-    static calculateGameRotation(shelfRotationY: number, side: ShelfSide): THREE.Quaternion {
-        const frontFlip = side === ShelfSide.Front ? Math.PI : 0
-        const totalY = shelfRotationY + frontFlip
+    static calculateGameRotation(shelfRotationY: number, face: ShelfFace): THREE.Quaternion {
+        const farFlip = face === ShelfFace.Far ? Math.PI : 0
+        const totalY = shelfRotationY + farFlip
         return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), totalY)
     }
 }

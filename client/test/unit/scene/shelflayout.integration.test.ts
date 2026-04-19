@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
 import { computeArcShelfLayout } from '../../../src/scene/props/shared/ArcLayoutUtils'
 import { GameBoxUtils } from '../../../src/scene/props/shared/GameBoxUtils'
-import { ShelfSide } from '../../../src/scene/props/shared/SharedPropsTypes'
+import { ShelfFace } from '../../../src/scene/props/shared/SharedPropsTypes'
 
 // Match production config exactly
 const TOTAL_BATCHES = 47
@@ -82,7 +82,7 @@ describe('arc shelf layout integration', () => {
         // Actually: game box model has artwork on -Z face. rotationY = shelf rotation.
         // After rotation, game -Z face points same direction as shelf +Z = toward origin. Check dot > 0.9.
         shelves.forEach((s, i) => {
-            const rotation = GameBoxUtils.calculateGameRotation(s.rotationY, ShelfSide.Front)
+            const rotation = GameBoxUtils.calculateGameRotation(s.rotationY, ShelfFace.Far)
             const gameFront = new THREE.Vector3(0, 0, -1).applyQuaternion(rotation)
             const toOrigin = new THREE.Vector3(-s.position.x, 0, -s.position.z).normalize()
             const dot = gameFront.dot(toOrigin)
@@ -92,8 +92,8 @@ describe('arc shelf layout integration', () => {
 
     it('back-side game rotation is opposite to front-side rotation for inner rows', () => {
         shelves.filter(s => s.row < 4).forEach((s, i) => {
-            const front = GameBoxUtils.calculateGameRotation(s.rotationY, ShelfSide.Front)
-            const back = GameBoxUtils.calculateGameRotation(s.rotationY, ShelfSide.Back)
+            const front = GameBoxUtils.calculateGameRotation(s.rotationY, ShelfFace.Far)
+            const back = GameBoxUtils.calculateGameRotation(s.rotationY, ShelfFace.Near)
             const frontVec = new THREE.Vector3(0, 0, -1).applyQuaternion(front)
             const backVec = new THREE.Vector3(0, 0, -1).applyQuaternion(back)
             const dot = frontVec.dot(backVec)
@@ -112,7 +112,7 @@ describe('arc shelf layout integration', () => {
         const game = { appid: 1, name: 'Test', playtime_forever: 0 } as never
 
         shelves.forEach((s, i) => {
-            const [pos] = GameBoxUtils.calculateGamePositions(s.position, surface, [game], ShelfSide.Front, BOX_DIMS, s.rotationY)
+            const [pos] = GameBoxUtils.calculateGamePositions(s.position, surface, [game], ShelfFace.Far, BOX_DIMS, s.rotationY)
             expect(isFinite(pos.x), `game at shelf ${i} x must be finite`).toBe(true)
             expect(isFinite(pos.z), `game at shelf ${i} z must be finite`).toBe(true)
         })

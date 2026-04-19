@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GameBoxUtils, ShelfSurfaceUtils, ShelfSide } from '../../src/scene/props/SharedPropsUtils';
+import { GameBoxUtils, ShelfSurfaceUtils, ShelfFace } from '../../src/scene/props/SharedPropsUtils';
 import type { SteamGameData } from '../../src/scene/game-box/types/GameData';
 import type { GameBoxDimensions } from '../../src/scene/game-box/types/GameBoxOptions';
 import * as THREE from 'three';
@@ -33,7 +33,7 @@ describe('Z-Axis Positioning Changes', () => {
             shelfPosition,
             bottomSurface,
             mockGames,
-            ShelfSide.Front,
+            ShelfFace.Far,
             TEST_BOX_DIMENSIONS
         );
 
@@ -41,7 +41,7 @@ describe('Z-Axis Positioning Changes', () => {
             shelfPosition,
             middleSurface,
             mockGames,
-            ShelfSide.Front,
+            ShelfFace.Far,
             TEST_BOX_DIMENSIONS
         );
 
@@ -49,7 +49,7 @@ describe('Z-Axis Positioning Changes', () => {
             shelfPosition,
             topSurface,
             mockGames,
-            ShelfSide.Front,
+            ShelfFace.Far,
             TEST_BOX_DIMENSIONS
         );
 
@@ -80,7 +80,7 @@ describe('Z-Axis Positioning Changes', () => {
             shelfPosition,
             middleSurface,
             mockGames,
-            ShelfSide.Front,
+            ShelfFace.Far,
             TEST_BOX_DIMENSIONS
         );
 
@@ -88,7 +88,7 @@ describe('Z-Axis Positioning Changes', () => {
             shelfPosition,
             middleSurface,
             mockGames,
-            ShelfSide.Back,
+            ShelfFace.Near,
             TEST_BOX_DIMENSIONS
         );
 
@@ -110,11 +110,11 @@ describe('Z-Axis Positioning Changes', () => {
         const topSurface = surfaces[2]; // top
         
         // Test that shelf-specific offsets work for both sides
-        const frontBottom = GameBoxUtils.calculateGamePositions(shelfPosition, bottomSurface, mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS);
-        const backBottom = GameBoxUtils.calculateGamePositions(shelfPosition, bottomSurface, mockGames, ShelfSide.Back, TEST_BOX_DIMENSIONS);
+        const frontBottom = GameBoxUtils.calculateGamePositions(shelfPosition, bottomSurface, mockGames, ShelfFace.Far, TEST_BOX_DIMENSIONS);
+        const backBottom = GameBoxUtils.calculateGamePositions(shelfPosition, bottomSurface, mockGames, ShelfFace.Near, TEST_BOX_DIMENSIONS);
         
-        const frontTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, ShelfSide.Front, TEST_BOX_DIMENSIONS);
-        const backTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, ShelfSide.Back, TEST_BOX_DIMENSIONS);
+        const frontTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, ShelfFace.Far, TEST_BOX_DIMENSIONS);
+        const backTop = GameBoxUtils.calculateGamePositions(shelfPosition, topSurface, mockGames, ShelfFace.Near, TEST_BOX_DIMENSIONS);
 
         // Top shelf protrudes more (larger magnitude) than bottom shelf for both sides
         // (see comment in first test for geometry rationale)
