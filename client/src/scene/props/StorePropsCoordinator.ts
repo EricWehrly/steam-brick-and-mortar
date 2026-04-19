@@ -16,7 +16,7 @@
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../../core/EventManager'
 import { Logger } from '../../utils/Logger'
-import { GameEventTypes, RoomEventTypes, StorePropsEventTypes } from '../../types/InteractionEvents'
+import { GameEventTypes, RoomEventTypes, StorePropsEventTypes, SteamEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import type {
     StorePropsSetupRequestEvent,
     StorePropsSetupCompletedEvent,
@@ -24,7 +24,7 @@ import type {
 } from './PropsEvents'
 import type { RoomResizedEvent } from '../../types/InteractionEvents'
 import type { BatchReadyForPlacementEvent } from '../../types/InteractionEvents'
-import { UIEventTypes } from '../../types/InteractionEvents'
+import type { SteamLoadLibraryEvent } from '../../types/InteractionEvents'
 import { type LayoutMode, type LayoutRequestedEvent } from '../../types/EnvironmentEvents'
 import { BatchCoordinator } from '../batch/BatchCoordinator'
 import { GameBoxSpawner } from '../spawning/GameBoxSpawner'
@@ -184,9 +184,19 @@ class StorePropsCoordinator {
         this.instancedShelfRenderer = null
         this.lastTotalBatches = 0
 
-        // Re-trigger setup with the new layout mode.
+        // Re-trigger setup with the new layout mode, then re-run the game loading pipeline.
         this.eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, {
             source: EventSource.System,
+        })
+
+        // Re-emit SteamLoadLibraryEvent so BatchCoordinator gets new batches and ShelfLayoutCoordinator
+        // receives BatchReadyForPlacement events under the new layout.
+        import('../../core/data').then(({ DataManager }) => {
+            const userInput = DataManager.getInstance().get<string>('steam.userInput')
+            this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
+                userInput: userInput ?? undefined,
+                forceUpdate: false,
+            })
         })
     }
 
