@@ -103,7 +103,7 @@ export class SteamIntegration {
         return !DataManager.getInstance().get<string>('steam.userInput')
     }
 
-    async loadGamesForUser(userInput: string, ignoreCache = false): Promise<GameLibraryState> {
+    private async loadGamesForUser(userInput: string, ignoreCache = false): Promise<GameLibraryState> {
         const parsedInput = ValidationUtils.parseSteamUserInput(userInput)
         let steamId: string | undefined
         let vanityUrl: string
