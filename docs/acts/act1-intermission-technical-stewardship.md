@@ -22,9 +22,9 @@
 
 **First-Start Follow-Up (must land — game rendering pipeline):**
 - [First-Start Follow-Up Plan](../plans/first-start-followup-plan.md) — four issues surfaced during anonymous→logged-in user transition:
-  1. **Double-allocation fix** — don't materialize game boxes until artwork resolves; remove eager label creation (P1, small)
-  2. **Progressive batch loading** — emit rendering batches as network batches complete, not all-at-once after 25s (P2, medium)
-  3. **Re-sort on user change** — split texture loading from instance placement so `GamesSort` can reposition boxes (P3, large, own branch). See also `resort-game-placement-plan.md` and `texture-placement-split-plan.md`.
+  1. **Double-allocation fix** ✅ — don't materialize game boxes until artwork resolves; remove eager label creation (P1, small)
+  2. **Progressive batch loading** ✅ — emit rendering batches as network batches complete, not all-at-once after 25s (P2, medium)
+  3. **Re-sort on user change** ✅ — split texture loading from instance placement so `GamesSort` can reposition boxes (P3, large, own branch). See also `resort-game-placement-plan.md` and `texture-placement-split-plan.md`.
   4. **Label slot exhaustion** — effectively resolved by #1; standalone fix is pool sizing (P4, small)
 
 **Nice to Have (best effort, punt when stuck):**
@@ -33,7 +33,7 @@
 - suppressEmit refactor in `GpuStorePropsRenderer` — single dedicated call site
 - `GpuStorePropsRenderer` split — extract layout-related functionality to its own class
 - Tech debt triage session — review `tech-debt.md`, assign Do Now / Act 2 / Later / Drop to each item
-- `ShelfSide` Front/Back rename to Near/Far — naming is backwards vs. player-facing intuition; currently papered over with inline comment
+- `ShelfSide` Front/Back rename to Near/Far ✅ — naming is backwards vs. player-facing intuition; currently papered over with inline comment
 - Back-row suppression policy — hardcoded `rowIndex < 4` should become a `ShelfLayoutPolicy` type
 - `ShelfSurfaceUtils` sort order unit test — top-to-bottom ordering has no test yet (`// TD [shelf-surface-sort]`)
 - Raycast drag suppression — suppress click selection after meaningful mouse drag delta; small guard test
