@@ -20,7 +20,6 @@ vi.mock('../../../src/scene/game-box/instancing/InstancedLabelRenderer', () => {
 
 vi.mock('../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug', () => {
     class MockLodArtworkOrchestratorDebug {
-        constructor(_config?: unknown) {}
         public setArtworkInstanceFromUrl = vi.fn(() => Promise.resolve({ success: true }))
         public prefetchArtwork = vi.fn(() => Promise.resolve('prefetched'))
         public placeInstance = vi.fn(() => 0)
@@ -29,6 +28,7 @@ vi.mock('../../../src/scene/game-box/instancing/LodArtworkOrchestratorDebug', ()
         public getMemoryStats = vi.fn(() => ({}))
         public logMemoryStats = vi.fn()
         public setGlobalLod = vi.fn()
+        static fromAppSettings(_maxGames?: number) { return new MockLodArtworkOrchestratorDebug() }
     }
     return { LodArtworkOrchestratorDebug: MockLodArtworkOrchestratorDebug }
 })
