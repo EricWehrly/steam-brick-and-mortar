@@ -11,12 +11,17 @@ interface CachedAppDetails {
     appid: number
     data: AppDetailsData
     cached_at: number
+    schema_version?: number
 }
 
 export class AppDetailsCache {
     private static readonly DB_NAME = 'steam-app-details-cache'
     private static readonly DB_VERSION = 1
     private static readonly STORE_NAME = 'appdetails'
+    
+    // Increment this when the required payload changes (e.g. adding steamspy tags)
+    // Entries with missing or older schema versions will be treated as cache misses
+    public static readonly CURRENT_SCHEMA_VERSION = 2
     
     private db: IDBDatabase | null = null
     private initPromise: Promise<void> | null = null
@@ -82,7 +87,17 @@ export class AppDetailsCache {
 
             request.onsuccess = () => {
                 const cached = request.result as CachedAppDetails | undefined
-                resolve(cached ? cached.data : null)
+                
+                if (cached) {
+                    // Treat missing or old schema versions as a cache miss
+                    if (cached.schema_version === AppDetailsCache.CURRENT_SCHEMA_VERSION) {
+                        resolve(cached.data)
+                    } else {
+                        resolve(null)
+                    }
+                } else {
+                    resolve(null)
+                }
             }
 
             request.onerror = () => {
@@ -114,8 +129,8 @@ export class AppDetailsCache {
                 request.onsuccess = () => {
                     const cached = request.result as CachedAppDetails | undefined
                     
-                    // Add cached data if it exists (no expiration)
-                    if (cached) {
+                    // Add cached data if it exists and schema version matches
+                    if (cached && cached.schema_version === AppDetailsCache.CURRENT_SCHEMA_VERSION) {
                         results.set(appid, cached.data)
                     }
 
@@ -148,7 +163,8 @@ export class AppDetailsCache {
         const cached: CachedAppDetails = {
             appid,
             data,
-            cached_at: Date.now()
+            cached_at: Date.now(),
+            schema_version: AppDetailsCache.CURRENT_SCHEMA_VERSION
         }
 
         return new Promise((resolve, _reject) => {
@@ -186,7 +202,8 @@ export class AppDetailsCache {
                 const cached: CachedAppDetails = {
                     appid,
                     data,
-                    cached_at: now
+                    cached_at: now,
+                    schema_version: AppDetailsCache.CURRENT_SCHEMA_VERSION
                 }
 
                 const request = store.put(cached)
