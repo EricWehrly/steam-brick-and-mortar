@@ -251,6 +251,7 @@ export const UIEventTypes = {
     MenuClose: 'ui:menu-close',
     ImageCacheStatsRequest: 'ui:image-cache-stats-request',
     SortRequested: 'ui:sort-requested',
+    LayoutRequested: 'ui:layout-requested',
 } as const
 
 export const GameEventTypes = {

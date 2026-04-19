@@ -10,6 +10,9 @@ import {
     type StorePropsProgressEvent,
 } from '../../types/InteractionEvents'
 import { computeArcShelfLayout, type ArcLayoutConfig, type ArcShelfInfo } from '../props/shared/ArcLayoutUtils'
+import { computeSpokeShelfLayout } from '../props/shared/SpokeLayoutUtils'
+import { ArcStockStrategy, RowStockStrategy, SpokeStockStrategy, type IStockStrategy } from '../props/shared/StockStrategy'
+import { type LayoutMode } from '../../types/EnvironmentEvents'
 
 /**
  * ShelfLayoutCoordinator
@@ -35,14 +38,20 @@ export class ShelfLayoutCoordinator {
 
     private static readonly FIXED_ROWS_COUNT = 4 + 6 + 10 + 12 // 32 — rows 0–3 with fixed counts
 
+    /** The stock strategy matching the current layout mode. Consumed by GameBoxSpawner. */
+    public readonly stockStrategy: IStockStrategy
+
     /** Current assumption: totalBatches maps 1:1 to shelves. See class doc. */
 
     private layoutComputed = false
     private shelvesByBatch = new Map<number, { position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }>()
     private emittedShelfIds = new Set<number>()
     private totalShelves = 0
+    private readonly layoutMode: LayoutMode
 
-    constructor() {
+    constructor(layoutMode: LayoutMode = 'arc') {
+        this.layoutMode = layoutMode
+        this.stockStrategy = ShelfLayoutCoordinator.strategyFor(layoutMode)
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
             (event: CustomEvent<BatchReadyForPlacementEvent>) => this.handleFirstBatch(event.detail)
@@ -67,7 +76,7 @@ export class ShelfLayoutCoordinator {
                 return
             }
 
-            ShelfLayoutCoordinator.logger.debug(`Computing arc layout for ${this.totalShelves} shelves`)
+            ShelfLayoutCoordinator.logger.debug(`Computing ${this.layoutMode} layout for ${this.totalShelves} shelves`)
             this.computeLayout(this.totalShelves)
         } else if (detail.totalBatches !== this.totalShelves) {
             // New load with different batch count (e.g. anonymous → real user).
@@ -84,35 +93,23 @@ export class ShelfLayoutCoordinator {
         this.emitShelfForBatch(detail.batchIndex)
     }
 
-    private computeLayout(totalShelves: number): void {
-        const arcConfig: ArcLayoutConfig = {
-            // Only override where we need non-default values; ArcLayoutUtils.DEFAULTS handle the rest.
-            shelvesPerRowByRow: [
-                4,
-                6,
-                10,
-                12,
-                Math.max(1, totalShelves - ShelfLayoutCoordinator.FIXED_ROWS_COUNT),
-            ],
-            halfAngleByRow: [
-                Math.PI / 3.5,
-                Math.PI / 3.5,
-                Math.PI / 3,
-                Math.PI / 3,
-                Math.PI / 2.6,
-            ],
-            minShelfGap: 1.0,
-            rowRadiusStep: 4.0,
-            firstRowRadius: 5.5,
+    private static strategyFor(layoutMode: LayoutMode): IStockStrategy {
+        switch (layoutMode) {
+            case 'spoke': return new SpokeStockStrategy()
+            case 'arc':
+            default:      return new ArcStockStrategy()
         }
+    }
 
-        const shelves = computeArcShelfLayout(totalShelves, arcConfig)
+    private computeLayout(totalShelves: number): void {
+        const shelves = this.layoutMode === 'spoke'
+            ? this.computeSpokeLayout()
+            : this.computeArcLayout(totalShelves)
 
         // Compute spatial bounds for room/lighting systems
         const bounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
-        // Use shelf width/depth from ArcLayoutUtils defaults rather than duplicating them here
-        const hw = 2.0 / 2  // default shelfWidthMetres / 2
-        const hd = 1.0 / 2  // default shelfDepth / 2
+        const hw = 2.0 / 2
+        const hd = 1.0 / 2
         for (const s of shelves) {
             bounds.minX = Math.min(bounds.minX, s.position.x - hw)
             bounds.maxX = Math.max(bounds.maxX, s.position.x + hw)
@@ -133,16 +130,49 @@ export class ShelfLayoutCoordinator {
 
         this.shelvesByBatch.clear()
         for (let i = 0; i < shelves.length; i++) {
-            const s: ArcShelfInfo = shelves[i]
+            const s = shelves[i]
             this.shelvesByBatch.set(i, {
                 position: s.position.clone(),
                 rotationY: s.rotationY,
-                row: s.row,
-                indexInRow: s.indexInRow,
+                row: 'row' in s ? (s as ArcShelfInfo).row : i,
+                indexInRow: 'indexInRow' in s ? (s as ArcShelfInfo).indexInRow : i,
             })
         }
 
-        ShelfLayoutCoordinator.logger.debug(`Layout determined for ${shelves.length} shelves`) 
+        ShelfLayoutCoordinator.logger.debug(`Layout determined for ${shelves.length} shelves`)
+    }
+
+    private computeArcLayout(totalShelves: number): ArcShelfInfo[] {
+        const arcConfig: ArcLayoutConfig = {
+            shelvesPerRowByRow: [
+                4,
+                6,
+                10,
+                12,
+                Math.max(1, totalShelves - ShelfLayoutCoordinator.FIXED_ROWS_COUNT),
+            ],
+            halfAngleByRow: [
+                Math.PI / 3.5,
+                Math.PI / 3.5,
+                Math.PI / 3,
+                Math.PI / 3,
+                Math.PI / 2.6,
+            ],
+            minShelfGap: 1.0,
+            rowRadiusStep: 4.0,
+            firstRowRadius: 5.5,
+        }
+        return computeArcShelfLayout(totalShelves, arcConfig)
+    }
+
+    private computeSpokeLayout(): Array<{ position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }> {
+        const spokeShelfInfos = computeSpokeShelfLayout()
+        return spokeShelfInfos.map((s, i) => ({
+            position: s.position,
+            rotationY: s.rotationY,
+            row: s.spokeIndex,
+            indexInRow: i,
+        }))
     }
 
     private emitShelfForBatch(batchIndex: number): void {

@@ -51,6 +51,7 @@ vi.mock('../../../../src/core/AppSettings', () => {
 })
 
 vi.mock('../../../../src/scene/props/SharedPropsUtils', () => ({
+    ArcStockStrategy: class { order(boards: any[]) { return boards.map((b: any) => b.near) } },
     ShelfSurfaceUtils: {
         findShelfSurfaces: vi.fn(() => [
             { topY: 0.5, frontZ: -0.5, backZ: 0.5, centerX: 0, width: 2.0 },

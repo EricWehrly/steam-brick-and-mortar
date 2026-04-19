@@ -2,7 +2,7 @@
  * LayoutSortPanel
  *
  * A compact control bar in #ui-right-center-group providing:
- *   - A disabled "Layout" dropdown (placeholder for future layout modes, currently Arc only)
+ *   - A "Layout" dropdown (Arc / Spoke; emits UIEventTypes.LayoutRequested)
  *   - A functional "Sort" dropdown (By Last Played / By Genre / By Playtime)
  *   - A toggle button (⚏) to show/hide the control bar
  *
@@ -16,8 +16,21 @@
 import { EventManager } from '../core/EventManager'
 import { UIEventTypes } from '../types/InteractionEvents'
 import type { SortRequestedEvent } from '../types/EnvironmentEvents'
-import type { GameSortMode } from '../types/EnvironmentEvents'
+import type { LayoutRequestedEvent } from '../types/EnvironmentEvents'
+import type { GameSortMode, LayoutMode } from '../types/EnvironmentEvents'
 import '../styles/components/layout-sort-panel.css'
+
+// ─── Layout option definitions ───────────────────────────────────────────────
+
+interface LayoutOption {
+    key: LayoutMode
+    label: string
+}
+
+const LAYOUT_OPTIONS: ReadonlyArray<LayoutOption> = [
+    { key: 'arc',   label: 'Arc'   },
+    { key: 'spoke', label: 'Spoke' },
+]
 
 // ─── Sort option definitions ───────────────────────────────────────────────────
 
@@ -40,7 +53,9 @@ const SORT_OPTIONS: ReadonlyArray<SortOption> = [
 export class LayoutSortPanel {
     private toggleButton: HTMLElement | null = null
     private controlsContainer: HTMLElement | null = null
+    private layoutSelect: HTMLSelectElement | null = null
     private sortSelect: HTMLSelectElement | null = null
+    private activeLayoutKey: LayoutMode = 'arc'
     private activeSortKey: SortOptionKey = 'recently-played'
     private isControlsVisible = true
     private keyboardHandler: ((e: KeyboardEvent) => void) | null = null
@@ -88,18 +103,33 @@ export class LayoutSortPanel {
 
         const select = document.createElement('select')
         select.className = 'layout-sort-select'
-        select.disabled = true
-        select.title = 'Layout mode (future options coming)'
+        select.title = 'Layout mode'
+        this.layoutSelect = select
 
-        const arcOption = document.createElement('option')
-        arcOption.value = 'arc'
-        arcOption.textContent = 'Arc'
-        arcOption.selected = true
-        select.appendChild(arcOption)
+        for (const option of LAYOUT_OPTIONS) {
+            const optElement = document.createElement('option')
+            optElement.value = option.key
+            optElement.textContent = option.label
+            optElement.selected = option.key === this.activeLayoutKey
+            select.appendChild(optElement)
+        }
+
+        select.addEventListener('change', () => {
+            const selectedKey = select.value as LayoutMode
+            this.applyLayout(selectedKey)
+        })
 
         group.appendChild(label)
         group.appendChild(select)
         return group
+    }
+
+    private applyLayout(layoutKey: LayoutMode): void {
+        this.activeLayoutKey = layoutKey
+        if (this.layoutSelect) this.layoutSelect.value = layoutKey
+        EventManager.getInstance().emit<LayoutRequestedEvent>(UIEventTypes.LayoutRequested, {
+            layoutMode: layoutKey,
+        })
     }
 
     private buildSortGroup(): HTMLElement {
