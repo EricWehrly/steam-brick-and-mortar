@@ -50,19 +50,20 @@ interface BatchStatusState {
 }
 
 export class BatchCoordinator<T> {
-    private static logger = Logger.createLogFunctions(BatchCoordinator.name)
+    private static readonly logger = Logger.createLogFunctions(BatchCoordinator.name)
+    private static instance: BatchCoordinator<unknown> | null = null
 
     private queue: BatchItem<T>[] = []
     private received: number = 0
     private expectedTotal: number = 0
     private isProcessing: boolean = false
-    private isScheduled: boolean = false  // Track if processQueue is scheduled
+    private isScheduled: boolean = false
     private isFirstBatch: boolean = true
     private completionEmitted: boolean = false
     private batchStatuses: Map<number, BatchStatusState> = new Map()
     private pendingSomeBatchesTimeout: ReturnType<typeof setTimeout> | null = null
     private readonly someBatchesDebounceMs: number = 50
-    
+
     private metrics: BatchMetrics = {
         batches: [],
         totalMainThreadTime: 0,
@@ -71,34 +72,38 @@ export class BatchCoordinator<T> {
 
     private readonly boundHandleBatchEvent: (e: CustomEvent<SteamGamesBatchEvent>) => void
     private readonly boundHandleGamesPlaced: (e: CustomEvent<GamesPlacedEvent>) => void
+    private readonly boundHandleClearRequest: () => void
 
-    constructor() {
-        this.boundHandleBatchEvent = this.handleBatchEvent.bind(this)
-        this.boundHandleGamesPlaced = this.handleGamesPlaced.bind(this)
-
-        // Self-register for GamesBatchReady events
-        EventManager.getInstance().registerEventHandler(
-            SteamEventTypes.GamesBatchReady,
-            this.boundHandleBatchEvent
-        )
-        EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.GamesPlaced,
-            this.boundHandleGamesPlaced
-        )
-        BatchCoordinator.logger.debug('Self-registered for GamesBatchReady events')
+    static getInstance<T = unknown>(): BatchCoordinator<T> {
+        if (!BatchCoordinator.instance) {
+            BatchCoordinator.instance = new BatchCoordinator()
+        }
+        return BatchCoordinator.instance as BatchCoordinator<T>
     }
 
-    public dispose(): void {
-        EventManager.getInstance().deregisterEventHandler(
+    /** @internal Test-only: reset the singleton so the next getInstance() constructs fresh. */
+    static _resetInstance(): void {
+        BatchCoordinator.instance = null
+    }
+
+    private constructor() {
+        this.boundHandleBatchEvent = this.handleBatchEvent.bind(this)
+        this.boundHandleGamesPlaced = this.handleGamesPlaced.bind(this)
+        this.boundHandleClearRequest = this.clearRunState.bind(this)
+
+        EventManager.getInstance().registerEventHandler(
             SteamEventTypes.GamesBatchReady,
             this.boundHandleBatchEvent
         )
-        EventManager.getInstance().deregisterEventHandler(
+        EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.GamesPlaced,
             this.boundHandleGamesPlaced
         )
-        this.clearRunState()
-        BatchCoordinator.logger.debug('Disposed')
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ClearRequest,
+            this.boundHandleClearRequest
+        )
+        BatchCoordinator.logger.debug('Constructed')
     }
     
     /**
@@ -162,11 +167,6 @@ export class BatchCoordinator<T> {
 
     public isFirstBatchProcessing(): boolean {
         return this.isFirstBatch
-    }
-
-    public reset(): void {
-        BatchCoordinator.logger.debug('Resetting batch coordinator')
-        this.clearRunState()
     }
 
     private prepareForNewRun(batch: BatchItem<T>): void {

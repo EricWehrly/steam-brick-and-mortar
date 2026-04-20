@@ -55,7 +55,8 @@ type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
  * only knows "game X goes at position Y".
  */
 export class GameBoxSpawner {
-    private static logger = Logger.createLogFunctions(GameBoxSpawner.name)
+    private static readonly logger = Logger.createLogFunctions(GameBoxSpawner.name)
+    private static instance: GameBoxSpawner | null = null
 
     // Owned renderer — constructed on first BatchReadyForPlacement
     private renderer: GpuGameBoxRenderer | null = null
@@ -84,13 +85,27 @@ export class GameBoxSpawner {
     private readonly boundHandleShelfReady: (e: CustomEvent<ShelfReadyEvent>) => void
     private readonly boundHandleLayoutDetermined: (e: CustomEvent<ShelfLayoutDeterminedEvent>) => void
     private readonly boundHandleSectionsReady: (e: CustomEvent<SectionsReadyEvent>) => void
+    private readonly boundHandleClearRequest: () => void
 
-    constructor() {
+    static getInstance(): GameBoxSpawner {
+        if (!GameBoxSpawner.instance) {
+            GameBoxSpawner.instance = new GameBoxSpawner()
+        }
+        return GameBoxSpawner.instance
+    }
+
+    /** @internal Test-only: reset the singleton so the next getInstance() constructs fresh. */
+    static _resetInstance(): void {
+        GameBoxSpawner.instance = null
+    }
+
+    private constructor() {
         this.labelsEnabled = AppSettings.get(Setting.EnableLabels)
         this.boundHandleBatchReady = this.handleBatchReadyForPlacement.bind(this)
         this.boundHandleShelfReady = this.handleShelfReady.bind(this)
         this.boundHandleLayoutDetermined = this.handleLayoutDetermined.bind(this)
         this.boundHandleSectionsReady = this.handleSectionsReady.bind(this)
+        this.boundHandleClearRequest = this.reset.bind(this)
 
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
@@ -108,11 +123,15 @@ export class GameBoxSpawner {
             GameEventTypes.SectionsReady,
             this.boundHandleSectionsReady
         )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ClearRequest,
+            this.boundHandleClearRequest
+        )
 
-        GameBoxSpawner.logger.debug('Registered listeners')
+        GameBoxSpawner.logger.debug('Constructed')
     }
 
-    public reset(): void {
+    private reset(): void {
         this.renderer?.dispose()
         this.renderer = null
         this.rendererInitialized = false
@@ -122,27 +141,6 @@ export class GameBoxSpawner {
         this.prefetchResults.clear()
         this.placementIntents.clear()
         GameBoxSpawner.logger.debug('Reset: renderer disposed, state cleared')
-    }
-
-    public dispose(): void {
-        EventManager.getInstance().deregisterEventHandler(
-            StorePropsEventTypes.BatchReadyForPlacement,
-            this.boundHandleBatchReady
-        )
-        EventManager.getInstance().deregisterEventHandler(
-            StorePropsEventTypes.ShelfReady,
-            this.boundHandleShelfReady
-        )
-        EventManager.getInstance().deregisterEventHandler(
-            GameEventTypes.ShelfLayoutDetermined,
-            this.boundHandleLayoutDetermined
-        )
-        EventManager.getInstance().deregisterEventHandler(
-            GameEventTypes.SectionsReady,
-            this.boundHandleSectionsReady
-        )
-        this.renderer?.dispose()
-        this.renderer = null
     }
 
     // -------------------------------------------------------------------------

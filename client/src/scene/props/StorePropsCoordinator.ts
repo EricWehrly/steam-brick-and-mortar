@@ -50,9 +50,7 @@ class StorePropsCoordinator {
 
     private readonly eventManager: EventManager
 
-    // Singleton pure coordinators — always present after first SetupRequest
-    private batchCoordinator: BatchCoordinator<unknown> | null = null
-    private gameBoxSpawner: GameBoxSpawner | null = null
+    // Singletons — initialised on first SetupRequest, alive for app lifetime
     private shelfLayoutCoordinator: ShelfLayoutCoordinator | null = null
 
     // GPU resource owner — disposed and reconstructed on layout switch
@@ -64,7 +62,7 @@ class StorePropsCoordinator {
     // Tracks last-seen batch count to detect library switches
     private lastTotalBatches = 0
 
-    // Active layout mode — drives ShelfLayoutCoordinator strategy on next setup
+    // Active layout mode — drives ShelfLayoutCoordinator on next batch run
     private activeLayoutMode: LayoutMode = 'arc'
 
     // True while a layout-switch rebuild is in progress; suppresses spurious ClearRequest handling
@@ -112,11 +110,11 @@ class StorePropsCoordinator {
             }
         }
 
-        // Pure coordinators: create once, always present after first SetupRequest
+        // Singletons: initialise on first SetupRequest via getInstance()
         if (!this.shelfLayoutCoordinator) {
             this.shelfLayoutCoordinator = ShelfLayoutCoordinator.getInstance(this.activeLayoutMode)
-            this.batchCoordinator = new BatchCoordinator()
-            this.gameBoxSpawner = new GameBoxSpawner()
+            BatchCoordinator.getInstance()
+            GameBoxSpawner.getInstance()
         }
 
         // GPU owner: create fresh each setup (disposed on layout switch or clear)
@@ -140,11 +138,9 @@ class StorePropsCoordinator {
             StorePropsCoordinator.logger.debug('ClearRequest suppressed during layout switch')
             return
         }
+        // BatchCoordinator and GameBoxSpawner handle ClearRequest internally.
         this.instancedShelfRenderer?.reset()
-        this.gameBoxSpawner?.reset()
-        this.batchCoordinator?.reset()
         this.lastTotalBatches = 0
-
         StorePropsCoordinator.logger.info('Store props cleared')
     }
 
@@ -192,13 +188,9 @@ class StorePropsCoordinator {
 
         this.layoutSwitchInProgress = true
 
-        // Update the coordinator's mode property — it will recompute on next batch run
         if (this.shelfLayoutCoordinator) {
             this.shelfLayoutCoordinator.layoutMode = detail.layoutMode
         }
-
-        this.batchCoordinator?.reset()
-        this.gameBoxSpawner?.reset()
         this.lastTotalBatches = 0
 
         // GPU owner must be fully torn down — InstancedMesh slots can't be partially reused

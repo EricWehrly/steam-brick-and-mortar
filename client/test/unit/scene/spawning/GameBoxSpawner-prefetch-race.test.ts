@@ -114,12 +114,15 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
-        spawner = new GameBoxSpawner()
+        EventManager.getInstance().removeAllListeners()
+        GameBoxSpawner._resetInstance()
+        spawner = GameBoxSpawner.getInstance()
         emitShelfLayoutDetermined()
     })
 
     afterEach(() => {
-        spawner.dispose()
+        GameBoxSpawner._resetInstance()
+        EventManager.getInstance().removeAllListeners()
     })
 
     it('PROBE: intent arrives before prefetch — placeGame fires when prefetch settles', async () => {

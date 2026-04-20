@@ -25,7 +25,6 @@ export class ShelfLayoutCoordinator {
     /** Active layout mode. Can be updated by orchestration before the next batch run. */
     public layoutMode: LayoutMode
 
-    private layoutComputed = false
     private shelvesByBatch = new Map<number, { position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }>()
     private emittedShelfIds = new Set<number>()
     private totalShelves = 0
@@ -33,7 +32,7 @@ export class ShelfLayoutCoordinator {
 
     private readonly boundHandleFirstBatch: (event: CustomEvent<BatchReadyForPlacementEvent>) => void
 
-static getInstance(initialLayoutMode: LayoutMode = 'arc'): ShelfLayoutCoordinator {
+    static getInstance(initialLayoutMode: LayoutMode = 'arc'): ShelfLayoutCoordinator {
         if (!ShelfLayoutCoordinator.instance) {
             ShelfLayoutCoordinator.instance = new ShelfLayoutCoordinator(initialLayoutMode)
         }
@@ -52,7 +51,6 @@ static getInstance(initialLayoutMode: LayoutMode = 'arc'): ShelfLayoutCoordinato
     }
 
     private clearRunState(): void {
-        this.layoutComputed = false
         this.shelvesByBatch.clear()
         this.emittedShelfIds.clear()
         this.totalShelves = 0
@@ -63,13 +61,10 @@ static getInstance(initialLayoutMode: LayoutMode = 'arc'): ShelfLayoutCoordinato
         const isNewRun = detail.batchIndex === 0 && this.emittedShelfIds.size > 0
         const batchCountChanged = detail.totalBatches !== this.totalShelves
         const layoutModeChanged = this.computedLayoutMode !== null && this.computedLayoutMode !== this.layoutMode
+        const neverComputed = this.computedLayoutMode === null
 
-        if (isNewRun || batchCountChanged || layoutModeChanged || !this.layoutComputed) {
-            if (isNewRun || batchCountChanged || layoutModeChanged) {
-                this.clearRunState()
-            }
-
-            this.layoutComputed = true
+        if (isNewRun || batchCountChanged || layoutModeChanged || neverComputed) {
+            this.clearRunState()
             this.totalShelves = detail.totalBatches
             this.computedLayoutMode = this.layoutMode
 

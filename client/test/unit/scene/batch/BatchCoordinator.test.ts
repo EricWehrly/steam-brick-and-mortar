@@ -14,11 +14,13 @@ describe('BatchCoordinator', () => {
     let eventManager: EventManager
     
     beforeEach(() => {
+        BatchCoordinator._resetInstance()
         eventManager = EventManager.getInstance()
         eventManager.removeAllListeners()
     })
 
     afterEach(() => {
+        BatchCoordinator._resetInstance()
         eventManager.removeAllListeners()
     })
 
@@ -34,7 +36,7 @@ describe('BatchCoordinator', () => {
                 }
             )
             
-            const coordinator = new BatchCoordinator<string>()
+            const coordinator = BatchCoordinator.getInstance<string>()
 
             // Enqueue batches out of order
             const batch2 = { batchIndex: 2, totalBatches: 3, data: 'batch-2' }
@@ -52,7 +54,7 @@ describe('BatchCoordinator', () => {
         })
 
         it('should track progress correctly', async () => {
-            const coordinator = new BatchCoordinator<number>()
+            const coordinator = BatchCoordinator.getInstance<number>()
 
             expect(coordinator.getProgress()).toEqual({
                 received: 0,
@@ -78,14 +80,14 @@ describe('BatchCoordinator', () => {
         })
 
         it('should reset state correctly', async () => {
-            const coordinator = new BatchCoordinator<string>()
+            const coordinator = BatchCoordinator.getInstance<string>()
 
             coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 2, data: 'test' })
             coordinator.enqueueBatch({ batchIndex: 1, totalBatches: 2, data: 'test' })
 
             await new Promise(resolve => setTimeout(resolve, 30))
 
-            coordinator.reset()
+            eventManager.emit(StorePropsEventTypes.ClearRequest, {})
 
             expect(coordinator.getProgress()).toEqual({
                 received: 0,
@@ -110,7 +112,7 @@ describe('BatchCoordinator', () => {
                 }
             )
             
-            const coordinator = new BatchCoordinator<string>()
+            const coordinator = BatchCoordinator.getInstance<string>()
 
             coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 2, data: 'first' })
             coordinator.enqueueBatch({ batchIndex: 1, totalBatches: 2, data: 'second' })
@@ -133,7 +135,7 @@ describe('BatchCoordinator', () => {
                 }
             )
 
-            const coordinator = new BatchCoordinator<string>()
+            const coordinator = BatchCoordinator.getInstance<string>()
 
             coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 3, data: 'a' })
             coordinator.enqueueBatch({ batchIndex: 1, totalBatches: 3, data: 'b' })
@@ -147,7 +149,7 @@ describe('BatchCoordinator', () => {
 
     describe('Metrics Tracking', () => {
         it('should track batch processing', async () => {
-            const coordinator = new BatchCoordinator<number>()
+            const coordinator = BatchCoordinator.getInstance<number>()
 
             coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 2, data: 10 })
             coordinator.enqueueBatch({ batchIndex: 1, totalBatches: 2, data: 20 })
@@ -163,7 +165,7 @@ describe('BatchCoordinator', () => {
         })
 
         it('should identify first batch correctly', async () => {
-            const coordinator = new BatchCoordinator<string>()
+            const coordinator = BatchCoordinator.getInstance<string>()
 
             expect(coordinator.isFirstBatchProcessing()).toBe(true)
 
@@ -184,7 +186,7 @@ describe('BatchCoordinator', () => {
                 () => { emitted = true }
             )
 
-            const coordinator = new BatchCoordinator<string>()
+            const coordinator = BatchCoordinator.getInstance<string>()
 
             coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 1, data: 'only' })
 
@@ -195,7 +197,7 @@ describe('BatchCoordinator', () => {
         })
 
         it('should handle empty queue', async () => {
-            const coordinator = new BatchCoordinator<string>()
+            const coordinator = BatchCoordinator.getInstance<string>()
 
             const progress = coordinator.getProgress()
             expect(progress.received).toBe(0)
@@ -212,7 +214,7 @@ describe('BatchCoordinator', () => {
                 }
             )
 
-            const coordinator = new BatchCoordinator<number>()
+            const coordinator = BatchCoordinator.getInstance<number>()
 
             // Enqueue many batches rapidly
             for (let i = 0; i < 10; i++) {
@@ -235,7 +237,7 @@ describe('BatchCoordinator', () => {
                 }
             )
 
-            const coordinator = new BatchCoordinator<string>()
+            const coordinator = BatchCoordinator.getInstance<string>()
 
             // Enqueue same batch index multiple times (should emit all)
             coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 2, data: 'first' })
@@ -264,7 +266,7 @@ describe('BatchCoordinator', () => {
                 }
             )
 
-            const coordinator = new BatchCoordinator<string>()
+            const coordinator = BatchCoordinator.getInstance<string>()
 
             coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 3, data: 'a' })
             coordinator.enqueueBatch({ batchIndex: 1, totalBatches: 3, data: 'b' })
@@ -289,7 +291,7 @@ describe('BatchCoordinator', () => {
                 () => { completionCount++ }
             )
 
-            const coordinator = new BatchCoordinator<string>()
+            const coordinator = BatchCoordinator.getInstance<string>()
 
             coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 2, data: 'a' })
             coordinator.enqueueBatch({ batchIndex: 1, totalBatches: 2, data: 'b' })
@@ -310,7 +312,7 @@ describe('BatchCoordinator', () => {
                 () => { completionCount++ }
             )
 
-            const coordinator = new BatchCoordinator<string>()
+            const coordinator = BatchCoordinator.getInstance<string>()
             coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 1, data: 'only' })
 
             await new Promise(resolve => setTimeout(resolve, 30))
