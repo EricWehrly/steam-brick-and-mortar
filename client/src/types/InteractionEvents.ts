@@ -19,6 +19,7 @@ import type { BaseInteractionEvent } from '../core/EventManager'
 import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { SteamGame } from '../steam'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
+import type { IStockStrategy } from '../scene/props/shared/StockStrategy'
 
 // =============================================================================
 // STEAM EVENTS
@@ -177,7 +178,7 @@ export interface ShelfBounds {
 export interface ShelfLayoutDeterminedEvent extends BaseInteractionEvent {
     shelfBounds: ShelfBounds
     shelfLayout: { rows: number; shelvesPerRow?: number }
-    stockStrategy: import('../scene/props/shared/StockStrategy').IStockStrategy
+    stockStrategy: IStockStrategy
 }
 
 // Moved to EnvironmentEvents.ts: LayoutChangedEvent, SomeBatchesCompleteEvent, AllBatchesCompleteEvent, GamesSortEvent
