@@ -144,18 +144,19 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
         expect(mockPrefetchArtwork).toHaveBeenCalledTimes(2)
         expect(mockClearPlacements).not.toHaveBeenCalled()
 
+        // SectionsReady first — caches sections and clears stale positions
+        emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+            sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }],
+            groupMode: 'by-recency', sortMode: 'by-last-played',
+        })
         emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
             shelfIndex: 0,
             sectionIndex: 0,
             position: new THREE.Vector3(0, 0, -5),
             rotationY: 0,
         })
-
-        // SectionsReady fires before prefetch resolves — assigns intents only
-        emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
-            sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }],
-            groupMode: 'by-recency', sortMode: 'by-last-played',
-        })
+        // ShelfLayoutDetermined triggers placement attempt (prefetch still pending)
+        emitShelfLayoutDetermined()
 
         expect(mockClearPlacements).toHaveBeenCalledTimes(1)
         // Intents assigned but prefetch not settled — placeGame not called yet
@@ -184,18 +185,19 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
         // Wait for prefetch microtasks to settle before GamesSort
         await new Promise(r => setTimeout(r, 0))
 
+        // SectionsReady first — caches sections, ShelfReady then ShelfLayoutDetermined
+        emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+            sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }],
+            groupMode: 'by-recency', sortMode: 'by-last-played',
+        })
         emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
             shelfIndex: 0,
             sectionIndex: 0,
             position: new THREE.Vector3(0, 0, -5),
             rotationY: 0,
         })
-
-        // Prefetch already settled — placeGame fires synchronously during intent assignment
-        emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
-            sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }],
-            groupMode: 'by-recency', sortMode: 'by-last-played',
-        })
+        // ShelfLayoutDetermined triggers placement (prefetch already resolved)
+        emitShelfLayoutDetermined()
 
         expect(mockPlaceGame).toHaveBeenCalledTimes(games.length)
     })
