@@ -34,6 +34,34 @@
 
 ---
 
+## Next branch — renderer lifecycle and stable capacity
+
+The current `GpuGameBoxRenderer` construction is tied to batch count and layout switches,
+which causes the renderer to be created/destroyed multiple times per session with varying
+capacity ceilings. This is wrong in principle:
+
+**The renderer should hold the full game library, always.**
+
+Re-sort, group, and layout changes don't change the source games. The renderer should be
+initialized once with `totalRenderableGames` capacity and survive layout/sort changes.
+Only a genuine library reload (new user, force-refresh) should trigger dispose + recreate.
+
+Consequences of the current approach:
+- Capacity checks like `requiredCapacity > this.rendererCapacity` are suspicious by design.
+  They exist because the renderer was undersized by a previous smaller-layout run.
+- Every layout switch disposes the artwork atlas, losing all prefetch cache.
+
+Correct approach:
+- Initialize `GpuGameBoxRenderer` once, sized to `steam.games` length from DataManager,
+  when the library first loads (`GameDataReady`).
+- On `ClearRequest` (layout switch, group/sort change), call `renderer.clearPlacements()` only — do NOT dispose.
+- On library reload (new user / force-refresh), dispose and recreate.
+- Remove all renderer capacity checks from `GameBoxSpawner`.
+- This enables the `ArtworkPrewarmer` split described in `GameBoxSpawner`'s TD comment:
+  prewarm is a library-lifetime concern; placement is a layout-lifetime concern.
+
+---
+
 ## Next branch — section-per-layout
 
 The core feature: each named Section gets its own spatial territory in the layout.
