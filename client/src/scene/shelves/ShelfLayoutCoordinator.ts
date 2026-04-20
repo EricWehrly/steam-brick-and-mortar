@@ -4,33 +4,41 @@ import { Logger } from '../../utils/Logger'
 import {
     StorePropsEventTypes,
     GameEventTypes,
-    type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
     type StorePropsProgressEvent,
 } from '../../types/InteractionEvents'
 import { LayoutRegistry } from '../props/shared/LayoutRegistry'
-import type { LayoutMode } from '../../types/LayoutTypes'
+import type { LayoutMode, Section } from '../../types/LayoutTypes'
+import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
+
+/** Slots-per-shelf: used to convert game count → shelf count per section. */
+const SLOTS_PER_SHELF = 18
 
 /**
  * ShelfLayoutCoordinator
  *
- * Singleton, non-disposable event coordinator for shelf geometry.
- * It stays alive for app lifetime and derives all run state from incoming batch events.
+ * Singleton, non-disposable coordinator. Listens to SectionsReady and computes
+ * the spatial layout for all shelves across all sections.
+ *
+ * Sections drive shelf count: ceil(section.games.length / SLOTS_PER_SHELF) shelves
+ * are allocated per section, placed contiguously within the active layout geometry.
+ *
+ * Emits:
+ *   - ShelfLayoutDetermined  once per layout run, with shelfBounds + stockStrategy
+ *   - ShelfReady             one per shelf, tagged with shelfIndex + sectionIndex
  */
 export class ShelfLayoutCoordinator {
     private static readonly logger = Logger.createLogFunctions(ShelfLayoutCoordinator.name)
     private static instance: ShelfLayoutCoordinator | null = null
 
-    /** Active layout mode. Can be updated by orchestration before the next batch run. */
+    /** Active layout mode. Set by orchestration before the next SectionsReady fires. */
     public layoutMode: LayoutMode
 
-    private shelvesByBatch = new Map<number, { position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }>()
-    private emittedShelfIds = new Set<number>()
-    private totalShelves = 0
     private computedLayoutMode: LayoutMode | null = null
-
-    private readonly boundHandleFirstBatch: (event: CustomEvent<BatchReadyForPlacementEvent>) => void
+    private shelvesByIndex = new Map<number, { position: THREE.Vector3; rotationY: number; sectionIndex: number }>()
+    private emittedShelfIndices = new Set<number>()
+    private totalShelves = 0
 
     static getInstance(initialLayoutMode: LayoutMode = 'arc'): ShelfLayoutCoordinator {
         if (!ShelfLayoutCoordinator.instance) {
@@ -41,110 +49,93 @@ export class ShelfLayoutCoordinator {
 
     private constructor(layoutMode: LayoutMode) {
         this.layoutMode = layoutMode
-        this.boundHandleFirstBatch = (event: CustomEvent<BatchReadyForPlacementEvent>) =>
-            this.handleFirstBatch(event.detail)
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.BatchReadyForPlacement,
-            this.boundHandleFirstBatch
+            GameEventTypes.SectionsReady,
+            (event: CustomEvent<SectionsReadyEvent>) => this.handleSectionsReady(event.detail)
+        )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ClearRequest,
+            () => this.clearRunState()
         )
         ShelfLayoutCoordinator.logger.debug(`Constructed in ${layoutMode} mode`)
     }
 
     private clearRunState(): void {
-        this.shelvesByBatch.clear()
-        this.emittedShelfIds.clear()
+        this.shelvesByIndex.clear()
+        this.emittedShelfIndices.clear()
         this.totalShelves = 0
         this.computedLayoutMode = null
     }
 
-    private handleFirstBatch(detail: BatchReadyForPlacementEvent): void {
-        const isNewRun = detail.batchIndex === 0 && this.emittedShelfIds.size > 0
-        const batchCountChanged = detail.totalBatches !== this.totalShelves
-        const layoutModeChanged = this.computedLayoutMode !== null && this.computedLayoutMode !== this.layoutMode
-        const neverComputed = this.computedLayoutMode === null
+    private handleSectionsReady(detail: SectionsReadyEvent): void {
+        this.clearRunState()
+        this.computedLayoutMode = this.layoutMode
 
-        if (isNewRun || batchCountChanged || layoutModeChanged || neverComputed) {
-            this.clearRunState()
-            this.totalShelves = detail.totalBatches
-            this.computedLayoutMode = this.layoutMode
+        // Compute total shelves across all sections
+        const shelvesPerSection = detail.sections.map(s =>
+            Math.max(1, Math.ceil(s.games.length / SLOTS_PER_SHELF))
+        )
+        this.totalShelves = shelvesPerSection.reduce((sum, n) => sum + n, 0)
 
-            if (this.totalShelves === 0) {
-                ShelfLayoutCoordinator.logger.warn('totalBatches is 0 — no shelves to lay out')
-                return
-            }
-
-            ShelfLayoutCoordinator.logger.debug(`Computing ${this.layoutMode} layout for ${this.totalShelves} shelves`)
-            this.computeLayout(this.totalShelves)
+        if (this.totalShelves === 0) {
+            ShelfLayoutCoordinator.logger.warn('No shelves to lay out — all sections empty')
+            return
         }
 
-        this.emitShelfForBatch(detail.batchIndex)
-    }
+        ShelfLayoutCoordinator.logger.debug(
+            `Computing ${this.layoutMode} layout: ${this.totalShelves} shelves across ${detail.sections.length} sections`
+        )
 
-    private computeLayout(totalShelves: number): void {
-        const shelves = LayoutRegistry[this.layoutMode].computeShelves(totalShelves)
+        const shelves = LayoutRegistry[this.layoutMode].computeShelves(this.totalShelves)
 
+        // Build bounds and section-tagged shelf map
         const bounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
-        const hw = 2.0 / 2
-        const hd = 1.0 / 2
-        for (const s of shelves) {
-            bounds.minX = Math.min(bounds.minX, s.position.x - hw)
-            bounds.maxX = Math.max(bounds.maxX, s.position.x + hw)
-            bounds.minZ = Math.min(bounds.minZ, s.position.z - hd)
-            bounds.maxZ = Math.max(bounds.maxZ, s.position.z + hd)
+        const hw = 2.0 / 2, hd = 1.0 / 2
+        let shelfIndex = 0
+        for (let sectionIndex = 0; sectionIndex < shelvesPerSection.length; sectionIndex++) {
+            const count = shelvesPerSection[sectionIndex]
+            for (let i = 0; i < count; i++, shelfIndex++) {
+                const s = shelves[shelfIndex]
+                bounds.minX = Math.min(bounds.minX, s.position.x - hw)
+                bounds.maxX = Math.max(bounds.maxX, s.position.x + hw)
+                bounds.minZ = Math.min(bounds.minZ, s.position.z - hd)
+                bounds.maxZ = Math.max(bounds.maxZ, s.position.z + hd)
+                this.shelvesByIndex.set(shelfIndex, {
+                    position: s.position.clone(),
+                    rotationY: s.rotationY,
+                    sectionIndex,
+                })
+            }
         }
 
         EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(
             GameEventTypes.ShelfLayoutDetermined,
             {
                 shelfBounds: bounds,
-                shelfLayout: {
-                    rows: (shelves[shelves.length - 1]?.row ?? 0) + 1,
-                },
+                shelfLayout: { rows: (shelves[shelves.length - 1]?.row ?? 0) + 1 },
                 stockStrategy: LayoutRegistry[this.layoutMode].createStockStrategy(),
             }
         )
 
-        this.shelvesByBatch.clear()
-        for (let i = 0; i < shelves.length; i++) {
-            const s = shelves[i]
-            this.shelvesByBatch.set(i, {
-                position: s.position.clone(),
-                rotationY: s.rotationY,
-                row: s.row,
-                indexInRow: s.indexInRow,
+        // Emit ShelfReady for every shelf now that positions are computed
+        let emitted = 0
+        for (const [idx, shelf] of this.shelvesByIndex) {
+            this.emittedShelfIndices.add(idx)
+            EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
+                step: 'shelves',
+                current: idx + 1,
+                total: this.totalShelves,
+                detail: `Placing shelf ${idx + 1}`,
             })
+            EventManager.getInstance().emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
+                shelfIndex: idx,
+                sectionIndex: shelf.sectionIndex,
+                position: shelf.position.clone(),
+                rotationY: shelf.rotationY,
+            })
+            emitted++
         }
 
-        ShelfLayoutCoordinator.logger.debug(`Layout determined for ${shelves.length} shelves`)
-    }
-
-    private emitShelfForBatch(batchIndex: number): void {
-        if (this.emittedShelfIds.has(batchIndex)) return
-
-        const shelf = this.shelvesByBatch.get(batchIndex)
-        if (!shelf) {
-            ShelfLayoutCoordinator.logger.warn(`No shelf layout found for batch ${batchIndex}`)
-            return
-        }
-
-        this.emittedShelfIds.add(batchIndex)
-
-        EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
-            step: 'shelves',
-            current: batchIndex + 1,
-            total: this.totalShelves,
-            detail: `Placing shelf ${batchIndex + 1}`,
-        })
-
-        queueMicrotask(() => {
-            EventManager.getInstance().emit<ShelfReadyEvent>(
-                StorePropsEventTypes.ShelfReady,
-                {
-                    batchIndex,
-                    position: shelf.position.clone(),
-                    rotationY: shelf.rotationY,
-                }
-            )
-        })
+        ShelfLayoutCoordinator.logger.debug(`ShelfReady emitted for ${emitted} shelves`)
     }
 }

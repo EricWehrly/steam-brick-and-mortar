@@ -476,7 +476,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
 
     private handleShelfReady(detail: ShelfReadyEvent): void {
         if (!this.isReady()) {
-            this.pendingShelfReady.set(detail.batchIndex, detail)
+            this.pendingShelfReady.set(detail.shelfIndex, detail)
             return
         }
 
@@ -484,7 +484,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         // This allows runtime relayout to reuse the same shelfId without re-instancing churn.
         // Full matrix rewrite is safe because setInstance overwrites the instance slot.
         const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, detail.rotationY, 0))
-        this.setInstance(detail.batchIndex, {
+        this.setInstance(detail.shelfIndex, {
             position: detail.position as THREE.Vector3,
             rotation,
         })
@@ -495,7 +495,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             return
         }
 
-        const pending = Array.from(this.pendingShelfReady.values()).sort((a, b) => a.batchIndex - b.batchIndex)
+        const pending = Array.from(this.pendingShelfReady.values()).sort((a, b) => a.shelfIndex - b.shelfIndex)
         this.pendingShelfReady.clear()
 
         for (const detail of pending) {

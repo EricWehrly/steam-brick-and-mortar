@@ -68,8 +68,10 @@ export interface BatchReadyForPlacementEvent extends BaseInteractionEvent {
  * Replaces the old ShelfCreatedEvent.
  */
 export interface ShelfReadyEvent extends BaseInteractionEvent {
-    /** Batch index this shelf maps to — used as unique shelf identifier. */
-    batchIndex: number
+    /** Global shelf index — unique identifier across all sections. */
+    shelfIndex: number
+    /** Which section this shelf belongs to. */
+    sectionIndex: number
     position: Readonly<THREE.Vector3>
     rotationY: number
 }

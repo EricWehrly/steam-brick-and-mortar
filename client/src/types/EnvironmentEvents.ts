@@ -15,6 +15,22 @@ export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
     // Pure terminal signal: all batches are complete.
 }
 
+/**
+ * GameDataReady
+ *
+ * Emitted by BatchCoordinator when all game data batches have been dispatched
+ * for processing — i.e. all games are in DataManager and all BatchReadyForPlacement
+ * events have fired. This is earlier than AllBatchesComplete, which waits for
+ * GamesPlaced confirmation.
+ *
+ * GameSorter listens to this event to trigger section planning. Downstream layout
+ * work (shelf placement, artwork prewarm) follows from SectionsReady.
+ */
+export interface GameDataReadyEvent extends BaseInteractionEvent {
+    totalGames: number
+    totalBatches: number
+}
+
 export interface SomeBatchesCompleteEvent extends BaseInteractionEvent {
     completedBatches: number
     totalBatches: number

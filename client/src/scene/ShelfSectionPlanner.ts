@@ -57,8 +57,8 @@ export class ShelfSectionPlanner {
     }
 
     private handleShelfReady(detail: ShelfReadyEvent): void {
-        this.shelfPositions[detail.batchIndex] = (detail.position as THREE.Vector3).clone()
-        this.shelfRotations[detail.batchIndex] = detail.rotationY ?? 0
+        this.shelfPositions[detail.shelfIndex] = (detail.position as THREE.Vector3).clone()
+        this.shelfRotations[detail.shelfIndex] = detail.rotationY ?? 0
     }
 
     private handleSectionsReady(detail: SectionsReadyEvent): void {

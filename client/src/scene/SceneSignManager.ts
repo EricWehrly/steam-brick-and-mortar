@@ -93,7 +93,7 @@ export class SceneSignManager {
     }
 
     private handleShelfCreated(detail: ShelfReadyEvent): void {
-        const { position, rotationY, batchIndex } = detail
+        const { position, rotationY, shelfIndex, sectionIndex } = detail
         const rotY = rotationY ?? 0
         const shelfPos = position as THREE.Vector3
 
