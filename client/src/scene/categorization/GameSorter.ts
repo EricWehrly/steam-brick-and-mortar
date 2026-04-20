@@ -41,14 +41,18 @@ export {
 export class GameSorter {
     private static readonly logger = Logger.createLogFunctions(GameSorter.name)
 
-    private activeGroupMode: GroupMode = GroupModes.ByRecency
-    private activeSortMode: SortMode = SortModes.ByLastPlayed
-    private hasArrangedOnce = false
+    /**
+     * Null until first arrangement is applied. Once set (by initial auth-based
+     * defaults or by an explicit ArrangementRequested), subsequent GameDataReady
+     * events (layout switches, library reloads) re-apply the current modes.
+     */
+    private activeGroupMode: GroupMode | null = null
+    private activeSortMode: SortMode | null = null
 
     constructor() {
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.GameDataReady,
-            (_event: CustomEvent<GameDataReadyEvent>) => this.runInitialArrangement()
+            (_event: CustomEvent<GameDataReadyEvent>) => this.handleGameDataReady()
         )
         EventManager.getInstance().registerEventHandler(
             UIEventTypes.ArrangementRequested,
@@ -57,8 +61,8 @@ export class GameSorter {
         GameSorter.logger.debug('GameSorter initialized')
     }
 
-    private runInitialArrangement(): void {
-        if (!this.hasArrangedOnce) {
+    private handleGameDataReady(): void {
+        if (this.activeGroupMode === null || this.activeSortMode === null) {
             // First load: choose defaults based on auth state
             if (SteamIntegration.getInstance().isAnonymous()) {
                 this.activeGroupMode = GroupModes.ByGenre
@@ -67,9 +71,8 @@ export class GameSorter {
                 this.activeGroupMode = GroupModes.ByRecency
                 this.activeSortMode = SortModes.ByLastPlayed
             }
-            this.hasArrangedOnce = true
         }
-        // Subsequent loads (layout switch, library reload): re-apply current modes
+        // Re-apply current modes on subsequent loads (layout switch, library reload)
         this.arrange(this.activeGroupMode, this.activeSortMode)
     }
 
