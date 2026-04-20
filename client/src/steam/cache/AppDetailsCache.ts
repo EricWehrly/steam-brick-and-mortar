@@ -6,6 +6,7 @@
  */
 
 import type { AppDetailsData } from '../batch/BatchAppDetailsClient'
+import { Logger } from '../../utils/Logger'
 
 interface CachedAppDetails {
     appid: number
@@ -33,6 +34,11 @@ export class AppDetailsCache {
     
     private db: IDBDatabase | null = null
     private initPromise: Promise<void> | null = null
+    private logger: ReturnType<typeof Logger.createLogFunctions>
+
+    constructor() {
+        this.logger = Logger.createLogFunctions('AppDetailsCache')
+    }
 
     /**
      * Initialize IndexedDB connection
@@ -45,7 +51,7 @@ export class AppDetailsCache {
             const request = indexedDB.open(AppDetailsCache.DB_NAME, AppDetailsCache.DB_VERSION)
 
             request.onerror = () => {
-                console.error('❌ [AppDetailsCache] Failed to open IndexedDB:', request.error)
+                this.logger.error('❌ [AppDetailsCache] Failed to open IndexedDB:', request.error)
                 this.initPromise = null
                 reject(request.error)
             }
@@ -55,7 +61,7 @@ export class AppDetailsCache {
                 
                 // Verify the object store exists before marking as ready
                 if (!db.objectStoreNames.contains(AppDetailsCache.STORE_NAME)) {
-                    console.error('❌ [AppDetailsCache] Object store missing - database schema not upgraded')
+                    this.logger.error('❌ [AppDetailsCache] Object store missing - database schema not upgraded')
                     db.close()
                     this.initPromise = null
                     reject(new Error('Database schema not initialized'))
@@ -63,7 +69,7 @@ export class AppDetailsCache {
                 }
                 
                 this.db = db
-                console.log('✅ [AppDetailsCache] IndexedDB initialized')
+                this.logger.debug('✅ [AppDetailsCache] IndexedDB initialized')
                 resolve()
             }
 
@@ -73,7 +79,7 @@ export class AppDetailsCache {
                 if (!db.objectStoreNames.contains(AppDetailsCache.STORE_NAME)) {
                     const store = db.createObjectStore(AppDetailsCache.STORE_NAME, { keyPath: 'appid' })
                     store.createIndex('cached_at', 'cached_at', { unique: false })
-                    console.log('📦 [AppDetailsCache] Created object store')
+                    this.logger.debug('📦 [AppDetailsCache] Created object store')
                 }
             }
         })
@@ -109,7 +115,7 @@ export class AppDetailsCache {
             }
 
             request.onerror = () => {
-                console.error(`❌ [AppDetailsCache] Failed to get appid ${appid}:`, request.error)
+                this.logger.error(`❌ [AppDetailsCache] Failed to get appid ${appid}:`, request.error)
                 resolve(null)
             }
         })
@@ -159,7 +165,7 @@ export class AppDetailsCache {
                     completed++
                     if (completed === total) {
                         if (results.size > 0 && results.size < total) {
-                            console.log(`📋 [AppDetailsCache] Cache: ${results.size}/${total} games (${staleCount} stale)`)
+                            this.logger.info(`📋 [AppDetailsCache] Cache: ${results.size}/${total} games (${staleCount} stale)`)
                         }
                         resolve(results)
                     }
@@ -199,7 +205,7 @@ export class AppDetailsCache {
             }
 
             request.onerror = () => {
-                console.error(`❌ [AppDetailsCache] Failed to cache appid ${appid}:`, request.error)
+                this.logger.error(`❌ [AppDetailsCache] Failed to cache appid ${appid}:`, request.error)
                 _reject(request.error)
             }
         })
@@ -260,12 +266,12 @@ export class AppDetailsCache {
             const request = store.clear()
 
             request.onsuccess = () => {
-                console.log('🗑️ [AppDetailsCache] Cleared all cached app details')
+                this.logger.info('🗑️ [AppDetailsCache] Cleared all cached app details')
                 resolve()
             }
 
             request.onerror = () => {
-                console.error('❌ [AppDetailsCache] Failed to clear cache:', request.error)
+                this.logger.error('❌ [AppDetailsCache] Failed to clear cache:', request.error)
                 _reject(request.error)
             }
         })

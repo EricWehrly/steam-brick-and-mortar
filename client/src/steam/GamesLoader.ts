@@ -159,35 +159,56 @@ export class GamesLoader {
         const refreshAppids: number[] = []
 
         for (const appid of appids) {
-            const cachedResult = cachedAppDetails.get(appid) as AppDetailsCacheResult | undefined
-            if (!cachedResult) {
-                refreshAppids.push(appid)
-                continue
-            }
-
-            const normalizedCachedData = this.normalizeBatchData(cachedResult)
-            if (this.isMetadataComplete(normalizedCachedData)) {
-                renderableAppids.push(appid)
-                renderableAppDetails.set(appid, normalizedCachedData)
-
-                if (cachedResult.isStale) {
-                    staleAppids.push(appid)
-                    refreshAppids.push(appid)
-                }
-            } else {
-                refreshAppids.push(appid)
-            }
-        }
-
-        if (refreshAppids.length === 0) {
-            this.logger.debug(`All ${appids.length} games have complete metadata in cache (0 stale)`)
-        } else {
-            this.logger.info(
-                `Loading ${appids.length} games: ${renderableAppids.length} renderable (${staleAppids.length} stale), ${refreshAppids.length} to refresh`
+            this.processCacheResult(
+                appid,
+                cachedAppDetails.get(appid) as AppDetailsCacheResult | undefined,
+                renderableAppids,
+                refreshAppids,
+                renderableAppDetails,
+                staleAppids
             )
         }
 
+        this.logPartitionResults(appids.length, renderableAppids.length, staleAppids.length, refreshAppids.length)
+
         return { renderableAppids, refreshAppids, renderableAppDetails, staleAppids }
+    }
+
+    private processCacheResult(
+        appid: number,
+        cachedResult: AppDetailsCacheResult | undefined,
+        renderableAppids: number[],
+        refreshAppids: number[],
+        renderableAppDetails: Map<number, AppDetailsData>,
+        staleAppids: number[]
+    ): void {
+        if (!cachedResult) {
+            refreshAppids.push(appid)
+            return
+        }
+
+        const normalizedCachedData = this.normalizeBatchData(cachedResult)
+        if (this.isMetadataComplete(normalizedCachedData)) {
+            renderableAppids.push(appid)
+            renderableAppDetails.set(appid, normalizedCachedData)
+
+            if (cachedResult.isStale) {
+                staleAppids.push(appid)
+                refreshAppids.push(appid)
+            }
+        } else {
+            refreshAppids.push(appid)
+        }
+    }
+
+    private logPartitionResults(total: number, renderable: number, stale: number, refresh: number): void {
+        if (refresh === 0) {
+            this.logger.debug(`All ${total} games have complete metadata in cache (0 stale)`)
+        } else {
+            this.logger.info(
+                `Loading ${total} games: ${renderable} renderable (${stale} stale), ${refresh} to refresh`
+            )
+        }
     }
 
     private isMetadataComplete(cached: AppDetailsData | undefined): boolean {
