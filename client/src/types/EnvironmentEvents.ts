@@ -7,9 +7,12 @@
  */
 
 import type { BaseInteractionEvent } from '../core/EventManager'
-import type { SteamGameData } from '../scene/game-box/types/GameData'
 import type { ShelfBounds } from './InteractionEvents'
-import type { Section } from './LayoutTypes'
+import type { Section, GroupMode, SortMode, LayoutMode } from './LayoutTypes'
+
+// Re-export GroupMode/SortMode/GroupModes/SortModes for consumers that import from here
+export type { GroupMode, SortMode } from './LayoutTypes'
+export { GroupModes, SortModes } from './LayoutTypes'
 
 export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
     // Pure terminal signal: all batches are complete.
@@ -36,47 +39,29 @@ export interface SomeBatchesCompleteEvent extends BaseInteractionEvent {
     totalBatches: number
 }
 
-export const GameSortModes = {
-    RecentlyPlayed: 'recently-played',
-    ByGenre:        'by-genre',
-    ByPlaytime:     'by-playtime',
-    ByRating:       'by-rating',
-} as const
-
-export type GameSortMode = typeof GameSortModes[keyof typeof GameSortModes]
-
-export interface GamesSortEvent extends BaseInteractionEvent {
-    /** Full sorted game list after all batches have loaded. */
-    sortedGames: ReadonlyArray<Readonly<SteamGameData>>
-    /**
-     * Maps bucket key to human-readable label.
-     * For recency sort: time-window keys (RecentlyPlayedBucket values).
-     * For genre sort: genre name keys.
-     * Empty for playtime sort (no meaningful sections).
-     */
-    buckets: ReadonlyMap<number | string, string>
-    /** Which sort policy produced this event. */
-    sortMode: GameSortMode
-}
-
 /**
  * SectionsReadyEvent
  *
- * Replaces GamesSortEvent. Emitted by GameSorter after grouping + sorting.
+ * Emitted by GameSorter after grouping (GroupResolver) + sorting (SectionSorter).
  * Each section carries its own game list and name (used for sign labels).
  * Consumers no longer need to re-derive group boundaries from a flat list.
  */
 export interface SectionsReadyEvent extends BaseInteractionEvent {
     sections: ReadonlyArray<Section>
-    /** Overall sort/group mode that produced these sections. */
-    sortMode: GameSortMode
+    groupMode: GroupMode
+    sortMode: SortMode
 }
 
-export interface SortRequestedEvent extends BaseInteractionEvent {
-    sortMode: GameSortMode
+/**
+ * ArrangementRequestedEvent
+ *
+ * Emitted by LayoutControlPanel when the user changes group or sort mode.
+ * Both axes are always carried together so GameSorter sees the full arrangement.
+ */
+export interface ArrangementRequestedEvent extends BaseInteractionEvent {
+    groupMode: GroupMode
+    sortMode: SortMode
 }
-
-import type { LayoutMode } from './LayoutTypes'
 
 export interface LayoutRequestedEvent extends BaseInteractionEvent {
     layoutMode: LayoutMode

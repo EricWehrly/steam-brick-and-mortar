@@ -13,7 +13,7 @@ import { PauseMenuManager } from '../pause/PauseMenuManager'
 import { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { LightingControlsPanel } from '../LightingControlsPanel'
 import { CategoryReferencePanel } from '../CategoryReferencePanel'
-import { LayoutSortPanel } from '../LayoutSortPanel'
+import { LayoutControlPanel } from '../LayoutControlPanel'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings } from '../../core/AppSettings'
 import { UIEventTypes, InputEventTypes, type SceneCanvasClickEvent } from '../../types/InteractionEvents'
@@ -25,7 +25,7 @@ export class SystemUICoordinator {
     private performanceMonitor: PerformanceMonitorUI
     private lightingControlsPanel?: LightingControlsPanel
     private categoryReferencePanel?: CategoryReferencePanel
-    private layoutSortPanel?: LayoutSortPanel
+    private layoutControlPanel?: LayoutControlPanel
     private eventManager: EventManager
     private appSettings: AppSettings
     private renderLoopRegistry: RenderLoopRegistry
@@ -91,8 +91,8 @@ export class SystemUICoordinator {
         // Setup Lighting Controls button
         this.setupLightingControlsButton()
 
-        // Sort/layout controls panel — initialized first to appear at the top of the UI group
-        this.initializeLayoutSortPanel()
+        // Layout/Group/Sort controls panel — initialized first to appear at the top of the UI group
+        this.initializeLayoutControlPanel()
 
         // Initialize integrated lighting controls panel
         this.initializeLightingControls()
@@ -149,10 +149,10 @@ export class SystemUICoordinator {
         }
     }
 
-    private initializeLayoutSortPanel(): void {
-        if (!this.layoutSortPanel) {
-            this.layoutSortPanel = new LayoutSortPanel()
-            this.layoutSortPanel.init()
+    private initializeLayoutControlPanel(): void {
+        if (!this.layoutControlPanel) {
+            this.layoutControlPanel = new LayoutControlPanel()
+            this.layoutControlPanel.init()
         }
     }
 
@@ -218,7 +218,7 @@ export class SystemUICoordinator {
         this.pauseMenuManager?.dispose()
         this.performanceMonitor?.dispose()
         this.lightingControlsPanel?.dispose()
-        this.layoutSortPanel?.dispose()
+        this.layoutControlPanel?.dispose()
 
         // Remove lighting controls button
         const lightingButton = document.getElementById('lighting-controls-button')

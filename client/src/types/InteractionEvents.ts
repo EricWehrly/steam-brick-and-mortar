@@ -252,7 +252,8 @@ export const UIEventTypes = {
     MenuOpen: 'ui:menu-open',
     MenuClose: 'ui:menu-close',
     ImageCacheStatsRequest: 'ui:image-cache-stats-request',
-    SortRequested: 'ui:sort-requested',
+    SortRequested: 'ui:sort-requested',  // TD: remove when LayoutControlPanel migration is complete
+    ArrangementRequested: 'ui:arrangement-requested',
     LayoutRequested: 'ui:layout-requested',
 } as const
 
