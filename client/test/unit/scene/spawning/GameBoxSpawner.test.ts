@@ -126,6 +126,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         DataManager.getInstance().set(DataKey.MainScene, mockScene, { domain: DataDomain.Scene })
 
         resetEventManager()
+        GameBoxSpawner._resetInstance()
         eventManager = EventManager.getInstance()
 
         eventHandlers = new Map()
@@ -144,7 +145,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             return true
         })
 
-        spawner = new GameBoxSpawner()
+        spawner = GameBoxSpawner.getInstance()
         emitShelfLayoutDetermined(eventManager)
     })
 
@@ -358,7 +359,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
             await Promise.resolve()
 
-            spawner.reset()
+            eventManager.emit(StorePropsEventTypes.ClearRequest, {})
             expect(mockRendererDispose).toHaveBeenCalled()
 
             // After reset, SectionsReady should not use old shelf positions (renderer gone)
@@ -375,7 +376,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             )
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
 
-            spawner.reset()
+            eventManager.emit(StorePropsEventTypes.ClearRequest, {})
             expect(mockRendererDispose).toHaveBeenCalled()
 
             expect(() => {
