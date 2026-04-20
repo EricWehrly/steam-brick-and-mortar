@@ -13,6 +13,7 @@ import { EventManager } from '../../../src/core/EventManager'
 import { GameLibraryManager } from '../../../src/steam-integration/GameLibraryManager'
 import { GameSorter } from '../../../src/scene/categorization/GameSorter'
 import { SteamEventTypes, GameEventTypes } from '../../../src/types/InteractionEvents'
+import type { GameDataReadyEvent } from '../../../src/types/EnvironmentEvents'
 import type { SteamGame } from '../../../src/steam'
 import type { SteamGameData } from '../../../src/scene'
 import { DataDomain } from '../../../src/core/data'
@@ -94,13 +95,14 @@ describe('Anonymous Store Data Storage (Bug Fix)', () => {
         const sortHandler = vi.fn()
         eventManager.registerEventHandler(GameEventTypes.SectionsReady, sortHandler)
 
-        // Emit AllBatchesComplete to trigger GameSorter.sortInitial()
-        eventManager.emit(GameEventTypes.AllBatchesComplete, {})
+        // Emit GameDataReady to trigger GameSorter initial arrangement
+        eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, { totalGames: 2, totalBatches: 1 })
 
-        // Assert: Sort should have happened with genre mode for anonymous
+        // Assert: Sort should have happened with genre grouping for anonymous
         expect(sortHandler).toHaveBeenCalledOnce()
         const sortEvent = sortHandler.mock.calls[0][0] as CustomEvent
-        expect(sortEvent.detail.sortMode).toBe('by-genre')
+        expect(sortEvent.detail.groupMode).toBe('by-genre')
+        expect(sortEvent.detail.sortMode).toBe('by-playtime')
         const totalGames = sortEvent.detail.sections.reduce((sum: number, s: any) => sum + s.games.length, 0)
         expect(totalGames).toBe(2)
     })

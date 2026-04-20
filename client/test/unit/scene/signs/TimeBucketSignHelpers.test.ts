@@ -22,18 +22,18 @@ function gameWithLastPlayed(unixSeconds: number, playtimeMinutes = 60): SteamGam
     } as SteamGameData
 }
 
-describe('shelfBucketKey — recently-played', () => {
+describe('shelfBucketKey — by-recency', () => {
     it('returns null when shelf index is out of range', () => {
         const games = [gameWithLastPlayed(NOW - DAY)]
-        expect(shelfBucketKey(1, games, 'recently-played')).toBeNull()
+        expect(shelfBucketKey(1, games, 'by-recency')).toBeNull()
     })
 
     it('returns the recency bucket key for the first game on the shelf', () => {
         const games: SteamGameData[] = Array.from({ length: 18 }, () => gameWithLastPlayed(NOW - DAY))
         games.push(gameWithLastPlayed(0))
 
-        expect(shelfBucketKey(0, games, 'recently-played')).toBe(RecentlyPlayedBucket.ThisWeek)
-        expect(shelfBucketKey(1, games, 'recently-played')).toBe(RecentlyPlayedBucket.Unplayed)
+        expect(shelfBucketKey(0, games, 'by-recency')).toBe(RecentlyPlayedBucket.ThisWeek)
+        expect(shelfBucketKey(1, games, 'by-recency')).toBe(RecentlyPlayedBucket.Unplayed)
     })
 })
 
@@ -53,7 +53,7 @@ describe('shelfBucketKey — by-playtime', () => {
 })
 
 describe('shelfBucketKey — by-genre', () => {
-    it('returns null for genre sort (no bucket concept)', () => {
+    it('returns null for genre grouping (no bucket concept)', () => {
         const games = [gameWithLastPlayed(NOW)]
         expect(shelfBucketKey(0, games, 'by-genre')).toBeNull()
     })

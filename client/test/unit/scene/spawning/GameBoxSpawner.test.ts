@@ -246,7 +246,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
                 makeShelfReady(0, new THREE.Vector3(0, 0, 0))
             )
 
-            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
             expect(mockPlaceGame).toHaveBeenCalledTimes(6)
@@ -280,7 +280,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
                 { games, batchIndex: 0, totalBatches: 1 }
             )
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
-            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
 
             expect(gamesPlacedEvents.length).toBeGreaterThan(0)
             expect(gamesPlacedEvents[0].status).toBe('games-placed')
@@ -297,7 +297,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0, new THREE.Vector3(0, 0, 0)))
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(1, new THREE.Vector3(3, 0, 0)))
 
-            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
             expect(mockPlaceGame).toHaveBeenCalledTimes(20)
@@ -311,8 +311,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
                 { games, batchIndex: 0, totalBatches: 1 }
             )
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
-            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
-            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games: [...games].reverse() as any, sortMode: 'recently-played' }], sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games: [...games].reverse() as any, groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(2)
         })
@@ -325,7 +325,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
 
             expect(() => {
-                eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games: [], sortMode: 'recently-played' }], sortMode: 'recently-played' })
+                eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games: [], groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
             }).not.toThrow()
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
@@ -339,7 +339,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games, batchIndex: 0, totalBatches: 1 }
             )
-            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
             expect(mockPlaceGame).not.toHaveBeenCalled()
@@ -364,7 +364,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             expect(mockRendererDispose).toHaveBeenCalled()
 
             // After reset, SectionsReady should not use old shelf positions (renderer gone)
-            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, sortMode: 'recently-played' }], sortMode: 'recently-played' })
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
             expect(mockPlaceGame).not.toHaveBeenCalled()
         })
     })
@@ -381,7 +381,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             expect(mockRendererDispose).toHaveBeenCalled()
 
             expect(() => {
-                eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games: createMockGamesWithArtwork(3, 0) as any[], sortMode: 'recently-played' }], sortMode: 'recently-played' })
+                eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games: createMockGamesWithArtwork(3, 0) as any[], groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
             }).not.toThrow()
         })
     })

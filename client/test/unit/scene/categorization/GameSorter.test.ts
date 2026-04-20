@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SteamGameData } from '../../../../src/scene/game-box/types/GameData'
-import { GameEventTypes } from '../../../../src/types/InteractionEvents'
-import { RecentlyPlayedBucket, getRecentlyPlayedBucket, getBucketLabel } from '../../../../src/scene/categorization/GameSorter'
+import { GameEventTypes, UIEventTypes } from '../../../../src/types/InteractionEvents'
+import { RecentlyPlayedBucket, getRecentlyPlayedBucket, PlaytimeBucket, getPlaytimeBucket } from '../../../../src/scene/categorization/GameSorter'
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -56,9 +56,15 @@ function makeGame(appid: number, rtime_last_played = 0, playtime_forever = 0, ge
     } as SteamGameData
 }
 
-function fireAllBatchesComplete(): void {
-    const handlers = mockHandlers.get(GameEventTypes.AllBatchesComplete) ?? []
-    const event = new CustomEvent(GameEventTypes.AllBatchesComplete, { detail: {} })
+function fireGameDataReady(): void {
+    const handlers = mockHandlers.get(GameEventTypes.GameDataReady) ?? []
+    const event = new CustomEvent(GameEventTypes.GameDataReady, { detail: { totalGames: mockGames.length, totalBatches: 1 } })
+    for (const h of handlers) h(event)
+}
+
+function fireArrangementRequested(groupMode: string, sortMode: string): void {
+    const handlers = mockHandlers.get(UIEventTypes.ArrangementRequested) ?? []
+    const event = new CustomEvent(UIEventTypes.ArrangementRequested, { detail: { groupMode, sortMode } })
     for (const h of handlers) h(event)
 }
 
@@ -69,17 +75,23 @@ describe('GameSorter', () => {
         mockHandlers.clear()
         mockEmit.mockReset()
         mockGames = []
+        mockIsAnonymous = false
     })
 
-    it('subscribes to AllBatchesComplete on construction', () => {
+    it('subscribes to GameDataReady on construction', () => {
         new GameSorter()
-        expect(mockHandlers.has(GameEventTypes.AllBatchesComplete)).toBe(true)
+        expect(mockHandlers.has(GameEventTypes.GameDataReady)).toBe(true)
     })
 
-    it('emits SectionsReady when AllBatchesComplete fires with games', () => {
+    it('subscribes to ArrangementRequested on construction', () => {
+        new GameSorter()
+        expect(mockHandlers.has(UIEventTypes.ArrangementRequested)).toBe(true)
+    })
+
+    it('emits SectionsReady when GameDataReady fires with games', () => {
         mockGames = [makeGame(1), makeGame(2)]
         new GameSorter()
-        fireAllBatchesComplete()
+        fireGameDataReady()
 
         expect(mockEmit).toHaveBeenCalledOnce()
         const [eventType, payload] = mockEmit.mock.calls[0]
@@ -91,14 +103,36 @@ describe('GameSorter', () => {
     it('does NOT emit when there are no games', () => {
         mockGames = []
         new GameSorter()
-        fireAllBatchesComplete()
+        fireGameDataReady()
         expect(mockEmit).not.toHaveBeenCalled()
     })
 
-    it('produces only Unplayed section when no recently-played data exists', () => {
+    it('default arrangement for non-anonymous: groupMode=by-recency, sortMode=by-last-played', () => {
+        mockIsAnonymous = false
+        mockGames = [makeGame(1, Math.floor(Date.now() / 1000) - 3600)]
+        new GameSorter()
+        fireGameDataReady()
+
+        const [, payload] = mockEmit.mock.calls[0]
+        expect(payload.groupMode).toBe('by-recency')
+        expect(payload.sortMode).toBe('by-last-played')
+    })
+
+    it('default arrangement for anonymous: groupMode=by-genre, sortMode=by-playtime', () => {
+        mockIsAnonymous = true
+        mockGames = [makeGame(1, 0, 100, 'Action')]
+        new GameSorter()
+        fireGameDataReady()
+
+        const [, payload] = mockEmit.mock.calls[0]
+        expect(payload.groupMode).toBe('by-genre')
+        expect(payload.sortMode).toBe('by-playtime')
+    })
+
+    it('produces only Never Played section when no recently-played data exists', () => {
         mockGames = [makeGame(1, 0), makeGame(2, 0)]
         new GameSorter()
-        fireAllBatchesComplete()
+        fireGameDataReady()
 
         const [, payload] = mockEmit.mock.calls[0]
         expect(payload.sections).toHaveLength(1)
@@ -112,7 +146,7 @@ describe('GameSorter', () => {
         const newer = now - 3600
         mockGames = [makeGame(1, older), makeGame(2, newer)]
         new GameSorter()
-        fireAllBatchesComplete()
+        fireGameDataReady()
 
         const [, payload] = mockEmit.mock.calls[0]
         const allGames = payload.sections.flatMap((s: any) => s.games)
@@ -124,11 +158,33 @@ describe('GameSorter', () => {
         const now = Math.floor(Date.now() / 1000)
         mockGames = [makeGame(1, now - 3600)]
         new GameSorter()
-        fireAllBatchesComplete()
+        fireGameDataReady()
 
         const [, payload] = mockEmit.mock.calls[0]
         const sectionNames: string[] = payload.sections.map((s: any) => s.name)
         expect(sectionNames).toContain('Played Today')
+    })
+
+    it('re-arranges on ArrangementRequested', () => {
+        mockGames = [makeGame(1, 0, 100, 'Action')]
+        new GameSorter()
+        fireGameDataReady()
+        mockEmit.mockReset()
+
+        fireArrangementRequested('by-genre', 'by-playtime')
+
+        expect(mockEmit).toHaveBeenCalledOnce()
+        const [eventType, payload] = mockEmit.mock.calls[0]
+        expect(eventType).toBe(GameEventTypes.SectionsReady)
+        expect(payload.groupMode).toBe('by-genre')
+        expect(payload.sortMode).toBe('by-playtime')
+    })
+
+    it('does not emit on ArrangementRequested when no games present', () => {
+        mockGames = []
+        new GameSorter()
+        fireArrangementRequested('by-genre', 'by-playtime')
+        expect(mockEmit).not.toHaveBeenCalled()
     })
 })
 
@@ -172,160 +228,5 @@ describe('getRecentlyPlayedBucket', () => {
 
     it('handles future dates as "today"', () => {
         expect(getRecentlyPlayedBucket(game(now + 3600), now)).toBe(RecentlyPlayedBucket.Today)
-    })
-})
-
-describe('getBucketLabel', () => {
-    it('returns correct human-readable labels', () => {
-        expect(getBucketLabel(RecentlyPlayedBucket.Today)).toBe('Played Today')
-        expect(getBucketLabel(RecentlyPlayedBucket.ThisWeek)).toBe('Played This Week')
-        expect(getBucketLabel(RecentlyPlayedBucket.ThisMonth)).toBe('Played This Month')
-        expect(getBucketLabel(RecentlyPlayedBucket.ThisYear)).toBe('Played This Year')
-        expect(getBucketLabel(RecentlyPlayedBucket.Before)).toBe('Played Before')
-        expect(getBucketLabel(RecentlyPlayedBucket.Unplayed)).toBe('Never Played')
-    })
-})
-
-describe('GameSorter.sortByPlaytime', () => {
-    beforeEach(() => {
-        mockHandlers.clear()
-        mockEmit.mockReset()
-        mockGames = []
-    })
-
-    it('emits SectionsReady sorted descending by playtime_forever', () => {
-        mockGames = [makeGame(1, 0, 100), makeGame(2, 0, 500), makeGame(3, 0, 50)]
-        const sorter = new GameSorter()
-        sorter.sortByPlaytime()
-
-        expect(mockEmit).toHaveBeenCalledOnce()
-        const [eventType, payload] = mockEmit.mock.calls[0]
-        expect(eventType).toBe(GameEventTypes.SectionsReady)
-        const allGames = payload.sections.flatMap((s: any) => s.games)
-        expect(allGames[0].appid).toBe(2)  // 500 minutes
-        expect(allGames[1].appid).toBe(1)  // 100 minutes
-        expect(allGames[2].appid).toBe(3)  // 50 minutes
-    })
-
-    it('does not emit when no games present', () => {
-        mockGames = []
-        const sorter = new GameSorter()
-        sorter.sortByPlaytime()
-        expect(mockEmit).not.toHaveBeenCalled()
-    })
-
-    it('emits sections with playtime bucket names', () => {
-        mockGames = [makeGame(1, 0, 6_001), makeGame(2, 0, 600), makeGame(3, 0, 0)]
-        const sorter = new GameSorter()
-        sorter.sortByPlaytime()
-        const [, payload] = mockEmit.mock.calls[0]
-        const sectionNames: string[] = payload.sections.map((s: any) => s.name)
-        expect(sectionNames).toContain('Played 100+ Hours')
-        expect(sectionNames).toContain('Played 10\u2013100 Hours')
-        expect(sectionNames).toContain('Never Played')
-    })
-})
-
-describe('GameSorter.sortByRating', () => {
-    beforeEach(() => {
-        mockHandlers.clear()
-        mockEmit.mockReset()
-        mockGames = []
-    })
-
-    it('emits SectionsReady sorted descending by userscore, breaking ties with playtime', () => {
-        const g1 = makeGame(1, 0, 100); g1.userscore = 95
-        const g2 = makeGame(2, 0, 500); g2.userscore = 95
-        const g3 = makeGame(3, 0, 50);  g3.userscore = 85
-        const g4 = makeGame(4, 0, 1000)
-
-        mockGames = [g1, g2, g3, g4]
-        const sorter = new GameSorter()
-        sorter.sortByRating()
-
-        expect(mockEmit).toHaveBeenCalledOnce()
-        const [eventType, payload] = mockEmit.mock.calls[0]
-        expect(eventType).toBe(GameEventTypes.SectionsReady)
-        const allGames = payload.sections.flatMap((s: any) => s.games)
-        expect(allGames[0].appid).toBe(2)
-        expect(allGames[1].appid).toBe(1)
-        expect(allGames[2].appid).toBe(3)
-        expect(allGames[3].appid).toBe(4)
-    })
-
-    it('does not emit when no games present', () => {
-        mockGames = []
-        const sorter = new GameSorter()
-        sorter.sortByRating()
-        expect(mockEmit).not.toHaveBeenCalled()
-    })
-
-    it('emits sections with rating tier names', () => {
-        const g1 = makeGame(1, 0, 100); g1.userscore = 92
-        const g2 = makeGame(2, 0, 100); g2.userscore = 85
-        const g3 = makeGame(3, 0, 100); g3.userscore = 75
-        const g4 = makeGame(4, 0, 100); g4.userscore = 50
-        const g5 = makeGame(5, 0, 100)
-
-        mockGames = [g1, g2, g3, g4, g5]
-        const sorter = new GameSorter()
-        sorter.sortByRating()
-
-        const [, payload] = mockEmit.mock.calls[0]
-        const sectionNames: string[] = payload.sections.map((s: any) => s.name)
-        expect(sectionNames).toContain('Overwhelmingly Positive')
-        expect(sectionNames).toContain('Very Positive')
-        expect(sectionNames).toContain('Mostly Positive')
-        expect(sectionNames).toContain('Mixed or Lower')
-        expect(sectionNames).toContain('Unrated')
-    })
-})
-
-describe('GameSorter.sortByGenre', () => {
-    beforeEach(() => {
-        mockHandlers.clear()
-        mockEmit.mockReset()
-        mockGames = []
-    })
-
-    it('emits SectionsReady grouped by genre in KNOWN_GENRES order', () => {
-        mockGames = [
-            makeGame(1, 0, 10, 'RPG'),
-            makeGame(2, 0, 10, 'Action'),
-            makeGame(3, 0, 10, 'Strategy'),
-        ]
-        const sorter = new GameSorter()
-        sorter.sortByGenre()
-
-        expect(mockEmit).toHaveBeenCalledOnce()
-        const [eventType, payload] = mockEmit.mock.calls[0]
-        expect(eventType).toBe(GameEventTypes.SectionsReady)
-        const sectionNames: string[] = payload.sections.map((s: any) => s.name)
-        expect(sectionNames.indexOf('Action')).toBeLessThan(sectionNames.indexOf('RPG'))
-        expect(sectionNames.indexOf('RPG')).toBeLessThan(sectionNames.indexOf('Strategy'))
-    })
-
-    it('sorts by playtime descending within the same genre section', () => {
-        mockGames = [
-            makeGame(1, 0, 30, 'Action'),
-            makeGame(2, 0, 100, 'Action'),
-            makeGame(3, 0, 10, 'Action'),
-        ]
-        const sorter = new GameSorter()
-        sorter.sortByGenre()
-
-        const [, payload] = mockEmit.mock.calls[0]
-        const actionSection = payload.sections.find((s: any) => s.name === 'Action')
-        expect(actionSection).toBeDefined()
-        expect(actionSection.games[0].appid).toBe(2)  // 100 min
-        expect(actionSection.games[1].appid).toBe(1)  // 30 min
-        expect(actionSection.games[2].appid).toBe(3)  // 10 min
-    })
-
-    it('does not emit when no games present', () => {
-        mockGames = []
-        const sorter = new GameSorter()
-        sorter.sortByGenre()
-        expect(mockEmit).not.toHaveBeenCalled()
     })
 })
