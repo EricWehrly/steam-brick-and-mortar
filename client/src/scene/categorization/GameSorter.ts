@@ -21,7 +21,7 @@
 import { EventManager } from '../../core/EventManager'
 import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
-import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
+import { GameEventTypes, UIEventTypes, StorePropsEventTypes } from '../../types/InteractionEvents'
 import { GroupModes, SortModes } from '../../types/LayoutTypes'
 import type { GroupMode, SortMode } from '../../types/LayoutTypes'
 import type { GameDataReadyEvent, SectionsReadyEvent, ArrangementRequestedEvent } from '../../types/EnvironmentEvents'
@@ -43,6 +43,7 @@ export class GameSorter {
 
     private activeGroupMode: GroupMode = GroupModes.ByRecency
     private activeSortMode: SortMode = SortModes.ByLastPlayed
+    private hasArrangedOnce = false
 
     constructor() {
         EventManager.getInstance().registerEventHandler(
@@ -53,17 +54,32 @@ export class GameSorter {
             UIEventTypes.ArrangementRequested,
             (event: CustomEvent<ArrangementRequestedEvent>) => this.handleArrangementRequested(event.detail)
         )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ClearRequest,
+            () => this.handleClearRequest()
+        )
         GameSorter.logger.debug('GameSorter initialized')
     }
 
+    private handleClearRequest(): void {
+        // Layout switch: preserve the user's chosen arrangement; don't reset to defaults.
+        // hasArrangedOnce stays true so the next GameDataReady re-applies the current modes.
+        GameSorter.logger.debug(`ClearRequest: preserving arrangement (group=${this.activeGroupMode}, sort=${this.activeSortMode})`)
+    }
+
     private runInitialArrangement(): void {
-        if (SteamIntegration.getInstance().isAnonymous()) {
-            this.activeGroupMode = GroupModes.ByGenre
-            this.activeSortMode = SortModes.ByPlaytime
-        } else {
-            this.activeGroupMode = GroupModes.ByRecency
-            this.activeSortMode = SortModes.ByLastPlayed
+        if (!this.hasArrangedOnce) {
+            // First load: choose defaults based on auth state
+            if (SteamIntegration.getInstance().isAnonymous()) {
+                this.activeGroupMode = GroupModes.ByGenre
+                this.activeSortMode = SortModes.ByPlaytime
+            } else {
+                this.activeGroupMode = GroupModes.ByRecency
+                this.activeSortMode = SortModes.ByLastPlayed
+            }
+            this.hasArrangedOnce = true
         }
+        // Subsequent loads (layout switch, library reload): re-apply current modes
         this.arrange(this.activeGroupMode, this.activeSortMode)
     }
 

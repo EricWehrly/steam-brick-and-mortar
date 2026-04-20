@@ -73,8 +73,18 @@ export class LayoutControlPanel {
         )
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SectionsReady,
-            (_event: CustomEvent<SectionsReadyEvent>) => this.setControlsEnabled(true)
+            (event: CustomEvent<SectionsReadyEvent>) => this.handleSectionsReady(event.detail)
         )
+    }
+
+    private handleSectionsReady(detail: SectionsReadyEvent): void {
+        // Keep dropdowns in sync with whatever arrangement was actually applied
+        // (handles initial anonymous default, layout switch re-use, etc.)
+        this.activeGroupKey = detail.groupMode
+        this.activeSortKey = detail.sortMode
+        if (this.groupSelect) this.groupSelect.value = detail.groupMode
+        if (this.sortSelect) this.sortSelect.value = detail.sortMode
+        this.setControlsEnabled(true)
     }
 
     // ─── Toggle button ─────────────────────────────────────────────────────────
