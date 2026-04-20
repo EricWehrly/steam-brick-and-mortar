@@ -39,6 +39,7 @@ export class ShelfSectionPlanner {
 
     private shelfPositions: THREE.Vector3[] = []
     private shelfRotations: number[] = []
+    private pendingSections: SectionsReadyEvent | null = null
     private readonly placedSignIdentifiers = new Set<string>()
 
     constructor(config: ShelfSectionPlannerConfig = {}) {
@@ -63,36 +64,47 @@ export class ShelfSectionPlanner {
     private handleShelfReady(detail: ShelfReadyEvent): void {
         this.shelfPositions[detail.shelfIndex] = (detail.position as THREE.Vector3).clone()
         this.shelfRotations[detail.shelfIndex] = detail.rotationY ?? 0
+        this.tryPlacePendingSections()
     }
 
     private handleClearRequest(): void {
         this.shelfPositions = []
         this.shelfRotations = []
+        this.pendingSections = null
         this.clearSigns()
     }
 
     private handleSectionsReady(detail: SectionsReadyEvent): void {
-        const { sections } = detail
+        this.pendingSections = detail
 
-        // Wait until the new layout has emitted shelves for this run.
-        // ClearRequest now happens before rebuild, so SectionsReady can arrive while
-        // this planner still holds stale shelf positions from the previous layout.
-        if (this.shelfPositions.length === 0) {
-            this.clearSigns()
-            ShelfSectionPlanner.logger.info(
-                `SectionsReady: ${sections.length} section(s), ` +
-                `${this.shelfPositions.length} shelf positions known`
-            )
-            ShelfSectionPlanner.logger.warn('No shelf positions yet — signs will be placed on next ShelfReady (not yet supported for re-sort)')
+        ShelfSectionPlanner.logger.info(
+            `SectionsReady: ${detail.sections.length} section(s), ` +
+            `${this.shelfPositions.length} shelf positions known`
+        )
+
+        this.tryPlacePendingSections()
+    }
+
+    private tryPlacePendingSections(): void {
+        if (!this.pendingSections) {
             return
         }
 
-        this.clearSigns()
+        const requiredShelves = this.pendingSections.sections
+            .map(section => Math.max(1, Math.ceil(section.games.length / SHELF_BATCH_SIZE)))
+            .reduce((sum, count) => sum + count, 0)
 
-        ShelfSectionPlanner.logger.info(
-            `SectionsReady: ${sections.length} section(s), ` +
-            `${this.shelfPositions.length} shelf positions known`
-        )
+        if (this.shelfPositions.length < requiredShelves) {
+            return
+        }
+
+        this.placeSignsForSections(this.pendingSections)
+        this.pendingSections = null
+    }
+
+    private placeSignsForSections(detail: SectionsReadyEvent): void {
+        const { sections } = detail
+        this.clearSigns()
 
         // Walk sections in order, placing a sign at the first shelf of each section.
         // Sections with no name (ungrouped) or named 'Other' get no sign.

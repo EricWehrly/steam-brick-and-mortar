@@ -109,6 +109,21 @@ Follows the same `SectionsPlanned` pattern as Spoke.
 Right side ascending, left descending — continuous loop. Config option on
 `SpokeLayoutConfig.mirrorWalkOrder`. Requires section-aware placement first.
 
+### Spoke follow-ups from live validation (2026-04-20)
+1. **Inside/outside flip**
+   - Current spoke stocking appears on the outer faces relative to aisle flow.
+   - Expected: games should present on the inner aisle faces.
+
+2. **Bounds authority for spoke store shape**
+   - Current spoke center aligns with current entrance mat/store framing assumptions.
+   - Upcoming environment variant will move the entrance mat to the middle; spoke geometry
+     should define store bounds independent of current mat placement.
+
+3. **Section signage at spoke entrance**
+   - Signs should anchor at the hub-side entrance of each spoke (optionally repeated deeper in aisle).
+   - Current placement limitations appear coupled to incomplete one-group-per-section behavior;
+     similar symptom observed in Arc when sort mode is `by-genre`.
+
 ### Dynamic layout switching without reload
 Smooth/instant-snap repositioning without full teardown. Requires `InstancedShelfRenderer`
 to support in-place position updates for existing shelf IDs.
