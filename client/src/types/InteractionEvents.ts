@@ -177,6 +177,7 @@ export interface ShelfBounds {
 export interface ShelfLayoutDeterminedEvent extends BaseInteractionEvent {
     shelfBounds: ShelfBounds
     shelfLayout: { rows: number; shelvesPerRow?: number }
+    stockStrategy: import('../scene/props/shared/StockStrategy').IStockStrategy
 }
 
 // Moved to EnvironmentEvents.ts: LayoutChangedEvent, SomeBatchesCompleteEvent, AllBatchesCompleteEvent, GamesSortEvent

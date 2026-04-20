@@ -9,39 +9,31 @@ import {
     type ShelfLayoutDeterminedEvent,
     type StorePropsProgressEvent,
 } from '../../types/InteractionEvents'
-import type { IStockStrategy } from '../props/shared/StockStrategy'
 import { LayoutRegistry } from '../props/shared/LayoutRegistry'
-import { type LayoutMode } from '../../types/LayoutTypes'
+import type { LayoutMode } from '../../types/LayoutTypes'
 
 /**
  * ShelfLayoutCoordinator
  *
- * Singleton coordinator — owns shelf layout computation for the lifetime of the app.
- * On layout switch, call reset(newLayoutMode) rather than dispose+reconstruct.
- *
- * Listens to BatchReadyForPlacement. Uses totalBatches to compute the full shelf
- * layout without waiting for game content or sort. Emits:
- *   - ShelfLayoutDetermined  once per layout, with shelfBounds for room/lighting
- *   - ShelfReady             one per shelf, with position + rotationY
- *
- * Knows nothing about games, GPU, or rendering. Pure layout authority.
+ * Singleton, non-disposable event coordinator for shelf geometry.
+ * It stays alive for app lifetime and derives all run state from incoming batch events.
  */
 export class ShelfLayoutCoordinator {
     private static readonly logger = Logger.createLogFunctions(ShelfLayoutCoordinator.name)
     private static instance: ShelfLayoutCoordinator | null = null
 
-    /** The stock strategy matching the current layout mode. Consumed by GameBoxSpawner. */
-    public stockStrategy: IStockStrategy
+    /** Active layout mode. Can be updated by orchestration before the next batch run. */
+    public layoutMode: LayoutMode
 
-    private layoutMode: LayoutMode
     private layoutComputed = false
     private shelvesByBatch = new Map<number, { position: THREE.Vector3; rotationY: number; row: number; indexInRow: number }>()
     private emittedShelfIds = new Set<number>()
     private totalShelves = 0
+    private computedLayoutMode: LayoutMode | null = null
 
     private readonly boundHandleFirstBatch: (event: CustomEvent<BatchReadyForPlacementEvent>) => void
 
-    static getInstance(initialLayoutMode: LayoutMode = 'arc'): ShelfLayoutCoordinator {
+static getInstance(initialLayoutMode: LayoutMode = 'arc'): ShelfLayoutCoordinator {
         if (!ShelfLayoutCoordinator.instance) {
             ShelfLayoutCoordinator.instance = new ShelfLayoutCoordinator(initialLayoutMode)
         }
@@ -50,7 +42,6 @@ export class ShelfLayoutCoordinator {
 
     private constructor(layoutMode: LayoutMode) {
         this.layoutMode = layoutMode
-        this.stockStrategy = LayoutRegistry[layoutMode].createStockStrategy()
         this.boundHandleFirstBatch = (event: CustomEvent<BatchReadyForPlacementEvent>) =>
             this.handleFirstBatch(event.detail)
         EventManager.getInstance().registerEventHandler(
@@ -60,35 +51,27 @@ export class ShelfLayoutCoordinator {
         ShelfLayoutCoordinator.logger.debug(`Constructed in ${layoutMode} mode`)
     }
 
-    /**
-     * Switch to a new layout mode and clear accumulated layout state.
-     * Event handler registration is preserved — no re-subscribe needed.
-     */
-    public reset(layoutMode: LayoutMode = this.layoutMode): void {
-        this.layoutMode = layoutMode
-        this.stockStrategy = LayoutRegistry[layoutMode].createStockStrategy()
+    private clearRunState(): void {
         this.layoutComputed = false
         this.shelvesByBatch.clear()
         this.emittedShelfIds.clear()
         this.totalShelves = 0
-        ShelfLayoutCoordinator.logger.debug(`Reset to ${layoutMode} mode`)
-    }
-
-    /** Full teardown — deregisters handler. Only needed at app shutdown. */
-    public dispose(): void {
-        EventManager.getInstance().deregisterEventHandler(
-            StorePropsEventTypes.BatchReadyForPlacement,
-            this.boundHandleFirstBatch
-        )
-        this.reset()
-        ShelfLayoutCoordinator.instance = null
-        ShelfLayoutCoordinator.logger.debug('Disposed')
+        this.computedLayoutMode = null
     }
 
     private handleFirstBatch(detail: BatchReadyForPlacementEvent): void {
-        if (!this.layoutComputed) {
+        const isNewRun = detail.batchIndex === 0 && this.emittedShelfIds.size > 0
+        const batchCountChanged = detail.totalBatches !== this.totalShelves
+        const layoutModeChanged = this.computedLayoutMode !== null && this.computedLayoutMode !== this.layoutMode
+
+        if (isNewRun || batchCountChanged || layoutModeChanged || !this.layoutComputed) {
+            if (isNewRun || batchCountChanged || layoutModeChanged) {
+                this.clearRunState()
+            }
+
             this.layoutComputed = true
             this.totalShelves = detail.totalBatches
+            this.computedLayoutMode = this.layoutMode
 
             if (this.totalShelves === 0) {
                 ShelfLayoutCoordinator.logger.warn('totalBatches is 0 — no shelves to lay out')
@@ -96,14 +79,6 @@ export class ShelfLayoutCoordinator {
             }
 
             ShelfLayoutCoordinator.logger.debug(`Computing ${this.layoutMode} layout for ${this.totalShelves} shelves`)
-            this.computeLayout(this.totalShelves)
-        } else if (detail.totalBatches !== this.totalShelves) {
-            ShelfLayoutCoordinator.logger.debug(
-                `Batch count changed (${this.totalShelves} → ${detail.totalBatches}) — resetting layout`
-            )
-            this.reset(this.layoutMode)
-            this.layoutComputed = true
-            this.totalShelves = detail.totalBatches
             this.computeLayout(this.totalShelves)
         }
 
@@ -130,6 +105,7 @@ export class ShelfLayoutCoordinator {
                 shelfLayout: {
                     rows: (shelves[shelves.length - 1]?.row ?? 0) + 1,
                 },
+                stockStrategy: LayoutRegistry[this.layoutMode].createStockStrategy(),
             }
         )
 
@@ -165,8 +141,6 @@ export class ShelfLayoutCoordinator {
             detail: `Placing shelf ${batchIndex + 1}`,
         })
 
-        // Defer to next microtask so all BatchReadyForPlacement handlers complete
-        // before ShelfReady fires — GameBoxSpawner must have stored its pending games first.
         queueMicrotask(() => {
             EventManager.getInstance().emit<ShelfReadyEvent>(
                 StorePropsEventTypes.ShelfReady,
