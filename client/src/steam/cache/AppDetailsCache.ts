@@ -14,6 +14,13 @@ interface CachedAppDetails {
     schema_version?: number
 }
 
+/**
+ * Result of a cache lookup for app details.
+ * Merges the data payload with staleness metadata.
+ */
+export interface AppDetailsCacheResult extends AppDetailsData {
+    isStale: boolean
+}
 
 export class AppDetailsCache {
     private static readonly DB_NAME = 'steam-app-details-cache'
@@ -78,7 +85,7 @@ export class AppDetailsCache {
      * Get cached app details for a single game.
      * Returns stale entries too, marked with isStale=true.
      */
-    async get(appid: number): Promise<AppDetailsData & { isStale: boolean } | null> {
+    async get(appid: number): Promise<AppDetailsCacheResult | null> {
         await this.init()
         if (!this.db) return null
 
@@ -94,10 +101,11 @@ export class AppDetailsCache {
                     return
                 }
 
+                const isStale = cached.schema_version !== AppDetailsCache.CURRENT_SCHEMA_VERSION
                 resolve({
                     ...cached.data,
-                    isStale: cached.schema_version !== AppDetailsCache.CURRENT_SCHEMA_VERSION
-                })
+                    isStale
+                } as AppDetailsCacheResult)
             }
 
             request.onerror = () => {
@@ -111,9 +119,9 @@ export class AppDetailsCache {
      * Get cached app details for multiple games.
      * Returns stale entries too, marked with isStale=true.
      */
-    async getMany(appids: number[]): Promise<Map<number, AppDetailsData & { isStale: boolean }>> {
+    async getMany(appids: number[]): Promise<Map<number, AppDetailsCacheResult>> {
         await this.init()
-        const results = new Map<number, AppDetailsData & { isStale: boolean }>()
+        const results = new Map<number, AppDetailsCacheResult>()
 
         if (!this.db) return results
 
@@ -141,7 +149,11 @@ export class AppDetailsCache {
                         if (isStale) {
                             staleCount++
                         }
-                        results.set(appid, { ...cached.data, isStale })
+                        const result: AppDetailsCacheResult = {
+                            ...cached.data,
+                            isStale
+                        }
+                        results.set(appid, result)
                     }
 
                     completed++

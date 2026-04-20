@@ -46,7 +46,7 @@ export const createIndexedDBMock = () => {
             return request
         }),
         
-        get: vi.fn((key: string) => {
+        get: vi.fn((key: string | number) => {
             const request = {
                 onsuccess: null as any,
                 onerror: null as any,
@@ -54,19 +54,19 @@ export const createIndexedDBMock = () => {
             }
             // Simulate async success
             setTimeout(() => {
-                request.result = stores.get(storeName)?.get(key)
+                request.result = stores.get(storeName)?.get(String(key))
                 request.onsuccess?.()
             }, 0)
             return request
         }),
         
-        delete: vi.fn((key: string) => {
+        delete: vi.fn((key: string | number) => {
             const request = {
                 onsuccess: null as any,
                 onerror: null as any
             }
             setTimeout(() => {
-                stores.get(storeName)?.delete(key)
+                stores.get(storeName)?.delete(String(key))
                 request.onsuccess?.()
             }, 0)
             return request

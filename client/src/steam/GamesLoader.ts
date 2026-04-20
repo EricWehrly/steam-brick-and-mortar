@@ -1,6 +1,6 @@
 import { CacheManager } from './cache/SimpleCacheManager'
 import { BatchAppDetailsClient, type AppDetailsData } from './batch/BatchAppDetailsClient'
-import { AppDetailsCache } from './cache/AppDetailsCache'
+import { AppDetailsCache, type AppDetailsCacheResult } from './cache/AppDetailsCache'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT, MAIN_THREAD_CONTEXT } from '../utils/PerformanceMonitor'
 import { EventManager } from '../core/EventManager'
@@ -159,7 +159,7 @@ export class GamesLoader {
         const refreshAppids: number[] = []
 
         for (const appid of appids) {
-            const cachedResult = cachedAppDetails.get(appid)
+            const cachedResult = cachedAppDetails.get(appid) as AppDetailsCacheResult | undefined
             if (!cachedResult) {
                 refreshAppids.push(appid)
                 continue
