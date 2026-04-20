@@ -149,7 +149,7 @@ export class GameBoxSpawner {
 
         // Construct renderer on first batch using total game estimate.
         // Renderer is replaced if batch count changes (library reload).
-        if (!this.renderer || totalBatches * 18 + 100 > (this.renderer as any)._capacity) {
+        if (!this.renderer || totalBatches * 18 + 100 > this.renderer.capacity) {
             this.renderer?.dispose()
             this.renderer = new GpuGameBoxRenderer(totalBatches * 18 + 100)
         }
@@ -230,6 +230,18 @@ export class GameBoxSpawner {
         if (!this.renderer) {
             GameBoxSpawner.logger.warn('placeSections: renderer not yet constructed')
             return
+        }
+
+        // Guard: if the renderer was created for a smaller layout (e.g. Spoke with few
+        // visible games), it may not have capacity for the full library. Recreate it
+        // using the total known prefetched game count so the label atlas can hold all labels.
+        const requiredCapacity = this.prefetchResults.size
+        if (requiredCapacity > this.renderer.capacity) {
+            GameBoxSpawner.logger.debug(
+                `Renderer capacity ${this.renderer.capacity} < required ${requiredCapacity} — recreating`
+            )
+            this.renderer.dispose()
+            this.renderer = new GpuGameBoxRenderer(requiredCapacity + 100)
         }
 
         if (!this.stockStrategy) {
