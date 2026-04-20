@@ -68,9 +68,12 @@ export class GameBoxSpawner {
     // Shelf world positions indexed by shelfIndex, grouped by sectionIndex
     private shelfPositions: Map<number, ShelfPosition & { sectionIndex: number }> = new Map()
 
+    // Cached sections from last SectionsReady — consumed when ShelfLayoutDetermined fires
+    private pendingSections: import('../../types/EnvironmentEvents').SectionsReadyEvent | null = null
+
     // Rendezvous state: prefetch result per appid (populated when prefetch settles)
     private prefetchResults: Map<number, PrefetchResult> = new Map()
-    // Rendezvous state: placement intent per appid (populated during SectionsReady)
+    // Rendezvous state: placement intent per appid (populated after shelves + strategy known)
     private placementIntents: Map<number, PlacementIntent> = new Map()
 
     private readonly labelsEnabled: boolean
@@ -116,6 +119,7 @@ export class GameBoxSpawner {
         this.renderer?.dispose()
         this.renderer = null
         this.stockStrategy = null
+        this.pendingSections = null
         this.shelfPositions.clear()
         this.prefetchResults.clear()
         this.placementIntents.clear()
@@ -123,11 +127,17 @@ export class GameBoxSpawner {
     }
 
     // -------------------------------------------------------------------------
-    // Receive stock strategy + construct renderer from ShelfLayoutDetermined
+    // Receive stock strategy + trigger placement once shelves are known
 
     private handleLayoutDetermined(event: CustomEvent<ShelfLayoutDeterminedEvent>): void {
         this.stockStrategy = event.detail.stockStrategy
-        GameBoxSpawner.logger.debug('Stock strategy updated from ShelfLayoutDetermined')
+        GameBoxSpawner.logger.debug('Stock strategy received from ShelfLayoutDetermined')
+
+        // If SectionsReady already arrived, place now
+        if (this.pendingSections) {
+            this.placeSections(this.pendingSections)
+            this.pendingSections = null
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -185,23 +195,36 @@ export class GameBoxSpawner {
     }
 
     // -------------------------------------------------------------------------
-    // Phase 2: assign placement intents per section using section-tagged shelves
+    // Phase 2: cache sections, place when strategy is available
 
     private handleSectionsReady(event: CustomEvent<SectionsReadyEvent>): void {
-        const { sections } = event.detail
+        // ShelfLayoutCoordinator also handles SectionsReady and will emit ShelfLayoutDetermined
+        // synchronously during its handler. Registration order is non-deterministic, so we
+        // cache sections here and place in handleLayoutDetermined once strategy is guaranteed.
+        if (this.stockStrategy) {
+            // Strategy already present (re-sort without layout change)
+            this.placeSections(event.detail)
+        } else {
+            this.pendingSections = event.detail
+            GameBoxSpawner.logger.debug('SectionsReady cached — waiting for ShelfLayoutDetermined')
+        }
+    }
+
+    private placeSections(detail: SectionsReadyEvent): void {
+        const { sections } = detail
         const totalGames = sections.reduce((sum, s) => sum + s.games.length, 0)
 
         GameBoxSpawner.logger.debug(
-            `SectionsReady: ${sections.length} section(s), ${totalGames} games total`
+            `Placing ${totalGames} games across ${sections.length} section(s)`
         )
 
         if (!this.renderer) {
-            GameBoxSpawner.logger.warn('SectionsReady: renderer not yet constructed — no batches received yet')
+            GameBoxSpawner.logger.warn('placeSections: renderer not yet constructed')
             return
         }
 
         if (!this.stockStrategy) {
-            GameBoxSpawner.logger.warn('SectionsReady: stock strategy not yet received — ShelfLayoutDetermined has not fired')
+            GameBoxSpawner.logger.warn('placeSections: no stock strategy')
             return
         }
 
@@ -210,7 +233,7 @@ export class GameBoxSpawner {
 
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         if (shelfSurfaces.length === 0) {
-            GameBoxSpawner.logger.warn('SectionsReady: no shelf surfaces found')
+            GameBoxSpawner.logger.warn('placeSections: no shelf surfaces found')
             return
         }
 

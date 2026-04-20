@@ -108,16 +108,8 @@ export class ShelfLayoutCoordinator {
             }
         }
 
-        EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(
-            GameEventTypes.ShelfLayoutDetermined,
-            {
-                shelfBounds: bounds,
-                shelfLayout: { rows: (shelves[shelves.length - 1]?.row ?? 0) + 1 },
-                stockStrategy: LayoutRegistry[this.layoutMode].createStockStrategy(),
-            }
-        )
-
-        // Emit ShelfReady for every shelf now that positions are computed
+        // Emit ShelfReady first so consumers (GameBoxSpawner) have shelf positions cached
+        // before ShelfLayoutDetermined triggers placement.
         let emitted = 0
         for (const [idx, shelf] of this.shelvesByIndex) {
             this.emittedShelfIndices.add(idx)
@@ -136,6 +128,17 @@ export class ShelfLayoutCoordinator {
             emitted++
         }
 
-        ShelfLayoutCoordinator.logger.debug(`ShelfReady emitted for ${emitted} shelves`)
+        // ShelfLayoutDetermined fires after ShelfReady so GameBoxSpawner has positions
+        // when placement is triggered by the strategy arriving.
+        EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(
+            GameEventTypes.ShelfLayoutDetermined,
+            {
+                shelfBounds: bounds,
+                shelfLayout: { rows: (shelves[shelves.length - 1]?.row ?? 0) + 1 },
+                stockStrategy: LayoutRegistry[this.layoutMode].createStockStrategy(),
+            }
+        )
+
+        ShelfLayoutCoordinator.logger.debug(`ShelfReady emitted for ${emitted} shelves, layout determined`)
     }
 }
