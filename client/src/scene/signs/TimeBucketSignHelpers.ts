@@ -9,8 +9,9 @@
  * They can be unit-tested without a scene or EventManager.
  */
 
-import { getRecentlyPlayedBucket, getBucketLabel, getPlaytimeBucket } from '../categorization/GameSorter'
-import type { GameSortMode } from '../../types/EnvironmentEvents'
+import { getRecencyBucket, getPlaytimeBucket } from '../categorization/GroupResolver'
+import type { GroupMode } from '../../types/LayoutTypes'
+import { GroupModes } from '../../types/LayoutTypes'
 import type { SteamGameData } from '../game-box/types/GameData'
 
 /** Number of games packed onto a single shelf unit. */
@@ -18,21 +19,21 @@ export const SHELF_BATCH_SIZE = 18
 
 /**
  * Return the bucket key for the first game on a given shelf, using the
- * appropriate classifier for the active sort mode.
+ * appropriate classifier for the active group mode.
  * Returns null if the shelf index is out of range.
  */
 export function shelfBucketKey(
     shelfId: number,
     sortedGames: ReadonlyArray<Readonly<SteamGameData>>,
-    sortMode: GameSortMode,
+    groupMode: GroupMode,
 ): string | null {
     const firstGameIndex = shelfId * SHELF_BATCH_SIZE
     if (firstGameIndex >= sortedGames.length) return null
     const game = sortedGames[firstGameIndex] as SteamGameData
-    switch (sortMode) {
-        case 'recently-played': return getRecentlyPlayedBucket(game)
-        case 'by-playtime':     return getPlaytimeBucket(game)
-        default:                return null
+    switch (groupMode) {
+        case GroupModes.ByRecency:  return getRecencyBucket(game)
+        case GroupModes.ByPlaytime: return getPlaytimeBucket(game)
+        default:                    return null
     }
 }
 

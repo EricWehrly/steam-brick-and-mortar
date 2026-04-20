@@ -11,13 +11,12 @@
 
 import * as THREE from 'three'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
-import type { GameSortMode } from './EnvironmentEvents'
 
 /**
  * LayoutMode
  *
  * Identifies which macro-level shelf arrangement the store uses.
- * Player-selectable via the Layout dropdown in LayoutSortPanel.
+ * Player-selectable via the Layout dropdown in LayoutControlPanel.
  */
 export const LayoutModes = {
     Arc:   'arc',
@@ -28,21 +27,56 @@ export const LayoutModes = {
 export type LayoutMode = typeof LayoutModes[keyof typeof LayoutModes]
 
 /**
+ * GroupMode
+ *
+ * Determines how games are partitioned into named sections.
+ * 'none' produces a single unnamed section containing all games.
+ * Player-selectable via the Group dropdown in LayoutControlPanel.
+ */
+export const GroupModes = {
+    None:      'none',
+    ByGenre:   'by-genre',
+    ByRecency: 'by-recency',
+    ByPlaytime: 'by-playtime',
+    ByRating:  'by-rating',
+} as const
+
+export type GroupMode = typeof GroupModes[keyof typeof GroupModes]
+
+/**
+ * SortMode
+ *
+ * Determines the ordering of games *within* each section.
+ * Independent of GroupMode — applies after grouping.
+ * Player-selectable via the Sort dropdown in LayoutControlPanel.
+ */
+export const SortModes = {
+    Alphabetical:  'alphabetical',
+    ByPlaytime:    'by-playtime',
+    ByRating:      'by-rating',
+    ByLastPlayed:  'by-last-played',
+} as const
+
+export type SortMode = typeof SortModes[keyof typeof SortModes]
+
+/**
  * A named partition of games produced by grouping + sorting.
  *
  * Ungrouped layouts produce one section (name: '') containing all games.
  * Grouped layouts produce N sections, one per group (genre, tag, rating tier, etc.).
  *
- * Games in a section are already sorted. Spatial allocation is assigned later by
- * the layout system and is absent until SectionsReady fires.
+ * Games in a section are already sorted by the active SortMode.
+ * Spatial allocation is assigned later by the layout system.
  */
 export interface Section {
     /** Human-readable label — used for sign placement. Empty string for ungrouped. */
     name: string
     /** Sorted games belonging to this section. */
     games: ReadonlyArray<Readonly<SteamGameData>>
+    /** Which group mode produced this section. */
+    groupMode: GroupMode
     /** Which sort mode was applied within this section. */
-    sortMode: GameSortMode
+    sortMode: SortMode
 }
 
 /**

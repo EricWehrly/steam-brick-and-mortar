@@ -46,7 +46,7 @@ import type {
     GameLoadingPhaseChangedEvent,
     GameLoadingProgressEvent,
 } from './InteractionEvents'
-import type { AllBatchesCompleteEvent, GameDataReadyEvent, GamesSortEvent, LayoutChangedEvent, SomeBatchesCompleteEvent, SortRequestedEvent, SectionsReadyEvent } from './EnvironmentEvents'
+import type { AllBatchesCompleteEvent, GameDataReadyEvent, LayoutChangedEvent, SomeBatchesCompleteEvent, ArrangementRequestedEvent, SectionsReadyEvent } from './EnvironmentEvents'
 
 export interface InteractionEventMap {
     // Steam events
@@ -75,7 +75,8 @@ export interface InteractionEventMap {
     [UIEventTypes.MenuOpen]: MenuOpenEvent
     [UIEventTypes.MenuClose]: MenuCloseEvent
     [UIEventTypes.ImageCacheStatsRequest]: ImageCacheStatsRequestEvent
-    [UIEventTypes.SortRequested]: SortRequestedEvent
+    [UIEventTypes.SortRequested]: ArrangementRequestedEvent  // TD: remove SortRequested alias once LayoutControlPanel fully replaces LayoutSortPanel
+    [UIEventTypes.ArrangementRequested]: ArrangementRequestedEvent
 
     // Game events
     [GameEventTypes.SceneReady]: SceneReadyEvent
@@ -88,7 +89,6 @@ export interface InteractionEventMap {
     // Environment events (from EnvironmentEvents.ts)
     [GameEventTypes.AllBatchesComplete]: AllBatchesCompleteEvent
     [GameEventTypes.GameDataReady]: GameDataReadyEvent
-    [GameEventTypes.GamesSort]: GamesSortEvent
     [GameEventTypes.SectionsReady]: SectionsReadyEvent
 
     // App events
