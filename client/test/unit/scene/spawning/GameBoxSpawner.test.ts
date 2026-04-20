@@ -81,8 +81,8 @@ vi.mock('../../../../src/core/EventManager', async (importOriginal) => {
 
 const resetEventManager = () => (EventManager as unknown as { resetInstance: () => void }).resetInstance()
 
-function makeShelfReady(batchIndex: number, position = new THREE.Vector3(0, 0, 0), rotationY = 0): ShelfReadyEvent {
-    return { batchIndex, position, rotationY }
+function makeShelfReady(shelfIndex: number, position = new THREE.Vector3(0, 0, 0), rotationY = 0): ShelfReadyEvent {
+    return { shelfIndex, sectionIndex: 0, position, rotationY }
 }
 
 function createMockGames(count: number, batchIndex: number): readonly SteamGame[] {

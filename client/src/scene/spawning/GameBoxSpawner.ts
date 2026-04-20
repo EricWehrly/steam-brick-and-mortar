@@ -62,19 +62,15 @@ type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
 export class GameBoxSpawner {
     private static readonly logger = Logger.createLogFunctions(GameBoxSpawner.name)
 
-    // Owned renderer — constructed on first BatchReadyForPlacement
+    // Owned renderer — constructed when sections are known (total game count drives allocation)
     private renderer: GpuGameBoxRenderer | null = null
-    private rendererInitialized = false
-    private lastTotalBatches = 0
 
-    // Games stored by batch index for prewarm tracking
-    private pendingGames: Map<number, readonly SteamGameData[]> = new Map()
-    // Shelf world positions indexed by batchIndex
-    private shelfPositions: Map<number, ShelfPosition> = new Map()
+    // Shelf world positions indexed by shelfIndex, grouped by sectionIndex
+    private shelfPositions: Map<number, ShelfPosition & { sectionIndex: number }> = new Map()
 
     // Rendezvous state: prefetch result per appid (populated when prefetch settles)
     private prefetchResults: Map<number, PrefetchResult> = new Map()
-    // Rendezvous state: placement intent per appid (populated during GamesSort)
+    // Rendezvous state: placement intent per appid (populated during SectionsReady)
     private placementIntents: Map<number, PlacementIntent> = new Map()
 
     private readonly labelsEnabled: boolean
@@ -85,43 +81,32 @@ export class GameBoxSpawner {
         return this.renderer
     }
 
-    private readonly boundHandleBatchReady: (e: CustomEvent<BatchReadyForPlacementEvent>) => void
-    private readonly boundHandleShelfReady: (e: CustomEvent<ShelfReadyEvent>) => void
-    private readonly boundHandleLayoutDetermined: (e: CustomEvent<ShelfLayoutDeterminedEvent>) => void
-    private readonly boundHandleSectionsReady: (e: CustomEvent<SectionsReadyEvent>) => void
-    private readonly boundHandleClearRequest: () => void
-
     static {
         new GameBoxSpawner()
     }
 
     private constructor() {
         this.labelsEnabled = AppSettings.get(Setting.EnableLabels)
-        this.boundHandleBatchReady = this.handleBatchReadyForPlacement.bind(this)
-        this.boundHandleShelfReady = this.handleShelfReady.bind(this)
-        this.boundHandleLayoutDetermined = this.handleLayoutDetermined.bind(this)
-        this.boundHandleSectionsReady = this.handleSectionsReady.bind(this)
-        this.boundHandleClearRequest = this.reset.bind(this)
 
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
-            this.boundHandleBatchReady
+            (e: CustomEvent<BatchReadyForPlacementEvent>) => this.handleBatchReadyForPlacement(e)
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfReady,
-            this.boundHandleShelfReady
+            (e: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(e)
         )
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.ShelfLayoutDetermined,
-            this.boundHandleLayoutDetermined
+            (e: CustomEvent<ShelfLayoutDeterminedEvent>) => this.handleLayoutDetermined(e)
         )
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SectionsReady,
-            this.boundHandleSectionsReady
+            (e: CustomEvent<SectionsReadyEvent>) => this.handleSectionsReady(e)
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ClearRequest,
-            this.boundHandleClearRequest
+            () => this.reset()
         )
 
         GameBoxSpawner.logger.debug('Constructed')
@@ -130,60 +115,49 @@ export class GameBoxSpawner {
     private reset(): void {
         this.renderer?.dispose()
         this.renderer = null
-        this.rendererInitialized = false
         this.stockStrategy = null
-        this.pendingGames.clear()
         this.shelfPositions.clear()
         this.prefetchResults.clear()
         this.placementIntents.clear()
-        GameBoxSpawner.logger.debug('Reset: renderer disposed, state cleared')
+        GameBoxSpawner.logger.debug('Reset')
     }
 
     // -------------------------------------------------------------------------
-    // Receive stock strategy from layout coordinator
+    // Receive stock strategy + construct renderer from ShelfLayoutDetermined
 
     private handleLayoutDetermined(event: CustomEvent<ShelfLayoutDeterminedEvent>): void {
         this.stockStrategy = event.detail.stockStrategy
-        GameBoxSpawner.logger.debug(`Stock strategy updated from ShelfLayoutDetermined`)
+        GameBoxSpawner.logger.debug('Stock strategy updated from ShelfLayoutDetermined')
     }
 
     // -------------------------------------------------------------------------
-    // Phase 1: prewarm artwork as batches arrive
+    // Phase 1: prewarm artwork as batches arrive (independent of shelf layout)
 
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
         const { games, batchIndex, totalBatches } = event.detail
 
-        if (!this.rendererInitialized || totalBatches !== this.lastTotalBatches) {
-            if (this.renderer) {
-                GameBoxSpawner.logger.debug(
-                    `Batch count changed (${this.lastTotalBatches} → ${totalBatches}) — replacing renderer`
-                )
-                this.renderer.dispose()
-            }
-            const estimatedGames = totalBatches * 18
-            this.renderer = new GpuGameBoxRenderer(estimatedGames + 100)
-            this.rendererInitialized = true
-            this.lastTotalBatches = totalBatches
+        // Construct renderer on first batch using total game estimate.
+        // Renderer is replaced if batch count changes (library reload).
+        if (!this.renderer || totalBatches * 18 + 100 > (this.renderer as any)._capacity) {
+            this.renderer?.dispose()
+            this.renderer = new GpuGameBoxRenderer(totalBatches * 18 + 100)
         }
 
         GameBoxSpawner.logger.debug(
             `BatchReadyForPlacement: batch ${batchIndex + 1}/${totalBatches}, ${games.length} games — prewarming artwork`
         )
 
-        this.pendingGames.set(batchIndex, games)
-
         for (const game of games) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
             const artworkUrl = this.selectBestArtworkUrl(game as SteamGameData)
 
             if (!artworkUrl) {
-                // No URL possible — record as permanent failure so tryPlace falls through to label
                 this.prefetchResults.set(appid, 'permanent-failure')
                 this.tryPlace(appid)
                 continue
             }
 
-            this.renderer!.prefetchArtwork(appid, artworkUrl, game.name).then((result) => {
+            this.renderer.prefetchArtwork(appid, artworkUrl, game.name).then((result) => {
                 this.prefetchResults.set(appid, result)
                 this.tryPlace(appid)
             }).catch((error) => {
@@ -191,7 +165,6 @@ export class GameBoxSpawner {
                 this.prefetchResults.set(appid, 'error')
                 this.tryPlace(appid)
             })
-            // Promise reference is not stored — it GCs after .then() is attached.
         }
     }
 
@@ -199,19 +172,20 @@ export class GameBoxSpawner {
     // Cache shelf positions from ShelfReady events
 
     private handleShelfReady(event: CustomEvent<ShelfReadyEvent>): void {
-        const { batchIndex, position, rotationY } = event.detail
-        this.shelfPositions.set(batchIndex, {
+        const { shelfIndex, sectionIndex, position, rotationY } = event.detail
+        this.shelfPositions.set(shelfIndex, {
             position: (position as THREE.Vector3).clone(),
-            rotationY
+            rotationY,
+            sectionIndex,
         })
         GameBoxSpawner.logger.debug(
-            `ShelfReady: cached position for batch ${batchIndex} ` +
+            `ShelfReady: shelf ${shelfIndex} (section ${sectionIndex}) at ` +
             `(${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)})`
         )
     }
 
     // -------------------------------------------------------------------------
-    // Phase 2: assign placement intents across all sections, place what's ready
+    // Phase 2: assign placement intents per section using section-tagged shelves
 
     private handleSectionsReady(event: CustomEvent<SectionsReadyEvent>): void {
         const { sections } = event.detail
@@ -240,33 +214,38 @@ export class GameBoxSpawner {
             return
         }
 
-        // Walk shelf positions in batchIndex order; distribute sections sequentially.
-        const sortedBatchIndices = [...this.shelfPositions.keys()].sort((a, b) => a - b)
-        let batchIndexCursor = 0
+        let shelvesUsed = 0
+        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+            const section = sections[sectionIndex]
+            const sectionShelves = [...this.shelfPositions.entries()]
+                .filter(([, shelf]) => shelf.sectionIndex === sectionIndex)
+                .sort(([a], [b]) => a - b)
 
-        for (const section of sections) {
             const gameQueue = [...section.games] as SteamGameData[]
-
-            while (gameQueue.length > 0 && batchIndexCursor < sortedBatchIndices.length) {
-                const batchIndex = sortedBatchIndices[batchIndexCursor]
-                const shelfPos = this.shelfPositions.get(batchIndex)!
+            for (const [shelfIndex, shelfPos] of sectionShelves) {
+                if (gameQueue.length === 0) break
                 const stockSurfaces = GameBoxUtils.buildStockSurfaces(
                     shelfPos.position, shelfPos.rotationY, shelfSurfaces, { strategy: this.stockStrategy }
                 )
                 const shelfCapacity = stockSurfaces.reduce((sum, s) => sum + s.capacity, 0)
                 const batch = gameQueue.splice(0, shelfCapacity)
                 this.assignIntentsFromStock(stockSurfaces, batch)
-
                 EventManager.getInstance().emit<GamesPlacedEvent>(
                     StorePropsEventTypes.GamesPlaced,
-                    { batchIndex, status: BatchProcessingStatus.GamesPlaced }
+                    { batchIndex: shelfIndex, status: BatchProcessingStatus.GamesPlaced }
                 )
-                batchIndexCursor++
+                shelvesUsed++
+            }
+
+            if (gameQueue.length > 0) {
+                GameBoxSpawner.logger.warn(
+                    `Section "${section.name}": ${gameQueue.length} games had no shelf space`
+                )
             }
         }
 
         GameBoxSpawner.logger.debug(
-            `SectionsReady: ${this.placementIntents.size} intents assigned across ${batchIndexCursor} shelves`
+            `Placement complete: ${this.placementIntents.size} intents across ${shelvesUsed} shelves`
         )
     }
 

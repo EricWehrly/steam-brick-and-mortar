@@ -61,9 +61,10 @@ function emitSectionsReady(sections: Section[], sortMode: SectionsReadyEvent['so
     })
 }
 
-function emitShelfReady(batchIndex: number, position = FAR_POSITION, rotationY = 0): void {
+function emitShelfReady(shelfIndex: number, position = FAR_POSITION, rotationY = 0): void {
     EventManager.getInstance().emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
-        batchIndex,
+        shelfIndex,
+        sectionIndex: 0,
         position,
         rotationY,
     })

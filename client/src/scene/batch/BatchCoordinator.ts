@@ -24,7 +24,7 @@ import {
     type BatchReadyForPlacementEvent,
     type GamesPlacedEvent,
 } from '../../types/InteractionEvents'
-import type { AllBatchesCompleteEvent, SomeBatchesCompleteEvent } from '../../types/EnvironmentEvents'
+import type { AllBatchesCompleteEvent, GameDataReadyEvent, SomeBatchesCompleteEvent } from '../../types/EnvironmentEvents'
 
 export interface BatchItem<T> {
     batchIndex: number
@@ -220,6 +220,21 @@ export class BatchCoordinator<T> {
             }
         } finally {
             this.isProcessing = false
+        }
+
+        // All batch data has been dispatched — games are in DataManager and all
+        // BatchReadyForPlacement events have fired. GameSorter can now sort and
+        // plan sections. This is earlier than AllBatchesComplete, which waits
+        // for GamesPlaced confirmation.
+        if (this.received > 0 && this.received === this.expectedTotal) {
+            const totalGames = this.queue.length === 0
+                ? this.received * 18  // approximate; actual count lives in DataManager
+                : 0
+            EventManager.getInstance().emit<GameDataReadyEvent>(
+                GameEventTypes.GameDataReady,
+                { totalGames, totalBatches: this.expectedTotal }
+            )
+            BatchCoordinator.logger.debug(`GameDataReady emitted (${this.expectedTotal} batches dispatched)`)
         }
 
         this.tryEmitCompletionEvent()

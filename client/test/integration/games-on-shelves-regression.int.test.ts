@@ -143,7 +143,7 @@ describe('Bug B — ShelfReady must not arrive before pending games are stored',
         em.registerEventHandler(
             StorePropsEventTypes.ShelfReady,
             (e: CustomEvent<ShelfReadyEvent>) => {
-                shelfReadyByTime.push(e.detail.batchIndex)
+                shelfReadyByTime.push(e.detail.shelfIndex)
             }
         )
 

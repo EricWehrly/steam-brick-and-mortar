@@ -33,13 +33,13 @@ describe('InstancedShelfRenderer Events', () => {
         it('does not increase instance count when same shelfId is received twice', async () => {
             await renderer.initialize()
             const pos = new THREE.Vector3(5, 0, -10)
-            const event: ShelfReadyEvent = { batchIndex: 0, position: pos, rotationY: 0 }
+            const event: ShelfReadyEvent = { shelfIndex: 0, sectionIndex: 0, position: pos, rotationY: 0 }
 
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, event)
             const statsAfterFirst = renderer.getStats().shelfUnits
 
             // Send the same batchIndex again with updated position
-            const event2: ShelfReadyEvent = { batchIndex: 0, position: new THREE.Vector3(6, 0, -11), rotationY: Math.PI }
+            const event2: ShelfReadyEvent = { shelfIndex: 0, sectionIndex: 0, position: new THREE.Vector3(6, 0, -11), rotationY: Math.PI }
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, event2)
             const statsAfterSecond = renderer.getStats().shelfUnits
 
@@ -50,10 +50,10 @@ describe('InstancedShelfRenderer Events', () => {
         it('accepts a second distinct batchIndex as a new unit', async () => {
             await renderer.initialize()
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
-                batchIndex: 0, position: new THREE.Vector3(0, 0, -5), rotationY: 0
+                shelfIndex: 0, sectionIndex: 0, position: new THREE.Vector3(0, 0, -5), rotationY: 0
             })
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
-                batchIndex: 1, position: new THREE.Vector3(5, 0, -5), rotationY: 0
+                shelfIndex: 1, sectionIndex: 0, position: new THREE.Vector3(5, 0, -5), rotationY: 0
             })
             expect(renderer.getStats().shelfUnits).toBe(2)
         })

@@ -14,7 +14,7 @@ import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
 import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import { GameSortModes } from '../../types/EnvironmentEvents'
-import type { AllBatchesCompleteEvent, SortRequestedEvent, SectionsReadyEvent } from '../../types/EnvironmentEvents'
+import type { GameDataReadyEvent, SortRequestedEvent, SectionsReadyEvent } from '../../types/EnvironmentEvents'
 import type { Section } from '../../types/LayoutTypes'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { sortByNumericField, primaryGenre, KNOWN_GENRES, sortByGenreThenPlaytime, groupByGenre } from './GameSortFunctions'
@@ -101,8 +101,8 @@ export class GameSorter {
 
     constructor() {
         EventManager.getInstance().registerEventHandler(
-            GameEventTypes.AllBatchesComplete,
-            (_event: CustomEvent<AllBatchesCompleteEvent>) => this.sortInitial()
+            GameEventTypes.GameDataReady,
+            (_event: CustomEvent<GameDataReadyEvent>) => this.sortInitial()
         )
         EventManager.getInstance().registerEventHandler(
             UIEventTypes.SortRequested,

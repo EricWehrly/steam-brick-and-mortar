@@ -145,7 +145,8 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
         expect(mockClearPlacements).not.toHaveBeenCalled()
 
         emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
-            batchIndex: 0,
+            shelfIndex: 0,
+            sectionIndex: 0,
             position: new THREE.Vector3(0, 0, -5),
             rotationY: 0,
         })
@@ -184,7 +185,8 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
         await new Promise(r => setTimeout(r, 0))
 
         emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
-            batchIndex: 0,
+            shelfIndex: 0,
+            sectionIndex: 0,
             position: new THREE.Vector3(0, 0, -5),
             rotationY: 0,
         })

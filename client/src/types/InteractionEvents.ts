@@ -264,6 +264,7 @@ export const GameEventTypes = {
     LayoutChanged: 'game:layout-changed',
     SomeBatchesComplete: 'game:some-batches-complete',
     AllBatchesComplete: 'game:all-batches-complete',
+    GameDataReady: 'game:game-data-ready',
     /**
      * Fired by LodArtworkOrchestrator when all in-flight artwork fetches have resolved
      * (success or permanent failure). Signals that label compaction can safely run,
