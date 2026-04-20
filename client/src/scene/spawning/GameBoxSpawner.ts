@@ -199,12 +199,20 @@ export class GameBoxSpawner {
     // Phase 2: cache sections, place when strategy is available
 
     private handleSectionsReady(event: CustomEvent<SectionsReadyEvent>): void {
+        // Clear stale shelf positions from the previous arrangement run.
+        // ShelfLayoutCoordinator will re-emit ShelfReady for the new section mapping;
+        // if we keep old positions, games land on phantom shelves or wrong sections.
+        this.shelfPositions.clear()
+        this.placementIntents.clear()
+
         // ShelfLayoutCoordinator also handles SectionsReady and will emit ShelfLayoutDetermined
         // synchronously during its handler. Registration order is non-deterministic, so we
         // cache sections here and place in handleLayoutDetermined once strategy is guaranteed.
         if (this.stockStrategy) {
             // Strategy already present (re-sort without layout change)
-            this.placeSections(event.detail)
+            // Wait for ShelfLayoutDetermined which fires after ShelfReady events
+            this.pendingSections = event.detail
+            GameBoxSpawner.logger.debug('SectionsReady: cleared stale positions, waiting for ShelfLayoutDetermined to trigger placement')
         } else {
             this.pendingSections = event.detail
             GameBoxSpawner.logger.debug('SectionsReady cached — waiting for ShelfLayoutDetermined')
