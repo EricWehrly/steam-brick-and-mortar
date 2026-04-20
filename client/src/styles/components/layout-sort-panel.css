@@ -98,3 +98,9 @@
     background: var(--panel-border);
     flex-shrink: 0;
 }
+
+/* Pipeline-active state: controls locked while layout/sort is processing */
+.layout-sort-controls.pipeline-active {
+    pointer-events: none;
+    opacity: 0.6;
+}

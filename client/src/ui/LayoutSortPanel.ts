@@ -14,9 +14,10 @@
  */
 
 import { EventManager } from '../core/EventManager'
-import { UIEventTypes } from '../types/InteractionEvents'
+import { GameEventTypes, UIEventTypes } from '../types/InteractionEvents'
 import type { SortRequestedEvent } from '../types/EnvironmentEvents'
 import type { LayoutRequestedEvent } from '../types/EnvironmentEvents'
+import type { AllBatchesCompleteEvent } from '../types/EnvironmentEvents'
 import type { GameSortMode } from '../types/EnvironmentEvents'
 import type { LayoutMode } from '../types/LayoutTypes'
 import '../styles/components/layout-sort-panel.css'
@@ -60,6 +61,7 @@ export class LayoutSortPanel {
     private activeLayoutKey: LayoutMode = 'arc'
     private activeSortKey: SortOptionKey = 'recently-played'
     private isControlsVisible = true
+    private isPipelineActive = false
     private keyboardHandler: ((e: KeyboardEvent) => void) | null = null
 
     constructor() {}
@@ -69,6 +71,10 @@ export class LayoutSortPanel {
         this.createControls(slot)
         this.createToggleButton(slot)
         this.registerKeyboardHandler()
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            (_event: CustomEvent<AllBatchesCompleteEvent>) => this.setControlsEnabled(true)
+        )
     }
 
     private createToggleButton(parentSlot: HTMLElement): void {
@@ -129,6 +135,7 @@ export class LayoutSortPanel {
     private applyLayout(layoutKey: LayoutMode): void {
         this.activeLayoutKey = layoutKey
         if (this.layoutSelect) this.layoutSelect.value = layoutKey
+        this.setControlsEnabled(false)
         EventManager.getInstance().emit<LayoutRequestedEvent>(UIEventTypes.LayoutRequested, {
             layoutMode: layoutKey,
         })
@@ -167,14 +174,18 @@ export class LayoutSortPanel {
 
     private applySort(sortKey: SortOptionKey): void {
         this.activeSortKey = sortKey
-
-        if (this.sortSelect) {
-            this.sortSelect.value = sortKey
-        }
-
+        if (this.sortSelect) this.sortSelect.value = sortKey
+        this.setControlsEnabled(false)
         EventManager.getInstance().emit<SortRequestedEvent>(UIEventTypes.SortRequested, {
             sortMode: sortKey,
         })
+    }
+
+    private setControlsEnabled(enabled: boolean): void {
+        this.isPipelineActive = !enabled
+        if (this.layoutSelect) this.layoutSelect.disabled = !enabled
+        if (this.sortSelect)   this.sortSelect.disabled   = !enabled
+        this.controlsContainer?.classList.toggle('pipeline-active', !enabled)
     }
 
     private toggleControlsVisibility(): void {
