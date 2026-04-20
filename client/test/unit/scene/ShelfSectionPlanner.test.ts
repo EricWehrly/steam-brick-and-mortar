@@ -50,14 +50,16 @@ function makeSection(name: string, gameCount = 18): Section {
     return {
         name,
         games: Array.from({ length: gameCount }, (_, i) => makeGame(i + 1)),
-        sortMode: 'recently-played',
+        groupMode: 'by-recency',
+        sortMode: 'by-last-played',
     }
 }
 
-function emitSectionsReady(sections: Section[], sortMode: SectionsReadyEvent['sortMode'] = 'recently-played'): void {
+function emitSectionsReady(sections: Section[]): void {
     EventManager.getInstance().emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
         sections,
-        sortMode,
+        groupMode: 'by-recency',
+        sortMode: 'by-last-played',
     })
 }
 

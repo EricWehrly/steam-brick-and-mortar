@@ -153,8 +153,8 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
 
         // SectionsReady fires before prefetch resolves — assigns intents only
         emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
-            sections: [{ name: 'Test', games, sortMode: 'recently-played' }],
-            sortMode: 'recently-played',
+            sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }],
+            groupMode: 'by-recency', sortMode: 'by-last-played',
         })
 
         expect(mockClearPlacements).toHaveBeenCalledTimes(1)
@@ -193,8 +193,8 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
 
         // Prefetch already settled — placeGame fires synchronously during intent assignment
         emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
-            sections: [{ name: 'Test', games, sortMode: 'recently-played' }],
-            sortMode: 'recently-played',
+            sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }],
+            groupMode: 'by-recency', sortMode: 'by-last-played',
         })
 
         expect(mockPlaceGame).toHaveBeenCalledTimes(games.length)
