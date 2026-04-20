@@ -17,7 +17,7 @@ import { EventManager } from '../core/EventManager'
 import { GameEventTypes, UIEventTypes } from '../types/InteractionEvents'
 import type { SortRequestedEvent } from '../types/EnvironmentEvents'
 import type { LayoutRequestedEvent } from '../types/EnvironmentEvents'
-import type { AllBatchesCompleteEvent } from '../types/EnvironmentEvents'
+import type { AllBatchesCompleteEvent, SectionsReadyEvent } from '../types/EnvironmentEvents'
 import type { GameSortMode } from '../types/EnvironmentEvents'
 import type { LayoutMode } from '../types/LayoutTypes'
 import '../styles/components/layout-sort-panel.css'
@@ -74,6 +74,10 @@ export class LayoutSortPanel {
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.AllBatchesComplete,
             (_event: CustomEvent<AllBatchesCompleteEvent>) => this.setControlsEnabled(true)
+        )
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.SectionsReady,
+            (_event: CustomEvent<SectionsReadyEvent>) => this.setControlsEnabled(true)
         )
     }
 
