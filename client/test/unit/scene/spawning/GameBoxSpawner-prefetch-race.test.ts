@@ -21,6 +21,7 @@ import {
     GameEventTypes,
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
+    type ShelfLayoutDeterminedEvent,
 } from '../../../../src/types/InteractionEvents'
 import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
 
@@ -97,6 +98,15 @@ function emit<T>(type: string, detail: T) {
     EventManager.getInstance().emit(type, detail)
 }
 
+function emitShelfLayoutDetermined() {
+    const mockStrategy = { order: (boards: any[]) => boards.map((b: any) => b.near) }
+    emit<ShelfLayoutDeterminedEvent>(GameEventTypes.ShelfLayoutDetermined, {
+        shelfBounds: { minX: -10, maxX: 10, minZ: -10, maxZ: 10 },
+        shelfLayout: { rows: 1 },
+        stockStrategy: mockStrategy as any,
+    })
+}
+
 // --- Tests ---
 
 describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
@@ -105,6 +115,7 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         spawner = new GameBoxSpawner()
+        emitShelfLayoutDetermined()
     })
 
     afterEach(() => {

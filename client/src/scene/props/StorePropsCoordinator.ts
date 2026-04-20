@@ -112,11 +112,11 @@ class StorePropsCoordinator {
             }
         }
 
-        // Pure coordinators: create once, reset on subsequent calls
+        // Pure coordinators: create once, always present after first SetupRequest
         if (!this.shelfLayoutCoordinator) {
             this.shelfLayoutCoordinator = ShelfLayoutCoordinator.getInstance(this.activeLayoutMode)
             this.batchCoordinator = new BatchCoordinator()
-            this.gameBoxSpawner = new GameBoxSpawner(this.shelfLayoutCoordinator.stockStrategy)
+            this.gameBoxSpawner = new GameBoxSpawner()
         }
 
         // GPU owner: create fresh each setup (disposed on layout switch or clear)
@@ -143,7 +143,6 @@ class StorePropsCoordinator {
         this.instancedShelfRenderer?.reset()
         this.gameBoxSpawner?.reset()
         this.batchCoordinator?.reset()
-        this.shelfLayoutCoordinator?.reset()
         this.lastTotalBatches = 0
 
         StorePropsCoordinator.logger.info('Store props cleared')
@@ -193,25 +192,23 @@ class StorePropsCoordinator {
 
         this.layoutSwitchInProgress = true
 
-        // Reset pure coordinators — keeps handlers, clears accumulated state
-        this.shelfLayoutCoordinator?.reset(detail.layoutMode)
+        // Update the coordinator's mode property — it will recompute on next batch run
+        if (this.shelfLayoutCoordinator) {
+            this.shelfLayoutCoordinator.layoutMode = detail.layoutMode
+        }
+
         this.batchCoordinator?.reset()
-        this.gameBoxSpawner?.resetWithStrategy(
-            this.shelfLayoutCoordinator?.stockStrategy ?? (() => { throw new Error('ShelfLayoutCoordinator not initialised') })()
-        )
+        this.gameBoxSpawner?.reset()
         this.lastTotalBatches = 0
 
         // GPU owner must be fully torn down — InstancedMesh slots can't be partially reused
         this.instancedShelfRenderer?.dispose()
         this.instancedShelfRenderer = null
 
-        // Rebuild GPU owner under new layout
         this.eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, {
             source: EventSource.System,
         })
 
-        // Re-emit LoadLibrary so the batch pipeline runs under the new layout.
-        // SteamIntegration will emit ClearRequest internally, which we suppress via the flag.
         const userInput = DataManager.getInstance().get<string>('steam.userInput')
         this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
             userInput: userInput ?? undefined,
@@ -223,7 +220,6 @@ class StorePropsCoordinator {
 
     public dispose(): void {
         this.instancedShelfRenderer?.dispose()
-        this.shelfLayoutCoordinator?.dispose()
 
         if (this.entranceMat && this.scene) {
             this.scene.remove(this.entranceMat)

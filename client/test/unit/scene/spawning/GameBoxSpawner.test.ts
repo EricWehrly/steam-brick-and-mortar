@@ -19,6 +19,7 @@ import {
     GameEventTypes,
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
+    type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
 } from '../../../../src/types/InteractionEvents'
 import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
@@ -105,6 +106,16 @@ function createMockGamesWithArtwork(count: number, batchIndex: number): readonly
     }))
 }
 
+function emitShelfLayoutDetermined(em: EventManager) {
+    // Minimal passthrough strategy — tests don't assert strategy-specific ordering
+    const mockStrategy = { order: (boards: any[]) => boards.flatMap(b => [b.near, b.far]) }
+    em.emit<ShelfLayoutDeterminedEvent>(GameEventTypes.ShelfLayoutDetermined, {
+        shelfBounds: { minX: -10, maxX: 10, minZ: -10, maxZ: 10 },
+        shelfLayout: { rows: 1 },
+        stockStrategy: mockStrategy as any,
+    })
+}
+
 describe('GameBoxSpawner — Two-Phase Load/Place', () => {
     let eventManager: EventManager
     let spawner: GameBoxSpawner
@@ -134,6 +145,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         })
 
         spawner = new GameBoxSpawner()
+        emitShelfLayoutDetermined(eventManager)
     })
 
     afterEach(() => {

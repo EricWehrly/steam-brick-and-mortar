@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
-import { ShelfSurfaceUtils, type ShelfSurface, GameBoxUtils, GameLayoutConstants, ArcStockStrategy, type IStockStrategy } from '../props/SharedPropsUtils'
+import { ShelfSurfaceUtils, type ShelfSurface, GameBoxUtils, GameLayoutConstants, type IStockStrategy } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { 
@@ -10,6 +10,7 @@ import {
     GameEventTypes,
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
+    type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
 } from '../../types/InteractionEvents'
 import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
@@ -72,7 +73,7 @@ export class GameBoxSpawner {
     private placementIntents: Map<number, PlacementIntent> = new Map()
 
     private readonly labelsEnabled: boolean
-    private stockStrategy: IStockStrategy
+    private stockStrategy: IStockStrategy | null = null
 
     /** Expose the current renderer for external consumers (e.g. addToScene, updateLODForCamera). */
     public getRenderer(): GpuGameBoxRenderer | null {
@@ -81,13 +82,14 @@ export class GameBoxSpawner {
 
     private readonly boundHandleBatchReady: (e: CustomEvent<BatchReadyForPlacementEvent>) => void
     private readonly boundHandleShelfReady: (e: CustomEvent<ShelfReadyEvent>) => void
+    private readonly boundHandleLayoutDetermined: (e: CustomEvent<ShelfLayoutDeterminedEvent>) => void
     private readonly boundHandleSectionsReady: (e: CustomEvent<SectionsReadyEvent>) => void
 
-    constructor(stockStrategy: IStockStrategy = new ArcStockStrategy()) {
+    constructor() {
         this.labelsEnabled = AppSettings.get(Setting.EnableLabels)
-        this.stockStrategy = stockStrategy
         this.boundHandleBatchReady = this.handleBatchReadyForPlacement.bind(this)
         this.boundHandleShelfReady = this.handleShelfReady.bind(this)
+        this.boundHandleLayoutDetermined = this.handleLayoutDetermined.bind(this)
         this.boundHandleSectionsReady = this.handleSectionsReady.bind(this)
 
         EventManager.getInstance().registerEventHandler(
@@ -99,28 +101,27 @@ export class GameBoxSpawner {
             this.boundHandleShelfReady
         )
         EventManager.getInstance().registerEventHandler(
+            GameEventTypes.ShelfLayoutDetermined,
+            this.boundHandleLayoutDetermined
+        )
+        EventManager.getInstance().registerEventHandler(
             GameEventTypes.SectionsReady,
             this.boundHandleSectionsReady
         )
 
-        GameBoxSpawner.logger.debug('Registered listeners for BatchReadyForPlacement, ShelfReady, and GamesSort')
+        GameBoxSpawner.logger.debug('Registered listeners')
     }
 
     public reset(): void {
         this.renderer?.dispose()
         this.renderer = null
         this.rendererInitialized = false
+        this.stockStrategy = null
         this.pendingGames.clear()
         this.shelfPositions.clear()
         this.prefetchResults.clear()
         this.placementIntents.clear()
         GameBoxSpawner.logger.debug('Reset: renderer disposed, state cleared')
-    }
-
-    /** Reset state and adopt a new stock strategy (e.g. on layout mode switch). */
-    public resetWithStrategy(stockStrategy: IStockStrategy): void {
-        this.stockStrategy = stockStrategy
-        this.reset()
     }
 
     public dispose(): void {
@@ -133,11 +134,23 @@ export class GameBoxSpawner {
             this.boundHandleShelfReady
         )
         EventManager.getInstance().deregisterEventHandler(
+            GameEventTypes.ShelfLayoutDetermined,
+            this.boundHandleLayoutDetermined
+        )
+        EventManager.getInstance().deregisterEventHandler(
             GameEventTypes.SectionsReady,
             this.boundHandleSectionsReady
         )
         this.renderer?.dispose()
         this.renderer = null
+    }
+
+    // -------------------------------------------------------------------------
+    // Receive stock strategy from layout coordinator
+
+    private handleLayoutDetermined(event: CustomEvent<ShelfLayoutDeterminedEvent>): void {
+        this.stockStrategy = event.detail.stockStrategy
+        GameBoxSpawner.logger.debug(`Stock strategy updated from ShelfLayoutDetermined`)
     }
 
     // -------------------------------------------------------------------------
@@ -216,6 +229,11 @@ export class GameBoxSpawner {
 
         if (!this.renderer) {
             GameBoxSpawner.logger.warn('SectionsReady: renderer not yet constructed — no batches received yet')
+            return
+        }
+
+        if (!this.stockStrategy) {
+            GameBoxSpawner.logger.warn('SectionsReady: stock strategy not yet received — ShelfLayoutDetermined has not fired')
             return
         }
 

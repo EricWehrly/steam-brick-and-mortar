@@ -45,7 +45,6 @@ export function createStorePropsTestHarness(scene: THREE.Scene): StorePropsTestH
         dispose() {
             gameBoxSpawner.dispose()
             instancedShelfRenderer.dispose()
-            shelfLayoutCoordinator.dispose()
             scene.remove(propsGroup)
         }
     }
