@@ -52,18 +52,11 @@ export class GpuGameBoxRenderer {
     private readonly instancedLabelRenderer: InstancedLabelRenderer
     private readonly lodArtworkRenderer: IGameArtworkPipeline
 
-    private readonly maxGames: number
-
     constructor(maxGames: number = 2000) {
-        this.maxGames = maxGames
         this.instancedLabelRenderer = new InstancedLabelRenderer({ maxInstances: maxGames })
         this.lodArtworkRenderer = LodArtworkOrchestratorDebug.fromAppSettings(maxGames)
 
         GpuGameBoxRenderer.logger.lifecycle(`Initialized (max ${maxGames} games)`)
-    }
-
-    public get capacity(): number {
-        return this.maxGames
     }
 
     /**
