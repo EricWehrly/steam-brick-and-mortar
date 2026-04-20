@@ -21,7 +21,7 @@
 import { EventManager } from '../../core/EventManager'
 import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
-import { GameEventTypes, UIEventTypes, StorePropsEventTypes } from '../../types/InteractionEvents'
+import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import { GroupModes, SortModes } from '../../types/LayoutTypes'
 import type { GroupMode, SortMode } from '../../types/LayoutTypes'
 import type { GameDataReadyEvent, SectionsReadyEvent, ArrangementRequestedEvent } from '../../types/EnvironmentEvents'
@@ -54,17 +54,7 @@ export class GameSorter {
             UIEventTypes.ArrangementRequested,
             (event: CustomEvent<ArrangementRequestedEvent>) => this.handleArrangementRequested(event.detail)
         )
-        EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ClearRequest,
-            () => this.handleClearRequest()
-        )
         GameSorter.logger.debug('GameSorter initialized')
-    }
-
-    private handleClearRequest(): void {
-        // Layout switch: preserve the user's chosen arrangement; don't reset to defaults.
-        // hasArrangedOnce stays true so the next GameDataReady re-applies the current modes.
-        GameSorter.logger.debug(`ClearRequest: preserving arrangement (group=${this.activeGroupMode}, sort=${this.activeSortMode})`)
     }
 
     private runInitialArrangement(): void {

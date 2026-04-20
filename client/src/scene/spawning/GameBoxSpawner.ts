@@ -65,6 +65,8 @@ export class GameBoxSpawner {
 
     // Owned renderer — constructed when sections are known (total game count drives allocation)
     private renderer: GpuGameBoxRenderer | null = null
+    // Capacity the renderer was built for — tracked here so GpuGameBoxRenderer stays clean
+    private rendererCapacity = 0
 
     // Shelf world positions indexed by shelfIndex, grouped by sectionIndex
     private shelfPositions: Map<number, ShelfPosition & { sectionIndex: number }> = new Map()
@@ -119,6 +121,7 @@ export class GameBoxSpawner {
     private reset(): void {
         this.renderer?.dispose()
         this.renderer = null
+        this.rendererCapacity = 0
         this.stockStrategy = null
         this.pendingSections = null
         this.shelfPositions.clear()
@@ -149,9 +152,11 @@ export class GameBoxSpawner {
 
         // Construct renderer on first batch using total game estimate.
         // Renderer is replaced if batch count changes (library reload).
-        if (!this.renderer || totalBatches * 18 + 100 > this.renderer.capacity) {
+        const requiredCapacity = totalBatches * 18 + 100
+        if (!this.renderer || requiredCapacity > this.rendererCapacity) {
             this.renderer?.dispose()
-            this.renderer = new GpuGameBoxRenderer(totalBatches * 18 + 100)
+            this.renderer = new GpuGameBoxRenderer(requiredCapacity)
+            this.rendererCapacity = requiredCapacity
         }
 
         GameBoxSpawner.logger.debug(
@@ -205,18 +210,11 @@ export class GameBoxSpawner {
         this.shelfPositions.clear()
         this.placementIntents.clear()
 
-        // ShelfLayoutCoordinator also handles SectionsReady and will emit ShelfLayoutDetermined
-        // synchronously during its handler. Registration order is non-deterministic, so we
-        // cache sections here and place in handleLayoutDetermined once strategy is guaranteed.
-        if (this.stockStrategy) {
-            // Strategy already present (re-sort without layout change)
-            // Wait for ShelfLayoutDetermined which fires after ShelfReady events
-            this.pendingSections = event.detail
-            GameBoxSpawner.logger.debug('SectionsReady: cleared stale positions, waiting for ShelfLayoutDetermined to trigger placement')
-        } else {
-            this.pendingSections = event.detail
-            GameBoxSpawner.logger.debug('SectionsReady cached — waiting for ShelfLayoutDetermined')
-        }
+        // Cache sections for placement. Placement is always deferred to handleLayoutDetermined
+        // because ShelfLayoutCoordinator emits ShelfReady (new positions) then ShelfLayoutDetermined
+        // synchronously in its SectionsReady handler — registration order is non-deterministic.
+        this.pendingSections = event.detail
+        GameBoxSpawner.logger.debug('SectionsReady: cleared stale positions, waiting for ShelfLayoutDetermined')
     }
 
     private placeSections(detail: SectionsReadyEvent): void {
@@ -236,12 +234,13 @@ export class GameBoxSpawner {
         // visible games), it may not have capacity for the full library. Recreate it
         // using the total known prefetched game count so the label atlas can hold all labels.
         const requiredCapacity = this.prefetchResults.size
-        if (requiredCapacity > this.renderer.capacity) {
+        if (requiredCapacity > this.rendererCapacity) {
             GameBoxSpawner.logger.debug(
-                `Renderer capacity ${this.renderer.capacity} < required ${requiredCapacity} — recreating`
+                `Renderer capacity ${this.rendererCapacity} < required ${requiredCapacity} — recreating`
             )
             this.renderer.dispose()
             this.renderer = new GpuGameBoxRenderer(requiredCapacity + 100)
+            this.rendererCapacity = requiredCapacity + 100
         }
 
         if (!this.stockStrategy) {
