@@ -51,7 +51,6 @@ interface BatchStatusState {
 
 export class BatchCoordinator<T> {
     private static readonly logger = Logger.createLogFunctions(BatchCoordinator.name)
-    private static instance: BatchCoordinator<unknown> | null = null
 
     private queue: BatchItem<T>[] = []
     private received: number = 0
@@ -74,16 +73,8 @@ export class BatchCoordinator<T> {
     private readonly boundHandleGamesPlaced: (e: CustomEvent<GamesPlacedEvent>) => void
     private readonly boundHandleClearRequest: () => void
 
-    static getInstance<T = unknown>(): BatchCoordinator<T> {
-        if (!BatchCoordinator.instance) {
-            BatchCoordinator.instance = new BatchCoordinator()
-        }
-        return BatchCoordinator.instance as BatchCoordinator<T>
-    }
-
-    /** @internal Test-only: reset the singleton so the next getInstance() constructs fresh. */
-    static _resetInstance(): void {
-        BatchCoordinator.instance = null
+    static {
+        new BatchCoordinator()
     }
 
     private constructor() {
@@ -351,3 +342,6 @@ export class BatchCoordinator<T> {
         ).length
     }
 }
+
+// Construct at import � registers event handlers for app lifetime.
+

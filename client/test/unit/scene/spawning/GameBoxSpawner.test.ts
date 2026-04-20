@@ -14,6 +14,7 @@ import { EventManager } from '../../../../src/core/EventManager'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
 import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
+
 import {
     StorePropsEventTypes,
     GameEventTypes,
@@ -126,7 +127,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         DataManager.getInstance().set(DataKey.MainScene, mockScene, { domain: DataDomain.Scene })
 
         resetEventManager()
-        GameBoxSpawner._resetInstance()
+        
         eventManager = EventManager.getInstance()
 
         eventHandlers = new Map()
@@ -145,7 +146,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             return true
         })
 
-        spawner = GameBoxSpawner.getInstance()
+        spawner = new (GameBoxSpawner as any)()
         emitShelfLayoutDetermined(eventManager)
     })
 

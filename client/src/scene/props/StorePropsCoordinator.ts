@@ -39,8 +39,6 @@ import type { SteamLoadLibraryEvent } from '../../types/InteractionEvents'
 import { type LayoutRequestedEvent } from '../../types/EnvironmentEvents'
 import { type LayoutMode } from '../../types/LayoutTypes'
 import { DataManager } from '../../core/data'
-import { BatchCoordinator } from '../batch/BatchCoordinator'
-import { GameBoxSpawner } from '../spawning/GameBoxSpawner'
 import { ShelfLayoutCoordinator } from '../shelves/ShelfLayoutCoordinator'
 import { InstancedShelfRenderer } from '../instancing/InstancedShelfRenderer'
 import { PropRenderer } from '../PropRenderer'
@@ -110,11 +108,10 @@ class StorePropsCoordinator {
             }
         }
 
-        // Singletons: initialise on first SetupRequest via getInstance()
+        // ShelfLayoutCoordinator is a singleton — BatchCoordinator and GameBoxSpawner
+        // self-register at import time and need no explicit initialisation here.
         if (!this.shelfLayoutCoordinator) {
             this.shelfLayoutCoordinator = ShelfLayoutCoordinator.getInstance(this.activeLayoutMode)
-            BatchCoordinator.getInstance()
-            GameBoxSpawner.getInstance()
         }
 
         // GPU owner: create fresh each setup (disposed on layout switch or clear)

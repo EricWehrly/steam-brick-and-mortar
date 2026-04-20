@@ -22,8 +22,8 @@ export interface StorePropsTestHarness {
 }
 
 export function createStorePropsTestHarness(scene: THREE.Scene): StorePropsTestHarness {
-    const batchCoordinator = BatchCoordinator.getInstance()
-    const gameBoxSpawner = GameBoxSpawner.getInstance()
+    const batchCoordinator = new (BatchCoordinator as any)()
+    const gameBoxSpawner = new (GameBoxSpawner as any)()
     const shelfLayoutCoordinator = ShelfLayoutCoordinator.getInstance()
     const instancedShelfRenderer = new InstancedShelfRenderer()
 
@@ -43,8 +43,9 @@ export function createStorePropsTestHarness(scene: THREE.Scene): StorePropsTestH
         instancedShelfRenderer,
         propsGroup,
         dispose() {
-            // Singletons (batchCoordinator, gameBoxSpawner, shelfLayoutCoordinator) are not disposed —
-            // they live for the test process lifetime. Only GPU resources get torn down.
+            // Event-coordinator instances (batchCoordinator, gameBoxSpawner) are test-scoped
+            // and simply go out of scope — their handlers die with them.
+            // Only GPU resources need explicit teardown.
             instancedShelfRenderer.dispose()
             scene.remove(propsGroup)
         }
