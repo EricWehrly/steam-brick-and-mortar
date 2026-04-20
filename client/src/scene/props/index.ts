@@ -11,8 +11,10 @@
  * No explicit initialization needed.
  */
 
-// Side-effect import — triggers StorePropsCoordinator self-registration
+// Side-effect imports — each module self-registers its event handlers at import time
 import './StorePropsCoordinator'
+import '../batch/BatchCoordinator'
+import '../spawning/GameBoxSpawner'
 
 // Export events and types for external use
 export * from './PropsEvents'
