@@ -54,6 +54,10 @@ export class ShelfSectionPlanner {
             StorePropsEventTypes.ShelfReady,
             (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(event.detail)
         )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.ClearRequest,
+            () => this.handleClearRequest()
+        )
     }
 
     private handleShelfReady(detail: ShelfReadyEvent): void {
@@ -61,8 +65,27 @@ export class ShelfSectionPlanner {
         this.shelfRotations[detail.shelfIndex] = detail.rotationY ?? 0
     }
 
+    private handleClearRequest(): void {
+        this.shelfPositions = []
+        this.shelfRotations = []
+        this.clearSigns()
+    }
+
     private handleSectionsReady(detail: SectionsReadyEvent): void {
         const { sections } = detail
+
+        // Wait until the new layout has emitted shelves for this run.
+        // ClearRequest now happens before rebuild, so SectionsReady can arrive while
+        // this planner still holds stale shelf positions from the previous layout.
+        if (this.shelfPositions.length === 0) {
+            this.clearSigns()
+            ShelfSectionPlanner.logger.info(
+                `SectionsReady: ${sections.length} section(s), ` +
+                `${this.shelfPositions.length} shelf positions known`
+            )
+            ShelfSectionPlanner.logger.warn('No shelf positions yet — signs will be placed on next ShelfReady (not yet supported for re-sort)')
+            return
+        }
 
         this.clearSigns()
 
@@ -70,11 +93,6 @@ export class ShelfSectionPlanner {
             `SectionsReady: ${sections.length} section(s), ` +
             `${this.shelfPositions.length} shelf positions known`
         )
-
-        if (this.shelfPositions.length === 0) {
-            ShelfSectionPlanner.logger.warn('No shelf positions yet — signs will be placed on next ShelfReady (not yet supported for re-sort)')
-            return
-        }
 
         // Walk sections in order, placing a sign at the first shelf of each section.
         // Sections with no name (ungrouped) or named 'Other' get no sign.

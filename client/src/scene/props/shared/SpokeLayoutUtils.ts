@@ -154,11 +154,23 @@ export function computeSpokeShelfLayout(
 export const SpokeLayout: ILayoutDefinition = {
     mode: 'spoke',
     createStockStrategy: () => new SpokeStockStrategy(),
-    computeShelves: (_totalShelves): ShelfInfo[] =>
-        computeSpokeShelfLayout().map((s, i) => ({
-            position: s.position,
-            rotationY: s.rotationY,
-            row: s.spokeIndex,
-            indexInRow: i,
-        })),
+    computeShelves: (totalShelves): ShelfInfo[] => {
+        const defaultSpokeCount = SPOKE_DEFAULTS.spokeCount
+        const shelvesPerSpokeNeeded = Math.max(
+            SPOKE_DEFAULTS.shelvesPerSpoke,
+            Math.ceil(totalShelves / (defaultSpokeCount * 2))
+        )
+
+        return computeSpokeShelfLayout({
+            spokeCount: defaultSpokeCount,
+            shelvesPerSpoke: shelvesPerSpokeNeeded,
+        })
+            .slice(0, totalShelves)
+            .map((s, i) => ({
+                position: s.position,
+                rotationY: s.rotationY,
+                row: s.spokeIndex,
+                indexInRow: i,
+            }))
+    },
 }
