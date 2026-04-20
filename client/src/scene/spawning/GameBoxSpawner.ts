@@ -53,10 +53,14 @@ type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
  * The artwork/label decision is NOT made here. GpuGameBoxRenderer.placeGame()
  * checks the atlas and falls through to a label box on miss. GameBoxSpawner
  * only knows "game X goes at position Y".
+ *
+ * TD: This class conflates two concerns — artwork prefetch/prewarm (Phase 1) and
+ * geometry-driven placement (Phase 2). They share only the renderer reference.
+ * Consider splitting into ArtworkPrewarmer and GamePlacementCoordinator once
+ * section-per-layout work settles the placement interface.
  */
 export class GameBoxSpawner {
     private static readonly logger = Logger.createLogFunctions(GameBoxSpawner.name)
-    private static instance: GameBoxSpawner | null = null
 
     // Owned renderer — constructed on first BatchReadyForPlacement
     private renderer: GpuGameBoxRenderer | null = null
@@ -87,16 +91,8 @@ export class GameBoxSpawner {
     private readonly boundHandleSectionsReady: (e: CustomEvent<SectionsReadyEvent>) => void
     private readonly boundHandleClearRequest: () => void
 
-    static getInstance(): GameBoxSpawner {
-        if (!GameBoxSpawner.instance) {
-            GameBoxSpawner.instance = new GameBoxSpawner()
-        }
-        return GameBoxSpawner.instance
-    }
-
-    /** @internal Test-only: reset the singleton so the next getInstance() constructs fresh. */
-    static _resetInstance(): void {
-        GameBoxSpawner.instance = null
+    static {
+        new GameBoxSpawner()
     }
 
     private constructor() {
@@ -324,3 +320,6 @@ export class GameBoxSpawner {
         return undefined
     }
 }
+
+// Construct at import � registers event handlers for app lifetime.
+

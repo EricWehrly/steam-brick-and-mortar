@@ -16,6 +16,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { EventManager } from '../../../../src/core/EventManager'
 import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
+
 import {
     StorePropsEventTypes,
     GameEventTypes,
@@ -115,13 +116,11 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         EventManager.getInstance().removeAllListeners()
-        GameBoxSpawner._resetInstance()
-        spawner = GameBoxSpawner.getInstance()
+        spawner = new (GameBoxSpawner as any)()
         emitShelfLayoutDetermined()
     })
 
     afterEach(() => {
-        GameBoxSpawner._resetInstance()
         EventManager.getInstance().removeAllListeners()
     })
 
