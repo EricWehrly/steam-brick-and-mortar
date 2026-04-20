@@ -67,6 +67,10 @@ export default [
           selector: 'ImportExpression',
           message: 'Prefer static top-of-file imports over inline import(). Use dynamic import only for genuine code-splitting.',
         },
+        {
+          selector: 'TSImportType',
+          message: 'Prefer top-of-file type imports over inline import(\'...\').Type queries.',
+        },
       ],
 
       // Error prevention (the important stuff)

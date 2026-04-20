@@ -15,6 +15,7 @@ import {
 } from '../../types/InteractionEvents'
 import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
 import { Logger } from '../../utils/Logger'
+import type { StockSurface } from '../../types/LayoutTypes'
 
 interface ShelfPosition {
     position: THREE.Vector3
@@ -69,7 +70,7 @@ export class GameBoxSpawner {
     private shelfPositions: Map<number, ShelfPosition & { sectionIndex: number }> = new Map()
 
     // Cached sections from last SectionsReady — consumed when ShelfLayoutDetermined fires
-    private pendingSections: import('../../types/EnvironmentEvents').SectionsReadyEvent | null = null
+    private pendingSections: SectionsReadyEvent | null = null
 
     // Rendezvous state: prefetch result per appid (populated when prefetch settles)
     private prefetchResults: Map<number, PrefetchResult> = new Map()
@@ -294,7 +295,7 @@ export class GameBoxSpawner {
     // Intent assignment helpers
 
     private assignIntentsFromStock(
-        stockSurfaces: import('../../types/LayoutTypes').StockSurface[],
+        stockSurfaces: StockSurface[],
         games: SteamGameData[]
     ): void {
         const intents = GameBoxUtils.stockSurfaces(stockSurfaces, games)
