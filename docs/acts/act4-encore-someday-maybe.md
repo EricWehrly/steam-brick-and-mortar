@@ -4,11 +4,14 @@
 > 
 > Some items here have feature docs already — they're listed here as stretch goals within those features. Check the feature doc for context before pulling forward.
 
+The main thing we'll want to check in this "encore" act is: Can we embed an audio-video stream from another source? Can we sample other desktop windows? What if we were a desktop program ourselves? Can we drum up webpage views? Could we capture/replay with the help of a tray app...?
+
 ## Visual / Atmosphere
 
 - **Architectural columns & decorative variants** — optional in-room columns (Roman/Corinthian style) to break up wall runs and frame aisles
 - **Waist-height counter area** — service counter / check-out zone near front-of-store; strong video-store vibe anchor
 - **Working analog wall clock** — in-world prop with real-time hand movement; ambient polish
+- Fill the camera up with steam after launching a game, so the effect of the frozen frame in application is .. steamy.
 - **Room variant — cozy basement** — see [Room Variants](../features/room-variants.md); Encore stretch beyond the Act 2 best-effort
 - **Poster walls from user media** — wall posters sourced from user-owned public screenshots/artwork, rotating by category/zone (needs rights/privacy review)
 - **Blacklight room atmosphere** — UV-style ambient with glowing accent colors; pairs naturally with basement variant; add to lighting preset system when room variants exist

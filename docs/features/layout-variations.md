@@ -67,6 +67,15 @@ Games ascend in sort order along the right side of the spoke, and descend along 
 **`SpokeStockStrategy`:**
 A third `IStockStrategy` implementation alongside `ArcStockStrategy` and `RowStockStrategy`. Near-only per unit — the Far face of each spoke shelf faces away from the aisle and is unused. Cross-row interleaving (left pos 0, right pos 0, left pos 1, …) is a layout-level concern driven by the order in which `ShelfLayoutCoordinator` emits `ShelfReady` events, not by the strategy itself.
 
+## Alternating Sections
+- The "toe-out" description is meant to describe an alternation approach for shelves arranged in rows.
+- In arcs, the alternation would be meant to start the next concentric ring after the end of this one. 
+Each arc/row should be separated from the other by our comfortable walking distance.
+but rather than "centering" the arcs, or aligning the middle of their rows,
+let's try having each ring begin with its first shelf, a short walking distance away from the last shelf in the previous row
+creating a small clearing between them
+and alternating the direction (ascending/descending) of the arc/rows
+
 ## Stock Strategy Abstraction
 
 Landed in PR #81 (`openclaw/feat-stock-strategy`). `IStockStrategy` in `StockStrategy.ts` defines the interface; current implementations:
