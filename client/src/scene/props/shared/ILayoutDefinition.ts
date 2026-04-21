@@ -12,11 +12,18 @@
  *   LayoutTypes -> IStockStrategy -> StockSurface -> LayoutTypes
  */
 
-import type { LayoutMode, ShelfInfo } from '../../../types/LayoutTypes'
+import type { LayoutMode, ShelfInfo, SectionShelfInfo, Section } from '../../../types/LayoutTypes'
 import type { IStockStrategy } from './StockStrategy'
 
 export interface ILayoutDefinition {
     readonly mode: LayoutMode
     createStockStrategy(): IStockStrategy
     computeShelves(totalShelves: number): ShelfInfo[]
+}
+
+/**
+ * Optional extension for layouts that can derive shelves directly from sections.
+ */
+export interface ISectionAwareLayoutDefinition extends ILayoutDefinition {
+    computeShelvesForSections(sections: ReadonlyArray<Section>): SectionShelfInfo[]
 }

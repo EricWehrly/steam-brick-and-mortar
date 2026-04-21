@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeArcShelfLayout } from '../../../../../src/scene/props/shared/ArcLayoutUtils'
+import { ArcLayout, computeArcShelfLayout } from '../../../../../src/scene/props/shared/ArcLayoutUtils'
 
 describe('computeArcShelfLayout', () => {
     it('generates the correct number of shelf positions', () => {
@@ -127,6 +127,25 @@ describe('computeArcShelfLayout', () => {
             expect(isFinite(s.position.x), `shelf ${i} x must be finite`).toBe(true)
             expect(isFinite(s.position.z), `shelf ${i} z must be finite`).toBe(true)
         })
+    })
+})
+
+describe('section-aware arc layout', () => {
+    it('assigns shelves to multiple sections instead of back-row single-section clumping', () => {
+        const sections = [
+            { name: 'Action', games: Array.from({ length: 500 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'Puzzle', games: Array.from({ length: 220 }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'RPG', games: Array.from({ length: 200 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+        ] as any
+
+        const shelves = ArcLayout.computeShelvesForSections(sections)
+        expect(shelves.length).toBeGreaterThan(0)
+
+        const rowFourShelves = shelves.filter((shelf) => shelf.row === 4)
+        const rowFourSectionIndices = new Set(rowFourShelves.map((shelf) => shelf.sectionIndex))
+
+        // Regression guard: row 4 should not collapse to a single dominant section.
+        expect(rowFourSectionIndices.size).toBeGreaterThan(1)
     })
 })
 

@@ -115,3 +115,12 @@ export interface ShelfInfo {
     row: number
     indexInRow: number
 }
+
+/**
+ * SectionShelfInfo
+ *
+ * ShelfInfo tagged with the owning section index for section-aware layouts.
+ */
+export interface SectionShelfInfo extends ShelfInfo {
+    sectionIndex: number
+}
