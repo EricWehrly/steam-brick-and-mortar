@@ -21,7 +21,7 @@
 import { EventManager } from '../../core/EventManager'
 import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
-import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
+import { GameEventTypes, SteamEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import { GroupModes, SortModes } from '../../types/LayoutTypes'
 import type { GroupMode, SortMode } from '../../types/LayoutTypes'
 import type { GameDataReadyEvent, SectionsReadyEvent, ArrangementRequestedEvent } from '../../types/EnvironmentEvents'
@@ -55,6 +55,10 @@ export class GameSorter {
             (_event: CustomEvent<GameDataReadyEvent>) => this.handleGameDataReady()
         )
         EventManager.getInstance().registerEventHandler(
+            SteamEventTypes.DataLoaded,
+            () => this.handleGameDataReady()
+        )
+        EventManager.getInstance().registerEventHandler(
             UIEventTypes.ArrangementRequested,
             (event: CustomEvent<ArrangementRequestedEvent>) => this.handleArrangementRequested(event.detail)
         )
@@ -72,7 +76,8 @@ export class GameSorter {
                 this.activeSortMode = SortModes.ByLastPlayed
             }
         }
-        // Re-apply current modes on subsequent loads (layout switch, library reload)
+        // Re-apply current modes on subsequent loads (layout switch, library reload,
+        // and fallback when SteamDataLoaded arrives after an early GameDataReady).
         this.arrange(this.activeGroupMode, this.activeSortMode)
     }
 
