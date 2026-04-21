@@ -43,6 +43,10 @@ export class ShelfSectionPlanner {
     private pendingSections: SectionsReadyEvent | null = null
     private readonly placedSignIdentifiers = new Set<string>()
 
+    private buildSignIdentifier(sectionName: string, edge: 'start' | 'end'): string {
+        return `${sectionName}::${edge}`
+    }
+
     constructor(config: ShelfSectionPlannerConfig = {}) {
         this.config = {
             signYOffset: config.signYOffset ?? SHELF_SIGN_Y_OFFSET,
@@ -136,9 +140,14 @@ export class ShelfSectionPlanner {
 
             const rotY = this.shelfRotations[anchorShelfIndex] ?? 0
 
-            const uniqueIdentifier = section.name
+            const endShelfIndex = this.findLastOwnedShelfIndex(sectionIndex)
+            const endAnchorPos = endShelfIndex >= 0 ? this.shelfPositions[endShelfIndex] : null
+            const endRotY = endShelfIndex >= 0 ? (this.shelfRotations[endShelfIndex] ?? rotY) : rotY
+
+            const startIdentifier = this.buildSignIdentifier(section.name, 'start')
             this.signSystem.placeSign('canvas', {
-                uniqueIdentifier,
+                uniqueIdentifier: startIdentifier,
+                text: section.name,
                 anchorPosition: anchorPos,
                 mount: {
                     style: this.config.signMountStyle,
@@ -148,7 +157,24 @@ export class ShelfSectionPlanner {
                 },
                 style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
             })
-            this.placedSignIdentifiers.add(uniqueIdentifier)
+            this.placedSignIdentifiers.add(startIdentifier)
+
+            if (endAnchorPos) {
+                const endIdentifier = this.buildSignIdentifier(section.name, 'end')
+                this.signSystem.placeSign('canvas', {
+                    uniqueIdentifier: endIdentifier,
+                    text: section.name,
+                    anchorPosition: endAnchorPos,
+                    mount: {
+                        style: this.config.signMountStyle,
+                        yOffset: this.config.signYOffset,
+                        frontOffset: SHELF_SIGN_FRONT_OFFSET,
+                        signFacingY: endRotY,
+                    },
+                    style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
+                })
+                this.placedSignIdentifiers.add(endIdentifier)
+            }
         }
 
         ShelfSectionPlanner.logger.debug(
@@ -161,6 +187,15 @@ export class ShelfSectionPlanner {
             this.signSystem.removeSignById(uniqueIdentifier)
         }
         this.placedSignIdentifiers.clear()
+    }
+
+    private findLastOwnedShelfIndex(sectionIndex: number): number {
+        for (let index = this.shelfSectionIndices.length - 1; index >= 0; index--) {
+            if (this.shelfSectionIndices[index] === sectionIndex) {
+                return index
+            }
+        }
+        return -1
     }
 
     public reset(): void {

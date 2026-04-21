@@ -97,8 +97,10 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
         ])
 
         const placedIds = placeSignSpy.mock.calls.map(([, d]) => d.uniqueIdentifier)
-        expect(placedIds).toContain('Played Today')
-        expect(placedIds).toContain('Played This Week')
+        expect(placedIds).toContain('Played Today::start')
+        expect(placedIds).toContain('Played Today::end')
+        expect(placedIds).toContain('Played This Week::start')
+        expect(placedIds).toContain('Played This Week::end')
     })
 
     it('does not place a sign for unnamed (empty name) sections', () => {
@@ -128,10 +130,12 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
         vi.clearAllMocks()
 
         emitSectionsReady([makeSection('Played Today')])
-        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action')
-        expect(removeSignByIdSpy).toHaveBeenCalledWith('RPG')
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action::start')
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action::end')
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('RPG::start')
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('RPG::end')
         expect(placeSignSpy).toHaveBeenCalledWith('canvas', expect.objectContaining({
-            uniqueIdentifier: 'Played Today',
+            uniqueIdentifier: 'Played Today::start',
         }))
     })
 
@@ -144,8 +148,8 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
 
         emitSectionsReady([makeSection('First', 18), makeSection('Second', 18)])
 
-        const firstCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'First')
-        const secondCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second')
+        const firstCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'First::start')
+        const secondCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second::start')
         expect(firstCall).toBeDefined()
         expect(secondCall).toBeDefined()
         // First section (index 0) anchors to shelf with sectionIndex=0 => shelf 1
@@ -163,8 +167,8 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
 
         emitSectionsReady([makeSection('First', 18), makeSection('Second', 18)])
 
-        const firstCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'First')
-        const secondCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second')
+        const firstCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'First::start')
+        const secondCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second::start')
         expect(firstCall).toBeDefined()
         expect(secondCall).toBeDefined()
         // First section anchors at shelf 0
@@ -177,10 +181,11 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
         new ShelfSectionPlanner()
         emitShelfReady(0, FAR_POSITION)
         emitSectionsReady([makeSection('Action')])
-        expect(placeSignSpy).toHaveBeenCalledTimes(1)
+        expect(placeSignSpy).toHaveBeenCalledTimes(2)
 
         emitLayoutClearRequest()
-        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action')
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action::start')
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action::end')
 
         // Need shelf positions again after clear
         vi.clearAllMocks()
@@ -192,10 +197,11 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
         new ShelfSectionPlanner()
         emitShelfReady(0, FAR_POSITION)
         emitSectionsReady([makeSection('Action')])
-        expect(placeSignSpy).toHaveBeenCalledTimes(1)
+        expect(placeSignSpy).toHaveBeenCalledTimes(2)
 
         emitLibraryReloadRequest()
-        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action')
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action::start')
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action::end')
     })
 
     it('does not throw if SectionsReady fires before any ShelfReady', () => {

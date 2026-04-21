@@ -49,15 +49,13 @@ describe('BatchCoordinator → GameDataReady ordering', () => {
         vi.clearAllMocks()
     })
 
-    it('emits GameDataReady before first BatchReadyForPlacement and uses steam.games count', async () => {
+    it('does not emit GameDataReady by itself; SteamIntegration emits it after steam.games is populated', async () => {
         const observedEventOrder: string[] = []
-        const gameDataReadyPayloads: Array<{ totalGames: number; totalBatches: number }> = []
 
         eventManager.registerEventHandler(
             GameEventTypes.GameDataReady,
-            (event: CustomEvent<{ totalGames: number; totalBatches: number }>) => {
+            (_event: CustomEvent<{ totalGames: number; totalBatches: number }>) => {
                 observedEventOrder.push('game-data-ready')
-                gameDataReadyPayloads.push(event.detail)
             }
         )
 
@@ -67,10 +65,6 @@ describe('BatchCoordinator → GameDataReady ordering', () => {
                 observedEventOrder.push('batch-ready-for-placement')
             }
         )
-
-        dataManager.set('steam.games', Array.from({ length: 835 }, (_, index) => ({ appid: index + 1 })), {
-            domain: DataDomain.SteamIntegration,
-        })
 
         const firstBatchGames = Array.from({ length: 18 }, (_, index) => ({
             appid: index + 1,
@@ -93,15 +87,10 @@ describe('BatchCoordinator → GameDataReady ordering', () => {
         })
 
         await vi.waitFor(() => {
-            expect(observedEventOrder).toContain('game-data-ready')
             expect(observedEventOrder).toContain('batch-ready-for-placement')
         }, { timeout: 5000, interval: 25 })
 
-        expect(gameDataReadyPayloads[0]).toMatchObject({
-            totalGames: 835,
-            totalBatches: 10,
-        })
-
-        expect(observedEventOrder[0]).toBe('game-data-ready')
+        expect(observedEventOrder).not.toContain('game-data-ready')
     })
+
 })

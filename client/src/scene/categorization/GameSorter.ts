@@ -21,7 +21,7 @@
 import { EventManager } from '../../core/EventManager'
 import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
-import { GameEventTypes, SteamEventTypes, UIEventTypes } from '../../types/InteractionEvents'
+import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import { GroupModes, SortModes } from '../../types/LayoutTypes'
 import type { GroupMode, SortMode } from '../../types/LayoutTypes'
 import type { GameDataReadyEvent, SectionsReadyEvent, ArrangementRequestedEvent } from '../../types/EnvironmentEvents'
@@ -48,16 +48,11 @@ export class GameSorter {
      */
     private activeGroupMode: GroupMode | null = null
     private activeSortMode: SortMode | null = null
-    private hasUserSelectedArrangement: boolean = false
 
     constructor() {
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.GameDataReady,
             (_event: CustomEvent<GameDataReadyEvent>) => this.handleGameDataReady()
-        )
-        EventManager.getInstance().registerEventHandler(
-            SteamEventTypes.DataLoaded,
-            () => this.handleGameDataReady()
         )
         EventManager.getInstance().registerEventHandler(
             UIEventTypes.ArrangementRequested,
@@ -67,10 +62,8 @@ export class GameSorter {
     }
 
     private handleGameDataReady(): void {
-        if (!this.hasUserSelectedArrangement) {
-            // Keep defaults auth-driven until the user explicitly chooses an arrangement.
-            // This lets SteamDataLoaded correct an early GameDataReady emitted before
-            // identity/userInput is fully established.
+        if (this.activeGroupMode === null || this.activeSortMode === null) {
+            // First load: choose defaults based on auth state
             if (SteamIntegration.getInstance().isAnonymous()) {
                 this.activeGroupMode = GroupModes.ByGenre
                 this.activeSortMode = SortModes.ByPlaytime
@@ -78,17 +71,11 @@ export class GameSorter {
                 this.activeGroupMode = GroupModes.ByRecency
                 this.activeSortMode = SortModes.ByLastPlayed
             }
-        } else if (this.activeGroupMode === null || this.activeSortMode === null) {
-            // Defensive fallback for impossible state.
-            this.activeGroupMode = GroupModes.ByRecency
-            this.activeSortMode = SortModes.ByLastPlayed
         }
-
         this.arrange(this.activeGroupMode, this.activeSortMode)
     }
 
     private handleArrangementRequested(detail: ArrangementRequestedEvent): void {
-        this.hasUserSelectedArrangement = true
         this.activeGroupMode = detail.groupMode
         this.activeSortMode = detail.sortMode
         this.arrange(detail.groupMode, detail.sortMode)
