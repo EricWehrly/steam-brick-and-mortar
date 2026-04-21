@@ -56,7 +56,9 @@ export interface InteractionEventMap {
     [SteamEventTypes.CacheStats]: SteamCacheStatsEvent
     [SteamEventTypes.ImageCacheClear]: SteamImageCacheClearEvent
     [SteamEventTypes.DevModeToggle]: SteamDevModeToggleEvent
+    // Integration/session signal (UI/cache refresh)
     [SteamEventTypes.DataLoaded]: SteamDataLoadedEvent
+    // Immutable library membership seam (capacity sizing)
     [SteamEventTypes.LibraryManifestReady]: SteamLibraryManifestReadyEvent
     [SteamEventTypes.GameLoaded]: SteamGameLoadedEvent
     [SteamEventTypes.GamesBatchReady]: SteamGamesBatchEvent
@@ -90,6 +92,7 @@ export interface InteractionEventMap {
 
     // Environment events (from EnvironmentEvents.ts)
     [GameEventTypes.AllBatchesComplete]: AllBatchesCompleteEvent
+    // Definitions-ready arrangement trigger (SteamIntegration-owned seam)
     [GameEventTypes.GameDataReady]: GameDataReadyEvent
     [GameEventTypes.SectionsReady]: SectionsReadyEvent
 

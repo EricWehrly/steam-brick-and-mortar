@@ -86,6 +86,14 @@ export class SteamIntegration {
         this.eventManager.registerEventHandler(GameEventTypes.Start, this.handleGameStart.bind(this))
     }
 
+    /**
+     * Persist Steam session/library state and emit phase-specific readiness events.
+     *
+     * Event order:
+     * 1) DataLoaded            - integration/session signal (UI/cache refresh)
+     * 2) LibraryManifestReady  - immutable membership (appid list + totals)
+     * 3) GameDataReady         - definitions-ready arrangement trigger
+     */
     private storeSteamDataAndEmitEvent(userInput: string | null): void {
         const gameLibraryState = this.getGameLibraryState()
         const games: SteamGameData[] = gameLibraryState.userData?.games || []
@@ -103,7 +111,9 @@ export class SteamIntegration {
             })
         }
 
-        this.eventManager.emit<SteamDataLoadedEvent>(SteamEventTypes.DataLoaded)
+        this.eventManager.emit<SteamDataLoadedEvent>(SteamEventTypes.DataLoaded, {
+            userInput: userInput ?? undefined,
+        })
 
         const totalGames = games.length
         const totalBatches = Math.max(1, Math.ceil(totalGames / 18))
