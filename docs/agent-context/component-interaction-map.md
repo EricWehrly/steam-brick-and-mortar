@@ -1,6 +1,6 @@
 # Complete Component Interaction Map - All Systems
 
-**Last Updated**: January 15, 2025  
+**Last Updated**: April 21, 2026  
 **Purpose**: Comprehensive map of ALL major systems, how they connect, and analysis of layering/architecture
 
 ## 🎯 Quick Navigation
@@ -8,6 +8,30 @@
 **Scope**: Complete application architecture (37 core components across 6 major systems)
 **Systems Covered**: Scene Rendering, WebXR, Steam Integration, UI, Materials, Infrastructure
 **Analysis Included**: Component relationships, event flows, layering issues, simplification opportunities
+
+### Runtime Event Flow (canonical, 2026-04)
+
+#### Phase 1 — Library manifest fixed
+- `SteamIntegration.storeSteamDataAndEmitEvent()` commits `steam.games` and emits:
+  - `SteamEventTypes.DataLoaded` (integration/UI refresh)
+  - `SteamEventTypes.LibraryManifestReady` (immutable membership: `appid[]`, totals)
+- `GameBoxSpawner` initializes renderer capacity from `LibraryManifestReady`.
+
+#### Phase 2 — Definitions ready for arrangement
+- `SteamIntegration` emits `GameEventTypes.GameDataReady` immediately after `steam.games` commit.
+- `GameSorter` listens to `GameDataReady`, resolves grouping+sorting, emits `GameEventTypes.SectionsReady`.
+- `ShelfLayoutCoordinator` and `ShelfSectionPlanner` consume `SectionsReady`.
+
+#### Phase 3 — Artwork/placement progress and completion
+- `GamesLoader` emits `SteamEventTypes.GamesBatchReady` (cache + remote progressive batches).
+- `BatchCoordinator` serializes and re-emits `StorePropsEventTypes.BatchReadyForPlacement`.
+- `GameBoxSpawner` prewarms artwork from `BatchReadyForPlacement`, places on `SectionsReady` + `ShelfLayoutDetermined`, then emits `StorePropsEventTypes.GamesPlaced`.
+- `BatchCoordinator` emits `SomeBatchesComplete` / `AllBatchesComplete` after placement accounting.
+
+#### Ownership rules
+- `GameDataReady` is a **SteamIntegration-owned seam** (definitions ready), not a BatchCoordinator signal.
+- `BatchCoordinator` owns placement-progress/completion only.
+- `DataLoaded` is integration/UI-level and can co-occur with readiness seams but should not be reused as the sorter trigger.
 
 ### System Entry Points:
 - **Scene Rendering**: `main.ts` → `SteamBrickAndMortarApp` → `SceneCoordinator` → Renderers

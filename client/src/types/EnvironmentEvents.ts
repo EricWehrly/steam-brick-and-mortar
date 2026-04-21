@@ -21,13 +21,14 @@ export interface AllBatchesCompleteEvent extends BaseInteractionEvent {
 /**
  * GameDataReady
  *
- * Emitted by BatchCoordinator when all game data batches have been dispatched
- * for processing — i.e. all games are in DataManager and all BatchReadyForPlacement
- * events have fired. This is earlier than AllBatchesComplete, which waits for
- * GamesPlaced confirmation.
+ * Canonical definitions-ready seam for the arrangement pipeline.
  *
- * GameSorter listens to this event to trigger section planning. Downstream layout
- * work (shelf placement, artwork prewarm) follows from SectionsReady.
+ * Emitted by SteamIntegration immediately after steam.games is committed to
+ * DataManager (membership fixed + definition records available for grouping/sort).
+ *
+ * Consumers:
+ * - GameSorter (group + sort → SectionsReady)
+ * - GameBoxSpawner (renderer capacity sizing)
  */
 export interface GameDataReadyEvent extends BaseInteractionEvent {
     totalGames: number

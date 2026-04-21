@@ -1,7 +1,7 @@
 # Feature: GameSort Full Pipeline
 
 **Act**: 2 (Gate 2)
-**Status**: Not Started (sort pipeline and GameSorter are substantially done — see Notes; box/shelf repositioning on re-sort is the actual remaining gap)
+**Status**: In Progress (group/sort pipeline works; event seam cleanup and placement regression guards are active work)
 **Priority**: Medium
 
 ## Goal
@@ -28,6 +28,21 @@ The current sort system updates signage (neon signs per genre/category) but does
 - Wire sort changes through `SceneCoordinator` to trigger shelf repopulation
 - Separate texture assignment from placement in `GameBoxRenderer` or equivalent
 - Test: sort change → verify box positions update to match new order
+
+## Event Contract (current)
+
+Game sort should hang from the definitions-ready seam, not artwork completion:
+
+1. `SteamEventTypes.LibraryManifestReady`
+   - Immutable membership known (`appid[]`, total count)
+   - Used for renderer sizing/progress baselines
+2. `GameEventTypes.GameDataReady`
+   - `steam.games` committed and definitions available
+   - Canonical trigger for `GameSorter`
+3. `GameEventTypes.SectionsReady`
+   - Group + sort output consumed by shelf/sign/placement
+4. Artwork pipeline completion events (`BatchReadyForPlacement`, `GamesPlaced`, `AllBatchesComplete`)
+   - Placement/progress only; must not gate sort/layout semantics
 
 ## Notes / Open Questions
 

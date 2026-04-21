@@ -48,6 +48,19 @@ export interface SteamDataLoadedEvent extends BaseInteractionEvent {
     userInput: string
 }
 
+/**
+ * Emitted when library membership is fixed for a load run.
+ *
+ * This is the immutable manifest signal (appid list + totals), emitted before
+ * progressive batch processing begins so systems can pre-size resources.
+ */
+export interface SteamLibraryManifestReadyEvent extends BaseInteractionEvent {
+    userInput?: string
+    totalGames: number
+    totalBatches: number
+    appids: ReadonlyArray<number>
+}
+
 export interface SteamGameLoadedEvent extends BaseInteractionEvent {
     game: Readonly<SteamGame>
 }
@@ -223,6 +236,7 @@ export const SteamEventTypes = {
     ImageCacheClear: 'steam:image-cache-clear',
     DevModeToggle: 'steam:dev-mode-toggle',
     DataLoaded: 'steam:data-loaded',
+    LibraryManifestReady: 'steam:library-manifest-ready',
     GameLoaded: 'steam:game-loaded',
     GamesBatchReady: 'steam:games-batch-ready',
     NetworkFetchProgress: 'steam:network-fetch-progress'
