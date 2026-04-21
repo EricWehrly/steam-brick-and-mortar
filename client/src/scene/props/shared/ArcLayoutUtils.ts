@@ -18,8 +18,8 @@
 import * as THREE from 'three'
 import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
 import type { StockSurface } from '../../../types/LayoutTypes'
-import type { ILayoutDefinition } from './ILayoutDefinition'
-import type { ShelfInfo } from '../../../types/LayoutTypes'
+import type { ISectionAwareLayoutDefinition } from './ILayoutDefinition'
+import type { ShelfInfo, Section, SectionShelfInfo } from '../../../types/LayoutTypes'
 
 /**
  * ArcStockStrategy
@@ -188,8 +188,52 @@ export function computeStoreArcShelfLayout(totalShelves: number): ArcShelfInfo[]
     return computeArcShelfLayout(totalShelves, config)
 }
 
-export const ArcLayout: ILayoutDefinition = {
+function computeArcShelvesForSections(sections: ReadonlyArray<Section>): SectionShelfInfo[] {
+    if (sections.length === 0) {
+        return []
+    }
+
+    const sectionShelfCounts = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    const totalShelves = sectionShelfCounts.reduce((sum, count) => sum + count, 0)
+
+    const rowCapacities = [4, 6, 10, 12]
+    const remaining = Math.max(0, totalShelves - STORE_ARC_FIXED_ROWS_COUNT)
+    if (remaining > 0) {
+        rowCapacities.push(remaining)
+    }
+
+    const owningSectionIndices: number[] = []
+    let sectionCursor = 0
+
+    for (const rowCapacity of rowCapacities) {
+        let rowRemaining = rowCapacity
+        while (rowRemaining > 0 && owningSectionIndices.length < totalShelves) {
+            let scanCount = 0
+            while (scanCount < sectionShelfCounts.length && sectionShelfCounts[sectionCursor] <= 0) {
+                sectionCursor = (sectionCursor + 1) % sectionShelfCounts.length
+                scanCount++
+            }
+            if (scanCount >= sectionShelfCounts.length) {
+                break
+            }
+
+            owningSectionIndices.push(sectionCursor)
+            sectionShelfCounts[sectionCursor]--
+            rowRemaining--
+            sectionCursor = (sectionCursor + 1) % sectionShelfCounts.length
+        }
+    }
+
+    const shelves = computeStoreArcShelfLayout(totalShelves)
+    return shelves.map((shelf, shelfIndex) => ({
+        ...shelf,
+        sectionIndex: owningSectionIndices[shelfIndex] ?? Math.min(sections.length - 1, shelfIndex % sections.length),
+    }))
+}
+
+export const ArcLayout: ISectionAwareLayoutDefinition = {
     mode: 'arc',
     createStockStrategy: () => new ArcStockStrategy(),
     computeShelves: (totalShelves): ShelfInfo[] => computeStoreArcShelfLayout(totalShelves),
+    computeShelvesForSections: (sections): SectionShelfInfo[] => computeArcShelvesForSections(sections),
 }

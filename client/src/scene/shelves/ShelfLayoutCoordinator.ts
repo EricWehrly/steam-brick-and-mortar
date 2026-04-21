@@ -9,7 +9,8 @@ import {
     type StorePropsProgressEvent,
 } from '../../types/InteractionEvents'
 import { LayoutRegistry } from '../props/shared/LayoutRegistry'
-import type { LayoutMode, Section } from '../../types/LayoutTypes'
+import type { LayoutMode, Section, SectionShelfInfo, ShelfInfo } from '../../types/LayoutTypes'
+import type { ISectionAwareLayoutDefinition } from '../props/shared/ILayoutDefinition'
 import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
 
 /** Slots-per-shelf: used to convert game count → shelf count per section. */
@@ -90,26 +91,27 @@ export class ShelfLayoutCoordinator {
             `Computing ${this.layoutMode} layout: ${this.totalShelves} shelves across ${detail.sections.length} sections`
         )
 
-        const shelves = LayoutRegistry[this.layoutMode].computeShelves(this.totalShelves)
+        const activeLayout = LayoutRegistry[this.layoutMode]
+        const isSectionAwareLayout = 'computeShelvesForSections' in activeLayout
+        const shelves = isSectionAwareLayout
+            ? (activeLayout as ISectionAwareLayoutDefinition).computeShelvesForSections(detail.sections)
+            : this.computeShelvesByLinearSectionOwnership(activeLayout.computeShelves(this.totalShelves), shelvesPerSection)
 
         // Build bounds and section-tagged shelf map
         const bounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
         const hw = 2.0 / 2, hd = 1.0 / 2
-        let shelfIndex = 0
-        for (let sectionIndex = 0; sectionIndex < shelvesPerSection.length; sectionIndex++) {
-            const count = shelvesPerSection[sectionIndex]
-            for (let i = 0; i < count; i++, shelfIndex++) {
-                const s = shelves[shelfIndex]
-                bounds.minX = Math.min(bounds.minX, s.position.x - hw)
-                bounds.maxX = Math.max(bounds.maxX, s.position.x + hw)
-                bounds.minZ = Math.min(bounds.minZ, s.position.z - hd)
-                bounds.maxZ = Math.max(bounds.maxZ, s.position.z + hd)
-                this.shelvesByIndex.set(shelfIndex, {
-                    position: s.position.clone(),
-                    rotationY: s.rotationY,
-                    sectionIndex,
-                })
-            }
+
+        for (let shelfIndex = 0; shelfIndex < shelves.length; shelfIndex++) {
+            const shelf = shelves[shelfIndex]
+            bounds.minX = Math.min(bounds.minX, shelf.position.x - hw)
+            bounds.maxX = Math.max(bounds.maxX, shelf.position.x + hw)
+            bounds.minZ = Math.min(bounds.minZ, shelf.position.z - hd)
+            bounds.maxZ = Math.max(bounds.maxZ, shelf.position.z + hd)
+            this.shelvesByIndex.set(shelfIndex, {
+                position: shelf.position.clone(),
+                rotationY: shelf.rotationY,
+                sectionIndex: shelf.sectionIndex,
+            })
         }
 
         // Emit ShelfReady first so consumers (GameBoxSpawner) have shelf positions cached
@@ -144,5 +146,25 @@ export class ShelfLayoutCoordinator {
         )
 
         ShelfLayoutCoordinator.logger.debug(`ShelfReady emitted for ${emitted} shelves, layout determined`)
+    }
+
+    private computeShelvesByLinearSectionOwnership(
+        shelves: ReadonlyArray<ShelfInfo>,
+        shelvesPerSection: ReadonlyArray<number>
+    ): SectionShelfInfo[] {
+        const sectionShelves: SectionShelfInfo[] = []
+        let shelfIndex = 0
+
+        for (let sectionIndex = 0; sectionIndex < shelvesPerSection.length; sectionIndex++) {
+            const count = shelvesPerSection[sectionIndex]
+            for (let indexInSection = 0; indexInSection < count && shelfIndex < shelves.length; indexInSection++, shelfIndex++) {
+                sectionShelves.push({
+                    ...shelves[shelfIndex],
+                    sectionIndex,
+                })
+            }
+        }
+
+        return sectionShelves
     }
 }
