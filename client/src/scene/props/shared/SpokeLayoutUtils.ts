@@ -84,6 +84,31 @@ const SPOKE_DEFAULTS: Required<SpokeLayoutConfig> = {
     aisleHalfWidthMetres: 1.5,
 }
 
+function deriveSpokeSpacingFromSectionCounts(
+    shelvesPerSection: ReadonlyArray<number>,
+    aisleHalfWidthMetres: number,
+    minimumHubClearanceMetres: number
+): { hubClearanceMetres: number; shelfSpacingMetres: number } {
+    const maxShelvesInAnySection = Math.max(1, ...shelvesPerSection)
+    const minimumShelfSpacingMetres = 2.5
+
+    // Target ~15% extra aisle depth as section shelf counts grow to avoid spoke overlap.
+    const dynamicShelfSpacingMetres = Math.max(
+        minimumShelfSpacingMetres,
+        2.2 + maxShelvesInAnySection * 0.35
+    )
+
+    const dynamicHubClearanceMetres = Math.max(
+        minimumHubClearanceMetres,
+        aisleHalfWidthMetres * 2 + maxShelvesInAnySection * 0.2
+    )
+
+    return {
+        hubClearanceMetres: dynamicHubClearanceMetres,
+        shelfSpacingMetres: dynamicShelfSpacingMetres,
+    }
+}
+
 export interface SpokeShelfInfo {
     position: THREE.Vector3
     /** Y rotation so shelf Near face faces the spoke aisle centreline. */
@@ -195,9 +220,17 @@ function computeSpokeShelvesForSections(sections: ReadonlyArray<Section>): Secti
         Math.ceil(totalShelves / (sections.length * 2))
     )
 
+    const spacing = deriveSpokeSpacingFromSectionCounts(
+        shelvesPerSection,
+        SPOKE_DEFAULTS.aisleHalfWidthMetres,
+        SPOKE_DEFAULTS.hubClearanceMetres
+    )
+
     const spokeShelves = computeSpokeShelfLayout({
         spokeCount: sections.length,
         shelvesPerSpoke: shelvesPerSpokeNeeded,
+        hubClearanceMetres: spacing.hubClearanceMetres,
+        shelfSpacingMetres: spacing.shelfSpacingMetres,
     })
 
     const sectionAwareShelves: SectionShelfInfo[] = []

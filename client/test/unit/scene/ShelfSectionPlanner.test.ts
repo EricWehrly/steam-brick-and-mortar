@@ -63,10 +63,10 @@ function emitSectionsReady(sections: Section[]): void {
     })
 }
 
-function emitShelfReady(shelfIndex: number, position = FAR_POSITION, rotationY = 0): void {
+function emitShelfReady(shelfIndex: number, position = FAR_POSITION, rotationY = 0, sectionIndex = 0): void {
     EventManager.getInstance().emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
         shelfIndex,
-        sectionIndex: 0,
+        sectionIndex,
         position,
         rotationY,
     })
@@ -88,8 +88,8 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
 
     it('places a sign for each named section when shelf positions are known', () => {
         new ShelfSectionPlanner()
-        emitShelfReady(0, FAR_POSITION)
-        emitShelfReady(1, new THREE.Vector3(5, 0, -20))
+        emitShelfReady(0, FAR_POSITION, 0, 0)
+        emitShelfReady(1, new THREE.Vector3(5, 0, -20), 0, 1)
 
         emitSectionsReady([
             makeSection('Played Today'),
@@ -121,8 +121,8 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
 
     it('clears previous signs before placing new ones on re-sort', () => {
         new ShelfSectionPlanner()
-        emitShelfReady(0, FAR_POSITION)
-        emitShelfReady(1, new THREE.Vector3(5, 0, -20))
+        emitShelfReady(0, FAR_POSITION, 0, 0)
+        emitShelfReady(1, new THREE.Vector3(5, 0, -20), 0, 1)
 
         emitSectionsReady([makeSection('Action'), makeSection('RPG')])
         vi.clearAllMocks()
@@ -135,12 +135,31 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
         }))
     })
 
+    it('anchors sections to shelf ownership, not just shelf index order', () => {
+        new ShelfSectionPlanner()
+        const pos0 = new THREE.Vector3(0, 0, -5)
+        const pos1 = new THREE.Vector3(5, 0, -5)
+        emitShelfReady(0, pos0, 0, 1) // shelf 0 owned by section index 1
+        emitShelfReady(1, pos1, 0, 0) // shelf 1 owned by section index 0
+
+        emitSectionsReady([makeSection('First', 18), makeSection('Second', 18)])
+
+        const firstCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'First')
+        const secondCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second')
+        expect(firstCall).toBeDefined()
+        expect(secondCall).toBeDefined()
+        // First section (index 0) anchors to shelf with sectionIndex=0 => shelf 1
+        expect(firstCall[1].anchorPosition).toEqual(pos1)
+        // Second section (index 1) anchors to shelf with sectionIndex=1 => shelf 0
+        expect(secondCall[1].anchorPosition).toEqual(pos0)
+    })
+
     it('anchors sections to shelf positions in order', () => {
         new ShelfSectionPlanner()
         const pos0 = new THREE.Vector3(0, 0, -5)
         const pos1 = new THREE.Vector3(5, 0, -5)
-        emitShelfReady(0, pos0)
-        emitShelfReady(1, pos1)
+        emitShelfReady(0, pos0, 0, 0)
+        emitShelfReady(1, pos1, 0, 1)
 
         emitSectionsReady([makeSection('First', 18), makeSection('Second', 18)])
 

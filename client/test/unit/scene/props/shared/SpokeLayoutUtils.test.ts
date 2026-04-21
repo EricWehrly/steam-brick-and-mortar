@@ -71,6 +71,29 @@ describe('SpokeLayout section-aware shelf ownership', () => {
             expect(shelf.sectionIndex).toBe(shelf.row)
         })
     })
+
+    it('expands spoke spacing dynamically for larger per-section shelf counts', () => {
+        const sections = [
+            { name: 'Action', games: Array.from({ length: 360 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'Puzzle', games: Array.from({ length: 300 }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'RPG', games: Array.from({ length: 280 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+            { name: 'Indie', games: Array.from({ length: 260 }, (_, i) => ({ appid: 3000 + i + 1 })) },
+        ] as any
+
+        const shelves = SpokeLayout.computeShelvesForSections(sections)
+        const radiiBySection = new Map<number, number[]>()
+
+        for (const shelf of shelves) {
+            const radius = Math.sqrt(shelf.position.x ** 2 + shelf.position.z ** 2)
+            const existing = radiiBySection.get(shelf.sectionIndex) ?? []
+            existing.push(radius)
+            radiiBySection.set(shelf.sectionIndex, existing)
+        }
+
+        // Large sections should produce spokes that extend well beyond the old fixed depth.
+        const allRadii = [...radiiBySection.values()].flat()
+        expect(Math.max(...allRadii)).toBeGreaterThan(14)
+    })
 })
 
 describe('computeSpokeShelfLayout', () => {

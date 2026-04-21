@@ -141,6 +141,25 @@ describe('GameSorter', () => {
         expect(payload.sortMode).toBe('by-last-played')
     })
 
+    it('SteamDataLoaded can correct default arrangement after early GameDataReady', () => {
+        mockIsAnonymous = false
+        mockGames = [makeGame(1, 0, 100, 'Action')]
+        new GameSorter()
+
+        // Early GameDataReady while integration still appears anonymous
+        mockIsAnonymous = true
+        fireGameDataReady()
+
+        // SteamDataLoaded should recompute defaults with authenticated state
+        mockIsAnonymous = false
+        mockEmit.mockReset()
+        fireSteamDataLoaded()
+
+        const [, payload] = mockEmit.mock.calls[0]
+        expect(payload.groupMode).toBe('by-recency')
+        expect(payload.sortMode).toBe('by-last-played')
+    })
+
     it('default arrangement for anonymous: groupMode=by-genre, sortMode=by-playtime', () => {
         mockIsAnonymous = true
         mockGames = [makeGame(1, 0, 100, 'Action')]

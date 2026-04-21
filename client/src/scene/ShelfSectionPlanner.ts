@@ -39,6 +39,7 @@ export class ShelfSectionPlanner {
 
     private shelfPositions: THREE.Vector3[] = []
     private shelfRotations: number[] = []
+    private shelfSectionIndices: number[] = []
     private pendingSections: SectionsReadyEvent | null = null
     private readonly placedSignIdentifiers = new Set<string>()
 
@@ -68,12 +69,14 @@ export class ShelfSectionPlanner {
     private handleShelfReady(detail: ShelfReadyEvent): void {
         this.shelfPositions[detail.shelfIndex] = (detail.position as THREE.Vector3).clone()
         this.shelfRotations[detail.shelfIndex] = detail.rotationY ?? 0
+        this.shelfSectionIndices[detail.shelfIndex] = detail.sectionIndex
         this.tryPlacePendingSections()
     }
 
     private handleClearRequest(): void {
         this.shelfPositions = []
         this.shelfRotations = []
+        this.shelfSectionIndices = []
         this.pendingSections = null
         this.clearSigns()
     }
@@ -98,7 +101,8 @@ export class ShelfSectionPlanner {
             .map(section => Math.max(1, Math.ceil(section.games.length / SHELF_BATCH_SIZE)))
             .reduce((sum, count) => sum + count, 0)
 
-        if (this.shelfPositions.length < requiredShelves) {
+        const knownShelfCount = this.shelfSectionIndices.filter((sectionIndex) => sectionIndex !== undefined).length
+        if (knownShelfCount < requiredShelves) {
             return
         }
 
@@ -110,19 +114,19 @@ export class ShelfSectionPlanner {
         const { sections } = detail
         this.clearSigns()
 
-        // Walk sections in order, placing a sign at the first shelf of each section.
+        // Place a sign at the first shelf owned by each section index.
         // Sections with no name (ungrouped) or named 'Other' get no sign.
-        let shelfCursor = 0
+        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+            const section = sections[sectionIndex]
+            if (!section.name || section.name === 'Other') {
+                continue
+            }
 
-        for (const section of sections) {
-            const anchorShelfIndex = shelfCursor
-
-            // Advance cursor by how many shelves this section occupies
-            const shelvesUsed = Math.ceil(section.games.length / SHELF_BATCH_SIZE)
-            shelfCursor += Math.max(shelvesUsed, 1)
-
-            // Skip nameless or catch-all sections
-            if (!section.name || section.name === 'Other') continue
+            const anchorShelfIndex = this.shelfSectionIndices.findIndex((ownedSectionIndex) => ownedSectionIndex === sectionIndex)
+            if (anchorShelfIndex < 0) {
+                ShelfSectionPlanner.logger.warn(`No shelf anchor found for section "${section.name}" (index ${sectionIndex})`)
+                continue
+            }
 
             const anchorPos = this.shelfPositions[anchorShelfIndex]
             if (!anchorPos) {
@@ -132,7 +136,6 @@ export class ShelfSectionPlanner {
 
             const rotY = this.shelfRotations[anchorShelfIndex] ?? 0
 
-            // Use name as identifier — unique per section within a layout
             const uniqueIdentifier = section.name
             this.signSystem.placeSign('canvas', {
                 uniqueIdentifier,
@@ -163,6 +166,7 @@ export class ShelfSectionPlanner {
     public reset(): void {
         this.shelfPositions = []
         this.shelfRotations = []
+        this.shelfSectionIndices = []
         this.clearSigns()
         this.signSystem.clearAll()
     }
