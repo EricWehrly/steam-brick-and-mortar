@@ -145,16 +145,40 @@ sorted game list within a section.
 
 ## Event Seams
 
+The runtime now follows three distinct readiness signals plus interaction triggers.
+Do not collapse these into a single overloaded "data ready" event.
+
+### Phase 1 — Library manifest fixed (immutable membership)
+
 | Event | Payload | Emitted by | Consumed by |
 |---|---|---|---|
-| `GamesLoaded` | all games | SteamIntegration | Layout pipeline start |
-| `LayoutSelected` | layout strategy id | UI / defaults | LayoutCoordinator |
-| `GroupingApplied` | `Section[]` (no spatial data yet) | GroupingCoordinator | LayoutCoordinator |
-| `SectionsReady` | `Section[]` (with spatial allocations) | LayoutCoordinator | GameBoxSpawner |
-| `SortApplied` | section id + sorted games | UI / defaults | LayoutCoordinator → re-place |
+| `SteamEventTypes.LibraryManifestReady` | `totalGames`, `totalBatches`, `appids[]` | `SteamIntegration` | `GameBoxSpawner` (capacity), loading/progress UI |
 
-*Note: `GamesSort` as a flat sorted list is the current stepping stone. It evolves
-into `SectionsReady` with per-section sorted game lists.*
+### Phase 2 — Definitions ready for grouping/sorting/layout
+
+| Event | Payload | Emitted by | Consumed by |
+|---|---|---|---|
+| `GameEventTypes.GameDataReady` | `totalGames`, `totalBatches` | `SteamIntegration` (after `steam.games` commit) | `GameSorter` (+ any definitions consumers) |
+| `GameEventTypes.SectionsReady` | `Section[]`, `groupMode`, `sortMode` | `GameSorter` | `ShelfLayoutCoordinator`, `GameBoxSpawner`, `ShelfSectionPlanner` |
+
+### Phase 3 — Artwork/placement progress + terminal completion
+
+| Event | Payload | Emitted by | Consumed by |
+|---|---|---|---|
+| `SteamEventTypes.GamesBatchReady` | `games[]`, `batchIndex`, `totalBatches` | `GamesLoader`/`BatchEmitter` | `BatchCoordinator`, startup progress trackers |
+| `StorePropsEventTypes.BatchReadyForPlacement` | same batch payload | `BatchCoordinator` | `GameBoxSpawner` prewarm |
+| `StorePropsEventTypes.GamesPlaced` | `batchIndex`, `status` | `GameBoxSpawner` | `BatchCoordinator` completion accounting |
+| `GameEventTypes.SomeBatchesComplete` | `completedBatches`, `totalBatches` | `BatchCoordinator` | progress UI |
+| `GameEventTypes.AllBatchesComplete` | terminal signal | `BatchCoordinator` | startup/UI completion |
+
+### User-driven reflow triggers
+
+| Event | Payload | Emitted by | Consumed by |
+|---|---|---|---|
+| `UIEventTypes.LayoutRequested` | `layoutMode` | UI | `StorePropsCoordinator` |
+| `UIEventTypes.ArrangementRequested` | `groupMode`, `sortMode` | UI | `GameSorter` |
+| `StorePropsEventTypes.LayoutClearRequest` | none | `StorePropsCoordinator` | placement/layout subsystems |
+| `StorePropsEventTypes.LibraryReloadRequest` | none | `SteamIntegration` | full library-teardown subsystems |
 
 ---
 

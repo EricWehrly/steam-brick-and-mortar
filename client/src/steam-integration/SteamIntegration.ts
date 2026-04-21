@@ -16,7 +16,14 @@ import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
 import type { SteamGameData } from '../scene'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes, AppSettingsEventTypes, GameEventTypes } from '../types/InteractionEvents'
-import type { SteamLoadLibraryEvent, SteamCacheClearEvent, SteamGamesBatchEvent, SteamDataLoadedEvent } from '../types/InteractionEvents'
+import type {
+    SteamLoadLibraryEvent,
+    SteamCacheClearEvent,
+    SteamGamesBatchEvent,
+    SteamDataLoadedEvent,
+    SteamLibraryManifestReadyEvent,
+} from '../types/InteractionEvents'
+import type { GameDataReadyEvent } from '../types/EnvironmentEvents'
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
@@ -97,6 +104,24 @@ export class SteamIntegration {
         }
 
         this.eventManager.emit<SteamDataLoadedEvent>(SteamEventTypes.DataLoaded)
+
+        const totalGames = games.length
+        const totalBatches = Math.max(1, Math.ceil(totalGames / 18))
+        const appids = games
+            .map((game) => (typeof game.appid === 'number' ? game.appid : Number(game.appid)))
+            .filter((appid) => Number.isFinite(appid))
+
+        this.eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+            userInput: userInput ?? undefined,
+            totalGames,
+            totalBatches,
+            appids,
+        })
+
+        this.eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, {
+            totalGames,
+            totalBatches,
+        })
     }
 
     /** Returns true when no user identity has been established (anonymous/demo browse). */

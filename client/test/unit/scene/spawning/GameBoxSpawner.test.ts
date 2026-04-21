@@ -17,13 +17,15 @@ import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
 
 import {
     StorePropsEventTypes,
+    SteamEventTypes,
     GameEventTypes,
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
 } from '../../../../src/types/InteractionEvents'
-import type { SectionsReadyEvent, GameDataReadyEvent } from '../../../../src/types/EnvironmentEvents'
+import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
+import type { SteamLibraryManifestReadyEvent } from '../../../../src/types/InteractionEvents'
 import type {
     StorePropsLayoutClearRequestEvent,
     StorePropsLibraryReloadRequestEvent,
@@ -151,8 +153,12 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         })
 
         spawner = new (GameBoxSpawner as any)()
-        // Ordering contract: renderer is initialized from GameDataReady before any batch prewarm events.
-        eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, { totalGames: 500, totalBatches: 28 })
+        // Ordering contract: renderer is initialized from immutable manifest before any batch prewarm events.
+        eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+            totalGames: 500,
+            totalBatches: 28,
+            appids: Array.from({ length: 500 }, (_, index) => index + 1),
+        })
         emitShelfLayoutDetermined(eventManager)
     })
 

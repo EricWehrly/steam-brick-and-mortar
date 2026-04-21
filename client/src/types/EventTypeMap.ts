@@ -18,6 +18,7 @@ import type {
     SteamImageCacheClearEvent,
     SteamDevModeToggleEvent,
     SteamDataLoadedEvent,
+    SteamLibraryManifestReadyEvent,
     SteamGameLoadedEvent,
     SteamGamesBatchEvent,
     SteamNetworkFetchProgressEvent,
@@ -56,6 +57,7 @@ export interface InteractionEventMap {
     [SteamEventTypes.ImageCacheClear]: SteamImageCacheClearEvent
     [SteamEventTypes.DevModeToggle]: SteamDevModeToggleEvent
     [SteamEventTypes.DataLoaded]: SteamDataLoadedEvent
+    [SteamEventTypes.LibraryManifestReady]: SteamLibraryManifestReadyEvent
     [SteamEventTypes.GameLoaded]: SteamGameLoadedEvent
     [SteamEventTypes.GamesBatchReady]: SteamGamesBatchEvent
     [SteamEventTypes.NetworkFetchProgress]: SteamNetworkFetchProgressEvent

@@ -8,12 +8,14 @@ import {
     BatchProcessingStatus,
     StorePropsEventTypes, 
     GameEventTypes,
+    SteamEventTypes,
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
 } from '../../types/InteractionEvents'
-import type { SectionsReadyEvent, GameDataReadyEvent } from '../../types/EnvironmentEvents'
+import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
+import type { SteamLibraryManifestReadyEvent } from '../../types/InteractionEvents'
 import type {
     StorePropsLayoutClearRequestEvent,
     StorePropsLibraryReloadRequestEvent,
@@ -113,8 +115,8 @@ export class GameBoxSpawner {
             (e: CustomEvent<SectionsReadyEvent>) => this.handleSectionsReady(e)
         )
         EventManager.getInstance().registerEventHandler(
-            GameEventTypes.GameDataReady,
-            (e: CustomEvent<GameDataReadyEvent>) => this.handleGameDataReady(e)
+            SteamEventTypes.LibraryManifestReady,
+            (e: CustomEvent<SteamLibraryManifestReadyEvent>) => this.handleLibraryManifestReady(e)
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.LayoutClearRequest,
@@ -177,7 +179,7 @@ export class GameBoxSpawner {
         GameBoxSpawner.logger.debug(`Renderer initialized: capacity ${rendererCapacity}`)
     }
 
-    private handleGameDataReady(event: CustomEvent<GameDataReadyEvent>): void {
+    private handleLibraryManifestReady(event: CustomEvent<SteamLibraryManifestReadyEvent>): void {
         const { totalGames } = event.detail
         this.initializeRendererForLibrary(totalGames)
     }

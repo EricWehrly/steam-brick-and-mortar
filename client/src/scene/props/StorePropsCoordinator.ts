@@ -27,7 +27,7 @@
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../../core/EventManager'
 import { Logger } from '../../utils/Logger'
-import { GameEventTypes, RoomEventTypes, StorePropsEventTypes, UIEventTypes } from '../../types/InteractionEvents'
+import { GameEventTypes, RoomEventTypes, SteamEventTypes, StorePropsEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import type {
     StorePropsSetupRequestEvent,
     StorePropsSetupCompletedEvent,
@@ -37,7 +37,7 @@ import type {
 
 import type { RoomResizedEvent } from '../../types/InteractionEvents'
 import type { BatchReadyForPlacementEvent } from '../../types/InteractionEvents'
-import { type LayoutRequestedEvent, type GameDataReadyEvent } from '../../types/EnvironmentEvents'
+import { type LayoutRequestedEvent } from '../../types/EnvironmentEvents'
 import { type LayoutMode } from '../../types/LayoutTypes'
 import { DataManager } from '../../core/data'
 import { ShelfLayoutCoordinator } from '../shelves/ShelfLayoutCoordinator'
@@ -209,10 +209,21 @@ class StorePropsCoordinator {
         // GameSorter listens to GameDataReady and will re-emit SectionsReady,
         // driving ShelfLayoutCoordinator and GameBoxSpawner with the new layout mode.
         const games = DataManager.getInstance().get<unknown[]>('steam.games') ?? []
+        const appids = games
+            .map((game) => (typeof game === 'object' && game !== null ? Number((game as { appid?: unknown }).appid) : NaN))
+            .filter((appid) => Number.isFinite(appid))
+
         if (games.length > 0) {
-            this.eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, {
+            const totalBatches = Math.max(1, Math.ceil(games.length / 18))
+            this.eventManager.emit(SteamEventTypes.LibraryManifestReady, {
                 totalGames: games.length,
-                totalBatches: this.lastTotalBatches,
+                totalBatches,
+                appids,
+            })
+
+            this.eventManager.emit(GameEventTypes.GameDataReady, {
+                totalGames: games.length,
+                totalBatches,
             })
         }
     }

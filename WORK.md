@@ -4,45 +4,58 @@
 **Base:** `openclaw/feat-renderer-lifetime-clean` (includes ordering + reload/layout split fixes)
 
 ## Goal
-Implement Section-Per-Layout (SPL) so shelf distribution is section-owned (not global overflow), and remove transitional coupling hacks that emerged in renderer-lifetime split work.
+Implement Section-Per-Layout (SPL) with clean, phase-specific event ownership:
+1) immutable library manifest,
+2) definitions-ready grouping/sorting,
+3) artwork/placement completion.
 
 ## Why now
-- Current branch has stabilizing fixes we want.
-- Additional cleanup before SPL likely causes churn.
-- SPL should simplify several awkward coordination paths by making section budgets explicit.
+- Current overlap (`DataLoaded` + `GameDataReady`) was semantically muddy.
+- Batch/placement ownership was split across multiple emitters.
+- Regressions (empty shelves/sign gaps) indicated readiness boundaries needed to be explicit.
 
 ---
 
-## Milestone 1 (vertical slice)
+## Milestone 1 (this pass)
 
-### A. Section-owned shelf budgets
-- Compute shelf allocation per section from section game counts (with sane min/max constraints)
-- Stop relying on global overflow behavior for arc back row as primary distribution mechanism
+### A. Event seam cleanup (single-owner boundaries)
+- [x] Added `SteamEventTypes.LibraryManifestReady` + payload type (`SteamLibraryManifestReadyEvent`)
+- [x] Moved canonical `GameDataReady` emission to `SteamIntegration` (definitions-ready seam)
+- [x] Removed `GameDataReady` emission from `BatchCoordinator`
+- [x] Updated `GameBoxSpawner` capacity init to listen to `LibraryManifestReady`
+- [x] Kept `DataLoaded` as integration/UI refresh signal
 
-### B. Placement consumes section budgets directly
-- Placement loops by section using explicit allocated shelf count
-- Ensure each section’s shelf range is deterministic and stable across layout switches
+### B. Layout-change replay semantics
+- [x] `StorePropsCoordinator` now re-emits `LibraryManifestReady` + `GameDataReady` from DataManager state on layout change
 
-### C. Keep event contracts stable
-- Preserve existing core events where possible (`SectionsReady`, `ShelfReady`, `ShelfLayoutDetermined`)
-- Avoid introducing broad new lifecycle events unless absolutely required
+### C. Documentation updates (existing docs only)
+- [x] `docs/plans/layout-pipeline-plan.md` — rewritten event seam table by 3 phases
+- [x] `docs/features/gamesort-full-pipeline.md` — updated status + contract section
+- [x] `docs/agent-context/component-interaction-map.md` — added canonical runtime event flow header
 
-### D. Arc squish validation
-- Validate genre-heavy libraries no longer collapse visually into back-row squish
-
----
-
-## Initial file targets (expected)
-- [ ] `client/src/scene/props/shared/ArcLayoutUtils.ts`
-- [ ] `client/src/scene/shelves/ShelfLayoutCoordinator.ts`
-- [ ] `client/src/scene/spawning/GameBoxSpawner.ts`
-- [ ] `client/src/scene/categorization/*` (if section metadata needs extension)
-- [ ] test updates in `client/test/unit/scene/*` + targeted integration coverage
+### D. Regression coverage
+- [x] Updated unit tests for new ownership (`BatchCoordinator` no longer emits `GameDataReady`)
+- [x] Updated GameBoxSpawner tests to manifest-based renderer initialization
+- [x] Added integration guard: `event-ordering-library-readiness.int.test.ts`
+- [x] Simplified/retargeted `games-on-shelves-regression.int.test.ts` to manifest+sections+batches contract
 
 ---
 
-## Constraints / Notes
-- Keep renderer lifecycle improvements intact (no art reload on layout switch).
-- Keep split clear events (`LayoutClearRequest`, `LibraryReloadRequest`).
-- Prefer explicit section semantics over inferred global capacity math.
-- Avoid speculative refactors unrelated to SPL vertical slice.
+## Validation run summary
+
+### Unit (`yarn test ...`)
+- [x] `test/unit/scene/batch/BatchCoordinator-game-data-ordering.test.ts`
+- [x] `test/unit/scene/spawning/GameBoxSpawner.test.ts`
+- [x] `test/unit/scene/categorization/GameSorter.test.ts`
+- [x] `test/unit/scene/ShelfSectionPlanner.test.ts`
+
+### Integration (`yarn test:integration ...`)
+- [x] `test/integration/games-on-shelves-regression.int.test.ts`
+- [x] `test/integration/event-ordering-library-readiness.int.test.ts`
+
+---
+
+## Remaining follow-ups
+- [ ] Decide whether `DataLoaded` naming should be narrowed (`SteamSessionReady` / similar) to reduce confusion with `GameDataReady`.
+- [ ] Consider explicit `GameDefinitionsBatchReady` / `GameDefinitionsReady` events if we want phase-2 batch semantics separate from `GamesBatchReady` transport semantics.
+- [ ] Optional: add direct integration assertion for sign object presence once sign renderer/test harness contract is made deterministic in integration env.

@@ -9,6 +9,9 @@
  *   GameDataReady           → run initial arrangement with defaults
  *   ArrangementRequested    → re-run with new group + sort axes
  *
+ * Note: GameDataReady is the definitions-ready seam (steam.games committed),
+ * not the terminal artwork/placement completion signal.
+ *
  * Emits SectionsReady with the resulting sections + provenance (groupMode, sortMode).
  *
  * Default arrangement:
