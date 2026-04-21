@@ -151,6 +151,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         })
 
         spawner = new (GameBoxSpawner as any)()
+        // Ordering contract: renderer is initialized from GameDataReady before any batch prewarm events.
+        eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, { totalGames: 500, totalBatches: 28 })
         emitShelfLayoutDetermined(eventManager)
     })
 

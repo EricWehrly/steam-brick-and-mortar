@@ -14,6 +14,7 @@
 import { Logger } from '../../utils/Logger'
 import { PerformanceMonitor } from '../../utils/PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
+import { DataManager } from '../../core/data/DataManager'
 import { 
     BatchProcessingStatus,
     GameEventTypes,
@@ -62,6 +63,7 @@ export class BatchCoordinator<T> {
     private batchStatuses: Map<number, BatchStatusState> = new Map()
     private pendingSomeBatchesTimeout: ReturnType<typeof setTimeout> | null = null
     private readonly someBatchesDebounceMs: number = 50
+    private gameDataReadyEmittedForRun: boolean = false
 
     private metrics: BatchMetrics = {
         batches: [],
@@ -197,6 +199,7 @@ export class BatchCoordinator<T> {
             totalMainThreadTime: 0,
             loadStart: 0
         }
+        this.gameDataReadyEmittedForRun = false
     }
 
     private async processQueue(): Promise<void> {
@@ -206,7 +209,8 @@ export class BatchCoordinator<T> {
         }
 
         this.isProcessing = true
-        
+        this.emitGameDataReadyIfNeeded()
+
         BatchCoordinator.logger.debug('Starting batch processing queue')
 
         try {
@@ -226,22 +230,31 @@ export class BatchCoordinator<T> {
             this.isProcessing = false
         }
 
-        // All batch data has been dispatched — games are in DataManager and all
-        // BatchReadyForPlacement events have fired. GameSorter can now sort and
-        // plan sections. This is earlier than AllBatchesComplete, which waits
-        // for GamesPlaced confirmation.
-        if (this.received > 0 && this.received === this.expectedTotal) {
-            const totalGames = this.queue.length === 0
-                ? this.received * 18  // approximate; actual count lives in DataManager
-                : 0
-            EventManager.getInstance().emit<GameDataReadyEvent>(
-                GameEventTypes.GameDataReady,
-                { totalGames, totalBatches: this.expectedTotal }
-            )
-            BatchCoordinator.logger.debug(`GameDataReady emitted (${this.expectedTotal} batches dispatched)`)
+        this.tryEmitCompletionEvent()
+    }
+
+    private emitGameDataReadyIfNeeded(): void {
+        if (this.gameDataReadyEmittedForRun || this.expectedTotal <= 0) {
+            return
         }
 
-        this.tryEmitCompletionEvent()
+        const totalGamesFromLibrary = DataManager.getInstance().get<unknown[]>('steam.games')?.length ?? 0
+        const totalGames = totalGamesFromLibrary > 0
+            ? totalGamesFromLibrary
+            : this.expectedTotal * 18
+
+        if (totalGamesFromLibrary === 0) {
+            BatchCoordinator.logger.warn(
+                `GameDataReady emitted without steam.games populated; using estimated totalGames=${totalGames}`
+            )
+        }
+
+        EventManager.getInstance().emit<GameDataReadyEvent>(
+            GameEventTypes.GameDataReady,
+            { totalGames, totalBatches: this.expectedTotal }
+        )
+        this.gameDataReadyEmittedForRun = true
+        BatchCoordinator.logger.debug(`GameDataReady emitted before batch dispatch (${this.expectedTotal} batches expected)`)
     }
 
     private async processOneBatch(batch: BatchItem<T>): Promise<void> {
