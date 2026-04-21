@@ -13,7 +13,8 @@ import {
     type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
 } from '../../types/InteractionEvents'
-import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
+import type { SectionsReadyEvent, GameDataReadyEvent } from '../../types/EnvironmentEvents'
+import type { StorePropsClearRequestEvent } from '../props/PropsEvents'
 import { Logger } from '../../utils/Logger'
 import type { StockSurface } from '../../types/LayoutTypes'
 
@@ -63,10 +64,9 @@ type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
 export class GameBoxSpawner {
     private static readonly logger = Logger.createLogFunctions(GameBoxSpawner.name)
 
-    // Owned renderer — constructed when sections are known (total game count drives allocation)
+    // Owned renderer — initialized on GameDataReady (sized to full library), lives for library lifetime.
+    // Cleared but NOT disposed on layout/group/sort switches.
     private renderer: GpuGameBoxRenderer | null = null
-    // Capacity the renderer was built for — tracked here so GpuGameBoxRenderer stays clean
-    private rendererCapacity = 0
 
     // Shelf world positions indexed by shelfIndex, grouped by sectionIndex
     private shelfPositions: Map<number, ShelfPosition & { sectionIndex: number }> = new Map()
@@ -111,23 +111,62 @@ export class GameBoxSpawner {
             (e: CustomEvent<SectionsReadyEvent>) => this.handleSectionsReady(e)
         )
         EventManager.getInstance().registerEventHandler(
+            GameEventTypes.GameDataReady,
+            (e: CustomEvent<GameDataReadyEvent>) => this.handleGameDataReady(e)
+        )
+        EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ClearRequest,
-            () => this.reset()
+            (e: CustomEvent<StorePropsClearRequestEvent>) => this.handleClearRequest(e)
         )
 
         GameBoxSpawner.logger.debug('Constructed')
     }
 
-    private reset(): void {
+    /**
+     * Full teardown — only on library reload (new user, force-refresh).
+     * Disposes the renderer and clears all prefetch state.
+     */
+    private fullReset(): void {
         this.renderer?.dispose()
         this.renderer = null
-        this.rendererCapacity = 0
         this.stockStrategy = null
         this.pendingSections = null
         this.shelfPositions.clear()
         this.prefetchResults.clear()
         this.placementIntents.clear()
-        GameBoxSpawner.logger.debug('Reset')
+        GameBoxSpawner.logger.debug('Full reset (library reload)')
+    }
+
+    /**
+     * Geometry reset — on layout/group/sort switches.
+     * Keeps the renderer and prefetch cache; only clears placement state.
+     */
+    private geometryReset(): void {
+        this.renderer?.clearPlacements()
+        this.stockStrategy = null
+        this.pendingSections = null
+        this.shelfPositions.clear()
+        this.placementIntents.clear()
+        GameBoxSpawner.logger.debug('Geometry reset (layout switch)')
+    }
+
+    private handleClearRequest(event: CustomEvent<StorePropsClearRequestEvent>): void {
+        if (event.detail.reason === 'library-reload') {
+            this.fullReset()
+        } else {
+            this.geometryReset()
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Initialize renderer at library load time (sized to full library)
+
+    private handleGameDataReady(event: CustomEvent<GameDataReadyEvent>): void {
+        const { totalGames } = event.detail
+        if (!this.renderer) {
+            this.renderer = new GpuGameBoxRenderer(totalGames + 100)
+            GameBoxSpawner.logger.debug(`Renderer initialized: capacity ${totalGames + 100}`)
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -150,18 +189,17 @@ export class GameBoxSpawner {
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
         const { games, batchIndex, totalBatches } = event.detail
 
-        // Construct renderer on first batch using total game estimate.
-        // Renderer is replaced if batch count changes (library reload).
-        const requiredCapacity = totalBatches * 18 + 100
-        if (!this.renderer || requiredCapacity > this.rendererCapacity) {
-            this.renderer?.dispose()
-            this.renderer = new GpuGameBoxRenderer(requiredCapacity)
-            this.rendererCapacity = requiredCapacity
-        }
-
         GameBoxSpawner.logger.debug(
             `BatchReadyForPlacement: batch ${batchIndex + 1}/${totalBatches}, ${games.length} games — prewarming artwork`
         )
+
+        if (!this.renderer) {
+            // Renderer should have been initialized by GameDataReady before batches arrive.
+            // Construct defensively here with batch-based estimate if it hasn't been.
+            const estimatedCapacity = totalBatches * 18 + 100
+            this.renderer = new GpuGameBoxRenderer(estimatedCapacity)
+            GameBoxSpawner.logger.warn(`Renderer not yet initialized via GameDataReady — fallback capacity ${estimatedCapacity}`)
+        }
 
         for (const game of games) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
@@ -228,19 +266,6 @@ export class GameBoxSpawner {
         if (!this.renderer) {
             GameBoxSpawner.logger.warn('placeSections: renderer not yet constructed')
             return
-        }
-
-        // Guard: if the renderer was created for a smaller layout (e.g. Spoke with few
-        // visible games), it may not have capacity for the full library. Recreate it
-        // using the total known prefetched game count so the label atlas can hold all labels.
-        const requiredCapacity = this.prefetchResults.size
-        if (requiredCapacity > this.rendererCapacity) {
-            GameBoxSpawner.logger.debug(
-                `Renderer capacity ${this.rendererCapacity} < required ${requiredCapacity} — recreating`
-            )
-            this.renderer.dispose()
-            this.renderer = new GpuGameBoxRenderer(requiredCapacity + 100)
-            this.rendererCapacity = requiredCapacity + 100
         }
 
         if (!this.stockStrategy) {

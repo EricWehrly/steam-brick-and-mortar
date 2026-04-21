@@ -1,25 +1,33 @@
-# WORK.md — feat-group-sort-separation
+# WORK.md — feat-renderer-lifecycle
 
-**Branch:** `openclaw/feat-group-sort-separation`  
+**Branch:** `openclaw/feat-renderer-lifecycle`  
 **Base:** `act1-intermission`
 
 ## Goal
-Separate Group, Sort, and Layout as three independent player-facing controls.
-No shimming: clean split, old fused `GameSortMode` deleted.
+- Renderer initialized once per library load, sized to full game count
+- Layout switches rebuild geometry without reloading library (no Steam API hit)
+- All capacity checks removed
 
 ## Approach
-1. **Types first** (`GroupMode`, `SortMode`, update `Section` + events)
-2. **Logic** (`GroupResolver` partitions, `GameSorter`/`SectionSorter` sorts within)
-3. **UI** (`LayoutControlPanel` — three dropdowns)
+
+1. `StorePropsCoordinator.handleLayoutRequested`:
+   - Remove `SteamEventTypes.LoadLibrary` emit
+   - Instead: emit `ClearRequest` + `SetupRequest` + `GameDataReady` (from DataManager)
+
+2. `GameBoxSpawner`:
+   - Listen to `GameDataReady` to initialize renderer at library size
+   - On `ClearRequest` (layout switch): `clearPlacements()` only, keep renderer + prefetchResults
+   - On genuine library reload signal: full dispose+recreate
+   - Remove all capacity checks
+
+3. Distinguish layout-switch ClearRequest from library-reload ClearRequest:
+   - Option A: `StorePropsCoordinator` emits a separate `SceneRebuildRequested` event for layout switches
+   - Option B: `ClearRequest` payload carries a `reason: 'layout-switch' | 'library-reload'`
+   - Leaning toward Option B — same event, more information, no new event type
 
 ## Affected files
-- [ ] `src/types/LayoutTypes.ts` — add `GroupMode`/`GroupModes`
-- [ ] `src/types/EnvironmentEvents.ts` — `GroupMode`/`SortMode` in events, delete old `GameSortModes`
-- [ ] `src/scene/categorization/GameSorter.ts` — rewrite as two-stage
-- [ ] `src/scene/categorization/GroupResolver.ts` — new file
-- [ ] `src/ui/LayoutSortPanel.ts` → `src/ui/LayoutControlPanel.ts` — three dropdowns
-- [ ] `src/ui/index.ts` or wiring — re-export
-
-## Open questions
-- Does `SteamIntegration.isAnonymous()` check for initial group mode still make sense? 
-  (anonymous → no recency data → default group 'by-genre' still valid)
+- [ ] `StorePropsCoordinator.ts` — remove LoadLibrary from layout switch
+- [ ] `GameBoxSpawner.ts` — renderer init on GameDataReady; clearPlacements on layout-switch ClearRequest
+- [ ] `PropsEvents.ts` — add reason field to StorePropsClearRequestEvent
+- [ ] `SteamIntegration.ts` — emit ClearRequest with reason='library-reload'
+- [ ] Tests

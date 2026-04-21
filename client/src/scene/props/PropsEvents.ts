@@ -44,9 +44,17 @@ export interface StorePropsSetupCompletedEvent extends BaseInteractionEvent {
     // completion is the signal; no payload needed
 }
 
-/** Emitted by SteamIntegration to tear down the current store before a reload. */
+/**
+ * Emitted to tear down the current store.
+ *
+ * reason:
+ *   'library-reload' — a new library is about to load; consumers must dispose GPU resources
+ *                      and clear prefetch state (full teardown)
+ *   'layout-switch'  — layout geometry is rebuilding but game data is unchanged; consumers
+ *                      should clear placements and shelf positions only (no GPU dispose)
+ */
 export interface StorePropsClearRequestEvent extends BaseInteractionEvent {
-    // no payload needed
+    reason: 'library-reload' | 'layout-switch'
 }
 
 // =============================================================================
