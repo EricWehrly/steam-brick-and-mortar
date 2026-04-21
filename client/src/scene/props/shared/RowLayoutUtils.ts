@@ -75,9 +75,9 @@ function deriveRowLayoutConfigFromSectionCounts(sections: ReadonlyArray<Section>
     const maxShelvesInAnySection = Math.max(1, ...sectionShelfCounts)
 
     return {
-        shelvesPerRow: Math.max(8, Math.ceil(Math.sqrt(maxShelvesInAnySection) * 3)),
-        shelfSpacingX: Math.max(2.5, 2.2 + maxShelvesInAnySection * 0.02),
-        rowSpacingZ: Math.max(4.0, 3.5 + maxShelvesInAnySection * 0.03),
+        shelvesPerRow: Math.max(8, Math.ceil(Math.sqrt(maxShelvesInAnySection) * 2.6)),
+        shelfSpacingX: Math.max(2.5, 2.2 + maxShelvesInAnySection * 0.015),
+        rowSpacingZ: Math.max(4.0, 3.5 + maxShelvesInAnySection * 0.02),
         firstRowZ: ROW_DEFAULTS.firstRowZ,
         maxRows: Math.max(ROW_DEFAULTS.maxRows, Math.ceil(maxShelvesInAnySection / 2) + 2),
     }

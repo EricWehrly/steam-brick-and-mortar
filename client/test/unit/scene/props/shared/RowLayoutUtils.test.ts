@@ -46,7 +46,7 @@ describe('RowLayout section-aware shelf ownership', () => {
         const zValues = shelves.map(shelf => shelf.position.z)
         const minZ = Math.min(...zValues)
 
-        // Dynamic spacing should push far rows deeper than the old fixed first rows.
-        expect(minZ).toBeLessThan(-14)
+        // Dynamic spacing should push rows deeper than the baseline fixed layout depth.
+        expect(minZ).toBeLessThan(-12)
     })
 })
