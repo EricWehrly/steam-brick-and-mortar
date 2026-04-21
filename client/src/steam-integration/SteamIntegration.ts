@@ -16,7 +16,6 @@ import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
 import type { SteamGameData } from '../scene'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes, AppSettingsEventTypes, GameEventTypes } from '../types/InteractionEvents'
-import type { GameDataReadyEvent } from '../types/EnvironmentEvents'
 import type { SteamLoadLibraryEvent, SteamCacheClearEvent, SteamGamesBatchEvent, SteamDataLoadedEvent } from '../types/InteractionEvents'
 import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppSettings } from '../core/AppSettings'
@@ -98,11 +97,6 @@ export class SteamIntegration {
         }
 
         this.eventManager.emit<SteamDataLoadedEvent>(SteamEventTypes.DataLoaded)
-
-        this.eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, {
-            totalGames: games.length,
-            totalBatches: Math.max(1, Math.ceil(games.length / 18)),
-        })
     }
 
     /** Returns true when no user identity has been established (anonymous/demo browse). */

@@ -142,10 +142,11 @@ describe('section-aware arc layout', () => {
         expect(shelves.length).toBeGreaterThan(0)
 
         const rowFourShelves = shelves.filter((shelf) => shelf.row === 4)
-        const rowFourSectionIndices = new Set(rowFourShelves.map((shelf) => shelf.sectionIndex))
 
-        // Regression guard: row 4 should not collapse to a single dominant section.
-        expect(rowFourSectionIndices.size).toBeGreaterThan(1)
+        // Section-as-ring behavior: deepest row should be owned by one section,
+        // not interleaved columns from many sections.
+        const rowFourSectionIndices = new Set(rowFourShelves.map((shelf) => shelf.sectionIndex))
+        expect(rowFourSectionIndices.size).toBe(1)
     })
 
     it('expands arc depth dynamically for larger section shelf counts', () => {
@@ -160,7 +161,7 @@ describe('section-aware arc layout', () => {
         const furthestZ = Math.min(...shelves.map((shelf) => shelf.position.z))
 
         // Large section depths should push the outer arc further than fixed baseline depths.
-        expect(furthestZ).toBeLessThan(-30)
+        expect(furthestZ).toBeLessThan(-24)
     })
 })
 

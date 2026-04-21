@@ -85,9 +85,9 @@ function deriveArcConfigFromSectionCounts(sectionShelfCounts: ReadonlyArray<numb
 
     return {
         rows: Math.max(5, Math.ceil(Math.sqrt(totalShelves / 3))),
-        rowRadiusStep: Math.max(4.0, 3.8 + maxShelvesInAnySection * 0.06),
-        firstRowRadius: Math.max(5.5, 4.8 + maxShelvesInAnySection * 0.03),
-        halfAngle: Math.PI / 2.8,
+        rowRadiusStep: Math.max(4.0, 3.8 + maxShelvesInAnySection * 0.025),
+        firstRowRadius: Math.max(5.5, 5.0 + maxShelvesInAnySection * 0.012),
+        halfAngle: Math.PI / 3,
         minShelfGap: 1.0,
         shelfWidthMetres: 2.0,
     }
@@ -222,22 +222,17 @@ function computeArcShelvesForSections(sections: ReadonlyArray<Section>): Section
     })
 
     const owningSectionIndices = new Array<number>(totalShelves).fill(0)
-    let sectionCursor = 0
 
+    // Section-as-ring behavior: assign contiguous rows to sections by shelf budget.
+    let sectionCursor = 0
     for (const [, shelfIndices] of [...shelvesByRow.entries()].sort(([a], [b]) => a - b)) {
         for (const shelfIndex of shelfIndices) {
-            let scanCount = 0
-            while (scanCount < sectionRemainingCounts.length && sectionRemainingCounts[sectionCursor] <= 0) {
-                sectionCursor = (sectionCursor + 1) % sectionRemainingCounts.length
-                scanCount++
-            }
-            if (scanCount >= sectionRemainingCounts.length) {
-                break
+            while (sectionCursor < sectionRemainingCounts.length - 1 && sectionRemainingCounts[sectionCursor] <= 0) {
+                sectionCursor++
             }
 
             owningSectionIndices[shelfIndex] = sectionCursor
-            sectionRemainingCounts[sectionCursor]--
-            sectionCursor = (sectionCursor + 1) % sectionRemainingCounts.length
+            sectionRemainingCounts[sectionCursor] = Math.max(0, sectionRemainingCounts[sectionCursor] - 1)
         }
     }
 

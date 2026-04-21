@@ -90,17 +90,15 @@ function deriveSpokeSpacingFromSectionCounts(
     minimumHubClearanceMetres: number
 ): { hubClearanceMetres: number; shelfSpacingMetres: number } {
     const maxShelvesInAnySection = Math.max(1, ...shelvesPerSection)
-    const minimumShelfSpacingMetres = 2.5
 
-    // Target ~15% extra aisle depth as section shelf counts grow to avoid spoke overlap.
     const dynamicShelfSpacingMetres = Math.max(
-        minimumShelfSpacingMetres,
-        2.2 + maxShelvesInAnySection * 0.35
+        2.4,
+        2.1 + maxShelvesInAnySection * 0.12
     )
 
     const dynamicHubClearanceMetres = Math.max(
         minimumHubClearanceMetres,
-        aisleHalfWidthMetres * 2 + maxShelvesInAnySection * 0.2
+        aisleHalfWidthMetres * 2 + maxShelvesInAnySection * 0.08
     )
 
     return {

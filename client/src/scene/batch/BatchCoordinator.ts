@@ -14,6 +14,7 @@
 import { Logger } from '../../utils/Logger'
 import { PerformanceMonitor } from '../../utils/PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
+import { DataManager } from '../../core/data/DataManager'
 import { 
     BatchProcessingStatus,
     GameEventTypes,
@@ -24,7 +25,7 @@ import {
     type BatchReadyForPlacementEvent,
     type GamesPlacedEvent,
 } from '../../types/InteractionEvents'
-import type { AllBatchesCompleteEvent, SomeBatchesCompleteEvent } from '../../types/EnvironmentEvents'
+import type { AllBatchesCompleteEvent, GameDataReadyEvent, SomeBatchesCompleteEvent } from '../../types/EnvironmentEvents'
 
 export interface BatchItem<T> {
     batchIndex: number
@@ -62,6 +63,7 @@ export class BatchCoordinator<T> {
     private batchStatuses: Map<number, BatchStatusState> = new Map()
     private pendingSomeBatchesTimeout: ReturnType<typeof setTimeout> | null = null
     private readonly someBatchesDebounceMs: number = 50
+    private gameDataReadyEmittedForRun: boolean = false
 
     private metrics: BatchMetrics = {
         batches: [],
@@ -197,6 +199,7 @@ export class BatchCoordinator<T> {
             totalMainThreadTime: 0,
             loadStart: 0
         }
+        this.gameDataReadyEmittedForRun = false
     }
 
     private async processQueue(): Promise<void> {
@@ -206,6 +209,7 @@ export class BatchCoordinator<T> {
         }
 
         this.isProcessing = true
+        this.emitGameDataReadyIfNeeded()
 
         BatchCoordinator.logger.debug('Starting batch processing queue')
 
@@ -227,6 +231,24 @@ export class BatchCoordinator<T> {
         }
 
         this.tryEmitCompletionEvent()
+    }
+
+    private emitGameDataReadyIfNeeded(): void {
+        if (this.gameDataReadyEmittedForRun || this.expectedTotal <= 0) {
+            return
+        }
+
+        const totalGamesFromLibrary = DataManager.getInstance().get<unknown[]>('steam.games')?.length ?? 0
+        const totalGames = totalGamesFromLibrary > 0
+            ? totalGamesFromLibrary
+            : this.expectedTotal * 18
+
+        EventManager.getInstance().emit<GameDataReadyEvent>(
+            GameEventTypes.GameDataReady,
+            { totalGames, totalBatches: this.expectedTotal }
+        )
+        this.gameDataReadyEmittedForRun = true
+        BatchCoordinator.logger.debug(`GameDataReady emitted before batch dispatch (${this.expectedTotal} batches expected)`)
     }
 
     private async processOneBatch(batch: BatchItem<T>): Promise<void> {

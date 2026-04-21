@@ -90,9 +90,12 @@ describe('SpokeLayout section-aware shelf ownership', () => {
             radiiBySection.set(shelf.sectionIndex, existing)
         }
 
-        // Large sections should produce spokes that extend well beyond the old fixed depth.
+        // Large sections should produce deeper spokes than the old fixed defaults,
+        // but not explode to extreme radii.
         const allRadii = [...radiiBySection.values()].flat()
-        expect(Math.max(...allRadii)).toBeGreaterThan(14)
+        const maxRadius = Math.max(...allRadii)
+        expect(maxRadius).toBeGreaterThan(10)
+        expect(maxRadius).toBeLessThan(45)
     })
 })
 
