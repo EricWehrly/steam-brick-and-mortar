@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SteamGameData } from '../../../../src/scene/game-box/types/GameData'
-import { GameEventTypes, UIEventTypes } from '../../../../src/types/InteractionEvents'
+import { GameEventTypes, SteamEventTypes, UIEventTypes } from '../../../../src/types/InteractionEvents'
 import { RecentlyPlayedBucket, getRecentlyPlayedBucket, PlaytimeBucket, getPlaytimeBucket } from '../../../../src/scene/categorization/GameSorter'
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -62,6 +62,12 @@ function fireGameDataReady(): void {
     for (const h of handlers) h(event)
 }
 
+function fireSteamDataLoaded(): void {
+    const handlers = mockHandlers.get(SteamEventTypes.DataLoaded) ?? []
+    const event = new CustomEvent(SteamEventTypes.DataLoaded, { detail: {} })
+    for (const h of handlers) h(event)
+}
+
 function fireArrangementRequested(groupMode: string, sortMode: string): void {
     const handlers = mockHandlers.get(UIEventTypes.ArrangementRequested) ?? []
     const event = new CustomEvent(UIEventTypes.ArrangementRequested, { detail: { groupMode, sortMode } })
@@ -83,9 +89,26 @@ describe('GameSorter', () => {
         expect(mockHandlers.has(GameEventTypes.GameDataReady)).toBe(true)
     })
 
+    it('subscribes to SteamDataLoaded on construction', () => {
+        new GameSorter()
+        expect(mockHandlers.has(SteamEventTypes.DataLoaded)).toBe(true)
+    })
+
     it('subscribes to ArrangementRequested on construction', () => {
         new GameSorter()
         expect(mockHandlers.has(UIEventTypes.ArrangementRequested)).toBe(true)
+    })
+
+    it('emits SectionsReady when SteamDataLoaded fires with games', () => {
+        mockGames = [makeGame(1), makeGame(2)]
+        new GameSorter()
+        fireSteamDataLoaded()
+
+        expect(mockEmit).toHaveBeenCalledOnce()
+        const [eventType, payload] = mockEmit.mock.calls[0]
+        expect(eventType).toBe(GameEventTypes.SectionsReady)
+        const totalGames = payload.sections.reduce((sum: number, s: any) => sum + s.games.length, 0)
+        expect(totalGames).toBe(2)
     })
 
     it('emits SectionsReady when GameDataReady fires with games', () => {
