@@ -17,6 +17,7 @@ import { SharedMaterialManager, MaterialType } from '../../../../src/utils/Share
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { EventManager } from '../../../../src/core/EventManager'
 import { SystemCapabilitiesDetector } from '../../../../src/utils/SystemCapabilities'
+import { GameEventTypes } from '../../../../src/types/InteractionEvents'
 
 // Mock dependencies to isolate unit under test
 vi.mock('../../../../src/utils/SharedMaterialManager')
@@ -57,6 +58,7 @@ describe('InstancedShelfRenderer', () => {
         // Setup mock event manager
         mockEventManager = {
             registerEventHandler: vi.fn(),
+            deregisterEventHandler: vi.fn(),
             emit: vi.fn()
         }
         vi.mocked(EventManager.getInstance).mockReturnValue(mockEventManager)
@@ -369,6 +371,33 @@ describe('InstancedShelfRenderer', () => {
             // Valid instances should still be tracked
             const stats = renderer.getStats()
             expect(stats.activeInstances).toBe(1)
+        })
+    })
+
+    describe('Layout Switch Regression Guard', () => {
+        it('should flush GPU updates when ShelfLayoutDetermined is emitted', async () => {
+            renderer = new InstancedShelfRenderer()
+            await renderer.initialize()
+
+            const updateSpy = vi.spyOn(renderer, 'updateGPU')
+            const registrations = mockEventManager.registerEventHandler.mock.calls as Array<[string, (...args: any[]) => void]>
+            const layoutDeterminedRegistration = registrations.find(([eventType]) => eventType === GameEventTypes.ShelfLayoutDetermined)
+
+            expect(layoutDeterminedRegistration).toBeDefined()
+            if (!layoutDeterminedRegistration) {
+                throw new Error('ShelfLayoutDetermined handler was not registered')
+            }
+
+            const [, handler] = layoutDeterminedRegistration
+            handler(new CustomEvent(GameEventTypes.ShelfLayoutDetermined, {
+                detail: {
+                    shelfBounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 },
+                    shelfLayout: { rows: 1 },
+                    stockStrategy: { order: () => [] },
+                },
+            }))
+
+            expect(updateSpy).toHaveBeenCalledTimes(1)
         })
     })
 
