@@ -3,7 +3,6 @@ import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { ShelfSurfaceUtils, type ShelfSurface, GameBoxUtils, GameLayoutConstants, type IStockStrategy } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
-import { DataManager } from '../../core/data/DataManager'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { 
     BatchProcessingStatus,
@@ -42,7 +41,6 @@ type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
  * Owns the GpuGameBoxRenderer lifecycle and coordinates the two-phase load/place split:
  *
  * Phase 1 — Prewarm (BatchReadyForPlacement):
- *   Constructs the renderer on the first batch (deferred until maxGames is known).
  *   Triggers artwork prefetch for each game — no GPU instances placed yet.
  *   When a prefetch settles, calls tryPlace() which places immediately if a
  *   position intent is already known.
@@ -209,13 +207,10 @@ export class GameBoxSpawner {
         )
 
         if (!this.renderer) {
-            // Defensive fallback: if GameDataReady hasn't arrived yet, derive capacity
-            // from the known library in DataManager (library lifetime), not batch size.
-            const totalGames = DataManager.getInstance().get<unknown[]>('steam.games')?.length ?? 0
-            this.initializeRendererForLibrary(totalGames)
             GameBoxSpawner.logger.warn(
-                `Renderer not yet initialized via GameDataReady — fallback library capacity ${(Math.max(totalGames, 1) + 100)}`
+                'BatchReadyForPlacement received before GameDataReady initialized renderer — dropping batch prewarm to enforce event ordering'
             )
+            return
         }
 
         for (const game of games) {
