@@ -147,6 +147,21 @@ describe('section-aware arc layout', () => {
         // Regression guard: row 4 should not collapse to a single dominant section.
         expect(rowFourSectionIndices.size).toBeGreaterThan(1)
     })
+
+    it('expands arc depth dynamically for larger section shelf counts', () => {
+        const sections = [
+            { name: 'Action', games: Array.from({ length: 500 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'Puzzle', games: Array.from({ length: 420 }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'RPG', games: Array.from({ length: 320 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+            { name: 'Indie', games: Array.from({ length: 260 }, (_, i) => ({ appid: 3000 + i + 1 })) },
+        ] as any
+
+        const shelves = ArcLayout.computeShelvesForSections(sections)
+        const furthestZ = Math.min(...shelves.map((shelf) => shelf.position.z))
+
+        // Large section depths should push the outer arc further than fixed baseline depths.
+        expect(furthestZ).toBeLessThan(-30)
+    })
 })
 
 describe('partial-row centering', () => {

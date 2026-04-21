@@ -70,6 +70,19 @@ const ROW_DEFAULTS: Required<RowLayoutConfig> = {
     maxRows: 8,
 }
 
+function deriveRowLayoutConfigFromSectionCounts(sections: ReadonlyArray<Section>): RowLayoutConfig {
+    const sectionShelfCounts = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    const maxShelvesInAnySection = Math.max(1, ...sectionShelfCounts)
+
+    return {
+        shelvesPerRow: Math.max(8, Math.ceil(Math.sqrt(maxShelvesInAnySection) * 3)),
+        shelfSpacingX: Math.max(2.5, 2.2 + maxShelvesInAnySection * 0.02),
+        rowSpacingZ: Math.max(4.0, 3.5 + maxShelvesInAnySection * 0.03),
+        firstRowZ: ROW_DEFAULTS.firstRowZ,
+        maxRows: Math.max(ROW_DEFAULTS.maxRows, Math.ceil(maxShelvesInAnySection / 2) + 2),
+    }
+}
+
 export interface RowShelfInfo {
     position: THREE.Vector3
     /** Y rotation: 0 means shelf faces -Z (toward player at origin). */
@@ -121,7 +134,7 @@ function computeRowShelvesForSections(sections: ReadonlyArray<Section>): Section
 
     const shelvesPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
     const totalShelves = shelvesPerSection.reduce((sum, count) => sum + count, 0)
-    const rowShelves = computeRowShelfLayout(totalShelves)
+    const rowShelves = computeRowShelfLayout(totalShelves, deriveRowLayoutConfigFromSectionCounts(sections))
 
     const result: SectionShelfInfo[] = []
     let shelfIndex = 0

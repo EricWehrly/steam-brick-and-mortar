@@ -34,4 +34,19 @@ describe('RowLayout section-aware shelf ownership', () => {
         // 36 -> 2 shelves, 18 -> 1 shelf, 54 -> 3 shelves
         expect(sectionIndices).toEqual([0, 0, 1, 2, 2, 2])
     })
+
+    it('expands row spacing dynamically for larger section shelf counts', () => {
+        const sections = [
+            { name: 'Action', games: Array.from({ length: 360 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'Puzzle', games: Array.from({ length: 320 }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'RPG', games: Array.from({ length: 280 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+        ] as any
+
+        const shelves = RowLayout.computeShelvesForSections(sections)
+        const zValues = shelves.map(shelf => shelf.position.z)
+        const minZ = Math.min(...zValues)
+
+        // Dynamic spacing should push far rows deeper than the old fixed first rows.
+        expect(minZ).toBeLessThan(-14)
+    })
 })

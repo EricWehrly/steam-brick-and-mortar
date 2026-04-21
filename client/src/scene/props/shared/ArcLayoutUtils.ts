@@ -79,6 +79,20 @@ const DEFAULTS: Required<Pick<ArcLayoutConfig, 'rows' | 'shelvesPerRow' | 'rowRa
     halfAngle: Math.PI / 3, // 60 deg each side
 }
 
+function deriveArcConfigFromSectionCounts(sectionShelfCounts: ReadonlyArray<number>): ArcLayoutConfig {
+    const maxShelvesInAnySection = Math.max(1, ...sectionShelfCounts)
+    const totalShelves = sectionShelfCounts.reduce((sum, count) => sum + count, 0)
+
+    return {
+        rows: Math.max(5, Math.ceil(Math.sqrt(totalShelves / 3))),
+        rowRadiusStep: Math.max(4.0, 3.8 + maxShelvesInAnySection * 0.06),
+        firstRowRadius: Math.max(5.5, 4.8 + maxShelvesInAnySection * 0.03),
+        halfAngle: Math.PI / 2.8,
+        minShelfGap: 1.0,
+        shelfWidthMetres: 2.0,
+    }
+}
+
 export interface ArcShelfInfo {
     position: THREE.Vector3
     /** Y rotation so shelf faces player origin (0,0,0). */
@@ -194,37 +208,39 @@ function computeArcShelvesForSections(sections: ReadonlyArray<Section>): Section
     }
 
     const sectionShelfCounts = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    const sectionRemainingCounts = [...sectionShelfCounts]
     const totalShelves = sectionShelfCounts.reduce((sum, count) => sum + count, 0)
 
-    const rowCapacities = [4, 6, 10, 12]
-    const remaining = Math.max(0, totalShelves - STORE_ARC_FIXED_ROWS_COUNT)
-    if (remaining > 0) {
-        rowCapacities.push(remaining)
-    }
+    const dynamicArcConfig = deriveArcConfigFromSectionCounts(sectionShelfCounts)
+    const shelves = computeArcShelfLayout(totalShelves, dynamicArcConfig)
 
-    const owningSectionIndices: number[] = []
+    const shelvesByRow = new Map<number, number[]>()
+    shelves.forEach((shelf, index) => {
+        const entries = shelvesByRow.get(shelf.row) ?? []
+        entries.push(index)
+        shelvesByRow.set(shelf.row, entries)
+    })
+
+    const owningSectionIndices = new Array<number>(totalShelves).fill(0)
     let sectionCursor = 0
 
-    for (const rowCapacity of rowCapacities) {
-        let rowRemaining = rowCapacity
-        while (rowRemaining > 0 && owningSectionIndices.length < totalShelves) {
+    for (const [, shelfIndices] of [...shelvesByRow.entries()].sort(([a], [b]) => a - b)) {
+        for (const shelfIndex of shelfIndices) {
             let scanCount = 0
-            while (scanCount < sectionShelfCounts.length && sectionShelfCounts[sectionCursor] <= 0) {
-                sectionCursor = (sectionCursor + 1) % sectionShelfCounts.length
+            while (scanCount < sectionRemainingCounts.length && sectionRemainingCounts[sectionCursor] <= 0) {
+                sectionCursor = (sectionCursor + 1) % sectionRemainingCounts.length
                 scanCount++
             }
-            if (scanCount >= sectionShelfCounts.length) {
+            if (scanCount >= sectionRemainingCounts.length) {
                 break
             }
 
-            owningSectionIndices.push(sectionCursor)
-            sectionShelfCounts[sectionCursor]--
-            rowRemaining--
-            sectionCursor = (sectionCursor + 1) % sectionShelfCounts.length
+            owningSectionIndices[shelfIndex] = sectionCursor
+            sectionRemainingCounts[sectionCursor]--
+            sectionCursor = (sectionCursor + 1) % sectionRemainingCounts.length
         }
     }
 
-    const shelves = computeStoreArcShelfLayout(totalShelves)
     return shelves.map((shelf, shelfIndex) => ({
         ...shelf,
         sectionIndex: owningSectionIndices[shelfIndex] ?? Math.min(sections.length - 1, shelfIndex % sections.length),
