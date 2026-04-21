@@ -206,8 +206,10 @@ class StorePropsCoordinator {
         })
 
         // Re-trigger arrangement pipeline from DataManager — no Steam API hit needed.
-        // GameSorter listens to GameDataReady and will re-emit SectionsReady,
-        // driving ShelfLayoutCoordinator and GameBoxSpawner with the new layout mode.
+        // Emit manifest + definitions seams explicitly:
+        // - LibraryManifestReady: immutable membership for capacity sizing
+        // - GameDataReady: definitions-ready trigger for GameSorter
+        // GameSorter will re-emit SectionsReady for the new layout mode.
         const games = DataManager.getInstance().get<unknown[]>('steam.games') ?? []
         const appids = games
             .map((game) => (typeof game === 'object' && game !== null ? Number((game as { appid?: unknown }).appid) : NaN))

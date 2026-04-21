@@ -109,7 +109,8 @@ export class PauseMenuManager {
     }
 
     private onSteamDataLoaded(_event: CustomEvent<SteamDataLoadedEvent>): void {
-        // Refresh cache management panel if it exists and is visible
+        // DataLoaded is an integration/session signal, used here to refresh
+        // cache/account panels after library/session persistence changes.
         if (this.cacheManagementPanel) {
             this.cacheManagementPanel.refreshTemplate()
         }

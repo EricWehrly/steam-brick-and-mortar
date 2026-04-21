@@ -44,8 +44,18 @@ export interface SteamDevModeToggleEvent extends BaseInteractionEvent {
     isEnabled: boolean
 }
 
+/**
+ * Integration/session-level Steam load signal.
+ *
+ * Semantics: SteamIntegration has finished persisting the current user/library
+ * session state (e.g. `steam.games`, optional `steam.userInput`).
+ *
+ * This event is intentionally NOT the canonical arrangement trigger. Use:
+ * - `SteamEventTypes.LibraryManifestReady` for immutable membership counts/appids
+ * - `GameEventTypes.GameDataReady` for definitions-ready grouping/sorting
+ */
 export interface SteamDataLoadedEvent extends BaseInteractionEvent {
-    userInput: string
+    userInput?: string
 }
 
 /**
@@ -235,7 +245,9 @@ export const SteamEventTypes = {
     CacheStats: 'steam:cache-stats',
     ImageCacheClear: 'steam:image-cache-clear',
     DevModeToggle: 'steam:dev-mode-toggle',
+    /** Session/integration signal (UI/cache panels), not pipeline readiness. */
     DataLoaded: 'steam:data-loaded',
+    /** Immutable membership signal for a load run (appid set + counts). */
     LibraryManifestReady: 'steam:library-manifest-ready',
     GameLoaded: 'steam:game-loaded',
     GamesBatchReady: 'steam:games-batch-ready',
@@ -280,6 +292,7 @@ export const GameEventTypes = {
     LayoutChanged: 'game:layout-changed',
     SomeBatchesComplete: 'game:some-batches-complete',
     AllBatchesComplete: 'game:all-batches-complete',
+    /** Definitions-ready seam (steam.games committed), emitted by SteamIntegration. */
     GameDataReady: 'game:game-data-ready',
     /**
      * Fired by LodArtworkOrchestrator when all in-flight artwork fetches have resolved
