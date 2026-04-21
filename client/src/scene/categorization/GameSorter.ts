@@ -48,6 +48,7 @@ export class GameSorter {
      */
     private activeGroupMode: GroupMode | null = null
     private activeSortMode: SortMode | null = null
+    private hasUserSelectedArrangement: boolean = false
 
     constructor() {
         EventManager.getInstance().registerEventHandler(
@@ -66,8 +67,10 @@ export class GameSorter {
     }
 
     private handleGameDataReady(): void {
-        if (this.activeGroupMode === null || this.activeSortMode === null) {
-            // First load: choose defaults based on auth state
+        if (!this.hasUserSelectedArrangement) {
+            // Keep defaults auth-driven until the user explicitly chooses an arrangement.
+            // This lets SteamDataLoaded correct an early GameDataReady emitted before
+            // identity/userInput is fully established.
             if (SteamIntegration.getInstance().isAnonymous()) {
                 this.activeGroupMode = GroupModes.ByGenre
                 this.activeSortMode = SortModes.ByPlaytime
@@ -75,13 +78,17 @@ export class GameSorter {
                 this.activeGroupMode = GroupModes.ByRecency
                 this.activeSortMode = SortModes.ByLastPlayed
             }
+        } else if (this.activeGroupMode === null || this.activeSortMode === null) {
+            // Defensive fallback for impossible state.
+            this.activeGroupMode = GroupModes.ByRecency
+            this.activeSortMode = SortModes.ByLastPlayed
         }
-        // Re-apply current modes on subsequent loads (layout switch, library reload,
-        // and fallback when SteamDataLoaded arrives after an early GameDataReady).
+
         this.arrange(this.activeGroupMode, this.activeSortMode)
     }
 
     private handleArrangementRequested(detail: ArrangementRequestedEvent): void {
+        this.hasUserSelectedArrangement = true
         this.activeGroupMode = detail.groupMode
         this.activeSortMode = detail.sortMode
         this.arrange(detail.groupMode, detail.sortMode)
