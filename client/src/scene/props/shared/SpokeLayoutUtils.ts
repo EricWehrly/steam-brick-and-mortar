@@ -25,8 +25,8 @@
 import * as THREE from 'three'
 import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
 import type { StockSurface } from '../../../types/LayoutTypes'
-import type { ILayoutDefinition } from './ILayoutDefinition'
-import type { ShelfInfo } from '../../../types/LayoutTypes'
+import type { ISectionAwareLayoutDefinition } from './ILayoutDefinition'
+import type { ShelfInfo, SectionShelfInfo, Section } from '../../../types/LayoutTypes'
 
 /**
  * SpokeStockStrategy
@@ -151,26 +151,88 @@ export function computeSpokeShelfLayout(
     return result
 }
 
-export const SpokeLayout: ILayoutDefinition = {
-    mode: 'spoke',
-    createStockStrategy: () => new SpokeStockStrategy(),
-    computeShelves: (totalShelves): ShelfInfo[] => {
-        const defaultSpokeCount = SPOKE_DEFAULTS.spokeCount
-        const shelvesPerSpokeNeeded = Math.max(
-            SPOKE_DEFAULTS.shelvesPerSpoke,
-            Math.ceil(totalShelves / (defaultSpokeCount * 2))
-        )
+function mapSpokeShelvesToShelfInfo(
+    spokeShelves: ReturnType<typeof computeSpokeShelfLayout>,
+    totalShelves: number
+): ShelfInfo[] {
+    return spokeShelves
+        .slice(0, totalShelves)
+        .map((s, i) => ({
+            position: s.position,
+            rotationY: s.rotationY,
+            row: s.spokeIndex,
+            indexInRow: i,
+        }))
+}
 
-        return computeSpokeShelfLayout({
+function computeSpokeShelvesByTotal(totalShelves: number): ShelfInfo[] {
+    const defaultSpokeCount = SPOKE_DEFAULTS.spokeCount
+    const shelvesPerSpokeNeeded = Math.max(
+        SPOKE_DEFAULTS.shelvesPerSpoke,
+        Math.ceil(totalShelves / (defaultSpokeCount * 2))
+    )
+
+    return mapSpokeShelvesToShelfInfo(
+        computeSpokeShelfLayout({
             spokeCount: defaultSpokeCount,
             shelvesPerSpoke: shelvesPerSpokeNeeded,
+        }),
+        totalShelves
+    )
+}
+
+function computeSpokeShelvesForSections(sections: ReadonlyArray<Section>): SectionShelfInfo[] {
+    if (sections.length === 0) {
+        return []
+    }
+
+    const shelvesPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    const totalShelves = shelvesPerSection.reduce((sum, count) => sum + count, 0)
+
+    // Keep spoke geometry keyed to section count so each section owns one spoke territory.
+    const shelvesPerSpokeNeeded = Math.max(
+        1,
+        Math.ceil(totalShelves / (sections.length * 2))
+    )
+
+    const spokeShelves = computeSpokeShelfLayout({
+        spokeCount: sections.length,
+        shelvesPerSpoke: shelvesPerSpokeNeeded,
+    })
+
+    const sectionAwareShelves: SectionShelfInfo[] = []
+    const sectionPlacedCount = new Array<number>(sections.length).fill(0)
+    const sectionTargetCount = shelvesPerSection.map(count => count)
+
+    for (const spokeShelf of spokeShelves) {
+        const sectionIndex = spokeShelf.spokeIndex
+        if (sectionIndex >= sections.length) {
+            continue
+        }
+        if (sectionPlacedCount[sectionIndex] >= sectionTargetCount[sectionIndex]) {
+            continue
+        }
+
+        sectionAwareShelves.push({
+            position: spokeShelf.position,
+            rotationY: spokeShelf.rotationY,
+            row: spokeShelf.spokeIndex,
+            indexInRow: sectionPlacedCount[sectionIndex],
+            sectionIndex,
         })
-            .slice(0, totalShelves)
-            .map((s, i) => ({
-                position: s.position,
-                rotationY: s.rotationY,
-                row: s.spokeIndex,
-                indexInRow: i,
-            }))
-    },
+        sectionPlacedCount[sectionIndex]++
+
+        if (sectionAwareShelves.length >= totalShelves) {
+            break
+        }
+    }
+
+    return sectionAwareShelves
+}
+
+export const SpokeLayout: ISectionAwareLayoutDefinition = {
+    mode: 'spoke',
+    createStockStrategy: () => new SpokeStockStrategy(),
+    computeShelves: (totalShelves): ShelfInfo[] => computeSpokeShelvesByTotal(totalShelves),
+    computeShelvesForSections: (sections): SectionShelfInfo[] => computeSpokeShelvesForSections(sections),
 }

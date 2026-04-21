@@ -17,8 +17,8 @@
 import * as THREE from 'three'
 import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
 import type { StockSurface } from '../../../types/LayoutTypes'
-import type { ILayoutDefinition } from './ILayoutDefinition'
-import type { ShelfInfo } from '../../../types/LayoutTypes'
+import type { ISectionAwareLayoutDefinition } from './ILayoutDefinition'
+import type { ShelfInfo, Section, SectionShelfInfo } from '../../../types/LayoutTypes'
 
 /**
  * RowStockStrategy
@@ -114,8 +114,33 @@ export function computeRowShelfLayout(
     return result
 }
 
-export const RowLayout: ILayoutDefinition = {
+function computeRowShelvesForSections(sections: ReadonlyArray<Section>): SectionShelfInfo[] {
+    if (sections.length === 0) {
+        return []
+    }
+
+    const shelvesPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    const totalShelves = shelvesPerSection.reduce((sum, count) => sum + count, 0)
+    const rowShelves = computeRowShelfLayout(totalShelves)
+
+    const result: SectionShelfInfo[] = []
+    let shelfIndex = 0
+    for (let sectionIndex = 0; sectionIndex < shelvesPerSection.length; sectionIndex++) {
+        const sectionShelfCount = shelvesPerSection[sectionIndex]
+        for (let sectionShelfIndex = 0; sectionShelfIndex < sectionShelfCount && shelfIndex < rowShelves.length; sectionShelfIndex++, shelfIndex++) {
+            result.push({
+                ...rowShelves[shelfIndex],
+                sectionIndex,
+            })
+        }
+    }
+
+    return result
+}
+
+export const RowLayout: ISectionAwareLayoutDefinition = {
     mode: 'row',
     createStockStrategy: () => new RowStockStrategy(),
     computeShelves: (totalShelves): ShelfInfo[] => computeRowShelfLayout(totalShelves),
+    computeShelvesForSections: (sections): SectionShelfInfo[] => computeRowShelvesForSections(sections),
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
 import {
+    SpokeLayout,
     computeSpokeShelfLayout,
     SpokeStockStrategy,
     type SpokeLayoutConfig,
@@ -45,6 +46,32 @@ describe('SpokeStockStrategy', () => {
 })
 
 // ── computeSpokeShelfLayout ───────────────────────────────────────────────────
+
+describe('SpokeLayout section-aware shelf ownership', () => {
+    it('maps one section per spoke and respects per-section shelf budgets', () => {
+        const sections = [
+            { name: 'Action', games: Array.from({ length: 36 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'Puzzle', games: Array.from({ length: 18 }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'RPG', games: Array.from({ length: 72 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+        ] as any
+
+        const shelves = SpokeLayout.computeShelvesForSections(sections)
+        const countsBySection = new Map<number, number>()
+        for (const shelf of shelves) {
+            countsBySection.set(shelf.sectionIndex, (countsBySection.get(shelf.sectionIndex) ?? 0) + 1)
+        }
+
+        // 36 -> 2 shelves, 18 -> 1 shelf, 72 -> 4 shelves
+        expect(countsBySection.get(0)).toBe(2)
+        expect(countsBySection.get(1)).toBe(1)
+        expect(countsBySection.get(2)).toBe(4)
+
+        // Section index should align with spoke index in section-aware spoke mode
+        shelves.forEach((shelf) => {
+            expect(shelf.sectionIndex).toBe(shelf.row)
+        })
+    })
+})
 
 describe('computeSpokeShelfLayout', () => {
     it('generates 2 shelves per position per spoke (left + right)', () => {
