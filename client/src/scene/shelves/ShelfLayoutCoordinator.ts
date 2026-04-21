@@ -54,7 +54,11 @@ export class ShelfLayoutCoordinator {
             (event: CustomEvent<SectionsReadyEvent>) => this.handleSectionsReady(event.detail)
         )
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ClearRequest,
+            StorePropsEventTypes.LayoutClearRequest,
+            () => this.clearRunState()
+        )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.LibraryReloadRequest,
             () => this.clearRunState()
         )
         ShelfLayoutCoordinator.logger.debug(`Constructed in ${layoutMode} mode`)

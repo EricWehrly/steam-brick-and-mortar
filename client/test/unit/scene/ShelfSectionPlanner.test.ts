@@ -72,6 +72,14 @@ function emitShelfReady(shelfIndex: number, position = FAR_POSITION, rotationY =
     })
 }
 
+function emitLayoutClearRequest(): void {
+    EventManager.getInstance().emit(StorePropsEventTypes.LayoutClearRequest, {})
+}
+
+function emitLibraryReloadRequest(): void {
+    EventManager.getInstance().emit(StorePropsEventTypes.LibraryReloadRequest, {})
+}
+
 describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     beforeEach(() => {
         EventManager.getInstance().removeAllListeners()
@@ -144,6 +152,31 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
         expect(firstCall[1].anchorPosition).toEqual(pos0)
         // Second section anchors at shelf 1
         expect(secondCall[1].anchorPosition).toEqual(pos1)
+    })
+
+    it('clears signs and caches on layout clear request', () => {
+        new ShelfSectionPlanner()
+        emitShelfReady(0, FAR_POSITION)
+        emitSectionsReady([makeSection('Action')])
+        expect(placeSignSpy).toHaveBeenCalledTimes(1)
+
+        emitLayoutClearRequest()
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action')
+
+        // Need shelf positions again after clear
+        vi.clearAllMocks()
+        emitSectionsReady([makeSection('Action')])
+        expect(placeSignSpy).not.toHaveBeenCalled()
+    })
+
+    it('clears signs and caches on library reload request', () => {
+        new ShelfSectionPlanner()
+        emitShelfReady(0, FAR_POSITION)
+        emitSectionsReady([makeSection('Action')])
+        expect(placeSignSpy).toHaveBeenCalledTimes(1)
+
+        emitLibraryReloadRequest()
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action')
     })
 
     it('does not throw if SectionsReady fires before any ShelfReady', () => {

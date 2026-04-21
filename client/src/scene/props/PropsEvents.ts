@@ -10,7 +10,7 @@
  *   SetupRequest  ──→  StorePropsCoordinator (override handler)
  *                  →   LightingRenderer, SharedMaterialManager (side-effect observers)
  *   SetupCompleted ─→  SceneCoordinator, LightingRenderer
- *   ClearRequest  ──→  StorePropsCoordinator (override handler)
+ *   LayoutClearRequest / LibraryReloadRequest  ──→  StorePropsCoordinator (override handlers)
  *
  *   [Steam API emits GamesBatchReady]
  *   BatchCoordinator serialises → BatchReadyForPlacement
@@ -45,17 +45,16 @@ export interface StorePropsSetupCompletedEvent extends BaseInteractionEvent {
 }
 
 /**
- * Emitted to tear down the current store.
- *
- * reason:
- *   'library-reload' — a new library is about to load; consumers must dispose GPU resources
- *                      and clear prefetch state (full teardown)
- *   'layout-switch'  — layout geometry is rebuilding but game data is unchanged; consumers
- *                      should clear placements and shelf positions only (no GPU dispose)
+ * Emitted to clear geometry/placement state for layout or arrangement changes.
+ * Game data is unchanged; consumers should avoid disposing long-lived art caches.
  */
-export interface StorePropsClearRequestEvent extends BaseInteractionEvent {
-    reason: 'library-reload' | 'layout-switch'
-}
+export interface StorePropsLayoutClearRequestEvent extends BaseInteractionEvent {}
+
+/**
+ * Emitted before loading a different library/user profile.
+ * Consumers should fully dispose library-bound GPU resources and prefetch state.
+ */
+export interface StorePropsLibraryReloadRequestEvent extends BaseInteractionEvent {}
 
 // =============================================================================
 // BATCH → PLACEMENT FLOW  (the runtime data pipeline)
@@ -129,7 +128,8 @@ export const StorePropsEventTypes = {
     // Lifecycle
     SetupRequest:  'store-props:setup-request',
     SetupCompleted: 'store-props:setup-completed',
-    ClearRequest:  'store-props:clear-request',
+    LayoutClearRequest:  'store-props:layout-clear-request',
+    LibraryReloadRequest: 'store-props:library-reload-request',
 
     // Batch → placement pipeline
     BatchReadyForPlacement: 'store-props:batch-ready-placement',

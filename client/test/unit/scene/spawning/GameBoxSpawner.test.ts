@@ -24,7 +24,10 @@ import {
     type GamesPlacedEvent,
 } from '../../../../src/types/InteractionEvents'
 import type { SectionsReadyEvent, GameDataReadyEvent } from '../../../../src/types/EnvironmentEvents'
-import type { StorePropsClearRequestEvent } from '../../../../src/scene/props/PropsEvents'
+import type {
+    StorePropsLayoutClearRequestEvent,
+    StorePropsLibraryReloadRequestEvent,
+} from '../../../../src/scene/props/PropsEvents'
 import type { SteamGame } from '../../../../src/steam'
 
 // Mock GpuGameBoxRenderer so the spawner never touches real GPU code
@@ -370,7 +373,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
             await Promise.resolve()
 
-            eventManager.emit<StorePropsClearRequestEvent>(StorePropsEventTypes.ClearRequest, { reason: 'library-reload' })
+            eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {})
             expect(mockRendererDispose).toHaveBeenCalled()
 
             // After full reset, SectionsReady should not place (renderer gone, no prefetch results)
@@ -379,7 +382,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         })
     })
 
-    describe('layout-switch ClearRequest', () => {
+    describe('layout-switch LayoutClearRequest', () => {
         it('clears placements but keeps renderer alive', async () => {
             const games = createMockGamesWithArtwork(5, 0) as any[]
 
@@ -390,7 +393,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             )
             await Promise.resolve()
 
-            eventManager.emit<StorePropsClearRequestEvent>(StorePropsEventTypes.ClearRequest, { reason: 'layout-switch' })
+            eventManager.emit<StorePropsLayoutClearRequestEvent>(StorePropsEventTypes.LayoutClearRequest, {})
             expect(mockRendererDispose).not.toHaveBeenCalled()
             expect(mockClearPlacements).toHaveBeenCalled()
         })
@@ -405,7 +408,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             )
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
 
-            eventManager.emit<StorePropsClearRequestEvent>(StorePropsEventTypes.ClearRequest, { reason: 'library-reload' })
+            eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {})
             expect(mockRendererDispose).toHaveBeenCalled()
 
             expect(() => {
