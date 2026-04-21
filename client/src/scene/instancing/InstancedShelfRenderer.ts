@@ -56,7 +56,12 @@ import type {
 import { ShelfStickerHandler } from '../stickers/ShelfStickerHandler'
 import { buildShelfGeometryTemplates, buildShelfUnitTemplate, ShelfGeometryType, type ShelfPartTemplate } from './ShelfGeometryBuilder'
 import { EventManager } from '../../core/EventManager'
-import { GameEventTypes, StorePropsEventTypes, type ShelfReadyEvent } from '../../types/InteractionEvents'
+import {
+    GameEventTypes,
+    StorePropsEventTypes,
+    type ShelfReadyEvent,
+    type ShelfLayoutDeterminedEvent,
+} from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import { MeshPrewarmer } from '../../utils/MeshPrewarmer'
 import { SystemCapabilitiesDetector } from '../../utils/SystemCapabilities'
@@ -122,6 +127,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
 
     private readonly boundUpdateGPU: () => void
     private readonly boundHandleShelfReady: (event: CustomEvent<ShelfReadyEvent>) => void
+    private readonly boundHandleShelfLayoutDetermined: (event: CustomEvent<ShelfLayoutDeterminedEvent>) => void
     
     // TODO: Consider making sticker system fully pluggable (dependency injection or optional feature)
     private readonly stickerHandler: ShelfStickerHandler
@@ -168,6 +174,12 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         this.boundHandleShelfReady = (event: CustomEvent<ShelfReadyEvent>) =>
             this.handleShelfReady(event.detail)
 
+        this.boundHandleShelfLayoutDetermined = () => {
+            // Layout-switch flows can emit ShelfReady/ShelfLayoutDetermined without new batch events.
+            // Flush matrices to GPU here so shelves become visible even when SomeBatchesComplete does not fire.
+            this.updateGPU()
+        }
+
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SomeBatchesComplete,
             this.boundUpdateGPU
@@ -176,6 +188,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfReady,
             this.boundHandleShelfReady
+        )
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.ShelfLayoutDetermined,
+            this.boundHandleShelfLayoutDetermined
         )
         
         InstancedShelfRenderer.logger.debug(`🏪 Created (max units: ${this.maxShelfUnits})`)
@@ -583,6 +599,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         EventManager.getInstance().deregisterEventHandler(
             StorePropsEventTypes.ShelfReady,
             this.boundHandleShelfReady
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            GameEventTypes.ShelfLayoutDetermined,
+            this.boundHandleShelfLayoutDetermined
         )
         
         // Dispose all managers
