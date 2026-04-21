@@ -22,6 +22,7 @@ import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
 import { sortByNumericField } from '../scene/categorization/GameSortFunctions'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
+import type { StorePropsClearRequestEvent } from '../scene/props/PropsEvents'
 
 export interface SteamIntegrationConfig {
     apiBaseUrl?: string
@@ -267,7 +268,7 @@ export class SteamIntegration {
         try {
             // If a store is already loaded, clear it before the new user's data arrives.
             if (this.gameLibrary.getState().userData?.games?.length) {
-                this.eventManager.emit(StorePropsEventTypes.ClearRequest, {})
+                this.eventManager.emit<StorePropsClearRequestEvent>(StorePropsEventTypes.ClearRequest, { reason: 'library-reload' })
                 SteamIntegration.logger.info('Emitted ClearRequest before library load')
             }
 

@@ -23,7 +23,8 @@ import {
     type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
 } from '../../../../src/types/InteractionEvents'
-import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
+import type { SectionsReadyEvent, GameDataReadyEvent } from '../../../../src/types/EnvironmentEvents'
+import type { StorePropsClearRequestEvent } from '../../../../src/scene/props/PropsEvents'
 import type { SteamGame } from '../../../../src/steam'
 
 // Mock GpuGameBoxRenderer so the spawner never touches real GPU code
@@ -356,8 +357,11 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
     // reset() and setRenderer()
 
     describe('reset()', () => {
-        it('clears pending games, shelf positions, and disposes renderer', async () => {
+        it('clears pending games, shelf positions, and disposes renderer on library reload', async () => {
             const games = createMockGamesWithArtwork(5, 0) as any[]
+
+            // Initialize renderer via GameDataReady first
+            eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, { totalGames: 5, totalBatches: 1 })
 
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
@@ -366,24 +370,42 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
             await Promise.resolve()
 
-            eventManager.emit(StorePropsEventTypes.ClearRequest, {})
+            eventManager.emit<StorePropsClearRequestEvent>(StorePropsEventTypes.ClearRequest, { reason: 'library-reload' })
             expect(mockRendererDispose).toHaveBeenCalled()
 
-            // After reset, SectionsReady should not use old shelf positions (renderer gone)
+            // After full reset, SectionsReady should not place (renderer gone, no prefetch results)
             eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
             expect(mockPlaceGame).not.toHaveBeenCalled()
         })
     })
 
+    describe('layout-switch ClearRequest', () => {
+        it('clears placements but keeps renderer alive', async () => {
+            const games = createMockGamesWithArtwork(5, 0) as any[]
+
+            eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, { totalGames: 5, totalBatches: 1 })
+            eventManager.emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                { games, batchIndex: 0, totalBatches: 1 }
+            )
+            await Promise.resolve()
+
+            eventManager.emit<StorePropsClearRequestEvent>(StorePropsEventTypes.ClearRequest, { reason: 'layout-switch' })
+            expect(mockRendererDispose).not.toHaveBeenCalled()
+            expect(mockClearPlacements).toHaveBeenCalled()
+        })
+    })
+
     describe('setRenderer(null)', () => {
         it('does not throw when renderer is cleared and GamesSort fires', () => {
+            eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, { totalGames: 2, totalBatches: 1 })
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games: createMockGamesWithArtwork(2, 0), batchIndex: 0, totalBatches: 1 }
             )
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
 
-            eventManager.emit(StorePropsEventTypes.ClearRequest, {})
+            eventManager.emit<StorePropsClearRequestEvent>(StorePropsEventTypes.ClearRequest, { reason: 'library-reload' })
             expect(mockRendererDispose).toHaveBeenCalled()
 
             expect(() => {
