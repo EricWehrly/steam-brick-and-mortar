@@ -3,6 +3,7 @@ import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { ShelfSurfaceUtils, type ShelfSurface, GameBoxUtils, GameLayoutConstants, type IStockStrategy } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
+import { DataManager } from '../../core/data/DataManager'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { 
     BatchProcessingStatus,
@@ -168,12 +169,19 @@ export class GameBoxSpawner {
     // -------------------------------------------------------------------------
     // Initialize renderer at library load time (sized to full library)
 
+    private initializeRendererForLibrary(totalGames: number): void {
+        if (this.renderer) {
+            return
+        }
+
+        const rendererCapacity = Math.max(totalGames, 1) + 100
+        this.renderer = new GpuGameBoxRenderer(rendererCapacity)
+        GameBoxSpawner.logger.debug(`Renderer initialized: capacity ${rendererCapacity}`)
+    }
+
     private handleGameDataReady(event: CustomEvent<GameDataReadyEvent>): void {
         const { totalGames } = event.detail
-        if (!this.renderer) {
-            this.renderer = new GpuGameBoxRenderer(totalGames + 100)
-            GameBoxSpawner.logger.debug(`Renderer initialized: capacity ${totalGames + 100}`)
-        }
+        this.initializeRendererForLibrary(totalGames)
     }
 
     // -------------------------------------------------------------------------
@@ -201,12 +209,13 @@ export class GameBoxSpawner {
         )
 
         if (!this.renderer) {
-            // Renderer should have been initialized by GameDataReady before batches arrive.
-            // Construct defensively here with batch-based estimate if it hasn't been.
-            // TD: we probably don't actually need this extra capacity, let's use the right numbers (everywhere in this file)
-            const estimatedCapacity = totalBatches * 18 + 100
-            this.renderer = new GpuGameBoxRenderer(estimatedCapacity)
-            GameBoxSpawner.logger.warn(`Renderer not yet initialized via GameDataReady — fallback capacity ${estimatedCapacity}`)
+            // Defensive fallback: if GameDataReady hasn't arrived yet, derive capacity
+            // from the known library in DataManager (library lifetime), not batch size.
+            const totalGames = DataManager.getInstance().get<unknown[]>('steam.games')?.length ?? 0
+            this.initializeRendererForLibrary(totalGames)
+            GameBoxSpawner.logger.warn(
+                `Renderer not yet initialized via GameDataReady — fallback library capacity ${(Math.max(totalGames, 1) + 100)}`
+            )
         }
 
         for (const game of games) {
