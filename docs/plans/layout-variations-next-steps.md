@@ -137,6 +137,14 @@ Follows the same `SectionsPlanned` pattern as Spoke.
 Right side ascending, left descending — continuous loop. Config option on
 `SpokeLayoutConfig.mirrorWalkOrder`. Requires section-aware placement first.
 
+### Arc + genre overflow follow-up (2026-04-21)
+1. **Back-row squish when grouping by genre in Arc layout**
+   - Symptom: in Arc + `By Genre`, non-dominant genres can appear visually compressed in the back row.
+   - Why: `computeStoreArcShelfLayout` uses fixed counts for rows 0–3, then dumps all remaining shelves into row 4 (`totalShelves - 32`).
+     Row 4 intentionally relaxes `minShelfGap` enforcement (`row < cfg.rows - 1` check), so overflow can be densely packed.
+   - Status: acknowledged/deferred. This is expected to disappear once section-aware shelf distribution owns per-section shelf budgets instead of global overflow.
+   - Suggested interim guardrail (optional): cap row-4 density and spill into additional rows before section-aware distribution lands.
+
 ### Spoke follow-ups from live validation (2026-04-20)
 1. **Inside/outside flip**
    - Current spoke stocking appears on the outer faces relative to aisle flow.
