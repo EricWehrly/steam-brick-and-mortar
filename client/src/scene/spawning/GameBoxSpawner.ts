@@ -196,6 +196,7 @@ export class GameBoxSpawner {
         if (!this.renderer) {
             // Renderer should have been initialized by GameDataReady before batches arrive.
             // Construct defensively here with batch-based estimate if it hasn't been.
+            // TD: we probably don't actually need this extra capacity, let's use the right numbers (everywhere in this file)
             const estimatedCapacity = totalBatches * 18 + 100
             this.renderer = new GpuGameBoxRenderer(estimatedCapacity)
             GameBoxSpawner.logger.warn(`Renderer not yet initialized via GameDataReady — fallback capacity ${estimatedCapacity}`)
