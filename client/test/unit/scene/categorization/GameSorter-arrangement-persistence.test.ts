@@ -85,9 +85,9 @@ function fireArrangementRequested(groupMode: string, sortMode: string): void {
     for (const h of handlers) h(event)
 }
 
-function fireClearRequest(): void {
-    const handlers = mockHandlers.get(StorePropsEventTypes.ClearRequest) ?? []
-    const event = new CustomEvent(StorePropsEventTypes.ClearRequest, { detail: {} })
+function fireLayoutClearRequest(): void {
+    const handlers = mockHandlers.get(StorePropsEventTypes.LayoutClearRequest) ?? []
+    const event = new CustomEvent(StorePropsEventTypes.LayoutClearRequest, { detail: {} })
     for (const h of handlers) h(event)
 }
 
@@ -169,7 +169,7 @@ describe('GameSorter — arrangement persistence across layout switches', () => 
         expect(payload.sortMode).toBe('by-playtime')
     })
 
-    it('ClearRequest does not reset hasArrangedOnce: next GameDataReady re-applies current modes', () => {
+    it('LayoutClearRequest does not reset hasArrangedOnce: next GameDataReady re-applies current modes', () => {
         mockIsAnonymous = false
         mockGames = [makeGame(1, 'Action'), makeGame(2, 'RPG')]
         new GameSorter()
@@ -181,7 +181,7 @@ describe('GameSorter — arrangement persistence across layout switches', () => 
         fireArrangementRequested('by-genre', 'by-playtime')
 
         // Store clears (layout switch trigger)
-        fireClearRequest()
+        fireLayoutClearRequest()
         mockEmit.mockClear()
 
         // GameDataReady after clear — should still use by-genre / by-playtime
@@ -192,7 +192,7 @@ describe('GameSorter — arrangement persistence across layout switches', () => 
         expect(payload.sortMode).toBe('by-playtime')
     })
 
-    it('ClearRequest alone does not emit SectionsReady', () => {
+    it('LayoutClearRequest alone does not emit SectionsReady', () => {
         mockIsAnonymous = false
         mockGames = [makeGame(1)]
         new GameSorter()
@@ -200,7 +200,7 @@ describe('GameSorter — arrangement persistence across layout switches', () => 
         fireGameDataReady()
         mockEmit.mockClear()
 
-        fireClearRequest()
+        fireLayoutClearRequest()
 
         const sectionsReadyCalls = mockEmit.mock.calls.filter(
             ([type]) => type === GameEventTypes.SectionsReady

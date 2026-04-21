@@ -55,7 +55,7 @@ describe('Store Props Renderer Independence - Event System', () => {
             })
             
             // Then: Event should be processed (no dependency errors)
-            expect(() => eventManager.emit(StorePropsEventTypes.ClearRequest, {
+            expect(() => eventManager.emit(StorePropsEventTypes.LayoutClearRequest, {
                 source: EventSource.System,
                 timestamp: Date.now()
             })).not.toThrow()
@@ -66,10 +66,10 @@ describe('Store Props Renderer Independence - Event System', () => {
         it('should handle event cleanup independently', () => {
             // Given: Mock handler for clear events
             const clearHandler = vi.fn()
-            eventManager.registerEventHandler(StorePropsEventTypes.ClearRequest, clearHandler)
+            eventManager.registerEventHandler(StorePropsEventTypes.LayoutClearRequest, clearHandler)
             
             // When: We emit clear request
-            eventManager.emit(StorePropsEventTypes.ClearRequest, {
+            eventManager.emit(StorePropsEventTypes.LayoutClearRequest, {
                 source: EventSource.System,
                 timestamp: Date.now()
             })
@@ -78,8 +78,8 @@ describe('Store Props Renderer Independence - Event System', () => {
             expect(clearHandler).toHaveBeenCalled()
             
             // Cleanup
-            eventManager.deregisterEventHandler(StorePropsEventTypes.ClearRequest, clearHandler)
-            expect(() => eventManager.deregisterEventHandler(StorePropsEventTypes.ClearRequest, clearHandler)).not.toThrow()
+            eventManager.deregisterEventHandler(StorePropsEventTypes.LayoutClearRequest, clearHandler)
+            expect(() => eventManager.deregisterEventHandler(StorePropsEventTypes.LayoutClearRequest, clearHandler)).not.toThrow()
         })
     })
 })

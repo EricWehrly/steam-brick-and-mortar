@@ -56,7 +56,11 @@ export class ShelfSectionPlanner {
             (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(event.detail)
         )
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ClearRequest,
+            StorePropsEventTypes.LayoutClearRequest,
+            () => this.handleClearRequest()
+        )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.LibraryReloadRequest,
             () => this.handleClearRequest()
         )
     }

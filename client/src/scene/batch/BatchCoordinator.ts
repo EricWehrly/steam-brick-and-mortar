@@ -91,7 +91,11 @@ export class BatchCoordinator<T> {
             this.boundHandleGamesPlaced
         )
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ClearRequest,
+            StorePropsEventTypes.LayoutClearRequest,
+            this.boundHandleClearRequest
+        )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.LibraryReloadRequest,
             this.boundHandleClearRequest
         )
         BatchCoordinator.logger.debug('Constructed')

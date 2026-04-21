@@ -88,7 +88,7 @@ describe('BatchCoordinator', () => {
 
             await new Promise(resolve => setTimeout(resolve, 30))
 
-            eventManager.emit(StorePropsEventTypes.ClearRequest, {})
+            eventManager.emit(StorePropsEventTypes.LayoutClearRequest, {})
 
             expect(coordinator.getProgress()).toEqual({
                 received: 0,

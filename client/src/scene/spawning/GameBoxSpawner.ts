@@ -14,7 +14,10 @@ import {
     type GamesPlacedEvent,
 } from '../../types/InteractionEvents'
 import type { SectionsReadyEvent, GameDataReadyEvent } from '../../types/EnvironmentEvents'
-import type { StorePropsClearRequestEvent } from '../props/PropsEvents'
+import type {
+    StorePropsLayoutClearRequestEvent,
+    StorePropsLibraryReloadRequestEvent,
+} from '../props/PropsEvents'
 import { Logger } from '../../utils/Logger'
 import type { StockSurface } from '../../types/LayoutTypes'
 
@@ -115,8 +118,12 @@ export class GameBoxSpawner {
             (e: CustomEvent<GameDataReadyEvent>) => this.handleGameDataReady(e)
         )
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.ClearRequest,
-            (e: CustomEvent<StorePropsClearRequestEvent>) => this.handleClearRequest(e)
+            StorePropsEventTypes.LayoutClearRequest,
+            (e: CustomEvent<StorePropsLayoutClearRequestEvent>) => this.handleLayoutClearRequest(e)
+        )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.LibraryReloadRequest,
+            (e: CustomEvent<StorePropsLibraryReloadRequestEvent>) => this.handleLibraryReloadRequest(e)
         )
 
         GameBoxSpawner.logger.debug('Constructed')
@@ -150,12 +157,12 @@ export class GameBoxSpawner {
         GameBoxSpawner.logger.debug('Geometry reset (layout switch)')
     }
 
-    private handleClearRequest(event: CustomEvent<StorePropsClearRequestEvent>): void {
-        if (event.detail.reason === 'library-reload') {
-            this.fullReset()
-        } else {
-            this.geometryReset()
-        }
+    private handleLayoutClearRequest(_event: CustomEvent<StorePropsLayoutClearRequestEvent>): void {
+        this.geometryReset()
+    }
+
+    private handleLibraryReloadRequest(_event: CustomEvent<StorePropsLibraryReloadRequestEvent>): void {
+        this.fullReset()
     }
 
     // -------------------------------------------------------------------------
