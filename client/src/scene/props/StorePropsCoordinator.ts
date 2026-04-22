@@ -135,8 +135,9 @@ class StorePropsCoordinator {
     }
 
     private handleLayoutClearRequest(_event: CustomEvent<StorePropsLayoutClearRequestEvent>): void {
-        // BatchCoordinator and GameBoxSpawner handle layout-clear internally.
-        // Instanced shelf renderer disposal is orchestrated by handleLayoutRequested.
+        // Clear GPU shelf geometry to avoid stale instances from prior arrangement.
+        // This ensures arrangement changes (group/sort) produce clean shelf visuals.
+        this.instancedShelfRenderer?.reset()
         this.lastTotalBatches = 0
         StorePropsCoordinator.logger.info('Store props cleared for layout/arrangement change')
     }
