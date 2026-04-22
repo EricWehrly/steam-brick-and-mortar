@@ -43,11 +43,33 @@ Identify and mitigate the performance regression when changing grouping/sorting 
 3. **URL param overrides**: Added `?shadowQuality=0` (0‑4), `?lightingQuality=simple|enhanced|advanced|ouch-my-eyes`, `?enableLighting=true|false`. Applied before lighting system initializes.
 
 ## Next steps
-- Run dev server with `?diagnostics=1&shadowQuality=0` and change grouping/sorting. Observe console for arrangement change duration and any performance change.
-- Determine if the 4‑frame stagger is still a factor (maybe `sceneInsertCancelled` prevents tasks).
-- Look for dynamic lighting/shadow recomputation triggers.
-- Add per‑shelf timing to see if matrix updates are heavy.
-- Consider partial reset: keep GPU instances and update matrices only (requires tracking which shelves changed).
+1. **Manual test with `?shadowQuality=0`** – Load app with `?diagnostics=1&shadowQuality=0`, trigger arrangement change, observe console logs for duration.
+2. **If duration still high**, add per‑shelf timing to isolate bottleneck (matrix updates vs GPU buffer flushes).
+3. **If duration is acceptable**, consider shadow recomputation as primary culprit.
+
+## Deterministic testing options
+
+### A. Vitest integration test (fast, mocked GPU)
+- Already added skeleton (`arrangement-change-performance.int.test.ts`).
+- Needs refinement to actually pass (wait for events, handle mocks).
+- Will give us a baseline for logical regression (not GPU‑bound).
+
+### B. Playwright visual test (real browser, real WebGL)
+- Created skeleton (`arrangement-change-performance.spec.ts`).
+- Requires UI interaction or global event emitter.
+- Can run with `?shadowQuality=0` vs `?shadowQuality=4` to measure difference.
+- Needs mock Steam API or network interception.
+
+**Recommendation:**
+- First verify manually that shadows are the bottleneck.
+- If yes, we can add a simple Playwright test that loads the app, triggers arrangement change via injected JS, and asserts duration < threshold.
+- Use network interception to serve static game data (36 games) for consistency.
+- Run in CI nightly, not per commit.
+
+## Open questions
+- Where is dynamic lighting recomputation triggered? Look for shadow map updates or light frustum recomputation.
+- Is there a way to toggle dynamic lights via URL param or debug command? (We added `?shadowQuality=0`).
+- Does the four‑frame stagger (`FrameBudgetScheduler`) apply to arrangement changes? Check `ShelfLayoutCoordinator` or `InstancedShelfRenderer`.
 
 ## Open questions
 - Where is dynamic lighting recomputation triggered? Look for shadow map updates or light frustum recomputation.
