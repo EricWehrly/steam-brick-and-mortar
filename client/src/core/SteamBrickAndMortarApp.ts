@@ -364,6 +364,30 @@ export class SteamBrickAndMortarApp {
             frameTimeWarnThreshold: 16.67,  // Warn if frame exceeds 60fps budget
             callbackTimeWarnThreshold: 5  // Warn if any callback > 5ms
         })
+
+        // Apply URL overrides to AppSettings before lighting system initializes
+        const shadowQualityParam = urlParams.get('shadowQuality')
+        if (shadowQualityParam !== null) {
+            const value = parseInt(shadowQualityParam, 10)
+            if (!isNaN(value) && value >= 0 && value <= 4) {
+                this.appSettings.setSetting('shadowQuality', value)
+                console.log(`🔧 URL override: shadowQuality = ${value}`)
+            }
+        }
+        const lightingQualityParam = urlParams.get('lightingQuality')
+        if (lightingQualityParam !== null) {
+            const valid = ['simple', 'enhanced', 'advanced', 'ouch-my-eyes']
+            if (valid.includes(lightingQualityParam)) {
+                this.appSettings.setSetting('lightingQuality', lightingQualityParam as import('./AppSettings').LightingQuality)
+                console.log(`🔧 URL override: lightingQuality = ${lightingQualityParam}`)
+            }
+        }
+        const enableLightingParam = urlParams.get('enableLighting')
+        if (enableLightingParam !== null) {
+            const value = enableLightingParam === 'true' || enableLightingParam === '1'
+            this.appSettings.setSetting('enableLighting', value)
+            console.log(`🔧 URL override: enableLighting = ${value}`)
+        }
         
         // Start the render loop (all updates happen via registry)
         this.sceneManager.startRenderLoop()
