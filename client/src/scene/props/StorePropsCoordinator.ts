@@ -28,6 +28,7 @@ import * as THREE from 'three'
 import { EventManager, EventSource } from '../../core/EventManager'
 import { Logger } from '../../utils/Logger'
 import { GameEventTypes, RoomEventTypes, SteamEventTypes, StorePropsEventTypes, UIEventTypes } from '../../types/InteractionEvents'
+import type { AllBatchesCompleteEvent } from '../../types/EnvironmentEvents'
 import type {
     StorePropsSetupRequestEvent,
     StorePropsSetupCompletedEvent,
@@ -60,6 +61,8 @@ class StorePropsCoordinator {
 
     // Tracks last-seen batch count to detect library switches
     private lastTotalBatches = 0
+    // Performance timing for arrangement changes
+    private arrangementChangeStartTime: number | null = null
 
     // Active layout mode - drives ShelfLayoutCoordinator on next batch run
     private activeLayoutMode: LayoutMode = 'arc'
@@ -96,7 +99,20 @@ class StorePropsCoordinator {
             (event: CustomEvent<LayoutRequestedEvent>) => this.handleLayoutRequested(event.detail)
         )
 
+        this.eventManager.registerEventHandler(
+            GameEventTypes.AllBatchesComplete,
+            this.handleAllBatchesComplete.bind(this)
+        )
+
         StorePropsCoordinator.logger.info('Registered')
+    }
+
+    private handleAllBatchesComplete(_event: CustomEvent<AllBatchesCompleteEvent>): void {
+        if (this.arrangementChangeStartTime !== null) {
+            const duration = performance.now() - this.arrangementChangeStartTime
+            StorePropsCoordinator.logger.info(`🔄 Arrangement change completed in ${duration.toFixed(2)}ms`)
+            this.arrangementChangeStartTime = null
+        }
     }
 
     private async handleSetupRequest(_event: CustomEvent<StorePropsSetupRequestEvent>): Promise<void> {
@@ -137,6 +153,7 @@ class StorePropsCoordinator {
     private handleLayoutClearRequest(_event: CustomEvent<StorePropsLayoutClearRequestEvent>): void {
         // Clear GPU shelf geometry to avoid stale instances from prior arrangement.
         // This ensures arrangement changes (group/sort) produce clean shelf visuals.
+        this.arrangementChangeStartTime = performance.now()
         this.instancedShelfRenderer?.reset()
         this.lastTotalBatches = 0
         StorePropsCoordinator.logger.info('Store props cleared for layout/arrangement change')
@@ -189,6 +206,7 @@ class StorePropsCoordinator {
     private handleLayoutRequested(detail: LayoutRequestedEvent): void {
         if (detail.layoutMode === this.activeLayoutMode) return
         this.activeLayoutMode = detail.layoutMode
+        this.arrangementChangeStartTime = performance.now()
         StorePropsCoordinator.logger.info(`Layout mode → ${detail.layoutMode}; rebuilding scene geometry`)
 
         if (this.shelfLayoutCoordinator) {

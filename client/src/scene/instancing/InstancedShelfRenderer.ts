@@ -546,11 +546,12 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             shelfBoard: 0,
             interior: 0
         }
-        this.meshesAddedToScene = false
+        // Keep meshesAddedToScene = true — meshes remain in scene after a reset.
+        // sceneInsertCancelled prevents any scheduled insertion tasks from re-adding.
         this.sceneInsertCancelled = true
         this.pendingShelfReady.clear()
         
-        InstancedShelfRenderer.logger.debug('🔄 Reset')
+        InstancedShelfRenderer.logger.debug('🔄 Reset (meshes remain in scene)')
     }
     
     public isReady(): boolean {
