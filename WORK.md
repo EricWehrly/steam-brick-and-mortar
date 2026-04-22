@@ -1,61 +1,45 @@
 # WORK.md — feat-section-per-layout-v2
 
 **Branch:** `openclaw/feat-section-per-layout-v2`
-**Base:** `openclaw/feat-renderer-lifetime-clean` (includes ordering + reload/layout split fixes)
+**Base:** `openclaw/feat-renderer-lifetime-clean`
 
 ## Goal
-Implement Section-Per-Layout (SPL) with clean, phase-specific event ownership:
-1) immutable library manifest,
-2) definitions-ready grouping/sorting,
-3) artwork/placement completion.
-
-## Why now
-- Current overlap (`DataLoaded` + `GameDataReady`) was semantically muddy.
-- Batch/placement ownership was split across multiple emitters.
-- Regressions (empty shelves/sign gaps) indicated readiness boundaries needed to be explicit.
+Section-Per-Layout (SPL): section-owned shelf geometry across arc/row/spoke, clean event phase boundaries, and correct artwork/label lifecycle for re-sorting and layout switching.
 
 ---
 
-## Milestone 1 (this pass)
+## Done on this branch
 
-### A. Event seam cleanup (single-owner boundaries)
-- [x] Added `SteamEventTypes.LibraryManifestReady` + payload type (`SteamLibraryManifestReadyEvent`)
-- [x] Moved canonical `GameDataReady` emission to `SteamIntegration` (definitions-ready seam)
-- [x] Removed `GameDataReady` emission from `BatchCoordinator`
-- [x] Updated `GameBoxSpawner` capacity init to listen to `LibraryManifestReady`
-- [x] Kept `DataLoaded` as integration/UI refresh signal
-
-### B. Layout-change replay semantics
-- [x] `StorePropsCoordinator` now re-emits `LibraryManifestReady` + `GameDataReady` from DataManager state on layout change
-
-### C. Documentation updates (existing docs only)
-- [x] `docs/plans/layout-pipeline-plan.md` — rewritten event seam table by 3 phases
-- [x] `docs/features/gamesort-full-pipeline.md` — updated status + contract section
-- [x] `docs/agent-context/component-interaction-map.md` — added canonical runtime event flow header
-
-### D. Regression coverage
-- [x] Updated unit tests for new ownership (`BatchCoordinator` no longer emits `GameDataReady`)
-- [x] Updated GameBoxSpawner tests to manifest-based renderer initialization
-- [x] Added integration guard: `event-ordering-library-readiness.int.test.ts`
-- [x] Simplified/retargeted `games-on-shelves-regression.int.test.ts` to manifest+sections+batches contract
+- [x] Split clear events (`LayoutClearRequest`, `LibraryReloadRequest`)
+- [x] `LibraryManifestReady` event (immutable membership seam)
+- [x] `GameDataReady` moved to `SteamIntegration` (single definitions-ready owner)
+- [x] Section-aware layout: arc, row, spoke each compute shelves per section
+- [x] Arc ring-band geometry (smallest section → innermost ring, contiguous row ownership)
+- [x] Spoke aisle-width clamped to angular geometry (no adjacent-spoke overlap)
+- [x] `ShelfSectionPlanner` sign threshold fixed (waits for one shelf per section, not game-count math)
+- [x] `InstancedShelfRenderer` capacity scaled to library size at setup time
+- [x] `ArtworkSettled` gated on `AllBatchesComplete` — prevents premature label compact when background fetch batches arrive after cached batch prewarm finishes
+- [x] Debug: `window.__debugSectionPlanner.labelAllShelves()` labels every shelf with `section·index`
+- [x] Event seam docs updated (layout-pipeline-plan, gamesort-full-pipeline, component-interaction-map)
+- [x] Integration test: `event-ordering-library-readiness.int.test.ts`
 
 ---
 
-## Validation run summary
+## Known open items on this branch
 
-### Unit (`yarn test ...`)
-- [x] `test/unit/scene/batch/BatchCoordinator-game-data-ordering.test.ts`
-- [x] `test/unit/scene/spawning/GameBoxSpawner.test.ts`
-- [x] `test/unit/scene/categorization/GameSorter.test.ts`
-- [x] `test/unit/scene/ShelfSectionPlanner.test.ts`
-
-### Integration (`yarn test:integration ...`)
-- [x] `test/integration/games-on-shelves-regression.int.test.ts`
-- [x] `test/integration/event-ordering-library-readiness.int.test.ts`
+- [ ] **Spoke inside-surface placement**: games may be appearing on the outward face of spoke shelves instead of the aisle face. `SpokeStockStrategy` selects `Near` (inward) correctly, but the `buildStockSurfaces` local-Z calculation for `Near` uses `backZ` — worth verifying against a rotated spoke shelf. Use `window.__debugSectionPlanner.labelAllShelves()` to confirm shelf orientations, then check whether `ShelfFace.Near` is truly the aisle side at spoke rotations.
+- [ ] Sorting issues (deferred — will change with multi-group work)
+- [ ] `DataLoaded` rename to `SteamSessionReady` or similar (low priority, cosmetic)
 
 ---
 
-## Remaining follow-ups
-- [ ] Decide whether `DataLoaded` naming should be narrowed (`SteamSessionReady` / similar) to reduce confusion with `GameDataReady`.
-- [ ] Consider explicit `GameDefinitionsBatchReady` / `GameDefinitionsReady` events if we want phase-2 batch semantics separate from `GamesBatchReady` transport semantics.
-- [ ] Optional: add direct integration assertion for sign object presence once sign renderer/test harness contract is made deterministic in integration env.
+## Next branch: multi-group placement
+
+**See:** `docs/plans/multi-group-placement-plan.md` (written below — move to that file)
+
+---
+
+## Remaining follow-ups (carry to MEMORY.md on close)
+- Arc ring geometry working, sections assigned contiguous rings
+- Spoke geometry improved but inside-surface placement needs visual verification
+- Label atlas exhaustion root cause was `ArtworkSettled` firing between batch waves — now gated
