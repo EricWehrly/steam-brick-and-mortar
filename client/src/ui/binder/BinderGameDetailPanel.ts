@@ -24,6 +24,13 @@ export class BinderGameDetailPanel {
             || `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`
         const playtimeHours = Math.round((game.playtime_forever || 0) / 60)
         const playtime2Weeks = Math.round((game.playtime_2weeks || 0) / 60)
+        const userscore = game.userscore ?? 0
+
+        const ratingBlock = `
+            <div class="detail-stat">
+                <div class="detail-stat-label">Steam Rating</div>
+                <div class="detail-stat-value">${this.formatRating(userscore)}</div>
+            </div>`
 
         const playtime2WeeksBlock = playtime2Weeks > 0 ? `
             <div class="detail-stat">
@@ -56,6 +63,7 @@ export class BinderGameDetailPanel {
             .replace(/\{\{appid\}\}/g, String(appid))
             .replace(/\{\{playtimeHours\}\}/g, String(playtimeHours))
             .replace(/\{\{playtime2WeeksBlock\}\}/g, playtime2WeeksBlock)
+            .replace(/\{\{ratingBlock\}\}/g, ratingBlock)
             .replace(/\{\{categoriesBlock\}\}/g, categoriesBlock)
             .replace(/\{\{jsonBlob\}\}/g, this.escapeHtml(jsonBlob))
 
@@ -101,6 +109,22 @@ export class BinderGameDetailPanel {
             this.panel.remove()
             this.panel = null
         }
+    }
+
+    private formatRating(userscore: number): string {
+        if (userscore <= 0) {
+            return 'Unrated'
+        }
+        if (userscore >= 90) {
+            return `${userscore}% · Overwhelmingly Positive`
+        }
+        if (userscore >= 80) {
+            return `${userscore}% · Very Positive`
+        }
+        if (userscore >= 70) {
+            return `${userscore}% · Mostly Positive`
+        }
+        return `${userscore}% · Mixed or Lower`
     }
 
     private escapeHtml(text: string): string {
