@@ -85,20 +85,20 @@ const SPOKE_DEFAULTS: Required<SpokeLayoutConfig> = {
 }
 
 function deriveSpokeSpacingFromSectionCounts(
-    shelvesPerSection: ReadonlyArray<number>,
+    spokePositionsPerSection: ReadonlyArray<number>,
     aisleHalfWidthMetres: number,
     minimumHubClearanceMetres: number
 ): { hubClearanceMetres: number; shelfSpacingMetres: number } {
-    const maxShelvesInAnySection = Math.max(1, ...shelvesPerSection)
+    const maxPositionsInAnySection = Math.max(1, ...spokePositionsPerSection)
 
     const dynamicShelfSpacingMetres = Math.max(
-        2.4,
-        2.1 + maxShelvesInAnySection * 0.12
+        2.25,
+        2.0 + maxPositionsInAnySection * 0.10
     )
 
     const dynamicHubClearanceMetres = Math.max(
         minimumHubClearanceMetres,
-        aisleHalfWidthMetres * 2 + maxShelvesInAnySection * 0.08
+        aisleHalfWidthMetres * 2 + maxPositionsInAnySection * 0.06
     )
 
     return {
@@ -209,17 +209,18 @@ function computeSpokeShelvesForSections(sections: ReadonlyArray<Section>): Secti
         return []
     }
 
-    const shelvesPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    // Spoke shelves are consumed near-only (9 games per physical shelf).
+    // Treat each spoke "position" (left+right pair) as the semantic unit for a
+    // 18-game chunk, then expand to two physical shelves so aisles stay balanced.
+    const spokePositionsPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    const shelvesPerSection = spokePositionsPerSection.map(positionCount => positionCount * 2)
     const totalShelves = shelvesPerSection.reduce((sum, count) => sum + count, 0)
 
     // Keep spoke geometry keyed to section count so each section owns one spoke territory.
-    const shelvesPerSpokeNeeded = Math.max(
-        1,
-        Math.ceil(totalShelves / (sections.length * 2))
-    )
+    const shelvesPerSpokeNeeded = Math.max(1, ...spokePositionsPerSection)
 
     const spacing = deriveSpokeSpacingFromSectionCounts(
-        shelvesPerSection,
+        spokePositionsPerSection,
         SPOKE_DEFAULTS.aisleHalfWidthMetres,
         SPOKE_DEFAULTS.hubClearanceMetres
     )

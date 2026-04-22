@@ -5,7 +5,11 @@ import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT, MAIN_THREAD_CONTEXT } from '../utils/PerformanceMonitor'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
-import type { SteamGamesBatchEvent, SteamNetworkFetchProgressEvent } from '../types/InteractionEvents'
+import type {
+    SteamGamesBatchEvent,
+    SteamNetworkFetchProgressEvent,
+    SteamLibraryManifestReadyEvent,
+} from '../types/InteractionEvents'
 import type { SteamGame, SteamUser } from './SteamApiClient'
 
 export class GamesLoader {
@@ -52,6 +56,12 @@ export class GamesLoader {
         const renderableBatchCount = Math.ceil(renderableAppids.length / BATCH_SIZE)
         const refreshBatchCount = Math.ceil(refreshAppids.length / BATCH_SIZE)
         const totalBatchCount = renderableBatchCount + refreshBatchCount
+
+        EventManager.getInstance().emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+            totalGames: sortedGames.length,
+            totalBatches: totalBatchCount,
+            appids,
+        })
 
         const emitter = new BatchEmitter(BATCH_SIZE, totalBatchCount)
 

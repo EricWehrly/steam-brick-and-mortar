@@ -61,10 +61,12 @@ describe('SpokeLayout section-aware shelf ownership', () => {
             countsBySection.set(shelf.sectionIndex, (countsBySection.get(shelf.sectionIndex) ?? 0) + 1)
         }
 
-        // 36 -> 2 shelves, 18 -> 1 shelf, 72 -> 4 shelves
-        expect(countsBySection.get(0)).toBe(2)
-        expect(countsBySection.get(1)).toBe(1)
-        expect(countsBySection.get(2)).toBe(4)
+        // Spoke layout now allocates near-only physical shelf rows:
+        // each 18-game semantic chunk maps to one left/right shelf pair.
+        // 36 -> 4 shelves, 18 -> 2 shelves, 72 -> 8 shelves
+        expect(countsBySection.get(0)).toBe(4)
+        expect(countsBySection.get(1)).toBe(2)
+        expect(countsBySection.get(2)).toBe(8)
 
         // Section index should align with spoke index in section-aware spoke mode
         shelves.forEach((shelf) => {
@@ -95,7 +97,7 @@ describe('SpokeLayout section-aware shelf ownership', () => {
         const allRadii = [...radiiBySection.values()].flat()
         const maxRadius = Math.max(...allRadii)
         expect(maxRadius).toBeGreaterThan(10)
-        expect(maxRadius).toBeLessThan(45)
+        expect(maxRadius).toBeLessThan(95)
     })
 })
 

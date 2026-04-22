@@ -208,31 +208,19 @@ function computeArcShelvesForSections(sections: ReadonlyArray<Section>): Section
     }
 
     const sectionShelfCounts = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
-    const sectionRemainingCounts = [...sectionShelfCounts]
     const totalShelves = sectionShelfCounts.reduce((sum, count) => sum + count, 0)
 
     const dynamicArcConfig = deriveArcConfigFromSectionCounts(sectionShelfCounts)
     const shelves = computeArcShelfLayout(totalShelves, dynamicArcConfig)
 
-    const shelvesByRow = new Map<number, number[]>()
-    shelves.forEach((shelf, index) => {
-        const entries = shelvesByRow.get(shelf.row) ?? []
-        entries.push(index)
-        shelvesByRow.set(shelf.row, entries)
-    })
-
+    // Section-as-ring behavior with hard contiguous spans:
+    // allocate a contiguous shelf run for each section in row-major shelf order.
     const owningSectionIndices = new Array<number>(totalShelves).fill(0)
-
-    // Section-as-ring behavior: assign contiguous rows to sections by shelf budget.
-    let sectionCursor = 0
-    for (const [, shelfIndices] of [...shelvesByRow.entries()].sort(([a], [b]) => a - b)) {
-        for (const shelfIndex of shelfIndices) {
-            while (sectionCursor < sectionRemainingCounts.length - 1 && sectionRemainingCounts[sectionCursor] <= 0) {
-                sectionCursor++
-            }
-
-            owningSectionIndices[shelfIndex] = sectionCursor
-            sectionRemainingCounts[sectionCursor] = Math.max(0, sectionRemainingCounts[sectionCursor] - 1)
+    let shelfCursor = 0
+    for (let sectionIndex = 0; sectionIndex < sectionShelfCounts.length; sectionIndex++) {
+        const shelvesForSection = sectionShelfCounts[sectionIndex]
+        for (let count = 0; count < shelvesForSection && shelfCursor < totalShelves; count++, shelfCursor++) {
+            owningSectionIndices[shelfCursor] = sectionIndex
         }
     }
 
