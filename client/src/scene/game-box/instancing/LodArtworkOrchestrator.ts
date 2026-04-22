@@ -393,7 +393,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     ): number {
         const textureIndex = this.gameNameToTextureIndex.get(gameName)
         if (textureIndex === undefined) {
-            LodArtworkOrchestrator.logger.debug(`placeInstance: no prefetched texture for "${gameName}" (appId ${appid}) — label fallback`)
+            LodArtworkOrchestrator.logger.warn(`placeInstance: no prefetched texture for "${gameName}" (appId ${appid})`)
             return -1
         }
 
