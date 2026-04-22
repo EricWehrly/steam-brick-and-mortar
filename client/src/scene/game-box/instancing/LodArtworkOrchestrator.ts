@@ -161,6 +161,12 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     // Used by placeInstance() to pass the final CDN URL to the renderer.
     private prefetchedArtworkUrl: Map<string, string> = new Map()
 
+    // Prevent ArtworkSettled from firing before AllBatchesComplete.
+    // prefetchArtwork requests can settle transiently between batch waves
+    // (e.g. cached games finish before network-fetch games arrive).
+    // Compact must only run after the full library's artwork opportunities are done.
+    private allBatchesComplete: boolean = false
+
     // Prevent log spam when atlas is full
     private atlasFullLogged: boolean = false
     private inFlightArtworkCount: number = 0
@@ -228,7 +234,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         )
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.AllBatchesComplete,
-            this.compactMidTierAfterLoad.bind(this)
+            this.handleAllBatchesComplete.bind(this)
         )
 
         this.logConfig()
@@ -240,6 +246,17 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
     private compactMidTierAfterLoad(): void {
         this.textureManager.compactMidTier()
+    }
+
+    private handleAllBatchesComplete(): void {
+        this.allBatchesComplete = true
+        this.compactMidTierAfterLoad()
+        // If in-flight artwork has already drained, fire ArtworkSettled now.
+        // Otherwise it will fire from the prefetchArtwork finally block when
+        // the last in-flight request completes.
+        if (this.inFlightArtworkCount === 0) {
+            EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
+        }
     }
 
     /** Factory method - override in debug subclass */
@@ -349,7 +366,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             return 'error'
         } finally {
             this.inFlightArtworkCount--
-            if (this.inFlightArtworkCount === 0) {
+            if (this.inFlightArtworkCount === 0 && this.allBatchesComplete) {
                 EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
             }
         }
@@ -449,7 +466,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             return await this.fetchAndPlaceArtwork(position, gameName, artworkUrl, appid, rotation)
         } finally {
             this.inFlightArtworkCount--
-            if (this.inFlightArtworkCount === 0) {
+            if (this.inFlightArtworkCount === 0 && this.allBatchesComplete) {
                 EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
             }
         }
