@@ -13,6 +13,7 @@ import {
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
+    type ArtworkSettledEvent,
 } from '../../types/InteractionEvents'
 import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
 import type { SteamLibraryManifestReadyEvent } from '../../types/InteractionEvents'
@@ -80,6 +81,10 @@ export class GameBoxSpawner {
 
     // Rendezvous state: prefetch result per appid (populated when prefetch settles)
     private prefetchResults: Map<number, PrefetchResult> = new Map()
+    // Keep app name for consolidated fallback diagnostics
+    private appNamesByAppId: Map<number, string> = new Map()
+    // Ensure expected fallback summary logs once per library load
+    private hasLoggedExpectedFallbackSummary = false
     // Rendezvous state: placement intent per appid (populated after shelves + strategy known)
     private placementIntents: Map<number, PlacementIntent> = new Map()
 
@@ -126,6 +131,10 @@ export class GameBoxSpawner {
             StorePropsEventTypes.LibraryReloadRequest,
             (e: CustomEvent<StorePropsLibraryReloadRequestEvent>) => this.handleLibraryReloadRequest(e)
         )
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.ArtworkSettled,
+            (event: CustomEvent<ArtworkSettledEvent>) => this.handleArtworkSettled(event)
+        )
 
         GameBoxSpawner.logger.debug('Constructed')
     }
@@ -141,6 +150,8 @@ export class GameBoxSpawner {
         this.pendingSections = null
         this.shelfPositions.clear()
         this.prefetchResults.clear()
+        this.appNamesByAppId.clear()
+        this.hasLoggedExpectedFallbackSummary = false
         this.placementIntents.clear()
         GameBoxSpawner.logger.debug('Full reset (library reload)')
     }
@@ -217,6 +228,7 @@ export class GameBoxSpawner {
 
         for (const game of games) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
+            this.appNamesByAppId.set(appid, game.name)
             const artworkUrl = this.selectBestArtworkUrl(game as SteamGameData)
 
             if (!artworkUrl) {
@@ -346,11 +358,53 @@ export class GameBoxSpawner {
         if (!intent) return // no position assigned yet
 
         this.placementIntents.delete(appid) // consume the intent
+
+        // Expected fallback path: artwork unavailable. Place label directly and
+        // avoid per-title atlas-miss warnings from deep renderer layers.
+        if (result === 'permanent-failure' || result === 'error') {
+            this.renderer.placeLabelBox(intent.game, intent.position, intent.rotation)
+            return
+        }
+
+        // Invariant path: prefetch says artwork exists/cached, so a miss in
+        // placeGame() is a real ordering/consistency signal and should remain visible.
         this.renderer.placeGame(intent.game, intent.position, intent.rotation)
     }
 
     // -------------------------------------------------------------------------
     // Intent assignment helpers
+
+    private handleArtworkSettled(_event: CustomEvent<ArtworkSettledEvent>): void {
+        if (this.hasLoggedExpectedFallbackSummary) {
+            return
+        }
+
+        const fallbackTitles: string[] = []
+        for (const [appid, result] of this.prefetchResults) {
+            if (result !== 'permanent-failure' && result !== 'error') {
+                continue
+            }
+            const title = this.appNamesByAppId.get(appid)
+            if (title) {
+                fallbackTitles.push(title)
+            }
+        }
+
+        if (fallbackTitles.length > 0) {
+            fallbackTitles.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+            const previewLimit = 25
+            const preview = fallbackTitles.slice(0, previewLimit)
+            const remaining = fallbackTitles.length - preview.length
+            const overflowSuffix = remaining > 0 ? ` (+${remaining} more)` : ''
+
+            GameBoxSpawner.logger.info(
+                `Artwork fallback summary: ${fallbackTitles.length} game(s) will use labels this run: ` +
+                `${preview.join(', ')}${overflowSuffix}`
+            )
+        }
+
+        this.hasLoggedExpectedFallbackSummary = true
+    }
 
     private assignIntentsFromStock(
         stockSurfaces: StockSurface[],
