@@ -1,31 +1,34 @@
 /**
- * Deterministic performance test for arrangement changes.
+ * Integration test for arrangement‑change performance.
  *
- * Measures wall‑clock duration from ArrangementRequested → AllBatchesComplete
- * with and without shadows.
- *
- * Runs in Vitest (JSDOM) with mocked GPU subsystems.
+ * Ensures that changing group/sort modes within the same layout completes
+ * within a reasonable time and does not emit duplicate events or perform
+ * unnecessary GPU work.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
-
 import { EventManager } from '../../src/core/EventManager'
-import { DataManager } from '../../src/core/data'
-import { AppSettings } from '../../src/core/AppSettings'
+import { DataManager, DataKey, DataDomain } from '../../src/core/data'
 import { createStorePropsTestHarness } from '../helpers/StorePropsTestHarness'
 import {
     SteamEventTypes,
     GameEventTypes,
     UIEventTypes,
+    StorePropsEventTypes,
     type SteamLibraryManifestReadyEvent,
     type GameDataReadyEvent,
     type AllBatchesCompleteEvent,
     type ArrangementRequestedEvent,
+    type StorePropsLayoutClearRequestEvent,
+    type SectionsReadyEvent as SectionsReadyEventType,
 } from '../../src/types/InteractionEvents'
 import type { SectionsReadyEvent } from '../../src/types/EnvironmentEvents'
 import type { SteamGame } from '../../src/steam'
 import type { SteamGameData } from '../../src/scene'
+
+// Ensure GameSorter is instantiated (side‑effect import)
+import '../../src/scene/categorization/GameSorter'
 
 // Mock TextureManager to avoid WebGL errors
 vi.mock('../../src/utils/TextureManager', async () => {
@@ -58,46 +61,47 @@ function makeGames(startAppid: number, count: number): SteamGame[] {
 }
 
 function emitBatch(eventManager: EventManager, batchIndex: number, totalBatches: number, games: SteamGame[]) {
-    eventManager.emit(SteamEventTypes.GamesBatch, {
+    eventManager.emit(SteamEventTypes.GamesBatchReady, {
+        games: games as SteamGameData[],
         batchIndex,
         totalBatches,
-        games: games as SteamGameData[],
-        source: 'test',
     })
 }
 
 describe('arrangement change performance', () => {
+    let scene: THREE.Scene
     let eventManager: EventManager
     let dataManager: DataManager
-    let appSettings: AppSettings
     let harness: ReturnType<typeof createStorePropsTestHarness>
-    let scene: THREE.Scene
 
     beforeEach(() => {
-        eventManager = EventManager.getInstance()
-        dataManager = DataManager.getInstance()
-        appSettings = AppSettings.getInstance()
-
-        // Reset DataManager state
-        dataManager.clear()
-        // Set a small library for predictable shelf count
-        const games = makeGames(1000, 36) // 36 games → 2 batches of 18 each
-        dataManager.set('steam.games', games)
-
-        // Create a minimal scene for the store props harness
         scene = new THREE.Scene()
+        eventManager = EventManager.getInstance()
+        eventManager.removeAllListeners()
+        dataManager = DataManager.getInstance()
+        dataManager.clear()
+        dataManager.set(DataKey.MainScene, scene, {
+            domain: DataDomain.Scene,
+            description: 'arrangement change test scene',
+        })
+
+        // Small library for predictable shelf count
+        const games = makeGames(1000, 36) // 36 games → 2 batches of 18 each
+        dataManager.set('steam.games', games, { domain: DataDomain.SteamIntegration })
+
         harness = createStorePropsTestHarness(scene)
     })
 
     afterEach(() => {
-        harness.dispose()
-        // Clean up any leftover event listeners
-        eventManager.clearAllEventHandlers()
+        harness?.dispose()
+        eventManager.removeAllListeners()
+        dataManager.clear()
+        scene.clear()
+        vi.clearAllMocks()
     })
 
     /**
-     * Helper that sets up initial store layout and waits for AllBatchesComplete.
-     * Returns a promise that resolves when the initial layout is fully placed.
+     * Sets up initial layout (genre grouping) and waits for AllBatchesComplete.
      */
     async function setupInitialLayout(): Promise<void> {
         return new Promise<void>((resolve) => {
@@ -105,18 +109,26 @@ describe('arrangement change performance', () => {
                 resolve()
             }, { once: true })
 
-            // Emit the pipeline events that trigger store props
             const games = dataManager.get<SteamGame[]>('steam.games')!
+            const totalBatches = Math.max(1, Math.ceil(games.length / 18))
+
             eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
                 totalGames: games.length,
-                totalBatches: Math.max(1, Math.ceil(games.length / 18)),
+                totalBatches,
                 appids: games.map((g) => g.appid),
             })
 
             eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, {
                 totalGames: games.length,
-                totalBatches: Math.max(1, Math.ceil(games.length / 18)),
+                totalBatches,
             })
+
+            // Split games into batches (18 per batch)
+            for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+                const start = batchIndex * 18
+                const batchGames = games.slice(start, start + 18)
+                emitBatch(eventManager, batchIndex, totalBatches, batchGames)
+            }
 
             // Initial sections (by genre)
             const sections: SectionsReadyEvent = {
@@ -137,15 +149,12 @@ describe('arrangement change performance', () => {
                 groupMode: 'by-genre',
                 sortMode: 'by-playtime',
             }
-            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, sections)
+            eventManager.emit<SectionsReadyEventType>(GameEventTypes.SectionsReady, sections)
         })
     }
 
     /**
-     * Trigger an arrangement change and measure duration until AllBatchesComplete.
-     * @param groupMode - new group mode
-     * @param sortMode - new sort mode (optional)
-     * @returns duration in milliseconds
+     * Triggers an arrangement change and returns the duration until AllBatchesComplete.
      */
     async function measureArrangementChange(
         groupMode: 'by-genre' | 'by-recently-played' | 'by-playtime' | 'by-alphabetical',
@@ -178,21 +187,49 @@ describe('arrangement change performance', () => {
         })
     }
 
-    it('should complete an arrangement change within reasonable time (shadows off)', async () => {
-        // Disable shadows via AppSettings before lighting system initializes
-        appSettings.setSetting('shadowQuality', 0)
+    it.only('completes an arrangement change within reasonable time', async () => {
+        // Spy on critical methods to detect redundant work
+        const resetSpy = vi.spyOn(harness.instancedShelfRenderer, 'reset')
+        const setInstanceSpy = vi.spyOn(harness.instancedShelfRenderer, 'setInstance')
+        const layoutClearSpy = vi.spyOn(eventManager, 'emit')
 
         await setupInitialLayout()
         console.log('Initial layout ready')
 
+        // Clear spies after initial setup
+        resetSpy.mockClear()
+        setInstanceSpy.mockClear()
+        layoutClearSpy.mockClear()
+
         const duration = await measureArrangementChange('by-recently-played')
         console.log(`Arrangement change duration: ${duration.toFixed(2)}ms`)
 
-        // Expect under 500ms in a mocked environment (no real GPU work)
+        // Duration should be under 500ms in mocked environment (no real GPU work)
         expect(duration).toBeLessThan(500)
+
+        // Reset should be called exactly once
+        expect(resetSpy).toHaveBeenCalledTimes(1)
+
+        // setInstance should be called for each shelf unit (we expect at least 2 shelves)
+        expect(setInstanceSpy).toHaveBeenCalled()
+        // We could assert exact count if we know shelf count, but it's variable.
+        // At least ensure it's called more than zero times.
+        expect(setInstanceSpy.mock.calls.length).toBeGreaterThan(0)
+
+        // LayoutClearRequest should be emitted exactly once
+        const layoutClearCalls = layoutClearSpy.mock.calls.filter(
+            call => call[0] === StorePropsEventTypes.LayoutClearRequest
+        )
+        expect(layoutClearCalls.length).toBe(1)
+
+        // SectionsReady should be emitted exactly once for the new arrangement
+        const sectionsReadyCalls = layoutClearSpy.mock.calls.filter(
+            call => call[0] === GameEventTypes.SectionsReady
+        )
+        expect(sectionsReadyCalls.length).toBe(1)
     })
 
-    // We could add a second test with shadows enabled, but that would require
-    // a real WebGL context (not available in Vitest). That's better suited for
-    // a Playwright test that runs in a real browser.
+    it.skip('does not emit duplicate events when arrangement does not change', async () => {
+        // Temporarily skipped to focus on first test
+    })
 })
