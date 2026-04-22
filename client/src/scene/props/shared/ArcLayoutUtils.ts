@@ -79,17 +79,60 @@ const DEFAULTS: Required<Pick<ArcLayoutConfig, 'rows' | 'shelvesPerRow' | 'rowRa
     halfAngle: Math.PI / 3, // 60 deg each side
 }
 
-function deriveArcConfigFromSectionCounts(sectionShelfCounts: ReadonlyArray<number>): ArcLayoutConfig {
-    const maxShelvesInAnySection = Math.max(1, ...sectionShelfCounts)
-    const totalShelves = sectionShelfCounts.reduce((sum, count) => sum + count, 0)
+/**
+ * Build a per-row shelf config so each section maps to a contiguous band of complete rings.
+ *
+ * Strategy:
+ *  - Sections are expected to arrive sorted smallest → largest game count.
+ *  - Each section claims as many rows as it needs, where each row holds as many
+ *    shelves as can fit at that radius with the minimum walkable gap.
+ *  - Row radius grows outward so inner rings (small sections) are tight and close;
+ *    outer rings (large sections) are wide and further away.
+ */
+function buildRingBandsForSections(
+    sectionShelfCounts: ReadonlyArray<number>
+): {
+    shelvesPerRowByRow: number[]
+    halfAngleByRow: number[]
+    rowOwnerByRow: number[]
+    firstRowRadius: number
+    rowRadiusStep: number
+} {
+    const FIRST_ROW_RADIUS = 5.5
+    const ROW_RADIUS_STEP = 4.0
+    const HALF_ANGLE = Math.PI / 3      // 60° each side = 120° arc span
+    const MIN_GAP = 1.0
+    const SHELF_WIDTH = 2.0
+
+    const shelvesPerRowByRow: number[] = []
+    const halfAngleByRow: number[] = []
+    const rowOwnerByRow: number[] = []
+
+    let currentRow = 0
+    for (let sectionIndex = 0; sectionIndex < sectionShelfCounts.length; sectionIndex++) {
+        let shelvesRemaining = sectionShelfCounts[sectionIndex]
+
+        // Keep adding rows until this section's shelf budget is exhausted
+        while (shelvesRemaining > 0) {
+            const radius = FIRST_ROW_RADIUS + currentRow * ROW_RADIUS_STEP
+            const capacity = maxShelvesForGap(radius, HALF_ANGLE, MIN_GAP, SHELF_WIDTH)
+            const placed = Math.min(capacity, shelvesRemaining)
+
+            shelvesPerRowByRow.push(placed)
+            halfAngleByRow.push(HALF_ANGLE)
+            rowOwnerByRow.push(sectionIndex)
+
+            shelvesRemaining -= placed
+            currentRow++
+        }
+    }
 
     return {
-        rows: Math.max(5, Math.ceil(Math.sqrt(totalShelves / 3))),
-        rowRadiusStep: Math.max(4.0, 3.8 + maxShelvesInAnySection * 0.025),
-        firstRowRadius: Math.max(5.5, 5.0 + maxShelvesInAnySection * 0.012),
-        halfAngle: Math.PI / 3,
-        minShelfGap: 1.0,
-        shelfWidthMetres: 2.0,
+        shelvesPerRowByRow,
+        halfAngleByRow,
+        rowOwnerByRow,
+        firstRowRadius: FIRST_ROW_RADIUS,
+        rowRadiusStep: ROW_RADIUS_STEP,
     }
 }
 
@@ -207,27 +250,49 @@ function computeArcShelvesForSections(sections: ReadonlyArray<Section>): Section
         return []
     }
 
-    const sectionShelfCounts = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
-    const totalShelves = sectionShelfCounts.reduce((sum, count) => sum + count, 0)
+    // Sort sections smallest → largest so the innermost ring holds the tightest group.
+    // We preserve the original sectionIndex for sign/placement lookups.
+    const indexedSections = sections.map((section, originalIndex) => ({ section, originalIndex }))
+    const sortedSections = [...indexedSections].sort(
+        (a, b) => a.section.games.length - b.section.games.length
+    )
 
-    const dynamicArcConfig = deriveArcConfigFromSectionCounts(sectionShelfCounts)
-    const shelves = computeArcShelfLayout(totalShelves, dynamicArcConfig)
+    const sortedShelfCounts = sortedSections.map(({ section }) =>
+        Math.max(1, Math.ceil(section.games.length / 18))
+    )
 
-    // Section-as-ring behavior with hard contiguous spans:
-    // allocate a contiguous shelf run for each section in row-major shelf order.
-    const owningSectionIndices = new Array<number>(totalShelves).fill(0)
+    const ringBands = buildRingBandsForSections(sortedShelfCounts)
+    const totalShelves = ringBands.shelvesPerRowByRow.reduce((sum, n) => sum + n, 0)
+
+    const shelves = computeArcShelfLayout(totalShelves, {
+        rows: ringBands.shelvesPerRowByRow.length,
+        shelvesPerRowByRow: ringBands.shelvesPerRowByRow,
+        halfAngleByRow: ringBands.halfAngleByRow,
+        firstRowRadius: ringBands.firstRowRadius,
+        rowRadiusStep: ringBands.rowRadiusStep,
+        minShelfGap: 1.0,
+        shelfWidthMetres: 2.0,
+    })
+
+    // Map each physical shelf back to its original (unsorted) section index
+    // by tracking which row band belongs to which sorted section.
     let shelfCursor = 0
-    for (let sectionIndex = 0; sectionIndex < sectionShelfCounts.length; sectionIndex++) {
-        const shelvesForSection = sectionShelfCounts[sectionIndex]
-        for (let count = 0; count < shelvesForSection && shelfCursor < totalShelves; count++, shelfCursor++) {
-            owningSectionIndices[shelfCursor] = sectionIndex
+    const result: SectionShelfInfo[] = []
+
+    for (let bandIndex = 0; bandIndex < ringBands.shelvesPerRowByRow.length; bandIndex++) {
+        const sortedSectionIndex = ringBands.rowOwnerByRow[bandIndex]
+        const originalSectionIndex = sortedSections[sortedSectionIndex].originalIndex
+        const shelvesInRow = ringBands.shelvesPerRowByRow[bandIndex]
+
+        for (let inRow = 0; inRow < shelvesInRow && shelfCursor < shelves.length; inRow++, shelfCursor++) {
+            result.push({
+                ...shelves[shelfCursor],
+                sectionIndex: originalSectionIndex,
+            })
         }
     }
 
-    return shelves.map((shelf, shelfIndex) => ({
-        ...shelf,
-        sectionIndex: owningSectionIndices[shelfIndex] ?? Math.min(sections.length - 1, shelfIndex % sections.length),
-    }))
+    return result
 }
 
 export const ArcLayout: ISectionAwareLayoutDefinition = {

@@ -131,22 +131,46 @@ describe('computeArcShelfLayout', () => {
 })
 
 describe('section-aware arc layout', () => {
-    it('assigns shelves to multiple sections instead of back-row single-section clumping', () => {
+    it('each section owns contiguous ring bands (no mixed-section rows)', () => {
         const sections = [
-            { name: 'Action', games: Array.from({ length: 500 }, (_, i) => ({ appid: i + 1 })) },
-            { name: 'Puzzle', games: Array.from({ length: 220 }, (_, i) => ({ appid: 1000 + i + 1 })) },
-            { name: 'RPG', games: Array.from({ length: 200 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+            { name: 'Puzzle', games: Array.from({ length: 50 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'RPG', games: Array.from({ length: 120 }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'Action', games: Array.from({ length: 280 }, (_, i) => ({ appid: 2000 + i + 1 })) },
         ] as any
 
         const shelves = ArcLayout.computeShelvesForSections(sections)
         expect(shelves.length).toBeGreaterThan(0)
 
-        const rowFourShelves = shelves.filter((shelf) => shelf.row === 4)
+        // Build a map of row → set of section indices
+        const rowToSections = new Map<number, Set<number>>()
+        for (const shelf of shelves) {
+            if (!rowToSections.has(shelf.row)) rowToSections.set(shelf.row, new Set())
+            rowToSections.get(shelf.row)!.add(shelf.sectionIndex)
+        }
 
-        // Section-as-ring behavior: deepest row should be owned by one section,
-        // not interleaved columns from many sections.
-        const rowFourSectionIndices = new Set(rowFourShelves.map((shelf) => shelf.sectionIndex))
-        expect(rowFourSectionIndices.size).toBe(1)
+        // Every row must be owned by exactly one section (ring-band semantics)
+        for (const [, sectionSet] of rowToSections) {
+            expect(sectionSet.size).toBe(1)
+        }
+    })
+
+    it('sections are sorted smallest-first so inner rings are tightest', () => {
+        const sections = [
+            // Deliberately pass largest-first to verify auto-sort
+            { name: 'Action', games: Array.from({ length: 280 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'RPG',    games: Array.from({ length: 120 }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'Puzzle', games: Array.from({ length: 50 },  (_, i) => ({ appid: 2000 + i + 1 })) },
+        ] as any
+
+        const shelves = ArcLayout.computeShelvesForSections(sections)
+        expect(shelves.length).toBeGreaterThan(0)
+
+        // Inner rings (row 0) should belong to the smallest section (Puzzle = originalIndex 2)
+        const innerShelves = shelves.filter((s) => s.row === 0)
+        const innerSections = new Set(innerShelves.map((s) => s.sectionIndex))
+        // The smallest section (50 games = Puzzle, originalIndex 2) should be closest
+        const smallestOriginalIndex = 2
+        expect(innerSections.has(smallestOriginalIndex)).toBe(true)
     })
 
     it('expands arc depth dynamically for larger section shelf counts', () => {

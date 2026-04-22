@@ -118,7 +118,9 @@ class StorePropsCoordinator {
 
         // GPU owner: create fresh each setup (disposed on layout switch or clear)
         if (!this.instancedShelfRenderer) {
-            this.instancedShelfRenderer = new InstancedShelfRenderer()
+            const games = DataManager.getInstance().get<unknown[]>('steam.games') ?? []
+            const estimatedShelves = Math.max(200, Math.ceil(games.length / 9))
+            this.instancedShelfRenderer = new InstancedShelfRenderer({ maxShelfUnits: estimatedShelves })
             this.instancedShelfRenderer.initialize().catch(error => {
                 StorePropsCoordinator.logger.warn('InstancedShelfRenderer initialization failed:', error)
             })

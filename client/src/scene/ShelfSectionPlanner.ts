@@ -83,6 +83,7 @@ export class ShelfSectionPlanner {
         this.shelfSectionIndices = []
         this.pendingSections = null
         this.clearSigns()
+        ShelfSectionPlanner.logger.debug('Cleared shelf positions and signs')
     }
 
     private handleSectionsReady(detail: SectionsReadyEvent): void {
@@ -90,7 +91,7 @@ export class ShelfSectionPlanner {
 
         ShelfSectionPlanner.logger.info(
             `SectionsReady: ${detail.sections.length} section(s), ` +
-            `${this.shelfPositions.length} shelf positions known`
+            `${this.shelfPositions.filter(Boolean).length} shelf positions known`
         )
 
         this.tryPlacePendingSections()
@@ -101,12 +102,21 @@ export class ShelfSectionPlanner {
             return
         }
 
-        const requiredShelves = this.pendingSections.sections
-            .map(section => Math.max(1, Math.ceil(section.games.length / SHELF_BATCH_SIZE)))
-            .reduce((sum, count) => sum + count, 0)
+        // Wait for ShelfLayoutDetermined to have fired at least once, which means
+        // ShelfLayoutCoordinator has emitted all ShelfReady events for this run.
+        // We check by waiting until we have at least one shelf position per section
+        // that actually has games (sections with 0 games produce 1 shelf minimum).
+        const knownShelvesPerSection = new Map<number, number>()
+        for (const sectionIndex of this.shelfSectionIndices) {
+            if (sectionIndex !== undefined) {
+                knownShelvesPerSection.set(sectionIndex, (knownShelvesPerSection.get(sectionIndex) ?? 0) + 1)
+            }
+        }
 
-        const knownShelfCount = this.shelfSectionIndices.filter((sectionIndex) => sectionIndex !== undefined).length
-        if (knownShelfCount < requiredShelves) {
+        const totalSectionsWithShelves = knownShelvesPerSection.size
+        const totalActiveSections = this.pendingSections.sections.filter(s => s.games.length > 0).length || this.pendingSections.sections.length
+
+        if (totalSectionsWithShelves < totalActiveSections) {
             return
         }
 
