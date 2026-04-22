@@ -41,11 +41,20 @@ Identify and mitigate the performance regression when changing grouping/sorting 
 1. **Instrumentation**: Added `arrangementChangeStartTime` in `StorePropsCoordinator`, logged duration on `AllBatchesComplete`. Logs at INFO level.
 2. **Reset optimization**: Changed `InstancedShelfRenderer.reset()` to keep `meshesAddedToScene = true` (meshes stay in scene). This avoids re‑adding meshes and the 4‑frame stagger for arrangement changes.
 3. **URL param overrides**: Added `?shadowQuality=0` (0‑4), `?lightingQuality=simple|enhanced|advanced|ouch-my-eyes`, `?enableLighting=true|false`. Applied before lighting system initializes.
+4. **Integration test skeleton**: Added `arrangement‑change‑performance.int.test.ts` (Vitest) to measure duration and detect duplicate events. Currently failing due to undefined event type (debugging needed).
+5. **Playwright test skeleton**: Added `arrangement‑change‑performance.spec.ts` (Playwright) for real‑browser performance measurement.
 
-## Next steps
-1. **Manual test with `?shadowQuality=0`** – Load app with `?diagnostics=1&shadowQuality=0`, trigger arrangement change, observe console logs for duration.
-2. **If duration still high**, add per‑shelf timing to isolate bottleneck (matrix updates vs GPU buffer flushes).
-3. **If duration is acceptable**, consider shadow recomputation as primary culprit.
+## Phase 2 Status
+- Integration test fails with `TypeError: Cannot read properties of undefined (reading 'includes')` in `EventManager.emit`. Likely one of the event‑type constants is undefined (needs verification).
+- Debugging required: need to inspect which event type is missing, possibly due to import mismatch or missing registration.
+- Given time, we could pivot to Phase 3 (Playwright) which runs against the real app and doesn't rely on mocked event system.
+
+## Phase 3 Next
+- Implement Playwright test with network interception for mock Steam data.
+- Use URL param `?shadowQuality=0` to test without shadows.
+- Capture console logs for arrangement change duration.
+- Compare duration with/without shadows.
+- This will give us real performance data and can be run in CI.
 
 ## Deterministic testing options
 
