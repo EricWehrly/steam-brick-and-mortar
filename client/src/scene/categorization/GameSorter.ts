@@ -21,14 +21,15 @@
  * Re-exports bucket helpers (moved to GroupResolver) for backward-compat callers.
  */
 
-import { EventManager } from '../../core/EventManager'
+import { EventManager, EventSource } from '../../core/EventManager'
 import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
-import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
+import { GameEventTypes, UIEventTypes, StorePropsEventTypes } from '../../types/InteractionEvents'
 import { GroupModes, SortModes } from '../../types/LayoutTypes'
 import type { GroupMode, SortMode } from '../../types/LayoutTypes'
 import type { GameDataReadyEvent, SectionsReadyEvent, ArrangementRequestedEvent } from '../../types/EnvironmentEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
+import type { StorePropsLayoutClearRequestEvent } from '../props/PropsEvents'
 import { SteamIntegration } from '../../steam-integration/SteamIntegration'
 import { resolveGroups } from './GroupResolver'
 import { sortSections } from './SectionSorter'
@@ -79,6 +80,14 @@ export class GameSorter {
     }
 
     private handleArrangementRequested(detail: ArrangementRequestedEvent): void {
+        // Signal to GPU renderers that geometry placements will be rebuilt.
+        // This ensures stale shelf instances from prior arrangement are cleared
+        // before new sections/shelf positions are computed.
+        // LayoutClearRequest resets placement state but leaves GPU atlas intact.
+        EventManager.getInstance().emit<StorePropsLayoutClearRequestEvent>(
+            StorePropsEventTypes.LayoutClearRequest,
+            {}
+        )
         this.activeGroupMode = detail.groupMode
         this.activeSortMode = detail.sortMode
         this.arrange(detail.groupMode, detail.sortMode)
