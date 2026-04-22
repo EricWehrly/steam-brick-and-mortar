@@ -237,8 +237,18 @@ export class InstancedLabelRenderer {
     }
 
     private runCompact(): void {
+        // Label textures are per-game, set once for the library lifetime.
+        // Compacting at ArtworkSettled is wrong: background-fetch batches arrive
+        // *after* ArtworkSettled and those games fall through to labels. Shrinking
+        // the array at this point leaves them no slot to write into.
+        //
+        // We skip label compaction until AllBatchesComplete, which guarantees all
+        // late-arriving games have had their chance to claim a label slot.
+        //
+        // TD: wire AllBatchesComplete → label compact once timing is confirmed safe.
         if (!this.isInitialized) return
-        const newTexture = this.textureArrayManager.compact()
+        // Intentionally not compacting — see comment above.
+        // const newTexture = this.textureArrayManager.compact()
         if (this.material) {
             this.material.uniforms['textureArray'].value = newTexture
             this.material.needsUpdate = true

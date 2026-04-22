@@ -219,4 +219,35 @@ export class ShelfSectionPlanner {
     public dispose(): void {
         this.signSystem.dispose()
     }
+
+    /**
+     * Debug helper: place a sign on every known shelf position showing its
+     * shelf index and section index. Useful for diagnosing spoke layout geometry.
+     * Call from browser console: `window.__debugSectionPlanner?.labelAllShelves()`
+     */
+    public labelAllShelves(): void {
+        for (let shelfIndex = 0; shelfIndex < this.shelfPositions.length; shelfIndex++) {
+            const pos = this.shelfPositions[shelfIndex]
+            const rotY = this.shelfRotations[shelfIndex] ?? 0
+            const sectionIndex = this.shelfSectionIndices[shelfIndex] ?? -1
+            if (!pos) continue
+
+            const uniqueIdentifier = `debug-shelf-${shelfIndex}`
+            const label = `s${sectionIndex}\u00b7${shelfIndex}`
+            this.signSystem.placeSign('canvas', {
+                uniqueIdentifier,
+                text: label,
+                anchorPosition: pos,
+                mount: {
+                    style: 'above-shelf',
+                    yOffset: 1.2,
+                    frontOffset: SHELF_SIGN_FRONT_OFFSET,
+                    signFacingY: rotY,
+                },
+                style: { ...SignStyles.Category, fontSize: 0.10, padding: '0.04 0.08' },
+            })
+            this.placedSignIdentifiers.add(uniqueIdentifier)
+        }
+        ShelfSectionPlanner.logger.info(`Debug: placed labels on ${this.shelfPositions.filter(Boolean).length} shelves`)
+    }
 }

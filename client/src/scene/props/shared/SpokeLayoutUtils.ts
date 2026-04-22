@@ -219,17 +219,33 @@ function computeSpokeShelvesForSections(sections: ReadonlyArray<Section>): Secti
     // Keep spoke geometry keyed to section count so each section owns one spoke territory.
     const shelvesPerSpokeNeeded = Math.max(1, ...spokePositionsPerSection)
 
+    const spokeCount = sections.length
+    const baseAisleHalfWidth = SPOKE_DEFAULTS.aisleHalfWidthMetres
+
     const spacing = deriveSpokeSpacingFromSectionCounts(
         spokePositionsPerSection,
-        SPOKE_DEFAULTS.aisleHalfWidthMetres,
+        baseAisleHalfWidth,
         SPOKE_DEFAULTS.hubClearanceMetres
     )
 
+    // Ensure adjacent spokes don't physically overlap.
+    // At the hub clearance radius, adjacent spoke centrelines are
+    // 2 * hubClearance * sin(π/n) apart. Both aisles must fit between them
+    // with at least 0.5m of breathing room per side.
+    const MINIMUM_AISLE_CLEARANCE = 0.5
+    const angularSeparation = spokeCount > 1 ? Math.sin(Math.PI / spokeCount) : 1
+    const maxSafeAisleHalfWidth = Math.max(
+        0.5,
+        spacing.hubClearanceMetres * angularSeparation - MINIMUM_AISLE_CLEARANCE
+    )
+    const clampedAisleHalfWidth = Math.min(baseAisleHalfWidth, maxSafeAisleHalfWidth)
+
     const spokeShelves = computeSpokeShelfLayout({
-        spokeCount: sections.length,
+        spokeCount,
         shelvesPerSpoke: shelvesPerSpokeNeeded,
         hubClearanceMetres: spacing.hubClearanceMetres,
         shelfSpacingMetres: spacing.shelfSpacingMetres,
+        aisleHalfWidthMetres: clampedAisleHalfWidth,
     })
 
     const sectionAwareShelves: SectionShelfInfo[] = []
