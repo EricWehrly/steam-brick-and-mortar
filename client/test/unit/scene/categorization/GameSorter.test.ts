@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SteamGameData } from '../../../../src/scene/game-box/types/GameData'
-import { GameEventTypes, UIEventTypes } from '../../../../src/types/InteractionEvents'
+import { GameEventTypes, UIEventTypes, StorePropsEventTypes } from '../../../../src/types/InteractionEvents'
 import { RecentlyPlayedBucket, getRecentlyPlayedBucket, PlaytimeBucket, getPlaytimeBucket } from '../../../../src/scene/categorization/GameSorter'
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -173,18 +173,23 @@ describe('GameSorter', () => {
 
         fireArrangementRequested('by-genre', 'by-playtime')
 
-        expect(mockEmit).toHaveBeenCalledOnce()
-        const [eventType, payload] = mockEmit.mock.calls[0]
-        expect(eventType).toBe(GameEventTypes.SectionsReady)
-        expect(payload.groupMode).toBe('by-genre')
-        expect(payload.sortMode).toBe('by-playtime')
+        // First emit: LayoutClearRequest (new), second emit: SectionsReady
+        expect(mockEmit).toHaveBeenCalledTimes(2)
+        const firstCall = mockEmit.mock.calls[0]
+        const secondCall = mockEmit.mock.calls[1]
+        expect(firstCall[0]).toBe(StorePropsEventTypes.LayoutClearRequest)
+        expect(secondCall[0]).toBe(GameEventTypes.SectionsReady)
+        expect(secondCall[1].groupMode).toBe('by-genre')
+        expect(secondCall[1].sortMode).toBe('by-playtime')
     })
 
     it('does not emit on ArrangementRequested when no games present', () => {
         mockGames = []
         new GameSorter()
         fireArrangementRequested('by-genre', 'by-playtime')
-        expect(mockEmit).not.toHaveBeenCalled()
+        // Even with no games, LayoutClearRequest is emitted before the arrangement check.
+        expect(mockEmit).toHaveBeenCalledTimes(1)
+        expect(mockEmit.mock.calls[0][0]).toBe(StorePropsEventTypes.LayoutClearRequest)
     })
 })
 
