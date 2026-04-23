@@ -389,6 +389,12 @@ export class SteamBrickAndMortarApp {
             console.log(`🔧 URL override: enableLighting = ${value}`)
         }
         
+        // Expose sceneManager on window for diagnostics / testing
+        if (diagnosticsEnabled) {
+            ;(window as any).__sceneManager = this.sceneManager
+            ;(window as any).THREE = THREE
+        }
+
         // Start the render loop (all updates happen via registry)
         this.sceneManager.startRenderLoop()
     }
