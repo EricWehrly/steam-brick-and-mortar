@@ -251,12 +251,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     private handleAllBatchesComplete(): void {
         this.allBatchesComplete = true
         this.compactMidTierAfterLoad()
-        // If in-flight artwork has already drained, fire ArtworkSettled now.
-        // Otherwise it will fire from the prefetchArtwork finally block when
-        // the last in-flight request completes.
-        if (this.inFlightArtworkCount === 0) {
-            EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
-        }
+        this.settleArtwork()
     }
 
     /** Factory method - override in debug subclass */
@@ -366,9 +361,13 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             return 'error'
         } finally {
             this.inFlightArtworkCount--
-            if (this.inFlightArtworkCount === 0 && this.allBatchesComplete) {
-                EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
-            }
+            this.settleArtwork()
+        }
+    }
+
+    private settleArtwork(): void {
+        if (this.inFlightArtworkCount === 0 && this.allBatchesComplete) {
+            EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
         }
     }
 
@@ -651,6 +650,3 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         LodArtworkOrchestrator.logger.lifecycle('Disposed')
     }
 }
-
-
-
