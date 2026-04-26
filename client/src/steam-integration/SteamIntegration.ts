@@ -116,16 +116,10 @@ export class SteamIntegration {
         })
 
         const totalGames = games.length
-        const totalBatches = Math.max(1, Math.ceil(totalGames / 18))
-        const appids = games
-            .map((game) => (typeof game.appid === 'number' ? game.appid : Number(game.appid)))
-            .filter((appid) => Number.isFinite(appid))
 
         this.eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
             userInput: userInput ?? undefined,
             totalGames,
-            totalBatches,
-            appids,
         })
 
         this.eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, {

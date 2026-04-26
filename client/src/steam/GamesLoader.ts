@@ -59,8 +59,6 @@ export class GamesLoader {
 
         EventManager.getInstance().emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
             totalGames: sortedGames.length,
-            totalBatches: totalBatchCount,
-            appids,
         })
 
         const emitter = new BatchEmitter(BATCH_SIZE, totalBatchCount)

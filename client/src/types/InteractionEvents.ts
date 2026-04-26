@@ -67,8 +67,6 @@ export interface SteamDataLoadedEvent extends BaseInteractionEvent {
 export interface SteamLibraryManifestReadyEvent extends BaseInteractionEvent {
     userInput?: string
     totalGames: number
-    totalBatches: number
-    appids: ReadonlyArray<number>
 }
 
 export interface SteamGameLoadedEvent extends BaseInteractionEvent {
