@@ -79,7 +79,7 @@ export function getPlaytimeBucket(game: SteamGameData): PlaytimeBucket {
 
 // ─── Rating bucket helpers ────────────────────────────────────────────────────
 
-const RATING_TIERS = [
+export const RATING_TIERS = [
     { minScore: 90, key: 'overwhelmingly-positive', label: 'Overwhelmingly Positive' },
     { minScore: 80, key: 'very-positive',           label: 'Very Positive' },
     { minScore: 70, key: 'mostly-positive',         label: 'Mostly Positive' },
