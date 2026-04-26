@@ -173,6 +173,14 @@ class StorePropsCoordinator {
             return
         }
 
+        // Guard: skip if dimensions haven't changed — avoids creating duplicate
+        // PropRenderer instances and leaking materials on repeated room:resized events.
+        if (this.entranceMat?.scale.x === dimensions.width &&
+            this.entranceMat.scale.z === dimensions.depth) {
+            StorePropsCoordinator.logger.debug('Room dimensions unchanged — skipping entrance mat recreation')
+            return
+        }
+
         if (this.entranceMat) {
             this.scene.remove(this.entranceMat)
             this.entranceMat = null
@@ -214,21 +222,14 @@ class StorePropsCoordinator {
         // - GameDataReady: definitions-ready trigger for GameSorter
         // GameSorter will re-emit SectionsReady for the new layout mode.
         const games = DataManager.getInstance().get<unknown[]>('steam.games') ?? []
-        const appids = games
-            .map((game) => (typeof game === 'object' && game !== null ? Number((game as { appid?: unknown }).appid) : NaN))
-            .filter((appid) => Number.isFinite(appid))
 
         if (games.length > 0) {
-            const totalBatches = Math.max(1, Math.ceil(games.length / 18))
             this.eventManager.emit(SteamEventTypes.LibraryManifestReady, {
                 totalGames: games.length,
-                totalBatches,
-                appids,
             })
 
             this.eventManager.emit(GameEventTypes.GameDataReady, {
                 totalGames: games.length,
-                totalBatches,
             })
         }
     }
