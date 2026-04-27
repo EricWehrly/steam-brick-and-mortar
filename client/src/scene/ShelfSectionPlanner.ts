@@ -14,8 +14,9 @@ import { EventManager } from '../core/EventManager'
 import {
     GameEventTypes,
     StorePropsEventTypes,
-    UIEventTypes,
     type ShelfReadyEvent,
+    type ShelfLayoutDeterminedEvent,
+    type StorePropsSetupRequestEvent,
 } from '../types/InteractionEvents'
 import type { SectionsReadyEvent } from '../types/EnvironmentEvents'
 import { SceneSignManager, SignStyles } from './SceneSignManager'
@@ -62,16 +63,16 @@ export class ShelfSectionPlanner {
             (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(event.detail)
         )
         EventManager.getInstance().registerEventHandler(
-            UIEventTypes.ArrangementRequested,
-            () => this.handleClearRequest()
+            GameEventTypes.ShelfLayoutDetermined,
+            (event: CustomEvent<ShelfLayoutDeterminedEvent>) => this.handleShelfLayoutDetermined(event.detail)
         )
         EventManager.getInstance().registerEventHandler(
-            UIEventTypes.LayoutRequested,
-            () => this.handleClearRequest()
+            StorePropsEventTypes.SetupRequest,
+            (event: CustomEvent<StorePropsSetupRequestEvent>) => this.handleSetupRequest(event.detail)
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.LibraryReloadRequest,
-            () => this.handleClearRequest()
+            () => this.handleLibraryReloadRequest()
         )
     }
 
@@ -79,16 +80,26 @@ export class ShelfSectionPlanner {
         this.shelfPositions[detail.shelfIndex] = (detail.position as THREE.Vector3).clone()
         this.shelfRotations[detail.shelfIndex] = detail.rotationY ?? 0
         this.shelfSectionIndices[detail.shelfIndex] = detail.sectionIndex
-        this.tryPlacePendingSections()
     }
 
-    private handleClearRequest(): void {
+    private handleSetupRequest(_detail: StorePropsSetupRequestEvent): void {
+        // Layout mode rebuild boundary: discard stale shelf anchors so sign placement
+        // for the next SectionsReady run can only use fresh ShelfReady data.
         this.shelfPositions = []
         this.shelfRotations = []
         this.shelfSectionIndices = []
         this.pendingSections = null
         this.clearSigns()
-        ShelfSectionPlanner.logger.debug('Cleared shelf positions and signs')
+        ShelfSectionPlanner.logger.debug('Cleared shelf positions and signs (setup request)')
+    }
+
+    private handleLibraryReloadRequest(): void {
+        this.shelfPositions = []
+        this.shelfRotations = []
+        this.shelfSectionIndices = []
+        this.pendingSections = null
+        this.clearSigns()
+        ShelfSectionPlanner.logger.debug('Cleared shelf positions and signs (library reload)')
     }
 
     private handleSectionsReady(detail: SectionsReadyEvent): void {
@@ -98,30 +109,10 @@ export class ShelfSectionPlanner {
             `SectionsReady: ${detail.sections.length} section(s), ` +
             `${this.shelfPositions.filter(Boolean).length} shelf positions known`
         )
-
-        this.tryPlacePendingSections()
     }
 
-    private tryPlacePendingSections(): void {
+    private handleShelfLayoutDetermined(_detail: ShelfLayoutDeterminedEvent): void {
         if (!this.pendingSections) {
-            return
-        }
-
-        // Wait for ShelfLayoutDetermined to have fired at least once, which means
-        // ShelfLayoutCoordinator has emitted all ShelfReady events for this run.
-        // We check by waiting until we have at least one shelf position per section
-        // that actually has games (sections with 0 games produce 1 shelf minimum).
-        const knownShelvesPerSection = new Map<number, number>()
-        for (const sectionIndex of this.shelfSectionIndices) {
-            if (sectionIndex !== undefined) {
-                knownShelvesPerSection.set(sectionIndex, (knownShelvesPerSection.get(sectionIndex) ?? 0) + 1)
-            }
-        }
-
-        const totalSectionsWithShelves = knownShelvesPerSection.size
-        const totalActiveSections = this.pendingSections.sections.filter(s => s.games.length > 0).length || this.pendingSections.sections.length
-
-        if (totalSectionsWithShelves < totalActiveSections) {
             return
         }
 
