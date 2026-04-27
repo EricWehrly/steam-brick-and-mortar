@@ -105,8 +105,6 @@ describe('library readiness ordering integration', () => {
 
         eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
             totalGames: allGames.length,
-            totalBatches: 2,
-            appids: allGames.map((game) => game.appid),
         })
 
         emitBatch(eventManager, 0, 2, firstSectionGames)
@@ -114,8 +112,18 @@ describe('library readiness ordering integration', () => {
 
         const sections: SectionsReadyEvent = {
             sections: [
-                { name: 'Action', games: firstSectionGames as SteamGameData[] },
-                { name: 'RPG', games: secondSectionGames as SteamGameData[] },
+                {
+                    name: 'Action',
+                    games: firstSectionGames as SteamGameData[],
+                    groupMode: 'by-genre',
+                    sortMode: 'alphabetical',
+                },
+                {
+                    name: 'RPG',
+                    games: secondSectionGames as SteamGameData[],
+                    groupMode: 'by-genre',
+                    sortMode: 'alphabetical',
+                },
             ],
             groupMode: 'by-genre',
             sortMode: 'alphabetical',

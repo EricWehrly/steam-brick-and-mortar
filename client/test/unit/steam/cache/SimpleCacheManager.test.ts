@@ -12,7 +12,7 @@ describe('CacheManager Unit Tests', () => {
             cacheDuration: 3600000, // 1 hour
             cachePrefix: 'test_api_',
             enableCache: true,
-            maxSizeBytes: 5 * 1024 * 1024
+            maxCacheSize: 5 * 1024 * 1024
         })
     })
 
@@ -122,7 +122,7 @@ describe('CacheManager Unit Tests', () => {
         it('should save and restore from localStorage on init', () => {
             // Set up a cache and save its state to local storage
             cache.set('persistent_key', 'persisted_val')
-            cache.saveToStorage() // Manually trigger since unload isn't firing in test
+            cache.saveImmediately() // Manually trigger since unload isn't firing in test
             
             // Simulate page reload by creating a fresh cache instance
             const reloadedCache = new CacheManager({
@@ -139,7 +139,7 @@ describe('CacheManager Unit Tests', () => {
             vi.useFakeTimers()
             
             cache.set('temp_key', 'temp_val')
-            cache.saveToStorage()
+            cache.saveImmediately()
             
             // Fast forward time while the 'app' is closed
             vi.advanceTimersByTime(3600001)

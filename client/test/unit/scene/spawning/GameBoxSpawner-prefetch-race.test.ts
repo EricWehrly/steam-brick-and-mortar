@@ -20,11 +20,13 @@ import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
 import {
     StorePropsEventTypes,
     GameEventTypes,
+    SteamEventTypes,
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
 } from '../../../../src/types/InteractionEvents'
 import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
+import type { SteamLibraryManifestReadyEvent } from '../../../../src/types/InteractionEvents'
 
 // --- Mocks ---
 
@@ -117,6 +119,11 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
         vi.clearAllMocks()
         EventManager.getInstance().removeAllListeners()
         spawner = new (GameBoxSpawner as any)()
+
+        emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+            totalGames: 2,
+        })
+
         emitShelfLayoutDetermined()
     })
 

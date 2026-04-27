@@ -21,11 +21,13 @@ import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
 import {
     StorePropsEventTypes,
     GameEventTypes,
+    SteamEventTypes,
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
 } from '../../../../src/types/InteractionEvents'
 import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
+import type { SteamLibraryManifestReadyEvent } from '../../../../src/types/InteractionEvents'
 import type { SteamGame } from '../../../../src/steam'
 
 // â”€â”€ GPU mock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -205,6 +207,11 @@ describe('GameBoxSpawner â€” stale shelf positions', () => {
 
         // Construct spawner â€” registers all event handlers
         spawner = new (GameBoxSpawner as any)()
+
+        eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+            totalGames: 100,
+        })
+
         // Prime stock strategy so spawner is ready for the first cycle
         emitShelfLayoutDetermined(eventManager)
     })
