@@ -14,6 +14,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
+import { GameRenderEventTypes, type PlacementResolvedEvent } from '../../../../src/types/InteractionEvents'
+
+const mockRegisterEventHandler = vi.fn()
+const mockDeregisterEventHandler = vi.fn()
+const mockEmitEvent = vi.fn()
 
 // ---- mocks ----
 
@@ -25,9 +30,9 @@ vi.mock('../../../../src/core/AppSettings', () => ({
 vi.mock('../../../../src/core/EventManager', () => ({
     EventManager: {
         getInstance: () => ({
-            registerEventHandler: vi.fn(),
-            deregisterEventHandler: vi.fn(),
-            emit: vi.fn(),
+            registerEventHandler: mockRegisterEventHandler,
+            deregisterEventHandler: mockDeregisterEventHandler,
+            emit: mockEmitEvent,
         }),
     },
 }))
@@ -83,16 +88,35 @@ describe('GpuGameBoxRenderer', () => {
         expect(renderer).toBeDefined()
     })
 
-    it('placeGame: uses artwork instance when atlas hit (placeInstance returns ≥ 0)', () => {
+    function emitPlacementResolved(appid: number): void {
+        const registration = mockRegisterEventHandler.mock.calls.find(
+            (call: unknown[]) => call[0] === GameRenderEventTypes.PlacementResolved
+        )
+        expect(registration).toBeTruthy()
+
+        const handler = registration?.[1] as (event: CustomEvent<PlacementResolvedEvent>) => void
+        handler(
+            new CustomEvent(GameRenderEventTypes.PlacementResolved, {
+                detail: {
+                    appid,
+                    game: makeGame(appid) as any,
+                    position: new THREE.Vector3(),
+                    rotation: new THREE.Quaternion(),
+                },
+            })
+        )
+    }
+
+    it('placement hook: uses artwork instance when atlas hit (placeInstance returns ≥ 0)', () => {
         mockPlaceInstance.mockReturnValueOnce(0)
-        renderer.placeGame(makeGame(1) as any, new THREE.Vector3(), new THREE.Quaternion())
+        emitPlacementResolved(1)
         expect(mockPlaceInstance).toHaveBeenCalledTimes(1)
         expect(mockAddLabelInstance).not.toHaveBeenCalled()
     })
 
-    it('placeGame: falls through to label when atlas miss (placeInstance returns -1)', () => {
+    it('placement hook: falls through to label when atlas miss (placeInstance returns -1)', () => {
         mockPlaceInstance.mockReturnValueOnce(-1)
-        renderer.placeGame(makeGame(1) as any, new THREE.Vector3(), new THREE.Quaternion())
+        emitPlacementResolved(1)
         expect(mockPlaceInstance).toHaveBeenCalledTimes(1)
         expect(mockAddLabelInstance).toHaveBeenCalledTimes(1)
     })
