@@ -156,8 +156,6 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         // Ordering contract: renderer is initialized from immutable manifest before any batch prewarm events.
         eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
             totalGames: 500,
-            totalBatches: 28,
-            appids: Array.from({ length: 500 }, (_, index) => index + 1),
         })
         emitShelfLayoutDetermined(eventManager)
     })
@@ -393,8 +391,6 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
             eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
                 totalGames: 5,
-                totalBatches: 1,
-                appids: Array.from({ length: 5 }, (_, i) => i + 1),
             })
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
@@ -405,6 +401,46 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventManager.emit(UIEventTypes.ArrangementRequested, { groupMode: 'by-recency', sortMode: 'by-last-played' } as any)
             expect(mockRendererDispose).not.toHaveBeenCalled()
             expect(mockClearPlacements).toHaveBeenCalled()
+        })
+    })
+
+    describe('LayoutRequested — placement replay', () => {
+        it('does not clear placements until the next SectionsReady run starts', async () => {
+            const games = createMockGamesWithArtwork(4, 0) as any[]
+
+            eventManager.emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                { games, batchIndex: 0, totalBatches: 1 }
+            )
+            await Promise.resolve()
+
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }],
+                groupMode: 'by-recency',
+                sortMode: 'by-last-played',
+            })
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
+            emitShelfLayoutDetermined(eventManager)
+
+            expect(mockClearPlacements).toHaveBeenCalledTimes(1)
+
+            mockClearPlacements.mockClear()
+            mockPlaceGame.mockClear()
+
+            eventManager.emit(UIEventTypes.LayoutRequested, { layoutMode: 'grid' } as any)
+
+            expect(mockClearPlacements).not.toHaveBeenCalled()
+
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                sections: [{ name: 'Test', games: [...games].reverse() as any, groupMode: 'by-recency', sortMode: 'by-last-played' }],
+                groupMode: 'by-recency',
+                sortMode: 'by-last-played',
+            })
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
+            emitShelfLayoutDetermined(eventManager)
+
+            expect(mockClearPlacements).toHaveBeenCalledTimes(1)
+            expect(mockPlaceGame).toHaveBeenCalledTimes(4)
         })
     })
 

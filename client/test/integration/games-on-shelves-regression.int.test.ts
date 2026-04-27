@@ -67,6 +67,8 @@ function emitSectionsByBatch(
         sections: batches.map((games, index) => ({
             name: `Section ${index + 1}`,
             games: games as SteamGameData[],
+            groupMode: 'none',
+            sortMode: 'alphabetical',
         })),
         groupMode: 'none',
         sortMode: 'alphabetical',
@@ -111,8 +113,6 @@ describe('games-on-shelves regression (manifest + sections + batches ordering)',
 
         eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
             totalGames: allGames.length,
-            totalBatches: batches.length,
-            appids: allGames.map((game) => game.appid),
         })
 
         batches.forEach((games, batchIndex) => {

@@ -14,9 +14,8 @@ import {
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
-    type ArtworkSettledEvent,
 } from '../../types/InteractionEvents'
-import type { SectionsReadyEvent, LayoutRequestedEvent } from '../../types/EnvironmentEvents'
+import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
 import type { SteamLibraryManifestReadyEvent } from '../../types/InteractionEvents'
 import type {
     StorePropsLibraryReloadRequestEvent,
@@ -128,16 +127,12 @@ export class GameBoxSpawner {
             () => this.geometryReset()
         )
         EventManager.getInstance().registerEventHandler(
-            UIEventTypes.LayoutRequested,
-            (_e: CustomEvent<LayoutRequestedEvent>) => this.geometryReset()
-        )
-        EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.LibraryReloadRequest,
             (e: CustomEvent<StorePropsLibraryReloadRequestEvent>) => this.handleLibraryReloadRequest(e)
         )
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.ArtworkSettled,
-            (event: CustomEvent<ArtworkSettledEvent>) => this.handleArtworkSettled(event)
+            (event: CustomEvent) => this.handleArtworkSettled(event)
         )
 
         GameBoxSpawner.logger.debug('Constructed')
@@ -268,15 +263,13 @@ export class GameBoxSpawner {
     // Phase 2: cache sections, place when strategy is available
 
     private handleSectionsReady(event: CustomEvent<SectionsReadyEvent>): void {
-        // Clear stale shelf positions from the previous arrangement run.
-        // ShelfLayoutCoordinator will re-emit ShelfReady for the new section mapping;
-        // if we keep old positions, games land on phantom shelves or wrong sections.
+        // Start-of-run reset: this is deterministic regardless of listener order on
+        // UI-triggering events (layout/group/sort changes).
         this.shelfPositions.clear()
         this.placementIntents.clear()
 
-        // Cache sections for placement. Placement is always deferred to handleLayoutDetermined
-        // because ShelfLayoutCoordinator emits ShelfReady (new positions) then ShelfLayoutDetermined
-        // synchronously in its SectionsReady handler — registration order is non-deterministic.
+        // Cache sections for placement. Placement is deferred to handleLayoutDetermined,
+        // which runs after ShelfReady has repopulated fresh shelf positions.
         this.pendingSections = event.detail
         GameBoxSpawner.logger.debug('SectionsReady: cleared stale positions, waiting for ShelfLayoutDetermined')
     }
@@ -374,7 +367,7 @@ export class GameBoxSpawner {
     // -------------------------------------------------------------------------
     // Intent assignment helpers
 
-    private handleArtworkSettled(_event: CustomEvent<ArtworkSettledEvent>): void {
+    private handleArtworkSettled(_event: CustomEvent): void {
         if (this.hasLoggedExpectedFallbackSummary) {
             return
         }

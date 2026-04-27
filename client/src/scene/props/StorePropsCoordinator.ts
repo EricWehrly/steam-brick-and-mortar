@@ -36,7 +36,8 @@ import type {
 
 import type { RoomResizedEvent } from '../../types/InteractionEvents'
 import type { BatchReadyForPlacementEvent } from '../../types/InteractionEvents'
-import { type LayoutRequestedEvent } from '../../types/EnvironmentEvents'
+import type { LayoutRequestedEvent, GameDataReadyEvent } from '../../types/EnvironmentEvents'
+import type { SteamLibraryManifestReadyEvent } from '../../types/InteractionEvents'
 import { type LayoutMode } from '../../types/LayoutTypes'
 import { DataManager } from '../../core/data'
 import { ShelfLayoutCoordinator } from '../shelves/ShelfLayoutCoordinator'
@@ -205,7 +206,6 @@ class StorePropsCoordinator {
         this.instancedShelfRenderer?.dispose()
         this.instancedShelfRenderer = null
 
-
         this.eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, {
             source: EventSource.System,
         })
@@ -218,12 +218,16 @@ class StorePropsCoordinator {
         const games = DataManager.getInstance().get<unknown[]>('steam.games') ?? []
 
         if (games.length > 0) {
-            this.eventManager.emit(SteamEventTypes.LibraryManifestReady, {
+            const BATCH_SIZE = 18
+            const totalBatches = Math.ceil(games.length / BATCH_SIZE)
+
+            this.eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
                 totalGames: games.length,
             })
 
-            this.eventManager.emit(GameEventTypes.GameDataReady, {
+            this.eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, {
                 totalGames: games.length,
+                totalBatches,
             })
         }
     }

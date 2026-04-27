@@ -11,6 +11,7 @@ import {
     type SteamGamesBatchEvent,
     type BatchReadyForPlacementEvent,
 } from '../../../../src/types/InteractionEvents'
+import type { GameDataReadyEvent } from '../../../../src/types/EnvironmentEvents'
 
 vi.mock('../../../../src/utils/TextureManager', async () => {
     const { MockTextureManager } = await import('../../../mocks/utils/TextureManager.mock')
@@ -54,7 +55,7 @@ describe('BatchCoordinator does not own GameDataReady emission', () => {
 
         eventManager.registerEventHandler(
             GameEventTypes.GameDataReady,
-            (_event: CustomEvent<{ totalGames: number; totalBatches: number }>) => {
+            (_event: CustomEvent<GameDataReadyEvent>) => {
                 observedEventOrder.push('game-data-ready')
             }
         )
