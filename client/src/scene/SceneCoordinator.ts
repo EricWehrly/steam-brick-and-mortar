@@ -78,9 +78,6 @@ export class SceneCoordinator {
         this.gameSorter = new GameSorter()
         this.sceneSignManager = SceneSignManager.instance
         this.shelfSectionPlanner = new ShelfSectionPlanner()
-        if (window) {
-            (window as any).__debugSectionPlanner = this.shelfSectionPlanner
-        }
 
         // Track WorldBuild phase — opens here, closes when props complete
         const tracker = StartupEventTracker.getInstance()
