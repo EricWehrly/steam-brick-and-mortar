@@ -27,7 +27,7 @@ import { Logger } from '../../utils/Logger'
 import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import { GroupModes, SortModes } from '../../types/LayoutTypes'
 import type { GroupMode, SortMode } from '../../types/LayoutTypes'
-import type { GameDataReadyEvent, SectionsReadyEvent, ArrangementRequestedEvent } from '../../types/EnvironmentEvents'
+import type { SectionsReadyEvent, ArrangementRequestedEvent } from '../../types/EnvironmentEvents'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { SteamIntegration } from '../../steam-integration/SteamIntegration'
 import { resolveGroups } from './GroupResolver'
@@ -55,7 +55,7 @@ export class GameSorter {
     constructor() {
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.GameDataReady,
-            (_event: CustomEvent<GameDataReadyEvent>) => this.handleGameDataReady()
+            this.handleGameDataReady.bind(this)
         )
         EventManager.getInstance().registerEventHandler(
             UIEventTypes.ArrangementRequested,

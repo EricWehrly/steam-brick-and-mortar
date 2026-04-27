@@ -56,6 +56,7 @@ interface BatchStatusState {
 
 export class BatchCoordinator<T> {
     private static readonly logger = Logger.createLogFunctions(BatchCoordinator.name)
+    private static activeInstance: BatchCoordinator<unknown> | null = null
 
     private queue: BatchItem<T>[] = []
     private received: number = 0
@@ -76,10 +77,14 @@ export class BatchCoordinator<T> {
 
     private readonly boundHandleBatchEvent: (e: CustomEvent<SteamGamesBatchEvent>) => void
     private readonly boundHandleGamesPlaced: (e: CustomEvent<GamesPlacedEvent>) => void
-    private readonly boundHandleClearRequest: () => void
+    private readonly boundHandleClearRequest: (e: CustomEvent) => void
 
     static {
-        new BatchCoordinator()
+        BatchCoordinator.spawnActiveInstance()
+    }
+
+    private static spawnActiveInstance(): void {
+        BatchCoordinator.activeInstance = new BatchCoordinator<unknown>()
     }
 
     private constructor() {
@@ -133,7 +138,6 @@ export class BatchCoordinator<T> {
     }
 
     public enqueueBatch(batch: BatchItem<T>): void {
-        this.prepareForNewRun(batch)
         BatchCoordinator.logger.debug(`Enqueuing batch ${batch.batchIndex + 1}/${batch.totalBatches}`)
 
         this.queue.push(batch)
@@ -173,19 +177,37 @@ export class BatchCoordinator<T> {
         return this.isFirstBatch
     }
 
-    private prepareForNewRun(batch: BatchItem<T>): void {
-        if (!this.completionEmitted) {
-            return
-        }
+    private recycleForNextRun(): void {
+        this.dispose()
+        BatchCoordinator.spawnActiveInstance()
+    }
 
-        const startsAtFirstBatch = batch.batchIndex === 0
-        const totalChanged = this.expectedTotal > 0 && batch.totalBatches !== this.expectedTotal
-        if (!startsAtFirstBatch && !totalChanged) {
-            return
-        }
+    private dispose(): void {
+        EventManager.getInstance().deregisterEventHandler(
+            SteamEventTypes.GamesBatchReady,
+            this.boundHandleBatchEvent
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            StorePropsEventTypes.GamesPlaced,
+            this.boundHandleGamesPlaced
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            UIEventTypes.ArrangementRequested,
+            this.boundHandleClearRequest
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            UIEventTypes.LayoutRequested,
+            this.boundHandleClearRequest
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            StorePropsEventTypes.LibraryReloadRequest,
+            this.boundHandleClearRequest
+        )
 
-        BatchCoordinator.logger.debug('Detected new batch run boundary — clearing previous run state')
         this.clearRunState()
+        if (BatchCoordinator.activeInstance === this) {
+            BatchCoordinator.activeInstance = null
+        }
     }
 
     private clearRunState(): void {
@@ -319,6 +341,12 @@ export class BatchCoordinator<T> {
             {}
         )
         EventManager.getInstance().emit(AppEventTypes.StoreFullyPopulated, {})
+
+        // Runtime singleton recycles between runs; ad-hoc test instances keep
+        // their terminal state available for assertions.
+        if (BatchCoordinator.activeInstance === this) {
+            this.recycleForNextRun()
+        }
     }
 
     private scheduleSomeBatchesCompleteEvent(): void {
