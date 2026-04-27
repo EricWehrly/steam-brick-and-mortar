@@ -22,6 +22,7 @@ import type {
 } from '../props/PropsEvents'
 import { Logger } from '../../utils/Logger'
 import type { StockSurface } from '../../types/LayoutTypes'
+import { ArtworkPrefetchCoordinator } from './ArtworkPrefetchCoordinator'
 
 interface ShelfPosition {
     position: THREE.Vector3
@@ -34,8 +35,6 @@ interface PlacementIntent {
     position: THREE.Vector3
     rotation: THREE.Quaternion
 }
-
-type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
 
 /**
  * GameBoxSpawner
@@ -78,12 +77,7 @@ export class GameBoxSpawner {
     // Cached sections from last SectionsReady — consumed when ShelfLayoutDetermined fires
     private pendingSections: SectionsReadyEvent | null = null
 
-    // Rendezvous state: prefetch result per appid (populated when prefetch settles)
-    private prefetchResults: Map<number, PrefetchResult> = new Map()
-    // Keep app name for consolidated fallback diagnostics
-    private appNamesByAppId: Map<number, string> = new Map()
-    // Ensure expected fallback summary logs once per library load
-    private hasLoggedExpectedFallbackSummary = false
+    private readonly artworkPrefetch = new ArtworkPrefetchCoordinator()
     // Rendezvous state: placement intents per appid (one game can appear in multiple sections)
     private placementIntents: Map<number, PlacementIntent[]> = new Map()
 
@@ -148,9 +142,7 @@ export class GameBoxSpawner {
         this.stockStrategy = null
         this.pendingSections = null
         this.shelfPositions.clear()
-        this.prefetchResults.clear()
-        this.appNamesByAppId.clear()
-        this.hasLoggedExpectedFallbackSummary = false
+        this.artworkPrefetch.reset()
         this.placementIntents.clear()
         GameBoxSpawner.logger.debug('Full reset (library reload)')
     }
@@ -221,26 +213,7 @@ export class GameBoxSpawner {
             return
         }
 
-        for (const game of games) {
-            const appid = typeof game.appid === 'number' ? game.appid : 0
-            this.appNamesByAppId.set(appid, game.name)
-            const artworkUrl = this.selectBestArtworkUrl(game as SteamGameData)
-
-            if (!artworkUrl) {
-                this.prefetchResults.set(appid, 'permanent-failure')
-                this.tryPlace(appid)
-                continue
-            }
-
-            this.renderer.prefetchArtwork(appid, artworkUrl, game.name).then((result) => {
-                this.prefetchResults.set(appid, result)
-                this.tryPlace(appid)
-            }).catch((error) => {
-                GameBoxSpawner.logger.warn(`prefetchArtwork failed for "${game.name}": ${error}`)
-                this.prefetchResults.set(appid, 'error')
-                this.tryPlace(appid)
-            })
-        }
+        this.artworkPrefetch.prefetchBatch(games as SteamGameData[], this.renderer, (appid) => this.tryPlace(appid))
     }
 
     // -------------------------------------------------------------------------
@@ -345,7 +318,7 @@ export class GameBoxSpawner {
      */
     private tryPlace(appid: number): void {
         if (!this.renderer) return
-        const result = this.prefetchResults.get(appid)
+        const result = this.artworkPrefetch.getResult(appid)
         if (result === undefined) return // prefetch not yet settled
         const intents = this.placementIntents.get(appid)
         if (!intents || intents.length === 0) return // no position assigned yet
@@ -377,35 +350,7 @@ export class GameBoxSpawner {
     // Intent assignment helpers
 
     private handleArtworkSettled(_event: CustomEvent): void {
-        if (this.hasLoggedExpectedFallbackSummary) {
-            return
-        }
-
-        const fallbackTitles: string[] = []
-        for (const [appid, result] of this.prefetchResults) {
-            if (result !== 'permanent-failure' && result !== 'error') {
-                continue
-            }
-            const title = this.appNamesByAppId.get(appid)
-            if (title) {
-                fallbackTitles.push(title)
-            }
-        }
-
-        if (fallbackTitles.length > 0) {
-            fallbackTitles.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
-            const previewLimit = 25
-            const preview = fallbackTitles.slice(0, previewLimit)
-            const remaining = fallbackTitles.length - preview.length
-            const overflowSuffix = remaining > 0 ? ` (+${remaining} more)` : ''
-
-            GameBoxSpawner.logger.info(
-                `Artwork fallback summary: ${fallbackTitles.length} game(s) will use labels this run: ` +
-                `${preview.join(', ')}${overflowSuffix}`
-            )
-        }
-
-        this.hasLoggedExpectedFallbackSummary = true
+        this.artworkPrefetch.logExpectedFallbackSummary()
     }
 
     private assignIntentsFromStock(
@@ -422,22 +367,6 @@ export class GameBoxSpawner {
         }
     }
 
-    /**
-     * Resolve the best available artwork URL for a game.
-     *
-     * Priority:
-     *  1. Metadata library URL (portrait, ideal for game boxes)
-     *  2. Metadata header URL (landscape, fallback)
-     *  3. Constructed CDN portrait URL (last resort when metadata is absent)
-     */
-    private selectBestArtworkUrl(game: SteamGameData): string | undefined {
-        if (game.artwork?.library) return game.artwork.library
-        if (game.artwork?.header) return game.artwork.header
-        if (game.appid) {
-            return `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
-        }
-        return undefined
-    }
 }
 
 // Construct at import � registers event handlers for app lifetime.
