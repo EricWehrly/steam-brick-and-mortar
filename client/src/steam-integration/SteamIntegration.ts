@@ -116,7 +116,8 @@ export class SteamIntegration {
         })
 
         const totalGames = games.length
-
+        const BATCH_SIZE = 18
+        const totalBatches = Math.ceil(totalGames / BATCH_SIZE)
         this.eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
             userInput: userInput ?? undefined,
             totalGames,
