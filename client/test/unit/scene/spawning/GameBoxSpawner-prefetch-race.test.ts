@@ -178,6 +178,54 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
         expect(mockPlaceGame.mock.calls.length).toBe(games.length)
     })
 
+    it('PROBE: duplicate section intents survive until a single prefetch settles', async () => {
+        let resolvePrefetch!: () => void
+        const slowPrefetch = new Promise<'prefetched'>((resolve) => {
+            resolvePrefetch = () => resolve('prefetched')
+        })
+        mockPrefetchArtwork.mockReturnValue(slowPrefetch)
+
+        const sharedGame = makeGame(1, 'Shared Game')
+
+        emit<BatchReadyForPlacementEvent>(StorePropsEventTypes.BatchReadyForPlacement, {
+            games: [sharedGame],
+            batchIndex: 0,
+            totalBatches: 1,
+        })
+
+        emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+            sections: [
+                { name: 'Action', games: [sharedGame], groupMode: 'by-genre', sortMode: 'by-playtime' },
+                { name: 'Indie', games: [sharedGame], groupMode: 'by-genre', sortMode: 'by-playtime' },
+            ],
+            groupMode: 'by-genre',
+            sortMode: 'by-playtime',
+        })
+        emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
+            shelfIndex: 0,
+            sectionIndex: 0,
+            position: new THREE.Vector3(0, 0, -5),
+            rotationY: 0,
+        })
+        emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
+            shelfIndex: 1,
+            sectionIndex: 1,
+            position: new THREE.Vector3(3, 0, -5),
+            rotationY: 0,
+        })
+        emitShelfLayoutDetermined()
+
+        expect(mockPlaceGame).not.toHaveBeenCalled()
+
+        resolvePrefetch()
+        await slowPrefetch
+        await new Promise(r => setTimeout(r, 0))
+
+        expect(mockPlaceGame).toHaveBeenCalledTimes(2)
+        expect(mockPlaceGame.mock.calls[0][0].appid).toBe(sharedGame.appid)
+        expect(mockPlaceGame.mock.calls[1][0].appid).toBe(sharedGame.appid)
+    })
+
     it('PROBE: prefetch arrives before intent — placeGame fires when GamesSort assigns position', async () => {
         mockPrefetchArtwork.mockResolvedValue('prefetched')
 
