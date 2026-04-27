@@ -84,8 +84,8 @@ export class GameBoxSpawner {
     private appNamesByAppId: Map<number, string> = new Map()
     // Ensure expected fallback summary logs once per library load
     private hasLoggedExpectedFallbackSummary = false
-    // Rendezvous state: placement intent per appid (populated after shelves + strategy known)
-    private placementIntents: Map<number, PlacementIntent> = new Map()
+    // Rendezvous state: placement intents per appid (one game can appear in multiple sections)
+    private placementIntents: Map<number, PlacementIntent[]> = new Map()
 
     private readonly labelsEnabled: boolean
     private stockStrategy: IStockStrategy | null = null
@@ -337,9 +337,9 @@ export class GameBoxSpawner {
     }
 
     /**
-     * Attempt to place a game. Succeeds only when both conditions are met:
-     * - prefetch has settled (result in prefetchResults)
-     * - a placement intent exists (position assigned by GamesSort)
+    * Attempt to place a game. Succeeds only when both conditions are met:
+    * - prefetch has settled (result in prefetchResults)
+    * - one or more placement intents exist (positions assigned by section placement)
      *
      * Called from both sides of the rendezvous — whichever arrives last wins.
      */
@@ -347,21 +347,30 @@ export class GameBoxSpawner {
         if (!this.renderer) return
         const result = this.prefetchResults.get(appid)
         if (result === undefined) return // prefetch not yet settled
-        const intent = this.placementIntents.get(appid)
-        if (!intent) return // no position assigned yet
+        const intents = this.placementIntents.get(appid)
+        if (!intents || intents.length === 0) return // no position assigned yet
 
-        this.placementIntents.delete(appid) // consume the intent
+        while (intents.length > 0) {
+            const intent = intents.shift()
+            if (!intent) {
+                break
+            }
 
-        // Expected fallback path: artwork unavailable. Place label directly and
-        // avoid per-title atlas-miss warnings from deep renderer layers.
-        if (result === 'permanent-failure' || result === 'error') {
-            this.renderer.placeLabelBox(intent.game, intent.position, intent.rotation)
-            return
+            // Expected fallback path: artwork unavailable. Place label directly and
+            // avoid per-title atlas-miss warnings from deep renderer layers.
+            if (result === 'permanent-failure' || result === 'error') {
+                this.renderer.placeLabelBox(intent.game, intent.position, intent.rotation)
+                continue
+            }
+
+            // Invariant path: prefetch says artwork exists/cached, so a miss in
+            // placeGame() is a real ordering/consistency signal and should remain visible.
+            this.renderer.placeGame(intent.game, intent.position, intent.rotation)
         }
 
-        // Invariant path: prefetch says artwork exists/cached, so a miss in
-        // placeGame() is a real ordering/consistency signal and should remain visible.
-        this.renderer.placeGame(intent.game, intent.position, intent.rotation)
+        if (intents.length === 0) {
+            this.placementIntents.delete(appid)
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -406,7 +415,9 @@ export class GameBoxSpawner {
         const intents = GameBoxUtils.stockSurfaces(stockSurfaces, games)
         for (const { game, position, rotation } of intents) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
-            this.placementIntents.set(appid, { game, position, rotation })
+            const pendingIntents = this.placementIntents.get(appid) ?? []
+            pendingIntents.push({ game, position, rotation })
+            this.placementIntents.set(appid, pendingIntents)
             this.tryPlace(appid)
         }
     }

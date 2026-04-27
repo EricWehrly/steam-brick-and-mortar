@@ -87,8 +87,13 @@ vi.mock('../../../../src/core/EventManager', async (importOriginal) => {
 
 const resetEventManager = () => (EventManager as unknown as { resetInstance: () => void }).resetInstance()
 
-function makeShelfReady(shelfIndex: number, position = new THREE.Vector3(0, 0, 0), rotationY = 0): ShelfReadyEvent {
-    return { shelfIndex, sectionIndex: 0, position, rotationY }
+function makeShelfReady(
+    shelfIndex: number,
+    position = new THREE.Vector3(0, 0, 0),
+    rotationY = 0,
+    sectionIndex = 0
+): ShelfReadyEvent {
+    return { shelfIndex, sectionIndex, position, rotationY }
 }
 
 function createMockGames(count: number, batchIndex: number): readonly SteamGame[] {
@@ -314,6 +319,39 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
             expect(mockPlaceGame).toHaveBeenCalledTimes(20)
+        })
+
+        it('places the same prefetched game once per section appearance', async () => {
+            const sharedGame = createMockGamesWithArtwork(1, 0)[0] as any
+
+            eventManager.emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                { games: [sharedGame], batchIndex: 0, totalBatches: 1 }
+            )
+            await Promise.resolve()
+
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                sections: [
+                    { name: 'Action', games: [sharedGame], groupMode: 'by-genre', sortMode: 'by-playtime' },
+                    { name: 'Indie', games: [sharedGame], groupMode: 'by-genre', sortMode: 'by-playtime' },
+                ],
+                groupMode: 'by-genre',
+                sortMode: 'by-playtime',
+            })
+            eventManager.emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                makeShelfReady(0, new THREE.Vector3(0, 0, 0), 0, 0)
+            )
+            eventManager.emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                makeShelfReady(1, new THREE.Vector3(3, 0, 0), 0, 1)
+            )
+            emitShelfLayoutDetermined(eventManager)
+
+            expect(mockPlaceGame).toHaveBeenCalledTimes(2)
+            expect(mockPlaceGame.mock.calls[0][0].appid).toBe(sharedGame.appid)
+            expect(mockPlaceGame.mock.calls[1][0].appid).toBe(sharedGame.appid)
+            expect(mockPlaceGame.mock.calls[0][1]).not.toEqual(mockPlaceGame.mock.calls[1][1])
         })
 
         it('re-sort triggers a fresh clearPlacements call each time', () => {
