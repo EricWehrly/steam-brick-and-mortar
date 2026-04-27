@@ -23,6 +23,7 @@ import {
     GameEventTypes,
     SteamEventTypes, 
     StorePropsEventTypes,
+    UIEventTypes,
     AppEventTypes,
     type SteamGamesBatchEvent,
     type BatchReadyForPlacementEvent,
@@ -95,7 +96,11 @@ export class BatchCoordinator<T> {
             this.boundHandleGamesPlaced
         )
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.LayoutClearRequest,
+            UIEventTypes.ArrangementRequested,
+            this.boundHandleClearRequest
+        )
+        EventManager.getInstance().registerEventHandler(
+            UIEventTypes.LayoutRequested,
             this.boundHandleClearRequest
         )
         EventManager.getInstance().registerEventHandler(

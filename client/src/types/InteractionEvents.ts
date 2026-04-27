@@ -220,7 +220,6 @@ export interface GameSelectedEvent extends BaseInteractionEvent {
 export type {
     StorePropsSetupRequestEvent,
     StorePropsSetupCompletedEvent,
-    StorePropsLayoutClearRequestEvent,
     StorePropsLibraryReloadRequestEvent,
     BatchReadyForPlacementEvent,
     ShelfReadyEvent,

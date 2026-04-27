@@ -10,7 +10,7 @@
  *   SetupRequest  ──→  StorePropsCoordinator (override handler)
  *                  →   LightingRenderer, SharedMaterialManager (side-effect observers)
  *   SetupCompleted ─→  SceneCoordinator, LightingRenderer
- *   LayoutClearRequest / LibraryReloadRequest  ──→  StorePropsCoordinator (override handlers)
+ *   LibraryReloadRequest  ──→  StorePropsCoordinator (override handler)
  *
  *   [Steam API emits GamesBatchReady]
  *   BatchCoordinator serialises → BatchReadyForPlacement
@@ -43,12 +43,6 @@ export interface StorePropsSetupRequestEvent extends BaseInteractionEvent {
 export interface StorePropsSetupCompletedEvent extends BaseInteractionEvent {
     // completion is the signal; no payload needed
 }
-
-/**
- * Emitted to clear geometry/placement state for layout or arrangement changes.
- * Game data is unchanged; consumers should avoid disposing long-lived art caches.
- */
-export interface StorePropsLayoutClearRequestEvent extends BaseInteractionEvent {}
 
 /**
  * Emitted before loading a different library/user profile.
@@ -128,7 +122,6 @@ export const StorePropsEventTypes = {
     // Lifecycle
     SetupRequest:  'store-props:setup-request',
     SetupCompleted: 'store-props:setup-completed',
-    LayoutClearRequest:  'store-props:layout-clear-request',
     LibraryReloadRequest: 'store-props:library-reload-request',
 
     // Batch → placement pipeline

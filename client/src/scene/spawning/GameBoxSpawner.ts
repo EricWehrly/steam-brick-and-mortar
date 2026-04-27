@@ -9,16 +9,16 @@ import {
     StorePropsEventTypes, 
     GameEventTypes,
     SteamEventTypes,
+    UIEventTypes,
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
     type ArtworkSettledEvent,
 } from '../../types/InteractionEvents'
-import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
+import type { SectionsReadyEvent, LayoutRequestedEvent } from '../../types/EnvironmentEvents'
 import type { SteamLibraryManifestReadyEvent } from '../../types/InteractionEvents'
 import type {
-    StorePropsLayoutClearRequestEvent,
     StorePropsLibraryReloadRequestEvent,
 } from '../props/PropsEvents'
 import { Logger } from '../../utils/Logger'
@@ -124,8 +124,12 @@ export class GameBoxSpawner {
             (e: CustomEvent<SteamLibraryManifestReadyEvent>) => this.handleLibraryManifestReady(e)
         )
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.LayoutClearRequest,
-            (e: CustomEvent<StorePropsLayoutClearRequestEvent>) => this.handleLayoutClearRequest(e)
+            UIEventTypes.ArrangementRequested,
+            () => this.geometryReset()
+        )
+        EventManager.getInstance().registerEventHandler(
+            UIEventTypes.LayoutRequested,
+            (_e: CustomEvent<LayoutRequestedEvent>) => this.geometryReset()
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.LibraryReloadRequest,
@@ -167,10 +171,6 @@ export class GameBoxSpawner {
         this.shelfPositions.clear()
         this.placementIntents.clear()
         GameBoxSpawner.logger.debug('Geometry reset (layout switch)')
-    }
-
-    private handleLayoutClearRequest(_event: CustomEvent<StorePropsLayoutClearRequestEvent>): void {
-        this.geometryReset()
     }
 
     private handleLibraryReloadRequest(_event: CustomEvent<StorePropsLibraryReloadRequestEvent>): void {
