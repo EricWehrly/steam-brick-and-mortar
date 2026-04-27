@@ -16,11 +16,14 @@ import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
 import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
 
 import {
+    GameRenderEventTypes,
     StorePropsEventTypes,
     SteamEventTypes,
     GameEventTypes,
     UIEventTypes,
+    type ArtworkIntentSettledEvent,
     type BatchReadyForPlacementEvent,
+    type PlacementIntentReadyEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
@@ -128,6 +131,48 @@ function emitShelfLayoutDetermined(em: EventManager) {
     })
 }
 
+function wireRenderIntentRendezvous(em: EventManager): void {
+    const artworkOutcomes = new Map<number, ArtworkIntentSettledEvent['result']>()
+    const pendingIntents = new Map<number, PlacementIntentReadyEvent[]>()
+
+    const flush = (appid: number) => {
+        const outcome = artworkOutcomes.get(appid)
+        if (outcome === undefined) return
+
+        const intents = pendingIntents.get(appid)
+        if (!intents || intents.length === 0) return
+
+        while (intents.length > 0) {
+            const intent = intents.shift()
+            if (!intent) break
+            if (outcome === 'permanent-failure' || outcome === 'error') {
+                continue
+            }
+            mockPlaceGame(intent.game, intent.position, intent.rotation)
+        }
+
+        pendingIntents.delete(appid)
+    }
+
+    em.registerEventHandler(
+        GameRenderEventTypes.ArtworkIntentSettled,
+        (event: CustomEvent<ArtworkIntentSettledEvent>) => {
+            artworkOutcomes.set(event.detail.appid, event.detail.result)
+            flush(event.detail.appid)
+        }
+    )
+
+    em.registerEventHandler(
+        GameRenderEventTypes.PlacementIntentReady,
+        (event: CustomEvent<PlacementIntentReadyEvent>) => {
+            const pending = pendingIntents.get(event.detail.appid) ?? []
+            pending.push(event.detail)
+            pendingIntents.set(event.detail.appid, pending)
+            flush(event.detail.appid)
+        }
+    )
+}
+
 describe('GameBoxSpawner — Two-Phase Load/Place', () => {
     let eventManager: EventManager
     let spawner: GameBoxSpawner
@@ -156,6 +201,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             }
             return true
         })
+
+        wireRenderIntentRendezvous(eventManager)
 
         spawner = new (GameBoxSpawner as any)()
         // Ordering contract: renderer is initialized from immutable manifest before any batch prewarm events.
