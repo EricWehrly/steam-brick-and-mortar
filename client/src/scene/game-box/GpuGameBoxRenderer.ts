@@ -14,7 +14,7 @@
  * 
  * RECEIVES:
  * - prefetchArtwork(appid, url, name) → Phase 1: load texture into atlas
- * - placeGame(game, position, rotation) → unified placement (artwork or label fallback)
+ * - PlacementResolved events → unified placement (artwork or label fallback)
  * - clearPlacements() → wipe all GPU instances before re-sort
  * - addToScene(scene) → Attaches instanced meshes to scene
  * - updateLODForCamera(camera) → Adjusts detail levels based on distance
@@ -46,6 +46,8 @@ import { LodArtworkOrchestratorDebug } from './instancing/LodArtworkOrchestrator
 import type { IGameArtworkPipeline } from './instancing/IGameArtworkPipeline'
 import { RenderIntentCoordinator } from './RenderIntentCoordinator'
 import { Logger } from '../../utils/Logger'
+import { EventManager } from '../../core/EventManager'
+import { GameRenderEventTypes, type PlacementResolvedEvent } from '../../types/InteractionEvents'
 
 export class GpuGameBoxRenderer {
     public static logger = Logger.createLogFunctions(GpuGameBoxRenderer.name)
@@ -53,16 +55,25 @@ export class GpuGameBoxRenderer {
     private readonly instancedLabelRenderer: InstancedLabelRenderer
     private readonly lodArtworkRenderer: IGameArtworkPipeline
     private readonly renderIntentCoordinator: RenderIntentCoordinator
+    private readonly boundHandlePlacementResolved: (event: CustomEvent<PlacementResolvedEvent>) => void
 
     constructor(maxGames: number = 2000) {
         this.instancedLabelRenderer = new InstancedLabelRenderer({ maxInstances: maxGames })
         this.lodArtworkRenderer = LodArtworkOrchestratorDebug.fromAppSettings(maxGames)
-        this.renderIntentCoordinator = new RenderIntentCoordinator({
-            placeTexturedGame: (game, position, rotation) => this.placeTexturedGame(game, position, rotation),
-            placeLabelGame: (game, position, rotation) => this.placeLabelBox(game, position, rotation),
-        })
+        this.renderIntentCoordinator = new RenderIntentCoordinator()
+        this.boundHandlePlacementResolved = this.handlePlacementResolved.bind(this)
+
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementResolved,
+            this.boundHandlePlacementResolved
+        )
 
         GpuGameBoxRenderer.logger.lifecycle(`Initialized (max ${maxGames} games)`)
+    }
+
+    private handlePlacementResolved(event: CustomEvent<PlacementResolvedEvent>): void {
+        const { game, position, rotation } = event.detail
+        this.placeResolvedGame(game, position, rotation)
     }
 
     /**
@@ -80,22 +91,7 @@ export class GpuGameBoxRenderer {
         return this.lodArtworkRenderer.prefetchArtwork(appid, artworkUrl, gameName)
     }
 
-    /**
-     * Unified placement: try artwork instance first; fall through to label box on atlas miss.
-     * This is the preferred placement path — callers do not need to know which renderer
-     * handles the game. The artwork/label decision lives here, not upstream.
-     *
-     * rotation encodes both shelf orientation and front/back side — no separate side param needed.
-     */
-    public placeGame(
-        game: SteamGameData,
-        position: THREE.Vector3,
-        rotation: THREE.Quaternion
-    ): void {
-        this.placeTexturedGame(game, position, rotation)
-    }
-
-    private placeTexturedGame(
+    private placeResolvedGame(
         game: SteamGameData,
         position: THREE.Vector3,
         rotation: THREE.Quaternion
@@ -141,6 +137,10 @@ export class GpuGameBoxRenderer {
 
     public dispose(): void {
         GpuGameBoxRenderer.logger.lifecycle('Disposing')
+        EventManager.getInstance().deregisterEventHandler(
+            GameRenderEventTypes.PlacementResolved,
+            this.boundHandlePlacementResolved
+        )
         this.renderIntentCoordinator.dispose()
         this.instancedLabelRenderer.dispose()
         this.lodArtworkRenderer.dispose()

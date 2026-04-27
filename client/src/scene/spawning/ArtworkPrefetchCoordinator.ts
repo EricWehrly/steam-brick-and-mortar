@@ -62,17 +62,17 @@ export class ArtworkPrefetchCoordinator {
 
             if (!artworkUrl) {
                 this.prefetchResults.set(appid, 'permanent-failure')
-                this.emitArtworkIntentSettled(appid, game.name, 'permanent-failure')
+                this.emitArtworkIntentSettled(appid, game.name)
                 continue
             }
 
             renderer.prefetchArtwork(appid, artworkUrl, game.name).then((result) => {
                 this.prefetchResults.set(appid, result)
-                this.emitArtworkIntentSettled(appid, game.name, result)
+                this.emitArtworkIntentSettled(appid, game.name)
             }).catch((error) => {
                 this.logger.warn(`prefetchArtwork failed for "${game.name}": ${error}`)
                 this.prefetchResults.set(appid, 'error')
-                this.emitArtworkIntentSettled(appid, game.name, 'error')
+                this.emitArtworkIntentSettled(appid, game.name)
             })
         }
     }
@@ -95,14 +95,10 @@ export class ArtworkPrefetchCoordinator {
         this.prefetchBatch(games as SteamGameData[], renderer)
     }
 
-    private emitArtworkIntentSettled(
-        appid: number,
-        gameName: string,
-        result: ArtworkIntentSettledEvent['result']
-    ): void {
+    private emitArtworkIntentSettled(appid: number, gameName: string): void {
         EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
             GameRenderEventTypes.ArtworkIntentSettled,
-            { appid, gameName, result }
+            { appid, gameName }
         )
     }
 

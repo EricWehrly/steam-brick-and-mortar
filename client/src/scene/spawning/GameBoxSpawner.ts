@@ -1,9 +1,8 @@
 import * as THREE from 'three'
 import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
-import { ShelfSurfaceUtils, type ShelfSurface, GameBoxUtils, GameLayoutConstants, type IStockStrategy } from '../props/SharedPropsUtils'
+import { ShelfSurfaceUtils, type ShelfSurface, GameBoxUtils, type IStockStrategy } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
-import { AppSettings, Setting } from '../../core/AppSettings'
 import { 
     BatchProcessingStatus,
     GameRenderEventTypes,
@@ -68,7 +67,6 @@ export class GameBoxSpawner {
     private pendingSections: SectionsReadyEvent | null = null
 
     private readonly artworkPrefetch: ArtworkPrefetchCoordinator
-    private readonly labelsEnabled: boolean
     private stockStrategy: IStockStrategy | null = null
 
     /** Expose the current renderer for external consumers (e.g. addToScene, updateLODForCamera). */
@@ -81,7 +79,6 @@ export class GameBoxSpawner {
     }
 
     private constructor() {
-        this.labelsEnabled = AppSettings.get(Setting.EnableLabels)
         this.artworkPrefetch = new ArtworkPrefetchCoordinator({
             getRenderer: () => this.renderer,
         })

@@ -212,10 +212,16 @@ export interface GameSelectedEvent extends BaseInteractionEvent {
 export interface ArtworkIntentSettledEvent extends BaseInteractionEvent {
     appid: number
     gameName: string
-    result: 'prefetched' | 'cached' | 'permanent-failure' | 'error'
 }
 
 export interface PlacementIntentReadyEvent extends BaseInteractionEvent {
+    appid: number
+    game: SteamGameData
+    position: THREE.Vector3
+    rotation: THREE.Quaternion
+}
+
+export interface PlacementResolvedEvent extends BaseInteractionEvent {
     appid: number
     game: SteamGameData
     position: THREE.Vector3
@@ -321,6 +327,7 @@ export const GameEventTypes = {
 export const GameRenderEventTypes = {
     ArtworkIntentSettled: 'game-render:artwork-intent-settled',
     PlacementIntentReady: 'game-render:placement-intent-ready',
+    PlacementResolved: 'game-render:placement-resolved',
 } as const
 
 export const CeilingEventTypes = {

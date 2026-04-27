@@ -6,6 +6,7 @@ import { RenderIntentCoordinator } from '../../../../src/scene/game-box/RenderIn
 import {
     GameRenderEventTypes,
     type ArtworkIntentSettledEvent,
+    type PlacementResolvedEvent,
     type PlacementIntentReadyEvent,
 } from '../../../../src/types/InteractionEvents'
 
@@ -26,18 +27,18 @@ describe('RenderIntentCoordinator', () => {
         EventManager.getInstance().removeAllListeners()
     })
 
-    it('places textured games when artwork settles before placement intent', () => {
-        const placeTexturedGame = vi.fn()
-        const placeLabelGame = vi.fn()
+    it('emits placement-resolved when artwork settles before placement intent', () => {
+        const coordinator = new RenderIntentCoordinator()
+        const resolved: PlacementResolvedEvent[] = []
 
-        const coordinator = new RenderIntentCoordinator({
-            placeTexturedGame,
-            placeLabelGame,
-        })
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementResolved,
+            (event: CustomEvent<PlacementResolvedEvent>) => resolved.push(event.detail)
+        )
 
         EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
             GameRenderEventTypes.ArtworkIntentSettled,
-            { appid: 7, gameName: 'Game 7', result: 'prefetched' }
+            { appid: 7, gameName: 'Game 7' }
         )
         EventManager.getInstance().emit<PlacementIntentReadyEvent>(
             GameRenderEventTypes.PlacementIntentReady,
@@ -49,20 +50,21 @@ describe('RenderIntentCoordinator', () => {
             } as any
         )
 
-        expect(placeTexturedGame).toHaveBeenCalledTimes(1)
-        expect(placeLabelGame).not.toHaveBeenCalled()
+        expect(resolved).toHaveLength(1)
+        expect(resolved[0]?.appid).toBe(7)
+        expect(resolved[0]?.game.name).toBe('Game 7')
 
         coordinator.dispose()
     })
 
-    it('places label boxes for failure outcomes and fans out to multiple intents', () => {
-        const placeTexturedGame = vi.fn()
-        const placeLabelGame = vi.fn()
+    it('fans out one settled signal to multiple placement intents', () => {
+        const coordinator = new RenderIntentCoordinator()
+        const resolved: PlacementResolvedEvent[] = []
 
-        const coordinator = new RenderIntentCoordinator({
-            placeTexturedGame,
-            placeLabelGame,
-        })
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementResolved,
+            (event: CustomEvent<PlacementResolvedEvent>) => resolved.push(event.detail)
+        )
 
         EventManager.getInstance().emit<PlacementIntentReadyEvent>(
             GameRenderEventTypes.PlacementIntentReady,
@@ -85,11 +87,11 @@ describe('RenderIntentCoordinator', () => {
 
         EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
             GameRenderEventTypes.ArtworkIntentSettled,
-            { appid: 42, gameName: 'Shared Game', result: 'permanent-failure' }
+            { appid: 42, gameName: 'Shared Game' }
         )
 
-        expect(placeTexturedGame).not.toHaveBeenCalled()
-        expect(placeLabelGame).toHaveBeenCalledTimes(2)
+        expect(resolved).toHaveLength(2)
+        expect(resolved.every(event => event.appid === 42)).toBe(true)
 
         coordinator.dispose()
     })

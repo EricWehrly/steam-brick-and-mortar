@@ -114,12 +114,11 @@ function emitShelfLayoutDetermined() {
 }
 
 function wireRenderIntentRendezvous(): void {
-    const outcomes = new Map<number, ArtworkIntentSettledEvent['result']>()
+    const settledAppIds = new Set<number>()
     const pending = new Map<number, PlacementIntentReadyEvent[]>()
 
     const flush = (appid: number) => {
-        const outcome = outcomes.get(appid)
-        if (outcome === undefined) return
+        if (!settledAppIds.has(appid)) return
 
         const intents = pending.get(appid)
         if (!intents || intents.length === 0) return
@@ -127,9 +126,6 @@ function wireRenderIntentRendezvous(): void {
         while (intents.length > 0) {
             const intent = intents.shift()
             if (!intent) break
-            if (outcome === 'permanent-failure' || outcome === 'error') {
-                continue
-            }
             mockPlaceGame(intent.game, intent.position, intent.rotation)
         }
 
@@ -139,7 +135,7 @@ function wireRenderIntentRendezvous(): void {
     EventManager.getInstance().registerEventHandler(
         GameRenderEventTypes.ArtworkIntentSettled,
         (event: CustomEvent<ArtworkIntentSettledEvent>) => {
-            outcomes.set(event.detail.appid, event.detail.result)
+            settledAppIds.add(event.detail.appid)
             flush(event.detail.appid)
         }
     )
