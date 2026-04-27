@@ -14,6 +14,7 @@ import { EventManager } from '../core/EventManager'
 import {
     GameEventTypes,
     StorePropsEventTypes,
+    UIEventTypes,
     type ShelfReadyEvent,
 } from '../types/InteractionEvents'
 import type { SectionsReadyEvent } from '../types/EnvironmentEvents'
@@ -61,7 +62,11 @@ export class ShelfSectionPlanner {
             (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(event.detail)
         )
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.LayoutClearRequest,
+            UIEventTypes.ArrangementRequested,
+            () => this.handleClearRequest()
+        )
+        EventManager.getInstance().registerEventHandler(
+            UIEventTypes.LayoutRequested,
             () => this.handleClearRequest()
         )
         EventManager.getInstance().registerEventHandler(
@@ -150,10 +155,6 @@ export class ShelfSectionPlanner {
 
             const rotY = this.shelfRotations[anchorShelfIndex] ?? 0
 
-            const endShelfIndex = this.findLastOwnedShelfIndex(sectionIndex)
-            const endAnchorPos = endShelfIndex >= 0 ? this.shelfPositions[endShelfIndex] : null
-            const endRotY = endShelfIndex >= 0 ? (this.shelfRotations[endShelfIndex] ?? rotY) : rotY
-
             const startIdentifier = this.buildSignIdentifier(section.name, 'start')
             this.signSystem.placeSign('canvas', {
                 uniqueIdentifier: startIdentifier,
@@ -168,23 +169,6 @@ export class ShelfSectionPlanner {
                 style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
             })
             this.placedSignIdentifiers.add(startIdentifier)
-
-            if (endAnchorPos) {
-                const endIdentifier = this.buildSignIdentifier(section.name, 'end')
-                this.signSystem.placeSign('canvas', {
-                    uniqueIdentifier: endIdentifier,
-                    text: section.name,
-                    anchorPosition: endAnchorPos,
-                    mount: {
-                        style: this.config.signMountStyle,
-                        yOffset: this.config.signYOffset,
-                        frontOffset: SHELF_SIGN_FRONT_OFFSET,
-                        signFacingY: endRotY,
-                    },
-                    style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
-                })
-                this.placedSignIdentifiers.add(endIdentifier)
-            }
         }
 
         ShelfSectionPlanner.logger.debug(
@@ -199,15 +183,6 @@ export class ShelfSectionPlanner {
         this.placedSignIdentifiers.clear()
     }
 
-    private findLastOwnedShelfIndex(sectionIndex: number): number {
-        for (let index = this.shelfSectionIndices.length - 1; index >= 0; index--) {
-            if (this.shelfSectionIndices[index] === sectionIndex) {
-                return index
-            }
-        }
-        return -1
-    }
-
     public reset(): void {
         this.shelfPositions = []
         this.shelfRotations = []
@@ -218,36 +193,5 @@ export class ShelfSectionPlanner {
 
     public dispose(): void {
         this.signSystem.dispose()
-    }
-
-    /**
-     * Debug helper: place a sign on every known shelf position showing its
-     * shelf index and section index. Useful for diagnosing spoke layout geometry.
-     * Call from browser console: `window.__debugSectionPlanner?.labelAllShelves()`
-     */
-    public labelAllShelves(): void {
-        for (let shelfIndex = 0; shelfIndex < this.shelfPositions.length; shelfIndex++) {
-            const pos = this.shelfPositions[shelfIndex]
-            const rotY = this.shelfRotations[shelfIndex] ?? 0
-            const sectionIndex = this.shelfSectionIndices[shelfIndex] ?? -1
-            if (!pos) continue
-
-            const uniqueIdentifier = `debug-shelf-${shelfIndex}`
-            const label = `s${sectionIndex}\u00b7${shelfIndex}`
-            this.signSystem.placeSign('canvas', {
-                uniqueIdentifier,
-                text: label,
-                anchorPosition: pos,
-                mount: {
-                    style: 'above-shelf',
-                    yOffset: 1.2,
-                    frontOffset: SHELF_SIGN_FRONT_OFFSET,
-                    signFacingY: rotY,
-                },
-                style: { ...SignStyles.Category, fontSize: 0.10, padding: '0.04 0.08' },
-            })
-            this.placedSignIdentifiers.add(uniqueIdentifier)
-        }
-        ShelfSectionPlanner.logger.info(`Debug: placed labels on ${this.shelfPositions.filter(Boolean).length} shelves`)
     }
 }
