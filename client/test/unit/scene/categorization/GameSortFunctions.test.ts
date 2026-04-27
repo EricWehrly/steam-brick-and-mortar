@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
     KNOWN_GENRES,
     groupByGenre,
+    groupingGenres,
     sortByGenreThenPlaytime,
     resolveGenre,
     primaryGenre,
@@ -20,7 +21,7 @@ describe('groupByGenre', () => {
         expect(groupByGenre([]).size).toBe(0)
     })
 
-    it('groups games by their primary genre', () => {
+    it('groups games by recognised genres', () => {
         const games: Partial<SteamGameData>[] = [
             { appid: 1, name: 'Game A', genres: [{ id: '1', description: 'Action' }] },
             { appid: 2, name: 'Game B', genres: [{ id: '1', description: 'Action' }] },
@@ -75,13 +76,44 @@ describe('groupByGenre', () => {
         expect([...result.keys()].filter(k => k === 'Other')).toHaveLength(1)
     })
 
-    it('uses genres[0] as the primary category', () => {
+    it('adds the same game to each recognised genre bucket', () => {
         const games: Partial<SteamGameData>[] = [
             { appid: 1, name: 'test', genres: [{ id: '1', description: 'Action' }, { id: '3', description: 'RPG' }] },
         ]
         const result = groupByGenre(games as SteamGameData[])
         expect(result.get('Action')).toHaveLength(1)
-        expect(result.has('RPG')).toBe(false)
+        expect(result.get('RPG')).toHaveLength(1)
+    })
+
+    it('does not duplicate the same game within one genre bucket when synonyms repeat', () => {
+        const games: Partial<SteamGameData>[] = [
+            {
+                appid: 1,
+                name: 'test',
+                genres: [
+                    { id: '1', description: 'Free to Play' },
+                    { id: '2', description: 'FREE TO PLAY' },
+                ],
+            },
+        ]
+        const result = groupByGenre(games as SteamGameData[])
+        expect(result.get('Free to Play')).toHaveLength(1)
+    })
+
+    it('does not add a game to Other when at least one recognised genre exists', () => {
+        const games: Partial<SteamGameData>[] = [
+            {
+                appid: 1,
+                name: 'test',
+                genres: [
+                    { id: '1', description: 'Action' },
+                    { id: '2', description: 'Acción' },
+                ],
+            },
+        ]
+        const result = groupByGenre(games as SteamGameData[])
+        expect(result.get('Action')).toHaveLength(1)
+        expect(result.has('Other')).toBe(false)
     })
 
     it('does not treat Early Access as a shelf genre', () => {
@@ -117,6 +149,27 @@ describe('primaryGenre', () => {
     it('returns "Other" when no genres', () => {
         expect(primaryGenre({} as SteamGameData)).toBe('Other')
         expect(primaryGenre({ genres: [] } as SteamGameData)).toBe('Other')
+    })
+})
+
+describe('groupingGenres', () => {
+    it('returns all recognised genres for a game', () => {
+        const game = {
+            genres: [
+                { id: '1', description: 'Action' },
+                { id: '2', description: 'RPG' },
+            ],
+        } as SteamGameData
+
+        expect(groupingGenres(game)).toEqual(['Action', 'RPG'])
+    })
+
+    it('falls back to Other when no recognised genre exists', () => {
+        const game = {
+            genres: [{ id: '1', description: 'Acción' }],
+        } as SteamGameData
+
+        expect(groupingGenres(game)).toEqual(['Other'])
     })
 })
 

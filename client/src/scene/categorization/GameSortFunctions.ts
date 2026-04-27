@@ -62,11 +62,37 @@ export function primaryGenre(game: SteamGameData): string {
 }
 
 /**
- * Group a flat game list by primary genre.
+ * Extract all canonical, recognised genres for grouping.
+ * Falls back to ['Other'] only when no recognised genre exists.
+ */
+export function groupingGenres(game: SteamGameData): string[] {
+    const genres = game.genres
+        ?.map((genre) => genre.description)
+        .filter((description): description is string => Boolean(description))
+        .map(resolveGenre)
+        .filter((genre) => genre !== 'Other') ?? []
+
+    const uniqueGenres = [...new Set(genres)]
+    return uniqueGenres.length > 0 ? uniqueGenres : ['Other']
+}
+
+/**
+ * Group a flat game list by all recognised genres.
+ * A game may appear in multiple genre buckets; if none are recognised, it falls into Other.
  * Returns a Map<string, SteamGameData[]>.
  */
 export function groupByGenre(games: readonly SteamGameData[]): Map<string, SteamGameData[]> {
-    return groupByKey(games, primaryGenre)
+    const grouped = new Map<string, SteamGameData[]>()
+
+    for (const game of games) {
+        for (const genre of groupingGenres(game)) {
+            const bucket = grouped.get(genre) ?? []
+            bucket.push(game)
+            grouped.set(genre, bucket)
+        }
+    }
+
+    return grouped
 }
 
 // ─── Comparator factories ──────────────────────────────────────────────────────

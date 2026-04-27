@@ -100,6 +100,31 @@ describe('GameSorter', () => {
         expect(totalGames).toBe(2)
     })
 
+    it('duplicates a multi-genre game across each matching genre section', () => {
+        mockIsAnonymous = true
+        mockGames = [
+            {
+                ...makeGame(1, 0, 100),
+                genres: [
+                    { id: '1', description: 'Action' },
+                    { id: '2', description: 'RPG' },
+                ],
+            } as SteamGameData,
+        ]
+
+        new GameSorter()
+        fireGameDataReady()
+
+        const [, payload] = mockEmit.mock.calls[0]
+        const actionSection = payload.sections.find((section: any) => section.name === 'Action')
+        const rpgSection = payload.sections.find((section: any) => section.name === 'RPG')
+
+        expect(actionSection.games).toHaveLength(1)
+        expect(rpgSection.games).toHaveLength(1)
+        expect(actionSection.games[0].appid).toBe(1)
+        expect(rpgSection.games[0].appid).toBe(1)
+    })
+
     it('does NOT emit when there are no games', () => {
         mockGames = []
         new GameSorter()
