@@ -18,10 +18,13 @@ import { EventManager } from '../../../../src/core/EventManager'
 import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
 
 import {
+    GameRenderEventTypes,
     StorePropsEventTypes,
     GameEventTypes,
     SteamEventTypes,
+    type ArtworkIntentSettledEvent,
     type BatchReadyForPlacementEvent,
+    type PlacementIntentReadyEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
 } from '../../../../src/types/InteractionEvents'
@@ -110,6 +113,47 @@ function emitShelfLayoutDetermined() {
     })
 }
 
+function wireRenderIntentRendezvous(): void {
+    const outcomes = new Map<number, ArtworkIntentSettledEvent['result']>()
+    const pending = new Map<number, PlacementIntentReadyEvent[]>()
+
+    const flush = (appid: number) => {
+        const outcome = outcomes.get(appid)
+        if (outcome === undefined) return
+
+        const intents = pending.get(appid)
+        if (!intents || intents.length === 0) return
+
+        while (intents.length > 0) {
+            const intent = intents.shift()
+            if (!intent) break
+            if (outcome === 'permanent-failure' || outcome === 'error') {
+                continue
+            }
+            mockPlaceGame(intent.game, intent.position, intent.rotation)
+        }
+
+        pending.delete(appid)
+    }
+
+    EventManager.getInstance().registerEventHandler(
+        GameRenderEventTypes.ArtworkIntentSettled,
+        (event: CustomEvent<ArtworkIntentSettledEvent>) => {
+            outcomes.set(event.detail.appid, event.detail.result)
+            flush(event.detail.appid)
+        }
+    )
+    EventManager.getInstance().registerEventHandler(
+        GameRenderEventTypes.PlacementIntentReady,
+        (event: CustomEvent<PlacementIntentReadyEvent>) => {
+            const intents = pending.get(event.detail.appid) ?? []
+            intents.push(event.detail)
+            pending.set(event.detail.appid, intents)
+            flush(event.detail.appid)
+        }
+    )
+}
+
 // --- Tests ---
 
 describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
@@ -118,6 +162,7 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         EventManager.getInstance().removeAllListeners()
+        wireRenderIntentRendezvous()
         spawner = new (GameBoxSpawner as any)()
 
         emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {

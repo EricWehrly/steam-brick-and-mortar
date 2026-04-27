@@ -209,6 +209,19 @@ export interface GameSelectedEvent extends BaseInteractionEvent {
     appid: number | string
 }
 
+export interface ArtworkIntentSettledEvent extends BaseInteractionEvent {
+    appid: number
+    gameName: string
+    result: 'prefetched' | 'cached' | 'permanent-failure' | 'error'
+}
+
+export interface PlacementIntentReadyEvent extends BaseInteractionEvent {
+    appid: number
+    game: SteamGameData
+    position: THREE.Vector3
+    rotation: THREE.Quaternion
+}
+
 // =============================================================================
 // STORE PROPS EVENTS
 // =============================================================================
@@ -303,6 +316,11 @@ export const GameEventTypes = {
     GamesSort: 'game:games-sort',
     /** Fired after grouping + sorting; carries sections ready for placement. */
     SectionsReady: 'game:sections-ready'
+} as const
+
+export const GameRenderEventTypes = {
+    ArtworkIntentSettled: 'game-render:artwork-intent-settled',
+    PlacementIntentReady: 'game-render:placement-intent-ready',
 } as const
 
 export const CeilingEventTypes = {

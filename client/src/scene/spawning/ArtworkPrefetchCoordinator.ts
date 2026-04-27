@@ -1,8 +1,20 @@
 import { Logger } from '../../utils/Logger'
+import { EventManager } from '../../core/EventManager'
+import {
+    GameEventTypes,
+    GameRenderEventTypes,
+    StorePropsEventTypes,
+    type ArtworkIntentSettledEvent,
+    type BatchReadyForPlacementEvent,
+} from '../../types/InteractionEvents'
 import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
 
 export type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
+
+interface ArtworkPrefetchCoordinatorOptions {
+    getRenderer?: () => GpuGameBoxRenderer | null
+}
 
 /**
  * Owns batch-time artwork prefetch state independently from shelf placement state.
@@ -10,10 +22,28 @@ export type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'er
  */
 export class ArtworkPrefetchCoordinator {
     private readonly logger = Logger.createLogFunctions(ArtworkPrefetchCoordinator.name)
+    private readonly getRenderer: () => GpuGameBoxRenderer | null
+    private readonly boundHandleArtworkSettled: () => void
+    private readonly boundHandleBatchReadyForPlacement: (event: CustomEvent<BatchReadyForPlacementEvent>) => void
 
     private readonly prefetchResults: Map<number, PrefetchResult> = new Map()
     private readonly appNamesByAppId: Map<number, string> = new Map()
     private hasLoggedExpectedFallbackSummary = false
+
+    public constructor(options: ArtworkPrefetchCoordinatorOptions = {}) {
+        this.getRenderer = options.getRenderer ?? (() => null)
+        this.boundHandleArtworkSettled = this.logExpectedFallbackSummary.bind(this)
+        this.boundHandleBatchReadyForPlacement = this.handleBatchReadyForPlacement.bind(this)
+
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.ArtworkSettled,
+            this.boundHandleArtworkSettled
+        )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.BatchReadyForPlacement,
+            this.boundHandleBatchReadyForPlacement
+        )
+    }
 
     public reset(): void {
         this.prefetchResults.clear()
@@ -21,14 +51,9 @@ export class ArtworkPrefetchCoordinator {
         this.hasLoggedExpectedFallbackSummary = false
     }
 
-    public getResult(appid: number): PrefetchResult | undefined {
-        return this.prefetchResults.get(appid)
-    }
-
     public prefetchBatch(
         games: ReadonlyArray<SteamGameData>,
-        renderer: GpuGameBoxRenderer,
-        onSettled: (appid: number) => void
+        renderer: GpuGameBoxRenderer
     ): void {
         for (const game of games) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
@@ -37,19 +62,48 @@ export class ArtworkPrefetchCoordinator {
 
             if (!artworkUrl) {
                 this.prefetchResults.set(appid, 'permanent-failure')
-                onSettled(appid)
+                this.emitArtworkIntentSettled(appid, game.name, 'permanent-failure')
                 continue
             }
 
             renderer.prefetchArtwork(appid, artworkUrl, game.name).then((result) => {
                 this.prefetchResults.set(appid, result)
-                onSettled(appid)
+                this.emitArtworkIntentSettled(appid, game.name, result)
             }).catch((error) => {
                 this.logger.warn(`prefetchArtwork failed for "${game.name}": ${error}`)
                 this.prefetchResults.set(appid, 'error')
-                onSettled(appid)
+                this.emitArtworkIntentSettled(appid, game.name, 'error')
             })
         }
+    }
+
+    private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
+        const { games, batchIndex, totalBatches } = event.detail
+
+        this.logger.debug(
+            `BatchReadyForPlacement: batch ${batchIndex + 1}/${totalBatches}, ${games.length} games — prewarming artwork`
+        )
+
+        const renderer = this.getRenderer()
+        if (!renderer) {
+            this.logger.warn(
+                'BatchReadyForPlacement received before GameDataReady initialized renderer — dropping batch prewarm to enforce event ordering'
+            )
+            return
+        }
+
+        this.prefetchBatch(games as SteamGameData[], renderer)
+    }
+
+    private emitArtworkIntentSettled(
+        appid: number,
+        gameName: string,
+        result: ArtworkIntentSettledEvent['result']
+    ): void {
+        EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
+            GameRenderEventTypes.ArtworkIntentSettled,
+            { appid, gameName, result }
+        )
     }
 
     public logExpectedFallbackSummary(): void {

@@ -44,6 +44,7 @@ import type { SteamGameData } from './types/GameData'
 import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { LodArtworkOrchestratorDebug } from './instancing/LodArtworkOrchestratorDebug'
 import type { IGameArtworkPipeline } from './instancing/IGameArtworkPipeline'
+import { RenderIntentCoordinator } from './RenderIntentCoordinator'
 import { Logger } from '../../utils/Logger'
 
 export class GpuGameBoxRenderer {
@@ -51,10 +52,15 @@ export class GpuGameBoxRenderer {
 
     private readonly instancedLabelRenderer: InstancedLabelRenderer
     private readonly lodArtworkRenderer: IGameArtworkPipeline
+    private readonly renderIntentCoordinator: RenderIntentCoordinator
 
     constructor(maxGames: number = 2000) {
         this.instancedLabelRenderer = new InstancedLabelRenderer({ maxInstances: maxGames })
         this.lodArtworkRenderer = LodArtworkOrchestratorDebug.fromAppSettings(maxGames)
+        this.renderIntentCoordinator = new RenderIntentCoordinator({
+            placeTexturedGame: (game, position, rotation) => this.placeTexturedGame(game, position, rotation),
+            placeLabelGame: (game, position, rotation) => this.placeLabelBox(game, position, rotation),
+        })
 
         GpuGameBoxRenderer.logger.lifecycle(`Initialized (max ${maxGames} games)`)
     }
@@ -82,6 +88,14 @@ export class GpuGameBoxRenderer {
      * rotation encodes both shelf orientation and front/back side — no separate side param needed.
      */
     public placeGame(
+        game: SteamGameData,
+        position: THREE.Vector3,
+        rotation: THREE.Quaternion
+    ): void {
+        this.placeTexturedGame(game, position, rotation)
+    }
+
+    private placeTexturedGame(
         game: SteamGameData,
         position: THREE.Vector3,
         rotation: THREE.Quaternion
@@ -120,12 +134,14 @@ export class GpuGameBoxRenderer {
      * Call before re-sorting; follow with placeArtworkInstance()/placeLabelBox() for each game.
      */
     public clearPlacements(): void {
+        this.renderIntentCoordinator.clearPendingPlacementIntents()
         this.lodArtworkRenderer.clearPlacements()
         this.instancedLabelRenderer.clear()
     }
 
     public dispose(): void {
         GpuGameBoxRenderer.logger.lifecycle('Disposing')
+        this.renderIntentCoordinator.dispose()
         this.instancedLabelRenderer.dispose()
         this.lodArtworkRenderer.dispose()
         GpuGameBoxRenderer.logger.lifecycle('Disposed')

@@ -22,73 +22,144 @@ Because texture loading is triggered by position, `GpuGameBoxRenderer.createGame
 
 ## Goal
 
-Separate the lifecycle into two independent phases:
+Separate the lifecycle into two independent signals and let the renderer own the final visual decision:
 
-| Phase | When | What |
-|-------|------|-------|
-| **Texture prefetch** | As batches arrive (no position needed) | Fetch + decode artwork by appId, hold in texture cache |
-| **Instance placement** | On `GamesSort` | Assign mesh instance slots and bind cached textures to positions |
+| Signal | Source | When | What |
+|-------|--------|------|------|
+| **Artwork readiness** | `ArtworkPrefetchCoordinator` | As batches arrive | Resolve a game's artwork outcome (`prefetched`, `cached`, `permanent-failure`, `error`) |
+| **Placement intent** | placement-side coordinator (currently `GameBoxSpawner`) | After sections/shelf layout are known | Publish one or more world-space placement intents for a game |
 
-After this, `GamesSort` becomes the single moment that arranges boxes. A re-sort is a position reassignment only — textures are already loaded.
+The renderer should consume both streams and decide, per intent, whether to place a textured box or a label box.
 
----
-
-## Key Change: Split `setArtworkInstanceFromUrl`
-
-Currently `LodArtworkOrchestrator` has one entry point that takes both position and URL:
-
-```ts
-setArtworkInstanceFromUrl(position, name, url, appid, rotation)
-```
-
-Split into two calls:
-
-```ts
-// Phase 1 — called on batch arrival, no position needed
-prefetchArtwork(appid: number, url: string): Promise<void>
-
-// Phase 2 — called on GamesSort, position now known
-placeInstance(appid: number, position: Vector3, rotation: Quaternion): void
-```
-
-The orchestrator caches decoded textures keyed by `appid`. `placeInstance` looks up the cached texture and writes the GPU instance. If texture is still loading, it queues the placement.
+After this, `GamesSort` remains the single moment that arranges boxes, but the artwork-vs-label arbitration no longer lives in `GameBoxSpawner`. A re-sort becomes a placement-intent rebuild only; artwork state is already cached and independently tracked.
 
 ---
 
-## Downstream Simplifications
+## Key Change: Renderer-Owned Rendezvous
 
-**`GameBoxSpawner`** dissolves or becomes trivial:
-- No more `pendingGames` map
-- No more `handleBatchReadyForPlacement`
-- `queueMicrotask` in `ShelfLayoutCoordinator` can be removed
+Currently the split is only half complete:
 
-**`BatchCoordinator`** emits `AllBatchesComplete` → triggers `GamesSort` → `GamesSort` drives placement. Batch ordering is no longer a concern for the rendering layer.
+- `ArtworkPrefetchCoordinator` owns batch-time prefetch state
+- `GameBoxSpawner` owns placement intents
+- `GameBoxSpawner.tryPlace()` still decides `placeGame()` vs `placeLabelBox()`
 
-**`GpuGameBoxRenderer`** subscribes to:
-- `BatchReadyForPlacement` → `prefetchArtwork()` for each game in the batch
-- `GamesSort` → `placeInstance()` for each game in sorted order
+That last decision should move downstream. The renderer layer should own the rendezvous between:
+
+1. "A placement intent exists for appId X at position Y"
+2. "Artwork for appId X settled with status Z"
+
+`LodArtworkOrchestrator` already exposes the right rendering primitives:
+
+```ts
+prefetchArtwork(appid: number, artworkUrl: string, gameName: string): Promise<PrefetchResult>
+
+placeInstance(appid: number, gameName: string, position: Vector3, rotation: Quaternion): number
+```
+
+What is missing is an event-driven render coordinator that listens for both readiness signals and executes one of two renderer actions:
+
+```ts
+placeInstance(appid, gameName, position, rotation)   // textured path
+placeLabelBox(game, position, rotation)              // fallback path
+```
+
+---
+
+## Proposed Responsibilities
+
+**Placement-side coordinator**
+- Keeps layout math, stock-surface math, and section-to-shelf assignment out of the renderer.
+- Emits placement intents only: `game`, `appid`, `position`, `rotation`.
+- Does not decide artwork vs label.
+
+**`ArtworkPrefetchCoordinator`**
+- Keeps ownership of batch-time artwork resolution and fallback-summary logging.
+- Emits artwork outcomes only: `appid`, `gameName`, `result`.
+- Does not know about world positions.
+
+**Renderer-side rendezvous coordinator**
+- Subscribes to artwork-outcome and placement-intent events.
+- Tracks pending state keyed by `appid`.
+- When both sides are ready, decides textured box vs label box.
+- Supports one artwork outcome satisfying multiple placement intents.
+
+**`GpuGameBoxRenderer`**
+- Remains ignorant of shelf math and grouping.
+- Exposes the two concrete render operations.
+- May itself host the rendezvous state, or a small renderer-adjacent coordinator can own it and call into `GpuGameBoxRenderer`.
 
 **`ShelfReadyEvent`** carries only layout data (position, rotationY, rowIndex) — no game data passes through it.
 
 ---
 
+## Event Shape
+
+Do not make the renderer re-derive placement from `SectionsReady`; that would push layout knowledge into the rendering layer. Prefer explicit readiness events.
+
+Suggested event seams:
+
+```ts
+GameRenderEventTypes.ArtworkIntentSettled
+GameRenderEventTypes.PlacementIntentReady
+```
+
+Suggested payloads:
+
+```ts
+interface ArtworkIntentSettledEvent {
+	appid: number
+	gameName: string
+	result: 'prefetched' | 'cached' | 'permanent-failure' | 'error'
+}
+
+interface PlacementIntentReadyEvent {
+	appid: number
+	game: SteamGameData
+	position: THREE.Vector3
+	rotation: THREE.Quaternion
+}
+```
+
+One settled artwork event may satisfy many placement intents; this directly supports multi-group placement.
+
+---
+
 ## Migration Path
 
-1. Add `prefetchArtwork(appid, url)` to `LodArtworkOrchestrator` — loads and caches texture, no instance slot allocated yet.
-2. Add `placeInstance(appid, position, rotation)` — allocates slot and binds cached texture (or queues if still loading).
-3. Wire `GpuGameBoxRenderer` to call `prefetchArtwork` on `BatchReadyForPlacement`.
-4. Wire `GpuGameBoxRenderer` to call `placeInstance` on `GamesSort`.
-5. Remove `GameBoxSpawner.handleBatchReadyForPlacement` and `pendingGames`.
-6. Remove `queueMicrotask` from `ShelfLayoutCoordinator`.
-7. Delete `GameBoxSpawner` if nothing substantive remains, or keep as a thin coordinator if placement math is still useful to isolate.
+1. Introduce explicit render-intent event types and payloads for artwork outcomes and placement intents.
+2. Make `ArtworkPrefetchCoordinator` emit `ArtworkIntentSettled` when a game's artwork result resolves.
+3. Replace `GameBoxSpawner.tryPlace()` with placement-intent emission only; stop calling `placeGame()` / `placeLabelBox()` directly there.
+4. Add a renderer-side rendezvous coordinator that buffers by `appid`:
+   - artwork outcome: one value per appid
+   - placement intents: many values per appid
+5. When both sides are available, have the rendezvous coordinator call:
+   - `renderer.placeInstance(...)` for `prefetched` / `cached`
+   - `renderer.placeLabelBox(...)` for `permanent-failure` / `error`
+6. Keep `clearPlacements()` and re-sort behavior in the placement flow; add a matching reset for renderer-side pending placement intents on section rebuild.
+7. Once the event-driven rendezvous is stable, decide whether `GameBoxSpawner` should be split into a pure placement coordinator or deleted entirely.
 
 ---
 
 ## Risks / Open Questions
 
-- `LodArtworkOrchestrator` currently ties instance slot allocation to texture loading — separating these requires a slot reservation mechanism (allocate slot by appId without a position, fill position later).
-- Labels (`InstancedLabelRenderer`) follow the same pattern and will need the same split.
-- The `GamesSort` event currently carries sorted game arrays — it would need to include position data too, or `GpuGameBoxRenderer` would need to re-derive positions from shelf layout. Prefer passing positions explicitly to keep rendering ignorant of layout math.
+- The renderer should not subscribe directly to `SectionsReady` unless the event already carries final positions. Re-deriving layout inside rendering would be a regression in ownership.
+- `placeInstance()` currently warns on missing prefetched texture. Once artwork outcomes become explicit, that warning path should become truly exceptional rather than part of normal fallback flow.
+- Labels already live behind `GpuGameBoxRenderer.placeLabelBox()`, which is good; the main migration risk is avoiding duplicate placement when both the old `tryPlace()` path and the new render-intent path coexist.
+- Reset semantics must be clear: a layout/group/sort change should clear pending placement intents and live GPU placements without discarding prefetched artwork outcomes.
+
+---
+
+## Recommended First Slice
+
+Do this in the smallest bisectable step:
+
+1. Add render-intent events.
+2. Keep all existing state owners in place.
+3. Change `ArtworkPrefetchCoordinator` to emit artwork-outcome events.
+4. Change `GameBoxSpawner` to emit placement-intent events instead of placing directly.
+5. Add a small renderer-side coordinator that listens to both and performs the existing `placeGame()` / `placeLabelBox()` calls.
+
+That proves the architecture without simultaneously deleting `GameBoxSpawner` or moving shelf math.
 
 ---
 

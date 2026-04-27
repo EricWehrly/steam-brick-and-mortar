@@ -6,11 +6,12 @@ import { EventManager } from '../../core/EventManager'
 import { AppSettings, Setting } from '../../core/AppSettings'
 import { 
     BatchProcessingStatus,
+    GameRenderEventTypes,
     StorePropsEventTypes, 
     GameEventTypes,
     SteamEventTypes,
     UIEventTypes,
-    type BatchReadyForPlacementEvent,
+    type PlacementIntentReadyEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
@@ -29,13 +30,6 @@ interface ShelfPosition {
     rotationY: number
 }
 
-/** Placement intent: where a game should appear once its artwork is ready. */
-interface PlacementIntent {
-    game: SteamGameData
-    position: THREE.Vector3
-    rotation: THREE.Quaternion
-}
-
 /**
  * GameBoxSpawner
  *
@@ -43,21 +37,17 @@ interface PlacementIntent {
  *
  * Phase 1 — Prewarm (BatchReadyForPlacement):
  *   Triggers artwork prefetch for each game — no GPU instances placed yet.
- *   When a prefetch settles, calls tryPlace() which places immediately if a
- *   position intent is already known.
  *
  * Phase 2 — Place (SectionsReady):
- *   Clears all existing placements, populates placement intents in sorted order
- *   across all sections, and calls tryPlace() for any game whose prefetch has
- *   already settled. Games still in-flight are placed by their prefetch .then()
- *   when it resolves.
+ *   Clears all existing placements and emits placement intents in sorted order
+ *   across all sections. Renderer-side rendezvous decides textured vs label
+ *   placement when artwork outcomes settle.
  *
  * ShelfReady:
  *   Caches shelf positions indexed by batchIndex for Phase 2 lookup.
  *
- * The artwork/label decision is NOT made here. GpuGameBoxRenderer.placeGame()
- * checks the atlas and falls through to a label box on miss. GameBoxSpawner
- * only knows "game X goes at position Y".
+ * The artwork/label decision is NOT made here. GameBoxSpawner only emits
+ * world-space placement intents ("game X goes at position Y").
  *
  * TD: This class conflates two concerns — artwork prefetch/prewarm (Phase 1) and
  * geometry-driven placement (Phase 2). They share only the renderer reference.
@@ -77,10 +67,7 @@ export class GameBoxSpawner {
     // Cached sections from last SectionsReady — consumed when ShelfLayoutDetermined fires
     private pendingSections: SectionsReadyEvent | null = null
 
-    private readonly artworkPrefetch = new ArtworkPrefetchCoordinator()
-    // Rendezvous state: placement intents per appid (one game can appear in multiple sections)
-    private placementIntents: Map<number, PlacementIntent[]> = new Map()
-
+    private readonly artworkPrefetch: ArtworkPrefetchCoordinator
     private readonly labelsEnabled: boolean
     private stockStrategy: IStockStrategy | null = null
 
@@ -95,11 +82,10 @@ export class GameBoxSpawner {
 
     private constructor() {
         this.labelsEnabled = AppSettings.get(Setting.EnableLabels)
+        this.artworkPrefetch = new ArtworkPrefetchCoordinator({
+            getRenderer: () => this.renderer,
+        })
 
-        EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.BatchReadyForPlacement,
-            (e: CustomEvent<BatchReadyForPlacementEvent>) => this.handleBatchReadyForPlacement(e)
-        )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfReady,
             (e: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(e)
@@ -124,10 +110,6 @@ export class GameBoxSpawner {
             StorePropsEventTypes.LibraryReloadRequest,
             (e: CustomEvent<StorePropsLibraryReloadRequestEvent>) => this.handleLibraryReloadRequest(e)
         )
-        EventManager.getInstance().registerEventHandler(
-            GameEventTypes.ArtworkSettled,
-            (event: CustomEvent) => this.handleArtworkSettled(event)
-        )
 
         GameBoxSpawner.logger.debug('Constructed')
     }
@@ -143,7 +125,6 @@ export class GameBoxSpawner {
         this.pendingSections = null
         this.shelfPositions.clear()
         this.artworkPrefetch.reset()
-        this.placementIntents.clear()
         GameBoxSpawner.logger.debug('Full reset (library reload)')
     }
 
@@ -156,7 +137,6 @@ export class GameBoxSpawner {
         this.stockStrategy = null
         this.pendingSections = null
         this.shelfPositions.clear()
-        this.placementIntents.clear()
         GameBoxSpawner.logger.debug('Geometry reset (layout switch)')
     }
 
@@ -197,26 +177,6 @@ export class GameBoxSpawner {
     }
 
     // -------------------------------------------------------------------------
-    // Phase 1: prewarm artwork as batches arrive (independent of shelf layout)
-
-    private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
-        const { games, batchIndex, totalBatches } = event.detail
-
-        GameBoxSpawner.logger.debug(
-            `BatchReadyForPlacement: batch ${batchIndex + 1}/${totalBatches}, ${games.length} games — prewarming artwork`
-        )
-
-        if (!this.renderer) {
-            GameBoxSpawner.logger.warn(
-                'BatchReadyForPlacement received before GameDataReady initialized renderer — dropping batch prewarm to enforce event ordering'
-            )
-            return
-        }
-
-        this.artworkPrefetch.prefetchBatch(games as SteamGameData[], this.renderer, (appid) => this.tryPlace(appid))
-    }
-
-    // -------------------------------------------------------------------------
     // Cache shelf positions from ShelfReady events
 
     private handleShelfReady(event: CustomEvent<ShelfReadyEvent>): void {
@@ -239,7 +199,6 @@ export class GameBoxSpawner {
         // Start-of-run reset: this is deterministic regardless of listener order on
         // UI-triggering events (layout/group/sort changes).
         this.shelfPositions.clear()
-        this.placementIntents.clear()
 
         // Cache sections for placement. Placement is deferred to handleLayoutDetermined,
         // which runs after ShelfReady has repopulated fresh shelf positions.
@@ -266,7 +225,6 @@ export class GameBoxSpawner {
         }
 
         this.renderer.clearPlacements()
-        this.placementIntents.clear()
 
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         if (shelfSurfaces.length === 0) {
@@ -305,53 +263,12 @@ export class GameBoxSpawner {
         }
 
         GameBoxSpawner.logger.debug(
-            `Placement complete: ${this.placementIntents.size} intents across ${shelvesUsed} shelves`
+            `Placement intents emitted across ${shelvesUsed} shelves`
         )
-    }
-
-    /**
-    * Attempt to place a game. Succeeds only when both conditions are met:
-    * - prefetch has settled (result in prefetchResults)
-    * - one or more placement intents exist (positions assigned by section placement)
-     *
-     * Called from both sides of the rendezvous — whichever arrives last wins.
-     */
-    private tryPlace(appid: number): void {
-        if (!this.renderer) return
-        const result = this.artworkPrefetch.getResult(appid)
-        if (result === undefined) return // prefetch not yet settled
-        const intents = this.placementIntents.get(appid)
-        if (!intents || intents.length === 0) return // no position assigned yet
-
-        while (intents.length > 0) {
-            const intent = intents.shift()
-            if (!intent) {
-                break
-            }
-
-            // Expected fallback path: artwork unavailable. Place label directly and
-            // avoid per-title atlas-miss warnings from deep renderer layers.
-            if (result === 'permanent-failure' || result === 'error') {
-                this.renderer.placeLabelBox(intent.game, intent.position, intent.rotation)
-                continue
-            }
-
-            // Invariant path: prefetch says artwork exists/cached, so a miss in
-            // placeGame() is a real ordering/consistency signal and should remain visible.
-            this.renderer.placeGame(intent.game, intent.position, intent.rotation)
-        }
-
-        if (intents.length === 0) {
-            this.placementIntents.delete(appid)
-        }
     }
 
     // -------------------------------------------------------------------------
     // Intent assignment helpers
-
-    private handleArtworkSettled(_event: CustomEvent): void {
-        this.artworkPrefetch.logExpectedFallbackSummary()
-    }
 
     private assignIntentsFromStock(
         stockSurfaces: StockSurface[],
@@ -360,10 +277,10 @@ export class GameBoxSpawner {
         const intents = GameBoxUtils.stockSurfaces(stockSurfaces, games)
         for (const { game, position, rotation } of intents) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
-            const pendingIntents = this.placementIntents.get(appid) ?? []
-            pendingIntents.push({ game, position, rotation })
-            this.placementIntents.set(appid, pendingIntents)
-            this.tryPlace(appid)
+            EventManager.getInstance().emit<PlacementIntentReadyEvent>(
+                GameRenderEventTypes.PlacementIntentReady,
+                { appid, game, position, rotation }
+            )
         }
     }
 
