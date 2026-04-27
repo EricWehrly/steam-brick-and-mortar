@@ -12,7 +12,6 @@ import type { SteamGameData } from '../../../../src/scene/game-box/types/GameDat
 import {
     GameEventTypes,
     UIEventTypes,
-    StorePropsEventTypes,
 } from '../../../../src/types/InteractionEvents'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -82,12 +81,6 @@ function fireArrangementRequested(groupMode: string, sortMode: string): void {
     const event = new CustomEvent(UIEventTypes.ArrangementRequested, {
         detail: { groupMode, sortMode },
     })
-    for (const h of handlers) h(event)
-}
-
-function fireLayoutClearRequest(): void {
-    const handlers = mockHandlers.get(StorePropsEventTypes.LayoutClearRequest) ?? []
-    const event = new CustomEvent(StorePropsEventTypes.LayoutClearRequest, { detail: {} })
     for (const h of handlers) h(event)
 }
 
@@ -169,7 +162,7 @@ describe('GameSorter — arrangement persistence across layout switches', () => 
         expect(payload.sortMode).toBe('by-playtime')
     })
 
-    it('LayoutClearRequest does not reset hasArrangedOnce: next GameDataReady re-applies current modes', () => {
+    it('arrangement persists across GameDataReady after ArrangementRequested', () => {
         mockIsAnonymous = false
         mockGames = [makeGame(1, 'Action'), makeGame(2, 'RPG')]
         new GameSorter()
@@ -179,12 +172,9 @@ describe('GameSorter — arrangement persistence across layout switches', () => 
 
         // User requests arrangement change
         fireArrangementRequested('by-genre', 'by-playtime')
-
-        // Store clears (layout switch trigger)
-        fireLayoutClearRequest()
         mockEmit.mockClear()
 
-        // GameDataReady after clear — should still use by-genre / by-playtime
+        // GameDataReady after arrangement request — should still use by-genre / by-playtime
         fireGameDataReady()
 
         const payload = lastSectionsReadyPayload()
@@ -192,15 +182,12 @@ describe('GameSorter — arrangement persistence across layout switches', () => 
         expect(payload.sortMode).toBe('by-playtime')
     })
 
-    it('LayoutClearRequest alone does not emit SectionsReady', () => {
+    it('GameDataReady without prior ArrangementRequested does not emit SectionsReady when no games', () => {
         mockIsAnonymous = false
-        mockGames = [makeGame(1)]
+        mockGames = []
         new GameSorter()
 
         fireGameDataReady()
-        mockEmit.mockClear()
-
-        fireLayoutClearRequest()
 
         const sectionsReadyCalls = mockEmit.mock.calls.filter(
             ([type]) => type === GameEventTypes.SectionsReady

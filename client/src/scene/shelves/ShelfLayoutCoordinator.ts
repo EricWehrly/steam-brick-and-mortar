@@ -4,6 +4,7 @@ import { Logger } from '../../utils/Logger'
 import {
     StorePropsEventTypes,
     GameEventTypes,
+    UIEventTypes,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
     type StorePropsProgressEvent,
@@ -55,7 +56,11 @@ export class ShelfLayoutCoordinator {
             (event: CustomEvent<SectionsReadyEvent>) => this.handleSectionsReady(event.detail)
         )
         EventManager.getInstance().registerEventHandler(
-            StorePropsEventTypes.LayoutClearRequest,
+            UIEventTypes.ArrangementRequested,
+            () => this.clearRunState()
+        )
+        EventManager.getInstance().registerEventHandler(
+            UIEventTypes.LayoutRequested,
             () => this.clearRunState()
         )
         EventManager.getInstance().registerEventHandler(

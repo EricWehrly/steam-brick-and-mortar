@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { BatchCoordinator, type BatchItem, type BatchProgress } from '../../../../src/scene/batch/BatchCoordinator'
 
 import { EventManager } from '../../../../src/core/EventManager'
-import { BatchProcessingStatus, GameEventTypes, StorePropsEventTypes, type BatchReadyForPlacementEvent, type GamesPlacedEvent } from '../../../../src/types/InteractionEvents'
+import { BatchProcessingStatus, GameEventTypes, StorePropsEventTypes, UIEventTypes, type BatchReadyForPlacementEvent, type GamesPlacedEvent } from '../../../../src/types/InteractionEvents'
 
 describe('BatchCoordinator', () => {
     let eventManager: EventManager
@@ -88,7 +88,7 @@ describe('BatchCoordinator', () => {
 
             await new Promise(resolve => setTimeout(resolve, 30))
 
-            eventManager.emit(StorePropsEventTypes.LayoutClearRequest, {})
+            eventManager.emit(UIEventTypes.ArrangementRequested, { groupMode: 'by-recency', sortMode: 'by-last-played' } as any)
 
             expect(coordinator.getProgress()).toEqual({
                 received: 0,

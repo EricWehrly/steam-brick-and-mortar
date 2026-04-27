@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { EventManager, EventSource, type BaseInteractionEvent } from '../../../src/core/EventManager'
 import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
+import { UIEventTypes } from '../../../src/types/InteractionEvents'
 
 // Import props module to ensure handlers register themselves
 import '../../../src/scene/props'
@@ -55,7 +56,9 @@ describe('Store Props Renderer Independence - Event System', () => {
             })
             
             // Then: Event should be processed (no dependency errors)
-            expect(() => eventManager.emit(StorePropsEventTypes.LayoutClearRequest, {
+            expect(() => eventManager.emit(UIEventTypes.ArrangementRequested, {
+                groupMode: 'by-recency',
+                sortMode: 'by-last-played',
                 source: EventSource.System,
                 timestamp: Date.now()
             })).not.toThrow()
@@ -66,10 +69,12 @@ describe('Store Props Renderer Independence - Event System', () => {
         it('should handle event cleanup independently', () => {
             // Given: Mock handler for clear events
             const clearHandler = vi.fn()
-            eventManager.registerEventHandler(StorePropsEventTypes.LayoutClearRequest, clearHandler)
+            eventManager.registerEventHandler(UIEventTypes.ArrangementRequested, clearHandler)
             
-            // When: We emit clear request
-            eventManager.emit(StorePropsEventTypes.LayoutClearRequest, {
+            // When: We emit arrangement request
+            eventManager.emit(UIEventTypes.ArrangementRequested, {
+                groupMode: 'by-recency',
+                sortMode: 'by-last-played',
                 source: EventSource.System,
                 timestamp: Date.now()
             })
@@ -78,8 +83,8 @@ describe('Store Props Renderer Independence - Event System', () => {
             expect(clearHandler).toHaveBeenCalled()
             
             // Cleanup
-            eventManager.deregisterEventHandler(StorePropsEventTypes.LayoutClearRequest, clearHandler)
-            expect(() => eventManager.deregisterEventHandler(StorePropsEventTypes.LayoutClearRequest, clearHandler)).not.toThrow()
+            eventManager.deregisterEventHandler(UIEventTypes.ArrangementRequested, clearHandler)
+            expect(() => eventManager.deregisterEventHandler(UIEventTypes.ArrangementRequested, clearHandler)).not.toThrow()
         })
     })
 })

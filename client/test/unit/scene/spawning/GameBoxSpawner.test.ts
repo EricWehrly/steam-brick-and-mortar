@@ -19,6 +19,7 @@ import {
     StorePropsEventTypes,
     SteamEventTypes,
     GameEventTypes,
+    UIEventTypes,
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
@@ -27,7 +28,6 @@ import {
 import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
 import type { SteamLibraryManifestReadyEvent } from '../../../../src/types/InteractionEvents'
 import type {
-    StorePropsLayoutClearRequestEvent,
     StorePropsLibraryReloadRequestEvent,
 } from '../../../../src/scene/props/PropsEvents'
 import type { SteamGame } from '../../../../src/steam'
@@ -371,9 +371,6 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         it('clears pending games, shelf positions, and disposes renderer on library reload', async () => {
             const games = createMockGamesWithArtwork(5, 0) as any[]
 
-            // Initialize renderer via GameDataReady first
-            eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, { totalGames: 5, totalBatches: 1 })
-
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games, batchIndex: 0, totalBatches: 1 }
@@ -390,18 +387,22 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         })
     })
 
-    describe('layout-switch LayoutClearRequest', () => {
+    describe('ArrangementRequested — geometry reset', () => {
         it('clears placements but keeps renderer alive', async () => {
             const games = createMockGamesWithArtwork(5, 0) as any[]
 
-            eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, { totalGames: 5, totalBatches: 1 })
+            eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+                totalGames: 5,
+                totalBatches: 1,
+                appids: Array.from({ length: 5 }, (_, i) => i + 1),
+            })
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games, batchIndex: 0, totalBatches: 1 }
             )
             await Promise.resolve()
 
-            eventManager.emit<StorePropsLayoutClearRequestEvent>(StorePropsEventTypes.LayoutClearRequest, {})
+            eventManager.emit(UIEventTypes.ArrangementRequested, { groupMode: 'by-recency', sortMode: 'by-last-played' } as any)
             expect(mockRendererDispose).not.toHaveBeenCalled()
             expect(mockClearPlacements).toHaveBeenCalled()
         })
@@ -409,7 +410,6 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
     describe('setRenderer(null)', () => {
         it('does not throw when renderer is cleared and GamesSort fires', () => {
-            eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, { totalGames: 2, totalBatches: 1 })
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
                 { games: createMockGamesWithArtwork(2, 0), batchIndex: 0, totalBatches: 1 }

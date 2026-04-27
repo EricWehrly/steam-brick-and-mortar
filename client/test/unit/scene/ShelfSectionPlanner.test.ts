@@ -4,6 +4,7 @@ import { EventManager } from '../../../src/core/EventManager'
 import {
     GameEventTypes,
     StorePropsEventTypes,
+    UIEventTypes,
     type ShelfReadyEvent,
 } from '../../../src/types/InteractionEvents'
 import type { SectionsReadyEvent } from '../../../src/types/EnvironmentEvents'
@@ -73,7 +74,7 @@ function emitShelfReady(shelfIndex: number, position = FAR_POSITION, rotationY =
 }
 
 function emitLayoutClearRequest(): void {
-    EventManager.getInstance().emit(StorePropsEventTypes.LayoutClearRequest, {})
+    EventManager.getInstance().emit(UIEventTypes.ArrangementRequested, { groupMode: 'by-recency', sortMode: 'by-last-played' } as any)
 }
 
 function emitLibraryReloadRequest(): void {

@@ -31,7 +31,6 @@ import { GameEventTypes, RoomEventTypes, SteamEventTypes, StorePropsEventTypes, 
 import type {
     StorePropsSetupRequestEvent,
     StorePropsSetupCompletedEvent,
-    StorePropsLayoutClearRequestEvent,
     StorePropsLibraryReloadRequestEvent,
 } from './PropsEvents'
 
@@ -76,10 +75,6 @@ class StorePropsCoordinator {
             this.handleSetupRequest.bind(this)
         )
         this.eventManager.registerOverrideHandler(
-            StorePropsEventTypes.LayoutClearRequest,
-            this.handleLayoutClearRequest.bind(this)
-        )
-        this.eventManager.registerOverrideHandler(
             StorePropsEventTypes.LibraryReloadRequest,
             this.handleLibraryReloadRequest.bind(this)
         )
@@ -90,6 +85,10 @@ class StorePropsCoordinator {
         this.eventManager.registerEventHandler(
             RoomEventTypes.Resized,
             this.handleRoomResized.bind(this)
+        )
+        this.eventManager.registerEventHandler(
+            UIEventTypes.ArrangementRequested,
+            () => this.handleArrangementRequested()
         )
         this.eventManager.registerEventHandler(
             UIEventTypes.LayoutRequested,
@@ -134,12 +133,10 @@ class StorePropsCoordinator {
         })
     }
 
-    private handleLayoutClearRequest(_event: CustomEvent<StorePropsLayoutClearRequestEvent>): void {
-        // Clear GPU shelf geometry to avoid stale instances from prior arrangement.
-        // This ensures arrangement changes (group/sort) produce clean shelf visuals.
+    private handleArrangementRequested(): void {
         this.instancedShelfRenderer?.reset()
         this.lastTotalBatches = 0
-        StorePropsCoordinator.logger.info('Store props cleared for layout/arrangement change')
+        StorePropsCoordinator.logger.info('Store props cleared for arrangement change')
     }
 
     private handleLibraryReloadRequest(_event: CustomEvent<StorePropsLibraryReloadRequestEvent>): void {
@@ -208,9 +205,6 @@ class StorePropsCoordinator {
         this.instancedShelfRenderer?.dispose()
         this.instancedShelfRenderer = null
 
-        // Notify subsystems to clear geometry/placement state only — game data is unchanged.
-        // GameBoxSpawner will clear placements but keep its renderer and prefetch cache.
-        this.eventManager.emit<StorePropsLayoutClearRequestEvent>(StorePropsEventTypes.LayoutClearRequest, {})
 
         this.eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, {
             source: EventSource.System,
