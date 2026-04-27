@@ -13,7 +13,7 @@ import type { SteamGameData } from '../game-box/types/GameData'
 export type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
 
 interface ArtworkPrefetchCoordinatorOptions {
-    getRenderer?: () => GpuGameBoxRenderer | null
+    renderer?: GpuGameBoxRenderer | null
 }
 
 /**
@@ -22,7 +22,7 @@ interface ArtworkPrefetchCoordinatorOptions {
  */
 export class ArtworkPrefetchCoordinator {
     private readonly logger = Logger.createLogFunctions(ArtworkPrefetchCoordinator.name)
-    private readonly getRenderer: () => GpuGameBoxRenderer | null
+    private readonly renderer: GpuGameBoxRenderer | null
     private readonly boundHandleArtworkSettled: () => void
     private readonly boundHandleBatchReadyForPlacement: (event: CustomEvent<BatchReadyForPlacementEvent>) => void
 
@@ -31,7 +31,7 @@ export class ArtworkPrefetchCoordinator {
     private hasLoggedExpectedFallbackSummary = false
 
     public constructor(options: ArtworkPrefetchCoordinatorOptions = {}) {
-        this.getRenderer = options.getRenderer ?? (() => null)
+        this.renderer = options.renderer ?? null
         this.boundHandleArtworkSettled = this.logExpectedFallbackSummary.bind(this)
         this.boundHandleBatchReadyForPlacement = this.handleBatchReadyForPlacement.bind(this)
 
@@ -84,15 +84,14 @@ export class ArtworkPrefetchCoordinator {
             `BatchReadyForPlacement: batch ${batchIndex + 1}/${totalBatches}, ${games.length} games — prewarming artwork`
         )
 
-        const renderer = this.getRenderer()
-        if (!renderer) {
+        if (!this.renderer) {
             this.logger.warn(
                 'BatchReadyForPlacement received before GameDataReady initialized renderer — dropping batch prewarm to enforce event ordering'
             )
             return
         }
 
-        this.prefetchBatch(games as SteamGameData[], renderer)
+        this.prefetchBatch(games as SteamGameData[], this.renderer)
     }
 
     private emitArtworkIntentSettled(appid: number, gameName: string): void {

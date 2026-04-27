@@ -79,9 +79,8 @@ export class GameBoxSpawner {
     }
 
     private constructor() {
-        this.artworkPrefetch = new ArtworkPrefetchCoordinator({
-            getRenderer: () => this.renderer,
-        })
+        // ArtworkPrefetchCoordinator is initialized in initializeArtworkPrefetch()
+        // after the renderer is created
 
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfReady,
@@ -152,6 +151,14 @@ export class GameBoxSpawner {
         const rendererCapacity = Math.max(totalGames, 1) + 100
         this.renderer = new GpuGameBoxRenderer(rendererCapacity)
         GameBoxSpawner.logger.debug(`Renderer initialized: capacity ${rendererCapacity}`)
+        
+        this.initializeArtworkPrefetch()
+    }
+
+    private initializeArtworkPrefetch(): void {
+        this.artworkPrefetch = new ArtworkPrefetchCoordinator({
+            renderer: this.renderer,
+        })
     }
 
     private handleLibraryManifestReady(event: CustomEvent<SteamLibraryManifestReadyEvent>): void {
