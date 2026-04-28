@@ -508,6 +508,69 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             expect(mockPlaceGame.mock.calls[0][0].appid).toBe(run2Game.appid)
         })
 
+        it('re-sort keeps multi-group duplicates for the new run while dropping stale intents', async () => {
+            const staleGame = createMockGames(1, 0)[0] as any
+            const sharedRun2Game = createMockGamesWithArtwork(1, 2)[0] as any
+
+            // Run 1 queues a single placement intent that never settles.
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                sections: [{ name: 'Run1', games: [staleGame], groupMode: 'by-genre', sortMode: 'by-playtime' }],
+                groupMode: 'by-genre',
+                sortMode: 'by-playtime',
+            })
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0, new THREE.Vector3(0, 0, 0), 0, 0))
+            emitShelfLayoutDetermined(eventManager)
+
+            // Run 2 boundary: arrangement change clears geometry-owned placement state.
+            eventManager.emit(UIEventTypes.ArrangementRequested, {
+                groupMode: 'by-genre',
+                sortMode: 'by-playtime',
+            } as any)
+
+            // Run 2 starts before run-1 settle; stale pending intents should be dropped.
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                sections: [
+                    { name: 'Action', games: [sharedRun2Game], groupMode: 'by-genre', sortMode: 'by-playtime' },
+                    { name: 'Indie', games: [sharedRun2Game], groupMode: 'by-genre', sortMode: 'by-playtime' },
+                ],
+                groupMode: 'by-genre',
+                sortMode: 'by-playtime',
+            })
+
+            eventManager.emit<ArtworkIntentSettledEvent>(
+                GameRenderEventTypes.ArtworkIntentSettled,
+                { appid: staleGame.appid, gameName: staleGame.name }
+            )
+            expect(mockPlaceGame).toHaveBeenCalledTimes(0)
+
+            eventManager.emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                { games: [sharedRun2Game], batchIndex: 0, totalBatches: 1 }
+            )
+            await Promise.resolve()
+
+            // Run 2 layout + settle should place duplicated intents once per section appearance.
+            eventManager.emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                makeShelfReady(0, new THREE.Vector3(2, 0, 0), 0, 0)
+            )
+            eventManager.emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                makeShelfReady(1, new THREE.Vector3(5, 0, 0), 0, 1)
+            )
+            emitShelfLayoutDetermined(eventManager)
+
+            eventManager.emit<ArtworkIntentSettledEvent>(
+                GameRenderEventTypes.ArtworkIntentSettled,
+                { appid: sharedRun2Game.appid, gameName: sharedRun2Game.name }
+            )
+
+            expect(mockPlaceGame).toHaveBeenCalledTimes(2)
+            expect(mockPlaceGame.mock.calls[0][0].appid).toBe(sharedRun2Game.appid)
+            expect(mockPlaceGame.mock.calls[1][0].appid).toBe(sharedRun2Game.appid)
+            expect(mockPlaceGame.mock.calls[0][1]).not.toEqual(mockPlaceGame.mock.calls[1][1])
+        })
+
         it('handles empty sorted list gracefully', () => {
             eventManager.emit<BatchReadyForPlacementEvent>(
                 StorePropsEventTypes.BatchReadyForPlacement,
