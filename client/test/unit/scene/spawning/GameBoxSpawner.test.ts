@@ -39,6 +39,7 @@ import type { SteamGame } from '../../../../src/steam'
 const mockPrefetchArtwork = vi.fn().mockResolvedValue('prefetched')
 const mockPlaceGame = vi.fn()
 const mockClearPlacements = vi.fn()
+const mockClearPendingPlacementIntents = vi.fn()
 const mockRendererDispose = vi.fn()
 
 vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', () => ({
@@ -46,6 +47,7 @@ vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', () => ({
         this.prefetchArtwork = mockPrefetchArtwork
         this.placeGame = mockPlaceGame
         this.clearPlacements = mockClearPlacements
+        this.clearPendingPlacementIntents = mockClearPendingPlacementIntents
         this.dispose = mockRendererDispose
         this.addToScene = vi.fn()
         this.updateLODForCamera = vi.fn()
@@ -283,6 +285,16 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             )
 
             expect(mockPlaceGame).not.toHaveBeenCalled()
+            expect(mockClearPlacements).not.toHaveBeenCalled()
+        })
+
+        it('clears pending placement intents at SectionsReady start', () => {
+            eventManager.emit<SectionsReadyEvent>(
+                GameEventTypes.SectionsReady,
+                { sections: [], groupMode: 'by-recency', sortMode: 'by-last-played' }
+            )
+
+            expect(mockClearPendingPlacementIntents).toHaveBeenCalledTimes(1)
             expect(mockClearPlacements).not.toHaveBeenCalled()
         })
     })

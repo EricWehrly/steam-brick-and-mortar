@@ -38,6 +38,7 @@ import type { SteamGame } from '../../../../src/steam'
 const mockPrefetchArtwork = vi.fn().mockResolvedValue('prefetched')
 const mockPlaceGame = vi.fn()
 const mockClearPlacements = vi.fn()
+const mockClearPendingPlacementIntents = vi.fn()
 const mockRendererDispose = vi.fn()
 
 vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', () => ({
@@ -45,6 +46,7 @@ vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', () => ({
         this.prefetchArtwork = mockPrefetchArtwork
         this.placeGame = mockPlaceGame
         this.clearPlacements = mockClearPlacements
+        this.clearPendingPlacementIntents = mockClearPendingPlacementIntents
         this.dispose = mockRendererDispose
         this.addToScene = vi.fn()
         this.updateLODForCamera = vi.fn()

@@ -135,6 +135,14 @@ export class GpuGameBoxRenderer {
         this.instancedLabelRenderer.clear()
     }
 
+    /**
+     * Clear only pending placement intents buffered by the renderer-side rendezvous.
+     * Use this at section rebuild start to avoid replaying stale intents from the prior run.
+     */
+    public clearPendingPlacementIntents(): void {
+        this.renderIntentCoordinator.clearPendingPlacementIntents()
+    }
+
     public dispose(): void {
         GpuGameBoxRenderer.logger.lifecycle('Disposing')
         EventManager.getInstance().deregisterEventHandler(

@@ -17,6 +17,7 @@ import type { GameDataReadyEvent } from '../../src/types/EnvironmentEvents'
 const mockPrefetchArtwork = vi.fn().mockResolvedValue('prefetched')
 const mockPlaceGame = vi.fn()
 const mockClearPlacements = vi.fn()
+const mockClearPendingPlacementIntents = vi.fn()
 const mockDispose = vi.fn()
 
 vi.mock('../../src/scene/game-box/GpuGameBoxRenderer', () => ({
@@ -25,6 +26,7 @@ vi.mock('../../src/scene/game-box/GpuGameBoxRenderer', () => ({
         this.placeGame = mockPlaceGame
         this.placeLabelBox = vi.fn()
         this.clearPlacements = mockClearPlacements
+        this.clearPendingPlacementIntents = mockClearPendingPlacementIntents
         this.dispose = mockDispose
         this.addToScene = vi.fn()
         this.updateLODForCamera = vi.fn()
