@@ -1,0 +1,369 @@
+{
+  "metadata": {
+    "generatedAt": "2026-04-27T19:55:27Z",
+    "steamRoot": "C:/Program Files (x86)/Steam",
+    "note": "Signals are exploratory and local-config parsing is heuristic."
+  },
+  "appSamples": [
+    {
+      "appid": 220,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "appid": 240,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 1,
+          "snippet": "\t\t\t\t\t}\n\t\t\t\t\t\"1463920\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1739076551\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"240\"\n\t\t\t\t\t\t\"cloud\"\n\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\"last_sync_state\"\t\t\"synchronized\"\n\t\t\t\t\t\t}\n\t\t\t\t\t\t\"autocloud\"\n\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\"lastlaunch\"\t\t\"1736484893\"\n\t\t\t\t\t\t\t\"lastexit\"\t\t\"1736486863\""
+        }
+      ]
+    },
+    {
+      "appid": 320,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 1,
+          "snippet": "\t\t\"243970\"\n\t\t{\n\t\t\t\"UseSteamControllerConfig\"\t\t\"2\"\n\t\t\t\"SteamControllerRumble\"\t\t\"-1\"\n\t\t\t\"SteamControllerRumbleIntensity\"\t\t\"320\"\n\t\t}\n\t}\n\t\"controller_config\"\n\t{\n\t\t\"2238040\"\n\t\t{\n\t\t\t\"usetime\"\t\t\"3546.208984375\"\n\t\t}"
+        }
+      ]
+    },
+    {
+      "appid": 360,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "appid": 400,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 2,
+          "snippet": "\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1358150400\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"13\"\n\t\t\t\t\t}\n\t\t\t\t\t\"400\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"86400\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"134\"\n\t\t\t\t\t}\n\t\t\t\t\t\"440\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1415156113\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"5247\""
+        }
+      ]
+    },
+    {
+      "appid": 440,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 1,
+          "snippet": "\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"86400\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"134\"\n\t\t\t\t\t}\n\t\t\t\t\t\"440\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1415156113\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"5247\"\n\t\t\t\t\t}\n\t\t\t\t\t\"480\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1482018609\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"1\""
+        }
+      ]
+    },
+    {
+      "appid": 550,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 1,
+          "snippet": "\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1482018609\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"1\"\n\t\t\t\t\t}\n\t\t\t\t\t\"550\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1421532951\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"685\"\n\t\t\t\t\t}\n\t\t\t\t\t\"620\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1319353200\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"882\""
+        }
+      ]
+    },
+    {
+      "appid": 620,
+      "cloudCollections": [
+        "Multiplayer"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 1,
+          "snippet": "\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1421532951\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"685\"\n\t\t\t\t\t}\n\t\t\t\t\t\"620\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1319353200\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"882\"\n\t\t\t\t\t}\n\t\t\t\t\t\"630\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1459304244\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"27\""
+        }
+      ]
+    },
+    {
+      "appid": 1250,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "appid": 1500,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "appid": 1510,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 1,
+          "snippet": "\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1459304244\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"27\"\n\t\t\t\t\t}\n\t\t\t\t\t\"1510\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"86400\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"34\"\n\t\t\t\t\t}\n\t\t\t\t\t\"1520\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1324627200\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"25\""
+        }
+      ]
+    },
+    {
+      "appid": 1520,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 1,
+          "snippet": "\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"86400\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"34\"\n\t\t\t\t\t}\n\t\t\t\t\t\"1520\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1324627200\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"25\"\n\t\t\t\t\t}\n\t\t\t\t\t\"3720\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1561918549\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"41\""
+        }
+      ]
+    },
+    {
+      "appid": 1523,
+      "cloudCollections": [
+        "Hidden"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "appid": 1700,
+      "cloudCollections": [
+        "To Play"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "appid": 2600,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "appid": 3720,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 1,
+          "snippet": "\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1324627200\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"25\"\n\t\t\t\t\t}\n\t\t\t\t\t\"3720\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1561918549\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"41\"\n\t\t\t\t\t}\n\t\t\t\t\t\"3830\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1324454400\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"132\""
+        }
+      ]
+    },
+    {
+      "appid": 3830,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 1,
+          "snippet": "\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1561918549\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"41\"\n\t\t\t\t\t}\n\t\t\t\t\t\"3830\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1324454400\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"132\"\n\t\t\t\t\t}\n\t\t\t\t\t\"4000\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1335164400\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"1783\""
+        }
+      ]
+    },
+    {
+      "appid": 3970,
+      "cloudCollections": [
+        "Ze Done"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "appid": 4000,
+      "cloudCollections": [
+        "Multiplayer"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 1,
+          "snippet": "\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1324454400\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"132\"\n\t\t\t\t\t}\n\t\t\t\t\t\"4000\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"1335164400\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"1783\"\n\t\t\t\t\t}\n\t\t\t\t\t\"4330\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"LastPlayed\"\t\t\"86400\"\n\t\t\t\t\t\t\"Playtime\"\t\t\"5\""
+        }
+      ]
+    },
+    {
+      "appid": 4560,
+      "cloudCollections": [
+        "Meh"
+      ],
+      "configSignals": [
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/7/remote/sharedconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        },
+        {
+          "path": "C:/Program Files (x86)/Steam/userdata/<redacted>/config/localconfig.vdf",
+          "matchCount": 0,
+          "snippet": ""
+        }
+      ]
+    }
+  ]
+}
