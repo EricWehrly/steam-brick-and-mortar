@@ -4,13 +4,11 @@ import * as THREE from 'three'
 import { EventManager } from '../../../../src/core/EventManager'
 import { RenderIntentCoordinator } from '../../../../src/scene/game-box/RenderIntentCoordinator'
 import {
-    GameEventTypes,
     GameRenderEventTypes,
     type ArtworkIntentSettledEvent,
     type PlacementResolvedEvent,
     type PlacementIntentReadyEvent,
 } from '../../../../src/types/InteractionEvents'
-import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
 
 const makeGame = (appid: number, name = `Game ${appid}`) => ({
     appid,
@@ -98,7 +96,7 @@ describe('RenderIntentCoordinator', () => {
         coordinator.dispose()
     })
 
-    it('clears stale pending placement intents when a new SectionsReady run starts', () => {
+    it('clears stale pending placement intents when explicitly reset', () => {
         const coordinator = new RenderIntentCoordinator()
         const resolved: PlacementResolvedEvent[] = []
 
@@ -117,10 +115,7 @@ describe('RenderIntentCoordinator', () => {
             } as any
         )
 
-        EventManager.getInstance().emit<SectionsReadyEvent>(
-            GameEventTypes.SectionsReady,
-            { sections: [], groupMode: 'by-recency', sortMode: 'by-last-played' }
-        )
+        coordinator.clearPendingPlacementIntents()
 
         EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
             GameRenderEventTypes.ArtworkIntentSettled,
