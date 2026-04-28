@@ -1,9 +1,14 @@
 import { EventManager } from '../../core/EventManager'
 import {
     GameRenderEventTypes,
+    UIEventTypes,
+    StorePropsEventTypes,
     type ArtworkIntentSettledEvent,
     type PlacementResolvedEvent,
     type PlacementIntentReadyEvent,
+    type ArrangementRequestedEvent,
+    type LayoutRequestedEvent,
+    type StorePropsLibraryReloadRequestEvent,
 } from '../../types/InteractionEvents'
 
 /**
@@ -16,10 +21,16 @@ export class RenderIntentCoordinator {
 
     private readonly boundHandleArtworkIntentSettled: (event: CustomEvent<ArtworkIntentSettledEvent>) => void
     private readonly boundHandlePlacementIntentReady: (event: CustomEvent<PlacementIntentReadyEvent>) => void
+    private readonly boundHandleArrangementRequested: (event: CustomEvent<ArrangementRequestedEvent>) => void
+    private readonly boundHandleLayoutRequested: (event: CustomEvent<LayoutRequestedEvent>) => void
+    private readonly boundHandleLibraryReloadRequest: (event: CustomEvent<StorePropsLibraryReloadRequestEvent>) => void
 
     public constructor() {
         this.boundHandleArtworkIntentSettled = this.handleArtworkIntentSettled.bind(this)
         this.boundHandlePlacementIntentReady = this.handlePlacementIntentReady.bind(this)
+        this.boundHandleArrangementRequested = this.handleArrangementRequested.bind(this)
+        this.boundHandleLayoutRequested = this.handleLayoutRequested.bind(this)
+        this.boundHandleLibraryReloadRequest = this.handleLibraryReloadRequest.bind(this)
 
         EventManager.getInstance().registerEventHandler(
             GameRenderEventTypes.ArtworkIntentSettled,
@@ -29,10 +40,18 @@ export class RenderIntentCoordinator {
             GameRenderEventTypes.PlacementIntentReady,
             this.boundHandlePlacementIntentReady
         )
-    }
-
-    public clearPendingPlacementIntents(): void {
-        this.pendingPlacementIntents.clear()
+        EventManager.getInstance().registerEventHandler(
+            UIEventTypes.ArrangementRequested,
+            this.boundHandleArrangementRequested
+        )
+        EventManager.getInstance().registerEventHandler(
+            UIEventTypes.LayoutRequested,
+            this.boundHandleLayoutRequested
+        )
+        EventManager.getInstance().registerEventHandler(
+            StorePropsEventTypes.LibraryReloadRequest,
+            this.boundHandleLibraryReloadRequest
+        )
     }
 
     public dispose(): void {
@@ -44,9 +63,20 @@ export class RenderIntentCoordinator {
             GameRenderEventTypes.PlacementIntentReady,
             this.boundHandlePlacementIntentReady
         )
+        EventManager.getInstance().deregisterEventHandler(
+            UIEventTypes.ArrangementRequested,
+            this.boundHandleArrangementRequested
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            UIEventTypes.LayoutRequested,
+            this.boundHandleLayoutRequested
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            StorePropsEventTypes.LibraryReloadRequest,
+            this.boundHandleLibraryReloadRequest
+        )
 
-        this.pendingPlacementIntents.clear()
-        this.settledAppIds.clear()
+        this.clearRunState()
     }
 
     private handleArtworkIntentSettled(event: CustomEvent<ArtworkIntentSettledEvent>): void {
@@ -61,6 +91,23 @@ export class RenderIntentCoordinator {
         pending.push(event.detail)
         this.pendingPlacementIntents.set(appid, pending)
         this.flushReadyPlacements(appid)
+    }
+
+    private handleArrangementRequested(_event: CustomEvent<ArrangementRequestedEvent>): void {
+        this.clearRunState()
+    }
+
+    private handleLayoutRequested(_event: CustomEvent<LayoutRequestedEvent>): void {
+        this.clearRunState()
+    }
+
+    private handleLibraryReloadRequest(_event: CustomEvent<StorePropsLibraryReloadRequestEvent>): void {
+        this.clearRunState()
+    }
+
+    private clearRunState(): void {
+        this.pendingPlacementIntents.clear()
+        this.settledAppIds.clear()
     }
 
     private flushReadyPlacements(appid: number): void {
