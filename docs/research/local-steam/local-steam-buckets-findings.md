@@ -4,9 +4,9 @@
 
 This note captures what was found from the first local Steam filesystem probe, based on:
 
-- `docs/research/local-steam-coverage-local-steam-spitemonger.log`
-- `docs/research/local-steam-coverage-local-steam-spitemonger.json`
-- `docs/research/local-steam-coverage-local-steam-spitemonger.md`
+- `docs/research/local-steam/local-steam-coverage-local-steam-spitemonger.log`
+- `docs/research/local-steam/local-steam-coverage-local-steam-spitemonger.json`
+- `docs/research/local-steam/local-steam-coverage-local-steam-spitemonger.md`
 
 Machine-specific identifiers are intentionally redacted in this document.
 
@@ -74,5 +74,5 @@ Deep-inspect high-volume buckets (cloud + config) and assemble per-app local sig
 This is now supported by:
 
 - `scripts/extract-local-steam-app-signal-samples.sh`
-- Output JSON: `docs/research/local-steam-app-signal-samples-local-steam-spitemonger.json`
-- Output Markdown: `docs/research/local-steam-app-signal-samples-local-steam-spitemonger.md`
+- Output JSON: `docs/research/local-steam/local-steam-app-signal-samples-local-steam-spitemonger.json`
+- Output Markdown: `docs/research/local-steam/local-steam-app-signal-samples-local-steam-spitemonger.md`

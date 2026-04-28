@@ -1,10 +1,17 @@
 # Feature: Local File Investigation
 
 **Act**: 2 (Best Effort — invest to try, not required to complete)
-**Status**: In Progress (VDF path ruled out; `cloud-storage-namespace-1.json` import is the current implementation track)
+**Status**: Paused (research complete for now; implementation deferred to AC4.4)
 **Priority**: Medium
 
-> **Ways of working note**: The VDF-first hypothesis is no longer current. Modern Steam collections are not stored in `localconfig.vdf` / `sharedconfig.vdf`; the active implementation target is the local Steam cloud sync file `cloud-storage-namespace-1.json`. In parallel, we still want a broader offline-data audit to understand what else can be surfaced without a network connection.
+> **Ways of working note**: The VDF-first hypothesis is no longer current. Modern Steam collections are not stored in `localconfig.vdf` / `sharedconfig.vdf`; the viable source is the local Steam cloud sync file `cloud-storage-namespace-1.json`. We are pausing this feature and deferring any filesystem API implementation until AC4.4.
+
+## Decision (Act 2 Tie-Off)
+
+- We are stopping local-files implementation work in Act 2.
+- The only high-value unique field confirmed is user collections/categories from `cloud-storage-namespace-1.json`.
+- Additional local signals (install presence, local playtime/last-played, limited cloud/controller state) are useful but do not justify introducing filesystem API complexity right now.
+- Re-entry target: AC4.4 (see `docs/acts/act4-encore-someday-maybe.md`).
 
 ## Goal
 
@@ -57,9 +64,10 @@ This is a non-tentpole feature for Act 2: we want to make a real attempt at it, 
 
 ### Latest Single-Machine Probe (Anonymized)
 
-- Coverage and bucket findings are documented in `docs/research/local-steam-buckets-findings.md`.
-- Raw generated artifacts for this probe are in `docs/research/local-steam-coverage-local-steam-spitemonger.{log,json,md}`.
-- Deep sample extraction artifacts for API comparison are in `docs/research/local-steam-app-signal-samples-local-steam-spitemonger.{json,md}`.
+- Coverage and bucket findings are documented in `docs/research/local-steam/local-steam-buckets-findings.md`.
+- Raw generated artifacts for this probe are in `docs/research/local-steam/local-steam-coverage-local-steam-spitemonger.{log,json,md}`.
+- Deep sample extraction artifacts for API comparison are in `docs/research/local-steam/local-steam-app-signal-samples-local-steam-spitemonger.{json,md}`.
+- Sharedconfig deep check artifacts are in `docs/research/local-steam/local-steam-coverage-sharedconfig-check.{json,md}` and `docs/research/local-steam/local-steam-app-signal-samples-sharedconfig-check.{json,md}`.
 - This is currently a single-machine result set; multi-machine validation is still pending before any broad assumptions are made.
 
 - The File System Access API still looks like the best browser-native path when available, but a plain file picker fallback is acceptable for the first implementation.
@@ -71,4 +79,4 @@ This is a non-tentpole feature for Act 2: we want to make a real attempt at it, 
 - Related plan docs: `docs/plans/steam-user-categories-feasibility.md`, `docs/plans/steam-user-categories-filesystem-plan.md`.
 - `steam-user-categories-feasibility.md`: VDF/local-file approach confirmed non-viable for modern Steam; user collections now stored in Steam Cloud, not local VDF. The `cloud-storage-namespace-1.json` file in the Steam cloud sync folder is the viable source.
 - `steam-user-categories-filesystem-plan.md`: Concrete plan for reading `cloud-storage-namespace-1.json` via File System Access API (`showOpenFilePicker`); parsing is straightforward JSON (no VDF needed).
-- Current implementation branch: `openclaw/feat-local-collections-import`.
+- Current implementation branch: `openclaw/feat-local-collections-import` (implementation intentionally paused).
