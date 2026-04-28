@@ -51,6 +51,18 @@ export class ArtworkPrefetchCoordinator {
         this.hasLoggedExpectedFallbackSummary = false
     }
 
+    public dispose(): void {
+        EventManager.getInstance().deregisterEventHandler(
+            GameEventTypes.ArtworkSettled,
+            this.boundHandleArtworkSettled
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            StorePropsEventTypes.BatchReadyForPlacement,
+            this.boundHandleBatchReadyForPlacement
+        )
+        this.reset()
+    }
+
     public prefetchBatch(
         games: ReadonlyArray<SteamGameData>,
         renderer: GpuGameBoxRenderer
