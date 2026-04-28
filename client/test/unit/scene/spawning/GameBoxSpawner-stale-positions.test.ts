@@ -40,16 +40,23 @@ const mockPlaceGame = vi.fn()
 const mockClearPlacements = vi.fn()
 const mockRendererDispose = vi.fn()
 
-vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', () => ({
-    GpuGameBoxRenderer: vi.fn().mockImplementation(function () {
-        this.prefetchArtwork = mockPrefetchArtwork
-        this.placeGame = mockPlaceGame
-        this.clearPlacements = mockClearPlacements
-        this.dispose = mockRendererDispose
-        this.addToScene = vi.fn()
-        this.updateLODForCamera = vi.fn()
-    }),
-}))
+vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
+    const { ArtworkPrefetchCoordinator } = await import('../../../../src/scene/spawning/ArtworkPrefetchCoordinator')
+    return {
+        GpuGameBoxRenderer: vi.fn().mockImplementation(function () {
+            this.prefetchArtwork = mockPrefetchArtwork
+            this.placeGame = mockPlaceGame
+            this.clearPlacements = mockClearPlacements
+            this.addToScene = vi.fn()
+            this.updateLODForCamera = vi.fn()
+            const coordinator = new ArtworkPrefetchCoordinator({ renderer: this })
+            this.dispose = vi.fn(() => {
+                mockRendererDispose()
+                coordinator.dispose()
+            })
+        }),
+    }
+})
 
 vi.mock('../../../../src/core/AppSettings', () => {
     const Setting = { EnableLabels: 'enableLabels' }
