@@ -134,9 +134,17 @@ export class GpuGameBoxRenderer {
      * Call before re-sorting; follow with placeArtworkInstance()/placeLabelBox() for each game.
      */
     public clearPlacements(): void {
-        this.renderIntentCoordinator.clearPendingPlacementIntents()
+        this.resetPendingPlacementIntents()
         this.lodArtworkRenderer.clearPlacements()
         this.instancedLabelRenderer.clear()
+    }
+
+    /**
+     * Drop unresolved placement intents at the start of a new placement run.
+     * This prevents stale intents from resolving during a later run.
+     */
+    public resetPendingPlacementIntents(): void {
+        this.renderIntentCoordinator.clearPendingPlacementIntents()
     }
 
     public dispose(): void {
