@@ -34,6 +34,8 @@ export class ManagedTextureArray {
         texture.magFilter = THREE.LinearFilter
         texture.wrapS = THREE.ClampToEdgeWrapping
         texture.wrapT = THREE.ClampToEdgeWrapping
+        texture.flipY = false
+        texture.premultiplyAlpha = false
         texture.needsUpdate = true
         this._texture = texture
     }

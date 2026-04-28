@@ -135,6 +135,19 @@ export class SystemCapabilitiesDetector {
             return 'unknown'
         }
 
+        const rendererEnum = (context as WebGLRenderingContext).RENDERER
+        if (rendererEnum !== undefined) {
+            const standardRenderer = context.getParameter(rendererEnum)
+            if (typeof standardRenderer === 'string' && standardRenderer.length > 0) {
+                return standardRenderer
+            }
+        }
+
+        const isFirefox = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent)
+        if (isFirefox) {
+            return 'unknown'
+        }
+
         const debugInfo = context.getExtension('WEBGL_debug_renderer_info')
         if (!debugInfo) {
             return 'unknown'
