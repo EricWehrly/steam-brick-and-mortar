@@ -39,7 +39,6 @@ import type { SteamGame } from '../../../../src/steam'
 const mockPrefetchArtwork = vi.fn().mockResolvedValue('prefetched')
 const mockPlaceGame = vi.fn()
 const mockClearPlacements = vi.fn()
-const mockClearPendingPlacementIntents = vi.fn()
 const mockRendererDispose = vi.fn()
 
 vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', () => ({
@@ -47,7 +46,6 @@ vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', () => ({
         this.prefetchArtwork = mockPrefetchArtwork
         this.placeGame = mockPlaceGame
         this.clearPlacements = mockClearPlacements
-        this.clearPendingPlacementIntents = mockClearPendingPlacementIntents
         this.dispose = mockRendererDispose
         this.addToScene = vi.fn()
         this.updateLODForCamera = vi.fn()
@@ -191,6 +189,10 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             eventHandlers.get(eventType)!.add(handler)
         })
 
+        vi.mocked(eventManager.deregisterEventHandler).mockImplementation((eventType: string, handler: Function) => {
+            eventHandlers.get(eventType)?.delete(handler)
+        })
+
         vi.mocked(eventManager.emit).mockImplementation((eventType: string, detail: any) => {
             const handlers = eventHandlers.get(eventType)
             if (handlers) {
@@ -288,15 +290,6 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             expect(mockClearPlacements).not.toHaveBeenCalled()
         })
 
-        it('clears pending placement intents at SectionsReady start', () => {
-            eventManager.emit<SectionsReadyEvent>(
-                GameEventTypes.SectionsReady,
-                { sections: [], groupMode: 'by-recency', sortMode: 'by-last-played' }
-            )
-
-            expect(mockClearPendingPlacementIntents).toHaveBeenCalledTimes(1)
-            expect(mockClearPlacements).not.toHaveBeenCalled()
-        })
     })
 
     // -------------------------------------------------------------------------
@@ -475,6 +468,62 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             // After full reset, SectionsReady should not place (renderer gone, no prefetch results)
             eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
             expect(mockPlaceGame).not.toHaveBeenCalled()
+        })
+
+        it('does not throw on library reload before the first renderer initialization', () => {
+            resetEventManager()
+            const isolatedEventManager = EventManager.getInstance()
+            const isolatedHandlers = new Map<string, Set<Function>>()
+
+            vi.mocked(isolatedEventManager.registerEventHandler).mockImplementation((eventType: string, handler: Function) => {
+                if (!isolatedHandlers.has(eventType)) isolatedHandlers.set(eventType, new Set())
+                isolatedHandlers.get(eventType)!.add(handler)
+            })
+            vi.mocked(isolatedEventManager.deregisterEventHandler).mockImplementation((eventType: string, handler: Function) => {
+                isolatedHandlers.get(eventType)?.delete(handler)
+            })
+            vi.mocked(isolatedEventManager.emit).mockImplementation((eventType: string, detail: any) => {
+                const handlers = isolatedHandlers.get(eventType)
+                if (handlers) {
+                    const event = new CustomEvent(eventType, { detail })
+                    handlers.forEach(handler => handler(event))
+                }
+                return true
+            })
+
+            const earlySpawner = new (GameBoxSpawner as any)()
+
+            expect(() => {
+                isolatedEventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {})
+            }).not.toThrow()
+
+            expect(earlySpawner).toBeDefined()
+        })
+
+        it('reinitializes artwork prefetch once after reload without duplicate batch listeners', async () => {
+            const games = createMockGamesWithArtwork(2, 0) as any[]
+
+            eventManager.emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                { games, batchIndex: 0, totalBatches: 1 }
+            )
+            await Promise.resolve()
+            expect(mockPrefetchArtwork).toHaveBeenCalledTimes(2)
+
+            eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {})
+            eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+                totalGames: 500,
+            })
+
+            mockPrefetchArtwork.mockClear()
+
+            eventManager.emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                { games, batchIndex: 0, totalBatches: 1 }
+            )
+            await Promise.resolve()
+
+            expect(mockPrefetchArtwork).toHaveBeenCalledTimes(2)
         })
     })
 

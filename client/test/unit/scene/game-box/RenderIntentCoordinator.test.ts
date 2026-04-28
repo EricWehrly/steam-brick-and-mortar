@@ -4,11 +4,13 @@ import * as THREE from 'three'
 import { EventManager } from '../../../../src/core/EventManager'
 import { RenderIntentCoordinator } from '../../../../src/scene/game-box/RenderIntentCoordinator'
 import {
+    GameEventTypes,
     GameRenderEventTypes,
     type ArtworkIntentSettledEvent,
     type PlacementResolvedEvent,
     type PlacementIntentReadyEvent,
 } from '../../../../src/types/InteractionEvents'
+import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
 
 const makeGame = (appid: number, name = `Game ${appid}`) => ({
     appid,
@@ -92,6 +94,40 @@ describe('RenderIntentCoordinator', () => {
 
         expect(resolved).toHaveLength(2)
         expect(resolved.every(event => event.appid === 42)).toBe(true)
+
+        coordinator.dispose()
+    })
+
+    it('clears stale pending placement intents when a new SectionsReady run starts', () => {
+        const coordinator = new RenderIntentCoordinator()
+        const resolved: PlacementResolvedEvent[] = []
+
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementResolved,
+            (event: CustomEvent<PlacementResolvedEvent>) => resolved.push(event.detail)
+        )
+
+        EventManager.getInstance().emit<PlacementIntentReadyEvent>(
+            GameRenderEventTypes.PlacementIntentReady,
+            {
+                appid: 9,
+                game: makeGame(9),
+                position: new THREE.Vector3(9, 0, 0),
+                rotation: new THREE.Quaternion(),
+            } as any
+        )
+
+        EventManager.getInstance().emit<SectionsReadyEvent>(
+            GameEventTypes.SectionsReady,
+            { sections: [], groupMode: 'by-recency', sortMode: 'by-last-played' }
+        )
+
+        EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
+            GameRenderEventTypes.ArtworkIntentSettled,
+            { appid: 9, gameName: 'Game 9' }
+        )
+
+        expect(resolved).toHaveLength(0)
 
         coordinator.dispose()
     })

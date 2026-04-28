@@ -60,6 +60,7 @@ steam-brick-and-mortar/
 ### 🎭 **Event-Driven Architecture Pattern**
 - **Zero Cross-Class Dependencies**: Classes communicate exclusively through typed events
 - **No Direct Method Fallbacks**: In production runtime paths, do not replace event handoffs with direct calls between orchestrators and handlers (for example renderer → spawner). If ordering/race issues appear, solve with event contract changes, readiness events, or buffering/queueing at event boundaries.
+- **Owner-Managed Subscriptions**: If a class owns buffered state or lifecycle-sensitive behavior, it should subscribe to the events that govern that state itself. Avoid pass-through control methods whose only job is to let another class tell the owner when to reset, clear, or react; treat that forwarding seam as a design smell unless there is a strong boundary reason.
 - **Capability-Based Handler Selection**: 
   - Default handlers provide baseline functionality (e.g., Legacy renderers)
   - Feature-rich handlers register as replacements when system supports them (e.g., Instanced renderers with WebGL2)

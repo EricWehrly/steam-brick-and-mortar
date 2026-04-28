@@ -66,7 +66,7 @@ export class GameBoxSpawner {
     // Cached sections from last SectionsReady — consumed when ShelfLayoutDetermined fires
     private pendingSections: SectionsReadyEvent | null = null
 
-    private artworkPrefetch!: ArtworkPrefetchCoordinator
+    private artworkPrefetch: ArtworkPrefetchCoordinator | null = null
     private stockStrategy: IStockStrategy | null = null
 
     /** Expose the current renderer for external consumers (e.g. addToScene, updateLODForCamera). */
@@ -115,12 +115,13 @@ export class GameBoxSpawner {
      * Disposes the renderer and clears all prefetch state.
      */
     private fullReset(): void {
+        this.artworkPrefetch?.dispose()
+        this.artworkPrefetch = null
         this.renderer?.dispose()
         this.renderer = null
         this.stockStrategy = null
         this.pendingSections = null
         this.shelfPositions.clear()
-        this.artworkPrefetch.reset()
         GameBoxSpawner.logger.debug('Full reset (library reload)')
     }
 
@@ -156,6 +157,11 @@ export class GameBoxSpawner {
     }
 
     private initializeArtworkPrefetch(): void {
+        if (!this.renderer) {
+            return
+        }
+
+        this.artworkPrefetch?.dispose()
         this.artworkPrefetch = new ArtworkPrefetchCoordinator({
             renderer: this.renderer,
         })
@@ -203,7 +209,6 @@ export class GameBoxSpawner {
         // Start-of-run reset: this is deterministic regardless of listener order on
         // UI-triggering events (layout/group/sort changes).
         this.shelfPositions.clear()
-        this.renderer?.clearPendingPlacementIntents()
 
         // Cache sections for placement. Placement is deferred to handleLayoutDetermined,
         // which runs after ShelfReady has repopulated fresh shelf positions.
