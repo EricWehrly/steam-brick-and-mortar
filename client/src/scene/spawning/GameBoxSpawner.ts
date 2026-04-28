@@ -198,6 +198,10 @@ export class GameBoxSpawner {
     private handleSectionsReady(event: CustomEvent<SectionsReadyEvent>): void {
         this.sectionsReadyCount++
 
+        // New placement run boundary: drop unresolved intents from the previous run.
+        // Visible placements are left intact until the new run is ready to place.
+        this.renderer?.resetPendingPlacementIntents()
+
         // Cache sections for placement. Placement can be triggered by either
         // ShelfLayoutDetermined (normal order) or SectionsReady (if layout already arrived).
         this.pendingSections = event.detail

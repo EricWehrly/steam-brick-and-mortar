@@ -39,6 +39,7 @@ import type { SteamGame } from '../../../../src/steam'
 const mockPrefetchArtwork = vi.fn().mockResolvedValue('prefetched')
 const mockPlaceGame = vi.fn()
 const mockClearPlacements = vi.fn()
+const mockResetPendingPlacementIntents = vi.fn()
 const mockRendererDispose = vi.fn()
 
 vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
@@ -47,7 +48,11 @@ vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
         GpuGameBoxRenderer: vi.fn().mockImplementation(function() {
             this.prefetchArtwork = mockPrefetchArtwork
             this.placeGame = mockPlaceGame
-            this.clearPlacements = mockClearPlacements
+            this.resetPendingPlacementIntents = mockResetPendingPlacementIntents
+            this.clearPlacements = vi.fn(() => {
+                mockClearPlacements()
+                mockResetPendingPlacementIntents()
+            })
             this.addToScene = vi.fn()
             this.updateLODForCamera = vi.fn()
             const coordinator = new ArtworkPrefetchCoordinator({ renderer: this })
@@ -138,7 +143,7 @@ function emitShelfLayoutDetermined(em: EventManager) {
     })
 }
 
-function wireRenderIntentRendezvous(em: EventManager): void {
+function wireRenderIntentRendezvous(em: EventManager): () => void {
     const settledAppIds = new Set<number>()
     const pendingIntents = new Map<number, PlacementIntentReadyEvent[]>()
 
@@ -174,6 +179,10 @@ function wireRenderIntentRendezvous(em: EventManager): void {
             flush(event.detail.appid)
         }
     )
+
+    return () => {
+        pendingIntents.clear()
+    }
 }
 
 describe('GameBoxSpawner — Two-Phase Load/Place', () => {
@@ -209,7 +218,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             return true
         })
 
-        wireRenderIntentRendezvous(eventManager)
+        const clearPendingIntents = wireRenderIntentRendezvous(eventManager)
+        mockResetPendingPlacementIntents.mockImplementation(() => clearPendingIntents())
 
         spawner = new (GameBoxSpawner as any)()
         // Ordering contract: renderer is initialized from immutable manifest before any batch prewarm events.
@@ -223,6 +233,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         vi.clearAllMocks()
         mockPrefetchArtwork.mockResolvedValue('prefetched')
         mockPlaceGame.mockReset()
+        mockResetPendingPlacementIntents.mockReset()
     })
 
     // -------------------------------------------------------------------------
@@ -453,6 +464,48 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             emitShelfLayoutDetermined(eventManager)
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(2)
+        })
+
+        it('drops stale pending intents when a new SectionsReady run starts before layout', () => {
+            const staleGame = createMockGames(1, 0)[0] as any
+            const run2Game = createMockGames(1, 1)[0] as any
+
+            // Run 1: placement intent is emitted for a game with no artwork settle yet.
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                sections: [{ name: 'Run1', games: [staleGame], groupMode: 'by-genre', sortMode: 'by-playtime' }],
+                groupMode: 'by-genre',
+                sortMode: 'by-playtime',
+            })
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0, new THREE.Vector3(0, 0, 0), 0, 0))
+            emitShelfLayoutDetermined(eventManager)
+
+            expect(mockPlaceGame).toHaveBeenCalledTimes(0)
+
+            // Run 2 starts before its layout; run-start reset should drop run-1 pending intents.
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                sections: [{ name: 'Run2', games: [run2Game], groupMode: 'by-genre', sortMode: 'by-playtime' }],
+                groupMode: 'by-genre',
+                sortMode: 'by-playtime',
+            })
+
+            eventManager.emit<ArtworkIntentSettledEvent>(
+                GameRenderEventTypes.ArtworkIntentSettled,
+                { appid: staleGame.appid, gameName: staleGame.name }
+            )
+
+            // Late settle from run 1 must not replay stale placement.
+            expect(mockPlaceGame).toHaveBeenCalledTimes(0)
+
+            // Run 2 still places normally once layout and settle occur.
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0, new THREE.Vector3(3, 0, 0), 0, 0))
+            emitShelfLayoutDetermined(eventManager)
+            eventManager.emit<ArtworkIntentSettledEvent>(
+                GameRenderEventTypes.ArtworkIntentSettled,
+                { appid: run2Game.appid, gameName: run2Game.name }
+            )
+
+            expect(mockPlaceGame).toHaveBeenCalledTimes(1)
+            expect(mockPlaceGame.mock.calls[0][0].appid).toBe(run2Game.appid)
         })
 
         it('handles empty sorted list gracefully', () => {
