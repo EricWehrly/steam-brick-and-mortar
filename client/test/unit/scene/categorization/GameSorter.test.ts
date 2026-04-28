@@ -125,6 +125,49 @@ describe('GameSorter', () => {
         expect(rpgSection.games[0].appid).toBe(1)
     })
 
+    it('preserves overlap across sections without within-section duplication', () => {
+        mockIsAnonymous = true
+        mockGames = [
+            {
+                ...makeGame(1, 0, 100),
+                genres: [
+                    { id: '1', description: 'Action' },
+                    { id: '2', description: 'RPG' },
+                ],
+            } as SteamGameData,
+            {
+                ...makeGame(2, 0, 80),
+                genres: [
+                    { id: '3', description: 'Action' },
+                    { id: '4', description: 'Shooter' },
+                ],
+            } as SteamGameData,
+            {
+                ...makeGame(3, 0, 60),
+                genres: [
+                    { id: '5', description: 'RPG' },
+                ],
+            } as SteamGameData,
+        ]
+
+        new GameSorter()
+        fireGameDataReady()
+
+        const [, payload] = mockEmit.mock.calls[0]
+        const actionSection = payload.sections.find((section: any) => section.name === 'Action')
+        const rpgSection = payload.sections.find((section: any) => section.name === 'RPG')
+        const shooterSection = payload.sections.find((section: any) => section.name === 'Shooter')
+
+        expect(actionSection.games.map((game: any) => game.appid)).toEqual([1, 2])
+        expect(rpgSection.games.map((game: any) => game.appid)).toEqual([1, 3])
+        expect(shooterSection.games.map((game: any) => game.appid)).toEqual([2])
+
+        const actionIds = actionSection.games.map((game: any) => game.appid)
+        const rpgIds = rpgSection.games.map((game: any) => game.appid)
+        expect(new Set(actionIds).size).toBe(actionIds.length)
+        expect(new Set(rpgIds).size).toBe(rpgIds.length)
+    })
+
     it('does NOT emit when there are no games', () => {
         mockGames = []
         new GameSorter()
