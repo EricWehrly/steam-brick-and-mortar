@@ -73,6 +73,6 @@ Interpretation:
 Deep-inspect high-volume buckets (cloud + config) and assemble per-app local signal blocks for API comparison.
 This is now supported by:
 
-- `scripts/extract-local-steam-app-signal-samples.sh`
+- `docs/research/local-steam/extract-local-steam-app-signal-samples.sh`
 - Output JSON: `docs/research/local-steam/local-steam-app-signal-samples-local-steam-spitemonger.json`
 - Output Markdown: `docs/research/local-steam/local-steam-app-signal-samples-local-steam-spitemonger.md`

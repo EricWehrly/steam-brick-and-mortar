@@ -3,14 +3,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-source "$SCRIPT_DIR/common.sh"
+source "$REPO_ROOT/scripts/common.sh"
 
 API_BASE_URL="${API_BASE_URL:-https://steam-api-dev.wehrly.com}"
 TARGET_VANITY_URL="${1:-SpiteMonger}"
 OUTPUT_PREFIX="${2:-$(echo "$TARGET_VANITY_URL" | tr '[:upper:]' '[:lower:]')}"
-OUTPUT_DIR="${3:-$REPO_ROOT/docs/research}"
+OUTPUT_DIR="${3:-$REPO_ROOT/docs/research/local-steam}"
 
 mkdir -p "$OUTPUT_DIR"
 
