@@ -60,9 +60,9 @@ export class GpuGameBoxRenderer {
     private readonly artworkPrefetchCoordinator: ArtworkPrefetchCoordinator
     private readonly boundHandlePlacementResolved: (event: CustomEvent<PlacementResolvedEvent>) => void
 
-    constructor(maxGames: number = 2000) {
-        this.instancedLabelRenderer = new InstancedLabelRenderer({ maxInstances: maxGames })
-        this.lodArtworkRenderer = LodArtworkOrchestratorDebug.fromAppSettings(maxGames)
+    constructor(textureCapacity: number = 2000, placementCapacity: number = textureCapacity) {
+        this.instancedLabelRenderer = new InstancedLabelRenderer({ maxInstances: placementCapacity })
+        this.lodArtworkRenderer = LodArtworkOrchestratorDebug.fromAppSettings(textureCapacity, placementCapacity)
         this.renderIntentCoordinator = new RenderIntentCoordinator()
         this.artworkPrefetchCoordinator = new ArtworkPrefetchCoordinator({ renderer: this })
         this.boundHandlePlacementResolved = this.handlePlacementResolved.bind(this)
@@ -72,7 +72,9 @@ export class GpuGameBoxRenderer {
             this.boundHandlePlacementResolved
         )
 
-        GpuGameBoxRenderer.logger.lifecycle(`Initialized (max ${maxGames} games)`)
+        GpuGameBoxRenderer.logger.lifecycle(
+            `Initialized (textureCapacity=${textureCapacity}, placementCapacity=${placementCapacity})`
+        )
     }
 
     private handlePlacementResolved(event: CustomEvent<PlacementResolvedEvent>): void {

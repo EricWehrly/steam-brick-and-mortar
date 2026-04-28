@@ -59,6 +59,7 @@ export const DEFAULT_LOD_CONFIGS: LodTierSpec[] = getDefaultLodTierSpecs().map(s
 /** Config matching old LodArtworkConfig */
 export interface LodArtworkConfig {
     maxTextures?: number
+    maxInstances?: number
     lodConfigs?: LodTierSpec[]
     boxWidth?: number
     boxHeight?: number
@@ -97,15 +98,15 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
      * Factory: construct with LOD config derived from AppSettings.
      * Reads LodHighReductionRatio, LodMedReductionRatio, LodMaxHighSlots.
      */
-    public static fromAppSettings(maxTextures: number): LodArtworkOrchestrator {
-        return new LodArtworkOrchestrator(LodArtworkOrchestrator.buildAppSettingsConfig(maxTextures))
+    public static fromAppSettings(maxTextures: number, maxInstances: number = maxTextures): LodArtworkOrchestrator {
+        return new LodArtworkOrchestrator(LodArtworkOrchestrator.buildAppSettingsConfig(maxTextures, maxInstances))
     }
 
     /**
      * Builds a LodArtworkConfig from AppSettings.
      * Extracted so debug subclasses can reuse it in their own fromAppSettings override.
      */
-    protected static buildAppSettingsConfig(maxTextures: number): LodArtworkConfig {
+    protected static buildAppSettingsConfig(maxTextures: number, maxInstances: number = maxTextures): LodArtworkConfig {
         const highRatio = AppSettings.get(Setting.LodHighReductionRatio)
         const medRatio = AppSettings.get(Setting.LodMedReductionRatio)
         const maxHighSlots = AppSettings.get(Setting.LodMaxHighSlots)
@@ -129,6 +130,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
         return {
             maxTextures,
+            maxInstances,
             lazyHighTextures: true,
             boxWidth: 0.3,
             boxHeight: 0.4,
@@ -145,6 +147,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     protected renderer: LodGameArtworkRenderer
 
     private readonly maxTextures: number
+    private readonly maxInstances: number
     private readonly lodConfigs: LodTierSpec[]
     private readonly lazyHighTextures: boolean
 
@@ -175,6 +178,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
     constructor(config: LodArtworkConfig = {}) {
         this.maxTextures = config.maxTextures ?? 512
+        this.maxInstances = config.maxInstances ?? this.maxTextures
         this.lodConfigs = config.lodConfigs ?? DEFAULT_LOD_CONFIGS
         this.lazyHighTextures = config.lazyHighTextures ?? false
 
@@ -201,7 +205,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         // Create renderer
         const highConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.HIGH)
         const rendererConfig: LodGameArtworkRendererConfig = {
-            maxInstances: this.maxTextures,
+            maxInstances: this.maxInstances,
             boxWidth: config.boxWidth ?? DEFAULT_BOX_WIDTH,
             boxHeight: config.boxHeight ?? DEFAULT_BOX_HEIGHT,
             boxDepth: config.boxDepth ?? 0.1,

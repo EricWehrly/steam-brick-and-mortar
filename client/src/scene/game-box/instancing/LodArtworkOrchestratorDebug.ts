@@ -37,8 +37,8 @@ import type { HighTextureCache } from './HighTextureCache'
 export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
     private readonly lodDistanceManager: LodDistanceManagerDebug
 
-    public static override fromAppSettings(maxTextures: number): LodArtworkOrchestratorDebug {
-        return new LodArtworkOrchestratorDebug(LodArtworkOrchestrator.buildAppSettingsConfig(maxTextures))
+    public static override fromAppSettings(maxTextures: number, maxInstances: number = maxTextures): LodArtworkOrchestratorDebug {
+        return new LodArtworkOrchestratorDebug(LodArtworkOrchestrator.buildAppSettingsConfig(maxTextures, maxInstances))
     }
 
     constructor(config: LodArtworkConfig = {}) {
