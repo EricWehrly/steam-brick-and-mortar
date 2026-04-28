@@ -6,9 +6,6 @@ import {
     type ArtworkIntentSettledEvent,
     type PlacementResolvedEvent,
     type PlacementIntentReadyEvent,
-    type ArrangementRequestedEvent,
-    type LayoutRequestedEvent,
-    type StorePropsLibraryReloadRequestEvent,
 } from '../../types/InteractionEvents'
 
 /**
@@ -21,16 +18,12 @@ export class RenderIntentCoordinator {
 
     private readonly boundHandleArtworkIntentSettled: (event: CustomEvent<ArtworkIntentSettledEvent>) => void
     private readonly boundHandlePlacementIntentReady: (event: CustomEvent<PlacementIntentReadyEvent>) => void
-    private readonly boundHandleArrangementRequested: (event: CustomEvent<ArrangementRequestedEvent>) => void
-    private readonly boundHandleLayoutRequested: (event: CustomEvent<LayoutRequestedEvent>) => void
-    private readonly boundHandleLibraryReloadRequest: (event: CustomEvent<StorePropsLibraryReloadRequestEvent>) => void
+    private readonly boundHandleRunResetRequested: (event: CustomEvent<unknown>) => void
 
     public constructor() {
         this.boundHandleArtworkIntentSettled = this.handleArtworkIntentSettled.bind(this)
         this.boundHandlePlacementIntentReady = this.handlePlacementIntentReady.bind(this)
-        this.boundHandleArrangementRequested = this.handleArrangementRequested.bind(this)
-        this.boundHandleLayoutRequested = this.handleLayoutRequested.bind(this)
-        this.boundHandleLibraryReloadRequest = this.handleLibraryReloadRequest.bind(this)
+        this.boundHandleRunResetRequested = this.handleRunResetRequested.bind(this)
 
         EventManager.getInstance().registerEventHandler(
             GameRenderEventTypes.ArtworkIntentSettled,
@@ -42,15 +35,15 @@ export class RenderIntentCoordinator {
         )
         EventManager.getInstance().registerEventHandler(
             UIEventTypes.ArrangementRequested,
-            this.boundHandleArrangementRequested
+            this.boundHandleRunResetRequested
         )
         EventManager.getInstance().registerEventHandler(
             UIEventTypes.LayoutRequested,
-            this.boundHandleLayoutRequested
+            this.boundHandleRunResetRequested
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.LibraryReloadRequest,
-            this.boundHandleLibraryReloadRequest
+            this.boundHandleRunResetRequested
         )
     }
 
@@ -65,15 +58,15 @@ export class RenderIntentCoordinator {
         )
         EventManager.getInstance().deregisterEventHandler(
             UIEventTypes.ArrangementRequested,
-            this.boundHandleArrangementRequested
+            this.boundHandleRunResetRequested
         )
         EventManager.getInstance().deregisterEventHandler(
             UIEventTypes.LayoutRequested,
-            this.boundHandleLayoutRequested
+            this.boundHandleRunResetRequested
         )
         EventManager.getInstance().deregisterEventHandler(
             StorePropsEventTypes.LibraryReloadRequest,
-            this.boundHandleLibraryReloadRequest
+            this.boundHandleRunResetRequested
         )
 
         this.clearRunState()
@@ -93,15 +86,7 @@ export class RenderIntentCoordinator {
         this.flushReadyPlacements(appid)
     }
 
-    private handleArrangementRequested(_event: CustomEvent<ArrangementRequestedEvent>): void {
-        this.clearRunState()
-    }
-
-    private handleLayoutRequested(_event: CustomEvent<LayoutRequestedEvent>): void {
-        this.clearRunState()
-    }
-
-    private handleLibraryReloadRequest(_event: CustomEvent<StorePropsLibraryReloadRequestEvent>): void {
+    private handleRunResetRequested(_event: CustomEvent<unknown>): void {
         this.clearRunState()
     }
 
