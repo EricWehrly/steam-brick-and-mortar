@@ -58,26 +58,18 @@ export class GameBoxSpawner {
     // Shelf world positions indexed by shelfIndex, grouped by sectionIndex
     private shelfPositions: Map<number, ShelfPosition & { sectionIndex: number }> = new Map()
 
-    // Cached sections from last SectionsReady — consumed when ShelfLayoutDetermined fires
+    // Cached sections from last SectionsReady until all placement preconditions are satisfied
     private pendingSections: SectionsReadyEvent | null = null
 
     private stockStrategy: IStockStrategy | null = null
     private sectionsReadyCount = 0
     private layoutDeterminedCount = 0
 
-    /** Expose the current renderer for external consumers (e.g. addToScene, updateLODForCamera). */
-    public getRenderer(): GpuGameBoxRenderer | null {
-        return this.renderer
-    }
-
     static {
         new GameBoxSpawner()
     }
 
     private constructor() {
-        // ArtworkPrefetchCoordinator is initialized in initializeArtworkPrefetch()
-        // after the renderer is created
-
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfReady,
             (e: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(e)
@@ -324,5 +316,5 @@ export class GameBoxSpawner {
 
 }
 
-// Construct at import � registers event handlers for app lifetime.
+// Construct at import: registers event handlers for app lifetime.
 
