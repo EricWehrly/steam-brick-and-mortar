@@ -62,6 +62,8 @@ export class GameBoxSpawner {
     private pendingSections: SectionsReadyEvent | null = null
 
     private stockStrategy: IStockStrategy | null = null
+    private sectionsReadyCount = 0
+    private layoutDeterminedCount = 0
 
     /** Expose the current renderer for external consumers (e.g. addToScene, updateLODForCamera). */
     public getRenderer(): GpuGameBoxRenderer | null {
@@ -113,6 +115,8 @@ export class GameBoxSpawner {
         this.renderer = null
         this.stockStrategy = null
         this.pendingSections = null
+        this.sectionsReadyCount = 0
+        this.layoutDeterminedCount = 0
         this.shelfPositions.clear()
         GameBoxSpawner.logger.debug('Full reset (library reload)')
     }
@@ -125,6 +129,8 @@ export class GameBoxSpawner {
         this.renderer?.clearPlacements()
         this.stockStrategy = null
         this.pendingSections = null
+        this.sectionsReadyCount = 0
+        this.layoutDeterminedCount = 0
         this.shelfPositions.clear()
         GameBoxSpawner.logger.debug('Geometry reset (layout switch)')
     }
@@ -156,13 +162,10 @@ export class GameBoxSpawner {
 
     private handleLayoutDetermined(event: CustomEvent<ShelfLayoutDeterminedEvent>): void {
         this.stockStrategy = event.detail.stockStrategy
+        this.layoutDeterminedCount++
         GameBoxSpawner.logger.debug('Stock strategy received from ShelfLayoutDetermined')
 
-        // If SectionsReady already arrived, place now
-        if (this.pendingSections) {
-            this.placeSections(this.pendingSections)
-            this.pendingSections = null
-        }
+        this.tryPlacePendingSections('ShelfLayoutDetermined')
     }
 
     // -------------------------------------------------------------------------
@@ -170,6 +173,14 @@ export class GameBoxSpawner {
 
     private handleShelfReady(event: CustomEvent<ShelfReadyEvent>): void {
         const { shelfIndex, sectionIndex, position, rotationY } = event.detail
+
+        // ShelfLayoutCoordinator emits a contiguous shelf wave per run starting at index 0.
+        // Clearing on the first shelf keeps only current-run positions regardless of
+        // whether this spawner's SectionsReady handler runs before or after that wave.
+        if (shelfIndex === 0) {
+            this.shelfPositions.clear()
+        }
+
         this.shelfPositions.set(shelfIndex, {
             position: (position as THREE.Vector3).clone(),
             rotationY,
@@ -185,14 +196,40 @@ export class GameBoxSpawner {
     // Phase 2: cache sections, place when strategy is available
 
     private handleSectionsReady(event: CustomEvent<SectionsReadyEvent>): void {
-        // Start-of-run reset: this is deterministic regardless of listener order on
-        // UI-triggering events (layout/group/sort changes).
-        this.shelfPositions.clear()
+        this.sectionsReadyCount++
 
-        // Cache sections for placement. Placement is deferred to handleLayoutDetermined,
-        // which runs after ShelfReady has repopulated fresh shelf positions.
+        // Cache sections for placement. Placement can be triggered by either
+        // ShelfLayoutDetermined (normal order) or SectionsReady (if layout already arrived).
         this.pendingSections = event.detail
-        GameBoxSpawner.logger.debug('SectionsReady: cleared stale positions, waiting for ShelfLayoutDetermined')
+        GameBoxSpawner.logger.debug('SectionsReady: cached sections for placement attempt')
+
+        if (this.layoutDeterminedCount >= this.sectionsReadyCount) {
+            this.tryPlacePendingSections('SectionsReady (layout already known)')
+        }
+    }
+
+    private tryPlacePendingSections(reason: string): void {
+        if (!this.pendingSections) {
+            return
+        }
+
+        if (!this.renderer) {
+            GameBoxSpawner.logger.warn(`tryPlacePendingSections: renderer not yet constructed (${reason})`)
+            return
+        }
+
+        if (!this.stockStrategy) {
+            GameBoxSpawner.logger.warn(`tryPlacePendingSections: no stock strategy (${reason})`)
+            return
+        }
+
+        if (this.shelfPositions.size === 0) {
+            GameBoxSpawner.logger.debug(`tryPlacePendingSections: waiting for shelf positions (${reason})`)
+            return
+        }
+
+        this.placeSections(this.pendingSections)
+        this.pendingSections = null
     }
 
     private placeSections(detail: SectionsReadyEvent): void {

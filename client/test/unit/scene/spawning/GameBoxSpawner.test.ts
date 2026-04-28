@@ -324,6 +324,35 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             expect(mockPlaceGame).toHaveBeenCalledTimes(6)
         })
 
+        it('places games when SectionsReady arrives after ShelfLayoutDetermined', async () => {
+            const games = createMockGamesWithArtwork(4, 0) as any[]
+
+            eventManager.emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                { games, batchIndex: 0, totalBatches: 1 }
+            )
+            await Promise.resolve()
+
+            eventManager.emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                makeShelfReady(0, new THREE.Vector3(0, 0, 0))
+            )
+            eventManager.emit<ShelfReadyEvent>(
+                StorePropsEventTypes.ShelfReady,
+                makeShelfReady(1, new THREE.Vector3(3, 0, 0))
+            )
+            emitShelfLayoutDetermined(eventManager)
+
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }],
+                groupMode: 'by-recency',
+                sortMode: 'by-last-played',
+            })
+
+            expect(mockClearPlacements).toHaveBeenCalledTimes(1)
+            expect(mockPlaceGame).toHaveBeenCalledTimes(4)
+        })
+
         it('skips prefetchArtwork for games with no appid and no artwork metadata', async () => {
             // Only games with no appid AND no artwork metadata get no URL at all.
             const games = [{ appid: 0, name: 'No ID Game', playtime_forever: 0, img_icon_url: '', img_logo_url: '', artwork: undefined }]
