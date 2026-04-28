@@ -138,6 +138,53 @@ One settled artwork event may satisfy many placement intents; this directly supp
 6. Keep `clearPlacements()` and re-sort behavior in the placement flow; add a matching reset for renderer-side pending placement intents on section rebuild.
 7. Once the event-driven rendezvous is stable, decide whether `GameBoxSpawner` should be split into a pure placement coordinator or deleted entirely.
 
+## Status After Steps 6-7
+
+Steps 1-6 are now complete in the current implementation.
+
+Step 6 landed with one important adjustment from the original sketch: the reset for stale pending placement intents is now owned by `RenderIntentCoordinator` itself. It listens to `SectionsReady` and clears only its own buffered intent state. We explicitly did NOT keep a pass-through method like `GameBoxSpawner -> GpuGameBoxRenderer -> RenderIntentCoordinator.clear...`, because that forwarding seam violated ownership.
+
+Step 7 decision: do NOT delete `GameBoxSpawner` yet.
+
+At this point it still owns three real concerns:
+
+- renderer lifetime for the game-box pipeline
+- placement math from sections + shelves + stock strategy
+- `ArtworkPrefetchCoordinator` lifetime wiring
+
+Deleting it now would just smear those responsibilities into adjacent classes. The right next split is to separate prewarm ownership from placement ownership, not to force removal of the current boundary before that seam exists.
+
+## What This Accomplished
+
+- Artwork settlement and placement intent are now independent signals.
+- The renderer owns artwork-vs-label arbitration through `RenderIntentCoordinator`.
+- One settled artwork outcome can satisfy many placement intents, which is the key enabling condition for multi-group placement.
+- Section rebuilds clear stale pending placement intents without discarding prefetched artwork outcomes.
+- Library reload / re-init now tears down and rebuilds `ArtworkPrefetchCoordinator` safely.
+- Owner-managed subscription has been established as the preferred pattern for lifecycle-sensitive buffered state.
+
+## Next Split
+
+The next slice in this split should be:
+
+1. Extract prewarm ownership out of `GameBoxSpawner` so the batch-time artwork pipeline is no longer a field hanging off the placement coordinator.
+2. Narrow `GameBoxSpawner` to placement-only responsibilities: shelf position cache, pending sections, stock strategy, and `PlacementIntentReady` emission.
+3. Once that seam is real, rename the remaining placement class to something closer to `GamePlacementCoordinator` and re-evaluate whether renderer lifetime should stay there or move to a separate owner.
+
+This is a better next move than deleting `GameBoxSpawner` outright, because it removes the actual mixed responsibility that still exists instead of only moving methods around.
+
+## Group Readiness
+
+From the texture/placement split perspective, the code is now ready for games appearing in multiple groups.
+
+That does NOT mean all future group work is done, but it does mean the critical blocker is gone:
+
+- one artwork prefetch can now drive many placements
+- duplicate section appearances no longer require a duplicate texture pipeline
+- current tests already cover duplicate section appearances and multi-genre placement
+
+So the next "games into groups" work should build on the existing render-intent seams rather than re-open texture/placement arbitration.
+
 ---
 
 ## Risks / Open Questions
