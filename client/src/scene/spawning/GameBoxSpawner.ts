@@ -165,7 +165,7 @@ export class GameBoxSpawner {
         this.layoutDeterminedCount++
         GameBoxSpawner.logger.debug('Stock strategy received from ShelfLayoutDetermined')
 
-        this.tryPlacePendingSections('ShelfLayoutDetermined')
+        this.tryPlacePendingSections()
     }
 
     // -------------------------------------------------------------------------
@@ -203,28 +203,40 @@ export class GameBoxSpawner {
         this.pendingSections = event.detail
         GameBoxSpawner.logger.debug('SectionsReady: cached sections for placement attempt')
 
-        if (this.layoutDeterminedCount >= this.sectionsReadyCount) {
-            this.tryPlacePendingSections('SectionsReady (layout already known)')
+        if (this.isLayoutReadyForPendingSections()) {
+            this.tryPlacePendingSections()
         }
     }
 
-    private tryPlacePendingSections(reason: string): void {
+    private isLayoutReadyForPendingSections(): boolean {
+        return this.layoutDeterminedCount >= this.sectionsReadyCount
+    }
+
+    private canPlacePendingSections(): boolean {
         if (!this.pendingSections) {
-            return
+            return false
         }
 
         if (!this.renderer) {
-            GameBoxSpawner.logger.warn(`tryPlacePendingSections: renderer not yet constructed (${reason})`)
-            return
+            GameBoxSpawner.logger.warn('tryPlacePendingSections: renderer not yet constructed')
+            return false
         }
 
         if (!this.stockStrategy) {
-            GameBoxSpawner.logger.warn(`tryPlacePendingSections: no stock strategy (${reason})`)
-            return
+            GameBoxSpawner.logger.warn('tryPlacePendingSections: no stock strategy')
+            return false
         }
 
         if (this.shelfPositions.size === 0) {
-            GameBoxSpawner.logger.debug(`tryPlacePendingSections: waiting for shelf positions (${reason})`)
+            GameBoxSpawner.logger.debug('tryPlacePendingSections: waiting for shelf positions')
+            return false
+        }
+
+        return true
+    }
+
+    private tryPlacePendingSections(): void {
+        if (!this.canPlacePendingSections()) {
             return
         }
 
