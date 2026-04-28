@@ -22,7 +22,6 @@ import type {
 } from '../props/PropsEvents'
 import { Logger } from '../../utils/Logger'
 import type { StockSurface } from '../../types/LayoutTypes'
-import { ArtworkPrefetchCoordinator } from './ArtworkPrefetchCoordinator'
 
 interface ShelfPosition {
     position: THREE.Vector3
@@ -35,7 +34,8 @@ interface ShelfPosition {
  * Owns the GpuGameBoxRenderer lifecycle and coordinates the two-phase load/place split:
  *
  * Phase 1 — Prewarm (BatchReadyForPlacement):
- *   Triggers artwork prefetch for each game — no GPU instances placed yet.
+ *   GpuGameBoxRenderer (via ArtworkPrefetchCoordinator) handles artwork prefetch.
+ *   GameBoxSpawner does not participate in Phase 1.
  *
  * Phase 2 — Place (SectionsReady):
  *   Clears all existing placements and emits placement intents in sorted order
@@ -47,11 +47,6 @@ interface ShelfPosition {
  *
  * The artwork/label decision is NOT made here. GameBoxSpawner only emits
  * world-space placement intents ("game X goes at position Y").
- *
- * TD: This class conflates two concerns — artwork prefetch/prewarm (Phase 1) and
- * geometry-driven placement (Phase 2). They share only the renderer reference.
- * Consider splitting into ArtworkPrewarmer and GamePlacementCoordinator once
- * section-per-layout work settles the placement interface.
  */
 export class GameBoxSpawner {
     private static readonly logger = Logger.createLogFunctions(GameBoxSpawner.name)
@@ -66,7 +61,6 @@ export class GameBoxSpawner {
     // Cached sections from last SectionsReady — consumed when ShelfLayoutDetermined fires
     private pendingSections: SectionsReadyEvent | null = null
 
-    private artworkPrefetch: ArtworkPrefetchCoordinator | null = null
     private stockStrategy: IStockStrategy | null = null
 
     /** Expose the current renderer for external consumers (e.g. addToScene, updateLODForCamera). */
@@ -115,8 +109,6 @@ export class GameBoxSpawner {
      * Disposes the renderer and clears all prefetch state.
      */
     private fullReset(): void {
-        this.artworkPrefetch?.dispose()
-        this.artworkPrefetch = null
         this.renderer?.dispose()
         this.renderer = null
         this.stockStrategy = null
@@ -152,19 +144,6 @@ export class GameBoxSpawner {
         const rendererCapacity = Math.max(totalGames, 1) + 100
         this.renderer = new GpuGameBoxRenderer(rendererCapacity)
         GameBoxSpawner.logger.debug(`Renderer initialized: capacity ${rendererCapacity}`)
-        
-        this.initializeArtworkPrefetch()
-    }
-
-    private initializeArtworkPrefetch(): void {
-        if (!this.renderer) {
-            return
-        }
-
-        this.artworkPrefetch?.dispose()
-        this.artworkPrefetch = new ArtworkPrefetchCoordinator({
-            renderer: this.renderer,
-        })
     }
 
     private handleLibraryManifestReady(event: CustomEvent<SteamLibraryManifestReadyEvent>): void {

@@ -11,6 +11,7 @@
  * - LOD artwork orchestrator for texture management
  * - LOD distance manager for camera-based detail switching
  * - Box instance state (positions, orientations, LOD levels)
+ * - ArtworkPrefetchCoordinator for batch-time artwork prewarm
  * 
  * RECEIVES:
  * - prefetchArtwork(appid, url, name) → Phase 1: load texture into atlas
@@ -29,10 +30,10 @@
  * - LodDistanceManagerDebug: Camera distance calculations, LOD distribution diagnostics
  * 
  * DOES NOT:
+ * DOES NOT:
  * - Know about shelves or layout (receives positions)
  * - Decide which games to display (told what to render)
- * - Select or construct artwork URLs from game metadata
- * - Handle batch processing (receives individual requests)
+ * - Handle section/placement ordering (that's GameBoxSpawner)
  * 
  * RELATED:
  * - GameBoxSpawner: Coordinates game placement and calls this renderer
@@ -45,6 +46,7 @@ import { InstancedLabelRenderer } from './instancing/InstancedLabelRenderer'
 import { LodArtworkOrchestratorDebug } from './instancing/LodArtworkOrchestratorDebug'
 import type { IGameArtworkPipeline } from './instancing/IGameArtworkPipeline'
 import { RenderIntentCoordinator } from './RenderIntentCoordinator'
+import { ArtworkPrefetchCoordinator } from '../spawning/ArtworkPrefetchCoordinator'
 import { Logger } from '../../utils/Logger'
 import { EventManager } from '../../core/EventManager'
 import { GameRenderEventTypes, type PlacementResolvedEvent } from '../../types/InteractionEvents'
@@ -55,12 +57,14 @@ export class GpuGameBoxRenderer {
     private readonly instancedLabelRenderer: InstancedLabelRenderer
     private readonly lodArtworkRenderer: IGameArtworkPipeline
     private readonly renderIntentCoordinator: RenderIntentCoordinator
+    private readonly artworkPrefetchCoordinator: ArtworkPrefetchCoordinator
     private readonly boundHandlePlacementResolved: (event: CustomEvent<PlacementResolvedEvent>) => void
 
     constructor(maxGames: number = 2000) {
         this.instancedLabelRenderer = new InstancedLabelRenderer({ maxInstances: maxGames })
         this.lodArtworkRenderer = LodArtworkOrchestratorDebug.fromAppSettings(maxGames)
         this.renderIntentCoordinator = new RenderIntentCoordinator()
+        this.artworkPrefetchCoordinator = new ArtworkPrefetchCoordinator({ renderer: this })
         this.boundHandlePlacementResolved = this.handlePlacementResolved.bind(this)
 
         EventManager.getInstance().registerEventHandler(
@@ -142,6 +146,7 @@ export class GpuGameBoxRenderer {
             this.boundHandlePlacementResolved
         )
         this.renderIntentCoordinator.dispose()
+        this.artworkPrefetchCoordinator.dispose()
         this.instancedLabelRenderer.dispose()
         this.lodArtworkRenderer.dispose()
         GpuGameBoxRenderer.logger.lifecycle('Disposed')

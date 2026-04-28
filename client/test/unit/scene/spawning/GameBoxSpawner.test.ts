@@ -2,7 +2,7 @@
  * Unit Tests: GameBoxSpawner — Two-Phase Load/Place
  *
  * Tests verify the refactored GameBoxSpawner correctly:
- * 1. Phase 1 (BatchReadyForPlacement): calls renderer.prefetchArtwork() for each game with a URL
+ * 1. Phase 1 (BatchReadyForPlacement): renderer-owned prewarm pipeline stays active
  * 2. ShelfReady: caches shelf positions for later use by GamesSort
  * 3. Phase 2 (GamesSort): calls clearPlacements() + placeArtworkInstance()/placeLabelBox() in sorted order
  * 4. Emits GamesPlaced events on GamesSort
@@ -41,16 +41,23 @@ const mockPlaceGame = vi.fn()
 const mockClearPlacements = vi.fn()
 const mockRendererDispose = vi.fn()
 
-vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', () => ({
-    GpuGameBoxRenderer: vi.fn().mockImplementation(function() {
-        this.prefetchArtwork = mockPrefetchArtwork
-        this.placeGame = mockPlaceGame
-        this.clearPlacements = mockClearPlacements
-        this.dispose = mockRendererDispose
-        this.addToScene = vi.fn()
-        this.updateLODForCamera = vi.fn()
-    })
-}))
+vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
+    const { ArtworkPrefetchCoordinator } = await import('../../../../src/scene/spawning/ArtworkPrefetchCoordinator')
+    return {
+        GpuGameBoxRenderer: vi.fn().mockImplementation(function() {
+            this.prefetchArtwork = mockPrefetchArtwork
+            this.placeGame = mockPlaceGame
+            this.clearPlacements = mockClearPlacements
+            this.addToScene = vi.fn()
+            this.updateLODForCamera = vi.fn()
+            const coordinator = new ArtworkPrefetchCoordinator({ renderer: this })
+            this.dispose = vi.fn(() => {
+                mockRendererDispose()
+                coordinator.dispose()
+            })
+        })
+    }
+})
 
 // Mock AppSettings so GameBoxSpawner can read EnableLabels at construction
 vi.mock('../../../../src/core/AppSettings', () => {
@@ -221,7 +228,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
     // -------------------------------------------------------------------------
     // Phase 1: Prewarm
 
-    describe('Phase 1 — BatchReadyForPlacement → prefetchArtwork()', () => {
+    describe('Phase 1 — BatchReadyForPlacement prewarm pipeline', () => {
         it('calls prefetchArtwork for each game that has an artwork URL', async () => {
             const games = createMockGamesWithArtwork(5, 0)
 
@@ -500,7 +507,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             expect(earlySpawner).toBeDefined()
         })
 
-        it('reinitializes artwork prefetch once after reload without duplicate batch listeners', async () => {
+        it('reinitializes renderer-owned prefetch listeners once after reload without duplicates', async () => {
             const games = createMockGamesWithArtwork(2, 0) as any[]
 
             eventManager.emit<BatchReadyForPlacementEvent>(

@@ -7,13 +7,16 @@ import {
     type ArtworkIntentSettledEvent,
     type BatchReadyForPlacementEvent,
 } from '../../types/InteractionEvents'
-import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
+
+interface IArtworkPrewarmer {
+    prefetchArtwork(appid: number, url: string, name: string): Promise<PrefetchResult>
+}
 
 export type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
 
 interface ArtworkPrefetchCoordinatorOptions {
-    renderer?: GpuGameBoxRenderer | null
+    renderer?: IArtworkPrewarmer | null
 }
 
 /**
@@ -22,7 +25,7 @@ interface ArtworkPrefetchCoordinatorOptions {
  */
 export class ArtworkPrefetchCoordinator {
     private readonly logger = Logger.createLogFunctions(ArtworkPrefetchCoordinator.name)
-    private readonly renderer: GpuGameBoxRenderer | null
+    private readonly renderer: IArtworkPrewarmer | null
     private readonly boundHandleArtworkSettled: () => void
     private readonly boundHandleBatchReadyForPlacement: (event: CustomEvent<BatchReadyForPlacementEvent>) => void
 
@@ -65,7 +68,7 @@ export class ArtworkPrefetchCoordinator {
 
     public prefetchBatch(
         games: ReadonlyArray<SteamGameData>,
-        renderer: GpuGameBoxRenderer
+        renderer: IArtworkPrewarmer
     ): void {
         for (const game of games) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
