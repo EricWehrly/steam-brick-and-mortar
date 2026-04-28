@@ -35,3 +35,7 @@ The main thing we'll want to check in this "encore" act is: Can we embed an audi
 
 - **Community management** — Discord/forums, code of conduct, moderation, beta programs
 - **A/B testing framework** — for feature improvements and UX experiments
+
+## Deferred Re-entry Candidates
+
+- **AC4.4: Local collections import (filesystem API)** — revisit `cloud-storage-namespace-1.json` import only if we are ready to accept filesystem API UX/security complexity. Prior findings show categories are the main unique value; other local metadata did not justify shipping this in Act 2.

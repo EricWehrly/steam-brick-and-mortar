@@ -11,6 +11,13 @@ Steam is installed. User data files exist. **The documented VDF schema is outdat
 
 User collections (including "Favorites" and "To Play") are **not present in any local file** on this machine. Modern Steam stores collection membership in Steam Cloud, not locally.
 
+Current interpretation update:
+- This result closes the VDF path for collections
+- It does **not** close local-file investigation overall
+- New priority is two-track:
+    1. collections via cloud sync JSON
+    2. local appid/game-list signal discovery and quality assessment
+
 ---
 
 ## What we investigated
@@ -159,6 +166,17 @@ New direction to investigate:
 - Steam's local client API (WebSocket on localhost, used by the web-based library UI)
 - Whether Steamworks SDK exposes collection data to overlay/game processes
 - Whether Steam's `ISteamClient` or `IClientLibrary` interfaces expose collection data
+
+### Task 5: Local appid discovery
+**Status**: 🔄 In progress (new priority)
+
+Questions:
+- What appid signals are available from local files (outside collections)?
+- Are those signals complete, partial, or highly inconsistent across users?
+- Can we expose confidence/coverage in UI if data is partial?
+
+Minimum useful outcome:
+- Produce a merged appid set from local sources with source-level provenance and confidence.
 
 ---
 
