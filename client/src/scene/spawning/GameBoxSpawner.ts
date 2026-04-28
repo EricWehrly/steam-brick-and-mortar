@@ -135,15 +135,6 @@ export class GameBoxSpawner {
         this.shelfPositions.clear()
     }
 
-    /**
-     * Reset run-boundary state when a new placement run begins.
-     * Drops unresolved intents from the previous run via renderer's explicit reset.
-     * Invoked at SectionsReady boundary, before new placement attempt.
-     */
-    private resetRunBoundaryState(): void {
-        this.renderer?.resetPendingPlacementIntents()
-    }
-
     private handleLibraryReloadRequest(_event: CustomEvent<StorePropsLibraryReloadRequestEvent>): void {
         this.fullReset()
     }
@@ -220,10 +211,6 @@ export class GameBoxSpawner {
 
     private handleSectionsReady(event: CustomEvent<SectionsReadyEvent>): void {
         this.sectionsReadyCount++
-
-        // New placement run boundary: drop unresolved intents from the previous run.
-        // Visible placements are left intact until the new run is ready to place.
-        this.resetRunBoundaryState()
 
         // Cache sections for placement. Placement can be triggered by either
         // ShelfLayoutDetermined (normal order) or SectionsReady (if layout already arrived).

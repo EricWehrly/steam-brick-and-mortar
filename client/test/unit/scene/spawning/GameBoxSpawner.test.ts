@@ -39,7 +39,6 @@ import type { SteamGame } from '../../../../src/steam'
 const mockPrefetchArtwork = vi.fn().mockResolvedValue('prefetched')
 const mockPlaceGame = vi.fn()
 const mockClearPlacements = vi.fn()
-const mockResetPendingPlacementIntents = vi.fn()
 const mockRendererDispose = vi.fn()
 
 vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
@@ -48,11 +47,7 @@ vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
         GpuGameBoxRenderer: vi.fn().mockImplementation(function() {
             this.prefetchArtwork = mockPrefetchArtwork
             this.placeGame = mockPlaceGame
-            this.resetPendingPlacementIntents = mockResetPendingPlacementIntents
-            this.clearPlacements = vi.fn(() => {
-                mockClearPlacements()
-                mockResetPendingPlacementIntents()
-            })
+            this.clearPlacements = vi.fn(() => mockClearPlacements())
             this.addToScene = vi.fn()
             this.updateLODForCamera = vi.fn()
             const coordinator = new ArtworkPrefetchCoordinator({ renderer: this })
@@ -147,6 +142,11 @@ function wireRenderIntentRendezvous(em: EventManager): () => void {
     const settledAppIds = new Set<number>()
     const pendingIntents = new Map<number, PlacementIntentReadyEvent[]>()
 
+    const clearRunState = () => {
+        pendingIntents.clear()
+        settledAppIds.clear()
+    }
+
     const flush = (appid: number) => {
         if (!settledAppIds.has(appid)) return
 
@@ -180,9 +180,11 @@ function wireRenderIntentRendezvous(em: EventManager): () => void {
         }
     )
 
-    return () => {
-        pendingIntents.clear()
-    }
+    em.registerEventHandler(UIEventTypes.ArrangementRequested, () => clearRunState())
+    em.registerEventHandler(UIEventTypes.LayoutRequested, () => clearRunState())
+    em.registerEventHandler(StorePropsEventTypes.LibraryReloadRequest, () => clearRunState())
+
+    return clearRunState
 }
 
 describe('GameBoxSpawner — Two-Phase Load/Place', () => {
@@ -218,8 +220,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             return true
         })
 
-        const clearPendingIntents = wireRenderIntentRendezvous(eventManager)
-        mockResetPendingPlacementIntents.mockImplementation(() => clearPendingIntents())
+        wireRenderIntentRendezvous(eventManager)
 
         spawner = new (GameBoxSpawner as any)()
         // Ordering contract: renderer is initialized from immutable manifest before any batch prewarm events.
@@ -233,7 +234,6 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
         vi.clearAllMocks()
         mockPrefetchArtwork.mockResolvedValue('prefetched')
         mockPlaceGame.mockReset()
-        mockResetPendingPlacementIntents.mockReset()
     })
 
     // -------------------------------------------------------------------------
@@ -466,7 +466,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             expect(mockClearPlacements).toHaveBeenCalledTimes(2)
         })
 
-        it('drops stale pending intents when a new SectionsReady run starts before layout', () => {
+        it('drops stale pending intents when ArrangementRequested starts a new run before layout', () => {
             const staleGame = createMockGames(1, 0)[0] as any
             const run2Game = createMockGames(1, 1)[0] as any
 
@@ -481,7 +481,12 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
             expect(mockPlaceGame).toHaveBeenCalledTimes(0)
 
-            // Run 2 starts before its layout; run-start reset should drop run-1 pending intents.
+            // Run 2 starts via arrangement change before its layout; reset should drop run-1 pending intents.
+            eventManager.emit(UIEventTypes.ArrangementRequested, {
+                groupMode: 'by-genre',
+                sortMode: 'by-playtime',
+            } as any)
+
             eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
                 sections: [{ name: 'Run2', games: [run2Game], groupMode: 'by-genre', sortMode: 'by-playtime' }],
                 groupMode: 'by-genre',
@@ -732,6 +737,13 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             })
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0))
             emitShelfLayoutDetermined(eventManager)
+
+            for (const game of games) {
+                eventManager.emit<ArtworkIntentSettledEvent>(
+                    GameRenderEventTypes.ArtworkIntentSettled,
+                    { appid: game.appid, gameName: game.name }
+                )
+            }
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
             expect(mockPlaceGame).toHaveBeenCalledTimes(4)
