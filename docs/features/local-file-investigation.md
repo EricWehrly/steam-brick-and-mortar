@@ -55,6 +55,13 @@ This is a non-tentpole feature for Act 2: we want to make a real attempt at it, 
 
 ## Notes / Open Questions
 
+### Latest Single-Machine Probe (Anonymized)
+
+- Coverage and bucket findings are documented in `docs/research/local-steam-buckets-findings.md`.
+- Raw generated artifacts for this probe are in `docs/research/local-steam-coverage-local-steam-spitemonger.{log,json,md}`.
+- Deep sample extraction artifacts for API comparison are in `docs/research/local-steam-app-signal-samples-local-steam-spitemonger.{json,md}`.
+- This is currently a single-machine result set; multi-machine validation is still pending before any broad assumptions are made.
+
 - The File System Access API still looks like the best browser-native path when available, but a plain file picker fallback is acceptable for the first implementation.
 - VDF parsing is still useful for the broader offline-data audit, but not for user collections on modern Steam.
 - Collections should be treated as additive labels over existing games, not as a replacement game list.
