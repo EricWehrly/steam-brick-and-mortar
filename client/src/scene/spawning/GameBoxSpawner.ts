@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import type { SteamGameData } from '../game-box/types/GameData'
-import { ShelfSurfaceUtils, type ShelfSurface, GameBoxUtils, type IStockStrategy } from '../props/SharedPropsUtils'
+import { ShelfSurfaceUtils, GameBoxUtils, type IStockStrategy } from '../props/SharedPropsUtils'
 import { EventManager } from '../../core/EventManager'
 import { 
     BatchProcessingStatus,
@@ -164,9 +164,12 @@ export class GameBoxSpawner {
             return
         }
 
-        const rendererCapacity = Math.max(totalGames, 1) + 100
-        this.renderer = new GpuGameBoxRenderer(rendererCapacity)
-        GameBoxSpawner.logger.debug(`Renderer initialized: capacity ${rendererCapacity}`)
+        const textureCapacity = Math.max(totalGames, 1) + 100
+        const placementCapacity = Math.max(textureCapacity + 100, Math.ceil(textureCapacity * 2))
+        this.renderer = new GpuGameBoxRenderer(textureCapacity, placementCapacity)
+        GameBoxSpawner.logger.debug(
+            `Renderer initialized: textureCapacity=${textureCapacity}, placementCapacity=${placementCapacity}`
+        )
     }
 
     private handleLibraryManifestReady(event: CustomEvent<SteamLibraryManifestReadyEvent>): void {

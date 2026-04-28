@@ -14,8 +14,10 @@ import { ManagedTextureArray } from './ManagedTextureArray'
 
 export class LabelTextureArrayManager {
     private readonly textureSize: number
+    private readonly maxTextureCapacity: number
     private managedArray: ManagedTextureArray
     private nextTextureIndex: number = 0
+    private hasLoggedTextureCapacity: boolean = false
 
     // Shared canvas for text rendering — created once, reused per label
     private readonly sharedCanvas: HTMLCanvasElement
@@ -23,11 +25,12 @@ export class LabelTextureArrayManager {
 
     constructor(textureSize: number = 128, maxTextures: number = 256) {
         this.textureSize = textureSize
+        this.maxTextureCapacity = Math.max(maxTextures, 1)
 
         this.managedArray = new ManagedTextureArray({
             width: textureSize,
             height: textureSize,
-            depth: maxTextures,
+            depth: this.maxTextureCapacity,
         })
 
         this.sharedCanvas = document.createElement('canvas')
@@ -37,10 +40,10 @@ export class LabelTextureArrayManager {
         if (!ctx) throw new Error('LabelTextureArrayManager: failed to get 2D canvas context')
         this.sharedContext = ctx
 
-        const vramMB = Math.round((textureSize * textureSize * maxTextures * 4) / (1024 * 1024))
+        const vramMB = Math.round((textureSize * textureSize * this.maxTextureCapacity * 4) / (1024 * 1024))
         DataManager.getInstance().addMemoryConsumption('Labels/textureArray', vramMB)
 
-        console.debug(`📦 [LabelTextureArrayManager] Initialized with texture size: ${textureSize}x${textureSize}, max: ${maxTextures}`)
+        console.debug(`📦 [LabelTextureArrayManager] Initialized with texture size: ${textureSize}x${textureSize}, max: ${this.maxTextureCapacity}`)
     }
 
     /** Underlying texture for use in shader uniforms. */
@@ -54,7 +57,19 @@ export class LabelTextureArrayManager {
      */
     public addTextLabel(label: string): number {
         if (this.nextTextureIndex >= this.managedArray.depth) {
-            console.error(`🚫 [LabelTextureArrayManager] Maximum textures reached (${this.managedArray.depth})`)
+            if (this.managedArray.depth < this.maxTextureCapacity) {
+                const grownDepth = Math.min(this.maxTextureCapacity, Math.max(this.managedArray.depth * 2, this.nextTextureIndex + 1))
+                this.resizeTextureArray(grownDepth, 'Expanded')
+            }
+        }
+
+        if (this.nextTextureIndex >= this.managedArray.depth) {
+            if (!this.hasLoggedTextureCapacity) {
+                console.error(
+                    `🚫 [LabelTextureArrayManager] Maximum textures reached (${this.managedArray.depth}); suppressing repeated errors`
+                )
+                this.hasLoggedTextureCapacity = true
+            }
             throw new Error('Maximum label textures reached')
         }
 
@@ -92,35 +107,13 @@ export class LabelTextureArrayManager {
             return this.managedArray.texture
         }
 
-        // Capture existing pixel data before disposal
-        const size = this.textureSize
-        const sliceBytes = size * size * 4
-        const oldData = this.managedArray.texture.image.data as Uint8Array
-        const savedPixels = new Uint8Array(actualCount * sliceBytes)
-        savedPixels.set(oldData.subarray(0, actualCount * sliceBytes))
-
-        // Dispose old over-allocated array
-        const oldVramMB = Math.round((size * size * this.managedArray.depth * 4) / (1024 * 1024))
-        DataManager.getInstance().removeMemoryConsumption('Labels/textureArray')
-        this.managedArray.dispose()
-
-        // Allocate compact replacement
-        this.managedArray = new ManagedTextureArray({ width: size, height: size, depth: actualCount })
-
-        // Re-write all slots
-        for (let i = 0; i < actualCount; i++) {
-            const slice = new Uint8ClampedArray(savedPixels.buffer, i * sliceBytes, sliceBytes)
-            this.managedArray.setSlotPixels(i, slice)
+        const bufferedTarget = Math.min(this.maxTextureCapacity, Math.ceil(actualCount * 1.25))
+        const targetDepth = Math.max(actualCount, bufferedTarget)
+        if (targetDepth >= this.managedArray.depth) {
+            return this.managedArray.texture
         }
-        this.managedArray.flushPendingToGpu()
 
-        const newVramMB = Math.round((size * size * actualCount * 4) / (1024 * 1024))
-        DataManager.getInstance().addMemoryConsumption('Labels/textureArray', newVramMB)
-
-        console.log(
-            `📦 [LabelTextureArrayManager] Compacted: ${this.managedArray.depth + (oldVramMB - newVramMB) / (size * size * 4 / (1024 * 1024))}` +
-            ` → ${actualCount} slots (~${oldVramMB - newVramMB}MB freed est.)`
-        )
+        this.resizeTextureArray(targetDepth, 'Compacted')
 
         return this.managedArray.texture
     }
@@ -192,5 +185,37 @@ export class LabelTextureArrayManager {
         })
 
         ctx.restore()
+    }
+
+    private resizeTextureArray(newDepth: number, reason: 'Compacted' | 'Expanded'): void {
+        const oldDepth = this.managedArray.depth
+        if (newDepth === oldDepth) return
+
+        const size = this.textureSize
+        const sliceBytes = size * size * 4
+        const oldData = this.managedArray.texture.image.data as Uint8Array
+        const usedSlices = Math.min(this.nextTextureIndex, oldDepth)
+        const savedPixels = new Uint8Array(usedSlices * sliceBytes)
+        savedPixels.set(oldData.subarray(0, usedSlices * sliceBytes))
+
+        const oldVramMB = Math.round((size * size * oldDepth * 4) / (1024 * 1024))
+        DataManager.getInstance().removeMemoryConsumption('Labels/textureArray')
+        this.managedArray.dispose()
+
+        this.managedArray = new ManagedTextureArray({ width: size, height: size, depth: newDepth })
+        for (let i = 0; i < usedSlices; i++) {
+            const slice = new Uint8ClampedArray(savedPixels.buffer, i * sliceBytes, sliceBytes)
+            this.managedArray.setSlotPixels(i, slice)
+        }
+        this.managedArray.flushPendingToGpu()
+
+        const newVramMB = Math.round((size * size * newDepth * 4) / (1024 * 1024))
+        DataManager.getInstance().addMemoryConsumption('Labels/textureArray', newVramMB)
+
+        const deltaMB = newVramMB - oldVramMB
+        const direction = deltaMB >= 0 ? '+' : ''
+        console.log(
+            `📦 [LabelTextureArrayManager] ${reason}: ${oldDepth} → ${newDepth} slots (${direction}${deltaMB}MB est.)`
+        )
     }
 }

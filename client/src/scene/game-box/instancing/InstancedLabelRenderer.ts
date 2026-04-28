@@ -30,6 +30,8 @@ export class InstancedLabelRenderer {
     private isInitialized: boolean = false
     private nextInstanceIndex: number = 0
     private gameNameToTextureIndex: Map<string, number> = new Map()
+    private hasWarnedNoLabelSlots: boolean = false
+    private hasWarnedLabelTextureCapacity: boolean = false
 
     private readonly boundHandleSomeBatchesComplete: (event: CustomEvent<SomeBatchesCompleteEvent>) => void
     private readonly boundHandleArtworkSettled: () => void
@@ -82,7 +84,10 @@ export class InstancedLabelRenderer {
         }
 
         if (this.nextInstanceIndex >= this.maxInstances) {
-            console.warn(`No label slots remaining (${this.maxInstances})`)
+            if (!this.hasWarnedNoLabelSlots) {
+                console.warn(`No label slots remaining (${this.maxInstances}); suppressing repeated warnings until clear/dispose`)
+                this.hasWarnedNoLabelSlots = true
+            }
             return false
         }
 
@@ -94,7 +99,15 @@ export class InstancedLabelRenderer {
                 textureIndex = this.textureArrayManager.addTextLabel(gameName)
                 this.gameNameToTextureIndex.set(gameName, textureIndex)
             } catch (error) {
-                console.warn(`Failed to add texture for game: ${gameName}`, error)
+                const isCapacityError = error instanceof Error && error.message === 'Maximum label textures reached'
+                if (isCapacityError) {
+                    if (!this.hasWarnedLabelTextureCapacity) {
+                        console.warn('Failed to add label textures: maximum label texture capacity reached; suppressing repeated warnings')
+                        this.hasWarnedLabelTextureCapacity = true
+                    }
+                } else {
+                    console.warn(`Failed to add texture for game: ${gameName}`, error)
+                }
                 return false
             }
         }
@@ -126,6 +139,7 @@ export class InstancedLabelRenderer {
     public clear(): void {
         this.currentCount = 0
         this.nextInstanceIndex = 0
+        this.hasWarnedNoLabelSlots = false
         if (this.instancedMesh) {
             this.instancedMesh.count = 0
         }
@@ -170,6 +184,8 @@ export class InstancedLabelRenderer {
         this.isInitialized = false
         this.currentCount = 0
         this.nextInstanceIndex = 0
+        this.hasWarnedNoLabelSlots = false
+        this.hasWarnedLabelTextureCapacity = false
 
         // Clear metadata so a new renderer instance doesn't inherit stale instanceId → game
         // entries, which would cause wrong-game-on-click after reload.

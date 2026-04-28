@@ -108,6 +108,7 @@ export class LodGameArtworkRenderer {
     private gpuUpdateFrameCounter: number = 0
     private readonly gpuUpdateInterval: number
     private pendingAttributeUpdate: boolean = false
+    private hasWarnedAtCapacity: boolean = false
     
     // HIGH texture lazy loading (memory optimization)
     private readonly lazyHighTextures: boolean
@@ -369,7 +370,12 @@ export class LodGameArtworkRenderer {
         }
         
         if (this.currentInstanceCount >= this.config.maxInstances) {
-            LodGameArtworkRenderer.logger.warn(`Cannot add instance: at capacity (${this.config.maxInstances})`)
+            if (!this.hasWarnedAtCapacity) {
+                LodGameArtworkRenderer.logger.warn(
+                    `Cannot add instance: at capacity (${this.config.maxInstances}); suppressing repeated warnings until placements are cleared`
+                )
+                this.hasWarnedAtCapacity = true
+            }
             return -1
         }
         
@@ -493,6 +499,7 @@ export class LodGameArtworkRenderer {
             this.instancedMesh.instanceMatrix.needsUpdate = true
         }
         this.pendingAttributeUpdate = true
+        this.hasWarnedAtCapacity = false
         LodGameArtworkRenderer.logger.debug('Cleared all instance placements (texture slots retained)')
     }
 
@@ -538,6 +545,7 @@ export class LodGameArtworkRenderer {
         this.textureIndices = null
         this.lodLevels = null
         this.highTextureSlots = null
+        this.hasWarnedAtCapacity = false
         
         LodGameArtworkRenderer.logger.lifecycle('Disposed')
     }
