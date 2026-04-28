@@ -1,12 +1,10 @@
 import { EventManager } from '../../core/EventManager'
 import {
-    GameEventTypes,
     GameRenderEventTypes,
     type ArtworkIntentSettledEvent,
     type PlacementResolvedEvent,
     type PlacementIntentReadyEvent,
 } from '../../types/InteractionEvents'
-import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
 
 /**
  * Renderer-side rendezvous for placement intents and artwork outcomes.
@@ -18,12 +16,10 @@ export class RenderIntentCoordinator {
 
     private readonly boundHandleArtworkIntentSettled: (event: CustomEvent<ArtworkIntentSettledEvent>) => void
     private readonly boundHandlePlacementIntentReady: (event: CustomEvent<PlacementIntentReadyEvent>) => void
-    private readonly boundHandleSectionsReady: (event: CustomEvent<SectionsReadyEvent>) => void
 
     public constructor() {
         this.boundHandleArtworkIntentSettled = this.handleArtworkIntentSettled.bind(this)
         this.boundHandlePlacementIntentReady = this.handlePlacementIntentReady.bind(this)
-        this.boundHandleSectionsReady = this.handleSectionsReady.bind(this)
 
         EventManager.getInstance().registerEventHandler(
             GameRenderEventTypes.ArtworkIntentSettled,
@@ -32,10 +28,6 @@ export class RenderIntentCoordinator {
         EventManager.getInstance().registerEventHandler(
             GameRenderEventTypes.PlacementIntentReady,
             this.boundHandlePlacementIntentReady
-        )
-        EventManager.getInstance().registerEventHandler(
-            GameEventTypes.SectionsReady,
-            this.boundHandleSectionsReady
         )
     }
 
@@ -52,17 +44,9 @@ export class RenderIntentCoordinator {
             GameRenderEventTypes.PlacementIntentReady,
             this.boundHandlePlacementIntentReady
         )
-        EventManager.getInstance().deregisterEventHandler(
-            GameEventTypes.SectionsReady,
-            this.boundHandleSectionsReady
-        )
 
         this.pendingPlacementIntents.clear()
         this.settledAppIds.clear()
-    }
-
-    private handleSectionsReady(_event: CustomEvent<SectionsReadyEvent>): void {
-        this.clearPendingPlacementIntents()
     }
 
     private handleArtworkIntentSettled(event: CustomEvent<ArtworkIntentSettledEvent>): void {
