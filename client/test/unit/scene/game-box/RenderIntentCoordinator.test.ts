@@ -96,7 +96,7 @@ describe('RenderIntentCoordinator', () => {
         coordinator.dispose()
     })
 
-    it('clears stale pending placement intents when explicitly reset', () => {
+    it('clears stale pending placement intents only when explicitly reset', () => {
         const coordinator = new RenderIntentCoordinator()
         const resolved: PlacementResolvedEvent[] = []
 
@@ -123,6 +123,53 @@ describe('RenderIntentCoordinator', () => {
         )
 
         expect(resolved).toHaveLength(0)
+
+        coordinator.dispose()
+    })
+
+    it('does not replay stale intents after reset on re-sort, but resolves new intents', () => {
+        const coordinator = new RenderIntentCoordinator()
+        const resolved: PlacementResolvedEvent[] = []
+
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementResolved,
+            (event: CustomEvent<PlacementResolvedEvent>) => resolved.push(event.detail)
+        )
+
+        // Run 1 emits an intent before artwork settles.
+        EventManager.getInstance().emit<PlacementIntentReadyEvent>(
+            GameRenderEventTypes.PlacementIntentReady,
+            {
+                appid: 11,
+                game: makeGame(11),
+                position: new THREE.Vector3(1, 0, 0),
+                rotation: new THREE.Quaternion(),
+            } as any
+        )
+
+        // Re-sort clear: stale pending intents must be dropped before settlement.
+        coordinator.clearPendingPlacementIntents()
+
+        EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
+            GameRenderEventTypes.ArtworkIntentSettled,
+            { appid: 11, gameName: 'Game 11' }
+        )
+        expect(resolved).toHaveLength(0)
+
+        // Run 2 emits a fresh intent for the same appid; this one should resolve.
+        EventManager.getInstance().emit<PlacementIntentReadyEvent>(
+            GameRenderEventTypes.PlacementIntentReady,
+            {
+                appid: 11,
+                game: makeGame(11),
+                position: new THREE.Vector3(2, 0, 0),
+                rotation: new THREE.Quaternion(),
+            } as any
+        )
+
+        expect(resolved).toHaveLength(1)
+        expect(resolved[0]?.appid).toBe(11)
+        expect(resolved[0]?.position).toEqual(new THREE.Vector3(2, 0, 0))
 
         coordinator.dispose()
     })
