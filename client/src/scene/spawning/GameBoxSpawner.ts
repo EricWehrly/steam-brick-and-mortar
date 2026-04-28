@@ -114,10 +114,9 @@ export class GameBoxSpawner {
         this.renderer?.dispose()
         this.renderer = null
         this.stockStrategy = null
-        this.pendingSections = null
+        this.clearPlacementState()
         this.sectionsReadyCount = 0
         this.layoutDeterminedCount = 0
-        this.shelfPositions.clear()
         GameBoxSpawner.logger.debug('Full reset (library reload)')
     }
 
@@ -128,11 +127,29 @@ export class GameBoxSpawner {
     private geometryReset(): void {
         this.renderer?.clearPlacements()
         this.stockStrategy = null
-        this.pendingSections = null
+        this.clearPlacementState()
         this.sectionsReadyCount = 0
         this.layoutDeterminedCount = 0
-        this.shelfPositions.clear()
         GameBoxSpawner.logger.debug('Geometry reset (layout switch)')
+    }
+
+    /**
+     * Clear all placement-related state.
+     * Invoked on geometry resets and run boundaries.
+     * Stock strategy persists across run boundaries until layout changes.
+     */
+    private clearPlacementState(): void {
+        this.pendingSections = null
+        this.shelfPositions.clear()
+    }
+
+    /**
+     * Reset run-boundary state when a new placement run begins.
+     * Drops unresolved intents from the previous run via renderer's explicit reset.
+     * Invoked at SectionsReady boundary, before new placement attempt.
+     */
+    private resetRunBoundaryState(): void {
+        this.renderer?.resetPendingPlacementIntents()
     }
 
     private handleLibraryReloadRequest(_event: CustomEvent<StorePropsLibraryReloadRequestEvent>): void {
@@ -173,10 +190,21 @@ export class GameBoxSpawner {
 
     private handleShelfReady(event: CustomEvent<ShelfReadyEvent>): void {
         const { shelfIndex, sectionIndex, position, rotationY } = event.detail
+        this.cacheShelfPosition(shelfIndex, sectionIndex, position, rotationY)
+    }
 
+    /**
+     * Cache shelf position for placement lookup.
+     * Clears old positions when a new wave starts (shelfIndex === 0).
+     * Ensures only current-run positions are used regardless of event ordering.
+     */
+    private cacheShelfPosition(
+        shelfIndex: number,
+        sectionIndex: number,
+        position: THREE.Vector3,
+        rotationY: number
+    ): void {
         // ShelfLayoutCoordinator emits a contiguous shelf wave per run starting at index 0.
-        // Clearing on the first shelf keeps only current-run positions regardless of
-        // whether this spawner's SectionsReady handler runs before or after that wave.
         if (shelfIndex === 0) {
             this.shelfPositions.clear()
         }
@@ -200,7 +228,7 @@ export class GameBoxSpawner {
 
         // New placement run boundary: drop unresolved intents from the previous run.
         // Visible placements are left intact until the new run is ready to place.
-        this.renderer?.resetPendingPlacementIntents()
+        this.resetRunBoundaryState()
 
         // Cache sections for placement. Placement can be triggered by either
         // ShelfLayoutDetermined (normal order) or SectionsReady (if layout already arrived).
