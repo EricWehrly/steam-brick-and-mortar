@@ -3,14 +3,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-source "$SCRIPT_DIR/common.sh"
+source "$REPO_ROOT/scripts/common.sh"
 
-BASELINE_APPIDS_FILE="${1:-$REPO_ROOT/docs/research/live-appids-spitemonger.json}"
+BASELINE_APPIDS_FILE="${1:-$REPO_ROOT/docs/research/local-steam/live-appids-spitemonger.json}"
 STEAM_ROOT_INPUT="${2:-}"
 OUTPUT_PREFIX="${3:-local-steam-spitemonger}"
-OUTPUT_DIR="${4:-$REPO_ROOT/docs/research}"
+OUTPUT_DIR="${4:-$REPO_ROOT/docs/research/local-steam}"
 
 TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEMP_DIR"' EXIT
