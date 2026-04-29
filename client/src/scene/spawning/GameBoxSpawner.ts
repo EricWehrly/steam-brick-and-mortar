@@ -9,6 +9,7 @@ import {
     StorePropsEventTypes, 
     GameEventTypes,
     SteamEventTypes,
+    type PlacementRunResetRequestedEvent,
     type PlacementIntentReadyEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
@@ -21,45 +22,20 @@ import type {
 } from '../props/PropsEvents'
 import { Logger } from '../../utils/Logger'
 import type { StockSurface } from '../../types/LayoutTypes'
+import type { ShelfSurface } from '../props/shared/SharedPropsTypes'
 
 interface ShelfPosition {
     position: THREE.Vector3
     rotationY: number
+    sectionIndex: number
 }
 
-/**
- * GameBoxSpawner
- *
- * Owns the GpuGameBoxRenderer lifecycle and coordinates the two-phase load/place split:
- *
- * Phase 1 — Prewarm (BatchReadyForPlacement):
- *   GpuGameBoxRenderer (via ArtworkPrefetchCoordinator) handles artwork prefetch.
- *   GameBoxSpawner does not participate in Phase 1.
- *
- * Phase 2 — Place (SectionsReady):
- *   Clears all existing placements and emits placement intents in sorted order
- *   across all sections. Renderer-side rendezvous decides textured vs label
- *   placement when artwork outcomes settle.
- *
- * ShelfReady:
- *   Caches shelf positions indexed by batchIndex for Phase 2 lookup.
- *
- * The artwork/label decision is NOT made here. GameBoxSpawner only emits
- * world-space placement intents ("game X goes at position Y").
- */
 export class GameBoxSpawner {
     private static readonly logger = Logger.createLogFunctions(GameBoxSpawner.name)
 
-    // Owned renderer — initialized on GameDataReady (sized to full library), lives for library lifetime.
-    // Cleared but NOT disposed on layout/group/sort switches.
     private renderer: GpuGameBoxRenderer | null = null
-
-    // Shelf world positions indexed by shelfIndex, grouped by sectionIndex
-    private shelfPositions: Map<number, ShelfPosition & { sectionIndex: number }> = new Map()
-
-    // Cached sections from last SectionsReady until all placement preconditions are satisfied
+    private shelfPositions: Map<number, ShelfPosition> = new Map()
     private pendingSections: SectionsReadyEvent | null = null
-
     private stockStrategy: IStockStrategy | null = null
     private layoutReadyForPlacement = false
     private layoutDeterminedSinceLastSections = false
@@ -93,10 +69,6 @@ export class GameBoxSpawner {
         GameBoxSpawner.logger.debug('Constructed')
     }
 
-    /**
-     * Full teardown — only on library reload (new user, force-refresh).
-     * Disposes the renderer and clears all prefetch state.
-     */
     private fullReset(): void {
         this.renderer?.dispose()
         this.renderer = null
@@ -107,11 +79,6 @@ export class GameBoxSpawner {
         GameBoxSpawner.logger.debug('Full reset (library reload)')
     }
 
-    /**
-     * Clear all placement-related state.
-     * Invoked on run boundaries.
-     * Stock strategy persists across run boundaries until layout changes.
-     */
     private clearPlacementState(): void {
         this.pendingSections = null
         this.shelfPositions.clear()
@@ -121,14 +88,8 @@ export class GameBoxSpawner {
         this.fullReset()
     }
 
-    // -------------------------------------------------------------------------
-    // Initialize renderer at library load time (sized to full library)
-
     private initializeRendererForLibrary(totalGames: number): void {
-        if (this.renderer) {
-            return
-        }
-
+        if (this.renderer) return
         const textureCapacity = Math.max(totalGames, 1) + 100
         const placementCapacity = Math.max(textureCapacity + 100, Math.ceil(textureCapacity * 2))
         this.renderer = new GpuGameBoxRenderer(textureCapacity, placementCapacity)
@@ -138,46 +99,21 @@ export class GameBoxSpawner {
     }
 
     private handleLibraryManifestReady(event: CustomEvent<SteamLibraryManifestReadyEvent>): void {
-        const { totalGames } = event.detail
-        this.initializeRendererForLibrary(totalGames)
+        this.initializeRendererForLibrary(event.detail.totalGames)
     }
-
-    // -------------------------------------------------------------------------
-    // Receive stock strategy + trigger placement once shelves are known
 
     private handleLayoutDetermined(event: CustomEvent<ShelfLayoutDeterminedEvent>): void {
         this.stockStrategy = event.detail.stockStrategy
         this.layoutReadyForPlacement = true
         this.layoutDeterminedSinceLastSections = true
         GameBoxSpawner.logger.debug('Stock strategy received from ShelfLayoutDetermined')
-
         this.tryPlacePendingSections()
     }
 
-    // -------------------------------------------------------------------------
-    // Cache shelf positions from ShelfReady events
-
     private handleShelfReady(event: CustomEvent<ShelfReadyEvent>): void {
         const { shelfIndex, sectionIndex, position, rotationY } = event.detail
-        this.cacheShelfPosition(shelfIndex, sectionIndex, position, rotationY)
-    }
-
-    /**
-     * Cache shelf position for placement lookup.
-     * Clears old positions when a new wave starts (shelfIndex === 0).
-     * Ensures only current-run positions are used regardless of event ordering.
-     */
-    private cacheShelfPosition(
-        shelfIndex: number,
-        sectionIndex: number,
-        position: THREE.Vector3,
-        rotationY: number
-    ): void {
-        // ShelfLayoutCoordinator emits a contiguous shelf wave per run starting at index 0.
-        if (shelfIndex === 0) {
-            this.shelfPositions.clear()
-        }
-
+        // ShelfLayoutCoordinator emits a contiguous wave per run starting at index 0.
+        if (shelfIndex === 0) this.shelfPositions.clear()
         this.shelfPositions.set(shelfIndex, {
             position: (position as THREE.Vector3).clone(),
             rotationY,
@@ -189,84 +125,49 @@ export class GameBoxSpawner {
         )
     }
 
-    // -------------------------------------------------------------------------
-    // Phase 2: cache sections, place when strategy is available
-
     private handleSectionsReady(event: CustomEvent<SectionsReadyEvent>): void {
-        // If SectionsReady arrives before layout computation, clear stale shelf state.
-        // If layout already arrived for this run (alternate ordering), keep the freshly
-        // computed shelf map and place immediately.
-        if (!this.layoutDeterminedSinceLastSections) {
-            this.clearPlacementState()
-        }
-
-        // Cache sections for placement. Placement can be triggered by either
-        // ShelfLayoutDetermined (normal order) or SectionsReady (if layout already arrived).
+        if (!this.layoutDeterminedSinceLastSections) this.clearPlacementState()
         this.pendingSections = event.detail
         this.layoutDeterminedSinceLastSections = false
         GameBoxSpawner.logger.debug('SectionsReady: cached sections for placement attempt')
-
-        if (this.layoutReadyForPlacement) {
-            this.tryPlacePendingSections()
-        }
+        if (this.layoutReadyForPlacement) this.tryPlacePendingSections()
     }
 
     private canPlacePendingSections(): boolean {
-        if (!this.pendingSections) {
-            return false
-        }
-
+        if (!this.pendingSections) return false
         if (!this.renderer) {
             GameBoxSpawner.logger.warn('tryPlacePendingSections: renderer not yet constructed')
             return false
         }
-
         if (!this.stockStrategy) {
             GameBoxSpawner.logger.warn('tryPlacePendingSections: no stock strategy')
             return false
         }
-
         if (this.shelfPositions.size === 0) {
             GameBoxSpawner.logger.debug('tryPlacePendingSections: waiting for shelf positions')
             return false
         }
-
         return true
     }
 
     private tryPlacePendingSections(): void {
-        if (!this.canPlacePendingSections()) {
-            return
-        }
-
-        if (this.placeSections(this.pendingSections)) {
-            this.pendingSections = null
-            this.layoutDeterminedSinceLastSections = false
-        }
+        const sections = this.pendingSections
+        const stockStrategy = this.stockStrategy
+        if (!this.canPlacePendingSections()) return
+        this.placeSections(sections, stockStrategy)
+        this.pendingSections = null
+        this.layoutDeterminedSinceLastSections = false
     }
 
-    private placeSections(detail: SectionsReadyEvent): boolean {
+    private placeSections(
+        detail: SectionsReadyEvent,
+        stockStrategy: IStockStrategy
+    ): void {
         const { sections } = detail
-        const totalGames = sections.reduce((sum, s) => sum + s.games.length, 0)
-
-        GameBoxSpawner.logger.debug(
-            `Placing ${totalGames} games across ${sections.length} section(s)`
-        )
-
-        if (!this.renderer) {
-            GameBoxSpawner.logger.warn('placeSections: renderer not yet constructed')
-            return false
-        }
-
-        if (!this.stockStrategy) {
-            GameBoxSpawner.logger.warn('placeSections: no stock strategy')
-            return false
-        }
-
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         if (shelfSurfaces.length === 0) {
             GameBoxSpawner.logger.warn('placeSections: no shelf surfaces found')
-            return false
+            return
         }
 
         const sectionShelvesByIndex = sections.map((_, sectionIndex) =>
@@ -275,61 +176,55 @@ export class GameBoxSpawner {
                 .sort(([a], [b]) => a - b)
         )
 
-        const totalSectionShelves = sectionShelvesByIndex.reduce(
-            (sum, sectionShelves) => sum + sectionShelves.length,
-            0
-        )
-
+        const totalSectionShelves = sectionShelvesByIndex.reduce((sum, s) => sum + s.length, 0)
         if (totalSectionShelves === 0) {
-            GameBoxSpawner.logger.debug(
-                'placeSections: no section shelves available for this run'
-            )
-            return false
+            GameBoxSpawner.logger.debug('placeSections: no section shelves available for this run')
+            return
         }
 
-        this.renderer.clearPlacements()
+        EventManager.getInstance().emit<PlacementRunResetRequestedEvent>(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            {}
+        )
 
         let shelvesUsed = 0
-        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
-            const section = sections[sectionIndex]
-            const sectionShelves = sectionShelvesByIndex[sectionIndex]
-
-            const gameQueue = [...section.games] as SteamGameData[]
-            for (const [shelfIndex, shelfPos] of sectionShelves) {
-                if (gameQueue.length === 0) break
-                const stockSurfaces = GameBoxUtils.buildStockSurfaces(
-                    shelfPos.position, shelfPos.rotationY, shelfSurfaces, { strategy: this.stockStrategy }
-                )
-                const shelfCapacity = stockSurfaces.reduce((sum, s) => sum + s.capacity, 0)
-                const batch = gameQueue.splice(0, shelfCapacity)
-                this.assignIntentsFromStock(stockSurfaces, batch)
-                EventManager.getInstance().emit<GamesPlacedEvent>(
-                    StorePropsEventTypes.GamesPlaced,
-                    { batchIndex: shelfIndex, status: BatchProcessingStatus.GamesPlaced }
-                )
-                shelvesUsed++
-            }
-
-            if (gameQueue.length > 0) {
-                GameBoxSpawner.logger.warn(
-                    `Section "${section.name}": ${gameQueue.length} games had no shelf space`
-                )
-            }
+        for (let i = 0; i < sections.length; i++) {
+            shelvesUsed += this.placeSection(sections[i], sectionShelvesByIndex[i], shelfSurfaces, stockStrategy)
         }
 
-        GameBoxSpawner.logger.debug(
-            `Placement intents emitted across ${shelvesUsed} shelves`
-        )
-        return true
+        GameBoxSpawner.logger.debug(`Placement intents emitted across ${shelvesUsed} shelves`)
     }
 
-    // -------------------------------------------------------------------------
-    // Intent assignment helpers
+    private placeSection(
+        section: SectionsReadyEvent['sections'][number],
+        sectionShelves: [number, ShelfPosition][],
+        shelfSurfaces: ShelfSurface[],
+        stockStrategy: IStockStrategy
+    ): number {
+        const gameQueue = [...section.games] as SteamGameData[]
+        let shelvesUsed = 0
 
-    private assignIntentsFromStock(
-        stockSurfaces: StockSurface[],
-        games: SteamGameData[]
-    ): void {
+        for (const [shelfIndex, shelfPos] of sectionShelves) {
+            if (gameQueue.length === 0) break
+            const stockSurfaces = GameBoxUtils.buildStockSurfaces(
+                shelfPos.position, shelfPos.rotationY, shelfSurfaces, { strategy: stockStrategy }
+            )
+            const batch = gameQueue.splice(0, stockSurfaces.reduce((sum, s) => sum + s.capacity, 0))
+            this.assignIntentsFromStock(stockSurfaces, batch)
+            EventManager.getInstance().emit<GamesPlacedEvent>(
+                StorePropsEventTypes.GamesPlaced,
+                { batchIndex: shelfIndex, status: BatchProcessingStatus.GamesPlaced }
+            )
+            shelvesUsed++
+        }
+
+        if (gameQueue.length > 0) {
+            GameBoxSpawner.logger.warn(`Section "${section.name}": ${gameQueue.length} games had no shelf space`)
+        }
+        return shelvesUsed
+    }
+
+    private assignIntentsFromStock(stockSurfaces: StockSurface[], games: SteamGameData[]): void {
         const intents = GameBoxUtils.stockSurfaces(stockSurfaces, games)
         for (const { game, position, rotation } of intents) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
@@ -341,6 +236,3 @@ export class GameBoxSpawner {
     }
 
 }
-
-// Construct at import: registers event handlers for app lifetime.
-

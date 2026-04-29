@@ -5,7 +5,6 @@ import { EventManager } from '../../../../src/core/EventManager'
 import { RenderIntentCoordinator } from '../../../../src/scene/game-box/RenderIntentCoordinator'
 import {
     GameRenderEventTypes,
-    GameEventTypes,
     StorePropsEventTypes,
     type ArtworkIntentSettledEvent,
     type PlacementResolvedEvent,
@@ -99,7 +98,7 @@ describe('RenderIntentCoordinator', () => {
         coordinator.dispose()
     })
 
-    it('clears stale pending placement intents on SectionsReady run boundary', () => {
+    it('clears stale pending placement intents when run reset is requested explicitly', () => {
         const coordinator = new RenderIntentCoordinator()
         const resolved: PlacementResolvedEvent[] = []
 
@@ -118,11 +117,10 @@ describe('RenderIntentCoordinator', () => {
             } as any
         )
 
-        EventManager.getInstance().emit(GameEventTypes.SectionsReady, {
-            sections: [{ name: 'Run2', games: [], groupMode: 'genre', sortMode: 'name-asc' }],
-            groupMode: 'genre',
-            sortMode: 'name-asc',
-        } as any)
+        EventManager.getInstance().emit(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            {}
+        )
 
         EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
             GameRenderEventTypes.ArtworkIntentSettled,
@@ -134,7 +132,7 @@ describe('RenderIntentCoordinator', () => {
         coordinator.dispose()
     })
 
-    it('preserves settled artwork across SectionsReady so replay can resolve', () => {
+    it('preserves settled artwork when run-reset clears pending placements', () => {
         const coordinator = new RenderIntentCoordinator()
         const resolved: PlacementResolvedEvent[] = []
 
@@ -148,11 +146,10 @@ describe('RenderIntentCoordinator', () => {
             { appid: 77, gameName: 'Game 77' }
         )
 
-        EventManager.getInstance().emit(GameEventTypes.SectionsReady, {
-            sections: [{ name: 'Run2', games: [], groupMode: 'genre', sortMode: 'name-asc' }],
-            groupMode: 'genre',
-            sortMode: 'name-asc',
-        } as any)
+        EventManager.getInstance().emit(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            {}
+        )
 
         EventManager.getInstance().emit<PlacementIntentReadyEvent>(
             GameRenderEventTypes.PlacementIntentReady,
@@ -191,11 +188,10 @@ describe('RenderIntentCoordinator', () => {
         )
 
         // New run boundary: stale pending intents must be dropped before settlement.
-        EventManager.getInstance().emit(GameEventTypes.SectionsReady, {
-            sections: [{ name: 'Run2', games: [], groupMode: 'genre', sortMode: 'name-asc' }],
-            groupMode: 'genre',
-            sortMode: 'name-asc',
-        } as any)
+        EventManager.getInstance().emit(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            {}
+        )
 
         EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
             GameRenderEventTypes.ArtworkIntentSettled,

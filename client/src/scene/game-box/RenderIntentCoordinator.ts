@@ -1,9 +1,9 @@
 import { EventManager } from '../../core/EventManager'
 import {
     GameRenderEventTypes,
-    GameEventTypes,
     StorePropsEventTypes,
     type ArtworkIntentSettledEvent,
+    type PlacementRunResetRequestedEvent,
     type PlacementResolvedEvent,
     type PlacementIntentReadyEvent,
 } from '../../types/InteractionEvents'
@@ -18,7 +18,7 @@ export class RenderIntentCoordinator {
 
     private readonly boundHandleArtworkIntentSettled: (event: CustomEvent<ArtworkIntentSettledEvent>) => void
     private readonly boundHandlePlacementIntentReady: (event: CustomEvent<PlacementIntentReadyEvent>) => void
-    private readonly boundHandleRunResetRequested: (event: CustomEvent<unknown>) => void
+    private readonly boundHandleRunResetRequested: (event: CustomEvent<PlacementRunResetRequestedEvent>) => void
     private readonly boundHandleLibraryReloadRequested: (event: CustomEvent<unknown>) => void
 
     public constructor() {
@@ -36,7 +36,7 @@ export class RenderIntentCoordinator {
             this.boundHandlePlacementIntentReady
         )
         EventManager.getInstance().registerEventHandler(
-            GameEventTypes.SectionsReady,
+            GameRenderEventTypes.PlacementRunResetRequested,
             this.boundHandleRunResetRequested
         )
         EventManager.getInstance().registerEventHandler(
@@ -55,7 +55,7 @@ export class RenderIntentCoordinator {
             this.boundHandlePlacementIntentReady
         )
         EventManager.getInstance().deregisterEventHandler(
-            GameEventTypes.SectionsReady,
+            GameRenderEventTypes.PlacementRunResetRequested,
             this.boundHandleRunResetRequested
         )
         EventManager.getInstance().deregisterEventHandler(
@@ -80,7 +80,7 @@ export class RenderIntentCoordinator {
         this.flushReadyPlacements(appid)
     }
 
-    private handleRunResetRequested(_event: CustomEvent<unknown>): void {
+    private handleRunResetRequested(_event: CustomEvent<PlacementRunResetRequestedEvent>): void {
         this.clearPendingState()
     }
 

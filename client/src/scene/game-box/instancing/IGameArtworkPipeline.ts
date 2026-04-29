@@ -52,7 +52,5 @@ export interface IGameArtworkPipeline {
         rotation?: THREE.Quaternion
     ): number
 
-    clearPlacements(): void
-
     dispose(): void
 }

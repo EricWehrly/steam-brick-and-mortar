@@ -16,7 +16,7 @@
  * RECEIVES:
  * - prefetchArtwork(appid, url, name) → Phase 1: load texture into atlas
  * - PlacementResolved events → unified placement (artwork or label fallback)
- * - clearPlacements() → wipe all GPU instances before re-sort
+ * - PlacementRunResetRequested → wipe all GPU instances before re-sort
  * - addToScene(scene) → Attaches instanced meshes to scene
  * - updateLODForCamera(camera) → Adjusts detail levels based on distance
  * - dispose() → Cleans up GPU resources
@@ -49,7 +49,10 @@ import { RenderIntentCoordinator } from './RenderIntentCoordinator'
 import { ArtworkPrefetchCoordinator } from '../spawning/ArtworkPrefetchCoordinator'
 import { Logger } from '../../utils/Logger'
 import { EventManager } from '../../core/EventManager'
-import { GameRenderEventTypes, type PlacementResolvedEvent } from '../../types/InteractionEvents'
+import {
+    GameRenderEventTypes,
+    type PlacementResolvedEvent,
+} from '../../types/InteractionEvents'
 
 export class GpuGameBoxRenderer {
     public static logger = Logger.createLogFunctions(GpuGameBoxRenderer.name)
@@ -129,15 +132,6 @@ export class GpuGameBoxRenderer {
         if (!success) {
             GpuGameBoxRenderer.logger.debug(`Failed to add label box for "${game.name}"`)
         }
-    }
-
-    /**
-     * Clear all GPU instance placements without releasing texture atlas slots.
-     * Call before re-sorting; follow with placeArtworkInstance()/placeLabelBox() for each game.
-     */
-    public clearPlacements(): void {
-        this.lodArtworkRenderer.clearPlacements()
-        this.instancedLabelRenderer.clear()
     }
 
     public dispose(): void {

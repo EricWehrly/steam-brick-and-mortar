@@ -14,7 +14,12 @@ import * as THREE from 'three'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { EventManager } from '../../../core/EventManager'
-import { GameEventTypes, AppEventTypes } from '../../../types/InteractionEvents'
+import {
+    GameEventTypes,
+    GameRenderEventTypes,
+    AppEventTypes,
+    type PlacementRunResetRequestedEvent,
+} from '../../../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../../../types/InteractionEvents'
 import type { SomeBatchesCompleteEvent } from '../../../types/EnvironmentEvents'
 import { Logger } from '../../../utils/Logger'
@@ -175,6 +180,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     private inFlightArtworkCount: number = 0
 
     private readonly onFocusChanged: (e: CustomEvent<VisibilityChangedEvent>) => void
+    private readonly boundHandlePlacementRunResetRequested: (event: CustomEvent<PlacementRunResetRequestedEvent>) => void
 
     constructor(config: LodArtworkConfig = {}) {
         this.maxTextures = config.maxTextures ?? 512
@@ -225,6 +231,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         }
 
         this.renderer = this.createRenderer(rendererConfig)
+        this.boundHandlePlacementRunResetRequested = this.handlePlacementRunResetRequested.bind(this)
 
         // Initialize with texture arrays
         const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
@@ -239,6 +246,10 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.AllBatchesComplete,
             this.handleAllBatchesComplete.bind(this)
+        )
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            this.boundHandlePlacementRunResetRequested
         )
 
         this.logConfig()
@@ -256,6 +267,12 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         this.allBatchesComplete = true
         this.compactMidTierAfterLoad()
         this.settleArtwork()
+    }
+
+    private handlePlacementRunResetRequested(_event: CustomEvent<PlacementRunResetRequestedEvent>): void {
+        this.instanceMetadata.clear()
+        this.renderer.clearPlacements()
+        LodArtworkOrchestrator.logger.debug('Cleared instance placements; texture slots retained')
     }
 
     /** Factory method - override in debug subclass */
@@ -400,8 +417,8 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     /**
      * Phase 2 of the load/place split: assign a world position to a prefetched game.
      * Must be called after prefetchArtwork() has resolved for this game.
-     * On re-sort, call clearPlacements() first, then call placeInstance() for every
-     * game in the new sorted order.
+        * On re-sort, placement reset is handled by PlacementRunResetRequested before
+        * new placement intents are emitted.
      *
      * @returns instanceIndex on success, -1 if texture was not prefetched or slot unavailable.
      */
@@ -431,16 +448,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
         this.instanceMetadata.set(instanceIndex, { name: gameName, appid, position: position.clone() })
         return instanceIndex
-    }
-
-    /**
-     * Reset all GPU instance placements without releasing texture slots.
-     * Call before re-sorting so placeInstance() can repopulate positions.
-     */
-    public clearPlacements(): void {
-        this.instanceMetadata.clear()
-        this.renderer.clearPlacements()
-        LodArtworkOrchestrator.logger.debug('Cleared instance placements; texture slots retained')
     }
 
     public async setArtworkInstanceFromUrl(
@@ -614,13 +621,13 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         return result
     }
 
-    public clearFailureCache(): void {
+    // === Protected accessors for debug subclass ===
+
+    protected clearFailureCache(): void {
         this.failedArtwork.clear()
         this.artworkProvider.clearCaches()
         LodArtworkOrchestrator.logger.info('Cleared artwork caches - all URLs will be retried on next load')
     }
-
-    // === Protected accessors for debug subclass ===
 
     protected getTextureManager(): LodTextureArrayManager {
         return this.textureManager
@@ -639,6 +646,10 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     }
 
     public dispose(): void {
+        EventManager.getInstance().deregisterEventHandler(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            this.boundHandlePlacementRunResetRequested
+        )
         EventManager.getInstance().removeEventListener(
             AppEventTypes.VisibilityChanged,
             this.onFocusChanged
