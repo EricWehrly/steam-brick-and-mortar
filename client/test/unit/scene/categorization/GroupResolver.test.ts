@@ -1,0 +1,53 @@
+import { describe, expect, it } from 'vitest'
+import { resolveGroups } from '../../../../src/scene/categorization/GroupResolver'
+import { GroupModes, SortModes } from '../../../../src/types/LayoutTypes'
+import type { SteamGameData } from '../../../../src/scene/game-box/types/GameData'
+
+function game(partial: Partial<SteamGameData>): SteamGameData {
+    return {
+        appid: partial.appid ?? 0,
+        name: partial.name ?? 'Test',
+        playtime_forever: partial.playtime_forever ?? 0,
+        ...partial,
+    }
+}
+
+describe('resolveGroups by-tag', () => {
+    it('groups by each game top tags and keeps untagged games in Untagged', () => {
+        const games: SteamGameData[] = [
+            game({ appid: 1, name: 'Game 1', steamspy_top_tags: ['Action', 'Co-op'] }),
+            game({ appid: 2, name: 'Game 2', steamspy_top_tags: ['Action', 'Roguelike'] }),
+            game({ appid: 3, name: 'Game 3', steamspy_tags: { Indie: 50, Puzzle: 40 } }),
+            game({ appid: 4, name: 'Game 4' }),
+        ]
+
+        const sections = resolveGroups(games, GroupModes.ByTag, SortModes.Alphabetical)
+        const names = sections.map(section => section.name)
+
+        expect(names[0]).toBe('Action')
+        expect(names).not.toContain('Untagged')
+
+        const byName = new Map(sections.map(section => [section.name, section]))
+        expect(byName.get('Action')?.games).toHaveLength(2)
+        expect(byName.get('Co-op')?.games).toHaveLength(1)
+        expect(byName.get('Roguelike')?.games).toHaveLength(1)
+        expect(byName.get('Indie')?.games).toHaveLength(1)
+        expect(byName.get('Puzzle')?.games).toHaveLength(1)
+    })
+
+    it('uses precomputed steamspy_top_tags when available', () => {
+        const games: SteamGameData[] = [
+            game({
+                appid: 11,
+                name: 'Precomputed',
+                steamspy_top_tags: ['OnlyTopTag'],
+                steamspy_tags: { OnlyTopTag: 1, IgnoredByTopTagList: 99 },
+            }),
+        ]
+
+        const sections = resolveGroups(games, GroupModes.ByTag, SortModes.Alphabetical)
+        const names = sections.map(section => section.name)
+
+        expect(names).toEqual(['OnlyTopTag'])
+    })
+})

@@ -36,6 +36,7 @@ export type LayoutMode = typeof LayoutModes[keyof typeof LayoutModes]
 export const GroupModes = {
     None:      'none',
     ByGenre:   'by-genre',
+    ByTag:     'by-tag',
     ByRecency: 'by-recency',
     ByPlaytime: 'by-playtime',
     ByRating:  'by-rating',
