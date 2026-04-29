@@ -56,6 +56,7 @@ export interface SteamDevModeToggleEvent extends BaseInteractionEvent {
  */
 export interface SteamDataLoadedEvent extends BaseInteractionEvent {
     userInput?: string
+    displayName?: string
 }
 
 /**
