@@ -21,6 +21,12 @@ import { RenderLoopRegistry } from '../../scene/RenderLoopRegistry'
 import { SceneClickGameBoxRaycast } from '../../scene/interaction/SceneClickGameBoxRaycast'
 
 export class SystemUICoordinator {
+    // TODO(input): Keep this coordinator minimal. When input complexity increases,
+    // move click/drag discrimination into a dedicated input manager and add:
+    // - unified pointer/touch/pen handling
+    // - multi-pointer correctness
+    // - cancellation/interruption paths (e.g., pointercancel)
+    // - camera/control drag-state integration
     private pauseMenuManager: PauseMenuManager
     private performanceMonitor: PerformanceMonitorUI
     private lightingControlsPanel?: LightingControlsPanel
@@ -32,6 +38,9 @@ export class SystemUICoordinator {
     private renderer?: THREE.WebGLRenderer
     private rendererDomElement?: HTMLCanvasElement
     private sceneClickGameBoxRaycast?: SceneClickGameBoxRaycast
+    private activeMouseDown: { clientX: number; clientY: number; button: number } | null = null
+    private pointerDraggedBeyondThreshold = false
+    private readonly sceneClickDragThresholdPx = 6
     private lastPerformanceUpdate = 0
     private readonly performanceUpdateInterval = 1000 // Update every second
 
@@ -64,7 +73,9 @@ export class SystemUICoordinator {
         this.performanceMonitor.start()
 
         if (this.rendererDomElement) {
-            this.rendererDomElement.addEventListener('click', this.handleRendererCanvasClick)
+            this.rendererDomElement.addEventListener('mousedown', this.handleRendererMouseDown)
+            this.rendererDomElement.addEventListener('mousemove', this.handleRendererMouseMove)
+            this.rendererDomElement.addEventListener('mouseup', this.handleRendererMouseUp)
             this.rendererDomElement.addEventListener('contextmenu', this.handleRendererContextMenu)
         }
 
@@ -178,7 +189,45 @@ export class SystemUICoordinator {
         this.pauseMenuManager.close()
     }
 
-    private readonly handleRendererCanvasClick = (event: MouseEvent): void => {
+    private readonly handleRendererMouseDown = (event: MouseEvent): void => {
+        this.activeMouseDown = {
+            clientX: event.clientX,
+            clientY: event.clientY,
+            button: event.button
+        }
+        this.pointerDraggedBeyondThreshold = false
+    }
+
+    private readonly handleRendererMouseMove = (event: MouseEvent): void => {
+        if (!this.activeMouseDown || this.pointerDraggedBeyondThreshold) {
+            return
+        }
+
+        const deltaX = event.clientX - this.activeMouseDown.clientX
+        const deltaY = event.clientY - this.activeMouseDown.clientY
+        const movementSquared = deltaX * deltaX + deltaY * deltaY
+        const thresholdSquared = this.sceneClickDragThresholdPx * this.sceneClickDragThresholdPx
+
+        if (movementSquared > thresholdSquared) {
+            this.pointerDraggedBeyondThreshold = true
+        }
+    }
+
+    private readonly handleRendererMouseUp = (event: MouseEvent): void => {
+        const mouseDown = this.activeMouseDown
+        this.activeMouseDown = null
+
+        if (!mouseDown) {
+            return
+        }
+
+        if (mouseDown.button !== event.button || this.pointerDraggedBeyondThreshold) {
+            this.pointerDraggedBeyondThreshold = false
+            return
+        }
+
+        this.pointerDraggedBeyondThreshold = false
+
         if (!this.rendererDomElement) {
             return
         }
@@ -208,7 +257,9 @@ export class SystemUICoordinator {
         this.renderLoopRegistry.unregister(this.constructor.name)
 
         if (this.rendererDomElement) {
-            this.rendererDomElement.removeEventListener('click', this.handleRendererCanvasClick)
+            this.rendererDomElement.removeEventListener('mousedown', this.handleRendererMouseDown)
+            this.rendererDomElement.removeEventListener('mousemove', this.handleRendererMouseMove)
+            this.rendererDomElement.removeEventListener('mouseup', this.handleRendererMouseUp)
             this.rendererDomElement.removeEventListener('contextmenu', this.handleRendererContextMenu)
             this.rendererDomElement = undefined
         }
