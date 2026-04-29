@@ -5,13 +5,11 @@ import { EventManager } from '../../../../src/core/EventManager'
 import { RenderIntentCoordinator } from '../../../../src/scene/game-box/RenderIntentCoordinator'
 import {
     GameRenderEventTypes,
-    UIEventTypes,
+    GameEventTypes,
     StorePropsEventTypes,
     type ArtworkIntentSettledEvent,
     type PlacementResolvedEvent,
     type PlacementIntentReadyEvent,
-    type ArrangementRequestedEvent,
-    type LayoutRequestedEvent,
     type StorePropsLibraryReloadRequestEvent,
 } from '../../../../src/types/InteractionEvents'
 
@@ -101,7 +99,7 @@ describe('RenderIntentCoordinator', () => {
         coordinator.dispose()
     })
 
-    it('clears stale pending placement intents on ArrangementRequested', () => {
+    it('clears stale pending placement intents on SectionsReady run boundary', () => {
         const coordinator = new RenderIntentCoordinator()
         const resolved: PlacementResolvedEvent[] = []
 
@@ -120,10 +118,11 @@ describe('RenderIntentCoordinator', () => {
             } as any
         )
 
-        EventManager.getInstance().emit<ArrangementRequestedEvent>(
-            UIEventTypes.ArrangementRequested,
-            { groupMode: 'genre', sortMode: 'name-asc' } as any
-        )
+        EventManager.getInstance().emit(GameEventTypes.SectionsReady, {
+            sections: [{ name: 'Run2', games: [], groupMode: 'genre', sortMode: 'name-asc' }],
+            groupMode: 'genre',
+            sortMode: 'name-asc',
+        } as any)
 
         EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
             GameRenderEventTypes.ArtworkIntentSettled,
@@ -135,7 +134,7 @@ describe('RenderIntentCoordinator', () => {
         coordinator.dispose()
     })
 
-    it('preserves settled artwork across ArrangementRequested so replay can resolve', () => {
+    it('preserves settled artwork across SectionsReady so replay can resolve', () => {
         const coordinator = new RenderIntentCoordinator()
         const resolved: PlacementResolvedEvent[] = []
 
@@ -149,10 +148,11 @@ describe('RenderIntentCoordinator', () => {
             { appid: 77, gameName: 'Game 77' }
         )
 
-        EventManager.getInstance().emit<ArrangementRequestedEvent>(
-            UIEventTypes.ArrangementRequested,
-            { groupMode: 'genre', sortMode: 'name-asc' } as any
-        )
+        EventManager.getInstance().emit(GameEventTypes.SectionsReady, {
+            sections: [{ name: 'Run2', games: [], groupMode: 'genre', sortMode: 'name-asc' }],
+            groupMode: 'genre',
+            sortMode: 'name-asc',
+        } as any)
 
         EventManager.getInstance().emit<PlacementIntentReadyEvent>(
             GameRenderEventTypes.PlacementIntentReady,
@@ -190,11 +190,12 @@ describe('RenderIntentCoordinator', () => {
             } as any
         )
 
-        // Re-sort clear: stale pending intents must be dropped before settlement.
-        EventManager.getInstance().emit<ArrangementRequestedEvent>(
-            UIEventTypes.ArrangementRequested,
-            { groupMode: 'genre', sortMode: 'name-asc' } as any
-        )
+        // New run boundary: stale pending intents must be dropped before settlement.
+        EventManager.getInstance().emit(GameEventTypes.SectionsReady, {
+            sections: [{ name: 'Run2', games: [], groupMode: 'genre', sortMode: 'name-asc' }],
+            groupMode: 'genre',
+            sortMode: 'name-asc',
+        } as any)
 
         EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
             GameRenderEventTypes.ArtworkIntentSettled,
@@ -216,75 +217,6 @@ describe('RenderIntentCoordinator', () => {
         expect(resolved).toHaveLength(1)
         expect(resolved[0]?.appid).toBe(11)
         expect(resolved[0]?.position).toEqual(new THREE.Vector3(2, 0, 0))
-
-        coordinator.dispose()
-    })
-
-    it('clears stale pending placement intents on LayoutRequested', () => {
-        const coordinator = new RenderIntentCoordinator()
-        const resolved: PlacementResolvedEvent[] = []
-
-        EventManager.getInstance().registerEventHandler(
-            GameRenderEventTypes.PlacementResolved,
-            (event: CustomEvent<PlacementResolvedEvent>) => resolved.push(event.detail)
-        )
-
-        EventManager.getInstance().emit<PlacementIntentReadyEvent>(
-            GameRenderEventTypes.PlacementIntentReady,
-            {
-                appid: 19,
-                game: makeGame(19),
-                position: new THREE.Vector3(9, 0, 0),
-                rotation: new THREE.Quaternion(),
-            } as any
-        )
-
-        EventManager.getInstance().emit<LayoutRequestedEvent>(
-            UIEventTypes.LayoutRequested,
-            { layoutMode: 'arc' } as any
-        )
-
-        EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
-            GameRenderEventTypes.ArtworkIntentSettled,
-            { appid: 19, gameName: 'Game 19' }
-        )
-
-        expect(resolved).toHaveLength(0)
-
-        coordinator.dispose()
-    })
-
-    it('preserves settled artwork across LayoutRequested so replay can resolve', () => {
-        const coordinator = new RenderIntentCoordinator()
-        const resolved: PlacementResolvedEvent[] = []
-
-        EventManager.getInstance().registerEventHandler(
-            GameRenderEventTypes.PlacementResolved,
-            (event: CustomEvent<PlacementResolvedEvent>) => resolved.push(event.detail)
-        )
-
-        EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
-            GameRenderEventTypes.ArtworkIntentSettled,
-            { appid: 88, gameName: 'Game 88' }
-        )
-
-        EventManager.getInstance().emit<LayoutRequestedEvent>(
-            UIEventTypes.LayoutRequested,
-            { layoutMode: 'arc' } as any
-        )
-
-        EventManager.getInstance().emit<PlacementIntentReadyEvent>(
-            GameRenderEventTypes.PlacementIntentReady,
-            {
-                appid: 88,
-                game: makeGame(88),
-                position: new THREE.Vector3(8, 0, 0),
-                rotation: new THREE.Quaternion(),
-            } as any
-        )
-
-        expect(resolved).toHaveLength(1)
-        expect(resolved[0]?.appid).toBe(88)
 
         coordinator.dispose()
     })

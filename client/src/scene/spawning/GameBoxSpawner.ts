@@ -9,7 +9,6 @@ import {
     StorePropsEventTypes, 
     GameEventTypes,
     SteamEventTypes,
-    UIEventTypes,
     type PlacementIntentReadyEvent,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
@@ -63,7 +62,7 @@ export class GameBoxSpawner {
 
     private stockStrategy: IStockStrategy | null = null
     private layoutReadyForPlacement = false
-    private retryPendingOnShelfReady = false
+    private layoutDeterminedSinceLastSections = false
 
     static {
         new GameBoxSpawner()
@@ -87,14 +86,6 @@ export class GameBoxSpawner {
             (e: CustomEvent<SteamLibraryManifestReadyEvent>) => this.handleLibraryManifestReady(e)
         )
         EventManager.getInstance().registerEventHandler(
-            UIEventTypes.ArrangementRequested,
-            () => this.geometryReset()
-        )
-        EventManager.getInstance().registerEventHandler(
-            UIEventTypes.LayoutRequested,
-            () => this.geometryReset()
-        )
-        EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.LibraryReloadRequest,
             (e: CustomEvent<StorePropsLibraryReloadRequestEvent>) => this.handleLibraryReloadRequest(e)
         )
@@ -111,30 +102,14 @@ export class GameBoxSpawner {
         this.renderer = null
         this.stockStrategy = null
         this.layoutReadyForPlacement = false
+        this.layoutDeterminedSinceLastSections = false
         this.clearPlacementState()
-        this.retryPendingOnShelfReady = false
         GameBoxSpawner.logger.debug('Full reset (library reload)')
     }
 
     /**
-     * Geometry reset — on layout/group/sort switches.
-     * Keeps the renderer and prefetch cache; only clears placement state.
-     * Note: renderer.clearPlacements() is NOT called here — placeSections() handles
-     * it atomically just before placing new games. Calling it here would wipe games
-     * placed by StorePropsCoordinator's LayoutRequested handler, which fires before
-     * this geometryReset (handler registration order).
-     */
-    private geometryReset(): void {
-        this.stockStrategy = null
-        this.layoutReadyForPlacement = false
-        this.clearPlacementState()
-        this.retryPendingOnShelfReady = false
-        GameBoxSpawner.logger.debug('Geometry reset (layout switch)')
-    }
-
-    /**
      * Clear all placement-related state.
-     * Invoked on geometry resets and run boundaries.
+     * Invoked on run boundaries.
      * Stock strategy persists across run boundaries until layout changes.
      */
     private clearPlacementState(): void {
@@ -173,6 +148,7 @@ export class GameBoxSpawner {
     private handleLayoutDetermined(event: CustomEvent<ShelfLayoutDeterminedEvent>): void {
         this.stockStrategy = event.detail.stockStrategy
         this.layoutReadyForPlacement = true
+        this.layoutDeterminedSinceLastSections = true
         GameBoxSpawner.logger.debug('Stock strategy received from ShelfLayoutDetermined')
 
         this.tryPlacePendingSections()
@@ -184,9 +160,6 @@ export class GameBoxSpawner {
     private handleShelfReady(event: CustomEvent<ShelfReadyEvent>): void {
         const { shelfIndex, sectionIndex, position, rotationY } = event.detail
         this.cacheShelfPosition(shelfIndex, sectionIndex, position, rotationY)
-        if (this.retryPendingOnShelfReady) {
-            this.tryPlacePendingSections()
-        }
     }
 
     /**
@@ -220,9 +193,17 @@ export class GameBoxSpawner {
     // Phase 2: cache sections, place when strategy is available
 
     private handleSectionsReady(event: CustomEvent<SectionsReadyEvent>): void {
+        // If SectionsReady arrives before layout computation, clear stale shelf state.
+        // If layout already arrived for this run (alternate ordering), keep the freshly
+        // computed shelf map and place immediately.
+        if (!this.layoutDeterminedSinceLastSections) {
+            this.clearPlacementState()
+        }
+
         // Cache sections for placement. Placement can be triggered by either
         // ShelfLayoutDetermined (normal order) or SectionsReady (if layout already arrived).
         this.pendingSections = event.detail
+        this.layoutDeterminedSinceLastSections = false
         GameBoxSpawner.logger.debug('SectionsReady: cached sections for placement attempt')
 
         if (this.layoutReadyForPlacement) {
@@ -260,7 +241,7 @@ export class GameBoxSpawner {
 
         if (this.placeSections(this.pendingSections)) {
             this.pendingSections = null
-            this.retryPendingOnShelfReady = false
+            this.layoutDeterminedSinceLastSections = false
         }
     }
 
@@ -300,9 +281,8 @@ export class GameBoxSpawner {
         )
 
         if (totalSectionShelves === 0) {
-            this.retryPendingOnShelfReady = true
             GameBoxSpawner.logger.debug(
-                'placeSections: no section shelves available yet; deferring placement until ShelfReady arrives'
+                'placeSections: no section shelves available for this run'
             )
             return false
         }
