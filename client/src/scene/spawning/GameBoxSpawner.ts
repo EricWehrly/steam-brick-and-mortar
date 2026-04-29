@@ -64,6 +64,7 @@ export class GameBoxSpawner {
     private stockStrategy: IStockStrategy | null = null
     private sectionsReadyCount = 0
     private layoutDeterminedCount = 0
+    private retryPendingOnShelfReady = false
 
     static {
         new GameBoxSpawner()
@@ -113,6 +114,7 @@ export class GameBoxSpawner {
         this.clearPlacementState()
         this.sectionsReadyCount = 0
         this.layoutDeterminedCount = 0
+        this.retryPendingOnShelfReady = false
         GameBoxSpawner.logger.debug('Full reset (library reload)')
     }
 
@@ -126,6 +128,7 @@ export class GameBoxSpawner {
         this.clearPlacementState()
         this.sectionsReadyCount = 0
         this.layoutDeterminedCount = 0
+        this.retryPendingOnShelfReady = false
         GameBoxSpawner.logger.debug('Geometry reset (layout switch)')
     }
 
@@ -181,6 +184,9 @@ export class GameBoxSpawner {
     private handleShelfReady(event: CustomEvent<ShelfReadyEvent>): void {
         const { shelfIndex, sectionIndex, position, rotationY } = event.detail
         this.cacheShelfPosition(shelfIndex, sectionIndex, position, rotationY)
+        if (this.retryPendingOnShelfReady) {
+            this.tryPlacePendingSections()
+        }
     }
 
     /**
@@ -258,11 +264,13 @@ export class GameBoxSpawner {
             return
         }
 
-        this.placeSections(this.pendingSections)
-        this.pendingSections = null
+        if (this.placeSections(this.pendingSections)) {
+            this.pendingSections = null
+            this.retryPendingOnShelfReady = false
+        }
     }
 
-    private placeSections(detail: SectionsReadyEvent): void {
+    private placeSections(detail: SectionsReadyEvent): boolean {
         const { sections } = detail
         const totalGames = sections.reduce((sum, s) => sum + s.games.length, 0)
 
@@ -272,28 +280,45 @@ export class GameBoxSpawner {
 
         if (!this.renderer) {
             GameBoxSpawner.logger.warn('placeSections: renderer not yet constructed')
-            return
+            return false
         }
 
         if (!this.stockStrategy) {
             GameBoxSpawner.logger.warn('placeSections: no stock strategy')
-            return
+            return false
         }
-
-        this.renderer.clearPlacements()
 
         const shelfSurfaces = ShelfSurfaceUtils.findShelfSurfaces(null, true)
         if (shelfSurfaces.length === 0) {
             GameBoxSpawner.logger.warn('placeSections: no shelf surfaces found')
-            return
+            return false
         }
+
+        const sectionShelvesByIndex = sections.map((_, sectionIndex) =>
+            [...this.shelfPositions.entries()]
+                .filter(([, shelf]) => shelf.sectionIndex === sectionIndex)
+                .sort(([a], [b]) => a - b)
+        )
+
+        const totalSectionShelves = sectionShelvesByIndex.reduce(
+            (sum, sectionShelves) => sum + sectionShelves.length,
+            0
+        )
+
+        if (totalSectionShelves === 0) {
+            this.retryPendingOnShelfReady = true
+            GameBoxSpawner.logger.debug(
+                'placeSections: no section shelves available yet; deferring placement until ShelfReady arrives'
+            )
+            return false
+        }
+
+        this.renderer.clearPlacements()
 
         let shelvesUsed = 0
         for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
             const section = sections[sectionIndex]
-            const sectionShelves = [...this.shelfPositions.entries()]
-                .filter(([, shelf]) => shelf.sectionIndex === sectionIndex)
-                .sort(([a], [b]) => a - b)
+            const sectionShelves = sectionShelvesByIndex[sectionIndex]
 
             const gameQueue = [...section.games] as SteamGameData[]
             for (const [shelfIndex, shelfPos] of sectionShelves) {
@@ -321,6 +346,7 @@ export class GameBoxSpawner {
         GameBoxSpawner.logger.debug(
             `Placement intents emitted across ${shelvesUsed} shelves`
         )
+        return true
     }
 
     // -------------------------------------------------------------------------
