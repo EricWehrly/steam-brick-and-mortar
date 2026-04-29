@@ -15,6 +15,7 @@ import type { Section } from '../../types/LayoutTypes'
 import { GroupModes } from '../../types/LayoutTypes'
 import type { GroupMode, SortMode } from '../../types/LayoutTypes'
 import { KNOWN_GENRES, groupByGenre, primaryGenre } from './GameSortFunctions'
+import { getTopSteamSpyTags } from '../../steam/utils/SteamSpyTags'
 
 // ─── Recency bucket helpers ──────────────────────────────────────────────────
 
@@ -87,6 +88,8 @@ export const RATING_TIERS = [
     { minScore:  0, key: 'unrated',                 label: 'Unrated' },
 ] as const
 
+
+
 // ─── GroupResolver ────────────────────────────────────────────────────────────
 
 /**
@@ -116,6 +119,9 @@ export function resolveGroups(
 
         case GroupModes.ByRating:
             return groupByRatingMode(games, groupMode, sortMode)
+
+        case GroupModes.ByTag:
+            return groupByTagMode(games, groupMode, sortMode)
     }
 }
 
@@ -184,4 +190,30 @@ function groupByRatingMode(games: SteamGameData[], groupMode: GroupMode, sortMod
     return RATING_TIERS
         .filter(t => groups.has(t.key))
         .map(t => ({ name: t.label, games: groups.get(t.key)!, groupMode, sortMode }))
+}
+
+function groupByTagMode(games: SteamGameData[], groupMode: GroupMode, sortMode: SortMode): Section[] {
+    const groups = new Map<string, SteamGameData[]>()
+
+    for (const game of games) {
+        const topTags = game.steamspy_top_tags?.length
+            ? game.steamspy_top_tags
+            : getTopSteamSpyTags(game.steamspy_tags)
+        const uniqueTags = [...new Set(topTags)]
+
+        if (uniqueTags.length === 0) continue
+
+        for (const tag of uniqueTags) {
+            if (!groups.has(tag)) groups.set(tag, [])
+            groups.get(tag)!.push(game)
+        }
+    }
+
+    return [...groups.keys()]
+        .sort((a, b) => {
+            const countDiff = groups.get(b)!.length - groups.get(a)!.length
+            if (countDiff !== 0) return countDiff
+            return a.localeCompare(b, undefined, { sensitivity: 'base' })
+        })
+        .map(tag => ({ name: tag, games: groups.get(tag)!, groupMode, sortMode }))
 }

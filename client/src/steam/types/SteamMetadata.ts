@@ -41,6 +41,7 @@ export interface SteamGameMetadata {
     
     // SteamSpy Hydrator Data
     steamspy_tags?: Record<string, number>
+    steamspy_top_tags?: string[]
     positive?: number
     negative?: number
     userscore?: number

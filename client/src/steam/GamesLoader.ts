@@ -5,6 +5,7 @@ import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT, MAIN_THREAD_CONTEXT } from '../utils/PerformanceMonitor'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
+import { getTopSteamSpyTags } from './utils/SteamSpyTags'
 import type {
     SteamGamesBatchEvent,
     SteamNetworkFetchProgressEvent,
@@ -272,6 +273,7 @@ export class GamesLoader {
             metacritic: appDetails?.metacritic,
             short_description: appDetails?.short_description,
             steamspy_tags: appDetails?.steamspy_tags,
+            steamspy_top_tags: getTopSteamSpyTags(appDetails?.steamspy_tags),
             positive: appDetails?.positive,
             negative: appDetails?.negative,
             userscore: appDetails?.userscore,

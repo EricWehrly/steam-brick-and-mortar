@@ -32,6 +32,7 @@ const LAYOUT_OPTIONS = [
 const GROUP_OPTIONS = [
     { key: GroupModes.ByRecency,  label: 'By Recency'  },
     { key: GroupModes.ByGenre,    label: 'By Genre'     },
+    { key: GroupModes.ByTag,      label: 'By Tag'       },
     { key: GroupModes.ByPlaytime, label: 'By Playtime'  },
     { key: GroupModes.ByRating,   label: 'By Rating'    },
     { key: GroupModes.None,       label: 'Ungrouped'    },
