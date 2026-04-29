@@ -62,8 +62,7 @@ export class GameBoxSpawner {
     private pendingSections: SectionsReadyEvent | null = null
 
     private stockStrategy: IStockStrategy | null = null
-    private sectionsReadyCount = 0
-    private layoutDeterminedCount = 0
+    private layoutReadyForPlacement = false
     private retryPendingOnShelfReady = false
 
     static {
@@ -111,9 +110,8 @@ export class GameBoxSpawner {
         this.renderer?.dispose()
         this.renderer = null
         this.stockStrategy = null
+        this.layoutReadyForPlacement = false
         this.clearPlacementState()
-        this.sectionsReadyCount = 0
-        this.layoutDeterminedCount = 0
         this.retryPendingOnShelfReady = false
         GameBoxSpawner.logger.debug('Full reset (library reload)')
     }
@@ -125,9 +123,8 @@ export class GameBoxSpawner {
     private geometryReset(): void {
         this.renderer?.clearPlacements()
         this.stockStrategy = null
+        this.layoutReadyForPlacement = false
         this.clearPlacementState()
-        this.sectionsReadyCount = 0
-        this.layoutDeterminedCount = 0
         this.retryPendingOnShelfReady = false
         GameBoxSpawner.logger.debug('Geometry reset (layout switch)')
     }
@@ -172,7 +169,7 @@ export class GameBoxSpawner {
 
     private handleLayoutDetermined(event: CustomEvent<ShelfLayoutDeterminedEvent>): void {
         this.stockStrategy = event.detail.stockStrategy
-        this.layoutDeterminedCount++
+        this.layoutReadyForPlacement = true
         GameBoxSpawner.logger.debug('Stock strategy received from ShelfLayoutDetermined')
 
         this.tryPlacePendingSections()
@@ -220,20 +217,14 @@ export class GameBoxSpawner {
     // Phase 2: cache sections, place when strategy is available
 
     private handleSectionsReady(event: CustomEvent<SectionsReadyEvent>): void {
-        this.sectionsReadyCount++
-
         // Cache sections for placement. Placement can be triggered by either
         // ShelfLayoutDetermined (normal order) or SectionsReady (if layout already arrived).
         this.pendingSections = event.detail
         GameBoxSpawner.logger.debug('SectionsReady: cached sections for placement attempt')
 
-        if (this.isLayoutReadyForPendingSections()) {
+        if (this.layoutReadyForPlacement) {
             this.tryPlacePendingSections()
         }
-    }
-
-    private isLayoutReadyForPendingSections(): boolean {
-        return this.layoutDeterminedCount >= this.sectionsReadyCount
     }
 
     private canPlacePendingSections(): boolean {
