@@ -93,6 +93,7 @@ const STEAM_EFFECTIVE_MAX_HEIGHT = 450
  */
 export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     public static logger = Logger.createLogFunctions(LodArtworkOrchestrator.name)
+    private static readonly MAX_MISSING_PREFETCH_WARNINGS = 10
 
     /**
      * Factory: construct with LOD config derived from AppSettings.
@@ -159,6 +160,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
     // Track failed artwork (for backward compat)
     private failedArtwork: Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> = new Map()
+    private missingPrefetchWarningCount: number = 0
 
     // Resolved artwork URLs for prefetched games, keyed by game name.
     // Used by placeInstance() to pass the final CDN URL to the renderer.
@@ -413,7 +415,14 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     ): number {
         const textureIndex = this.gameNameToTextureIndex.get(gameName)
         if (textureIndex === undefined) {
-            LodArtworkOrchestrator.logger.warn(`placeInstance: no prefetched texture for "${gameName}" (appId ${appid})`)
+            if (this.missingPrefetchWarningCount < LodArtworkOrchestrator.MAX_MISSING_PREFETCH_WARNINGS) {
+                LodArtworkOrchestrator.logger.warn(`placeInstance: no prefetched texture for "${gameName}" (appId ${appid})`)
+            } else if (this.missingPrefetchWarningCount === LodArtworkOrchestrator.MAX_MISSING_PREFETCH_WARNINGS) {
+                LodArtworkOrchestrator.logger.warn(
+                    `placeInstance: additional missing prefetched texture warnings suppressed after ${LodArtworkOrchestrator.MAX_MISSING_PREFETCH_WARNINGS} entries`
+                )
+            }
+            this.missingPrefetchWarningCount++
             return -1
         }
 

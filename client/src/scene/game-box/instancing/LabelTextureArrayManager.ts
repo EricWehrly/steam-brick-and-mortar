@@ -17,6 +17,7 @@ export class LabelTextureArrayManager {
     private readonly maxTextureCapacity: number
     private managedArray: ManagedTextureArray
     private nextTextureIndex: number = 0
+    private hasLoggedTextureCapacity: boolean = false
 
     // Shared canvas for text rendering — created once, reused per label
     private readonly sharedCanvas: HTMLCanvasElement
@@ -63,7 +64,12 @@ export class LabelTextureArrayManager {
         }
 
         if (this.nextTextureIndex >= this.managedArray.depth) {
-            console.error(`🚫 [LabelTextureArrayManager] Maximum textures reached (${this.managedArray.depth})`)
+            if (!this.hasLoggedTextureCapacity) {
+                console.error(
+                    `🚫 [LabelTextureArrayManager] Maximum textures reached (${this.managedArray.depth}); suppressing repeated errors`
+                )
+                this.hasLoggedTextureCapacity = true
+            }
             throw new Error('Maximum label textures reached')
         }
 
