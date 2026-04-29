@@ -699,7 +699,9 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
             eventManager.emit(UIEventTypes.ArrangementRequested, { groupMode: 'by-recency', sortMode: 'by-last-played' } as any)
             expect(mockRendererDispose).not.toHaveBeenCalled()
-            expect(mockClearPlacements).toHaveBeenCalled()
+            // clearPlacements is called inside placeSections() before new placement,
+            // not immediately on ArrangementRequested.
+            expect(mockClearPlacements).not.toHaveBeenCalled()
         })
     })
 
@@ -728,7 +730,9 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
             eventManager.emit(UIEventTypes.LayoutRequested, { layoutMode: 'grid' } as any)
 
-            expect(mockClearPlacements).toHaveBeenCalledTimes(1)
+            // clearPlacements is NOT called immediately on LayoutRequested — it fires
+            // atomically inside placeSections() just before new games are placed.
+            expect(mockClearPlacements).toHaveBeenCalledTimes(0)
 
             mockClearPlacements.mockClear()
 
@@ -797,7 +801,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
                 { appid: run2Game.appid, gameName: run2Game.name }
             )
 
-            expect(mockClearPlacements).toHaveBeenCalledTimes(1)
+            // clearPlacements not called yet — placement deferred until shelves arrive
+            expect(mockClearPlacements).toHaveBeenCalledTimes(0)
             expect(mockPlaceGame).toHaveBeenCalledTimes(0)
 
             eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0, new THREE.Vector3(4, 0, 0), 0, 0))
