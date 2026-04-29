@@ -221,13 +221,20 @@ class StorePropsCoordinator {
             const BATCH_SIZE = 18
             const totalBatches = Math.ceil(games.length / BATCH_SIZE)
 
-            this.eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
-                totalGames: games.length,
-            })
+            // Important ordering: layout-switch replay must happen after all
+            // LayoutRequested handlers complete their reset logic (spawner,
+            // rendezvous coordinator, batch state). Emitting replay events
+            // synchronously here can place games during the same dispatch, then
+            // have later handlers clear that fresh state.
+            queueMicrotask(() => {
+                this.eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+                    totalGames: games.length,
+                })
 
-            this.eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, {
-                totalGames: games.length,
-                totalBatches,
+                this.eventManager.emit<GameDataReadyEvent>(GameEventTypes.GameDataReady, {
+                    totalGames: games.length,
+                    totalBatches,
+                })
             })
         }
     }

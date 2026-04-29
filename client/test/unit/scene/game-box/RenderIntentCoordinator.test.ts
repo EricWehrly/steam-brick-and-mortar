@@ -135,6 +135,41 @@ describe('RenderIntentCoordinator', () => {
         coordinator.dispose()
     })
 
+    it('preserves settled artwork across ArrangementRequested so replay can resolve', () => {
+        const coordinator = new RenderIntentCoordinator()
+        const resolved: PlacementResolvedEvent[] = []
+
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementResolved,
+            (event: CustomEvent<PlacementResolvedEvent>) => resolved.push(event.detail)
+        )
+
+        EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
+            GameRenderEventTypes.ArtworkIntentSettled,
+            { appid: 77, gameName: 'Game 77' }
+        )
+
+        EventManager.getInstance().emit<ArrangementRequestedEvent>(
+            UIEventTypes.ArrangementRequested,
+            { groupMode: 'genre', sortMode: 'name-asc' } as any
+        )
+
+        EventManager.getInstance().emit<PlacementIntentReadyEvent>(
+            GameRenderEventTypes.PlacementIntentReady,
+            {
+                appid: 77,
+                game: makeGame(77),
+                position: new THREE.Vector3(7, 0, 0),
+                rotation: new THREE.Quaternion(),
+            } as any
+        )
+
+        expect(resolved).toHaveLength(1)
+        expect(resolved[0]?.appid).toBe(77)
+
+        coordinator.dispose()
+    })
+
     it('does not replay stale intents after reset on re-sort, but resolves new intents', () => {
         const coordinator = new RenderIntentCoordinator()
         const resolved: PlacementResolvedEvent[] = []
@@ -215,6 +250,41 @@ describe('RenderIntentCoordinator', () => {
         )
 
         expect(resolved).toHaveLength(0)
+
+        coordinator.dispose()
+    })
+
+    it('preserves settled artwork across LayoutRequested so replay can resolve', () => {
+        const coordinator = new RenderIntentCoordinator()
+        const resolved: PlacementResolvedEvent[] = []
+
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementResolved,
+            (event: CustomEvent<PlacementResolvedEvent>) => resolved.push(event.detail)
+        )
+
+        EventManager.getInstance().emit<ArtworkIntentSettledEvent>(
+            GameRenderEventTypes.ArtworkIntentSettled,
+            { appid: 88, gameName: 'Game 88' }
+        )
+
+        EventManager.getInstance().emit<LayoutRequestedEvent>(
+            UIEventTypes.LayoutRequested,
+            { layoutMode: 'arc' } as any
+        )
+
+        EventManager.getInstance().emit<PlacementIntentReadyEvent>(
+            GameRenderEventTypes.PlacementIntentReady,
+            {
+                appid: 88,
+                game: makeGame(88),
+                position: new THREE.Vector3(8, 0, 0),
+                rotation: new THREE.Quaternion(),
+            } as any
+        )
+
+        expect(resolved).toHaveLength(1)
+        expect(resolved[0]?.appid).toBe(88)
 
         coordinator.dispose()
     })

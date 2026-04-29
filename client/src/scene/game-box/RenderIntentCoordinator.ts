@@ -19,11 +19,13 @@ export class RenderIntentCoordinator {
     private readonly boundHandleArtworkIntentSettled: (event: CustomEvent<ArtworkIntentSettledEvent>) => void
     private readonly boundHandlePlacementIntentReady: (event: CustomEvent<PlacementIntentReadyEvent>) => void
     private readonly boundHandleRunResetRequested: (event: CustomEvent<unknown>) => void
+    private readonly boundHandleLibraryReloadRequested: (event: CustomEvent<unknown>) => void
 
     public constructor() {
         this.boundHandleArtworkIntentSettled = this.handleArtworkIntentSettled.bind(this)
         this.boundHandlePlacementIntentReady = this.handlePlacementIntentReady.bind(this)
         this.boundHandleRunResetRequested = this.handleRunResetRequested.bind(this)
+        this.boundHandleLibraryReloadRequested = this.handleLibraryReloadRequested.bind(this)
 
         EventManager.getInstance().registerEventHandler(
             GameRenderEventTypes.ArtworkIntentSettled,
@@ -43,7 +45,7 @@ export class RenderIntentCoordinator {
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.LibraryReloadRequest,
-            this.boundHandleRunResetRequested
+            this.boundHandleLibraryReloadRequested
         )
     }
 
@@ -66,10 +68,10 @@ export class RenderIntentCoordinator {
         )
         EventManager.getInstance().deregisterEventHandler(
             StorePropsEventTypes.LibraryReloadRequest,
-            this.boundHandleRunResetRequested
+            this.boundHandleLibraryReloadRequested
         )
 
-        this.clearRunState()
+        this.clearAllState()
     }
 
     private handleArtworkIntentSettled(event: CustomEvent<ArtworkIntentSettledEvent>): void {
@@ -87,11 +89,19 @@ export class RenderIntentCoordinator {
     }
 
     private handleRunResetRequested(_event: CustomEvent<unknown>): void {
-        this.clearRunState()
+        this.clearPendingState()
     }
 
-    private clearRunState(): void {
+    private handleLibraryReloadRequested(_event: CustomEvent<unknown>): void {
+        this.clearAllState()
+    }
+
+    private clearPendingState(): void {
         this.pendingPlacementIntents.clear()
+    }
+
+    private clearAllState(): void {
+        this.clearPendingState()
         this.settledAppIds.clear()
     }
 

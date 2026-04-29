@@ -119,9 +119,12 @@ export class GameBoxSpawner {
     /**
      * Geometry reset — on layout/group/sort switches.
      * Keeps the renderer and prefetch cache; only clears placement state.
+     * Note: renderer.clearPlacements() is NOT called here — placeSections() handles
+     * it atomically just before placing new games. Calling it here would wipe games
+     * placed by StorePropsCoordinator's LayoutRequested handler, which fires before
+     * this geometryReset (handler registration order).
      */
     private geometryReset(): void {
-        this.renderer?.clearPlacements()
         this.stockStrategy = null
         this.layoutReadyForPlacement = false
         this.clearPlacementState()
