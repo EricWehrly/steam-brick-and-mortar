@@ -6,6 +6,7 @@ import { PerformanceMonitor, ASYNC_CONTEXT, MAIN_THREAD_CONTEXT } from '../utils
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
 import { getTopSteamSpyTags } from './utils/SteamSpyTags'
+import { GameLayoutConstants } from '../scene/props/shared/GameBoxUtils'
 import type {
     SteamGamesBatchEvent,
     SteamNetworkFetchProgressEvent,
@@ -47,7 +48,7 @@ export class GamesLoader {
         } = {}
     ): Promise<SteamGame[]> {
         const { maxGames = 9999, sortFn } = options
-        const BATCH_SIZE = 18 // One shelf's worth
+        const BATCH_SIZE = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
 
         const sortedGames = this.sortAndLimitGames(steamUser.games, maxGames, sortFn)
         const appids = sortedGames.map(g => g.appid)

@@ -10,12 +10,15 @@ import {
     type StorePropsProgressEvent,
 } from '../../types/InteractionEvents'
 import { LayoutRegistry } from '../props/shared/LayoutRegistry'
-import type { LayoutMode, Section, SectionShelfInfo, ShelfInfo } from '../../types/LayoutTypes'
+import type { LayoutMode, SectionShelfInfo, ShelfInfo } from '../../types/LayoutTypes'
 import type { ISectionAwareLayoutDefinition } from '../props/shared/ILayoutDefinition'
 import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
+import { GameLayoutConstants } from '../props/shared/GameBoxUtils'
 
 /** Slots-per-shelf: used to convert game count → shelf count per section. */
-const SLOTS_PER_SHELF = 18
+const SLOTS_PER_SHELF = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
+// CONFIG-CANDIDATE(layout-capacity): expose as lighting/layout tuning once section streaming is implemented.
+const MAX_SHELVES_PER_ROW = 12
 
 /**
  * ShelfLayoutCoordinator
@@ -141,16 +144,34 @@ export class ShelfLayoutCoordinator {
 
         // ShelfLayoutDetermined fires after ShelfReady so GameBoxSpawner has positions
         // when placement is triggered by the strategy arriving.
+        const shelvesPerRow = this.deriveShelvesPerRow(shelves)
+        const rowCount = Math.max(1, Math.ceil(shelves.length / shelvesPerRow))
+
         EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(
             GameEventTypes.ShelfLayoutDetermined,
             {
                 shelfBounds: bounds,
-                shelfLayout: { rows: (shelves[shelves.length - 1]?.row ?? 0) + 1 },
+                shelfLayout: {
+                    rows: rowCount,
+                    shelvesPerRow,
+                },
                 stockStrategy: LayoutRegistry[this.layoutMode].createStockStrategy(),
             }
         )
 
         ShelfLayoutCoordinator.logger.debug(`ShelfReady emitted for ${emitted} shelves, layout determined`)
+    }
+
+    private deriveShelvesPerRow(shelves: ReadonlyArray<SectionShelfInfo>): number {
+        if (shelves.length === 0) return 1
+
+        const shelfCountByRow = new Map<number, number>()
+        for (const shelf of shelves) {
+            shelfCountByRow.set(shelf.row, (shelfCountByRow.get(shelf.row) ?? 0) + 1)
+        }
+
+        const widestRow = Math.max(...shelfCountByRow.values())
+        return Math.min(MAX_SHELVES_PER_ROW, Math.max(1, widestRow))
     }
 
     private computeShelvesByLinearSectionOwnership(

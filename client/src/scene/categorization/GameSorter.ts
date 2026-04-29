@@ -21,17 +21,23 @@
  * Re-exports bucket helpers (moved to GroupResolver) for backward-compat callers.
  */
 
-import { EventManager, EventSource } from '../../core/EventManager'
+import { EventManager } from '../../core/EventManager'
 import { DataManager } from '../../core/data/DataManager'
 import { Logger } from '../../utils/Logger'
 import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import { GroupModes, SortModes } from '../../types/LayoutTypes'
 import type { GroupMode, SortMode } from '../../types/LayoutTypes'
 import type { SectionsReadyEvent, ArrangementRequestedEvent } from '../../types/EnvironmentEvents'
+import type { Section } from '../../types/LayoutTypes'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { SteamIntegration } from '../../steam-integration/SteamIntegration'
 import { resolveGroups } from './GroupResolver'
 import { sortSections } from './SectionSorter'
+import { GameLayoutConstants } from '../props/shared/GameBoxUtils'
+
+const SHELF_BATCH_SIZE = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
+// CONFIG-CANDIDATE(layout-capacity): promote to AppSettings/UI once progressive section loading lands.
+const MAX_SHELVES_PER_ARRANGEMENT = 180
 
 // Re-export bucket helpers so existing callers don't break
 export {
@@ -92,7 +98,8 @@ export class GameSorter {
         }
 
         const grouped = resolveGroups([...games] as SteamGameData[], groupMode, sortMode)
-        const sections = sortSections(grouped, sortMode)
+        const sortedSections = sortSections(grouped, sortMode)
+        const sections = this.limitSectionsToShelfBudget(sortedSections, groupMode)
 
         EventManager.getInstance().emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
             sections,
@@ -103,5 +110,31 @@ export class GameSorter {
             `SectionsReady emitted: ${sections.length} sections, ` +
             `group=${groupMode}, sort=${sortMode}, ${games.length} games`
         )
+    }
+
+    private limitSectionsToShelfBudget(sections: ReadonlyArray<Section>, groupMode: GroupMode): Section[] {
+        let usedShelves = 0
+        const limited: Section[] = []
+
+        for (const section of sections) {
+            const sectionShelves = Math.max(1, Math.ceil(section.games.length / SHELF_BATCH_SIZE))
+            if (usedShelves + sectionShelves > MAX_SHELVES_PER_ARRANGEMENT) {
+                break
+            }
+            limited.push(section)
+            usedShelves += sectionShelves
+        }
+
+        if (limited.length < sections.length) {
+            const droppedSections = sections.length - limited.length
+            const droppedGames = sections.slice(limited.length).reduce((sum, section) => sum + section.games.length, 0)
+            GameSorter.logger.warn(
+                `Arrangement capped in ${groupMode}: using ${limited.length}/${sections.length} sections ` +
+                `(${usedShelves}/${MAX_SHELVES_PER_ARRANGEMENT} shelves), deferred ${droppedSections} sections ` +
+                `(${droppedGames} game placements)`
+            )
+        }
+
+        return limited
     }
 }
