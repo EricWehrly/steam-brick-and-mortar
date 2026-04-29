@@ -32,6 +32,10 @@ export class InstancedLabelRenderer {
     private gameNameToTextureIndex: Map<string, number> = new Map()
     private hasWarnedNoLabelSlots: boolean = false
     private hasWarnedLabelTextureCapacity: boolean = false
+    private runNoSlotFailures: number = 0
+    private runTextureCapacityFailures: number = 0
+    private runTextureOtherFailures: number = 0
+    private hasLoggedRunFailureSummary: boolean = false
 
     private readonly boundHandleSomeBatchesComplete: (event: CustomEvent<SomeBatchesCompleteEvent>) => void
     private readonly boundHandleArtworkSettled: () => void
@@ -84,14 +88,13 @@ export class InstancedLabelRenderer {
         }
 
         if (this.nextInstanceIndex >= this.maxInstances) {
+            this.runNoSlotFailures++
             if (!this.hasWarnedNoLabelSlots) {
                 console.warn(`No label slots remaining (${this.maxInstances}); suppressing repeated warnings until clear/dispose`)
                 this.hasWarnedNoLabelSlots = true
             }
             return false
         }
-
-        const index = this.nextInstanceIndex++
 
         let textureIndex = this.gameNameToTextureIndex.get(gameName)
         if (textureIndex === undefined) {
@@ -101,16 +104,20 @@ export class InstancedLabelRenderer {
             } catch (error) {
                 const isCapacityError = error instanceof Error && error.message === 'Maximum label textures reached'
                 if (isCapacityError) {
+                    this.runTextureCapacityFailures++
                     if (!this.hasWarnedLabelTextureCapacity) {
                         console.warn('Failed to add label textures: maximum label texture capacity reached; suppressing repeated warnings')
                         this.hasWarnedLabelTextureCapacity = true
                     }
                 } else {
+                    this.runTextureOtherFailures++
                     console.warn(`Failed to add texture for game: ${gameName}`, error)
                 }
                 return false
             }
         }
+
+        const index = this.nextInstanceIndex++
 
         // rotation encodes shelf orientation and front/back side — always passed by callers.
         // Fallback to identity if somehow called without rotation (shouldn't happen in practice).
@@ -139,7 +146,7 @@ export class InstancedLabelRenderer {
     public clear(): void {
         this.currentCount = 0
         this.nextInstanceIndex = 0
-        this.hasWarnedNoLabelSlots = false
+        this.resetRunDiagnostics()
         if (this.instancedMesh) {
             this.instancedMesh.count = 0
         }
@@ -184,8 +191,7 @@ export class InstancedLabelRenderer {
         this.isInitialized = false
         this.currentCount = 0
         this.nextInstanceIndex = 0
-        this.hasWarnedNoLabelSlots = false
-        this.hasWarnedLabelTextureCapacity = false
+        this.resetRunDiagnostics()
 
         // Clear metadata so a new renderer instance doesn't inherit stale instanceId → game
         // entries, which would cause wrong-game-on-click after reload.
@@ -259,6 +265,26 @@ export class InstancedLabelRenderer {
             this.material.uniforms['textureArray'].value = newTexture
             this.material.needsUpdate = true
         }
+
+        if (!this.hasLoggedRunFailureSummary) {
+            const totalFailures = this.runNoSlotFailures + this.runTextureCapacityFailures + this.runTextureOtherFailures
+            if (totalFailures > 0) {
+                console.warn(
+                    `[InstancedLabelRenderer] fallback-label failures this run: ` +
+                    `no-slot=${this.runNoSlotFailures}, texture-capacity=${this.runTextureCapacityFailures}, texture-other=${this.runTextureOtherFailures}`
+                )
+            }
+            this.hasLoggedRunFailureSummary = true
+        }
+    }
+
+    private resetRunDiagnostics(): void {
+        this.hasWarnedNoLabelSlots = false
+        this.hasWarnedLabelTextureCapacity = false
+        this.runNoSlotFailures = 0
+        this.runTextureCapacityFailures = 0
+        this.runTextureOtherFailures = 0
+        this.hasLoggedRunFailureSummary = false
     }
 
     private createLabelMaterial(textureArray: THREE.DataArrayTexture): THREE.ShaderMaterial {
