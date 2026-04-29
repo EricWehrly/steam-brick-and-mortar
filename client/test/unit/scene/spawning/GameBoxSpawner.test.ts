@@ -704,7 +704,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
     })
 
     describe('LayoutRequested — placement replay', () => {
-        it('does not clear placements until the next SectionsReady run starts', async () => {
+        it('clears placements immediately and replays on the next sections run', async () => {
             const games = createMockGamesWithArtwork(4, 0) as any[]
 
             eventManager.emit<BatchReadyForPlacementEvent>(
@@ -728,7 +728,9 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
             eventManager.emit(UIEventTypes.LayoutRequested, { layoutMode: 'grid' } as any)
 
-            expect(mockClearPlacements).not.toHaveBeenCalled()
+            expect(mockClearPlacements).toHaveBeenCalledTimes(1)
+
+            mockClearPlacements.mockClear()
 
             eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
                 sections: [{ name: 'Test', games: [...games].reverse() as any, groupMode: 'by-recency', sortMode: 'by-last-played' }],
@@ -747,6 +749,66 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
 
             expect(mockClearPlacements).toHaveBeenCalledTimes(1)
             expect(mockPlaceGame).toHaveBeenCalledTimes(4)
+        })
+
+        it('does not place against stale shelf positions after a layout switch', async () => {
+            const run1Game = createMockGamesWithArtwork(1, 0)[0] as any
+            const run2Game = createMockGamesWithArtwork(1, 1)[0] as any
+
+            eventManager.emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                { games: [run1Game], batchIndex: 0, totalBatches: 1 }
+            )
+            await Promise.resolve()
+
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                sections: [{ name: 'Run1', games: [run1Game], groupMode: 'by-recency', sortMode: 'by-last-played' }],
+                groupMode: 'by-recency',
+                sortMode: 'by-last-played',
+            })
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0, new THREE.Vector3(0, 0, 0), 0, 0))
+            emitShelfLayoutDetermined(eventManager)
+            eventManager.emit<ArtworkIntentSettledEvent>(
+                GameRenderEventTypes.ArtworkIntentSettled,
+                { appid: run1Game.appid, gameName: run1Game.name }
+            )
+
+            expect(mockPlaceGame).toHaveBeenCalledTimes(1)
+
+            mockPlaceGame.mockClear()
+            mockClearPlacements.mockClear()
+
+            eventManager.emit(UIEventTypes.LayoutRequested, { layoutMode: 'grid' } as any)
+
+            eventManager.emit<BatchReadyForPlacementEvent>(
+                StorePropsEventTypes.BatchReadyForPlacement,
+                { games: [run2Game], batchIndex: 0, totalBatches: 1 }
+            )
+            await Promise.resolve()
+
+            eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                sections: [{ name: 'Run2', games: [run2Game], groupMode: 'by-recency', sortMode: 'by-last-played' }],
+                groupMode: 'by-recency',
+                sortMode: 'by-last-played',
+            })
+
+            eventManager.emit<ArtworkIntentSettledEvent>(
+                GameRenderEventTypes.ArtworkIntentSettled,
+                { appid: run2Game.appid, gameName: run2Game.name }
+            )
+
+            expect(mockClearPlacements).toHaveBeenCalledTimes(1)
+            expect(mockPlaceGame).toHaveBeenCalledTimes(0)
+
+            eventManager.emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, makeShelfReady(0, new THREE.Vector3(4, 0, 0), 0, 0))
+            emitShelfLayoutDetermined(eventManager)
+            eventManager.emit<ArtworkIntentSettledEvent>(
+                GameRenderEventTypes.ArtworkIntentSettled,
+                { appid: run2Game.appid, gameName: run2Game.name }
+            )
+
+            expect(mockPlaceGame).toHaveBeenCalledTimes(1)
+            expect(mockPlaceGame.mock.calls[0][0].appid).toBe(run2Game.appid)
         })
     })
 
