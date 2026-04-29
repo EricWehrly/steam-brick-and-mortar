@@ -1,7 +1,7 @@
 import { EventManager } from '../../core/EventManager'
 import {
     GameRenderEventTypes,
-    UIEventTypes,
+    GameEventTypes,
     StorePropsEventTypes,
     type ArtworkIntentSettledEvent,
     type PlacementResolvedEvent,
@@ -36,11 +36,7 @@ export class RenderIntentCoordinator {
             this.boundHandlePlacementIntentReady
         )
         EventManager.getInstance().registerEventHandler(
-            UIEventTypes.ArrangementRequested,
-            this.boundHandleRunResetRequested
-        )
-        EventManager.getInstance().registerEventHandler(
-            UIEventTypes.LayoutRequested,
+            GameEventTypes.SectionsReady,
             this.boundHandleRunResetRequested
         )
         EventManager.getInstance().registerEventHandler(
@@ -59,11 +55,7 @@ export class RenderIntentCoordinator {
             this.boundHandlePlacementIntentReady
         )
         EventManager.getInstance().deregisterEventHandler(
-            UIEventTypes.ArrangementRequested,
-            this.boundHandleRunResetRequested
-        )
-        EventManager.getInstance().deregisterEventHandler(
-            UIEventTypes.LayoutRequested,
+            GameEventTypes.SectionsReady,
             this.boundHandleRunResetRequested
         )
         EventManager.getInstance().deregisterEventHandler(
