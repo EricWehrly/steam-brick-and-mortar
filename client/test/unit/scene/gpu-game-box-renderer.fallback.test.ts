@@ -88,11 +88,10 @@ describe('GpuGameBoxRenderer — pure execution surface', () => {
         expect(labelAddInstanceSpy.mock.calls[1][1]).toBe('Game B')
     })
 
-    it('clearPlacements resets instanced label renderer', () => {
+    it('constructs and places label boxes without requiring a renderer clear API', () => {
         const renderer = new GpuGameBoxRenderer(10)
-        renderer.placeLabelBox({ appid: 1, name: 'Game A' } as any, new THREE.Vector3(0, 0, 0), new THREE.Quaternion())
-
-        // clearPlacements should not throw even after label boxes placed
-        expect(() => renderer.clearPlacements()).not.toThrow()
+        expect(() => {
+            renderer.placeLabelBox({ appid: 1, name: 'Game A' } as any, new THREE.Vector3(0, 0, 0), new THREE.Quaternion())
+        }).not.toThrow()
     })
 })

@@ -3,7 +3,7 @@
  *
  * GpuGameBoxRenderer is now a thin coordinator: it constructs
  * LodArtworkOrchestratorDebug (via fromAppSettings) and InstancedLabelRenderer,
- * and provides placeGame() / clearPlacements() / dispose().
+ * and wires placement-resolved handling plus dispose().
  *
  * The LodDistanceManager lifecycle tests that previously lived here have moved:
  * LodDistanceManager is now owned by LodArtworkOrchestratorDebug and
@@ -121,10 +121,14 @@ describe('GpuGameBoxRenderer', () => {
         expect(mockAddLabelInstance).toHaveBeenCalledTimes(1)
     })
 
-    it('clearPlacements: clears both artwork and label renderers', () => {
-        renderer.clearPlacements()
-        expect(mockClearPlacements).toHaveBeenCalledTimes(1)
-        expect(mockLabelClear).toHaveBeenCalledTimes(1)
+    it('does not subscribe directly to PlacementRunResetRequested', () => {
+        const resetRegistrations = mockRegisterEventHandler.mock.calls.filter(
+            (call: unknown[]) => call[0] === GameRenderEventTypes.PlacementRunResetRequested
+        )
+        const rendererOwnedRegistration = resetRegistrations.find(
+            (call: unknown[]) => String((call[1] as Function)?.name ?? '').includes('handlePlacementRunResetRequested')
+        )
+        expect(rendererOwnedRegistration).toBeFalsy()
     })
 
     it('dispose: disposes both renderers', () => {

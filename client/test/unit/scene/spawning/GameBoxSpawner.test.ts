@@ -47,7 +47,6 @@ vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
         GpuGameBoxRenderer: vi.fn().mockImplementation(function() {
             this.prefetchArtwork = mockPrefetchArtwork
             this.placeGame = mockPlaceGame
-            this.clearPlacements = vi.fn(() => mockClearPlacements())
             this.addToScene = vi.fn()
             this.updateLODForCamera = vi.fn()
             const coordinator = new ArtworkPrefetchCoordinator({ renderer: this })
@@ -177,6 +176,14 @@ function wireRenderIntentRendezvous(em: EventManager): () => void {
             pending.push(event.detail)
             pendingIntents.set(event.detail.appid, pending)
             flush(event.detail.appid)
+        }
+    )
+
+    em.registerEventHandler(
+        GameRenderEventTypes.PlacementRunResetRequested,
+        () => {
+            pendingIntents.clear()
+            mockClearPlacements()
         }
     )
 

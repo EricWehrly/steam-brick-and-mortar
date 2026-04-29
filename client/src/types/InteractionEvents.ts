@@ -228,6 +228,8 @@ export interface PlacementResolvedEvent extends BaseInteractionEvent {
     rotation: THREE.Quaternion
 }
 
+export interface PlacementRunResetRequestedEvent extends BaseInteractionEvent {}
+
 // =============================================================================
 // STORE PROPS EVENTS
 // =============================================================================
@@ -325,6 +327,7 @@ export const GameEventTypes = {
 } as const
 
 export const GameRenderEventTypes = {
+    PlacementRunResetRequested: 'game-render:placement-run-reset-requested',
     ArtworkIntentSettled: 'game-render:artwork-intent-settled',
     PlacementIntentReady: 'game-render:placement-intent-ready',
     PlacementResolved: 'game-render:placement-resolved',

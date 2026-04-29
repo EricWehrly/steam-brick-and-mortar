@@ -1,7 +1,11 @@
 import * as THREE from 'three'
 import { LabelTextureArrayManager } from './LabelTextureArrayManager'
 import { EventManager } from '../../../core/EventManager'
-import { GameEventTypes } from '../../../types/InteractionEvents'
+import {
+    GameEventTypes,
+    GameRenderEventTypes,
+    type PlacementRunResetRequestedEvent,
+} from '../../../types/InteractionEvents'
 import type { SomeBatchesCompleteEvent } from '../../../types/EnvironmentEvents'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
@@ -33,6 +37,7 @@ export class InstancedLabelRenderer {
 
     private readonly boundHandleSomeBatchesComplete: (event: CustomEvent<SomeBatchesCompleteEvent>) => void
     private readonly boundHandleArtworkSettled: () => void
+    private readonly boundHandlePlacementRunResetRequested: (event: CustomEvent<PlacementRunResetRequestedEvent>) => void
 
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion()
 
@@ -44,6 +49,7 @@ export class InstancedLabelRenderer {
 
         this.boundHandleSomeBatchesComplete = this.handleSomeBatchesComplete.bind(this)
         this.boundHandleArtworkSettled = this.runCompact.bind(this)
+        this.boundHandlePlacementRunResetRequested = this.handlePlacementRunResetRequested.bind(this)
 
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SomeBatchesComplete,
@@ -52,6 +58,10 @@ export class InstancedLabelRenderer {
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.ArtworkSettled,
             this.boundHandleArtworkSettled
+        )
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            this.boundHandlePlacementRunResetRequested
         )
 
         // Initialise a fresh metadata map so stale entries from a prior load don't
@@ -117,20 +127,6 @@ export class InstancedLabelRenderer {
         return true
     }
 
-    /**
-     * Reset all label instance placements without disposing textures.
-     * Retains the gameNameToTextureIndex map so re-sorts reuse already-baked
-     * texture slots rather than re-allocating them.
-     * Call before re-sorting so new label boxes can be placed in the new order.
-     */
-    public clear(): void {
-        this.currentCount = 0
-        this.nextInstanceIndex = 0
-        if (this.instancedMesh) {
-            this.instancedMesh.count = 0
-        }
-    }
-
     public updateGPU(): void {
         if (!this.isInitialized || !this.instancedMesh || !this.geometry) return
 
@@ -154,6 +150,10 @@ export class InstancedLabelRenderer {
         EventManager.getInstance().deregisterEventHandler(
             GameEventTypes.ArtworkSettled,
             this.boundHandleArtworkSettled
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            this.boundHandlePlacementRunResetRequested
         )
 
         if (this.instancedMesh) {
@@ -242,6 +242,14 @@ export class InstancedLabelRenderer {
         if (this.material) {
             this.material.uniforms['textureArray'].value = newTexture
             this.material.needsUpdate = true
+        }
+    }
+
+    private handlePlacementRunResetRequested(_event: CustomEvent<PlacementRunResetRequestedEvent>): void {
+        this.currentCount = 0
+        this.nextInstanceIndex = 0
+        if (this.instancedMesh) {
+            this.instancedMesh.count = 0
         }
     }
 
