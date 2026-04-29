@@ -91,6 +91,10 @@ export class GameBoxSpawner {
             () => this.geometryReset()
         )
         EventManager.getInstance().registerEventHandler(
+            UIEventTypes.LayoutRequested,
+            () => this.geometryReset()
+        )
+        EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.LibraryReloadRequest,
             (e: CustomEvent<StorePropsLibraryReloadRequestEvent>) => this.handleLibraryReloadRequest(e)
         )
