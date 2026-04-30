@@ -25,6 +25,7 @@
     font-family: var(--panel-font);
     z-index: 1000;
     overflow: hidden;
+    padding: 0;
     display: flex;
     flex-direction: column;
     transition: width var(--menu-transition-time) ease;
@@ -139,52 +140,6 @@
     margin-left: auto;
     font-size: var(--panel-font-size-xs);
     color: var(--panel-text-muted);
-}
-
-.lighting-controls-panel .light-group {
-    margin-bottom: var(--panel-space-4);
-    border: 1px solid var(--panel-border);
-    border-radius: var(--panel-radius-md);
-    overflow: hidden;
-}
-
-.lighting-controls-panel .group-header {
-    display: flex;
-    align-items: center;
-    background: var(--panel-group-header-bg);
-    padding: var(--panel-space-4) var(--panel-space-6);
-    gap: var(--panel-space-6);
-}
-
-.lighting-controls-panel .group-checkbox-area {
-    display: flex;
-    align-items: center;
-    gap: var(--panel-space-8);
-    flex: 1;
-    cursor: pointer;
-    padding: var(--panel-space-4);
-    border-radius: var(--panel-radius-sm);
-    transition: background-color 0.2s ease;
-}
-
-.lighting-controls-panel .group-checkbox-area:hover {
-    background: var(--panel-subtle-hover-bg);
-}
-
-.lighting-controls-panel .group-expander {
-    padding: var(--panel-space-4) var(--panel-space-8);
-    cursor: pointer;
-    color: var(--panel-text-muted);
-    font-size: var(--panel-font-size-sm);
-    border-radius: var(--panel-radius-sm);
-    transition: background-color 0.2s ease, transform var(--menu-transition-time) ease;
-    user-select: none;
-    display: inline-block;
-}
-
-.lighting-controls-panel .group-expander:hover {
-    background: var(--panel-strong-hover-bg);
-    color: var(--panel-text-strong);
 }
 
 .lighting-controls-panel .group-expander.collapsed {

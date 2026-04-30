@@ -57,7 +57,7 @@ export class LightingControlsPanel {
     private createPanel(): HTMLElement {
         const panel = document.createElement('div')
         panel.id = 'lighting-controls-panel'
-        panel.className = 'lighting-controls-panel horizontally-collapsed'
+        panel.className = 'ui-panel lighting-controls-panel horizontally-collapsed'
         panel.innerHTML = renderTemplate(lightingControlsPanelTemplate, {
             debugIndicatorEnabled: this.debugIndicatorEnabled
         })
@@ -216,15 +216,15 @@ export class LightingControlsPanel {
 
         this.lightGroups.forEach((group, type) => {
             const groupElement = document.createElement('div')
-            groupElement.className = 'light-group'
+            groupElement.className = 'light-group ui-group'
             
             // Create group header with separate click regions
             const groupHeader = document.createElement('div')
-            groupHeader.className = 'group-header'
+            groupHeader.className = 'group-header ui-group-header'
             
             // Checkbox area (label + checkbox)
             const checkboxArea = document.createElement('div')
-            checkboxArea.className = 'group-checkbox-area'
+            checkboxArea.className = 'group-checkbox-area ui-group-toggle'
             checkboxArea.innerHTML = `
                 <input type="checkbox" class="group-toggle ui-checkbox ui-checkbox--rollup" data-type="${type}" ${group.enabled ? 'checked' : ''}>
                 <span class="control-label">${type} (${group.lights.length})</span>
@@ -232,7 +232,7 @@ export class LightingControlsPanel {
             
             // Expander arrow
             const expander = document.createElement('span')
-            expander.className = `group-expander${group.collapsed ? ' collapsed' : ''}`
+            expander.className = `group-expander ui-group-expander${group.collapsed ? ' collapsed' : ''}`
             expander.textContent = '▼'
             expander.dataset.type = type
             

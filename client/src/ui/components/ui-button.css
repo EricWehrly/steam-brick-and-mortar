@@ -18,6 +18,12 @@
         transform var(--duration-fast) ease;
 }
 
+.ui-button.icon {
+    min-width: 32px;
+    padding: 0;
+    aspect-ratio: 1;
+}
+
 .ui-button:hover {
     background: var(--color-accent-bright);
     border-color: var(--color-accent);
@@ -38,16 +44,4 @@
     border-color: var(--color-border);
     color: var(--color-text-tertiary);
     cursor: not-allowed;
-}
-
-.ui-button--secondary {
-    background: var(--color-surface-2);
-    border-color: var(--color-border);
-    color: var(--color-text-secondary);
-}
-
-.ui-button--secondary:hover {
-    background: var(--color-surface-3);
-    border-color: var(--color-border-bright);
-    color: var(--color-text-primary);
 }
