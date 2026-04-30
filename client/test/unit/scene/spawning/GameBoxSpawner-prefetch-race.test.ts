@@ -187,14 +187,15 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
         EventManager.getInstance().removeAllListeners()
     })
 
-    it('provisions placement capacity from baseline policy', () => {
+    it('provisions fixed instance limits for renderer ceilings', () => {
         // beforeEach emits LibraryManifestReady(totalGames=2), which should initialize renderer once.
         const rendererCtor = GpuGameBoxRenderer as unknown as ReturnType<typeof vi.fn>
         expect(rendererCtor).toHaveBeenCalled()
 
-        const [textureCapacity, placementCapacity] = rendererCtor.mock.calls[0] as [number, number]
+        const [textureCapacity, placementCapacity, labelCapacity] = rendererCtor.mock.calls[0] as [number, number, number]
         expect(textureCapacity).toBe(102)
-        expect(placementCapacity).toBe(204)
+        expect(placementCapacity).toBe(2000)
+        expect(labelCapacity).toBe(200)
     })
 
     it('PROBE: intent arrives before prefetch — placeGame fires when prefetch settles', async () => {

@@ -10,10 +10,11 @@
 import { LodArtworkOrchestrator, type LodArtworkConfig } from './LodArtworkOrchestrator'
 import { HighTextureCacheDebug } from './HighTextureCacheDebug'
 import { EventManager } from '../../../core/EventManager'
-import { GameEventTypes } from '../../../types/InteractionEvents'
+import { GameEventTypes, GameRenderEventTypes } from '../../../types/InteractionEvents'
 import { GameArtworkProvider } from './GameArtworkProvider'
 import { DataManager } from '../../../core/data/DataManager'
 import { LodDistanceManagerDebug } from './LodDistanceManagerDebug'
+import { LOD_TIER_NAME } from './IGameArtworkPipeline'
 
 /** Result of queryLodState() — structured pixel data for both LOD tiers */
 export interface LodTierData {
@@ -28,6 +29,20 @@ export interface LodQueryResult {
     mid: LodTierData
     high: LodTierData & { slot: number; state: string | null }
 }
+
+interface SaturationScenarioOptions {
+    targetCount?: number
+    textureVariantCount?: number
+    textureSize?: number
+}
+
+interface SyntheticTextureEntry {
+    appid: number
+    gameName: string
+    textureIndex: number
+}
+
+const SYNTHETIC_APP_ID_BASE = 910000
 import { GpuMemoryEstimator } from '../../../debug/GpuMemoryEstimator'
 import { DataKey } from '../../../core/data/DataTypes'
 import * as THREE from 'three'
@@ -69,6 +84,20 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
             const renderer = DataManager.getInstance().get<THREE.WebGLRenderer>(DataKey.Renderer)
             const gpu = GpuMemoryEstimator.estimate(renderer ?? undefined)
             return { ...heap, gpuEstimateMB: gpu.totalEstimatedMB }
+        }
+        ;(window as any).instancingSnapshot = () => {
+            const renderer = this.getInternalRenderer()
+            const artworkMetadata = DataManager.getInstance().get<Map<number, unknown>>(DataKey.InstancedArtworkMetadata)
+            const labelMetadata = DataManager.getInstance().get<Map<number, unknown>>(DataKey.InstancedLabelMetadata)
+            return {
+                artworkRendererReady: renderer.isReady(),
+                artworkInstanceCount: renderer.getInstanceCount(),
+                artworkMetadataCount: artworkMetadata?.size ?? 0,
+                labelMetadataCount: labelMetadata?.size ?? 0,
+            }
+        }
+        ;(window as any).__sbmRunInstanceSaturationScenario = async (options: SaturationScenarioOptions = {}) => {
+            return this.runInstanceSaturationScenario(options)
         }
         ;(window as any).diagnosePending = () => this.diagnosePendingState()
         
@@ -129,6 +158,180 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
 
     private getHighTextureCache(): HighTextureCache | null {
         return this.renderer.getHighTextureCache()
+    }
+
+    private async runInstanceSaturationScenario(options: SaturationScenarioOptions = {}): Promise<{
+        placedCount: number
+        attemptedCount: number
+        textureVariantCount: number
+        prefetchFailures: number
+        textureWritesSucceeded: number
+        reusableSlotCount: number
+        midTierDepth: number
+    }> {
+        const attemptedCount = Math.max(0, Math.floor(options.targetCount ?? 0))
+        const textureVariantCount = Math.max(1, Math.min(64, Math.floor(options.textureVariantCount ?? 12)))
+        const textureSize = Math.max(16, Math.min(256, Math.floor(options.textureSize ?? 64)))
+
+        EventManager.getInstance().emit(GameRenderEventTypes.PlacementRunResetRequested, {})
+
+        const { entries, prefetchFailures, textureWritesSucceeded, reusableSlotCount, midTierDepth } =
+            this.ensureSyntheticTextures(textureVariantCount, textureSize)
+        if (entries.length === 0) {
+            return {
+                placedCount: 0,
+                attemptedCount,
+                textureVariantCount,
+                prefetchFailures,
+                textureWritesSucceeded,
+                reusableSlotCount,
+                midTierDepth,
+            }
+        }
+
+        let placedCount = 0
+        const rowWidth = 100
+        const spacing = 0.26
+        const renderer = this.getInternalRenderer()
+        const internalState = this as unknown as {
+            instanceMetadata: Map<number, { name: string; appid?: number; position: THREE.Vector3 }>
+        }
+        for (let i = 0; i < attemptedCount; i++) {
+            const entry = entries[i % entries.length]
+            const position = new THREE.Vector3((i % rowWidth) * spacing, 1.25, -Math.floor(i / rowWidth) * spacing)
+            const instanceIndex = renderer.addInstance({
+                position,
+                textureIndex: entry.textureIndex,
+                gameName: entry.gameName,
+            })
+            if (instanceIndex < 0) {
+                break
+            }
+            internalState.instanceMetadata.set(instanceIndex, {
+                name: entry.gameName,
+                appid: entry.appid,
+                position: position.clone(),
+            })
+            placedCount++
+        }
+
+        this.getInternalRenderer().flushToGpu()
+        return {
+            placedCount,
+            attemptedCount,
+            textureVariantCount,
+            prefetchFailures,
+            textureWritesSucceeded,
+            reusableSlotCount,
+            midTierDepth,
+        }
+    }
+
+    private ensureSyntheticTextures(
+        textureVariantCount: number,
+        textureSize: number
+    ): {
+        entries: SyntheticTextureEntry[]
+        prefetchFailures: number
+        textureWritesSucceeded: number
+        reusableSlotCount: number
+        midTierDepth: number
+    } {
+        const textureManager = this.getTextureManager()
+        const midConfig = textureManager.getTierConfig(LOD_TIER_NAME.MID)
+        const highConfig = textureManager.getTierConfig(LOD_TIER_NAME.HIGH)
+        if (!midConfig) {
+            return {
+                entries: [],
+                prefetchFailures: textureVariantCount,
+                textureWritesSucceeded: 0,
+                reusableSlotCount: 0,
+                midTierDepth: 0,
+            }
+        }
+
+        const gameNameToTextureIndex = this.getGameNameToTextureIndex() as Map<string, number>
+        const internalState = this as unknown as { textureIndexToGameName: Map<number, string> }
+
+        const entries: SyntheticTextureEntry[] = []
+        let prefetchFailures = 0
+        const reusableSlotCount = Math.min(textureVariantCount, midConfig.maxDepth)
+        let textureWritesSucceeded = 0
+
+        for (let i = 0; i < reusableSlotCount; i++) {
+            const appid = SYNTHETIC_APP_ID_BASE + i
+            const gameName = `SyntheticTexture${i}`
+            const slot = i
+
+            const midPixels = this.buildNoisePixels(i, midConfig.width, midConfig.height, textureSize)
+            const acceptedMid = textureManager.setSlotPixels(
+                LOD_TIER_NAME.MID,
+                slot,
+                midPixels,
+                midConfig.width,
+                midConfig.height
+            )
+            if (!acceptedMid) {
+                prefetchFailures++
+                continue
+            }
+
+            if (highConfig) {
+                const highPixels = this.buildNoisePixels(i + 1000, highConfig.width, highConfig.height, textureSize)
+                textureManager.setSlotPixels(
+                    LOD_TIER_NAME.HIGH,
+                    slot,
+                    highPixels,
+                    highConfig.width,
+                    highConfig.height
+                )
+            }
+
+            textureWritesSucceeded++
+            gameNameToTextureIndex.set(gameName, slot)
+            internalState.textureIndexToGameName.set(slot, gameName)
+            entries.push({ appid, gameName, textureIndex: slot })
+        }
+
+        prefetchFailures += textureVariantCount - reusableSlotCount
+
+        textureManager.flushToGpu()
+        this.getInternalRenderer().flushToGpu()
+
+        return {
+            entries,
+            prefetchFailures,
+            textureWritesSucceeded,
+            reusableSlotCount,
+            midTierDepth: midConfig.maxDepth,
+        }
+    }
+
+    private buildNoisePixels(seed: number, width: number, height: number, coarseGrain: number): Uint8ClampedArray {
+        const pixels = new Uint8ClampedArray(width * height * 4)
+        let state = ((seed + 1) * 2654435761) >>> 0
+
+        const grain = Math.max(2, Math.min(32, coarseGrain >> 2))
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const blockX = Math.floor(x / grain)
+                const blockY = Math.floor(y / grain)
+                state = (1664525 * (state + blockX * 131 + blockY * 911) + 1013904223) >>> 0
+                const r = state & 0xff
+                state = (1664525 * state + 1013904223) >>> 0
+                const g = state & 0xff
+                state = (1664525 * state + 1013904223) >>> 0
+                const b = state & 0xff
+
+                const index = (y * width + x) * 4
+                pixels[index] = r
+                pixels[index + 1] = g
+                pixels[index + 2] = b
+                pixels[index + 3] = 0xff
+            }
+        }
+
+        return pixels
     }
 
     public getMemoryStats(): {
