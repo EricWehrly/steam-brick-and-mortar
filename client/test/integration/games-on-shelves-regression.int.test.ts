@@ -12,6 +12,7 @@ import * as THREE from 'three'
 import { EventManager } from '../../src/core/EventManager'
 import { DataDomain, DataKey, DataManager } from '../../src/core/data'
 import { createStorePropsTestHarness } from '../helpers/StorePropsTestHarness'
+import { ShelfLayoutCoordinator } from '../../src/scene/shelves/ShelfLayoutCoordinator'
 import {
     StorePropsEventTypes,
     SteamEventTypes,
@@ -22,7 +23,7 @@ import {
     type GamesPlacedEvent,
 } from '../../src/types/InteractionEvents'
 import type { SteamGame } from '../../src/steam'
-import type { SectionsReadyEvent } from '../../src/types/EnvironmentEvents'
+import type { SectionsReadyEvent, SectionsReadyForPlacementEvent } from '../../src/types/EnvironmentEvents'
 import type { SteamGameData } from '../../src/scene'
 
 vi.mock('../../src/utils/TextureManager', async () => {
@@ -63,13 +64,25 @@ function emitSectionsByBatch(
     eventManager: EventManager,
     batches: ReadonlyArray<ReadonlyArray<SteamGame>>,
 ): void {
-    eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
-        sections: batches.map((games, index) => ({
-            name: `Section ${index + 1}`,
-            games: games as SteamGameData[],
-            groupMode: 'none',
-            sortMode: 'alphabetical',
+    const sections = batches.map((games, index) => ({
+        name: `Section ${index + 1}`,
+        games: games as SteamGameData[],
+        groupMode: 'none' as const,
+        sortMode: 'alphabetical' as const,
+    }))
+
+    eventManager.emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
+        sections: sections.map((section, index) => ({
+            sectionId: `batch-${index}`,
+            sectionIndex: index,
+            section,
         })),
+        groupMode: 'none',
+        sortMode: 'alphabetical',
+    })
+
+    eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+        sections,
         groupMode: 'none',
         sortMode: 'alphabetical',
     })
@@ -80,6 +93,7 @@ let eventManager: EventManager
 let dataManager: DataManager
 
 beforeEach(() => {
+    ;(ShelfLayoutCoordinator as unknown as { instance: ShelfLayoutCoordinator | null }).instance = null
     scene = new THREE.Scene()
     eventManager = EventManager.getInstance()
     eventManager.removeAllListeners()
@@ -93,6 +107,7 @@ beforeEach(() => {
 
 afterEach(() => {
     eventManager.removeAllListeners()
+    ;(ShelfLayoutCoordinator as unknown as { instance: ShelfLayoutCoordinator | null }).instance = null
     dataManager.clear()
     scene.clear()
     vi.clearAllMocks()

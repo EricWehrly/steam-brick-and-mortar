@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { EventManager } from '../../src/core/EventManager'
 import { DataDomain, DataKey, DataManager } from '../../src/core/data'
 import { createStorePropsTestHarness, type StorePropsTestHarness } from '../helpers/StorePropsTestHarness'
+import { ShelfLayoutCoordinator } from '../../src/scene/shelves/ShelfLayoutCoordinator'
 import {
     SteamEventTypes,
     StorePropsEventTypes,
@@ -13,7 +14,7 @@ import {
     type GamesPlacedEvent,
     type ShelfReadyEvent,
 } from '../../src/types/InteractionEvents'
-import type { SectionsReadyEvent } from '../../src/types/EnvironmentEvents'
+import type { SectionsReadyEvent, SectionsReadyForPlacementEvent } from '../../src/types/EnvironmentEvents'
 import type { SteamGame } from '../../src/steam'
 import type { SteamGameData } from '../../src/scene'
 
@@ -59,6 +60,24 @@ function emitBatch(
     })
 }
 
+function emitSections(
+    eventManager: EventManager,
+    sections: SectionsReadyEvent
+): void {
+    const placementSections: SectionsReadyForPlacementEvent = {
+        groupMode: sections.groupMode,
+        sortMode: sections.sortMode,
+        sections: sections.sections.map((section, sectionIndex) => ({
+            sectionId: `${section.name}-${sectionIndex}`,
+            sectionIndex,
+            section,
+        })),
+    }
+
+    eventManager.emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, placementSections)
+    eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, sections)
+}
+
 describe('library readiness ordering integration', () => {
     let scene: THREE.Scene
     let eventManager: EventManager
@@ -66,6 +85,7 @@ describe('library readiness ordering integration', () => {
     let harness: StorePropsTestHarness
 
     beforeEach(() => {
+        ;(ShelfLayoutCoordinator as unknown as { instance: ShelfLayoutCoordinator | null }).instance = null
         scene = new THREE.Scene()
         eventManager = EventManager.getInstance()
         eventManager.removeAllListeners()
@@ -82,6 +102,7 @@ describe('library readiness ordering integration', () => {
     afterEach(() => {
         harness?.dispose()
         eventManager.removeAllListeners()
+        ;(ShelfLayoutCoordinator as unknown as { instance: ShelfLayoutCoordinator | null }).instance = null
         dataManager.clear()
         scene.clear()
         vi.clearAllMocks()
@@ -128,7 +149,7 @@ describe('library readiness ordering integration', () => {
             groupMode: 'by-genre',
             sortMode: 'alphabetical',
         }
-        eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, sections)
+        emitSections(eventManager, sections)
 
         await vi.waitFor(() => {
             expect(gamesPlacedEvents.length).toBeGreaterThan(0)
@@ -141,5 +162,60 @@ describe('library readiness ordering integration', () => {
         const sectionIndices = new Set(shelfReadyEvents.map((event) => event.sectionIndex))
         expect(sectionIndices.has(0)).toBe(true)
         expect(sectionIndices.has(1)).toBe(true)
+    })
+
+    it('does not emit ShelfReady for empty sections in mixed section runs', async () => {
+        const firstSectionGames = makeGames(3000, 18)
+        const thirdSectionGames = makeGames(4000, 18)
+        const allGames = [...firstSectionGames, ...thirdSectionGames]
+
+        const shelfReadyEvents: ShelfReadyEvent[] = []
+        eventManager.registerEventHandler(
+            StorePropsEventTypes.ShelfReady,
+            (event: CustomEvent<ShelfReadyEvent>) => shelfReadyEvents.push(event.detail)
+        )
+
+        eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+            totalGames: allGames.length,
+        })
+
+        emitBatch(eventManager, 0, 2, firstSectionGames)
+        emitBatch(eventManager, 1, 2, thirdSectionGames)
+
+        const sections: SectionsReadyEvent = {
+            sections: [
+                {
+                    name: 'Action',
+                    games: firstSectionGames as SteamGameData[],
+                    groupMode: 'by-genre',
+                    sortMode: 'alphabetical',
+                },
+                {
+                    name: 'Empty Genre',
+                    games: [],
+                    groupMode: 'by-genre',
+                    sortMode: 'alphabetical',
+                },
+                {
+                    name: 'RPG',
+                    games: thirdSectionGames as SteamGameData[],
+                    groupMode: 'by-genre',
+                    sortMode: 'alphabetical',
+                },
+            ],
+            groupMode: 'by-genre',
+            sortMode: 'alphabetical',
+        }
+
+        emitSections(eventManager, sections)
+
+        await vi.waitFor(() => {
+            expect(shelfReadyEvents.length).toBeGreaterThan(0)
+        }, { timeout: 8000, interval: 50 })
+
+        const sectionIndices = new Set(shelfReadyEvents.map((event) => event.sectionIndex))
+        expect(sectionIndices.has(0)).toBe(true)
+        expect(sectionIndices.has(1)).toBe(false)
+        expect(sectionIndices.has(2)).toBe(true)
     })
 })

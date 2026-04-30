@@ -40,15 +40,18 @@ vi.mock('../../src/utils/TextureManager', async () => {
 import { EventManager } from '../../src/core/EventManager'
 import { DataDomain, DataKey, DataManager } from '../../src/core/data'
 import { createStorePropsTestHarness, type StorePropsTestHarness } from '../helpers/StorePropsTestHarness'
+import { ShelfLayoutCoordinator } from '../../src/scene/shelves/ShelfLayoutCoordinator'
 import { 
     SteamEventTypes, 
     StorePropsEventTypes,
     GameEventTypes, 
     type SteamGamesBatchEvent,
+    type SteamLibraryManifestReadyEvent,
     type BatchReadyForPlacementEvent,
     type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent
 } from '../../src/types/InteractionEvents'
+import type { SectionsReadyEvent, SectionsReadyForPlacementEvent } from '../../src/types/EnvironmentEvents'
 import type { SteamGame } from '../../src/steam'
 
 describe('Batch-to-Placement Flow Integration', () => {
@@ -79,6 +82,7 @@ describe('Batch-to-Placement Flow Integration', () => {
     }
 
     beforeEach(async () => {
+        ;(ShelfLayoutCoordinator as unknown as { instance: ShelfLayoutCoordinator | null }).instance = null
         scene = new THREE.Scene()
         eventManager = EventManager.getInstance()
         eventManager.removeAllListeners()
@@ -96,6 +100,9 @@ describe('Batch-to-Placement Flow Integration', () => {
         layoutEventData = null
         batchReadyEvents = []
         gamesPlacedEvents = []
+
+        const pendingBatches = new Map<number, Readonly<SteamGame>[]>()
+        let expectedBatchCount = 0
         
         // Listen for BatchReadyForPlacement (Phase 3b)
         eventManager.registerEventHandler(
@@ -103,6 +110,43 @@ describe('Batch-to-Placement Flow Integration', () => {
             (event: CustomEvent<BatchReadyForPlacementEvent>) => {
                 console.log('📦 TEST: BatchReadyForPlacement received!', event.detail)
                 batchReadyEvents.push(event.detail)
+
+                pendingBatches.set(event.detail.batchIndex, event.detail.games as Readonly<SteamGame>[])
+                expectedBatchCount = Math.max(expectedBatchCount, event.detail.totalBatches)
+
+                if (pendingBatches.size !== expectedBatchCount) {
+                    return
+                }
+
+                const orderedSections = [...pendingBatches.entries()]
+                    .sort(([a], [b]) => a - b)
+                    .map(([batchIndex, games]) => ({
+                        sectionId: `batch-${batchIndex}`,
+                        sectionIndex: batchIndex,
+                        section: {
+                            name: `Batch ${batchIndex}`,
+                            games: games as any,
+                            groupMode: 'by-recency' as const,
+                            sortMode: 'by-last-played' as const,
+                        },
+                    }))
+
+                const totalGames = orderedSections.reduce((sum, entry) => sum + entry.section.games.length, 0)
+                eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+                    totalGames,
+                })
+
+                eventManager.emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
+                    groupMode: 'by-recency',
+                    sortMode: 'by-last-played',
+                    sections: orderedSections,
+                })
+
+                eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                    groupMode: 'by-recency',
+                    sortMode: 'by-last-played',
+                    sections: orderedSections.map((entry) => entry.section),
+                })
             }
         )
         
@@ -140,6 +184,7 @@ describe('Batch-to-Placement Flow Integration', () => {
     afterEach(() => {
         harness?.dispose()
         eventManager.removeAllListeners()
+        ;(ShelfLayoutCoordinator as unknown as { instance: ShelfLayoutCoordinator | null }).instance = null
         dataManager.clear()
         scene.clear()
         vi.clearAllMocks()
