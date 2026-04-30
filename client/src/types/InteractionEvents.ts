@@ -55,7 +55,6 @@ export interface SteamDevModeToggleEvent extends BaseInteractionEvent {
  * - `GameEventTypes.GameDataReady` for definitions-ready grouping/sorting
  */
 export interface SteamDataLoadedEvent extends BaseInteractionEvent {
-    userInput?: string
     displayName?: string
 }
 

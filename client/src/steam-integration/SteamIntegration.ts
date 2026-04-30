@@ -116,7 +116,6 @@ export class SteamIntegration {
         }
 
         this.eventManager.emit<SteamDataLoadedEvent>(SteamEventTypes.DataLoaded, {
-            userInput: userInput ?? undefined,
             displayName,
         })
 
