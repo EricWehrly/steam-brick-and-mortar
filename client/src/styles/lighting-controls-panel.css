@@ -92,7 +92,7 @@
     max-height: min(75vh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap) - 52px));
     min-height: auto;
     opacity: 1;
-    transition: max-height var(--menu-transition-time) ease, min-height var(--menu-transition-time) ease, opacity var(--menu-transition-time) ease, padding var(--menu-transition-time) ease, flex var(--menu-transition-time) ease;
+    transition: max-height var(--menu-transition-time) ease, opacity var(--menu-transition-time) ease;
 }
 
 .lighting-controls-panel .panel-content.collapsed {
