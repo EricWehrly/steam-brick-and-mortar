@@ -54,6 +54,66 @@ export interface SectionsReadyEvent extends BaseInteractionEvent {
 }
 
 /**
+ * SectionsReadyForPlacementEvent
+ *
+ * Placement-scoped sections keyed by sectionId. Games are already windowed to
+ * allocated capacity and can be consumed directly by GameBoxSpawner.
+ */
+export interface SectionsReadyForPlacementEvent extends BaseInteractionEvent {
+    groupMode: GroupMode
+    sortMode: SortMode
+    sections: ReadonlyArray<{
+        sectionId: string
+        sectionIndex: number
+        section: Section
+    }>
+}
+
+/**
+ * SectionsComputedEvent
+ *
+ * Canonical uncapped section topology emitted by GameSorter before any
+ * arrangement allocation/capping is applied.
+ */
+export interface SectionsComputedEvent extends BaseInteractionEvent {
+    groupMode: GroupMode
+    sortMode: SortMode
+    sections: ReadonlyArray<{
+        sectionId: string
+        sectionIndex: number
+        section: Section
+    }>
+}
+
+/**
+ * ArrangementAllocationPlannedEvent
+ *
+ * Emitted by GameSorter after section identity is computed.
+ * Carries only allocation decisions keyed by sectionId.
+ */
+export interface ArrangementAllocationPlannedEvent extends BaseInteractionEvent {
+    groupMode: GroupMode
+    sortMode: SortMode
+    shelfCapacity: number
+    maxShelves: number
+    totalRequestedShelves: number
+    totalAllocatedShelves: number
+    totalRequestedGames: number
+    totalAllocatedGames: number
+    deferredSections: number
+    deferredGames: number
+    sections: ReadonlyArray<{
+        sectionId: string
+        requestedShelves: number
+        allocatedShelves: number
+        shelfCapacity: number
+        requestedGames: number
+        allocatedGames: number
+        deferredGames: number
+    }>
+}
+
+/**
  * ArrangementRequestedEvent
  *
  * Emitted by LayoutControlPanel when the user changes group or sort mode.

@@ -322,8 +322,14 @@ export const GameEventTypes = {
     Selected: 'game:selected',
     /** Fired after all batches complete; carries the sorted game list and bucket map. */
     GamesSort: 'game:games-sort',
+    /** Fired after grouping+sorting and before allocation; carries uncapped section topology. */
+    SectionsComputed: 'game:sections-computed',
+    /** Fired after allocation planning; carries per-section shelf/game plan metadata keyed by sectionId. */
+    ArrangementAllocationPlanned: 'game:arrangement-allocation-planned',
     /** Fired after grouping + sorting; carries sections ready for placement. */
-    SectionsReady: 'game:sections-ready'
+    SectionsReady: 'game:sections-ready',
+    /** Fired with placement-scoped sections keyed by sectionId. */
+    SectionsReadyForPlacement: 'game:sections-ready-for-placement'
 } as const
 
 export const GameRenderEventTypes = {

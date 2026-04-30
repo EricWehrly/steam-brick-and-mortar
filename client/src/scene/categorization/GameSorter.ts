@@ -27,7 +27,13 @@ import { Logger } from '../../utils/Logger'
 import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import { GroupModes, SortModes } from '../../types/LayoutTypes'
 import type { GroupMode, SortMode } from '../../types/LayoutTypes'
-import type { SectionsReadyEvent, ArrangementRequestedEvent } from '../../types/EnvironmentEvents'
+import type {
+    SectionsReadyEvent,
+    SectionsReadyForPlacementEvent,
+    ArrangementRequestedEvent,
+    SectionsComputedEvent,
+    ArrangementAllocationPlannedEvent,
+} from '../../types/EnvironmentEvents'
 import type { Section } from '../../types/LayoutTypes'
 import type { SteamGameData } from '../game-box/types/GameData'
 import { SteamIntegration } from '../../steam-integration/SteamIntegration'
@@ -38,6 +44,16 @@ import { GameLayoutConstants } from '../props/shared/GameBoxUtils'
 const SHELF_BATCH_SIZE = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
 // CONFIG-CANDIDATE(layout-capacity): promote to AppSettings/UI once progressive section loading lands.
 const MAX_SHELVES_PER_ARRANGEMENT = 180
+
+type SectionPlacementPlanRow = {
+    sectionId: string
+    requestedShelves: number
+    allocatedShelves: number
+    shelfCapacity: number
+    requestedGames: number
+    allocatedGames: number
+    deferredGames: number
+}
 
 // Re-export bucket helpers so existing callers don't break
 export {
@@ -99,7 +115,50 @@ export class GameSorter {
 
         const grouped = resolveGroups([...games] as SteamGameData[], groupMode, sortMode)
         const sortedSections = sortSections(grouped, sortMode)
-        const sections = this.limitSectionsToShelfBudget(sortedSections, groupMode)
+        const computedSections = sortedSections.map((section, sectionIndex) => ({
+            sectionId: this.getSectionId(groupMode, section.name, sectionIndex),
+            sectionIndex,
+            section,
+        }))
+        const plan = this.buildSectionPlacementPlan(computedSections)
+        const allocatedSections = this.buildAllocatedSections(computedSections, plan.sections)
+        const sections = allocatedSections.map(({ section }) => section)
+
+        EventManager.getInstance().emit<SectionsComputedEvent>(GameEventTypes.SectionsComputed, {
+            groupMode,
+            sortMode,
+            sections: computedSections,
+        })
+
+        const allocationEvent: ArrangementAllocationPlannedEvent = {
+            groupMode,
+            sortMode,
+            shelfCapacity: SHELF_BATCH_SIZE,
+            maxShelves: MAX_SHELVES_PER_ARRANGEMENT,
+            totalRequestedShelves: plan.totalRequestedShelves,
+            totalAllocatedShelves: plan.totalAllocatedShelves,
+            totalRequestedGames: plan.totalRequestedGames,
+            totalAllocatedGames: plan.totalAllocatedGames,
+            deferredSections: plan.deferredSections,
+            deferredGames: plan.deferredGames,
+            sections: plan.sections,
+        }
+
+        EventManager.getInstance().emit<ArrangementAllocationPlannedEvent>(GameEventTypes.ArrangementAllocationPlanned, allocationEvent)
+
+        EventManager.getInstance().emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
+            groupMode,
+            sortMode,
+            sections: allocatedSections,
+        })
+
+        if (plan.totalAllocatedSections < sortedSections.length) {
+            GameSorter.logger.warn(
+                `Arrangement capped in ${groupMode}: using ${plan.totalAllocatedSections}/${sortedSections.length} sections ` +
+                `(${plan.totalAllocatedShelves}/${MAX_SHELVES_PER_ARRANGEMENT} shelves), deferred ${plan.deferredSections} sections ` +
+                `(${plan.deferredGames} game placements)`
+            )
+        }
 
         EventManager.getInstance().emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
             sections,
@@ -112,29 +171,87 @@ export class GameSorter {
         )
     }
 
-    private limitSectionsToShelfBudget(sections: ReadonlyArray<Section>, groupMode: GroupMode): Section[] {
+    private buildSectionPlacementPlan(
+        sections: ReadonlyArray<{ sectionId: string; section: Section }>
+    ) {
         let usedShelves = 0
-        const limited: Section[] = []
+        let totalAllocatedSections = 0
 
-        for (const section of sections) {
+        const sectionPlans: SectionPlacementPlanRow[] = []
+        let totalRequestedShelves = 0
+        let totalRequestedGames = 0
+        let totalAllocatedGames = 0
+
+        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+            const { sectionId, section } = sections[sectionIndex]
             const sectionShelves = Math.max(1, Math.ceil(section.games.length / SHELF_BATCH_SIZE))
-            if (usedShelves + sectionShelves > MAX_SHELVES_PER_ARRANGEMENT) {
-                break
+            const remainingShelves = Math.max(0, MAX_SHELVES_PER_ARRANGEMENT - usedShelves)
+            const allocatedShelves = Math.min(sectionShelves, remainingShelves)
+            const allocatedGames = Math.min(section.games.length, allocatedShelves * SHELF_BATCH_SIZE)
+            const deferredGames = section.games.length - allocatedGames
+
+            totalRequestedShelves += sectionShelves
+            totalRequestedGames += section.games.length
+            totalAllocatedGames += allocatedGames
+
+            if (allocatedShelves > 0) {
+                usedShelves += allocatedShelves
+                totalAllocatedSections++
             }
-            limited.push(section)
-            usedShelves += sectionShelves
+
+            sectionPlans.push({
+                sectionId,
+                requestedShelves: sectionShelves,
+                allocatedShelves,
+                shelfCapacity: SHELF_BATCH_SIZE,
+                requestedGames: section.games.length,
+                allocatedGames,
+                deferredGames,
+            })
         }
 
-        if (limited.length < sections.length) {
-            const droppedSections = sections.length - limited.length
-            const droppedGames = sections.slice(limited.length).reduce((sum, section) => sum + section.games.length, 0)
-            GameSorter.logger.warn(
-                `Arrangement capped in ${groupMode}: using ${limited.length}/${sections.length} sections ` +
-                `(${usedShelves}/${MAX_SHELVES_PER_ARRANGEMENT} shelves), deferred ${droppedSections} sections ` +
-                `(${droppedGames} game placements)`
-            )
+        const deferredSections = sectionPlans.filter(section => section.allocatedShelves === 0).length
+        const deferredGames = totalRequestedGames - totalAllocatedGames
+
+        return {
+            totalAllocatedSections,
+            totalRequestedShelves,
+            totalAllocatedShelves: usedShelves,
+            totalRequestedGames,
+            totalAllocatedGames,
+            deferredSections,
+            deferredGames,
+            sections: sectionPlans,
+        }
+    }
+
+    private buildAllocatedSections(
+        sections: ReadonlyArray<{ sectionId: string; sectionIndex: number; section: Section }>,
+        plans: ReadonlyArray<SectionPlacementPlanRow>
+    ): Array<{ sectionId: string; sectionIndex: number; section: Section }> {
+        const planBySectionId = new Map(plans.map((plan) => [plan.sectionId, plan]))
+        const allocatedSections: Array<{ sectionId: string; sectionIndex: number; section: Section }> = []
+
+        for (const sectionEntry of sections) {
+            const plan = planBySectionId.get(sectionEntry.sectionId)
+            if (!plan || plan.allocatedGames <= 0) continue
+
+            const allocatedGames = sectionEntry.section.games.slice(0, plan.allocatedGames)
+            allocatedSections.push({
+                sectionId: sectionEntry.sectionId,
+                sectionIndex: allocatedSections.length,
+                section: {
+                    ...sectionEntry.section,
+                    games: allocatedGames,
+                },
+            })
         }
 
-        return limited
+        return allocatedSections
+    }
+
+    private getSectionId(groupMode: GroupMode, sectionName: string, sectionIndex: number): string {
+        const normalizedName = sectionName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'ungrouped'
+        return `${groupMode}:${normalizedName}:${sectionIndex}`
     }
 }

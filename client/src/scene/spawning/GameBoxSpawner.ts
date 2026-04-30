@@ -15,7 +15,7 @@ import {
     type ShelfLayoutDeterminedEvent,
     type GamesPlacedEvent,
 } from '../../types/InteractionEvents'
-import type { SectionsReadyEvent } from '../../types/EnvironmentEvents'
+import type { SectionsReadyForPlacementEvent } from '../../types/EnvironmentEvents'
 import type { SteamLibraryManifestReadyEvent } from '../../types/InteractionEvents'
 import type {
     StorePropsLibraryReloadRequestEvent,
@@ -35,7 +35,7 @@ export class GameBoxSpawner {
 
     private renderer: GpuGameBoxRenderer | null = null
     private shelfPositions: Map<number, ShelfPosition> = new Map()
-    private pendingSections: SectionsReadyEvent | null = null
+    private pendingSections: SectionsReadyForPlacementEvent | null = null
     private stockStrategy: IStockStrategy | null = null
     private layoutReadyForPlacement = false
     private layoutDeterminedSinceLastSections = false
@@ -54,8 +54,8 @@ export class GameBoxSpawner {
             (e: CustomEvent<ShelfLayoutDeterminedEvent>) => this.handleLayoutDetermined(e)
         )
         EventManager.getInstance().registerEventHandler(
-            GameEventTypes.SectionsReady,
-            (e: CustomEvent<SectionsReadyEvent>) => this.handleSectionsReady(e)
+            GameEventTypes.SectionsReadyForPlacement,
+            (e: CustomEvent<SectionsReadyForPlacementEvent>) => this.handleSectionsReadyForPlacement(e)
         )
         EventManager.getInstance().registerEventHandler(
             SteamEventTypes.LibraryManifestReady,
@@ -125,11 +125,11 @@ export class GameBoxSpawner {
         )
     }
 
-    private handleSectionsReady(event: CustomEvent<SectionsReadyEvent>): void {
+    private handleSectionsReadyForPlacement(event: CustomEvent<SectionsReadyForPlacementEvent>): void {
         if (!this.layoutDeterminedSinceLastSections) this.clearPlacementState()
         this.pendingSections = event.detail
         this.layoutDeterminedSinceLastSections = false
-        GameBoxSpawner.logger.debug('SectionsReady: cached sections for placement attempt')
+        GameBoxSpawner.logger.debug('SectionsReadyForPlacement: cached sections for placement attempt')
         if (this.layoutReadyForPlacement) this.tryPlacePendingSections()
     }
 
@@ -160,7 +160,7 @@ export class GameBoxSpawner {
     }
 
     private placeSections(
-        detail: SectionsReadyEvent,
+        detail: SectionsReadyForPlacementEvent,
         stockStrategy: IStockStrategy
     ): void {
         const { sections } = detail
@@ -170,9 +170,9 @@ export class GameBoxSpawner {
             return
         }
 
-        const sectionShelvesByIndex = sections.map((_, sectionIndex) =>
+        const sectionShelvesByIndex = sections.map((sectionEntry) =>
             [...this.shelfPositions.entries()]
-                .filter(([, shelf]) => shelf.sectionIndex === sectionIndex)
+            .filter(([, shelf]) => shelf.sectionIndex === sectionEntry.sectionIndex)
                 .sort(([a], [b]) => a - b)
         )
 
@@ -189,14 +189,14 @@ export class GameBoxSpawner {
 
         let shelvesUsed = 0
         for (let i = 0; i < sections.length; i++) {
-            shelvesUsed += this.placeSection(sections[i], sectionShelvesByIndex[i], shelfSurfaces, stockStrategy)
+            shelvesUsed += this.placeSection(sections[i].section, sectionShelvesByIndex[i], shelfSurfaces, stockStrategy)
         }
 
         GameBoxSpawner.logger.debug(`Placement intents emitted across ${shelvesUsed} shelves`)
     }
 
     private placeSection(
-        section: SectionsReadyEvent['sections'][number],
+        section: SectionsReadyForPlacementEvent['sections'][number]['section'],
         sectionShelves: [number, ShelfPosition][],
         shelfSurfaces: ShelfSurface[],
         stockStrategy: IStockStrategy

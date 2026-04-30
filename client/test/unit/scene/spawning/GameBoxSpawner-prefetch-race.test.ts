@@ -28,7 +28,7 @@ import {
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
 } from '../../../../src/types/InteractionEvents'
-import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
+import type { SectionsReadyForPlacementEvent } from '../../../../src/types/EnvironmentEvents'
 import type { SteamLibraryManifestReadyEvent } from '../../../../src/types/InteractionEvents'
 
 // --- Mocks ---
@@ -124,6 +124,13 @@ function wireRenderIntentRendezvous(): void {
     const settledAppIds = new Set<number>()
     const pending = new Map<number, PlacementIntentReadyEvent[]>()
 
+    EventManager.getInstance().registerEventHandler(
+        GameRenderEventTypes.PlacementRunResetRequested,
+        () => {
+            mockClearPlacements()
+        }
+    )
+
     const flush = (appid: number) => {
         if (!settledAppIds.has(appid)) return
 
@@ -200,9 +207,14 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
         expect(mockClearPlacements).not.toHaveBeenCalled()
 
         // SectionsReady first — caches sections and clears stale positions
-        emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
-            sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }],
-            groupMode: 'by-recency', sortMode: 'by-last-played',
+        emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
+            sections: [{
+                sectionId: 'by-recency:test:0',
+                sectionIndex: 0,
+                section: { name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' },
+            }],
+            groupMode: 'by-recency',
+            sortMode: 'by-last-played',
         })
         emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
             shelfIndex: 0,
@@ -241,10 +253,18 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
             totalBatches: 1,
         })
 
-        emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+        emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
             sections: [
-                { name: 'Action', games: [sharedGame], groupMode: 'by-genre', sortMode: 'by-playtime' },
-                { name: 'Indie', games: [sharedGame], groupMode: 'by-genre', sortMode: 'by-playtime' },
+                {
+                    sectionId: 'by-genre:action:0',
+                    sectionIndex: 0,
+                    section: { name: 'Action', games: [sharedGame], groupMode: 'by-genre', sortMode: 'by-playtime' },
+                },
+                {
+                    sectionId: 'by-genre:indie:1',
+                    sectionIndex: 1,
+                    section: { name: 'Indie', games: [sharedGame], groupMode: 'by-genre', sortMode: 'by-playtime' },
+                },
             ],
             groupMode: 'by-genre',
             sortMode: 'by-playtime',
@@ -289,9 +309,14 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
         await new Promise(r => setTimeout(r, 0))
 
         // SectionsReady first — caches sections, ShelfReady then ShelfLayoutDetermined
-        emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
-            sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }],
-            groupMode: 'by-recency', sortMode: 'by-last-played',
+        emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
+            sections: [{
+                sectionId: 'by-recency:test:0',
+                sectionIndex: 0,
+                section: { name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' },
+            }],
+            groupMode: 'by-recency',
+            sortMode: 'by-last-played',
         })
         emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
             shelfIndex: 0,

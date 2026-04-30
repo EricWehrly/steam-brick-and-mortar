@@ -68,6 +68,12 @@ function fireArrangementRequested(groupMode: string, sortMode: string): void {
     for (const h of handlers) h(event)
 }
 
+function lastEmittedPayload(eventType: string): any {
+    const calls = mockEmit.mock.calls.filter(([type]) => type === eventType)
+    expect(calls.length).toBeGreaterThan(0)
+    return calls[calls.length - 1][1]
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('GameSorter', () => {
@@ -93,11 +99,60 @@ describe('GameSorter', () => {
         new GameSorter()
         fireGameDataReady()
 
-        expect(mockEmit).toHaveBeenCalledOnce()
-        const [eventType, payload] = mockEmit.mock.calls[0]
-        expect(eventType).toBe(GameEventTypes.SectionsReady)
+        const payload = lastEmittedPayload(GameEventTypes.SectionsReady)
         const totalGames = payload.sections.reduce((sum: number, s: any) => sum + s.games.length, 0)
         expect(totalGames).toBe(2)
+    })
+
+    it('emits SectionsComputed before planning and ready events', () => {
+        mockGames = [makeGame(1), makeGame(2), makeGame(3)]
+        new GameSorter()
+
+        fireGameDataReady()
+
+        const emittedTypes = mockEmit.mock.calls.map(([eventType]) => eventType)
+        expect(emittedTypes).toContain(GameEventTypes.SectionsComputed)
+        expect(emittedTypes).toContain(GameEventTypes.ArrangementAllocationPlanned)
+        expect(emittedTypes).toContain(GameEventTypes.SectionsReadyForPlacement)
+        expect(emittedTypes).toContain(GameEventTypes.SectionsReady)
+
+        const computedIndex = emittedTypes.indexOf(GameEventTypes.SectionsComputed)
+        const plannedIndex = emittedTypes.indexOf(GameEventTypes.ArrangementAllocationPlanned)
+        const placementReadyIndex = emittedTypes.indexOf(GameEventTypes.SectionsReadyForPlacement)
+        const readyIndex = emittedTypes.indexOf(GameEventTypes.SectionsReady)
+        expect(computedIndex).toBeLessThan(plannedIndex)
+        expect(plannedIndex).toBeLessThan(placementReadyIndex)
+        expect(plannedIndex).toBeLessThan(readyIndex)
+
+        const computed = lastEmittedPayload(GameEventTypes.SectionsComputed)
+        expect(Array.isArray(computed.sections)).toBe(true)
+        expect(computed.sections.length).toBeGreaterThan(0)
+        expect(computed.sections[0]).toMatchObject({
+            sectionId: expect.any(String),
+            sectionIndex: expect.any(Number),
+            section: expect.any(Object),
+        })
+
+        const plan = lastEmittedPayload(GameEventTypes.ArrangementAllocationPlanned)
+        expect(plan.shelfCapacity).toBeGreaterThan(0)
+        expect(plan.maxShelves).toBeGreaterThan(0)
+        expect(plan.totalRequestedGames).toBeGreaterThan(0)
+        expect(Array.isArray(plan.sections)).toBe(true)
+        expect(plan.sections[0]).toMatchObject({
+            sectionId: expect.any(String),
+            requestedShelves: expect.any(Number),
+            allocatedShelves: expect.any(Number),
+        })
+
+        const placement = lastEmittedPayload(GameEventTypes.SectionsReadyForPlacement)
+        expect(Array.isArray(placement.sections)).toBe(true)
+        if (placement.sections.length > 0) {
+            expect(placement.sections[0]).toMatchObject({
+                sectionId: expect.any(String),
+                sectionIndex: expect.any(Number),
+                section: expect.any(Object),
+            })
+        }
     })
 
     it('duplicates a multi-genre game across each matching genre section', () => {
@@ -115,7 +170,7 @@ describe('GameSorter', () => {
         new GameSorter()
         fireGameDataReady()
 
-        const [, payload] = mockEmit.mock.calls[0]
+        const payload = lastEmittedPayload(GameEventTypes.SectionsReady)
         const actionSection = payload.sections.find((section: any) => section.name === 'Action')
         const rpgSection = payload.sections.find((section: any) => section.name === 'RPG')
 
@@ -153,7 +208,7 @@ describe('GameSorter', () => {
         new GameSorter()
         fireGameDataReady()
 
-        const [, payload] = mockEmit.mock.calls[0]
+        const payload = lastEmittedPayload(GameEventTypes.SectionsReady)
         const actionSection = payload.sections.find((section: any) => section.name === 'Action')
         const rpgSection = payload.sections.find((section: any) => section.name === 'RPG')
         const shooterSection = payload.sections.find((section: any) => section.name === 'Shooter')
@@ -181,7 +236,7 @@ describe('GameSorter', () => {
         new GameSorter()
         fireGameDataReady()
 
-        const [, payload] = mockEmit.mock.calls[0]
+        const payload = lastEmittedPayload(GameEventTypes.SectionsReady)
         expect(payload.groupMode).toBe('by-recency')
         expect(payload.sortMode).toBe('by-last-played')
     })
@@ -192,7 +247,7 @@ describe('GameSorter', () => {
         new GameSorter()
         fireGameDataReady()
 
-        const [, payload] = mockEmit.mock.calls[0]
+        const payload = lastEmittedPayload(GameEventTypes.SectionsReady)
         expect(payload.groupMode).toBe('by-genre')
         expect(payload.sortMode).toBe('by-playtime')
     })
@@ -202,7 +257,7 @@ describe('GameSorter', () => {
         new GameSorter()
         fireGameDataReady()
 
-        const [, payload] = mockEmit.mock.calls[0]
+        const payload = lastEmittedPayload(GameEventTypes.SectionsReady)
         expect(payload.sections).toHaveLength(1)
         expect(payload.sections[0].name).toBe('Never Played')
         expect(payload.sections[0].games).toHaveLength(2)
@@ -216,7 +271,7 @@ describe('GameSorter', () => {
         new GameSorter()
         fireGameDataReady()
 
-        const [, payload] = mockEmit.mock.calls[0]
+        const payload = lastEmittedPayload(GameEventTypes.SectionsReady)
         const allGames = payload.sections.flatMap((s: any) => s.games)
         expect(allGames[0].appid).toBe(2)
         expect(allGames[1].appid).toBe(1)
@@ -228,7 +283,7 @@ describe('GameSorter', () => {
         new GameSorter()
         fireGameDataReady()
 
-        const [, payload] = mockEmit.mock.calls[0]
+        const payload = lastEmittedPayload(GameEventTypes.SectionsReady)
         const sectionNames: string[] = payload.sections.map((s: any) => s.name)
         expect(sectionNames).toContain('Played Today')
     })
@@ -241,12 +296,9 @@ describe('GameSorter', () => {
 
         fireArrangementRequested('by-genre', 'by-playtime')
 
-        // Only SectionsReady is emitted (no LayoutClearRequest intermediary)
-        expect(mockEmit).toHaveBeenCalledTimes(1)
-        const firstCall = mockEmit.mock.calls[0]
-        expect(firstCall[0]).toBe(GameEventTypes.SectionsReady)
-        expect(firstCall[1].groupMode).toBe('by-genre')
-        expect(firstCall[1].sortMode).toBe('by-playtime')
+        const sectionsPayload = lastEmittedPayload(GameEventTypes.SectionsReady)
+        expect(sectionsPayload.groupMode).toBe('by-genre')
+        expect(sectionsPayload.sortMode).toBe('by-playtime')
     })
 
     it('does not emit on ArrangementRequested when no games present', () => {

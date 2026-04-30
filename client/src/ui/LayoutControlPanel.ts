@@ -9,7 +9,7 @@
  * A toggle button (⚏) shows/hides the bar. Hotkey: Shift+L.
  *
  * All controls are disabled while the pipeline is executing.
- * Re-enabled on SectionsReady (placement complete).
+ * Re-enabled on SectionsReady (arrangement applied).
  */
 
 import { EventManager } from '../core/EventManager'
