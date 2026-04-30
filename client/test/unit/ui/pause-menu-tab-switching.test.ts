@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { PauseMenuManager } from '../../../src/ui/pause/PauseMenuManager'
 import { GameSettingsPanel } from '../../../src/ui/pause/panels/GameSettingsPanel'
 import { CacheManagementPanel } from '../../../src/ui/pause/panels/CacheManagementPanel'
-import { HelpPanel } from '../../../src/ui/pause/panels/HelpPanel'
+import { ControlsPanel } from '../../../src/ui/pause/panels/ControlsPanel'
 import { ApplicationPanel } from '../../../src/ui/pause/panels/ApplicationPanel'
 import { DebugPanel } from '../../../src/ui/pause/panels/DebugPanel'
 import { EventManager } from '../../../src/core/EventManager'
@@ -50,8 +50,8 @@ describe('Pause Menu Tab Switching', () => {
         // Register all panels
         const cachePanel = new CacheManagementPanel()
         pauseMenuManager.registerPanel(cachePanel)
-        
-        pauseMenuManager.registerPanel(new HelpPanel())
+
+        pauseMenuManager.registerPanel(new ControlsPanel())
         
         const applicationPanel = new ApplicationPanel({}, mockAppSettings, mockEventManager)
         applicationPanel.initialize({ onSettingsChanged: vi.fn() })
@@ -88,7 +88,7 @@ describe('Pause Menu Tab Switching', () => {
         
         // Test switching to each tab
         // Use the actual tab IDs that are created by the system
-        const tabIds = ['tab-cache-management', 'tab-help', 'tab-application', 'tab-game-settings', 'tab-debug']
+        const tabIds = ['tab-cache-management', 'tab-controls', 'tab-application', 'tab-game-settings', 'tab-debug']
         
         for (const tabId of tabIds) {
             console.log(`Testing switch to tab: ${tabId}`)
@@ -126,7 +126,7 @@ describe('Pause Menu Tab Switching', () => {
         expect(gameSettingsTab.classList.contains('active')).toBe(true)
         
         // Now try switching to each other panel
-        const otherTabIds = ['tab-cache-management', 'tab-help', 'tab-application', 'tab-debug']
+        const otherTabIds = ['tab-cache-management', 'tab-controls', 'tab-application', 'tab-debug']
         
         for (const tabId of otherTabIds) {
             console.log(`Testing switch from game-settings to ${tabId}`)

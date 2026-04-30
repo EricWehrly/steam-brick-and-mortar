@@ -12,7 +12,7 @@ import '../../styles/pause-menu/pause-menu-manager.css'
 
 // Panel imports for default registration
 import { CacheManagementPanel } from './panels/CacheManagementPanel'
-import { HelpPanel } from './panels/HelpPanel'
+import { ControlsPanel } from './panels/ControlsPanel'
 import { ApplicationPanel } from './panels/ApplicationPanel'
 import { GameSettingsPanel } from './panels/GameSettingsPanel'
 import { GraphicsSettingsPanel } from './panels/GraphicsSettingsPanel'
@@ -131,9 +131,9 @@ export class PauseMenuManager {
         const cachePanel = new CacheManagementPanel()
         this.cacheManagementPanel = cachePanel
         this.registerPanel(cachePanel)
-        
-        // Register help panel
-        this.registerPanel(new HelpPanel())
+
+        // Register controls panel
+        this.registerPanel(new ControlsPanel())
         
         // Register application panel
         const applicationPanel = new ApplicationPanel({}, this.appSettings, this.eventManager)
