@@ -1,5 +1,5 @@
 /**
- * ShelfSectionPlanner
+ * ShelfSignPlanner
  *
  * Listens for SectionsReady and places signs at section boundaries.
  * Each section carries its own name and game list — no re-derivation of group
@@ -23,7 +23,7 @@ import { SceneSignManager, SignStyles } from './SceneSignManager'
 import type { SignMount } from './SignTypes'
 import { Logger } from '../utils/Logger'
 
-export interface ShelfSectionPlannerConfig {
+export interface ShelfSignPlannerConfig {
     signYOffset?: number
     signMountStyle?: SignMount['style']
 }
@@ -31,13 +31,11 @@ export interface ShelfSectionPlannerConfig {
 const SHELF_SIGN_Y_OFFSET = 2.02
 const SHELF_SIGN_MOUNT_STYLE: SignMount['style'] = 'above-shelf'
 const SHELF_SIGN_FRONT_OFFSET = 0.28
-const SHELF_BATCH_SIZE = 18
-
-export class ShelfSectionPlanner {
-    private static readonly logger = Logger.createLogFunctions(ShelfSectionPlanner.name)
+export class ShelfSignPlanner {
+    private static readonly logger = Logger.createLogFunctions(ShelfSignPlanner.name)
 
     private get signSystem(): SceneSignManager { return SceneSignManager.instance }
-    private readonly config: Required<ShelfSectionPlannerConfig>
+    private readonly config: Required<ShelfSignPlannerConfig>
 
     private shelfPositions: THREE.Vector3[] = []
     private shelfRotations: number[] = []
@@ -49,40 +47,40 @@ export class ShelfSectionPlanner {
         return `${sectionName}::${edge}`
     }
 
-    constructor(config: ShelfSectionPlannerConfig = {}) {
+    constructor(config: ShelfSignPlannerConfig = {}) {
         this.config = {
             signYOffset: config.signYOffset ?? SHELF_SIGN_Y_OFFSET,
             signMountStyle: config.signMountStyle ?? SHELF_SIGN_MOUNT_STYLE,
         }
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SectionsReady,
-            (event: CustomEvent<SectionsReadyEvent>) => this.handleSectionsReady(event.detail)
+            (event: CustomEvent<SectionsReadyEvent>) => this.stageSectionSigns(event.detail)
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.ShelfReady,
-            (event: CustomEvent<ShelfReadyEvent>) => this.handleShelfReady(event.detail)
+            (event: CustomEvent<ShelfReadyEvent>) => this.recordShelfAnchor(event.detail)
         )
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.ShelfLayoutDetermined,
-            (event: CustomEvent<ShelfLayoutDeterminedEvent>) => this.handleShelfLayoutDetermined(event.detail)
+            (event: CustomEvent<ShelfLayoutDeterminedEvent>) => this.applyStagedSignsWhenLayoutReady(event.detail)
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.SetupRequest,
-            (event: CustomEvent<StorePropsSetupRequestEvent>) => this.handleSetupRequest(event.detail)
+            (event: CustomEvent<StorePropsSetupRequestEvent>) => this.resetSignAnchorsForLayoutSetup(event.detail)
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.LibraryReloadRequest,
-            () => this.handleLibraryReloadRequest()
+            () => this.resetSignAnchorsForLibraryReload()
         )
     }
 
-    private handleShelfReady(detail: ShelfReadyEvent): void {
+    private recordShelfAnchor(detail: ShelfReadyEvent): void {
         this.shelfPositions[detail.shelfIndex] = (detail.position as THREE.Vector3).clone()
         this.shelfRotations[detail.shelfIndex] = detail.rotationY ?? 0
         this.shelfSectionIndices[detail.shelfIndex] = detail.sectionIndex
     }
 
-    private handleSetupRequest(_detail: StorePropsSetupRequestEvent): void {
+    private resetSignAnchorsForLayoutSetup(_detail: StorePropsSetupRequestEvent): void {
         // Layout mode rebuild boundary: discard stale shelf anchors so sign placement
         // for the next SectionsReady run can only use fresh ShelfReady data.
         this.shelfPositions = []
@@ -90,28 +88,28 @@ export class ShelfSectionPlanner {
         this.shelfSectionIndices = []
         this.pendingSections = null
         this.clearSigns()
-        ShelfSectionPlanner.logger.debug('Cleared shelf positions and signs (setup request)')
+        ShelfSignPlanner.logger.debug('Cleared shelf positions and signs (setup request)')
     }
 
-    private handleLibraryReloadRequest(): void {
+    private resetSignAnchorsForLibraryReload(): void {
         this.shelfPositions = []
         this.shelfRotations = []
         this.shelfSectionIndices = []
         this.pendingSections = null
         this.clearSigns()
-        ShelfSectionPlanner.logger.debug('Cleared shelf positions and signs (library reload)')
+        ShelfSignPlanner.logger.debug('Cleared shelf positions and signs (library reload)')
     }
 
-    private handleSectionsReady(detail: SectionsReadyEvent): void {
+    private stageSectionSigns(detail: SectionsReadyEvent): void {
         this.pendingSections = detail
 
-        ShelfSectionPlanner.logger.info(
+        ShelfSignPlanner.logger.info(
             `SectionsReady: ${detail.sections.length} section(s), ` +
             `${this.shelfPositions.filter(Boolean).length} shelf positions known`
         )
     }
 
-    private handleShelfLayoutDetermined(_detail: ShelfLayoutDeterminedEvent): void {
+    private applyStagedSignsWhenLayoutReady(_detail: ShelfLayoutDeterminedEvent): void {
         if (!this.pendingSections) {
             return
         }
@@ -134,13 +132,13 @@ export class ShelfSectionPlanner {
 
             const anchorShelfIndex = this.shelfSectionIndices.findIndex((ownedSectionIndex) => ownedSectionIndex === sectionIndex)
             if (anchorShelfIndex < 0) {
-                ShelfSectionPlanner.logger.warn(`No shelf anchor found for section "${section.name}" (index ${sectionIndex})`)
+                ShelfSignPlanner.logger.warn(`No shelf anchor found for section "${section.name}" (index ${sectionIndex})`)
                 continue
             }
 
             const anchorPos = this.shelfPositions[anchorShelfIndex]
             if (!anchorPos) {
-                ShelfSectionPlanner.logger.warn(`No shelf position at index ${anchorShelfIndex} for section "${section.name}"`)
+                ShelfSignPlanner.logger.warn(`No shelf position at index ${anchorShelfIndex} for section "${section.name}"`)
                 continue
             }
 
@@ -162,7 +160,7 @@ export class ShelfSectionPlanner {
             this.placedSignIdentifiers.add(startIdentifier)
         }
 
-        ShelfSectionPlanner.logger.debug(
+        ShelfSignPlanner.logger.debug(
             `Placed ${this.placedSignIdentifiers.size} signs across ${sections.length} sections`
         )
     }

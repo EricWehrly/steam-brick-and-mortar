@@ -119,7 +119,7 @@ export class SceneSignManager {
         return signObject
     }
 
-    /** Remove a sign by identifier. Called by layout coordinators (e.g. ShelfSectionPlanner). */
+    /** Remove a sign by identifier. Called by layout coordinators (e.g. ShelfSignPlanner). */
     public removeSignById(uniqueIdentifier: string): void {
         this.removeSign(uniqueIdentifier)
     }

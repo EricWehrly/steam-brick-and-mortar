@@ -32,7 +32,7 @@ vi.mock('../../../src/scene/SceneSignManager', () => ({
     },
 }))
 
-import { ShelfSectionPlanner } from '../../../src/scene/ShelfSectionPlanner'
+import { ShelfSignPlanner } from '../../../src/scene/ShelfSignPlanner'
 
 const FAR_POSITION = new THREE.Vector3(10, 0, -20)
 
@@ -85,14 +85,14 @@ function emitLibraryReloadRequest(): void {
     EventManager.getInstance().emit(StorePropsEventTypes.LibraryReloadRequest, {})
 }
 
-describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
+describe('ShelfSignPlanner — sign placement from SectionsReady', () => {
     beforeEach(() => {
         EventManager.getInstance().removeAllListeners()
         vi.clearAllMocks()
     })
 
     it('places a sign for each named section when shelf positions are known', () => {
-        new ShelfSectionPlanner()
+        new ShelfSignPlanner()
         emitShelfReady(0, FAR_POSITION, 0, 0)
         emitShelfReady(1, new THREE.Vector3(5, 0, -20), 0, 1)
 
@@ -108,7 +108,7 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     })
 
     it('does not place a sign for unnamed (empty name) sections', () => {
-        new ShelfSectionPlanner()
+        new ShelfSignPlanner()
         emitShelfReady(0, FAR_POSITION)
 
         emitSectionsReady([makeSection('')])
@@ -117,7 +117,7 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     })
 
     it('does not place a sign for "Other" sections', () => {
-        new ShelfSectionPlanner()
+        new ShelfSignPlanner()
         emitShelfReady(0, FAR_POSITION)
 
         emitSectionsReady([makeSection('Other')])
@@ -126,7 +126,7 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     })
 
     it('clears previous signs before placing new ones on re-sort', () => {
-        new ShelfSectionPlanner()
+        new ShelfSignPlanner()
         emitShelfReady(0, FAR_POSITION, 0, 0)
         emitShelfReady(1, new THREE.Vector3(5, 0, -20), 0, 1)
 
@@ -144,7 +144,7 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     })
 
     it('anchors sections to shelf ownership, not just shelf index order', () => {
-        new ShelfSectionPlanner()
+        new ShelfSignPlanner()
         const pos0 = new THREE.Vector3(0, 0, -5)
         const pos1 = new THREE.Vector3(5, 0, -5)
         emitShelfReady(0, pos0, 0, 1) // shelf 0 owned by section index 1
@@ -164,7 +164,7 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     })
 
     it('anchors sections to shelf positions in order', () => {
-        new ShelfSectionPlanner()
+        new ShelfSignPlanner()
         const pos0 = new THREE.Vector3(0, 0, -5)
         const pos1 = new THREE.Vector3(5, 0, -5)
         emitShelfReady(0, pos0, 0, 0)
@@ -184,7 +184,7 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     })
 
     it('clears signs and anchor caches on setup request', () => {
-        new ShelfSectionPlanner()
+        new ShelfSignPlanner()
         emitShelfReady(0, FAR_POSITION)
         emitSectionsReady([makeSection('Action')])
         emitShelfLayoutDetermined()
@@ -199,7 +199,7 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     })
 
     it('clears signs and caches on library reload request', () => {
-        new ShelfSectionPlanner()
+        new ShelfSignPlanner()
         emitShelfReady(0, FAR_POSITION)
         emitSectionsReady([makeSection('Action')])
         emitShelfLayoutDetermined()
@@ -210,7 +210,7 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     })
 
     it('places signs when ShelfLayoutDetermined arrives after SectionsReady', () => {
-        new ShelfSectionPlanner()
+        new ShelfSignPlanner()
         emitSectionsReady([makeSection('Action')])
 
         emitShelfReady(0, FAR_POSITION, 0, 0)
@@ -222,7 +222,7 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     })
 
     it('uses fresh shelf anchors after setup request on layout rebuild', () => {
-        new ShelfSectionPlanner()
+        new ShelfSignPlanner()
 
         const oldPosition = new THREE.Vector3(0, 0, -5)
         emitShelfReady(0, oldPosition, 0, 0)
@@ -243,7 +243,7 @@ describe('ShelfSectionPlanner — sign placement from SectionsReady', () => {
     })
 
     it('does not throw if SectionsReady fires before any ShelfReady', () => {
-        new ShelfSectionPlanner()
+        new ShelfSignPlanner()
         expect(() => {
             emitSectionsReady([makeSection('Action')])
         }).not.toThrow()

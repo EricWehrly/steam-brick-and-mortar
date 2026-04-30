@@ -33,7 +33,7 @@ import type { SteamGameData } from './game-box/types/GameData'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 import { SceneSignManager } from './SceneSignManager'
-import { ShelfSectionPlanner } from './ShelfSectionPlanner'
+import { ShelfSignPlanner } from './ShelfSignPlanner'
 import { GameSorter } from './categorization/GameSorter'
 
 export interface SceneCoordinatorConfig {
@@ -57,7 +57,7 @@ export class SceneCoordinator {
     private eventManager: EventManager
     private gameSorter: GameSorter
     private sceneSignManager: SceneSignManager
-    private shelfSectionPlanner: ShelfSectionPlanner
+    private shelfSignPlanner: ShelfSignPlanner
 
     constructor(sceneManager?: SceneManager) {
         // TODO: DI tho?
@@ -77,7 +77,7 @@ export class SceneCoordinator {
         this.roomManager = new RoomManager()
         this.gameSorter = new GameSorter()
         this.sceneSignManager = SceneSignManager.instance
-        this.shelfSectionPlanner = new ShelfSectionPlanner()
+        this.shelfSignPlanner = new ShelfSignPlanner()
 
         // Track WorldBuild phase — opens here, closes when props complete
         const tracker = StartupEventTracker.getInstance()
@@ -185,7 +185,7 @@ export class SceneCoordinator {
         this.skyboxManager.dispose()
         this.lightingRenderer.dispose()
         this.roomManager.dispose()
-        this.shelfSectionPlanner.dispose()
+        this.shelfSignPlanner.dispose()
     }
 
     private analyzeTaxonomies(): void {
