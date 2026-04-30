@@ -7,7 +7,7 @@
  * ── Genre config ──────────────────────────────────────────────────────────────
  *
  *   KNOWN_GENRES         Canonical genre list (controls shelf sort/display order)
- *   ShelfGroup           Grouped game list type used by ShelfSectionPlanner
+ *   ShelfGroup           Grouped game list type used by ShelfSignPlanner
  *   resolveGenre(raw)    Map a raw Steam genre string to canonical, or 'Other'
  *   primaryGenre(game)   Extract and canonicalize genres[0].description
  *   groupByGenre(games)  Partition games by primaryGenre

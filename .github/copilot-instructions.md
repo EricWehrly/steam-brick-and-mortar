@@ -50,6 +50,7 @@ steam-brick-and-mortar/
 - **Comments should add value**: Only add comments when they explain WHY something is done, not WHAT is being done (the code shows what)
 - **Meaningful documentation**: Comments should provide context, gotchas, business logic, or non-obvious implementation details
 - **Avoid comment noise**: If a comment doesn't make the code significantly clearer, don't add it
+- **Event callback naming**: Avoid generic `handleX` names for event subscribers. Prefer intent-revealing names that describe the state transition or action (example: `stagePlacementRunFromSections` instead of `handleSectionsReady`).
 
 ### 🎨 **UI Development**
 - **Use UIComponentUtils for form controls**: Declarative configs reduce boilerplate by 50-70%

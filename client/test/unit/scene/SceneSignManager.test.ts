@@ -170,7 +170,7 @@ describe('SceneSignManager — lifecycle', () => {
         manager.dispose()
     })
 
-    it('does not place canvas signs on RoomResized (those are data-driven via ShelfSectionPlanner)', () => {
+    it('does not place canvas signs on RoomResized (those are data-driven via ShelfSignPlanner)', () => {
         const manager = new SceneSignManager()
         EventManager.getInstance().emit<RoomResizedEvent>(RoomEventTypes.Resized, {
             dimensions: { width: 22, depth: 16, height: 3.2 },
