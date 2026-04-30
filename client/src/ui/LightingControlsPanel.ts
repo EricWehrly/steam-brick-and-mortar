@@ -16,10 +16,11 @@ import { LightingEventTypes, type LightCreatedEvent, type LightingSystemReadyEve
 import { AppSettings } from '../core/AppSettings'
 import { LightRegistry } from '../lighting/LightRegistry'
 import { Logger } from '../utils/Logger'
+import { renderTemplate } from '../utils/TemplateEngine'
+import lightingControlsPanelTemplate from '../templates/ui/lighting-controls-panel.html?raw'
 import '../styles/lighting-controls-panel.css'
 
 interface LightGroupInfo {
-    type: string
     lights: THREE.Light[]
     enabled: boolean
     collapsed: boolean
@@ -28,7 +29,6 @@ interface LightGroupInfo {
 export class LightingControlsPanel {
     public static logger = Logger.createLogFunctions(LightingControlsPanel.name)
     private container: HTMLElement
-    private scene: THREE.Scene | null = null
     private lightGroups: Map<string, LightGroupInfo> = new Map()
     private eventManager: EventManager
     private lightCreatedHandler: (event: CustomEvent<LightCreatedEvent>) => void
@@ -36,9 +36,8 @@ export class LightingControlsPanel {
 
     private appSettings: AppSettings
     private debugIndicatorEnabled: boolean
-    private panelCollapsed: boolean = true
-    private horizontallyCollapsed: boolean = true
     private checkboxUpdatePending: number | null = null
+    private initialScanPerformed = false
     
     // Use central registry for light and debug helper lookups
     private registry: LightRegistry
@@ -50,8 +49,6 @@ export class LightingControlsPanel {
         this.lightingSystemReadyHandler = this.onLightingSystemReady.bind(this)
         this.appSettings = appSettings
         this.debugIndicatorEnabled = this.appSettings.getSetting('showLightingDebug') ?? false
-        this.panelCollapsed = true
-        this.horizontallyCollapsed = true
         this.container = this.createPanel()
         this.setupEventListeners()
         // No initial scan - we'll scan when we get the first light event or system ready event
@@ -61,38 +58,15 @@ export class LightingControlsPanel {
         const panel = document.createElement('div')
         panel.id = 'lighting-controls-panel'
         panel.className = 'lighting-controls-panel horizontally-collapsed'
-        panel.innerHTML = `
-            <div class="panel-header clickable-header" id="lighting-panel-header">
-                <h3><span class="panel-icon">💡</span><span class="panel-title"> Lighting Controls</span></h3>
-                <div class="header-controls">
-                    <button class="refresh-button ui-button" id="refresh-lights">🔄</button>
-                    <span class="toggle-indicator" id="toggle-indicator">▶</span>
-                </div>
-            </div>
-            <div class="panel-content collapsed" id="lighting-panel-content">
-                <div class="master-controls">
-                    <label class="control-item">
-                        <input type="checkbox" class="ui-checkbox ui-checkbox--rollup" id="all-lights-toggle">
-                        <span class="control-label">All Lights</span>
-                    </label>
-                    <label class="control-item">
-                        <input type="checkbox" class="ui-checkbox" id="debug-indicator-toggle" ${this.debugIndicatorEnabled ? 'checked' : ''}>
-                        <span class="control-label">Show Debug Indicators</span>
-                    </label>
-                </div>
-                <div class="light-groups" id="light-groups-container">
-                    <!-- Light groups with nested individual lights will be populated here -->
-                </div>
-            </div>
-        `
+        panel.innerHTML = renderTemplate(lightingControlsPanelTemplate, {
+            debugIndicatorEnabled: this.debugIndicatorEnabled
+        })
 
         // Hide the separate lighting controls button since we're integrating it into the panel
         const separateButton = document.getElementById('lighting-controls-button')
         if (separateButton) {
             separateButton.style.display = 'none'
         }
-
-        // Styles are now loaded from external CSS file
 
         const slot = document.getElementById('ui-right-center-group') ?? document.getElementById('ui-slot-top-right')
         if (slot) {
@@ -128,7 +102,6 @@ export class LightingControlsPanel {
         // Debug indicator toggle
         const debugToggle = document.getElementById('debug-indicator-toggle') as HTMLInputElement
         if (debugToggle) {
-            debugToggle.checked = this.debugIndicatorEnabled
             debugToggle.addEventListener('change', () => {
                 this.debugIndicatorEnabled = debugToggle.checked
                 this.appSettings.setSetting('showLightingDebug', this.debugIndicatorEnabled, EventSource.UI)
@@ -140,6 +113,10 @@ export class LightingControlsPanel {
         const refreshButton = document.getElementById('refresh-lights')
         if (refreshButton) {
             refreshButton.addEventListener('click', (e) => {
+                // Manual resync for rare cases where event ordering leaves stale panel state.
+                // TODO: LightingEventTypes.Created and LightingEventTypes.SystemReady should already
+                // cover the cases that make this necessary. If those events are reliable, the refresh
+                // button can be removed. Audit event coverage before deleting.
                 e.stopPropagation() // Prevent header click from triggering
                 this.scanLights()
                 this.updateUI()
@@ -157,10 +134,12 @@ export class LightingControlsPanel {
     private onLightCreated(event: CustomEvent<LightCreatedEvent>): void {
         LightingControlsPanel.logger.debug(`💡 Light created: ${event.detail.lightType} (${event.detail.lightName || 'unnamed'})`)
         
-        // Get scene from the first light event
-        if (!this.scene) {
-            this.scene = event.detail.scene
-            this.performInitialScan() // Now we can scan for existing lights
+        // Perform initial scan on first event (catches any lights created before panel initialization)
+        if (!this.initialScanPerformed) {
+            this.initialScanPerformed = true
+            this.scanLights()
+            this.updateUI()
+            this.doUpdateCheckboxStates()
         }
         
         this.addLightToGroups(event.detail.light, event.detail.lightType)
@@ -170,10 +149,12 @@ export class LightingControlsPanel {
     private onLightingSystemReady(event: CustomEvent<LightingSystemReadyEvent>): void {
         LightingControlsPanel.logger.debug(`💡 Lighting system ready: ${event.detail.quality} quality`)
         
-        // Get scene from the system ready event if we don't have it yet
-        if (!this.scene) {
-            this.scene = event.detail.scene
-            this.performInitialScan() // Now we can scan for existing lights
+        // Perform initial scan on first event if not already done
+        if (!this.initialScanPerformed) {
+            this.initialScanPerformed = true
+            this.scanLights()
+            this.updateUI()
+            this.doUpdateCheckboxStates()
         }
         
         // Always refresh UI when system is ready (covers initial load and quality changes)
@@ -184,30 +165,20 @@ export class LightingControlsPanel {
     private addLightToGroups(light: THREE.Light, lightType: string): void {
         if (!this.lightGroups.has(lightType)) {
             this.lightGroups.set(lightType, {
-                type: lightType,
                 lights: [],
                 enabled: light.visible, // Initialize based on first light's actual visibility
                 collapsed: true // Start collapsed
             })
         }
         
-        const group = this.lightGroups.get(lightType)!
+        const group = this.lightGroups.get(lightType)
+        if (!group) return
         group.lights.push(light)
         
         // Recalculate group enabled state: true if ANY light in group is visible
         const enabledCount = group.lights.filter(l => l.visible).length
         group.enabled = enabledCount > 0
     }
-
-    private performInitialScan(): void {
-        // Initial scan to catch any existing lights
-        this.scanLights()
-        this.updateUI()
-        // Force immediate checkbox update on initial load (don't defer)
-        this.doUpdateCheckboxStates()
-    }
-
-
 
     private scanLights(): void {
         const newGroups = new Map<string, LightGroupInfo>()
@@ -217,7 +188,6 @@ export class LightingControlsPanel {
         
         for (const [lightType, lights] of groupedLights) {
             newGroups.set(lightType, {
-                type: lightType,
                 lights: [...lights], // Copy array
                 enabled: true,
                 collapsed: true // Start collapsed
@@ -235,7 +205,6 @@ export class LightingControlsPanel {
 
     private updateUI(): void {
         this.updateLightGroups()
-        this.updateIndividualLights()
         this.doUpdateCheckboxStates()
     }
 
@@ -302,8 +271,9 @@ export class LightingControlsPanel {
             
             // Event listeners
             const checkbox = checkboxArea.querySelector('.group-toggle') as HTMLInputElement
+            // Click-area expansion trick: allows clicking the label area to toggle, but don't double-toggle
+            // if user clicks the checkbox itself (it will fire change event)
             checkboxArea.addEventListener('click', (e) => {
-                // Only toggle checkbox if clicking the area, not the checkbox itself
                 if (e.target !== checkbox) {
                     checkbox.checked = !checkbox.checked
                     this.toggleLightGroup(type, checkbox.checked)
@@ -320,12 +290,6 @@ export class LightingControlsPanel {
 
             container.appendChild(groupElement)
         })
-    }
-
-    private updateIndividualLights(): void {
-        // Individual lights are now nested within their groups
-        // This method is kept for backwards compatibility but does nothing
-        // The lights are rendered in updateLightGroups()
     }
 
     private updateMasterToggle(): void {
@@ -403,6 +367,9 @@ export class LightingControlsPanel {
         return info.length > 0 ? `(${info.join(', ')})` : ''
     }
 
+    // TODO: These toggle methods mutate Three.js light objects directly from UI code.
+    // They should instead emit events (e.g. LightingEventTypes.Toggle) and let the
+    // lighting system own the mutation. Deferred to avoid a large PR review.
     private toggleAllLights(enabled: boolean): void {
         this.lightGroups.forEach((group) => {
             group.lights.forEach(light => {
@@ -514,14 +481,12 @@ export class LightingControlsPanel {
         if (!content || !indicator) return
 
         const isCollapsed = content.classList.contains('collapsed')
-        this.panelCollapsed = !isCollapsed // Will be the new state after toggle
         
         if (isCollapsed) {
             // Expand: remove collapsed classes
             content.classList.remove('collapsed')
             panel.classList.remove('horizontally-collapsed')
             indicator.textContent = '▼'
-            this.horizontallyCollapsed = false
             this.scanLights()
             this.updateUI()
         } else {
@@ -529,7 +494,6 @@ export class LightingControlsPanel {
             content.classList.add('collapsed')
             panel.classList.add('horizontally-collapsed')
             indicator.textContent = '▶'
-            this.horizontallyCollapsed = true
         }
     }
 

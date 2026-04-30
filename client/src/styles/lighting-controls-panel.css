@@ -211,16 +211,13 @@
 
 .lighting-controls-panel .group-lights-container {
     max-height: 500px;
-    opacity: 1;
     padding-left: var(--panel-space-8);
-    transition: max-height var(--menu-transition-time) ease, opacity var(--menu-transition-time) ease;
+    transition: max-height 0.35s ease-out;
     overflow: hidden;
 }
 
 .lighting-controls-panel .group-lights-container.collapsed {
     max-height: 0;
-    opacity: 0;
-    padding-left: 0;
 }
 
 .lighting-controls-panel .individual-lights h4 {
