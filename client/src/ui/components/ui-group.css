@@ -34,7 +34,7 @@
     color: var(--panel-text-muted);
     font-size: var(--panel-font-size-sm);
     border-radius: var(--panel-radius-sm);
-    transition: background-color 0.2s ease, transform var(--menu-transition-time, var(--duration-standard)) ease;
+    transition: background-color 0.2s ease, transform var(--duration-menu-group, var(--duration-menu, var(--duration-standard))) ease;
     user-select: none;
     display: inline-block;
 }
