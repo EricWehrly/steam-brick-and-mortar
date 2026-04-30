@@ -16,6 +16,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { EventManager } from '../../../../src/core/EventManager'
 import { GameBoxSpawner } from '../../../../src/scene/spawning/GameBoxSpawner'
+import { GpuGameBoxRenderer } from '../../../../src/scene/game-box/GpuGameBoxRenderer'
 
 import {
     GameRenderEventTypes,
@@ -184,6 +185,16 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
 
     afterEach(() => {
         EventManager.getInstance().removeAllListeners()
+    })
+
+    it('provisions placement capacity from baseline policy', () => {
+        // beforeEach emits LibraryManifestReady(totalGames=2), which should initialize renderer once.
+        const rendererCtor = GpuGameBoxRenderer as unknown as ReturnType<typeof vi.fn>
+        expect(rendererCtor).toHaveBeenCalled()
+
+        const [textureCapacity, placementCapacity] = rendererCtor.mock.calls[0] as [number, number]
+        expect(textureCapacity).toBe(102)
+        expect(placementCapacity).toBe(204)
     })
 
     it('PROBE: intent arrives before prefetch — placeGame fires when prefetch settles', async () => {

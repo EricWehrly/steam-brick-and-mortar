@@ -27,6 +27,22 @@
 
 ---
 
+## id: placement-headroom-policy
+**Priority**: High  
+**Effort**: ~1 day (instrumentation review + policy implementation + validation)  
+**Context**: Placement capacity is currently derived from a fixed multiplier over texture capacity. This can under-allocate during multi-group overlap and over-allocate for smaller libraries. Capacity should be policy-driven from observed overlap/cardinality and explicitly validated on arrangement/layout changes.
+
+**Done when**:
+- Placement capacity is derived from a documented policy (not a hardcoded multiplier)
+- Policy is configurable/observable enough to tune safely
+- Regression coverage protects against instance-capacity exhaustion on regroup/re-layout
+- Runtime diagnostics can confirm reset + capacity behavior per placement run
+
+**Source tag**:
+- `// TD: placement-headroom-policy` in `client/src/scene/spawning/GameBoxSpawner.ts`
+
+---
+
 ## id: carpet-worker-offload
 **Status**: ✅ Resolved 2026-04-13 — carpet texture generation moved to `ProceduralTextureWorker` (`carpet_enhanced` type). ~700ms main-thread startup hitch eliminated.
 
