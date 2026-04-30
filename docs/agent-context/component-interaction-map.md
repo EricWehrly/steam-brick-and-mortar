@@ -19,13 +19,14 @@
 
 #### Phase 2 — Definitions ready for arrangement
 - `SteamIntegration` emits `GameEventTypes.GameDataReady` immediately after `steam.games` commit.
-- `GameSorter` listens to `GameDataReady`, resolves grouping+sorting, emits `GameEventTypes.SectionsReady`.
+- `GameSorter` listens to `GameDataReady`, resolves grouping+sorting, emits `SectionsComputed`, `ArrangementAllocationPlanned`, `SectionsReadyForPlacement`, and `SectionsReady`.
 - `ShelfLayoutCoordinator` and `ShelfSectionPlanner` consume `SectionsReady`.
+- `GameBoxSpawner` consumes `SectionsReadyForPlacement`.
 
 #### Phase 3 — Artwork/placement progress and completion
 - `GamesLoader` emits `SteamEventTypes.GamesBatchReady` (cache + remote progressive batches).
 - `BatchCoordinator` serializes and re-emits `StorePropsEventTypes.BatchReadyForPlacement`.
-- `GameBoxSpawner` prewarms artwork from `BatchReadyForPlacement`, places on `SectionsReady` + `ShelfLayoutDetermined`, then emits `StorePropsEventTypes.GamesPlaced`.
+- `GameBoxSpawner` prewarms artwork from `BatchReadyForPlacement`, places on `SectionsReadyForPlacement` + `ShelfLayoutDetermined`, then emits `StorePropsEventTypes.GamesPlaced`.
 - `BatchCoordinator` emits `SomeBatchesComplete` / `AllBatchesComplete` after placement accounting.
 
 #### Ownership rules

@@ -39,14 +39,20 @@ Game sort should hang from the definitions-ready seam, not artwork completion:
 2. `GameEventTypes.GameDataReady`
    - `steam.games` committed and definitions available
    - Canonical trigger for `GameSorter`
-3. `GameEventTypes.SectionsReady`
-   - Group + sort output consumed by shelf/sign/placement
-4. Artwork pipeline completion events (`BatchReadyForPlacement`, `GamesPlaced`, `AllBatchesComplete`)
+3. `GameEventTypes.SectionsComputed`
+   - Uncapped section identity seam (`sectionId` + section identity)
+4. `GameEventTypes.ArrangementAllocationPlanned`
+   - Allocation decision seam keyed by `sectionId`
+5. `GameEventTypes.SectionsReadyForPlacement`
+   - Placement execution seam consumed by `GameBoxSpawner`
+6. `GameEventTypes.SectionsReady`
+   - Arrangement seam consumed by shelf layout/sign systems and UI sync
+7. Artwork pipeline completion events (`BatchReadyForPlacement`, `GamesPlaced`, `AllBatchesComplete`)
    - Placement/progress only; must not gate sort/layout semantics
 
 ## Notes / Open Questions
 
-- **What's already done**: `GameSorter` is fully implemented and emits `GamesSortEvent` with sorted games. `ShelfSectionPlanner` listens and receives `sortedGames`. Sort policy has been moved out of `SteamApiClient`. Sort modes (genre, recently-played, playtime) exist. `LayoutSortPanel` wired to `SortRequested` → `GameSorter`. The remaining gap is specifically box/shelf repositioning — games don't move in the scene when sort mode changes.
+- **What's already done**: `GameSorter` now emits separated arrangement seams (`SectionsComputed`, `ArrangementAllocationPlanned`, `SectionsReadyForPlacement`, `SectionsReady`). `ShelfSectionPlanner` listens to `SectionsReady`; `GameBoxSpawner` listens to `SectionsReadyForPlacement`. Sort policy has been moved out of `SteamApiClient`.
 - "Sort by" in-scene affordance and sort mode switch UI is a related intake item from Apr 6-7 session dossier.
 - Multi-instance genre sections (same game appearing in multiple thematic views) is out of scope here — that's Encore.
 - Coordinate with `SignageRenderer` singleton/static-method evaluation (also in the dossier).
