@@ -191,10 +191,6 @@
     transform: rotate(-90deg);
 }
 
-.lighting-controls-panel .group-control .control-label {
-    font-weight: bold;
-}
-
 .lighting-controls-panel .group-lights-container {
     max-height: 500px;
     padding-left: var(--panel-space-8);
@@ -204,14 +200,6 @@
 
 .lighting-controls-panel .group-lights-container.collapsed {
     max-height: 0;
-}
-
-.lighting-controls-panel .individual-lights h4 {
-    margin: var(--panel-space-12) 0 var(--panel-space-8) 0;
-    font-size: var(--panel-font-size-sm);
-    color: var(--panel-heading-text);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .lighting-controls-panel .light-control {
