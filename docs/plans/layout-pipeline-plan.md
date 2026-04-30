@@ -159,7 +159,10 @@ Do not collapse these into a single overloaded "data ready" event.
 | Event | Payload | Emitted by | Consumed by |
 |---|---|---|---|
 | `GameEventTypes.GameDataReady` | `totalGames`, `totalBatches` | `SteamIntegration` (after `steam.games` commit) | `GameSorter` (+ any definitions consumers) |
-| `GameEventTypes.SectionsReady` | `Section[]`, `groupMode`, `sortMode` | `GameSorter` | `ShelfLayoutCoordinator`, `GameBoxSpawner`, `ShelfSectionPlanner` |
+| `GameEventTypes.SectionsComputed` | `sectionId + section identity` (uncapped) | `GameSorter` | diagnostics/allocation observers |
+| `GameEventTypes.ArrangementAllocationPlanned` | allocation rows keyed by `sectionId` | `GameSorter` | capacity/layout diagnostics |
+| `GameEventTypes.SectionsReadyForPlacement` | allocated sections keyed by `sectionId` | `GameSorter` | `GameBoxSpawner` |
+| `GameEventTypes.SectionsReady` | `Section[]`, `groupMode`, `sortMode` | `GameSorter` | `ShelfLayoutCoordinator`, `ShelfSectionPlanner`, arrangement UI sync |
 
 ### Phase 3 — Artwork/placement progress + terminal completion
 
