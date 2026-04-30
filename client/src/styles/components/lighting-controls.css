@@ -24,18 +24,12 @@
 }
 
 .lighting-controls-panel .refresh-button {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid #555;
-    color: white;
+    min-height: auto;
     padding: 4px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    transition: background-color 0.2s;
 }
 
 .lighting-controls-panel .refresh-button:hover {
-    background: rgba(255, 255, 255, 0.2);
+    filter: brightness(1.05);
 }
 
 .lighting-controls-panel .panel-content {
@@ -126,15 +120,15 @@
 }
 
 /* Checkbox styling */
-.lighting-controls-panel input[type="checkbox"] {
+.lighting-controls-panel input[type="checkbox"]:not(.ui-checkbox) {
     accent-color: #0078d7;
 }
 
-.lighting-controls-panel input[type="checkbox"]:checked {
+.lighting-controls-panel input[type="checkbox"]:not(.ui-checkbox):checked {
     background-color: #0078d7;
 }
 
-.lighting-controls-panel input[type="checkbox"]:indeterminate {
+.lighting-controls-panel input[type="checkbox"]:not(.ui-checkbox):indeterminate {
     background-color: #ff8c00;
 }
 

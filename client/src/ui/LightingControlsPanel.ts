@@ -65,18 +65,18 @@ export class LightingControlsPanel {
             <div class="panel-header clickable-header" id="lighting-panel-header">
                 <h3><span class="panel-icon">💡</span><span class="panel-title"> Lighting Controls</span></h3>
                 <div class="header-controls">
-                    <button class="refresh-button" id="refresh-lights">🔄</button>
+                    <button class="refresh-button ui-button" id="refresh-lights">🔄</button>
                     <span class="toggle-indicator" id="toggle-indicator">▶</span>
                 </div>
             </div>
             <div class="panel-content collapsed" id="lighting-panel-content">
                 <div class="master-controls">
                     <label class="control-item">
-                        <input type="checkbox" id="all-lights-toggle">
+                        <input type="checkbox" class="ui-checkbox ui-checkbox--rollup" id="all-lights-toggle">
                         <span class="control-label">All Lights</span>
                     </label>
                     <label class="control-item">
-                        <input type="checkbox" id="debug-indicator-toggle" ${this.debugIndicatorEnabled ? 'checked' : ''}>
+                        <input type="checkbox" class="ui-checkbox" id="debug-indicator-toggle" ${this.debugIndicatorEnabled ? 'checked' : ''}>
                         <span class="control-label">Show Debug Indicators</span>
                     </label>
                 </div>
@@ -236,7 +236,7 @@ export class LightingControlsPanel {
     private updateUI(): void {
         this.updateLightGroups()
         this.updateIndividualLights()
-        this.updateMasterToggle()
+        this.doUpdateCheckboxStates()
     }
 
     private updateLightGroups(): void {
@@ -257,7 +257,7 @@ export class LightingControlsPanel {
             const checkboxArea = document.createElement('div')
             checkboxArea.className = 'group-checkbox-area'
             checkboxArea.innerHTML = `
-                <input type="checkbox" class="group-toggle" data-type="${type}" ${group.enabled ? 'checked' : ''}>
+                <input type="checkbox" class="group-toggle ui-checkbox ui-checkbox--rollup" data-type="${type}" ${group.enabled ? 'checked' : ''}>
                 <span class="control-label">${type} (${group.lights.length})</span>
             `
             
@@ -284,7 +284,7 @@ export class LightingControlsPanel {
                 const lightName = light.name || `${type}-${index}`
                 lightElement.innerHTML = `
                     <label class="control-item light-control">
-                        <input type="checkbox" class="light-toggle" data-light-id="${light.id}" ${light.visible ? 'checked' : ''}>
+                        <input type="checkbox" class="light-toggle ui-checkbox" data-light-id="${light.id}" ${light.visible ? 'checked' : ''}>
                         <span class="control-label">${lightName}</span>
                         <span class="light-info">${this.getLightInfo(light)}</span>
                     </label>

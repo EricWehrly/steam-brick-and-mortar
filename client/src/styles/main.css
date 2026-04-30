@@ -2,9 +2,9 @@
 @import './tokens.css';
 @import './components/toast.css';
 @import './components/steam-ui.css';
-@import './components/lighting-controls.css';
 @import './components/game-artwork-inspector.css';
 @import './components/scene-blur-overlay.css';
+@import '../ui/components/index.css';
 
 /* ===== Global Color Scheme ===== */
 :root {

@@ -119,26 +119,33 @@
 }
 
 .lighting-controls-panel .master-controls {
-    /* No bottom margin — the separator is enough */
     margin-bottom: var(--panel-space-6);
-    padding-bottom: var(--panel-space-4);
-    border-bottom: 1px solid var(--panel-border);
+    padding: var(--panel-space-4) var(--panel-space-6);
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.lighting-controls-panel .master-controls .control-item {
+    padding: var(--panel-space-4) var(--panel-space-8);
+    border-radius: var(--panel-radius-sm);
+}
+
+.lighting-controls-panel .master-controls .control-item:hover {
+    background: var(--panel-subtle-hover-bg);
 }
 
 .lighting-controls-panel .control-item {
     /* Bare-bones layout — no container border, no extra vertical padding */
     display: flex;
     align-items: center;
+    gap: var(--panel-space-8);
     margin-bottom: var(--panel-space-3);
     cursor: pointer;
 }
 
-.lighting-controls-panel .control-item input[type="checkbox"] {
-    margin-right: var(--panel-space-8);
-}
-
 .lighting-controls-panel .control-label {
     font-size: var(--panel-font-size);
+    line-height: 1.2;
     user-select: none;
 }
 
@@ -166,6 +173,7 @@
 .lighting-controls-panel .group-checkbox-area {
     display: flex;
     align-items: center;
+    gap: var(--panel-space-8);
     flex: 1;
     cursor: pointer;
     padding: var(--panel-space-4);
@@ -204,6 +212,7 @@
 .lighting-controls-panel .group-lights-container {
     max-height: 500px;
     opacity: 1;
+    padding-left: var(--panel-space-8);
     transition: max-height var(--menu-transition-time) ease, opacity var(--menu-transition-time) ease;
     overflow: hidden;
 }
@@ -211,6 +220,7 @@
 .lighting-controls-panel .group-lights-container.collapsed {
     max-height: 0;
     opacity: 0;
+    padding-left: 0;
 }
 
 .lighting-controls-panel .individual-lights h4 {
@@ -234,4 +244,8 @@
 
 .lighting-controls-panel .light-control .control-label {
     font-weight: normal;
+}
+
+.lighting-controls-panel .ui-checkbox {
+    flex: 0 0 auto;
 }
