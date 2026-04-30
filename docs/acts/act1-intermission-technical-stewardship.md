@@ -19,6 +19,9 @@
 - [Key Metrics Instrumentation](../features/key-metrics-instrumentation.md) — frame time, memory, hitch detection
 - [Background Resource Reduction](../features/background-resource-reduction.md) — Page Visibility API, LOD disable on blur, frame throttle
 - [UI Standardization](../features/ui-standardization.md) — design tokens, component library, VR-ready architecture
+  - Active implementation roadmap: [UI Normalization Plan](../plans/ui-normalization-plan.md)
+  - Token source of truth: [UI Design Tokens](../plans/ui-design-tokens.md)
+  - Current inconsistency inventory: [UI Normalization Audit](../plans/ui-normalization-audit.md)
 
 **First-Start Follow-Up (must land — game rendering pipeline):**
 - [First-Start Follow-Up Plan](../plans/first-start-followup-plan.md) — four issues surfaced during anonymous→logged-in user transition:
