@@ -72,6 +72,7 @@
     --duration-standard: 0.2s;
     --duration-slow:     0.4s;
     --duration-menu:     1.3s;  /* Panel expand/collapse — intentionally slow */
+    --duration-menu-group: 0.8s;  /* Nested light-group expand/collapse */
 
     /* ─── Z-index layers (blocks of 100 per layer) ───────────────────── */
     /* TD: z-index-layers — see tech-debt.md for full formalization plan */

@@ -28,9 +28,6 @@
     --warning-color: #ff9800;
     --error-color: #dc3545;
     
-    /* UI transition timing */
-    --menu-transition-time: 0.2s;
-
     /* Shared UI layout rails */
     --ui-edge-gap: 10px;
     --ui-top-inset: 20px;

@@ -7,6 +7,42 @@
     padding: var(--space-lg);
 }
 
+.ui-panel .panel-header.clickable-header {
+    padding: var(--panel-space-8, var(--space-md)) var(--panel-space-12, var(--space-lg));
+    background: var(--panel-header-bg, var(--color-surface-2));
+    border-bottom: 1px solid var(--panel-border, var(--color-border));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+    margin-bottom: 0;
+}
+
+.ui-panel .panel-header.clickable-header:hover {
+    background: var(--panel-hover-bg, var(--color-surface-overlay));
+}
+
+.ui-panel .panel-header h3 {
+    margin: 0;
+    font-size: var(--panel-font-size-md, var(--font-size-lg));
+    user-select: none;
+}
+
+.ui-panel .header-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--panel-space-8, var(--space-sm));
+}
+
+.ui-panel .toggle-indicator {
+    font-size: var(--panel-font-size-sm, var(--font-size-sm));
+    color: var(--panel-text-muted, var(--color-text-secondary));
+    user-select: none;
+    transition: transform var(--duration-menu, var(--duration-standard)) ease;
+    display: inline-block;
+}
+
 /**
  * Horizontal collapse variant: collapses the panel to a narrow sidebar, hiding label content
  * Useful for toggleable side panels and similar UI elements

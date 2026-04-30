@@ -1,12 +1,3 @@
-/**
- * Lighting Controls Panel Styles
- */
-
-:root {
-    /* TODO: Apply this transition time to #steam-ui fade out */
-    --menu-transition-time: 1.3s;
-}
-
 .lighting-controls-panel {
     position: relative;
     top: auto;
@@ -28,56 +19,13 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    transition: width var(--menu-transition-time) ease;
-}
-
-/* Horizontal collapse behavior is defined in ui-panel.css as .ui-panel.horizontally-collapsed */
-
-.lighting-controls-panel .clickable-header {
-    padding: var(--panel-space-8) var(--panel-space-12);
-    background: var(--panel-header-bg);
-    border-bottom: 1px solid var(--panel-border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    transition: background-color 0.2s ease;
-    cursor: pointer;
-    margin-bottom: 0;
-}
-
-.lighting-controls-panel .clickable-header:hover {
-    background: var(--panel-hover-bg);
-}
-
-.lighting-controls-panel .clickable-header h3 {
-    margin: 0;
-    font-size: var(--panel-font-size-md);
-    user-select: none;
-}
-
-.lighting-controls-panel .header-controls {
-    display: flex;
-    align-items: center;
-    gap: var(--panel-space-8);
-}
-
-.lighting-controls-panel .toggle-indicator {
-    font-size: var(--panel-font-size-sm);
-    color: var(--panel-text-muted);
-    user-select: none;
-    transition: transform var(--menu-transition-time) ease;
-    display: inline-block;
+    transition: width var(--duration-menu) ease;
 }
 
 .lighting-controls-panel .refresh-button {
     background: none;
     border: none;
     color: var(--panel-text-muted);
-    cursor: pointer;
-    font-size: var(--panel-font-size-sm);
-    padding: var(--panel-space-2) var(--panel-space-4);
-    border-radius: var(--panel-radius-sm);
-    transition: background-color 0.2s ease;
 }
 
 .lighting-controls-panel .refresh-button:hover {
@@ -93,7 +41,7 @@
     max-height: min(75vh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap) - 52px));
     min-height: auto;
     opacity: 1;
-    transition: max-height var(--menu-transition-time) ease, opacity var(--menu-transition-time) ease;
+    transition: max-height var(--duration-menu) ease, opacity var(--duration-menu) ease;
 }
 
 .lighting-controls-panel .panel-content.collapsed {
@@ -109,16 +57,11 @@
     margin-bottom: var(--panel-space-6);
     padding: var(--panel-space-4) var(--panel-space-6);
     padding-bottom: 0;
-    border-bottom: none;
 }
 
 .lighting-controls-panel .master-controls .control-item {
     padding: var(--panel-space-4) var(--panel-space-8);
     border-radius: var(--panel-radius-sm);
-}
-
-.lighting-controls-panel .master-controls .control-item:hover {
-    background: var(--panel-subtle-hover-bg);
 }
 
 .lighting-controls-panel .control-item {
@@ -128,6 +71,10 @@
     gap: var(--panel-space-8);
     margin-bottom: var(--panel-space-3);
     cursor: pointer;
+}
+
+.lighting-controls-panel .control-item:hover {
+    background: var(--panel-subtle-hover-bg);
 }
 
 .lighting-controls-panel .control-label {
@@ -147,9 +94,9 @@
 }
 
 .lighting-controls-panel .group-lights-container {
-    max-height: 500px;
+    max-height: 0;
     padding-left: var(--panel-space-8);
-    transition: max-height 0.35s ease-out;
+    transition: max-height var(--duration-menu-group) ease-out;
     overflow: hidden;
 }
 
@@ -166,10 +113,6 @@
 
 .lighting-controls-panel .light-control:hover {
     background: var(--panel-item-hover-bg);
-}
-
-.lighting-controls-panel .light-control .control-label {
-    font-weight: normal;
 }
 
 .lighting-controls-panel .ui-checkbox {

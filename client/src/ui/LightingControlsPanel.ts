@@ -266,7 +266,7 @@ export class LightingControlsPanel {
                 
                 lightsContainer.appendChild(lightElement)
             })
-            
+
             groupElement.appendChild(lightsContainer)
             
             // Event listeners
@@ -289,6 +289,7 @@ export class LightingControlsPanel {
             })
 
             container.appendChild(groupElement)
+            this.syncGroupContainerHeight(lightsContainer, group.collapsed)
         })
     }
 
@@ -438,12 +439,26 @@ export class LightingControlsPanel {
         }
         
         if (lightsContainer) {
-            if (group.collapsed) {
-                lightsContainer.classList.add('collapsed')
-            } else {
-                lightsContainer.classList.remove('collapsed')
-            }
+            this.syncGroupContainerHeight(lightsContainer, group.collapsed)
         }
+    }
+
+    private syncGroupContainerHeight(lightsContainer: Element, collapsed: boolean): void {
+        if (!(lightsContainer instanceof HTMLElement)) return
+
+        // TODO: Replace this measured max-height JS with a cleaner shared animation approach.
+        // The pure CSS max-height hack makes rollout feel instantaneous and collapse too slow.
+        if (collapsed) {
+            lightsContainer.style.maxHeight = `${lightsContainer.scrollHeight}px`
+            requestAnimationFrame(() => {
+                lightsContainer.classList.add('collapsed')
+                lightsContainer.style.maxHeight = '0px'
+            })
+            return
+        }
+
+        lightsContainer.classList.remove('collapsed')
+        lightsContainer.style.maxHeight = `${lightsContainer.scrollHeight}px`
     }
 
     public show(): void {
