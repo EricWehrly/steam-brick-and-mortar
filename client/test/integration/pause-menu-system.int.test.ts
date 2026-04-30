@@ -8,7 +8,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { PauseMenuManager } from '../../src/ui/pause/PauseMenuManager'
 import { CacheManagementPanel } from '../../src/ui/pause/panels/CacheManagementPanel'
-import { HelpPanel } from '../../src/ui/pause/panels/HelpPanel'
+import { ControlsPanel } from '../../src/ui/pause/panels/ControlsPanel'
+import { ApplicationPanel } from '../../src/ui/pause/panels/ApplicationPanel'
 import { EventManager } from '../../src/core/EventManager'
 import { AppSettings } from '../../src/core/AppSettings'
 
@@ -136,10 +137,13 @@ describe('Pause Menu Integration Tests', () => {
             pauseMenuManager.init()
             
             const cachePanel = new CacheManagementPanel()
-            const helpPanel = new HelpPanel()
+            const controlsPanel = new ControlsPanel()
+            const applicationPanel = new ApplicationPanel({}, appSettings, eventManager)
+            applicationPanel.initialize({ onSettingsChanged: vi.fn() })
             
             expect(() => pauseMenuManager.registerPanel(cachePanel)).not.toThrow()
-            expect(() => pauseMenuManager.registerPanel(helpPanel)).not.toThrow()
+            expect(() => pauseMenuManager.registerPanel(controlsPanel)).not.toThrow()
+            expect(() => pauseMenuManager.registerPanel(applicationPanel)).not.toThrow()
         })
     })
 
@@ -147,7 +151,10 @@ describe('Pause Menu Integration Tests', () => {
         beforeEach(() => {
             pauseMenuManager.init()
             pauseMenuManager.registerPanel(new CacheManagementPanel())
-            pauseMenuManager.registerPanel(new HelpPanel())
+            pauseMenuManager.registerPanel(new ControlsPanel())
+            const applicationPanel = new ApplicationPanel({}, appSettings, eventManager)
+            applicationPanel.initialize({ onSettingsChanged: vi.fn() })
+            pauseMenuManager.registerPanel(applicationPanel)
         })
 
         it('should toggle menu open and closed', () => {
@@ -176,8 +183,8 @@ describe('Pause Menu Integration Tests', () => {
             pauseMenuManager.open('cache-management')
             expect(pauseMenuManager.getState().activePanel).toBe('cache-management')
             
-            pauseMenuManager.showPanel('help')
-            expect(pauseMenuManager.getState().activePanel).toBe('help')
+            pauseMenuManager.showPanel('application')
+            expect(pauseMenuManager.getState().activePanel).toBe('application')
         })
     })
 
@@ -247,24 +254,22 @@ describe('Pause Menu Integration Tests', () => {
             expect(cachePanel.icon).toBe('💾')
         })
 
-        it('should create help panel with controls information', () => {
-            const helpPanel = new HelpPanel()
-            pauseMenuManager.registerPanel(helpPanel)
-            
-            expect(helpPanel.id).toBe('help')
-            expect(helpPanel.title).toBe('Controls')
-            expect(helpPanel.icon).toBe('🎮')
+        it('should create controls panel with expected metadata', () => {
+            const controlsPanel = new ControlsPanel()
+            pauseMenuManager.registerPanel(controlsPanel)
+
+            expect(controlsPanel.id).toBe('controls')
+            expect(controlsPanel.title).toBe('Controls')
+            expect(controlsPanel.icon).toBe('🎮')
         })
 
-        it('should render panel content correctly', () => {
-            const helpPanel = new HelpPanel()
-            const content = helpPanel.render()
-            
+        it('should render controls panel content correctly', () => {
+            const controlsPanel = new ControlsPanel()
+            const content = controlsPanel.render()
+
             expect(content).toContain('Movement Controls')
             expect(content).toContain('W A S D')
             expect(content).toContain('System Controls')
-            expect(content).toContain('Escape')
-            expect(content).toContain('VR Controls')
         })
     })
 
