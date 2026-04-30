@@ -84,25 +84,31 @@ export class ShelfLayoutCoordinator {
         this.clearRunState()
         this.computedLayoutMode = this.layoutMode
 
-        // Compute total shelves across all sections
-        const shelvesPerSection = detail.sections.map(s =>
-            Math.max(1, Math.ceil(s.games.length / SLOTS_PER_SHELF))
-        )
-        this.totalShelves = shelvesPerSection.reduce((sum, n) => sum + n, 0)
+        // Filter out sections with zero games to prevent empty shelves from being spawned.
+        // Keep original section indices so downstream placement/signage mappings remain stable.
+        const nonEmptySections = detail.sections.filter(s => s.games.length > 0)
 
-        if (this.totalShelves === 0) {
+        if (nonEmptySections.length === 0) {
             ShelfLayoutCoordinator.logger.warn('No shelves to lay out — all sections empty')
             return
         }
 
+        // Compute total shelves across all sections
+        const shelvesPerSection = nonEmptySections.map(s =>
+            Math.max(1, Math.ceil(s.games.length / SLOTS_PER_SHELF))
+        )
+        this.totalShelves = shelvesPerSection.reduce((sum, n) => sum + n, 0)
+
         ShelfLayoutCoordinator.logger.debug(
-            `Computing ${this.layoutMode} layout: ${this.totalShelves} shelves across ${detail.sections.length} sections`
+            `Computing ${this.layoutMode} layout: ${this.totalShelves} shelves across ${nonEmptySections.length} non-empty sections`
         )
 
         const activeLayout = LayoutRegistry[this.layoutMode]
         const isSectionAwareLayout = 'computeShelvesForSections' in activeLayout
         const shelves = isSectionAwareLayout
-            ? (activeLayout as ISectionAwareLayoutDefinition).computeShelvesForSections(detail.sections)
+            ? (activeLayout as ISectionAwareLayoutDefinition)
+                .computeShelvesForSections(detail.sections)
+                .filter(shelf => detail.sections[shelf.sectionIndex]?.games.length > 0)
             : this.computeShelvesByLinearSectionOwnership(activeLayout.computeShelves(this.totalShelves), shelvesPerSection)
 
         // Build bounds and section-tagged shelf map

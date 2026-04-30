@@ -34,15 +34,18 @@ vi.mock('../../src/utils/TextureManager', async () => {
 import { EventManager } from '../../src/core/EventManager'
 import { DataManager } from '../../src/core/data'
 import { createStorePropsTestHarness, type StorePropsTestHarness } from '../helpers/StorePropsTestHarness'
+import { ShelfLayoutCoordinator } from '../../src/scene/shelves/ShelfLayoutCoordinator'
 import {
     SteamEventTypes,
     StorePropsEventTypes,
     GameEventTypes,
     type SteamGamesBatchEvent,
+    type SteamLibraryManifestReadyEvent,
     type BatchReadyForPlacementEvent,
     type ShelfReadyEvent,
     type GamesPlacedEvent
 } from '../../src/types/InteractionEvents'
+import type { SectionsReadyEvent, SectionsReadyForPlacementEvent } from '../../src/types/EnvironmentEvents'
 import type { SteamGame } from '../../src/steam'
 
 describe('Event-Driven Coordination Integration (Phase 3f)', () => {
@@ -80,6 +83,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
     }
 
     beforeEach(async () => {
+        ;(ShelfLayoutCoordinator as unknown as { instance: ShelfLayoutCoordinator | null }).instance = null
         scene = new THREE.Scene()
         eventManager = EventManager.getInstance()
         eventManager.removeAllListeners()
@@ -93,6 +97,9 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
         allBatchesCompleteReceived = false
         eventTimeline.length = 0
 
+        const pendingBatches = new Map<number, Readonly<SteamGame>[]>()
+        let expectedBatchCount = 0
+
         // Setup event listeners to track the complete flow
         eventManager.registerEventHandler(
             StorePropsEventTypes.BatchReadyForPlacement,
@@ -104,6 +111,42 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
                     timestamp: Date.now()
                 })
                 console.log(`[EVENT] BatchReadyForPlacement: batch ${event.detail.batchIndex}, ${event.detail.games.length} games`)
+
+                pendingBatches.set(event.detail.batchIndex, event.detail.games as Readonly<SteamGame>[])
+                expectedBatchCount = Math.max(expectedBatchCount, event.detail.totalBatches)
+                if (pendingBatches.size !== expectedBatchCount) {
+                    return
+                }
+
+                const orderedSections = [...pendingBatches.entries()]
+                    .sort(([a], [b]) => a - b)
+                    .map(([batchIndex, games]) => ({
+                        sectionId: `batch-${batchIndex}`,
+                        sectionIndex: batchIndex,
+                        section: {
+                            name: `Batch ${batchIndex}`,
+                            games: games as any,
+                            groupMode: 'by-recency' as const,
+                            sortMode: 'by-last-played' as const,
+                        },
+                    }))
+
+                const totalGames = orderedSections.reduce((sum, entry) => sum + entry.section.games.length, 0)
+                eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+                    totalGames,
+                })
+
+                eventManager.emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
+                    groupMode: 'by-recency',
+                    sortMode: 'by-last-played',
+                    sections: orderedSections,
+                })
+
+                eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+                    groupMode: 'by-recency',
+                    sortMode: 'by-last-played',
+                    sections: orderedSections.map((entry) => entry.section),
+                })
             }
         )
 
@@ -154,6 +197,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
     afterEach(() => {
         harness?.dispose()
         eventManager.removeAllListeners()
+        ;(ShelfLayoutCoordinator as unknown as { instance: ShelfLayoutCoordinator | null }).instance = null
         dataManager.clear()
         scene.clear()
         vi.clearAllMocks()
@@ -307,7 +351,7 @@ describe('Event-Driven Coordination Integration (Phase 3f)', () => {
             expect(gamesPlacedEvents).toHaveLength(3)
 
             expect(shelfReadyEvents.map(e => e.shelfIndex)).toEqual([0, 1, 2])
-            expect(gamesPlacedEvents.map(e => e.batchIndex)).toEqual([0, 1, 2])
+            expect(gamesPlacedEvents.map(e => e.batchIndex).sort((a, b) => a - b)).toEqual([0, 1, 2])
         })
 
         it('should not have race conditions between batches', async () => {

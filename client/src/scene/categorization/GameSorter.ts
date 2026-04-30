@@ -43,7 +43,11 @@ import { GameLayoutConstants } from '../props/shared/GameBoxUtils'
 
 const SHELF_BATCH_SIZE = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF
 // CONFIG-CANDIDATE(layout-capacity): promote to AppSettings/UI once progressive section loading lands.
-const MAX_SHELVES_PER_ARRANGEMENT = 180
+const MAX_GAME_BOX_INSTANCES_PER_ARRANGEMENT = 2000
+const MAX_SHELVES_PER_ARRANGEMENT = Math.min(
+    180,
+    Math.max(1, Math.floor(MAX_GAME_BOX_INSTANCES_PER_ARRANGEMENT / SHELF_BATCH_SIZE))
+)
 
 type SectionPlacementPlanRow = {
     sectionId: string
@@ -184,7 +188,7 @@ export class GameSorter {
 
         for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
             const { sectionId, section } = sections[sectionIndex]
-            const sectionShelves = Math.max(1, Math.ceil(section.games.length / SHELF_BATCH_SIZE))
+            const sectionShelves = Math.max(0, Math.ceil(section.games.length / SHELF_BATCH_SIZE))
             const remainingShelves = Math.max(0, MAX_SHELVES_PER_ARRANGEMENT - usedShelves)
             const allocatedShelves = Math.min(sectionShelves, remainingShelves)
             const allocatedGames = Math.min(section.games.length, allocatedShelves * SHELF_BATCH_SIZE)
