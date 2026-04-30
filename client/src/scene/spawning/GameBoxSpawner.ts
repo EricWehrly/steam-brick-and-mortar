@@ -32,6 +32,8 @@ interface ShelfPosition {
 
 export class GameBoxSpawner {
     private static readonly logger = Logger.createLogFunctions(GameBoxSpawner.name)
+    private static readonly GAME_BOX_INSTANCE_LIMIT = 2000
+    private static readonly LABEL_BOX_INSTANCE_LIMIT = 200
 
     private renderer: GpuGameBoxRenderer | null = null
     private shelfPositions: Map<number, ShelfPosition> = new Map()
@@ -92,12 +94,13 @@ export class GameBoxSpawner {
     private initializeRendererForLibrary(totalGames: number): void {
         if (this.renderer) return
         const textureCapacity = Math.max(totalGames, 1) + 100
-        // TD: placement-headroom-policy (HIGH) — placement capacity should be policy-driven
-        // from measured overlap/cardinality, not a fixed multiplier.
-        const placementCapacity = Math.max(textureCapacity + 100, Math.ceil(textureCapacity * 2))
-        this.renderer = new GpuGameBoxRenderer(textureCapacity, placementCapacity)
+        // TODO: Make these limits configurable and optionally driven by detected system capabilities.
+        const placementCapacity = GameBoxSpawner.GAME_BOX_INSTANCE_LIMIT
+        const labelCapacity = GameBoxSpawner.LABEL_BOX_INSTANCE_LIMIT
+        this.renderer = new GpuGameBoxRenderer(textureCapacity, placementCapacity, labelCapacity)
         GameBoxSpawner.logger.debug(
-            `Renderer initialized: textureCapacity=${textureCapacity}, placementCapacity=${placementCapacity}`
+            `Renderer initialized: textureCapacity=${textureCapacity}, ` +
+            `placementCapacity=${placementCapacity}, labelCapacity=${labelCapacity}`
         )
     }
 
@@ -209,6 +212,13 @@ export class GameBoxSpawner {
             `games=${totalGames}, shelves=${totalSectionShelves}`
         )
 
+        if (totalGames > GameBoxSpawner.GAME_BOX_INSTANCE_LIMIT) {
+            GameBoxSpawner.logger.warn(
+                `Placement run ${placementRunId}: projected placements (${totalGames}) exceed ` +
+                `game-box instance limit (${GameBoxSpawner.GAME_BOX_INSTANCE_LIMIT})`
+            )
+        }
+
         EventManager.getInstance().emit<PlacementRunResetRequestedEvent>(
             GameRenderEventTypes.PlacementRunResetRequested,
             {}
@@ -236,8 +246,19 @@ export class GameBoxSpawner {
             const stockSurfaces = GameBoxUtils.buildStockSurfaces(
                 shelfPos.position, shelfPos.rotationY, shelfSurfaces, { strategy: stockStrategy }
             )
-            const batch = gameQueue.splice(0, stockSurfaces.reduce((sum, s) => sum + s.capacity, 0))
-            this.assignIntentsFromStock(stockSurfaces, batch)
+            const shelfSlotCapacity = stockSurfaces.reduce((sum, s) => sum + s.capacity, 0)
+            const batch = gameQueue.splice(0, shelfSlotCapacity)
+            const emittedIntents = this.assignIntentsFromStock(stockSurfaces, batch)
+            GameBoxSpawner.logger.debug(
+                `Section "${section.name}" shelf ${shelfIndex}: slots=${shelfSlotCapacity}, ` +
+                `gamesTaken=${batch.length}, intentsEmitted=${emittedIntents}, queueRemaining=${gameQueue.length}`
+            )
+            if (emittedIntents > shelfSlotCapacity) {
+                GameBoxSpawner.logger.warn(
+                    `Section "${section.name}" shelf ${shelfIndex}: emitted intents (${emittedIntents}) ` +
+                    `exceeded shelf slots (${shelfSlotCapacity})`
+                )
+            }
             EventManager.getInstance().emit<GamesPlacedEvent>(
                 StorePropsEventTypes.GamesPlaced,
                 { batchIndex: shelfIndex, status: BatchProcessingStatus.GamesPlaced }
@@ -251,7 +272,7 @@ export class GameBoxSpawner {
         return shelvesUsed
     }
 
-    private assignIntentsFromStock(stockSurfaces: StockSurface[], games: SteamGameData[]): void {
+    private assignIntentsFromStock(stockSurfaces: StockSurface[], games: SteamGameData[]): number {
         const intents = GameBoxUtils.stockSurfaces(stockSurfaces, games)
         for (const { game, position, rotation } of intents) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
@@ -260,6 +281,7 @@ export class GameBoxSpawner {
                 { appid, game, position, rotation }
             )
         }
+        return intents.length
     }
 
 }

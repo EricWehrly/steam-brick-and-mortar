@@ -43,6 +43,28 @@
 
 ---
 
+## id: instanced-mesh-memory-envelope
+**Priority**: High  
+**Effort**: ~0.5-1 day  
+**Context**: We need a measured memory/perf envelope for game-box instancing limits before committing to long-term capacity policy. The experiment matrix should validate behavior under under-saturation, exact saturation, and over-saturation at fixed limits.
+
+**Status**: 🚧 WIP (paused) — experimental harness exists but is currently unreliable (`mid` tier not available in the runtime path used by the visual experiment), so results are not decision-grade yet.
+
+**Experiment matrix**:
+- Limits: 100, 1000, 10000
+- Saturation levels per limit: under, exact, over
+- Metrics: JS heap (`mainHeapMB`), estimated GPU memory (`gpuEstimateMB`), warnings/errors, and whether saturation hooks executed
+
+**Done when**:
+- Playwright experiment output is generated and archived for all 9 scenarios
+- A recommended default limit is documented from measured data
+- Follow-up config plan exists for capability-driven limits (instead of hardcoded constants)
+
+**Related files**:
+- `client/test/visual/wip/instance-limit-memory-experiment.spec.ts` (intentionally skipped)
+
+---
+
 ## id: carpet-worker-offload
 **Status**: ✅ Resolved 2026-04-13 — carpet texture generation moved to `ProceduralTextureWorker` (`carpet_enhanced` type). ~700ms main-thread startup hitch eliminated.
 

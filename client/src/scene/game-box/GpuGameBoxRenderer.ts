@@ -63,8 +63,12 @@ export class GpuGameBoxRenderer {
     private readonly artworkPrefetchCoordinator: ArtworkPrefetchCoordinator
     private readonly boundHandlePlacementResolved: (event: CustomEvent<PlacementResolvedEvent>) => void
 
-    constructor(textureCapacity: number = 2000, placementCapacity: number = textureCapacity) {
-        this.instancedLabelRenderer = new InstancedLabelRenderer({ maxInstances: placementCapacity })
+    constructor(
+        textureCapacity: number,
+        placementCapacity: number = textureCapacity,
+        labelCapacity: number
+    ) {
+        this.instancedLabelRenderer = new InstancedLabelRenderer({ maxInstances: labelCapacity })
         this.lodArtworkRenderer = LodArtworkOrchestratorDebug.fromAppSettings(textureCapacity, placementCapacity)
         this.renderIntentCoordinator = new RenderIntentCoordinator()
         this.artworkPrefetchCoordinator = new ArtworkPrefetchCoordinator({ renderer: this })
@@ -76,7 +80,8 @@ export class GpuGameBoxRenderer {
         )
 
         GpuGameBoxRenderer.logger.lifecycle(
-            `Initialized (textureCapacity=${textureCapacity}, placementCapacity=${placementCapacity})`
+            `Initialized (textureCapacity=${textureCapacity}, placementCapacity=${placementCapacity}, ` +
+            `labelCapacity=${labelCapacity})`
         )
     }
 
@@ -130,7 +135,7 @@ export class GpuGameBoxRenderer {
             rotation
         )
         if (!success) {
-            GpuGameBoxRenderer.logger.debug(`Failed to add label box for "${game.name}"`)
+            GpuGameBoxRenderer.logger.warn(`Failed to add label box for "${game.name}" (label instance limit reached?)`)
         }
     }
 
