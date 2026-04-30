@@ -1,101 +1,75 @@
-# UI Normalization — Active Plan
+# UI Normalization — Active Roadmap
 **Milestone**: 6.6  
-**Status**: 🔮 Ready to start  
-**Approach**: Incremental sub-agent bites. One small change per run, review before next bite.
+**Status**: 🔄 In Progress (Phase A Complete)  
+**Approach**: Incremental updates. One small component or panel at a time to ensure nothing breaks.
 
 ---
 
-## Why do this first
+## The "Why" and "How"
 
-Before adding any new UI (search omnibar, 3D signage, lighting controls), we need shared components. Otherwise every new panel is more inconsistency to clean up later.
+Before adding any new UI (search omnibar, 3D signage, lighting controls), we need shared components. Otherwise, every new panel is more technical debt and inconsistency. 
 
-This work is highly parallel-eligible: once tokens are defined, converting each panel is independent.
-
----
-
-## Phase A — Audit + Design Token Spec
-**Goal**: Inventory what exists, define the token system. Output: `docs/ui-design-tokens.md`.
-
-### A1. Audit existing UI elements
-Sub-agent task: read all files in `client/src/ui/` and produce a flat list of:
-- Every hardcoded color value
-- Every hardcoded font size or font family
-- Every hardcoded padding/margin/border-radius
-- Which files they appear in
-
-Output: inline report (don't need to commit anything yet).
-
-### A2. Define CSS custom property tokens
-Based on audit, define a minimal set of tokens:
-
-```css
-/* Palette */
---color-primary: ...
---color-accent: ...
---color-surface-0: ...   /* deepest background */
---color-surface-1: ...   /* panel background */
---color-surface-2: ...   /* inset/input background */
---color-border: ...
---color-text-primary: ...
---color-text-secondary: ...
---color-text-disabled: ...
-
-/* Spacing */
---space-xs: 4px
---space-sm: 8px
---space-md: 16px
---space-lg: 24px
-
-/* Radius */
---radius-sm: 4px
---radius-md: 8px
-
-/* Typography */
---font-family-ui: ...
---font-size-sm: ...
---font-size-md: ...
---font-size-lg: ...
-```
-
-Commit as `docs/ui-design-tokens.md` with the token list + rationale for each choice.
+`tokens.css` gives us the raw ingredients (standard colors, corner radiuses, paddings), but it doesn't enforce that "all buttons look the same". To achieve that, we need shared CSS component classes (e.g., `.ui-button`, `.ui-panel`) that consume these tokens.
 
 ---
 
-## Phase B — Base Components
-**Goal**: One shared CSS/TS component file for each primitive. Components use tokens only.
-
-### B1. First component: Button
-Convert one button to use a `ui-button` class backed by tokens.  
-**File**: create `client/src/ui/components/UIButton.ts` + `ui-button.css`  
-**Review**: Does it look right? Does it match existing style?
-
-### B2. Second component: Checkbox / Toggle
-Convert one checkbox.  
-**File**: `UICheckbox.ts` + `ui-checkbox.css`  
-**Review**: Same drill.
-
-### B3. Panel component
-`UIPanel.ts` + `ui-panel.css` — standard container with header + body regions.
-
-### B4. Tab bar
-`UITabBar.ts` + `ui-tab-bar.css`
+## Phase A — Audit + Design Token Spec (✅ Complete)
+**Goal**: Inventory what exists, define the token system.
+- Audit completed in `docs/plans/ui-normalization-audit.md`
+- Token spec defined in `docs/plans/ui-design-tokens.md`
+- Tokens implemented in `client/src/ui/tokens.css`
 
 ---
 
-## Phase C — Migrate Existing Panels (one at a time)
-**Goal**: Replace inline styles and one-off classes in each panel with shared components.
+## Phase B — Shared UI Components (🚧 In Progress)
+**Goal**: Create utility CSS classes for common primitives so all UI elements share the exact same padding, rounding, and interaction states.
 
-**Order** (most broken/inconsistent first):
-1. Settings / Graphics panel (`GraphicsSettingsPanel.ts`)
-2. Cache panel (`CacheManagementPanel` or equivalent) — **also fix broken preview here**
-3. Lighting panel (`LightingControlsPanel.ts`)
-4. Steam UI panel (`SteamUIPanel.ts`)
-5. Pause menu tabs and navigation
+Implementation structure:
+- Keep each primitive in its own file: `ui-button.css`, `ui-panel.css`, `ui-input.css`, `ui-checkbox.css`, etc.
+- Use one import-only entrypoint (`client/src/ui/components/index.css`) to aggregate component styles.
+- Import that entrypoint once from app root styles to avoid scattered imports.
 
-**Per-panel sub-agent prompt template**:
-> "Convert `<file>` to use shared UI components from `client/src/ui/components/`. Replace all hardcoded colors, sizes, and layout values with CSS custom property tokens from `docs/ui-design-tokens.md`. Do not change any behavior or functionality. Produce a minimal diff."
+We will create component styles for:
 
-**Review after each one.** Don't batch-migrate.
+### B1. Interactive Elements (`.ui-button`, `.ui-input`, `.ui-checkbox`)
+- **Buttons**: Standard padding (e.g., `var(--space-sm) var(--space-md)`), standard border radius (`var(--radius-md)`), standard hover states and text colors. 
+- **Inputs**: Consistent borders, focus outlines (`var(--color-border-bright)`), backgrounds (`var(--surface-2)`).
+- **Checkboxes/Toggles**: Consistent styling for toggles instead of native browser checkboxes.
+
+### B2. Layout Primitives (`.ui-panel`, `.ui-header`, `.ui-divider`)
+- **Panels**: Standard container with `var(--color-surface-1)`, `var(--radius-lg)`, and standard padding.
+- **Headers**: Consistent typography sizing (`var(--font-size-lg)`) and bottom spacing.
+- **Dividers**: Simple lines using `var(--color-border)`.
+
+### B0. Scaffold status (implemented)
+- `client/src/ui/components/index.css` created as single import entrypoint.
+- `client/src/ui/components/ui-button.css` created.
+- `client/src/ui/components/ui-panel.css` created.
+- `client/src/ui/components/ui-input.css` created.
+- `client/src/ui/components/ui-checkbox.css` created.
+- `client/src/styles/main.css` now imports `../ui/components/index.css`.
+
+### B1. First live adoption slice (implemented)
+- `LightingControlsPanel.ts` refresh action now uses shared `.ui-button`.
+- `LightingControlsPanel.ts` checkboxes now use shared `.ui-checkbox` for master/group/light toggles.
+- `lighting-controls.css` no longer hard-overrides shared checkbox styling when `.ui-checkbox` is present.
+
+---
+
+## Phase C — Migrate Existing Panels (Incremental Roadmap)
+**Goal**: Replace inline styles and bespoke CSS in each existing panel with the shared component classes from Phase B. 
+
+**Order of Migration** (Working from most standalone to most integrated):
+1. **Base Testing**: Convert one small panel first to test the utility classes. (e.g., `GraphicsSettingsPanel.ts`)
+2. **Settings / Debug**: `LightingControlsPanel.ts` and `LayoutControlPanel.ts`
+3. **Core Menus**: The Pause Menu system (`PauseMenuManager.ts` & `PauseMenuPanel.ts` & pause tabs)
+4. **Data/Integration**: `SteamUIPanel.ts`
+5. **Specialized UI**: `PerformanceMonitor.ts` (currently uses inline styles) and `CacheManagementUI.ts`
+
+**Migration Rules for each step**:
+- Delete bespoke CSS for standard buttons/inputs in the panel's custom `.css` file.
+- Add `.ui-*` classes to the generated DOM elements.
+- Verify nothing functionally broke.
 
 ---
 

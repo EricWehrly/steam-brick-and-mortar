@@ -1,7 +1,7 @@
 # Feature: UI Standardization
 
 **Act**: 2 (Intermission)
-**Status**: Not Started
+**Status**: In Progress (Phase A complete, Phase B starting)
 **Priority**: High
 
 ## Goal
@@ -27,13 +27,14 @@ The UI has grown organically and lacks a unified design token system. Inconsiste
 - **7.5.1.1** In-scene omnibar — 3D box element with hourglass icon, game search by name/appid, spotlight highlighting of results
 - **7.5.1.2** Steam profile input refinement — width, expand-on-interaction, consistent styling
 - **7.5.1.3** Convert 2D signage planes to 3D box elements
-- **7.5.1.4** Component standardization — establish color/typography/spacing tokens, standardize all existing components
+- **7.5.1.4** Component standardization — standardize all existing components using CSS tokens and shared utility classes (buttons, panels, inputs)
 - **7.5.1.5** VR-ready architecture planning — document transition strategy from 2D overlay to 3D spatial UI
 
 ## Notes / Open Questions
 
 - This overlaps with the intermission's third goal. Get the token system and component audit done in the intermission; deeper VR-ready architecture can extend into Act 2.
 - The dongle switch panel (Feature 8.5.1) is blocked on this landing first.
+- Active implementation order is tracked in `docs/plans/ui-normalization-plan.md` and should be treated as the execution source of truth for this feature.
 - Related plan: `docs/plans/ui-design-tokens.md` — CSS custom property token spec (palette, spacing, typography).
 - Related plan: `docs/plans/ui-normalization-audit.md` — inventory of hardcoded values and inconsistencies across all UI components.
 - Related plan: `docs/plans/ui-normalization-plan.md` — phased migration plan (audit → base components → panel migration → tag components).
