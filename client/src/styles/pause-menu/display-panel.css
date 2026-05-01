@@ -1,0 +1,62 @@
+@import './shared-components.css';
+
+.pause-menu-subtabs {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: #242424;
+    overflow-x: auto;
+    min-height: 38px;
+    flex: 0 0 auto;
+    padding: 0 6px;
+}
+
+.pause-menu-subtab {
+    background: none;
+    border: none;
+    color: #aeb6bc;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: none;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+}
+
+.pause-menu-subtab:hover {
+    background: #333;
+    color: #fff;
+}
+
+.pause-menu-subtab.active {
+    color: #67c1f5;
+    border-bottom-color: #67c1f5;
+    background: #2f2f2f;
+}
+
+.pause-menu-content.display-tab-group-active #panel-graphics-settings > .panel-content,
+.pause-menu-content.display-tab-group-active #panel-camera-settings > .panel-content {
+    padding: 0 26px;
+}
+
+.pause-menu-content.display-tab-group-active .graphics-settings-panel {
+    height: auto;
+}
+
+.pause-menu-content.display-tab-group-active .graphics-settings-panel .settings-sections {
+    overflow-y: visible;
+    padding: 16px 0 20px;
+}
+
+.pause-menu-content.display-tab-group-active .camera-settings-panel {
+    height: auto;
+    overflow: visible;
+    padding: 16px 0 20px;
+    box-sizing: border-box;
+}

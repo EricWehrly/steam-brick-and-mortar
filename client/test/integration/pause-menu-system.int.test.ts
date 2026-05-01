@@ -259,8 +259,8 @@ describe('Pause Menu Integration Tests', () => {
             pauseMenuManager.registerPanel(controlsPanel)
 
             expect(controlsPanel.id).toBe('controls')
-            expect(controlsPanel.title).toBe('Controls')
-            expect(controlsPanel.icon).toBe('🎮')
+            expect(controlsPanel.title).toBe('Input')
+            expect(controlsPanel.icon).toBe('⌨️')
         })
 
         it('should render controls panel content correctly', () => {
