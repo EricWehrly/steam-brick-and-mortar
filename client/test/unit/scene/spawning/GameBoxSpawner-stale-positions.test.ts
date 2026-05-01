@@ -29,7 +29,7 @@ import {
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
 } from '../../../../src/types/InteractionEvents'
-import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
+import type { SectionsReadyForPlacementEvent } from '../../../../src/types/EnvironmentEvents'
 import type { SteamLibraryManifestReadyEvent } from '../../../../src/types/InteractionEvents'
 import type { SteamGame } from '../../../../src/steam'
 
@@ -175,9 +175,13 @@ function makeGames(count: number, offset = 0): SteamGame[] {
     }))
 }
 
-function makeSectionsReadyEvent(games: SteamGame[], sectionName = 'All'): SectionsReadyEvent {
+function makeSectionsReadyEvent(games: SteamGame[], sectionName = 'All'): SectionsReadyForPlacementEvent {
     return {
-        sections: [{ name: sectionName, games: games as any, groupMode: 'by-recency', sortMode: 'by-last-played' }],
+        sections: [{
+            sectionId: `test-${sectionName.toLowerCase()}-0`,
+            sectionIndex: 0,
+            section: { name: sectionName, games: games as any, groupMode: 'by-recency', sortMode: 'by-last-played' },
+        }],
         groupMode: 'by-recency',
         sortMode: 'by-last-played',
     }
@@ -225,8 +229,8 @@ async function runCycle(
     await Promise.resolve() // let prefetchArtwork microtasks settle
 
     // SectionsReady: clears stale positions, caches sections
-    eventManager.emit<SectionsReadyEvent>(
-        GameEventTypes.SectionsReady,
+    eventManager.emit<SectionsReadyForPlacementEvent>(
+        GameEventTypes.SectionsReadyForPlacement,
         makeSectionsReadyEvent(games, sectionName)
     )
 
@@ -333,10 +337,18 @@ describe('GameBoxSpawner â€” stale shelf positions', () => {
         await Promise.resolve()
 
         // Cycle 1: two sections, one shelf each
-        eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+        eventManager.emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
             sections: [
-                { name: 'Section A', games: gamesSection0 as any, groupMode: 'by-recency', sortMode: 'by-last-played' },
-                { name: 'Section B', games: gamesSection1 as any, groupMode: 'by-recency', sortMode: 'by-last-played' },
+                {
+                    sectionId: 'test-section-a-0',
+                    sectionIndex: 0,
+                    section: { name: 'Section A', games: gamesSection0 as any, groupMode: 'by-recency', sortMode: 'by-last-played' },
+                },
+                {
+                    sectionId: 'test-section-b-1',
+                    sectionIndex: 1,
+                    section: { name: 'Section B', games: gamesSection1 as any, groupMode: 'by-recency', sortMode: 'by-last-played' },
+                },
             ],
             groupMode: 'by-recency',
             sortMode: 'by-last-played',
@@ -354,9 +366,13 @@ describe('GameBoxSpawner â€” stale shelf positions', () => {
         await Promise.resolve()
 
         // Cycle 2: single section, single shelf â€” section 1 from cycle 1 must not persist
-        eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+        eventManager.emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
             sections: [
-                { name: 'Only Section', games: gamesCycle2 as any, groupMode: 'by-recency', sortMode: 'by-last-played' },
+                {
+                    sectionId: 'test-only-section-0',
+                    sectionIndex: 0,
+                    section: { name: 'Only Section', games: gamesCycle2 as any, groupMode: 'by-recency', sortMode: 'by-last-played' },
+                },
             ],
             groupMode: 'by-recency',
             sortMode: 'by-last-played',

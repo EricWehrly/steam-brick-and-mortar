@@ -195,7 +195,7 @@ describe('GameBoxSpawner — prefetch/place rendezvous probe', () => {
         const [textureCapacity, placementCapacity, labelCapacity] = rendererCtor.mock.calls[0] as [number, number, number]
         expect(textureCapacity).toBe(102)
         expect(placementCapacity).toBe(2000)
-        expect(labelCapacity).toBe(200)
+        expect(labelCapacity).toBe(512)
     })
 
     it('PROBE: intent arrives before prefetch — placeGame fires when prefetch settles', async () => {
