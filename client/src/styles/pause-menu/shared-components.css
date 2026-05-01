@@ -213,14 +213,32 @@
     min-width: 120px;
 }
 
-/* Action sections */
-.action-section {
+/* ===== SECTION PRIMITIVES ===== */
+
+/* Divider-style section: open layout with bottom border separator */
+.panel-section,
+.action-section,
+.cache-section,
+.app-section {
     padding: 16px 0;
     border-bottom: 1px solid #333;
 }
 
-.action-section:last-child {
+.panel-section:last-child,
+.action-section:last-child,
+.cache-section:last-child,
+.app-section:last-child {
     border-bottom: none;
+}
+
+/* Card-style section: elevated surface with border and rounded corners */
+.panel-card,
+.settings-section,
+.debug-section {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--color-border, #333);
+    border-radius: 6px;
+    padding: 1rem;
 }
 
 /* ===== UTILITY CLASSES ===== */

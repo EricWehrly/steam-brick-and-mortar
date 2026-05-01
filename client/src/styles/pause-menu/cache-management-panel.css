@@ -5,15 +5,7 @@
 
 @import './shared-components.css';
 
-/* Cache-specific sections */
-.cache-section {
-    padding: 15px;
-    border-bottom: 1px solid #333;
-}
-
-.cache-section:last-child {
-    border-bottom: none;
-}
+/* Cache-specific sections — layout handled by shared .cache-section alias in shared-components */
 
 /* Cache stats grid layout */
 .cache-stats {
