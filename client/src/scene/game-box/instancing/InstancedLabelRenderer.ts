@@ -10,6 +10,7 @@ import type { SomeBatchesCompleteEvent } from '../../../types/EnvironmentEvents'
 import { DataManager } from '../../../core/data/DataManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { SceneLayer } from '../../SceneLayers'
+import { PlacementRunResettableInstancedBase } from './PlacementRunResettableInstancedBase'
 import vertexShader from './shaders/instanced-label.vert?raw'
 import fragmentShader from './shaders/instanced-label.frag?raw'
 
@@ -22,17 +23,14 @@ export interface InstancedLabelConfig {
 
 export const INSTANCED_LABEL_MESH_NAME = 'gpu-instanced-game-boxes' as const
 
-export class InstancedLabelRenderer {
+export class InstancedLabelRenderer extends PlacementRunResettableInstancedBase {
     private instancedMesh: THREE.InstancedMesh | null = null
     private textureArrayManager: LabelTextureArrayManager
     private geometry: THREE.PlaneGeometry | null = null
     private material: THREE.ShaderMaterial | null = null
 
-    private maxInstances: number
     private readonly textureSize: number
-    private currentCount: number = 0
     private isInitialized: boolean = false
-    private nextInstanceIndex: number = 0
     private gameNameToTextureIndex: Map<string, number> = new Map()
     private readonly labelMetadata = new Map<number, { name: string; appid?: number; position: THREE.Vector3 }>()
 
@@ -43,7 +41,7 @@ export class InstancedLabelRenderer {
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion()
 
     constructor(config: InstancedLabelConfig = {}) {
-        this.maxInstances = config.maxInstances || 2000
+        super(config.maxInstances || 2000)
         this.textureSize = config.textureSize || 128
 
         this.textureArrayManager = new LabelTextureArrayManager(this.textureSize, this.maxInstances)
@@ -65,14 +63,7 @@ export class InstancedLabelRenderer {
             this.boundHandlePlacementRunResetRequested
         )
 
-        // Initialise a fresh metadata map so stale entries from a prior load don't
-        // survive into this renderer instance (dispose() also clears it, but construction
-        // must be self-sufficient in case dispose() wasn't called cleanly).
-        DataManager.getInstance().set(
-            DataKey.InstancedLabelMetadata,
-            this.labelMetadata,
-            { domain: DataDomain.Renderer }
-        )
+        this.publishLabelMetadataReference()
 
         console.debug(`📋 InstancedLabelRenderer created (max: ${this.maxInstances} labels)`)
     }
@@ -92,12 +83,11 @@ export class InstancedLabelRenderer {
             return false
         }
 
-        if (this.nextInstanceIndex >= this.maxInstances) {
+        const index = this.allocateInstanceIndex()
+        if (index < 0) {
             console.warn(`No label slots remaining (${this.maxInstances})`)
             return false
         }
-
-        const index = this.nextInstanceIndex++
 
         let textureIndex = this.gameNameToTextureIndex.get(gameName)
         if (textureIndex === undefined) {
@@ -121,14 +111,10 @@ export class InstancedLabelRenderer {
         const textureIndices = this.geometry.getAttribute('textureIndex') as THREE.InstancedBufferAttribute
         textureIndices.setX(index, textureIndex)
 
-        this.currentCount = Math.max(this.currentCount, index + 1)
-
         // Arrangement changes can place labels without emitting SomeBatchesComplete.
         // Keep instance buffers visible immediately so labels don't disappear until
         // a later batch event happens to flush GPU state.
-        this.instancedMesh.instanceMatrix.needsUpdate = true
-        this.instancedMesh.count = this.currentCount
-        this.instancedMesh.boundingSphere = null
+        this.invalidateInstancedMesh(this.instancedMesh)
         textureIndices.needsUpdate = true
 
         this.storeLabelMetadata(index, gameName, position, appid)
@@ -139,14 +125,10 @@ export class InstancedLabelRenderer {
     public updateGPU(): void {
         if (!this.isInitialized || !this.instancedMesh || !this.geometry) return
 
-        this.instancedMesh.instanceMatrix.needsUpdate = true
-        this.instancedMesh.count = this.currentCount
-        this.instancedMesh.boundingSphere = null  // Force recompute; stale sphere breaks raycasting
+        this.invalidateInstancedMesh(this.instancedMesh)  // Force recompute; stale sphere breaks raycasting
+        this.invalidateInstanceAttribute(this.geometry, 'textureIndex')
 
-        const textureIndices = this.geometry.getAttribute('textureIndex')
-        if (textureIndices) textureIndices.needsUpdate = true
-
-        console.debug(`🔄 GPU updated: ${this.currentCount} active label instances`)
+        console.debug(`🔄 GPU updated: ${this.getCurrentInstanceCount()} active label instances`)
     }
 
     public dispose(): void {
@@ -175,11 +157,9 @@ export class InstancedLabelRenderer {
         this.material?.dispose()
         this.textureArrayManager.dispose()
 
-        this.gameNameToTextureIndex.clear()
-        this.labelMetadata.clear()
+        this.resetForPlacementRun()
+        this.publishLabelMetadataReference()
         this.isInitialized = false
-        this.currentCount = 0
-        this.nextInstanceIndex = 0
 
         console.debug('✅ InstancedLabelRenderer disposed')
     }
@@ -240,24 +220,28 @@ export class InstancedLabelRenderer {
     }
 
     private handlePlacementRunResetRequested(_event: CustomEvent<PlacementRunResetRequestedEvent>): void {
-        this.currentCount = 0
-        this.nextInstanceIndex = 0
+        this.resetForPlacementRun()
+        this.publishLabelMetadataReference()
+
+        if (this.instancedMesh) {
+            this.invalidateInstancedMesh(this.instancedMesh)
+        }
+        this.invalidateInstanceAttribute(this.geometry, 'textureIndex')
+    }
+
+    protected override onPlacementRunReset(): void {
         this.gameNameToTextureIndex.clear()
         this.labelMetadata.clear()
+    }
 
+    private publishLabelMetadataReference(): void {
+        // Policy: this renderer is the sole owner of DataKey.InstancedLabelMetadata.
+        // Publish only at lifecycle boundaries so consumers always observe the authoritative map.
         DataManager.getInstance().set(
             DataKey.InstancedLabelMetadata,
             this.labelMetadata,
             { domain: DataDomain.Renderer }
         )
-
-        if (this.instancedMesh) {
-            this.instancedMesh.count = 0
-            this.instancedMesh.instanceMatrix.needsUpdate = true
-            this.instancedMesh.boundingSphere = null
-        }
-        const textureIndices = this.geometry?.getAttribute('textureIndex')
-        if (textureIndices) textureIndices.needsUpdate = true
     }
 
     private createLabelMaterial(textureArray: THREE.DataArrayTexture): THREE.ShaderMaterial {

@@ -21,6 +21,7 @@ import { SceneLayer } from '../../SceneLayers'
 import { Logger } from '../../../utils/Logger'
 import { HighTextureCache, type HighTextureCacheConfig } from './HighTextureCache'
 import { SpatialPrewarmingManager, type PrewarmingConfig } from './SpatialPrewarmingManager'
+import { PlacementRunResettableInstancedBase } from './PlacementRunResettableInstancedBase'
 import type { RendererTextureSources } from './LodTypes'
 import vertexShader from './shaders/instanced-artwork-lod.vert?raw'
 import fragmentShader from './shaders/instanced-artwork-lod.frag?raw'
@@ -85,7 +86,7 @@ export interface AddInstanceParams {
  * Clean renderer focused solely on GPU rendering.
  * Texture population is handled externally.
  */
-export class LodGameArtworkRenderer {
+export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase {
     public static logger = Logger.createLogFunctions(LodGameArtworkRenderer.name)
     private instancedMesh: THREE.InstancedMesh | null = null
     private geometry: THREE.BoxGeometry | null = null
@@ -100,7 +101,6 @@ export class LodGameArtworkRenderer {
     private textureIndices: Float32Array | null = null
     
     // Instance tracking
-    private currentInstanceCount: number = 0
     private instanceData: Map<number, InstanceData> = new Map()
     private textureIndexToInstance: Map<number, number> = new Map()
     
@@ -124,6 +124,7 @@ export class LodGameArtworkRenderer {
     private static readonly DEFAULT_ROTATION = new THREE.Quaternion()
 
     constructor(config: LodGameArtworkRendererConfig) {
+        super(config.maxInstances)
         this.lazyHighTextures = config.lazyHighTextures ?? false
         this.config = {
             maxInstances: config.maxInstances,
@@ -335,17 +336,10 @@ export class LodGameArtworkRenderer {
         if (!this.instancedMesh || !this.geometry) return
         if (!this.pendingAttributeUpdate) return
         
-        this.instancedMesh.instanceMatrix.needsUpdate = true
-        this.instancedMesh.count = this.currentInstanceCount
-        this.instancedMesh.boundingSphere = null  // Force recompute; stale sphere breaks raycasting
-        
-        const textureIndexAttr = this.geometry.getAttribute('textureIndex')
-        const lodLevelAttr = this.geometry.getAttribute('lodLevel')
-        const highSlotAttr = this.geometry.getAttribute('highTextureSlot')
-        
-        if (textureIndexAttr) textureIndexAttr.needsUpdate = true
-        if (lodLevelAttr) lodLevelAttr.needsUpdate = true
-        if (highSlotAttr) highSlotAttr.needsUpdate = true
+        this.invalidateInstancedMesh(this.instancedMesh)  // Force recompute; stale sphere breaks raycasting
+        this.invalidateInstanceAttribute(this.geometry, 'textureIndex')
+        this.invalidateInstanceAttribute(this.geometry, 'lodLevel')
+        this.invalidateInstanceAttribute(this.geometry, 'highTextureSlot')
         
         this.pendingAttributeUpdate = false
     }
@@ -368,12 +362,11 @@ export class LodGameArtworkRenderer {
             return -1
         }
         
-        if (this.currentInstanceCount >= this.config.maxInstances) {
-            LodGameArtworkRenderer.logger.warn(`Cannot add instance: at capacity (${this.config.maxInstances})`)
+        const instanceIndex = this.allocateInstanceIndex()
+        if (instanceIndex < 0) {
+            LodGameArtworkRenderer.logger.warn(`Cannot add instance: at capacity (${this.maxInstances})`)
             return -1
         }
-        
-        const instanceIndex = this.currentInstanceCount++
         
         // Set transform
         const matrix = new THREE.Matrix4()
@@ -413,7 +406,7 @@ export class LodGameArtworkRenderer {
      */
     public setInstanceLod(instanceIndex: number, lodLevel: LodLevel): boolean {
         if (!this.geometry || !this.lodLevels) return false
-        if (instanceIndex < 0 || instanceIndex >= this.currentInstanceCount) return false
+        if (instanceIndex < 0 || instanceIndex >= this.getCurrentInstanceCount()) return false
         
         let effectiveLod = lodLevel
         
@@ -447,7 +440,7 @@ export class LodGameArtworkRenderer {
      */
     public setInstanceHighSlot(instanceIndex: number, slot: number): boolean {
         if (!this.geometry || !this.highTextureSlots) return false
-        if (instanceIndex < 0 || instanceIndex >= this.currentInstanceCount) return false
+        if (instanceIndex < 0 || instanceIndex >= this.getCurrentInstanceCount()) return false
         
         this.highTextureSlots[instanceIndex] = slot
         
@@ -461,18 +454,18 @@ export class LodGameArtworkRenderer {
     public setGlobalLod(lodLevel: LodLevel): void {
         if (!this.lodLevels) return
         
-        for (let i = 0; i < this.currentInstanceCount; i++) {
+        for (let i = 0; i < this.getCurrentInstanceCount(); i++) {
             this.lodLevels[i] = lodLevel
             const data = this.instanceData.get(i)
             if (data) data.lodLevel = lodLevel
         }
         
         this.pendingAttributeUpdate = true
-        LodGameArtworkRenderer.logger.debug(`Set global LOD to ${lodLevel} for ${this.currentInstanceCount} instances`)
+        LodGameArtworkRenderer.logger.debug(`Set global LOD to ${lodLevel} for ${this.getCurrentInstanceCount()} instances`)
     }
     
     public getInstanceCount(): number {
-        return this.currentInstanceCount
+        return this.getCurrentInstanceCount()
     }
 
     /**
@@ -483,17 +476,19 @@ export class LodGameArtworkRenderer {
     public clearPlacements(): void {
         if (!this.instancedMesh) return
         const hidden = new THREE.Matrix4().setPosition(0, -10000, 0)
-        for (let i = 0; i < this.currentInstanceCount; i++) {
+        for (let i = 0; i < this.getCurrentInstanceCount(); i++) {
             this.instancedMesh.setMatrixAt(i, hidden)
         }
-        this.currentInstanceCount = 0
-        this.instanceData.clear()
-        this.textureIndexToInstance.clear()
-        if (this.instancedMesh.instanceMatrix) {
-            this.instancedMesh.instanceMatrix.needsUpdate = true
-        }
+
+        this.resetForPlacementRun()
+        this.invalidateInstancedMesh(this.instancedMesh)
         this.pendingAttributeUpdate = true
         LodGameArtworkRenderer.logger.debug('Cleared all instance placements (texture slots retained)')
+    }
+
+    protected override onPlacementRunReset(): void {
+        this.instanceData.clear()
+        this.textureIndexToInstance.clear()
     }
 
     public getInstanceLod(instanceIndex: number): LodLevel | null {
