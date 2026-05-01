@@ -48,7 +48,7 @@
  * Useful for toggleable side panels and similar UI elements
  */
 .ui-panel.horizontally-collapsed {
-    width: 60px;
+    max-width: 60px;
 }
 
 .ui-panel.horizontally-collapsed .panel-title,
