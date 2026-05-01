@@ -25,8 +25,7 @@ export abstract class PauseMenuPanel {
     protected container: HTMLElement | null = null
     protected config: PauseMenuPanelConfig
     protected isVisible: boolean = false
-    
-    /** Store initial values to detect changes */
+
     protected initialValues: Map<string, string> = new Map()
 
     constructor(config: PauseMenuPanelConfig = {}) {
@@ -47,11 +46,6 @@ export abstract class PauseMenuPanel {
     abstract onShow(): void
     abstract onHide(): void
     
-    /**
-     * Mark a control as changed or unchanged.
-     * Sets data-changed attribute which CSS uses with data-requires-reload
-     * to show reload indicators via :has() selectors.
-     */
     protected markControlChanged(controlId: string, changed: boolean): void {
         const control = document.getElementById(controlId)
         if (control) {
@@ -63,34 +57,21 @@ export abstract class PauseMenuPanel {
         }
     }
     
-    /**
-     * Store initial value for a control to detect changes later.
-     */
     protected storeInitialValue(controlId: string, value: string): void {
         this.initialValues.set(controlId, value)
     }
-    
-    /**
-     * Check if control value has changed from initial and update data-changed attribute.
-     * Call this when a setting changes.
-     */
+
     protected updateChangedState(controlId: string, currentValue: string): void {
         const initial = this.initialValues.get(controlId)
         const changed = initial !== undefined && initial !== currentValue
         this.markControlChanged(controlId, changed)
     }
-    
-    /**
-     * Clear all data-changed attributes (e.g., on panel show or after reload).
-     */
+
     protected clearAllChangedStates(): void {
         const controls = document.querySelectorAll('[data-changed]')
         controls.forEach(control => control.removeAttribute('data-changed'))
     }
 
-    /**
-     * Initialize the panel within the specified container
-     */
     init(): void {
         const containerId = this.config.containerId
         if (!containerId) {
@@ -108,13 +89,7 @@ export abstract class PauseMenuPanel {
         this.attachEvents()
         this.attachChangeTracking()
     }
-    
-    /**
-     * Attach generic change tracking to all inputs/selects in this panel.
-     * When any control changes, automatically:
-     * 1. Store initial value if not yet stored
-     * 2. Compare to initial and set/remove data-changed attribute
-     */
+
     private attachChangeTracking(): void {
         const panel = this.getPanelElement()
         if (!panel) return
@@ -133,11 +108,7 @@ export abstract class PauseMenuPanel {
         panel.addEventListener('input', handleChange)
         panel.addEventListener('change', handleChange)
     }
-    
-    /**
-     * Store initial values for all inputs/selects in the panel.
-     * Called on show to establish baseline for change detection.
-     */
+
     protected storeAllInitialValues(): void {
         const panel = this.getPanelElement()
         if (!panel) return
@@ -151,9 +122,6 @@ export abstract class PauseMenuPanel {
         })
     }
 
-    /**
-     * Show this panel (hide others, show this one)
-     */
     show(): void {
         if (!this.container) return
 
@@ -165,9 +133,6 @@ export abstract class PauseMenuPanel {
         }
     }
 
-    /**
-     * Hide this panel
-     */
     hide(): void {
         if (!this.container) return
 
@@ -179,24 +144,15 @@ export abstract class PauseMenuPanel {
         }
     }
 
-    /**
-     * Check if panel is currently visible
-     */
     getIsVisible(): boolean {
         return this.isVisible
     }
 
-    /**
-     * Render the panel HTML structure
-     */
     private renderPanel(): void {
         if (!this.container) return
 
         const panelHtml = `
             <div id="panel-${this.id}" class="${this.config.className}" style="display: none;">
-                <div class="panel-header">
-                    <h3>${this.icon} ${this.title}</h3>
-                </div>
                 <div class="panel-content">
                     ${this.render()}
                 </div>
@@ -206,16 +162,10 @@ export abstract class PauseMenuPanel {
         this.container.insertAdjacentHTML('beforeend', panelHtml)
     }
 
-    /**
-     * Get panel DOM element
-     */
     protected getPanelElement(): HTMLElement | null {
         return document.getElementById(`panel-${this.id}`)
     }
 
-    /**
-     * Add event listener helper with automatic cleanup tracking
-     */
     protected addEventListener<K extends keyof HTMLElementEventMap>(
         element: HTMLElement | null,
         type: K,
@@ -228,9 +178,6 @@ export abstract class PauseMenuPanel {
         }
     }
 
-    /**
-     * Clean up resources and remove event listeners
-     */
     dispose(): void {
         const panelElement = this.getPanelElement()
         if (panelElement) {

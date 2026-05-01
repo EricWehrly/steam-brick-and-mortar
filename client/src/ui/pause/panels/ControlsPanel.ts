@@ -5,6 +5,7 @@
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import controlsPanelTemplate from '../templates/controls-panel.html?raw'
+import '../../../styles/pause-menu/controls-panel.css'
 
 export class ControlsPanel extends PauseMenuPanel {
     readonly id = 'controls'

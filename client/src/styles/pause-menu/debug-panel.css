@@ -30,14 +30,6 @@
     padding: 1rem;
 }
 
-.debug-section h4 {
-    margin: 0 0 0.75rem 0;
-    font-size: 1rem;
-    color: var(--pause-accent);
-    border-bottom: 1px solid var(--pause-border);
-    padding-bottom: 0.5rem;
-}
-
 .debug-stats {
     display: flex;
     flex-direction: column;

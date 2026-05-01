@@ -1,5 +1,9 @@
 # UI Development Guidelines
 
+## Related Documents
+- Visual style source of truth: `docs/guidelines/steam-ui-style-guide.md`
+- Token specification: `docs/plans/ui-design-tokens.md`
+
 ## Core Principles
 
 ### Template Pattern

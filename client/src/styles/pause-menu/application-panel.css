@@ -35,13 +35,6 @@
     margin-bottom: 0;
 }
 
-.app-section h4 {
-    margin: 0 0 16px 0;
-    color: #fff;
-    font-size: 1.1em;
-    font-weight: 600;
-}
-
 .control-buttons {
     display: flex;
     gap: 12px;
