@@ -86,34 +86,6 @@ export interface SectionsComputedEvent extends BaseInteractionEvent {
 }
 
 /**
- * ArrangementAllocationPlannedEvent
- *
- * Emitted by GameSorter after section identity is computed.
- * Carries only allocation decisions keyed by sectionId.
- */
-export interface ArrangementAllocationPlannedEvent extends BaseInteractionEvent {
-    groupMode: GroupMode
-    sortMode: SortMode
-    shelfCapacity: number
-    maxShelves: number
-    totalRequestedShelves: number
-    totalAllocatedShelves: number
-    totalRequestedGames: number
-    totalAllocatedGames: number
-    deferredSections: number
-    deferredGames: number
-    sections: ReadonlyArray<{
-        sectionId: string
-        requestedShelves: number
-        allocatedShelves: number
-        shelfCapacity: number
-        requestedGames: number
-        allocatedGames: number
-        deferredGames: number
-    }>
-}
-
-/**
  * ArrangementRequestedEvent
  *
  * Emitted by LayoutControlPanel when the user changes group or sort mode.

@@ -47,7 +47,7 @@ import type {
     GameLoadingPhaseChangedEvent,
     GameLoadingProgressEvent,
 } from './InteractionEvents'
-import type { AllBatchesCompleteEvent, GameDataReadyEvent, LayoutChangedEvent, SomeBatchesCompleteEvent, ArrangementRequestedEvent, SectionsReadyEvent, SectionsComputedEvent, ArrangementAllocationPlannedEvent, SectionsReadyForPlacementEvent } from './EnvironmentEvents'
+import type { AllBatchesCompleteEvent, GameDataReadyEvent, LayoutChangedEvent, SomeBatchesCompleteEvent, ArrangementRequestedEvent, SectionsReadyEvent, SectionsComputedEvent, SectionsReadyForPlacementEvent } from './EnvironmentEvents'
 
 export interface InteractionEventMap {
     // Steam events
@@ -95,7 +95,6 @@ export interface InteractionEventMap {
     // Definitions-ready arrangement trigger (SteamIntegration-owned seam)
     [GameEventTypes.GameDataReady]: GameDataReadyEvent
     [GameEventTypes.SectionsComputed]: SectionsComputedEvent
-    [GameEventTypes.ArrangementAllocationPlanned]: ArrangementAllocationPlannedEvent
     [GameEventTypes.SectionsReady]: SectionsReadyEvent
     [GameEventTypes.SectionsReadyForPlacement]: SectionsReadyForPlacementEvent
 
