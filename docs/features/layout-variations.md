@@ -51,6 +51,24 @@ Changing layout mode should reposition shelves live - similar to how sort mode c
 - Implement dynamic shelf repositioning on layout change
 - Define and implement grouping parameter
 
+### Layout-Owned Mat/Carpet Spawning (Forward Plan)
+
+This is forward feature intent, not debt: layouts should own where entrance mats/carpets appear.
+
+**Near-term (current layout pass):**
+- Ensure spoke layouts keep shelves inside the store envelope
+- Place the entrance mat meaningfully for spoke (hub/center-driven placement)
+- Keep implementation minimal and compatible with current prop pipeline
+
+**Next step (Act 2 best effort):**
+- Add a layout-owned prop spawn seam so each layout can emit "spawn this prop here" directives
+- Move entrance mat placement from fixed global assumptions to layout-owned placement
+
+**Longer-term convergence (late Act 2 or next layout cycle):**
+- Converge "entrance mat" and "carpet" into one parameterized floor-prop system
+- Reuse existing carpet texture/material generation with layout-controlled dimensions, placement, and style presets
+- Allow arbitrary carpet/mat spawning from layout parameters (not one hardcoded entrance mat)
+
 ## Spoke Layout
 
 A dedicated spoke-based variant where each Section gets its own aisle radiating outward from a central hub area.
