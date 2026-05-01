@@ -232,6 +232,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
         this.renderer = this.createRenderer(rendererConfig)
         this.boundHandlePlacementRunResetRequested = this.handlePlacementRunResetRequested.bind(this)
+        this.publishArtworkMetadataReference()
 
         // Initialize with texture arrays
         const scene = DataManager.getInstance().get<THREE.Scene>(DataKey.MainScene)
@@ -271,6 +272,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
     private handlePlacementRunResetRequested(_event: CustomEvent<PlacementRunResetRequestedEvent>): void {
         this.instanceMetadata.clear()
+        this.publishArtworkMetadataReference()
         this.renderer.clearPlacements()
         LodArtworkOrchestrator.logger.debug('Cleared instance placements; texture slots retained')
     }
@@ -308,7 +310,12 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
         this.renderer.initialize(textureArrays, scene)
 
-        // Register instance metadata map for downstream systems (raycast, diagnostics)
+        this.publishArtworkMetadataReference()
+    }
+
+    private publishArtworkMetadataReference(): void {
+        // Policy: this orchestrator is the sole owner of DataKey.InstancedArtworkMetadata.
+        // Publish only at lifecycle boundaries so consumers read a single authoritative map.
         DataManager.getInstance().set(
             DataKey.InstancedArtworkMetadata,
             this.instanceMetadata,
@@ -659,6 +666,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         this.gameNameToTextureIndex.clear()
         this.textureIndexToGameName.clear()
         this.instanceMetadata.clear()
+        this.publishArtworkMetadataReference()
         this.prefetchedArtworkUrl.clear()
         this.failedArtwork.clear()
 
