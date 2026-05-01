@@ -93,7 +93,7 @@ export class LayoutControlPanel {
 
     private createPanel(parentSlot: HTMLElement): void {
         this.panelContainer = document.createElement('div')
-        this.panelContainer.className = 'ui-panel layout-sort-panel horizontally-collapsed'
+        this.panelContainer.className = 'ui-panel layout-sort-panel horizontally-collapsible horizontally-collapsed'
 
         const header = document.createElement('div')
         header.className = 'panel-header clickable-header'
@@ -107,7 +107,7 @@ export class LayoutControlPanel {
         header.addEventListener('click', () => this.toggleControlsVisibility())
 
         this.panelContent = document.createElement('div')
-        this.panelContent.className = 'panel-content collapsed'
+        this.panelContent.className = 'panel-content'
 
         this.controlsContainer = document.createElement('div')
         this.controlsContainer.className = 'layout-sort-controls'
@@ -254,9 +254,12 @@ export class LayoutControlPanel {
     // ─── Visibility toggle ─────────────────────────────────────────────────────
 
     private toggleControlsVisibility(): void {
+        if (!this.panelContainer || !this.panelContent) return
+
         this.isControlsVisible = !this.isControlsVisible
-        this.panelContent?.classList.toggle('collapsed', !this.isControlsVisible)
-        this.panelContainer?.classList.toggle('horizontally-collapsed', !this.isControlsVisible)
+
+        this.panelContainer.classList.toggle('horizontally-collapsed', !this.isControlsVisible)
+
         if (this.toggleIndicator) {
             this.toggleIndicator.textContent = this.isControlsVisible ? '▼' : '▶'
         }

@@ -5,6 +5,11 @@
     color: var(--color-text-primary);
     font-family: var(--font-family-ui);
     padding: var(--space-lg);
+    --panel-collapsed-width: 60px;
+    --panel-collapsed-height: 52px;
+    --panel-expanded-max-width: 100vw;
+    --panel-expanded-max-height: 1000px;
+    --panel-collapse-duration: calc(var(--duration-menu, var(--duration-standard)) * 1.2);
 }
 
 .ui-panel .panel-header.clickable-header {
@@ -39,7 +44,7 @@
     font-size: var(--panel-font-size-sm, var(--font-size-sm));
     color: var(--panel-text-muted, var(--color-text-secondary));
     user-select: none;
-    transition: transform var(--duration-menu, var(--duration-standard)) ease;
+    transition: transform var(--panel-collapse-duration) ease;
     display: inline-block;
 }
 
@@ -47,8 +52,16 @@
  * Horizontal collapse variant: collapses the panel to a narrow sidebar, hiding label content
  * Useful for toggleable side panels and similar UI elements
  */
+.ui-panel.horizontally-collapsible {
+    overflow: hidden;
+    max-width: var(--panel-expanded-max-width);
+    max-height: var(--panel-expanded-max-height);
+    transition: max-width var(--panel-collapse-duration) ease, max-height var(--panel-collapse-duration) ease;
+}
+
 .ui-panel.horizontally-collapsed {
-    max-width: 60px;
+    max-width: var(--panel-collapsed-width);
+    max-height: var(--panel-collapsed-height);
 }
 
 .ui-panel.horizontally-collapsed .panel-title,
@@ -58,4 +71,20 @@
 
 .ui-panel.horizontally-collapsed .toggle-indicator {
     transform: rotate(-90deg);
+}
+
+.ui-panel.horizontally-collapsible .panel-content {
+    max-width: var(--panel-expanded-max-width);
+    max-height: var(--panel-expanded-max-height);
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height var(--panel-collapse-duration) ease,
+                max-width var(--panel-collapse-duration) ease,
+                opacity var(--panel-collapse-duration) ease;
+}
+
+.ui-panel.horizontally-collapsed .panel-content {
+    max-height: 0;
+    max-width: 0;
+    opacity: 0;
 }
