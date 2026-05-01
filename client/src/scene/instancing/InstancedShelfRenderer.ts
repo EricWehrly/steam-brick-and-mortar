@@ -58,9 +58,11 @@ import { buildShelfGeometryTemplates, buildShelfUnitTemplate, ShelfGeometryType,
 import { EventManager } from '../../core/EventManager'
 import {
     GameEventTypes,
+    GameRenderEventTypes,
     StorePropsEventTypes,
     type ShelfReadyEvent,
     type ShelfLayoutDeterminedEvent,
+    type PlacementRunResetRequestedEvent,
 } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import { MeshPrewarmer } from '../../utils/MeshPrewarmer'
@@ -128,6 +130,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     private readonly boundUpdateGPU: () => void
     private readonly boundHandleShelfReady: (event: CustomEvent<ShelfReadyEvent>) => void
     private readonly boundHandleShelfLayoutDetermined: (event: CustomEvent<ShelfLayoutDeterminedEvent>) => void
+    private readonly boundHandlePlacementRunResetRequested: (event: CustomEvent<PlacementRunResetRequestedEvent>) => void
     
     // TODO: Consider making sticker system fully pluggable (dependency injection or optional feature)
     private readonly stickerHandler: ShelfStickerHandler
@@ -180,6 +183,8 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
             this.updateGPU()
         }
 
+        this.boundHandlePlacementRunResetRequested = this.reset.bind(this)
+
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.SomeBatchesComplete,
             this.boundUpdateGPU
@@ -192,6 +197,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.ShelfLayoutDetermined,
             this.boundHandleShelfLayoutDetermined
+        )
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            this.boundHandlePlacementRunResetRequested
         )
         
         InstancedShelfRenderer.logger.debug(`🏪 Created (max units: ${this.maxShelfUnits})`)
@@ -603,6 +612,10 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
         EventManager.getInstance().deregisterEventHandler(
             GameEventTypes.ShelfLayoutDetermined,
             this.boundHandleShelfLayoutDetermined
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            this.boundHandlePlacementRunResetRequested
         )
         
         // Dispose all managers
