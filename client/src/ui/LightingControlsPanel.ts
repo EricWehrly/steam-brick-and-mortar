@@ -57,7 +57,7 @@ export class LightingControlsPanel {
     private createPanel(): HTMLElement {
         const panel = document.createElement('div')
         panel.id = 'lighting-controls-panel'
-        panel.className = 'ui-panel lighting-controls-panel horizontally-collapsed'
+        panel.className = 'ui-panel lighting-controls-panel horizontally-collapsible horizontally-collapsed'
         panel.innerHTML = renderTemplate(lightingControlsPanelTemplate, {
             debugIndicatorEnabled: this.debugIndicatorEnabled
         })
@@ -495,18 +495,14 @@ export class LightingControlsPanel {
         
         if (!content || !indicator) return
 
-        const isCollapsed = content.classList.contains('collapsed')
+        const isCollapsed = panel.classList.contains('horizontally-collapsed')
         
         if (isCollapsed) {
-            // Expand: remove collapsed classes
-            content.classList.remove('collapsed')
             panel.classList.remove('horizontally-collapsed')
             indicator.textContent = '▼'
             this.scanLights()
             this.updateUI()
         } else {
-            // Collapse: add collapsed classes
-            content.classList.add('collapsed')
             panel.classList.add('horizontally-collapsed')
             indicator.textContent = '▶'
         }

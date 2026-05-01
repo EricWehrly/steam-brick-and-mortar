@@ -4,11 +4,11 @@
  */
 
 .layout-sort-panel {
+    --panel-expanded-max-width: min(var(--ui-right-rail), calc(100vw - 2 * var(--ui-edge-gap)));
+    --panel-expanded-max-height: 240px;
     padding: 0;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
-    transition: max-width var(--duration-menu) ease;
 }
 
 .layout-sort-panel .layout-icon {
@@ -22,16 +22,6 @@
     flex: 0 1 auto;
     max-height: 180px;
     min-height: auto;
-    opacity: 1;
-    transition: max-height var(--duration-menu-group) ease, opacity var(--duration-menu-group) ease;
-}
-
-.layout-sort-panel .panel-content.collapsed {
-    flex: 0;
-    max-height: 0;
-    min-height: 0;
-    opacity: 0;
-    overflow: hidden;
 }
 
 .layout-sort-controls {

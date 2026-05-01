@@ -1,4 +1,6 @@
 .lighting-controls-panel {
+    --panel-expanded-max-width: min(var(--ui-right-rail), calc(100vw - 2 * var(--ui-edge-gap)));
+    --panel-expanded-max-height: min(80dvh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap)));
     position: relative;
     top: auto;
     right: auto;
@@ -15,11 +17,9 @@
     color: var(--panel-text);
     font-family: var(--panel-font);
     z-index: 1000;
-    overflow: hidden;
     padding: 0;
     display: flex;
     flex-direction: column;
-    transition: width var(--duration-menu) ease;
 }
 
 .lighting-controls-panel .refresh-button {
@@ -40,17 +40,6 @@
     flex: 0 1 auto;
     max-height: min(75vh, calc(100dvh - var(--ui-top-inset) - var(--ui-edge-gap) - 52px));
     min-height: auto;
-    opacity: 1;
-    transition: max-height var(--duration-menu) ease, opacity var(--duration-menu) ease;
-}
-
-.lighting-controls-panel .panel-content.collapsed {
-    flex: 0;
-    max-height: 0;
-    min-height: 0;  /* overwrite .panel-content min-height from pause-menu-manager.css */
-    opacity: 0;
-    padding: 0;
-    overflow: hidden;
 }
 
 .lighting-controls-panel .master-controls {
