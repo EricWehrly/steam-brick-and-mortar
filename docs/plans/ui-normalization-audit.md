@@ -34,6 +34,20 @@ This audit covers the current state of the UI in the Steam Brick and Mortar clie
 - **Families**: `Arial, sans-serif`, `Monaco, monospace`, `'Courier New', monospace`
 - **Sizes**: `10px`, `11px`, `12px`, `13px`, `14px`
 
+## Structural Debt
+
+### shared-components.css
+`shared-components.css` is a catch-all that has grown to cover buttons, form controls, layout primitives (`.panel-section`, `.panel-card`), section headings, and utility classes. It should be split into targeted files matching the pattern of `ui-panel.css`, `ui-button.css`, etc. — one concern per file.
+
+Candidate split:
+- `ui-section.css` — `.panel-section`, `.panel-card`, `.action-section` aliases, `.section-label`
+- `ui-button.css` — `.pause-btn` and variants (primary, secondary, warning, accent)
+- `ui-form.css` — `.pause-input`, `.pause-select`, `.pause-checkbox`, `.setting-item`, `.setting-label`
+- `ui-layout.css` — `.btn-group`, `.stat-item`, `.flex-row`, `.flex-col`, utility classes
+- `ui-status.css` — `.status-good`, `.status-warning`, `.status-error`, status badge patterns
+
+Not urgent — shared-components works fine as-is. Do this split when adding a new file to the group would make the catch-all feel too large to navigate.
+
 ## Duplication & Inconsistencies
 1. **Buttons**: Different implementations in `shared-components.css` (`.pause-btn`), `main.css` (`.settings-button`), and `LightingControlsPanel.ts` (`.refresh-button`).
 2. **Checkboxes**: Native checkboxes are used everywhere, but styled differently (or not at all) in various panels. `UIComponentUtils` helps but doesn't solve the styling.

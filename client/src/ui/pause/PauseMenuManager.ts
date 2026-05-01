@@ -9,6 +9,7 @@ import { PauseMenuPanel } from './PauseMenuPanel'
 import { renderTemplate } from '../../utils/TemplateEngine'
 import pauseMenuStructureTemplate from '../../templates/pause-menu/main-structure.html?raw'
 import '../../styles/pause-menu/pause-menu-manager.css'
+import '../../styles/pause-menu/display-panel.css'
 
 // Panel imports for default registration
 import { CacheManagementPanel } from './panels/CacheManagementPanel'
@@ -52,6 +53,14 @@ export interface SystemDependencies {
     renderer: THREE.WebGLRenderer
 }
 
+interface PauseMenuTabGroup {
+    id: string
+    title: string
+    icon: string
+    childPanelIds: string[]
+    defaultChildPanelId: string
+}
+
 
 export class PauseMenuManager {
     private state: PauseMenuState = {
@@ -65,6 +74,9 @@ export class PauseMenuManager {
     private callbacks: PauseMenuCallbacks
     private systemDependencies: SystemDependencies | null = null
     private panels: Map<string, PauseMenuPanel> = new Map()
+    private tabGroups: Map<string, PauseMenuTabGroup> = new Map()
+    private panelParentTabIds: Map<string, string> = new Map()
+    private topLevelTabIds: string[] = []
     private overlay: HTMLElement | null = null
     private menuContainer: HTMLElement | null = null
     private cacheManagementPanel: CacheManagementPanel | null = null
@@ -123,7 +135,23 @@ export class PauseMenuManager {
     registerPanel(panel: PauseMenuPanel): void {
         this.panels.set(panel.id, panel)
         panel.init()
+
+        if (this.panelParentTabIds.has(panel.id)) {
+            return
+        }
+
+        this.addTopLevelTabId(panel.id)
         this.createPanelTab(panel)
+    }
+
+    registerTabGroup(group: PauseMenuTabGroup): void {
+        this.tabGroups.set(group.id, group)
+        group.childPanelIds.forEach(childPanelId => {
+            this.panelParentTabIds.set(childPanelId, group.id)
+        })
+
+        this.addTopLevelTabId(group.id)
+        this.createTopLevelTab(group.id, group.title, group.icon, () => this.showPanel(group.id))
     }
 
     registerDefaultPanels(): void {
@@ -145,6 +173,14 @@ export class PauseMenuManager {
         
         // Register game settings panel
         this.registerPanel(new GameSettingsPanel({}, this.appSettings))
+
+        this.registerTabGroup({
+            id: 'display',
+            title: 'Display',
+            icon: '🖥️',
+            childPanelIds: ['graphics-settings', 'camera-settings'],
+            defaultChildPanelId: 'graphics-settings'
+        })
         
         // Register graphics settings panel
         const graphicsPanel = new GraphicsSettingsPanel({}, this.appSettings)
@@ -152,10 +188,9 @@ export class PauseMenuManager {
             onSettingsChanged: (settings) => this.handleSettingsChange(settings)
         })
         this.registerPanel(graphicsPanel)
-        
+
         // Register camera settings panel
-        const cameraPanel = new CameraSettingsPanel({}, this.appSettings)
-        this.registerPanel(cameraPanel)
+        this.registerPanel(new CameraSettingsPanel({}, this.appSettings))
     
         const debugPanel = new DebugPanel({}, this.performanceMonitor)
         this.registerPanel(debugPanel)
@@ -220,6 +255,8 @@ export class PauseMenuManager {
     }
 
     showPanel(panelId: string): void {
+        const resolvedPanelId = this.resolvePanelId(panelId)
+
         // Hide current panel
         if (this.state.activePanel) {
             const currentPanel = this.panels.get(this.state.activePanel)
@@ -227,11 +264,13 @@ export class PauseMenuManager {
         }
 
         // Show new panel
-        const panel = this.panels.get(panelId)
+        const panel = this.panels.get(resolvedPanelId)
         if (panel) {
             panel.show()
-            this.state.activePanel = panelId
-            this.updateActiveTab(panelId)
+            this.state.activePanel = resolvedPanelId
+            this.renderSubtabs(resolvedPanelId)
+            this.updateActiveTab(resolvedPanelId)
+            this.updateContentLayout(resolvedPanelId)
         }
     }
 
@@ -266,7 +305,7 @@ export class PauseMenuManager {
             this.menuContainer = existingOverlay.querySelector(`.${this.config.menuClass}`)
             
             // Verify required elements exist, if not recreate them
-            if (!this.menuContainer || !existingOverlay.querySelector('#pause-menu-tabs')) {
+            if (!this.menuContainer || !existingOverlay.querySelector('#pause-menu-tabs') || !existingOverlay.querySelector('#pause-menu-subtabs')) {
                 console.log('⚠️ Existing structure incomplete, recreating...')
                 existingOverlay.remove()
                 this.createNewMenuStructure()
@@ -320,65 +359,149 @@ export class PauseMenuManager {
     }
 
     private setupTabsScrolling(): void {
-        const tabsContainer = document.getElementById('pause-menu-tabs')
-        if (!tabsContainer) return
-
-        // Mousewheel horizontal scrolling
-        tabsContainer.addEventListener('wheel', (e) => {
-            if (e.deltaY !== 0) {
-                e.preventDefault()
-                tabsContainer.scrollLeft += e.deltaY
-            }
-        }, { passive: false })
-
-        // Touch horizontal scrolling (already handled by native touch events on overflow-x)
-        // No additional code needed - CSS overflow-x: auto handles touch scrolling natively
+        this.attachHorizontalScroll('pause-menu-tabs')
+        this.attachHorizontalScroll('pause-menu-subtabs')
     }
 
     private createPanelTab(panel: PauseMenuPanel): void {
+        this.createTopLevelTab(panel.id, panel.title, panel.icon, () => this.showPanel(panel.id))
+    }
+
+    private createTopLevelTab(tabId: string, title: string, icon: string, onClick: () => void): void {
         const tabsContainer = document.getElementById('pause-menu-tabs')
         if (!tabsContainer) {
-            console.warn(`⚠️ Cannot create tab for panel '${panel.id}': tabs container not found`)
+            console.warn(`⚠️ Cannot create tab for '${tabId}': tabs container not found`)
             return
         }
 
-        // Check if tab already exists (prevent duplicates)
-        const existingTab = document.getElementById(`tab-${panel.id}`)
+        const existingTab = document.getElementById(`tab-${tabId}`)
         if (existingTab) {
-            console.log(`🔄 Tab for panel '${panel.id}' already exists, skipping creation`)
+            console.log(`🔄 Tab for '${tabId}' already exists, skipping creation`)
             return
         }
 
         const tab = document.createElement('button')
-        tab.id = `tab-${panel.id}`
+        tab.id = `tab-${tabId}`
         tab.className = 'pause-menu-tab'
-        tab.innerHTML = `${panel.icon} ${panel.title}`
-        
-        tab.addEventListener('click', () => this.showPanel(panel.id))
-        
+        tab.innerHTML = `${icon} ${title}`
+        tab.addEventListener('click', onClick)
         tabsContainer.appendChild(tab)
     }
 
     private updateActiveTab(panelId: string): void {
-        // Remove active class from all tabs
         document.querySelectorAll('.pause-menu-tab').forEach(tab => {
             tab.classList.remove('active')
         })
 
-        // Add active class to current tab
-        const activeTab = document.getElementById(`tab-${panelId}`)
+        document.querySelectorAll('.pause-menu-subtab').forEach(tab => {
+            tab.classList.remove('active')
+        })
+
+        const topLevelTabId = this.panelParentTabIds.get(panelId) ?? panelId
+        const activeTab = document.getElementById(`tab-${topLevelTabId}`)
         if (activeTab) {
             activeTab.classList.add('active')
+        }
+
+        const activeSubtab = document.getElementById(`subtab-${panelId}`)
+        if (activeSubtab) {
+            activeSubtab.classList.add('active')
         }
     }
 
     private hideAllPanels(): void {
         this.panels.forEach(panel => panel.hide())
         this.state.activePanel = null
+        this.renderSubtabs(null)
+        this.updateContentLayout(null)
     }
 
     private getFirstPanelId(): string | undefined {
-        return this.panels.keys().next().value
+        return this.topLevelTabIds[0]
+    }
+
+    private attachHorizontalScroll(containerId: string): void {
+        const tabsContainer = document.getElementById(containerId)
+        if (!tabsContainer) return
+
+        tabsContainer.addEventListener('wheel', (e) => {
+            if (e.deltaY !== 0) {
+                e.preventDefault()
+                tabsContainer.scrollLeft += e.deltaY
+            }
+        }, { passive: false })
+    }
+
+    private addTopLevelTabId(tabId: string): void {
+        if (!this.topLevelTabIds.includes(tabId)) {
+            this.topLevelTabIds.push(tabId)
+        }
+    }
+
+    private resolvePanelId(panelId: string): string {
+        const group = this.tabGroups.get(panelId)
+        if (!group) {
+            return panelId
+        }
+
+        if (this.state.activePanel && this.panelParentTabIds.get(this.state.activePanel) === group.id) {
+            return this.state.activePanel
+        }
+
+        return group.defaultChildPanelId
+    }
+
+    private renderSubtabs(activePanelId: string | null): void {
+        const subtabsContainer = document.getElementById('pause-menu-subtabs')
+        if (!subtabsContainer) return
+
+        subtabsContainer.innerHTML = ''
+
+        if (!activePanelId) {
+            subtabsContainer.style.display = 'none'
+            return
+        }
+
+        const groupId = this.panelParentTabIds.get(activePanelId)
+        if (!groupId) {
+            subtabsContainer.style.display = 'none'
+            return
+        }
+
+        const group = this.tabGroups.get(groupId)
+        if (!group) {
+            subtabsContainer.style.display = 'none'
+            return
+        }
+
+        subtabsContainer.style.display = 'flex'
+
+        group.childPanelIds.forEach(childPanelId => {
+            const panel = this.panels.get(childPanelId)
+            if (!panel) {
+                return
+            }
+
+            const subtab = document.createElement('button')
+            subtab.id = `subtab-${childPanelId}`
+            subtab.className = 'pause-menu-subtab'
+            subtab.innerHTML = `${panel.icon} ${panel.title}`
+            subtab.addEventListener('click', () => this.showPanel(childPanelId))
+            subtabsContainer.appendChild(subtab)
+        })
+    }
+
+    private updateContentLayout(activePanelId: string | null): void {
+        const contentContainer = document.getElementById('pause-menu-content')
+        if (!contentContainer) return
+
+        const isDisplayGroupActive = activePanelId !== null && this.panelParentTabIds.get(activePanelId) === 'display'
+
+        if (isDisplayGroupActive) {
+            contentContainer.classList.add('display-tab-group-active')
+        } else {
+            contentContainer.classList.remove('display-tab-group-active')
+        }
     }
 
     private setupKeyboardHandling(): void {

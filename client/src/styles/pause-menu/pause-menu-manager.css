@@ -108,4 +108,5 @@
 .panel-content {
     color: #ccc;
     min-height: 200px;
+    padding: 0px 12px;
 }

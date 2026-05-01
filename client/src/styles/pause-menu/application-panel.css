@@ -1,50 +1,44 @@
 /* Application Panel Styles */
 @import './shared-components.css';
 
-.pause-menu-panel {
-    padding: 20px;
-    max-height: 70vh;
-    overflow-y: auto;
-}
-
-.panel-header {
+#panel-application .panel-header {
     margin-bottom: 12px;
     text-align: center;
 }
 
-.panel-header h3 {
+#panel-application .panel-header h3 {
     margin: 0 0 8px 0;
     color: #fff;
     font-size: 1.4em;
 }
 
-.panel-header p {
+#panel-application .panel-header p {
     margin: 0;
     color: #aaa;
     font-size: 0.9em;
 }
 
 /* .app-section layout handled by shared alias in shared-components */
-.app-section {
+#panel-application .app-section {
     margin-bottom: 24px;
     padding-bottom: 20px;
 }
 
-.app-section:last-child {
+#panel-application .app-section:last-child {
     margin-bottom: 0;
 }
 
-.control-buttons {
+#panel-application .control-buttons {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
 }
 
-.btn-icon {
+#panel-application .btn-icon {
     font-size: 1.1em;
 }
 
-.btn-shortcut {
+#panel-application .btn-shortcut {
     position: absolute;
     top: 4px;
     right: 6px;
@@ -55,25 +49,25 @@
     border-radius: 3px;
 }
 
-.settings-grid {
+#panel-application .settings-grid {
     display: grid;
     gap: 16px;
 }
 
-.setting-item {
+#panel-application .setting-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
 }
 
-.setting-item label:not(.checkbox-label) {
+#panel-application .setting-item label:not(.checkbox-label) {
     color: #ccc;
     font-size: 0.9em;
     min-width: 120px;
 }
 
-.setting-select {
+#panel-application .setting-select {
     background: #333;
     border: 1px solid #555;
     color: #fff;
@@ -83,17 +77,17 @@
     min-width: 120px;
 }
 
-.setting-select:focus {
+#panel-application .setting-select:focus {
     outline: none;
     border-color: #2a5470;
     box-shadow: 0 0 0 2px rgba(42, 84, 112, 0.3);
 }
 
-.checkbox-item {
+#panel-application .checkbox-item {
     justify-content: flex-start;
 }
 
-.checkbox-label {
+#panel-application .checkbox-label {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -103,11 +97,11 @@
     font-size: 0.9em;
 }
 
-.checkbox-label input[type="checkbox"] {
+#panel-application .checkbox-label input[type="checkbox"] {
     display: none;
 }
 
-.checkmark {
+#panel-application .checkmark {
     width: 18px;
     height: 18px;
     border: 2px solid #555;
@@ -116,12 +110,12 @@
     transition: all 0.2s ease;
 }
 
-.checkbox-label input:checked + .checkmark {
+#panel-application .checkbox-label input:checked + .checkmark {
     background: #2a5470;
     border-color: #3d6b8a;
 }
 
-.checkmark::after {
+#panel-application .checkmark::after {
     content: '';
     position: absolute;
     left: 4px;
@@ -135,27 +129,27 @@
     transition: opacity 0.2s ease;
 }
 
-.checkbox-label input:checked + .checkmark::after {
+#panel-application .checkbox-label input:checked + .checkmark::after {
     opacity: 1;
 }
 
-.debug-section {
+#panel-application .debug-section {
     border: 1px solid #444;
     border-radius: 8px;
     padding: 16px;
     background: rgba(255, 255, 255, 0.02);
 }
 
-.debug-actions,
-.general-actions {
+#panel-application .debug-actions,
+#panel-application .general-actions {
     display: flex;
     gap: 8px;
     margin-top: 16px;
     flex-wrap: wrap;
 }
 
-.debug-btn,
-.action-btn {
+#panel-application .debug-btn,
+#panel-application .action-btn {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -169,41 +163,41 @@
     transition: all 0.2s ease;
 }
 
-.debug-btn:hover,
-.action-btn:hover {
+#panel-application .debug-btn:hover,
+#panel-application .action-btn:hover {
     background: rgba(255, 255, 255, 0.15);
     border-color: #666;
     color: #fff;
 }
 
-.action-btn.warning {
+#panel-application .action-btn.warning {
     background: rgba(139, 69, 19, 0.3);
     border-color: #8b4513;
     color: #cd853f;
 }
 
-.action-btn.warning:hover {
+#panel-application .action-btn.warning:hover {
     background: rgba(139, 69, 19, 0.5);
     border-color: #a0522d;
     color: #daa520;
 }
 
 @media (max-width: 600px) {
-    .control-buttons {
+    #panel-application .control-buttons {
         flex-direction: column;
     }
     
-    .app-btn {
+    #panel-application .app-btn {
         min-width: auto;
     }
     
-    .debug-actions,
-    .general-actions {
+    #panel-application .debug-actions,
+    #panel-application .general-actions {
         flex-direction: column;
     }
     
-    .debug-btn,
-    .action-btn {
+    #panel-application .debug-btn,
+    #panel-application .action-btn {
         justify-content: center;
     }
 }

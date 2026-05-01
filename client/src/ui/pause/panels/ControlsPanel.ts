@@ -9,8 +9,8 @@ import '../../../styles/pause-menu/controls-panel.css'
 
 export class ControlsPanel extends PauseMenuPanel {
     readonly id = 'controls'
-    readonly title = 'Controls'
-    readonly icon = '🎮'
+    readonly title = 'Input'
+    readonly icon = '⌨️'
 
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)
