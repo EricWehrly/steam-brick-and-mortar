@@ -25,6 +25,7 @@ The main thing we'll want to check in this "encore" act is: Can we embed an audi
 - **Encircling Games layout mode** — the "Cyberspace room"; games orbit the player in concentric rings
 - **Dynamic spoke/aisle shelf arrangement** — shelves as spokes per category, or giant aisles running past; 4-6 day estimate post-Act 2 core; see [Layout Variations](../features/layout-variations.md)
 - **Layout grouping** — apply a shape to N shelves then repeat; stretch goal within [Layout Variations](../features/layout-variations.md)
+- **Entrance aisle runner carpet with marquee lights** — add a long runner along the primary entrance aisle (from door through center) with movie-theater style border lighting.
 
 ## Extensibility
 
