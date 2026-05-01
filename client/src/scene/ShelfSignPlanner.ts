@@ -122,7 +122,7 @@ export class ShelfSignPlanner {
         const { sections } = detail
         this.clearSigns()
 
-        // Place a sign at the first shelf owned by each section index.
+        // Place signs at the first and last shelf owned by each section index.
         // Sections with no name (ungrouped) or named 'Other' get no sign.
         for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
             const section = sections[sectionIndex]
@@ -130,34 +130,57 @@ export class ShelfSignPlanner {
                 continue
             }
 
-            const anchorShelfIndex = this.shelfSectionIndices.findIndex((ownedSectionIndex) => ownedSectionIndex === sectionIndex)
-            if (anchorShelfIndex < 0) {
+            const ownedShelfIndices = this.shelfSectionIndices
+                .map((ownedSectionIndex, shelfIndex) => ({ ownedSectionIndex, shelfIndex }))
+                .filter((entry) => entry.ownedSectionIndex === sectionIndex && !!this.shelfPositions[entry.shelfIndex])
+                .map((entry) => entry.shelfIndex)
+
+            if (ownedShelfIndices.length === 0) {
                 ShelfSignPlanner.logger.warn(`No shelf anchor found for section "${section.name}" (index ${sectionIndex})`)
                 continue
             }
 
-            const anchorPos = this.shelfPositions[anchorShelfIndex]
-            if (!anchorPos) {
-                ShelfSignPlanner.logger.warn(`No shelf position at index ${anchorShelfIndex} for section "${section.name}"`)
-                continue
-            }
+            const startShelfIndex = ownedShelfIndices[0]
+            const endShelfIndex = ownedShelfIndices[ownedShelfIndices.length - 1]
 
-            const rotY = this.shelfRotations[anchorShelfIndex] ?? 0
+            const startPos = this.shelfPositions[startShelfIndex]
+            const endPos = this.shelfPositions[endShelfIndex]
+            const startRotY = this.shelfRotations[startShelfIndex] ?? 0
+            const endRotY = this.shelfRotations[endShelfIndex] ?? startRotY
+
+            if (!startPos || !endPos) continue
 
             const startIdentifier = this.buildSignIdentifier(section.name, 'start')
             this.signSystem.placeSign('canvas', {
                 uniqueIdentifier: startIdentifier,
                 text: section.name,
-                anchorPosition: anchorPos,
+                anchorPosition: startPos,
                 mount: {
                     style: this.config.signMountStyle,
                     yOffset: this.config.signYOffset,
                     frontOffset: SHELF_SIGN_FRONT_OFFSET,
-                    signFacingY: rotY,
+                    signFacingY: startRotY,
                 },
                 style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
             })
             this.placedSignIdentifiers.add(startIdentifier)
+
+            if (endShelfIndex !== startShelfIndex) {
+                const endIdentifier = this.buildSignIdentifier(section.name, 'end')
+                this.signSystem.placeSign('canvas', {
+                    uniqueIdentifier: endIdentifier,
+                    text: section.name,
+                    anchorPosition: endPos,
+                    mount: {
+                        style: this.config.signMountStyle,
+                        yOffset: this.config.signYOffset,
+                        frontOffset: SHELF_SIGN_FRONT_OFFSET,
+                        signFacingY: endRotY,
+                    },
+                    style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
+                })
+                this.placedSignIdentifiers.add(endIdentifier)
+            }
         }
 
         ShelfSignPlanner.logger.debug(
