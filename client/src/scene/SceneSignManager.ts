@@ -15,8 +15,10 @@ import type { RenderKind, SignDescriptor, SignMount, ShelfTopSurface } from './S
 import {
     StorePropsEventTypes,
     RoomEventTypes,
+    SteamEventTypes,
     type ShelfReadyEvent,
     type RoomResizedEvent,
+    type SteamDataLoadedEvent,
 } from '../types/InteractionEvents'
 import { ShelfSurfaceUtils } from './props/shared/ShelfSurfaceUtils'
 import { RoomConstants } from './RoomManager'
@@ -66,6 +68,8 @@ export class SceneSignManager {
     private readonly scene: THREE.Scene
     private readonly rendererByIdentifier = new Map<string, RenderKind>()
     private roomDepth: number = RoomConstants.DEFAULT_ROOM_DEPTH
+    private roomWorldOffsetZ = 0
+    private steamLibraryTitleText = 'STEAM LIBRARY'
 
     private static readonly ABOVE_SHELF_DEFAULT_Y_OFFSET = 0.6
     private static readonly SIGN_Z_FACE_PLAYER = 0.01
@@ -90,6 +94,23 @@ export class SceneSignManager {
             RoomEventTypes.Resized,
             (event: CustomEvent<RoomResizedEvent>) => this.handleRoomResized(event.detail)
         )
+        EventManager.getInstance().registerEventHandler(
+            SteamEventTypes.DataLoaded,
+            (event: CustomEvent<SteamDataLoadedEvent>) => this.handleSteamDataLoaded(event.detail)
+        )
+    }
+
+    private handleSteamDataLoaded(detail: SteamDataLoadedEvent): void {
+        this.steamLibraryTitleText = this.buildSteamLibraryTitle(detail.displayName)
+        this.syncSteamLibraryBlockSign()
+    }
+
+    private buildSteamLibraryTitle(displayName?: string): string {
+        const trimmedName = displayName?.trim()
+        if (!trimmedName) {
+            return 'STEAM LIBRARY'
+        }
+        return `${trimmedName}'s Steam Library`
     }
 
     private handleShelfCreated(detail: ShelfReadyEvent): void {
@@ -108,6 +129,9 @@ export class SceneSignManager {
 
     private handleRoomResized(detail: RoomResizedEvent): void {
         this.roomDepth = detail.dimensions.depth
+        if (detail.centerOffset) {
+            this.roomWorldOffsetZ = detail.centerOffset.z + RoomConstants.STORE_FRONT_OFFSET
+        }
         // TODO(layout): replace with layout coordinator invalidation.
         this.syncSteamLibraryBlockSign()
     }
@@ -220,11 +244,11 @@ export class SceneSignManager {
         // Mounted high on the back wall, facing the player at the entrance.
         // Offset by half the sign depth so letters sit flush against the wall surface.
         const SIGN_DEPTH = 0.08
-        const backWallZ   = -(this.roomDepth / 2) + SIGN_DEPTH / 2
+        const backWallZ   = this.roomWorldOffsetZ - (this.roomDepth / 2) + SIGN_DEPTH / 2
         const signHeightY = RoomConstants.STORE_CEILING_HEIGHT - 0.5
         this.placeSign('block-letter', {
             uniqueIdentifier: 'steam-library-title',
-            text: 'STEAM LIBRARY',
+            text: this.steamLibraryTitleText,
             anchorPosition: new THREE.Vector3(0, signHeightY, backWallZ),
             style: {
                 color: 0x003087,

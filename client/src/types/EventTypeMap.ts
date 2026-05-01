@@ -45,7 +45,7 @@ import type {
     GameLoadingPhaseChangedEvent,
     GameLoadingProgressEvent,
 } from './InteractionEvents'
-import type { AllBatchesCompleteEvent, GameDataReadyEvent, SomeBatchesCompleteEvent, ArrangementRequestedEvent, SectionsReadyEvent, SectionsComputedEvent, SectionsReadyForPlacementEvent } from './EnvironmentEvents'
+import type { AllBatchesCompleteEvent, GameDataReadyEvent, LayoutChangedEvent, SomeBatchesCompleteEvent, ArrangementRequestedEvent, SectionsReadyEvent, SectionsComputedEvent, SectionsReadyForPlacementEvent } from './EnvironmentEvents'
 
 export interface InteractionEventMap {
     // Steam events

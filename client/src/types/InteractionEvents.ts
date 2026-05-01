@@ -51,7 +51,7 @@ export interface SteamImageCacheClearEvent extends BaseInteractionEvent {
  * - `GameEventTypes.GameDataReady` for definitions-ready grouping/sorting
  */
 export interface SteamDataLoadedEvent extends BaseInteractionEvent {
-    userInput?: string
+    displayName?: string
 }
 
 /**
@@ -306,6 +306,8 @@ export const GameEventTypes = {
     ArtworkSettled: 'game:artwork-settled',
     /** Fired when a game is selected (e.g. clicked in scene) - opens detail panel */
     Selected: 'game:selected',
+    /** Fired after all batches complete; carries the sorted game list and bucket map. */
+    GamesSort: 'game:games-sort',
     /** Fired after grouping+sorting and before allocation; carries uncapped section topology. */
     SectionsComputed: 'game:sections-computed',
     /** Fired after grouping + sorting; carries sections ready for placement. */

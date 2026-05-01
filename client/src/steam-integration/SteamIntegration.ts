@@ -8,7 +8,7 @@
  * - Cache management
  */
 
-import { SteamApiClient, type SteamGame, type SteamUser, type SteamResolveResponse } from '../steam'
+import { SteamApiClient, type SteamGame, type SteamResolveResponse } from '../steam'
 import { ANONYMOUS_STORE_USER } from '../steam/fixtures/demo-games'
 import { ValidationUtils } from '../utils'
 import { Logger } from '../utils/Logger'
@@ -98,6 +98,10 @@ export class SteamIntegration {
         const gameLibraryState = this.getGameLibraryState()
         const games: SteamGameData[] = gameLibraryState.userData?.games || []
         this.steamId = gameLibraryState.userData?.steamid
+        const vanityUrl = gameLibraryState.userData?.vanity_url?.trim()
+        const displayName = vanityUrl && !vanityUrl.toLowerCase().startsWith('steamid:')
+            ? vanityUrl
+            : undefined
 
         SteamIntegration.logger.debug(`Storing ${games.length} games in DataManager`)
 
@@ -112,7 +116,7 @@ export class SteamIntegration {
         }
 
         this.eventManager.emit<SteamDataLoadedEvent>(SteamEventTypes.DataLoaded, {
-            userInput: userInput ?? undefined,
+            displayName,
         })
 
         const totalGames = games.length
@@ -136,16 +140,14 @@ export class SteamIntegration {
 
     private async loadGamesForUser(userInput: string, ignoreCache = false): Promise<GameLibraryState> {
         const parsedInput = ValidationUtils.parseSteamUserInput(userInput)
-        let steamId: string | undefined
-        let vanityUrl: string
         
         SteamIntegration.logger.info(`Loading games for Steam user: ${parsedInput.value} (type: ${parsedInput.type}${ignoreCache ? ', ignoring cache' : ''})`);
 
-        ({ steamId, vanityUrl } = await this.getSteamIdAndVanityUrl(parsedInput, steamId, vanityUrl, ignoreCache))
+        const { steamId, vanityUrl } = await this.getSteamIdAndVanityUrl(parsedInput, ignoreCache)
 
         const userGames = await this.steamClient.getUserGames(steamId, ignoreCache)
         userGames.steamid = steamId
-        userGames.vanity_url = vanityUrl
+        userGames.vanity_url = userGames.vanity_url ?? vanityUrl
         this.gameLibrary.setUserData(userGames)
         
         await this.steamClient.loadGamesProgressively(userGames, {
@@ -158,7 +160,9 @@ export class SteamIntegration {
         return this.gameLibrary.getState()
     }
 
-    private async getSteamIdAndVanityUrl(parsedInput: { type: "steamid" | "customurl"; value: string }, steamId: string, vanityUrl: string, ignoreCache: boolean) {
+    private async getSteamIdAndVanityUrl(parsedInput: { type: "steamid" | "customurl"; value: string }, ignoreCache: boolean): Promise<{ steamId: string; vanityUrl: string }> {
+        let steamId: string
+        let vanityUrl: string
         if (parsedInput.type === 'steamid') {
             // Direct steamID - no resolution needed
             steamId = parsedInput.value
@@ -171,9 +175,6 @@ export class SteamIntegration {
         }
 
         // Validate we have a steamID before proceeding
-        if (!steamId) {
-            throw new Error('Failed to obtain valid Steam ID')
-        }
         return { steamId, vanityUrl }
     }
 
