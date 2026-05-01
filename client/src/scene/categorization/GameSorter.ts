@@ -32,7 +32,6 @@ import type {
     SectionsReadyForPlacementEvent,
     ArrangementRequestedEvent,
     SectionsComputedEvent,
-    ArrangementAllocationPlannedEvent,
 } from '../../types/EnvironmentEvents'
 import type { Section } from '../../types/LayoutTypes'
 import type { SteamGameData } from '../game-box/types/GameData'
@@ -133,22 +132,6 @@ export class GameSorter {
             sortMode,
             sections: computedSections,
         })
-
-        const allocationEvent: ArrangementAllocationPlannedEvent = {
-            groupMode,
-            sortMode,
-            shelfCapacity: SHELF_BATCH_SIZE,
-            maxShelves: MAX_SHELVES_PER_ARRANGEMENT,
-            totalRequestedShelves: plan.totalRequestedShelves,
-            totalAllocatedShelves: plan.totalAllocatedShelves,
-            totalRequestedGames: plan.totalRequestedGames,
-            totalAllocatedGames: plan.totalAllocatedGames,
-            deferredSections: plan.deferredSections,
-            deferredGames: plan.deferredGames,
-            sections: plan.sections,
-        }
-
-        EventManager.getInstance().emit<ArrangementAllocationPlannedEvent>(GameEventTypes.ArrangementAllocationPlanned, allocationEvent)
 
         EventManager.getInstance().emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
             groupMode,

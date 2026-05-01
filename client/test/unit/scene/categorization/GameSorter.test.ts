@@ -104,7 +104,7 @@ describe('GameSorter', () => {
         expect(totalGames).toBe(2)
     })
 
-    it('emits SectionsComputed before planning and ready events', () => {
+    it('emits SectionsComputed before placement and ready events', () => {
         mockGames = [makeGame(1), makeGame(2), makeGame(3)]
         new GameSorter()
 
@@ -112,17 +112,14 @@ describe('GameSorter', () => {
 
         const emittedTypes = mockEmit.mock.calls.map(([eventType]) => eventType)
         expect(emittedTypes).toContain(GameEventTypes.SectionsComputed)
-        expect(emittedTypes).toContain(GameEventTypes.ArrangementAllocationPlanned)
         expect(emittedTypes).toContain(GameEventTypes.SectionsReadyForPlacement)
         expect(emittedTypes).toContain(GameEventTypes.SectionsReady)
 
         const computedIndex = emittedTypes.indexOf(GameEventTypes.SectionsComputed)
-        const plannedIndex = emittedTypes.indexOf(GameEventTypes.ArrangementAllocationPlanned)
         const placementReadyIndex = emittedTypes.indexOf(GameEventTypes.SectionsReadyForPlacement)
         const readyIndex = emittedTypes.indexOf(GameEventTypes.SectionsReady)
-        expect(computedIndex).toBeLessThan(plannedIndex)
-        expect(plannedIndex).toBeLessThan(placementReadyIndex)
-        expect(plannedIndex).toBeLessThan(readyIndex)
+        expect(computedIndex).toBeLessThan(placementReadyIndex)
+        expect(computedIndex).toBeLessThan(readyIndex)
 
         const computed = lastEmittedPayload(GameEventTypes.SectionsComputed)
         expect(Array.isArray(computed.sections)).toBe(true)
@@ -131,17 +128,6 @@ describe('GameSorter', () => {
             sectionId: expect.any(String),
             sectionIndex: expect.any(Number),
             section: expect.any(Object),
-        })
-
-        const plan = lastEmittedPayload(GameEventTypes.ArrangementAllocationPlanned)
-        expect(plan.shelfCapacity).toBeGreaterThan(0)
-        expect(plan.maxShelves).toBeGreaterThan(0)
-        expect(plan.totalRequestedGames).toBeGreaterThan(0)
-        expect(Array.isArray(plan.sections)).toBe(true)
-        expect(plan.sections[0]).toMatchObject({
-            sectionId: expect.any(String),
-            requestedShelves: expect.any(Number),
-            allocatedShelves: expect.any(Number),
         })
 
         const placement = lastEmittedPayload(GameEventTypes.SectionsReadyForPlacement)
