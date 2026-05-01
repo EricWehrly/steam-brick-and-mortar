@@ -36,6 +36,43 @@ interface RoomResizeEventData {
     shelfLayout?: { rows: number; shelvesPerRow?: number }
 }
 
+interface ShelfBounds {
+    minX: number
+    maxX: number
+    minZ: number
+    maxZ: number
+}
+
+export function computeRoomEnvelopeFromShelfBounds(shelfBounds: ShelfBounds): {
+    dimensions: RoomDimensions
+    centerOffset: { x: number; y: number; z: number }
+} {
+    const roomWidth = (shelfBounds.maxX - shelfBounds.minX) + (RoomConstants.STORE_WALL_CLEARANCE * 2)
+    const roomHeight = RoomConstants.STORE_CEILING_HEIGHT
+
+    // Spoke-like layouts straddle origin and should be centered within the room.
+    // Forward-facing layouts keep extra entrance clearance in front.
+    const spansOrigin = shelfBounds.minZ < 0 && shelfBounds.maxZ > 0
+    const backClearance = RoomConstants.STORE_BACK_CLEARANCE
+    const frontClearance = spansOrigin
+        ? RoomConstants.STORE_BACK_CLEARANCE
+        : RoomConstants.STORE_ENTRANCE_CLEARANCE
+
+    const roomMinZ = shelfBounds.minZ - backClearance
+    const roomMaxZ = shelfBounds.maxZ + frontClearance
+    const roomDepth = roomMaxZ - roomMinZ
+    const roomCenterZ = (roomMinZ + roomMaxZ) / 2
+
+    // RoomManager applies STORE_FRONT_OFFSET at build time; keep event payload
+    // in pre-offset coordinates for downstream systems that follow the same contract.
+    const centerOffset = { x: 0, y: 0, z: roomCenterZ - RoomConstants.STORE_FRONT_OFFSET }
+
+    return {
+        dimensions: { width: roomWidth, depth: roomDepth, height: roomHeight },
+        centerOffset,
+    }
+}
+
 export class RoomManager {
     private scene: THREE.Scene
     private camera: THREE.PerspectiveCamera
@@ -115,17 +152,10 @@ export class RoomManager {
             return
         }
         
-        // Calculate room dimensions using our own constants
-        const roomWidth = (shelfBounds.maxX - shelfBounds.minX) + (RoomConstants.STORE_WALL_CLEARANCE * 2)
-        const roomDepth = Math.abs(shelfBounds.minZ) + RoomConstants.STORE_BACK_CLEARANCE
-        const roomHeight = RoomConstants.STORE_CEILING_HEIGHT
-        const roomCenterZ = (shelfBounds.minZ - RoomConstants.STORE_BACK_CLEARANCE) / 2
-        
-        const dimensions: RoomDimensions = { width: roomWidth, depth: roomDepth, height: roomHeight }
-        const centerOffset = { x: 0, y: 0, z: roomCenterZ }
+        const { dimensions, centerOffset } = computeRoomEnvelopeFromShelfBounds(shelfBounds)
         
         console.debug(`📐 Shelf bounds: X[${shelfBounds.minX.toFixed(1)}, ${shelfBounds.maxX.toFixed(1)}], Z[${shelfBounds.minZ.toFixed(1)}, ${shelfBounds.maxZ.toFixed(1)}]`)
-        console.debug(`🏠 Calculated room: ${roomWidth.toFixed(1)}x${roomDepth.toFixed(1)}x${roomHeight.toFixed(1)}, center Z: ${roomCenterZ.toFixed(1)}`)
+        console.debug(`🏠 Calculated room: ${dimensions.width.toFixed(1)}x${dimensions.depth.toFixed(1)}x${dimensions.height.toFixed(1)}, center Z: ${(centerOffset.z + RoomConstants.STORE_FRONT_OFFSET).toFixed(1)}`)
         
         perf.end({ rows: shelfLayout.rows, shelvesPerRow: shelfLayout.shelvesPerRow })
         
