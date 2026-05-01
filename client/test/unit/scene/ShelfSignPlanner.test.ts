@@ -95,6 +95,7 @@ describe('ShelfSignPlanner — sign placement from SectionsReady', () => {
         new ShelfSignPlanner()
         emitShelfReady(0, FAR_POSITION, 0, 0)
         emitShelfReady(1, new THREE.Vector3(5, 0, -20), 0, 1)
+        emitShelfReady(2, new THREE.Vector3(8, 0, -20), 0, 1)
 
         emitSectionsReady([
             makeSection('Played Today'),
@@ -104,7 +105,9 @@ describe('ShelfSignPlanner — sign placement from SectionsReady', () => {
 
         const placedIds = placeSignSpy.mock.calls.map(([, d]) => d.uniqueIdentifier)
         expect(placedIds).toContain('Played Today::start')
+        expect(placedIds).not.toContain('Played Today::end')
         expect(placedIds).toContain('Played This Week::start')
+        expect(placedIds).toContain('Played This Week::end')
     })
 
     it('does not place a sign for unnamed (empty name) sections', () => {
@@ -129,6 +132,7 @@ describe('ShelfSignPlanner — sign placement from SectionsReady', () => {
         new ShelfSignPlanner()
         emitShelfReady(0, FAR_POSITION, 0, 0)
         emitShelfReady(1, new THREE.Vector3(5, 0, -20), 0, 1)
+        emitShelfReady(2, new THREE.Vector3(8, 0, -20), 0, 1)
 
         emitSectionsReady([makeSection('Action'), makeSection('RPG')])
         emitShelfLayoutDetermined()
@@ -138,6 +142,7 @@ describe('ShelfSignPlanner — sign placement from SectionsReady', () => {
         emitShelfLayoutDetermined()
         expect(removeSignByIdSpy).toHaveBeenCalledWith('Action::start')
         expect(removeSignByIdSpy).toHaveBeenCalledWith('RPG::start')
+        expect(removeSignByIdSpy).toHaveBeenCalledWith('RPG::end')
         expect(placeSignSpy).toHaveBeenCalledWith('canvas', expect.objectContaining({
             uniqueIdentifier: 'Played Today::start',
         }))
@@ -147,40 +152,50 @@ describe('ShelfSignPlanner — sign placement from SectionsReady', () => {
         new ShelfSignPlanner()
         const pos0 = new THREE.Vector3(0, 0, -5)
         const pos1 = new THREE.Vector3(5, 0, -5)
+        const pos2 = new THREE.Vector3(9, 0, -5)
         emitShelfReady(0, pos0, 0, 1) // shelf 0 owned by section index 1
         emitShelfReady(1, pos1, 0, 0) // shelf 1 owned by section index 0
+        emitShelfReady(2, pos2, 0, 1) // shelf 2 also owned by section index 1
 
         emitSectionsReady([makeSection('First', 18), makeSection('Second', 18)])
         emitShelfLayoutDetermined()
 
         const firstCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'First::start')
-        const secondCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second::start')
+        const secondStartCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second::start')
+        const secondEndCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second::end')
         expect(firstCall).toBeDefined()
-        expect(secondCall).toBeDefined()
+        expect(secondStartCall).toBeDefined()
+        expect(secondEndCall).toBeDefined()
         // First section (index 0) anchors to shelf with sectionIndex=0 => shelf 1
         expect(firstCall[1].anchorPosition).toEqual(pos1)
-        // Second section (index 1) anchors to shelf with sectionIndex=1 => shelf 0
-        expect(secondCall[1].anchorPosition).toEqual(pos0)
+        // Second section (index 1) anchors start/end to first/last owned shelves => 0/2
+        expect(secondStartCall?.[1].anchorPosition).toEqual(pos0)
+        expect(secondEndCall?.[1].anchorPosition).toEqual(pos2)
     })
 
     it('anchors sections to shelf positions in order', () => {
         new ShelfSignPlanner()
         const pos0 = new THREE.Vector3(0, 0, -5)
         const pos1 = new THREE.Vector3(5, 0, -5)
+        const pos2 = new THREE.Vector3(10, 0, -5)
         emitShelfReady(0, pos0, 0, 0)
         emitShelfReady(1, pos1, 0, 1)
+        emitShelfReady(2, pos2, 0, 1)
 
         emitSectionsReady([makeSection('First', 18), makeSection('Second', 18)])
         emitShelfLayoutDetermined()
 
         const firstCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'First::start')
-        const secondCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second::start')
+        const secondStartCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second::start')
+        const secondEndCall = placeSignSpy.mock.calls.find(([, d]) => d.uniqueIdentifier === 'Second::end')
         expect(firstCall).toBeDefined()
-        expect(secondCall).toBeDefined()
+        expect(secondStartCall).toBeDefined()
+        expect(secondEndCall).toBeDefined()
         // First section anchors at shelf 0
         expect(firstCall[1].anchorPosition).toEqual(pos0)
-        // Second section anchors at shelf 1
-        expect(secondCall[1].anchorPosition).toEqual(pos1)
+        // Second section anchors start/end at shelf 1 and 2
+        expect(secondStartCall?.[1].anchorPosition).toEqual(pos1)
+        expect(secondEndCall?.[1].anchorPosition).toEqual(pos2)
     })
 
     it('clears signs and anchor caches on setup request', () => {
