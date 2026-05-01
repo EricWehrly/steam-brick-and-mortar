@@ -3,32 +3,35 @@
  * Uses tokens from tokens.css.
  */
 
-.layout-sort-toggle-btn {
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    color: var(--panel-text);
-    border-radius: var(--panel-border-radius);
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color var(--panel-transition), border-color var(--panel-transition);
-    line-height: 1;
+.layout-sort-panel {
     padding: 0;
-    flex-shrink: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: max-width var(--duration-menu) ease;
 }
 
-.layout-sort-toggle-btn:hover {
-    background: var(--panel-hover-bg);
-    border-color: var(--panel-accent);
+.layout-sort-panel .layout-icon {
+    margin-right: var(--panel-space-6);
+    opacity: 0.7;
 }
 
-.layout-sort-toggle-btn.active {
-    background: var(--panel-header-bg);
-    border-color: var(--panel-accent);
+.layout-sort-panel .panel-content {
+    padding: 0;
+    overflow-y: auto;
+    flex: 0 1 auto;
+    max-height: 180px;
+    min-height: auto;
+    opacity: 1;
+    transition: max-height var(--duration-menu-group) ease, opacity var(--duration-menu-group) ease;
+}
+
+.layout-sort-panel .panel-content.collapsed {
+    flex: 0;
+    max-height: 0;
+    min-height: 0;
+    opacity: 0;
+    overflow: hidden;
 }
 
 .layout-sort-controls {
@@ -36,16 +39,7 @@
     flex-direction: row;
     align-items: center;
     gap: var(--panel-space-12);
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: var(--panel-border-radius);
     padding: var(--panel-space-6) var(--panel-space-12);
-    backdrop-filter: blur(4px);
-    transition: opacity var(--panel-transition), transform var(--panel-transition);
-}
-
-.layout-sort-controls.hidden {
-    display: none;
 }
 
 .layout-sort-control-group {

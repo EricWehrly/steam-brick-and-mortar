@@ -59,6 +59,12 @@ We will create component styles for:
 ## Phase C — Migrate Existing Panels (Incremental Roadmap)
 **Goal**: Replace inline styles and bespoke CSS in each existing panel with the shared component classes from Phase B. 
 
+### Visual Validation Pattern (required for panel work)
+- Capture a targeted **before** screenshot for the panel/region before changing styles.
+- Capture a matching **after** screenshot using the same selector after changes.
+- Use `client/test/visual/screenshot.spec.ts` with `PLAYWRIGHT_SCREENSHOT_NAME` and `PLAYWRIGHT_SCREENSHOT_SELECTOR`.
+- Keep results under `client/test-results/` (auto-archived in `client/test-results/archive/`).
+
 **Order of Migration** (Working from most standalone to most integrated):
 1. **Base Testing**: Convert one small panel first to test the utility classes. (e.g., `GraphicsSettingsPanel.ts`)
 2. **Settings / Debug**: `LightingControlsPanel.ts` and `LayoutControlPanel.ts`

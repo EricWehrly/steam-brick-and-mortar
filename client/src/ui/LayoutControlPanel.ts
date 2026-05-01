@@ -48,7 +48,9 @@ const SORT_OPTIONS = [
 // ─── LayoutControlPanel ───────────────────────────────────────────────────────
 
 export class LayoutControlPanel {
-    private toggleButton: HTMLElement | null = null
+    private panelContainer: HTMLElement | null = null
+    private panelContent: HTMLElement | null = null
+    private toggleIndicator: HTMLElement | null = null
     private controlsContainer: HTMLElement | null = null
     private layoutSelect: HTMLSelectElement | null = null
     private groupSelect: HTMLSelectElement | null = null
@@ -58,15 +60,14 @@ export class LayoutControlPanel {
     private activeGroupKey: GroupMode = GroupModes.ByRecency
     private activeSortKey: SortMode = SortModes.ByLastPlayed
 
-    private isControlsVisible = true
+    private isControlsVisible = false
     private keyboardHandler: ((e: KeyboardEvent) => void) | null = null
 
     constructor() {}
 
     public init(): void {
         const slot = document.getElementById('ui-right-center-group') ?? document.body
-        this.createControls(slot)
-        this.createToggleButton(slot)
+        this.createPanel(slot)
         this.registerKeyboardHandler()
         EventManager.getInstance().registerEventHandler(
             GameEventTypes.AllBatchesComplete,
@@ -88,20 +89,26 @@ export class LayoutControlPanel {
         this.setControlsEnabled(true)
     }
 
-    // ─── Toggle button ─────────────────────────────────────────────────────────
-
-    private createToggleButton(parentSlot: HTMLElement): void {
-        this.toggleButton = document.createElement('button')
-        this.toggleButton.className = 'layout-sort-toggle-btn active'
-        this.toggleButton.title = 'Toggle controls (Shift+L)'
-        this.toggleButton.textContent = '⚏'
-        this.toggleButton.addEventListener('click', () => this.toggleControlsVisibility())
-        parentSlot.appendChild(this.toggleButton)
-    }
-
     // ─── Controls container ────────────────────────────────────────────────────
 
-    private createControls(parentSlot: HTMLElement): void {
+    private createPanel(parentSlot: HTMLElement): void {
+        this.panelContainer = document.createElement('div')
+        this.panelContainer.className = 'ui-panel layout-sort-panel horizontally-collapsed'
+
+        const header = document.createElement('div')
+        header.className = 'panel-header clickable-header'
+        header.id = 'layout-sort-panel-header'
+        header.innerHTML = `
+            <h3><span class="layout-icon" aria-hidden="true">⊞</span><span class="panel-title">Layout</span></h3>
+            <div class="header-controls">
+                <span class="toggle-indicator" id="layout-sort-toggle-indicator">▶</span>
+            </div>
+        `
+        header.addEventListener('click', () => this.toggleControlsVisibility())
+
+        this.panelContent = document.createElement('div')
+        this.panelContent.className = 'panel-content collapsed'
+
         this.controlsContainer = document.createElement('div')
         this.controlsContainer.className = 'layout-sort-controls'
 
@@ -111,7 +118,12 @@ export class LayoutControlPanel {
         this.controlsContainer.appendChild(this.buildDivider())
         this.controlsContainer.appendChild(this.buildSortGroup())
 
-        parentSlot.appendChild(this.controlsContainer)
+        this.panelContent.appendChild(this.controlsContainer)
+        this.panelContainer.appendChild(header)
+        this.panelContainer.appendChild(this.panelContent)
+        this.toggleIndicator = header.querySelector('#layout-sort-toggle-indicator')
+
+        parentSlot.appendChild(this.panelContainer)
     }
 
     private buildDivider(): HTMLElement {
@@ -243,8 +255,11 @@ export class LayoutControlPanel {
 
     private toggleControlsVisibility(): void {
         this.isControlsVisible = !this.isControlsVisible
-        this.controlsContainer?.classList.toggle('hidden', !this.isControlsVisible)
-        this.toggleButton?.classList.toggle('active', this.isControlsVisible)
+        this.panelContent?.classList.toggle('collapsed', !this.isControlsVisible)
+        this.panelContainer?.classList.toggle('horizontally-collapsed', !this.isControlsVisible)
+        if (this.toggleIndicator) {
+            this.toggleIndicator.textContent = this.isControlsVisible ? '▼' : '▶'
+        }
     }
 
     private registerKeyboardHandler(): void {
@@ -260,7 +275,6 @@ export class LayoutControlPanel {
             document.removeEventListener('keydown', this.keyboardHandler)
             this.keyboardHandler = null
         }
-        this.controlsContainer?.remove()
-        this.toggleButton?.remove()
+        this.panelContainer?.remove()
     }
 }
