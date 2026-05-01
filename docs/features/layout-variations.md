@@ -107,3 +107,22 @@ Landed in PR #81 (`openclaw/feat-stock-strategy`). `IStockStrategy` in `StockStr
 - Dynamic switching requires shelves to be repositionable - check whether current `ShelfRenderer`/`InstancedShelfRenderer` supports in-place position updates or needs rebuild
 - The spoke/aisle arrangement (4-6 day estimate) from the Encore list is a natural candidate for pull-forward once two shapes are working
 - Layout grouping is related to `ShelfSectionPlanner` - section boundaries may need to be aware of group limits
+
+## Aisles + Clustering Sequence (Intermission Plan)
+
+To support both central aisles and upcoming row clustering without rework, treat this as a two-branch sequence:
+
+### Branch A (current): Aisle-capable geometry
+
+- Add a central aisle seam to each layout family:
+- Rows: split each row into left/right shelf blocks with a clean center corridor.
+- Arcs: interrupt each ring at the center corridor and cluster shelves before/after the aisle opening.
+- Spokes: rotate spokes so lanes avoid the aisle axis by default.
+- Add aisle-edge sign anchors where row shelf runs terminate at the aisle opening.
+
+### Branch B (next): Cluster-aware section assignment
+
+- Move section-to-shelf assignment from strict linear fill toward layout-directed packing.
+- Support balancing scenarios like `6` shelves on one side and `2+4` on the other.
+- Preserve aisle seams while allowing grouped section blocks per side.
+- Keep this as a section-allocation layer so geometry code remains stable.
