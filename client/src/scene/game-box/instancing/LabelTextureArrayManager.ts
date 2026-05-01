@@ -9,7 +9,9 @@
  */
 
 import * as THREE from 'three'
+import { EventManager } from '../../../core/EventManager'
 import { DataManager } from '../../../core/data/DataManager'
+import { GameRenderEventTypes, type PlacementRunResetRequestedEvent } from '../../../types/InteractionEvents'
 import { ManagedTextureArray } from './ManagedTextureArray'
 
 export class LabelTextureArrayManager {
@@ -21,6 +23,7 @@ export class LabelTextureArrayManager {
     // Shared canvas for text rendering — created once, reused per label
     private readonly sharedCanvas: HTMLCanvasElement
     private readonly sharedContext: CanvasRenderingContext2D
+    private readonly boundHandlePlacementRunResetRequested: (event: CustomEvent<PlacementRunResetRequestedEvent>) => void
 
     constructor(textureSize: number = 128, maxTextures: number = 256) {
         this.textureSize = textureSize
@@ -41,6 +44,12 @@ export class LabelTextureArrayManager {
 
         const vramMB = Math.round((textureSize * textureSize * this.maxTextureCapacity * 4) / (1024 * 1024))
         DataManager.getInstance().addMemoryConsumption('Labels/textureArray', vramMB)
+
+        this.boundHandlePlacementRunResetRequested = this.resetForPlacementRun.bind(this)
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            this.boundHandlePlacementRunResetRequested
+        )
 
         console.debug(`📦 [LabelTextureArrayManager] Initialized with texture size: ${textureSize}x${textureSize}, max: ${this.maxTextureCapacity}`)
     }
@@ -78,10 +87,6 @@ export class LabelTextureArrayManager {
         return index
     }
 
-    /**
-     * Flush pending texture updates to the GPU.
-     * Call once after adding a batch of labels.
-     */
     public flushToGpu(): void {
         this.managedArray.flushPendingToGpu()
     }
@@ -125,12 +130,14 @@ export class LabelTextureArrayManager {
     }
 
     public dispose(): void {
+        EventManager.getInstance().deregisterEventHandler(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            this.boundHandlePlacementRunResetRequested
+        )
         this.managedArray.dispose()
         DataManager.getInstance().removeMemoryConsumption('Labels/textureArray')
         console.log('🗑️ [LabelTextureArrayManager] Disposed')
     }
-
-    // ── Private ────────────────────────────────────────────────────────────────
 
     private drawTextLabel(ctx: CanvasRenderingContext2D, text: string, size: number): void {
         // Background
@@ -211,5 +218,9 @@ export class LabelTextureArrayManager {
         console.log(
             `📦 [LabelTextureArrayManager] ${reason}: ${oldDepth} → ${newDepth} slots (${direction}${deltaMB}MB est.)`
         )
+    }
+
+    private resetForPlacementRun(_event: CustomEvent<PlacementRunResetRequestedEvent>): void {
+        this.nextTextureIndex = 0
     }
 }

@@ -33,7 +33,7 @@ interface ShelfPosition {
 export class GameBoxSpawner {
     private static readonly logger = Logger.createLogFunctions(GameBoxSpawner.name)
     private static readonly GAME_BOX_INSTANCE_LIMIT = 2000
-    private static readonly LABEL_BOX_INSTANCE_LIMIT = 200
+    private static readonly LABEL_BOX_INSTANCE_LIMIT = 512
 
     private renderer: GpuGameBoxRenderer | null = null
     private shelfPositions: Map<number, ShelfPosition> = new Map()
@@ -206,7 +206,6 @@ export class GameBoxSpawner {
 
         const placementRunId = ++this.placementRunSequence
         const totalGames = sections.reduce((sum, sectionEntry) => sum + sectionEntry.section.games.length, 0)
-
         GameBoxSpawner.logger.info(
             `Placement run ${placementRunId}: sections=${sections.length}, ` +
             `games=${totalGames}, shelves=${totalSectionShelves}`
