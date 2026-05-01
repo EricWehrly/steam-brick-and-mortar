@@ -1,0 +1,53 @@
+#panel-controls .control-list {
+    display: grid;
+    gap: 10px;
+}
+
+#panel-controls .control-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: #2a2a2a;
+    border-radius: 6px;
+    border-left: 3px solid transparent;
+}
+
+#panel-controls .control-item.selected {
+    border-left-color: #00aaff;
+}
+
+#panel-controls .control-key {
+    background: #444;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 60px;
+    text-align: center;
+}
+
+#panel-controls .control-desc {
+    font-size: 13px;
+    flex: 1;
+    margin-left: 15px;
+}
+
+#panel-controls .help-text {
+    line-height: 1.5;
+}
+
+#panel-controls .help-text p {
+    margin: 0 0 15px 0;
+    font-size: 13px;
+}
+
+#panel-controls .help-text p:last-child {
+    margin-bottom: 0;
+}
+
+#panel-controls .help-text strong {
+    color: #fff;
+}

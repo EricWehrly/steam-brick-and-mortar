@@ -154,6 +154,16 @@
 
 /* ===== SHARED LAYOUTS ===== */
 
+/* Shared section label styling for pause menu panels. */
+.pause-menu-panel h4 {
+    margin: 0 0 10px 0;
+    color: var(--panel-text-muted, #8f98a0);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
 /* Stat item layout (used in multiple panels) */
 .stat-item {
     display: flex;
