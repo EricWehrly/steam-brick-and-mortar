@@ -9,12 +9,7 @@
     overflow-y: auto;
 }
 
-.settings-section {
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid var(--pause-border);
-    border-radius: 6px;
-    padding: 1rem;
-}
+/* .settings-section layout handled by shared .panel-card alias in shared-components */
 
 .setting-row {
     display: flex;
