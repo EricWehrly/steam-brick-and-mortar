@@ -10,11 +10,14 @@
  * on construction, and reset() also clears it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import * as THREE from 'three'
 import { DataKey } from '../../../../../src/core/data/DataTypes'
+import { GameRenderEventTypes } from '../../../../../src/types/InteractionEvents'
 
 // ---- mocks ----
 
 const mockStore = new Map<string, unknown>()
+const mockHandlers = new Map<string, Array<(event: CustomEvent<unknown>) => void>>()
 
 vi.mock('../../../../../src/core/data/DataManager', () => ({
     DataManager: {
@@ -28,8 +31,32 @@ vi.mock('../../../../../src/core/data/DataManager', () => ({
     DataDomain: { Renderer: 'renderer' },
 }))
 
-vi.mock('../../../core/EventManager', () => ({
-    EventManager: { getInstance: () => ({ registerEventHandler: vi.fn() }) },
+vi.mock('../../../../../src/core/EventManager', () => ({
+    EventManager: {
+        getInstance: () => ({
+            registerEventHandler: vi.fn((eventType: string, handler: (event: CustomEvent<unknown>) => void) => {
+                const handlers = mockHandlers.get(eventType) ?? []
+                handlers.push(handler)
+                mockHandlers.set(eventType, handlers)
+            }),
+            deregisterEventHandler: vi.fn((eventType: string, handler: (event: CustomEvent<unknown>) => void) => {
+                const handlers = mockHandlers.get(eventType)
+                if (!handlers) return
+                const nextHandlers = handlers.filter((h) => h !== handler)
+                if (nextHandlers.length === 0) {
+                    mockHandlers.delete(eventType)
+                    return
+                }
+                mockHandlers.set(eventType, nextHandlers)
+            }),
+            emit: vi.fn((eventType: string, detail: unknown) => {
+                const handlers = mockHandlers.get(eventType) ?? []
+                for (const handler of handlers) {
+                    handler({ detail } as CustomEvent<unknown>)
+                }
+            }),
+        }),
+    },
 }))
 
 vi.mock('../../../core/AppSettings', () => ({
@@ -60,6 +87,7 @@ vi.mock('three', async () => {
 
 beforeEach(() => {
     mockStore.clear()
+    mockHandlers.clear()
 })
 
 import { InstancedLabelRenderer } from '../../../../../src/scene/game-box/instancing/InstancedLabelRenderer'
@@ -82,5 +110,44 @@ describe('InstancedLabelRenderer metadata lifecycle', () => {
         const map = mockStore.get(DataKey.InstancedLabelMetadata) as Map<unknown, unknown>
         expect(map).not.toBe(staleMap)   // must be a new map object
         expect(map.size).toBe(0)          // must be empty
+    })
+
+    it('updates visible instance count immediately when placing a label', () => {
+        const renderer = new InstancedLabelRenderer({ maxInstances: 10 })
+
+        const added = renderer.addLabelInstance(
+            new THREE.Vector3(1, 2, 3),
+            'Test Game',
+            123
+        )
+
+        expect(added).toBe(true)
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const meshCount = ((renderer as any).instancedMesh?.count ?? -1)
+        expect(meshCount).toBe(1)
+    })
+
+    it('restores label capacity on placement run reset', () => {
+        const renderer = new InstancedLabelRenderer({ maxInstances: 4 })
+
+        const pos = new THREE.Vector3(0, 0, 0)
+        expect(renderer.addLabelInstance(pos, 'A', 1)).toBe(true)
+        expect(renderer.addLabelInstance(pos, 'B', 2)).toBe(true)
+        expect(renderer.addLabelInstance(pos, 'C', 3)).toBe(true)
+        expect(renderer.addLabelInstance(pos, 'D', 4)).toBe(true)
+        expect(renderer.addLabelInstance(pos, 'E', 5)).toBe(false)
+
+        const resetHandlers = mockHandlers.get(GameRenderEventTypes.PlacementRunResetRequested)
+        expect(resetHandlers?.length).toBeGreaterThan(0)
+        for (const handler of resetHandlers ?? []) {
+            handler({ detail: {} } as CustomEvent<unknown>)
+        }
+
+        expect(renderer.addLabelInstance(pos, 'E', 5)).toBe(true)
+        expect(renderer.addLabelInstance(pos, 'F', 6)).toBe(true)
+        expect(renderer.addLabelInstance(pos, 'G', 7)).toBe(true)
+        expect(renderer.addLabelInstance(pos, 'H', 8)).toBe(true)
+        expect(renderer.addLabelInstance(pos, 'I', 9)).toBe(false)
     })
 })

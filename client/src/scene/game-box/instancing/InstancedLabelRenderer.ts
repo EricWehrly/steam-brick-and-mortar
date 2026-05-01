@@ -34,6 +34,7 @@ export class InstancedLabelRenderer {
     private isInitialized: boolean = false
     private nextInstanceIndex: number = 0
     private gameNameToTextureIndex: Map<string, number> = new Map()
+    private readonly labelMetadata = new Map<number, { name: string; appid?: number; position: THREE.Vector3 }>()
 
     private readonly boundHandleSomeBatchesComplete: (event: CustomEvent<SomeBatchesCompleteEvent>) => void
     private readonly boundHandleArtworkSettled: () => void
@@ -69,7 +70,7 @@ export class InstancedLabelRenderer {
         // must be self-sufficient in case dispose() wasn't called cleanly).
         DataManager.getInstance().set(
             DataKey.InstancedLabelMetadata,
-            new Map<number, { name: string; appid?: number; position: THREE.Vector3 }>(),
+            this.labelMetadata,
             { domain: DataDomain.Renderer }
         )
 
@@ -122,6 +123,14 @@ export class InstancedLabelRenderer {
 
         this.currentCount = Math.max(this.currentCount, index + 1)
 
+        // Arrangement changes can place labels without emitting SomeBatchesComplete.
+        // Keep instance buffers visible immediately so labels don't disappear until
+        // a later batch event happens to flush GPU state.
+        this.instancedMesh.instanceMatrix.needsUpdate = true
+        this.instancedMesh.count = this.currentCount
+        this.instancedMesh.boundingSphere = null
+        textureIndices.needsUpdate = true
+
         this.storeLabelMetadata(index, gameName, position, appid)
 
         return true
@@ -167,17 +176,10 @@ export class InstancedLabelRenderer {
         this.textureArrayManager.dispose()
 
         this.gameNameToTextureIndex.clear()
+        this.labelMetadata.clear()
         this.isInitialized = false
         this.currentCount = 0
         this.nextInstanceIndex = 0
-
-        // Clear metadata so a new renderer instance doesn't inherit stale instanceId → game
-        // entries, which would cause wrong-game-on-click after reload.
-        DataManager.getInstance().set(
-            DataKey.InstancedLabelMetadata,
-            new Map<number, { name: string; position: THREE.Vector3 }>(),
-            { domain: DataDomain.Renderer }
-        )
 
         console.debug('✅ InstancedLabelRenderer disposed')
     }
@@ -221,15 +223,7 @@ export class InstancedLabelRenderer {
     }
 
     private storeLabelMetadata(index: number, gameName: string, position: THREE.Vector3, appid?: number): void {
-        const dataManager = DataManager.getInstance()
-        let metadata = dataManager.get<Map<number, { name: string; appid?: number; position: THREE.Vector3 }>>(DataKey.InstancedLabelMetadata)
-
-        if (!metadata) {
-            metadata = new Map()
-            dataManager.set(DataKey.InstancedLabelMetadata, metadata, { domain: DataDomain.Renderer })
-        }
-
-        metadata.set(index, { name: gameName, appid, position: position.clone() })
+        this.labelMetadata.set(index, { name: gameName, appid, position: position.clone() })
     }
 
     private handleSomeBatchesComplete(_event: CustomEvent<SomeBatchesCompleteEvent>): void {
@@ -248,9 +242,22 @@ export class InstancedLabelRenderer {
     private handlePlacementRunResetRequested(_event: CustomEvent<PlacementRunResetRequestedEvent>): void {
         this.currentCount = 0
         this.nextInstanceIndex = 0
+        this.gameNameToTextureIndex.clear()
+        this.labelMetadata.clear()
+
+        DataManager.getInstance().set(
+            DataKey.InstancedLabelMetadata,
+            this.labelMetadata,
+            { domain: DataDomain.Renderer }
+        )
+
         if (this.instancedMesh) {
             this.instancedMesh.count = 0
+            this.instancedMesh.instanceMatrix.needsUpdate = true
+            this.instancedMesh.boundingSphere = null
         }
+        const textureIndices = this.geometry?.getAttribute('textureIndex')
+        if (textureIndices) textureIndices.needsUpdate = true
     }
 
     private createLabelMaterial(textureArray: THREE.DataArrayTexture): THREE.ShaderMaterial {
