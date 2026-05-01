@@ -50,7 +50,9 @@ import { ArtworkPrefetchCoordinator } from '../spawning/ArtworkPrefetchCoordinat
 import { Logger } from '../../utils/Logger'
 import { EventManager } from '../../core/EventManager'
 import {
+    GameEventTypes,
     GameRenderEventTypes,
+    type PlacementRunResetRequestedEvent,
     type PlacementResolvedEvent,
 } from '../../types/InteractionEvents'
 
@@ -61,7 +63,12 @@ export class GpuGameBoxRenderer {
     private readonly lodArtworkRenderer: IGameArtworkPipeline
     private readonly renderIntentCoordinator: RenderIntentCoordinator
     private readonly artworkPrefetchCoordinator: ArtworkPrefetchCoordinator
+    private readonly boundHandleArtworkSettled: (event: CustomEvent<unknown>) => void
     private readonly boundHandlePlacementResolved: (event: CustomEvent<PlacementResolvedEvent>) => void
+    private readonly boundHandlePlacementRunResetRequested: (event: CustomEvent<PlacementRunResetRequestedEvent>) => void
+    private resolvedArtworkPlacements = 0
+    private resolvedLabelPlacements = 0
+    private failedLabelPlacements = 0
 
     constructor(
         textureCapacity: number,
@@ -72,11 +79,21 @@ export class GpuGameBoxRenderer {
         this.lodArtworkRenderer = LodArtworkOrchestratorDebug.fromAppSettings(textureCapacity, placementCapacity)
         this.renderIntentCoordinator = new RenderIntentCoordinator()
         this.artworkPrefetchCoordinator = new ArtworkPrefetchCoordinator({ renderer: this })
+        this.boundHandleArtworkSettled = this.handleArtworkSettled.bind(this)
         this.boundHandlePlacementResolved = this.handlePlacementResolved.bind(this)
+        this.boundHandlePlacementRunResetRequested = this.handlePlacementRunResetRequested.bind(this)
 
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.ArtworkSettled,
+            this.boundHandleArtworkSettled
+        )
         EventManager.getInstance().registerEventHandler(
             GameRenderEventTypes.PlacementResolved,
             this.boundHandlePlacementResolved
+        )
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            this.boundHandlePlacementRunResetRequested
         )
 
         GpuGameBoxRenderer.logger.lifecycle(
@@ -88,6 +105,16 @@ export class GpuGameBoxRenderer {
     private handlePlacementResolved(event: CustomEvent<PlacementResolvedEvent>): void {
         const { game, position, rotation } = event.detail
         this.placeResolvedGame(game, position, rotation)
+    }
+
+    private handleArtworkSettled(_event: CustomEvent<unknown>): void {
+        this.logRunSummary()
+    }
+
+    private handlePlacementRunResetRequested(event: CustomEvent<PlacementRunResetRequestedEvent>): void {
+        this.resolvedArtworkPlacements = 0
+        this.resolvedLabelPlacements = 0
+        this.failedLabelPlacements = 0
     }
 
     /**
@@ -112,7 +139,11 @@ export class GpuGameBoxRenderer {
     ): void {
         const appid = typeof game.appid === 'number' ? game.appid : 0
         const instanceIndex = this.lodArtworkRenderer.placeInstance(appid, game.name, position, rotation)
-        if (instanceIndex >= 0) return
+        if (instanceIndex >= 0) {
+            this.resolvedArtworkPlacements++
+            return
+        }
+
         // Atlas miss — fall through to label
         this.placeLabelBox(game, position, rotation)
     }
@@ -134,7 +165,11 @@ export class GpuGameBoxRenderer {
             typeof game.appid === 'number' ? game.appid : undefined,
             rotation
         )
+        if (success) {
+            this.resolvedLabelPlacements++
+        }
         if (!success) {
+            this.failedLabelPlacements++
             GpuGameBoxRenderer.logger.warn(`Failed to add label box for "${game.name}" (label instance limit reached?)`)
         }
     }
@@ -142,14 +177,34 @@ export class GpuGameBoxRenderer {
     public dispose(): void {
         GpuGameBoxRenderer.logger.lifecycle('Disposing')
         EventManager.getInstance().deregisterEventHandler(
+            GameEventTypes.ArtworkSettled,
+            this.boundHandleArtworkSettled
+        )
+        EventManager.getInstance().deregisterEventHandler(
             GameRenderEventTypes.PlacementResolved,
             this.boundHandlePlacementResolved
+        )
+        EventManager.getInstance().deregisterEventHandler(
+            GameRenderEventTypes.PlacementRunResetRequested,
+            this.boundHandlePlacementRunResetRequested
         )
         this.renderIntentCoordinator.dispose()
         this.artworkPrefetchCoordinator.dispose()
         this.instancedLabelRenderer.dispose()
         this.lodArtworkRenderer.dispose()
         GpuGameBoxRenderer.logger.lifecycle('Disposed')
+    }
+
+    private logRunSummary(): void {
+        const placed = this.resolvedArtworkPlacements + this.resolvedLabelPlacements
+        if (placed === 0 && this.failedLabelPlacements === 0) {
+            return
+        }
+
+        GpuGameBoxRenderer.logger.info(
+            `Placement complete: placed=${placed}, artwork=${this.resolvedArtworkPlacements}, ` +
+            `labels=${this.resolvedLabelPlacements}, labelFailures=${this.failedLabelPlacements}`
+        )
     }
 }
 

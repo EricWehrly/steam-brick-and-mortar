@@ -121,14 +121,14 @@ describe('GpuGameBoxRenderer', () => {
         expect(mockAddLabelInstance).toHaveBeenCalledTimes(1)
     })
 
-    it('does not subscribe directly to PlacementRunResetRequested', () => {
+    it('subscribes directly to PlacementRunResetRequested for run counters', () => {
         const resetRegistrations = mockRegisterEventHandler.mock.calls.filter(
             (call: unknown[]) => call[0] === GameRenderEventTypes.PlacementRunResetRequested
         )
         const rendererOwnedRegistration = resetRegistrations.find(
             (call: unknown[]) => String((call[1] as Function)?.name ?? '').includes('handlePlacementRunResetRequested')
         )
-        expect(rendererOwnedRegistration).toBeFalsy()
+        expect(rendererOwnedRegistration).toBeTruthy()
     })
 
     it('dispose: disposes both renderers', () => {
