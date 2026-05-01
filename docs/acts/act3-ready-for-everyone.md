@@ -15,6 +15,10 @@
 - [Legal / Privacy Compliance](../features/legal-privacy-compliance.md) — privacy policy, user consent, GDPR/CCPA
 - [Production Infrastructure](../features/production-infrastructure.md) — auto-scaling, security hardening, DDoS protection, ops readiness
 
+## Also In Act 3 (Best Effort)
+
+- **Front glass wall door interaction** — add a visible front-door handle on the glass wall; selecting the handle prompts a confirm dialog ("Are you sure?") and closes the store tab/window on confirmation.
+
 ## Completion Criteria
 
 - Complete privacy policy and user consent management
