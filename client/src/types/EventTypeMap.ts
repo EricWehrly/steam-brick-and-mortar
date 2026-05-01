@@ -16,10 +16,8 @@ import type {
     SteamCacheClearEvent,
     SteamCacheStatsEvent,
     SteamImageCacheClearEvent,
-    SteamDevModeToggleEvent,
     SteamDataLoadedEvent,
     SteamLibraryManifestReadyEvent,
-    SteamGameLoadedEvent,
     SteamGamesBatchEvent,
     SteamNetworkFetchProgressEvent,
     WebXREventTypes,
@@ -47,7 +45,7 @@ import type {
     GameLoadingPhaseChangedEvent,
     GameLoadingProgressEvent,
 } from './InteractionEvents'
-import type { AllBatchesCompleteEvent, GameDataReadyEvent, LayoutChangedEvent, SomeBatchesCompleteEvent, ArrangementRequestedEvent, SectionsReadyEvent, SectionsComputedEvent, SectionsReadyForPlacementEvent } from './EnvironmentEvents'
+import type { AllBatchesCompleteEvent, GameDataReadyEvent, SomeBatchesCompleteEvent, ArrangementRequestedEvent, SectionsReadyEvent, SectionsComputedEvent, SectionsReadyForPlacementEvent } from './EnvironmentEvents'
 
 export interface InteractionEventMap {
     // Steam events
@@ -55,12 +53,10 @@ export interface InteractionEventMap {
     [SteamEventTypes.CacheClear]: SteamCacheClearEvent
     [SteamEventTypes.CacheStats]: SteamCacheStatsEvent
     [SteamEventTypes.ImageCacheClear]: SteamImageCacheClearEvent
-    [SteamEventTypes.DevModeToggle]: SteamDevModeToggleEvent
     // Integration/session signal (UI/cache refresh)
     [SteamEventTypes.DataLoaded]: SteamDataLoadedEvent
     // Immutable library membership seam (capacity sizing)
     [SteamEventTypes.LibraryManifestReady]: SteamLibraryManifestReadyEvent
-    [SteamEventTypes.GameLoaded]: SteamGameLoadedEvent
     [SteamEventTypes.GamesBatchReady]: SteamGamesBatchEvent
     [SteamEventTypes.NetworkFetchProgress]: SteamNetworkFetchProgressEvent
 
@@ -79,15 +75,12 @@ export interface InteractionEventMap {
     [UIEventTypes.MenuOpen]: MenuOpenEvent
     [UIEventTypes.MenuClose]: MenuCloseEvent
     [UIEventTypes.ImageCacheStatsRequest]: ImageCacheStatsRequestEvent
-    [UIEventTypes.SortRequested]: ArrangementRequestedEvent  // TD: remove SortRequested alias once LayoutControlPanel fully replaces LayoutSortPanel
     [UIEventTypes.ArrangementRequested]: ArrangementRequestedEvent
 
     // Game events
     [GameEventTypes.SceneReady]: SceneReadyEvent
     [GameEventTypes.Start]: GameStartEvent
     [GameEventTypes.ShelfLayoutDetermined]: ShelfLayoutDeterminedEvent
-    /** Reserved seam — no emitter yet. Wire behavior in relayout branch. */
-    [GameEventTypes.LayoutChanged]: LayoutChangedEvent
     [GameEventTypes.SomeBatchesComplete]: SomeBatchesCompleteEvent
 
     // Environment events (from EnvironmentEvents.ts)
