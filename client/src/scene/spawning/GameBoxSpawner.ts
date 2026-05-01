@@ -132,7 +132,10 @@ export class GameBoxSpawner {
     }
 
     private stagePlacementRunFromSections(detail: SectionsReadyForPlacementEvent): void {
-        this.resetPlacementStateForIncomingSections()
+        if (!this.layoutDeterminedSinceLastSections) {
+            this.clearPlacementState()
+        }
+
         this.pendingSections = detail
         this.layoutDeterminedSinceLastSections = false
         const totalGames = detail.sections.reduce((sum, sectionEntry) => sum + sectionEntry.section.games.length, 0)
@@ -140,16 +143,7 @@ export class GameBoxSpawner {
             `Placement staging: ${detail.sections.length} section(s), ${totalGames} game placements, ` +
             `layoutReady=${this.layoutReadyForPlacement}, shelvesKnown=${this.shelfPositions.size}`
         )
-        this.tryPlacementWhenLayoutReady()
-    }
-
-    private resetPlacementStateForIncomingSections(): void {
-        if (!this.layoutDeterminedSinceLastSections) {
-            this.clearPlacementState()
-        }
-    }
-
-    private tryPlacementWhenLayoutReady(): void {
+        
         if (this.layoutReadyForPlacement) {
             this.tryPlacePendingSections()
         }
