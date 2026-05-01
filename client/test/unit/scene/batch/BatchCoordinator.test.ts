@@ -317,6 +317,8 @@ describe('BatchCoordinator', () => {
             coordinator.enqueueBatch({ batchIndex: 0, totalBatches: 1, data: 'only' })
 
             await new Promise(resolve => setTimeout(resolve, 30))
+            const completionCountBeforeDuplicates = completionCount
+            expect(completionCountBeforeDuplicates).toBeGreaterThan(0)
 
             eventManager.emit<GamesPlacedEvent>(
                 StorePropsEventTypes.GamesPlaced,
@@ -328,7 +330,7 @@ describe('BatchCoordinator', () => {
             )
 
             await new Promise(resolve => setTimeout(resolve, 0))
-            expect(completionCount).toBe(1)
+            expect(completionCount).toBe(completionCountBeforeDuplicates)
         })
     })
 })

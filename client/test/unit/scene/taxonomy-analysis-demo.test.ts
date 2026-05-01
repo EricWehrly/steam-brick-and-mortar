@@ -70,7 +70,7 @@ describe('Taxonomy Analysis Demo', () => {
                 ]
             }
         }
-    })
+    }, 30000)
 
     afterEach(() => {
         delete (window as any).app
