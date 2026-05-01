@@ -40,10 +40,6 @@ export interface SteamImageCacheClearEvent extends BaseInteractionEvent {
     // No additional data needed
 }
 
-export interface SteamDevModeToggleEvent extends BaseInteractionEvent {
-    isEnabled: boolean
-}
-
 /**
  * Integration/session-level Steam load signal.
  *
@@ -55,7 +51,7 @@ export interface SteamDevModeToggleEvent extends BaseInteractionEvent {
  * - `GameEventTypes.GameDataReady` for definitions-ready grouping/sorting
  */
 export interface SteamDataLoadedEvent extends BaseInteractionEvent {
-    displayName?: string
+    userInput?: string
 }
 
 /**
@@ -67,10 +63,6 @@ export interface SteamDataLoadedEvent extends BaseInteractionEvent {
 export interface SteamLibraryManifestReadyEvent extends BaseInteractionEvent {
     userInput?: string
     totalGames: number
-}
-
-export interface SteamGameLoadedEvent extends BaseInteractionEvent {
-    game: Readonly<SteamGame>
 }
 
 export interface SteamGamesBatchEvent extends BaseInteractionEvent {
@@ -202,7 +194,7 @@ export interface ShelfLayoutDeterminedEvent extends BaseInteractionEvent {
     stockStrategy: IStockStrategy
 }
 
-// Moved to EnvironmentEvents.ts: LayoutChangedEvent, SomeBatchesCompleteEvent, AllBatchesCompleteEvent, GamesSortEvent
+// Moved to EnvironmentEvents.ts: SomeBatchesCompleteEvent, AllBatchesCompleteEvent
 
 export interface GameSelectedEvent extends BaseInteractionEvent {
     /** App ID of the selected game */
@@ -262,18 +254,15 @@ export const SteamEventTypes = {
     CacheClear: 'steam:cache-clear',
     CacheStats: 'steam:cache-stats',
     ImageCacheClear: 'steam:image-cache-clear',
-    DevModeToggle: 'steam:dev-mode-toggle',
     /** Session/integration signal (UI/cache panels), not pipeline readiness. */
     DataLoaded: 'steam:data-loaded',
     /** Immutable membership signal for a load run (appid set + counts). */
     LibraryManifestReady: 'steam:library-manifest-ready',
-    GameLoaded: 'steam:game-loaded',
     GamesBatchReady: 'steam:games-batch-ready',
     NetworkFetchProgress: 'steam:network-fetch-progress'
 } as const
 
 export const RoomEventTypes = {
-    CreateInitial: 'room:create-initial',
     Resize: 'room:resize',
     Created: 'room:created',
     Resized: 'room:resized'
@@ -297,7 +286,6 @@ export const UIEventTypes = {
     MenuOpen: 'ui:menu-open',
     MenuClose: 'ui:menu-close',
     ImageCacheStatsRequest: 'ui:image-cache-stats-request',
-    SortRequested: 'ui:sort-requested',  // TD: remove when LayoutControlPanel migration is complete
     ArrangementRequested: 'ui:arrangement-requested',
     LayoutRequested: 'ui:layout-requested',
 } as const
@@ -306,8 +294,6 @@ export const GameEventTypes = {
     SceneReady: 'game:scene-ready',
     Start: 'game:start',
     ShelfLayoutDetermined: 'game:shelf-layout-determined',
-    /** Reserved seam: emitted when an existing layout changes at runtime. No emitters yet. */
-    LayoutChanged: 'game:layout-changed',
     SomeBatchesComplete: 'game:some-batches-complete',
     AllBatchesComplete: 'game:all-batches-complete',
     /** Definitions-ready seam (steam.games committed), emitted by SteamIntegration. */
@@ -320,8 +306,6 @@ export const GameEventTypes = {
     ArtworkSettled: 'game:artwork-settled',
     /** Fired when a game is selected (e.g. clicked in scene) - opens detail panel */
     Selected: 'game:selected',
-    /** Fired after all batches complete; carries the sorted game list and bucket map. */
-    GamesSort: 'game:games-sort',
     /** Fired after grouping+sorting and before allocation; carries uncapped section topology. */
     SectionsComputed: 'game:sections-computed',
     /** Fired after grouping + sorting; carries sections ready for placement. */

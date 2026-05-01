@@ -7,7 +7,6 @@
  */
 
 import type { BaseInteractionEvent } from '../core/EventManager'
-import type { ShelfBounds } from './InteractionEvents'
 import type { Section, GroupMode, SortMode, LayoutMode } from './LayoutTypes'
 
 // Re-export GroupMode/SortMode/GroupModes/SortModes for consumers that import from here
@@ -98,21 +97,4 @@ export interface ArrangementRequestedEvent extends BaseInteractionEvent {
 
 export interface LayoutRequestedEvent extends BaseInteractionEvent {
     layoutMode: LayoutMode
-}
-
-/**
- * LayoutChangedEvent
- *
- * Fired when the shelf layout changes at runtime
- * (e.g. layout mode switch, scene reload). Consumers that care about relayout
- * (lighting, instanced renderers, sign placement) listen to this alongside
- * ShelfLayoutDetermined.
- *
- * Phase: reserved seam — no emitters exist yet. Wire behavior in the next branch.
- */
-export interface LayoutChangedEvent extends BaseInteractionEvent {
-    shelfBounds: ShelfBounds
-    shelfLayout: { rows: number; shelvesPerRow?: number }
-    /** Why the layout changed (for diagnostics / animation decisions). */
-    reason: 'reload' | 'mode-switch' | 'resize'
 }
