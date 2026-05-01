@@ -135,16 +135,14 @@ class StorePropsCoordinator {
     }
 
     private handleArrangementRequested(): void {
-        this.instancedShelfRenderer?.reset()
         this.lastTotalBatches = 0
-        StorePropsCoordinator.logger.info('Store props cleared for arrangement change')
+        StorePropsCoordinator.logger.info('Store props ready for arrangement change (reset will be handled by placement-run event)')
     }
 
     private handleLibraryReloadRequest(_event: CustomEvent<StorePropsLibraryReloadRequestEvent>): void {
-        // New library/user profile incoming: reset GPU-owned shelf state.
-        this.instancedShelfRenderer?.reset()
+        // New library/user profile incoming: GPU-owned shelf state will be reset via placement-run event
         this.lastTotalBatches = 0
-        StorePropsCoordinator.logger.info('Store props cleared for library reload')
+        StorePropsCoordinator.logger.info('Store props ready for library reload (reset will be handled by placement-run event)')
     }
 
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
@@ -152,9 +150,8 @@ class StorePropsCoordinator {
 
         if (this.lastTotalBatches > 0 && totalBatches !== this.lastTotalBatches) {
             StorePropsCoordinator.logger.debug(
-                `Batch count changed (${this.lastTotalBatches} → ${totalBatches}) - resetting shelf renderer`
+                `Batch count changed (${this.lastTotalBatches} → ${totalBatches}) - shelf reset will happen via placement-run event`
             )
-            this.instancedShelfRenderer?.reset()
         }
         this.lastTotalBatches = totalBatches
     }
