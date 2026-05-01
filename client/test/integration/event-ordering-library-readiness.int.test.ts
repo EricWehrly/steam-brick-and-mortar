@@ -9,6 +9,7 @@ import {
     SteamEventTypes,
     StorePropsEventTypes,
     GameEventTypes,
+    UIEventTypes,
     type SteamGamesBatchEvent,
     type SteamLibraryManifestReadyEvent,
     type GamesPlacedEvent,
@@ -217,5 +218,75 @@ describe('library readiness ordering integration', () => {
         expect(sectionIndices.has(0)).toBe(true)
         expect(sectionIndices.has(1)).toBe(false)
         expect(sectionIndices.has(2)).toBe(true)
+    })
+
+    it('emits shelf lifecycle events on first boot and after regroup rerun', async () => {
+        const initialGames = makeGames(5000, 36)
+        const regroupGames = makeGames(6000, 72)
+        const shelfReadyEvents: ShelfReadyEvent[] = []
+        eventManager.registerEventHandler(
+            StorePropsEventTypes.ShelfReady,
+            (event: CustomEvent<ShelfReadyEvent>) => shelfReadyEvents.push(event.detail)
+        )
+
+        eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+            totalGames: initialGames.length,
+        })
+
+        emitBatch(eventManager, 0, 1, initialGames)
+        emitSections(eventManager, {
+            sections: [
+                {
+                    name: 'Initial',
+                    games: initialGames as SteamGameData[],
+                    groupMode: 'none',
+                    sortMode: 'alphabetical',
+                },
+            ],
+            groupMode: 'none',
+            sortMode: 'alphabetical',
+        })
+
+        await vi.waitFor(() => {
+            expect(shelfReadyEvents.length).toBeGreaterThan(0)
+        }, { timeout: 8000, interval: 50 })
+
+        shelfReadyEvents.length = 0
+
+        eventManager.emit(UIEventTypes.ArrangementRequested, {
+            grouping: 'by-tag',
+            sortBy: 'alphabetical',
+        } as any)
+
+        eventManager.emit<SteamLibraryManifestReadyEvent>(SteamEventTypes.LibraryManifestReady, {
+            totalGames: regroupGames.length,
+        })
+        emitBatch(eventManager, 0, 1, regroupGames)
+        emitSections(eventManager, {
+            sections: [
+                {
+                    name: 'Regroup A',
+                    games: regroupGames.slice(0, 36) as SteamGameData[],
+                    groupMode: 'by-tag',
+                    sortMode: 'alphabetical',
+                },
+                {
+                    name: 'Regroup B',
+                    games: regroupGames.slice(36) as SteamGameData[],
+                    groupMode: 'by-tag',
+                    sortMode: 'alphabetical',
+                },
+            ],
+            groupMode: 'by-tag',
+            sortMode: 'alphabetical',
+        })
+
+        await vi.waitFor(() => {
+            expect(shelfReadyEvents.length).toBeGreaterThan(0)
+        }, { timeout: 8000, interval: 50 })
+
+        const sectionIndices = new Set(shelfReadyEvents.map((event) => event.sectionIndex))
+        expect(sectionIndices.has(0)).toBe(true)
+        expect(sectionIndices.has(1)).toBe(true)
     })
 })
