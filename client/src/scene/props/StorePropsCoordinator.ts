@@ -44,6 +44,7 @@ import { ShelfLayoutCoordinator } from '../shelves/ShelfLayoutCoordinator'
 import { InstancedShelfRenderer } from '../instancing/InstancedShelfRenderer'
 import { PropRenderer, type EntranceMatOptions } from '../PropRenderer'
 import { STORE_CENTER_AISLE_HALF_WIDTH_X } from './shared/ArcLayoutUtils'
+import { RoomConstants } from '../RoomManager'
 
 const ROW_CENTER_AISLE_WIDTH_X = 3.0
 const SPOKE_CENTER_RUNNER_WIDTH_X = 3.2
@@ -165,6 +166,11 @@ class StorePropsCoordinator {
 
     private async handleRoomResized(event: CustomEvent<RoomResizedEvent>): Promise<void> {
         const { dimensions } = event.detail
+        const roomWorldOffsetX = event.detail.centerOffset?.x ?? 0
+        const roomWorldOffsetY = event.detail.centerOffset?.y ?? 0
+        const roomWorldOffsetZ = event.detail.centerOffset
+            ? event.detail.centerOffset.z + RoomConstants.STORE_FRONT_OFFSET
+            : 0
 
         if (!this.scene) {
             this.scene = DataManager.getInstance().get<THREE.Scene>('core.mainScene')
@@ -178,7 +184,10 @@ class StorePropsCoordinator {
         // Guard: skip if dimensions haven't changed — avoids creating duplicate
         // PropRenderer instances and leaking materials on repeated room:resized events.
         if (this.entranceMat?.scale.x === dimensions.width &&
-            this.entranceMat.scale.z === dimensions.depth) {
+            this.entranceMat.scale.z === dimensions.depth &&
+            this.entranceMat.position.x === roomWorldOffsetX &&
+            this.entranceMat.position.y === roomWorldOffsetY &&
+            this.entranceMat.position.z === roomWorldOffsetZ) {
             StorePropsCoordinator.logger.debug('Room dimensions unchanged — skipping entrance mat recreation')
             return
         }
@@ -194,7 +203,7 @@ class StorePropsCoordinator {
             dimensions.depth,
             this.buildEntranceMatOptions(dimensions)
         )
-        this.entranceMat.position.set(0, 0, 0)
+        this.entranceMat.position.set(roomWorldOffsetX, roomWorldOffsetY, roomWorldOffsetZ)
         this.scene.add(this.entranceMat)
 
         StorePropsCoordinator.logger.debug('Entrance mat placed at origin')
