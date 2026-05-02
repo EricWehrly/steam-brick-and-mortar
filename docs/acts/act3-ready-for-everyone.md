@@ -17,6 +17,7 @@
 
 ## Also In Act 3 (Best Effort)
 
+- **Overhead row-hanging signage pass** — replace current in-store signs with hanging overhead signs between rows to improve navigability. Target double-sided sign faces and include a color swatch system (N colors, or at least two alternating colors) that matches shelving unit colors on the ground; likely needs shader updates to support driven sign/swatch color values.
 - **Front glass wall door interaction** — add a visible front-door handle on the glass wall; selecting the handle prompts a confirm dialog ("Are you sure?") and closes the store tab/window on confirmation.
 
 ## Completion Criteria
