@@ -107,18 +107,15 @@
         </p>
         <div class="setting-control">
           <label class="checkbox-container" style="margin-bottom: 0.75rem;">
-            <input type="checkbox" id="enable-lighting" {{#enableLighting}}checked{{/enableLighting}}>
-            <span class="checkbox-checkmark"></span>
+            <input type="checkbox" class="ui-checkbox" id="enable-lighting" {{#enableLighting}}checked{{/enableLighting}}>
             Enable Lighting (toggle lights on/off to compare lit vs unlit scene)
           </label>
           <label class="checkbox-container" style="margin-bottom: 0.75rem;">
-            <input type="checkbox" id="show-lighting-debug" {{#showLightingDebug}}checked{{/showLightingDebug}}>
-            <span class="checkbox-checkmark"></span>
+            <input type="checkbox" class="ui-checkbox" id="show-lighting-debug" {{#showLightingDebug}}checked{{/showLightingDebug}}>
             Show Red Debug Shapes (visualize where lights should affect the scene)
           </label>
           <label class="checkbox-container">
-            <input type="checkbox" id="show-ceiling" {{#showCeiling}}checked{{/showCeiling}}>
-            <span class="checkbox-checkmark"></span>
+            <input type="checkbox" class="ui-checkbox" id="show-ceiling" {{#showCeiling}}checked{{/showCeiling}}>
             Show Ceiling ("Hollywood Soundstage Mode" for debugging lights)
           </label>
         </div>
