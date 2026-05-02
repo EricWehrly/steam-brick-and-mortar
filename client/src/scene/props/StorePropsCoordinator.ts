@@ -43,11 +43,8 @@ import { DataManager } from '../../core/data'
 import { ShelfLayoutCoordinator } from '../shelves/ShelfLayoutCoordinator'
 import { InstancedShelfRenderer } from '../instancing/InstancedShelfRenderer'
 import { PropRenderer, type EntranceMatOptions } from '../PropRenderer'
-import { STORE_CENTER_AISLE_HALF_WIDTH_X } from './shared/ArcLayoutUtils'
+import { AISLE_WIDTH_X } from './shared/LayoutAisleWidths'
 import { RoomConstants } from '../RoomManager'
-
-const ROW_CENTER_AISLE_WIDTH_X = 3.0
-const SPOKE_CENTER_RUNNER_WIDTH_X = 3.2
 
 class StorePropsCoordinator {
     private static readonly logger = Logger.createLogFunctions(StorePropsCoordinator.name)
@@ -210,13 +207,7 @@ class StorePropsCoordinator {
     }
 
     private buildEntranceMatOptions(dimensions: { width: number; depth: number }): EntranceMatOptions {
-        const runnerWidthByLayout: Record<LayoutMode, number> = {
-            arc: STORE_CENTER_AISLE_HALF_WIDTH_X * 2,
-            row: ROW_CENTER_AISLE_WIDTH_X,
-            spoke: SPOKE_CENTER_RUNNER_WIDTH_X,
-        }
-
-        const runnerWidth = runnerWidthByLayout[this.activeLayoutMode] ?? ROW_CENTER_AISLE_WIDTH_X
+        const runnerWidth = AISLE_WIDTH_X
         const runnerDepth = Math.max(4.5, dimensions.depth * 0.92)
 
         return {

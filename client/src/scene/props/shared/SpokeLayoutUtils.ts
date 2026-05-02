@@ -27,6 +27,7 @@ import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
 import type { StockSurface } from '../../../types/LayoutTypes'
 import type { ISectionAwareLayoutDefinition } from './ILayoutDefinition'
 import type { ShelfInfo, SectionShelfInfo, Section } from '../../../types/LayoutTypes'
+import { AISLE_HALF_WIDTH_X } from './LayoutAisleWidths'
 
 /**
  * SpokeStockStrategy
@@ -55,8 +56,8 @@ export interface SpokeLayoutConfig {
     firstSpokeAngleOffset?: number
     /**
      * When true, default spoke angles avoid the central aisle axis (X=0 corridor)
-     * by centering spoke gaps on the +Z/-Z axis. Explicit firstSpokeAngleOffset wins.
-     * Default: true.
+        * by centering spoke gaps on the +Z/-Z axis. Explicit firstSpokeAngleOffset wins.
+        * Default: derived from centerRunnerHalfWidthX > 0.
      */
     avoidCentralAisleAxis?: boolean
     /**
@@ -87,15 +88,22 @@ export interface SpokeLayoutConfig {
     centerRunnerHalfWidthX?: number
 }
 
+const DEFAULT_SPOKE_COUNT = 4
+const DEFAULT_FIRST_SPOKE_ANGLE_OFFSET = -Math.PI / 2 + Math.PI / 8
+const DEFAULT_HUB_CLEARANCE_METRES = 4
+const DEFAULT_SHELVES_PER_SPOKE = 6
+const DEFAULT_SHELF_SPACING_METRES = 2.5
+const DEFAULT_AISLE_HALF_WIDTH_METRES = 1.8
+
 const SPOKE_DEFAULTS: Required<SpokeLayoutConfig> = {
-    spokeCount: 4,
-    firstSpokeAngleOffset: -Math.PI / 2 + Math.PI / 8, // 22.5° bias off cardinal axes
+    spokeCount: DEFAULT_SPOKE_COUNT,
+    firstSpokeAngleOffset: DEFAULT_FIRST_SPOKE_ANGLE_OFFSET,
     avoidCentralAisleAxis: true,
-    hubClearanceMetres: 4,
-    shelvesPerSpoke: 6,
-    shelfSpacingMetres: 2.5,
-    aisleHalfWidthMetres: 1.8,
-    centerRunnerHalfWidthX: 1.6,
+    hubClearanceMetres: DEFAULT_HUB_CLEARANCE_METRES,
+    shelvesPerSpoke: DEFAULT_SHELVES_PER_SPOKE,
+    shelfSpacingMetres: DEFAULT_SHELF_SPACING_METRES,
+    aisleHalfWidthMetres: DEFAULT_AISLE_HALF_WIDTH_METRES,
+    centerRunnerHalfWidthX: AISLE_HALF_WIDTH_X,
 }
 
 const DEFAULT_SHELF_HALF_WIDTH_X = 1.0
@@ -128,7 +136,10 @@ function deriveFirstSpokeAngleOffset(config: SpokeLayoutConfig, spokeCount: numb
         return config.firstSpokeAngleOffset
     }
 
-    if (!config.avoidCentralAisleAxis && config.avoidCentralAisleAxis !== undefined) {
+    const shouldAvoidCentralAisleAxis = config.avoidCentralAisleAxis
+        ?? (config.centerRunnerHalfWidthX ?? 0) > 0
+
+    if (!shouldAvoidCentralAisleAxis) {
         return SPOKE_DEFAULTS.firstSpokeAngleOffset
     }
 
@@ -259,6 +270,7 @@ function computeSpokeShelvesByTotal(totalShelves: number): ShelfInfo[] {
         computeSpokeShelfLayout({
             spokeCount: defaultSpokeCount,
             shelvesPerSpoke: shelvesPerSpokeNeeded,
+            centerRunnerHalfWidthX: AISLE_HALF_WIDTH_X,
         }),
         totalShelves
     )
@@ -306,6 +318,7 @@ function computeSpokeShelvesForSections(sections: ReadonlyArray<Section>): Secti
         hubClearanceMetres: spacing.hubClearanceMetres,
         shelfSpacingMetres: spacing.shelfSpacingMetres,
         aisleHalfWidthMetres: clampedAisleHalfWidth,
+        centerRunnerHalfWidthX: AISLE_HALF_WIDTH_X,
     })
 
     const sectionAwareShelves: SectionShelfInfo[] = []
