@@ -257,6 +257,8 @@ export class SteamIntegration {
             // them without crashes, but isAnonymous() returns true because steam.userInput is not set.
             this.gameLibrary.setUserData({ ...demoUser, vanity_url: '', steamid: '' })
 
+            this.storeSteamDataAndEmitEvent(null)
+
             // Emit games directly as batch events - no Steam API network calls.
             for (let i = 0; i < totalBatches; i++) {
                 const batchGames = games.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE).map(game => ({
@@ -271,7 +273,6 @@ export class SteamIntegration {
                 }
             }
 
-            this.storeSteamDataAndEmitEvent(null)
             SteamIntegration.logger.info(`Demo store loaded: ${games.length} games in ${totalBatches} batches`)
         } catch (error) {
             SteamIntegration.logger.error('Failed to load demo games:', error)

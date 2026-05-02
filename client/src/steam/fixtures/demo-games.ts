@@ -51,6 +51,3 @@ export const ANONYMOUS_STORE_USER: SteamUser = {
         { appid: 359320,  name: 'Creativerse',          playtime_forever: 800,   img_icon_url: '', img_logo_url: '', artwork: { icon: '', logo: '', header: header(359320),  library: lib(359320)  }, genres: F2P        },
     ]
 };
-
-/** @deprecated Use ANONYMOUS_STORE_USER */
-export const DEMO_STEAM_USER = ANONYMOUS_STORE_USER;
