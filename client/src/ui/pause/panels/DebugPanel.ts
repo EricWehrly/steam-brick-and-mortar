@@ -6,6 +6,10 @@
  * - Performance metrics and memory usage
  * - Cache statistics and diagnostics
  * - Console access toggle
+ * - Display controls (FPS and Performance Stats toggles)
+ * 
+ * Note: "Hide UI in VR Mode" checkbox is currently commented out in ApplicationPanel
+ * and will be moved to a future "VR" tab under the Display tabgroup in Act 3.
  */
 
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
@@ -14,6 +18,7 @@ import debugPanelTemplate from '../templates/debug-panel.html?raw'
 import '../../../styles/pause-menu/debug-panel.css'
 import { DebugStatsProvider } from './DebugStatsProvider'
 import type { PerformanceMonitorUI } from '../../PerformanceMonitor'
+import { AppSettings } from '../../../core/AppSettings'
 
 export interface DebugStats {
     // Three.js Scene Stats
@@ -68,6 +73,7 @@ export class DebugPanel extends PauseMenuPanel {
     private currentStats: DebugStats | null = null
     private debugStatsProvider: DebugStatsProvider
     private consoleVisible = false
+    private appSettings: AppSettings = AppSettings.getInstance()
 
     constructor(config: PauseMenuPanelConfig = {}, performanceMonitor: PerformanceMonitorUI) {
         super(config)
@@ -77,11 +83,16 @@ export class DebugPanel extends PauseMenuPanel {
 
     render(): string {
         // Flatten the hierarchical stats data for the simple template engine
+        const currentSettings = this.appSettings.getAllSettings()
         const templateData = {
             // Console state
             consoleActiveClass: this.consoleVisible ? 'primary' : 'secondary',
             consoleButtonText: this.consoleVisible ? '🙈 Hide Console' : '👁️ Show Console',
             consoleVisibilityClass: this.consoleVisible ? 'visible' : 'hidden',
+            
+            // Display controls (from AppSettings)
+            showFPS: currentSettings.showFPS,
+            showPerformanceStats: currentSettings.showPerformanceStats,
             
             // Scene objects (flattened)
             sceneObjectsTotal: this.stats.sceneObjects.total,

@@ -68,6 +68,7 @@ We will create component styles for:
 	- Reduced motion toggle for UI transitions
 	- Optional high-contrast toggle for panel readability
 - Remove inline `style="..."` usage from pause-menu templates (especially Graphics panel) so typography, spacing, and disabled visuals are token-driven and consistent.
+- Pause menu heading icon tokenization is deferred. Keep current inline heading icons for now and revisit with a broader icon consistency pass across panel/tab icons.
 
 ### Visual Validation Pattern (required for panel work)
 - Capture a targeted **before** screenshot for the panel/region before changing styles.
