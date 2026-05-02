@@ -49,27 +49,25 @@
 }
 
 .lighting-controls-panel .master-controls .control-item {
-    padding: var(--panel-space-4) var(--panel-space-8);
-    border-radius: var(--panel-radius-sm);
+    padding: var(--ui-shared-row-padding, 4px 6px);
+    border-radius: var(--ui-shared-row-radius, var(--panel-radius-sm));
 }
 
 .lighting-controls-panel .control-item {
-    /* Bare-bones layout — no container border, no extra vertical padding */
+    /* Share row rhythm/tone with pause rows while preserving lighting-specific grouping behavior. */
     display: flex;
     align-items: center;
     gap: var(--panel-space-8);
-    margin-bottom: var(--panel-space-3);
+    margin-bottom: var(--ui-shared-row-gap, var(--panel-space-3));
+    padding: var(--ui-shared-row-padding, 4px 6px);
+    border-radius: var(--ui-shared-row-radius, var(--panel-radius-sm));
+    background: var(--ui-shared-row-bg, transparent);
+    color: var(--ui-shared-row-text, var(--panel-text));
     cursor: pointer;
 }
 
 .lighting-controls-panel .control-item:hover {
     background: var(--panel-subtle-hover-bg);
-}
-
-.lighting-controls-panel .control-label {
-    font-size: var(--panel-font-size);
-    line-height: 1.2;
-    user-select: none;
 }
 
 .lighting-controls-panel .light-info {

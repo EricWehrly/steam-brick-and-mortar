@@ -8,6 +8,7 @@
   flex-direction: column;
   height: 100%;
   padding: 0;
+  --ui-shared-row-text: var(--pause-text, #fff);
 }
 
 /* Panel Header */
@@ -155,17 +156,6 @@
   background: var(--background-dark);
   color: var(--text-primary);
   padding: 0.5rem;
-}
-
-/* Checkbox Controls */
-.graphics-settings-panel .checkbox-container {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  cursor: pointer;
-  font-size: 0.95rem;
-  color: var(--pause-text, #fff);
-  user-select: none;
 }
 
 .graphics-settings-panel .setting-slider {

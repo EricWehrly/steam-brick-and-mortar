@@ -48,6 +48,20 @@
     display: inline-block;
 }
 
+.ui-inline-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1em;
+}
+
+.ui-control-label {
+    font-size: var(--panel-font-size, var(--font-size-md));
+    line-height: 1.2;
+    color: inherit;
+    user-select: none;
+}
+
 /**
  * Horizontal collapse variant: collapses the panel to a narrow sidebar, hiding label content
  * Useful for toggleable side panels and similar UI elements
