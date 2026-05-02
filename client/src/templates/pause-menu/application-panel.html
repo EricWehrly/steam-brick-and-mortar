@@ -1,76 +1,62 @@
-<!-- Application Control -->
-<div class="app-section">
-    <h4>Application Control</h4>
-    <div class="control-buttons">
-        <!-- TODO: Consider moving fullscreen button to main pause menu header for better accessibility -->
-        <button id="app-fullscreen-btn" class="pause-btn secondary">
-            <span class="btn-icon">🖥️</span>
-            <span class="btn-text">Toggle Fullscreen</span>
-            <span class="btn-shortcut">F11</span>
-        </button>
-    </div>
-</div>
-
 <!-- Interface Settings -->
-<div class="app-section">
+<div class="app-section panel-card pause-section">
     <h4>Interface Settings</h4>
-    <div class="settings-grid">
-        <div class="setting-item checkbox-item">
-            <label class="checkbox-label">
-                <input type="checkbox" class="ui-checkbox" id="show-fps-toggle" {{#checked showFPS}}checked{{/checked}}>
+    <div class="settings-grid pause-row-list">
+        <div class="setting-item checkbox-item pause-row pause-disabled-row">
+            <label class="checkbox-label pause-row-text">
+                <input type="checkbox" class="ui-checkbox" id="show-fps-toggle" {{#checked showFPS}}checked{{/checked}} disabled>
                 <span class="label-text">Show FPS Counter</span>
+                <span class="control-disabled-note pause-disabled-note">disabled</span>
             </label>
         </div>
         
-        <div class="setting-item checkbox-item">
-            <label class="checkbox-label">
-                <input type="checkbox" class="ui-checkbox" id="show-perf-toggle" {{#checked showPerformanceStats}}checked{{/checked}}>
+        <div class="setting-item checkbox-item pause-row pause-disabled-row">
+            <label class="checkbox-label pause-row-text">
+                <input type="checkbox" class="ui-checkbox" id="show-perf-toggle" {{#checked showPerformanceStats}}checked{{/checked}} disabled>
                 <span class="label-text">Show Performance Stats</span>
+                <span class="control-disabled-note pause-disabled-note">disabled</span>
             </label>
         </div>
         
-        <div class="setting-item checkbox-item">
-            <label class="checkbox-label">
-                <input type="checkbox" class="ui-checkbox" id="hide-ui-vr-toggle" {{#checked hideUIInVR}}checked{{/checked}}>
+        <div class="setting-item checkbox-item pause-row pause-disabled-row">
+            <label class="checkbox-label pause-row-text">
+                <input type="checkbox" class="ui-checkbox" id="hide-ui-vr-toggle" {{#checked hideUIInVR}}checked{{/checked}} disabled>
                 <span class="label-text">Hide UI in VR Mode</span>
+                <span class="control-disabled-note pause-disabled-note">disabled</span>
             </label>
         </div>
     </div>
 </div>
 
 <!-- Debug Settings (for development) -->
-<div class="app-section debug-section">
+<div class="app-section debug-section panel-card pause-section">
     <h4>Debug & Development</h4>
-    <div class="settings-grid">
-        <div class="setting-item checkbox-item">
-            <label class="checkbox-label">
-                <input type="checkbox" class="ui-checkbox" id="verbose-logging-toggle" {{#checked verboseLogging}}checked{{/checked}}>
+    <div class="settings-grid pause-row-list">
+        <div class="setting-item checkbox-item pause-row pause-disabled-row">
+            <label class="checkbox-label pause-row-text">
+                <input type="checkbox" class="ui-checkbox" id="verbose-logging-toggle" {{#checked verboseLogging}}checked{{/checked}} disabled>
                 <span class="label-text">Verbose Logging</span>
+                <span class="control-disabled-note pause-disabled-note">disabled</span>
             </label>
         </div>
         
-        <div class="setting-item checkbox-item">
-            <label class="checkbox-label">
-                <input type="checkbox" class="ui-checkbox" id="show-debug-toggle" {{#checked showDebugInfo}}checked{{/checked}}>
+        <div class="setting-item checkbox-item pause-row pause-disabled-row">
+            <label class="checkbox-label pause-row-text">
+                <input type="checkbox" class="ui-checkbox" id="show-debug-toggle" {{#checked showDebugInfo}}checked{{/checked}} disabled>
                 <span class="label-text">Show Debug Info</span>
+                <span class="control-disabled-note pause-disabled-note">disabled</span>
             </label>
         </div>
     </div>
     
-    <div class="debug-actions">
-        <button id="export-logs-btn" class="pause-btn secondary">
-            <span class="btn-icon">📋</span>
-            Export Debug Logs
-        </button>
-    </div>
 </div>
 
 <!-- General Settings -->
-<div class="app-section">
+<div class="app-section panel-card pause-section">
     <h4>General Settings</h4>
-    <div class="settings-grid">
-        <div class="setting-item checkbox-item">
-            <label class="checkbox-label">
+    <div class="settings-grid pause-row-list">
+        <div class="setting-item checkbox-item pause-row">
+            <label class="checkbox-label pause-row-text">
                 <input type="checkbox" class="ui-checkbox" id="auto-save-toggle" {{#checked autoSave}}checked{{/checked}}>
                 <span class="label-text">Auto-save Settings</span>
             </label>

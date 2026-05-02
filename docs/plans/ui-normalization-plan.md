@@ -59,6 +59,16 @@ We will create component styles for:
 ## Phase C — Migrate Existing Panels (Incremental Roadmap)
 **Goal**: Replace inline styles and bespoke CSS in each existing panel with the shared component classes from Phase B. 
 
+### C0. Short-term TODO (design now, implement in Act 3)
+- Add a new `UI` subtab under the existing Display parent tab.
+- Include a `UI Scale` slider in that panel (defer runtime scaling implementation until Act 3).
+- Define the first-pass `UI` panel scope now so we do not scatter UI-only settings later. Candidate controls:
+	- UI scale (global panel/control text and spacing multiplier)
+	- Panel density mode (comfortable/compact spacing)
+	- Reduced motion toggle for UI transitions
+	- Optional high-contrast toggle for panel readability
+- Remove inline `style="..."` usage from pause-menu templates (especially Graphics panel) so typography, spacing, and disabled visuals are token-driven and consistent.
+
 ### Visual Validation Pattern (required for panel work)
 - Capture a targeted **before** screenshot for the panel/region before changing styles.
 - Capture a matching **after** screenshot using the same selector after changes.

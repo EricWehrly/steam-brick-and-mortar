@@ -81,9 +81,12 @@
 }
 
 .graphics-settings-panel .hint-disabled {
-  color: var(--panel-text-muted, #8f98a0);
-  background: rgba(128, 128, 128, 0.2);
-  border: 1px dashed rgba(128, 128, 128, 0.4);
+  color: inherit;
+  background: transparent;
+  border: 1px dashed currentColor;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
 }
 
 .graphics-settings-panel .hint-instant {
@@ -92,9 +95,13 @@
 }
 
 /* Disabled setting controls */
+.graphics-settings-panel .disabled-setting {
+  opacity: 0.55;
+}
+
 .graphics-settings-panel .disabled-setting .setting-slider {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.5;
 }
 
 .graphics-settings-panel .disabled-setting .setting-slider::-webkit-slider-thumb {

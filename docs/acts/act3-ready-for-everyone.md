@@ -25,3 +25,10 @@
 - 24/7 monitoring, alerting, and incident response
 - User support infrastructure and documentation
 - Production service ready for public launch
+
+## TODOs To Pull Into Act 3
+
+- Validate settings import/export manually end-to-end in the pause menu (export file, inspect, modify valid fields, re-import, verify applied settings).
+- Add integration tests that cover settings import/export with real generated JSON fixtures (valid payload, invalid payload, partial payload, and backwards-compatible payload).
+- Keep generated JSON fixtures in test resources and assert round-trip behavior (export -> import -> equivalent settings snapshot).
+- Add `Display > UI` subtab with a `UI Scale` slider (implementation deferred from intermission UI normalization work); finalize scope for adjacent UI-only controls in the same panel.

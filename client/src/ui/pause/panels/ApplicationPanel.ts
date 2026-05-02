@@ -60,35 +60,12 @@ export class ApplicationPanel extends PauseMenuPanel {
 
     public attachEvents(): void {
         UIComponentUtils.setupButtons(this.container, [
-            { buttonId: 'app-resume-btn', onClick: this.resume.bind(this) },
-            { buttonId: 'app-fullscreen-btn', onClick: this.toggleFullscreen.bind(this) },
-            { buttonId: 'export-logs-btn', onClick: this.exportLogs.bind(this) },
             { buttonId: 'reset-settings-btn', onClick: this.resetSettings.bind(this) },
             { buttonId: 'export-settings-btn', onClick: this.exportSettings.bind(this) },
             { buttonId: 'import-settings-btn', onClick: this.importSettings.bind(this) }
         ])
 
         UIComponentUtils.setupToggles(this.container, [
-            {
-                toggleId: 'show-fps-toggle',
-                onChange: (checked) => this.updateSetting('showFPS', checked)
-            },
-            {
-                toggleId: 'show-perf-toggle',
-                onChange: (checked) => this.updateSetting('showPerformanceStats', checked)
-            },
-            {
-                toggleId: 'hide-ui-vr-toggle',
-                onChange: (checked) => this.updateSetting('hideUIInVR', checked)
-            },
-            {
-                toggleId: 'verbose-logging-toggle',
-                onChange: (checked) => this.updateSetting('verboseLogging', checked)
-            },
-            {
-                toggleId: 'show-debug-toggle',
-                onChange: (checked) => this.updateSetting('showDebugInfo', checked)
-            },
             {
                 toggleId: 'auto-save-toggle',
                 onChange: (checked) => this.updateSetting('autoSave', checked)
@@ -104,31 +81,6 @@ export class ApplicationPanel extends PauseMenuPanel {
 
     }
 
-    private resume(): void {
-        // Close the pause menu - emit event that parent can listen to
-        this.container?.dispatchEvent(new CustomEvent('pause-menu-close', { bubbles: true }))
-    }
-
-    private toggleFullscreen(): void {
-        // TODO: Consider moving this fullscreen functionality to the main pause menu header
-        // for better accessibility and more prominent placement
-        try {
-            if (!document.fullscreenElement) {
-                // Enter fullscreen
-                document.documentElement.requestFullscreen().catch((err) => {
-                    console.warn('Failed to enter fullscreen:', err)
-                })
-            } else {
-                // Exit fullscreen
-                document.exitFullscreen().catch((err) => {
-                    console.warn('Failed to exit fullscreen:', err)
-                })
-            }
-        } catch (error) {
-            console.warn('Fullscreen API not supported or failed:', error)
-        }
-    }
-
     private updateSetting<K extends keyof ApplicationSettings>(
         key: K,
         value: ApplicationSettings[K]
@@ -139,30 +91,8 @@ export class ApplicationPanel extends PauseMenuPanel {
         this.onSettingsChanged?.({ [key]: value })
     }
 
-    private exportLogs(): void {
-        // TODO: Implement log export functionality
-        const currentSettings = this.appSettings.getAllSettings()
-        const logs = {
-            timestamp: new Date().toISOString(),
-            settings: currentSettings,
-            userAgent: navigator.userAgent,
-            url: window.location.href
-        }
-        
-        const dataStr = JSON.stringify(logs, null, 2)
-        const dataBlob = new Blob([dataStr], { type: 'application/json' })
-        const url = URL.createObjectURL(dataBlob)
-        
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `steam-brick-mortar-logs-${Date.now()}.json`
-        link.click()
-        
-        URL.revokeObjectURL(url)
-    }
-
     private resetSettings(): void {
-        if (window.confirm('Are you sure you want to reset all settings to defaults?\n\nThis cannot be undone.')) {
+        if (window.confirm('Are you sure?\n\nReset all settings to defaults. This cannot be undone.')) {
             this.appSettings.resetToDefaults(EventSource.UI)
             this.refreshSettingsDisplay()
             
