@@ -19,6 +19,7 @@
 
 - **Overhead row-hanging signage pass** — replace current in-store signs with hanging overhead signs between rows to improve navigability. Target double-sided sign faces and include a color swatch system (N colors, or at least two alternating colors) that matches shelving unit colors on the ground; likely needs shader updates to support driven sign/swatch color values.
 - **Front glass wall door interaction** — add a visible front-door handle on the glass wall; selecting the handle prompts a confirm dialog ("Are you sure?") and closes the store tab/window on confirmation.
+- **"Liminal" long-row rendering (sliding window / treadmill shelves)** — use a configurable per-row shelf window with bounds `0..(totalShelves - windowSize)`, smooth continuous movement with hysteresis, and no treadmill when `totalShelves <= windowSize`. Initial version should not render/permit interaction outside the active window (nice-to-haves like impostors can come later). Keep window logic separate from rendering, emit typed movement/shift events for animation/effects, persist per-row window state in-session, and keep non-adjacent rows statically parked while only relevant/adjacent rows treadmill as the player moves along the row aisle. Prefer shifting shelves along the row axis (geometry recycling) rather than moving player state.
 
 ## Completion Criteria
 

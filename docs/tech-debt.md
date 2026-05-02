@@ -169,9 +169,22 @@
 
 ---
 
----
-
 ## Later (only true debt, not feature wish-list)
+
+## id: aisle-terminology-main-vs-row
+**Priority**: Low  
+**Effort**: ~1-2 hours  
+**Context**: "Aisle" currently ambiguously refers to both the global/main aisle and row-local aisle traversal space. This creates friction in implementation discussions, event naming, and UI labels.
+
+**Done when**:
+- Canonical terms are chosen and documented for global aisle vs row-local aisle zones
+- Existing references in docs/event names/UI labels are normalized where touched
+- New code/docs avoid the ambiguous term without qualifier
+
+**Related docs**:
+- `docs/acts/act3-ready-for-everyone.md`
+
+---
 
 ## id: layout-math-renderer-decoupling
 **Priority**: Low  
