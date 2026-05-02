@@ -47,6 +47,8 @@ const MAX_SHELVES_PER_ARRANGEMENT = Math.min(
     180,
     Math.max(1, Math.floor(MAX_GAME_BOX_INSTANCES_PER_ARRANGEMENT / SHELF_BATCH_SIZE))
 )
+const SECTION_TRIM_PERCENT_PER_PASS = 10
+const MIN_SHELVES_PER_RETAINED_SECTION = 1
 
 type SectionPlacementPlanRow = {
     sectionId: string
@@ -161,40 +163,110 @@ export class GameSorter {
     private buildSectionPlacementPlan(
         sections: ReadonlyArray<{ sectionId: string; section: Section }>
     ) {
-        let usedShelves = 0
-        let totalAllocatedSections = 0
-
-        const sectionPlans: SectionPlacementPlanRow[] = []
+        const sectionPlans: SectionPlacementPlanRow[] = sections.map(({ sectionId, section }) => ({
+            sectionId,
+            requestedShelves: Math.max(0, Math.ceil(section.games.length / SHELF_BATCH_SIZE)),
+            allocatedShelves: 0,
+            shelfCapacity: SHELF_BATCH_SIZE,
+            requestedGames: section.games.length,
+            allocatedGames: 0,
+            deferredGames: 0,
+        }))
         let totalRequestedShelves = 0
         let totalRequestedGames = 0
+        for (const sectionPlan of sectionPlans) {
+            totalRequestedShelves += sectionPlan.requestedShelves
+            totalRequestedGames += sectionPlan.requestedGames
+        }
+
+        const allocatedShelvesBySection = sectionPlans.map(sectionPlan => sectionPlan.requestedShelves)
+        let shelvesToTrim = Math.max(0, totalRequestedShelves - MAX_SHELVES_PER_ARRANGEMENT)
+
+        if (sectionPlans.length > MAX_SHELVES_PER_ARRANGEMENT) {
+            for (let sectionIndex = MAX_SHELVES_PER_ARRANGEMENT; sectionIndex < allocatedShelvesBySection.length; sectionIndex++) {
+                shelvesToTrim -= allocatedShelvesBySection[sectionIndex]
+                allocatedShelvesBySection[sectionIndex] = 0
+            }
+            shelvesToTrim = Math.max(0, shelvesToTrim)
+
+            GameSorter.logger.warn(
+                `Edge case: ${sectionPlans.length} sections exceed shelf cap ${MAX_SHELVES_PER_ARRANGEMENT}; trimming tail sections by current sort order before proportional passes`
+            )
+        }
+
+        while (shelvesToTrim > 0) {
+            const trimmableSections = allocatedShelvesBySection
+                .map((allocatedShelves, sectionIndex) => ({ allocatedShelves, sectionIndex }))
+                .filter(({ allocatedShelves }) => allocatedShelves > MIN_SHELVES_PER_RETAINED_SECTION)
+                .sort((left, right) => {
+                    if (right.allocatedShelves !== left.allocatedShelves) {
+                        return right.allocatedShelves - left.allocatedShelves
+                    }
+                    return left.sectionIndex - right.sectionIndex
+                })
+
+            if (trimmableSections.length === 0) {
+                break
+            }
+
+            let trimmedThisPass = 0
+
+            for (const { sectionIndex, allocatedShelves } of trimmableSections) {
+                if (shelvesToTrim <= 0) {
+                    break
+                }
+
+                const proportionalTrim = Math.floor(allocatedShelves * SECTION_TRIM_PERCENT_PER_PASS / 100)
+                const passTrim = Math.max(1, proportionalTrim)
+                const maxTrimForSection = Math.max(0, allocatedShelves - MIN_SHELVES_PER_RETAINED_SECTION)
+                const appliedTrim = Math.min(passTrim, maxTrimForSection, shelvesToTrim)
+
+                if (appliedTrim <= 0) {
+                    continue
+                }
+
+                allocatedShelvesBySection[sectionIndex] -= appliedTrim
+                shelvesToTrim -= appliedTrim
+                trimmedThisPass += appliedTrim
+            }
+
+            if (trimmedThisPass === 0) {
+                break
+            }
+        }
+
+        if (shelvesToTrim > 0) {
+            for (let sectionIndex = allocatedShelvesBySection.length - 1; sectionIndex >= 0 && shelvesToTrim > 0; sectionIndex--) {
+                const trim = Math.min(allocatedShelvesBySection[sectionIndex], shelvesToTrim)
+                allocatedShelvesBySection[sectionIndex] -= trim
+                shelvesToTrim -= trim
+            }
+
+            if (shelvesToTrim > 0) {
+                GameSorter.logger.warn(`Safety trim exhausted while ${shelvesToTrim} shelves still over cap`)
+            }
+        }
+
+        let totalAllocatedSections = 0
+        let usedShelves = 0
         let totalAllocatedGames = 0
 
-        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
-            const { sectionId, section } = sections[sectionIndex]
-            const sectionShelves = Math.max(0, Math.ceil(section.games.length / SHELF_BATCH_SIZE))
-            const remainingShelves = Math.max(0, MAX_SHELVES_PER_ARRANGEMENT - usedShelves)
-            const allocatedShelves = Math.min(sectionShelves, remainingShelves)
-            const allocatedGames = Math.min(section.games.length, allocatedShelves * SHELF_BATCH_SIZE)
-            const deferredGames = section.games.length - allocatedGames
+        for (let sectionIndex = 0; sectionIndex < sectionPlans.length; sectionIndex++) {
+            const plan = sectionPlans[sectionIndex]
+            const allocatedShelves = allocatedShelvesBySection[sectionIndex]
+            const allocatedGames = Math.min(plan.requestedGames, allocatedShelves * SHELF_BATCH_SIZE)
+            const deferredGames = plan.requestedGames - allocatedGames
 
-            totalRequestedShelves += sectionShelves
-            totalRequestedGames += section.games.length
+            plan.allocatedShelves = allocatedShelves
+            plan.allocatedGames = allocatedGames
+            plan.deferredGames = deferredGames
+
             totalAllocatedGames += allocatedGames
 
             if (allocatedShelves > 0) {
                 usedShelves += allocatedShelves
                 totalAllocatedSections++
             }
-
-            sectionPlans.push({
-                sectionId,
-                requestedShelves: sectionShelves,
-                allocatedShelves,
-                shelfCapacity: SHELF_BATCH_SIZE,
-                requestedGames: section.games.length,
-                allocatedGames,
-                deferredGames,
-            })
         }
 
         const deferredSections = sectionPlans.filter(section => section.allocatedShelves === 0).length
