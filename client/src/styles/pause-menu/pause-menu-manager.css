@@ -11,7 +11,7 @@
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    padding: 12px;
+    padding: 8px 12px;
 }
 
 .pause-menu {
@@ -21,7 +21,7 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     max-width: min(800px, calc(100vw - 24px));
     width: min(90vw, 800px);
-    max-height: 85vh;
+    max-height: 92vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -108,5 +108,5 @@
 .panel-content {
     color: #ccc;
     min-height: 200px;
-    padding: 0px 12px;
+    padding: 12px;
 }
