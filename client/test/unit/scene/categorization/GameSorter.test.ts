@@ -40,7 +40,7 @@ vi.mock('../../../../src/steam-integration/SteamIntegration', () => ({
     },
 }))
 
-import { GameSorter } from '../../../../src/scene/categorization/GameSorter'
+import { ARRANGEMENT_SHELF_CAP, GameSorter } from '../../../../src/scene/categorization/GameSorter'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -312,23 +312,19 @@ describe('GameSorter placement trimming', () => {
     it('trims largest sections first using proportional passes', () => {
         const sorter = new GameSorter() as any
         const sections = [
-            makeSectionForPlanner('Action', 50),
-            makeSectionForPlanner('RPG', 30),
-            makeSectionForPlanner('Indie', 20),
-            makeSectionForPlanner('Puzzle', 10),
-            makeSectionForPlanner('Strategy', 5),
+            makeSectionForPlanner('Action', ARRANGEMENT_SHELF_CAP),
+            makeSectionForPlanner('RPG', 1),
+            makeSectionForPlanner('Indie', 1),
+            makeSectionForPlanner('Puzzle', 1),
         ]
 
-        const plan = sorter.buildSectionPlacementPlan(sections)
-        const planById = new Map(plan.sections.map((section: any) => [section.sectionId, section]))
+        const sectionPlans = sorter.buildSectionPlacementPlan(sections)
+        const planById = new Map(sectionPlans.map((section: any) => [section.sectionId, section]))
 
-        expect(plan.totalRequestedShelves).toBe(115)
-        expect(plan.totalAllocatedShelves).toBe(111)
-        expect(planById.get('by-genre:Action:0')?.allocatedShelves).toBe(46)
-        expect(planById.get('by-genre:RPG:0')?.allocatedShelves).toBe(30)
-        expect(planById.get('by-genre:Indie:0')?.allocatedShelves).toBe(20)
-        expect(planById.get('by-genre:Puzzle:0')?.allocatedShelves).toBe(10)
-        expect(planById.get('by-genre:Strategy:0')?.allocatedShelves).toBe(5)
+        expect(planById.get('by-genre:Action:0')?.allocatedShelves).toBe(ARRANGEMENT_SHELF_CAP - 3)
+        expect(planById.get('by-genre:RPG:0')?.allocatedShelves).toBe(1)
+        expect(planById.get('by-genre:Indie:0')?.allocatedShelves).toBe(1)
+        expect(planById.get('by-genre:Puzzle:0')?.allocatedShelves).toBe(1)
     })
 
     it('safeguards section-overflow edge case by dropping trailing sections in sort order', () => {
@@ -337,14 +333,26 @@ describe('GameSorter placement trimming', () => {
             makeSectionForPlanner(`Section-${index}`, 1)
         )
 
-        const plan = sorter.buildSectionPlacementPlan(sections)
-        const retainedCount = plan.sections.filter((section: any) => section.allocatedShelves > 0).length
+        const sectionPlans = sorter.buildSectionPlacementPlan(sections)
+        const retainedCount = sectionPlans.filter((section: any) => section.allocatedShelves > 0).length
 
-        expect(plan.totalRequestedShelves).toBe(120)
-        expect(plan.totalAllocatedShelves).toBe(111)
-        expect(retainedCount).toBe(111)
-        expect(plan.sections[110].allocatedShelves).toBe(1)
-        expect(plan.sections[111].allocatedShelves).toBe(0)
+        expect(retainedCount).toBe(ARRANGEMENT_SHELF_CAP)
+        expect(sectionPlans[ARRANGEMENT_SHELF_CAP - 1].allocatedShelves).toBe(1)
+        expect(sectionPlans[ARRANGEMENT_SHELF_CAP].allocatedShelves).toBe(0)
+    })
+
+    it('does not drop tail sections when shelf pressure is high but section count is still under cap', () => {
+        const sorter = new GameSorter() as any
+        const sectionCount = Math.max(1, ARRANGEMENT_SHELF_CAP - 1)
+        const sections = Array.from({ length: sectionCount }, (_, index) =>
+            makeSectionForPlanner(`Section-${index}`, 2)
+        )
+
+        const sectionPlans = sorter.buildSectionPlacementPlan(sections)
+        const retainedCount = sectionPlans.filter((section: any) => section.allocatedShelves > 0).length
+
+        expect(retainedCount).toBe(sectionCount)
+        expect(sectionPlans[sectionCount - 1].allocatedShelves).toBeGreaterThan(0)
     })
 })
 
