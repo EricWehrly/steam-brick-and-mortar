@@ -36,7 +36,7 @@ describe('computeRowShelfLayout', () => {
 })
 
 describe('RowLayout section-aware shelf ownership', () => {
-    it('assigns contiguous shelf ranges per section in order', () => {
+    it('keeps each section shelf count while balancing assignment across aisle regions', () => {
         const sections = [
             { name: 'Action', games: Array.from({ length: 36 }, (_, i) => ({ appid: i + 1 })) },
             { name: 'Puzzle', games: Array.from({ length: 18 }, (_, i) => ({ appid: 1000 + i + 1 })) },
@@ -44,10 +44,31 @@ describe('RowLayout section-aware shelf ownership', () => {
         ] as any
 
         const shelves = RowLayout.computeShelvesForSections(sections)
-        const sectionIndices = shelves.map(shelf => shelf.sectionIndex)
+        const shelvesPerSection = sections.map((section: { games: unknown[] }) => Math.max(1, Math.ceil(section.games.length / 18)))
 
-        // 36 -> 2 shelves, 18 -> 1 shelf, 54 -> 3 shelves
-        expect(sectionIndices).toEqual([0, 0, 1, 2, 2, 2])
+        for (let sectionIndex = 0; sectionIndex < shelvesPerSection.length; sectionIndex++) {
+            const actual = shelves.filter(shelf => shelf.sectionIndex === sectionIndex).length
+            expect(actual).toBe(shelvesPerSection[sectionIndex])
+        }
+
+        const negativeCount = shelves.filter(shelf => shelf.position.x < 0).length
+        const positiveCount = shelves.filter(shelf => shelf.position.x > 0).length
+
+        expect(Math.abs(negativeCount - positiveCount)).toBeLessThanOrEqual(1)
+    })
+
+    it('allows large sections to straddle the aisle when one side cannot fit all shelves', () => {
+        const sections = [
+            { name: 'Huge', games: Array.from({ length: 144 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'TinyA', games: Array.from({ length: 18 }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'TinyB', games: Array.from({ length: 18 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+        ] as any
+
+        const shelves = RowLayout.computeShelvesForSections(sections)
+        const hugeShelves = shelves.filter(shelf => shelf.sectionIndex === 0)
+
+        expect(hugeShelves.some(shelf => shelf.position.x < 0)).toBe(true)
+        expect(hugeShelves.some(shelf => shelf.position.x > 0)).toBe(true)
     })
 
     it('expands row spacing dynamically for larger section shelf counts', () => {

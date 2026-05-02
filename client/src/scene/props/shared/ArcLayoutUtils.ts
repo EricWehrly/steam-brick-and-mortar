@@ -21,6 +21,7 @@ import type { StockSurface } from '../../../types/LayoutTypes'
 import type { ISectionAwareLayoutDefinition } from './ILayoutDefinition'
 import type { ShelfInfo, Section, SectionShelfInfo } from '../../../types/LayoutTypes'
 import { AISLE_HALF_WIDTH_X } from './LayoutAisleWidths'
+import { assignSectionsByBalancedXAxisRegions } from './BalancedSectionAllocator'
 
 /**
  * ArcStockStrategy
@@ -324,18 +325,8 @@ function computeArcShelvesForSections(sections: ReadonlyArray<Section>): Section
         return []
     }
 
-    // Sort sections smallest → largest so the innermost ring holds the tightest group.
-    // We preserve the original sectionIndex for sign/placement lookups.
-    const indexedSections = sections.map((section, originalIndex) => ({ section, originalIndex }))
-    const sortedSections = [...indexedSections].sort(
-        (a, b) => a.section.games.length - b.section.games.length
-    )
-
-    const sortedShelfCounts = sortedSections.map(({ section }) =>
-        Math.max(1, Math.ceil(section.games.length / 18))
-    )
-
-    const ringBands = buildRingBandsForSections(sortedShelfCounts)
+    const shelvesPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
+    const ringBands = buildRingBandsForSections([shelvesPerSection.reduce((sum, count) => sum + count, 0)])
     const totalShelves = ringBands.shelvesPerRowByRow.reduce((sum, n) => sum + n, 0)
 
     const shelves = computeArcShelfLayout(totalShelves, {
@@ -348,26 +339,12 @@ function computeArcShelvesForSections(sections: ReadonlyArray<Section>): Section
         shelfWidthMetres: 2.0,
         centerAisleHalfWidthX: AISLE_HALF_WIDTH_X + DEFAULT_SHELF_HALF_WIDTH_X,
     })
+    const sectionByShelfIndex = assignSectionsByBalancedXAxisRegions(shelves, shelvesPerSection)
 
-    // Map each physical shelf back to its original (unsorted) section index
-    // by tracking which row band belongs to which sorted section.
-    let shelfCursor = 0
-    const result: SectionShelfInfo[] = []
-
-    for (let bandIndex = 0; bandIndex < ringBands.shelvesPerRowByRow.length; bandIndex++) {
-        const sortedSectionIndex = ringBands.rowOwnerByRow[bandIndex]
-        const originalSectionIndex = sortedSections[sortedSectionIndex].originalIndex
-        const shelvesInRow = ringBands.shelvesPerRowByRow[bandIndex]
-
-        for (let inRow = 0; inRow < shelvesInRow && shelfCursor < shelves.length; inRow++, shelfCursor++) {
-            result.push({
-                ...shelves[shelfCursor],
-                sectionIndex: originalSectionIndex,
-            })
-        }
-    }
-
-    return result
+    return shelves.map((shelf, shelfIndex) => ({
+        ...shelf,
+        sectionIndex: sectionByShelfIndex[shelfIndex] ?? 0,
+    }))
 }
 
 export const ArcLayout: ISectionAwareLayoutDefinition = {
