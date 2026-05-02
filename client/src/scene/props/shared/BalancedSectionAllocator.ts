@@ -13,6 +13,16 @@ interface RegionOrders {
     positive: number[]
 }
 
+interface DpState {
+    previousSum: number
+    sectionIndex: number
+}
+
+interface NegativeSelectionResult {
+    sectionIndices: Set<number>
+    achievedSlots: number
+}
+
 function partitionShelfIndicesByXAxis(shelves: ReadonlyArray<ShelfInfo>): RegionBuckets {
     const buckets: RegionBuckets = {
         negative: [],
@@ -34,8 +44,50 @@ function partitionShelfIndicesByXAxis(shelves: ReadonlyArray<ShelfInfo>): Region
     return buckets
 }
 
-function chooseRegionWithMostCapacity(remainingCapacity: Record<AxisRegion, number>): AxisRegion {
-    return remainingCapacity.negative >= remainingCapacity.positive ? 'negative' : 'positive'
+function chooseNegativeRegionSections(
+    shelvesPerSection: ReadonlyArray<number>,
+    targetNegativeSlots: number
+): NegativeSelectionResult {
+    const clampedTarget = Math.max(0, targetNegativeSlots)
+    const states: Array<DpState | null> = new Array(clampedTarget + 1).fill(null)
+    states[0] = { previousSum: -1, sectionIndex: -1 }
+
+    for (let sectionIndex = 0; sectionIndex < shelvesPerSection.length; sectionIndex++) {
+        const sectionCount = shelvesPerSection[sectionIndex]
+        for (let sum = clampedTarget; sum >= sectionCount; sum--) {
+            if (states[sum] !== null || states[sum - sectionCount] === null) {
+                continue
+            }
+
+            states[sum] = {
+                previousSum: sum - sectionCount,
+                sectionIndex,
+            }
+        }
+    }
+
+    let bestSum = clampedTarget
+    while (bestSum > 0 && states[bestSum] === null) {
+        bestSum--
+    }
+
+    const chosen = new Set<number>()
+    let cursor = bestSum
+
+    while (cursor > 0) {
+        const state = states[cursor]
+        if (!state || state.sectionIndex < 0) {
+            break
+        }
+
+        chosen.add(state.sectionIndex)
+        cursor = state.previousSum
+    }
+
+    return {
+        sectionIndices: chosen,
+        achievedSlots: bestSum,
+    }
 }
 
 function buildRegionOrders(
@@ -46,73 +98,39 @@ function buildRegionOrders(
         negative: [],
         positive: [],
     }
-    const remainingCapacity: Record<AxisRegion, number> = {
-        negative: regionCapacity.negative,
-        positive: regionCapacity.positive,
+    const selection = chooseNegativeRegionSections(shelvesPerSection, regionCapacity.negative)
+    const negativeCountPerSection = shelvesPerSection.map((count, sectionIndex) =>
+        selection.sectionIndices.has(sectionIndex) ? count : 0
+    )
+
+    let deficit = Math.max(0, regionCapacity.negative - selection.achievedSlots)
+    if (deficit > 0) {
+        for (let sectionIndex = 0; sectionIndex < shelvesPerSection.length && deficit > 0; sectionIndex++) {
+            if (selection.sectionIndices.has(sectionIndex)) {
+                continue
+            }
+
+            const movable = Math.min(deficit, shelvesPerSection[sectionIndex])
+            negativeCountPerSection[sectionIndex] += movable
+            deficit -= movable
+        }
     }
 
-    const sectionsBySize = shelvesPerSection
-        .map((count, sectionIndex) => ({ sectionIndex, count }))
-        .sort((a, b) => {
-            if (b.count !== a.count) return b.count - a.count
-            return a.sectionIndex - b.sectionIndex
-        })
+    for (let sectionIndex = 0; sectionIndex < shelvesPerSection.length; sectionIndex++) {
+        const sectionShelfCount = shelvesPerSection[sectionIndex]
+        const negativeCount = Math.min(sectionShelfCount, negativeCountPerSection[sectionIndex])
+        const positiveCount = sectionShelfCount - negativeCount
 
-    for (const { sectionIndex, count } of sectionsBySize) {
-        let remainingForSection = count
+        for (let slot = 0; slot < negativeCount; slot++) {
+            orders.negative.push(sectionIndex)
+        }
 
-        while (remainingForSection > 0) {
-            let targetRegion = chooseRegionWithMostCapacity(remainingCapacity)
-            if (remainingCapacity[targetRegion] <= 0) {
-                targetRegion = targetRegion === 'negative' ? 'positive' : 'negative'
-            }
-
-            const allocatable = Math.min(remainingForSection, Math.max(0, remainingCapacity[targetRegion]))
-            if (allocatable <= 0) {
-                break
-            }
-
-            for (let slot = 0; slot < allocatable; slot++) {
-                orders[targetRegion].push(sectionIndex)
-            }
-
-            remainingForSection -= allocatable
-            remainingCapacity[targetRegion] -= allocatable
+        for (let slot = 0; slot < positiveCount; slot++) {
+            orders.positive.push(sectionIndex)
         }
     }
 
     return orders
-}
-
-function findNextAvailableSection(remainingPerSection: number[]): number {
-    for (let sectionIndex = 0; sectionIndex < remainingPerSection.length; sectionIndex++) {
-        if (remainingPerSection[sectionIndex] > 0) {
-            return sectionIndex
-        }
-    }
-    return 0
-}
-
-function takeNextSectionFromRegionOrder(
-    region: AxisRegion,
-    orders: RegionOrders,
-    cursors: Record<AxisRegion, number>,
-    remainingPerSection: number[]
-): number {
-    const order = orders[region]
-    let cursor = cursors[region]
-
-    while (cursor < order.length) {
-        const sectionIndex = order[cursor]
-        cursor++
-        if (remainingPerSection[sectionIndex] > 0) {
-            cursors[region] = cursor
-            return sectionIndex
-        }
-    }
-
-    cursors[region] = cursor
-    return findNextAvailableSection(remainingPerSection)
 }
 
 export function assignSectionsByBalancedXAxisRegions(
@@ -130,32 +148,37 @@ export function assignSectionsByBalancedXAxisRegions(
     })
 
     const sectionByShelfIndex = new Array<number>(shelves.length)
-    const remainingPerSection = [...shelvesPerSection]
     const cursors: Record<AxisRegion, number> = {
         negative: 0,
         positive: 0,
     }
 
     for (const shelfIndex of buckets.negative) {
-        const sectionIndex = takeNextSectionFromRegionOrder('negative', orders, cursors, remainingPerSection)
+        const sectionIndex = orders.negative[cursors.negative] ?? 0
+        cursors.negative++
         sectionByShelfIndex[shelfIndex] = sectionIndex
-        remainingPerSection[sectionIndex] = Math.max(0, remainingPerSection[sectionIndex] - 1)
     }
 
     for (const shelfIndex of buckets.positive) {
-        const sectionIndex = takeNextSectionFromRegionOrder('positive', orders, cursors, remainingPerSection)
+        const sectionIndex = orders.positive[cursors.positive] ?? 0
+        cursors.positive++
         sectionByShelfIndex[shelfIndex] = sectionIndex
-        remainingPerSection[sectionIndex] = Math.max(0, remainingPerSection[sectionIndex] - 1)
     }
 
     for (const shelfIndex of buckets.neutral) {
-        const negativeRemaining = orders.negative.length - cursors.negative
-        const positiveRemaining = orders.positive.length - cursors.positive
-        const preferredRegion: AxisRegion = negativeRemaining >= positiveRemaining ? 'negative' : 'positive'
-        const sectionIndex = takeNextSectionFromRegionOrder(preferredRegion, orders, cursors, remainingPerSection)
+        const negativeRemaining = buckets.negative.length - cursors.negative
+        const preferredRegion: AxisRegion = negativeRemaining > 0 ? 'negative' : 'positive'
+        const sectionIndex = preferredRegion === 'negative'
+            ? (orders.negative[cursors.negative] ?? 0)
+            : (orders.positive[cursors.positive] ?? 0)
+
+        if (preferredRegion === 'negative') {
+            cursors.negative++
+        } else {
+            cursors.positive++
+        }
 
         sectionByShelfIndex[shelfIndex] = sectionIndex
-        remainingPerSection[sectionIndex] = Math.max(0, remainingPerSection[sectionIndex] - 1)
     }
 
     return sectionByShelfIndex

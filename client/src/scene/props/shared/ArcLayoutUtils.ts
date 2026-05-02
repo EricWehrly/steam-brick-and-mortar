@@ -92,7 +92,7 @@ const DEFAULTS: Required<Pick<ArcLayoutConfig, 'rows' | 'shelvesPerRow' | 'rowRa
 
 const DEFAULT_CENTER_AISLE_HALF_ANGLE = 0
 const STORE_ROW_RADIUS_STEP_METRES = 4.0
-const ARC_ROW_SPREAD_SCALE = 0.8
+const ARC_ROW_SPREAD_SCALE = 1.0
 const MIN_HALF_ANGLE_CLEARANCE = 0.01
 const ASIN_RATIO_MAX = 0.99
 const DEFAULT_SHELF_HALF_WIDTH_X = 1.0  // 2.0m shelf / 2

@@ -57,18 +57,41 @@ describe('RowLayout section-aware shelf ownership', () => {
         expect(Math.abs(negativeCount - positiveCount)).toBeLessThanOrEqual(1)
     })
 
-    it('allows large sections to straddle the aisle when one side cannot fit all shelves', () => {
+    it('keeps each section on a single aisle region (no wrapping across the aisle)', () => {
         const sections = [
-            { name: 'Huge', games: Array.from({ length: 144 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'Huge', games: Array.from({ length: 72 }, (_, i) => ({ appid: i + 1 })) },
             { name: 'TinyA', games: Array.from({ length: 18 }, (_, i) => ({ appid: 1000 + i + 1 })) },
-            { name: 'TinyB', games: Array.from({ length: 18 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+            { name: 'TinyB', games: Array.from({ length: 36 }, (_, i) => ({ appid: 2000 + i + 1 })) },
         ] as any
 
         const shelves = RowLayout.computeShelvesForSections(sections)
-        const hugeShelves = shelves.filter(shelf => shelf.sectionIndex === 0)
+        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+            const sectionShelves = shelves.filter(shelf => shelf.sectionIndex === sectionIndex)
+            const hasNegative = sectionShelves.some(shelf => shelf.position.x < 0)
+            const hasPositive = sectionShelves.some(shelf => shelf.position.x > 0)
+            expect(!(hasNegative && hasPositive)).toBe(true)
+        }
+    })
 
-        expect(hugeShelves.some(shelf => shelf.position.x < 0)).toBe(true)
-        expect(hugeShelves.some(shelf => shelf.position.x > 0)).toBe(true)
+    it('preserves section order within each aisle region', () => {
+        const sections = [
+            { name: 'Last Week', games: Array.from({ length: 18 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'Last Month', games: Array.from({ length: 36 }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'Older', games: Array.from({ length: 54 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+            { name: 'Archive', games: Array.from({ length: 72 }, (_, i) => ({ appid: 3000 + i + 1 })) },
+        ] as any
+
+        const shelves = RowLayout.computeShelvesForSections(sections)
+        const negativeOrder = shelves.filter(shelf => shelf.position.x < 0).map(shelf => shelf.sectionIndex)
+        const positiveOrder = shelves.filter(shelf => shelf.position.x > 0).map(shelf => shelf.sectionIndex)
+
+        for (let index = 1; index < negativeOrder.length; index++) {
+            expect(negativeOrder[index]).toBeGreaterThanOrEqual(negativeOrder[index - 1])
+        }
+
+        for (let index = 1; index < positiveOrder.length; index++) {
+            expect(positiveOrder[index]).toBeGreaterThanOrEqual(positiveOrder[index - 1])
+        }
     })
 
     it('expands row spacing dynamically for larger section shelf counts', () => {
