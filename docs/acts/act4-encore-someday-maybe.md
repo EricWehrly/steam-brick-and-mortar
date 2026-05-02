@@ -37,6 +37,19 @@ The main thing we'll want to check in this "encore" act is: Can we embed an audi
 - **Community management** — Discord/forums, code of conduct, moderation, beta programs
 - **A/B testing framework** — for feature improvements and UX experiments
 
+## Misc
+
+- Portal-style portals linking different rooms
+would love to build to support inside the same room, but not at first
+Would love to build as much as possible, a "filter" drawing effect that causes the different appearance of the different "rooms"
+like a cartoonish effect for a more Nikelodeon feel,
+art deco effect that adds a little emphasis on top of our 'blockbuster' scene
+
 ## Deferred Re-entry Candidates
 
 - **AC4.4: Local collections import (filesystem API)** — revisit `cloud-storage-namespace-1.json` import only if we are ready to accept filesystem API UX/security complexity. Prior findings show categories are the main unique value; other local metadata did not justify shipping this in Act 2.
+
+## I don't know where to put this note
+but want it displayed in the games menus somewhere
+"Nostalgia is evoking a memory of how something made you feel
+retro (?) is harmonizing with _why_ that thing made you feel what you did"
