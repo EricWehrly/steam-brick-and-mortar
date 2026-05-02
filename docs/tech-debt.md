@@ -14,6 +14,25 @@
 
 ## Fix Now (Intermission)
 
+## id: angled-layout-center-aisle-overlap
+**Priority**: High  
+**Effort**: ~0.5-1 day (geometry pass + visual validation)  
+**Context**: In angled layouts (`arc`, `spoke`), shelf bodies can still visually crowd/overlap around center-aisle boundaries under some section distributions. Row layout spacing is currently acceptable; this debt is specifically for angled layout geometry seams.
+
+**Done when**:
+- Shelf body extents (not only shelf centers) are guaranteed to remain outside the reserved center aisle corridor in `arc` and `spoke`
+- No shelf-to-shelf overlap appears in angled layouts at default and high-count section distributions
+- Regression tests cover center-aisle clearance and nearest-neighbor spacing for both angled layouts
+
+**When to pick up**:
+- Early Act 2 (after current intermission layout tuning is merged)
+
+**Related files**:
+- `client/src/scene/props/shared/ArcLayoutUtils.ts`
+- `client/src/scene/props/shared/SpokeLayoutUtils.ts`
+
+---
+
 ## id: debug-window-consolidation
 **Priority**: Low  
 **Effort**: ~1-2 hours  
