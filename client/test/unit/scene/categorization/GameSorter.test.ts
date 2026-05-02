@@ -296,6 +296,58 @@ describe('GameSorter', () => {
     })
 })
 
+describe('GameSorter placement trimming', () => {
+    function makeSectionForPlanner(sectionName: string, shelfCount: number) {
+        return {
+            sectionId: `by-genre:${sectionName}:0`,
+            section: {
+                name: sectionName,
+                groupMode: 'by-genre',
+                sortMode: 'by-playtime',
+                games: Array.from({ length: shelfCount * 18 }, (_, index) => makeGame(index + 1)),
+            },
+        } as any
+    }
+
+    it('trims largest sections first using proportional passes', () => {
+        const sorter = new GameSorter() as any
+        const sections = [
+            makeSectionForPlanner('Action', 50),
+            makeSectionForPlanner('RPG', 30),
+            makeSectionForPlanner('Indie', 20),
+            makeSectionForPlanner('Puzzle', 10),
+            makeSectionForPlanner('Strategy', 5),
+        ]
+
+        const plan = sorter.buildSectionPlacementPlan(sections)
+        const planById = new Map(plan.sections.map((section: any) => [section.sectionId, section]))
+
+        expect(plan.totalRequestedShelves).toBe(115)
+        expect(plan.totalAllocatedShelves).toBe(111)
+        expect(planById.get('by-genre:Action:0')?.allocatedShelves).toBe(46)
+        expect(planById.get('by-genre:RPG:0')?.allocatedShelves).toBe(30)
+        expect(planById.get('by-genre:Indie:0')?.allocatedShelves).toBe(20)
+        expect(planById.get('by-genre:Puzzle:0')?.allocatedShelves).toBe(10)
+        expect(planById.get('by-genre:Strategy:0')?.allocatedShelves).toBe(5)
+    })
+
+    it('safeguards section-overflow edge case by dropping trailing sections in sort order', () => {
+        const sorter = new GameSorter() as any
+        const sections = Array.from({ length: 120 }, (_, index) =>
+            makeSectionForPlanner(`Section-${index}`, 1)
+        )
+
+        const plan = sorter.buildSectionPlacementPlan(sections)
+        const retainedCount = plan.sections.filter((section: any) => section.allocatedShelves > 0).length
+
+        expect(plan.totalRequestedShelves).toBe(120)
+        expect(plan.totalAllocatedShelves).toBe(111)
+        expect(retainedCount).toBe(111)
+        expect(plan.sections[110].allocatedShelves).toBe(1)
+        expect(plan.sections[111].allocatedShelves).toBe(0)
+    })
+})
+
 describe('getRecentlyPlayedBucket', () => {
     const DAY = 24 * 60 * 60
     const now = 1000000000
