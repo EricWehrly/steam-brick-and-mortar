@@ -54,6 +54,12 @@ export interface SpokeLayoutConfig {
      */
     firstSpokeAngleOffset?: number
     /**
+     * When true, default spoke angles avoid the central aisle axis (X=0 corridor)
+     * by centering spoke gaps on the +Z/-Z axis. Explicit firstSpokeAngleOffset wins.
+     * Default: true.
+     */
+    avoidCentralAisleAxis?: boolean
+    /**
      * Distance from origin to the first shelf pair on each spoke (metres).
      * Should be large enough to leave a walkable open hub area. Default: 4.
      */
@@ -70,18 +76,65 @@ export interface SpokeLayoutConfig {
     shelfSpacingMetres?: number
     /**
      * Lateral offset from the spoke centreline to each shelf row (metres).
-     * Shelf fronts (Near surfaces) face the aisle at this distance. Default: 1.5.
+     * Shelf fronts (Near surfaces) face the aisle at this distance. Default: 1.8.
      */
     aisleHalfWidthMetres?: number
+    /**
+     * Half-width of the global entrance runner aisle on X (metres).
+     * Shelves are shifted so |x| stays outside this corridor.
+     * Default: 1.6.
+     */
+    centerRunnerHalfWidthX?: number
 }
 
 const SPOKE_DEFAULTS: Required<SpokeLayoutConfig> = {
     spokeCount: 4,
     firstSpokeAngleOffset: -Math.PI / 2 + Math.PI / 8, // 22.5° bias off cardinal axes
+    avoidCentralAisleAxis: true,
     hubClearanceMetres: 4,
     shelvesPerSpoke: 6,
     shelfSpacingMetres: 2.5,
-    aisleHalfWidthMetres: 1.5,
+    aisleHalfWidthMetres: 1.8,
+    centerRunnerHalfWidthX: 1.6,
+}
+
+const DEFAULT_SHELF_HALF_WIDTH_X = 1.0
+
+function enforceCenterRunnerAisleX(
+    position: THREE.Vector3,
+    halfWidth: number,
+    shelfHalfWidthX: number,
+    spokeDirX: number,
+): THREE.Vector3 {
+    if (halfWidth <= 0) {
+        return position
+    }
+
+    const absX = Math.abs(position.x)
+    const minimumShelfCenterAbsX = halfWidth + Math.max(0, shelfHalfWidthX)
+    if (absX >= minimumShelfCenterAbsX) {
+        return position
+    }
+
+    const dominantSide = Math.abs(position.x) > 0.0001
+        ? Math.sign(position.x)
+        : (Math.sign(spokeDirX) || 1)
+
+    return new THREE.Vector3(dominantSide * minimumShelfCenterAbsX, position.y, position.z)
+}
+
+function deriveFirstSpokeAngleOffset(config: SpokeLayoutConfig, spokeCount: number): number {
+    if (config.firstSpokeAngleOffset !== undefined) {
+        return config.firstSpokeAngleOffset
+    }
+
+    if (!config.avoidCentralAisleAxis && config.avoidCentralAisleAxis !== undefined) {
+        return SPOKE_DEFAULTS.firstSpokeAngleOffset
+    }
+
+    const angleStep = (2 * Math.PI) / Math.max(1, spokeCount)
+    // Spokes are centered between +Z and -Z so the central aisle axis remains clear.
+    return angleStep / 2
 }
 
 function deriveSpokeSpacingFromSectionCounts(
@@ -134,9 +187,10 @@ export function computeSpokeShelfLayout(
     const result: SpokeShelfInfo[] = []
 
     const angleStep = (2 * Math.PI) / cfg.spokeCount
+    const firstSpokeAngleOffset = deriveFirstSpokeAngleOffset(cfg, cfg.spokeCount)
 
     for (let spokeIndex = 0; spokeIndex < cfg.spokeCount; spokeIndex++) {
-        const spokeAngle = cfg.firstSpokeAngleOffset + spokeIndex * angleStep
+        const spokeAngle = firstSpokeAngleOffset + spokeIndex * angleStep
 
         // Unit vector along the spoke (outward from hub)
         const spokeDir = new THREE.Vector3(Math.cos(spokeAngle), 0, Math.sin(spokeAngle))
@@ -152,6 +206,12 @@ export function computeSpokeShelfLayout(
                 const lateralSign = side === 'left' ? 1 : -1
                 const shelfCentre = centrePoint.clone()
                     .addScaledVector(perpDir, lateralSign * cfg.aisleHalfWidthMetres)
+                const adjustedShelfCentre = enforceCenterRunnerAisleX(
+                    shelfCentre,
+                    cfg.centerRunnerHalfWidthX,
+                    DEFAULT_SHELF_HALF_WIDTH_X,
+                    spokeDir.x,
+                )
 
                 // Shelf Near face must face the aisle (toward centreline).
                 // Left row faces right (-perpDir), right row faces left (+perpDir).
@@ -161,7 +221,7 @@ export function computeSpokeShelfLayout(
                 const rotationY = Math.atan2(facingDir.x, facingDir.z)
 
                 result.push({
-                    position: shelfCentre.clone(),
+                    position: adjustedShelfCentre,
                     rotationY,
                     spokeIndex,
                     positionIndex,

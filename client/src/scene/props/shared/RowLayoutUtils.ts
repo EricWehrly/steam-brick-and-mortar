@@ -60,6 +60,12 @@ export interface RowLayoutConfig {
      * Default: 8.
      */
     maxRows?: number
+    /**
+     * Width of the central walkable aisle (metres, along X).
+     * Shelf centres are shifted away from X=0 to preserve this gap.
+     * Default: 3.0.
+     */
+    centralAisleWidthX?: number
 }
 
 const ROW_DEFAULTS: Required<RowLayoutConfig> = {
@@ -68,18 +74,44 @@ const ROW_DEFAULTS: Required<RowLayoutConfig> = {
     rowSpacingZ: 4.0,
     firstRowZ: 4.0,
     maxRows: 8,
+    centralAisleWidthX: 3.0,
+}
+
+function ensureEven(count: number): number {
+    return count % 2 === 0 ? count : count + 1
+}
+
+function computeAisleShiftedX(
+    colIndex: number,
+    shelvesPerRow: number,
+    shelfSpacingX: number,
+    centralAisleWidthX: number
+): number {
+    const totalWidth = (shelvesPerRow - 1) * shelfSpacingX
+    const baseX = -totalWidth / 2 + colIndex * shelfSpacingX
+    const aisleHalfWidth = centralAisleWidthX / 2
+
+    if (baseX < 0) {
+        return baseX - aisleHalfWidth
+    }
+    if (baseX > 0) {
+        return baseX + aisleHalfWidth
+    }
+    return baseX - aisleHalfWidth
 }
 
 function deriveRowLayoutConfigFromSectionCounts(sections: ReadonlyArray<Section>): RowLayoutConfig {
     const sectionShelfCounts = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
     const maxShelvesInAnySection = Math.max(1, ...sectionShelfCounts)
+    const dynamicShelvesPerRow = Math.max(8, Math.ceil(Math.sqrt(maxShelvesInAnySection) * 2.6))
 
     return {
-        shelvesPerRow: Math.max(8, Math.ceil(Math.sqrt(maxShelvesInAnySection) * 2.6)),
+        shelvesPerRow: ensureEven(dynamicShelvesPerRow),
         shelfSpacingX: Math.max(2.5, 2.2 + maxShelvesInAnySection * 0.015),
         rowSpacingZ: Math.max(4.0, 3.5 + maxShelvesInAnySection * 0.02),
         firstRowZ: ROW_DEFAULTS.firstRowZ,
         maxRows: Math.max(ROW_DEFAULTS.maxRows, Math.ceil(maxShelvesInAnySection / 2) + 2),
+        centralAisleWidthX: ROW_DEFAULTS.centralAisleWidthX,
     }
 }
 
@@ -103,17 +135,21 @@ export function computeRowShelfLayout(
     config: RowLayoutConfig = {}
 ): RowShelfInfo[] {
     const cfg = { ...ROW_DEFAULTS, ...config }
+    const shelvesPerRow = ensureEven(Math.max(2, cfg.shelvesPerRow))
     const result: RowShelfInfo[] = []
     let placed = 0
 
     for (let row = 0; row < cfg.maxRows && placed < totalShelves; row++) {
         const z = -(cfg.firstRowZ + row * cfg.rowSpacingZ)
-        const actualCount = Math.min(cfg.shelvesPerRow, totalShelves - placed)
-        const totalWidth = (cfg.shelvesPerRow - 1) * cfg.shelfSpacingX
-        const startX = -totalWidth / 2
+        const actualCount = Math.min(shelvesPerRow, totalShelves - placed)
 
         for (let col = 0; col < actualCount; col++) {
-            const x = startX + col * cfg.shelfSpacingX
+            const x = computeAisleShiftedX(
+                col,
+                shelvesPerRow,
+                cfg.shelfSpacingX,
+                cfg.centralAisleWidthX
+            )
             result.push({
                 position: new THREE.Vector3(x, 0, z),
                 rotationY: 0, // faces -Z, toward player

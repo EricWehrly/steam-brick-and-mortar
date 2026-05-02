@@ -18,6 +18,21 @@ describe('computeRowShelfLayout', () => {
         const secondRowZ = shelves[8].position.z
         expect(secondRowZ).toBeLessThan(firstRowZ)
     })
+
+    it('leaves a central aisle gap between left and right shelf blocks', () => {
+        const shelves = computeRowShelfLayout(8, {
+            shelvesPerRow: 8,
+            shelfSpacingX: 2.5,
+            centralAisleWidthX: 3.0,
+        })
+        const row0 = shelves.filter(shelf => shelf.row === 0).sort((a, b) => a.position.x - b.position.x)
+        const leftInner = row0.filter(shelf => shelf.position.x < 0).at(-1)
+        const rightInner = row0.find(shelf => shelf.position.x > 0)
+
+        expect(leftInner).toBeDefined()
+        expect(rightInner).toBeDefined()
+        expect((rightInner?.position.x ?? 0) - (leftInner?.position.x ?? 0)).toBeGreaterThan(5.0)
+    })
 })
 
 describe('RowLayout section-aware shelf ownership', () => {
