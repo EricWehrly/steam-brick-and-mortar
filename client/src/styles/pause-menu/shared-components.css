@@ -130,6 +130,51 @@
     box-shadow: 0 0 0 2px rgba(0, 136, 204, 0.2);
 }
 
+/* Shared range slider styling */
+.pause-slider {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.pause-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #67c1f5;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.pause-slider::-webkit-slider-thumb:hover {
+    background: #8ed4ff;
+    transform: scale(1.1);
+}
+
+.pause-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #67c1f5;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.pause-slider::-moz-range-thumb:hover {
+    background: #8ed4ff;
+    transform: scale(1.1);
+}
+
 /* Checkbox styling */
 .pause-checkbox {
     display: inline-flex;

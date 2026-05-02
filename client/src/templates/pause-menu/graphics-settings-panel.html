@@ -27,6 +27,32 @@
             <option value="ultra" {{#qualityUltra}}selected{{/qualityUltra}}>Ultra</option>
           </select>
         </div>
+        <div class="setting-control" style="margin-top: 0.75rem;">
+          <label class="checkbox-container">
+            <input type="checkbox" class="ui-checkbox" id="shadow-map-enabled" {{#shadowMapEnabled}}checked{{/shadowMapEnabled}}>
+            Enable Shadow Maps
+          </label>
+        </div>
+        <div class="setting-control" style="margin-top: 0.75rem;">
+          <label class="setting-label" for="pixel-ratio-scale" style="font-weight: normal; font-size: 0.9rem;">
+            Pixel Ratio Scale: <span id="pixel-ratio-value">{{pixelRatioScaleLabel}}</span>
+            <span class="setting-hint-badge hint-instant">experimental</span>
+          </label>
+          <input
+            type="range"
+            id="pixel-ratio-scale"
+            class="setting-slider pause-slider"
+            min="0.5"
+            max="2.0"
+            step="0.05"
+            value="{{pixelRatioScale}}"
+          >
+          <div class="slider-labels">
+            <span>0.5</span>
+            <span>1.0</span>
+            <span>2.0</span>
+          </div>
+        </div>
       </div>
     </section>
     
@@ -71,7 +97,7 @@
           <input 
             type="range" 
             id="shadow-quality" 
-            class="setting-slider"
+            class="setting-slider pause-slider"
             min="0" 
             max="4" 
             step="1" 
@@ -101,7 +127,7 @@
           <input 
             type="range" 
             id="ceiling-height" 
-            class="setting-slider"
+            class="setting-slider pause-slider"
             data-requires-reload
             min="2.5" 
             max="5.0" 
@@ -160,7 +186,7 @@
           <input 
             type="range" 
             id="lod-high-distance" 
-            class="setting-slider"
+            class="setting-slider pause-slider"
             min="1" 
             max="10" 
             step="0.5" 
@@ -179,7 +205,7 @@
           <input 
             type="range" 
             id="lod-med-distance" 
-            class="setting-slider"
+            class="setting-slider pause-slider"
             min="3" 
             max="20" 
             step="0.5" 
@@ -205,7 +231,7 @@
           <input 
             type="range" 
             id="lod-max-high-slots" 
-            class="setting-slider"
+            class="setting-slider pause-slider"
             data-requires-reload
             min="32" 
             max="512" 
@@ -229,7 +255,7 @@
           <input 
             type="range" 
             id="lod-high-ratio" 
-            class="setting-slider"
+            class="setting-slider pause-slider"
             data-requires-reload
             min="0.25" 
             max="1.0" 
@@ -252,7 +278,7 @@
           <input 
             type="range" 
             id="lod-med-ratio" 
-            class="setting-slider"
+            class="setting-slider pause-slider"
             data-requires-reload
             min="0.1" 
             max="0.5" 

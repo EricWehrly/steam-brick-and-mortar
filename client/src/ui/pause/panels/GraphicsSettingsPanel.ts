@@ -46,6 +46,9 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             qualityMedium: this.appSettings.getSetting('qualityLevel') === 'medium',
             qualityHigh: this.appSettings.getSetting('qualityLevel') === 'high',
             qualityUltra: this.appSettings.getSetting('qualityLevel') === 'ultra',
+            shadowMapEnabled: this.appSettings.getSetting('shadowMapEnabled'),
+            pixelRatioScale: this.appSettings.getSetting('pixelRatioScale'),
+            pixelRatioScaleLabel: this.appSettings.getSetting('pixelRatioScale').toFixed(2),
 
             // Lighting Quality
             lightingQualitySimple: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.SIMPLE,
@@ -123,6 +126,10 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
                     }
                     EventManager.getInstance().emit(CeilingEventTypes.Toggle, ceilingEvent)
                 }
+            },
+            {
+                toggleId: 'shadow-map-enabled',
+                onChange: (checked) => this.updateSetting('shadowMapEnabled', checked)
             }
         ])
     }
@@ -180,6 +187,12 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
                     this.updateSetting('lodMedReductionRatio', value)
                     this.updateMedDimensions(value)
                 }
+            },
+            {
+                sliderId: 'pixel-ratio-scale',
+                valueDisplayId: 'pixel-ratio-value',
+                formatDisplay: (v) => v.toFixed(2),
+                onInput: (value) => this.updateSetting('pixelRatioScale', value)
             }
         ])
     }
@@ -285,6 +298,19 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         const qualityLevelSelect = document.getElementById('quality-level-select') as HTMLSelectElement
         if (qualityLevelSelect) {
             qualityLevelSelect.value = this.appSettings.getSetting('qualityLevel')
+        }
+
+        const shadowMapToggle = document.getElementById('shadow-map-enabled') as HTMLInputElement
+        if (shadowMapToggle) {
+            shadowMapToggle.checked = this.appSettings.getSetting('shadowMapEnabled')
+        }
+
+        const pixelRatioSlider = document.getElementById('pixel-ratio-scale') as HTMLInputElement
+        const pixelRatioValue = document.getElementById('pixel-ratio-value') as HTMLSpanElement
+        if (pixelRatioSlider && pixelRatioValue) {
+            const ratio = this.appSettings.getSetting('pixelRatioScale')
+            pixelRatioSlider.value = ratio.toString()
+            pixelRatioValue.textContent = ratio.toFixed(2)
         }
 
         // Update lighting quality select
