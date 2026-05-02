@@ -1,4 +1,5 @@
 /* Debug Panel Styles */
+@import './token-icons.css';
 @import './shared-components.css';
 
 .debug-content {

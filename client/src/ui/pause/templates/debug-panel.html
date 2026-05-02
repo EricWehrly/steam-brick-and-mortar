@@ -1,12 +1,4 @@
 <div class="debug-content">
-    <div class="debug-actions">
-        <button id="refresh-debug" class="pause-btn secondary">🔄 Refresh Stats</button>
-        <button id="toggle-console" class="pause-btn {{consoleActiveClass}}">
-            {{consoleButtonText}}
-        </button>
-        <button id="export-debug" class="pause-btn accent">📋 Export Debug Info</button>
-    </div>
-
     <div class="debug-sections">
         <div class="debug-section">
             <h4>🎬 Three.js Scene</h4>
@@ -125,6 +117,39 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="debug-section">
+        <h4>⚙️ Display Controls</h4>
+        <div class="debug-stats">
+            <div class="setting-item pause-row">
+                <span class="pause-row-text ui-control-label">One day I'll grow up to be a log level control</span>
+            </div>
+            
+            <div class="stat-item checkbox-item pause-row pause-disabled-row">
+                <label class="checkbox-label pause-row-text ui-checkbox-row">
+                    <input type="checkbox" class="ui-checkbox" id="show-fps-toggle" {{#checked showFPS}}checked{{/checked}} disabled>
+                    <span class="label-text">Show FPS Counter</span>
+                    <span class="control-disabled-note pause-disabled-note">disabled</span>
+                </label>
+            </div>
+            
+            <div class="stat-item checkbox-item pause-row pause-disabled-row">
+                <label class="checkbox-label pause-row-text ui-checkbox-row">
+                    <input type="checkbox" class="ui-checkbox" id="show-perf-toggle" {{#checked showPerformanceStats}}checked{{/checked}} disabled>
+                    <span class="label-text">Show Performance Stats</span>
+                    <span class="control-disabled-note pause-disabled-note">disabled</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="debug-actions">
+        <button id="refresh-debug" class="pause-btn secondary">🔄 Refresh Stats</button>
+        <button id="toggle-console" class="pause-btn {{consoleActiveClass}}">
+            {{consoleButtonText}}
+        </button>
+        <button id="export-debug" class="pause-btn accent">📋 Export Debug Info</button>
     </div>
 
     <div id="debug-console" class="debug-console {{consoleVisibilityClass}}">

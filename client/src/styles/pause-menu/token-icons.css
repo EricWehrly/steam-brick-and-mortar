@@ -1,0 +1,17 @@
+/**
+ * Pause Menu Icon Tokens
+ * 
+ * Centralized icon definitions for consistent usage across panels
+ */
+
+:root {
+    /* Display/Settings Icons */
+    --icon-display: "⚙️";
+    --icon-refresh: "🔄";
+    --icon-console: "🖥️";
+    --icon-export: "📋";
+    --icon-stats-scene: "🎬";
+    --icon-stats-performance: "⚡";
+    --icon-stats-cache: "💾";
+    --icon-stats-system: "🖥️";
+}
