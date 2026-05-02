@@ -178,6 +178,7 @@ export class PauseMenuManager {
             id: 'display',
             title: 'Display',
             icon: '🖥️',
+            // TODO(act3-ui-normalization): add 'ui-settings' child panel when UI Scale slider is implemented.
             childPanelIds: ['graphics-settings', 'camera-settings'],
             defaultChildPanelId: 'graphics-settings'
         })

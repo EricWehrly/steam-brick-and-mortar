@@ -1,47 +1,13 @@
 /* Application Panel Styles */
 @import './shared-components.css';
 
-/* .app-section layout handled by shared alias in shared-components */
-#panel-application .app-section {
-    margin: 0;
-}
-
-#panel-application .control-buttons {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
-#panel-application .btn-icon {
-    font-size: 1.1em;
-}
-
-#panel-application .btn-shortcut {
-    position: absolute;
-    top: 4px;
-    right: 6px;
-    font-size: 0.7em;
-    color: #aaa;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 2px 4px;
-    border-radius: 3px;
-}
-
-#panel-application .settings-grid {
-    display: grid;
-    gap: 12px;
-}
-
 #panel-application .setting-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    margin-bottom: 0;
 }
 
 #panel-application .setting-item label:not(.checkbox-label) {
     color: var(--panel-text, #ccc);
-    font-size: 0.9em;
+    font-size: 0.95rem;
     min-width: 120px;
 }
 
@@ -52,40 +18,31 @@
 #panel-application .checkbox-label {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
     cursor: pointer;
     user-select: none;
     color: var(--panel-text, #ccc);
-    font-size: 0.9em;
+    font-size: 0.95rem;
+    line-height: 1.35;
 }
 
 #panel-application .checkbox-label .ui-checkbox {
     flex: 0 0 auto;
 }
 
-#panel-application .debug-actions,
 #panel-application .general-actions {
     display: flex;
     gap: 8px;
-    margin-top: 16px;
+    margin-top: 12px;
     flex-wrap: wrap;
 }
 
 @media (max-width: 600px) {
-    #panel-application .control-buttons {
-        flex-direction: column;
-    }
-    
-    #panel-application .app-btn {
-        min-width: auto;
-    }
-    
-    #panel-application .debug-actions,
     #panel-application .general-actions {
         flex-direction: column;
     }
 
-    #panel-application .debug-actions .pause-btn,
     #panel-application .general-actions .pause-btn {
         width: 100%;
     }

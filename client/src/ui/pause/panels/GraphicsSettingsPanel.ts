@@ -46,6 +46,7 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             qualityMedium: this.appSettings.getSetting('qualityLevel') === 'medium',
             qualityHigh: this.appSettings.getSetting('qualityLevel') === 'high',
             qualityUltra: this.appSettings.getSetting('qualityLevel') === 'ultra',
+            fullscreenEnabled: !!document.fullscreenElement,
             shadowMapEnabled: this.appSettings.getSetting('shadowMapEnabled'),
             pixelRatioScale: this.appSettings.getSetting('pixelRatioScale'),
             pixelRatioScaleLabel: this.appSettings.getSetting('pixelRatioScale').toFixed(2),
@@ -107,6 +108,10 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
 
     private attachCheckboxEvents(): void {
         UIComponentUtils.setupToggles(document.body, [
+            {
+                toggleId: 'fullscreen-enabled',
+                onChange: (checked) => this.setFullscreenEnabled(checked)
+            },
             {
                 toggleId: 'enable-lighting',
                 onChange: (checked) => this.updateSetting('enableLighting', checked)
@@ -300,6 +305,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             qualityLevelSelect.value = this.appSettings.getSetting('qualityLevel')
         }
 
+        const fullscreenToggle = document.getElementById('fullscreen-enabled') as HTMLInputElement
+        if (fullscreenToggle) {
+            fullscreenToggle.checked = !!document.fullscreenElement
+        }
+
         const shadowMapToggle = document.getElementById('shadow-map-enabled') as HTMLInputElement
         if (shadowMapToggle) {
             shadowMapToggle.checked = this.appSettings.getSetting('shadowMapEnabled')
@@ -401,6 +411,26 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             lodMedRatioSlider.value = ratio.toString()
             lodMedRatioValue.textContent = `${Math.round(ratio * 100)}%`
             this.updateMedDimensions(ratio)
+        }
+    }
+
+    private async setFullscreenEnabled(enabled: boolean): Promise<void> {
+        try {
+            if (enabled && !document.fullscreenElement) {
+                await document.documentElement.requestFullscreen()
+                return
+            }
+
+            if (!enabled && document.fullscreenElement) {
+                await document.exitFullscreen()
+                return
+            }
+        } catch (error) {
+            console.warn('Fullscreen API not supported or failed:', error)
+            const fullscreenToggle = document.getElementById('fullscreen-enabled') as HTMLInputElement
+            if (fullscreenToggle) {
+                fullscreenToggle.checked = !!document.fullscreenElement
+            }
         }
     }
 

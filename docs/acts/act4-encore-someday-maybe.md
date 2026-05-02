@@ -31,6 +31,7 @@ The main thing we'll want to check in this "encore" act is: Can we embed an audi
 
 - **Plugin/extension system** — community additions and modular panel architecture
 - **Hot reload system** — live preview for UI/content changes during development
+- **Settings version history + recovery** — auto-save versioned settings snapshots and provide rollback/recovery UI for earlier known-good configurations
 
 ## Community / Analytics
 

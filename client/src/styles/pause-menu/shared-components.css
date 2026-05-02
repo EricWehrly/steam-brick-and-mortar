@@ -283,7 +283,68 @@
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--color-border, #333);
     border-radius: 6px;
-    padding: 1rem;
+    padding: 0.5rem;
+}
+
+/* Shared section rhythm for card-based pause panels */
+.pause-section {
+    margin-bottom: 1.1rem;
+}
+
+.pause-section:last-child {
+    margin-bottom: 0.5rem;
+}
+
+/* Shared row/list primitives used by Input + Application */
+.pause-row-list {
+    display: grid;
+    gap: 10px;
+}
+
+.pause-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 6px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+}
+
+.pause-row-key {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--pause-text, #fff);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 60px;
+    text-align: center;
+}
+
+.pause-row-text {
+    color: var(--panel-text, #ccc);
+    font-size: 0.95rem;
+    line-height: 1.35;
+}
+
+.pause-disabled-row {
+    opacity: 0.55;
+}
+
+.pause-disabled-note {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 3px;
+    border: 1px dashed currentColor;
+    background: transparent;
+    color: inherit;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.85;
 }
 
 /* ===== UTILITY CLASSES ===== */
