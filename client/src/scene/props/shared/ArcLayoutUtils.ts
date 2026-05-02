@@ -94,6 +94,7 @@ const STORE_ROW_RADIUS_STEP_METRES = 4.0
 const ARC_ROW_SPREAD_SCALE = 0.8
 const MIN_HALF_ANGLE_CLEARANCE = 0.01
 const ASIN_RATIO_MAX = 0.99
+const DEFAULT_SHELF_HALF_WIDTH_X = 1.0  // 2.0m shelf / 2
 
 function buildArcRowAngles(count: number, halfAngle: number, centerAisleHalfAngle: number): number[] {
     if (count <= 0) {
@@ -313,7 +314,7 @@ export function computeStoreArcShelfLayout(totalShelves: number): ArcShelfInfo[]
         minShelfGap: 1.0,
         rowRadiusStep: STORE_ROW_RADIUS_STEP_METRES,
         firstRowRadius: 5.5,
-        centerAisleHalfWidthX: AISLE_HALF_WIDTH_X,
+        centerAisleHalfWidthX: AISLE_HALF_WIDTH_X + DEFAULT_SHELF_HALF_WIDTH_X,
     }
     return computeArcShelfLayout(totalShelves, config)
 }
@@ -345,7 +346,7 @@ function computeArcShelvesForSections(sections: ReadonlyArray<Section>): Section
         rowRadiusStep: ringBands.rowRadiusStep,
         minShelfGap: 1.0,
         shelfWidthMetres: 2.0,
-        centerAisleHalfWidthX: AISLE_HALF_WIDTH_X,
+        centerAisleHalfWidthX: AISLE_HALF_WIDTH_X + DEFAULT_SHELF_HALF_WIDTH_X,
     })
 
     // Map each physical shelf back to its original (unsorted) section index
