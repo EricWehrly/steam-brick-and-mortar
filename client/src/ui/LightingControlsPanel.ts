@@ -227,7 +227,7 @@ export class LightingControlsPanel {
             checkboxArea.className = 'group-checkbox-area ui-group-toggle'
             checkboxArea.innerHTML = `
                 <input type="checkbox" class="group-toggle ui-checkbox ui-checkbox--rollup" data-type="${type}" ${group.enabled ? 'checked' : ''}>
-                <span class="control-label">${type} (${group.lights.length})</span>
+                <span class="control-label ui-control-label">${type} (${group.lights.length})</span>
             `
             
             // Expander arrow
@@ -254,7 +254,7 @@ export class LightingControlsPanel {
                 lightElement.innerHTML = `
                     <label class="control-item light-control">
                         <input type="checkbox" class="light-toggle ui-checkbox" data-light-id="${light.id}" ${light.visible ? 'checked' : ''}>
-                        <span class="control-label">${lightName}</span>
+                        <span class="control-label ui-control-label">${lightName}</span>
                         <span class="light-info">${this.getLightInfo(light)}</span>
                     </label>
                 `

@@ -28,13 +28,13 @@
           </select>
         </div>
         <div class="setting-control" style="margin-top: 0.75rem;">
-          <label class="checkbox-container" style="margin-bottom: 0.75rem;">
+          <label class="checkbox-container ui-checkbox-row" style="margin-bottom: 0.75rem;">
             <input type="checkbox" class="ui-checkbox" id="fullscreen-enabled" {{#fullscreenEnabled}}checked{{/fullscreenEnabled}}>
             Fullscreen Mode
           </label>
         </div>
         <div class="setting-control" style="margin-top: 0.75rem;">
-          <label class="checkbox-container">
+          <label class="checkbox-container ui-checkbox-row">
             <input type="checkbox" class="ui-checkbox" id="shadow-map-enabled" {{#shadowMapEnabled}}checked{{/shadowMapEnabled}}>
             Enable Shadow Maps
           </label>
@@ -158,15 +158,15 @@
           Tools to help visualize and debug the lighting system for troubleshooting.
         </p>
         <div class="setting-control">
-          <label class="checkbox-container" style="margin-bottom: 0.75rem;">
+          <label class="checkbox-container ui-checkbox-row" style="margin-bottom: 0.75rem;">
             <input type="checkbox" class="ui-checkbox" id="enable-lighting" {{#enableLighting}}checked{{/enableLighting}}>
             Enable Lighting (toggle lights on/off to compare lit vs unlit scene)
           </label>
-          <label class="checkbox-container" style="margin-bottom: 0.75rem;">
+          <label class="checkbox-container ui-checkbox-row" style="margin-bottom: 0.75rem;">
             <input type="checkbox" class="ui-checkbox" id="show-lighting-debug" {{#showLightingDebug}}checked{{/showLightingDebug}}>
             Show Red Debug Shapes (visualize where lights should affect the scene)
           </label>
-          <label class="checkbox-container">
+          <label class="checkbox-container ui-checkbox-row">
             <input type="checkbox" class="ui-checkbox" id="show-ceiling" {{#showCeiling}}checked{{/showCeiling}}>
             Show Ceiling ("Hollywood Soundstage Mode" for debugging lights)
           </label>

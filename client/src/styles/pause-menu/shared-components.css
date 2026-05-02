@@ -5,6 +5,15 @@
  * used across multiple pause menu panels.
  */
 
+:root {
+    /* Shared row rhythm across pause menu + lighting controls */
+    --ui-shared-row-gap: 10px;
+    --ui-shared-row-padding: 4px 6px;
+    --ui-shared-row-radius: 6px;
+    --ui-shared-row-bg: rgba(0, 0, 0, 0.2);
+    --ui-shared-row-text: var(--panel-text, #ccc);
+}
+
 /* ===== SHARED BUTTON STYLES ===== */
 
 /* Base button class for all pause menu buttons */
@@ -175,28 +184,6 @@
     transform: scale(1.1);
 }
 
-/* Checkbox styling */
-.pause-checkbox {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    font-size: 13px;
-    color: #fff;
-}
-
-.pause-checkbox input[type="checkbox"] {
-    margin: 0;
-    width: 16px;
-    height: 16px;
-    accent-color: #0088cc;
-    cursor: pointer;
-}
-
-.pause-checkbox:hover {
-    color: #ccc;
-}
-
 /* ===== SHARED LAYOUTS ===== */
 
 /* Shared section label styling for pause menu panels. */
@@ -298,7 +285,7 @@
 /* Shared row/list primitives used by Input + Application */
 .pause-row-list {
     display: grid;
-    gap: 10px;
+    gap: var(--ui-shared-row-gap, 10px);
 }
 
 .pause-row {
@@ -306,9 +293,9 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 4px 6px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 6px;
+    padding: var(--ui-shared-row-padding, 4px 6px);
+    background: var(--ui-shared-row-bg, rgba(0, 0, 0, 0.2));
+    border-radius: var(--ui-shared-row-radius, 6px);
 }
 
 .pause-row-key {
@@ -324,9 +311,25 @@
 }
 
 .pause-row-text {
-    color: var(--panel-text, #ccc);
+    color: var(--ui-shared-row-text, var(--panel-text, #ccc));
     font-size: 0.95rem;
     line-height: 1.35;
+}
+
+.ui-checkbox-row {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--ui-shared-row-text, var(--panel-text, #ccc));
+    font-size: 0.95rem;
+    line-height: 1.35;
+}
+
+.ui-checkbox-row .ui-checkbox {
+    flex: 0 0 auto;
 }
 
 .pause-disabled-row {
