@@ -20,6 +20,7 @@ import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
 import type { StockSurface } from '../../../types/LayoutTypes'
 import type { ISectionAwareLayoutDefinition } from './ILayoutDefinition'
 import type { ShelfInfo, Section, SectionShelfInfo } from '../../../types/LayoutTypes'
+import { AISLE_HALF_WIDTH_X } from './LayoutAisleWidths'
 
 /**
  * ArcStockStrategy
@@ -90,13 +91,7 @@ const DEFAULTS: Required<Pick<ArcLayoutConfig, 'rows' | 'shelvesPerRow' | 'rowRa
 
 const DEFAULT_CENTER_AISLE_HALF_ANGLE = 0
 const STORE_ROW_RADIUS_STEP_METRES = 4.0
-const STORE_CENTER_AISLE_WIDTH_MULTIPLIER = 1.25
-export const STORE_CENTER_AISLE_HALF_WIDTH_X = (STORE_ROW_RADIUS_STEP_METRES * STORE_CENTER_AISLE_WIDTH_MULTIPLIER) / 2
 const ARC_ROW_SPREAD_SCALE = 0.8
-
-function lerp(start: number, end: number, t: number): number {
-    return start + (end - start) * t
-}
 
 function buildArcRowAngles(count: number, halfAngle: number, centerAisleHalfAngle: number): number[] {
     if (count <= 0) {
@@ -112,8 +107,8 @@ function buildArcRowAngles(count: number, halfAngle: number, centerAisleHalfAngl
     if (usableHalfAngle <= 0) {
         return Array.from({ length: count }, (_, index) => {
             if (count === 1) return 0
-            const t = index / (count - 1)
-            return lerp(-halfAngle, halfAngle, t)
+            const interpolationFactor = index / (count - 1)
+            return THREE.MathUtils.lerp(-halfAngle, halfAngle, interpolationFactor)
         })
     }
 
@@ -122,13 +117,13 @@ function buildArcRowAngles(count: number, halfAngle: number, centerAisleHalfAngl
     const angles: number[] = []
 
     for (let index = 0; index < leftCount; index++) {
-        const t = leftCount === 1 ? 0.5 : index / (leftCount - 1)
-        angles.push(lerp(-halfAngle, -usableHalfAngle, t))
+        const interpolationFactor = leftCount === 1 ? 0.5 : index / (leftCount - 1)
+        angles.push(THREE.MathUtils.lerp(-halfAngle, -usableHalfAngle, interpolationFactor))
     }
 
     for (let index = 0; index < rightCount; index++) {
-        const t = rightCount === 1 ? 0.5 : index / (rightCount - 1)
-        angles.push(lerp(usableHalfAngle, halfAngle, t))
+        const interpolationFactor = rightCount === 1 ? 0.5 : index / (rightCount - 1)
+        angles.push(THREE.MathUtils.lerp(usableHalfAngle, halfAngle, interpolationFactor))
     }
 
     return angles
@@ -316,7 +311,7 @@ export function computeStoreArcShelfLayout(totalShelves: number): ArcShelfInfo[]
         minShelfGap: 1.0,
         rowRadiusStep: STORE_ROW_RADIUS_STEP_METRES,
         firstRowRadius: 5.5,
-        centerAisleHalfWidthX: STORE_CENTER_AISLE_HALF_WIDTH_X,
+        centerAisleHalfWidthX: AISLE_HALF_WIDTH_X,
     }
     return computeArcShelfLayout(totalShelves, config)
 }
@@ -348,7 +343,7 @@ function computeArcShelvesForSections(sections: ReadonlyArray<Section>): Section
         rowRadiusStep: ringBands.rowRadiusStep,
         minShelfGap: 1.0,
         shelfWidthMetres: 2.0,
-        centerAisleHalfWidthX: STORE_CENTER_AISLE_HALF_WIDTH_X,
+        centerAisleHalfWidthX: AISLE_HALF_WIDTH_X,
     })
 
     // Map each physical shelf back to its original (unsorted) section index

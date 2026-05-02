@@ -173,6 +173,26 @@
 
 ## Later (only true debt, not feature wish-list)
 
+## id: layout-math-renderer-decoupling
+**Priority**: Low  
+**Effort**: Deferred (no active timebox)  
+**Context**: Layout math in shelf layout utilities currently depends on `THREE` types/constructors (`Vector3`) and overlaps with renderer-adjacent concerns. Long term, layout generation should be pure geometry data so it can be tested and reused without Three.js coupling.
+
+**Done when**:
+- Layout utility outputs are plain serializable geometry data (no `THREE.Vector3` construction in layout files)
+- A mapping layer translates layout DTOs into renderer-specific types near rendering boundaries
+- Layout files no longer import `three`
+
+**When to pick up**:
+- Indefinite backlog (revisit only when layout architecture work naturally touches these modules)
+
+**Related files**:
+- `client/src/scene/props/shared/ArcLayoutUtils.ts`
+- `client/src/scene/props/shared/RowLayoutUtils.ts`
+- `client/src/scene/props/shared/SpokeLayoutUtils.ts`
+
+---
+
 ### Test suite runtime-cost reduction
 Keep reducing expensive overlap in tests (prefer cheaper deterministic coverage where equivalent).
 

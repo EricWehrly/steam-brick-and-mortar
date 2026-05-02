@@ -19,6 +19,7 @@ import type { BoardSurfacePair, IStockStrategy } from './StockStrategy'
 import type { StockSurface } from '../../../types/LayoutTypes'
 import type { ISectionAwareLayoutDefinition } from './ILayoutDefinition'
 import type { ShelfInfo, Section, SectionShelfInfo } from '../../../types/LayoutTypes'
+import { AISLE_WIDTH_X } from './LayoutAisleWidths'
 
 /**
  * RowStockStrategy
@@ -74,7 +75,7 @@ const ROW_DEFAULTS: Required<RowLayoutConfig> = {
     rowSpacingZ: 4.0,
     firstRowZ: 4.0,
     maxRows: 8,
-    centralAisleWidthX: 3.0,
+    centralAisleWidthX: AISLE_WIDTH_X,
 }
 
 function ensureEven(count: number): number {
