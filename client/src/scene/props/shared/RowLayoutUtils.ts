@@ -9,6 +9,7 @@
  * - Each row extends left-to-right across the store width
  * - Shelves face forward (-Z direction, toward the player at origin)
  * - Rows recede away from the player along -Z
+ * - Shelf traversal starts at the central aisle edge and moves outward toward the walls
  *
  * This is the classic "video store" arrangement: walk down the aisle,
  * shelves to your left and right all face the same direction.
@@ -102,6 +103,27 @@ function computeAisleShiftedX(
     return baseX - aisleHalfWidth
 }
 
+function buildAisleOutwardTraversalColumns(
+    actualCount: number,
+    startCol: number,
+    shelvesPerRow: number,
+    shelfSpacingX: number,
+    centralAisleWidthX: number
+): number[] {
+    return Array.from({ length: actualCount }, (_, offset) => startCol + offset)
+        .sort((leftColumn, rightColumn) => {
+            const leftX = computeAisleShiftedX(leftColumn, shelvesPerRow, shelfSpacingX, centralAisleWidthX)
+            const rightX = computeAisleShiftedX(rightColumn, shelvesPerRow, shelfSpacingX, centralAisleWidthX)
+            const distanceDifference = Math.abs(leftX) - Math.abs(rightX)
+
+            if (Math.abs(distanceDifference) > 0.0001) {
+                return distanceDifference
+            }
+
+            return leftX - rightX
+        })
+}
+
 function deriveRowLayoutConfigFromSectionCounts(sections: ReadonlyArray<Section>): RowLayoutConfig {
     const sectionShelfCounts = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
     const maxShelvesInAnySection = Math.max(1, ...sectionShelfCounts)
@@ -129,8 +151,8 @@ export interface RowShelfInfo {
  * Generate shelf positions for the row layout.
  *
  * Returns shelves in row-major order (all shelves of row 0, then row 1, etc).
- * Within each row, shelves are ordered left-to-right (negative X to positive X),
- * centred on X=0.
+ * Within each row, shelves are ordered from the aisle outward so sequence-driven
+ * layouts begin at the corridor and expand toward the store walls on both sides.
  */
 export function computeRowShelfLayout(
     totalShelves: number,
@@ -145,10 +167,18 @@ export function computeRowShelfLayout(
         const z = -(cfg.firstRowZ + row * cfg.rowSpacingZ)
         const actualCount = Math.min(shelvesPerRow, totalShelves - placed)
         const startCol = Math.floor((shelvesPerRow - actualCount) / 2)
+        const traversalColumns = buildAisleOutwardTraversalColumns(
+            actualCount,
+            startCol,
+            shelvesPerRow,
+            cfg.shelfSpacingX,
+            cfg.centralAisleWidthX
+        )
 
-        for (let col = 0; col < actualCount; col++) {
+        for (let indexInRow = 0; indexInRow < traversalColumns.length; indexInRow++) {
+            const col = traversalColumns[indexInRow]
             const x = computeAisleShiftedX(
-                startCol + col,
+                col,
                 shelvesPerRow,
                 cfg.shelfSpacingX,
                 cfg.centralAisleWidthX
@@ -157,7 +187,7 @@ export function computeRowShelfLayout(
                 position: new THREE.Vector3(x, 0, z),
                 rotationY: 0, // faces -Z, toward player
                 row,
-                indexInRow: col,
+                indexInRow,
             })
             placed++
         }

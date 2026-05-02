@@ -33,6 +33,26 @@ describe('computeRowShelfLayout', () => {
         expect(rightInner).toBeDefined()
         expect((rightInner?.position.x ?? 0) - (leftInner?.position.x ?? 0)).toBeGreaterThan(5.0)
     })
+
+    it('orders each row from the aisle outward on both sides', () => {
+        const shelves = computeRowShelfLayout(8, {
+            shelvesPerRow: 8,
+            shelfSpacingX: 2.5,
+            centralAisleWidthX: 3.0,
+        })
+
+        const row0 = shelves.filter(shelf => shelf.row === 0)
+        const negativeSide = row0.filter(shelf => shelf.position.x < 0)
+        const positiveSide = row0.filter(shelf => shelf.position.x > 0)
+
+        for (let index = 1; index < negativeSide.length; index++) {
+            expect(Math.abs(negativeSide[index].position.x)).toBeGreaterThanOrEqual(Math.abs(negativeSide[index - 1].position.x))
+        }
+
+        for (let index = 1; index < positiveSide.length; index++) {
+            expect(Math.abs(positiveSide[index].position.x)).toBeGreaterThanOrEqual(Math.abs(positiveSide[index - 1].position.x))
+        }
+    })
 })
 
 describe('RowLayout section-aware shelf ownership', () => {

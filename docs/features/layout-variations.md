@@ -18,6 +18,7 @@ The concentric-arc layout was built during Act 1 as the primary spatial arrangem
 
 - **Arc / concentric rings** — current implementation; shelves arranged in arcs radiating from the player
 - **Square rows** — traditional grid rows; simpler, more “video store” feeling; the pre-arc default
+- **Square rows** traversal rule — with the bisecting aisle in place, "closest to the player" starts at the aisle edge. For sequence-sensitive groupings like recency or alphabetical, section flow should begin at the aisle and work outward toward the store walls on both regions, rather than reading from the outer wall inward.
 - **Alternating toe-out aisles** — neighboring shelf groups rotate outward (e.g., ~15° toe-out with wider aisle openings) to improve readability and navigation
 - **Spoke** — see below
 - **Other simple shapes** — chevron, etc.; TBD based on what feels good
@@ -107,6 +108,7 @@ Landed in PR #81 (`openclaw/feat-stock-strategy`). `IStockStrategy` in `StockStr
 - Dynamic switching requires shelves to be repositionable - check whether current `ShelfRenderer`/`InstancedShelfRenderer` supports in-place position updates or needs rebuild
 - The spoke/aisle arrangement (4-6 day estimate) from the Encore list is a natural candidate for pull-forward once two shapes are working
 - Layout grouping is related to `ShelfSectionPlanner` - section boundaries may need to be aware of group limits
+- Allocator strategy should become group-mode aware in Act 2: recency/alphabetical want sequence-preserving, non-wrapping region assignment, while `by-tag` likely wants a different packing allocator that optimizes density/balance instead of strict sequential flow
 
 ## Aisles + Clustering Sequence (Intermission Plan)
 
@@ -126,3 +128,4 @@ To support both central aisles and upcoming row clustering without rework, treat
 - Support balancing scenarios like `6` shelves on one side and `2+4` on the other.
 - Preserve aisle seams while allowing grouped section blocks per side.
 - Keep this as a section-allocation layer so geometry code remains stable.
+- Current intermission direction: for sequence-sensitive groupings, preserve section order and avoid cross-aisle wrapping where possible; defer a separate tag-oriented allocator to Act 2.
