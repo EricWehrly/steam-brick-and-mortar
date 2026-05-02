@@ -214,4 +214,30 @@ describe('partial-row centering', () => {
         const xSum = shelves[0].position.x + shelves[1].position.x
         expect(Math.abs(xSum)).toBeLessThan(0.01) // symmetric around x=0
     })
+
+    it('interrupts arc rows around the center aisle opening', () => {
+        const shelves = computeArcShelfLayout(8, {
+            rows: 1,
+            shelvesPerRow: 8,
+            firstRowRadius: 7,
+            halfAngle: Math.PI / 3,
+            centerAisleHalfAngle: Math.PI / 12,
+        })
+
+        const closestToCenterX = Math.min(...shelves.map(shelf => Math.abs(shelf.position.x)))
+        expect(closestToCenterX).toBeGreaterThan(1.7)
+    })
+
+    it('does not place a single-shelf row at x=0 when center aisle width interruption is enabled', () => {
+        const shelves = computeArcShelfLayout(1, {
+            rows: 1,
+            shelvesPerRow: 1,
+            firstRowRadius: 5.5,
+            halfAngle: Math.PI / 3,
+            centerAisleHalfWidthX: 2.5,
+        })
+
+        expect(shelves).toHaveLength(1)
+        expect(Math.abs(shelves[0].position.x)).toBeGreaterThanOrEqual(2.45)
+    })
 })

@@ -156,6 +156,7 @@ export class ShelfLayoutCoordinator {
         EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(
             GameEventTypes.ShelfLayoutDetermined,
             {
+                layoutMode: this.layoutMode,
                 shelfBounds: bounds,
                 shelfLayout: {
                     rows: rowCount,

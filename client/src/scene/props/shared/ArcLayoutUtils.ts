@@ -51,6 +51,15 @@ export interface ArcLayoutConfig {
     halfAngle?: number
     /** Optional per-row half-angle overrides (radians). */
     halfAngleByRow?: number[]
+    /** Half-angle of a central aisle interruption in radians. Default PI/18 (~10 deg). */
+    centerAisleHalfAngle?: number
+    /** Optional per-row central aisle half-angle overrides (radians). */
+    centerAisleHalfAngleByRow?: number[]
+    /**
+     * Half-width of the center bisection corridor on X (metres).
+     * If provided, rows reserve |x| < centerAisleHalfWidthX.
+     */
+    centerAisleHalfWidthX?: number
     /** Physical width of one shelf unit in metres (used with minShelfGap). Default 2.0. */
     shelfWidthMetres?: number
     /**
@@ -79,6 +88,66 @@ const DEFAULTS: Required<Pick<ArcLayoutConfig, 'rows' | 'shelvesPerRow' | 'rowRa
     halfAngle: Math.PI / 3, // 60 deg each side
 }
 
+const DEFAULT_CENTER_AISLE_HALF_ANGLE = 0
+const STORE_ROW_RADIUS_STEP_METRES = 4.0
+const STORE_CENTER_AISLE_WIDTH_MULTIPLIER = 1.25
+export const STORE_CENTER_AISLE_HALF_WIDTH_X = (STORE_ROW_RADIUS_STEP_METRES * STORE_CENTER_AISLE_WIDTH_MULTIPLIER) / 2
+const ARC_ROW_SPREAD_SCALE = 0.8
+
+function lerp(start: number, end: number, t: number): number {
+    return start + (end - start) * t
+}
+
+function buildArcRowAngles(count: number, halfAngle: number, centerAisleHalfAngle: number): number[] {
+    if (count <= 0) {
+        return []
+    }
+
+    const usableHalfAngle = Math.max(0, Math.min(centerAisleHalfAngle, halfAngle - 0.01))
+
+    if (count === 1) {
+        return [usableHalfAngle > 0 ? usableHalfAngle : 0]
+    }
+
+    if (usableHalfAngle <= 0) {
+        return Array.from({ length: count }, (_, index) => {
+            if (count === 1) return 0
+            const t = index / (count - 1)
+            return lerp(-halfAngle, halfAngle, t)
+        })
+    }
+
+    const leftCount = Math.ceil(count / 2)
+    const rightCount = count - leftCount
+    const angles: number[] = []
+
+    for (let index = 0; index < leftCount; index++) {
+        const t = leftCount === 1 ? 0.5 : index / (leftCount - 1)
+        angles.push(lerp(-halfAngle, -usableHalfAngle, t))
+    }
+
+    for (let index = 0; index < rightCount; index++) {
+        const t = rightCount === 1 ? 0.5 : index / (rightCount - 1)
+        angles.push(lerp(usableHalfAngle, halfAngle, t))
+    }
+
+    return angles
+}
+
+function deriveCenterAisleHalfAngleForRow(
+    radius: number,
+    centerAisleHalfWidthX: number | undefined,
+    fallbackHalfAngle: number
+): number {
+    if (!centerAisleHalfWidthX || centerAisleHalfWidthX <= 0 || radius <= 0) {
+        return Math.max(0, fallbackHalfAngle)
+    }
+
+    const ratio = Math.min(0.99, centerAisleHalfWidthX / radius)
+    const widthDerivedHalfAngle = Math.asin(ratio)
+    return Math.max(widthDerivedHalfAngle, fallbackHalfAngle)
+}
+
 /**
  * Build a per-row shelf config so each section maps to a contiguous band of complete rings.
  *
@@ -99,8 +168,8 @@ function buildRingBandsForSections(
     rowRadiusStep: number
 } {
     const FIRST_ROW_RADIUS = 5.5
-    const ROW_RADIUS_STEP = 4.0
-    const HALF_ANGLE = Math.PI / 3      // 60° each side = 120° arc span
+    const ROW_RADIUS_STEP = STORE_ROW_RADIUS_STEP_METRES
+    const HALF_ANGLE = (Math.PI / 3) * ARC_ROW_SPREAD_SCALE
     const MIN_GAP = 1.0
     const SHELF_WIDTH = 2.0
 
@@ -184,12 +253,18 @@ export function computeArcShelfLayout(
         // Clamp to how many shelves we'll actually place in this row so the
         // placed shelves are centred at angle=0 rather than bunched to one side.
         const actualCount = Math.min(count, totalShelves - shelfIndex)
+        const rowCenterAisleHalfAngle = cfg.centerAisleHalfAngleByRow?.[row]
+            ?? cfg.centerAisleHalfAngle
+            ?? DEFAULT_CENTER_AISLE_HALF_ANGLE
+        const effectiveCenterAisleHalfAngle = deriveCenterAisleHalfAngleForRow(
+            radius,
+            cfg.centerAisleHalfWidthX,
+            rowCenterAisleHalfAngle
+        )
+        const rowAngles = buildArcRowAngles(actualCount, rowHalfAngle, effectiveCenterAisleHalfAngle)
 
-        for (let i = 0; i < count && shelfIndex < totalShelves; i++) {
-            // Spread shelves evenly across the arc span, using actualCount for
-            // spacing so a partial row stays centred (not left-justified).
-            const t = actualCount === 1 ? 0 : (i / (actualCount - 1)) - 0.5   // -0.5 .. +0.5
-            const angle = t * 2 * rowHalfAngle                     // -halfAngle .. +halfAngle
+        for (let i = 0; i < rowAngles.length && shelfIndex < totalShelves; i++) {
+            const angle = rowAngles[i]
 
             // Arc is in the -Z half-space (in front of player)
             // angle = 0 means straight ahead (-Z axis), positive angle = left, negative = right
@@ -232,15 +307,16 @@ export function computeStoreArcShelfLayout(totalShelves: number): ArcShelfInfo[]
             Math.max(1, totalShelves - STORE_ARC_FIXED_ROWS_COUNT),
         ],
         halfAngleByRow: [
-            Math.PI / 3.5,
-            Math.PI / 3.5,
-            Math.PI / 3,
-            Math.PI / 3,
-            Math.PI / 2.6,
+            (Math.PI / 3.5) * ARC_ROW_SPREAD_SCALE,
+            (Math.PI / 3.5) * ARC_ROW_SPREAD_SCALE,
+            (Math.PI / 3) * ARC_ROW_SPREAD_SCALE,
+            (Math.PI / 3) * ARC_ROW_SPREAD_SCALE,
+            (Math.PI / 2.6) * ARC_ROW_SPREAD_SCALE,
         ],
         minShelfGap: 1.0,
-        rowRadiusStep: 4.0,
+        rowRadiusStep: STORE_ROW_RADIUS_STEP_METRES,
         firstRowRadius: 5.5,
+        centerAisleHalfWidthX: STORE_CENTER_AISLE_HALF_WIDTH_X,
     }
     return computeArcShelfLayout(totalShelves, config)
 }
@@ -272,6 +348,7 @@ function computeArcShelvesForSections(sections: ReadonlyArray<Section>): Section
         rowRadiusStep: ringBands.rowRadiusStep,
         minShelfGap: 1.0,
         shelfWidthMetres: 2.0,
+        centerAisleHalfWidthX: STORE_CENTER_AISLE_HALF_WIDTH_X,
     })
 
     // Map each physical shelf back to its original (unsorted) section index

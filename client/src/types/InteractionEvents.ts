@@ -20,6 +20,7 @@ import type { WebXRCapabilities } from '../webxr/WebXRManager'
 import type { SteamGame } from '../steam'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
 import type { IStockStrategy } from '../scene/props/shared/StockStrategy'
+import type { LayoutMode } from './LayoutTypes'
 
 // =============================================================================
 // STEAM EVENTS
@@ -189,6 +190,7 @@ export interface ShelfBounds {
 }
 
 export interface ShelfLayoutDeterminedEvent extends BaseInteractionEvent {
+    layoutMode?: LayoutMode
     shelfBounds: ShelfBounds
     shelfLayout: { rows: number; shelvesPerRow?: number }
     stockStrategy: IStockStrategy

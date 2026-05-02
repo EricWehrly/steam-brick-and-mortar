@@ -172,7 +172,7 @@ describe('computeSpokeShelfLayout', () => {
     })
 
     it('spokes are evenly angularly spaced', () => {
-        const config: SpokeLayoutConfig = { spokeCount: 4, shelvesPerSpoke: 1 }
+        const config: SpokeLayoutConfig = { spokeCount: 4, shelvesPerSpoke: 1, centerRunnerHalfWidthX: 0 }
         const shelves = computeSpokeShelfLayout(config)
         // For each spoke, get the midpoint of its two shelves to approximate centreline angle
         const angles: number[] = []
@@ -193,5 +193,24 @@ describe('computeSpokeShelfLayout', () => {
         for (const diff of diffs) {
             expect(diff).toBeCloseTo(Math.PI / 2, 1)
         }
+    })
+
+    it('default spoke centrelines avoid the central aisle axis', () => {
+        const config: SpokeLayoutConfig = { spokeCount: 4, shelvesPerSpoke: 1, centerRunnerHalfWidthX: 0 }
+        const shelves = computeSpokeShelfLayout(config)
+
+        for (let spoke = 0; spoke < 4; spoke++) {
+            const inSpoke = shelves.filter(shelf => shelf.spokeIndex === spoke)
+            const midX = inSpoke.reduce((sum, shelf) => sum + shelf.position.x, 0) / inSpoke.length
+            expect(Math.abs(midX)).toBeGreaterThan(0.5)
+        }
+    })
+
+    it('keeps the global entrance runner aisle clear on the X axis', () => {
+        const config: SpokeLayoutConfig = { spokeCount: 4, shelvesPerSpoke: 3, centerRunnerHalfWidthX: 1.6 }
+        const shelves = computeSpokeShelfLayout(config)
+
+        const closestToRunnerCenter = Math.min(...shelves.map(shelf => Math.abs(shelf.position.x)))
+        expect(closestToRunnerCenter).toBeGreaterThanOrEqual(2.59)
     })
 })

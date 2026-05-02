@@ -22,6 +22,7 @@ import type { SectionsReadyEvent } from '../types/EnvironmentEvents'
 import { SceneSignManager, SignStyles } from './SceneSignManager'
 import type { SignMount } from './SignTypes'
 import { Logger } from '../utils/Logger'
+import type { LayoutMode } from '../types/LayoutTypes'
 
 export interface ShelfSignPlannerConfig {
     signYOffset?: number
@@ -31,6 +32,7 @@ export interface ShelfSignPlannerConfig {
 const SHELF_SIGN_Y_OFFSET = 2.02
 const SHELF_SIGN_MOUNT_STYLE: SignMount['style'] = 'above-shelf'
 const SHELF_SIGN_FRONT_OFFSET = 0.28
+const ROW_AISLE_MIN_GAP_METRES = 2.4
 export class ShelfSignPlanner {
     private static readonly logger = Logger.createLogFunctions(ShelfSignPlanner.name)
 
@@ -41,6 +43,7 @@ export class ShelfSignPlanner {
     private shelfRotations: number[] = []
     private shelfSectionIndices: number[] = []
     private pendingSections: SectionsReadyEvent | null = null
+    private activeLayoutMode: LayoutMode | null = null
     private readonly placedSignIdentifiers = new Set<string>()
 
     private buildSignIdentifier(sectionName: string, edge: 'start' | 'end'): string {
@@ -87,6 +90,7 @@ export class ShelfSignPlanner {
         this.shelfRotations = []
         this.shelfSectionIndices = []
         this.pendingSections = null
+        this.activeLayoutMode = null
         this.clearSigns()
         ShelfSignPlanner.logger.debug('Cleared shelf positions and signs (setup request)')
     }
@@ -96,6 +100,7 @@ export class ShelfSignPlanner {
         this.shelfRotations = []
         this.shelfSectionIndices = []
         this.pendingSections = null
+        this.activeLayoutMode = null
         this.clearSigns()
         ShelfSignPlanner.logger.debug('Cleared shelf positions and signs (library reload)')
     }
@@ -113,6 +118,8 @@ export class ShelfSignPlanner {
         if (!this.pendingSections) {
             return
         }
+
+        this.activeLayoutMode = _detail.layoutMode ?? null
 
         this.placeSignsForSections(this.pendingSections)
         this.pendingSections = null
@@ -183,9 +190,82 @@ export class ShelfSignPlanner {
             }
         }
 
+        if (this.activeLayoutMode === 'row') {
+            this.placeRowAisleEdgeSigns(sections)
+        }
+
         ShelfSignPlanner.logger.debug(
             `Placed ${this.placedSignIdentifiers.size} signs across ${sections.length} sections`
         )
+    }
+
+    private placeRowAisleEdgeSigns(sections: ReadonlyArray<{ name: string }>): void {
+        type RowAnchor = { shelfIndex: number; position: THREE.Vector3; rotationY: number }
+        const rowAnchorsByZ = new Map<number, RowAnchor[]>()
+
+        for (let shelfIndex = 0; shelfIndex < this.shelfPositions.length; shelfIndex++) {
+            const position = this.shelfPositions[shelfIndex]
+            if (!position) {
+                continue
+            }
+            const rowZKey = Math.round(position.z * 100)
+            const anchors = rowAnchorsByZ.get(rowZKey) ?? []
+            anchors.push({
+                shelfIndex,
+                position,
+                rotationY: this.shelfRotations[shelfIndex] ?? 0,
+            })
+            rowAnchorsByZ.set(rowZKey, anchors)
+        }
+
+        for (const [rowZKey, rowAnchors] of rowAnchorsByZ) {
+            const leftInnerAnchor = rowAnchors
+                .filter(anchor => anchor.position.x < 0)
+                .sort((a, b) => b.position.x - a.position.x)[0]
+            const rightInnerAnchor = rowAnchors
+                .filter(anchor => anchor.position.x > 0)
+                .sort((a, b) => a.position.x - b.position.x)[0]
+
+            if (!leftInnerAnchor || !rightInnerAnchor) {
+                continue
+            }
+
+            const aisleGapWidth = rightInnerAnchor.position.x - leftInnerAnchor.position.x
+            if (aisleGapWidth < ROW_AISLE_MIN_GAP_METRES) {
+                continue
+            }
+
+            this.placeRowAisleSignForAnchor(rowZKey, leftInnerAnchor, 'left', sections)
+            this.placeRowAisleSignForAnchor(rowZKey, rightInnerAnchor, 'right', sections)
+        }
+    }
+
+    private placeRowAisleSignForAnchor(
+        rowZKey: number,
+        anchor: { position: THREE.Vector3; rotationY: number },
+        side: 'left' | 'right',
+        sections: ReadonlyArray<{ name: string }>
+    ): void {
+        const sectionIndex = this.shelfSectionIndices[anchor.shelfIndex]
+        const sectionName = sections[sectionIndex]?.name
+        if (!sectionName || sectionName === 'Other') {
+            return
+        }
+
+        const uniqueIdentifier = `row-aisle-${rowZKey}-${side}`
+        this.signSystem.placeSign('canvas', {
+            uniqueIdentifier,
+            text: sectionName,
+            anchorPosition: anchor.position,
+            mount: {
+                style: this.config.signMountStyle,
+                yOffset: this.config.signYOffset,
+                frontOffset: SHELF_SIGN_FRONT_OFFSET,
+                signFacingY: anchor.rotationY,
+            },
+            style: { ...SignStyles.Category, fontSize: 0.12, padding: '0.05 0.08' },
+        })
+        this.placedSignIdentifiers.add(uniqueIdentifier)
     }
 
     private clearSigns(): void {
@@ -199,6 +279,7 @@ export class ShelfSignPlanner {
         this.shelfPositions = []
         this.shelfRotations = []
         this.shelfSectionIndices = []
+        this.activeLayoutMode = null
         this.clearSigns()
         this.signSystem.clearAll()
     }

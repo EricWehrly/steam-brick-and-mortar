@@ -8,7 +8,7 @@ import {
     type ShelfLayoutDeterminedEvent,
 } from '../../../src/types/InteractionEvents'
 import type { SectionsReadyEvent } from '../../../src/types/EnvironmentEvents'
-import type { Section } from '../../../src/types/LayoutTypes'
+import type { LayoutMode, Section } from '../../../src/types/LayoutTypes'
 import type { SteamGameData } from '../../../src/scene/game-box/types/GameData'
 
 const placeSignSpy = vi.fn().mockReturnValue(new THREE.Group())
@@ -73,8 +73,9 @@ function emitShelfReady(shelfIndex: number, position = FAR_POSITION, rotationY =
     })
 }
 
-function emitShelfLayoutDetermined(): void {
+function emitShelfLayoutDetermined(layoutMode?: LayoutMode): void {
     EventManager.getInstance().emit<ShelfLayoutDeterminedEvent>(GameEventTypes.ShelfLayoutDetermined, {
+        layoutMode,
         shelfBounds: { minX: -10, maxX: 10, minZ: -20, maxZ: -2 },
         shelfLayout: { rows: 1 },
         stockStrategy: { order: (boards: any[]) => boards } as any,
@@ -263,5 +264,27 @@ describe('ShelfSignPlanner — sign placement from SectionsReady', () => {
             emitSectionsReady([makeSection('Action')])
         }).not.toThrow()
         expect(placeSignSpy).not.toHaveBeenCalled()
+    })
+
+    it('adds aisle-edge signs for row layouts where a central aisle exists', () => {
+        new ShelfSignPlanner()
+        emitShelfReady(0, new THREE.Vector3(-4, 0, -8), 0, 0)
+        emitShelfReady(1, new THREE.Vector3(-1.5, 0, -8), 0, 0)
+        emitShelfReady(2, new THREE.Vector3(1.5, 0, -8), 0, 0)
+        emitShelfReady(3, new THREE.Vector3(4, 0, -8), 0, 0)
+
+        emitSectionsReady([makeSection('Action')])
+        emitShelfLayoutDetermined('row')
+
+        const placedIds = placeSignSpy.mock.calls.map(([, detail]) => detail.uniqueIdentifier)
+        expect(placedIds).toContain('Action::start')
+        expect(placedIds).toContain('Action::end')
+        expect(placedIds).toContain('row-aisle--800-left')
+        expect(placedIds).toContain('row-aisle--800-right')
+
+        const leftAisleSign = placeSignSpy.mock.calls.find(([, detail]) => detail.uniqueIdentifier === 'row-aisle--800-left')
+        const rightAisleSign = placeSignSpy.mock.calls.find(([, detail]) => detail.uniqueIdentifier === 'row-aisle--800-right')
+        expect(leftAisleSign?.[1].text).toBe('Action')
+        expect(rightAisleSign?.[1].text).toBe('Action')
     })
 })
