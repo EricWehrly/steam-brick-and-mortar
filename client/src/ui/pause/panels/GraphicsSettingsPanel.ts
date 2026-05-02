@@ -41,6 +41,12 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         const lodMaxHighSlots = this.appSettings.getSetting('lodMaxHighSlots')
         
         return renderTemplate(graphicsSettingsPanelTemplate, {
+            // Renderer quality preset
+            qualityLow: this.appSettings.getSetting('qualityLevel') === 'low',
+            qualityMedium: this.appSettings.getSetting('qualityLevel') === 'medium',
+            qualityHigh: this.appSettings.getSetting('qualityLevel') === 'high',
+            qualityUltra: this.appSettings.getSetting('qualityLevel') === 'ultra',
+
             // Lighting Quality
             lightingQualitySimple: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.SIMPLE,
             lightingQualityEnhanced: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.ENHANCED,
@@ -85,6 +91,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     }
 
     private attachSelectEvents(): void {
+        UIComponentUtils.setupSelect<ApplicationSettings['qualityLevel']>(document.body, {
+            selectId: 'quality-level-select',
+            onChange: (quality) => this.updateSetting('qualityLevel', quality)
+        })
+
         UIComponentUtils.setupSelect<ApplicationSettings['lightingQuality']>(document.body, {
             selectId: 'lighting-quality',
             onChange: (quality) => this.updateSetting('lightingQuality', quality)
@@ -270,6 +281,12 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     private refreshSettingsDisplay(): void {
         if (!this.container) return
         
+        // Update lighting quality select
+        const qualityLevelSelect = document.getElementById('quality-level-select') as HTMLSelectElement
+        if (qualityLevelSelect) {
+            qualityLevelSelect.value = this.appSettings.getSetting('qualityLevel')
+        }
+
         // Update lighting quality select
         const lightingSelect = document.getElementById('lighting-quality') as HTMLSelectElement
         if (lightingSelect) {

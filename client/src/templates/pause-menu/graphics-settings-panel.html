@@ -9,6 +9,26 @@
       <span>⚠️</span>
       <span>Some changes require a scene reload to take effect</span>
     </div>
+
+    <!-- Renderer Quality Preset -->
+    <section class="setting-section">
+      <div class="setting-group">
+        <label class="setting-label" for="quality-level-select">
+          ⚙️ Renderer Quality Preset
+        </label>
+        <p class="setting-description">
+          Coarse renderer preset for pixel ratio and shadow map defaults.
+        </p>
+        <div class="setting-control">
+          <select id="quality-level-select" class="setting-select pause-select">
+            <option value="low" {{#qualityLow}}selected{{/qualityLow}}>Low</option>
+            <option value="medium" {{#qualityMedium}}selected{{/qualityMedium}}>Medium</option>
+            <option value="high" {{#qualityHigh}}selected{{/qualityHigh}}>High</option>
+            <option value="ultra" {{#qualityUltra}}selected{{/qualityUltra}}>Ultra</option>
+          </select>
+        </div>
+      </div>
+    </section>
     
     <!-- Lighting Quality Section -->
     <section class="setting-section">

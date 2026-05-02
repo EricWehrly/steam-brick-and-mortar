@@ -48,12 +48,6 @@ export class ApplicationPanel extends PauseMenuPanel {
     public render(): string {
         const currentSettings = this.appSettings.getAllSettings()
         return renderTemplate(applicationPanelTemplate, {
-            // Quality level selections
-            qualityLow: currentSettings.qualityLevel === 'low',
-            qualityMedium: currentSettings.qualityLevel === 'medium',
-            qualityHigh: currentSettings.qualityLevel === 'high',
-            qualityUltra: currentSettings.qualityLevel === 'ultra',
-            
             // Checkbox states
             showFPS: currentSettings.showFPS,
             showPerformanceStats: currentSettings.showPerformanceStats,
@@ -73,11 +67,6 @@ export class ApplicationPanel extends PauseMenuPanel {
             { buttonId: 'export-settings-btn', onClick: this.exportSettings.bind(this) },
             { buttonId: 'import-settings-btn', onClick: this.importSettings.bind(this) }
         ])
-
-        UIComponentUtils.setupSelect<ApplicationSettings['qualityLevel']>(this.container, {
-            selectId: 'quality-select',
-            onChange: (value) => this.updateSetting('qualityLevel', value)
-        })
 
         UIComponentUtils.setupToggles(this.container, [
             {
@@ -238,9 +227,6 @@ export class ApplicationPanel extends PauseMenuPanel {
     private refreshSettingsDisplay(): void {
         // Update all form elements to reflect current settings
         const currentSettings = this.appSettings.getAllSettings()
-        
-        const qualitySelect = this.container?.querySelector('#quality-select') as HTMLSelectElement
-        if (qualitySelect) qualitySelect.value = currentSettings.qualityLevel
         
         // Update all checkboxes
         const checkboxes = [

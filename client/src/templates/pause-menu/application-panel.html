@@ -11,46 +11,27 @@
     </div>
 </div>
 
-<!-- Performance Settings -->
-<div class="app-section">
-    <h4>Performance Settings</h4>
-    <div class="settings-grid">
-        <div class="setting-item">
-            <label for="quality-select">Graphics Quality:</label>
-            <select id="quality-select" class="setting-select">
-                <option value="low" {{#selected qualityLow}}selected{{/selected}}>Low</option>
-                <option value="medium" {{#selected qualityMedium}}selected{{/selected}}>Medium</option>
-                <option value="high" {{#selected qualityHigh}}selected{{/selected}}>High</option>
-                <option value="ultra" {{#selected qualityUltra}}selected{{/selected}}>Ultra</option>
-            </select>
-        </div>
-    </div>
-</div>
-
 <!-- Interface Settings -->
 <div class="app-section">
     <h4>Interface Settings</h4>
     <div class="settings-grid">
         <div class="setting-item checkbox-item">
             <label class="checkbox-label">
-                <input type="checkbox" id="show-fps-toggle" {{#checked showFPS}}checked{{/checked}}>
-                <span class="checkmark"></span>
+                <input type="checkbox" class="ui-checkbox" id="show-fps-toggle" {{#checked showFPS}}checked{{/checked}}>
                 <span class="label-text">Show FPS Counter</span>
             </label>
         </div>
         
         <div class="setting-item checkbox-item">
             <label class="checkbox-label">
-                <input type="checkbox" id="show-perf-toggle" {{#checked showPerformanceStats}}checked{{/checked}}>
-                <span class="checkmark"></span>
+                <input type="checkbox" class="ui-checkbox" id="show-perf-toggle" {{#checked showPerformanceStats}}checked{{/checked}}>
                 <span class="label-text">Show Performance Stats</span>
             </label>
         </div>
         
         <div class="setting-item checkbox-item">
             <label class="checkbox-label">
-                <input type="checkbox" id="hide-ui-vr-toggle" {{#checked hideUIInVR}}checked{{/checked}}>
-                <span class="checkmark"></span>
+                <input type="checkbox" class="ui-checkbox" id="hide-ui-vr-toggle" {{#checked hideUIInVR}}checked{{/checked}}>
                 <span class="label-text">Hide UI in VR Mode</span>
             </label>
         </div>
@@ -63,16 +44,14 @@
     <div class="settings-grid">
         <div class="setting-item checkbox-item">
             <label class="checkbox-label">
-                <input type="checkbox" id="verbose-logging-toggle" {{#checked verboseLogging}}checked{{/checked}}>
-                <span class="checkmark"></span>
+                <input type="checkbox" class="ui-checkbox" id="verbose-logging-toggle" {{#checked verboseLogging}}checked{{/checked}}>
                 <span class="label-text">Verbose Logging</span>
             </label>
         </div>
         
         <div class="setting-item checkbox-item">
             <label class="checkbox-label">
-                <input type="checkbox" id="show-debug-toggle" {{#checked showDebugInfo}}checked{{/checked}}>
-                <span class="checkmark"></span>
+                <input type="checkbox" class="ui-checkbox" id="show-debug-toggle" {{#checked showDebugInfo}}checked{{/checked}}>
                 <span class="label-text">Show Debug Info</span>
             </label>
         </div>
@@ -92,8 +71,7 @@
     <div class="settings-grid">
         <div class="setting-item checkbox-item">
             <label class="checkbox-label">
-                <input type="checkbox" id="auto-save-toggle" {{#checked autoSave}}checked{{/checked}}>
-                <span class="checkmark"></span>
+                <input type="checkbox" class="ui-checkbox" id="auto-save-toggle" {{#checked autoSave}}checked{{/checked}}>
                 <span class="label-text">Auto-save Settings</span>
             </label>
         </div>
