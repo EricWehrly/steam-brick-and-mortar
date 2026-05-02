@@ -148,21 +148,44 @@ describe('section-aware arc layout', () => {
 
         const negativeCount = shelves.filter(shelf => shelf.position.x < 0).length
         const positiveCount = shelves.filter(shelf => shelf.position.x > 0).length
-        expect(Math.abs(negativeCount - positiveCount)).toBeLessThanOrEqual(1)
+        expect(Math.abs(negativeCount - positiveCount)).toBeLessThanOrEqual(2)
     })
 
-    it('allows a large section to straddle both arc sides when it cannot fit one side cleanly', () => {
+    it('keeps each section on a single arc side (no wrapping across the aisle)', () => {
         const sections = [
-            { name: 'Huge', games: Array.from({ length: 252 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'Huge', games: Array.from({ length: 72 }, (_, i) => ({ appid: i + 1 })) },
             { name: 'TinyA', games: Array.from({ length: 18 }, (_, i) => ({ appid: 1000 + i + 1 })) },
-            { name: 'TinyB', games: Array.from({ length: 18 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+            { name: 'TinyB', games: Array.from({ length: 36 }, (_, i) => ({ appid: 2000 + i + 1 })) },
         ] as any
 
         const shelves = ArcLayout.computeShelvesForSections(sections)
-        const hugeShelves = shelves.filter(shelf => shelf.sectionIndex === 0)
+        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+            const sectionShelves = shelves.filter(shelf => shelf.sectionIndex === sectionIndex)
+            const hasNegative = sectionShelves.some(shelf => shelf.position.x < 0)
+            const hasPositive = sectionShelves.some(shelf => shelf.position.x > 0)
+            expect(!(hasNegative && hasPositive)).toBe(true)
+        }
+    })
 
-        expect(hugeShelves.some(shelf => shelf.position.x < 0)).toBe(true)
-        expect(hugeShelves.some(shelf => shelf.position.x > 0)).toBe(true)
+    it('preserves section order within each arc side', () => {
+        const sections = [
+            { name: 'Last Week', games: Array.from({ length: 18 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'Last Month', games: Array.from({ length: 36 }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'Older', games: Array.from({ length: 54 }, (_, i) => ({ appid: 2000 + i + 1 })) },
+            { name: 'Archive', games: Array.from({ length: 72 }, (_, i) => ({ appid: 3000 + i + 1 })) },
+        ] as any
+
+        const shelves = ArcLayout.computeShelvesForSections(sections)
+        const negativeOrder = shelves.filter(shelf => shelf.position.x < 0).map(shelf => shelf.sectionIndex)
+        const positiveOrder = shelves.filter(shelf => shelf.position.x > 0).map(shelf => shelf.sectionIndex)
+
+        for (let index = 1; index < negativeOrder.length; index++) {
+            expect(negativeOrder[index]).toBeGreaterThanOrEqual(negativeOrder[index - 1])
+        }
+
+        for (let index = 1; index < positiveOrder.length; index++) {
+            expect(positiveOrder[index]).toBeGreaterThanOrEqual(positiveOrder[index - 1])
+        }
     })
 
     it('expands arc depth dynamically for larger section shelf counts', () => {
