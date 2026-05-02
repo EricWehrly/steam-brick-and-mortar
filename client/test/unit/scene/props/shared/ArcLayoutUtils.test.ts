@@ -131,7 +131,7 @@ describe('computeArcShelfLayout', () => {
 })
 
 describe('section-aware arc layout', () => {
-    it('each section owns contiguous ring bands (no mixed-section rows)', () => {
+    it('keeps each section shelf count while balancing assignment across aisle regions', () => {
         const sections = [
             { name: 'Puzzle', games: Array.from({ length: 50 }, (_, i) => ({ appid: i + 1 })) },
             { name: 'RPG', games: Array.from({ length: 120 }, (_, i) => ({ appid: 1000 + i + 1 })) },
@@ -139,38 +139,30 @@ describe('section-aware arc layout', () => {
         ] as any
 
         const shelves = ArcLayout.computeShelvesForSections(sections)
-        expect(shelves.length).toBeGreaterThan(0)
+        const shelvesPerSection = sections.map((section: { games: unknown[] }) => Math.max(1, Math.ceil(section.games.length / 18)))
 
-        // Build a map of row → set of section indices
-        const rowToSections = new Map<number, Set<number>>()
-        for (const shelf of shelves) {
-            if (!rowToSections.has(shelf.row)) rowToSections.set(shelf.row, new Set())
-            rowToSections.get(shelf.row)!.add(shelf.sectionIndex)
+        for (let sectionIndex = 0; sectionIndex < shelvesPerSection.length; sectionIndex++) {
+            const actual = shelves.filter(shelf => shelf.sectionIndex === sectionIndex).length
+            expect(actual).toBe(shelvesPerSection[sectionIndex])
         }
 
-        // Every row must be owned by exactly one section (ring-band semantics)
-        for (const [, sectionSet] of rowToSections) {
-            expect(sectionSet.size).toBe(1)
-        }
+        const negativeCount = shelves.filter(shelf => shelf.position.x < 0).length
+        const positiveCount = shelves.filter(shelf => shelf.position.x > 0).length
+        expect(Math.abs(negativeCount - positiveCount)).toBeLessThanOrEqual(1)
     })
 
-    it('sections are sorted smallest-first so inner rings are tightest', () => {
+    it('allows a large section to straddle both arc sides when it cannot fit one side cleanly', () => {
         const sections = [
-            // Deliberately pass largest-first to verify auto-sort
-            { name: 'Action', games: Array.from({ length: 280 }, (_, i) => ({ appid: i + 1 })) },
-            { name: 'RPG',    games: Array.from({ length: 120 }, (_, i) => ({ appid: 1000 + i + 1 })) },
-            { name: 'Puzzle', games: Array.from({ length: 50 },  (_, i) => ({ appid: 2000 + i + 1 })) },
+            { name: 'Huge', games: Array.from({ length: 252 }, (_, i) => ({ appid: i + 1 })) },
+            { name: 'TinyA', games: Array.from({ length: 18 }, (_, i) => ({ appid: 1000 + i + 1 })) },
+            { name: 'TinyB', games: Array.from({ length: 18 }, (_, i) => ({ appid: 2000 + i + 1 })) },
         ] as any
 
         const shelves = ArcLayout.computeShelvesForSections(sections)
-        expect(shelves.length).toBeGreaterThan(0)
+        const hugeShelves = shelves.filter(shelf => shelf.sectionIndex === 0)
 
-        // Inner rings (row 0) should belong to the smallest section (Puzzle = originalIndex 2)
-        const innerShelves = shelves.filter((s) => s.row === 0)
-        const innerSections = new Set(innerShelves.map((s) => s.sectionIndex))
-        // The smallest section (50 games = Puzzle, originalIndex 2) should be closest
-        const smallestOriginalIndex = 2
-        expect(innerSections.has(smallestOriginalIndex)).toBe(true)
+        expect(hugeShelves.some(shelf => shelf.position.x < 0)).toBe(true)
+        expect(hugeShelves.some(shelf => shelf.position.x > 0)).toBe(true)
     })
 
     it('expands arc depth dynamically for larger section shelf counts', () => {

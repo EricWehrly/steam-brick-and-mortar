@@ -20,6 +20,7 @@ import type { StockSurface } from '../../../types/LayoutTypes'
 import type { ISectionAwareLayoutDefinition } from './ILayoutDefinition'
 import type { ShelfInfo, Section, SectionShelfInfo } from '../../../types/LayoutTypes'
 import { AISLE_WIDTH_X } from './LayoutAisleWidths'
+import { assignSectionsByBalancedXAxisRegions } from './BalancedSectionAllocator'
 
 /**
  * RowStockStrategy
@@ -143,10 +144,11 @@ export function computeRowShelfLayout(
     for (let row = 0; row < cfg.maxRows && placed < totalShelves; row++) {
         const z = -(cfg.firstRowZ + row * cfg.rowSpacingZ)
         const actualCount = Math.min(shelvesPerRow, totalShelves - placed)
+        const startCol = Math.floor((shelvesPerRow - actualCount) / 2)
 
         for (let col = 0; col < actualCount; col++) {
             const x = computeAisleShiftedX(
-                col,
+                startCol + col,
                 shelvesPerRow,
                 cfg.shelfSpacingX,
                 cfg.centralAisleWidthX
@@ -172,20 +174,12 @@ function computeRowShelvesForSections(sections: ReadonlyArray<Section>): Section
     const shelvesPerSection = sections.map(section => Math.max(1, Math.ceil(section.games.length / 18)))
     const totalShelves = shelvesPerSection.reduce((sum, count) => sum + count, 0)
     const rowShelves = computeRowShelfLayout(totalShelves, deriveRowLayoutConfigFromSectionCounts(sections))
+    const sectionByShelfIndex = assignSectionsByBalancedXAxisRegions(rowShelves, shelvesPerSection)
 
-    const result: SectionShelfInfo[] = []
-    let shelfIndex = 0
-    for (let sectionIndex = 0; sectionIndex < shelvesPerSection.length; sectionIndex++) {
-        const sectionShelfCount = shelvesPerSection[sectionIndex]
-        for (let sectionShelfIndex = 0; sectionShelfIndex < sectionShelfCount && shelfIndex < rowShelves.length; sectionShelfIndex++, shelfIndex++) {
-            result.push({
-                ...rowShelves[shelfIndex],
-                sectionIndex,
-            })
-        }
-    }
-
-    return result
+    return rowShelves.map((shelf, shelfIndex) => ({
+        ...shelf,
+        sectionIndex: sectionByShelfIndex[shelfIndex] ?? 0,
+    }))
 }
 
 export const RowLayout: ISectionAwareLayoutDefinition = {
