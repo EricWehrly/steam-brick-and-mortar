@@ -33,6 +33,11 @@ export interface WireRackOptions {
   spacing?: number
 }
 
+export interface EntranceMatOptions {
+  width?: number
+  depth?: number
+}
+
 export class PropRenderer {
   public static logger = Logger.createLogFunctions(PropRenderer.name)
   private scene: THREE.Scene
@@ -280,13 +285,13 @@ export class PropRenderer {
   /**
    * Create entrance floor mat for visual entrance indication
    */
-  public createEntranceFloorMat(roomWidth: number, _roomDepth: number): THREE.Group {
+  public createEntranceFloorMat(roomWidth: number, roomDepth: number, options: EntranceMatOptions = {}): THREE.Group {
     const entranceGroup = new THREE.Group()
     entranceGroup.name = 'entrance-floor-mat'
     
-    // Create entrance mat geometry (will be positioned by caller)
-    const matWidth = Math.min(6, roomWidth * 0.4) // 40% of room width, max 6m
-    const matDepth = 1.5 // 1.5m deep entrance mat
+    // Aisle runner: narrow along X, long along Z (PlaneGeometry(w,h) + rotation.x=-PI/2 maps w→X, h→Z)
+    const matWidth = options.width ?? Math.min(3.2, roomWidth * 0.15)
+    const matDepth = options.depth ?? Math.min(10, roomDepth * 0.7)
     const matGeometry = new THREE.PlaneGeometry(matWidth, matDepth)
     
     // Create mat material with different color/texture
