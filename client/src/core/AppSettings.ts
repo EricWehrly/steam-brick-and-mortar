@@ -32,6 +32,8 @@ export const Setting = {
     // Graphics
     LightingQuality: 'lightingQuality',
     ShadowQuality: 'shadowQuality',
+    ShadowMapEnabled: 'shadowMapEnabled',
+    PixelRatioScale: 'pixelRatioScale',
     CeilingHeight: 'ceilingHeight',
     EnableLighting: 'enableLighting',
     ShowLightingDebug: 'showLightingDebug',
@@ -69,6 +71,8 @@ export const SettingCategory = {
     Graphics: [
         Setting.LightingQuality,
         Setting.ShadowQuality,
+        Setting.ShadowMapEnabled,
+        Setting.PixelRatioScale,
         Setting.CeilingHeight,
         Setting.EnableLighting,
         Setting.ShowLightingDebug,
@@ -89,6 +93,8 @@ export interface ApplicationSettings {
     // Graphics Settings
     lightingQuality: LightingQuality
     shadowQuality: number // 0=off, 1=low, 2=medium, 3=high, 4=ultra
+    shadowMapEnabled: boolean
+    pixelRatioScale: number
     ceilingHeight: number
     enableLighting: boolean
     showLightingDebug: boolean
@@ -389,6 +395,8 @@ export class AppSettings {
             // Graphics Settings
             lightingQuality: LIGHTING_QUALITY.ENHANCED,
             shadowQuality: 2, // Medium shadows by default
+            shadowMapEnabled: true,
+            pixelRatioScale: 1,
             ceilingHeight: 3.2,
             enableLighting: true,
             showLightingDebug: false,
@@ -445,12 +453,16 @@ export class AppSettings {
             'verboseLogging', 'showDebugInfo', 'showCompassRose',
             'autoSave', 'autoLoadProfile', 'developmentMode',
             'enableLabels', 'enableStickers', 'enableArtwork', 'useMultiAtlas', 'useLodAtlas',
-            'enableLighting', 'showLightingDebug', 'showCeiling'
+            'enableLighting', 'showLightingDebug', 'showCeiling', 'shadowMapEnabled'
         ]
         for (const field of booleanFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'boolean') {
                 return false
             }
+        }
+
+        if (settingsObj.pixelRatioScale !== undefined && typeof settingsObj.pixelRatioScale !== 'number') {
+            return false
         }
         
         return true

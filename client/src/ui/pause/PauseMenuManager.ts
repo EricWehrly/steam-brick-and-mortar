@@ -578,6 +578,15 @@ export class PauseMenuManager {
             this.updateGraphicsQuality(settings.qualityLevel)
         }
 
+        if (settings.shadowMapEnabled !== undefined && this.systemDependencies) {
+            this.systemDependencies.renderer.shadowMap.enabled = settings.shadowMapEnabled
+        }
+
+        if (settings.pixelRatioScale !== undefined && this.systemDependencies) {
+            const clampedRatio = Math.max(0.25, Math.min(2, settings.pixelRatioScale))
+            this.systemDependencies.renderer.setPixelRatio(clampedRatio)
+        }
+
         // Handle graphics settings
         if (settings.lightingQuality !== undefined || settings.shadowQuality !== undefined) {
             console.log('🎨 Graphics settings changed, applying lighting update...')
@@ -619,24 +628,34 @@ export class PauseMenuManager {
         }
 
         const renderer = this.systemDependencies.renderer
+        let shadowMapEnabled = true
+        let pixelRatioScale = 1
         
         switch (quality) {
             case 'low':
-                renderer.shadowMap.enabled = false
-                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1))
+                shadowMapEnabled = false
+                pixelRatioScale = 1
                 break
             case 'medium':
-                renderer.shadowMap.enabled = true
-                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
+                shadowMapEnabled = true
+                pixelRatioScale = 1.5
                 break
             case 'high':
-                renderer.shadowMap.enabled = true
-                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+                shadowMapEnabled = true
+                pixelRatioScale = 2
                 break
             case 'ultra':
-                renderer.shadowMap.enabled = true
-                renderer.setPixelRatio(window.devicePixelRatio)
+                shadowMapEnabled = true
+                pixelRatioScale = window.devicePixelRatio
                 break
         }
+
+        renderer.shadowMap.enabled = shadowMapEnabled
+        renderer.setPixelRatio(pixelRatioScale)
+
+        this.appSettings.updateSettings({
+            shadowMapEnabled,
+            pixelRatioScale
+        }, EventSource.System)
     }
 }
