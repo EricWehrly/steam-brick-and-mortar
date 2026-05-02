@@ -3,14 +3,17 @@
  * 
  * Provides application-level controls and settings:
  * - Resume application control
- * - Performance and graphics settings
  * - User preferences and interface options
- * - Debug and development tools
+ * - General application configuration (auto-save)
  * 
- * Central hub for all non-Steam related application configuration.
+ * Central hub for all application-level settings not related to graphics/performance.
  * 
  * This panel serves as a UI representation of the AppSettings service,
  * displaying current settings and allowing user interaction to modify them.
+ * 
+ * Note: Performance/debug display toggles (Show FPS, Show Performance Stats) have been
+ * moved to the Debug panel. VR settings (Hide UI in VR Mode) are commented out and will
+ * be moved to a future "VR" tab under the Display tabgroup in Act 3.
  */
 
 import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
@@ -49,11 +52,6 @@ export class ApplicationPanel extends PauseMenuPanel {
         const currentSettings = this.appSettings.getAllSettings()
         return renderTemplate(applicationPanelTemplate, {
             // Checkbox states
-            showFPS: currentSettings.showFPS,
-            showPerformanceStats: currentSettings.showPerformanceStats,
-            hideUIInVR: currentSettings.hideUIInVR,
-            verboseLogging: currentSettings.verboseLogging,
-            showDebugInfo: currentSettings.showDebugInfo,
             autoSave: currentSettings.autoSave
         })
     }
@@ -160,11 +158,6 @@ export class ApplicationPanel extends PauseMenuPanel {
         
         // Update all checkboxes
         const checkboxes = [
-            { id: '#show-fps-toggle', setting: 'showFPS' as const },
-            { id: '#show-perf-toggle', setting: 'showPerformanceStats' as const },
-            { id: '#hide-ui-vr-toggle', setting: 'hideUIInVR' as const },
-            { id: '#verbose-logging-toggle', setting: 'verboseLogging' as const },
-            { id: '#show-debug-toggle', setting: 'showDebugInfo' as const },
             { id: '#auto-save-toggle', setting: 'autoSave' as const }
         ]
         

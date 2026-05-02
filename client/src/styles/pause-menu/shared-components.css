@@ -188,7 +188,7 @@
 
 /* Shared section label styling for pause menu panels. */
 .pause-menu-panel h4 {
-    margin: 0 0 10px 0;
+    margin: 5px 10px 10px;
     color: var(--panel-text-muted, #8f98a0);
     font-size: 12px;
     font-weight: 700;

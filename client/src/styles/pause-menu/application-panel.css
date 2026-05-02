@@ -22,6 +22,17 @@
     flex-wrap: wrap;
 }
 
+#panel-application .general-actions .pause-btn.reset-mild {
+    background: linear-gradient(135deg, #5a4a40 0%, #473a33 100%);
+    border-color: #7a6559;
+    color: #f2e6de;
+}
+
+#panel-application .general-actions .pause-btn.reset-mild:hover:not([disabled]) {
+    background: linear-gradient(135deg, #6a5549 0%, #5a4a40 100%);
+    border-color: #8a7266;
+}
+
 @media (max-width: 600px) {
     #panel-application .general-actions {
         flex-direction: column;
