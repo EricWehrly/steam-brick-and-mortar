@@ -46,6 +46,10 @@ import { PropRenderer, type EntranceMatOptions } from '../PropRenderer'
 import { AISLE_WIDTH_X } from './shared/LayoutAisleWidths'
 import { RoomConstants } from '../RoomManager'
 
+const RUNNER_MIN_DEPTH_METRES = 4.5
+const RUNNER_MARGIN_RATIO_PER_SIDE = 0.01
+const PERCENT_BASE = 100
+
 class StorePropsCoordinator {
     private static readonly logger = Logger.createLogFunctions(StorePropsCoordinator.name)
 
@@ -208,12 +212,17 @@ class StorePropsCoordinator {
 
     private buildEntranceMatOptions(dimensions: { width: number; depth: number }): EntranceMatOptions {
         const runnerWidth = AISLE_WIDTH_X
-        const runnerDepth = Math.max(4.5, dimensions.depth * 0.92)
+        const runnerDepth = this.getRunnerDepthMetres(dimensions.depth)
 
         return {
             width: runnerWidth,
             depth: runnerDepth,
         }
+    }
+
+    private getRunnerDepthMetres(roomDepthMetres: number): number {
+        const runnerDepthRatio = (PERCENT_BASE - (2 * RUNNER_MARGIN_RATIO_PER_SIDE * PERCENT_BASE)) / PERCENT_BASE
+        return Math.max(RUNNER_MIN_DEPTH_METRES, roomDepthMetres * runnerDepthRatio)
     }
 
     private handleLayoutRequested(detail: LayoutRequestedEvent): void {

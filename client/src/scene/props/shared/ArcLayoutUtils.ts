@@ -92,13 +92,15 @@ const DEFAULTS: Required<Pick<ArcLayoutConfig, 'rows' | 'shelvesPerRow' | 'rowRa
 const DEFAULT_CENTER_AISLE_HALF_ANGLE = 0
 const STORE_ROW_RADIUS_STEP_METRES = 4.0
 const ARC_ROW_SPREAD_SCALE = 0.8
+const MIN_HALF_ANGLE_CLEARANCE = 0.01
+const ASIN_RATIO_MAX = 0.99
 
 function buildArcRowAngles(count: number, halfAngle: number, centerAisleHalfAngle: number): number[] {
     if (count <= 0) {
         return []
     }
 
-    const usableHalfAngle = Math.max(0, Math.min(centerAisleHalfAngle, halfAngle - 0.01))
+    const usableHalfAngle = Math.max(0, Math.min(centerAisleHalfAngle, halfAngle - MIN_HALF_ANGLE_CLEARANCE))
 
     if (count === 1) {
         return [usableHalfAngle > 0 ? usableHalfAngle : 0]
@@ -138,7 +140,7 @@ function deriveCenterAisleHalfAngleForRow(
         return Math.max(0, fallbackHalfAngle)
     }
 
-    const ratio = Math.min(0.99, centerAisleHalfWidthX / radius)
+    const ratio = Math.min(ASIN_RATIO_MAX, centerAisleHalfWidthX / radius)
     const widthDerivedHalfAngle = Math.asin(ratio)
     return Math.max(widthDerivedHalfAngle, fallbackHalfAngle)
 }
