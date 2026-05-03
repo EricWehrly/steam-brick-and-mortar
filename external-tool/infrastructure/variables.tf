@@ -50,6 +50,17 @@ variable "allowed_origins" {
   ]
 }
 
+variable "github_pages_origin" {
+  description = "Optional GitHub Pages origin URL for CORS, for example https://EricWehrly.github.io"
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.github_pages_origin == "" || length(regexall("^https://", var.github_pages_origin)) > 0
+    error_message = "The github_pages_origin value must be empty or start with https://."
+  }
+}
+
 variable "lambda_timeout" {
   description = "Lambda function timeout in seconds"
   type        = number

@@ -3,6 +3,10 @@
 # Local values for computed configurations
 locals {
   api_domain_name = "${var.api_subdomain}-${var.environment}.${var.domain_name}"
+  combined_allowed_origins = concat(
+    var.allowed_origins,
+    var.github_pages_origin != "" ? [var.github_pages_origin] : []
+  )
   
   common_tags = {
     Project     = var.project_name
@@ -78,7 +82,7 @@ module "api_gateway" {
   api_domain_name         = local.api_domain_name
   certificate_arn         = module.domain.certificate_arn
   route53_zone_id         = var.route53_zone_id
-  allowed_origins         = var.allowed_origins
+  allowed_origins         = local.combined_allowed_origins
   throttle_rate_limit     = var.api_throttle_rate_limit
   throttle_burst_limit    = var.api_throttle_burst_limit
   log_retention_days      = var.cloudwatch_log_retention_days
