@@ -393,9 +393,8 @@ export class AppSettings {
     }
 
     private getDefaultSettings(): ApplicationSettings {
-        // In development mode, disable GPU-intensive features by default for faster startup.
-        const hostname = typeof window !== 'undefined' && window.location ? window.location.hostname : ''
-        const isDev = hostname === 'localhost' || hostname === '127.0.0.1'
+        // Use Vite's mode flag so prod/dev behavior is tied to the build, not runtime hostname checks.
+        const isDev = import.meta.env.DEV
         
         return {
             // Performance Settings

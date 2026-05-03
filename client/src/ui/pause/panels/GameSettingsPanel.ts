@@ -262,7 +262,11 @@ export class GameSettingsPanel extends PauseMenuPanel {
         
         // Reset AppSettings to defaults as well
         this.appSettings.setSetting('autoLoadProfile', false, EventSource.UI)
-        this.appSettings.setSetting('developmentMode', true, EventSource.UI)
+        this.appSettings.setSetting(
+            'developmentMode',
+            this.appSettings.getDefaultSetting('developmentMode'),
+            EventSource.UI
+        )
         
         this.saveSettings()
         this.refreshSettingsDisplay() // Re-render with default values
