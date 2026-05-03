@@ -22,6 +22,14 @@ import { EventManager } from '../core/EventManager'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 import { AppEventTypes } from '../types/InteractionEvents'
 import { FrameBudgetScheduler } from './FrameBudgetScheduler'
+import { CARPET_DIFFUSE_OPTIONS, CARPET_NORMAL_OPTIONS } from './materials/presets/carpetTextureProfiles'
+import { CEILING_DIFFUSE_OPTIONS, CEILING_NORMAL_OPTIONS } from './materials/presets/ceilingTextureProfiles'
+import {
+    MDF_VENEER_DIFFUSE_OPTIONS,
+    MDF_VENEER_NORMAL_OPTIONS,
+    WALL_WOOD_DIFFUSE_OPTIONS,
+    WALL_WOOD_NORMAL_OPTIONS,
+} from './materials/presets/woodTextureProfiles'
 
 
 
@@ -33,7 +41,6 @@ export enum MaterialType {
     Carpet          = 'carpet',
     Ceiling         = 'ceiling',
     WallWood        = 'wallWood',
-    BasicWood       = 'basicWood',
     Glass           = 'glass'
 }
 
@@ -108,8 +115,6 @@ export class SharedMaterialManager {
                 this.prewarmCarpet(worker),
                 this.prewarmCeiling(worker),
                 this.prewarmWallWood(worker),
-                // BasicWood: currently unused — no getMaterial(BasicWood) callers exist.
-                // Re-add this.prewarmBasicWood(worker) if a use is introduced.
             ])
 
             SharedMaterialManager.logger.debug(
@@ -171,12 +176,8 @@ export class SharedMaterialManager {
 
     private async prewarmMDFVeneer(worker: ProceduralTextureWorker): Promise<void> {
         const [diffuseBitmap, normalBitmap] = await Promise.all([
-            worker.generate('wood_enhanced', {
-                width: 1024, height: 1024,
-                grainStrength: 0.3, ringFrequency: 0.01,
-                color1: '#E6D3B7', color2: '#D4C4A0', color3: '#C8B896',
-            }),
-            worker.generate('wood_normal', { width: 1024, height: 1024, strength: 0.06 }),
+            worker.generate('wood_enhanced', { ...MDF_VENEER_DIFFUSE_OPTIONS }),
+            worker.generate('wood_normal', { ...MDF_VENEER_NORMAL_OPTIONS }),
         ])
         const diffuse = this.bitmapToTexture(diffuseBitmap, 6, 4)
         const normal  = this.bitmapToTexture(normalBitmap,  6, 4)
@@ -189,31 +190,13 @@ export class SharedMaterialManager {
     }
 
     private async prewarmCarpet(worker: ProceduralTextureWorker): Promise<void> {
-        const normalMapIntensity = 0.3  // was 0 (unset) in old config — now intentional
         const [diffuseBitmap, normalBitmap] = await Promise.all([
-            worker.generate('carpet_classic', {
-                width: 512,
-                height: 512,
-                color: '#8B0000',
-                accentColor: '#722F37',
-                fiberDensity: 0.4,
-                roughness: 0.9,
-                geometricIntensity: 0.1,
-                variant: 'diamond',
-                scale: 1.0,
-                seed: 12345,
-            }),
-            worker.generate('carpet_normal', {
-                width: 512,
-                height: 512,
-                intensity: normalMapIntensity,
-                pileHeight: 0.3,
-                fiberVariation: 0.2,
-            }),
+            worker.generate('carpet_classic', { ...CARPET_DIFFUSE_OPTIONS }),
+            worker.generate('carpet_normal', { ...CARPET_NORMAL_OPTIONS }),
         ])
         const diffuse    = this.bitmapToTexture(diffuseBitmap, 4, 4)
         const normalMap  = this.bitmapToTexture(normalBitmap,  4, 4)
-        const boostedScale = normalMapIntensity * 9.6
+        const boostedScale = CARPET_NORMAL_OPTIONS.intensity * 9.6
 
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.Carpet, new THREE.MeshStandardMaterial({
@@ -229,14 +212,8 @@ export class SharedMaterialManager {
 
     private async prewarmCeiling(worker: ProceduralTextureWorker): Promise<void> {
         const [diffuseBitmap, normalBitmap] = await Promise.all([
-            worker.generate('ceiling_popcorn', {
-                width: 512, height: 512,
-                color: '#E8E6D0', bumpDensity: 14, bumpHeight: 1.4, detailScale: 5,
-            }),
-            worker.generate('ceiling_popcorn_normal', {
-                width: 512, height: 512,
-                bumpDensity: 14, detailScale: 5, strength: 20,
-            }),
+            worker.generate('ceiling_popcorn', { ...CEILING_DIFFUSE_OPTIONS }),
+            worker.generate('ceiling_popcorn_normal', { ...CEILING_NORMAL_OPTIONS }),
         ])
         const diffuse = this.bitmapToTexture(diffuseBitmap, 6, 6)
         const normal  = this.bitmapToTexture(normalBitmap, 6, 6)
@@ -253,15 +230,8 @@ export class SharedMaterialManager {
 
     private async prewarmWallWood(worker: ProceduralTextureWorker): Promise<void> {
         const [d, n] = await Promise.all([
-            worker.generate('wood_planks', {
-                width: 1024, height: 1024,
-                numPlanks: 4,
-                grainFrequency: 1.2,
-                grainStrength: 0.12,
-                baseColors: ['#7B3F10', '#8B4A14', '#9B5520', '#A8622A', '#8C4A18', '#955218'],
-                edgeColor: '#5C2F0A',
-            }),
-            worker.generate('wood_normal', { width: 1024, height: 1024, strength: 0.3 }),
+            worker.generate('wood_planks', { ...WALL_WOOD_DIFFUSE_OPTIONS }),
+            worker.generate('wood_normal', { ...WALL_WOOD_NORMAL_OPTIONS }),
         ])
         // Texture Y = plank bands. Rotated 90deg so planks run vertically on wall.
         // repeat(1, 12): 1 tile per ceiling height, 12 tiles across wall width (~0.55m per plank width).
@@ -274,28 +244,6 @@ export class SharedMaterialManager {
         
         FrameBudgetScheduler.getInstance().schedule(
             () => this.upsertMaterial(MaterialType.WallWood,
-                new THREE.MeshStandardMaterial({
-                    map: diffuse,
-                    normalMap: normal,
-                    roughness: 0.8, metalness: 0.1,
-                })),
-            { priority: 'normal', estimatedMs: 2, maxDeferMs: 0 }
-        )
-    }
-
-    private async prewarmBasicWood(worker: ProceduralTextureWorker): Promise<void> {
-        const [d, n] = await Promise.all([
-            worker.generate('wood_enhanced', {
-                width: 1024, height: 1024, grainStrength: 0.3, ringFrequency: 0.08,
-                color1: '#8B4513', color2: '#A0522D', color3: '#654321',
-            }),
-            worker.generate('wood_normal', { width: 1024, height: 1024, strength: 0.18 }),
-        ])
-        const diffuse = this.bitmapToTexture(d, 3, 1)
-        const normal  = this.bitmapToTexture(n, 3, 1)
-
-        FrameBudgetScheduler.getInstance().schedule(
-            () => this.upsertMaterial(MaterialType.BasicWood,
                 new THREE.MeshStandardMaterial({
                     map: diffuse,
                     normalMap: normal,
@@ -385,7 +333,6 @@ export class SharedMaterialManager {
             case MaterialType.Carpet:
             case MaterialType.Ceiling:
             case MaterialType.WallWood:
-            case MaterialType.BasicWood:
                 SharedMaterialManager.logger.debug(
                     `getMaterial(${type}) called before prewarm() — returning flat-color fallback (prewarm not yet complete)`
                 )
@@ -405,7 +352,6 @@ export class SharedMaterialManager {
             [MaterialType.Carpet]:    0x8B0000,
             [MaterialType.Ceiling]:   0xF5F5DC,
             [MaterialType.WallWood]:  0x8B4513,
-            [MaterialType.BasicWood]: 0x8B4513,
         }
         return new THREE.MeshStandardMaterial({
             color:     FALLBACK_COLORS[type] ?? 0x888888,
