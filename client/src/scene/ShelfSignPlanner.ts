@@ -43,10 +43,8 @@ export class ShelfSignPlanner {
     private shelfRotations: number[] = []
     private shelfSectionIndices: number[] = []
     private pendingSections: SectionsReadyEvent | null = null
-    private pendingSectionRunId: number | null = null
     private activeLayoutMode: LayoutMode | null = null
     private readonly placedSignIdentifiers = new Set<string>()
-    private sectionRunCounter = 0
 
     private buildSignIdentifier(sectionName: string, edge: 'start' | 'end'): string {
         return `${sectionName}::${edge}`
@@ -85,8 +83,8 @@ export class ShelfSignPlanner {
         this.shelfSectionIndices[detail.shelfIndex] = detail.sectionIndex
 
         if (detail.shelfIndex < 4 || detail.shelfIndex % 10 === 0) {
-            ShelfSignPlanner.logger.info(
-                `[ShelfSignAnchor] shelf=${detail.shelfIndex}, section=${detail.sectionIndex}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
+            ShelfSignPlanner.logger.debug(
+                `Shelf anchor recorded: shelf=${detail.shelfIndex}, section=${detail.sectionIndex}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
             )
         }
     }
@@ -107,27 +105,23 @@ export class ShelfSignPlanner {
         this.shelfRotations = []
         this.shelfSectionIndices = []
         this.pendingSections = null
-        this.pendingSectionRunId = null
         this.activeLayoutMode = null
         this.clearSigns()
         ShelfSignPlanner.logger.debug('Cleared shelf positions and signs (library reload)')
     }
 
     private stageSectionSigns(detail: SectionsReadyEvent): void {
-        const sectionRunId = ++this.sectionRunCounter
         const nonEmptySections = detail.sections.filter(section => section.games.length > 0).length
         this.pendingSections = detail
-        this.pendingSectionRunId = sectionRunId
 
-        ShelfSignPlanner.logger.info(
-            `[ShelfSign#${sectionRunId}] staged SectionsReady: totalSections=${detail.sections.length}, nonEmptySections=${nonEmptySections}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
+        ShelfSignPlanner.logger.debug(
+            `Staged SectionsReady: totalSections=${detail.sections.length}, nonEmptySections=${nonEmptySections}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
         )
     }
 
     private applyStagedSignsWhenLayoutReady(_detail: ShelfLayoutDeterminedEvent): void {
-        const stagedRunId = this.pendingSectionRunId
-        ShelfSignPlanner.logger.info(
-            `[ShelfSign#${stagedRunId ?? 'none'}] ShelfLayoutDetermined received: layoutMode=${_detail.layoutMode}, hasPendingSections=${this.pendingSections !== null}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
+        ShelfSignPlanner.logger.debug(
+            `ShelfLayoutDetermined received: layoutMode=${_detail.layoutMode}, hasPendingSections=${this.pendingSections !== null}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
         )
 
         if (!this.pendingSections) {
@@ -138,16 +132,14 @@ export class ShelfSignPlanner {
 
         this.placeSignsForSections(this.pendingSections)
         this.pendingSections = null
-        this.pendingSectionRunId = null
     }
 
     private placeSignsForSections(detail: SectionsReadyEvent): void {
         const { sections } = detail
-        const stagedRunId = this.pendingSectionRunId
         this.clearSigns()
 
-        ShelfSignPlanner.logger.info(
-            `[ShelfSign#${stagedRunId ?? 'none'}] placeSignsForSections start: sections=${sections.length}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
+        ShelfSignPlanner.logger.debug(
+            `placeSignsForSections start: sections=${sections.length}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
         )
 
         // Place signs at the first and last shelf owned by each section index.
@@ -193,8 +185,8 @@ export class ShelfSignPlanner {
             })
             this.placedSignIdentifiers.add(startIdentifier)
 
-            ShelfSignPlanner.logger.info(
-                `[ShelfSign#${stagedRunId ?? 'none'}] placed start sign: id=${startIdentifier}, shelf=${startShelfIndex}`
+            ShelfSignPlanner.logger.debug(
+                `Placed start sign: id=${startIdentifier}, shelf=${startShelfIndex}`
             )
 
             if (endShelfIndex !== startShelfIndex) {
@@ -212,8 +204,8 @@ export class ShelfSignPlanner {
                     style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
                 })
                 this.placedSignIdentifiers.add(endIdentifier)
-                ShelfSignPlanner.logger.info(
-                    `[ShelfSign#${stagedRunId ?? 'none'}] placed end sign: id=${endIdentifier}, shelf=${endShelfIndex}`
+                ShelfSignPlanner.logger.debug(
+                    `Placed end sign: id=${endIdentifier}, shelf=${endShelfIndex}`
                 )
             }
         }
@@ -225,9 +217,7 @@ export class ShelfSignPlanner {
         ShelfSignPlanner.logger.debug(
             `Placed ${this.placedSignIdentifiers.size} signs across ${sections.length} sections`
         )
-        ShelfSignPlanner.logger.info(
-            `[ShelfSign#${stagedRunId ?? 'none'}] complete: placed=${this.placedSignIdentifiers.size}`
-        )
+        ShelfSignPlanner.logger.debug(`placeSignsForSections complete: placed=${this.placedSignIdentifiers.size}`)
     }
 
     private placeRowAisleEdgeSigns(sections: ReadonlyArray<{ name: string }>): void {
@@ -301,8 +291,8 @@ export class ShelfSignPlanner {
 
     private clearSigns(): void {
         if (this.placedSignIdentifiers.size > 0) {
-            ShelfSignPlanner.logger.info(
-                `[ShelfSign] clearing existing signs: count=${this.placedSignIdentifiers.size}`
+            ShelfSignPlanner.logger.debug(
+                `Clearing existing signs: count=${this.placedSignIdentifiers.size}`
             )
         }
         for (const uniqueIdentifier of this.placedSignIdentifiers) {
