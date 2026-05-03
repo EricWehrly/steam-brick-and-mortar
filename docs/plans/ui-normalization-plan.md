@@ -129,6 +129,21 @@ Write findings to `docs/plans/steam-tag-research.md`.
 ### F1. Scroll-to-top anchors
 For any scrollable panel content that extends 300%+ of the visible panel height, add a "scroll to top" anchor/button. Design it so adding a "scroll to bottom" later is trivial (same component, different direction). Low priority — implement when panels have substantial content.
 
+### F2. Section bookmark rail + proximity peek interactions (Settings/Pause menus)
+Add a left-side vertical rail of section bookmarks (use existing `h4` section headers as anchor targets) for long settings/menu panels.
+
+Interaction concept:
+- Render bookmark tags as compact stacked tabs on the left edge (bookmark-like, optional `>` glyph treatment).
+- Clicking a tag scrolls/jumps to the corresponding section anchor.
+- While pointer movement occurs on the scene/canvas region behind the expanded menu, nearby right-side menu items "peek" outward by proximity in 4 staged states:
+	1. Rolled
+	2. Small peek
+	3. Big peek
+	4. Unrolled
+- Nearest vertically aligned item gets big peek; immediate adjacent items get small peek.
+
+Implementation note: treat as post-normalization UX polish. Keep behavior gated so in-menu interactions (inside expanded controls) do not trigger proximity-peek jitter.
+
 ---
 
 ## Done criteria
