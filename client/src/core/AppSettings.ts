@@ -143,7 +143,7 @@ export interface ApplicationSettings {
 }
 
 export interface SettingChangedEvent extends BaseInteractionEvent {
-    key: keyof ApplicationSettings
+    settingName: keyof ApplicationSettings
     value: ApplicationSettings[keyof ApplicationSettings]
     previousValue: ApplicationSettings[keyof ApplicationSettings]
 }
@@ -226,7 +226,7 @@ export class AppSettings {
 
         // Emit change event
         this.eventManager.emit<SettingChangedEvent>(AppSettingsEventTypes.Changed, {
-            key,
+            settingName: key,
             value,
             previousValue,
             source
@@ -254,7 +254,7 @@ export class AppSettings {
             if (previousValue !== value) {
                 settingsRecord[typedKey] = value as ApplicationSettings[keyof ApplicationSettings]
                 changes.push({
-                    key: typedKey,
+                    settingName: typedKey,
                     value: value as ApplicationSettings[keyof ApplicationSettings],
                     previousValue,
                     timestamp: Date.now(),
@@ -296,7 +296,7 @@ export class AppSettings {
             
             if (previousValue !== value) {
                 this.eventManager.emit<SettingChangedEvent>(AppSettingsEventTypes.Changed, {
-                    key: typedKey,
+                    settingName: typedKey,
                     value: value as ApplicationSettings[keyof ApplicationSettings],
                     previousValue,
                     timestamp: Date.now(),
@@ -326,7 +326,7 @@ export class AppSettings {
                 ;(changes as Record<keyof ApplicationSettings, unknown>)[key] = defaultValue
                 
                 this.eventManager.emit<SettingChangedEvent>(AppSettingsEventTypes.Changed, {
-                    key,
+                    settingName: key,
                     value: defaultValue,
                     previousValue: currentValue,
                     timestamp: Date.now(),

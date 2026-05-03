@@ -12,7 +12,7 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import graphicsSettingsPanelTemplate from '../../../templates/pause-menu/graphics-settings-panel.html?raw'
 import '../../../styles/pause-menu/graphics-settings-panel.css'
-import { AppSettings, LIGHTING_QUALITY, SettingCategory, type ApplicationSettings, type QualityLevel, type SettingChangedEvent } from '../../../core/AppSettings'
+import { AppSettings, LIGHTING_QUALITY, Setting, SettingCategory, type ApplicationSettings, type QualityLevel, type SettingChangedEvent } from '../../../core/AppSettings'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import type * as THREE from 'three'
 import { AppSettingsEventTypes, CeilingEventTypes } from '../../../types/InteractionEvents'
@@ -46,11 +46,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     }
 
     private applySettingToScene(event: SettingChangedEvent): void {
-        const { key, value } = event
+        const { settingName, value } = event
         const eventManager = EventManager.getInstance()
 
-        if ((key === 'shadowMapEnabled' || key === 'pixelRatioScale') && this.renderer) {
-            if (key === 'shadowMapEnabled') {
+        if ((settingName === Setting.ShadowMapEnabled || settingName === Setting.PixelRatioScale) && this.renderer) {
+            if (settingName === Setting.ShadowMapEnabled) {
                 this.renderer.shadowMap.enabled = value as boolean
             } else {
                 const clampedRatio = Math.max(0.25, Math.min(2, value as number))
@@ -58,20 +58,20 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             }
         }
 
-        if (key === 'lightingQuality') {
+        if (settingName === Setting.LightingQuality) {
             eventManager.emit(LightingEventTypes.QualityChanged, {
                 quality: value as ApplicationSettings['lightingQuality'],
                 source: EventSource.UI
             })
         }
 
-        if (key === 'enableLighting') {
+        if (settingName === Setting.EnableLighting) {
             eventManager.emit(LightingEventTypes.Toggle, {
                 enabled: value as boolean
             } as LightingToggleEvent)
         }
 
-        if (key === 'showLightingDebug') {
+        if (settingName === Setting.ShowLightingDebug) {
             eventManager.emit(LightingEventTypes.DebugToggle, {
                 enabled: value as boolean
             } as LightingDebugToggleEvent)

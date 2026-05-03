@@ -116,7 +116,7 @@ describe('AppSettings Reset Functionality', () => {
             
             // Should have emitted one event
             expect(changedEvents).toHaveLength(1)
-            expect(changedEvents[0].key).toBe('shadowQuality')
+            expect(changedEvents[0].settingName).toBe('shadowQuality')
             expect(changedEvents[0].previousValue).toBe(4)
             expect(changedEvents[0].value).toBe(appSettings.getDefaultSetting('shadowQuality'))
             expect(changedEvents[0].source).toBe(EventSource.UI)

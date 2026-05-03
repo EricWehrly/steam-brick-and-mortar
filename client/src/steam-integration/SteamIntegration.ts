@@ -25,7 +25,7 @@ import type {
 } from '../types/InteractionEvents'
 import type { GameDataReadyEvent } from '../types/EnvironmentEvents'
 import type { SettingChangedEvent } from '../core/AppSettings'
-import { AppSettings } from '../core/AppSettings'
+import { AppSettings, Setting } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
 import { sortByNumericField } from '../scene/categorization/GameSortFunctions'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
@@ -317,9 +317,9 @@ export class SteamIntegration {
     }
 
     private async handleSettingsChange(event: CustomEvent<SettingChangedEvent>): Promise<void> {
-        const { key, value } = event.detail
+        const { settingName, value } = event.detail
 
-        if (key !== 'developmentMode') return
+        if (settingName !== Setting.DevelopmentMode) return
 
         const maxGames = value ? 20 : 9999        
         this.config.maxGames = maxGames
