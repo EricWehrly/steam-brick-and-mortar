@@ -89,13 +89,6 @@ export interface RoomCreateEvent extends BaseInteractionEvent {
     proceduralTextures?: boolean
 }
 
-export interface RoomResizeEvent extends BaseInteractionEvent {
-    width: number
-    depth: number
-    height: number
-    reason?: string
-}
-
 export interface RoomCreatedEvent extends BaseInteractionEvent {
     dimensions: { width: number; depth: number; height: number }
 }
@@ -265,7 +258,6 @@ export const SteamEventTypes = {
 } as const
 
 export const RoomEventTypes = {
-    Resize: 'room:resize',
     Created: 'room:created',
     Resized: 'room:resized'
 } as const
