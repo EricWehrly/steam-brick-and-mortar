@@ -25,6 +25,15 @@ export const LIGHTING_QUALITY = {
 
 export type LightingQuality = typeof LIGHTING_QUALITY[keyof typeof LIGHTING_QUALITY]
 
+export const QUALITY_LEVEL = {
+    LOW: 'low',
+    MEDIUM: 'medium',
+    HIGH: 'high',
+    ULTRA: 'ultra'
+} as const
+
+export type QualityLevel = typeof QUALITY_LEVEL[keyof typeof QUALITY_LEVEL]
+
 /** Setting keys as const for type-safe, refactorable access */
 export const Setting = {
     // Performance
@@ -88,7 +97,7 @@ export const SettingCategory = {
 
 export interface ApplicationSettings {
     // Performance Settings
-    qualityLevel: 'low' | 'medium' | 'high' | 'ultra'
+    qualityLevel: QualityLevel
     
     // Graphics Settings
     lightingQuality: LightingQuality
@@ -443,7 +452,7 @@ export class AppSettings {
         const settingsObj = settings as Record<string, unknown>
         
         // Validate specific fields if present
-        if (settingsObj.qualityLevel && !['low', 'medium', 'high', 'ultra'].includes(settingsObj.qualityLevel as string)) {
+        if (settingsObj.qualityLevel && !Object.values(QUALITY_LEVEL).includes(settingsObj.qualityLevel as QualityLevel)) {
             return false
         }
         

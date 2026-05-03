@@ -12,8 +12,9 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import graphicsSettingsPanelTemplate from '../../../templates/pause-menu/graphics-settings-panel.html?raw'
 import '../../../styles/pause-menu/graphics-settings-panel.css'
-import { AppSettings, LIGHTING_QUALITY, SettingCategory, type ApplicationSettings } from '../../../core/AppSettings'
+import { AppSettings, LIGHTING_QUALITY, SettingCategory, type ApplicationSettings, type QualityLevel } from '../../../core/AppSettings'
 import { EventManager, EventSource } from '../../../core/EventManager'
+import type * as THREE from 'three'
 import { CeilingEventTypes } from '../../../types/InteractionEvents'
 import { type CeilingToggleEvent } from '../../../types/LightingEvents'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
@@ -25,14 +26,16 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
 
     private appSettings: AppSettings
     private onSettingsChanged?: (settings: Partial<ApplicationSettings>) => void
+    private renderer: THREE.WebGLRenderer | null = null
 
     constructor(config: PauseMenuPanelConfig = {}, appSettings: AppSettings) {
         super(config)
         this.appSettings = appSettings
     }
 
-    initialize(callbacks: { onSettingsChanged?: (settings: Partial<ApplicationSettings>) => void }): void {
+    initialize(callbacks: { onSettingsChanged?: (settings: Partial<ApplicationSettings>) => void, renderer?: THREE.WebGLRenderer }): void {
         this.onSettingsChanged = callbacks.onSettingsChanged
+        this.renderer = callbacks.renderer ?? null
     }
 
     render(): string {
@@ -97,7 +100,10 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     private attachSelectEvents(): void {
         UIComponentUtils.setupSelect<ApplicationSettings['qualityLevel']>(document.body, {
             selectId: 'quality-level-select',
-            onChange: (quality) => this.updateSetting('qualityLevel', quality)
+            onChange: (quality) => {
+                this.applyQualityPreset(quality)
+                this.updateSetting('qualityLevel', quality)
+            }
         })
 
         UIComponentUtils.setupSelect<ApplicationSettings['lightingQuality']>(document.body, {
@@ -241,6 +247,40 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     private updateMedDimensions(ratio: number): void {
         const el = document.getElementById('lod-med-dimensions')
         if (el) el.textContent = this.calculateDimensions(ratio)
+    }
+
+    private applyQualityPreset(quality: QualityLevel): void {
+        if (!this.renderer) {
+            console.warn('⚠️ Renderer not available - cannot apply graphics quality preset')
+            return
+        }
+
+        let shadowMapEnabled = true
+        let pixelRatioScale = 1
+
+        switch (quality) {
+            case 'low':
+                shadowMapEnabled = false
+                pixelRatioScale = 1
+                break
+            case 'medium':
+                shadowMapEnabled = true
+                pixelRatioScale = 1.5
+                break
+            case 'high':
+                shadowMapEnabled = true
+                pixelRatioScale = 2
+                break
+            case 'ultra':
+                shadowMapEnabled = true
+                pixelRatioScale = window.devicePixelRatio
+                break
+        }
+
+        this.renderer.shadowMap.enabled = shadowMapEnabled
+        this.renderer.setPixelRatio(pixelRatioScale)
+
+        this.appSettings.updateSettings({ shadowMapEnabled, pixelRatioScale }, EventSource.System)
     }
 
     private getShadowQualityLabel(quality: number): string {
