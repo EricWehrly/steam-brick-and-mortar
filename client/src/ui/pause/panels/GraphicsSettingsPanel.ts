@@ -12,11 +12,11 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import graphicsSettingsPanelTemplate from '../../../templates/pause-menu/graphics-settings-panel.html?raw'
 import '../../../styles/pause-menu/graphics-settings-panel.css'
-import { AppSettings, LIGHTING_QUALITY, SettingCategory, type ApplicationSettings, type QualityLevel } from '../../../core/AppSettings'
+import { AppSettings, LIGHTING_QUALITY, SettingCategory, type ApplicationSettings, type QualityLevel, type SettingChangedEvent } from '../../../core/AppSettings'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import type * as THREE from 'three'
-import { CeilingEventTypes } from '../../../types/InteractionEvents'
-import { type CeilingToggleEvent } from '../../../types/LightingEvents'
+import { AppSettingsEventTypes, CeilingEventTypes } from '../../../types/InteractionEvents'
+import { LightingEventTypes, type CeilingToggleEvent, type LightingToggleEvent, type LightingDebugToggleEvent } from '../../../types/LightingEvents'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 
 export class GraphicsSettingsPanel extends PauseMenuPanel {
@@ -25,7 +25,6 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     readonly icon = '🎨'
 
     private appSettings: AppSettings
-    private onSettingsChanged?: (settings: Partial<ApplicationSettings>) => void
     private renderer: THREE.WebGLRenderer | null = null
 
     constructor(config: PauseMenuPanelConfig = {}, appSettings: AppSettings) {
@@ -33,9 +32,50 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         this.appSettings = appSettings
     }
 
-    initialize(callbacks: { onSettingsChanged?: (settings: Partial<ApplicationSettings>) => void, renderer?: THREE.WebGLRenderer }): void {
-        this.onSettingsChanged = callbacks.onSettingsChanged
+    initialize(callbacks: { renderer?: THREE.WebGLRenderer }): void {
         this.renderer = callbacks.renderer ?? null
+        this.subscribeToSettingsChanges()
+    }
+
+    private subscribeToSettingsChanges(): void {
+        const eventManager = EventManager.getInstance()
+        eventManager.registerEventHandler<SettingChangedEvent>(
+            AppSettingsEventTypes.Changed,
+            (event) => this.applySettingToScene(event.detail)
+        )
+    }
+
+    private applySettingToScene(event: SettingChangedEvent): void {
+        const { key, value } = event
+        const eventManager = EventManager.getInstance()
+
+        if ((key === 'shadowMapEnabled' || key === 'pixelRatioScale') && this.renderer) {
+            if (key === 'shadowMapEnabled') {
+                this.renderer.shadowMap.enabled = value as boolean
+            } else {
+                const clampedRatio = Math.max(0.25, Math.min(2, value as number))
+                this.renderer.setPixelRatio(clampedRatio)
+            }
+        }
+
+        if (key === 'lightingQuality') {
+            eventManager.emit(LightingEventTypes.QualityChanged, {
+                quality: value as ApplicationSettings['lightingQuality'],
+                source: EventSource.UI
+            })
+        }
+
+        if (key === 'enableLighting') {
+            eventManager.emit(LightingEventTypes.Toggle, {
+                enabled: value as boolean
+            } as LightingToggleEvent)
+        }
+
+        if (key === 'showLightingDebug') {
+            eventManager.emit(LightingEventTypes.DebugToggle, {
+                enabled: value as boolean
+            } as LightingDebugToggleEvent)
+        }
     }
 
     render(): string {
@@ -299,7 +339,6 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         value: ApplicationSettings[K]
     ): void {
         this.appSettings.setSetting(key, value, EventSource.UI)
-        this.onSettingsChanged?.({ [key]: value } as Partial<ApplicationSettings>)
         console.log(`🎨 Graphics setting updated: ${key} = ${value}`)
     }
 
@@ -317,11 +356,7 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             control.setAttribute('data-changed', '')
         })
         
-        // Notify that settings changed
-        if (Object.keys(changes).length > 0) {
-            this.onSettingsChanged?.(changes)
-        }
-        
+        // Notify that settings changed — AppSettings emits events automatically
         console.log('🎨 Graphics settings reset to defaults')
     }
 
@@ -475,6 +510,5 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
     }
 
     dispose(): void {
-        this.onSettingsChanged = undefined
     }
 }
