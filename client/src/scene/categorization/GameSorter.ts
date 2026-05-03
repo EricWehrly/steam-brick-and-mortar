@@ -68,6 +68,7 @@ export {
 
 export class GameSorter {
     private static readonly logger = Logger.createLogFunctions(GameSorter.name)
+    private arrangementRunCounter = 0
 
     /**
      * Null until first arrangement is applied. Once set (by initial auth-based
@@ -110,6 +111,7 @@ export class GameSorter {
     }
 
     private arrange(groupMode: GroupMode, sortMode: SortMode): void {
+        const arrangementRunId = ++this.arrangementRunCounter
         const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
         if (games.length === 0) {
             GameSorter.logger.warn('arrange called but no games in DataManager — skipping emit')
@@ -127,17 +129,27 @@ export class GameSorter {
         const allocatedSections = this.buildAllocatedSections(computedSections, plan.sections)
         const sections = allocatedSections.map(({ section }) => section)
 
+        GameSorter.logger.info(
+            `[Arrange#${arrangementRunId}] start: games=${games.length}, sections=${sections.length}, group=${groupMode}, sort=${sortMode}`
+        )
+
         EventManager.getInstance().emit<SectionsComputedEvent>(GameEventTypes.SectionsComputed, {
             groupMode,
             sortMode,
             sections: computedSections,
         })
+        GameSorter.logger.info(
+            `[Arrange#${arrangementRunId}] emitted SectionsComputed: sectionCount=${computedSections.length}`
+        )
 
         EventManager.getInstance().emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
             groupMode,
             sortMode,
             sections: allocatedSections,
         })
+        GameSorter.logger.info(
+            `[Arrange#${arrangementRunId}] emitted SectionsReadyForPlacement: sectionCount=${allocatedSections.length}`
+        )
 
         if (plan.totalAllocatedSections < sortedSections.length) {
             GameSorter.logger.warn(
@@ -152,6 +164,9 @@ export class GameSorter {
             groupMode,
             sortMode,
         })
+        GameSorter.logger.info(
+            `[Arrange#${arrangementRunId}] emitted SectionsReady: sectionCount=${sections.length}`
+        )
         GameSorter.logger.debug(
             `SectionsReady emitted: ${sections.length} sections, ` +
             `group=${groupMode}, sort=${sortMode}, ${games.length} games`
