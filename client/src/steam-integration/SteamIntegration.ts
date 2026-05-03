@@ -252,22 +252,12 @@ export class SteamIntegration {
             const BATCH_SIZE = 18
             const totalBatches = Math.ceil(games.length / BATCH_SIZE)
 
-            SteamIntegration.logger.debug(
-                `Demo load start: games=${games.length}, totalBatches=${totalBatches}`
-            )
-
             // Register games in gameLibrary so they're available for storeSteamDataAndEmitEvent().
             // We set vanity_url and steamid to empty strings (not undefined) so the UI can access
             // them without crashes, but isAnonymous() returns true because steam.userInput is not set.
             this.gameLibrary.setUserData({ ...demoUser, vanity_url: '', steamid: '' })
 
-            SteamIntegration.logger.debug('Demo load: gameLibrary userData staged')
-
             this.storeSteamDataAndEmitEvent(null)
-
-            SteamIntegration.logger.debug(
-                'Demo load: emitted readiness seams DataLoaded/LibraryManifestReady/GameDataReady'
-            )
 
             // Emit games directly as batch events - no Steam API network calls.
             for (let i = 0; i < totalBatches; i++) {
@@ -277,9 +267,6 @@ export class SteamIntegration {
                 EventManager.getInstance().emit<SteamGamesBatchEvent>(
                     SteamEventTypes.GamesBatchReady,
                     { games: batchGames, batchIndex: i, totalBatches }
-                )
-                SteamIntegration.logger.debug(
-                    `Demo load: emitted GamesBatchReady batch=${i + 1}/${totalBatches}, batchSize=${batchGames.length}`
                 )
                 if (i < totalBatches - 1) {
                     await new Promise(resolve => setTimeout(resolve, 0))

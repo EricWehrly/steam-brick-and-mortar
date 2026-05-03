@@ -127,23 +127,17 @@ export class GameSorter {
         const allocatedSections = this.buildAllocatedSections(computedSections, plan.sections)
         const sections = allocatedSections.map(({ section }) => section)
 
-        GameSorter.logger.debug(
-            `Arrangement start: games=${games.length}, sections=${sections.length}, group=${groupMode}, sort=${sortMode}`
-        )
-
         EventManager.getInstance().emit<SectionsComputedEvent>(GameEventTypes.SectionsComputed, {
             groupMode,
             sortMode,
             sections: computedSections,
         })
-        GameSorter.logger.debug(`Emitted SectionsComputed: sectionCount=${computedSections.length}`)
 
         EventManager.getInstance().emit<SectionsReadyForPlacementEvent>(GameEventTypes.SectionsReadyForPlacement, {
             groupMode,
             sortMode,
             sections: allocatedSections,
         })
-        GameSorter.logger.debug(`Emitted SectionsReadyForPlacement: sectionCount=${allocatedSections.length}`)
 
         if (plan.totalAllocatedSections < sortedSections.length) {
             GameSorter.logger.warn(
@@ -158,9 +152,8 @@ export class GameSorter {
             groupMode,
             sortMode,
         })
-        GameSorter.logger.debug(`Emitted SectionsReady: sectionCount=${sections.length}`)
         GameSorter.logger.debug(
-            `SectionsReady emitted: ${sections.length} sections, ` +
+            `Arrangement emitted: ${sections.length} sections, ` +
             `group=${groupMode}, sort=${sortMode}, ${games.length} games`
         )
     }
