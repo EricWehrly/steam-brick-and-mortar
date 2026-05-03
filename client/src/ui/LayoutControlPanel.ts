@@ -13,6 +13,7 @@
  */
 
 import { EventManager } from '../core/EventManager'
+import { DataManager } from '../core/data/DataManager'
 import { GameEventTypes, UIEventTypes } from '../types/InteractionEvents'
 import { GroupModes, SortModes } from '../types/LayoutTypes'
 import type { GroupMode, SortMode, LayoutMode } from '../types/LayoutTypes'
@@ -63,7 +64,12 @@ export class LayoutControlPanel {
     private isControlsVisible = false
     private keyboardHandler: ((e: KeyboardEvent) => void) | null = null
 
-    constructor() {}
+    constructor() {
+        if (DataManager.getInstance().get<boolean>('steam.hasRecencyData') === false) {
+            this.activeGroupKey = GroupModes.ByPlaytime
+            this.activeSortKey = SortModes.ByPlaytime
+        }
+    }
 
     public init(): void {
         const slot = document.getElementById('ui-right-center-group') ?? document.body
@@ -183,7 +189,9 @@ export class LayoutControlPanel {
         select.title = 'Group mode'
         this.groupSelect = select
 
+        const hasRecencyData = DataManager.getInstance().get<boolean>('steam.hasRecencyData') ?? true
         for (const option of GROUP_OPTIONS) {
+            if (!hasRecencyData && option.key === GroupModes.ByRecency) continue
             const el = document.createElement('option')
             el.value = option.key
             el.textContent = option.label
@@ -216,7 +224,9 @@ export class LayoutControlPanel {
         select.title = 'Sort order'
         this.sortSelect = select
 
+        const hasRecencyData = DataManager.getInstance().get<boolean>('steam.hasRecencyData') ?? true
         for (const option of SORT_OPTIONS) {
+            if (!hasRecencyData && option.key === SortModes.ByLastPlayed) continue
             const el = document.createElement('option')
             el.value = option.key
             el.textContent = option.label
