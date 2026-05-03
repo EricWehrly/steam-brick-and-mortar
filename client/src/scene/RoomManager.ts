@@ -31,12 +31,6 @@ export interface RoomDimensions {
     height: number
 }
 
-interface RoomResizeEventData {
-    dimensions?: RoomDimensions
-    centerOffset?: { x: number; y: number; z: number }
-    shelfLayout?: { rows: number; shelvesPerRow?: number }
-}
-
 interface ShelfBounds {
     minX: number
     maxX: number
@@ -119,7 +113,6 @@ export class RoomManager {
         this.appSettings = AppSettings.getInstance()
         this.currentDimensions.height = this.getCurrentCeilingHeight()
         
-        this.eventManager.registerEventHandler(RoomEventTypes.Resize, this.onResizeRoom.bind(this))
         this.eventManager.registerEventHandler(GameEventTypes.ShelfLayoutDetermined, this.onShelfLayoutDetermined.bind(this))
         this.eventManager.registerEventHandler(CeilingEventTypes.Toggle, this.onCeilingToggle.bind(this))
         this.eventManager.registerEventHandler(AppSettingsEventTypes.Changed, this.onAppSettingsChanged.bind(this))
@@ -187,39 +180,6 @@ export class RoomManager {
         })
     }
 
-    private async onResizeRoom(event: CustomEvent<RoomResizeEventData>): Promise<void> {
-        const { dimensions, centerOffset, shelfLayout } = event.detail
-        
-        if (!dimensions) {
-            // No dimensions provided - ignore (legacy events without dimensions)
-            return
-        }
-        
-        if (shelfLayout) {
-            this.currentShelfLayout = shelfLayout
-        }
-
-        if (centerOffset) {
-            this.currentCenterOffset = centerOffset
-        }
-
-        if (this.isBuilding) {
-            // Room still building - just update the target, don't queue multiple operations
-            this.targetDimensions = dimensions
-            this.targetCenterOffset = centerOffset ?? null
-            console.debug('🏠 Room building, queued resize target')
-        } else {
-            // Room ready - resize immediately
-            await this.buildRoom(dimensions, centerOffset)
-        }
-        
-        // Notify listeners that room has resized (or will resize to these dimensions)
-        this.eventManager.emit<RoomResizedEvent>(RoomEventTypes.Resized, { 
-            dimensions,
-            shelfLayout: this.currentShelfLayout,
-            centerOffset: this.currentCenterOffset
-        })
-    }
 
     private async onAppSettingsChanged(event: CustomEvent<SettingChangedEvent>): Promise<void> {
         if (event.detail.settingName !== Setting.CeilingHeight) {
