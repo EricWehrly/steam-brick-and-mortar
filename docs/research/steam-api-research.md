@@ -258,6 +258,32 @@ https://steamcommunity.com/profiles/76561197960287930/games/?tab=all&xml=1
 
 ### Phase 1C: Manual Library Input (Immediate Solution) 📝 **QUICK START**
 1. **Simple game addition UI** in current WebXR app
+
+## 2026-05 Findings: `rtime_last_played` Field Variability
+
+### What we observed in production
+- `GET /games/{steamid}` currently proxies `IPlayerService/GetOwnedGames/v1/` and returns Steam's `games` payload as-is.
+- For some users, `rtime_last_played` is present for many games.
+- For other users, `rtime_last_played` is missing or zero for all games.
+
+### Official documentation signals
+- `GetOwnedGames` docs describe ownership retrieval and visibility constraints, but do not guarantee every optional per-game field for every account.
+  - Source: https://partner.steamgames.com/doc/webapi/IPlayerService#GetOwnedGames
+- `GetRecentlyPlayedGames` exists as a separate endpoint specifically for recent-play data.
+  - Source: https://partner.steamgames.com/doc/webapi/IPlayerService#GetRecentlyPlayedGames
+- Web API overview notes that methods are subject to access/auth visibility restrictions.
+  - Source: https://partner.steamgames.com/doc/webapi_overview
+
+### Community reports (non-authoritative, but consistent)
+- Steam Community thread (Apr 2024) reports `GetOwnedGames` often returning reduced fields for non-owner lookups.
+  - Source: https://steamcommunity.com/discussions/forum/7/4361249282371665215/?l=english
+- Stack Overflow thread (Jun 2024) reports the same symptom: `rtime_last_played` returned for some profiles, not others.
+  - Source: https://stackoverflow.com/questions/78640273/why-is-rtime-last-played-not-being-returned-for-most-steam-profiles-via-the-stea
+
+### Practical implication for this project
+- Treat `GetOwnedGames` as an ownership and baseline playtime source.
+- Treat recent-play metadata as best-effort and augment via `GetRecentlyPlayedGames`.
+- Keep client merge precedence conservative to avoid overwriting trusted existing values.
 2. **Steam Store search integration** for autocomplete
 3. **Local storage** for game library persistence
 4. **No external dependencies**
