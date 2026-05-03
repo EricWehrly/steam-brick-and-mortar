@@ -130,11 +130,11 @@ export class LodDistanceManager {
     }
 
     private onSettingChanged(event: SettingChangedEvent): void {
-        if (event.key === 'lodHighDistance' && typeof event.value === 'number') {
+        if (event.settingName === Setting.LodHighDistance && typeof event.value === 'number') {
             this.config.highDistance = event.value
             this.updateSquaredDistances()
             LodDistanceManager.logger.info(`HIGH distance updated to ${event.value}m`)
-        } else if (event.key === 'lodMedDistance' && typeof event.value === 'number') {
+        } else if (event.settingName === Setting.LodMedDistance && typeof event.value === 'number') {
             this.config.midDistance = event.value
             this.updateSquaredDistances()
             LodDistanceManager.logger.info(`MED distance updated to ${event.value}m`)

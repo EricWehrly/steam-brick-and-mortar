@@ -36,7 +36,7 @@ export class CompassRose {
         this.eventManager.registerEventHandler<SettingChangedEvent>(
             AppSettingsEventTypes.Changed,
             (event) => {
-                if (event.detail.key === 'showCompassRose') {
+                if (event.detail.settingName === 'showCompassRose') {
                     this.setVisible(event.detail.value as boolean)
                 }
             }
