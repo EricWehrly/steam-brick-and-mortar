@@ -23,8 +23,6 @@
     flex: 1;
 }
 
-/* .debug-section layout handled by shared .panel-card alias in shared-components */
-
 .debug-stats {
     display: flex;
     flex-direction: column;

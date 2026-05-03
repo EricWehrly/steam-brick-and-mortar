@@ -9,7 +9,6 @@ import { PauseMenuPanel } from './PauseMenuPanel'
 import { renderTemplate } from '../../utils/TemplateEngine'
 import pauseMenuStructureTemplate from '../../templates/pause-menu/main-structure.html?raw'
 import '../../styles/pause-menu/pause-menu-manager.css'
-import '../../styles/pause-menu/display-panel.css'
 
 // Panel imports for default registration
 import { CacheManagementPanel } from './panels/CacheManagementPanel'

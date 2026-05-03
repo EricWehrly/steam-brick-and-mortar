@@ -2,6 +2,14 @@
 
 /* Camera Settings Panel Styles */
 
+/* When shown as a display subtab the parent has no fixed height, so let the panel size naturally */
+.pause-menu-content.display-tab-group-active .camera-settings-panel {
+    height: auto;
+    overflow: visible;
+    padding: 16px 0 20px;
+    box-sizing: border-box;
+}
+
 .camera-settings-panel {
     display: flex;
     flex-direction: column;
