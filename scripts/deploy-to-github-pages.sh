@@ -39,9 +39,6 @@ git clone --single-branch --branch gh-pages "$ORIGIN_URL" "$TMP_PUBLISH_DIR" >/d
 find "$TMP_PUBLISH_DIR" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
 cp -R "$REPO_ROOT/client/dist/." "$TMP_PUBLISH_DIR/"
 
-# Exclude unused assets from deployment.
-rm -f "$TMP_PUBLISH_DIR/models/video_store_shelf.glb"
-
 # Keep Pages static serving behavior explicit.
 touch "$TMP_PUBLISH_DIR/.nojekyll"
 
