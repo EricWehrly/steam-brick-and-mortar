@@ -120,11 +120,25 @@ resource "aws_cloudwatch_log_group" "lambda_logs" {
   tags = var.tags
 }
 
+# Run yarn install before zipping
+resource "null_resource" "yarn_install" {
+  triggers = {
+    package_json = filemd5("${var.lambda_source_dir}/package.json")
+  }
+
+  provisioner "local-exec" {
+    command     = "cd ${var.lambda_source_dir}; yarn install --production"
+    interpreter = ["powershell", "-Command"]
+  }
+}
+
 # Create deployment package from source code
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = var.lambda_source_dir
   output_path = "${path.module}/lambda_function.zip"
+
+  depends_on = [null_resource.yarn_install]
 }
 
 # Lambda function
