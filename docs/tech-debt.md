@@ -14,6 +14,24 @@
 
 ## Fix Now (Intermission)
 
+## id: appsettings-default-vs-override-persistence
+**Priority**: Medium  
+**Effort**: ~1-2 hours  
+**Context**: App settings currently mix environment-derived defaults (Vite `DEV`) with persisted values. We started refactoring persistence to store only explicit overrides vs defaults, but paused to avoid churn during current shipping work.
+
+**Decision (for now)**:
+- Do not tweak this further in current pass.
+- Revisit after current release-critical tasks are complete.
+
+**Done when**:
+- Effective value model is explicitly defined as: runtime defaults + user overrides
+- Persistence behavior is documented and covered by tests (especially `developmentMode`)
+- Reset-to-default behavior in settings panels cannot force dev mode in production builds
+
+**Related files**:
+- `client/src/core/AppSettings.ts`
+- `client/src/ui/pause/panels/GameSettingsPanel.ts`
+
 ## id: angled-layout-center-aisle-overlap
 **Priority**: High  
 **Effort**: ~0.5-1 day (geometry pass + visual validation)  
