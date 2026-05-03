@@ -18,12 +18,10 @@ import { GameSettingsPanel } from './panels/GameSettingsPanel'
 import { GraphicsSettingsPanel } from './panels/GraphicsSettingsPanel'
 import { CameraSettingsPanel } from './panels/CameraSettingsPanel'
 import type { PerformanceMonitorUI } from '../PerformanceMonitor'
-import { EventManager, EventSource } from '../../core/EventManager'
+import { EventManager } from '../../core/EventManager'
 import { SteamEventTypes } from '../../types/InteractionEvents'
-import { LightingEventTypes } from '../../types/LightingEvents'
 import type { SteamDataLoadedEvent } from '../../types/InteractionEvents'
-import type { LightingToggleEvent, LightingDebugToggleEvent } from '../../types/LightingEvents'
-import { AppSettings, type ApplicationSettings } from '../../core/AppSettings'
+import { AppSettings } from '../../core/AppSettings'
 import { DebugPanel } from './panels/DebugPanel'
 
 export interface PauseMenuState {
@@ -164,9 +162,7 @@ export class PauseMenuManager {
         
         // Register application panel
         const applicationPanel = new ApplicationPanel({}, this.appSettings, this.eventManager)
-        applicationPanel.initialize({
-            onSettingsChanged: (settings) => this.handleSettingsChange(settings)
-        })
+        applicationPanel.initialize({})
         this.applicationPanel = applicationPanel
         this.registerPanel(applicationPanel)
         
@@ -185,7 +181,6 @@ export class PauseMenuManager {
         // Register graphics settings panel
         const graphicsPanel = new GraphicsSettingsPanel({}, this.appSettings)
         graphicsPanel.initialize({
-            onSettingsChanged: (settings) => this.handleSettingsChange(settings),
             renderer: this.systemDependencies?.renderer
         })
         this.registerPanel(graphicsPanel)
@@ -568,51 +563,6 @@ export class PauseMenuManager {
             } catch (error) {
                 console.warn('Failed to remove styles:', error)
             }
-        }
-    }
-
-    private handleSettingsChange(settings: Partial<ApplicationSettings>): void {
-        console.log('⚙️ Settings changed:', settings)
-
-        if (settings.shadowMapEnabled !== undefined && this.systemDependencies) {
-            this.systemDependencies.renderer.shadowMap.enabled = settings.shadowMapEnabled
-        }
-
-        if (settings.pixelRatioScale !== undefined && this.systemDependencies) {
-            const clampedRatio = Math.max(0.25, Math.min(2, settings.pixelRatioScale))
-            this.systemDependencies.renderer.setPixelRatio(clampedRatio)
-        }
-
-        // Handle graphics settings
-        if (settings.lightingQuality !== undefined || settings.shadowQuality !== undefined) {
-            console.log('🎨 Graphics settings changed, applying lighting update...')
-            // Emit lighting quality change event
-            if (settings.lightingQuality !== undefined) {
-                this.eventManager.emit(LightingEventTypes.QualityChanged, {
-                    quality: settings.lightingQuality,
-                    source: EventSource.UI
-                })
-            }
-        }
-
-        if (settings.ceilingHeight !== undefined) {
-            console.log(`📏 Ceiling height changed to ${settings.ceilingHeight}m`)
-            // Note: Environment changes require SceneCoordinator integration (handled in next step)
-        }
-
-        // Handle lighting toggles (these can be applied immediately)
-        if (settings.enableLighting !== undefined) {
-            console.log(`💡 Lighting ${settings.enableLighting ? 'enabled' : 'disabled'}`)
-            this.eventManager.emit(LightingEventTypes.Toggle, { 
-                enabled: settings.enableLighting 
-            } as LightingToggleEvent)
-        }
-
-        if (settings.showLightingDebug !== undefined) {
-            console.log(`🔍 Lighting debug ${settings.showLightingDebug ? 'enabled' : 'disabled'}`)
-            this.eventManager.emit(LightingEventTypes.DebugToggle, { 
-                enabled: settings.showLightingDebug 
-            } as LightingDebugToggleEvent)
         }
     }
 
