@@ -26,7 +26,7 @@
  *   OUT: NeonGeometryResponse | NeonGeometryError
  */
 
-import { toPublicAssetUrl } from '../assetUrl'
+import { blockLetterFontUrl } from '../../assets/runtimeAssetUrls'
 
 // Worker global scope
 const ctx: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope
@@ -78,7 +78,7 @@ let cachedFontData: FontData | null = null
 
 async function loadFont(): Promise<FontData> {
     if (cachedFontData) return cachedFontData
-    const res = await fetch(toPublicAssetUrl('/fonts/helvetiker_bold.typeface.json'))
+    const res = await fetch(blockLetterFontUrl)
     if (!res.ok) throw new Error(`Failed to fetch font: ${res.status} ${res.statusText}`)
     cachedFontData = (await res.json()) as FontData
     return cachedFontData
