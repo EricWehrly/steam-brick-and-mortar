@@ -218,7 +218,6 @@
         height: calc(100dvh - 132px);
         padding: var(--spread-top-pad) 12px var(--spread-bottom-pad);
     }
-    }
 
     .binder-ring {
         width: 10px;
