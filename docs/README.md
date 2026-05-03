@@ -55,11 +55,6 @@ These are detailed "how to build it" docs for specific features. Check these bef
 **Deep-dive technical design documents.**
 Read these when touching specific complex systems (WebXR, instancing, event-driven patterns, data management).
 
-### 🎨 guidelines/
-Implementation and visual standards used during active UI normalization.
-- `guidelines/ui-guidelines.md` — template/coding conventions for UI components
-- `guidelines/steam-ui-style-guide.md` — top-level visual style driver for Intermission redesign
-
 
 ### 🔬 research/ & 📦 archive/
 **Historical context.**
