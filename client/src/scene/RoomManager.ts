@@ -10,6 +10,7 @@ import { DataKey } from '../core/data/DataTypes'
 import { PerformanceMonitor } from '../utils/PerformanceMonitor'
 import { Logger } from '../utils/Logger'
 
+// TD: room-defaults-ownership
 export class RoomConstants {
     static readonly GAMES_PER_SURFACE = 3
     static readonly SURFACES_PER_SHELF = 6
