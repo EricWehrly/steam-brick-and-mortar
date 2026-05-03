@@ -1,0 +1,2 @@
+export const blockLetterFontUrl = new URL('../../public/fonts/helvetiker_bold.typeface.json', import.meta.url).href
+export const skyboxAuroraUrl = new URL('../../public/textures/skyboxes/aurorasky.png', import.meta.url).href
