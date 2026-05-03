@@ -1,7 +1,8 @@
 import * as THREE from 'three'
+import { AppSettings, Setting, type SettingChangedEvent } from '../core/AppSettings'
 import { EventManager } from '../core/EventManager'
 import { SharedMaterialManager, MaterialType } from '../utils/SharedMaterialManager'
-import { RoomEventTypes, type RoomResizedEvent, CeilingEventTypes, GameEventTypes, type ShelfLayoutDeterminedEvent } from '../types/InteractionEvents'
+import { RoomEventTypes, type RoomResizedEvent, CeilingEventTypes, GameEventTypes, type ShelfLayoutDeterminedEvent, AppSettingsEventTypes } from '../types/InteractionEvents'
 import { type CeilingToggleEvent } from '../types/LightingEvents'
 import { StorePropsEventTypes, type StorePropsProgressEvent } from '../types/InteractionEvents'
 import { DataManager } from '../core/data/DataManager'
@@ -18,7 +19,6 @@ export class RoomConstants {
     static readonly STORE_WALL_CLEARANCE = 2
     static readonly STORE_BACK_CLEARANCE = 2
     static readonly STORE_FRONT_OFFSET = 1.0
-    static readonly STORE_CEILING_HEIGHT = 3.2
     static readonly DEFAULT_ROOM_WIDTH = 22
     static readonly DEFAULT_ROOM_DEPTH = 16  
     static readonly DEFAULT_ROOM_HEIGHT = 3.5
@@ -43,12 +43,15 @@ interface ShelfBounds {
     maxZ: number
 }
 
-export function computeRoomEnvelopeFromShelfBounds(shelfBounds: ShelfBounds): {
+export function computeRoomEnvelopeFromShelfBounds(
+    shelfBounds: ShelfBounds,
+    ceilingHeight: number = RoomConstants.DEFAULT_ROOM_HEIGHT
+): {
     dimensions: RoomDimensions
     centerOffset: { x: number; y: number; z: number }
 } {
     const roomWidth = (shelfBounds.maxX - shelfBounds.minX) + (RoomConstants.STORE_WALL_CLEARANCE * 2)
-    const roomHeight = RoomConstants.STORE_CEILING_HEIGHT
+    const roomHeight = ceilingHeight
 
     // Spoke-like layouts straddle origin and should be centered within the room.
     // Forward-facing layouts keep extra entrance clearance in front.
@@ -78,12 +81,15 @@ export class RoomManager {
     private camera: THREE.PerspectiveCamera
     private materialManager: SharedMaterialManager
     private eventManager: EventManager
+    private appSettings: AppSettings
     private logger = Logger.createLogFunctions('RoomManager')
     
     // Resize state: if room is building, this is the target; otherwise resize immediately
     private targetDimensions: RoomDimensions | null = null
     private targetCenterOffset: { x: number; y: number; z: number } | null = null
     private isBuilding = false
+    private currentCenterOffset?: { x: number; y: number; z: number }
+    private currentShelfLayout?: { rows: number; shelvesPerRow?: number }
     
     // Room structure (reused on resize)
     private roomGroup: THREE.Group | null = null
@@ -109,10 +115,13 @@ export class RoomManager {
         
         this.materialManager = SharedMaterialManager.getInstance()
         this.eventManager = EventManager.getInstance()
+        this.appSettings = AppSettings.getInstance()
+        this.currentDimensions.height = this.getCurrentCeilingHeight()
         
         this.eventManager.registerEventHandler(RoomEventTypes.Resize, this.onResizeRoom.bind(this))
         this.eventManager.registerEventHandler(GameEventTypes.ShelfLayoutDetermined, this.onShelfLayoutDetermined.bind(this))
         this.eventManager.registerEventHandler(CeilingEventTypes.Toggle, this.onCeilingToggle.bind(this))
+        this.eventManager.registerEventHandler(AppSettingsEventTypes.Changed, this.onAppSettingsChanged.bind(this))
         
         // Fire-and-forget initial room creation
         this.createInitialRoom()
@@ -144,6 +153,7 @@ export class RoomManager {
         const perf = PerformanceMonitor.start('room-resize-calculation', this.logger)
         
         const { shelfBounds, shelfLayout } = event.detail
+        this.currentShelfLayout = shelfLayout
         
         // Validate shelf bounds exist
         if (shelfBounds.minX === Infinity) {
@@ -152,7 +162,8 @@ export class RoomManager {
             return
         }
         
-        const { dimensions, centerOffset } = computeRoomEnvelopeFromShelfBounds(shelfBounds)
+        const { dimensions, centerOffset } = computeRoomEnvelopeFromShelfBounds(shelfBounds, this.getCurrentCeilingHeight())
+        this.currentCenterOffset = centerOffset
         
         console.debug(`📐 Shelf bounds: X[${shelfBounds.minX.toFixed(1)}, ${shelfBounds.maxX.toFixed(1)}], Z[${shelfBounds.minZ.toFixed(1)}, ${shelfBounds.maxZ.toFixed(1)}]`)
         console.debug(`🏠 Calculated room: ${dimensions.width.toFixed(1)}x${dimensions.depth.toFixed(1)}x${dimensions.height.toFixed(1)}, center Z: ${(centerOffset.z + RoomConstants.STORE_FRONT_OFFSET).toFixed(1)}`)
@@ -183,6 +194,14 @@ export class RoomManager {
             return
         }
         
+        if (shelfLayout) {
+            this.currentShelfLayout = shelfLayout
+        }
+
+        if (centerOffset) {
+            this.currentCenterOffset = centerOffset
+        }
+
         if (this.isBuilding) {
             // Room still building - just update the target, don't queue multiple operations
             this.targetDimensions = dimensions
@@ -196,9 +215,43 @@ export class RoomManager {
         // Notify listeners that room has resized (or will resize to these dimensions)
         this.eventManager.emit<RoomResizedEvent>(RoomEventTypes.Resized, { 
             dimensions,
-            shelfLayout,
-            centerOffset
+            shelfLayout: this.currentShelfLayout,
+            centerOffset: this.currentCenterOffset
         })
+    }
+
+    private async onAppSettingsChanged(event: CustomEvent<SettingChangedEvent>): Promise<void> {
+        if (event.detail.settingName !== Setting.CeilingHeight) {
+            return
+        }
+
+        const ceilingHeight = this.getCurrentCeilingHeight()
+        if (ceilingHeight === this.currentDimensions.height) {
+            return
+        }
+
+        const dimensions: RoomDimensions = {
+            ...this.currentDimensions,
+            height: ceilingHeight
+        }
+
+        if (this.isBuilding) {
+            this.targetDimensions = dimensions
+            this.targetCenterOffset = this.currentCenterOffset ?? null
+            console.debug('🏠 Room building, queued ceiling-height update')
+        } else {
+            await this.buildRoom(dimensions, this.currentCenterOffset)
+        }
+
+        this.eventManager.emit<RoomResizedEvent>(RoomEventTypes.Resized, {
+            dimensions,
+            shelfLayout: this.currentShelfLayout,
+            centerOffset: this.currentCenterOffset
+        })
+    }
+
+    private getCurrentCeilingHeight(): number {
+        return this.appSettings.getSetting('ceilingHeight')
     }
 
     private async buildRoom(dimensions: RoomDimensions, centerOffset?: { x: number; y: number; z: number }): Promise<void> {
@@ -211,6 +264,7 @@ export class RoomManager {
         if (centerOffset) {
             const appliedZ = centerOffset.z + RoomConstants.STORE_FRONT_OFFSET
             this.roomGroup.position.set(centerOffset.x, centerOffset.y, appliedZ)
+            this.currentCenterOffset = centerOffset
             
             // Reposition and reorient camera to face the store center
             // Player spawns at origin (0, 1.6, 0), should look at back wall center

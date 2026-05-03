@@ -1,0 +1,56 @@
+import * as THREE from 'three'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { EventManager } from '../../../src/core/EventManager'
+import { LightingRenderer } from '../../../src/scene/LightingRenderer'
+import { RoomEventTypes, type RoomResizedEvent } from '../../../src/types/InteractionEvents'
+
+describe('LightingRenderer ceiling-height fixture refresh', () => {
+    let eventManager: EventManager
+    let lightingRenderer: LightingRenderer
+
+    beforeEach(() => {
+        EventManager['instance'] = undefined as unknown as EventManager
+        eventManager = EventManager.getInstance()
+
+        const scene = new THREE.Scene()
+        const renderer = {
+            shadowMap: {
+                enabled: false,
+                type: THREE.PCFSoftShadowMap,
+            },
+        } as unknown as THREE.WebGLRenderer
+
+        lightingRenderer = new LightingRenderer(scene, renderer)
+    })
+
+    afterEach(() => {
+        lightingRenderer.dispose()
+        EventManager['instance'] = undefined as unknown as EventManager
+    })
+
+    it('rebuilds fixtures when only room height changes after shelf layout is known', () => {
+        const fixtureSetupSpy = vi
+            .spyOn(lightingRenderer as unknown as { setupFluorescentFixtures: (layout?: { rows: number; shelvesPerRow?: number }) => Promise<void> }, 'setupFluorescentFixtures')
+            .mockResolvedValue(undefined)
+
+        eventManager.emit<RoomResizedEvent>(RoomEventTypes.Resized, {
+            dimensions: { width: 22, depth: 16, height: 4.0 },
+            shelfLayout: { rows: 4, shelvesPerRow: 3 },
+        })
+
+        expect(fixtureSetupSpy).toHaveBeenCalledTimes(1)
+        expect(fixtureSetupSpy).toHaveBeenLastCalledWith({ rows: 4, shelvesPerRow: 3 })
+
+        const lightingGroup = (lightingRenderer as unknown as { lightingGroup: THREE.Group }).lightingGroup
+        const existingFixtures = new THREE.Group()
+        existingFixtures.name = 'fluorescent-fixtures'
+        lightingGroup.add(existingFixtures)
+
+        eventManager.emit<RoomResizedEvent>(RoomEventTypes.Resized, {
+            dimensions: { width: 22, depth: 16, height: 4.7 },
+        })
+
+        expect(fixtureSetupSpy).toHaveBeenCalledTimes(2)
+        expect(fixtureSetupSpy).toHaveBeenLastCalledWith({ rows: 4, shelvesPerRow: 3 })
+    })
+})

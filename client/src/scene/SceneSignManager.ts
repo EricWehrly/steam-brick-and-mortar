@@ -68,6 +68,7 @@ export class SceneSignManager {
     private readonly scene: THREE.Scene
     private readonly rendererByIdentifier = new Map<string, RenderKind>()
     private roomDepth: number = RoomConstants.DEFAULT_ROOM_DEPTH
+    private roomHeight: number = RoomConstants.DEFAULT_ROOM_HEIGHT
     private roomWorldOffsetZ = 0
     private steamLibraryTitleText = 'STEAM LIBRARY'
 
@@ -129,6 +130,7 @@ export class SceneSignManager {
 
     private handleRoomResized(detail: RoomResizedEvent): void {
         this.roomDepth = detail.dimensions.depth
+        this.roomHeight = detail.dimensions.height
         if (detail.centerOffset) {
             this.roomWorldOffsetZ = detail.centerOffset.z + RoomConstants.STORE_FRONT_OFFSET
         }
@@ -245,7 +247,7 @@ export class SceneSignManager {
         // Offset by half the sign depth so letters sit flush against the wall surface.
         const SIGN_DEPTH = 0.08
         const backWallZ   = this.roomWorldOffsetZ - (this.roomDepth / 2) + SIGN_DEPTH / 2
-        const signHeightY = RoomConstants.STORE_CEILING_HEIGHT - 0.5
+        const signHeightY = this.roomHeight - 0.5
         this.placeSign('block-letter', {
             uniqueIdentifier: 'steam-library-title',
             text: this.steamLibraryTitleText,

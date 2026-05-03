@@ -326,7 +326,7 @@ export class LightingRenderer {
         
         // Main exterior light: Combined moonlight + street light as single directional
         // Positioned high and forward with warmer tone (mix of cool moonlight + warm street light)
-        const exteriorHeight = (this.config.ceilingHeight ?? 3.2) + 2
+        const exteriorHeight = (this.config.ceilingHeight) + 2
         const exteriorLight = this.lightFactory.createDirectionalLight(0xD4DFF2, 0.22, { // Soft blue-white blend
             name: 'exterior-ambient-light',
             parent: this.lightingGroup,
@@ -357,7 +357,7 @@ export class LightingRenderer {
         
         // Subtle rim light: defines edges from back, prevents flat lighting
         // Cool temperature, very low intensity, non-shadow casting
-        const rimLightHeight = (this.config.ceilingHeight ?? 3.2) + 1
+        const rimLightHeight = (this.config.ceilingHeight) + 1
         const rimLight = this.lightFactory.createDirectionalLight(BlockbusterColors.fluorescentCool, 0.08, {
             name: 'rim-light',
             parent: this.lightingGroup,
@@ -409,7 +409,7 @@ export class LightingRenderer {
         const shelfRows = layout?.rows ?? 2
         const fixtureRows = Math.max(1, Math.ceil(shelfRows / 2)) // One light per 2 shelf rows
         const fixturesPerRow = layout?.shelvesPerRow ?? 4
-        const ceilingHeight = this.config.ceilingHeight ?? 3.2
+        const ceilingHeight = this.config.ceilingHeight
         
         const fixtures = this.propRenderer.createCeilingLightFixtures(
             ceilingHeight,
@@ -514,8 +514,10 @@ export class LightingRenderer {
         CURRENT_ROOM_DIMENSIONS.WIDTH = dimensions.width
         CURRENT_ROOM_DIMENSIONS.DEPTH = dimensions.depth
         
-        // Update ceiling height in config if different
-        if (this.config.ceilingHeight !== dimensions.height) {
+        const previousCeilingHeight = this.config.ceilingHeight
+        const ceilingHeightChanged = previousCeilingHeight !== dimensions.height
+
+        if (ceilingHeightChanged) {
             this.config.ceilingHeight = dimensions.height
         }
         
@@ -531,21 +533,26 @@ export class LightingRenderer {
             LightingRenderer.logger.debug(`💡 Lighting group positioned at: (${centerOffset.x}, ${centerOffset.y}, ${centerOffset.z.toFixed(1)})`)
         }
         
-        // Add or update ceiling fixtures based on shelf layout
-        // Only add fixtures if we have shelf layout data and don't already have them
-        if (shelfLayout) {
-            const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
+        const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
+        const layoutForFixtures = shelfLayout ?? this.currentShelfLayout
+        const shouldRefreshFixtures = Boolean(layoutForFixtures) && (
+            Boolean(shelfLayout) ||
+            (ceilingHeightChanged && Boolean(existingFixtures))
+        )
+
+        if (shouldRefreshFixtures && layoutForFixtures) {
             if (existingFixtures) {
-                LightingRenderer.logger.debug('💡 Updating existing ceiling fixtures for new shelf layout...')
+                LightingRenderer.logger.debug('💡 Updating existing ceiling fixtures for room changes...')
                 this.lightingGroup.remove(existingFixtures)
             } else {
                 LightingRenderer.logger.debug('💡 Adding ceiling fixtures for shelf layout...')
             }
-            this.setupFluorescentFixtures(shelfLayout)
+
+            this.setupFluorescentFixtures(layoutForFixtures)
         }
     }
 
-    public toggleLighting(enabled: boolean): void {
+    private toggleLighting(enabled: boolean): void {
         LightingRenderer.logger.debug(`💡 ${enabled ? 'Enabling' : 'Disabling'} all lights`)
         
         for (const [, lights] of this.registry.getLightsGroupedByType()) {
@@ -555,7 +562,7 @@ export class LightingRenderer {
         }
     }
 
-    public toggleDebugVisualization(enabled: boolean): void {
+    private toggleDebugVisualization(enabled: boolean): void {
         LightingRenderer.logger.debug(`🔍 ${enabled ? 'Showing' : 'Hiding'} light debug visualization`)
         
         if (enabled) {
@@ -565,10 +572,7 @@ export class LightingRenderer {
         }
     }
 
-    /**
-     * Toggle specific light by name on/off
-     */
-    public toggleLightByName(lightName: string, enabled: boolean): void {
+    private toggleLightByName(lightName: string, enabled: boolean): void {
         const light = this.lightingGroup.getObjectByName(lightName) as THREE.Light
         if (light) {
             light.visible = enabled
@@ -576,13 +580,6 @@ export class LightingRenderer {
         } else {
             LightingRenderer.logger.warn(`⚠️ Light '${lightName}' not found for toggle`)
         }
-    }
-
-    /**
-     * Toggle ambient light on/off (convenience method)
-     */
-    public toggleAmbientLight(enabled: boolean): void {
-        this.toggleLightByName(LIGHT_NAMES.AMBIENT, enabled)
     }
 
     private clearLights(): void {

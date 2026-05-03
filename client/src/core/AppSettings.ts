@@ -406,7 +406,7 @@ export class AppSettings {
             shadowQuality: 2, // Medium shadows by default
             shadowMapEnabled: true,
             pixelRatioScale: 1,
-            ceilingHeight: 3.2,
+            ceilingHeight: 4.2,
             enableLighting: true,
             showLightingDebug: false,
             showCeiling: true,
