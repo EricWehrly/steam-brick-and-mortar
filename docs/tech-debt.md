@@ -31,6 +31,27 @@
 **Related files**:
 - `client/src/core/AppSettings.ts`
 - `client/src/ui/pause/panels/GameSettingsPanel.ts`
+## id: room-defaults-ownership
+**Priority**: Medium  
+**Effort**: ~1-2 hours (ownership cleanup + test updates)  
+**Context**: Room spatial defaults are currently split across domains. `RoomManager`/`RoomConstants` defines room defaults while `AppSettings` also hardcodes ceiling defaults (`4.2`). This creates drift risk and unclear ownership for baseline room dimensions.
+
+**Done when**:
+- A single owner is defined for room spatial defaults (including ceiling height; prefer room-domain ownership in `RoomManager`/`RoomConstants`)
+- `AppSettings` consumes room-owned defaults via dependency/bootstrap wiring instead of hardcoded competing values
+- Startup and settings-change tests verify no default mismatch can regress
+
+**When to pick up**:
+- Intermission debt pass after current room/lighting stabilization
+
+**Related files**:
+- `client/src/scene/RoomManager.ts`
+- `client/src/core/AppSettings.ts`
+
+**Source tag**:
+- `// TD: room-defaults-ownership` in `client/src/scene/RoomManager.ts`
+
+---
 
 ## id: angled-layout-center-aisle-overlap
 **Priority**: High  
