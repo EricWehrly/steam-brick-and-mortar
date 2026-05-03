@@ -81,12 +81,6 @@ export class ShelfSignPlanner {
         this.shelfPositions[detail.shelfIndex] = (detail.position as THREE.Vector3).clone()
         this.shelfRotations[detail.shelfIndex] = detail.rotationY ?? 0
         this.shelfSectionIndices[detail.shelfIndex] = detail.sectionIndex
-
-        if (detail.shelfIndex < 4 || detail.shelfIndex % 10 === 0) {
-            ShelfSignPlanner.logger.debug(
-                `Shelf anchor recorded: shelf=${detail.shelfIndex}, section=${detail.sectionIndex}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
-            )
-        }
     }
 
     private resetSignAnchorsForLayoutSetup(_detail: StorePropsSetupRequestEvent): void {
@@ -113,17 +107,10 @@ export class ShelfSignPlanner {
     private stageSectionSigns(detail: SectionsReadyEvent): void {
         const nonEmptySections = detail.sections.filter(section => section.games.length > 0).length
         this.pendingSections = detail
-
-        ShelfSignPlanner.logger.debug(
-            `Staged SectionsReady: totalSections=${detail.sections.length}, nonEmptySections=${nonEmptySections}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
-        )
+        ShelfSignPlanner.logger.debug(`Staged sections: total=${detail.sections.length}, nonEmpty=${nonEmptySections}`)
     }
 
     private applyStagedSignsWhenLayoutReady(_detail: ShelfLayoutDeterminedEvent): void {
-        ShelfSignPlanner.logger.debug(
-            `ShelfLayoutDetermined received: layoutMode=${_detail.layoutMode}, hasPendingSections=${this.pendingSections !== null}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
-        )
-
         if (!this.pendingSections) {
             return
         }
@@ -137,10 +124,6 @@ export class ShelfSignPlanner {
     private placeSignsForSections(detail: SectionsReadyEvent): void {
         const { sections } = detail
         this.clearSigns()
-
-        ShelfSignPlanner.logger.debug(
-            `placeSignsForSections start: sections=${sections.length}, knownAnchors=${this.shelfPositions.filter(Boolean).length}`
-        )
 
         // Place signs at the first and last shelf owned by each section index.
         // Sections with no name (ungrouped) or named 'Other' get no sign.
@@ -185,10 +168,6 @@ export class ShelfSignPlanner {
             })
             this.placedSignIdentifiers.add(startIdentifier)
 
-            ShelfSignPlanner.logger.debug(
-                `Placed start sign: id=${startIdentifier}, shelf=${startShelfIndex}`
-            )
-
             if (endShelfIndex !== startShelfIndex) {
                 const endIdentifier = this.buildSignIdentifier(section.name, 'end')
                 this.signSystem.placeSign('canvas', {
@@ -204,9 +183,6 @@ export class ShelfSignPlanner {
                     style: { ...SignStyles.Category, fontSize: 0.16, padding: '0.08 0.14' },
                 })
                 this.placedSignIdentifiers.add(endIdentifier)
-                ShelfSignPlanner.logger.debug(
-                    `Placed end sign: id=${endIdentifier}, shelf=${endShelfIndex}`
-                )
             }
         }
 
@@ -215,9 +191,8 @@ export class ShelfSignPlanner {
         }
 
         ShelfSignPlanner.logger.debug(
-            `Placed ${this.placedSignIdentifiers.size} signs across ${sections.length} sections`
+            `Signs placed: count=${this.placedSignIdentifiers.size}, sections=${sections.length}, layoutMode=${this.activeLayoutMode ?? 'unknown'}`
         )
-        ShelfSignPlanner.logger.debug(`placeSignsForSections complete: placed=${this.placedSignIdentifiers.size}`)
     }
 
     private placeRowAisleEdgeSigns(sections: ReadonlyArray<{ name: string }>): void {
@@ -290,11 +265,6 @@ export class ShelfSignPlanner {
     }
 
     private clearSigns(): void {
-        if (this.placedSignIdentifiers.size > 0) {
-            ShelfSignPlanner.logger.debug(
-                `Clearing existing signs: count=${this.placedSignIdentifiers.size}`
-            )
-        }
         for (const uniqueIdentifier of this.placedSignIdentifiers) {
             this.signSystem.removeSignById(uniqueIdentifier)
         }

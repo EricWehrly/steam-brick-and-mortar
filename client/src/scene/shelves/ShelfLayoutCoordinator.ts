@@ -84,10 +84,6 @@ export class ShelfLayoutCoordinator {
         this.clearRunState()
         this.computedLayoutMode = this.layoutMode
 
-        ShelfLayoutCoordinator.logger.debug(
-            `Layout start: layoutMode=${this.layoutMode}, incomingSections=${detail.sections.length}`
-        )
-
         // Filter out sections with zero games to prevent empty shelves from being spawned.
         // Keep original section indices so downstream placement/signage mappings remain stable.
         const nonEmptySections = detail.sections.filter(s => s.games.length > 0)
@@ -102,10 +98,6 @@ export class ShelfLayoutCoordinator {
             Math.max(1, Math.ceil(s.games.length / SLOTS_PER_SHELF))
         )
         this.totalShelves = shelvesPerSection.reduce((sum, n) => sum + n, 0)
-
-        ShelfLayoutCoordinator.logger.debug(
-            `Layout sections: nonEmptySections=${nonEmptySections.length}, totalShelves=${this.totalShelves}`
-        )
 
         ShelfLayoutCoordinator.logger.debug(
             `Computing ${this.layoutMode} layout: ${this.totalShelves} shelves across ${nonEmptySections.length} non-empty sections`
@@ -156,8 +148,6 @@ export class ShelfLayoutCoordinator {
             emitted++
         }
 
-        ShelfLayoutCoordinator.logger.debug(`Emitted ShelfReady count=${emitted}`)
-
         // ShelfLayoutDetermined fires after ShelfReady so GameBoxSpawner has positions
         // when placement is triggered by the strategy arriving.
         const shelvesPerRow = this.deriveShelvesPerRow(shelves)
@@ -177,10 +167,8 @@ export class ShelfLayoutCoordinator {
         )
 
         ShelfLayoutCoordinator.logger.debug(
-            `Emitted ShelfLayoutDetermined rows=${rowCount}, shelvesPerRow=${shelvesPerRow}`
+            `Layout ready: mode=${this.layoutMode}, sections=${nonEmptySections.length}, shelves=${emitted}, rows=${rowCount}, shelvesPerRow=${shelvesPerRow}`
         )
-
-        ShelfLayoutCoordinator.logger.debug(`ShelfReady emitted for ${emitted} shelves, layout determined`)
     }
 
     private deriveShelvesPerRow(shelves: ReadonlyArray<SectionShelfInfo>): number {
