@@ -33,6 +33,16 @@
 }
 
 /* Settings Sections */
+/* When shown as a display subtab the parent has no fixed height, so let the panel size naturally */
+.pause-menu-content.display-tab-group-active .graphics-settings-panel {
+  height: auto;
+}
+
+.pause-menu-content.display-tab-group-active .graphics-settings-panel .settings-sections {
+  overflow-y: visible;
+  padding: 16px 0 20px;
+}
+
 .graphics-settings-panel .settings-sections {
   flex: 1;
   overflow-y: auto;
