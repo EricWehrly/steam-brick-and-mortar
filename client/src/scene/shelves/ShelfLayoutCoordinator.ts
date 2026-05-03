@@ -36,7 +36,6 @@ const MAX_SHELVES_PER_ROW = 12
 export class ShelfLayoutCoordinator {
     private static readonly logger = Logger.createLogFunctions(ShelfLayoutCoordinator.name)
     private static instance: ShelfLayoutCoordinator | null = null
-    private layoutRunCounter = 0
 
     /** Active layout mode. Set by orchestration before the next SectionsReady fires. */
     public layoutMode: LayoutMode
@@ -82,12 +81,11 @@ export class ShelfLayoutCoordinator {
     }
 
     private handleSectionsReady(detail: SectionsReadyEvent): void {
-        const layoutRunId = ++this.layoutRunCounter
         this.clearRunState()
         this.computedLayoutMode = this.layoutMode
 
-        ShelfLayoutCoordinator.logger.info(
-            `[ShelfLayout#${layoutRunId}] start: layoutMode=${this.layoutMode}, incomingSections=${detail.sections.length}`
+        ShelfLayoutCoordinator.logger.debug(
+            `Layout start: layoutMode=${this.layoutMode}, incomingSections=${detail.sections.length}`
         )
 
         // Filter out sections with zero games to prevent empty shelves from being spawned.
@@ -105,8 +103,8 @@ export class ShelfLayoutCoordinator {
         )
         this.totalShelves = shelvesPerSection.reduce((sum, n) => sum + n, 0)
 
-        ShelfLayoutCoordinator.logger.info(
-            `[ShelfLayout#${layoutRunId}] nonEmptySections=${nonEmptySections.length}, totalShelves=${this.totalShelves}`
+        ShelfLayoutCoordinator.logger.debug(
+            `Layout sections: nonEmptySections=${nonEmptySections.length}, totalShelves=${this.totalShelves}`
         )
 
         ShelfLayoutCoordinator.logger.debug(
@@ -158,9 +156,7 @@ export class ShelfLayoutCoordinator {
             emitted++
         }
 
-        ShelfLayoutCoordinator.logger.info(
-            `[ShelfLayout#${layoutRunId}] emitted ShelfReady count=${emitted}`
-        )
+        ShelfLayoutCoordinator.logger.debug(`Emitted ShelfReady count=${emitted}`)
 
         // ShelfLayoutDetermined fires after ShelfReady so GameBoxSpawner has positions
         // when placement is triggered by the strategy arriving.
@@ -180,8 +176,8 @@ export class ShelfLayoutCoordinator {
             }
         )
 
-        ShelfLayoutCoordinator.logger.info(
-            `[ShelfLayout#${layoutRunId}] emitted ShelfLayoutDetermined rows=${rowCount}, shelvesPerRow=${shelvesPerRow}`
+        ShelfLayoutCoordinator.logger.debug(
+            `Emitted ShelfLayoutDetermined rows=${rowCount}, shelvesPerRow=${shelvesPerRow}`
         )
 
         ShelfLayoutCoordinator.logger.debug(`ShelfReady emitted for ${emitted} shelves, layout determined`)

@@ -46,6 +46,22 @@
 
 ---
 
+## id: logger-level-discoverability
+**Priority**: Medium  
+**Effort**: ~1-2 hours  
+**Context**: Logger defaults are intentionally `info` to control runtime noise, but this behavior is easy to miss during implementation and review. This leads to debug instrumentation being promoted to `info` just to be visible, which pollutes normal logs and creates PR churn.
+
+**Done when**:
+- A short logger-level section is added to agent-facing instructions (and/or contributor docs) that clearly states default logger level behavior and how to temporarily enable `debug`
+- The preferred policy is documented: diagnostic instrumentation should default to `debug` unless explicitly needed at `info`
+- There is a single discoverable reference for runtime log-level toggling during debugging sessions
+
+**Related files**:
+- `.github/copilot-instructions.md`
+- `client/README.md`
+
+---
+
 ## id: placement-headroom-policy
 **Priority**: High  
 **Effort**: ~1 day (instrumentation review + policy implementation + validation)  

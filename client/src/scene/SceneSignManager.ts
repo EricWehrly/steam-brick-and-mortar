@@ -142,7 +142,7 @@ export class SceneSignManager {
         const renderer = this.rendererByKind[renderKind]
         const signObject = renderer.setSign(this.buildSignRequest(renderKind, descriptor), this.scene)
         this.rendererByIdentifier.set(descriptor.uniqueIdentifier, renderKind)
-        SceneSignManager.logger.info(
+        SceneSignManager.logger.debug(
             `[SceneSign] place: id=${descriptor.uniqueIdentifier}, kind=${renderKind}, managed=${this.rendererByIdentifier.size}`
         )
         return signObject
@@ -183,7 +183,7 @@ export class SceneSignManager {
 
         this.rendererByKind[renderKind].removeSign(uniqueIdentifier, this.scene)
         this.rendererByIdentifier.delete(uniqueIdentifier)
-        SceneSignManager.logger.info(
+        SceneSignManager.logger.debug(
             `[SceneSign] remove: id=${uniqueIdentifier}, kind=${renderKind}, managed=${this.rendererByIdentifier.size}`
         )
     }

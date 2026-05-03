@@ -52,7 +52,6 @@ export class SteamIntegration {
 
     private steamClient: SteamApiClient
     private gameLibrary: GameLibraryManager
-    private demoLoadRunCounter = 0
     private eventManager: EventManager
     private steamId: string
     private config: {
@@ -248,14 +247,13 @@ export class SteamIntegration {
      */
     private async loadDemoGames(): Promise<void> {
         try {
-            const demoRunId = ++this.demoLoadRunCounter
             const demoUser = ANONYMOUS_STORE_USER
             const games = demoUser.games as SteamGame[]
             const BATCH_SIZE = 18
             const totalBatches = Math.ceil(games.length / BATCH_SIZE)
 
-            SteamIntegration.logger.info(
-                `[DemoLoad#${demoRunId}] start: games=${games.length}, totalBatches=${totalBatches}`
+            SteamIntegration.logger.debug(
+                `Demo load start: games=${games.length}, totalBatches=${totalBatches}`
             )
 
             // Register games in gameLibrary so they're available for storeSteamDataAndEmitEvent().
@@ -263,12 +261,12 @@ export class SteamIntegration {
             // them without crashes, but isAnonymous() returns true because steam.userInput is not set.
             this.gameLibrary.setUserData({ ...demoUser, vanity_url: '', steamid: '' })
 
-            SteamIntegration.logger.info(`[DemoLoad#${demoRunId}] gameLibrary userData staged`)
+            SteamIntegration.logger.debug('Demo load: gameLibrary userData staged')
 
             this.storeSteamDataAndEmitEvent(null)
 
-            SteamIntegration.logger.info(
-                `[DemoLoad#${demoRunId}] emitted readiness seams: DataLoaded/LibraryManifestReady/GameDataReady`
+            SteamIntegration.logger.debug(
+                'Demo load: emitted readiness seams DataLoaded/LibraryManifestReady/GameDataReady'
             )
 
             // Emit games directly as batch events - no Steam API network calls.
@@ -280,8 +278,8 @@ export class SteamIntegration {
                     SteamEventTypes.GamesBatchReady,
                     { games: batchGames, batchIndex: i, totalBatches }
                 )
-                SteamIntegration.logger.info(
-                    `[DemoLoad#${demoRunId}] emitted GamesBatchReady batch=${i + 1}/${totalBatches}, batchSize=${batchGames.length}`
+                SteamIntegration.logger.debug(
+                    `Demo load: emitted GamesBatchReady batch=${i + 1}/${totalBatches}, batchSize=${batchGames.length}`
                 )
                 if (i < totalBatches - 1) {
                     await new Promise(resolve => setTimeout(resolve, 0))
