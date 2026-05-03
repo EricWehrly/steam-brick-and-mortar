@@ -4,6 +4,7 @@ import { BaseMaterialGenerator } from './BaseMaterialGenerator'
 import { TextureLoader } from './TextureLoader'
 import { WoodTextureGenerator } from '../textures/WoodTextureGenerator'
 import { BlockbusterColors } from '../Colors'
+import { toPublicAssetUrl } from '../assetUrl'
 
 export interface WoodMaterialOptions extends MaterialOptions {
   color?: THREE.Color
@@ -60,9 +61,9 @@ export class WoodMaterialGenerator extends BaseMaterialGenerator {
    */
   public createMaterial(options: WoodMaterialOptions = {}): Promise<THREE.MeshStandardMaterial> {
     const {
-      diffuseUrl = '/textures/wood/wood_diffuse.jpg',
-      normalUrl = '/textures/wood/wood_normal.jpg',
-      roughnessUrl = '/textures/wood/wood_roughness.jpg',
+      diffuseUrl = toPublicAssetUrl('/textures/wood/wood_diffuse.jpg'),
+      normalUrl = toPublicAssetUrl('/textures/wood/wood_normal.jpg'),
+      roughnessUrl = toPublicAssetUrl('/textures/wood/wood_roughness.jpg'),
       repeat = { x: 1, y: 1 },
       color = new THREE.Color(0x8B4513),
       roughness = 0.8,

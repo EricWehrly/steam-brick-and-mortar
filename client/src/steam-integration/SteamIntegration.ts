@@ -15,7 +15,7 @@ import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
 import type { SteamGameData } from '../scene'
 import { EventManager } from '../core/EventManager'
-import { SteamEventTypes, AppSettingsEventTypes, GameEventTypes } from '../types/InteractionEvents'
+import { SteamEventTypes, AppSettingsEventTypes, GameEventTypes, AppEventTypes } from '../types/InteractionEvents'
 import type {
     SteamLoadLibraryEvent,
     SteamCacheClearEvent,
@@ -215,21 +215,17 @@ export class SteamIntegration {
     private async handleGameStart(): Promise<void> {
         const cachedUsers = this.steamClient.getCachedUsers()
 
-        // Dev/test fallback: load demo games when no cached user exists, regardless of
-        // autoLoadProfile (which defaults false and won't be set in a fresh test env)
-        if (cachedUsers.length === 0 && AppSettings.get('developmentMode')) {
-            SteamIntegration.logger.info('No cached user - loading anonymous store for dev/test')
+        // Empty-start fallback: load demo games when no cached profile exists.
+        // This keeps first-run experiences from stalling on an empty world.
+        if (cachedUsers.length === 0) {
+            SteamIntegration.logger.info('No cached user - loading anonymous store')
             await this.loadDemoGames()
             return
         }
 
         if (!AppSettings.get('autoLoadProfile')) {
             SteamIntegration.logger.debug('Auto-load disabled')
-            return
-        }
-
-        if (cachedUsers.length === 0) {
-            SteamIntegration.logger.warn('⚠️ Auto-load enabled but no Steam profiles cached yet - user must load a profile first')
+            this.eventManager.emit(AppEventTypes.StartupComplete, {})
             return
         }
 

@@ -8,6 +8,7 @@
 import * as THREE from 'three'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
+import { skyboxAuroraUrl } from '../assets/runtimeAssetUrls'
 
 export interface SkyboxConfig {
     /** Path to the skybox image (relative to public folder) */
@@ -78,7 +79,7 @@ export class SkyboxManager {
  */
 export const SkyboxPresets = {
     aurora: {
-        imagePath: '/textures/skyboxes/aurorasky.png',
+        imagePath: skyboxAuroraUrl,
         fallbackColor: 0x404040  // Dark gray
     }
 } as const

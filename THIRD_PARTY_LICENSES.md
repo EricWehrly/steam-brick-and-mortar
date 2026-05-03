@@ -45,7 +45,4 @@ distribution platform requirements. See also: docs/plans/neon-stroke-skeleton-pl
 
 ---
 
-## Models
 
-**File:** `client/public/models/video_store_shelf.glb`  
-**License:** _(custom — generated via Blender pipeline, assumed original work)_

@@ -13,8 +13,9 @@ import * as THREE from 'three'
 import { FontLoader, type Font } from 'three/examples/jsm/loaders/FontLoader.js'
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
 import type { ISignRenderer, SignRequest } from './ISignRenderer'
+import { blockLetterFontUrl } from '../../assets/runtimeAssetUrls'
 
-const FONT_URL        = '/fonts/helvetiker_bold.typeface.json'
+const FONT_URL        = blockLetterFontUrl
 const BEVEL_SIZE         = 0.008
 const BEVEL_THICKNESS    = 0.004
 
