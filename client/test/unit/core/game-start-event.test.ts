@@ -117,17 +117,6 @@ vi.mock('../../../src/ui/PerformanceMonitor', () => ({
     } })
 }))
 
-vi.mock('../../../src/ui/ToastManager', () => ({
-    ToastManager: {
-        getInstance: vi.fn(),
-        // Static convenience methods
-        success: vi.fn(),
-        error: vi.fn(),
-        info: vi.fn(),
-        warning: vi.fn()
-    }
-}))
-
 // Steam integration mocks
 vi.mock('../../../src/steam-integration/SteamIntegration', () => ({
     SteamIntegration: vi.fn().mockImplementation(function() { return {

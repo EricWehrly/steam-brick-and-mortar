@@ -13,7 +13,7 @@
  */
 
 import * as THREE from 'three'
-import { ToastManager, UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
+import { UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
 import { WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
 import { FocusCoordinator } from '../ui/coordinators/FocusCoordinator'
 import { SceneManager, SceneCoordinator } from '../scene'
@@ -267,8 +267,6 @@ export class SteamBrickAndMortarApp {
 
             // Initialize system UI coordinator (lighting panel, debug panels, etc.)
             await this.systemUICoordinator.init(this.sceneManager.getRenderer())
-
-            ToastManager.success('Steam Brick and Mortar is fully loaded!', { duration: 3000 })
 
         } catch (error) {
             console.error('Failed to load non-essential systems:', error)

@@ -17,7 +17,6 @@ import { EventManager } from '../core/EventManager'
 import { WebXRCoordinator } from './WebXRCoordinator'
 import { WebXRUICoordinator } from '../ui/coordinators'
 import { Logger } from '../utils/Logger'
-import { ToastManager } from '../ui/ToastManager'
 import { WebXREventTypes, InputEventTypes, UIEventTypes } from '../types/InteractionEvents'
 import type {
     WebXRToggleEvent,
@@ -128,7 +127,6 @@ export class WebXREventHandler {
 
     private handleWebXRError(event: WebXRErrorEvent): void {
         WebXREventHandler.logger.error('WebXR error occurred:', event.error)
-        ToastManager.error('Failed to enter VR mode')
     }
 
     private handleWebXRSupportChange(event: WebXRSupportChangeEvent): void {
