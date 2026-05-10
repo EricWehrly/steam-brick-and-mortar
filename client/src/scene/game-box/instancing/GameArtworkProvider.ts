@@ -99,21 +99,15 @@ interface UrlCacheEntry {
     fallbackType?: string
 }
 
-/** Fallback URL patterns for Steam CDN */
-const FALLBACK_PATTERNS: Record<ArtworkFormat, Array<{ pattern: string; name: string }>> = {
-    library: [
-        { pattern: 'library_600x900.jpg', name: 'library' },
-        { pattern: 'capsule_616x353.jpg', name: 'capsule' },
-        { pattern: 'header.jpg', name: 'header' }
-    ],
-    header: [
-        { pattern: 'header.jpg', name: 'header' }
-    ],
-    capsule: [
-        { pattern: 'capsule_616x353.jpg', name: 'capsule' },
-        { pattern: 'header.jpg', name: 'header-fallback' }
-    ]
+type CdnArtworkType = 'library' | 'capsule' | 'header'
+
+const CDN_PATTERNS: Record<CdnArtworkType, string> = {
+    library: 'library_600x900.jpg',
+    capsule: 'capsule_616x353.jpg',
+    header: 'header.jpg'
 }
+
+const LIBRARY_FALLBACK_CHAIN: CdnArtworkType[] = ['library', 'capsule', 'header']
 
 /**
  * Provider for game artwork - singleton that manages caching and URL strategies.
@@ -211,13 +205,16 @@ export class GameArtworkProvider {
         
         if (!isNewCdn) {
             const baseUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}`
-            const patterns = FALLBACK_PATTERNS[format] || FALLBACK_PATTERNS.library
-            
-            for (const { pattern, name } of patterns) {
+            const fallbackChain: CdnArtworkType[] = format === 'library'
+                ? LIBRARY_FALLBACK_CHAIN
+                : [format]
+
+            for (const type of fallbackChain) {
+                const pattern = CDN_PATTERNS[type]
                 const fallbackUrl = `${baseUrl}/${pattern}`
                 const alreadyAdded = urls.some(u => u.url === fallbackUrl)
                 if (!alreadyAdded) {
-                    urls.push({ url: fallbackUrl, type: `cdn-${name}` })
+                    urls.push({ url: fallbackUrl, type: `cdn-${type}` })
                 }
             }
         }
