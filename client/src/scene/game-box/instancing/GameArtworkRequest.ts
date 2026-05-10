@@ -2,14 +2,13 @@ import {
     ARTWORK_DIMENSIONS, 
     GameArtworkProvider 
 } from './GameArtworkProvider'
-import { DataManager } from '../../../core/data/DataManager'
 import type { 
     GameArtwork, 
     ArtworkFormat, 
     FailureReason, 
     PixelDataResult 
 } from './GameArtworkProvider'
-import type { SteamGameData } from '../types/GameData'
+import { SteamDataManager } from '../../../core/data/SteamDataManager'
 
 /**
  * Handle to artwork for a specific game.
@@ -100,12 +99,6 @@ export class GameArtworkRequest implements GameArtwork {
                     this.provider.recordSuccess(this.appId, this.format, url, type)
                 }
 
-                if (libraryFailed && (route === 'capsule' || route === 'header')) {
-                    GameArtworkProvider.logger.info(
-                        `Artwork route: "${this.gameName}" (${this.appId}) library failed -> using ${route}`
-                    )
-                }
-
                 if (route === 'library' || route === 'capsule' || route === 'header') {
                     this.setArtworkSelection(route, url)
                 }
@@ -124,17 +117,6 @@ export class GameArtworkRequest implements GameArtwork {
         this.provider.recordFailure(this.appId, this.format, this.failureReason, triedUrls)
         this.setArtworkSelection('label')
 
-        if (libraryFailed) {
-            const attemptedFallbacks = triedRoutes.filter(route => route === 'capsule' || route === 'header')
-            const fallbackSummary = attemptedFallbacks.length > 0
-                ? `${attemptedFallbacks.join(' -> ')} failed`
-                : 'no capsule/header fallback available'
-
-            GameArtworkProvider.logger.warn(
-                `Artwork route: "${this.gameName}" (${this.appId}) library failed; ${fallbackSummary}; falling back to label`
-            )
-        }
-        
         throw new Error(`Failed to load artwork for ${this.gameName}: ${this.failureReason}`)
     }
     
@@ -179,9 +161,6 @@ export class GameArtworkRequest implements GameArtwork {
         // When it returns 404 WITHOUT CORS headers, CORS fires first (see above).
         // Treat any 404 as permanent — the artwork doesn't exist on the CDN.
         if (lower.includes('http 404') || lower.includes('404') || lower.includes('not found')) {
-            GameArtworkProvider.logger.debug(
-                `Categorized as 404 (permanent): tried ${urlsTried.length} URL(s): ${urlsTried.join(', ')}`
-            )
             return '404'
         }
         
@@ -199,11 +178,8 @@ export class GameArtworkRequest implements GameArtwork {
     }
 
     private setArtworkSelection(selectedType: 'library' | 'capsule' | 'header' | 'label', selectedUrl?: string): void {
-        const games = DataManager.getInstance().get<SteamGameData[]>('steam.games')
-        if (!games) return
-
-        const match = games.find((game) => Number(game.appid) === this.appId)
-        if (!match) return
+        
+        const match = SteamDataManager.GetGame(this.appId);
 
         match.artworkSelectedType = selectedType
         if (selectedUrl) {
