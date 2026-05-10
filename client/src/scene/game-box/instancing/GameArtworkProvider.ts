@@ -99,20 +99,6 @@ interface UrlCacheEntry {
     fallbackType?: string
 }
 
-export interface ArtworkSuccessCacheEntry {
-    timestamp: number
-    fallbackUrl: string
-    fallbackType: string
-}
-
-export interface ArtworkFailureCacheEntry {
-    timestamp: number
-    reason: FailureReason
-    isPermanent: boolean
-    attemptCount: number
-    urlsTried: string[]
-}
-
 /** Fallback URL patterns for Steam CDN */
 const FALLBACK_PATTERNS: Record<ArtworkFormat, Array<{ pattern: string; name: string }>> = {
     library: [
@@ -381,36 +367,6 @@ export class GameArtworkProvider {
     public getFailureReason(appId: number, format: ArtworkFormat): FailureReason | null {
         const cacheKey = `${appId}-${format}`
         return this.failureCache.get(cacheKey)?.reason ?? null
-    }
-
-    public getSuccessCacheEntry(appId: number, format: ArtworkFormat): ArtworkSuccessCacheEntry | null {
-        const cacheKey = `${appId}-${format}`
-        const entry = this.successCache.get(cacheKey)
-        if (!entry?.fallbackUrl || !entry.fallbackType) {
-            return null
-        }
-
-        return {
-            timestamp: entry.timestamp,
-            fallbackUrl: entry.fallbackUrl,
-            fallbackType: entry.fallbackType
-        }
-    }
-
-    public getFailureCacheEntry(appId: number, format: ArtworkFormat): ArtworkFailureCacheEntry | null {
-        const cacheKey = `${appId}-${format}`
-        const entry = this.failureCache.get(cacheKey)
-        if (!entry?.reason) {
-            return null
-        }
-
-        return {
-            timestamp: entry.timestamp,
-            reason: entry.reason,
-            isPermanent: entry.isPermanent ?? false,
-            attemptCount: entry.attemptCount ?? 0,
-            urlsTried: entry.urlsTried ?? []
-        }
     }
     
     /**
