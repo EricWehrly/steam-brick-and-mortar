@@ -102,7 +102,9 @@ interface UrlCacheEntry {
 /** Fallback URL patterns for Steam CDN */
 const FALLBACK_PATTERNS: Record<ArtworkFormat, Array<{ pattern: string; name: string }>> = {
     library: [
-        { pattern: 'library_600x900.jpg', name: 'library' }
+        { pattern: 'library_600x900.jpg', name: 'library' },
+        { pattern: 'capsule_616x353.jpg', name: 'capsule' },
+        { pattern: 'header.jpg', name: 'header' }
     ],
     header: [
         { pattern: 'header.jpg', name: 'header' }

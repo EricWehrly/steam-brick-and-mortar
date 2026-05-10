@@ -73,13 +73,21 @@ export class ArtworkPrefetchCoordinator {
         for (const game of games) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
             this.appNamesByAppId.set(appid, game.name)
-            const artworkUrl = this.selectBestArtworkUrl(game)
+            const selection = this.selectBestArtworkUrl(game)
+            const artworkUrl = selection.url
 
             if (!artworkUrl) {
+                this.logger.info(
+                    `Artwork route candidate: "${game.name}" (${appid}) library unavailable, capsule unavailable, header unavailable -> label fallback candidate`
+                )
                 this.prefetchResults.set(appid, 'permanent-failure')
                 this.emitArtworkIntentSettled(appid, game.name)
                 continue
             }
+
+            this.logger.info(
+                `Artwork route candidate: "${game.name}" (${appid}) using ${selection.source}`
+            )
 
             renderer.prefetchArtwork(appid, artworkUrl, game.name).then((result) => {
                 this.prefetchResults.set(appid, result)
@@ -148,12 +156,23 @@ export class ArtworkPrefetchCoordinator {
         this.hasLoggedExpectedFallbackSummary = true
     }
 
-    private selectBestArtworkUrl(game: SteamGameData): string | undefined {
-        if (game.artwork?.library) return game.artwork.library
-        if (game.artwork?.header) return game.artwork.header
-        if (game.appid) {
-            return `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
+    private selectBestArtworkUrl(game: SteamGameData): {
+        url?: string
+        source: 'library' | 'capsule' | 'header' | 'none'
+    } {
+        if (game.artwork?.library) {
+            return { url: game.artwork.library, source: 'library' }
         }
-        return undefined
+
+        if (game.appid) {
+            // Return capsule CDN URL as first fallback
+            // Provider will attempt capsule first, then header if capsule fails
+            return {
+                url: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/capsule_616x353.jpg`,
+                source: 'capsule'
+            }
+        }
+
+        return { source: 'none' }
     }
 }
