@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
 import { LightingControlsPanel } from '../../../src/ui/LightingControlsPanel'
+import { LightRegistry } from '../../../src/lighting/LightRegistry'
 import { LightingEventTypes } from '../../../src/types/LightingEvents'
 import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { AppSettings } from '../../../src/core/AppSettings'
@@ -11,6 +12,7 @@ describe('Lighting Panel Refresh Integration', () => {
     let eventManager: EventManager
 
     beforeEach(() => {
+        LightRegistry.getInstance().clear()
         scene = new THREE.Scene()
         eventManager = EventManager.getInstance()
         const appSettings = AppSettings.getInstance()
@@ -27,8 +29,7 @@ describe('Lighting Panel Refresh Integration', () => {
         directionalLight.name = 'test-directional'
         scene.add(directionalLight)
 
-        // Initially panel should not have scene reference
-        expect((panel as any).scene).toBeNull()
+        expect((panel as any).initialScanPerformed).toBe(false)
 
         // Emit the lighting system ready event
         eventManager.emit(LightingEventTypes.SystemReady, {
@@ -38,13 +39,11 @@ describe('Lighting Panel Refresh Integration', () => {
             source: EventSource.System
         })
 
-        // Panel should now have the scene reference (indicating the event was processed)
-        expect((panel as any).scene).toBe(scene)
+        expect((panel as any).initialScanPerformed).toBe(true)
     })
 
     it('should get scene reference from system ready event', () => {
-        // Initially panel should not have scene
-        expect((panel as any).scene).toBeNull()
+        expect((panel as any).initialScanPerformed).toBe(false)
 
         // Emit the lighting system ready event
         eventManager.emit(LightingEventTypes.SystemReady, {
@@ -54,13 +53,13 @@ describe('Lighting Panel Refresh Integration', () => {
             source: EventSource.System
         })
 
-        // Panel should now have the scene reference
-        expect((panel as any).scene).toBe(scene)
+        expect((panel as any).initialScanPerformed).toBe(true)
     })
 
     it('should handle both light created and system ready events', () => {
         // First emit a light created event (original functionality)
         const light = new THREE.PointLight(0xffffff, 1.0)
+        LightRegistry.getInstance().registerLight(light, { source: 'test' })
         eventManager.emit(LightingEventTypes.Created, {
             light: light,
             scene: scene,
@@ -70,8 +69,8 @@ describe('Lighting Panel Refresh Integration', () => {
             source: EventSource.ManagedLight
         })
 
-        // Panel should have scene after first event
-        expect((panel as any).scene).toBe(scene)
+        expect((panel as any).initialScanPerformed).toBe(true)
+        expect((panel as any).lightGroups.get('PointLight')?.lights).toContain(light)
 
         // Then emit system ready event (new functionality)
         eventManager.emit(LightingEventTypes.SystemReady, {
@@ -81,7 +80,7 @@ describe('Lighting Panel Refresh Integration', () => {
             source: EventSource.System
         })
 
-        // Panel should still have the scene reference
-        expect((panel as any).scene).toBe(scene)
+        expect((panel as any).initialScanPerformed).toBe(true)
+        expect((panel as any).lightGroups.get('PointLight')?.lights).toContain(light)
     })
 })

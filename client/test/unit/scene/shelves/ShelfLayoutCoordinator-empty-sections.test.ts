@@ -10,6 +10,7 @@ import { EventManager } from '../../../../src/core/EventManager'
 import { ShelfLayoutCoordinator } from '../../../../src/scene/shelves/ShelfLayoutCoordinator'
 import { GameEventTypes, StorePropsEventTypes, type ShelfReadyEvent } from '../../../../src/types/InteractionEvents'
 import type { SectionsReadyEvent } from '../../../../src/types/EnvironmentEvents'
+import { GroupModes, SortModes } from '../../../../src/types/LayoutTypes'
 
 describe('ShelfLayoutCoordinator – empty sections', () => {
     let eventManager: EventManager
@@ -41,13 +42,19 @@ describe('ShelfLayoutCoordinator – empty sections', () => {
     })
 
     function emitSectionsReady(sections: SectionsReadyEvent['sections']) {
-        eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, { sections })
+        eventManager.emit<SectionsReadyEvent>(GameEventTypes.SectionsReady, {
+            sections,
+            groupMode: GroupModes.ByGenre,
+            sortMode: SortModes.ByPlaytime,
+        })
     }
 
     it('should allocate 0 shelves for a completely empty section', () => {
         emitSectionsReady([
             {
                 name: 'Empty Section',
+                groupMode: GroupModes.ByGenre,
+                sortMode: SortModes.ByPlaytime,
                 games: []
             }
         ])
@@ -60,6 +67,8 @@ describe('ShelfLayoutCoordinator – empty sections', () => {
         emitSectionsReady([
             {
                 name: 'Games Section',
+                groupMode: GroupModes.ByGenre,
+                sortMode: SortModes.ByPlaytime,
                 games: [
                     { appid: 1, name: 'Game 1' } as any,
                     { appid: 2, name: 'Game 2' } as any,
@@ -67,10 +76,14 @@ describe('ShelfLayoutCoordinator – empty sections', () => {
             },
             {
                 name: 'Empty Section',
+                groupMode: GroupModes.ByGenre,
+                sortMode: SortModes.ByPlaytime,
                 games: []
             },
             {
                 name: 'More Games',
+                groupMode: GroupModes.ByGenre,
+                sortMode: SortModes.ByPlaytime,
                 games: [
                     { appid: 3, name: 'Game 3' } as any,
                 ]
@@ -88,14 +101,20 @@ describe('ShelfLayoutCoordinator – empty sections', () => {
         emitSectionsReady([
             {
                 name: 'Section A',
+                groupMode: GroupModes.ByGenre,
+                sortMode: SortModes.ByPlaytime,
                 games: Array(5).fill(null).map((_, i) => ({ appid: i + 1, name: `Game ${i + 1}` } as any))
             },
             {
                 name: 'Empty',
+                groupMode: GroupModes.ByGenre,
+                sortMode: SortModes.ByPlaytime,
                 games: []
             },
             {
                 name: 'Section B',
+                groupMode: GroupModes.ByGenre,
+                sortMode: SortModes.ByPlaytime,
                 games: Array(3).fill(null).map((_, i) => ({ appid: i + 100, name: `Game ${i + 100}` } as any))
             }
         ])

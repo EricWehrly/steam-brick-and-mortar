@@ -102,7 +102,7 @@ export class SceneSignManager {
     }
 
     private handleSteamDataLoaded(detail: SteamDataLoadedEvent): void {
-        this.steamLibraryTitleText = this.buildSteamLibraryTitle(detail.displayName)
+        this.steamLibraryTitleText = this.buildSteamLibraryTitle(detail.userInput)
         this.syncSteamLibraryBlockSign()
     }
 

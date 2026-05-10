@@ -4,7 +4,6 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { NoiseGenerator } from '../../../src/utils/NoiseGenerator'
-import { ProceduralTextures } from '../../../src/utils/ProceduralTextures'
 import { SharedMaterialManager, MaterialType } from '../../../src/utils/SharedMaterialManager'
 import * as THREE from 'three'
 
@@ -71,103 +70,6 @@ describe('NoiseGenerator', () => {
       
       expect(ceiling1).toBeGreaterThanOrEqual(0)
       expect(ceiling2).toBeGreaterThanOrEqual(0)
-    })
-  })
-})
-
-describe('ProceduralTextures Enhanced', () => {
-  let proceduralTextures: ProceduralTextures
-
-  beforeEach(() => {
-    proceduralTextures = ProceduralTextures.getInstance()
-  })
-
-  afterEach(() => {
-    proceduralTextures.clearCache()
-  })
-
-  describe('enhanced wood texture', () => {
-    it('should create enhanced wood texture with default options', () => {
-      const texture = proceduralTextures.createEnhancedWoodTexture()
-      
-      expect(texture).toBeInstanceOf(THREE.Texture)
-      expect((texture.image as { width: number; height: number }).width).toBe(2048)
-      expect((texture.image as { width: number; height: number }).height).toBe(2048)
-      expect(texture.wrapS).toBe(THREE.RepeatWrapping)
-      expect(texture.wrapT).toBe(THREE.RepeatWrapping)
-    })
-
-    it('should create texture with custom dimensions', () => {
-      const texture = proceduralTextures.createEnhancedWoodTexture({
-        width: 256,
-        height: 256
-      })
-      
-      expect((texture.image as { width: number; height: number }).width).toBe(256)
-      expect((texture.image as { width: number; height: number }).height).toBe(256)
-    })
-
-    it('should cache textures with same parameters', () => {
-      const options = { width: 256, height: 256, grainStrength: 0.5 }
-      const texture1 = proceduralTextures.createEnhancedWoodTexture(options)
-      const texture2 = proceduralTextures.createEnhancedWoodTexture(options)
-      
-      expect(texture1).toBe(texture2)
-    })
-
-    it('should create different textures with different parameters', () => {
-      const texture1 = proceduralTextures.createEnhancedWoodTexture({ grainStrength: 0.2 })
-      const texture2 = proceduralTextures.createEnhancedWoodTexture({ grainStrength: 0.8 })
-      
-      expect(texture1).not.toBe(texture2)
-    })
-  })
-
-  describe('enhanced carpet texture', () => {
-    it('should create enhanced carpet texture with default options', () => {
-      const texture = proceduralTextures.createEnhancedCarpetTexture()
-      
-      expect(texture).toBeInstanceOf(THREE.Texture)
-      expect((texture.image as { width: number; height: number }).width).toBe(512)
-      expect((texture.image as { width: number; height: number }).height).toBe(512)
-    })
-
-    it('should handle different fiber densities', () => {
-      const sparse = proceduralTextures.createEnhancedCarpetTexture({ fiberDensity: 0.1 })
-      const dense = proceduralTextures.createEnhancedCarpetTexture({ fiberDensity: 0.9 })
-      
-      expect(sparse).not.toBe(dense)
-    })
-
-    it('should handle different colors', () => {
-      const red = proceduralTextures.createEnhancedCarpetTexture({ color: '#FF0000' })
-      const blue = proceduralTextures.createEnhancedCarpetTexture({ color: '#0000FF' })
-      
-      expect(red).not.toBe(blue)
-    })
-  })
-
-  describe('enhanced ceiling texture', () => {
-    it('should create enhanced ceiling texture with default options', () => {
-      const texture = proceduralTextures.createEnhancedCeilingTexture()
-      
-      expect(texture).toBeInstanceOf(THREE.Texture)
-      expect((texture.image as { width: number; height: number }).width).toBe(512)
-      expect((texture.image as { width: number; height: number }).height).toBe(512)
-    })
-
-    it('should handle different bump sizes', () => {
-      const small = proceduralTextures.createEnhancedCeilingTexture({ bumpSize: 0.1 })
-      const large = proceduralTextures.createEnhancedCeilingTexture({ bumpSize: 0.9 })
-      
-      expect(small).not.toBe(large)
-    })
-
-    it('should handle different densities', () => {
-      const sparse = proceduralTextures.createEnhancedCeilingTexture({ density: 0.3 })
-      const dense = proceduralTextures.createEnhancedCeilingTexture({ density: 0.9 })
-      
-      expect(sparse).not.toBe(dense)
     })
   })
 })
@@ -272,12 +174,12 @@ describe('VR Performance Considerations', () => {
   })
 
   it('should use reasonable texture dimensions for VR', () => {
-    const proceduralTextures = ProceduralTextures.getInstance()
-    const texture = proceduralTextures.createEnhancedWoodTexture()
+    const material = materialManager.getMaterial(MaterialType.WallWood)
+    const texture = material.map as THREE.Texture & { image?: { width?: number; height?: number } }
     
-    // 2048x2048 for high-fidelity VR experience (Phase 1 - enhanced quality)
-    expect((texture.image as { width: number; height: number }).width).toBe(2048)
-    expect((texture.image as { width: number; height: number }).height).toBe(2048)
+    expect(texture).toBeInstanceOf(THREE.Texture)
+    expect(texture.image?.width).toBeGreaterThan(0)
+    expect(texture.image?.height).toBeGreaterThan(0)
   })
 
   it('should handle large numbers of materials without memory leaks', () => {

@@ -312,7 +312,7 @@ describe('LodArtworkOrchestrator', () => {
         })
 
         it('should clear failure cache', () => {
-            expect(() => orchestrator.clearFailureCache()).not.toThrow()
+            expect(() => (orchestrator as any).clearFailureCache()).not.toThrow()
         })
 
         it('should dispose without throwing', () => {

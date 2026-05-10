@@ -116,7 +116,7 @@ export class SteamIntegration {
         }
 
         this.eventManager.emit<SteamDataLoadedEvent>(SteamEventTypes.DataLoaded, {
-            displayName,
+            userInput: displayName,
         })
 
         const totalGames = games.length

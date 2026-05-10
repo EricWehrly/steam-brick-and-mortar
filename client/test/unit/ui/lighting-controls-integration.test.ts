@@ -76,25 +76,26 @@ describe('Lighting Controls Panel Integration', () => {
 
     it('should toggle panel content when header is clicked', () => {
         const header = document.getElementById('lighting-panel-header')
+        const panel = document.getElementById('lighting-controls-panel')
         const content = document.getElementById('lighting-panel-content')
         const indicator = document.getElementById('toggle-indicator')
 
         expect(header).toBeTruthy()
+        expect(panel).toBeTruthy()
         expect(content).toBeTruthy()
         expect(indicator).toBeTruthy()
 
-        // Initially content should be collapsed (new default behavior)
-        expect(content!.classList.contains('collapsed')).toBe(true)
+        expect(panel!.classList.contains('horizontally-collapsed')).toBe(true)
         expect(indicator!.textContent).toBe('▶')
 
         // Click header to expand
         header!.click()
-        expect(content!.classList.contains('collapsed')).toBe(false)
+        expect(panel!.classList.contains('horizontally-collapsed')).toBe(false)
         expect(indicator!.textContent).toBe('▼')
 
         // Click header again to collapse
         header!.click()
-        expect(content!.classList.contains('collapsed')).toBe(true)
+        expect(panel!.classList.contains('horizontally-collapsed')).toBe(true)
         expect(indicator!.textContent).toBe('▶')
     })
 
@@ -147,7 +148,7 @@ describe('Lighting Controls Panel Integration', () => {
         // Show panel - it should be visible but remain in its collapsed state
         lightingPanel.show()
         expect(panel!.style.display).toBe('flex')
-        expect(content!.classList.contains('collapsed')).toBe(true) // Still collapsed
+        expect(panel!.classList.contains('horizontally-collapsed')).toBe(true)
         expect(indicator!.textContent).toBe('▶') // Still showing collapsed indicator
     })
 })

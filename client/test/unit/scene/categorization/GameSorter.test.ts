@@ -319,7 +319,9 @@ describe('GameSorter placement trimming', () => {
         ]
 
         const sectionPlans = sorter.buildSectionPlacementPlan(sections)
-        const planById = new Map(sectionPlans.map((section: any) => [section.sectionId, section]))
+        const planById = new Map<string, { allocatedShelves: number }>(
+            sectionPlans.map((section: any) => [section.sectionId, section])
+        )
 
         expect(planById.get('by-genre:Action:0')?.allocatedShelves).toBe(ARRANGEMENT_SHELF_CAP - 3)
         expect(planById.get('by-genre:RPG:0')?.allocatedShelves).toBe(1)

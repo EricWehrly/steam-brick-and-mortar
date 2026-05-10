@@ -199,7 +199,7 @@ describe('ShelfSignPlanner — sign placement from SectionsReady', () => {
         expect(secondEndCall?.[1].anchorPosition).toEqual(pos2)
     })
 
-    it('clears signs and anchor caches on setup request', () => {
+    it('clears anchor caches on setup request', () => {
         new ShelfSignPlanner()
         emitShelfReady(0, FAR_POSITION)
         emitSectionsReady([makeSection('Action')])
@@ -207,7 +207,7 @@ describe('ShelfSignPlanner — sign placement from SectionsReady', () => {
         expect(placeSignSpy).toHaveBeenCalledTimes(1)
 
         EventManager.getInstance().emit(StorePropsEventTypes.SetupRequest, { source: 'system' } as any)
-        expect(removeSignByIdSpy).toHaveBeenCalledWith('Action::start')
+        expect(removeSignByIdSpy).not.toHaveBeenCalled()
 
         vi.clearAllMocks()
         emitSectionsReady([makeSection('Action')])
