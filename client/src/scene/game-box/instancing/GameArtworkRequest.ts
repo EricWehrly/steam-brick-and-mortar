@@ -76,28 +76,43 @@ export class GameArtworkRequest implements GameArtwork {
         // Known non-permanent failures should be retried.
         // They are historical hints, not hard blocks.
 
-        // Keep one artwork source URL per request handle to avoid MID/HIGH LOD image swapping.
-        if (this.resolvedUrl) {
-            try {
-                const result = await this.provider.fetchPixels(
-                    this.resolvedUrl,
-                    width,
-                    height,
-                    `${this.appId}-${this.format}`
-                )
-                this.cachedPixels = result
-
-                const pinnedRoute = this.classifyRoute(this.resolvedUrl, 'resolved')
-                if (pinnedRoute === 'library' || pinnedRoute === 'capsule' || pinnedRoute === 'header') {
-                    this.setArtworkSelection(pinnedRoute, this.resolvedUrl)
-                }
-
-                return result
-            } catch {
-                this.resolvedUrl = null
-            }
+        const pinnedResult = await this.fetchFromResolvedUrl(width, height)
+        if (pinnedResult) {
+            return pinnedResult
         }
-        
+
+        return this.fetchFromStrategy(width, height)
+    }
+
+    private async fetchFromResolvedUrl(width: number, height: number): Promise<PixelDataResult | null> {
+        if (!this.resolvedUrl) {
+            return null
+        }
+
+        // Keep one artwork source URL per request handle to avoid MID/HIGH LOD image swapping.
+        try {
+            const result = await this.provider.fetchPixels(
+                this.resolvedUrl,
+                width,
+                height,
+                `${this.appId}-${this.format}`
+            )
+
+            this.cachedPixels = result
+
+            const pinnedRoute = this.classifyRoute(this.resolvedUrl, 'resolved')
+            if (this.isCdnArtworkType(pinnedRoute)) {
+                this.setArtworkSelection(pinnedRoute, this.resolvedUrl)
+            }
+
+            return result
+        } catch {
+            this.resolvedUrl = null
+            return null
+        }
+    }
+
+    private async fetchFromStrategy(width: number, height: number): Promise<PixelDataResult> {
         const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.preferredUrl)
         const triedUrls: string[] = []
         let lastError: Error | null = null
@@ -110,19 +125,8 @@ export class GameArtworkRequest implements GameArtwork {
                 const result = await this.provider.fetchPixels(
                     url, width, height, `${this.appId}-${this.format}`
                 )
-                
-                this.resolvedUrl = url
-                this.cachedPixels = result
-                
-                // Record success if it was a fallback
-                if (type !== 'preferred' && !type.startsWith('cached-')) {
-                    this.provider.recordSuccess(this.appId, this.format, url, type)
-                }
 
-                if (route === 'library' || route === 'capsule' || route === 'header') {
-                    this.setArtworkSelection(route, url)
-                }
-                
+                this.recordSuccessfulResolution(result, url, type, route)
                 return result
             } catch (e) {
                 lastError = e instanceof Error ? e : new Error(String(e))
@@ -135,6 +139,24 @@ export class GameArtworkRequest implements GameArtwork {
         this.setArtworkSelection('label')
 
         throw new Error(`Failed to load artwork for ${this.gameName}: ${this.failureReason}`)
+    }
+
+    private recordSuccessfulResolution(
+        result: PixelDataResult,
+        url: string,
+        type: string,
+        route: CdnArtworkType | 'other'
+    ): void {
+        this.resolvedUrl = url
+        this.cachedPixels = result
+
+        if (type !== 'preferred' && !type.startsWith('cached-')) {
+            this.provider.recordSuccess(this.appId, this.format, url, type)
+        }
+
+        if (this.isCdnArtworkType(route)) {
+            this.setArtworkSelection(route, url)
+        }
     }
     
     async isCached(): Promise<boolean> {
@@ -192,6 +214,10 @@ export class GameArtworkRequest implements GameArtwork {
         if (type.includes('capsule') || url.includes('/capsule_616x353.jpg')) return 'capsule'
         if (type.includes('header') || url.includes('/header.jpg')) return 'header'
         return 'other'
+    }
+
+    private isCdnArtworkType(route: CdnArtworkType | 'other'): route is CdnArtworkType {
+        return route === 'library' || route === 'capsule' || route === 'header'
     }
 
     private setArtworkSelection(selectedType: CdnArtworkType | 'label', selectedUrl?: string): void {
