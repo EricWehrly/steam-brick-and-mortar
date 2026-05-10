@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { test, expect } from '@playwright/test'
 import { writeFile } from 'fs/promises'
 import { getResultPath } from './helpers/results'

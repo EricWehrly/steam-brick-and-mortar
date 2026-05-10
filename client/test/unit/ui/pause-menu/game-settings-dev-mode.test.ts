@@ -83,7 +83,7 @@ describe('GameSettingsPanel Development Mode', () => {
             expect(emitSpy).toHaveBeenCalledWith(
                 AppSettingsEventTypes.Changed,
                 expect.objectContaining({
-                    key: 'developmentMode',
+                    settingName: 'developmentMode',
                     value: false,
                     source: 'ui'
                 })

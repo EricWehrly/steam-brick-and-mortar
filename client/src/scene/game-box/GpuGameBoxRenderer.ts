@@ -73,7 +73,7 @@ export class GpuGameBoxRenderer {
     constructor(
         textureCapacity: number,
         placementCapacity: number = textureCapacity,
-        labelCapacity: number
+        labelCapacity: number = placementCapacity
     ) {
         this.instancedLabelRenderer = new InstancedLabelRenderer({ maxInstances: labelCapacity })
         this.lodArtworkRenderer = LodArtworkOrchestratorDebug.fromAppSettings(textureCapacity, placementCapacity)

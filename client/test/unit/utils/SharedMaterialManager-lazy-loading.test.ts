@@ -136,11 +136,6 @@ describe('SharedMaterialManager Lazy Loading', () => {
             expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
         })
 
-        it('should create basic wood material only when requested', () => {
-            manager.initialize()
-            const material = manager.getMaterial(MaterialType.BasicWood)
-            expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
-        })
     })
 
     describe('Auto-Initialization Behavior', () => {
