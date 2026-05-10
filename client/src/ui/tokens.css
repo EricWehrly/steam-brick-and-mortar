@@ -8,8 +8,7 @@
  * Use tokens for all colors, spacing, radii, and transitions.
  * When migrating: #333 → var(--color-surface-3), rgba(0,0,0,0.85) → var(--color-surface-overlay), etc.
  *
- * ToastManager: leave as-is for now — lowest priority, revisit in later Phase 2 alongside
- * other UI work. May be shut off entirely when the broader UI is tidied up.
+ * Notification layering remains available as a token even without a global toast manager.
  */
 
 :root {
@@ -80,5 +79,5 @@
     --z-panel:   1000;  /* Standard UI panels (binder: 1500) */
     --z-overlay: 2000;  /* Overlays above panels (detail panel) */
     --z-modal:   3000;  /* Modals, confirmations */
-    --z-toast:   4000;  /* Toasts, notifications — always on top */
+    --z-toast:   4000;  /* Notifications — always on top */
 }

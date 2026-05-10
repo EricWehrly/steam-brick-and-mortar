@@ -1,6 +1,5 @@
 /* Main application styles */
 @import './tokens.css';
-@import './components/toast.css';
 @import './components/steam-ui.css';
 @import './components/game-artwork-inspector.css';
 @import './components/scene-blur-overlay.css';
