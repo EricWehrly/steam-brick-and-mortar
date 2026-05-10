@@ -76,10 +76,14 @@ export class GameArtworkRequest implements GameArtwork {
         
         const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.preferredUrl)
         const triedUrls: string[] = []
+        const triedRoutes: string[] = []
+        let libraryFailed = false
         let lastError: Error | null = null
         
         for (const { url, type } of strategy) {
             triedUrls.push(url)
+            const route = this.classifyRoute(url, type)
+            triedRoutes.push(route)
             
             try {
                 const result = await this.provider.fetchPixels(
@@ -93,16 +97,36 @@ export class GameArtworkRequest implements GameArtwork {
                 if (type !== 'preferred' && !type.startsWith('cached-')) {
                     this.provider.recordSuccess(this.appId, this.format, url, type)
                 }
+
+                if (libraryFailed && (route === 'capsule' || route === 'header')) {
+                    GameArtworkProvider.logger.info(
+                        `Artwork route: "${this.gameName}" (${this.appId}) library failed -> using ${route}`
+                    )
+                }
                 
                 return result
             } catch (e) {
                 lastError = e instanceof Error ? e : new Error(String(e))
+                if (route === 'library') {
+                    libraryFailed = true
+                }
             }
         }
         
         // All URLs failed - categorize and record
         this.failureReason = this.categorizeError(lastError?.message ?? 'Unknown error', triedUrls)
         this.provider.recordFailure(this.appId, this.format, this.failureReason, triedUrls)
+
+        if (libraryFailed) {
+            const attemptedFallbacks = triedRoutes.filter(route => route === 'capsule' || route === 'header')
+            const fallbackSummary = attemptedFallbacks.length > 0
+                ? `${attemptedFallbacks.join(' -> ')} failed`
+                : 'no capsule/header fallback available'
+
+            GameArtworkProvider.logger.warn(
+                `Artwork route: "${this.gameName}" (${this.appId}) library failed; ${fallbackSummary}; falling back to label`
+            )
+        }
         
         throw new Error(`Failed to load artwork for ${this.gameName}: ${this.failureReason}`)
     }
@@ -158,5 +182,12 @@ export class GameArtworkRequest implements GameArtwork {
         if (lower.includes('network') || lower.includes('failed to fetch')) return 'NETWORK'
         
         return 'UNKNOWN'
+    }
+
+    private classifyRoute(url: string, type: string): 'library' | 'capsule' | 'header' | 'other' {
+        if (type.includes('library') || url.includes('/library_600x900.jpg')) return 'library'
+        if (type.includes('capsule') || url.includes('/capsule_616x353.jpg')) return 'capsule'
+        if (type.includes('header') || url.includes('/header.jpg')) return 'header'
+        return 'other'
     }
 }

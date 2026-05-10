@@ -1,22 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 import { EventManager } from '../../../../src/core/EventManager'
-import { ArtworkPrefetchCoordinator } from '../../../../src/scene/spawning/ArtworkPrefetchCoordinator'
+import { ArtworkPrefetchCoordinator, type PrefetchResult } from '../../../../src/scene/spawning/ArtworkPrefetchCoordinator'
 import {
     GameEventTypes,
     GameRenderEventTypes,
     type ArtworkIntentSettledEvent,
 } from '../../../../src/types/InteractionEvents'
 
-const { mockInfo, mockWarn } = vi.hoisted(() => ({
-    mockInfo: vi.fn(),
+const { mockWarn } = vi.hoisted(() => ({
     mockWarn: vi.fn(),
 }))
 
 vi.mock('../../../../src/utils/Logger', () => ({
     Logger: {
         createLogFunctions: vi.fn(() => ({
-            info: mockInfo,
+            info: vi.fn(),
             warn: mockWarn,
             debug: vi.fn(),
             lifecycle: vi.fn(),
@@ -25,23 +24,36 @@ vi.mock('../../../../src/utils/Logger', () => ({
 }))
 
 describe('ArtworkPrefetchCoordinator', () => {
+    const createDeferred = <T,>() => {
+        let resolve!: (value: T | PromiseLike<T>) => void
+        let reject!: (reason?: unknown) => void
+        const promise = new Promise<T>((res, rej) => {
+            resolve = res
+            reject = rej
+        })
+        return { promise, resolve, reject }
+    }
+
     beforeEach(() => {
         EventManager.getInstance().removeAllListeners(GameEventTypes.ArtworkSettled)
         EventManager.getInstance().removeAllListeners(GameRenderEventTypes.ArtworkIntentSettled)
         vi.clearAllMocks()
     })
 
-    it('logs expected fallback summary only once after artwork settled is emitted', async () => {
+    it('emits ArtworkIntentSettled once per game across success, fetch failure, and no-art cases', async () => {
         const coordinator = new ArtworkPrefetchCoordinator()
+        const success = createDeferred<PrefetchResult>()
+        const failure = createDeferred<PrefetchResult>()
+
         const renderer = {
             prefetchArtwork: vi.fn((appid: number) => {
                 if (appid === 1) {
-                    return Promise.resolve('prefetched')
+                    return success.promise
                 }
                 if (appid === 2) {
-                    return Promise.reject(new Error('404'))
+                    return failure.promise
                 }
-                return Promise.resolve('prefetched')
+                return Promise.resolve('prefetched' as PrefetchResult)
             }),
         } as any
 
@@ -54,7 +66,7 @@ describe('ArtworkPrefetchCoordinator', () => {
             {
                 appid: 2,
                 name: 'Broken Art',
-                artwork: { library: 'https://example.com/2.jpg' },
+                artwork: undefined,
             },
             {
                 appid: 0,
@@ -68,37 +80,63 @@ describe('ArtworkPrefetchCoordinator', () => {
             GameRenderEventTypes.ArtworkIntentSettled,
             (event: CustomEvent<ArtworkIntentSettledEvent>) => settled.push(event.detail.appid)
         )
+
         coordinator.prefetchBatch(games, renderer)
+
+        expect(renderer.prefetchArtwork).toHaveBeenCalledTimes(2)
+        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(1, 1, 'https://example.com/1.jpg', 'Has Art')
+        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(2, 2, 'https://cdn.akamai.steamstatic.com/steam/apps/2/capsule_616x353.jpg', 'Broken Art')
+        expect(settled).toEqual([0])
+
+        success.resolve('prefetched')
         await Promise.resolve()
+        expect(settled).toEqual([0, 1])
+
+        failure.reject(new Error('404'))
+        await failure.promise.catch(() => undefined)
         await Promise.resolve()
 
         expect(settled.sort((a, b) => a - b)).toEqual([0, 1, 2])
+        expect(mockWarn).toHaveBeenCalledTimes(1)
 
-        EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
-        EventManager.getInstance().emit(GameEventTypes.ArtworkSettled, {})
-
-        expect(mockInfo).toHaveBeenCalledTimes(1)
-        expect(mockInfo.mock.calls[0][0]).toContain('Broken Art')
-        expect(mockInfo.mock.calls[0][0]).toContain('No Art')
+        coordinator.dispose()
     })
 
-    it('does not log fallback summary when all prefetches succeed', async () => {
+    it('uses header fallback URL when library artwork is missing', async () => {
         const coordinator = new ArtworkPrefetchCoordinator()
+        const prefetch = createDeferred<PrefetchResult>()
+
         const renderer = {
-            prefetchArtwork: vi.fn().mockResolvedValue('prefetched'),
+            prefetchArtwork: vi.fn(() => prefetch.promise),
         } as any
+
+        const settled: number[] = []
+        EventManager.getInstance().registerEventHandler(
+            GameRenderEventTypes.ArtworkIntentSettled,
+            (event: CustomEvent<ArtworkIntentSettledEvent>) => settled.push(event.detail.appid)
+        )
 
         coordinator.prefetchBatch([
             {
-                appid: 1,
-                name: 'Has Art',
-                artwork: { library: 'https://example.com/1.jpg' },
+                appid: 7,
+                name: 'Header Candidate',
+                artwork: undefined,
             } as any,
         ], renderer)
 
-        await Promise.resolve()
-        coordinator.logExpectedFallbackSummary()
+        expect(renderer.prefetchArtwork).toHaveBeenCalledWith(
+            7,
+            'https://cdn.akamai.steamstatic.com/steam/apps/7/capsule_616x353.jpg',
+            'Header Candidate'
+        )
+        expect(settled).toEqual([])
 
-        expect(mockInfo).not.toHaveBeenCalled()
+        prefetch.resolve('prefetched')
+        await Promise.resolve()
+
+        expect(settled).toEqual([7])
+        expect(mockWarn).not.toHaveBeenCalled()
+
+        coordinator.dispose()
     })
 })
