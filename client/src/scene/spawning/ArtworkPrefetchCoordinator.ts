@@ -77,17 +77,10 @@ export class ArtworkPrefetchCoordinator {
             const artworkUrl = selection.url
 
             if (!artworkUrl) {
-                this.logger.info(
-                    `Artwork route candidate: "${game.name}" (${appid}) library unavailable, capsule unavailable, header unavailable -> label fallback candidate`
-                )
                 this.prefetchResults.set(appid, 'permanent-failure')
                 this.emitArtworkIntentSettled(appid, game.name)
                 continue
             }
-
-            this.logger.info(
-                `Artwork route candidate: "${game.name}" (${appid}) using ${selection.source}`
-            )
 
             renderer.prefetchArtwork(appid, artworkUrl, game.name).then((result) => {
                 this.prefetchResults.set(appid, result)

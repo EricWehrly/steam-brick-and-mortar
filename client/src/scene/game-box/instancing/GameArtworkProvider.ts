@@ -99,7 +99,7 @@ interface UrlCacheEntry {
     fallbackType?: string
 }
 
-type CdnArtworkType = 'library' | 'capsule' | 'header'
+export type CdnArtworkType = 'library' | 'capsule' | 'header'
 
 const CDN_PATTERNS: Record<CdnArtworkType, string> = {
     library: 'library_600x900.jpg',
@@ -185,12 +185,6 @@ export class GameArtworkProvider {
         const cacheKey = `${appId}-${format}`
         const urls: Array<{ url: string; type: string }> = []
         
-        // Check if we have a known-good fallback URL
-        const cachedSuccess = this.successCache.get(cacheKey)
-        if (cachedSuccess?.fallbackUrl) {
-            urls.push({ url: cachedSuccess.fallbackUrl, type: `cached-${cachedSuccess.fallbackType}` })
-        }
-        
         // Add preferred URL if provided (usually from Steam API metadata)
         if (preferredUrl) {
             const alreadyAdded = urls.some(u => u.url === preferredUrl)
@@ -199,23 +193,26 @@ export class GameArtworkProvider {
             }
         }
         
-        // Add CDN fallback URLs
-        const isNewCdn = preferredUrl?.includes('shared.akamai.steamstatic.com') || 
-                         preferredUrl?.includes('store_item_assets')
-        
-        if (!isNewCdn) {
-            const baseUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}`
-            const fallbackChain: CdnArtworkType[] = format === 'library'
-                ? LIBRARY_FALLBACK_CHAIN
-                : [format]
+        const baseUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}`
+        const fallbackChain: CdnArtworkType[] = format === 'library'
+            ? LIBRARY_FALLBACK_CHAIN
+            : [format]
 
-            for (const type of fallbackChain) {
-                const pattern = CDN_PATTERNS[type]
-                const fallbackUrl = `${baseUrl}/${pattern}`
-                const alreadyAdded = urls.some(u => u.url === fallbackUrl)
-                if (!alreadyAdded) {
-                    urls.push({ url: fallbackUrl, type: `cdn-${type}` })
-                }
+        for (const type of fallbackChain) {
+            const pattern = CDN_PATTERNS[type]
+            const fallbackUrl = `${baseUrl}/${pattern}`
+            const alreadyAdded = urls.some(u => u.url === fallbackUrl)
+            if (!alreadyAdded) {
+                urls.push({ url: fallbackUrl, type: `cdn-${type}` })
+            }
+        }
+
+        // Keep historical success as a final candidate so preferred/canonical URLs stay authoritative.
+        const cachedSuccess = this.successCache.get(cacheKey)
+        if (cachedSuccess?.fallbackUrl) {
+            const alreadyAdded = urls.some(u => u.url === cachedSuccess.fallbackUrl)
+            if (!alreadyAdded) {
+                urls.push({ url: cachedSuccess.fallbackUrl, type: `cached-${cachedSuccess.fallbackType}` })
             }
         }
         

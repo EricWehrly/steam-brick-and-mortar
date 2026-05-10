@@ -5,6 +5,7 @@ import {
 import type { 
     GameArtwork, 
     ArtworkFormat, 
+    CdnArtworkType,
     FailureReason, 
     PixelDataResult 
 } from './GameArtworkProvider'
@@ -74,17 +75,36 @@ export class GameArtworkRequest implements GameArtwork {
         
         // Known non-permanent failures should be retried.
         // They are historical hints, not hard blocks.
+
+        // Keep one artwork source URL per request handle to avoid MID/HIGH LOD image swapping.
+        if (this.resolvedUrl) {
+            try {
+                const result = await this.provider.fetchPixels(
+                    this.resolvedUrl,
+                    width,
+                    height,
+                    `${this.appId}-${this.format}`
+                )
+                this.cachedPixels = result
+
+                const pinnedRoute = this.classifyRoute(this.resolvedUrl, 'resolved')
+                if (pinnedRoute === 'library' || pinnedRoute === 'capsule' || pinnedRoute === 'header') {
+                    this.setArtworkSelection(pinnedRoute, this.resolvedUrl)
+                }
+
+                return result
+            } catch {
+                this.resolvedUrl = null
+            }
+        }
         
         const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.preferredUrl)
         const triedUrls: string[] = []
-        const triedRoutes: string[] = []
-        let libraryFailed = false
         let lastError: Error | null = null
         
         for (const { url, type } of strategy) {
             triedUrls.push(url)
             const route = this.classifyRoute(url, type)
-            triedRoutes.push(route)
             
             try {
                 const result = await this.provider.fetchPixels(
@@ -106,9 +126,6 @@ export class GameArtworkRequest implements GameArtwork {
                 return result
             } catch (e) {
                 lastError = e instanceof Error ? e : new Error(String(e))
-                if (route === 'library') {
-                    libraryFailed = true
-                }
             }
         }
         
@@ -170,16 +187,16 @@ export class GameArtworkRequest implements GameArtwork {
         return 'UNKNOWN'
     }
 
-    private classifyRoute(url: string, type: string): 'library' | 'capsule' | 'header' | 'other' {
+    private classifyRoute(url: string, type: string): CdnArtworkType | 'other' {
         if (type.includes('library') || url.includes('/library_600x900.jpg')) return 'library'
         if (type.includes('capsule') || url.includes('/capsule_616x353.jpg')) return 'capsule'
         if (type.includes('header') || url.includes('/header.jpg')) return 'header'
         return 'other'
     }
 
-    private setArtworkSelection(selectedType: 'library' | 'capsule' | 'header' | 'label', selectedUrl?: string): void {
-        
+    private setArtworkSelection(selectedType: CdnArtworkType | 'label', selectedUrl?: string): void {
         const match = SteamDataManager.GetGame(this.appId);
+        if (!match) return
 
         match.artworkSelectedType = selectedType
         if (selectedUrl) {
