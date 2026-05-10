@@ -39,7 +39,7 @@
 - **WebXR (VR/AR)**: `WebXRCoordinator` → `WebXRManager` + `InputManager`
 - **Steam Integration**: `SteamWorkflowManager` → `SteamIntegration` → `SteamApiClient`
 - **UI System**: `UIManager` + 3 UI Coordinators (Steam, WebXR, System)
-- **Material System**: `SharedMaterialManager` → Material Generators
+- **Material System**: `SharedMaterialManager` + `ProceduralTextureWorker` + texture profiles
 - **Infrastructure**: `EventManager`, `DataManager`, `AppSettings` (global singletons)
 
 ---
@@ -124,7 +124,7 @@ main.ts
       │       ├── PauseMenuManager (pause menu)
       │       ├── PerformanceMonitor (FPS/stats)
       │       ├── DebugStatsProvider (debug info)
-      │       └── ToastManager (notifications)
+      │       └── (No global toast system)
       │
       ├── DATA/EVENT INFRASTRUCTURE (shared services)
       │   ├── EventManager (event bus) 📡
@@ -133,9 +133,9 @@ main.ts
       │
       └── MATERIAL SYSTEM (shared resources)
           └── SharedMaterialManager (material pooling)
-              ├── WoodMaterialGenerator (shelf materials)
-              ├── CarpetMaterialGenerator (floor materials)
-              ├── CeilingMaterialGenerator (ceiling materials)
+            ├── ProceduralTextureWorker (off-thread generation)
+            ├── Texture profile presets (wood/carpet/ceiling)
+            ├── FrameBudgetScheduler (main-thread application)
               └── MaterialUtils (utilities)
 ```
 
@@ -1044,13 +1044,10 @@ User Input → SteamUICoordinator → EventManager → SteamWorkflowManager
   - `getStats()` - Get current stats
   - Updates UI every frame
 
-**ToastManager** (Notifications)
-- **File**: `client/src/ui/ToastManager.ts`
-- **Role**: Display toast notifications
-- **Dependencies**: DOM
-- **Key Methods**:
-  - `success()` / `error()` / `info()` - Show toast
-  - Auto-dismiss after timeout
+**Notifications** (Current State)
+- **Status**: No global toast manager
+- **Behavior**: Notification UX is currently handled via panel-level UI and targeted status elements
+- **Follow-up**: Keep transient notifications event-driven if a replacement is introduced
 
 #### Potential Over-Layering Issues:
 
@@ -1078,35 +1075,25 @@ User Input → SteamUICoordinator → EventManager → SteamWorkflowManager
 **SharedMaterialManager** (Material Pooling)
 - **File**: `client/src/utils/SharedMaterialManager.ts`
 - **Role**: Pool materials to reduce duplication (95% memory reduction)
-- **Dependencies**: WoodMaterialGenerator, CarpetMaterialGenerator, CeilingMaterialGenerator
+- **Dependencies**: ProceduralTextureWorker, FrameBudgetScheduler, EventManager, texture profile presets
 - **Key Methods**:
   - `initialize()` - Create material pool
-  - `getGameBoxMaterialFromName()` - Get game box material (hue-based)
-  - `getShelfMaterial()` - Get shelf material
-  - `getCarpetMaterial()` / `getCeilingMaterial()` - Get environment materials
+  - `generateTexturesAsync()` - Prewarm off-thread procedural materials
+  - `getMaterial(type)` - Resolve pooled material by type
+  - `getStats()` - Inspect pool usage
+  - `dispose()` - Release pooled resources
 
-**WoodMaterialGenerator** (Shelf Materials)
-- **File**: `client/src/utils/materials/WoodMaterialGenerator.ts`
-- **Role**: Generate wood materials for shelves
-- **Dependencies**: TextureLoader, WoodTextureGenerator
-- **Key Methods**:
-  - `createMDFVeneerMaterial()` - MDF with veneer
-  - `createShelfInteriorMaterial()` - White glossy interior
-  - `createBrandAccentMaterial()` - Blue accent posts
+**ProceduralTextureWorker** (Off-Thread Generation)
+- **File**: `client/src/utils/textures/ProceduralTextureWorker.ts`
+- **Role**: Generate procedural bitmaps without blocking the main thread
+- **Outputs**: `wood_enhanced`, `wood_planks`, `wood_normal`, `carpet_*`, `ceiling_*`
 
-**CarpetMaterialGenerator** (Floor Materials)
-- **File**: `client/src/utils/materials/CarpetMaterialGenerator.ts`
-- **Role**: Generate carpet/floor materials
-- **Dependencies**: TextureLoader
-- **Key Methods**:
-  - `createCommercialCarpetMaterial()` - Store carpet
-
-**CeilingMaterialGenerator** (Ceiling Materials)
-- **File**: `client/src/utils/materials/CeilingMaterialGenerator.ts`
-- **Role**: Generate ceiling materials
-- **Dependencies**: TextureLoader
-- **Key Methods**:
-  - `createPopcornCeilingMaterial()` - Acoustic tile ceiling
+**Texture Profile Presets** (Tuning)
+- **Files**:
+  - `client/src/utils/materials/presets/woodTextureProfiles.ts`
+  - `client/src/utils/materials/presets/carpetTextureProfiles.ts`
+  - `client/src/utils/materials/presets/ceilingTextureProfiles.ts`
+- **Role**: Keep procedural tuning centralized and versionable
 
 **MaterialUtils** (Utilities)
 - **File**: `client/src/utils/MaterialUtils.ts`
@@ -1123,7 +1110,7 @@ User Input → SteamUICoordinator → EventManager → SteamWorkflowManager
 #### Potential Over-Layering Issues:
 
 ✅ **Material system is WELL DESIGNED**
-- **Reason**: Clear separation (Manager → Generators → Utils)
+- **Reason**: Clear separation (Manager → Worker + profiles + scheduler)
 - **Keep**: This architecture is optimal
 
 ---
@@ -1255,11 +1242,10 @@ User Input → SteamUICoordinator → EventManager → SteamWorkflowManager
 | **UI System** | `SystemUICoordinator` | System UI | Orchestration | 1 |
 | **UI System** | `PauseMenuManager` | Pause menu | UI | 1 |
 | **UI System** | `PerformanceMonitor` | Performance stats | UI | 1 |
-| **UI System** | `ToastManager` | Notifications | UI | 1 |
 | **Material System** | `SharedMaterialManager` | Material pooling | Utilities | 1 |
-| **Material System** | `WoodMaterialGenerator` | Shelf materials | Utilities | 1 |
-| **Material System** | `CarpetMaterialGenerator` | Floor materials | Utilities | 1 |
-| **Material System** | `CeilingMaterialGenerator` | Ceiling materials | Utilities | 1 |
+| **Material System** | `ProceduralTextureWorker` | Off-thread texture generation | Worker | 1 |
+| **Material System** | `FrameBudgetScheduler` | Frame-safe material application | Utilities | 1 |
+| **Material System** | `MaterialUtils` | Shared material helpers | Utilities | 1 |
 
 **Total Core Components**: 37 classes  
 **Total Orchestrators/Coordinators**: 8 classes  
