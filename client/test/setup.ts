@@ -4,8 +4,14 @@
 import { beforeEach } from 'vitest'
 import { installMockWorker, resetMockWorkerMessageHandlers } from './utils/mock-worker'
 import { installNetworkIsolation, resetNetworkIsolation } from './utils/network-isolation'
+import { setupIndexedDBMock } from './mocks/indexeddb.mock'
 
 installMockWorker()
+
+// TODO: Test performance impact of global IndexedDB mock.
+// This mock initializes for every test, even those that don't use Steam integration.
+// Consider scoping to only suites that need it if profiling shows measurable overhead.
+setupIndexedDBMock()
 
 // Network isolation blocks all outbound fetch.
 // Opt out by setting VITEST_LIVE=true in the vitest config (used for live integration tests
