@@ -21,4 +21,6 @@ export interface SteamGameData extends SteamGameMetadata {
         header: string
         library: string
     }
+    artworkSelectedType?: 'library' | 'capsule' | 'header' | 'label'
+    artworkSelectedUrl?: string
 }

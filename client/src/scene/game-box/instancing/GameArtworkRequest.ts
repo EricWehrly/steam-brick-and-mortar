@@ -2,12 +2,14 @@ import {
     ARTWORK_DIMENSIONS, 
     GameArtworkProvider 
 } from './GameArtworkProvider'
+import { DataManager } from '../../../core/data/DataManager'
 import type { 
     GameArtwork, 
     ArtworkFormat, 
     FailureReason, 
     PixelDataResult 
 } from './GameArtworkProvider'
+import type { SteamGameData } from '../types/GameData'
 
 /**
  * Handle to artwork for a specific game.
@@ -103,6 +105,10 @@ export class GameArtworkRequest implements GameArtwork {
                         `Artwork route: "${this.gameName}" (${this.appId}) library failed -> using ${route}`
                     )
                 }
+
+                if (route === 'library' || route === 'capsule' || route === 'header') {
+                    this.setArtworkSelection(route, url)
+                }
                 
                 return result
             } catch (e) {
@@ -116,6 +122,7 @@ export class GameArtworkRequest implements GameArtwork {
         // All URLs failed - categorize and record
         this.failureReason = this.categorizeError(lastError?.message ?? 'Unknown error', triedUrls)
         this.provider.recordFailure(this.appId, this.format, this.failureReason, triedUrls)
+        this.setArtworkSelection('label')
 
         if (libraryFailed) {
             const attemptedFallbacks = triedRoutes.filter(route => route === 'capsule' || route === 'header')
@@ -189,5 +196,18 @@ export class GameArtworkRequest implements GameArtwork {
         if (type.includes('capsule') || url.includes('/capsule_616x353.jpg')) return 'capsule'
         if (type.includes('header') || url.includes('/header.jpg')) return 'header'
         return 'other'
+    }
+
+    private setArtworkSelection(selectedType: 'library' | 'capsule' | 'header' | 'label', selectedUrl?: string): void {
+        const games = DataManager.getInstance().get<SteamGameData[]>('steam.games')
+        if (!games) return
+
+        const match = games.find((game) => Number(game.appid) === this.appId)
+        if (!match) return
+
+        match.artworkSelectedType = selectedType
+        if (selectedUrl) {
+            match.artworkSelectedUrl = selectedUrl
+        }
     }
 }
