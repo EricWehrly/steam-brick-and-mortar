@@ -79,5 +79,4 @@
     --z-panel:   1000;  /* Standard UI panels (binder: 1500) */
     --z-overlay: 2000;  /* Overlays above panels (detail panel) */
     --z-modal:   3000;  /* Modals, confirmations */
-    --z-toast:   4000;  /* Notifications — always on top */
 }
