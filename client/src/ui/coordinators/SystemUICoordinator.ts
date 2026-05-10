@@ -13,6 +13,7 @@ import { PauseMenuManager } from '../pause/PauseMenuManager'
 import { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { LightingControlsPanel } from '../LightingControlsPanel'
 import { CategoryReferencePanel } from '../CategoryReferencePanel'
+import { GameLibraryListPanel } from '../GameLibraryListPanel'
 import { LayoutControlPanel } from '../LayoutControlPanel'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings } from '../../core/AppSettings'
@@ -31,6 +32,7 @@ export class SystemUICoordinator {
     private performanceMonitor: PerformanceMonitorUI
     private lightingControlsPanel?: LightingControlsPanel
     private categoryReferencePanel?: CategoryReferencePanel
+    private gameLibraryListPanel?: GameLibraryListPanel
     private layoutControlPanel?: LayoutControlPanel
     private eventManager: EventManager
     private appSettings: AppSettings
@@ -111,6 +113,9 @@ export class SystemUICoordinator {
         // Category reference panel (dev/debug tool)
         this.initializeCategoryReferencePanel()
 
+        // Spreadsheet-style metadata panel (dev/debug tool)
+        this.initializeGameLibraryListPanel()
+
         this.renderLoopRegistry.register(this.constructor.name, this.updatePerformanceStats.bind(this))
     }
 
@@ -157,6 +162,13 @@ export class SystemUICoordinator {
         if (!this.categoryReferencePanel) {
             this.categoryReferencePanel = new CategoryReferencePanel()
             this.categoryReferencePanel.init()
+        }
+    }
+
+    private initializeGameLibraryListPanel(): void {
+        if (!this.gameLibraryListPanel) {
+            this.gameLibraryListPanel = new GameLibraryListPanel()
+            this.gameLibraryListPanel.init()
         }
     }
 
@@ -269,6 +281,8 @@ export class SystemUICoordinator {
         this.pauseMenuManager?.dispose()
         this.performanceMonitor?.dispose()
         this.lightingControlsPanel?.dispose()
+        this.categoryReferencePanel?.dispose()
+        this.gameLibraryListPanel?.dispose()
         this.layoutControlPanel?.dispose()
 
         // Remove lighting controls button
