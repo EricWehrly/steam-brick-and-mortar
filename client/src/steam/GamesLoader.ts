@@ -100,7 +100,6 @@ export class GamesLoader {
         const cachedGames = sortedGames.filter(g => cachedAppids.includes(g.appid))
         for (const game of cachedGames) {
             const enhanced = this.buildEnhancedGame(game, cachedAppDetails.get(game.appid))
-            this.cache.set(`game_${game.appid}`, enhanced)
             await emitter.push(enhanced)
         }
         monitor.end({ count: cachedGames.length })
@@ -128,7 +127,6 @@ export class GamesLoader {
                     if (!baseGame) continue
 
                     const enhanced = this.buildEnhancedGame(baseGame, normalized)
-                    this.cache.set(`game_${appid}`, enhanced)
                     await emitter.push(enhanced)
                 }
 
