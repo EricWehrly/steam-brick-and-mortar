@@ -23,7 +23,6 @@ import { RoomEventTypes, type RoomCreatedEvent, type RoomResizedEvent } from '..
 import { StorePropsEventTypes } from './props/PropsEvents'
 import { LightFactory } from '../lighting/LightFactory'
 import { LightRegistry } from '../lighting/LightRegistry'
-import { applyRendererShadowPolicy, applyLightShadowPolicy, configureDirectionalShadow, refitDirectionalShadowCameras } from '../lighting/ShadowPolicy'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor } from '../utils/PerformanceMonitor'
 import { GameSpotlight } from '../debug/GameSpotlight'
@@ -46,6 +45,13 @@ const CURRENT_ROOM_DIMENSIONS = {
     DEPTH: 16
 }
 
+const SHADOW_MAP_SIZES = {
+    LOW: 512,
+    MEDIUM: 1024, 
+    HIGH: 2048,
+    ULTRA: 4096
+} as const
+
 export interface LightingConfig {
     /** Ambient light intensity (0.0 - 1.0) */
     ambientIntensity?: number
@@ -59,6 +65,8 @@ export interface LightingConfig {
     shadowQuality?: number
     /** Global renderer shadow map toggle */
     shadowMapEnabled?: boolean
+    /** Shadow map resolution (derived from shadowQuality) */
+    shadowMapSize?: number
     /** Lighting quality level */
     quality?: LightingQuality
 }
@@ -204,7 +212,7 @@ export class LightingRenderer {
             this.clearLights()
             
             // Now do full setup with shadows and fixtures
-            applyRendererShadowPolicy(this.renderer, this.config)
+            this.configureShadows()
             await this.setupLightsByQuality()
             monitor.end({ quality: this.config.quality })
             
@@ -246,12 +254,84 @@ export class LightingRenderer {
             ceilingHeight: appSettings.getSetting('ceilingHeight'),
             shadowQuality: shadowQuality,
             shadowMapEnabled: appSettings.getSetting('shadowMapEnabled'),
+            shadowMapSize: this.getShadowMapSizeForQuality(shadowQuality),
             quality: appSettings.getSetting('lightingQuality')
         }
     }
 
-    private currentFootprint(): { width: number; depth: number } {
-        return { width: CURRENT_ROOM_DIMENSIONS.WIDTH, depth: CURRENT_ROOM_DIMENSIONS.DEPTH }
+    private configureShadows(): void {
+        const shadowQuality = this.config.shadowQuality || 0
+        const shadowMapEnabled = this.config.shadowMapEnabled !== false
+        
+        if (!shadowMapEnabled || shadowQuality === 0) {
+            this.renderer.shadowMap.enabled = false
+            return
+        }
+        
+        this.renderer.shadowMap.enabled = true
+        
+        // Set shadow map type based on quality
+        if (shadowQuality >= 4) {
+            this.renderer.shadowMap.type = THREE.VSMShadowMap // Ultra quality
+        } else {
+            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap // Standard quality
+        }
+    }
+
+    private getShadowMapSizeForQuality(shadowQuality: number): number {
+        switch (shadowQuality) {
+            case 0: return 0 // Shadows disabled
+            case 1: return SHADOW_MAP_SIZES.LOW    // 512
+            case 2: return SHADOW_MAP_SIZES.MEDIUM // 1024
+            case 3: return SHADOW_MAP_SIZES.HIGH   // 2048
+            case 4: return SHADOW_MAP_SIZES.ULTRA  // 4096
+            default: return SHADOW_MAP_SIZES.MEDIUM
+        }
+    }
+
+    private shouldCastShadows(): boolean {
+        return this.config.shadowMapEnabled !== false && (this.config.shadowQuality ?? 0) > 0
+    }
+
+    private applyShadowPolicy(light: THREE.DirectionalLight | THREE.SpotLight): void {
+        if (!this.shouldCastShadows()) {
+            light.castShadow = false
+            return
+        }
+
+        const shadowMapSize = this.getShadowMapSizeForQuality(this.config.shadowQuality || 0)
+        light.castShadow = true
+        light.shadow.mapSize.width = shadowMapSize
+        light.shadow.mapSize.height = shadowMapSize
+    }
+
+    private fitDirectionalShadowCamera(light: THREE.DirectionalLight): void {
+        const halfWidth = Math.max(10, CURRENT_ROOM_DIMENSIONS.WIDTH * 0.6)
+        const halfDepth = Math.max(8, CURRENT_ROOM_DIMENSIONS.DEPTH * 0.6)
+        light.shadow.camera.left = -halfWidth
+        light.shadow.camera.right = halfWidth
+        light.shadow.camera.top = halfDepth
+        light.shadow.camera.bottom = -halfDepth
+        light.shadow.camera.near = 0.5
+        light.shadow.camera.far = 40
+        light.shadow.camera.updateProjectionMatrix()
+    }
+
+    private refitDirectionalShadowCameras(): void {
+        this.lightingGroup.traverse((child) => {
+            if (!(child instanceof THREE.DirectionalLight)) return
+            if (!child.castShadow) return
+            this.fitDirectionalShadowCamera(child)
+        })
+    }
+
+    private configureDirectionalShadow(light: THREE.DirectionalLight): void {
+        this.applyShadowPolicy(light)
+        if (!light.castShadow) return
+
+        light.shadow.bias = -0.0006
+        light.shadow.normalBias = 0.015
+        this.fitDirectionalShadowCamera(light)
     }
 
     private attachDirectionalTarget(light: THREE.DirectionalLight, position: THREE.Vector3 = new THREE.Vector3(0, 0, 0)): void {
@@ -298,7 +378,7 @@ export class LightingRenderer {
         const mainDirectional = this.lightingGroup.getObjectByName(LIGHT_NAMES.MAIN_DIRECTIONAL)
         if (mainDirectional instanceof THREE.DirectionalLight) {
             this.attachDirectionalTarget(mainDirectional)
-            configureDirectionalShadow(mainDirectional, this.config, this.currentFootprint())
+            this.configureDirectionalShadow(mainDirectional)
         }
         
         LightingRenderer.logger.debug(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
@@ -326,7 +406,7 @@ export class LightingRenderer {
             position: [1, exteriorHeight, 10]
         })
         this.attachDirectionalTarget(exteriorLight)
-        configureDirectionalShadow(exteriorLight, this.config, this.currentFootprint())
+        this.configureDirectionalShadow(exteriorLight)
         exteriorLight.visible = false // Disabled by default - toggleable in lighting panel
         
         // Entrance spotlight: Creates inviting bright area at storefront that fades inward
@@ -456,7 +536,7 @@ export class LightingRenderer {
             position: [0, 8, 0]
         })
         spotLight1.target.position.set(0, 0, 0)
-        applyLightShadowPolicy(spotLight1, this.config)
+        this.applyShadowPolicy(spotLight1)
         this.lightingGroup.add(spotLight1.target)
         
         const accentColors = [0xff4444, 0x44ff44, 0x4444ff]
@@ -475,7 +555,7 @@ export class LightingRenderer {
         
         // Refresh full config from AppSettings to get updated shadows/ceiling height too
         this.config = { ...this.getCurrentConfig(), quality }
-        applyRendererShadowPolicy(this.renderer, this.config)
+        this.configureShadows()
         await this.setupLightsByQuality()
         this.forceShadowStateRefresh()
         
@@ -546,7 +626,7 @@ export class LightingRenderer {
         }
 
         if (roomFootprintChanged) {
-            refitDirectionalShadowCameras(this.lightingGroup, this.currentFootprint())
+            this.refitDirectionalShadowCameras()
         }
     }
 
