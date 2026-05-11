@@ -30,8 +30,8 @@ describe('LightingRenderer ceiling-height fixture refresh', () => {
 
     it('rebuilds fixtures when only room height changes after shelf layout is known', () => {
         const fixtureSetupSpy = vi
-            .spyOn(lightingRenderer as unknown as { setupFluorescentFixtures: (layout?: { rows: number; shelvesPerRow?: number }) => void }, 'setupFluorescentFixtures')
-            .mockImplementation(() => undefined)
+            .spyOn(lightingRenderer as unknown as { setupFluorescentFixtures: (layout?: { rows: number; shelvesPerRow?: number }) => Promise<void> }, 'setupFluorescentFixtures')
+            .mockResolvedValue(undefined)
 
         eventManager.emit<RoomResizedEvent>(RoomEventTypes.Resized, {
             dimensions: { width: 22, depth: 16, height: 4.0 },

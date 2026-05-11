@@ -146,7 +146,7 @@ export class LightingRenderer {
      * Setup basic lighting fast - just ambient + directional
      * This lets the scene become visible quickly without expensive fixtures
      */
-    private setupBasicLighting(): void {
+    private async setupBasicLighting(): Promise<void> {
         if (this.lightingUpgradeStarted) {
             LightingRenderer.logger.debug('Skipping basic lighting because upgrade has already started')
             return
@@ -161,7 +161,7 @@ export class LightingRenderer {
             // No shadows for fast startup
             this.renderer.shadowMap.enabled = false
             
-            this.setupSimpleLighting()
+            await this.setupSimpleLighting()
 
             if (this.lightingUpgradeStarted) {
                 LightingRenderer.logger.debug('Skipping remaining basic-lighting work because upgrade started mid-pass')
@@ -187,10 +187,10 @@ export class LightingRenderer {
      * Reconfigure lights with current config and quality settings
      * Extracts shared lifecycle: clear → apply shadow policy → setup by quality
      */
-    private reconfigureWithQuality(): void {
+    private async reconfigureWithQuality(): Promise<void> {
         this.clearLights()
         applyRendererShadowPolicy(this.renderer, this.config)
-        this.setupLightsByQuality()
+        await this.setupLightsByQuality()
     }
 
     /**
@@ -203,7 +203,7 @@ export class LightingRenderer {
      * unnecessary — or should be restructured to add lights incrementally rather
      * than clear-and-rebuild.
      */
-    private upgradeLighting(): void {
+    private async upgradeLighting(): Promise<void> {
         this.lightingUpgradeStarted = true
         const monitor = PerformanceMonitor.start('lighting-upgrade', LightingRenderer.logger)
         const startTime = window.performance.now()
@@ -213,7 +213,7 @@ export class LightingRenderer {
         
         try {
             // Now do full setup with shadows and fixtures
-            this.reconfigureWithQuality()
+            await this.reconfigureWithQuality()
             monitor.end({ quality: this.config.quality })
             
             // Check current settings for debug helpers and lighting state
@@ -269,22 +269,22 @@ export class LightingRenderer {
         }
     }
 
-    private setupLightsByQuality(): void {
+    private async setupLightsByQuality(): Promise<void> {
         switch (this.config.quality) {
             case LIGHTING_QUALITY.SIMPLE:
-                this.setupSimpleLighting()
+                await this.setupSimpleLighting()
                 break
             case LIGHTING_QUALITY.ENHANCED:
-                this.setupEnhancedLighting()
+                await this.setupEnhancedLighting()
                 break
             case LIGHTING_QUALITY.ADVANCED:
-                this.setupAdvancedLighting()
+                await this.setupAdvancedLighting()
                 break
             case LIGHTING_QUALITY.OUCH_MY_EYES:
-                this.setupOuchMyEyesLighting()
+                await this.setupOuchMyEyesLighting()
                 break
             default:
-                this.setupEnhancedLighting()
+                await this.setupEnhancedLighting()
         }
     }
 
@@ -358,7 +358,7 @@ export class LightingRenderer {
         this.toggleDebugVisualization(false)
     }
 
-    private setupSimpleLighting(): void {
+    private async setupSimpleLighting(): Promise<void> {
         LightingRenderer.logger.lifecycle('💡 Setting up SIMPLE lighting - basic illumination only')
         
         // Higher ambient light to compensate for fewer light sources
@@ -382,7 +382,7 @@ export class LightingRenderer {
         LightingRenderer.logger.debug(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
     }
 
-    private setupEnhancedLighting(): void {
+    private async setupEnhancedLighting(): Promise<void> {
         LightingRenderer.logger.lifecycle('💡 Setting up ENHANCED lighting - optimized retail atmosphere')
 
         this.setupRetailCoreLighting()
@@ -398,7 +398,7 @@ export class LightingRenderer {
         LightingRenderer.logger.debug(`💡 Ceiling fixtures will be added when shelf layout is determined`)
     }
 
-    private setupAdvancedLighting(): void {
+    private async setupAdvancedLighting(): Promise<void> {
         LightingRenderer.logger.lifecycle('💡 Setting up ADVANCED lighting - enhanced + point lights + better shadows')
 
         this.setupRetailCoreLighting()
@@ -408,7 +408,7 @@ export class LightingRenderer {
         LightingRenderer.logger.debug(`✅ Advanced lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
 
-    private setupOuchMyEyesLighting(): void {
+    private async setupOuchMyEyesLighting(): Promise<void> {
         LightingRenderer.logger.lifecycle('💡 Setting up OUCH-MY-EYES lighting - maximum visual fidelity + dramatic effects')
 
         this.setupRetailCoreLighting()
@@ -418,7 +418,7 @@ export class LightingRenderer {
         LightingRenderer.logger.debug(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
 
-    private setupFluorescentFixtures(shelfLayout?: { rows: number; shelvesPerRow?: number }): void {
+    private async setupFluorescentFixtures(shelfLayout?: { rows: number; shelvesPerRow?: number }): Promise<void> {
         const monitor = PerformanceMonitor.start('ceiling-fixtures-setup', LightingRenderer.logger)
         
         if (!this.propRenderer) {
@@ -497,12 +497,12 @@ export class LightingRenderer {
         })
     }
 
-    private updateLightingQuality(quality: LightingQuality): void {
+    private async updateLightingQuality(quality: LightingQuality): Promise<void> {
         this.debugHelper.clearHelpers()
         
         // Refresh full config from AppSettings to get updated shadows/ceiling height too
         this.config = { ...this.getCurrentConfig(), quality }
-        this.reconfigureWithQuality()
+        await this.reconfigureWithQuality()
         this.forceShadowStateRefresh()
         
         // Only show debug helpers if setting is enabled
