@@ -105,8 +105,6 @@ export class BlockLetterSignRenderer implements ISignRenderer {
         if (!entry) return  // removed while font was loading
         const letterMesh = new THREE.Mesh(this.buildLetterGeometry(font, text, fontSize, depth), entry.material)
         letterMesh.name = `sign-block-letter-${uniqueIdentifier.toLowerCase().replace(/\s+/g, '-').slice(0, 32)}`
-        letterMesh.castShadow = true
-        letterMesh.receiveShadow = true
         entry.group.add(letterMesh)
     }
 
