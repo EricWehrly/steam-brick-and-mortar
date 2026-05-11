@@ -293,7 +293,7 @@ export class LightingRenderer {
         return this.config.shadowMapEnabled !== false && (this.config.shadowQuality ?? 0) > 0
     }
 
-    private configureDirectionalShadow(light: THREE.DirectionalLight): void {
+    private applyShadowPolicy(light: THREE.DirectionalLight | THREE.SpotLight): void {
         if (!this.shouldCastShadows()) {
             light.castShadow = false
             return
@@ -303,9 +303,9 @@ export class LightingRenderer {
         light.castShadow = true
         light.shadow.mapSize.width = shadowMapSize
         light.shadow.mapSize.height = shadowMapSize
-        light.shadow.bias = -0.0006
-        light.shadow.normalBias = 0.015
+    }
 
+    private fitDirectionalShadowCamera(light: THREE.DirectionalLight): void {
         const halfWidth = Math.max(10, CURRENT_ROOM_DIMENSIONS.WIDTH * 0.6)
         const halfDepth = Math.max(8, CURRENT_ROOM_DIMENSIONS.DEPTH * 0.6)
         light.shadow.camera.left = -halfWidth
@@ -315,6 +315,23 @@ export class LightingRenderer {
         light.shadow.camera.near = 0.5
         light.shadow.camera.far = 40
         light.shadow.camera.updateProjectionMatrix()
+    }
+
+    private refitDirectionalShadowCameras(): void {
+        this.lightingGroup.traverse((child) => {
+            if (!(child instanceof THREE.DirectionalLight)) return
+            if (!child.castShadow) return
+            this.fitDirectionalShadowCamera(child)
+        })
+    }
+
+    private configureDirectionalShadow(light: THREE.DirectionalLight): void {
+        this.applyShadowPolicy(light)
+        if (!light.castShadow) return
+
+        light.shadow.bias = -0.0006
+        light.shadow.normalBias = 0.015
+        this.fitDirectionalShadowCamera(light)
     }
 
     private attachDirectionalTarget(light: THREE.DirectionalLight, position: THREE.Vector3 = new THREE.Vector3(0, 0, 0)): void {
@@ -519,12 +536,7 @@ export class LightingRenderer {
             position: [0, 8, 0]
         })
         spotLight1.target.position.set(0, 0, 0)
-        if ((this.config.shadowQuality || 0) > 0) {
-            spotLight1.castShadow = true
-            const shadowMapSize = this.getShadowMapSizeForQuality(this.config.shadowQuality || 0)
-            spotLight1.shadow.mapSize.width = shadowMapSize
-            spotLight1.shadow.mapSize.height = shadowMapSize
-        }
+        this.applyShadowPolicy(spotLight1)
         this.lightingGroup.add(spotLight1.target)
         
         const accentColors = [0xff4444, 0x44ff44, 0x4444ff]
@@ -570,8 +582,11 @@ export class LightingRenderer {
         LightingRenderer.logger.debug(`💡 Updating lighting for room dimensions: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
         
         // Update current room dimensions for fluorescent fixture positioning
+        const previousWidth = CURRENT_ROOM_DIMENSIONS.WIDTH
+        const previousDepth = CURRENT_ROOM_DIMENSIONS.DEPTH
         CURRENT_ROOM_DIMENSIONS.WIDTH = dimensions.width
         CURRENT_ROOM_DIMENSIONS.DEPTH = dimensions.depth
+        const roomFootprintChanged = previousWidth !== dimensions.width || previousDepth !== dimensions.depth
         
         const previousCeilingHeight = this.config.ceilingHeight
         const ceilingHeightChanged = previousCeilingHeight !== dimensions.height
@@ -608,6 +623,10 @@ export class LightingRenderer {
             }
 
             this.setupFluorescentFixtures(layoutForFixtures)
+        }
+
+        if (roomFootprintChanged) {
+            this.refitDirectionalShadowCameras()
         }
     }
 
