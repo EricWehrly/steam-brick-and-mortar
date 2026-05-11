@@ -115,6 +115,8 @@ export class NeonTubeSignRenderer implements ISignRenderer {
             const tubeGeo = new THREE.TubeGeometry(curve, pts3d.length * 2, TUBE_RADIUS, 8, true)
             const tubeMesh = new THREE.Mesh(tubeGeo, material)
             tubeMesh.name = `neon-tube-${request.uniqueIdentifier}-${group.children.length}`
+            tubeMesh.castShadow = true
+            tubeMesh.receiveShadow = true
             group.add(tubeMesh)
         }
 
