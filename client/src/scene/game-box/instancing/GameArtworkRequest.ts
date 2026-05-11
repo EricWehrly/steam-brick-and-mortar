@@ -64,9 +64,13 @@ export class GameArtworkRequest implements GameArtwork {
             this.cachedPixels.height === height) {
             return this.cachedPixels
         }
+
+        const strategyUrls = this.provider
+            .buildUrlStrategy(this.appId, this.format, this.preferredUrl)
+            .map((entry) => entry.url)
         
         // Check if this is a permanent failure we should skip
-        if (this.provider.isPermanentFailure(this.appId, this.format)) {
+        if (this.provider.shouldSkipPermanentFailureForUrls(this.appId, this.format, strategyUrls)) {
             const reason = this.failureReason ?? this.provider.getFailureReason(this.appId, this.format)
             if (reason) {
                 this.provider.recordSkip(this.appId, this.gameName, reason)
@@ -231,9 +235,9 @@ export class GameArtworkRequest implements GameArtwork {
     }
 
     private classifyRoute(url: string, type: string): CdnArtworkType | 'other' {
-        if (type.includes('library') || url.includes('/library_600x900.jpg')) return 'library'
-        if (type.includes('capsule') || url.includes('/capsule_616x353.jpg')) return 'capsule'
-        if (type.includes('header') || url.includes('/header.jpg')) return 'header'
+        if (type.includes('library') || url.includes('library_600x900.jpg')) return 'library'
+        if (type.includes('capsule') || url.includes('capsule_616x353.jpg')) return 'capsule'
+        if (type.includes('header') || url.includes('header.jpg')) return 'header'
         return 'other'
     }
 
@@ -264,9 +268,19 @@ export class GameArtworkRequest implements GameArtwork {
         const match = SteamDataManager.GetGame(this.appId);
         if (!match) return
 
+        const currentType = match.artworkSelectedType
+
+        // Never let a later failure path overwrite a successful artwork selection.
+        // This can happen when multiple request handles exist for the same game.
+        if (selectedType === 'label' && currentType && currentType !== 'label') {
+            return
+        }
+
         match.artworkSelectedType = selectedType
         if (selectedUrl) {
             match.artworkSelectedUrl = selectedUrl
+        } else {
+            delete match.artworkSelectedUrl
         }
     }
 }
