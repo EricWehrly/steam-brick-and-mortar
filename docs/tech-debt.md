@@ -316,3 +316,37 @@
 - Conventions live in one durable technical reference
 - Reference is linked from contributor/agent docs
 - New reviews can point to the single source instead of restating policy
+
+---
+
+## id: shadow-default-policy-evaluation
+**Priority**: Low  
+**Effort**: ~0.5 day (research + recommendation)  
+**Context**: Shadow participation is currently configured per-object (`castShadow` / `receiveShadow`) at creation sites. This is explicit but easy to miss and can drift. We should evaluate whether a universal/default shadow policy can be applied safely (for example through shared creation helpers or policy wrappers), versus keeping only per-object flags.
+
+**Done when**:
+- We have a short recommendation doc comparing approaches: per-object only vs centralized defaults/policy wrappers
+- Tradeoffs are explicit for performance, visual correctness, and accidental over-shadowing risk
+- If a centralized approach is chosen, a bounded rollout plan exists with clear exclusions (transparent surfaces, emissive signage, special-effect meshes)
+
+**Related files**:
+- `client/src/scene/RoomManager.ts`
+- `client/src/scene/SignageRenderer.ts`
+- `client/src/scene/signs/BlockLetterSignRenderer.ts`
+- `client/src/scene/signs/NeonTubeSignRenderer.ts`
+- `client/src/scene/LightingRenderer.ts`
+
+---
+
+## id: game-artwork-box-shading-plan
+**Priority**: Medium  
+**Effort**: ~1-2 days (spike + implementation)  
+**Context**: Instanced game artwork/labels use custom ShaderMaterial pipelines that do not currently include Three.js lighting/shadow chunks, so boxes can cast but not visually receive lighting/shadow in a physically coherent way.
+
+**Done when**:
+- A chosen shading approach is documented and implemented for instanced artwork boxes
+- Lighting/shadow behavior is validated across at least one quality tier and one fallback tier
+- Regression coverage exists for shadow participation assumptions in instanced box renderers
+
+**Plan reference**:
+- `docs/plans/game-artwork-box-shading-plan.md`
