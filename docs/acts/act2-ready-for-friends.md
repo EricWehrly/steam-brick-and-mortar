@@ -33,6 +33,7 @@
 
 > Real work we intend to make a serious attempt at. Not blockers. We punt when stuck.
 
+- [User Screenshot Wall](../features/user-screenshot-wall.md) — early Act 2 feature spike to pull a player's Steam screenshots and display them in-store; store media remains fallback baseline
 - [Steam Tag Pipeline](../features/steam-tag-pipeline.md) — SteamSpy tags via background Lambda + S3 snapshot; active in separate branch; invest to try, not required
 - [Local File Investigation](../features/local-file-investigation.md) — research completed enough to make an Act 2 decision: local collections are useful, but filesystem API integration is deferred; revisit in AC4.4
 - [Layout Variations](../features/layout-variations.md) — arc exists; square rows + dynamic switching are the open work; grouping is Encore; include layout-owned entrance mat placement for spoke and stage mat/carpet convergence as a mid-Act 2 follow-up, and treat angled-layout center-aisle overlap cleanup (`arc`/`spoke`) as medium priority without a fixed timebox
