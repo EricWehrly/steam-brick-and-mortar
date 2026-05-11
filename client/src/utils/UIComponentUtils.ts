@@ -52,7 +52,8 @@ export interface SelectConfig<T = string> {
 
 export interface InputConfig<T = string> {
     inputId: string
-    onChange: (value: T) => void
+    onInput?: (value: T) => void
+    onChange?: (value: T) => void
     parseValue?: (rawValue: string) => T
 }
 
@@ -200,11 +201,23 @@ export class UIComponentUtils {
         const input = container.querySelector(`#${config.inputId}`) as HTMLInputElement
         if (!input) return
 
-        input.addEventListener('change', (e) => {
-            const rawValue = (e.target as HTMLInputElement).value
-            const value = config.parseValue ? config.parseValue(rawValue) : rawValue as T
-            config.onChange(value)
-        })
+        if (!config.onInput && !config.onChange) return
+
+        if (config.onInput) {
+            input.addEventListener('input', (e) => {
+                const rawValue = (e.target as HTMLInputElement).value
+                const value = config.parseValue ? config.parseValue(rawValue) : rawValue as T
+                config.onInput?.(value)
+            })
+        }
+
+        if (config.onChange) {
+            input.addEventListener('change', (e) => {
+                const rawValue = (e.target as HTMLInputElement).value
+                const value = config.parseValue ? config.parseValue(rawValue) : rawValue as T
+                config.onChange?.(value)
+            })
+        }
     }
 
     static setupInputs<T = string>(
