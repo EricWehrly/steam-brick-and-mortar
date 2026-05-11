@@ -123,6 +123,10 @@ export class GameArtworkProvider {
     public static readonly FAILURE_CACHE_KEY = 'steam-artwork-failures-v4'
     public static readonly SUCCESS_CACHE_KEY = 'steam-artwork-successes-v4'
     private static readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000  // 24 hours
+    private static readonly PERSIST_LIMITS = {
+        normal: { failures: 180, successes: 180 },
+        fallback: { failures: 60, successes: 60 }
+    } as const
     
     private failureCache: Map<string, UrlCacheEntry> = new Map()  // key: appId-format
     private successCache: Map<string, UrlCacheEntry> = new Map()
@@ -387,6 +391,62 @@ export class GameArtworkProvider {
         const cacheKey = `${appId}-${format}`
         return this.failureCache.get(cacheKey)?.isPermanent ?? false
     }
+
+    /**
+     * Decide whether a permanent failure entry should block a new attempt.
+     * If caller supplies a candidate URL not seen in the recorded failure attempts,
+     * allow one more attempt so metadata URLs can recover from stale canonical dead-ends.
+     */
+    public shouldSkipPermanentFailure(
+        appId: number,
+        format: ArtworkFormat,
+        candidateUrl?: string
+    ): boolean {
+        const cacheKey = `${appId}-${format}`
+        const entry = this.failureCache.get(cacheKey)
+        if (!entry?.isPermanent) {
+            return false
+        }
+
+        if (!candidateUrl) {
+            return true
+        }
+
+        const candidate = candidateUrl.trim()
+        if (!candidate) {
+            return true
+        }
+
+        const triedUrls = entry.urlsTried ?? []
+        const alreadyTried = triedUrls.includes(candidate)
+        return alreadyTried
+    }
+
+    /**
+     * Strategy-aware permanent failure gate.
+     * Skip only when all viable candidate URLs were already tried under a permanent failure.
+     */
+    public shouldSkipPermanentFailureForUrls(
+        appId: number,
+        format: ArtworkFormat,
+        candidateUrls: string[]
+    ): boolean {
+        const cacheKey = `${appId}-${format}`
+        const entry = this.failureCache.get(cacheKey)
+        if (!entry?.isPermanent) {
+            return false
+        }
+
+        const candidates = Array.from(
+            new Set(candidateUrls.map((u) => u.trim()).filter((u) => u.length > 0))
+        )
+        if (candidates.length === 0) {
+            return true
+        }
+
+        const triedUrls = entry.urlsTried ?? []
+        return candidates.every((url) => triedUrls.includes(url))
+    }
     
     /**
      * Record a skipped attempt (permanent failure).
@@ -468,7 +528,7 @@ export class GameArtworkProvider {
             GameArtworkProvider.logger.debug('Could not clear localStorage:', e)
         }
     }
-    
+
     /**
      * Log failure statistics summary at startup.
      */
@@ -542,29 +602,68 @@ export class GameArtworkProvider {
     }
     
     private savePersistentFailures(): void {
-        try {
-            const data: Record<string, UrlCacheEntry> = {}
-            for (const [key, entry] of this.failureCache) {
-                data[key] = entry
-            }
-            localStorage.setItem(GameArtworkProvider.FAILURE_CACHE_KEY, JSON.stringify(data))
-        } catch (e) {
-            GameArtworkProvider.logger.debug('Could not save failure cache:', e)
+        const persisted = this.persistEntriesWithFallback(
+            GameArtworkProvider.FAILURE_CACHE_KEY,
+            this.getFailureEntriesForPersistence(GameArtworkProvider.PERSIST_LIMITS.normal.failures),
+            this.getFailureEntriesForPersistence(GameArtworkProvider.PERSIST_LIMITS.fallback.failures)
+        )
+        if (!persisted) {
+            GameArtworkProvider.logger.warn('Could not save failure cache (quota likely full).')
         }
     }
     
     private savePersistentSuccesses(): void {
-        try {
-            const data: Record<string, UrlCacheEntry> = {}
-            for (const [key, entry] of this.successCache) {
-                data[key] = entry
-            }
-            localStorage.setItem(GameArtworkProvider.SUCCESS_CACHE_KEY, JSON.stringify(data))
-        } catch (e) {
-            GameArtworkProvider.logger.debug('Could not save success cache:', e)
+        const persisted = this.persistEntriesWithFallback(
+            GameArtworkProvider.SUCCESS_CACHE_KEY,
+            this.getSuccessEntriesForPersistence(GameArtworkProvider.PERSIST_LIMITS.normal.successes),
+            this.getSuccessEntriesForPersistence(GameArtworkProvider.PERSIST_LIMITS.fallback.successes)
+        )
+        if (!persisted) {
+            GameArtworkProvider.logger.warn('Could not save success cache (quota likely full).')
         }
     }
-    
+
+    private persistEntriesWithFallback(
+        storageKey: string,
+        normalEntries: Array<[string, UrlCacheEntry]>,
+        fallbackEntries: Array<[string, UrlCacheEntry]>
+    ): boolean {
+        const attempts = [normalEntries, fallbackEntries]
+        for (const entries of attempts) {
+            try {
+                const data: Record<string, UrlCacheEntry> = {}
+                for (const [key, entry] of entries) {
+                    data[key] = entry
+                }
+                localStorage.setItem(storageKey, JSON.stringify(data))
+                return true
+            } catch {
+                // Try next attempt.
+            }
+        }
+
+        return false
+    }
+
+    private getFailureEntriesForPersistence(limit: number): Array<[string, UrlCacheEntry]> {
+        return Array.from(this.failureCache.entries())
+            .sort((a, b) => {
+                const aPermanent = a[1].isPermanent ? 1 : 0
+                const bPermanent = b[1].isPermanent ? 1 : 0
+                if (aPermanent !== bPermanent) {
+                    return bPermanent - aPermanent
+                }
+                return b[1].timestamp - a[1].timestamp
+            })
+            .slice(0, limit)
+    }
+
+    private getSuccessEntriesForPersistence(limit: number): Array<[string, UrlCacheEntry]> {
+        return Array.from(this.successCache.entries())
+            .sort((a, b) => b[1].timestamp - a[1].timestamp)
+            .slice(0, limit)
+    }
+
     public dispose(): void {
         this.textureWorker.dispose()
         GameArtworkProvider.instance = null

@@ -76,17 +76,18 @@ export class ArtworkPrefetchCoordinator {
         for (const game of games) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
             this.appNamesByAppId.set(appid, game.name)
-            const artworkUrl = appid > 0
+            const preferredUrl = appid > 0
                 ? this.selectInitialLibraryUrl(appid, game.artwork)
                 : undefined
+            const secondaryUrl = this.selectSecondaryLibraryUrl(game.artwork, preferredUrl)
 
-            if (!artworkUrl) {
+            if (!preferredUrl) {
                 this.prefetchResults.set(appid, 'permanent-failure')
                 this.emitArtworkIntentSettled(appid, game.name)
                 continue
             }
 
-            renderer.prefetchArtwork(appid, artworkUrl, game.name).then((result) => {
+            this.prefetchWithSecondaryUrl(renderer, appid, game.name, preferredUrl, secondaryUrl).then((result) => {
                 this.prefetchResults.set(appid, result)
                 this.emitArtworkIntentSettled(appid, game.name)
             }).catch((error) => {
@@ -95,6 +96,24 @@ export class ArtworkPrefetchCoordinator {
                 this.emitArtworkIntentSettled(appid, game.name)
             })
         }
+    }
+
+    private async prefetchWithSecondaryUrl(
+        renderer: IArtworkPrewarmer,
+        appid: number,
+        gameName: string,
+        preferredUrl: string,
+        secondaryUrl?: string
+    ): Promise<PrefetchResult> {
+        const firstResult = await renderer.prefetchArtwork(appid, preferredUrl, gameName)
+        if (firstResult !== 'permanent-failure' || !secondaryUrl) {
+            return firstResult
+        }
+
+        this.logger.debug(
+            `Prefetch retry with secondary URL for "${gameName}" (appid ${appid}) after permanent-failure on preferred URL`
+        )
+        return renderer.prefetchArtwork(appid, secondaryUrl, gameName)
     }
 
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
@@ -121,6 +140,16 @@ export class ArtworkPrefetchCoordinator {
         const preferredUrl = artworkHints?.library ?? artworkHints?.header
         const strategy = this.artworkProvider.buildUrlStrategy(appId, 'library', preferredUrl)
         return strategy[0]?.url
+    }
+
+    private selectSecondaryLibraryUrl(
+        artworkHints: { library?: string; header?: string } | undefined,
+        preferredUrl: string | undefined
+    ): string | undefined {
+        if (!artworkHints?.header || !preferredUrl) {
+            return undefined
+        }
+        return artworkHints.header === preferredUrl ? undefined : artworkHints.header
     }
 
     private emitArtworkIntentSettled(appid: number, gameName: string): void {
