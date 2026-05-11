@@ -23,9 +23,12 @@ import applicationPanelTemplate from '../../../templates/pause-menu/application-
 import { AppSettings, type ApplicationSettings } from '../../../core/AppSettings'
 import { EventSource } from '../../../core/EventManager'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
+import { Logger } from '../../../utils/Logger'
 import type { EventManager } from '../../../core/EventManager'
 
 export class ApplicationPanel extends PauseMenuPanel {
+    private static readonly logger = Logger.createLogFunctions(ApplicationPanel.name)
+
     public readonly id = 'application'
     public readonly title = 'Application'
     public readonly icon = '⚙️'
@@ -38,19 +41,9 @@ export class ApplicationPanel extends PauseMenuPanel {
         this.appSettings = appSettings
     }
 
-    /**
-     * Initialize with application control callbacks
-     */
-    public initialize(callbacks: {
-        onSettingsChanged?: (settings: Partial<ApplicationSettings>) => void
-    }): void {
-        this.onSettingsChanged = callbacks.onSettingsChanged
-    }
-
     public render(): string {
         const currentSettings = this.appSettings.getAllSettings()
         return renderTemplate(applicationPanelTemplate, {
-            // Checkbox states
             autoSave: currentSettings.autoSave
         })
     }
@@ -71,7 +64,6 @@ export class ApplicationPanel extends PauseMenuPanel {
     }
 
     public onShow(): void {
-        // Update settings display when panel is shown
         this.refreshSettingsDisplay()
     }
     public onHide(): void {
@@ -83,8 +75,6 @@ export class ApplicationPanel extends PauseMenuPanel {
         value: ApplicationSettings[K]
     ): void {
         this.appSettings.setSetting(key, value, EventSource.UI)
-        
-        // Notify of settings change
         this.onSettingsChanged?.({ [key]: value })
     }
 
@@ -92,8 +82,6 @@ export class ApplicationPanel extends PauseMenuPanel {
         if (window.confirm('Are you sure?\n\nReset all settings to defaults. This cannot be undone.')) {
             this.appSettings.resetToDefaults(EventSource.UI)
             this.refreshSettingsDisplay()
-            
-            // Notify of complete settings reset
             const currentSettings = this.appSettings.getAllSettings()
             this.onSettingsChanged?.(currentSettings)
         }
@@ -126,22 +114,19 @@ export class ApplicationPanel extends PauseMenuPanel {
             reader.onload = (event) => {
                 try {
                     const importedSettings = JSON.parse(event.target?.result as string)
-                    
-                    // Use AppSettings validation and import
+
                     if (this.appSettings.importSettings(importedSettings, EventSource.UI)) {
                         this.refreshSettingsDisplay()
-                        
-                        // Notify of settings import
+
                         const currentSettings = this.appSettings.getAllSettings()
                         this.onSettingsChanged?.(currentSettings)
-                        
-                        window.alert('Settings imported successfully!')
+
+                        ApplicationPanel.logger.info('Settings imported successfully')
                     } else {
-                        window.alert('Invalid settings file format.')
+                        ApplicationPanel.logger.warn('Invalid settings file format during import')
                     }
                 } catch (error) {
-                    console.error('Failed to import settings:', error)
-                    window.alert('Failed to import settings. Please check the file format.')
+                    ApplicationPanel.logger.error('Failed to import settings. Please check the file format.', error)
                 }
             }
             
@@ -152,10 +137,7 @@ export class ApplicationPanel extends PauseMenuPanel {
     }
 
     private refreshSettingsDisplay(): void {
-        // Update all form elements to reflect current settings
         const currentSettings = this.appSettings.getAllSettings()
-        
-        // Update all checkboxes
         const checkboxes = [
             { id: '#auto-save-toggle', setting: 'autoSave' as const }
         ]
@@ -175,10 +157,5 @@ export class ApplicationPanel extends PauseMenuPanel {
     public updateSettings(newSettings: Partial<ApplicationSettings>): void {
         this.appSettings.updateSettings(newSettings, EventSource.UI)
         this.refreshSettingsDisplay()
-    }
-
-    public dispose(): void {
-        // No need to manually save - AppSettings handles persistence automatically
-        super.dispose()
     }
 }

@@ -162,7 +162,6 @@ export class PauseMenuManager {
         
         // Register application panel
         const applicationPanel = new ApplicationPanel({}, this.appSettings, this.eventManager)
-        applicationPanel.initialize({})
         this.applicationPanel = applicationPanel
         this.registerPanel(applicationPanel)
         
