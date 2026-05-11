@@ -39,13 +39,13 @@
 - `ShelfSide` Front/Back rename to Near/Far ✅ — naming is backwards vs. player-facing intuition; currently papered over with inline comment
 - Back-row suppression policy — hardcoded `rowIndex < 4` should become a `ShelfLayoutPolicy` type
 - `ShelfSurfaceUtils` sort order unit test — top-to-bottom ordering has no test yet (`// TD [shelf-surface-sort]`)
-- ~~Raycast drag suppression~~ ✅ — click selection now suppresses after meaningful mouse drag delta; guard coverage added
-- Test-suite cost reduction pass (**higher-priority debt**) — audit slow/duplicative tests, consolidate overlapping integration tests
-- Playwright scene-health collector (**lower-priority debt**) — one load per mode, shared collectors for logs/memory/startup/screenshot; no duplicated app loads
+- Raycast drag suppression — suppress click selection after meaningful mouse drag delta; small guard test
+- Test-suite cost reduction pass — audit slow/duplicative tests, consolidate overlapping integration tests
+- Playwright scene-health collector — one load per mode, shared collectors for logs/memory/startup/screenshot; no duplicated app loads
 
 ## Notes
 
-- Active background items and open threads should be tracked directly in act docs + `tech-debt.md` (the old open-subagent tracker is deprecated).
+- Active background items and open threads live in `docs/plans/open-subagent-threads.md`.
 - The categorization work (GameSorter, ShelfSectionPlanner, sort modes) is pull-forward eligible if bandwidth allows — it doesn't need to wait for full Act 2 ramp.
 - The old detailed bucket breakdown is archived at `docs/archive/intermission-before-phase2.md` (superseded by this doc).
 - The intermission is intentionally not a formal act. It does not have a user-facing delivery goal.

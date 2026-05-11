@@ -41,4 +41,4 @@ The backend already lives in AWS (Lambda + API Gateway at `https://steam-api-dev
 - S3 + CloudFront is probably the right call given existing AWS investment, but ops burden vs. Netlify/Vercel is worth a quick conversation before committing.
 - If S3 + CloudFront is chosen, coordinate with the multi-layer caching feature — the CloudFront distribution for hosting and the one for artwork caching may be the same or separate distributions.
 - WebXR requires HTTPS — this is non-negotiable regardless of host choice.
-- The offline/bookmarklet export-format research (tracked in `docs/acts/act3-ready-for-everyone.md`) is related: if we ever want to circumvent Lambda, the hosted version is where that would matter most.
+- The offline/bookmarklet export format research (noted in open-subagent-threads) is related: if we ever want to circumvent Lambda, the hosted version is where that would matter most.
