@@ -182,6 +182,16 @@ export class LightingRenderer {
     }
 
     /**
+     * Reconfigure lights with current config and quality settings
+     * Extracts shared lifecycle: clear → apply shadow policy → setup by quality
+     */
+    private async reconfigureWithQuality(): Promise<void> {
+        this.clearLights()
+        applyRendererShadowPolicy(this.renderer, this.config)
+        await this.setupLightsByQuality()
+    }
+
+    /**
      * Upgrade to full lighting system - called asynchronously after scene is visible
      * 
      * TODO: Currently disabled in SceneCoordinator (suspected startup hitch).
@@ -200,12 +210,8 @@ export class LightingRenderer {
         LightingRenderer.logger.lifecycle(`💡 Upgrading to ${this.config.quality} lighting...`)
         
         try {
-            // Clear basic lighting
-            this.clearLights()
-            
             // Now do full setup with shadows and fixtures
-            applyRendererShadowPolicy(this.renderer, this.config)
-            await this.setupLightsByQuality()
+            await this.reconfigureWithQuality()
             monitor.end({ quality: this.config.quality })
             
             // Check current settings for debug helpers and lighting state
@@ -471,12 +477,10 @@ export class LightingRenderer {
 
     private async updateLightingQuality(quality: LightingQuality): Promise<void> {
         this.debugHelper.clearHelpers()
-        this.clearLights()
         
         // Refresh full config from AppSettings to get updated shadows/ceiling height too
         this.config = { ...this.getCurrentConfig(), quality }
-        applyRendererShadowPolicy(this.renderer, this.config)
-        await this.setupLightsByQuality()
+        await this.reconfigureWithQuality()
         this.forceShadowStateRefresh()
         
         // Only show debug helpers if setting is enabled
@@ -494,39 +498,26 @@ export class LightingRenderer {
         })
     }
 
-    private updateRoomDimensions(
-        dimensions: { width: number; depth: number; height: number },
-        shelfLayout?: { rows: number; shelvesPerRow?: number },
-        centerOffset?: { x: number; y: number; z: number }
-    ): void {
-        LightingRenderer.logger.debug(`💡 Updating lighting for room dimensions: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
-        
-        // Update current room dimensions for fluorescent fixture positioning
+    private applyRoomFootprint(width: number, depth: number): boolean {
         const previousWidth = CURRENT_ROOM_DIMENSIONS.WIDTH
         const previousDepth = CURRENT_ROOM_DIMENSIONS.DEPTH
-        CURRENT_ROOM_DIMENSIONS.WIDTH = dimensions.width
-        CURRENT_ROOM_DIMENSIONS.DEPTH = dimensions.depth
-        const roomFootprintChanged = previousWidth !== dimensions.width || previousDepth !== dimensions.depth
-        
-        const previousCeilingHeight = this.config.ceilingHeight
-        const ceilingHeightChanged = previousCeilingHeight !== dimensions.height
+        CURRENT_ROOM_DIMENSIONS.WIDTH = width
+        CURRENT_ROOM_DIMENSIONS.DEPTH = depth
+        return previousWidth !== width || previousDepth !== depth
+    }
 
-        if (ceilingHeightChanged) {
-            this.config.ceilingHeight = dimensions.height
-        }
-        
-        // Store shelf layout for use during lighting upgrades
-        if (shelfLayout) {
-            this.currentShelfLayout = shelfLayout
-            LightingRenderer.logger.debug(`💡 Stored shelf layout: ${shelfLayout.rows} rows x ${shelfLayout.shelvesPerRow} shelves per row`)
-        }
-        
-        // Position lighting group to match room offset so lights align with shelves
+    private applyLightingGroupOffset(centerOffset?: { x: number; y: number; z: number }): void {
         if (centerOffset) {
             this.lightingGroup.position.set(centerOffset.x, centerOffset.y, centerOffset.z)
             LightingRenderer.logger.debug(`💡 Lighting group positioned at: (${centerOffset.x}, ${centerOffset.y}, ${centerOffset.z.toFixed(1)})`)
         }
-        
+    }
+
+    private refreshFixturesAndShadowFrustum(
+        ceilingHeightChanged: boolean,
+        roomFootprintChanged: boolean,
+        shelfLayout?: { rows: number; shelvesPerRow?: number }
+    ): void {
         const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
         const layoutForFixtures = shelfLayout ?? this.currentShelfLayout
         const shouldRefreshFixtures = Boolean(layoutForFixtures) && (
@@ -550,6 +541,32 @@ export class LightingRenderer {
         }
     }
 
+    private updateRoomDimensions(
+        dimensions: { width: number; depth: number; height: number },
+        shelfLayout?: { rows: number; shelvesPerRow?: number },
+        centerOffset?: { x: number; y: number; z: number }
+    ): void {
+        LightingRenderer.logger.debug(`💡 Updating lighting for room dimensions: ${dimensions.width}x${dimensions.depth}x${dimensions.height}`)
+        
+        const roomFootprintChanged = this.applyRoomFootprint(dimensions.width, dimensions.depth)
+        
+        const previousCeilingHeight = this.config.ceilingHeight
+        const ceilingHeightChanged = previousCeilingHeight !== dimensions.height
+
+        if (ceilingHeightChanged) {
+            this.config.ceilingHeight = dimensions.height
+        }
+        
+        // Store shelf layout for use during lighting upgrades
+        if (shelfLayout) {
+            this.currentShelfLayout = shelfLayout
+            LightingRenderer.logger.debug(`💡 Stored shelf layout: ${shelfLayout.rows} rows x ${shelfLayout.shelvesPerRow} shelves per row`)
+        }
+        
+        this.applyLightingGroupOffset(centerOffset)
+        this.refreshFixturesAndShadowFrustum(ceilingHeightChanged, roomFootprintChanged, shelfLayout)
+    }
+
     private toggleLighting(enabled: boolean): void {
         LightingRenderer.logger.debug(`💡 ${enabled ? 'Enabling' : 'Disabling'} all lights`)
         
@@ -567,16 +584,6 @@ export class LightingRenderer {
             this.debugHelper.addHelpersForRegisteredLights()
         } else {
             this.debugHelper.clearHelpers()
-        }
-    }
-
-    private toggleLightByName(lightName: string, enabled: boolean): void {
-        const light = this.lightingGroup.getObjectByName(lightName) as THREE.Light
-        if (light) {
-            light.visible = enabled
-            LightingRenderer.logger.debug(`💡 ${lightName} light ${enabled ? 'enabled' : 'disabled'}`)
-        } else {
-            LightingRenderer.logger.warn(`⚠️ Light '${lightName}' not found for toggle`)
         }
     }
 
