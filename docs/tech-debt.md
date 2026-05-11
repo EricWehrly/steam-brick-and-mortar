@@ -315,9 +315,6 @@
 - `client/src/scene/signs/NeonTubeSignRenderer.ts`
 - `client/src/scene/LightingRenderer.ts`
 
-**Plan reference**:
-- `docs/plans/lighting-shadow-refactor-plan.md`
-
 ---
 
 ## id: game-artwork-box-shading-plan

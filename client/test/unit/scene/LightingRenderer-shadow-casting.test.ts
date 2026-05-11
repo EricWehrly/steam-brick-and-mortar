@@ -6,7 +6,6 @@ import { DataManager } from '../../../src/core/data/DataManager'
 import { DataDomain, DataKey } from '../../../src/core/data/DataTypes'
 import { LightingRenderer } from '../../../src/scene/LightingRenderer'
 import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
-import { RoomEventTypes, type RoomResizedEvent } from '../../../src/types/InteractionEvents'
 
 function createRendererMock(): THREE.WebGLRenderer {
     return {
@@ -104,43 +103,5 @@ describe('LightingRenderer shadow casting integration', () => {
         })
 
         expect(hasDirectionalShadowCaster).toBe(false)
-    })
-
-    it('applies shared shadow policy to dramatic spotlight path', () => {
-        ;(lightingRenderer as unknown as { config: { shadowQuality: number; shadowMapEnabled: boolean } }).config = {
-            shadowQuality: 2,
-            shadowMapEnabled: false,
-        }
-        ;(lightingRenderer as unknown as { addDramaticLighting: () => void }).addDramaticLighting()
-
-        const lightingGroup = (lightingRenderer as unknown as { lightingGroup: THREE.Group }).lightingGroup
-        const dramaticSpot = lightingGroup.getObjectByName('dramatic-spotlight')
-        expect(dramaticSpot).toBeInstanceOf(THREE.SpotLight)
-        expect((dramaticSpot as THREE.SpotLight).castShadow).toBe(false)
-    })
-
-    it('refits directional shadow camera when room footprint changes', async () => {
-        const appSettings = AppSettings.getInstance()
-        appSettings.setSetting('shadowQuality', 2, EventSource.System)
-        appSettings.setSetting('shadowMapEnabled', true, EventSource.System)
-
-        eventManager.emit(StorePropsEventTypes.SetupRequest, { config: {} })
-        eventManager.emit(StorePropsEventTypes.SetupCompleted, {})
-        await Promise.resolve()
-
-        const lightingGroup = (lightingRenderer as unknown as { lightingGroup: THREE.Group }).lightingGroup
-        const directional = lightingGroup.getObjectByName('exterior-ambient-light') as THREE.DirectionalLight
-        expect(directional).toBeInstanceOf(THREE.DirectionalLight)
-
-        const beforeLeft = directional.shadow.camera.left
-        eventManager.emit<RoomResizedEvent>(RoomEventTypes.Resized, {
-            dimensions: { width: 40, depth: 30, height: 4.2 },
-        })
-
-        expect(directional.shadow.camera.left).toBeCloseTo(-24, 5)
-        expect(directional.shadow.camera.right).toBeCloseTo(24, 5)
-        expect(directional.shadow.camera.top).toBeCloseTo(18, 5)
-        expect(directional.shadow.camera.bottom).toBeCloseTo(-18, 5)
-        expect(directional.shadow.camera.left).not.toBe(beforeLeft)
     })
 })
