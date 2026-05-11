@@ -7,6 +7,7 @@ import {
     type ArtworkIntentSettledEvent,
     type BatchReadyForPlacementEvent,
 } from '../../types/InteractionEvents'
+import { GameArtworkProvider } from '../game-box/instancing/GameArtworkProvider'
 import type { SteamGameData } from '../game-box/types/GameData'
 
 interface IArtworkPrewarmer {
@@ -26,6 +27,7 @@ interface ArtworkPrefetchCoordinatorOptions {
 export class ArtworkPrefetchCoordinator {
     private readonly logger = Logger.createLogFunctions(ArtworkPrefetchCoordinator.name)
     private readonly renderer: IArtworkPrewarmer | null
+    private readonly artworkProvider: GameArtworkProvider
     private readonly boundHandleArtworkSettled: () => void
     private readonly boundHandleBatchReadyForPlacement: (event: CustomEvent<BatchReadyForPlacementEvent>) => void
 
@@ -35,6 +37,7 @@ export class ArtworkPrefetchCoordinator {
 
     public constructor(options: ArtworkPrefetchCoordinatorOptions = {}) {
         this.renderer = options.renderer ?? null
+        this.artworkProvider = GameArtworkProvider.getInstance()
         this.boundHandleArtworkSettled = this.logExpectedFallbackSummary.bind(this)
         this.boundHandleBatchReadyForPlacement = this.handleBatchReadyForPlacement.bind(this)
 
@@ -73,8 +76,9 @@ export class ArtworkPrefetchCoordinator {
         for (const game of games) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
             this.appNamesByAppId.set(appid, game.name)
-            const selection = this.selectBestArtworkUrl(game)
-            const artworkUrl = selection.url
+            const artworkUrl = appid > 0
+                ? this.selectInitialLibraryUrl(appid, game.artwork)
+                : undefined
 
             if (!artworkUrl) {
                 this.prefetchResults.set(appid, 'permanent-failure')
@@ -108,6 +112,15 @@ export class ArtworkPrefetchCoordinator {
         }
 
         this.prefetchBatch(games as SteamGameData[], this.renderer)
+    }
+
+    private selectInitialLibraryUrl(
+        appId: number,
+        artworkHints?: { library?: string; header?: string }
+    ): string | undefined {
+        const preferredUrl = artworkHints?.library ?? artworkHints?.header
+        const strategy = this.artworkProvider.buildUrlStrategy(appId, 'library', preferredUrl)
+        return strategy[0]?.url
     }
 
     private emitArtworkIntentSettled(appid: number, gameName: string): void {
@@ -149,23 +162,4 @@ export class ArtworkPrefetchCoordinator {
         this.hasLoggedExpectedFallbackSummary = true
     }
 
-    private selectBestArtworkUrl(game: SteamGameData): {
-        url?: string
-        source: 'library' | 'capsule' | 'header' | 'none'
-    } {
-        if (game.artwork?.library) {
-            return { url: game.artwork.library, source: 'library' }
-        }
-
-        if (game.appid) {
-            // Return capsule CDN URL as first fallback
-            // Provider will attempt capsule first, then header if capsule fails
-            return {
-                url: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/capsule_616x353.jpg`,
-                source: 'capsule'
-            }
-        }
-
-        return { source: 'none' }
-    }
 }

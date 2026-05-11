@@ -85,7 +85,7 @@ describe('ArtworkPrefetchCoordinator', () => {
 
         expect(renderer.prefetchArtwork).toHaveBeenCalledTimes(2)
         expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(1, 1, 'https://example.com/1.jpg', 'Has Art')
-        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(2, 2, 'https://cdn.akamai.steamstatic.com/steam/apps/2/capsule_616x353.jpg', 'Broken Art')
+        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(2, 2, 'https://cdn.akamai.steamstatic.com/steam/apps/2/library_600x900.jpg', 'Broken Art')
         expect(settled).toEqual([0])
 
         success.resolve('prefetched')
@@ -102,7 +102,7 @@ describe('ArtworkPrefetchCoordinator', () => {
         coordinator.dispose()
     })
 
-    it('uses header fallback URL when library artwork is missing', async () => {
+    it('uses provider-selected first URL when library artwork is missing', async () => {
         const coordinator = new ArtworkPrefetchCoordinator()
         const prefetch = createDeferred<PrefetchResult>()
 
@@ -126,7 +126,7 @@ describe('ArtworkPrefetchCoordinator', () => {
 
         expect(renderer.prefetchArtwork).toHaveBeenCalledWith(
             7,
-            'https://cdn.akamai.steamstatic.com/steam/apps/7/capsule_616x353.jpg',
+            'https://cdn.akamai.steamstatic.com/steam/apps/7/library_600x900.jpg',
             'Header Candidate'
         )
         expect(settled).toEqual([])
