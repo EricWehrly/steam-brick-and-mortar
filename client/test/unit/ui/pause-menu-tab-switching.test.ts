@@ -54,7 +54,6 @@ describe('Pause Menu Tab Switching', () => {
         pauseMenuManager.registerPanel(new ControlsPanel())
         
         const applicationPanel = new ApplicationPanel({}, mockAppSettings, mockEventManager)
-        applicationPanel.initialize({ onSettingsChanged: vi.fn() })
         pauseMenuManager.registerPanel(applicationPanel)
         
         pauseMenuManager.registerPanel(new GameSettingsPanel({}, mockAppSettings))

@@ -139,7 +139,6 @@ describe('Pause Menu Integration Tests', () => {
             const cachePanel = new CacheManagementPanel()
             const controlsPanel = new ControlsPanel()
             const applicationPanel = new ApplicationPanel({}, appSettings, eventManager)
-            applicationPanel.initialize({ onSettingsChanged: vi.fn() })
             
             expect(() => pauseMenuManager.registerPanel(cachePanel)).not.toThrow()
             expect(() => pauseMenuManager.registerPanel(controlsPanel)).not.toThrow()
@@ -153,7 +152,6 @@ describe('Pause Menu Integration Tests', () => {
             pauseMenuManager.registerPanel(new CacheManagementPanel())
             pauseMenuManager.registerPanel(new ControlsPanel())
             const applicationPanel = new ApplicationPanel({}, appSettings, eventManager)
-            applicationPanel.initialize({ onSettingsChanged: vi.fn() })
             pauseMenuManager.registerPanel(applicationPanel)
         })
 
