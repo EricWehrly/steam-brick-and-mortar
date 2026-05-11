@@ -41,4 +41,4 @@ We don't have a concrete definition of what "correct" looks like yet. That needs
 - The anonymous store uses F2P games (currently TF2 appid 440 and similar) — is this the right fixture set for a first impression? Consider curating it slightly.
 - "Correct" is a product question as much as a technical one. Pin it before Gate 1, not during.
 - Ties into static hosting (Gate 1): the first-load experience can only be validated from a real public URL, not localhost.
-- Related: `docs/plans/open-subagent-threads.md` has a note on offline/bookmarklet export format — the anonymous store fixture format should eventually align with whatever static export shape we land on.
+- Related: `docs/acts/act3-ready-for-everyone.md` has the offline/bookmarklet export-format research item — the anonymous store fixture format should eventually align with whatever static export shape we land on.
