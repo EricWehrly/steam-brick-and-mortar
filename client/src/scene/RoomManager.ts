@@ -271,6 +271,9 @@ export class RoomManager {
             this.floor.name = 'room-floor'
             this.roomGroup.add(this.floor)
         }
+
+        this.floor.castShadow = false
+        this.floor.receiveShadow = true
     }
 
     private ensureCeiling(dimensions: RoomDimensions): void {
@@ -290,6 +293,9 @@ export class RoomManager {
             this.ceiling.name = 'room-ceiling'
             this.roomGroup.add(this.ceiling)
         }
+
+        this.ceiling.castShadow = false
+        this.ceiling.receiveShadow = true
     }
 
     private ensureWalls(dimensions: RoomDimensions): void {
@@ -313,6 +319,8 @@ export class RoomManager {
             this.walls.back.name = 'room-back-wall'
             this.roomGroup.add(this.walls.back)
         }
+        this.walls.back.castShadow = false
+        this.walls.back.receiveShadow = true
         
         // Front wall (glass storefront)
         if (this.walls.front) {
@@ -329,6 +337,8 @@ export class RoomManager {
             this.walls.front.name = 'room-front-wall-glass'
             this.roomGroup.add(this.walls.front)
         }
+        this.walls.front.castShadow = false
+        this.walls.front.receiveShadow = true
         
         // Left wall
         if (this.walls.left) {
@@ -345,6 +355,8 @@ export class RoomManager {
             this.walls.left.name = 'room-left-wall'
             this.roomGroup.add(this.walls.left)
         }
+        this.walls.left.castShadow = false
+        this.walls.left.receiveShadow = true
         
         // Right wall
         if (this.walls.right) {
@@ -361,6 +373,8 @@ export class RoomManager {
             this.walls.right.name = 'room-right-wall'
             this.roomGroup.add(this.walls.right)
         }
+        this.walls.right.castShadow = false
+        this.walls.right.receiveShadow = true
     }
 
     public getCurrentDimensions(): RoomDimensions {
