@@ -34,8 +34,6 @@ const LIGHT_NAMES = {
     MAIN_DIRECTIONAL: 'main-directional-light', 
     FILL: 'window-fill-light',
     RIM_LIGHT: 'rim-light',
-    EXTERIOR_AMBIENT: 'exterior-ambient-light',
-    ENTRANCE_SPOTLIGHT: 'entrance-spotlight',
     FLUORESCENT_FIXTURES: 'fluorescent-fixtures',
     DRAMATIC_SPOTLIGHT: 'dramatic-spotlight',
     POINT_LIGHT: 'point-light',
@@ -288,76 +286,6 @@ export class LightingRenderer {
         }
     }
 
-    private setupRetailCoreLighting(): void {
-        // Ambient light — warm retail white, noticeable brightness.
-        // ambientIntensity in config is near-zero by design (keeps specular bias down),
-        // but ambient *base* must be high enough to see the room before fixtures kick in.
-        const ambientLight = this.lightFactory.createAmbientLight(0xFFF8E7, 0.45, {
-            name: LIGHT_NAMES.AMBIENT,
-            parent: this.lightingGroup
-        })
-        ambientLight.visible = true
-
-        // Main exterior light: Combined moonlight + street light as single directional
-        // Positioned high and forward with warmer tone (mix of cool moonlight + warm street light)
-        const exteriorHeight = (this.config.ceilingHeight) + 2
-        const exteriorLight = this.lightFactory.createDirectionalLight(0xD4DFF2, 0.22, {
-            name: LIGHT_NAMES.EXTERIOR_AMBIENT,
-            parent: this.lightingGroup,
-            position: [1, exteriorHeight, 10]
-        })
-        this.attachDirectionalTarget(exteriorLight)
-        configureDirectionalShadow(exteriorLight, this.config, this.currentFootprint())
-        exteriorLight.visible = false
-
-        // Entrance spotlight: Creates inviting bright area at storefront that fades inward
-        // Positioned outside looking in, warm welcoming glow
-        const entranceSpot = this.lightFactory.createSpotLight(
-            0xFFE4B5,
-            0.6,
-            12,
-            Math.PI / 5,
-            0.3,
-            1.5,
-            {
-                name: LIGHT_NAMES.ENTRANCE_SPOTLIGHT,
-                parent: this.lightingGroup,
-                position: [0, exteriorHeight - 0.5, CURRENT_ROOM_DIMENSIONS.DEPTH / 2 + 2]
-            }
-        )
-        entranceSpot.target.position.set(0, 0, CURRENT_ROOM_DIMENSIONS.DEPTH / 2 - 3)
-        entranceSpot.castShadow = false
-        entranceSpot.visible = false
-        this.lightingGroup.add(entranceSpot.target)
-
-        // Subtle rim light: defines edges from back, prevents flat lighting
-        // Cool temperature, very low intensity, non-shadow casting
-        const rimLightHeight = (this.config.ceilingHeight) + 1
-        const rimLight = this.lightFactory.createDirectionalLight(BlockbusterColors.fluorescentCool, 0.08, {
-            name: LIGHT_NAMES.RIM_LIGHT,
-            parent: this.lightingGroup,
-            position: [3, rimLightHeight, -5]
-        })
-        rimLight.castShadow = false
-        rimLight.visible = false
-    }
-
-    private applyQualityFeatureLights(quality: LightingQuality): void {
-        if (quality === LIGHTING_QUALITY.ADVANCED || quality === LIGHTING_QUALITY.OUCH_MY_EYES) {
-            this.addPointLights()
-        }
-
-        if (quality === LIGHTING_QUALITY.OUCH_MY_EYES) {
-            this.addDramaticLighting()
-        }
-    }
-
-    private applyRetailProfileDefaults(): void {
-        // Ensure proper state when retail-profile lighting takes over.
-        this.toggleLighting(true)
-        this.toggleDebugVisualization(false)
-    }
-
     private async setupSimpleLighting(): Promise<void> {
         LightingRenderer.logger.lifecycle('💡 Setting up SIMPLE lighting - basic illumination only')
         
@@ -384,26 +312,77 @@ export class LightingRenderer {
 
     private async setupEnhancedLighting(): Promise<void> {
         LightingRenderer.logger.lifecycle('💡 Setting up ENHANCED lighting - optimized retail atmosphere')
-
-        this.setupRetailCoreLighting()
-        this.applyQualityFeatureLights(LIGHTING_QUALITY.ENHANCED)
-        this.applyRetailProfileDefaults()
+        
+        // Ambient light — warm retail white, noticeable brightness.
+        // ambientIntensity in config is near-zero by design (keeps specular bias down),
+        // but ambient *base* must be high enough to see the room before fixtures kick in.
+        const ambientLight = this.lightFactory.createAmbientLight(0xFFF8E7, 0.45, {
+            name: LIGHT_NAMES.AMBIENT,
+            parent: this.lightingGroup
+        })
+        // Now enabled by default - provides base illumination
+        ambientLight.visible = true
+        
+        // Main exterior light: Combined moonlight + street light as single directional
+        // Positioned high and forward with warmer tone (mix of cool moonlight + warm street light)
+        const exteriorHeight = (this.config.ceilingHeight) + 2
+        const exteriorLight = this.lightFactory.createDirectionalLight(0xD4DFF2, 0.22, { // Soft blue-white blend
+            name: 'exterior-ambient-light',
+            parent: this.lightingGroup,
+            position: [1, exteriorHeight, 10]
+        })
+        this.attachDirectionalTarget(exteriorLight)
+        configureDirectionalShadow(exteriorLight, this.config, this.currentFootprint())
+        exteriorLight.visible = false // Disabled by default - toggleable in lighting panel
+        
+        // Entrance spotlight: Creates inviting bright area at storefront that fades inward
+        // Positioned outside looking in, warm welcoming glow
+        const entranceSpot = this.lightFactory.createSpotLight(
+            0xFFE4B5, // Warm moccasin - inviting store lighting
+            0.6, // Strong enough to be noticeable
+            12, // 12m range - reaches into store entrance
+            Math.PI / 5, // ~36° cone - focused on entrance area
+            0.3, // Soft penumbra for gradual fade
+            1.5, // Moderate decay for natural falloff
+            {
+                name: 'entrance-spotlight',
+                parent: this.lightingGroup,
+                position: [0, exteriorHeight - 0.5, CURRENT_ROOM_DIMENSIONS.DEPTH / 2 + 2] // Just outside front wall
+            }
+        )
+        entranceSpot.target.position.set(0, 0, CURRENT_ROOM_DIMENSIONS.DEPTH / 2 - 3) // Aims into entrance
+        entranceSpot.castShadow = false // Performance - emissive glass provides visual
+        entranceSpot.visible = false // Disabled by default - toggleable in lighting panel
+        this.lightingGroup.add(entranceSpot.target)
+        
+        // Subtle rim light: defines edges from back, prevents flat lighting
+        // Cool temperature, very low intensity, non-shadow casting
+        const rimLightHeight = (this.config.ceilingHeight) + 1
+        const rimLight = this.lightFactory.createDirectionalLight(BlockbusterColors.fluorescentCool, 0.08, {
+            name: 'rim-light',
+            parent: this.lightingGroup,
+            position: [3, rimLightHeight, -5]
+        })
+        rimLight.castShadow = false
+        rimLight.visible = false // Disabled by default - toggleable in lighting panel
         
         // Primary illumination: RectAreaLights from ceiling fixtures
         // NOTE: Fixtures are added later when shelf layout is known (via updateRoomDimensions)
         // This keeps initial room lit with base lighting before shelves spawn
         
         LightingRenderer.logger.debug(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient enabled, directional/spot/point disabled by default)`)
+                // Ensure proper state when enhanced lighting takes over
+        this.toggleLighting(true)
+        this.toggleDebugVisualization(false)
 
         LightingRenderer.logger.debug(`💡 Ceiling fixtures will be added when shelf layout is determined`)
     }
 
     private async setupAdvancedLighting(): Promise<void> {
         LightingRenderer.logger.lifecycle('💡 Setting up ADVANCED lighting - enhanced + point lights + better shadows')
-
-        this.setupRetailCoreLighting()
-        this.applyQualityFeatureLights(LIGHTING_QUALITY.ADVANCED)
-        this.applyRetailProfileDefaults()
+        
+        await this.setupEnhancedLighting()
+        this.addPointLights()
         
         LightingRenderer.logger.debug(`✅ Advanced lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
@@ -411,9 +390,8 @@ export class LightingRenderer {
     private async setupOuchMyEyesLighting(): Promise<void> {
         LightingRenderer.logger.lifecycle('💡 Setting up OUCH-MY-EYES lighting - maximum visual fidelity + dramatic effects')
 
-        this.setupRetailCoreLighting()
-        this.applyQualityFeatureLights(LIGHTING_QUALITY.OUCH_MY_EYES)
-        this.applyRetailProfileDefaults()
+        await this.setupAdvancedLighting()
+        this.addDramaticLighting()
         
         LightingRenderer.logger.debug(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
