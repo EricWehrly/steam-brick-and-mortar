@@ -5,7 +5,7 @@ import { EventManager, EventSource } from '../../../src/core/EventManager'
 import { DataManager } from '../../../src/core/data/DataManager'
 import { DataDomain, DataKey } from '../../../src/core/data/DataTypes'
 import { LightingRenderer } from '../../../src/scene/LightingRenderer'
-import { StorePropsEventTypes } from '../../../src/scene/props/PropsEvents'
+import { StorePropsEventTypes, type StorePropsSetupRequestEvent } from '../../../src/scene/props/PropsEvents'
 import { RoomEventTypes, type RoomResizedEvent } from '../../../src/types/InteractionEvents'
 
 function createRendererMock(): THREE.WebGLRenderer {
@@ -43,7 +43,7 @@ describe('LightingRenderer shadow casting integration', () => {
         const appSettings = AppSettings.getInstance()
         appSettings.setSetting('shadowQuality', 2, EventSource.System)
 
-        eventManager.emit(StorePropsEventTypes.SetupRequest, { config: {} })
+        eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, { config: {} })
         eventManager.emit(StorePropsEventTypes.SetupCompleted, {})
         await Promise.resolve()
 
@@ -65,7 +65,7 @@ describe('LightingRenderer shadow casting integration', () => {
         const appSettings = AppSettings.getInstance()
         appSettings.setSetting('shadowQuality', 0, EventSource.System)
 
-        eventManager.emit(StorePropsEventTypes.SetupRequest, { config: {} })
+        eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, { config: {} })
         eventManager.emit(StorePropsEventTypes.SetupCompleted, {})
         await Promise.resolve()
 
@@ -88,7 +88,7 @@ describe('LightingRenderer shadow casting integration', () => {
         appSettings.setSetting('shadowQuality', 2, EventSource.System)
         appSettings.setSetting('shadowMapEnabled', false, EventSource.System)
 
-        eventManager.emit(StorePropsEventTypes.SetupRequest, { config: {} })
+        eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, { config: {} })
         eventManager.emit(StorePropsEventTypes.SetupCompleted, {})
         await Promise.resolve()
 
@@ -124,7 +124,7 @@ describe('LightingRenderer shadow casting integration', () => {
         appSettings.setSetting('shadowQuality', 2, EventSource.System)
         appSettings.setSetting('shadowMapEnabled', true, EventSource.System)
 
-        eventManager.emit(StorePropsEventTypes.SetupRequest, { config: {} })
+        eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, { config: {} })
         eventManager.emit(StorePropsEventTypes.SetupCompleted, {})
         await Promise.resolve()
 
