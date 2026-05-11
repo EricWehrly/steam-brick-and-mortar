@@ -355,7 +355,13 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         // Already in the texture atlas — nothing to do.
         if (this.gameNameToTextureIndex.has(gameName)) return 'cached'
 
-        if (this.artworkProvider.isPermanentFailure(appid, 'library')) return 'permanent-failure'
+        const candidateUrls = this.artworkProvider
+            .buildUrlStrategy(appid, 'library', artworkUrl)
+            .map((entry) => entry.url)
+        if (this.artworkProvider.shouldSkipPermanentFailureForUrls(appid, 'library', candidateUrls)) {
+            LodArtworkOrchestrator.logger.warn(`Prefetch skipped for "${gameName}" (appId ${appid}) due to permanent failure`)
+            return 'permanent-failure'
+        }
 
         this.inFlightArtworkCount++
         try {
