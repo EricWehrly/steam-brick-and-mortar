@@ -298,10 +298,9 @@ export class GameLibraryListPanel {
         delete game.artworkSelectedType
         delete game.artworkSelectedUrl
 
-        const preferredBaseUrl = game.artwork?.library ?? game.artwork?.header
-        const preferredUrl = preferredBaseUrl
-            ? `${preferredBaseUrl}${preferredBaseUrl.includes('?') ? '&' : '?'}retry=${Date.now()}`
-            : undefined
+        // Retry follows canonical artwork preference: library first.
+        // Header remains available via the strategy fallback chain.
+        const preferredUrl = game.artwork?.library ?? game.artwork?.header
 
         try {
             const artwork = this.artworkProvider.getArtwork(appid, game.name, 'library', preferredUrl)
