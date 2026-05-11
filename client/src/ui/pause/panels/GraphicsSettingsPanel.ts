@@ -65,13 +65,6 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             })
         }
 
-        if (settingName === Setting.ShadowMapEnabled || settingName === Setting.ShadowQuality) {
-            eventManager.emit(LightingEventTypes.QualityChanged, {
-                quality: this.appSettings.getSetting('lightingQuality'),
-                source: EventSource.UI
-            })
-        }
-
         if (settingName === Setting.EnableLighting) {
             eventManager.emit(LightingEventTypes.Toggle, {
                 enabled: value as boolean

@@ -63,8 +63,6 @@ export interface LightingConfig {
     ceilingHeight?: number
     /** Shadow quality (0=off, 1=low, 2=medium, 3=high, 4=ultra) */
     shadowQuality?: number
-    /** Global renderer shadow map toggle */
-    shadowMapEnabled?: boolean
     /** Shadow map resolution (derived from shadowQuality) */
     shadowMapSize?: number
     /** Lighting quality level */
@@ -82,7 +80,6 @@ export class LightingRenderer {
     private eventManager: EventManager
     private lightFactory: LightFactory
     private currentShelfLayout?: { rows: number; shelvesPerRow?: number }
-    private lightingUpgradeStarted = false
     public static logger = Logger.createLogFunctions(LightingRenderer.name)
 
     constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
@@ -153,11 +150,6 @@ export class LightingRenderer {
      * This lets the scene become visible quickly without expensive fixtures
      */
     private async setupBasicLighting(): Promise<void> {
-        if (this.lightingUpgradeStarted) {
-            LightingRenderer.logger.debug('Skipping basic lighting because upgrade has already started')
-            return
-        }
-
         const startTime = window.performance.now()
         this.config = this.getCurrentConfig()
         
@@ -168,11 +160,6 @@ export class LightingRenderer {
             this.renderer.shadowMap.enabled = false
             
             await this.setupSimpleLighting()
-
-            if (this.lightingUpgradeStarted) {
-                LightingRenderer.logger.debug('Skipping remaining basic-lighting work because upgrade started mid-pass')
-                return
-            }
 
             // Create GameSpotlight pool BEFORE room geometry renders, so its SpotLight
             // is counted in the initial light-hash. Materials compile once with the
@@ -200,7 +187,6 @@ export class LightingRenderer {
      * than clear-and-rebuild.
      */
     private async upgradeLighting(): Promise<void> {
-        this.lightingUpgradeStarted = true
         const monitor = PerformanceMonitor.start('lighting-upgrade', LightingRenderer.logger)
         const startTime = window.performance.now()
         this.config = this.getCurrentConfig()
@@ -253,7 +239,6 @@ export class LightingRenderer {
             fillLightIntensity: 0.12, // Reduced by 40%
             ceilingHeight: appSettings.getSetting('ceilingHeight'),
             shadowQuality: shadowQuality,
-            shadowMapEnabled: appSettings.getSetting('shadowMapEnabled'),
             shadowMapSize: this.getShadowMapSizeForQuality(shadowQuality),
             quality: appSettings.getSetting('lightingQuality')
         }
@@ -261,9 +246,8 @@ export class LightingRenderer {
 
     private configureShadows(): void {
         const shadowQuality = this.config.shadowQuality || 0
-        const shadowMapEnabled = this.config.shadowMapEnabled !== false
         
-        if (!shadowMapEnabled || shadowQuality === 0) {
+        if (shadowQuality === 0) {
             this.renderer.shadowMap.enabled = false
             return
         }
@@ -286,41 +270,6 @@ export class LightingRenderer {
             case 3: return SHADOW_MAP_SIZES.HIGH   // 2048
             case 4: return SHADOW_MAP_SIZES.ULTRA  // 4096
             default: return SHADOW_MAP_SIZES.MEDIUM
-        }
-    }
-
-    private shouldCastShadows(): boolean {
-        return this.config.shadowMapEnabled !== false && (this.config.shadowQuality ?? 0) > 0
-    }
-
-    private configureDirectionalShadow(light: THREE.DirectionalLight): void {
-        if (!this.shouldCastShadows()) {
-            light.castShadow = false
-            return
-        }
-
-        const shadowMapSize = this.getShadowMapSizeForQuality(this.config.shadowQuality || 0)
-        light.castShadow = true
-        light.shadow.mapSize.width = shadowMapSize
-        light.shadow.mapSize.height = shadowMapSize
-        light.shadow.bias = -0.0006
-        light.shadow.normalBias = 0.015
-
-        const halfWidth = Math.max(10, CURRENT_ROOM_DIMENSIONS.WIDTH * 0.6)
-        const halfDepth = Math.max(8, CURRENT_ROOM_DIMENSIONS.DEPTH * 0.6)
-        light.shadow.camera.left = -halfWidth
-        light.shadow.camera.right = halfWidth
-        light.shadow.camera.top = halfDepth
-        light.shadow.camera.bottom = -halfDepth
-        light.shadow.camera.near = 0.5
-        light.shadow.camera.far = 40
-        light.shadow.camera.updateProjectionMatrix()
-    }
-
-    private attachDirectionalTarget(light: THREE.DirectionalLight, position: THREE.Vector3 = new THREE.Vector3(0, 0, 0)): void {
-        light.target.position.copy(position)
-        if (light.target.parent !== this.lightingGroup) {
-            this.lightingGroup.add(light.target)
         }
     }
 
@@ -358,11 +307,6 @@ export class LightingRenderer {
             parent: this.lightingGroup,
             position: [0, 10, 0]
         })
-        const mainDirectional = this.lightingGroup.getObjectByName(LIGHT_NAMES.MAIN_DIRECTIONAL)
-        if (mainDirectional instanceof THREE.DirectionalLight) {
-            this.attachDirectionalTarget(mainDirectional)
-            this.configureDirectionalShadow(mainDirectional)
-        }
         
         LightingRenderer.logger.debug(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
     }
@@ -388,8 +332,7 @@ export class LightingRenderer {
             parent: this.lightingGroup,
             position: [1, exteriorHeight, 10]
         })
-        this.attachDirectionalTarget(exteriorLight)
-        this.configureDirectionalShadow(exteriorLight)
+        exteriorLight.castShadow = false // No shadows for performance
         exteriorLight.visible = false // Disabled by default - toggleable in lighting panel
         
         // Entrance spotlight: Creates inviting bright area at storefront that fades inward
@@ -543,9 +486,7 @@ export class LightingRenderer {
         
         // Refresh full config from AppSettings to get updated shadows/ceiling height too
         this.config = { ...this.getCurrentConfig(), quality }
-        this.configureShadows()
         await this.setupLightsByQuality()
-        this.forceShadowStateRefresh()
         
         // Only show debug helpers if setting is enabled
         const appSettings = AppSettings.getInstance()
@@ -670,23 +611,6 @@ export class LightingRenderer {
             this.lightingGroup.add(existingFixtures)
             LightingRenderer.logger.debug('💡 Preserved ceiling fixtures during lighting upgrade')
         }
-    }
-
-    private forceShadowStateRefresh(): void {
-        this.renderer.shadowMap.needsUpdate = true
-
-        this.scene.traverse((object) => {
-            if (!(object instanceof THREE.Mesh)) return
-
-            if (Array.isArray(object.material)) {
-                for (const material of object.material) {
-                    material.needsUpdate = true
-                }
-                return
-            }
-
-            object.material.needsUpdate = true
-        })
     }
 
     public dispose(): void {
