@@ -1,5 +1,8 @@
 import { DataManager } from '../core/data/DataManager'
+import { ARTWORK_DIMENSIONS, GameArtworkProvider } from '../scene/game-box/instancing/GameArtworkProvider'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
+import { UIComponentUtils } from '../utils/UIComponentUtils'
+import '../styles/pause-menu/shared-components.css'
 import '../styles/game-library-list-panel.css'
 
 interface LibraryViewRow {
@@ -19,6 +22,21 @@ export class GameLibraryListPanel {
     private isOpen = false
     private searchTerm = ''
     private selectedAppId: number | null = null
+    private readonly artworkProvider: GameArtworkProvider
+    private isRetryingArtwork = false
+    private retryStatusText = ''
+    private readonly boundToggle: () => void
+    private readonly boundRenderRows: () => void
+    private readonly boundHandleRowsClick: (event: Event) => void
+    private readonly boundHandleDetailClick: (event: Event) => void
+
+    public constructor() {
+        this.artworkProvider = GameArtworkProvider.getInstance()
+        this.boundToggle = this.toggle.bind(this)
+        this.boundRenderRows = this.renderRows.bind(this)
+        this.boundHandleRowsClick = this.handleRowsClick.bind(this)
+        this.boundHandleDetailClick = this.handleDetailClick.bind(this)
+    }
 
     public init(): void {
         this.createToggleButton()
@@ -31,7 +49,7 @@ export class GameLibraryListPanel {
         this.toggleButton.className = 'game-list-toggle-btn'
         this.toggleButton.innerHTML = '📋'
         this.toggleButton.title = 'Game Metadata List'
-        this.toggleButton.addEventListener('click', () => this.toggle())
+        this.toggleButton.addEventListener('click', this.boundToggle)
 
         const slot = document.getElementById('ui-right-center-group') ?? document.getElementById('ui-slot-top-right')
         if (slot) {
@@ -54,10 +72,10 @@ export class GameLibraryListPanel {
         return `
             <div class="game-list-header">
                 <span>📋 Game Metadata List</span>
-                <button class="game-list-close" title="Close">✕</button>
+                <button id="game-list-close-btn" class="game-list-close" title="Close">✕</button>
             </div>
             <div class="game-list-toolbar">
-                <input id="game-list-search" class="game-list-search" type="text" placeholder="Search name, appid, genre, developer..." />
+                <input id="game-list-search" class="game-list-search pause-input" type="text" placeholder="Search name, appid, genre, developer..." />
                 <button id="game-list-refresh" class="game-list-refresh">Refresh</button>
                 <span id="game-list-summary" class="game-list-summary"></span>
             </div>
@@ -81,17 +99,46 @@ export class GameLibraryListPanel {
     }
 
     private wirePanelEvents(): void {
-        const closeBtn = this.container?.querySelector('.game-list-close')
-        closeBtn?.addEventListener('click', () => this.toggle())
+        UIComponentUtils.setupButtons(this.container, [
+            { buttonId: 'game-list-close-btn', onClick: this.boundToggle },
+            { buttonId: 'game-list-refresh', onClick: this.boundRenderRows },
+        ])
 
-        const searchInput = this.container?.querySelector('#game-list-search') as HTMLInputElement | null
-        searchInput?.addEventListener('input', () => {
-            this.searchTerm = searchInput.value.trim().toLowerCase()
-            this.renderRows()
+        UIComponentUtils.setupInput(this.container, {
+            inputId: 'game-list-search',
+            onInput: (value) => {
+                this.searchTerm = String(value).trim().toLowerCase()
+                this.renderRows()
+            },
         })
 
-        const refreshBtn = this.container?.querySelector('#game-list-refresh')
-        refreshBtn?.addEventListener('click', () => this.renderRows())
+        const rowsEl = this.container?.querySelector('#game-list-rows')
+        rowsEl?.addEventListener('click', this.boundHandleRowsClick)
+
+        const detailEl = this.container?.querySelector('#game-list-detail')
+        detailEl?.addEventListener('click', this.boundHandleDetailClick)
+    }
+
+    private handleRowsClick(event: Event): void {
+        const target = event.target as HTMLElement | null
+        const rowEl = target?.closest('tr[data-appid]') as HTMLTableRowElement | null
+        if (!rowEl) {
+            return
+        }
+
+        const appid = Number(rowEl.dataset.appid)
+        this.selectedAppId = Number.isFinite(appid) ? appid : null
+        this.renderRows()
+    }
+
+    private handleDetailClick(event: Event): void {
+        const target = event.target as HTMLElement | null
+        const retryButton = target?.closest('button[data-action="retry-artwork"]') as HTMLButtonElement | null
+        if (!retryButton || retryButton.disabled) {
+            return
+        }
+
+        void this.retrySelectedArtwork()
     }
 
     private toggle(): void {
@@ -171,16 +218,6 @@ export class GameLibraryListPanel {
             `
         }).join('')
 
-        const clickableRows = rowsEl.querySelectorAll<HTMLTableRowElement>('tr[data-appid]')
-        for (const rowEl of clickableRows) {
-            rowEl.addEventListener('click', () => {
-                const appid = Number(rowEl.dataset.appid)
-                this.selectedAppId = Number.isFinite(appid) ? appid : null
-                this.renderRows()
-                this.renderDetail(filteredRows)
-            })
-        }
-
         this.renderDetail(filteredRows)
     }
 
@@ -202,6 +239,16 @@ export class GameLibraryListPanel {
         const categoriesText = (game.categories ?? []).map((c) => c.description).join(', ') || '-'
         const devText = (game.developers ?? []).join(', ') || '-'
         const pubText = (game.publishers ?? []).join(', ') || '-'
+        const artworkAttemptRows = (game.artworkAttemptResults ?? []).map((attempt) => {
+            const status = attempt.result === 'success' ? 'ok' : attempt.result === 'failure' ? 'fail' : 'skip'
+            const errorText = attempt.error ? ` (${this.escapeHtml(attempt.error)})` : ''
+            return `<li class="game-list-attempt game-list-attempt--${status}"><code>${this.escapeHtml(attempt.type)}</code> ${this.escapeHtml(attempt.result)} - ${this.escapeHtml(attempt.url)}${errorText}</li>`
+        }).join('') || '<li class="game-list-attempt game-list-attempt--none">No attempt data yet.</li>'
+        const retryButtonLabel = this.isRetryingArtwork ? 'Retrying...' : 'Retry artwork'
+        const retryButtonDisabled = this.isRetryingArtwork ? 'disabled' : ''
+        const retryStatus = this.retryStatusText
+            ? `<div class="game-list-retry-status">${this.escapeHtml(this.retryStatusText)}</div>`
+            : ''
 
         detailEl.innerHTML = `
             <div class="game-list-detail-title">${this.escapeHtml(selected.name)} (${selected.appid})</div>
@@ -217,7 +264,65 @@ export class GameLibraryListPanel {
                 <div><span class="label">Developers:</span> ${this.escapeHtml(devText)}</div>
                 <div><span class="label">Publishers:</span> ${this.escapeHtml(pubText)}</div>
             </div>
+            <div class="game-list-attempts-wrap">
+                <div class="game-list-attempts-head">
+                    <div class="game-list-attempts-title">Artwork attempt results</div>
+                    <button class="game-list-refresh game-list-retry-btn" data-action="retry-artwork" ${retryButtonDisabled}>${retryButtonLabel}</button>
+                </div>
+                ${retryStatus}
+                <ul class="game-list-attempts">${artworkAttemptRows}</ul>
+            </div>
         `
+    }
+
+    private async retrySelectedArtwork(): Promise<void> {
+        const game = this.getSelectedGame()
+        if (!game) {
+            return
+        }
+
+        const appid = this.toNumericAppId(game.appid)
+        if (appid <= 0) {
+            this.retryStatusText = 'Cannot retry: invalid appid.'
+            this.renderRows()
+            return
+        }
+
+        this.isRetryingArtwork = true
+        this.retryStatusText = 'Retrying artwork fetch...'
+        this.renderRows()
+
+        this.artworkProvider.clearCachedOutcome(appid, 'library')
+
+        game.artworkAttemptResults = []
+        delete game.artworkSelectedType
+        delete game.artworkSelectedUrl
+
+        const preferredBaseUrl = game.artwork?.library ?? game.artwork?.header
+        const preferredUrl = preferredBaseUrl
+            ? `${preferredBaseUrl}${preferredBaseUrl.includes('?') ? '&' : '?'}retry=${Date.now()}`
+            : undefined
+
+        try {
+            const artwork = this.artworkProvider.getArtwork(appid, game.name, 'library', preferredUrl)
+            const dims = ARTWORK_DIMENSIONS.library
+            await artwork.getPixelsAtSize(dims.width, dims.height)
+            this.retryStatusText = 'Retry complete.'
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            this.retryStatusText = `Retry failed: ${message}`
+        } finally {
+            this.isRetryingArtwork = false
+            this.renderRows()
+        }
+    }
+
+    private getSelectedGame(): SteamGameData | null {
+        const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
+        if (this.selectedAppId === null) {
+            return null
+        }
+        return games.find((game) => this.toNumericAppId(game.appid) === this.selectedAppId) ?? null
     }
 
     private toNumericAppId(appid: number | string): number {

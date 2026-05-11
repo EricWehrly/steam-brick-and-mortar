@@ -346,6 +346,23 @@ export class GameArtworkProvider {
         })
         this.savePersistentSuccesses()
     }
+
+    /**
+     * Clear cached success/failure outcomes for a single game+format.
+     * Useful for explicit user-driven retry flows.
+     */
+    public clearCachedOutcome(appId: number, format: ArtworkFormat): void {
+        const cacheKey = `${appId}-${format}`
+        const removedFailure = this.failureCache.delete(cacheKey)
+        const removedSuccess = this.successCache.delete(cacheKey)
+
+        if (removedFailure) {
+            this.savePersistentFailures()
+        }
+        if (removedSuccess) {
+            this.savePersistentSuccesses()
+        }
+    }
     
     /**
      * Check if an appId/format is known to have failed.
