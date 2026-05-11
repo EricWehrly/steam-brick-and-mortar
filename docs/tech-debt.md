@@ -261,8 +261,37 @@
 
 ---
 
-### Test suite runtime-cost reduction
-Keep reducing expensive overlap in tests (prefer cheaper deterministic coverage where equivalent).
+## id: test-suite-runtime-cost-reduction
+**Priority**: High  
+**Effort**: ~0.5-1 day (audit + targeted rewrites)  
+**Context**: Runtime cost is still inflated by overlapping unit/integration coverage and expensive setup paths. We want equivalent behavioral confidence with cheaper deterministic tests first.
 
-### Conventions codification
-Capture Logger/EventManager/DataManager conventions in one durable technical reference to reduce repeat review feedback.
+**Done when**:
+- Slow/duplicative tests are audited and grouped by overlap reason
+- Expensive integration assertions that are already covered at unit level are reduced or replaced
+- Runtime improves measurably without reducing behavioral coverage guarantees
+- A short "cheap tests first" guideline exists for future additions
+
+---
+
+## id: playwright-scene-health-collector
+**Priority**: Low  
+**Effort**: ~1 day (collector wiring + baseline report)  
+**Context**: A shared Playwright scene-health collector is useful for observability, but it is not currently release-critical compared to core correctness and unit/integration test quality.
+
+**Done when**:
+- A single pass per mode captures logs, memory snapshot, startup smoothness, and screenshot pointer
+- Collection avoids duplicate app loads and output clobbering
+- Output format is stable enough to compare runs over time
+
+---
+
+## id: conventions-codification
+**Priority**: Medium  
+**Effort**: ~1-2 hours  
+**Context**: Logger/EventManager/DataManager conventions are repeatedly rediscovered during implementation and review.
+
+**Done when**:
+- Conventions live in one durable technical reference
+- Reference is linked from contributor/agent docs
+- New reviews can point to the single source instead of restating policy
