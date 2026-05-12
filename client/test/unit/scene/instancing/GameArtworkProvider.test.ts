@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataDomain } from '../../../../src/core/data/DataTypes'
+import { SteamArtworkStateManager } from '../../../../src/core/data/SteamArtworkStateManager'
 import { SteamDataManager } from '../../../../src/core/data/SteamDataManager'
 import { 
     GameArtworkProvider, 
@@ -198,7 +199,7 @@ describe('GameArtworkProvider', () => {
             expect(isCached).toBe(false)
         })
 
-        it('should throw immediately for known permanent failures', async () => {
+        it('should continue through strategy even with known permanent failures', async () => {
             provider.recordFailure(12345, 'library', 'CORS', [
                 'https://cdn.akamai.steamstatic.com/steam/apps/12345/library_600x900.jpg',
                 'https://cdn.akamai.steamstatic.com/steam/apps/12345/capsule_616x353.jpg',
@@ -208,7 +209,20 @@ describe('GameArtworkProvider', () => {
             const artwork = provider.getArtwork(12345, 'Test Game', 'library')
             
             const dims = ARTWORK_DIMENSIONS.library
-            await expect(artwork.getPixelsAtSize(dims.width, dims.height)).rejects.toThrow('Permanent failure (CORS) - skipping retry')
+            const result = await artwork.getPixelsAtSize(dims.width, dims.height)
+
+            expect(result.width).toBe(300)
+            expect(result.height).toBe(450)
+            expect(result.pixels).toBeInstanceOf(Uint8ClampedArray)
+        })
+
+        it('should short-circuit to label when cached selection is label', async () => {
+            SteamArtworkStateManager.setSelection(12345, 'label')
+
+            const artwork = provider.getArtwork(12345, 'Test Game', 'library')
+            const dims = ARTWORK_DIMENSIONS.library
+
+            await expect(artwork.getPixelsAtSize(dims.width, dims.height)).rejects.toThrow('Resolved label artwork for Test Game')
         })
 
         it('should retry for known non-permanent failures', async () => {
