@@ -1,4 +1,5 @@
 import { DataManager } from '../core/data/DataManager'
+import { SteamDataManager } from '../core/data/SteamDataManager'
 import { ARTWORK_DIMENSIONS, GameArtworkProvider } from '../scene/game-box/instancing/GameArtworkProvider'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
 import { UIComponentUtils } from '../utils/UIComponentUtils'
@@ -293,10 +294,11 @@ export class GameLibraryListPanel {
         this.renderRows()
 
         this.artworkProvider.clearCachedOutcome(appid, 'library')
-
-        game.artworkAttemptResults = []
-        delete game.artworkSelectedType
-        delete game.artworkSelectedUrl
+        SteamDataManager.AmendGame(appid, (entry) => {
+            entry.artworkAttemptResults = []
+            delete entry.artworkSelectedType
+            delete entry.artworkSelectedUrl
+        })
 
         // Retry follows canonical artwork preference: library first.
         // Header remains available via the strategy fallback chain.
