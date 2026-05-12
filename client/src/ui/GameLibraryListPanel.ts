@@ -1,5 +1,5 @@
 import { DataManager } from '../core/data/DataManager'
-import { SteamDataManager } from '../core/data/SteamDataManager'
+import { SteamArtworkStateManager } from '../core/data/SteamArtworkStateManager'
 import { ARTWORK_DIMENSIONS, GameArtworkProvider } from '../scene/game-box/instancing/GameArtworkProvider'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
 import { UIComponentUtils } from '../utils/UIComponentUtils'
@@ -166,7 +166,7 @@ export class GameLibraryListPanel {
             return {
                 appid,
                 name: game.name,
-                artworkType: game.artworkSelectedType ?? '-',
+                artworkType: SteamArtworkStateManager.getState(appid)?.selectedType ?? '-',
                 playtimeHours,
                 lastPlayedText,
                 genresText,
@@ -237,10 +237,11 @@ export class GameLibraryListPanel {
         this.selectedAppId = selected.appid
 
         const game = selected.game
+        const artworkState = SteamArtworkStateManager.getState(selected.appid)
         const categoriesText = (game.categories ?? []).map((c) => c.description).join(', ') || '-'
         const devText = (game.developers ?? []).join(', ') || '-'
         const pubText = (game.publishers ?? []).join(', ') || '-'
-        const artworkAttemptRows = (game.artworkAttemptResults ?? []).map((attempt) => {
+        const artworkAttemptRows = (artworkState?.attemptResults ?? []).map((attempt) => {
             const status = attempt.result === 'success' ? 'ok' : attempt.result === 'failure' ? 'fail' : 'skip'
             const errorText = attempt.error ? ` (${this.escapeHtml(attempt.error)})` : ''
             return `<li class="game-list-attempt game-list-attempt--${status}"><code>${this.escapeHtml(attempt.type)}</code> ${this.escapeHtml(attempt.result)} - ${this.escapeHtml(attempt.url)}${errorText}</li>`
@@ -254,8 +255,8 @@ export class GameLibraryListPanel {
         detailEl.innerHTML = `
             <div class="game-list-detail-title">${this.escapeHtml(selected.name)} (${selected.appid})</div>
             <div class="game-list-detail-grid">
-                <div><span class="label">Artwork selected:</span> ${this.escapeHtml(game.artworkSelectedType ?? '-')}</div>
-                <div><span class="label">Artwork URL:</span> ${this.escapeHtml(game.artworkSelectedUrl ?? '-')}</div>
+                <div><span class="label">Artwork selected:</span> ${this.escapeHtml(artworkState?.selectedType ?? '-')}</div>
+                <div><span class="label">Artwork URL:</span> ${this.escapeHtml(artworkState?.selectedUrl ?? '-')}</div>
                 <div><span class="label">Library URL:</span> ${this.escapeHtml(game.artwork?.library ?? '-')}</div>
                 <div><span class="label">Header URL:</span> ${this.escapeHtml(game.artwork?.header ?? '-')}</div>
                 <div><span class="label">Playtime:</span> ${selected.playtimeHours}h</div>
@@ -294,11 +295,7 @@ export class GameLibraryListPanel {
         this.renderRows()
 
         this.artworkProvider.clearCachedOutcome(appid, 'library')
-        SteamDataManager.AmendGame(appid, (entry) => {
-            entry.artworkAttemptResults = []
-            delete entry.artworkSelectedType
-            delete entry.artworkSelectedUrl
-        })
+        SteamArtworkStateManager.clearPresentationState(appid)
 
         // Retry follows canonical artwork preference: library first.
         // Header remains available via the strategy fallback chain.

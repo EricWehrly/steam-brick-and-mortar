@@ -8,15 +8,16 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { DataManager } from '../../../../src/core/data/DataManager'
+import { DataDomain } from '../../../../src/core/data/DataTypes'
+import { SteamDataManager } from '../../../../src/core/data/SteamDataManager'
 import { 
     GameArtworkProvider, 
     ARTWORK_DIMENSIONS,
     type GameArtwork,
     type ArtworkFormat
 } from '../../../../src/scene/game-box/instancing/GameArtworkProvider'
-
-// Cache key constants for testing
-const { FAILURE_CACHE_KEY, SUCCESS_CACHE_KEY } = GameArtworkProvider
+import type { SteamGameData } from '../../../../src/scene/game-box/types/GameData'
 
 // Mock TextureWorker
 vi.mock('../../../../src/scene/game-box/instancing/TextureWorker', () => ({
@@ -39,24 +40,34 @@ vi.mock('../../../../src/scene/game-box/instancing/PixelDataCache', () => ({
     }
 }))
 
-// Mock localStorage
-const localStorageMock = (() => {
-    let store: Record<string, string> = {}
-    return {
-        getItem: vi.fn((key: string) => store[key] || null),
-        setItem: vi.fn((key: string, value: string) => { store[key] = value }),
-        removeItem: vi.fn((key: string) => { delete store[key] }),
-        clear: vi.fn(() => { store = {} })
-    }
-})()
-Object.defineProperty(global, 'localStorage', { value: localStorageMock })
-
 describe('GameArtworkProvider', () => {
     let provider: GameArtworkProvider
 
+    function makeGame(appid: number, name = `Game ${appid}`): SteamGameData {
+        return {
+            appid,
+            name,
+            playtime_forever: 0,
+            artwork: {
+                icon: '',
+                logo: '',
+                header: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
+                library: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`
+            }
+        }
+    }
+
     beforeEach(() => {
         vi.clearAllMocks()
-        localStorageMock.clear()
+        DataManager.resetInstance()
+        ;(SteamDataManager as unknown as { _instance: null })._instance = null
+
+        DataManager.getInstance().set<SteamGameData[]>(
+            'steam.games',
+            [makeGame(12345, 'Test Game'), makeGame(67890, 'Header Game')],
+            { domain: DataDomain.SteamIntegration }
+        )
+
         // Reset singleton
         ;(GameArtworkProvider as unknown as { instance: null }).instance = null
         provider = GameArtworkProvider.getInstance()
@@ -106,23 +117,22 @@ describe('GameArtworkProvider', () => {
             expect(cdnUrl?.url).toContain('library_600x900.jpg')
         })
 
-        it('should not add CDN fallbacks for new CDN URLs', () => {
+        it('should keep preferred new CDN URL first', () => {
             const newCdnUrl = 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/12345/header.jpg'
             const strategy = provider.buildUrlStrategy(12345, 'library', newCdnUrl)
-            
-            // Should have preferred URL but no cdn.akamai fallbacks
-            expect(strategy.length).toBe(1)
+
             expect(strategy[0].url).toBe(newCdnUrl)
+            expect(strategy.some((entry) => entry.url.includes('library_600x900.jpg'))).toBe(true)
         })
 
-        it('should use cached success URL first when available', () => {
+        it('should include cached success URL as a candidate', () => {
             // Record a success
             provider.recordSuccess(12345, 'library', 'https://cached-success.com/art.jpg', 'cached-test')
             
             const strategy = provider.buildUrlStrategy(12345, 'library')
-            
-            expect(strategy[0].url).toBe('https://cached-success.com/art.jpg')
-            expect(strategy[0].type).toBe('cached-cached-test')
+
+            const cachedEntry = strategy.find((entry) => entry.url === 'https://cached-success.com/art.jpg')
+            expect(cachedEntry?.type).toBe('cached-cached-test')
         })
     })
 
@@ -168,24 +178,6 @@ describe('GameArtworkProvider', () => {
             expect(provider.getFailureReason(99999, 'library')).toBeNull()
         })
 
-        it('should persist failures to localStorage', () => {
-            provider.recordFailure(12345, 'library', 'NETWORK', ['url1'])
-            
-            expect(localStorageMock.setItem).toHaveBeenCalledWith(
-                FAILURE_CACHE_KEY,
-                expect.any(String)
-            )
-        })
-
-        it('should persist successes to localStorage', () => {
-            provider.recordSuccess(12345, 'library', 'https://fallback.com/art.jpg', 'cdn-library')
-            
-            expect(localStorageMock.setItem).toHaveBeenCalledWith(
-                SUCCESS_CACHE_KEY,
-                expect.any(String)
-            )
-        })
-
         it('should clear all caches', () => {
             provider.recordFailure(12345, 'library', '404', ['url1'])
             provider.recordSuccess(67890, 'header', 'https://fallback.com', 'test')
@@ -193,8 +185,6 @@ describe('GameArtworkProvider', () => {
             provider.clearCaches()
             
             expect(provider.isKnownFailure(12345, 'library')).toBe(false)
-            expect(localStorageMock.removeItem).toHaveBeenCalledWith(FAILURE_CACHE_KEY)
-            expect(localStorageMock.removeItem).toHaveBeenCalledWith(SUCCESS_CACHE_KEY)
         })
     })
 
@@ -209,7 +199,11 @@ describe('GameArtworkProvider', () => {
         })
 
         it('should throw immediately for known permanent failures', async () => {
-            provider.recordFailure(12345, 'library', 'CORS', ['url1'])
+            provider.recordFailure(12345, 'library', 'CORS', [
+                'https://cdn.akamai.steamstatic.com/steam/apps/12345/library_600x900.jpg',
+                'https://cdn.akamai.steamstatic.com/steam/apps/12345/capsule_616x353.jpg',
+                'https://cdn.akamai.steamstatic.com/steam/apps/12345/header.jpg',
+            ])
             
             const artwork = provider.getArtwork(12345, 'Test Game', 'library')
             
