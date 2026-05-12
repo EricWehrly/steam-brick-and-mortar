@@ -241,11 +241,6 @@ export class GameLibraryListPanel {
         const categoriesText = (game.categories ?? []).map((c) => c.description).join(', ') || '-'
         const devText = (game.developers ?? []).join(', ') || '-'
         const pubText = (game.publishers ?? []).join(', ') || '-'
-        const artworkAttemptRows = (artworkState?.attemptResults ?? []).map((attempt) => {
-            const status = attempt.result === 'success' ? 'ok' : attempt.result === 'failure' ? 'fail' : 'skip'
-            const errorText = attempt.error ? ` (${this.escapeHtml(attempt.error)})` : ''
-            return `<li class="game-list-attempt game-list-attempt--${status}"><code>${this.escapeHtml(attempt.type)}</code> ${this.escapeHtml(attempt.result)} - ${this.escapeHtml(attempt.url)}${errorText}</li>`
-        }).join('') || '<li class="game-list-attempt game-list-attempt--none">No attempt data yet.</li>'
         const retryButtonLabel = this.isRetryingArtwork ? 'Retrying...' : 'Retry artwork'
         const retryButtonDisabled = this.isRetryingArtwork ? 'disabled' : ''
         const retryStatus = this.retryStatusText
@@ -268,11 +263,10 @@ export class GameLibraryListPanel {
             </div>
             <div class="game-list-attempts-wrap">
                 <div class="game-list-attempts-head">
-                    <div class="game-list-attempts-title">Artwork attempt results</div>
+                    <div class="game-list-attempts-title">Artwork controls</div>
                     <button class="game-list-refresh game-list-retry-btn" data-action="retry-artwork" ${retryButtonDisabled}>${retryButtonLabel}</button>
                 </div>
                 ${retryStatus}
-                <ul class="game-list-attempts">${artworkAttemptRows}</ul>
             </div>
         `
     }
@@ -295,7 +289,7 @@ export class GameLibraryListPanel {
         this.renderRows()
 
         this.artworkProvider.clearCachedOutcome(appid, 'library')
-        SteamArtworkStateManager.clearPresentationState(appid)
+        SteamArtworkStateManager.clearSelection(appid)
 
         // Retry follows canonical artwork preference: library first.
         // Header remains available via the strategy fallback chain.

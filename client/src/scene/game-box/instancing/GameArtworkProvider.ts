@@ -1,7 +1,7 @@
 /**
  * Game Artwork Provider - Universal artwork retrieval for any renderer
  *
- * - Sidecar failure/success caching (`steam.artworkState`)
+ * - Runtime failure/success caching (session only)
  * TD: singleton-pattern-refactor
  *
  * - URL for the artwork
@@ -15,18 +15,16 @@
  * 
  * Handles internally:
  * - URL strategy (primary vs fallback CDN URLs)
- * - steam.games-owned failure/success caching
+ * - Runtime failure/success caching
  * - Coordination with TextureWorker for fetching
  * - PixelDataCache for disk caching
  */
 
 import { Logger } from '../../../utils/Logger'
-import { SteamArtworkStateManager } from '../../../core/data/SteamArtworkStateManager'
 import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 import { GameArtworkRequest } from './GameArtworkRequest'
 import { resizePixels } from './ArtworkPixelUtils'
-import type { ArtworkCacheEntry } from '../../../core/data/SteamArtworkStateManager'
 
 // Class-scoped logger will be attached to the class
 
@@ -99,6 +97,15 @@ const CDN_PATTERNS: Record<CdnArtworkType, string> = {
 
 const LIBRARY_FALLBACK_CHAIN: CdnArtworkType[] = ['library', 'capsule', 'header']
 
+interface RuntimeArtworkCacheEntry {
+    reason?: FailureReason
+    urlsTried?: string[]
+    attemptCount?: number
+    isPermanent?: boolean
+    fallbackUrl?: string
+    fallbackType?: string
+}
+
 /**
  * Provider for game artwork - singleton that manages caching and URL strategies.
  */
@@ -108,6 +115,8 @@ export class GameArtworkProvider {
     
     private textureWorker: TextureWorker
     private pixelCache: PixelDataCache | null = null
+    private readonly failureCache = new Map<string, RuntimeArtworkCacheEntry>()
+    private readonly successCache = new Map<string, RuntimeArtworkCacheEntry>()
     
     // Skip tracking (per session)
     private skipStats: Map<FailureReason, number> = new Map()
@@ -188,7 +197,7 @@ export class GameArtworkProvider {
         }
 
         // Keep historical success as a final candidate so preferred/canonical URLs stay authoritative.
-        const cachedSuccess = this.getCacheEntry(appId, format)
+        const cachedSuccess = this.getSuccessEntry(appId, format)
         if (cachedSuccess?.fallbackUrl) {
             const alreadyAdded = urls.some(u => u.url === cachedSuccess.fallbackUrl)
             if (!alreadyAdded) {
@@ -283,7 +292,7 @@ export class GameArtworkProvider {
         reason: FailureReason,
         urlsTried: string[]
     ): void {
-        const existing = this.getCacheEntry(appId, format)
+        const existing = this.getFailureEntry(appId, format)
         const attemptCount = (existing?.attemptCount ?? 0) + 1
         
         // Permanent failures: NO_ARTWORK, CORS, DECODE, and 404.
@@ -291,7 +300,7 @@ export class GameArtworkProvider {
         // (CORS failures sometimes mask 404s; both are unretryable.)
         const isPermanent = GameArtworkProvider.isReasonPermanent(reason)
         
-        this.setCacheEntry(appId, format, {
+        this.setFailureEntry(appId, format, {
             ...existing,
             reason,
             urlsTried,
@@ -316,8 +325,8 @@ export class GameArtworkProvider {
         fallbackUrl: string,
         fallbackType: string
     ): void {
-        const existing = this.getCacheEntry(appId, format)
-        this.setCacheEntry(appId, format, {
+        const existing = this.getSuccessEntry(appId, format)
+        this.setSuccessEntry(appId, format, {
             ...existing,
             fallbackUrl,
             fallbackType
@@ -329,28 +338,29 @@ export class GameArtworkProvider {
      * Useful for explicit user-driven retry flows.
      */
     public clearCachedOutcome(appId: number, format: ArtworkFormat): void {
-        this.deleteCacheEntry(appId, format)
+        this.deleteFailureEntry(appId, format)
+        this.deleteSuccessEntry(appId, format)
     }
     
     /**
      * Check if an appId/format is known to have failed.
      */
     public isKnownFailure(appId: number, format: ArtworkFormat): boolean {
-        return this.getCacheEntry(appId, format)?.reason !== undefined
+        return this.getFailureEntry(appId, format)?.reason !== undefined
     }
     
     /**
      * Get failure reason for an appId/format.
      */
     public getFailureReason(appId: number, format: ArtworkFormat): FailureReason | null {
-        return this.getCacheEntry(appId, format)?.reason ?? null
+        return this.getFailureEntry(appId, format)?.reason ?? null
     }
     
     /**
      * Check if failure is permanent (should not retry).
      */
     public isPermanentFailure(appId: number, format: ArtworkFormat): boolean {
-        return this.getCacheEntry(appId, format)?.isPermanent ?? false
+        return this.getFailureEntry(appId, format)?.isPermanent ?? false
     }
 
     /**
@@ -363,7 +373,7 @@ export class GameArtworkProvider {
         format: ArtworkFormat,
         candidateUrl?: string
     ): boolean {
-        const entry = this.getCacheEntry(appId, format)
+        const entry = this.getFailureEntry(appId, format)
         if (!entry?.isPermanent) {
             return false
         }
@@ -391,7 +401,7 @@ export class GameArtworkProvider {
         format: ArtworkFormat,
         candidateUrls: string[]
     ): boolean {
-        const entry = this.getCacheEntry(appId, format)
+        const entry = this.getFailureEntry(appId, format)
         if (!entry?.isPermanent) {
             return false
         }
@@ -462,15 +472,11 @@ export class GameArtworkProvider {
             permanent: 0
         }
 
-        const stateMap = SteamArtworkStateManager.getStateMap()
-        for (const state of Object.values(stateMap)) {
-            const entries = Object.values(state.cacheByFormat ?? {})
-            for (const entry of entries) {
-                if (entry?.reason) {
-                    stats[entry.reason] = (stats[entry.reason] || 0) + 1
-                    stats.total++
-                    if (entry.isPermanent) stats.permanent++
-                }
+        for (const entry of this.failureCache.values()) {
+            if (entry.reason) {
+                stats[entry.reason] = (stats[entry.reason] || 0) + 1
+                stats.total++
+                if (entry.isPermanent) stats.permanent++
             }
         }
         
@@ -481,20 +487,37 @@ export class GameArtworkProvider {
      * Clear all caches (force retry of failed URLs).
      */
     public clearCaches(): void {
-        SteamArtworkStateManager.clearAllState()
+        this.failureCache.clear()
+        this.successCache.clear()
         GameArtworkProvider.logger.info('Cleared artwork caches')
     }
 
-    private getCacheEntry(appId: number, format: ArtworkFormat): ArtworkCacheEntry | null {
-        return SteamArtworkStateManager.getCacheEntry(appId, format)
+    private getFailureEntry(appId: number, format: ArtworkFormat): RuntimeArtworkCacheEntry | null {
+        return this.failureCache.get(this.cacheKey(appId, format)) ?? null
     }
 
-    private setCacheEntry(appId: number, format: ArtworkFormat, cacheEntry: ArtworkCacheEntry): void {
-        SteamArtworkStateManager.setCacheEntry(appId, format, cacheEntry)
+    private setFailureEntry(appId: number, format: ArtworkFormat, cacheEntry: RuntimeArtworkCacheEntry): void {
+        this.failureCache.set(this.cacheKey(appId, format), cacheEntry)
     }
 
-    private deleteCacheEntry(appId: number, format: ArtworkFormat): void {
-        SteamArtworkStateManager.deleteCacheEntry(appId, format)
+    private deleteFailureEntry(appId: number, format: ArtworkFormat): void {
+        this.failureCache.delete(this.cacheKey(appId, format))
+    }
+
+    private getSuccessEntry(appId: number, format: ArtworkFormat): RuntimeArtworkCacheEntry | null {
+        return this.successCache.get(this.cacheKey(appId, format)) ?? null
+    }
+
+    private setSuccessEntry(appId: number, format: ArtworkFormat, cacheEntry: RuntimeArtworkCacheEntry): void {
+        this.successCache.set(this.cacheKey(appId, format), cacheEntry)
+    }
+
+    private deleteSuccessEntry(appId: number, format: ArtworkFormat): void {
+        this.successCache.delete(this.cacheKey(appId, format))
+    }
+
+    private cacheKey(appId: number, format: ArtworkFormat): string {
+        return `${appId}-${format}`
     }
 
     /**

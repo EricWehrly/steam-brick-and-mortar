@@ -10,7 +10,6 @@ import type {
     PixelDataResult 
 } from './GameArtworkProvider'
 import { SteamArtworkStateManager } from '../../../core/data/SteamArtworkStateManager'
-import type { ArtworkAttemptResult } from '../../../core/data/SteamArtworkStateManager'
 
 /**
  * Handle to artwork for a specific game.
@@ -75,12 +74,6 @@ export class GameArtworkRequest implements GameArtwork {
             if (reason) {
                 this.provider.recordSkip(this.appId, this.gameName, reason)
             }
-            this.appendArtworkAttempt({
-                type: 'label',
-                url: '-',
-                result: 'skipped-permanent',
-                error: reason ?? 'unknown',
-            })
             throw new Error(`Permanent failure (${reason}) - skipping retry`)
         }
         
@@ -127,8 +120,6 @@ export class GameArtworkRequest implements GameArtwork {
         const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.preferredUrl)
         const triedUrls: string[] = []
         let lastError: Error | null = null
-
-        this.resetArtworkAttempts()
         
         for (const { url, type } of strategy) {
             triedUrls.push(url)
@@ -139,22 +130,10 @@ export class GameArtworkRequest implements GameArtwork {
                     url, width, height, `${this.appId}-${this.format}`
                 )
 
-                this.appendArtworkAttempt({
-                    type: this.toAttemptType(route),
-                    url,
-                    result: 'success',
-                })
-
                 this.recordSuccessfulResolution(result, url, type, route)
                 return result
             } catch (e) {
                 lastError = e instanceof Error ? e : new Error(String(e))
-                this.appendArtworkAttempt({
-                    type: this.toAttemptType(route),
-                    url,
-                    result: 'failure',
-                    error: lastError.message,
-                })
             }
         }
         
@@ -243,18 +222,6 @@ export class GameArtworkRequest implements GameArtwork {
 
     private isCdnArtworkType(route: CdnArtworkType | 'other'): route is CdnArtworkType {
         return route === 'library' || route === 'capsule' || route === 'header'
-    }
-
-    private toAttemptType(route: CdnArtworkType | 'other'): ArtworkAttemptResult['type'] {
-        return this.isCdnArtworkType(route) ? route : 'other'
-    }
-
-    private resetArtworkAttempts(): void {
-        SteamArtworkStateManager.resetAttempts(this.appId)
-    }
-
-    private appendArtworkAttempt(attempt: ArtworkAttemptResult): void {
-        SteamArtworkStateManager.appendAttempt(this.appId, attempt)
     }
 
     private setArtworkSelection(selectedType: CdnArtworkType | 'label', selectedUrl?: string): void {
