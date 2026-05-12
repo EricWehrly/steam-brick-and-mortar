@@ -19,6 +19,7 @@ import { DataManager } from '../../../../src/core/data/DataManager'
 import { DataKey, DataDomain } from '../../../../src/core/data/DataTypes'
 import { EventManager } from '../../../../src/core/EventManager'
 import { GameArtworkProvider } from '../../../../src/scene/game-box/instancing/GameArtworkProvider'
+import { SteamArtworkStateManager } from '../../../../src/core/data/SteamArtworkStateManager'
 
 // Mock DataManager
 vi.mock('../../../../src/core/data/DataManager', () => ({
@@ -55,6 +56,15 @@ vi.mock('../../../../src/scene/game-box/instancing/GameArtworkProvider', () => (
             getFailureReason: vi.fn(),
             clearCaches: vi.fn()
         })
+    }
+}))
+
+// Mock SteamArtworkStateManager so label gating can be driven deterministically
+vi.mock('../../../../src/core/data/SteamArtworkStateManager', () => ({
+    SteamArtworkStateManager: {
+        getState: vi.fn(),
+        setSelection: vi.fn(),
+        clearSelection: vi.fn(),
     }
 }))
 
@@ -247,7 +257,47 @@ describe('LodArtworkOrchestrator', () => {
     })
 
     describe('Failure skip semantics', () => {
+        it('short-circuits prefetch when label selection is cached', async () => {
+            mockDataManager.get.mockReturnValue(null)
+            orchestrator = new LodArtworkOrchestrator({ lazyHighTextures: true })
+
+            const provider = GameArtworkProvider.getInstance() as unknown as {
+                getArtwork: ReturnType<typeof vi.fn>
+            }
+
+            vi.mocked(SteamArtworkStateManager.getState).mockReturnValue({ selectedType: 'label' })
+
+            const result = await orchestrator.prefetchArtwork(123, 'https://example.com/art.jpg', 'Blocked Game')
+
+            expect(result).toBe('permanent-failure')
+            expect(provider.getArtwork).not.toHaveBeenCalled()
+        })
+
+        it('short-circuits placement when label selection is cached', async () => {
+            mockDataManager.get.mockReturnValue(null)
+            orchestrator = new LodArtworkOrchestrator()
+
+            const provider = GameArtworkProvider.getInstance() as unknown as {
+                getArtwork: ReturnType<typeof vi.fn>
+            }
+
+            vi.mocked(SteamArtworkStateManager.getState).mockReturnValue({ selectedType: 'label' })
+
+            const result = await orchestrator.setArtworkInstanceFromUrl(
+                new THREE.Vector3(0, 0, 0),
+                'Blocked Game',
+                'https://example.com/art.jpg',
+                123
+            )
+
+            expect(result.success).toBe(false)
+            expect(result.permanent).toBe(true)
+            expect(provider.getArtwork).not.toHaveBeenCalled()
+        })
+
         it('does not short-circuit on non-permanent known failures', async () => {
+            vi.mocked(SteamArtworkStateManager.getState).mockReturnValue(null)
+
             const mockScene = new THREE.Scene()
             mockDataManager.get.mockImplementation((key: DataKey) => {
                 if (key === DataKey.MainScene) return mockScene
@@ -276,7 +326,7 @@ describe('LodArtworkOrchestrator', () => {
             expect(provider.getArtwork).toHaveBeenCalled()
         })
 
-        it('short-circuits on permanent failures', async () => {
+        it('does not short-circuit on permanent failures', async () => {
             mockDataManager.get.mockReturnValue(null)
             orchestrator = new LodArtworkOrchestrator()
 
@@ -297,7 +347,7 @@ describe('LodArtworkOrchestrator', () => {
             )
 
             expect(result.success).toBe(false)
-            expect(provider.getArtwork).not.toHaveBeenCalled()
+            expect(provider.getArtwork).toHaveBeenCalled()
         })
     })
 

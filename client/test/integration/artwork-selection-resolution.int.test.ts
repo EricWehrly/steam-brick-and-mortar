@@ -17,6 +17,7 @@ import { DataManager } from '../../src/core/data/DataManager'
 import { DataDomain } from '../../src/core/data/DataTypes'
 import { SteamArtworkStateManager } from '../../src/core/data/SteamArtworkStateManager'
 import { SteamDataManager } from '../../src/core/data/SteamDataManager'
+import { GameLibraryListPanel } from '../../src/ui/GameLibraryListPanel'
 import { 
     GameArtworkProvider, 
     ARTWORK_DIMENSIONS
@@ -213,15 +214,8 @@ describe('Artwork Selection Resolution Integration', () => {
             SteamArtworkStateManager.setSelection(10001, 'label')
 
             const artwork = provider.getArtwork(10001, 'Library Game', 'library')
-            
-            const thrown = vi.fn()
-            try {
-                await artwork.getPixelsAtSize(300, 450)
-            } catch {
-                thrown()
-            }
 
-            expect(thrown).toHaveBeenCalled()
+            await expect(artwork.getPixelsAtSize(300, 450)).rejects.toThrow('Resolved label artwork')
         })
     })
 
@@ -317,6 +311,25 @@ describe('Artwork Selection Resolution Integration', () => {
     })
 
     describe('Cross-scenario edge cases', () => {
+        it('should surface cached artwork state when the panel opens', async () => {
+            SteamArtworkStateManager.setSelection(10001, 'header', 'https://cdn.akamai.steamstatic.com/steam/apps/10001/header.jpg')
+
+            const originalBody = document.body.innerHTML
+            document.body.innerHTML = '<div id="ui-right-center-group"></div>'
+
+            const panel = new GameLibraryListPanel()
+            panel.init()
+
+            document.getElementById('game-list-toggle-btn')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+            expect(document.getElementById('game-list-summary')?.textContent).toBe('3 / 3 games')
+            expect(document.getElementById('game-list-detail')?.textContent).toContain('Artwork selected: header')
+            expect(document.getElementById('game-list-detail')?.textContent).toContain('header.jpg')
+
+            panel.dispose()
+            document.body.innerHTML = originalBody
+        })
+
         it('should handle rapid selection changes gracefully', async () => {
             // Rapidly get different formats for same game
             for (let i = 0; i < 3; i++) {
