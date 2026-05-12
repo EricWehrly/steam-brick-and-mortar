@@ -250,22 +250,19 @@ export class GameArtworkRequest implements GameArtwork {
     }
 
     private resetArtworkAttempts(): void {
-        const match = SteamDataManager.GetGame(this.appId)
-        if (!match) return
-        match.artworkAttemptResults = []
+        SteamDataManager.AmendGame(this.appId, (game) => {
+            game.artworkAttemptResults = []
+        })
     }
 
     private appendArtworkAttempt(attempt: ArtworkAttemptResult): void {
-        const match = SteamDataManager.GetGame(this.appId)
-        if (!match) return
-        if (!match.artworkAttemptResults) {
-            match.artworkAttemptResults = []
-        }
-        match.artworkAttemptResults.push(attempt)
+        SteamDataManager.AmendGame(this.appId, (game) => {
+            game.artworkAttemptResults = [...(game.artworkAttemptResults ?? []), attempt]
+        })
     }
 
     private setArtworkSelection(selectedType: CdnArtworkType | 'label', selectedUrl?: string): void {
-        const match = SteamDataManager.GetGame(this.appId);
+        const match = SteamDataManager.GetGame(this.appId)
         if (!match) return
 
         const currentType = match.artworkSelectedType
@@ -276,11 +273,13 @@ export class GameArtworkRequest implements GameArtwork {
             return
         }
 
-        match.artworkSelectedType = selectedType
-        if (selectedUrl) {
-            match.artworkSelectedUrl = selectedUrl
-        } else {
-            delete match.artworkSelectedUrl
-        }
+        SteamDataManager.AmendGame(this.appId, (game) => {
+            game.artworkSelectedType = selectedType
+            if (selectedUrl) {
+                game.artworkSelectedUrl = selectedUrl
+            } else {
+                delete game.artworkSelectedUrl
+            }
+        })
     }
 }

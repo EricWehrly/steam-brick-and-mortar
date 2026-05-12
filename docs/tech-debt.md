@@ -14,6 +14,27 @@
 
 ## Fix Now (Intermission)
 
+## id: appid-keyed-cache-split
+**Priority**: High  
+**Effort**: ~1-2 days (cache model refactor + migration + tests)  
+**Context**: Current cache persistence paths still rely on monolithic single-entry storage patterns (for example one serialized cache blob), which makes per-app invalidation, debugging, and incremental updates harder than needed. Move to appid-keyed entries in a dedicated cache namespace/store instead of extending the single-entry path.
+
+**Decision (for now)**:
+- Do not refactor this in the current review pass.
+- Track as high-priority intermission debt and execute in a focused refactor.
+
+**Done when**:
+- Cache entries are keyed by appid (not a single aggregate entry)
+- A separate cache namespace/store is introduced for this data path
+- Invalidation supports per-app purge without wiping unrelated cache entries
+- Read/write paths are updated consistently and covered by unit tests
+- Existing cache data migration (or a safe reset strategy) is documented
+
+**Related files**:
+- `client/src/steam/cache/SimpleCacheManager.ts`
+- `client/src/steam/SteamApiClient.ts`
+- `client/src/steam/GamesLoader.ts`
+
 ## id: appsettings-default-vs-override-persistence
 **Priority**: Medium  
 **Effort**: ~1-2 hours  
