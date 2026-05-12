@@ -59,17 +59,13 @@ export class GameArtworkRequest implements GameArtwork {
             return this.cachedPixels
         }
 
-        const strategyUrls = this.provider
-            .buildUrlStrategy(this.appId, this.format, this.preferredUrl)
-            .map((entry) => entry.url)
-        
-        // Check if this is a permanent failure we should skip
-        if (this.provider.shouldSkipPermanentFailureForUrls(this.appId, this.format, strategyUrls)) {
-            const reason = this.failureReason ?? this.provider.getFailureReason(this.appId, this.format)
-            if (reason) {
-                this.provider.recordSkip(this.appId, this.gameName, reason)
-            }
-            throw new Error(`Permanent failure (${reason}) - skipping retry`)
+        const cachedSelection = SteamArtworkStateManager.getState(this.appId)
+        if (cachedSelection?.selectedType === 'label') {
+            throw new Error(`Resolved label artwork for ${this.gameName}`)
+        }
+
+        if (!this.resolvedUrl && cachedSelection?.selectedUrl) {
+            this.resolvedUrl = cachedSelection.selectedUrl
         }
         
         // Known non-permanent failures should be retried.
