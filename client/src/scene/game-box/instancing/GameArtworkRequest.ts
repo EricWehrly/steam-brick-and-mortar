@@ -9,8 +9,8 @@ import type {
     FailureReason, 
     PixelDataResult 
 } from './GameArtworkProvider'
-import { SteamDataManager } from '../../../core/data/SteamDataManager'
-import type { ArtworkAttemptResult } from '../types/GameData'
+import { SteamArtworkStateManager } from '../../../core/data/SteamArtworkStateManager'
+import type { ArtworkAttemptResult } from '../../../core/data/SteamArtworkStateManager'
 
 /**
  * Handle to artwork for a specific game.
@@ -250,22 +250,15 @@ export class GameArtworkRequest implements GameArtwork {
     }
 
     private resetArtworkAttempts(): void {
-        SteamDataManager.AmendGame(this.appId, (game) => {
-            game.artworkAttemptResults = []
-        })
+        SteamArtworkStateManager.resetAttempts(this.appId)
     }
 
     private appendArtworkAttempt(attempt: ArtworkAttemptResult): void {
-        SteamDataManager.AmendGame(this.appId, (game) => {
-            game.artworkAttemptResults = [...(game.artworkAttemptResults ?? []), attempt]
-        })
+        SteamArtworkStateManager.appendAttempt(this.appId, attempt)
     }
 
     private setArtworkSelection(selectedType: CdnArtworkType | 'label', selectedUrl?: string): void {
-        const match = SteamDataManager.GetGame(this.appId)
-        if (!match) return
-
-        const currentType = match.artworkSelectedType
+        const currentType = SteamArtworkStateManager.getState(this.appId)?.selectedType
 
         // Never let a later failure path overwrite a successful artwork selection.
         // This can happen when multiple request handles exist for the same game.
@@ -273,13 +266,6 @@ export class GameArtworkRequest implements GameArtwork {
             return
         }
 
-        SteamDataManager.AmendGame(this.appId, (game) => {
-            game.artworkSelectedType = selectedType
-            if (selectedUrl) {
-                game.artworkSelectedUrl = selectedUrl
-            } else {
-                delete game.artworkSelectedUrl
-            }
-        })
+        SteamArtworkStateManager.setSelection(this.appId, selectedType, selectedUrl)
     }
 }

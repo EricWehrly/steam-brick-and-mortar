@@ -7,13 +7,6 @@
 
 import type { SteamGameMetadata } from '../../../steam/types/SteamMetadata'
 
-export interface ArtworkAttemptResult {
-    type: 'library' | 'capsule' | 'header' | 'other' | 'label'
-    url: string
-    result: 'success' | 'failure' | 'skipped-permanent'
-    error?: string
-}
-
 export interface SteamGameData extends SteamGameMetadata {
     appid: string | number
     name: string
@@ -28,7 +21,4 @@ export interface SteamGameData extends SteamGameMetadata {
         header: string
         library: string
     }
-    artworkSelectedType?: 'library' | 'capsule' | 'header' | 'label'
-    artworkSelectedUrl?: string
-    artworkAttemptResults?: ArtworkAttemptResult[]
 }
