@@ -12,6 +12,7 @@
 
 import * as THREE from 'three'
 import { DataManager } from '../../../core/data/DataManager'
+import { SteamArtworkStateManager } from '../../../core/data/SteamArtworkStateManager'
 import { DataKey, DataDomain } from '../../../core/data/DataTypes'
 import { EventManager } from '../../../core/EventManager'
 import {
@@ -355,11 +356,8 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         // Already in the texture atlas — nothing to do.
         if (this.gameNameToTextureIndex.has(gameName)) return 'cached'
 
-        const candidateUrls = this.artworkProvider
-            .buildUrlStrategy(appid, 'library', artworkUrl)
-            .map((entry) => entry.url)
-        if (this.artworkProvider.shouldSkipPermanentFailureForUrls(appid, 'library', candidateUrls)) {
-            LodArtworkOrchestrator.logger.warn(`Prefetch skipped for "${gameName}" (appId ${appid}) due to permanent failure`)
+        if (this.isLabelSelection(appid)) {
+            LodArtworkOrchestrator.logger.debug(`Prefetch skipped for "${gameName}" (appId ${appid}) due to cached label selection`)
             return 'permanent-failure'
         }
 
@@ -476,11 +474,8 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             return { success: true, instanceIndex: existingIndex }
         }
 
-        // Only skip known permanent failures. Non-permanent historical failures
-        // (UNKNOWN/TIMEOUT/NETWORK) should be retried.
-        if (this.artworkProvider.isPermanentFailure(appid ?? 0, 'library')) {
-            const reason = this.artworkProvider.getFailureReason(appid ?? 0, 'library')
-            LodArtworkOrchestrator.logger.debug(`Skipping "${gameName}": permanent failure (${reason})`)
+        if (this.isLabelSelection(appid)) {
+            LodArtworkOrchestrator.logger.debug(`Skipping "${gameName}": cached label selection`)
             return { success: false, instanceIndex: -1, permanent: true }
         }
 
@@ -579,9 +574,16 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
                 timestamp: Date.now()
             })
             LodArtworkOrchestrator.logger.debug(`Artwork failed for "${gameName}": ${reason}`)
-            const isPermanent = this.artworkProvider.isPermanentFailure(appid ?? 0, 'library')
+            const isPermanent = this.isLabelSelection(appid)
             return { success: false, instanceIndex: -1, permanent: isPermanent }
         }
+    }
+
+    private isLabelSelection(appid?: number): boolean {
+        if (appid === undefined || appid <= 0) {
+            return false
+        }
+        return SteamArtworkStateManager.getState(appid)?.selectedType === 'label'
     }
 
     private categorizeFailure(msg: string): string {

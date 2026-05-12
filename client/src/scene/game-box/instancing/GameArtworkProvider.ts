@@ -362,60 +362,6 @@ export class GameArtworkProvider {
     }
 
     /**
-     * Decide whether a permanent failure entry should block a new attempt.
-     * If caller supplies a candidate URL not seen in the recorded failure attempts,
-     * allow one more attempt so metadata URLs can recover from stale canonical dead-ends.
-     */
-    public shouldSkipPermanentFailure(
-        appId: number,
-        format: ArtworkFormat,
-        candidateUrl?: string
-    ): boolean {
-        const entry = this.getFailureEntry(appId, format)
-        if (!entry?.isPermanent) {
-            return false
-        }
-
-        if (!candidateUrl) {
-            return true
-        }
-
-        const candidate = candidateUrl.trim()
-        if (!candidate) {
-            return true
-        }
-
-        const triedUrls = entry.urlsTried ?? []
-        const alreadyTried = triedUrls.includes(candidate)
-        return alreadyTried
-    }
-
-    /**
-     * Strategy-aware permanent failure gate.
-     * Skip only when all viable candidate URLs were already tried under a permanent failure.
-     */
-    public shouldSkipPermanentFailureForUrls(
-        appId: number,
-        format: ArtworkFormat,
-        candidateUrls: string[]
-    ): boolean {
-        const entry = this.getFailureEntry(appId, format)
-        if (!entry?.isPermanent) {
-            return false
-        }
-
-        const candidates = Array.from(
-            new Set(candidateUrls.map((u) => u.trim()).filter((u) => u.length > 0))
-        )
-        if (candidates.length === 0) {
-            return true
-        }
-
-        const triedUrls = entry.urlsTried ?? []
-        return candidates.every((url) => triedUrls.includes(url))
-    }
-    
-    /**
      * Record a skipped attempt (permanent failure).
      */
     public recordSkip(appId: number, gameName: string, reason: FailureReason): void {
