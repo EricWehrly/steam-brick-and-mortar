@@ -207,14 +207,16 @@ describe('GameArtworkProvider', () => {
             
             const artwork = provider.getArtwork(12345, 'Test Game', 'library')
             
-            await expect(artwork.getPixels()).rejects.toThrow('Permanent failure (CORS) - skipping retry')
+            const dims = ARTWORK_DIMENSIONS.library
+            await expect(artwork.getPixelsAtSize(dims.width, dims.height)).rejects.toThrow('Permanent failure (CORS) - skipping retry')
         })
 
         it('should retry for known non-permanent failures', async () => {
             provider.recordFailure(12345, 'library', 'UNKNOWN', ['url1'])
 
             const artwork = provider.getArtwork(12345, 'Test Game', 'library', 'https://example.com/art.jpg')
-            const result = await artwork.getPixels()
+            const dims = ARTWORK_DIMENSIONS.library
+            const result = await artwork.getPixelsAtSize(dims.width, dims.height)
 
             expect(result.width).toBe(300)
             expect(result.height).toBe(450)
@@ -223,8 +225,9 @@ describe('GameArtworkProvider', () => {
 
         it('should fetch pixels at native size', async () => {
             const artwork = provider.getArtwork(12345, 'Test Game', 'library')
+            const dims = ARTWORK_DIMENSIONS.library
             
-            const result = await artwork.getPixels()
+            const result = await artwork.getPixelsAtSize(dims.width, dims.height)
             
             expect(result.width).toBe(300)
             expect(result.height).toBe(450)

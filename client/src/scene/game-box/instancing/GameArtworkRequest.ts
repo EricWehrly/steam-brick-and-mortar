@@ -52,11 +52,6 @@ export class GameArtworkRequest implements GameArtwork {
         return strategy[0]?.url ?? ''
     }
     
-    async getPixels(): Promise<PixelDataResult> {
-        const dims = ARTWORK_DIMENSIONS[this.format]
-        return this.getPixelsAtSize(dims.width, dims.height)
-    }
-    
     async getPixelsAtSize(width: number, height: number): Promise<PixelDataResult> {
         // If we already loaded and it's the same size, return cached
         if (this.cachedPixels?.width === width && 
