@@ -62,8 +62,6 @@ export interface GameArtwork {
      * Get pixel data at native resolution for this format.
      * Returns cached data if available, otherwise fetches.
      */
-    getPixels(): Promise<PixelDataResult>
-    
     /**
      * Get pixel data resized to specific dimensions.
      * Useful for LOD tiers that need smaller textures.
