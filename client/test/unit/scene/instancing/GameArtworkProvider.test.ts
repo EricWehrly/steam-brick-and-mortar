@@ -256,5 +256,44 @@ describe('GameArtworkProvider', () => {
             expect(result.width).toBe(150)
             expect(result.height).toBe(225)
         })
+
+        it('should support full retry cycle: cache → clear → re-resolve', async () => {
+            // Phase 1: Initial resolution stores selection in sidecar
+            const artwork1 = provider.getArtwork(12345, 'Test Game', 'library', 'https://example.com/library_600x900.jpg')
+            const dims = ARTWORK_DIMENSIONS.library
+            await artwork1.getPixelsAtSize(dims.width, dims.height)
+
+            // Verify selection was persisted
+            let state = SteamArtworkStateManager.getState(12345)
+            expect(state?.selectedType).toBe('library')
+            expect(state?.selectedUrl).toBe('https://example.com/library_600x900.jpg')
+
+            // Phase 2: New handle for same game reuses cached selection
+            const artwork2 = provider.getArtwork(12345, 'Test Game', 'header')
+            // This should reuse the library URL from cache, not use the header URL provided
+            const result2 = await artwork2.getPixelsAtSize(dims.width, dims.height)
+            expect(result2.width).toBe(dims.width)
+            expect(result2.height).toBe(dims.height)
+
+            // Phase 3: Retry clears selection and provider cache
+            SteamArtworkStateManager.clearSelection(12345)
+            provider.clearCachedOutcome(12345, 'library')
+
+            // Verify selection was cleared
+            state = SteamArtworkStateManager.getState(12345)
+            expect(state?.selectedType).toBeUndefined()
+            expect(state?.selectedUrl).toBeUndefined()
+
+            // Phase 4: New handle after clear enters fresh resolution
+            const artwork3 = provider.getArtwork(12345, 'Test Game', 'header', 'https://example.com/header.jpg')
+            const result3 = await artwork3.getPixelsAtSize(ARTWORK_DIMENSIONS.header.width, ARTWORK_DIMENSIONS.header.height)
+            expect(result3.width).toBe(ARTWORK_DIMENSIONS.header.width)
+            expect(result3.height).toBe(ARTWORK_DIMENSIONS.header.height)
+
+            // New selection should reflect the clean re-resolution
+            state = SteamArtworkStateManager.getState(12345)
+            expect(state?.selectedType).toBe('header')
+            expect(state?.selectedUrl).toBe('https://example.com/header.jpg')
+        })
     })
 })
