@@ -15,6 +15,7 @@ import { GameArtworkProvider } from './GameArtworkProvider'
 import { DataManager } from '../../../core/data/DataManager'
 import { LodDistanceManagerDebug } from './LodDistanceManagerDebug'
 import { LOD_TIER_NAME } from './IGameArtworkPipeline'
+import { isLodStripeDebugEnabled, setLodStripeDebugEnabled } from './LodDebugSettings'
 
 /** Result of queryLodState() — structured pixel data for both LOD tiers */
 export interface LodTierData {
@@ -116,6 +117,17 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
             console.log('📊 Artwork Skip Statistics (this session):', stats)
             return stats
         }
+        ;(window as any).lodStripeDebug = (enabled: boolean) => {
+            setLodStripeDebugEnabled(Boolean(enabled))
+            console.log(
+                `🎨 LOD stripe debug ${enabled ? 'enabled' : 'disabled'} (saved). Reload to apply to MID/HIGH texture arrays.`
+            )
+        }
+        ;(window as any).lodStripeStatus = () => {
+            const enabled = isLodStripeDebugEnabled()
+            console.log(`🎨 LOD stripe debug is ${enabled ? 'ENABLED' : 'DISABLED'} (reload to apply changes).`)
+            return { enabled }
+        }
 
         // Frame Budget Scheduler
         ;(window as any).diagnoseScheduler = async () => {
@@ -148,7 +160,7 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         // Side-by-side LOD visual comparison is now integrated into window.inspectGameArtwork()
         // No separate compareLod() command needed.
 
-        console.log('🔧 LOD debug exports registered. Try: lodCacheStats(), diagnoseArtworkFailures()')
+        console.log('🔧 LOD debug exports registered. Try: lodCacheStats(), lodStripeStatus(), lodStripeDebug(true)')
     }
 
     private getHighTextureCache(): HighTextureCache | null {

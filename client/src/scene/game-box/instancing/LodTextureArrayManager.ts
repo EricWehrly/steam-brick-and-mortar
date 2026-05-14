@@ -5,7 +5,7 @@ import { Logger } from '../../../utils/Logger'
 import { DataManager } from '../../../core/data/DataManager'
 import { LOD_TIER_NAME } from './IGameArtworkPipeline'
 import { ManagedTextureArray } from './ManagedTextureArray'
-import { LOD_DEBUG_SETTINGS } from './LodDebugSettings'
+import { getLodStripeDebugColor, isLodStripeDebugEnabled } from './LodDebugSettings'
 
 /** Runtime tier allocation config. */
 export interface LodTierConfig {
@@ -45,7 +45,7 @@ export class LodTextureArrayManager {
         for (const tierConfig of tierConfigs) {
             const { name, width, height, maxDepth } = tierConfig
 
-            const debugStripe = LOD_DEBUG_SETTINGS.stripeEnabled ? LOD_DEBUG_SETTINGS.stripeColors[name] : undefined
+            const debugStripe = isLodStripeDebugEnabled() ? getLodStripeDebugColor(name) : undefined
             const array = new ManagedTextureArray({ width, height, depth: maxDepth, debugStripe })
             
             this.tiers.set(name, { config: tierConfig, array })
