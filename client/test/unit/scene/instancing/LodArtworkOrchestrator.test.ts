@@ -269,7 +269,7 @@ describe('LodArtworkOrchestrator', () => {
 
             const result = await orchestrator.prefetchArtwork(123, { library: 'https://example.com/art.jpg' }, 'Blocked Game')
 
-            expect(result).toBe('permanent-failure')
+            expect(result).toBe('skipped')
             expect(provider.getArtwork).not.toHaveBeenCalled()
         })
 
@@ -291,7 +291,6 @@ describe('LodArtworkOrchestrator', () => {
             )
 
             expect(result.success).toBe(false)
-            expect(result.permanent).toBe(true)
             expect(provider.getArtwork).not.toHaveBeenCalled()
         })
 

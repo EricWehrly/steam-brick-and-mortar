@@ -17,7 +17,7 @@ interface IArtworkPrewarmer {
     ): Promise<PrefetchResult>
 }
 
-export type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
+export type PrefetchResult = 'prefetched' | 'cached' | 'skipped' | 'error'
 
 interface ArtworkPrefetchCoordinatorOptions {
     renderer?: IArtworkPrewarmer | null
@@ -77,15 +77,6 @@ export class ArtworkPrefetchCoordinator {
         for (const game of games) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
             this.appNamesByAppId.set(appid, game.name)
-            
-            // Pass artwork hints directly; let the provider handle ordering
-            const hasHints = (appid > 0 && (game.artwork?.library || game.artwork?.header))
-
-            if (!hasHints) {
-                this.prefetchResults.set(appid, 'permanent-failure')
-                this.emitArtworkIntentSettled(appid, game.name)
-                continue
-            }
 
             renderer.prefetchArtwork(appid, game.artwork, game.name).then((result) => {
                 this.prefetchResults.set(appid, result)
@@ -131,7 +122,7 @@ export class ArtworkPrefetchCoordinator {
 
         const fallbackTitles: string[] = []
         for (const [appid, result] of this.prefetchResults) {
-            if (result !== 'permanent-failure' && result !== 'error') {
+            if (result !== 'skipped' && result !== 'error') {
                 continue
             }
             const title = this.appNamesByAppId.get(appid)

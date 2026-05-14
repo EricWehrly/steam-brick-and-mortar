@@ -14,7 +14,7 @@
  * - ArtworkPrefetchCoordinator for batch-time artwork prewarm
  * 
  * RECEIVES:
- * - prefetchArtwork(appid, url, name) → Phase 1: load texture into atlas
+ * - prefetchArtwork(appid, artworkHints, name) → Phase 1: load texture into atlas
  * - PlacementResolved events → unified placement (artwork or label fallback)
  * - PlacementRunResetRequested → wipe all GPU instances before re-sort
  * - addToScene(scene) → Attaches instanced meshes to scene
@@ -121,14 +121,14 @@ export class GpuGameBoxRenderer {
      * Phase 1: fetch and cache artwork for a game without placing a GPU instance.
      * Call as batches arrive. Idempotent — calling again for the same game is a no-op.
      *
-     * Callers are responsible for resolving the artwork URL and for deciding whether
-     * this game should get artwork at all. Pass the resolved URL directly.
+     * Callers provide optional artwork hints. URL ordering and fallback policy are
+     * owned by the artwork provider/orchestrator pipeline.
      */
     public async prefetchArtwork(
         appid: number,
         artworkHints: { library?: string; header?: string } | undefined,
         gameName: string
-    ): Promise<'prefetched' | 'cached' | 'permanent-failure' | 'error'> {
+    ): Promise<'prefetched' | 'cached' | 'skipped' | 'error'> {
         return this.lodArtworkRenderer.prefetchArtwork(appid, artworkHints, gameName)
     }
 

@@ -40,7 +40,7 @@ describe('ArtworkPrefetchCoordinator', () => {
         vi.clearAllMocks()
     })
 
-    it('emits ArtworkIntentSettled once per game across success, fetch failure, and no-art cases', async () => {
+    it('emits ArtworkIntentSettled once per game while delegating all prefetch decisions to renderer', async () => {
         const coordinator = new ArtworkPrefetchCoordinator()
         const success = createDeferred<PrefetchResult>()
 
@@ -79,14 +79,18 @@ describe('ArtworkPrefetchCoordinator', () => {
 
         coordinator.prefetchBatch(games, renderer)
 
-        expect(renderer.prefetchArtwork).toHaveBeenCalledTimes(1)
+        expect(renderer.prefetchArtwork).toHaveBeenCalledTimes(3)
         expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(
             1,
             1,
             { header: 'https://example.com/1-header.jpg', library: 'https://example.com/1.jpg' },
             'Has Art'
         )
-        expect(settled).toEqual([2, 0])
+        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(2, 2, undefined, 'Broken Art')
+        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(3, 0, undefined, 'No Art')
+
+        await Promise.resolve()
+        expect(settled.sort((a, b) => a - b)).toEqual([0, 2])
 
         success.resolve('prefetched')
         await success.promise
@@ -132,7 +136,7 @@ describe('ArtworkPrefetchCoordinator', () => {
         coordinator.dispose()
     })
 
-    it('does not retry inside coordinator when renderer reports permanent failure', async () => {
+    it('does not retry inside coordinator when renderer reports skipped', async () => {
         const coordinator = new ArtworkPrefetchCoordinator()
         const prefetch = createDeferred<PrefetchResult>()
         const renderer = {
@@ -158,7 +162,7 @@ describe('ArtworkPrefetchCoordinator', () => {
             library: canonicalLibraryUrl,
         }, 'Vital Shell')
 
-        prefetch.resolve('permanent-failure')
+        prefetch.resolve('skipped')
         await prefetch.promise
         await Promise.resolve()
 
