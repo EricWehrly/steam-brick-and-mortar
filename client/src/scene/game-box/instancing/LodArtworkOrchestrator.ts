@@ -345,20 +345,25 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
      * placing a GPU instance. Safe to call as batches arrive, before shelf positions
      * are known. Idempotent — calling again for the same appId is a no-op.
      *
-     * @returns 'prefetched' when texture was freshly loaded, 'cached' if already done,
-     *          'permanent-failure' if the artwork URL is known-bad, 'error' on unexpected failure.
+    * @returns 'prefetched' when texture was freshly loaded, 'cached' if already done,
+    *          'skipped' when selection policy says no artwork should load, 'error' on unexpected failure.
      */
     public async prefetchArtwork(
         appid: number,
         artworkHints: { library?: string; header?: string } | undefined,
         gameName: string
-    ): Promise<'prefetched' | 'cached' | 'permanent-failure' | 'error'> {
+    ): Promise<'prefetched' | 'cached' | 'skipped' | 'error'> {
         // Already in the texture atlas — nothing to do.
         if (this.gameNameToTextureIndex.has(gameName)) return 'cached'
 
+        if (appid <= 0) {
+            LodArtworkOrchestrator.logger.debug(`Prefetch skipped for "${gameName}" (invalid appId ${appid})`)
+            return 'skipped'
+        }
+
         if (this.isLabelSelection(appid)) {
             LodArtworkOrchestrator.logger.debug(`Prefetch skipped for "${gameName}" (appId ${appid}) due to cached label selection`)
-            return 'permanent-failure'
+            return 'skipped'
         }
 
         this.inFlightArtworkCount++
@@ -383,12 +388,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             return 'prefetched'
         } catch (error) {
             const reason = error instanceof Error ? error.message : String(error)
-            this.failedArtwork.set(gameName, {
-                reason: this.categorizeFailure(reason),
-                url: artworkHints?.library ?? 'unknown',
-                urlsTried: [artworkHints?.library ?? 'unknown'],
-                timestamp: Date.now()
-            })
             LodArtworkOrchestrator.logger.debug(`Prefetch failed for "${gameName}": ${reason}`)
             return 'error'
         } finally {
@@ -467,7 +466,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         artworkHints: { library?: string; header?: string } | undefined,
         appid?: number,
         rotation?: THREE.Quaternion
-    ): Promise<{ success: boolean; instanceIndex: number; permanent?: boolean }> {
+    ): Promise<{ success: boolean; instanceIndex: number }> {
         // Check if already loaded
         const existingIndex = this.gameNameToTextureIndex.get(gameName)
         if (existingIndex !== undefined) {
@@ -476,7 +475,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
         if (this.isLabelSelection(appid)) {
             LodArtworkOrchestrator.logger.debug(`Skipping "${gameName}": cached label selection`)
-            return { success: false, instanceIndex: -1, permanent: true }
+            return { success: false, instanceIndex: -1 }
         }
 
         this.inFlightArtworkCount++
@@ -496,7 +495,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         artworkHints: { library?: string; header?: string } | undefined,
         appid?: number,
         rotation?: THREE.Quaternion
-    ): Promise<{ success: boolean; instanceIndex: number; permanent?: boolean }> {
+    ): Promise<{ success: boolean; instanceIndex: number }> {
         const textureIndex = this.textureManager.allocateSlot()
         if (textureIndex < 0) {
             if (!this.atlasFullLogged) {
@@ -567,15 +566,8 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
         } catch (error) {
             const reason = error instanceof Error ? error.message : String(error)
-            this.failedArtwork.set(gameName, {
-                reason: this.categorizeFailure(reason),
-                url: artworkHints?.library ?? artworkHints?.header ?? 'unknown',
-                urlsTried: [artworkHints?.library ?? artworkHints?.header ?? 'unknown'],
-                timestamp: Date.now()
-            })
             LodArtworkOrchestrator.logger.debug(`Artwork failed for "${gameName}": ${reason}`)
-            const isPermanent = this.isLabelSelection(appid)
-            return { success: false, instanceIndex: -1, permanent: isPermanent }
+            return { success: false, instanceIndex: -1 }
         }
     }
 
@@ -584,15 +576,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             return false
         }
         return SteamArtworkStateManager.getState(appid)?.selectedType === 'label'
-    }
-
-    private categorizeFailure(msg: string): string {
-        const lower = msg.toLowerCase()
-        if (lower.includes('cors')) return 'CORS'
-        if (lower.includes('404') || lower.includes('not found')) return '404'
-        if (lower.includes('timeout') || lower.includes('abort')) return 'TIMEOUT'
-        if (lower.includes('network') || lower.includes('failed to fetch')) return 'NETWORK'
-        return 'UNKNOWN'
     }
 
     // === Delegated methods to renderer ===
