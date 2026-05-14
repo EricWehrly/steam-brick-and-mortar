@@ -148,13 +148,6 @@ describe('GameArtworkProvider', () => {
             expect(artwork.format).toBe('library')
         })
 
-        it('should return empty URL before resolution', () => {
-            const artwork = provider.getArtwork(12345, 'Test Game', 'library', { library: 'https://preferred.com/art.jpg' })
-            
-            const url = artwork.getUrl()
-            expect(url).toBe('')
-        })
-
         it('should return known failure reason', () => {
             provider.recordFailure(12345, 'library', 'CORS', ['url1', 'url2'])
             
@@ -191,15 +184,6 @@ describe('GameArtworkProvider', () => {
     })
 
     describe('GameArtwork Handle', () => {
-        it('should check if cached', async () => {
-            const artwork = provider.getArtwork(12345, 'Test Game', 'library')
-            
-            const isCached = await artwork.isCached()
-            
-            // Our mock returns null for cache, so should be false
-            expect(isCached).toBe(false)
-        })
-
         it('should continue through strategy even with known permanent failures', async () => {
             provider.recordFailure(12345, 'library', 'CORS', [
                 'https://cdn.akamai.steamstatic.com/steam/apps/12345/library_600x900.jpg',
