@@ -11,7 +11,11 @@ import { GameArtworkProvider } from '../game-box/instancing/GameArtworkProvider'
 import type { SteamGameData } from '../game-box/types/GameData'
 
 interface IArtworkPrewarmer {
-    prefetchArtwork(appid: number, url: string, name: string): Promise<PrefetchResult>
+    prefetchArtwork(
+        appid: number,
+        artworkHints: { library?: string; header?: string } | undefined,
+        name: string
+    ): Promise<PrefetchResult>
 }
 
 export type PrefetchResult = 'prefetched' | 'cached' | 'permanent-failure' | 'error'
@@ -76,18 +80,17 @@ export class ArtworkPrefetchCoordinator {
         for (const game of games) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
             this.appNamesByAppId.set(appid, game.name)
-            const preferredUrl = appid > 0
-                ? this.selectInitialLibraryUrl(appid, game.artwork)
-                : undefined
-            const secondaryUrl = this.selectSecondaryLibraryUrl(game.artwork, preferredUrl)
+            
+            // Pass artwork hints directly; let the provider handle ordering
+            const hasHints = (appid > 0 && (game.artwork?.library || game.artwork?.header))
 
-            if (!preferredUrl) {
+            if (!hasHints) {
                 this.prefetchResults.set(appid, 'permanent-failure')
                 this.emitArtworkIntentSettled(appid, game.name)
                 continue
             }
 
-            this.prefetchWithSecondaryUrl(renderer, appid, game.name, preferredUrl, secondaryUrl).then((result) => {
+            renderer.prefetchArtwork(appid, game.artwork, game.name).then((result) => {
                 this.prefetchResults.set(appid, result)
                 this.emitArtworkIntentSettled(appid, game.name)
             }).catch((error) => {
@@ -98,23 +101,7 @@ export class ArtworkPrefetchCoordinator {
         }
     }
 
-    private async prefetchWithSecondaryUrl(
-        renderer: IArtworkPrewarmer,
-        appid: number,
-        gameName: string,
-        preferredUrl: string,
-        secondaryUrl?: string
-    ): Promise<PrefetchResult> {
-        const firstResult = await renderer.prefetchArtwork(appid, preferredUrl, gameName)
-        if (firstResult !== 'permanent-failure' || !secondaryUrl) {
-            return firstResult
-        }
 
-        this.logger.debug(
-            `Prefetch retry with secondary URL for "${gameName}" (appid ${appid}) after permanent-failure on preferred URL`
-        )
-        return renderer.prefetchArtwork(appid, secondaryUrl, gameName)
-    }
 
     private handleBatchReadyForPlacement(event: CustomEvent<BatchReadyForPlacementEvent>): void {
         const { games, batchIndex, totalBatches } = event.detail
@@ -131,25 +118,6 @@ export class ArtworkPrefetchCoordinator {
         }
 
         this.prefetchBatch(games as SteamGameData[], this.renderer)
-    }
-
-    private selectInitialLibraryUrl(
-        appId: number,
-        artworkHints?: { library?: string; header?: string }
-    ): string | undefined {
-        const preferredUrl = artworkHints?.library ?? artworkHints?.header
-        const strategy = this.artworkProvider.buildUrlStrategy(appId, 'library', preferredUrl)
-        return strategy[0]?.url
-    }
-
-    private selectSecondaryLibraryUrl(
-        artworkHints: { library?: string; header?: string } | undefined,
-        preferredUrl: string | undefined
-    ): string | undefined {
-        if (!artworkHints?.header || !preferredUrl) {
-            return undefined
-        }
-        return artworkHints.header === preferredUrl ? undefined : artworkHints.header
     }
 
     private emitArtworkIntentSettled(appid: number, gameName: string): void {

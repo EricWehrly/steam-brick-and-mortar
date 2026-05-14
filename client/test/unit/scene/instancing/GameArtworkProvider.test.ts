@@ -102,12 +102,12 @@ describe('GameArtworkProvider', () => {
     })
 
     describe('buildUrlStrategy', () => {
-        it('should include preferred URL first when provided', () => {
+        it('should include metadata library URL first when provided', () => {
             const preferredUrl = 'https://example.com/custom-artwork.jpg'
-            const strategy = provider.buildUrlStrategy(12345, 'library', preferredUrl)
+            const strategy = provider.buildUrlStrategy(12345, 'library', { library: preferredUrl })
             
             expect(strategy[0].url).toBe(preferredUrl)
-            expect(strategy[0].type).toBe('preferred')
+            expect(strategy[0].type).toBe('metadata-library')
         })
 
         it('should include CDN fallback URLs for library format', () => {
@@ -118,11 +118,12 @@ describe('GameArtworkProvider', () => {
             expect(cdnUrl?.url).toContain('library_600x900.jpg')
         })
 
-        it('should keep preferred new CDN URL first', () => {
+        it('should use metadata header when library hint is missing', () => {
             const newCdnUrl = 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/12345/header.jpg'
-            const strategy = provider.buildUrlStrategy(12345, 'library', newCdnUrl)
+            const strategy = provider.buildUrlStrategy(12345, 'library', { header: newCdnUrl })
 
             expect(strategy[0].url).toBe(newCdnUrl)
+            expect(strategy[0].type).toBe('metadata-header')
             expect(strategy.some((entry) => entry.url.includes('library_600x900.jpg'))).toBe(true)
         })
 
@@ -148,7 +149,7 @@ describe('GameArtworkProvider', () => {
         })
 
         it('should return URL from strategy', () => {
-            const artwork = provider.getArtwork(12345, 'Test Game', 'library', 'https://preferred.com/art.jpg')
+            const artwork = provider.getArtwork(12345, 'Test Game', 'library', { library: 'https://preferred.com/art.jpg' })
             
             const url = artwork.getUrl()
             expect(url).toBe('https://preferred.com/art.jpg')
@@ -228,7 +229,7 @@ describe('GameArtworkProvider', () => {
         it('should retry for known non-permanent failures', async () => {
             provider.recordFailure(12345, 'library', 'UNKNOWN', ['url1'])
 
-            const artwork = provider.getArtwork(12345, 'Test Game', 'library', 'https://example.com/art.jpg')
+            const artwork = provider.getArtwork(12345, 'Test Game', 'library', { library: 'https://example.com/art.jpg' })
             const dims = ARTWORK_DIMENSIONS.library
             const result = await artwork.getPixelsAtSize(dims.width, dims.height)
 
@@ -259,7 +260,7 @@ describe('GameArtworkProvider', () => {
 
         it('should support full retry cycle: cache → clear → re-resolve', async () => {
             // Phase 1: Initial resolution stores selection in sidecar
-            const artwork1 = provider.getArtwork(12345, 'Test Game', 'library', 'https://example.com/library_600x900.jpg')
+            const artwork1 = provider.getArtwork(12345, 'Test Game', 'library', { library: 'https://example.com/library_600x900.jpg' })
             const dims = ARTWORK_DIMENSIONS.library
             await artwork1.getPixelsAtSize(dims.width, dims.height)
 
@@ -285,7 +286,7 @@ describe('GameArtworkProvider', () => {
             expect(state?.selectedUrl).toBeUndefined()
 
             // Phase 4: New handle after clear enters fresh resolution
-            const artwork3 = provider.getArtwork(12345, 'Test Game', 'header', 'https://example.com/header.jpg')
+            const artwork3 = provider.getArtwork(12345, 'Test Game', 'header', { header: 'https://example.com/header.jpg' })
             const result3 = await artwork3.getPixelsAtSize(ARTWORK_DIMENSIONS.header.width, ARTWORK_DIMENSIONS.header.height)
             expect(result3.width).toBe(ARTWORK_DIMENSIONS.header.width)
             expect(result3.height).toBe(ARTWORK_DIMENSIONS.header.height)

@@ -36,6 +36,7 @@ export class BinderGameDetailPanel {
         const appid = game.appid
         const headerUrl = game.artwork?.header
             || `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`
+
         const playtimeHours = Math.round((game.playtime_forever || 0) / 60)
         const playtime2Weeks = Math.round((game.playtime_2weeks || 0) / 60)
         const userscore = game.userscore ?? 0

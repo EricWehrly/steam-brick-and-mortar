@@ -350,7 +350,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
      */
     public async prefetchArtwork(
         appid: number,
-        artworkUrl: string,
+        artworkHints: { library?: string; header?: string } | undefined,
         gameName: string
     ): Promise<'prefetched' | 'cached' | 'permanent-failure' | 'error'> {
         // Already in the texture atlas — nothing to do.
@@ -372,7 +372,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
                 return 'error'
             }
 
-            const artwork = this.artworkProvider.getArtwork(appid, gameName, 'library', artworkUrl)
+            const artwork = this.artworkProvider.getArtwork(appid, gameName, 'library', artworkHints)
             const resolvedUrl = await this.fetchAndCachePixels(artwork, textureIndex)
 
             this.gameNameToTextureIndex.set(gameName, textureIndex)
@@ -385,8 +385,8 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             const reason = error instanceof Error ? error.message : String(error)
             this.failedArtwork.set(gameName, {
                 reason: this.categorizeFailure(reason),
-                url: artworkUrl,
-                urlsTried: [artworkUrl],
+                url: artworkHints?.library ?? 'unknown',
+                urlsTried: [artworkHints?.library ?? 'unknown'],
                 timestamp: Date.now()
             })
             LodArtworkOrchestrator.logger.debug(`Prefetch failed for "${gameName}": ${reason}`)
@@ -464,7 +464,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     public async setArtworkInstanceFromUrl(
         position: THREE.Vector3,
         gameName: string,
-        artworkUrl: string,
+        artworkHints: { library?: string; header?: string } | undefined,
         appid?: number,
         rotation?: THREE.Quaternion
     ): Promise<{ success: boolean; instanceIndex: number; permanent?: boolean }> {
@@ -481,7 +481,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
         this.inFlightArtworkCount++
         try {
-            return await this.fetchAndPlaceArtwork(position, gameName, artworkUrl, appid, rotation)
+            return await this.fetchAndPlaceArtwork(position, gameName, artworkHints, appid, rotation)
         } finally {
             this.inFlightArtworkCount--
             if (this.inFlightArtworkCount === 0 && this.allBatchesComplete) {
@@ -493,7 +493,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     private async fetchAndPlaceArtwork(
         position: THREE.Vector3,
         gameName: string,
-        artworkUrl: string,
+        artworkHints: { library?: string; header?: string } | undefined,
         appid?: number,
         rotation?: THREE.Quaternion
     ): Promise<{ success: boolean; instanceIndex: number; permanent?: boolean }> {
@@ -512,7 +512,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
                 appid ?? 0,
                 gameName,
                 'library',
-                artworkUrl
+                artworkHints
             )
 
             // Load MID texture (always needed)
@@ -569,8 +569,8 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             const reason = error instanceof Error ? error.message : String(error)
             this.failedArtwork.set(gameName, {
                 reason: this.categorizeFailure(reason),
-                url: artworkUrl,
-                urlsTried: [artworkUrl],
+                url: artworkHints?.library ?? artworkHints?.header ?? 'unknown',
+                urlsTried: [artworkHints?.library ?? artworkHints?.header ?? 'unknown'],
                 timestamp: Date.now()
             })
             LodArtworkOrchestrator.logger.debug(`Artwork failed for "${gameName}": ${reason}`)

@@ -30,7 +30,7 @@ export interface IGameArtworkPipeline {
     setArtworkInstanceFromUrl(
         position: THREE.Vector3,
         gameName: string,
-        artworkUrl: string,
+        artworkHints: { library?: string; header?: string } | undefined,
         appid?: number,
         rotation?: THREE.Quaternion
     ): Promise<SetArtworkResult>
@@ -41,7 +41,7 @@ export interface IGameArtworkPipeline {
 
     prefetchArtwork(
         appid: number,
-        artworkUrl: string,
+        artworkHints: { library?: string; header?: string } | undefined,
         gameName: string
     ): Promise<'prefetched' | 'cached' | 'permanent-failure' | 'error'>
 

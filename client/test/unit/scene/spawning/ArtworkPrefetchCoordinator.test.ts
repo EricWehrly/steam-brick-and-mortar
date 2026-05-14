@@ -43,15 +43,11 @@ describe('ArtworkPrefetchCoordinator', () => {
     it('emits ArtworkIntentSettled once per game across success, fetch failure, and no-art cases', async () => {
         const coordinator = new ArtworkPrefetchCoordinator()
         const success = createDeferred<PrefetchResult>()
-        const failure = createDeferred<PrefetchResult>()
 
         const renderer = {
             prefetchArtwork: vi.fn((appid: number) => {
                 if (appid === 1) {
                     return success.promise
-                }
-                if (appid === 2) {
-                    return failure.promise
                 }
                 return Promise.resolve('prefetched' as PrefetchResult)
             }),
@@ -61,7 +57,7 @@ describe('ArtworkPrefetchCoordinator', () => {
             {
                 appid: 1,
                 name: 'Has Art',
-                artwork: { library: 'https://example.com/1.jpg' },
+                artwork: { header: 'https://example.com/1-header.jpg', library: 'https://example.com/1.jpg' },
             },
             {
                 appid: 2,
@@ -83,26 +79,26 @@ describe('ArtworkPrefetchCoordinator', () => {
 
         coordinator.prefetchBatch(games, renderer)
 
-        expect(renderer.prefetchArtwork).toHaveBeenCalledTimes(2)
-        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(1, 1, 'https://example.com/1.jpg', 'Has Art')
-        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(2, 2, 'https://cdn.akamai.steamstatic.com/steam/apps/2/library_600x900.jpg', 'Broken Art')
-        expect(settled).toEqual([0])
+        expect(renderer.prefetchArtwork).toHaveBeenCalledTimes(1)
+        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(
+            1,
+            1,
+            { header: 'https://example.com/1-header.jpg', library: 'https://example.com/1.jpg' },
+            'Has Art'
+        )
+        expect(settled).toEqual([2, 0])
 
         success.resolve('prefetched')
-        await Promise.resolve()
-        expect(settled).toEqual([0, 1])
-
-        failure.reject(new Error('404'))
-        await failure.promise.catch(() => undefined)
+        await success.promise
         await Promise.resolve()
 
         expect(settled.sort((a, b) => a - b)).toEqual([0, 1, 2])
-        expect(mockWarn).toHaveBeenCalledTimes(1)
+        expect(mockWarn).toHaveBeenCalledTimes(0)
 
         coordinator.dispose()
     })
 
-    it('uses provider-selected first URL when library artwork is missing', async () => {
+    it('passes both metadata hints to renderer when header and library exist', async () => {
         const coordinator = new ArtworkPrefetchCoordinator()
         const prefetch = createDeferred<PrefetchResult>()
 
@@ -110,32 +106,97 @@ describe('ArtworkPrefetchCoordinator', () => {
             prefetchArtwork: vi.fn(() => prefetch.promise),
         } as any
 
-        const settled: number[] = []
-        EventManager.getInstance().registerEventHandler(
-            GameRenderEventTypes.ArtworkIntentSettled,
-            (event: CustomEvent<ArtworkIntentSettledEvent>) => settled.push(event.detail.appid)
-        )
+        const richHeaderUrl = 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3741860/abc123/header.jpg?t=1234'
+        const canonicalLibraryUrl = 'https://cdn.akamai.steamstatic.com/steam/apps/3741860/library_600x900.jpg'
 
         coordinator.prefetchBatch([
             {
-                appid: 7,
-                name: 'Header Candidate',
-                artwork: undefined,
+                appid: 3741860,
+                name: 'Vital Shell',
+                artwork: {
+                    header: richHeaderUrl,
+                    library: canonicalLibraryUrl,
+                },
+            } as any,
+        ], renderer)
+
+        expect(renderer.prefetchArtwork).toHaveBeenCalledWith(3741860, {
+            header: richHeaderUrl,
+            library: canonicalLibraryUrl,
+        }, 'Vital Shell')
+
+        prefetch.resolve('prefetched')
+        await prefetch.promise
+        await Promise.resolve()
+
+        coordinator.dispose()
+    })
+
+    it('does not retry inside coordinator when renderer reports permanent failure', async () => {
+        const coordinator = new ArtworkPrefetchCoordinator()
+        const prefetch = createDeferred<PrefetchResult>()
+        const renderer = {
+            prefetchArtwork: vi.fn(() => prefetch.promise),
+        } as any
+
+        const richHeaderUrl = 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3741860/abc123/header.jpg?t=1234'
+        const canonicalLibraryUrl = 'https://cdn.akamai.steamstatic.com/steam/apps/3741860/library_600x900.jpg'
+
+        coordinator.prefetchBatch([
+            {
+                appid: 3741860,
+                name: 'Vital Shell',
+                artwork: {
+                    header: richHeaderUrl,
+                    library: canonicalLibraryUrl,
+                },
+            } as any,
+        ], renderer)
+
+        expect(renderer.prefetchArtwork).toHaveBeenNthCalledWith(1, 3741860, {
+            header: richHeaderUrl,
+            library: canonicalLibraryUrl,
+        }, 'Vital Shell')
+
+        prefetch.resolve('permanent-failure')
+        await prefetch.promise
+        await Promise.resolve()
+
+        expect(renderer.prefetchArtwork).toHaveBeenCalledTimes(1)
+
+        coordinator.dispose()
+    })
+
+    it('uses only library when header URL is not present', async () => {
+        const coordinator = new ArtworkPrefetchCoordinator()
+        const prefetch = createDeferred<PrefetchResult>()
+
+        const renderer = {
+            prefetchArtwork: vi.fn(() => prefetch.promise),
+        } as any
+
+        const canonicalLibraryUrl = 'https://cdn.akamai.steamstatic.com/steam/apps/777/library_600x900.jpg'
+
+        coordinator.prefetchBatch([
+            {
+                appid: 777,
+                name: 'Some Game',
+                artwork: {
+                    library: canonicalLibraryUrl,
+                },
             } as any,
         ], renderer)
 
         expect(renderer.prefetchArtwork).toHaveBeenCalledWith(
-            7,
-            'https://cdn.akamai.steamstatic.com/steam/apps/7/library_600x900.jpg',
-            'Header Candidate'
+            777,
+            { library: canonicalLibraryUrl },
+            'Some Game'
         )
-        expect(settled).toEqual([])
+        expect(renderer.prefetchArtwork).toHaveBeenCalledTimes(1)
 
         prefetch.resolve('prefetched')
+        await prefetch.promise
         await Promise.resolve()
-
-        expect(settled).toEqual([7])
-        expect(mockWarn).not.toHaveBeenCalled()
 
         coordinator.dispose()
     })

@@ -126,10 +126,10 @@ export class GpuGameBoxRenderer {
      */
     public async prefetchArtwork(
         appid: number,
-        artworkUrl: string,
+        artworkHints: { library?: string; header?: string } | undefined,
         gameName: string
     ): Promise<'prefetched' | 'cached' | 'permanent-failure' | 'error'> {
-        return this.lodArtworkRenderer.prefetchArtwork(appid, artworkUrl, gameName)
+        return this.lodArtworkRenderer.prefetchArtwork(appid, artworkHints, gameName)
     }
 
     private placeResolvedGame(

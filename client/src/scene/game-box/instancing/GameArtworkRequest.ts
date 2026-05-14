@@ -10,17 +10,20 @@ import type {
     PixelDataResult 
 } from './GameArtworkProvider'
 import { SteamArtworkStateManager } from '../../../core/data/SteamArtworkStateManager'
+import { Logger } from '../../../utils/Logger'
 
 /**
  * Handle to artwork for a specific game.
  * Implements GameArtwork interface with lazy loading.
  */
 export class GameArtworkRequest implements GameArtwork {
+    private static logger = Logger.createLogFunctions(GameArtworkRequest.name)
+
     readonly appId: number
     readonly gameName: string
     readonly format: ArtworkFormat
     
-    private readonly preferredUrl?: string
+    private readonly artworkHints?: { library?: string; header?: string }
     private readonly provider: GameArtworkProvider
     
     private resolvedUrl: string | null = null
@@ -31,13 +34,13 @@ export class GameArtworkRequest implements GameArtwork {
         appId: number,
         gameName: string,
         format: ArtworkFormat,
-        preferredUrl: string | undefined,
+        artworkHints: { library?: string; header?: string } | undefined,
         provider: GameArtworkProvider
     ) {
         this.appId = appId
         this.gameName = gameName
         this.format = format
-        this.preferredUrl = preferredUrl
+        this.artworkHints = artworkHints
         this.provider = provider
         
         // Check if known failure
@@ -48,7 +51,7 @@ export class GameArtworkRequest implements GameArtwork {
         if (this.resolvedUrl) return this.resolvedUrl
         
         // Return first URL from strategy (may not be the one that works)
-        const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.preferredUrl)
+        const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.artworkHints)
         return strategy[0]?.url ?? ''
     }
     
@@ -108,7 +111,7 @@ export class GameArtworkRequest implements GameArtwork {
     }
 
     private async fetchFromStrategy(width: number, height: number): Promise<PixelDataResult> {
-        const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.preferredUrl)
+        const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.artworkHints)
         const triedUrls: string[] = []
         let lastError: Error | null = null
         
@@ -133,6 +136,11 @@ export class GameArtworkRequest implements GameArtwork {
         this.provider.recordFailure(this.appId, this.format, this.failureReason, triedUrls)
         this.setArtworkSelection('label')
 
+        GameArtworkRequest.logger.warn(
+            `Artwork resolution failed for appId ${this.appId} (${this.gameName}). ` +
+            `reason=${this.failureReason}; tried=${triedUrls.join(' -> ')}`
+        )
+
         throw new Error(`Failed to load artwork for ${this.gameName}: ${this.failureReason}`)
     }
 
@@ -149,13 +157,19 @@ export class GameArtworkRequest implements GameArtwork {
             this.provider.recordSuccess(this.appId, this.format, url, type)
         }
 
+        if (route === 'capsule' || route === 'header') {
+            GameArtworkRequest.logger.debug(
+                `Artwork fallback selected for appId ${this.appId} (${this.gameName}): route=${route}; url=${url}`
+            )
+        }
+
         if (this.isCdnArtworkType(route)) {
             this.setArtworkSelection(route, url)
         }
     }
     
     async isCached(): Promise<boolean> {
-        const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.preferredUrl)
+        const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.artworkHints)
         const dims = ARTWORK_DIMENSIONS[this.format]
         for (const { url } of strategy) {
             if (await this.provider.isPixelsCached(url, dims.width, dims.height)) {
