@@ -25,7 +25,7 @@ import { PixelDataCache } from './PixelDataCache'
 import { FrameBudgetScheduler } from '../../../utils/FrameBudgetScheduler'
 import { ManagedTextureArray } from './ManagedTextureArray'
 import { LOD_TIER_NAME } from './IGameArtworkPipeline'
-import { LOD_DEBUG_SETTINGS } from './LodDebugSettings'
+import { getLodStripeDebugColor, isLodStripeDebugEnabled } from './LodDebugSettings'
 import { HighSlotAllocator } from './HighSlotAllocator'
 
 // Logger will be attached to the class below
@@ -176,7 +176,7 @@ export class HighTextureCache {
         this.slotAllocator = new HighSlotAllocator(this.config.totalSlots)
         this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
 
-        const debugStripe = LOD_DEBUG_SETTINGS.stripeEnabled ? LOD_DEBUG_SETTINGS.stripeColors[LOD_TIER_NAME.HIGH] : undefined
+        const debugStripe = isLodStripeDebugEnabled() ? getLodStripeDebugColor(LOD_TIER_NAME.HIGH) : undefined
         this.managedArray = new ManagedTextureArray({
             width: this.config.textureWidth,
             height: this.config.textureHeight,
