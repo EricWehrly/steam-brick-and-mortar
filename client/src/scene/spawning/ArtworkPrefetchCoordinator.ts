@@ -7,7 +7,6 @@ import {
     type ArtworkIntentSettledEvent,
     type BatchReadyForPlacementEvent,
 } from '../../types/InteractionEvents'
-import { GameArtworkProvider } from '../game-box/instancing/GameArtworkProvider'
 import type { SteamGameData } from '../game-box/types/GameData'
 
 interface IArtworkPrewarmer {
@@ -31,7 +30,6 @@ interface ArtworkPrefetchCoordinatorOptions {
 export class ArtworkPrefetchCoordinator {
     private readonly logger = Logger.createLogFunctions(ArtworkPrefetchCoordinator.name)
     private readonly renderer: IArtworkPrewarmer | null
-    private readonly artworkProvider: GameArtworkProvider
     private readonly boundHandleArtworkSettled: () => void
     private readonly boundHandleBatchReadyForPlacement: (event: CustomEvent<BatchReadyForPlacementEvent>) => void
 
@@ -41,7 +39,6 @@ export class ArtworkPrefetchCoordinator {
 
     public constructor(options: ArtworkPrefetchCoordinatorOptions = {}) {
         this.renderer = options.renderer ?? null
-        this.artworkProvider = GameArtworkProvider.getInstance()
         this.boundHandleArtworkSettled = this.logExpectedFallbackSummary.bind(this)
         this.boundHandleBatchReadyForPlacement = this.handleBatchReadyForPlacement.bind(this)
 
