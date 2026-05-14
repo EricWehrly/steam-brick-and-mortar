@@ -131,7 +131,7 @@ export class LightingRenderer {
         // Lighting is a side-effect observer of the scene lifecycle, not the owner.
         this.eventManager.registerEventHandler(
             StorePropsEventTypes.SetupRequest,
-            this.setupBasicLighting.bind(this)
+            this.setupInitialLighting.bind(this)
         )
 
         this.eventManager.registerEventHandler(
@@ -143,44 +143,36 @@ export class LightingRenderer {
     }
 
     /**
-     * Setup basic lighting fast - just ambient + directional
+     * Setup initial lighting fast - just ambient + directional
      * This lets the scene become visible quickly without expensive fixtures
      */
-    private setupBasicLighting(): void {
+    private setupInitialLighting(): void {
         if (this.lightingUpgradeStarted) {
-            LightingRenderer.logger.debug('Skipping basic lighting because upgrade has already started')
+            LightingRenderer.logger.debug('Skipping initial lighting because upgrade has already started')
             return
         }
 
-        const startTime = window.performance.now()
         this.config = this.getCurrentConfig()
         
-        LightingRenderer.logger.lifecycle(`💡 Setting up BASIC lighting (fast pass)...`)
+        LightingRenderer.logger.lifecycle(`💡 Setting up initial lighting (fast pass)...`)
         
-        try {
-            // No shadows for fast startup
-            this.renderer.shadowMap.enabled = false
-            
-            this.setupSimpleLighting()
+        // No shadows for fast startup
+        this.renderer.shadowMap.enabled = false
+        
+        // Basic ambient + directional illumination
+        LightingRenderer.logger.lifecycle('💡 Setting up basic illumination - ambient + directional light')
+        this.setupAmbientAndMainDirectionalLighting()
+        LightingRenderer.logger.debug(`✅ Basic lighting: ${this.lightingGroup.children.length} lights added`)
 
-            if (this.lightingUpgradeStarted) {
-                LightingRenderer.logger.debug('Skipping remaining basic-lighting work because upgrade started mid-pass')
-                return
-            }
-
-            // Create GameSpotlight pool BEFORE room geometry renders, so its SpotLight
-            // is counted in the initial light-hash. Materials compile once with the
-            // full light count during startup instead of recompiling on first click.
-            new GameSpotlight()
-            
-            const duration = window.performance.now() - startTime
-            LightingRenderer.logger.debug(`✅ Basic lighting ready in ${duration.toFixed(1)}ms (advanced lighting will load in background)`)
-        } catch (error) {
-            LightingRenderer.logger.error('❌ Failed to set up basic lighting:', error)
-            // Absolute fallback - just ambient
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
-            this.lightingGroup.add(ambientLight)
+        if (this.lightingUpgradeStarted) {
+            LightingRenderer.logger.debug('Skipping remaining lighting work because upgrade started mid-pass')
+            return
         }
+
+        // Create GameSpotlight pool BEFORE room geometry renders, so its SpotLight
+        // is counted in the initial light-hash. Materials compile once with the
+        // full light count during startup instead of recompiling on first click.
+        new GameSpotlight()
     }
 
     /**
@@ -197,9 +189,9 @@ export class LightingRenderer {
      * Upgrade to full lighting system - called asynchronously after scene is visible
      * 
      * TODO: Currently disabled in SceneCoordinator (suspected startup hitch).
-     * Re-evaluate: this clears all lights then rebuilds from scratch, which forces
-     * a full shader recompile of every MeshStandardMaterial in the scene. If lights
-     * are already set up correctly in setupBasicLighting(), this method may be
+    * Re-evaluate: this clears all lights then rebuilds from scratch, which forces
+    * a full shader recompile of every MeshStandardMaterial in the scene. If lights
+    * are already set up correctly in setupInitialLighting(), this method may be
      * unnecessary — or should be restructured to add lights incrementally rather
      * than clear-and-rebuild.
      */
@@ -269,22 +261,48 @@ export class LightingRenderer {
         }
     }
 
+    private setupAmbientAndMainDirectionalLighting(): void {
+        this.lightFactory.createAmbientLight(0xffffff, 0.4, {
+            name: LIGHT_NAMES.AMBIENT,
+            parent: this.lightingGroup
+        })
+        this.lightFactory.createDirectionalLight(0xffffff, 0.6, {
+            name: LIGHT_NAMES.MAIN_DIRECTIONAL,
+            parent: this.lightingGroup,
+            position: [0, 10, 0]
+        })
+        const mainDirectional = this.lightingGroup.getObjectByName(LIGHT_NAMES.MAIN_DIRECTIONAL)
+        if (mainDirectional instanceof THREE.DirectionalLight) {
+            this.attachDirectionalTarget(mainDirectional)
+            configureDirectionalShadow(mainDirectional, this.config, this.currentFootprint())
+        }
+    }
+
     private setupLightsByQuality(): void {
-        switch (this.config.quality) {
-            case LIGHTING_QUALITY.SIMPLE:
-                this.setupSimpleLighting()
-                break
-            case LIGHTING_QUALITY.ENHANCED:
-                this.setupEnhancedLighting()
-                break
-            case LIGHTING_QUALITY.ADVANCED:
-                this.setupAdvancedLighting()
-                break
-            case LIGHTING_QUALITY.OUCH_MY_EYES:
-                this.setupOuchMyEyesLighting()
-                break
-            default:
-                this.setupEnhancedLighting()
+        const quality = this.config.quality ?? LIGHTING_QUALITY.ENHANCED
+        
+        if (quality === LIGHTING_QUALITY.SIMPLE) {
+            // Fallback/minimal tier: ambient + directional only.
+            // ENHANCED and above are the normal retail-profile lighting levels.
+            LightingRenderer.logger.lifecycle('💡 Setting up FALLBACK lighting (SIMPLE tier) - minimal illumination only')
+            this.setupAmbientAndMainDirectionalLighting()
+            LightingRenderer.logger.debug(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
+        } else {
+            // Quality >= ENHANCED: baseline retail profile with optional feature escalation
+            LightingRenderer.logger.lifecycle(`💡 Setting up ${quality} lighting - retail core + optional features`)
+            
+            this.setupRetailCoreLighting()
+            
+            // Feature escalation by numeric threshold
+            if (quality >= LIGHTING_QUALITY.ADVANCED) {
+                this.addPointLights()
+            }
+            if (quality >= LIGHTING_QUALITY.OUCH_MY_EYES) {
+                this.addDramaticLighting()
+            }
+            
+            this.applyRetailProfileDefaults()
+            LightingRenderer.logger.debug(`✅ ${quality} lighting: ${this.lightingGroup.children.length} lights/groups added`)
         }
     }
 
@@ -342,80 +360,10 @@ export class LightingRenderer {
         rimLight.visible = false
     }
 
-    private applyQualityFeatureLights(quality: LightingQuality): void {
-        if (quality === LIGHTING_QUALITY.ADVANCED || quality === LIGHTING_QUALITY.OUCH_MY_EYES) {
-            this.addPointLights()
-        }
-
-        if (quality === LIGHTING_QUALITY.OUCH_MY_EYES) {
-            this.addDramaticLighting()
-        }
-    }
-
     private applyRetailProfileDefaults(): void {
         // Ensure proper state when retail-profile lighting takes over.
         this.toggleLighting(true)
         this.toggleDebugVisualization(false)
-    }
-
-    private setupSimpleLighting(): void {
-        LightingRenderer.logger.lifecycle('💡 Setting up SIMPLE lighting - basic illumination only')
-        
-        // Higher ambient light to compensate for fewer light sources
-        this.lightFactory.createAmbientLight(0xffffff, 0.4, { 
-            name: LIGHT_NAMES.AMBIENT,
-            parent: this.lightingGroup
-        })
-        
-        // Single directional light
-        this.lightFactory.createDirectionalLight(0xffffff, 0.6, { 
-            name: LIGHT_NAMES.MAIN_DIRECTIONAL,
-            parent: this.lightingGroup,
-            position: [0, 10, 0]
-        })
-        const mainDirectional = this.lightingGroup.getObjectByName(LIGHT_NAMES.MAIN_DIRECTIONAL)
-        if (mainDirectional instanceof THREE.DirectionalLight) {
-            this.attachDirectionalTarget(mainDirectional)
-            configureDirectionalShadow(mainDirectional, this.config, this.currentFootprint())
-        }
-        
-        LightingRenderer.logger.debug(`✅ Simple lighting: ${this.lightingGroup.children.length} lights added`)
-    }
-
-    private setupEnhancedLighting(): void {
-        LightingRenderer.logger.lifecycle('💡 Setting up ENHANCED lighting - optimized retail atmosphere')
-
-        this.setupRetailCoreLighting()
-        this.applyQualityFeatureLights(LIGHTING_QUALITY.ENHANCED)
-        this.applyRetailProfileDefaults()
-        
-        // Primary illumination: RectAreaLights from ceiling fixtures
-        // NOTE: Fixtures are added later when shelf layout is known (via updateRoomDimensions)
-        // This keeps initial room lit with base lighting before shelves spawn
-        
-        LightingRenderer.logger.debug(`✅ Enhanced lighting: ${this.lightingGroup.children.length} lights/groups added (ambient enabled, directional/spot/point disabled by default)`)
-
-        LightingRenderer.logger.debug(`💡 Ceiling fixtures will be added when shelf layout is determined`)
-    }
-
-    private setupAdvancedLighting(): void {
-        LightingRenderer.logger.lifecycle('💡 Setting up ADVANCED lighting - enhanced + point lights + better shadows')
-
-        this.setupRetailCoreLighting()
-        this.applyQualityFeatureLights(LIGHTING_QUALITY.ADVANCED)
-        this.applyRetailProfileDefaults()
-        
-        LightingRenderer.logger.debug(`✅ Advanced lighting: ${this.lightingGroup.children.length} lights/groups added`)
-    }
-
-    private setupOuchMyEyesLighting(): void {
-        LightingRenderer.logger.lifecycle('💡 Setting up OUCH-MY-EYES lighting - maximum visual fidelity + dramatic effects')
-
-        this.setupRetailCoreLighting()
-        this.applyQualityFeatureLights(LIGHTING_QUALITY.OUCH_MY_EYES)
-        this.applyRetailProfileDefaults()
-        
-        LightingRenderer.logger.debug(`✅ Ouch-my-eyes lighting: ${this.lightingGroup.children.length} lights/groups added`)
     }
 
     private setupFluorescentFixtures(shelfLayout?: { rows: number; shelvesPerRow?: number }): void {
