@@ -226,47 +226,18 @@ export class HighTextureCache {
     }
     
     /**
-     * Convert any Steam artwork URL to portrait format (library_600x900.jpg)
-     * HIGH textures need portrait format (300x450) not header format (460x215)
-     * 
-     * Handles both CDN domains:
-     * - cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg
-     * - shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/header.jpg
-     */
-    private convertToPortraitUrl(artworkUrl: string): string {
-        // Extract appid from URL patterns like:
-        // https://cdn.akamai.steamstatic.com/steam/apps/1145350/header.jpg
-        // https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1145350/.../header.jpg
-        const appidMatch = artworkUrl.match(/\/apps\/(\d+)\//)
-        if (!appidMatch) {
-            HighTextureCache.logger.warn(`Could not extract appid from URL: ${artworkUrl}`)
-            return artworkUrl // Return original if can't parse
-        }
-        
-        const appid = appidMatch[1]
-        // Use cdn.akamai domain for portrait images (more reliable for library art)
-        return `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`
-    }
-    
-    /**
      * Register a game (called when a game is added)
      * Does NOT load the HIGH texture - just records that the game exists
-     * 
-     * Note: The artwork URL is converted to portrait format (library_600x900.jpg)
-     * because HIGH textures expect 300x450 portrait dimensions, not 460x215 header dimensions.
      */
     public registerGame(gameIndex: number, gameName: string, artworkUrl: string): void {
         if (this.games.has(gameIndex)) {
             return // Already registered
         }
-        
-        // Convert to portrait URL for HIGH textures
-        const portraitUrl = this.convertToPortraitUrl(artworkUrl)
-        
+
         this.games.set(gameIndex, {
             gameIndex,
             gameName,
-            artworkUrl: portraitUrl,
+            artworkUrl,
             state: HighTextureState.EMPTY,
             highSlot: -1,
             lastAccessTime: 0,

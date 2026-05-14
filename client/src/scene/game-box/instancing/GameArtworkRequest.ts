@@ -49,10 +49,11 @@ export class GameArtworkRequest implements GameArtwork {
     
     getUrl(): string {
         if (this.resolvedUrl) return this.resolvedUrl
-        
-        // Return first URL from strategy (may not be the one that works)
-        const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.artworkHints)
-        return strategy[0]?.url ?? ''
+
+        GameArtworkRequest.logger.warn(
+            `getUrl() called before resolution for appId ${this.appId} (${this.gameName})`
+        )
+        return ''
     }
     
     async getPixelsAtSize(width: number, height: number): Promise<PixelDataResult> {
