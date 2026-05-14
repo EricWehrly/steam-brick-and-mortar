@@ -77,27 +77,15 @@ export interface SteamNetworkFetchProgressEvent extends BaseInteractionEvent {
     total: number
 }
 
-// =============================================================================
-// ROOM EVENTS
-// =============================================================================
-
-export interface RoomCreateEvent extends BaseInteractionEvent {
-    width?: number
-    depth?: number
-    height?: number
-    skyboxPreset?: string
-    proceduralTextures?: boolean
-}
-
-export interface RoomCreatedEvent extends BaseInteractionEvent {
-    dimensions: { width: number; depth: number; height: number }
-}
-
 export interface RoomResizedEvent extends BaseInteractionEvent {
     dimensions: { width: number; depth: number; height: number }
     centerOffset?: { x: number; y: number; z: number }
     shelfLayout?: { rows: number; shelvesPerRow?: number }
 }
+
+// =============================================================================
+// ROOM EVENTS
+// =============================================================================
 
 // =============================================================================
 // WEBXR EVENTS
@@ -258,7 +246,6 @@ export const SteamEventTypes = {
 } as const
 
 export const RoomEventTypes = {
-    Created: 'room:created',
     Resized: 'room:resized'
 } as const
 
