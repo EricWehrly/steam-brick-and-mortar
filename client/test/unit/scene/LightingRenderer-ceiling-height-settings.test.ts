@@ -41,10 +41,11 @@ describe('LightingRenderer ceiling-height fixture refresh', () => {
         expect(fixtureSetupSpy).toHaveBeenCalledTimes(1)
         expect(fixtureSetupSpy).toHaveBeenLastCalledWith({ rows: 4, shelvesPerRow: 3 })
 
-        const lightingGroup = (lightingRenderer as unknown as { lightingGroup: THREE.Group }).lightingGroup
-        const existingFixtures = new THREE.Group()
-        existingFixtures.name = 'fluorescent-fixtures'
-        lightingGroup.add(existingFixtures)
+        // Simulate fixture creation by setting the currentFixtures field directly
+        const mockFixtures = new THREE.Group()
+        const lightingRendererTyped = lightingRenderer as unknown as { currentFixtures: THREE.Group | null; lightingGroup: THREE.Group }
+        lightingRendererTyped.currentFixtures = mockFixtures
+        lightingRendererTyped.lightingGroup.add(mockFixtures)
 
         eventManager.emit<RoomResizedEvent>(RoomEventTypes.Resized, {
             dimensions: { width: 22, depth: 16, height: 4.7 },

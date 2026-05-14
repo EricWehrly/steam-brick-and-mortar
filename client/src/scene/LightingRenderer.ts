@@ -36,7 +36,6 @@ const LIGHT_NAMES = {
     RIM_LIGHT: 'rim-light',
     EXTERIOR_AMBIENT: 'exterior-ambient-light',
     ENTRANCE_SPOTLIGHT: 'entrance-spotlight',
-    FLUORESCENT_FIXTURES: 'fluorescent-fixtures',
     DRAMATIC_SPOTLIGHT: 'dramatic-spotlight',
     POINT_LIGHT: 'point-light',
     ACCENT_LIGHT: 'accent-light'
@@ -76,6 +75,7 @@ export class LightingRenderer {
     private eventManager: EventManager
     private lightFactory: LightFactory
     private currentShelfLayout?: { rows: number; shelvesPerRow?: number }
+    private currentFixtures: THREE.Group | null = null
     private lightingUpgradeStarted = false
     public static logger = Logger.createLogFunctions(LightingRenderer.name)
 
@@ -173,10 +173,9 @@ export class LightingRenderer {
 
     /**
      * Reconfigure lights with current config and quality settings
-     * Extracts shared lifecycle: clear → apply shadow policy → setup by quality
+     * Apply shadow policy and setup lights for the current quality level.
      */
     private reconfigureWithQuality(): void {
-        this.clearLights()
         applyRendererShadowPolicy(this.renderer, this.config)
         this.setupLightsByQuality()
     }
@@ -391,8 +390,8 @@ export class LightingRenderer {
             }
         )
         
-        fixtures.name = LIGHT_NAMES.FLUORESCENT_FIXTURES
-        this.lightingGroup.add(fixtures)
+        this.scene.add(fixtures)
+        this.currentFixtures = fixtures
         
         monitor.end({ fixtureCount: fixtureRows * fixturesPerRow, shelfRows })
         LightingRenderer.logger.debug(`💡 Created ${fixtureRows * fixturesPerRow} ceiling fixtures (${fixtureRows} rows x ${fixturesPerRow} per row) for ${shelfRows} shelf rows`)
@@ -484,17 +483,17 @@ export class LightingRenderer {
         roomFootprintChanged: boolean,
         shelfLayout?: { rows: number; shelvesPerRow?: number }
     ): void {
-        const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
         const layoutForFixtures = shelfLayout ?? this.currentShelfLayout
         const shouldRefreshFixtures = Boolean(layoutForFixtures) && (
             Boolean(shelfLayout) ||
-            (ceilingHeightChanged && Boolean(existingFixtures))
+            (ceilingHeightChanged && Boolean(this.currentFixtures))
         )
 
         if (shouldRefreshFixtures && layoutForFixtures) {
-            if (existingFixtures) {
+            if (this.currentFixtures) {
                 LightingRenderer.logger.debug('💡 Updating existing ceiling fixtures for room changes...')
-                this.lightingGroup.remove(existingFixtures)
+                this.scene.remove(this.currentFixtures)
+                this.currentFixtures = null
             } else {
                 LightingRenderer.logger.debug('💡 Adding ceiling fixtures for shelf layout...')
             }
@@ -556,14 +555,8 @@ export class LightingRenderer {
     private clearLights(): void {
         // Clear registry first so the controls panel doesn't see stale entries
         this.registry.clear()
-
-        // Preserve ceiling fixtures if they exist (added when shelves spawn)
-        const existingFixtures = this.lightingGroup.getObjectByName(LIGHT_NAMES.FLUORESCENT_FIXTURES)
-        if (existingFixtures) {
-            this.lightingGroup.remove(existingFixtures)
-        }
         
-        // Remove all other children from lighting group
+        // Remove all lights from lighting group
         while (this.lightingGroup.children.length > 0) {
             const child = this.lightingGroup.children[0]
             this.lightingGroup.remove(child)
@@ -575,12 +568,6 @@ export class LightingRenderer {
                     shadowLight.shadow.dispose()
                 }
             }
-        }
-        
-        // Re-add preserved fixtures
-        if (existingFixtures) {
-            this.lightingGroup.add(existingFixtures)
-            LightingRenderer.logger.debug('💡 Preserved ceiling fixtures during lighting upgrade')
         }
     }
 
@@ -603,6 +590,10 @@ export class LightingRenderer {
 
     public dispose(): void {
         this.clearLights()
+        if (this.currentFixtures) {
+            this.scene.remove(this.currentFixtures)
+            this.currentFixtures = null
+        }
         this.debugHelper.dispose()
         if (this.propRenderer) {
             this.propRenderer.dispose()
