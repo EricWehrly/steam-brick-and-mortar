@@ -163,9 +163,9 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     private textureIndexToGameName: Map<number, string> = new Map()
     private instanceMetadata: Map<number, InstanceMetadata> = new Map()
 
-    // Resolved artwork URLs for prefetched games, keyed by game name.
-    // Used by placeInstance() to pass the final CDN URL to the renderer.
-    private prefetchedArtworkUrl: Map<string, string> = new Map()
+    // Library/high artwork URLs for prefetched games, keyed by game name.
+    // Used by placeInstance() to seed HIGH cache registration.
+    private prefetchedHighArtworkUrl: Map<string, string> = new Map()
 
     // Prevent ArtworkSettled from firing before AllBatchesComplete.
     // prefetchArtwork requests can settle transiently between batch waves
@@ -375,11 +375,11 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             }
 
             const artwork = this.artworkProvider.getArtwork(appid, gameName, 'library', artworkHints)
-            const resolvedUrl = await this.fetchAndCachePixels(artwork, textureIndex)
+            await this.fetchAndCachePixels(artwork, textureIndex)
 
             this.gameNameToTextureIndex.set(gameName, textureIndex)
             this.textureIndexToGameName.set(textureIndex, gameName)
-            this.prefetchedArtworkUrl.set(gameName, resolvedUrl)
+            this.prefetchedHighArtworkUrl.set(gameName, this.resolveHighArtworkUrl(appid, artworkHints))
 
             LodArtworkOrchestrator.logger.debug(`Prefetched artwork for "${gameName}" → slot ${textureIndex}`)
             return 'prefetched'
@@ -402,7 +402,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     private async fetchAndCachePixels(
         artwork: GameArtwork,
         textureIndex: number
-    ): Promise<string> {
+    ): Promise<void> {
         const midConfig = findTierByLevel(this.lodConfigs, LOD_LEVEL.MID)
         const midWidth = midConfig?.textureWidth ?? 150
         const midHeight = midConfig?.textureHeight ?? 225
@@ -418,7 +418,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         }
 
         this.updateGPU()
-        return artwork.getUrl()
     }
 
     /**
@@ -441,12 +440,12 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             return -1
         }
 
-        const resolvedUrl = this.prefetchedArtworkUrl.get(gameName)
+        const highArtworkUrl = this.prefetchedHighArtworkUrl.get(gameName)
         const instanceIndex = this.renderer.addInstance({
             position,
             textureIndex,
             gameName,
-            artworkUrl: resolvedUrl,
+            highArtworkUrl,
             lodLevel: this.lazyHighTextures ? LOD_LEVEL.MID : LOD_LEVEL.HIGH,
             rotation,
         })
@@ -536,12 +535,11 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             this.updateGPU()
 
             // Create instance
-            const resolvedUrl = artwork.getUrl()
             const instanceIndex = this.renderer.addInstance({
                 position,
                 textureIndex,
                 gameName,
-                artworkUrl: resolvedUrl,
+                highArtworkUrl: this.resolveHighArtworkUrl(appid, artworkHints),
                 lodLevel: this.lazyHighTextures ? LOD_LEVEL.MID : LOD_LEVEL.HIGH,
                 rotation,
             })
@@ -573,6 +571,18 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             return false
         }
         return SteamArtworkStateManager.getState(appid)?.selectedType === 'label'
+    }
+
+    private resolveHighArtworkUrl(
+        appid: number | undefined,
+        artworkHints: { library?: string; header?: string } | undefined
+    ): string {
+        if (artworkHints?.library) {
+            return artworkHints.library
+        }
+
+        const validAppId = appid ?? 0
+        return `https://cdn.akamai.steamstatic.com/steam/apps/${validAppId}/library_600x900.jpg`
     }
 
     // === Delegated methods to renderer ===
@@ -650,7 +660,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         this.textureIndexToGameName.clear()
         this.instanceMetadata.clear()
         this.publishArtworkMetadataReference()
-        this.prefetchedArtworkUrl.clear()
+        this.prefetchedHighArtworkUrl.clear()
 
         LodArtworkOrchestrator.logger.lifecycle('Disposed')
     }

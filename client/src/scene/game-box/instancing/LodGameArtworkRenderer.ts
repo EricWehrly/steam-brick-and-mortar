@@ -76,7 +76,7 @@ export interface AddInstanceParams {
     position: THREE.Vector3
     textureIndex: number
     gameName: string
-    artworkUrl?: string
+    highArtworkUrl?: string
     lodLevel?: LodLevel
     highTextureSlot?: number
     rotation?: THREE.Quaternion
@@ -352,7 +352,7 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
         position,
         textureIndex,
         gameName,
-        artworkUrl,
+        highArtworkUrl,
         lodLevel = this.config.defaultLod,
         highTextureSlot = -1,
         rotation,
@@ -390,8 +390,8 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
         this.textureIndexToInstance.set(textureIndex, instanceIndex)
         
         // Register with HIGH texture cache if lazy loading
-        if (this.lazyHighTextures && this.highTextureCache && artworkUrl) {
-            this.highTextureCache.registerGame(textureIndex, gameName, artworkUrl)
+        if (this.lazyHighTextures && this.highTextureCache && highArtworkUrl) {
+            this.highTextureCache.registerGame(textureIndex, gameName, highArtworkUrl)
         }
         
         // Register position for spatial prewarming

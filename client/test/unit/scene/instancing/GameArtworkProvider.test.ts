@@ -148,11 +148,11 @@ describe('GameArtworkProvider', () => {
             expect(artwork.format).toBe('library')
         })
 
-        it('should return URL from strategy', () => {
+        it('should return empty URL before resolution', () => {
             const artwork = provider.getArtwork(12345, 'Test Game', 'library', { library: 'https://preferred.com/art.jpg' })
             
             const url = artwork.getUrl()
-            expect(url).toBe('https://preferred.com/art.jpg')
+            expect(url).toBe('')
         })
 
         it('should return known failure reason', () => {
