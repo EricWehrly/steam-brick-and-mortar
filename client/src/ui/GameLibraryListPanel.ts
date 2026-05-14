@@ -291,12 +291,8 @@ export class GameLibraryListPanel {
         this.artworkProvider.clearCachedOutcome(appid, 'library')
         SteamArtworkStateManager.clearSelection(appid)
 
-        // Retry follows canonical artwork preference: library first.
-        // Header remains available via the strategy fallback chain.
-        const preferredUrl = game.artwork?.library ?? game.artwork?.header
-
         try {
-            const artwork = this.artworkProvider.getArtwork(appid, game.name, 'library', preferredUrl)
+            const artwork = this.artworkProvider.getArtwork(appid, game.name, 'library', game.artwork)
             const dims = ARTWORK_DIMENSIONS.library
             await artwork.getPixelsAtSize(dims.width, dims.height)
             this.retryStatusText = 'Retry complete.'

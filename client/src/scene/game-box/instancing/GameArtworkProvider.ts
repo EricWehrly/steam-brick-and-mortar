@@ -150,57 +150,58 @@ export class GameArtworkProvider {
         appId: number,
         gameName: string,
         format: ArtworkFormat = 'library',
-        preferredUrl?: string
+        artworkHints?: { library?: string; header?: string }
     ): GameArtwork {
         return new GameArtworkRequest(
             appId,
             gameName,
             format,
-            preferredUrl,
+            artworkHints,
             this
         )
     }
     
     /**
      * Build the URL strategy for an appId/format.
-     * Returns ordered list of URLs to try.
+     * Consolidates all candidate ordering in one place.
+     * Priority: Library > Header > Capsule
      */
     public buildUrlStrategy(
         appId: number,
         format: ArtworkFormat,
-        preferredUrl?: string
+        artworkHints?: { library?: string; header?: string }
     ): Array<{ url: string; type: string }> {
         const urls: Array<{ url: string; type: string }> = []
-        
-        // Add preferred URL if provided (usually from Steam API metadata)
-        if (preferredUrl) {
-            const alreadyAdded = urls.some(u => u.url === preferredUrl)
-            if (!alreadyAdded) {
-                urls.push({ url: preferredUrl, type: 'preferred' })
-            }
-        }
-        
-        const baseUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}`
-        const fallbackChain: CdnArtworkType[] = format === 'library'
-            ? LIBRARY_FALLBACK_CHAIN
-            : [format]
+        const seen = new Set<string>()
 
-        for (const type of fallbackChain) {
-            const pattern = CDN_PATTERNS[type]
-            const fallbackUrl = `${baseUrl}/${pattern}`
-            const alreadyAdded = urls.some(u => u.url === fallbackUrl)
-            if (!alreadyAdded) {
-                urls.push({ url: fallbackUrl, type: `cdn-${type}` })
-            }
+        const addUrl = (url: string | undefined, type: string): void => {
+            if (!url || seen.has(url)) return
+            seen.add(url)
+            urls.push({ url, type })
         }
 
-        // Keep historical success as a final candidate so preferred/canonical URLs stay authoritative.
+        // Priority: Library > Header > Capsule
+        // Metadata URLs first, then canonicals
+        if (format === 'library') {
+            addUrl(artworkHints?.library, 'metadata-library')
+            addUrl(artworkHints?.header, 'metadata-header')
+            
+            const baseUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}`
+            addUrl(`${baseUrl}/library_600x900.jpg`, 'cdn-library')
+            addUrl(`${baseUrl}/capsule_616x353.jpg`, 'cdn-capsule')
+            addUrl(`${baseUrl}/header.jpg`, 'cdn-header')
+        } else {
+            // For non-library formats, apply same priority when hints exist
+            addUrl(artworkHints?.header, 'metadata-header')
+            
+            const baseUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}`
+            addUrl(`${baseUrl}/${CDN_PATTERNS[format]}`, `cdn-${format}`)
+        }
+
+        // Keep historical success as a final candidate
         const cachedSuccess = this.getSuccessEntry(appId, format)
         if (cachedSuccess?.fallbackUrl) {
-            const alreadyAdded = urls.some(u => u.url === cachedSuccess.fallbackUrl)
-            if (!alreadyAdded) {
-                urls.push({ url: cachedSuccess.fallbackUrl, type: `cached-${cachedSuccess.fallbackType}` })
-            }
+            addUrl(cachedSuccess.fallbackUrl, `cached-${cachedSuccess.fallbackType}`)
         }
         
         return urls

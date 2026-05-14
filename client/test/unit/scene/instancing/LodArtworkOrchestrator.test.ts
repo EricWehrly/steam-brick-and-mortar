@@ -267,7 +267,7 @@ describe('LodArtworkOrchestrator', () => {
 
             vi.mocked(SteamArtworkStateManager.getState).mockReturnValue({ selectedType: 'label' })
 
-            const result = await orchestrator.prefetchArtwork(123, 'https://example.com/art.jpg', 'Blocked Game')
+            const result = await orchestrator.prefetchArtwork(123, { library: 'https://example.com/art.jpg' }, 'Blocked Game')
 
             expect(result).toBe('permanent-failure')
             expect(provider.getArtwork).not.toHaveBeenCalled()
@@ -286,7 +286,7 @@ describe('LodArtworkOrchestrator', () => {
             const result = await orchestrator.setArtworkInstanceFromUrl(
                 new THREE.Vector3(0, 0, 0),
                 'Blocked Game',
-                'https://example.com/art.jpg',
+                { library: 'https://example.com/art.jpg' },
                 123
             )
 
@@ -319,7 +319,7 @@ describe('LodArtworkOrchestrator', () => {
             await orchestrator.setArtworkInstanceFromUrl(
                 new THREE.Vector3(0, 0, 0),
                 'Test Game',
-                'https://example.com/art.jpg',
+                { library: 'https://example.com/art.jpg' },
                 123
             )
 
@@ -342,7 +342,7 @@ describe('LodArtworkOrchestrator', () => {
             const result = await orchestrator.setArtworkInstanceFromUrl(
                 new THREE.Vector3(0, 0, 0),
                 'Blocked Game',
-                'https://example.com/art.jpg',
+                { library: 'https://example.com/art.jpg' },
                 999
             )
 

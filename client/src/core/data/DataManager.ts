@@ -98,8 +98,6 @@ export class DataManager {
         }
         
         window.dispatchEvent(new CustomEvent('data:changed', { detail: changeDetail }))
-        
-        console.debug(`📊 Stored data: ${key} (domain: ${metadata.domain})`)
     }
 
     /**
