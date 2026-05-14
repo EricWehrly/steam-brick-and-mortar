@@ -163,9 +163,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     private textureIndexToGameName: Map<number, string> = new Map()
     private instanceMetadata: Map<number, InstanceMetadata> = new Map()
 
-    // Track failed artwork (for backward compat)
-    private failedArtwork: Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> = new Map()
-
     // Resolved artwork URLs for prefetched games, keyed by game name.
     // Used by placeInstance() to pass the final CDN URL to the renderer.
     private prefetchedArtworkUrl: Map<string, string> = new Map()
@@ -622,7 +619,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     // === Protected accessors for debug subclass ===
 
     protected clearFailureCache(): void {
-        this.failedArtwork.clear()
         this.artworkProvider.clearCaches()
         LodArtworkOrchestrator.logger.info('Cleared artwork caches - all URLs will be retried on next load')
     }
@@ -637,10 +633,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
 
     protected getGameNameToTextureIndex(): ReadonlyMap<string, number> {
         return this.gameNameToTextureIndex
-    }
-
-    protected getFailedArtwork(): Map<string, { reason: string; url: string; urlsTried: string[]; timestamp: number }> {
-        return this.failedArtwork
     }
 
     public dispose(): void {
@@ -659,7 +651,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         this.instanceMetadata.clear()
         this.publishArtworkMetadataReference()
         this.prefetchedArtworkUrl.clear()
-        this.failedArtwork.clear()
 
         LodArtworkOrchestrator.logger.lifecycle('Disposed')
     }

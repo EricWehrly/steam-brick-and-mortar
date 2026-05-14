@@ -102,15 +102,10 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         ;(window as any).diagnosePending = () => this.diagnosePendingState()
         
         // Artwork failure tracking
-        ;(window as any).diagnoseArtworkFailures = () => {
-            this.logFailureDiagnostics()
-            return this.getFailureDiagnostics()
-        }
         ;(window as any).clearArtworkFailures = () => {
             this.clearFailureCache()
             console.log('✅ Artwork failure cache cleared - failures will be retried on next load')
         }
-        ;(window as any).auditArtworkFailures = () => this.auditFailedArtwork()
         ;(window as any).artworkFailureStats = () => {
             const stats = GameArtworkProvider.getInstance().getFailureStats()
             console.log('📊 Artwork Failure Statistics:', stats)
@@ -339,8 +334,6 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         totalAllocated: number
         textureCount: number
         instanceCount: number
-        failedArtworkCount: number
-        failedArtwork: Map<string, { reason: string; url: string; timestamp: number }>
     } {
         const lods: Record<string, { allocated: number; textureWidth: number; textureHeight: number; arrayDepth: number }> = {}
         let totalAllocated = 0
@@ -360,17 +353,11 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
             }
         }
         
-        const failedArtwork = this.getFailedArtwork()
-        
         return {
             lods,
             totalAllocated,
             textureCount: textureManager.getSlotCount(),
             instanceCount: this.getInstanceCount(),
-            failedArtworkCount: failedArtwork.size,
-            failedArtwork: new Map(
-                Array.from(failedArtwork.entries()).map(([k, v]) => [k, { reason: v.reason, url: v.url, timestamp: v.timestamp }])
-            )
         }
     }
 
@@ -396,7 +383,7 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         }
 
         console.log(`  ────────────────────────`)
-        console.log(`  Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}, Failed artwork: ${stats.failedArtworkCount}`)
+        console.log(`  Textures: ${stats.textureCount}, Instances: ${stats.instanceCount}`)
         console.log(`  Total tracked VRAM: ~${totalMB.toFixed(1)} MB (est. — actual GPU usage typically higher due to driver overhead)`)
 
         const perf = window.performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number } }
@@ -456,88 +443,6 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
             console.log(`HIGH cache - Loading: ${stats.loading}, Queued: ${stats.queueLength}`)
         }
         
-        console.groupEnd()
-    }
-
-    public getFailureDiagnostics(): {
-        totalFailed: number
-        byReason: Record<string, number>
-        recentFailures: Array<{ game: string; reason: string; url: string }>
-    } {
-        const failedArtwork = this.getFailedArtwork()
-        const byReason: Record<string, number> = {}
-        const recentFailures: Array<{ game: string; reason: string; url: string }> = []
-        
-        const now = Date.now()
-        const recentThreshold = 5 * 60 * 1000 // 5 minutes
-        
-        for (const [gameName, failure] of failedArtwork) {
-            byReason[failure.reason] = (byReason[failure.reason] || 0) + 1
-            
-            if (now - failure.timestamp < recentThreshold) {
-                recentFailures.push({ game: gameName, reason: failure.reason, url: failure.url })
-            }
-        }
-        
-        return {
-            totalFailed: failedArtwork.size,
-            byReason,
-            recentFailures: recentFailures.slice(0, 10)
-        }
-    }
-
-    public logFailureDiagnostics(): void {
-        const diag = this.getFailureDiagnostics()
-        
-        console.group('🚨 Artwork Failure Diagnostics')
-        console.log(`Total failed: ${diag.totalFailed}`)
-        console.log('By reason:', diag.byReason)
-        
-        if (diag.recentFailures.length > 0) {
-            console.log('Recent failures:')
-            for (const f of diag.recentFailures) {
-                console.log(`  - "${f.game}": ${f.reason}`)
-            }
-        }
-        console.groupEnd()
-    }
-
-    public async auditFailedArtwork(): Promise<void> {
-        const failedArtwork = this.getFailedArtwork()
-        console.group('🔍 Auditing failed artwork URLs...')
-        
-        let retryable = 0
-        let permanent = 0
-        const permanentReasons: Record<string, number> = {}
-        const retryableReasons: Record<string, number> = {}
-        
-        for (const [_gameName, failure] of failedArtwork) {
-            const isPermanent = 
-                failure.reason === 'CORS' || 
-                failure.reason === '404' || 
-                failure.reason === 'NO_ARTWORK' ||
-                failure.reason === 'DECODE'
-            
-            if (isPermanent) {
-                permanent++
-                permanentReasons[failure.reason] = (permanentReasons[failure.reason] || 0) + 1
-            } else {
-                retryable++
-                retryableReasons[failure.reason] = (retryableReasons[failure.reason] || 0) + 1
-            }
-        }
-        
-        console.log(`✅ Retryable (NETWORK/TIMEOUT/UNKNOWN): ${retryable}`)
-        if (Object.keys(retryableReasons).length > 0) {
-            console.log('   Breakdown:', retryableReasons)
-        }
-        
-        console.log(`🚫 Permanent dead-ends (CORS/404/NO_ARTWORK/DECODE): ${permanent}`)
-        if (Object.keys(permanentReasons).length > 0) {
-            console.log('   Breakdown:', permanentReasons)
-        }
-        
-        console.log(`Use clearArtworkFailures() to retry all (including ${permanent} permanent failures)`)
         console.groupEnd()
     }
 
