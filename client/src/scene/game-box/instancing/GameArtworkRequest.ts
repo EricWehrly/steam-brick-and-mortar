@@ -1,5 +1,4 @@
 import { 
-    ARTWORK_DIMENSIONS, 
     GameArtworkProvider 
 } from './GameArtworkProvider'
 import type { 
@@ -45,15 +44,6 @@ export class GameArtworkRequest implements GameArtwork {
         
         // Check if known failure
         this.failureReason = provider.getFailureReason(appId, format)
-    }
-    
-    getUrl(): string {
-        if (this.resolvedUrl) return this.resolvedUrl
-
-        GameArtworkRequest.logger.warn(
-            `getUrl() called before resolution for appId ${this.appId} (${this.gameName})`
-        )
-        return ''
     }
     
     async getPixelsAtSize(width: number, height: number): Promise<PixelDataResult> {
@@ -167,17 +157,6 @@ export class GameArtworkRequest implements GameArtwork {
         if (this.isCdnArtworkType(route)) {
             this.setArtworkSelection(route, url)
         }
-    }
-    
-    async isCached(): Promise<boolean> {
-        const strategy = this.provider.buildUrlStrategy(this.appId, this.format, this.artworkHints)
-        const dims = ARTWORK_DIMENSIONS[this.format]
-        for (const { url } of strategy) {
-            if (await this.provider.isPixelsCached(url, dims.width, dims.height)) {
-                return true
-            }
-        }
-        return false
     }
     
     getFailureReason(): FailureReason | null {

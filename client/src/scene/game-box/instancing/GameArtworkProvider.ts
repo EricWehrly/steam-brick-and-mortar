@@ -54,10 +54,7 @@ export interface GameArtwork {
     readonly appId: number
     readonly gameName: string
     readonly format: ArtworkFormat
-    
-    /** Get the URL for this artwork (resolved from strategy) */
-    getUrl(): string
-    
+
     /** 
      * Get pixel data at native resolution for this format.
      * Returns cached data if available, otherwise fetches.
@@ -67,9 +64,6 @@ export interface GameArtwork {
      * Useful for LOD tiers that need smaller textures.
      */
     getPixelsAtSize(width: number, height: number): Promise<PixelDataResult>
-    
-    /** Check if pixel data is already cached (won't trigger network) */
-    isCached(): Promise<boolean>
     
     /** Get failure reason if artwork couldn't be loaded */
     getFailureReason(): FailureReason | null
@@ -93,7 +87,25 @@ const CDN_PATTERNS: Record<CdnArtworkType, string> = {
     header: 'header.jpg'
 }
 
-const LIBRARY_FALLBACK_CHAIN: CdnArtworkType[] = ['library', 'capsule', 'header']
+type ArtworkHintType = 'library' | 'header'
+
+const STRATEGY_BY_FORMAT: Record<ArtworkFormat, {
+    hintOrder: readonly ArtworkHintType[]
+    cdnOrder: readonly CdnArtworkType[]
+}> = {
+    library: {
+        hintOrder: ['library', 'header'],
+        cdnOrder: ['library', 'capsule', 'header']
+    },
+    header: {
+        hintOrder: ['header', 'library'],
+        cdnOrder: ['header']
+    },
+    capsule: {
+        hintOrder: ['header', 'library'],
+        cdnOrder: ['capsule']
+    }
+}
 
 interface RuntimeArtworkCacheEntry {
     reason?: FailureReason
@@ -173,29 +185,40 @@ export class GameArtworkProvider {
     ): Array<{ url: string; type: string }> {
         const urls: Array<{ url: string; type: string }> = []
         const seen = new Set<string>()
+        const sourceByUrl = new Map<string, string>()
 
         const addUrl = (url: string | undefined, type: string): void => {
-            if (!url || seen.has(url)) return
+            if (!url) return
+
+            if (seen.has(url)) {
+                const existingType = sourceByUrl.get(url)
+                const metadataVsCdnDuplicate = Boolean(existingType) && (
+                    (existingType!.startsWith('metadata-') && type.startsWith('cdn-')) ||
+                    (existingType!.startsWith('cdn-') && type.startsWith('metadata-'))
+                )
+
+                if (metadataVsCdnDuplicate) {
+                    GameArtworkProvider.logger.debug(
+                        `Strategy deduped duplicate URL for appId ${appId}: existing=${existingType}; skipped=${type}; url=${url}`
+                    )
+                }
+                return
+            }
+
             seen.add(url)
+            sourceByUrl.set(url, type)
             urls.push({ url, type })
         }
 
-        // Priority: Library > Header > Capsule
-        // Metadata URLs first, then canonicals
-        if (format === 'library') {
-            addUrl(artworkHints?.library, 'metadata-library')
-            addUrl(artworkHints?.header, 'metadata-header')
-            
-            const baseUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}`
-            addUrl(`${baseUrl}/library_600x900.jpg`, 'cdn-library')
-            addUrl(`${baseUrl}/capsule_616x353.jpg`, 'cdn-capsule')
-            addUrl(`${baseUrl}/header.jpg`, 'cdn-header')
-        } else {
-            // For non-library formats, apply same priority when hints exist
-            addUrl(artworkHints?.header, 'metadata-header')
-            
-            const baseUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}`
-            addUrl(`${baseUrl}/${CDN_PATTERNS[format]}`, `cdn-${format}`)
+        const strategy = STRATEGY_BY_FORMAT[format]
+        const baseUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}`
+
+        for (const hintType of strategy.hintOrder) {
+            addUrl(artworkHints?.[hintType], `metadata-${hintType}`)
+        }
+
+        for (const cdnType of strategy.cdnOrder) {
+            addUrl(`${baseUrl}/${CDN_PATTERNS[cdnType]}`, `cdn-${cdnType}`)
         }
 
         // Keep historical success as a final candidate
