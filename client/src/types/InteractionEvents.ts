@@ -131,6 +131,25 @@ export interface SceneCanvasClickEvent extends BaseInteractionEvent {
     ndcY: number
 }
 
+export interface InputDevicesChangedEvent extends BaseInteractionEvent {
+    devices: ReadonlyArray<{
+        id: string
+        name: string
+        kind: string
+        connected: boolean
+        profileId: string
+    }>
+}
+
+export interface InputActionChangedEvent extends BaseInteractionEvent {
+    actionId: string
+    pressed: boolean
+}
+
+export interface InputProfileChangedEvent extends BaseInteractionEvent {
+    profileId: string
+}
+
 // =============================================================================
 // UI EVENTS
 // =============================================================================
@@ -260,7 +279,10 @@ export const WebXREventTypes = {
 export const InputEventTypes = {
     Pause: 'input:pause',
     Resume: 'input:resume',
-    SceneCanvasClick: 'input:scene-canvas-click'
+    SceneCanvasClick: 'input:scene-canvas-click',
+    DevicesChanged: 'input:devices-changed',
+    ActionChanged: 'input:action-changed',
+    ProfileChanged: 'input:profile-changed'
 } as const
 
 export const UIEventTypes = {

@@ -13,7 +13,7 @@
 
 import * as THREE from 'three'
 import { WebXRManager, type WebXRCapabilities } from './WebXRManager'
-import { InputManager } from './InputManager'
+import { InputManager } from '../input/InputManager'
 import { EventManager } from '../core/EventManager'
 import { WebXREventTypes } from '../types/InteractionEvents'
 import type { WebXRErrorEvent, WebXRSupportChangeEvent } from '../types/InteractionEvents'
@@ -53,7 +53,7 @@ export class WebXRCoordinator {
         // Initialize input manager with mouse move callback
         this.inputManager = new InputManager(
             { 
-                speed: config.input?.speed ?? 0.1, 
+                speed: config.input?.speed ?? 0.075, 
                 mouseSensitivity: config.input?.mouseSensitivity ?? 0.005 
             },
             {
@@ -155,11 +155,13 @@ export class WebXRCoordinator {
 
     private handleSessionStart(): void {
         console.log('✅ WebXR session started!')
+        this.inputManager.setXRSession(this.webxrManager.getCurrentSession())
         this.eventManager.emit(WebXREventTypes.SessionStart, {})
     }
 
     private handleSessionEnd(): void {
         console.log('🚪 WebXR session ended')
+        this.inputManager.setXRSession(null)
         this.eventManager.emit(WebXREventTypes.SessionEnd, {})
     }
 

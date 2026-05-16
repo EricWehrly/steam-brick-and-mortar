@@ -20,4 +20,4 @@ export {
     type InputState,
     type MovementOptions,
     type InputCallbacks
-} from './InputManager'
+} from '../input/InputManager'
