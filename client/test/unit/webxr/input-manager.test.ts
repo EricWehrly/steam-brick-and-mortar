@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { InputManager, type InputCallbacks, type MovementOptions } from '../../../src/webxr/InputManager';
+import { InputManager, type InputCallbacks, type MovementOptions } from '../../../src/input/InputManager';
 import * as THREE from 'three';
 
 // Mock Three.js classes

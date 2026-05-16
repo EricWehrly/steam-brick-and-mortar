@@ -45,7 +45,7 @@ vi.mock('../../src/webxr/WebXRManager', async () => {
     return webxrManagerMockFactory()
 })
 
-vi.mock('../../src/webxr/InputManager', async () => {
+vi.mock('../../src/input/InputManager', async () => {
     const { inputManagerMockFactory } = await import('../mocks/webxr/InputManager.mock')
     return inputManagerMockFactory()
 })
