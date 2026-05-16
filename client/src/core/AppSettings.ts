@@ -73,6 +73,10 @@ export const Setting = {
     // Steam
     AutoLoadProfile: 'autoLoadProfile',
     DevelopmentMode: 'developmentMode',
+    // Input
+    InputProfile: 'inputProfile',
+    InputBindings: 'inputBindings',
+    InputDevicesEnabled: 'inputDevicesEnabled',
 } as const
 
 /** Settings grouped by UI panel/category for bulk operations */
@@ -140,6 +144,11 @@ export interface ApplicationSettings {
     // Steam Settings (moved from GameSettings for centralization)
     autoLoadProfile: boolean
     developmentMode: boolean // Limit to 20 games for testing
+
+    // Input Settings
+    inputProfile: string
+    inputBindings: string
+    inputDevicesEnabled: string
 }
 
 export interface SettingChangedEvent extends BaseInteractionEvent {
@@ -441,7 +450,12 @@ export class AppSettings {
             
             // Steam Settings  
             autoLoadProfile: true,
-            developmentMode: isDev // Default based on environment
+            developmentMode: isDev, // Default based on environment
+
+            // Input Settings
+            inputProfile: 'mouse-keyboard',
+            inputBindings: '{}',
+            inputDevicesEnabled: '{"mouse-keyboard":true,"gamepad":true,"touch":true,"vr":true}'
         }
     }
 
@@ -471,6 +485,13 @@ export class AppSettings {
 
         if (settingsObj.pixelRatioScale !== undefined && typeof settingsObj.pixelRatioScale !== 'number') {
             return false
+        }
+
+        const stringFields = ['inputProfile', 'inputBindings', 'inputDevicesEnabled']
+        for (const field of stringFields) {
+            if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'string') {
+                return false
+            }
         }
         
         return true
