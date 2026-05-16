@@ -2,7 +2,7 @@
  * LOD Game Artwork Renderer - Clean separation of concerns
  * 
  * This renderer is responsible for:
- * - Holding the InstancedMesh and ShaderMaterial
+ * - Holding the InstancedMesh and lit MeshStandardMaterial
  * - Updating GPU state each frame
  * - Managing per-instance LOD levels
  * - HIGH texture cache (LRU for memory optimization)
@@ -23,8 +23,7 @@ import { HighTextureCache, type HighTextureCacheConfig } from './HighTextureCach
 import { SpatialPrewarmingManager, type PrewarmingConfig } from './SpatialPrewarmingManager'
 import { PlacementRunResettableInstancedBase } from './PlacementRunResettableInstancedBase'
 import type { RendererTextureSources } from './LodTypes'
-import vertexShader from './shaders/instanced-artwork-lod.vert?raw'
-import fragmentShader from './shaders/instanced-artwork-lod.frag?raw'
+import { createLitArtworkMaterial } from './LitArtworkMaterial'
 
 // Class-scoped logger will be attached to the class
 
@@ -90,7 +89,7 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
     public static logger = Logger.createLogFunctions(LodGameArtworkRenderer.name)
     private instancedMesh: THREE.InstancedMesh | null = null
     private geometry: THREE.BoxGeometry | null = null
-    private material: THREE.ShaderMaterial | null = null
+    private material: THREE.MeshStandardMaterial | null = null
     
     // Texture arrays referenced by shader uniforms
     private textureArrays: { mode: 'lazy' | 'eager'; mid: THREE.DataArrayTexture; high: THREE.DataArrayTexture } | null = null
@@ -185,16 +184,8 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
 
         this.textureArrays = { mode: isExplicitLazy || isLegacyLazy ? 'lazy' : 'eager', mid: midTexture, high: highTexture }
 
-        this.material = new THREE.ShaderMaterial({
-            uniforms: {
-                textureArrayHigh: { value: highTexture },
-                textureArrayMid: { value: midTexture }
-            },
-            vertexShader,
-            fragmentShader,
-            transparent: true,
-            side: THREE.FrontSide
-        })
+
+        this.material = createLitArtworkMaterial({ highTexture, midTexture })
         
         // Create geometry
         this.geometry = new THREE.BoxGeometry(
