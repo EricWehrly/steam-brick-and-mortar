@@ -2,6 +2,94 @@
     border-left: 3px solid transparent;
 }
 
+#panel-controls #input-device-select {
+    width: 100%;
+    min-height: 34px;
+    border-radius: 6px;
+    border: 1px solid #3f4a56;
+    background: #1f232b;
+    color: #f3f6fa;
+    padding: 6px 10px;
+}
+
+#panel-controls #input-analog-select {
+    width: 100%;
+    min-height: 34px;
+    border-radius: 6px;
+    border: 1px solid #3f4a56;
+    background: #1f232b;
+    color: #f3f6fa;
+    padding: 6px 10px;
+}
+
+#panel-controls .input-profile-toggles {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+}
+
+#panel-controls .input-profile-toggle-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #c2cdd9;
+}
+
+#panel-controls .input-mapping-table-wrap {
+    overflow-x: auto;
+}
+
+#panel-controls .input-mapping-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+}
+
+#panel-controls .input-mapping-table th,
+#panel-controls .input-mapping-table td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid #2f3742;
+}
+
+#panel-controls .input-mapping-table th {
+    font-weight: 600;
+    color: #d8e1ec;
+}
+
+#panel-controls .input-mapping-table td {
+    color: #c2cdd9;
+}
+
+#panel-controls .input-capture-status {
+    min-height: 20px;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    color: #9fb3c9;
+}
+
+#panel-controls .input-mapping-table button,
+#panel-controls .input-reset-button {
+    border: 1px solid #3f4a56;
+    background: #1f232b;
+    color: #e6eef8;
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+#panel-controls .input-mapping-actions {
+    margin-top: 10px;
+}
+
+#panel-controls .input-fast-follow-note {
+    margin-top: 10px;
+    font-size: 0.84rem;
+    color: #90a4ba;
+    line-height: 1.3;
+}
+
 #panel-controls .control-item.selected {
     border-left-color: #00aaff;
 }
