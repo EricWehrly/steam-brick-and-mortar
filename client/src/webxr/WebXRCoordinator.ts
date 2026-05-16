@@ -36,7 +36,6 @@ export class WebXRCoordinator {
     private eventManager: EventManager
     private renderLoopRegistry: RenderLoopRegistry
     private camera: THREE.Camera
-    private pendingMouseDeltas: { deltaX: number, deltaY: number } | null = null
 
     constructor(config: WebXRCoordinatorConfig) {
         this.camera = config.camera
@@ -50,18 +49,11 @@ export class WebXRCoordinator {
             onSupportChange: (capabilities: WebXRCapabilities) => this.handleSupportChange(capabilities)
         })
 
-        // Initialize input manager with mouse move callback
+        // Initialize consolidated input manager.
         this.inputManager = new InputManager(
             { 
                 speed: config.input?.speed ?? 0.075, 
                 mouseSensitivity: config.input?.mouseSensitivity ?? 0.005 
-            },
-            {
-                onMouseMove: (deltaX: number, deltaY: number) => {
-                    // We need the camera for mouse rotation, but we don't have it here
-                    // Store the deltas and apply them in updateCameraMovement
-                    this.pendingMouseDeltas = { deltaX, deltaY }
-                }
             }
         )
     }
@@ -114,11 +106,8 @@ export class WebXRCoordinator {
         // Handle Q/E roll rotation
         this.inputManager.updateCameraRoll(camera)
         
-        // Handle pending mouse rotation (Y-axis only now)
-        if (this.pendingMouseDeltas) {
-            this.inputManager.updateCameraRotation(camera, this.pendingMouseDeltas.deltaX, this.pendingMouseDeltas.deltaY)
-            this.pendingMouseDeltas = null // Clear after processing
-        }
+        // Mouse-drag look is intentionally disabled; camera rotation now relies on other input paths.
+        this.inputManager.updateCameraRotation(camera, 0, 0)
     }
 
     /**
