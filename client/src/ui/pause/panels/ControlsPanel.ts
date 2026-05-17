@@ -22,7 +22,6 @@ export class ControlsPanel extends PauseMenuPanel {
     private capturingActionId: InputActionId | null = null
     private capturingProfileId: InputProfileIdValue | null = null
     private captureGamepadPollTimer: number | null = null
-    private analogRefreshTimer: number | null = null
 
     constructor(config: PauseMenuPanelConfig = {}) {
         super(config)
@@ -46,18 +45,6 @@ export class ControlsPanel extends PauseMenuPanel {
                                 <input id="input-device-enabled" type="checkbox" data-input-device-enabled />
                                 <span>Enabled for runtime input</span>
                             </label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="app-section panel-card pause-section">
-                <h4>Analog Inputs</h4>
-                <div class="pause-row-list">
-                    <div class="pause-row control-item">
-                        <label for="input-analog-select" class="control-key pause-row-key">Detected Axis</label>
-                        <div class="control-desc pause-row-text">
-                            <select id="input-analog-select" aria-label="Detected analog axes"></select>
                         </div>
                     </div>
                 </div>
@@ -132,13 +119,9 @@ export class ControlsPanel extends PauseMenuPanel {
 
     onShow(): void {
         this.refreshUI()
-        if (this.analogRefreshTimer === null) {
-            this.analogRefreshTimer = window.setInterval(() => this.refreshUI(), 250)
-        }
     }
 
     onHide(): void {
-        this.stopAnalogRefreshTimer()
         this.stopCaptureListeners()
         this.capturingActionId = null
     }
@@ -447,12 +430,7 @@ export class ControlsPanel extends PauseMenuPanel {
         }
     }
 
-    private stopAnalogRefreshTimer(): void {
-        if (this.analogRefreshTimer !== null) {
-            window.clearInterval(this.analogRefreshTimer)
-            this.analogRefreshTimer = null
-        }
-    }
+
 
     private refreshUI(): void {
         const panel = this.getPanelElement()
@@ -469,7 +447,6 @@ export class ControlsPanel extends PauseMenuPanel {
 
         this.renderDeviceOptions(devices, profiles, activeProfileId)
         this.renderActiveToggle(activeProfile)
-        this.renderAnalogSnapshot(inputManager.actionResolver.getConnectedGamepadAxisSnapshot())
         this.renderMappingTable(activeProfile)
     }
 
@@ -532,27 +509,6 @@ export class ControlsPanel extends PauseMenuPanel {
         }
 
         toggle.checked = profile.enabled
-    }
-
-    private renderAnalogSnapshot(axes: ReadonlyArray<{ label: string; value: number }>): void {
-        const panel = this.getPanelElement()
-        if (!panel) {
-            return
-        }
-
-        const select = panel.querySelector('#input-analog-select') as HTMLSelectElement | null
-        if (!select) {
-            return
-        }
-
-        if (axes.length === 0) {
-            select.innerHTML = '<option value="">No connected gamepad axes detected</option>'
-            return
-        }
-
-        select.innerHTML = axes
-            .map(axis => `<option value="${axis.label}">${axis.label}: ${axis.value.toFixed(3)}</option>`)
-            .join('')
     }
 
     private renderMappingTable(profile: InputProfileDefinition): void {
@@ -630,7 +586,6 @@ export class ControlsPanel extends PauseMenuPanel {
             this.eventManager.deregisterEventHandler(InputEventTypes.ProfileChanged, this.handleProfileChanged)
             this.profileListenerRegistered = false
         }
-        this.stopAnalogRefreshTimer()
         this.stopCaptureListeners()
         super.dispose()
     }
