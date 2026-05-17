@@ -23,7 +23,7 @@ import { HighTextureCache, type HighTextureCacheConfig } from './HighTextureCach
 import { SpatialPrewarmingManager, type PrewarmingConfig } from './SpatialPrewarmingManager'
 import { PlacementRunResettableInstancedBase } from './PlacementRunResettableInstancedBase'
 import type { RendererTextureSources } from './LodTypes'
-import { createLitArtworkMaterial } from './LitArtworkMaterial'
+import { createLitArtworkMaterial, tuneLitArtworkGloss, tuneLitArtworkFresnel } from './LitArtworkMaterial'
 
 // Class-scoped logger will be attached to the class
 
@@ -186,6 +186,10 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
 
 
         this.material = createLitArtworkMaterial({ highTexture, midTexture })
+        
+        // Tune the material for artwork vibrancy and silhouette readability.
+        tuneLitArtworkGloss(this.material, { roughness: 0.35, metalness: 0.05 })
+        tuneLitArtworkFresnel(this.material, { fresnelLift: 0.15, fresnelPower: 4.0 })
         
         // Create geometry
         this.geometry = new THREE.BoxGeometry(
