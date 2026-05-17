@@ -75,4 +75,55 @@ describe('BindingResolver', () => {
         expect((state.axes.get(InputAction.MoveRight) ?? 0) > 0).toBe(true)
         expect(state.buttons.get(InputAction.Interact)).toBe(true)
     })
+
+    it('supports directional button bindings for axis actions', () => {
+        const resolver = new BindingResolver()
+        const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
+
+        const state = resolver.resolve(
+            {
+                ...mouseKeyboardProfile,
+                bindings: {
+                    ...mouseKeyboardProfile.bindings,
+                    [InputAction.LookHorizontal]: [
+                        { type: 'keyboard-button', code: 'KeyJ', direction: 'negative' },
+                        { type: 'keyboard-button', code: 'KeyL', direction: 'positive' }
+                    ]
+                }
+            },
+            {
+                keysPressed: new Set(['KeyJ']),
+                mouseButtonsPressed: new Set(),
+                mouseDeltaX: 0,
+                mouseDeltaY: 0,
+                gamepads: []
+            }
+        )
+
+        expect(state.axes.get(InputAction.LookHorizontal)).toBe(-1)
+    })
+
+    it('still resolves button actions when directional metadata is present', () => {
+        const resolver = new BindingResolver()
+        const mouseKeyboardProfile = getProfile(InputProfileId.MouseKeyboard)
+
+        const state = resolver.resolve(
+            {
+                ...mouseKeyboardProfile,
+                bindings: {
+                    ...mouseKeyboardProfile.bindings,
+                    [InputAction.Interact]: [{ type: 'keyboard-button', code: 'KeyE', direction: 'negative' }]
+                }
+            },
+            {
+                keysPressed: new Set(['KeyE']),
+                mouseButtonsPressed: new Set(),
+                mouseDeltaX: 0,
+                mouseDeltaY: 0,
+                gamepads: []
+            }
+        )
+
+        expect(state.buttons.get(InputAction.Interact)).toBe(true)
+    })
 })

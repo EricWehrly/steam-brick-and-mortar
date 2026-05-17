@@ -7,7 +7,7 @@ import { EventManager } from '../../../core/EventManager'
 import { InputEventTypes } from '../../../types/InteractionEvents'
 import { getInputActionDefinition, InputAction, InputActionType, INPUT_ACTION_ORDER, type InputActionId } from '../../../input/InputActions'
 import { InputManager } from '../../../input/InputManager'
-import { formatBindingList, InputProfileId, type InputBinding, type InputProfileDefinition, type InputProfileIdValue } from '../../../input/InputProfile'
+import { formatBindingList, InputDeviceKind, InputProfileId, type AxisDirection, type InputBinding, type InputProfileDefinition, type InputProfileIdValue } from '../../../input/InputProfile'
 import '../../../styles/pause-menu/controls-panel.css'
 
 export class ControlsPanel extends PauseMenuPanel {
@@ -18,6 +18,8 @@ export class ControlsPanel extends PauseMenuPanel {
     private deviceListenerRegistered = false
     private profileListenerRegistered = false
     private capturingActionId: InputActionId | null = null
+    private capturingProfileId: InputProfileIdValue | null = null
+    private captureGamepadPollTimer: number | null = null
     private analogRefreshTimer: number | null = null
 
     constructor(config: PauseMenuPanelConfig = {}) {
@@ -189,18 +191,43 @@ export class ControlsPanel extends PauseMenuPanel {
             return
         }
 
+        const inputManager = InputManager.getActiveInstance()
+        if (!inputManager) {
+            return
+        }
+
+        const activeProfile = inputManager.profileService.getActiveProfile()
+
         this.stopCaptureListeners()
         this.capturingActionId = actionId
-        this.updateCaptureStatus(`Press a key or mouse button for ${getInputActionDefinition(actionId).label}`)
+        this.capturingProfileId = activeProfile.id
+        const actionLabel = getInputActionDefinition(actionId).label
 
-        document.addEventListener('keydown', this.handleCaptureKeyDown, { once: true })
-        document.addEventListener('mousedown', this.handleCaptureMouseDown, { once: true })
+        if (activeProfile.deviceKind === InputDeviceKind.Gamepad) {
+            this.updateCaptureStatus(`Move a stick or press a gamepad button for ${actionLabel}`)
+            this.captureGamepadPollTimer = window.setInterval(() => this.pollGamepadCapture(), 50)
+            return
+        }
+
+        if (activeProfile.deviceKind === InputDeviceKind.MouseKeyboard) {
+            this.updateCaptureStatus(`Press a key, click a mouse button, or move mouse axis for ${actionLabel}`)
+            document.addEventListener('keydown', this.handleCaptureKeyDown, { once: true })
+            document.addEventListener('mousedown', this.handleCaptureMouseDown, { once: true })
+            document.addEventListener('mousemove', this.handleCaptureMouseMove)
+            return
+        }
+
+        this.updateCaptureStatus(`Editing ${activeProfile.name} bindings is not supported yet`)
+        this.capturingActionId = null
+        this.capturingProfileId = null
     }
 
     private finishCapture(binding: InputBinding): void {
         this.stopCaptureListeners()
         const actionId = this.capturingActionId
         this.capturingActionId = null
+        const captureProfileId = this.capturingProfileId
+        this.capturingProfileId = null
 
         if (!actionId) {
             return
@@ -211,6 +238,11 @@ export class ControlsPanel extends PauseMenuPanel {
             return
         }
 
+        if (captureProfileId && inputManager.profileService.getActiveProfileId() !== captureProfileId) {
+            this.updateCaptureStatus('Capture cancelled because active profile changed')
+            return
+        }
+
         inputManager.profileService.setActionBinding(actionId, binding)
         this.updateCaptureStatus('Binding updated')
         this.refreshUI()
@@ -218,20 +250,167 @@ export class ControlsPanel extends PauseMenuPanel {
 
     private handleCaptureKeyDown = (event: KeyboardEvent): void => {
         event.preventDefault()
+        const actionId = this.capturingActionId
+        if (!actionId) {
+            return
+        }
+
+        const direction = this.getButtonDirectionForAxisAction(actionId)
+        if (direction === null) {
+            this.stopCaptureListeners()
+            this.capturingActionId = null
+            this.capturingProfileId = null
+            this.updateCaptureStatus('Capture cancelled')
+            return
+        }
+
         this.finishCapture({
             type: 'keyboard-button',
             code: event.code,
+            direction,
             label: event.code
         })
     }
 
     private handleCaptureMouseDown = (event: MouseEvent): void => {
         event.preventDefault()
+        const actionId = this.capturingActionId
+        if (!actionId) {
+            return
+        }
+
+        const direction = this.getButtonDirectionForAxisAction(actionId)
+        if (direction === null) {
+            this.stopCaptureListeners()
+            this.capturingActionId = null
+            this.capturingProfileId = null
+            this.updateCaptureStatus('Capture cancelled')
+            return
+        }
+
         this.finishCapture({
             type: 'mouse-button',
             button: event.button,
+            direction,
             label: event.button === 0 ? 'Left Click' : `Mouse ${event.button}`
         })
+    }
+
+    private handleCaptureMouseMove = (event: MouseEvent): void => {
+        const actionId = this.capturingActionId
+        if (!actionId || !this.isAxisAction(actionId)) {
+            return
+        }
+
+        if (Math.abs(event.movementX) < 3 && Math.abs(event.movementY) < 3) {
+            return
+        }
+
+        const axis = Math.abs(event.movementX) >= Math.abs(event.movementY) ? 'x' : 'y'
+        this.finishCapture({
+            type: 'mouse-axis',
+            axis,
+            sensitivity: 1,
+            label: axis === 'x' ? 'Mouse X' : 'Mouse Y'
+        })
+    }
+
+    private pollGamepadCapture(): void {
+        const actionId = this.capturingActionId
+        if (!actionId) {
+            return
+        }
+
+        const gamepads = Array.from(navigator.getGamepads?.() ?? []).filter((gamepad): gamepad is Gamepad => Boolean(gamepad && gamepad.connected))
+        if (gamepads.length === 0) {
+            return
+        }
+
+        if (this.isAxisAction(actionId)) {
+            let strongestAxis: { index: number; value: number } | null = null
+            for (const gamepad of gamepads) {
+                gamepad.axes.forEach((axisValue, axisIndex) => {
+                    if (Math.abs(axisValue) < 0.5) {
+                        return
+                    }
+
+                    if (!strongestAxis || Math.abs(axisValue) > Math.abs(strongestAxis.value)) {
+                        strongestAxis = { index: axisIndex, value: axisValue }
+                    }
+                })
+            }
+
+            if (strongestAxis) {
+                const direction = this.getGamepadAxisDirectionForAction(actionId, strongestAxis.value)
+                this.finishCapture({
+                    type: 'gamepad-axis',
+                    axis: strongestAxis.index,
+                    direction,
+                    deadZone: 0.15,
+                    label: `Gamepad Axis ${strongestAxis.index}`
+                })
+                return
+            }
+        }
+
+        for (const gamepad of gamepads) {
+            for (let buttonIndex = 0; buttonIndex < gamepad.buttons.length; buttonIndex += 1) {
+                const button = gamepad.buttons[buttonIndex]
+                if (!button || button.value < 0.5) {
+                    continue
+                }
+
+                const direction = this.getButtonDirectionForAxisAction(actionId)
+                if (direction === null) {
+                    this.stopCaptureListeners()
+                    this.capturingActionId = null
+                    this.capturingProfileId = null
+                    this.updateCaptureStatus('Capture cancelled')
+                    return
+                }
+
+                this.finishCapture({
+                    type: 'gamepad-button',
+                    button: buttonIndex,
+                    direction,
+                    label: `Gamepad Button ${buttonIndex}`
+                })
+                return
+            }
+        }
+    }
+
+    private isAxisAction(actionId: InputActionId): boolean {
+        return getInputActionDefinition(actionId).type === InputActionType.Axis
+    }
+
+    private getButtonDirectionForAxisAction(actionId: InputActionId): AxisDirection | undefined | null {
+        if (!this.isAxisAction(actionId)) {
+            return undefined
+        }
+
+        if (actionId !== InputAction.LookHorizontal && actionId !== InputAction.LookVertical) {
+            return 'positive'
+        }
+
+        const response = window.prompt(
+            'Bind as + or - direction? Type + for increase (right/up), - for decrease (left/down).',
+            '+'
+        )
+
+        if (response === null) {
+            return null
+        }
+
+        return response.trim().startsWith('-') ? 'negative' : 'positive'
+    }
+
+    private getGamepadAxisDirectionForAction(actionId: InputActionId, axisValue: number): 'positive' | 'negative' | 'both' {
+        if (actionId === InputAction.LookHorizontal || actionId === InputAction.LookVertical) {
+            return 'both'
+        }
+
+        return axisValue >= 0 ? 'positive' : 'negative'
     }
 
     private updateCaptureStatus(message: string): void {
@@ -251,6 +430,12 @@ export class ControlsPanel extends PauseMenuPanel {
     private stopCaptureListeners(): void {
         document.removeEventListener('keydown', this.handleCaptureKeyDown)
         document.removeEventListener('mousedown', this.handleCaptureMouseDown)
+        document.removeEventListener('mousemove', this.handleCaptureMouseMove)
+
+        if (this.captureGamepadPollTimer !== null) {
+            window.clearInterval(this.captureGamepadPollTimer)
+            this.captureGamepadPollTimer = null
+        }
     }
 
     private stopAnalogRefreshTimer(): void {
@@ -391,12 +576,16 @@ export class ControlsPanel extends PauseMenuPanel {
     }
 
     private isActionEditable(actionId: InputActionId): boolean {
-        if (actionId === InputAction.LookHorizontal || actionId === InputAction.LookVertical) {
-            return false
-        }
-
         const definition = getInputActionDefinition(actionId)
-        return definition.type !== InputActionType.Axis || actionId === InputAction.MoveForward || actionId === InputAction.MoveBack || actionId === InputAction.MoveLeft || actionId === InputAction.MoveRight || actionId === InputAction.MoveUp || actionId === InputAction.MoveDown
+        return definition.type !== InputActionType.Axis
+            || actionId === InputAction.MoveForward
+            || actionId === InputAction.MoveBack
+            || actionId === InputAction.MoveLeft
+            || actionId === InputAction.MoveRight
+            || actionId === InputAction.MoveUp
+            || actionId === InputAction.MoveDown
+            || actionId === InputAction.LookHorizontal
+            || actionId === InputAction.LookVertical
     }
 
     dispose(): void {

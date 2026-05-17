@@ -37,10 +37,18 @@ export class InputActionResolver {
         const gamepads = Array.from(navigator.getGamepads?.() ?? []).filter((gamepad): gamepad is Gamepad => Boolean(gamepad && gamepad.connected))
         this.lastConnectedGamepads = gamepads
 
+        const connectedProfileIds = new Set(
+            this.deviceDetector.getAvailableDevices()
+                .filter(device => device.connected)
+                .map(device => device.profileId)
+        )
+
+        const connectedProfiles = enabledProfiles.filter(profile => connectedProfileIds.has(profile.id))
+
         const mergedAxes = new Map<string, number>()
         const mergedButtons = new Map<string, boolean>()
 
-        for (const profile of enabledProfiles) {
+        for (const profile of connectedProfiles) {
             const resolved = this.bindingResolver.resolve(profile, {
                 keysPressed,
                 mouseButtonsPressed,

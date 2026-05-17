@@ -18,15 +18,19 @@ export const InputDeviceKind = {
 
 export type InputDeviceKindValue = typeof InputDeviceKind[keyof typeof InputDeviceKind]
 
+export type AxisDirection = 'positive' | 'negative'
+
 export interface KeyboardButtonBinding {
     type: 'keyboard-button'
     code: string
+    direction?: AxisDirection
     label?: string
 }
 
 export interface MouseButtonBinding {
     type: 'mouse-button'
     button: number
+    direction?: AxisDirection
     label?: string
 }
 
@@ -42,6 +46,7 @@ export interface GamepadButtonBinding {
     type: 'gamepad-button'
     button: number
     threshold?: number
+    direction?: AxisDirection
     label?: string
 }
 
@@ -105,15 +110,20 @@ export function formatBindingLabel(binding: InputBinding): string {
         return binding.label
     }
 
+    const directionalSuffix =
+        'direction' in binding && binding.direction
+            ? binding.direction === 'positive' ? ' (+)' : ' (-)'
+            : ''
+
     switch (binding.type) {
         case 'keyboard-button':
-            return binding.code
+            return `${binding.code}${directionalSuffix}`
         case 'mouse-button':
-            return binding.button === 0 ? 'Left Click' : `Mouse ${binding.button}`
+            return `${binding.button === 0 ? 'Left Click' : `Mouse ${binding.button}`}${directionalSuffix}`
         case 'mouse-axis':
             return binding.axis === 'x' ? 'Mouse X' : 'Mouse Y'
         case 'gamepad-button':
-            return `Gamepad Button ${binding.button}`
+            return `Gamepad Button ${binding.button}${directionalSuffix}`
         case 'gamepad-axis':
             return `Gamepad Axis ${binding.axis}`
         case 'touch-gesture':
