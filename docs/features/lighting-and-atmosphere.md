@@ -45,3 +45,31 @@ There's also a longer-term design where lighting presets and room variants (base
 - Blacklight / UV atmosphere (glowing accents, dark ambient) is on the Encore list paired with the basement room variant; it's not in scope here but the preset architecture should make adding it easy.
 - Dust motes and animated spotlights were previously on the Encore list — graduating them here as stretch goals because the scope is reasonable (1-3 days each) and they're high-impact for atmosphere.
 - Related: archived source notes in `docs/archive/phase2-ready-for-friends.md` (Feature 8.5.0 / 8.5.1).
+
+## Progress Snapshot (2026-05)
+
+What has landed recently on the "make the store look better" path:
+- Instanced game artwork moved to a lit material strategy (`MeshStandardMaterial` with array-texture sampling patch) so boxes now participate in scene lighting and shadows more convincingly.
+- Retail lighting was retuned (ambient/directional/spot/rim plus ceiling fixture intensity), producing better shelf readability and stronger artwork contrast.
+- Texture-array color handling was corrected in the pipeline (array texture color-space tagging and decode-path adjustments) to reduce muted artwork output.
+- Lighting controls panel was upgraded to multiplier sliders, making brightness balancing easier and more predictable during visual tuning.
+
+Current decision boundaries:
+- TSL/NodeMaterial was evaluated and deferred for now because it implies a broader renderer migration scope than this feature needs.
+- Near-term visual improvements should continue on the current WebGL material path unless a renderer-wide migration is explicitly scheduled.
+
+What remains in this feature:
+- Tone presets and in-scene "dongle" controls.
+- Atmosphere effects (dust motes, subtle spotlight shimmer).
+- Optional additional art-direction tuning once preset architecture is in place.
+
+## Pre-Clutter Immersion Checkpoint
+
+Before investing in new clutter assets, prefer these technical immersion passes:
+1. Improve game-box gloss and edge readability.
+2. Tighten contact shadow grounding around shelves.
+3. Add subtle per-instance variation to reduce clone look.
+4. Add dust motes and subtle light animation for depth and presence.
+
+Actionable implementation notes and execution order are tracked in:
+- `docs/plans/game-artwork-box-shading-plan.md` (Pre-Clutter Technical Options section).

@@ -39,7 +39,7 @@
 - [Layout Variations](../features/layout-variations.md) — arc exists; square rows + dynamic switching are the open work; grouping is Encore; include layout-owned entrance mat placement for spoke and stage mat/carpet convergence as a mid-Act 2 follow-up, and treat angled-layout center-aisle overlap cleanup (`arc`/`spoke`) as medium priority without a fixed timebox
 - [Game Detail Screen](../features/game-detail-screen.md) — design pass tied to VR; do once with VR in mind rather than twice
 - [Room Variants](../features/room-variants.md) — room structure cleanup first, then variant system; Cozy Basement is the target variant
-- [Lighting and Atmosphere](../features/lighting-and-atmosphere.md) — tone presets (corporate → dank), dongle switch panel; core lighting is done, this is the experiential layer
+- [Lighting and Atmosphere](../features/lighting-and-atmosphere.md) — tone presets (corporate → dank), dongle switch panel; core lighting is done, and recent passes improved game-box shadow response + artwork vibrancy; remaining work is the experiential layer
 - [Procedural Texture Quality Pass](../features/procedural-texture-quality.md) — MDF veneer, popcorn ceiling, wood plank walls, carpet; carried from Act 1
 - [UI Standardization](../features/ui-standardization.md) — in-scene omnibar, 3D sign elements, component tokens (started in intermission, may extend into Act 2)
 - Enhanced error handling — robust recovery for rate limits, invalid Steam IDs, timeouts, partial failures

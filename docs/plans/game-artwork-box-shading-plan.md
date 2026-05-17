@@ -73,3 +73,85 @@ Enable believable lighting and shadow response for instanced game artwork boxes 
 ## Out of Scope
 - Full signage visual redesign.
 - Non-instanced fallback rendering architecture.
+
+## Implementation Outcome Snapshot (2026-05)
+
+The Phase 1/2 direction has effectively been exercised and integrated.
+
+What was achieved:
+- `LodGameArtworkRenderer` now uses a lit artwork material path built on `MeshStandardMaterial` with `onBeforeCompile` array-texture sampling.
+- Artwork boxes now receive scene lighting/shadow response in a way that is materially closer to other PBR scene assets.
+- Related visual support work landed alongside this path:
+   - lighting profile retune for retail readability
+   - texture-array color pipeline corrections
+   - better runtime lighting controls for balancing
+
+What this plan proved:
+- Option B (material strategy with standard lighting pipeline) is viable and currently the baseline path.
+- Full TSL/NodeMaterial migration is not a material-only drop-in for this app's current renderer stack and is deferred.
+
+Recommended next options from here:
+1. Harden current material patching with compile-time replacement checks/assertions.
+2. If maintainability becomes a pain point, evaluate a full custom lit `ShaderMaterial` while staying on `WebGLRenderer`.
+3. Treat TSL/WebGPU as a separate renderer-migration initiative, not an incremental shading tweak.
+
+## Pre-Clutter Technical Options (Actionable)
+
+These are scene-immersion improvements that do not require designing new clutter props first.
+
+### Tier 1: Fast visual wins (0.5-2 days)
+1. Add controlled card gloss shaping on artwork boxes.
+   - Why: game boxes should read as coated print stock, not matte cardboard.
+   - How: expose and tune roughness/metalness envelope for artwork material, and optionally add a mild view-dependent highlight approximation.
+   - Touch points: `client/src/scene/game-box/instancing/LitArtworkMaterial.ts`.
+   - Validation: compare shelf-angle specular response in 3 camera positions under existing retail lighting.
+
+2. Add subtle fresnel edge lift for box readability.
+   - Why: edge reflections help silhouettes read at oblique angles.
+   - How: multiply a small grazing-angle boost into final albedo or specular response, clamped to avoid artificial halos.
+   - Touch points: `client/src/scene/game-box/instancing/LitArtworkMaterial.ts`.
+   - Validation: ensure front-facing color is unchanged while side-angle readability improves.
+
+3. Improve shadow contact grounding around shelf intersections.
+   - Why: boxes feel floaty when contact shadows are too soft or weak.
+   - How: tighten directional shadow camera fit and bias tuning for shelf zones already in the scene.
+   - Touch points: `client/src/lighting/ShadowPolicy.ts`, `client/src/scene/LightingRenderer.ts`.
+   - Validation: side-by-side snapshots at shelf base and under overhangs.
+
+### Tier 2: Medium effort, strong realism gain (1-3 days)
+1. Add lightweight per-instance variation to break clone look.
+   - Why: identical roughness and response across all boxes reads synthetic even before clutter.
+   - How: derive a deterministic per-instance variation factor from `textureIndex` and apply small roughness or albedo offsets within strict bounds.
+   - Touch points: `client/src/scene/game-box/instancing/LitArtworkMaterial.ts`, `client/src/scene/game-box/instancing/LodGameArtworkRenderer.ts`.
+   - Validation: no visible popping across LOD transitions; variation should remain subtle.
+
+2. Add edge-wear micro normal for box side faces only.
+   - Why: perfectly flat side faces reduce realism at close range.
+   - How: apply a tiny procedural normal perturbation on non-front faces, leaving cover art face clean.
+   - Touch points: `client/src/scene/game-box/instancing/LitArtworkMaterial.ts`.
+   - Validation: close-up pass in VR and desktop to ensure no shimmering.
+
+3. Add scene reflection context for glossy response.
+   - Why: gloss looks wrong when there is nothing meaningful to reflect.
+   - How: ensure environment contribution is present and tuned for retail interior values.
+   - Touch points: scene setup and material environment configuration paths.
+   - Validation: highlight movement should track camera and light shifts naturally.
+
+### Tier 3: Atmosphere before clutter (1-3 days)
+1. Dust motes in lit cones.
+   - Why: adds depth cues and "air" without adding geometry clutter.
+   - How: low-density particle pass bounded to key light volumes.
+   - Existing roadmap tie-in: already tracked by Lighting and Atmosphere feature.
+
+2. Subtle spotlight shimmer or breathing.
+   - Why: static lighting can feel lifeless even when technically correct.
+   - How: low-amplitude temporal modulation with strict caps.
+   - Existing roadmap tie-in: already tracked by Lighting and Atmosphere feature.
+
+## Suggested Execution Order (Before Clutter)
+1. Card gloss shaping.
+2. Shadow contact grounding.
+3. Per-instance variation.
+4. Dust motes.
+
+This sequence gives high immersion gain per day while preserving the current architecture and avoiding renderer migration scope.

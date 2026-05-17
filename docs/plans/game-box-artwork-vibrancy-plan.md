@@ -106,4 +106,56 @@ Regression checks:
 - No measurable regression in startup stability or frame pacing.
 
 ## 8. Immediate Next Step
-Implement Phase 1 only (shader color-space correctness) as a small, isolated patch in `client/src/scene/game-box/instancing/LitArtworkMaterial.ts`, then validate visually before touching asset pipeline or adding artistic compensation controls.
+The original "Phase 1 only" next step has already been overtaken by implementation work.
+
+Current practical next step:
+- consolidate this into a small hardening pass on the existing material path (replacement checks/assertions and visual regression capture), rather than changing renderer architecture.
+
+What is already in place:
+- lit artwork material path integrated
+- lighting profile retune completed
+- texture-array color pipeline fixes applied
+- optional albedo boost hook validated during tuning
+
+## 9. Reassessment After TSL Spike
+
+### What We Were Here To Fix
+The original issue was not "make the renderer more modern." It was:
+- game box artwork looked muted in the lit instanced path
+- the custom array-texture material path was deviating from Three.js's standard map handling
+- we wanted more vibrancy without breaking shadows, tone mapping, or instancing performance
+
+### Why TSL Was Considered And Then Rejected For Now
+TSL looked attractive because it would replace shader string patching with a structured node graph. In practice, it pushes this renderer toward `WebGPURenderer`, which means a broader renderer migration.
+
+That is a larger project than this fix and it changes too many surrounding assumptions at once for current work:
+- renderer construction and type signatures
+- WebXR integration
+- debug renderer instrumentation
+- capability detection and test coverage
+
+Conclusion: TSL is a valid future direction, but it is not the right next step for this branch or for the foreseeable roadmap.
+
+### Remaining Options
+1. Keep the current `MeshStandardMaterial` + `onBeforeCompile` path, but harden it with replacement checks and small focused assertions.
+2. Move to a fully custom `ShaderMaterial` if we want explicit control without string replacement, while staying on `WebGLRenderer`.
+3. Revisit TSL/WebGPU only as part of a deliberate renderer migration project, not as a material-only cleanup.
+
+### Current Decision
+For now, do not pursue the TSL path. Treat the existing material approach as the baseline, and only revisit if we intentionally start a renderer-wide migration later.
+
+## 10. Where We Are Overall On This Path
+
+We started this path to improve realism and shelf presence by making game boxes:
+- respond to light/shadow more like the rest of the scene
+- retain stronger color/vibrancy under the lit path
+- avoid regressions in LOD and instancing performance
+
+Current state:
+- The visual quality direction is working: boxes read more convincingly in lit scenes than before.
+- The remaining work is mostly hardening and polish, not foundational architecture change.
+
+Remaining options from here:
+1. Maintain and harden current `MeshStandardMaterial` + `onBeforeCompile` path (recommended short-term).
+2. Move to full custom lit shader path if patching complexity grows.
+3. Re-open TSL only inside a deliberate renderer migration project.
