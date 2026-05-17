@@ -102,12 +102,9 @@ export class WebXRCoordinator {
         // Handle keyboard movement
         // we should ABSOLUTELY NOT update the camera in VR this way (from keybinds rather than headset data)
         this.inputManager.updateCameraMovement(camera)
-        
-        // Handle Q/E roll rotation
-        this.inputManager.updateCameraRoll(camera)
-        
+
         // Mouse-drag look is intentionally disabled; camera rotation now relies on other input paths.
-        this.inputManager.updateCameraRotation(camera, 0, 0)
+        this.inputManager.updateCameraRotation(camera)
     }
 
     /**

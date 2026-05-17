@@ -32,11 +32,11 @@ describe('InputManager multi-device behavior', () => {
         })
 
         manager.startListening()
-        manager.setProfileEnabled(InputProfileId.GamepadStandard, true)
+        manager.profileService.setProfileEnabled(InputProfileId.GamepadStandard, true)
         manager.updateFrame()
 
         const beforeYaw = camera.rotation.y
-        manager.updateCameraRotation(camera, 0, 0)
+        manager.updateCameraRotation(camera, 0)
         const afterYaw = camera.rotation.y
 
         expect(afterYaw).not.toBe(beforeYaw)

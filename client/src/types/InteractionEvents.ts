@@ -141,11 +141,6 @@ export interface InputDevicesChangedEvent extends BaseInteractionEvent {
     }>
 }
 
-export interface InputActionChangedEvent extends BaseInteractionEvent {
-    actionId: string
-    pressed: boolean
-}
-
 export interface InputProfileChangedEvent extends BaseInteractionEvent {
     profileId: string
 }
@@ -281,7 +276,6 @@ export const InputEventTypes = {
     Resume: 'input:resume',
     SceneCanvasClick: 'input:scene-canvas-click',
     DevicesChanged: 'input:devices-changed',
-    ActionChanged: 'input:action-changed',
     ProfileChanged: 'input:profile-changed'
 } as const
 

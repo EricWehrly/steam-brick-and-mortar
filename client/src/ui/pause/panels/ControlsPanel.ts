@@ -35,8 +35,16 @@ export class ControlsPanel extends PauseMenuPanel {
                             <select id="input-device-select" aria-label="Active input device"></select>
                         </div>
                     </div>
+                    <div class="pause-row control-item">
+                        <span class="control-key pause-row-key">Active</span>
+                        <div class="control-desc pause-row-text">
+                            <label class="input-device-enabled-toggle">
+                                <input id="input-device-enabled" type="checkbox" data-input-device-enabled />
+                                <span>Enabled for runtime input</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
-                <div id="input-profile-toggles" class="input-profile-toggles"></div>
             </div>
 
             <div class="app-section panel-card pause-section">
@@ -91,8 +99,8 @@ export class ControlsPanel extends PauseMenuPanel {
                     return
                 }
 
-                inputManager.setActiveProfile(selectedProfileId)
-                this.renderMappingTable(inputManager.getActiveProfile())
+                inputManager.profileService.setActiveProfile(selectedProfileId)
+                this.renderMappingTable(inputManager.profileService.getActiveProfile())
             })
         }
 
@@ -104,7 +112,7 @@ export class ControlsPanel extends PauseMenuPanel {
                     return
                 }
 
-                inputManager.resetActiveProfileBindings()
+                inputManager.profileService.resetActiveProfileBindings()
                 this.refreshUI()
             })
         }
@@ -163,13 +171,8 @@ export class ControlsPanel extends PauseMenuPanel {
 
     private handlePanelChange = (event: Event): void => {
         const target = event.target as HTMLElement
-        const toggle = target.closest('[data-input-profile-toggle]') as HTMLInputElement | null
-        if (!toggle) {
-            return
-        }
-
-        const profileId = toggle.dataset.inputProfileToggle as InputProfileIdValue | undefined
-        if (!profileId) {
+        const activeToggle = target.closest('[data-input-device-enabled]') as HTMLInputElement | null
+        if (!activeToggle) {
             return
         }
 
@@ -178,7 +181,7 @@ export class ControlsPanel extends PauseMenuPanel {
             return
         }
 
-        inputManager.setProfileEnabled(profileId, toggle.checked)
+        inputManager.profileService.setProfileEnabled(inputManager.profileService.getActiveProfileId(), activeToggle.checked)
     }
 
     private startCapture(actionId: InputActionId): void {
@@ -208,7 +211,7 @@ export class ControlsPanel extends PauseMenuPanel {
             return
         }
 
-        inputManager.setActionBinding(actionId, binding)
+        inputManager.profileService.setActionBinding(actionId, binding)
         this.updateCaptureStatus('Binding updated')
         this.refreshUI()
     }
@@ -265,14 +268,15 @@ export class ControlsPanel extends PauseMenuPanel {
             return
         }
 
-        const devices = inputManager.getAvailableDevices()
-        const profiles = inputManager.getProfiles()
-        const activeProfileId = inputManager.getActiveProfileId()
+        const devices = inputManager.actionResolver.getAvailableDevices()
+        const profiles = inputManager.profileService.getProfiles()
+        const activeProfileId = inputManager.profileService.getActiveProfileId()
+        const activeProfile = inputManager.profileService.getActiveProfile()
 
         this.renderDeviceOptions(devices, profiles, activeProfileId)
-        this.renderProfileToggles(profiles)
-        this.renderAnalogSnapshot(inputManager.getConnectedGamepadAxisSnapshot())
-        this.renderMappingTable(inputManager.getActiveProfile())
+        this.renderActiveToggle(activeProfile)
+        this.renderAnalogSnapshot(inputManager.actionResolver.getConnectedGamepadAxisSnapshot())
+        this.renderMappingTable(activeProfile)
     }
 
     private renderDeviceOptions(
@@ -293,17 +297,24 @@ export class ControlsPanel extends PauseMenuPanel {
         const options = new Map<InputProfileIdValue, string>()
         for (const device of devices) {
             const profile = profiles.find(candidate => candidate.id === device.profileId)
-            if (!profile || !profile.enabled) {
+            if (!profile) {
                 continue
             }
 
             if (!options.has(profile.id)) {
-                options.set(profile.id, profile.name)
+                options.set(profile.id, profile.enabled ? profile.name : `${profile.name} (Disabled)`)
             }
         }
 
         if (options.size === 0) {
             options.set(InputProfileId.MouseKeyboard, 'Mouse + Keyboard')
+        }
+
+        if (!options.has(activeProfileId)) {
+            const activeProfile = profiles.find(candidate => candidate.id === activeProfileId)
+            if (activeProfile) {
+                options.set(activeProfile.id, activeProfile.enabled ? activeProfile.name : `${activeProfile.name} (Disabled)`)
+            }
         }
 
         select.innerHTML = Array.from(options.entries())
@@ -315,25 +326,18 @@ export class ControlsPanel extends PauseMenuPanel {
         }
     }
 
-    private renderProfileToggles(profiles: ReadonlyArray<InputProfileDefinition>): void {
+    private renderActiveToggle(profile: InputProfileDefinition): void {
         const panel = this.getPanelElement()
         if (!panel) {
             return
         }
 
-        const container = panel.querySelector('#input-profile-toggles') as HTMLElement | null
-        if (!container) {
+        const toggle = panel.querySelector('#input-device-enabled') as HTMLInputElement | null
+        if (!toggle) {
             return
         }
 
-        container.innerHTML = profiles
-            .map(profile => `
-                <label class="input-profile-toggle-item">
-                    <input type="checkbox" data-input-profile-toggle="${profile.id}" ${profile.enabled ? 'checked' : ''} />
-                    <span>${profile.name} Active</span>
-                </label>
-            `)
-            .join('')
+        toggle.checked = profile.enabled
     }
 
     private renderAnalogSnapshot(axes: ReadonlyArray<{ label: string; value: number }>): void {

@@ -111,7 +111,7 @@ export class SceneManager {
     }
 
     private setupCamera() {
-        // Position camera at average human eye height
+        // >>> REVIEW: camera.position set here on initial scene setup
         this.camera.position.set(0, 1.6, 0)
     }
 
