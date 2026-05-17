@@ -230,6 +230,7 @@ export class RoomManager {
             // Reposition and reorient camera to face the store center
             // Player spawns at origin (0, 1.6, 0), should look at back wall center
             const targetZ = appliedZ - (dimensions.depth / 2)
+            // >>> REVIEW: camera.position set here on room build/resize
             this.camera.position.set(0, 1.6, 0)
             this.camera.lookAt(0, 1.6, targetZ)
             console.debug(`📷 Camera repositioned to face store center at Z=${targetZ.toFixed(1)}`)
