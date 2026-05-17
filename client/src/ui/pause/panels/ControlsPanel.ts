@@ -6,8 +6,10 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { EventManager } from '../../../core/EventManager'
 import { InputEventTypes } from '../../../types/InteractionEvents'
 import { getInputActionDefinition, InputAction, InputActionType, INPUT_ACTION_ORDER, type InputActionId } from '../../../input/InputActions'
+import { getDuplicateBindingWarnings, getLinkedInverseAssignment, isDerivedLinkedActionLocked } from '../../../input/InputBindingUtils'
 import { InputManager } from '../../../input/InputManager'
 import { formatBindingList, InputDeviceKind, InputProfileId, type AxisDirection, type InputBinding, type InputProfileDefinition, type InputProfileIdValue } from '../../../input/InputProfile'
+import { UIComponentUtils } from '../../../utils/UIComponentUtils'
 import '../../../styles/pause-menu/controls-panel.css'
 
 export class ControlsPanel extends PauseMenuPanel {
@@ -92,35 +94,28 @@ export class ControlsPanel extends PauseMenuPanel {
             return
         }
 
-        const select = panel.querySelector('#input-device-select') as HTMLSelectElement | null
-        if (select) {
-            select.addEventListener('change', () => {
-                const selectedProfileId = select.value as InputProfileIdValue
-                const inputManager = InputManager.getActiveInstance()
-                if (!inputManager) {
-                    return
-                }
+        UIComponentUtils.setupSelect<InputProfileIdValue>(panel, {
+            selectId: 'input-device-select',
+            parseValue: (rawValue) => rawValue as InputProfileIdValue,
+            onChange: this.handleProfileSelectionChange.bind(this)
+        })
 
-                inputManager.profileService.setActiveProfile(selectedProfileId)
-                this.renderMappingTable(inputManager.profileService.getActiveProfile())
-            })
-        }
+        UIComponentUtils.setupToggle(panel, {
+            toggleId: 'input-device-enabled',
+            onChange: this.handleProfileEnabledToggle.bind(this)
+        })
 
-        const resetButton = panel.querySelector('#input-reset-profile') as HTMLButtonElement | null
-        if (resetButton) {
-            resetButton.addEventListener('click', () => {
-                const inputManager = InputManager.getActiveInstance()
-                if (!inputManager) {
-                    return
-                }
+        UIComponentUtils.setupButton(panel, {
+            buttonId: 'input-reset-profile',
+            onClick: this.handleResetProfileClick.bind(this)
+        })
 
-                inputManager.profileService.resetActiveProfileBindings()
-                this.refreshUI()
-            })
-        }
-
-        panel.addEventListener('click', this.handlePanelClick)
-        panel.addEventListener('change', this.handlePanelChange)
+        UIComponentUtils.setupDelegatedDataButtons<string>(
+            panel,
+            '[data-input-edit-action]',
+            'inputEditAction',
+            (rawActionId) => this.handleEditActionClick(rawActionId as InputActionId)
+        )
 
         if (!this.deviceListenerRegistered) {
             this.eventManager.registerEventHandler(InputEventTypes.DevicesChanged, this.handleDevicesChanged)
@@ -156,34 +151,41 @@ export class ControlsPanel extends PauseMenuPanel {
         this.refreshUI()
     }
 
-    private handlePanelClick = (event: Event): void => {
-        const target = event.target as HTMLElement
-        const actionButton = target.closest('[data-input-edit-action]') as HTMLButtonElement | null
-        if (!actionButton) {
-            return
-        }
-
-        const actionId = actionButton.dataset.inputEditAction as InputActionId | undefined
-        if (!actionId) {
-            return
-        }
-
-        this.startCapture(actionId)
-    }
-
-    private handlePanelChange = (event: Event): void => {
-        const target = event.target as HTMLElement
-        const activeToggle = target.closest('[data-input-device-enabled]') as HTMLInputElement | null
-        if (!activeToggle) {
-            return
-        }
-
+    private handleProfileSelectionChange(selectedProfileId: InputProfileIdValue): void {
         const inputManager = InputManager.getActiveInstance()
         if (!inputManager) {
             return
         }
 
-        inputManager.profileService.setProfileEnabled(inputManager.profileService.getActiveProfileId(), activeToggle.checked)
+        inputManager.profileService.setActiveProfile(selectedProfileId)
+        this.renderMappingTable(inputManager.profileService.getActiveProfile())
+    }
+
+    private handleProfileEnabledToggle(checked: boolean): void {
+        const inputManager = InputManager.getActiveInstance()
+        if (!inputManager) {
+            return
+        }
+
+        inputManager.profileService.setProfileEnabled(inputManager.profileService.getActiveProfileId(), checked)
+    }
+
+    private handleResetProfileClick(): void {
+        const inputManager = InputManager.getActiveInstance()
+        if (!inputManager) {
+            return
+        }
+
+        inputManager.profileService.resetActiveProfileBindings()
+        this.refreshUI()
+    }
+
+    private handleEditActionClick(actionId: InputActionId): void {
+        if (!INPUT_ACTION_ORDER.includes(actionId)) {
+            return
+        }
+
+        this.startCapture(actionId)
     }
 
     private startCapture(actionId: InputActionId): void {
@@ -244,7 +246,14 @@ export class ControlsPanel extends PauseMenuPanel {
         }
 
         inputManager.profileService.setActionBinding(actionId, binding)
-        this.updateCaptureStatus('Binding updated')
+        const linkedAssignment = getLinkedInverseAssignment(actionId, binding)
+        if (linkedAssignment) {
+            inputManager.profileService.setActionBinding(linkedAssignment.actionId, linkedAssignment.binding)
+            const linkedLabel = getInputActionDefinition(linkedAssignment.actionId).label
+            this.updateCaptureStatus(`Binding updated; ${linkedLabel} assigned inverse`) 
+        } else {
+            this.updateCaptureStatus('Binding updated')
+        }
         this.refreshUI()
     }
 
@@ -552,30 +561,54 @@ export class ControlsPanel extends PauseMenuPanel {
             return
         }
 
-        const tbody = panel.querySelector('#input-mapping-tbody') as HTMLElement | null
-        if (!tbody) {
-            return
-        }
+        const duplicateWarnings = getDuplicateBindingWarnings(profile)
 
-        tbody.innerHTML = INPUT_ACTION_ORDER
-            .map(actionId => {
-                const action = getInputActionDefinition(actionId)
-                const bindingText = formatBindingList(profile.bindings[actionId])
-                const canEdit = this.isActionEditable(actionId)
-                return `
-                    <tr>
-                        <td>${action.label}</td>
-                        <td>${bindingText}</td>
-                        <td>
-                            ${canEdit ? `<button type="button" data-input-edit-action="${actionId}">Edit</button>` : '<span>Locked</span>'}
-                        </td>
-                    </tr>
-                `
-            })
-            .join('')
+        const rows = INPUT_ACTION_ORDER.map((actionId) => {
+            const action = getInputActionDefinition(actionId)
+            const bindingText = formatBindingList(profile.bindings[actionId])
+            const canEdit = this.isActionEditable(profile, actionId)
+            const duplicateWarning = duplicateWarnings.get(actionId)
+
+            return {
+                actionId,
+                label: action.label,
+                bindingText,
+                canEdit,
+                duplicateWarning
+            }
+        })
+
+        UIComponentUtils.renderTable(panel, {
+            tbodyId: 'input-mapping-tbody',
+            rows,
+            rowClassName: (row) => row.duplicateWarning ? 'has-binding-warning' : undefined,
+            columns: [
+                {
+                    key: 'action',
+                    renderCell: (row) => row.label
+                },
+                {
+                    key: 'binding',
+                    renderCell: (row) => `
+                        <div>${row.bindingText}</div>
+                        ${row.duplicateWarning ? `<div class="input-binding-warning">Warning: ${row.duplicateWarning}</div>` : ''}
+                    `
+                },
+                {
+                    key: 'edit',
+                    renderCell: (row) => row.canEdit
+                        ? `<button type="button" data-input-edit-action="${row.actionId}">Edit</button>`
+                        : '<span>Locked</span>'
+                }
+            ]
+        })
     }
 
-    private isActionEditable(actionId: InputActionId): boolean {
+    private isActionEditable(profile: InputProfileDefinition, actionId: InputActionId): boolean {
+        if (isDerivedLinkedActionLocked(profile, actionId)) {
+            return false
+        }
+
         const definition = getInputActionDefinition(actionId)
         return definition.type !== InputActionType.Axis
             || actionId === InputAction.MoveForward
@@ -599,9 +632,6 @@ export class ControlsPanel extends PauseMenuPanel {
         }
         this.stopAnalogRefreshTimer()
         this.stopCaptureListeners()
-        const panel = this.getPanelElement()
-        panel?.removeEventListener('click', this.handlePanelClick)
-        panel?.removeEventListener('change', this.handlePanelChange)
         super.dispose()
     }
 }

@@ -55,6 +55,16 @@
     color: #c2cdd9;
 }
 
+#panel-controls .input-mapping-table tr.has-binding-warning td {
+    background: rgba(255, 187, 0, 0.08);
+}
+
+#panel-controls .input-binding-warning {
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: #ffcc66;
+}
+
 #panel-controls .input-capture-status {
     min-height: 20px;
     margin-bottom: 8px;

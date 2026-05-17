@@ -57,6 +57,18 @@ export interface InputConfig<T = string> {
     parseValue?: (rawValue: string) => T
 }
 
+export interface TableColumnConfig<TRow> {
+    key: string
+    renderCell: (row: TRow) => string
+}
+
+export interface TableRenderConfig<TRow> {
+    tbodyId: string
+    rows: ReadonlyArray<TRow>
+    columns: ReadonlyArray<TableColumnConfig<TRow>>
+    rowClassName?: (row: TRow) => string | undefined
+}
+
 export class UIComponentUtils {
     static setupSlider(
         container: HTMLElement | null,
@@ -169,6 +181,30 @@ export class UIComponentUtils {
         })
     }
 
+    static setupDelegatedDataButtons<T = string>(
+        container: HTMLElement | null,
+        selector: string,
+        dataAttribute: string,
+        onClick: (value: T, button: HTMLElement) => void
+    ): void {
+        if (!container) return
+
+        container.addEventListener('click', (event) => {
+            const target = event.target as HTMLElement | null
+            const button = target?.closest(selector) as HTMLElement | null
+            if (!button) {
+                return
+            }
+
+            const value = button.dataset[dataAttribute] as T | undefined
+            if (value === undefined) {
+                return
+            }
+
+            onClick(value, button)
+        })
+    }
+
     static setupSelect<T = string>(
         container: HTMLElement | null,
         config: SelectConfig<T>
@@ -248,5 +284,25 @@ export class UIComponentUtils {
                 ? formatDisplay(value)
                 : value.toString()
         }
+    }
+
+    static renderTable<TRow>(
+        container: HTMLElement | null,
+        config: TableRenderConfig<TRow>
+    ): void {
+        if (!container) return
+
+        const tbody = container.querySelector(`#${config.tbodyId}`) as HTMLElement | null
+        if (!tbody) return
+
+        tbody.innerHTML = config.rows.map((row) => {
+            const rowClass = config.rowClassName?.(row)
+            const classAttr = rowClass ? ` class="${rowClass}"` : ''
+            const cells = config.columns
+                .map((column) => `<td data-table-col="${column.key}">${column.renderCell(row)}</td>`)
+                .join('')
+
+            return `<tr${classAttr}>${cells}</tr>`
+        }).join('')
     }
 }
