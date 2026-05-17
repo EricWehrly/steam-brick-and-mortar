@@ -63,7 +63,7 @@
     border-radius: var(--ui-shared-row-radius, var(--panel-radius-sm));
     background: var(--ui-shared-row-bg, transparent);
     color: var(--ui-shared-row-text, var(--panel-text));
-    cursor: pointer;
+    cursor: default;
 }
 
 .lighting-controls-panel .control-item:hover {
@@ -74,6 +74,27 @@
     margin-left: auto;
     font-size: var(--panel-font-size-xs);
     color: var(--panel-text-muted);
+}
+
+.lighting-controls-panel .master-brightness-slider,
+.lighting-controls-panel .group-brightness-slider,
+.lighting-controls-panel .light-brightness-slider {
+    flex: 1 1 auto;
+    min-width: 90px;
+}
+
+.lighting-controls-panel .slider-value {
+    flex: 0 0 3.2ch;
+    text-align: right;
+    font-size: var(--panel-font-size-xs);
+    color: var(--panel-text-muted);
+}
+
+.lighting-controls-panel .group-slider-area {
+    display: flex;
+    align-items: center;
+    gap: var(--panel-space-8);
+    width: 100%;
 }
 
 .lighting-controls-panel .group-expander.collapsed {

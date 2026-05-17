@@ -257,11 +257,11 @@ export class LightingRenderer {
     }
 
     private setupAmbientAndMainDirectionalLighting(): void {
-        this.lightFactory.createAmbientLight(0xffffff, 0.4, {
+        this.lightFactory.createAmbientLight(0xffffff, 0.3, {
             name: LIGHT_NAMES.AMBIENT,
             parent: this.lightingGroup
         })
-        this.lightFactory.createDirectionalLight(0xffffff, 0.6, {
+        this.lightFactory.createDirectionalLight(0xffffff, 0.95, {
             name: LIGHT_NAMES.MAIN_DIRECTIONAL,
             parent: this.lightingGroup,
             position: [0, 10, 0]
@@ -305,7 +305,7 @@ export class LightingRenderer {
         // Ambient light — warm retail white, noticeable brightness.
         // ambientIntensity in config is near-zero by design (keeps specular bias down),
         // but ambient *base* must be high enough to see the room before fixtures kick in.
-        const ambientLight = this.lightFactory.createAmbientLight(0xFFF8E7, 0.45, {
+        const ambientLight = this.lightFactory.createAmbientLight(0xFFF8E7, 0.32, {
             name: LIGHT_NAMES.AMBIENT,
             parent: this.lightingGroup
         })
@@ -314,7 +314,7 @@ export class LightingRenderer {
         // Main exterior light: Combined moonlight + street light as single directional
         // Positioned high and forward with warmer tone (mix of cool moonlight + warm street light)
         const exteriorHeight = (this.config.ceilingHeight) + 2
-        const exteriorLight = this.lightFactory.createDirectionalLight(0xD4DFF2, 0.22, {
+        const exteriorLight = this.lightFactory.createDirectionalLight(0xD4DFF2, 0.52, {
             name: LIGHT_NAMES.EXTERIOR_AMBIENT,
             parent: this.lightingGroup,
             position: [1, exteriorHeight, 10]
@@ -327,7 +327,7 @@ export class LightingRenderer {
         // Positioned outside looking in, warm welcoming glow
         const entranceSpot = this.lightFactory.createSpotLight(
             0xFFE4B5,
-            0.6,
+            0.82,
             12,
             Math.PI / 5,
             0.3,
@@ -346,7 +346,7 @@ export class LightingRenderer {
         // Subtle rim light: defines edges from back, prevents flat lighting
         // Cool temperature, very low intensity, non-shadow casting
         const rimLightHeight = (this.config.ceilingHeight) + 1
-        const rimLight = this.lightFactory.createDirectionalLight(BlockbusterColors.fluorescentCool, 0.08, {
+        const rimLight = this.lightFactory.createDirectionalLight(BlockbusterColors.fluorescentCool, 0.14, {
             name: LIGHT_NAMES.RIM_LIGHT,
             parent: this.lightingGroup,
             position: [3, rimLightHeight, -5]

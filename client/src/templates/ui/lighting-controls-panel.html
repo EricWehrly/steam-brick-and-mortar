@@ -8,8 +8,9 @@
 <div class="panel-content" id="lighting-panel-content">
     <div class="master-controls">
         <label class="control-item">
-            <input type="checkbox" class="ui-checkbox ui-checkbox--rollup" id="all-lights-toggle">
             <span class="control-label ui-control-label">All Lights</span>
+            <input type="range" min="0" max="3" step="0.01" class="master-brightness-slider" id="all-lights-slider" value="1">
+            <span class="slider-value" id="all-lights-value">100%</span>
         </label>
         <label class="control-item">
             <input type="checkbox" class="ui-checkbox" id="debug-indicator-toggle" {{#checked debugIndicatorEnabled}}checked{{/checked}}>

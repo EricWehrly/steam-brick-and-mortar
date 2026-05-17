@@ -30,6 +30,9 @@ export class ManagedTextureArray {
         const texture = new THREE.DataArrayTexture(data, config.width, config.height, config.depth)
         texture.format = THREE.RGBAFormat
         texture.type = THREE.UnsignedByteType
+        // Artwork pixel bytes come from sRGB image sources (Steam CDN / canvas extraction).
+        // Keep this metadata explicit for tools/debug paths that inspect texture color intent.
+        texture.colorSpace = THREE.SRGBColorSpace
         texture.minFilter = THREE.LinearFilter
         texture.magFilter = THREE.LinearFilter
         texture.wrapS = THREE.ClampToEdgeWrapping
