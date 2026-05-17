@@ -104,6 +104,22 @@ function ensureCanvas(width: number, height: number): void {
 }
 
 /**
+ * Decode image blobs without browser color-space/alpha pre-processing so we
+ * control artwork color transforms explicitly in the shader pipeline.
+ */
+async function createBitmapPreservingSourceColor(blob: Blob): Promise<ImageBitmap> {
+    try {
+        return await createImageBitmap(blob, {
+            colorSpaceConversion: 'none',
+            premultiplyAlpha: 'none'
+        })
+    } catch {
+        // Fallback for engines that don't support the options object.
+        return createImageBitmap(blob)
+    }
+}
+
+/**
  * Process a blob into texture pixel data (legacy square mode)
  */
 async function processBlob(
@@ -113,7 +129,7 @@ async function processBlob(
     ensureCanvas(textureSize, textureSize)
     
     // Create image bitmap from blob
-    const imageBitmap = await createImageBitmap(blob)
+    const imageBitmap = await createBitmapPreservingSourceColor(blob)
     
     // Clear and draw scaled to texture size
     offscreenContext!.clearRect(0, 0, textureSize, textureSize)
@@ -145,7 +161,7 @@ async function processBlobWithDimensions(
     useNativeSize?: boolean
 ): Promise<ProcessBlobResult> {
     // Create image bitmap from blob
-    const imageBitmap = await createImageBitmap(blob)
+    const imageBitmap = await createBitmapPreservingSourceColor(blob)
     
     // Determine output dimensions
     let width: number

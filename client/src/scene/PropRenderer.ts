@@ -64,7 +64,7 @@ export class PropRenderer {
       width = 4,
       height = 0.15,
       depth = 0.6,
-      emissiveIntensity = 0.8,
+      emissiveIntensity = 1.0,
       rows = 2,
       fixturesPerRow = 4
     } = options
@@ -79,7 +79,7 @@ export class PropRenderer {
     const fixtureMaterial = new THREE.MeshStandardMaterial({
       color: 0xFFFFF0, // Ivory (warmer and brighter than ghost white)
       emissive: 0xF0F8FF, // Alice blue glow (brighter emissive)
-      emissiveIntensity: emissiveIntensity * 2.0, // Further increased for more prominence
+      emissiveIntensity: emissiveIntensity * 1.8, // Prominent, but not self-lit enough to wash out shadows
       roughness: 0.05, // Even smoother for more reflection
       metalness: 0.02,
       transparent: true,
@@ -150,7 +150,7 @@ export class PropRenderer {
       
       const rowLight = this.lightFactory.createRectAreaLight(
         BlockbusterColors.fluorescentCool,
-        4, // Balanced intensity per row
+        6, // Brighter retail fixture balance per row
         roomWidth * 0.8,
         depth * 0.9,
         {
