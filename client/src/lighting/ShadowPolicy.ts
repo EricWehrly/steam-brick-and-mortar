@@ -77,6 +77,27 @@ export function fitDirectionalShadowCamera(
     light.shadow.camera.updateProjectionMatrix()
 }
 
+/**
+ * Fit shadow camera with tighter framing for shelf contact grounding.
+ * Reduces the view area to focus on shelf zones, allowing for tighter
+ * contact shadows with better precision around shelf bases and overhangs.
+ */
+export function fitDirectionalShadowCameraForShelfContact(
+    light: THREE.DirectionalLight,
+    footprint: RoomFootprint
+): void {
+    // Tighter fit (0.5 instead of 0.6) focuses shadow precision on shelf zones
+    const halfWidth = Math.max(10, footprint.width * 0.5)
+    const halfDepth = Math.max(8, footprint.depth * 0.5)
+    light.shadow.camera.left = -halfWidth
+    light.shadow.camera.right = halfWidth
+    light.shadow.camera.top = halfDepth
+    light.shadow.camera.bottom = -halfDepth
+    light.shadow.camera.near = 0.5
+    light.shadow.camera.far = 40
+    light.shadow.camera.updateProjectionMatrix()
+}
+
 export function configureDirectionalShadow(
     light: THREE.DirectionalLight,
     config: ShadowConfig,
@@ -88,6 +109,28 @@ export function configureDirectionalShadow(
     light.shadow.bias = -0.0006
     light.shadow.normalBias = 0.015
     fitDirectionalShadowCamera(light, footprint)
+}
+
+/**
+ * Configure directional shadow with tighter contact grounding for shelf zones.
+ * Uses more aggressive bias tuning and tighter camera framing to create
+ * darker, more visible contact shadows at shelf-box intersections.
+ */
+export function configureDirectionalShadowForShelfContact(
+    light: THREE.DirectionalLight,
+    config: ShadowConfig,
+    footprint: RoomFootprint
+): void {
+    applyLightShadowPolicy(light, config)
+    if (!light.castShadow) return
+
+    // More aggressive bias values for tighter contact shadows
+    // Slightly more negative bias pulls shadows closer to contact points
+    light.shadow.bias = -0.001
+    // Reduce normalBias to allow shadows to creep closer to surfaces
+    light.shadow.normalBias = 0.005
+    // Use tighter camera framing for shelf zones
+    fitDirectionalShadowCameraForShelfContact(light, footprint)
 }
 
 export function refitDirectionalShadowCameras(

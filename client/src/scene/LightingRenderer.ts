@@ -23,7 +23,7 @@ import { RoomEventTypes, type RoomResizedEvent } from '../types/InteractionEvent
 import { StorePropsEventTypes } from './props/PropsEvents'
 import { LightFactory } from '../lighting/LightFactory'
 import { LightRegistry } from '../lighting/LightRegistry'
-import { applyRendererShadowPolicy, applyLightShadowPolicy, configureDirectionalShadow, refitDirectionalShadowCameras } from '../lighting/ShadowPolicy'
+import { applyRendererShadowPolicy, applyLightShadowPolicy, configureDirectionalShadow, configureDirectionalShadowForShelfContact, refitDirectionalShadowCameras } from '../lighting/ShadowPolicy'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor } from '../utils/PerformanceMonitor'
 import { GameSpotlight } from '../debug/GameSpotlight'
@@ -269,7 +269,7 @@ export class LightingRenderer {
         const mainDirectional = this.lightingGroup.getObjectByName(LIGHT_NAMES.MAIN_DIRECTIONAL)
         if (mainDirectional instanceof THREE.DirectionalLight) {
             this.attachDirectionalTarget(mainDirectional)
-            configureDirectionalShadow(mainDirectional, this.config, this.currentFootprint())
+            configureDirectionalShadowForShelfContact(mainDirectional, this.config, this.currentFootprint())
         }
     }
 
