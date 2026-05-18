@@ -13,6 +13,18 @@
 
 import * as THREE from 'three'
 
+/**
+ * Compute a deterministic per-instance variation factor (0-1) from textureIndex.
+ * Used to break up the synthetic appearance of identical instances with subtle
+ * roughness/brightness variations. Uses a simple hash for determinism.
+ */
+export function computePerInstanceVariation(textureIndex: number): number {
+    // Simple hash: fold the texture index through a pseudo-random function
+    // Result is normalized to [0, 1] for use as a variation factor
+    const x = Math.sin(textureIndex * 12.9898) * 43758.5453
+    return x - Math.floor(x)
+}
+
 export interface LitArtworkMaterialOptions {
     highTexture: THREE.DataArrayTexture
     midTexture: THREE.DataArrayTexture
@@ -44,6 +56,7 @@ varying float vTextureIndex;
 varying float vLodLevel;
 varying float vHighTextureSlot;
 varying float vFresnelFactor;
+varying float vRoughnessVariation;
 
 uniform float artworkFresnelPower;
 `
@@ -60,6 +73,11 @@ vHighTextureSlot = highTextureSlot;
 vec3 viewDir = normalize( vViewPosition );
 float NdotV = max( 0.0, dot( normal, viewDir ) );
 vFresnelFactor = pow( 1.0 - NdotV, artworkFresnelPower );
+
+// Compute per-instance roughness variation from textureIndex.
+// Uses a simple hash to produce deterministic variation [0, 1] per instance.
+float x = sin( textureIndex * 12.9898 ) * 43758.5453;
+vRoughnessVariation = x - floor( x );
 `
 
 /** GLSL declarations injected into the fragment shader. */
@@ -72,6 +90,23 @@ varying float vTextureIndex;
 varying float vLodLevel;
 varying float vHighTextureSlot;
 varying float vFresnelFactor;
+varying float vRoughnessVariation;
+`
+
+/**
+ * GLSL that applies per-instance roughness variation.
+ *
+ * Maps the per-instance variation factor [0, 1] to a roughness offset
+ * within strict bounds to break up the clone look without popping.
+ */
+const FRAG_ROUGHNESS_VARIATION_CHUNK = /* glsl */ `
+{
+    // Apply per-instance roughness variation to break clone appearance.
+    // Variation [0, 1] is mapped to offset [-0.05, +0.05] around base 0.35.
+    // Clamped to [0.2, 0.6] to stay within valid specular response range.
+    float roughnessOffset = (vRoughnessVariation - 0.5) * 2.0 * 0.05;
+    roughnessFactor = clamp( roughnessFactor + roughnessOffset, 0.2, 0.6 );
+}
 `
 
 /**
@@ -158,6 +193,13 @@ export function createLitArtworkMaterial(options: LitArtworkMaterialOptions): TH
             '#include <map_fragment>',
             FRAG_MAP_CHUNK
         )
+
+        // Fragment: inject per-instance roughness variation after roughness map processing.
+        // This allows each instance to have subtle variation without popping.
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <roughnessmap_fragment>',
+            '#include <roughnessmap_fragment>\n' + FRAG_ROUGHNESS_VARIATION_CHUNK
+        )
     }
 
     // Ensure Three.js re-compiles when the material is cloned or the renderer
@@ -205,4 +247,29 @@ export function tuneLitArtworkFresnel(
     if (shader?.uniforms?.artworkFresnelPower) {
         shader.uniforms.artworkFresnelPower.value = Math.min(8.0, Math.max(2.0, params?.fresnelPower ?? 4.0))
     }
+}
+
+/**
+ * Apply per-instance roughness variation to break up the clone look.
+ *
+ * Computes a deterministic variation factor from textureIndex and applies
+ * a small roughness offset within strict bounds to avoid popping across
+ * LOD transitions or camera movement.
+ *
+ * @param material - The MeshStandardMaterial to modify.
+ * @param textureIndex - The texture index for this instance (used to seed deterministic variation).
+ * @param baseRoughness - The base roughness value. Variation will be applied around this.
+ * @param variationRange - How much to vary roughness (default 0.05 for ±5% of typical range).
+ */
+export function applyPerInstanceRoughnessVariation(
+    material: THREE.MeshStandardMaterial,
+    textureIndex: number,
+    baseRoughness: number = 0.35,
+    variationRange: number = 0.05
+): void {
+    const variation = computePerInstanceVariation(textureIndex)
+    // Map variation [0, 1] to [-variationRange, +variationRange]
+    const offset = (variation - 0.5) * 2 * variationRange
+    // Clamp final roughness within safe bounds
+    material.roughness = Math.min(0.6, Math.max(0.2, baseRoughness + offset))
 }
