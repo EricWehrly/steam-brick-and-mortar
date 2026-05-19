@@ -455,7 +455,7 @@ export class AppSettings {
             // Input Settings
             inputProfile: 'mouse-keyboard',
             inputBindings: '{}',
-            inputDevicesEnabled: '{"mouse-keyboard":true,"gamepad":true,"touch":true,"vr":true}'
+            inputDevicesEnabled: '{}'
         }
     }
 
