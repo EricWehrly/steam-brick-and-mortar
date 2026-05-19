@@ -1,9 +1,9 @@
 /**
  * Cache Management Panel Styles
- * Uses shared components from shared-components.css
+ * Uses shared settings components from settings-components.css
  */
 
-@import './shared-components.css';
+@import './settings-components.css';
 
 /* Cache-specific sections — layout handled by shared .cache-section alias in shared-components */
 

@@ -1,5 +1,5 @@
 /* Application Panel Styles */
-@import './shared-components.css';
+@import './settings-components.css';
 
 #panel-application .setting-item {
     margin-bottom: 0;

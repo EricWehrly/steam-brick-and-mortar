@@ -1,3 +1,5 @@
+@import './settings-components.css';
+
 /**
  * Graphics Settings Panel Styles
  * Following the established pause menu design patterns
@@ -51,60 +53,6 @@
   scrollbar-color: var(--accent-color) transparent;
 }
 
-.graphics-settings-panel .setting-section {
-  margin-bottom: 1.1rem;
-}
-
-.graphics-settings-panel .setting-section:last-child {
-  margin-bottom: 0.5rem;
-}
-
-/* Setting Groups */
-.graphics-settings-panel .setting-group {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--color-border, #333);
-  border-radius: 6px;
-  padding: 0.9rem 1rem;
-}
-
-.graphics-settings-panel .setting-label {
-  display: block;
-  font-weight: bold;
-  color: var(--text-primary);
-  font-size: 1rem;
-  margin-bottom: 0.5rem;
-}
-
-/* Setting behavior hints - subtle informational badges */
-.graphics-settings-panel .setting-hint-badge {
-  font-size: 0.7rem;
-  font-weight: normal;
-  padding: 0.15rem 0.4rem;
-  border-radius: 3px;
-  margin-left: 0.5rem;
-  opacity: 0.7;
-  transition: all 0.3s ease;
-}
-
-.graphics-settings-panel .hint-reload {
-  color: var(--panel-text-muted, #8f98a0);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.graphics-settings-panel .hint-disabled {
-  color: inherit;
-  background: transparent;
-  border: 1px dashed currentColor;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  opacity: 0.85;
-}
-
-.graphics-settings-panel .hint-instant {
-  color: #4caf50;
-  background: rgba(102, 170, 102, 0.15);
-}
-
 /* Disabled setting controls */
 .graphics-settings-panel .disabled-setting {
   opacity: 0.55;
@@ -127,18 +75,6 @@
   opacity: 1;
 }
 
-.graphics-settings-panel .setting-description {
-  margin: 0 0 1rem 0;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  line-height: 1.4;
-}
-
-.graphics-settings-panel .setting-control {
-  margin-top: 0.75rem;
-}
-
-/* Select Controls */
 .graphics-settings-panel .setting-select {
   width: 100%;
   padding: 0.75rem;
@@ -168,22 +104,9 @@
   padding: 0.5rem;
 }
 
-.graphics-settings-panel .setting-slider {
-  margin-bottom: 0.5rem;
-}
-
-.graphics-settings-panel .slider-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  color: #67c1f5;
-  font-weight: 500;
-  margin-top: 0.25rem;
-}
-
 /* =============================================================================
    RELOAD INDICATOR SYSTEM
-   
+
    Uses two data attributes for pure CSS control:
    - data-requires-reload: Static, declared in HTML on controls that need reload
    - data-changed: Dynamic, set by JS when value differs from initial

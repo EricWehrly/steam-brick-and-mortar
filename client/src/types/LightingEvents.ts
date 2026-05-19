@@ -61,3 +61,20 @@ export const LightingEventTypes = {
     /** Request a point light be created by the lighting system (avoids direct scene add) */
     PointLightRequested: 'lighting:point-light-requested',
 } as const
+
+export interface ArtworkTuningChangedEvent extends BaseInteractionEvent {
+    roughness?: number
+    metalness?: number
+    fresnelLift?: number
+    fresnelPower?: number
+}
+
+export interface ShadowContactTuningChangedEvent extends BaseInteractionEvent {
+    bias?: number
+    normalBias?: number
+}
+
+export const ArtworkEventTypes = {
+    TuningChanged: 'artwork:tuning-changed',
+    ShadowContactTuningChanged: 'artwork:shadow-contact-tuning-changed',
+} as const
