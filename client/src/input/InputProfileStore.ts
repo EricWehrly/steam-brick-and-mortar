@@ -76,12 +76,9 @@ export class InputProfileStore {
                 }
             }
 
-            const enabledOverride = enabledMap[defaultProfile.deviceKind]
             const profileEnabledOverride = enabledMap[defaultProfile.id]
             if (typeof profileEnabledOverride === 'boolean') {
                 merged.enabled = profileEnabledOverride
-            } else if (typeof enabledOverride === 'boolean') {
-                merged.enabled = enabledOverride
             }
 
             return merged

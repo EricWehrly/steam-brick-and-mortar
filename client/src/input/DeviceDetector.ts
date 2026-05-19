@@ -84,13 +84,7 @@ export class DeviceDetector {
 
             const deviceId = `gamepad-${gamepad.index}`
             connectedGamepadIds.add(deviceId)
-            this.devices.set(deviceId, {
-                id: deviceId,
-                name: gamepad.id || `Gamepad ${gamepad.index + 1}`,
-                kind: InputDeviceKind.Gamepad,
-                connected: true,
-                profileId: 'gamepad-standard'
-            })
+            this.addGamepadDevice(gamepad)
         }
 
         let changed = false
@@ -112,8 +106,7 @@ export class DeviceDetector {
             .sort((left, right) => left.name.localeCompare(right.name))
     }
 
-    private handleGamepadConnected = (event: GamepadEvent): void => {
-        const gamepad = event.gamepad
+    private addGamepadDevice(gamepad: Gamepad): void {
         const deviceId = `gamepad-${gamepad.index}`
         this.devices.set(deviceId, {
             id: deviceId,
@@ -122,6 +115,10 @@ export class DeviceDetector {
             connected: true,
             profileId: 'gamepad-standard'
         })
+    }
+
+    private handleGamepadConnected = (event: GamepadEvent): void => {
+        this.addGamepadDevice(event.gamepad)
         this.emitDevicesChanged()
     }
 
