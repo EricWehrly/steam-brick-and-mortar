@@ -220,19 +220,6 @@
     font-size: 13px;
 }
 
-/* Setting item layout */
-.setting-item {
-    margin-bottom: 16px;
-}
-
-.setting-label {
-    display: block;
-    color: #ccc;
-    font-size: 13px;
-    margin-bottom: 6px;
-    font-weight: 500;
-}
-
 /* Button groups */
 .btn-group {
     display: flex;
@@ -385,3 +372,4 @@
         gap: 4px;
     }
 }
+

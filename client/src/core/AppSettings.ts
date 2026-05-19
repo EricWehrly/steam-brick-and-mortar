@@ -59,6 +59,13 @@ export const Setting = {
     LodMaxHighSlots: 'lodMaxHighSlots',
     LodHighReductionRatio: 'lodHighReductionRatio',
     LodMedReductionRatio: 'lodMedReductionRatio',
+    // Artwork Tuning
+    ArtworkRoughness: 'artworkRoughness',
+    ArtworkMetalness: 'artworkMetalness',
+    ArtworkFresnelLift: 'artworkFresnelLift',
+    ArtworkFresnelPower: 'artworkFresnelPower',
+    ShadowContactBias: 'shadowContactBias',
+    ShadowContactNormalBias: 'shadowContactNormalBias',
     // Interface
     ShowFPS: 'showFPS',
     ShowPerformanceStats: 'showPerformanceStats',
@@ -95,6 +102,12 @@ export const SettingCategory = {
         Setting.LodMaxHighSlots,
         Setting.LodHighReductionRatio,
         Setting.LodMedReductionRatio,
+        Setting.ArtworkRoughness,
+        Setting.ArtworkMetalness,
+        Setting.ArtworkFresnelLift,
+        Setting.ArtworkFresnelPower,
+        Setting.ShadowContactBias,
+        Setting.ShadowContactNormalBias,
     ] as const,
     // Add other categories as needed (Interface, Debug, Steam, etc.)
 } as const
@@ -126,6 +139,14 @@ export interface ApplicationSettings {
     lodMaxHighSlots: number      // Max HIGH texture slots (affects VRAM)
     lodHighReductionRatio: number // HIGH texture reduction (0.5 = 50% of source)
     lodMedReductionRatio: number  // MED texture reduction (0.25 = 25% of source)
+
+    // Artwork Tuning (Advanced Display settings)
+    artworkRoughness: number          // PBR roughness [0.2, 0.6]
+    artworkMetalness: number          // PBR metalness [0.0, 0.2]
+    artworkFresnelLift: number        // Edge lift intensity [0.0, 0.3]
+    artworkFresnelPower: number       // Edge sharpness exponent [2.0, 8.0]
+    shadowContactBias: number         // Directional shadow bias (negative)
+    shadowContactNormalBias: number   // Directional shadow normal bias
     
     // Interface Settings
     showFPS: boolean
@@ -433,6 +454,14 @@ export class AppSettings {
             lodMaxHighSlots: 128,  // Max HIGH texture slots (128 × 300×450 = ~66MB VRAM)
             lodHighReductionRatio: 0.5,  // HIGH = 50% of nominal = 300×450 (true CDN ceiling for most titles)
             lodMedReductionRatio: 0.25,  // MED = 25% of source (600×900 → 150×225)
+
+            // Artwork Tuning
+            artworkRoughness: 0.35,
+            artworkMetalness: 0.05,
+            artworkFresnelLift: 0.15,
+            artworkFresnelPower: 4.0,
+            shadowContactBias: -0.001,
+            shadowContactNormalBias: 0.005,
             
             // Interface Settings
             showFPS: false,

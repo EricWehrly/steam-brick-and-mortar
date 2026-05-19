@@ -17,6 +17,7 @@ import { ApplicationPanel } from './panels/ApplicationPanel'
 import { GameSettingsPanel } from './panels/GameSettingsPanel'
 import { GraphicsSettingsPanel } from './panels/GraphicsSettingsPanel'
 import { CameraSettingsPanel } from './panels/CameraSettingsPanel'
+import { DisplayAdvancedPanel } from './panels/DisplayAdvancedPanel'
 import type { PerformanceMonitorUI } from '../PerformanceMonitor'
 import { EventManager } from '../../core/EventManager'
 import { SteamEventTypes } from '../../types/InteractionEvents'
@@ -173,7 +174,7 @@ export class PauseMenuManager {
             title: 'Display',
             icon: '🖥️',
             // TODO(act3-ui-normalization): add 'ui-settings' child panel when UI Scale slider is implemented.
-            childPanelIds: ['graphics-settings', 'camera-settings'],
+            childPanelIds: ['graphics-settings', 'camera-settings', 'display-advanced'],
             defaultChildPanelId: 'graphics-settings'
         })
         
@@ -186,6 +187,9 @@ export class PauseMenuManager {
 
         // Register camera settings panel
         this.registerPanel(new CameraSettingsPanel({}, this.appSettings))
+
+        // Register advanced display tuning panel
+        this.registerPanel(new DisplayAdvancedPanel({}, this.appSettings))
     
         const debugPanel = new DebugPanel({}, this.performanceMonitor)
         this.registerPanel(debugPanel)
