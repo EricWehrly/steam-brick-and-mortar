@@ -22,14 +22,7 @@
     padding: 6px 10px;
 }
 
-#panel-controls .input-profile-toggles {
-    margin-top: 10px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 8px;
-}
-
-#panel-controls .input-profile-toggle-item {
+#panel-controls .input-device-enabled-toggle {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -60,6 +53,16 @@
 
 #panel-controls .input-mapping-table td {
     color: #c2cdd9;
+}
+
+#panel-controls .input-mapping-table tr.has-binding-warning td {
+    background: rgba(255, 187, 0, 0.08);
+}
+
+#panel-controls .input-binding-warning {
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: #ffcc66;
 }
 
 #panel-controls .input-capture-status {

@@ -83,6 +83,7 @@ export class RoomManager {
     private targetDimensions: RoomDimensions | null = null
     private targetCenterOffset: { x: number; y: number; z: number } | null = null
     private isBuilding = false
+    private hasPositionedCamera = false
     private currentCenterOffset?: { x: number; y: number; z: number }
     private currentShelfLayout?: { rows: number; shelvesPerRow?: number }
     
@@ -227,12 +228,13 @@ export class RoomManager {
             this.roomGroup.position.set(centerOffset.x, centerOffset.y, appliedZ)
             this.currentCenterOffset = centerOffset
             
-            // Reposition and reorient camera to face the store center
-            // Player spawns at origin (0, 1.6, 0), should look at back wall center
-            const targetZ = appliedZ - (dimensions.depth / 2)
-            this.camera.position.set(0, 1.6, 0)
-            this.camera.lookAt(0, 1.6, targetZ)
-            console.debug(`📷 Camera repositioned to face store center at Z=${targetZ.toFixed(1)}`)
+            if (!this.hasPositionedCamera) {
+                this.hasPositionedCamera = true
+                const targetZ = appliedZ - (dimensions.depth / 2)
+                this.camera.position.set(0, 1.6, 0)
+                this.camera.lookAt(0, 1.6, targetZ)
+                console.debug(`📷 Camera initial position set to face store center at Z=${targetZ.toFixed(1)}`)
+            }
         }
 
         this.emitProgress('Building floor')

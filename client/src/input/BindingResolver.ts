@@ -9,6 +9,7 @@ import type {
     GamepadButtonBinding,
     InputBinding,
     InputProfileDefinition,
+    AxisDirection,
     MouseAxisBinding
 } from './InputProfile'
 
@@ -104,6 +105,21 @@ function resolveBindingValue(binding: InputBinding, rawState: RawInputState): nu
     }
 }
 
+function isButtonBinding(binding: InputBinding): binding is Extract<InputBinding, { type: 'keyboard-button' | 'mouse-button' | 'gamepad-button' }> {
+    return binding.type === 'keyboard-button' || binding.type === 'mouse-button' || binding.type === 'gamepad-button'
+}
+
+function resolveAxisBindingValue(binding: InputBinding, rawState: RawInputState): number {
+    const rawValue = resolveBindingValue(binding, rawState)
+    if (!isButtonBinding(binding)) {
+        return rawValue
+    }
+
+    const direction: AxisDirection = binding.direction ?? 'positive'
+    const magnitude = Math.abs(rawValue)
+    return direction === 'negative' ? -magnitude : magnitude
+}
+
 export class BindingResolver {
     resolve(profile: InputProfileDefinition, rawState: RawInputState): ResolvedActionState {
         const axisValues = new Map<InputActionId, number>()
@@ -124,7 +140,7 @@ export class BindingResolver {
             if (definition.type === InputActionType.Axis) {
                 let axisValue = 0
                 for (const binding of bindings) {
-                    const value = resolveBindingValue(binding, rawState)
+                    const value = resolveAxisBindingValue(binding, rawState)
                     if (definition.id === InputAction.LookHorizontal || definition.id === InputAction.LookVertical) {
                         axisValue += value
                     } else {
@@ -139,7 +155,7 @@ export class BindingResolver {
             } else {
                 let pressed = false
                 for (const binding of bindings) {
-                    if (resolveBindingValue(binding, rawState) >= 0.5) {
+                    if (Math.abs(resolveBindingValue(binding, rawState)) >= 0.5) {
                         pressed = true
                         break
                     }

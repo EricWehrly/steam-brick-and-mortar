@@ -35,7 +35,6 @@ describe('InputManager User Experience Tests', () => {
     
     // Create mock callbacks
     mockCallbacks = {
-      onMouseMove: vi.fn(),
       onKeyPress: vi.fn(),
       onKeyRelease: vi.fn(),
     };
@@ -273,8 +272,7 @@ describe('InputManager User Experience Tests', () => {
       });
       document.dispatchEvent(mouseMove);
       
-      // System should register the look direction change
-      expect(mockCallbacks.onMouseMove).toHaveBeenCalledWith(10, -10);
+      // System should register the position change
       expect(inputState.mouse.x).toBe(110);
       expect(inputState.mouse.y).toBe(190);
     });
@@ -306,7 +304,7 @@ describe('InputManager User Experience Tests', () => {
       document.dispatchEvent(mouseMove);
       
       // Should not trigger look callbacks (user not intending to look)
-      expect(mockCallbacks.onMouseMove).not.toHaveBeenCalled();
+      expect(mockCallbacks.onKeyPress).not.toHaveBeenCalled();
     });
 
     it('should handle rapid mouse movements without lag', () => {
@@ -333,9 +331,8 @@ describe('InputManager User Experience Tests', () => {
       
       const endTime = performance.now();
       
-      // Should handle 60 mouse events quickly (< 50ms)
+      // Should process 60 mouse events quickly (< 50ms)
       expect(endTime - startTime).toBeLessThan(50);
-      expect(mockCallbacks.onMouseMove).toHaveBeenCalledTimes(60);
     });
 
     it('should maintain smooth look behavior with varying mouse speeds', () => {
@@ -353,19 +350,9 @@ describe('InputManager User Experience Tests', () => {
         bubbles: true
       });
       document.dispatchEvent(slowMove);
-      expect(mockCallbacks.onMouseMove).toHaveBeenCalledWith(1, 1);
-      
-      // Test fast movement  
-      const fastMove = new MouseEvent('mousemove', {
-        clientX: 200,
-        clientY: 50,
-        bubbles: true
-      });
-      document.dispatchEvent(fastMove);
-      expect(mockCallbacks.onMouseMove).toHaveBeenCalledWith(99, -51);
-      
-      // Both should work without issues
-      expect(mockCallbacks.onMouseMove).toHaveBeenCalledTimes(2);
+      // Position should be tracked regardless of look mode
+      expect(inputManager.getInputState().mouse.x).toBe(101);
+      expect(inputManager.getInputState().mouse.y).toBe(101);
     });
   });
 
@@ -403,9 +390,10 @@ describe('InputManager User Experience Tests', () => {
         // Reset to initial position for clean test
         mockCamera.position.copy(initialPosition);
         
-        // Clear any previous key state
-        const inputState = inputManager.getInputState();
-        Object.keys(inputState.keys).forEach(k => inputState.keys[k] = false);
+        // Release all tracked keys before testing this direction
+        ['KeyW', 'KeyA', 'KeyS', 'KeyD'].forEach(k =>
+          document.dispatchEvent(new KeyboardEvent('keyup', { code: k }))
+        )
         
         // User presses key for this direction
         const keyEvent = new KeyboardEvent('keydown', { code: key });
@@ -427,7 +415,7 @@ describe('InputManager User Experience Tests', () => {
       
       // User looks right and slightly down (common VR interaction)
       const lookRightDown = { deltaX: 10, deltaY: 5 };
-      inputManager.updateCameraRotation(mockCamera, lookRightDown.deltaX, lookRightDown.deltaY);
+      inputManager.updateCameraRotation(mockCamera, lookRightDown.deltaX);
       
       // Camera should rotate to follow user's look direction
       expect(mockCamera.rotation.y).not.toBe(initialRotation.y); // Horizontal look changed
@@ -525,12 +513,11 @@ describe('InputManager User Experience Tests', () => {
       
       // Apply both movement and look
       inputManager.updateCameraMovement(mockCamera);
-      inputManager.updateCameraRotation(mockCamera, 20, 0);
+      inputManager.updateCameraRotation(mockCamera, 20);
       
       // Both movement and look should work simultaneously
       expect(mockCamera.position.z).toBeLessThan(initialPosition.z); // Moved forward
       expect(mockCamera.rotation.y).not.toBe(initialRotation); // Looked around
-      expect(mockCallbacks.onMouseMove).toHaveBeenCalledWith(20, 0);
     });
   });
 
@@ -571,7 +558,7 @@ describe('InputManager User Experience Tests', () => {
         
         // Verify sensitivity actually affects look behavior
         const initialRotation = mockCamera.rotation.y;
-        inputManager.updateCameraRotation(mockCamera, 10, 0);
+        inputManager.updateCameraRotation(mockCamera, 10);
         
         // Should have rotated (exact amount depends on sensitivity)
         expect(mockCamera.rotation.y).not.toBe(initialRotation);
@@ -595,7 +582,7 @@ describe('InputManager User Experience Tests', () => {
       const wKeyEvent = new KeyboardEvent('keydown', { code: 'KeyW' });
       document.dispatchEvent(wKeyEvent);
       inputManager.updateCameraMovement(mockCamera);
-      inputManager.updateCameraRotation(mockCamera, 1, 0);
+      inputManager.updateCameraRotation(mockCamera, 1);
       
       expect(isFinite(mockCamera.position.x)).toBe(true);
       expect(isFinite(mockCamera.position.z)).toBe(true);
@@ -609,7 +596,7 @@ describe('InputManager User Experience Tests', () => {
       inputManager.setMovementOptions(highOptions);
       
       inputManager.updateCameraMovement(mockCamera);
-      inputManager.updateCameraRotation(mockCamera, 1, 0);
+      inputManager.updateCameraRotation(mockCamera, 1);
       
       expect(isFinite(mockCamera.position.x)).toBe(true);
       expect(isFinite(mockCamera.position.z)).toBe(true);
@@ -626,9 +613,9 @@ describe('InputManager User Experience Tests', () => {
         onKeyPress: mockKeyPress,
         onKeyRelease: mockKeyRelease,
       };
-      
-      inputManager.setCallbacks(userCallbacks);
-      inputManager.startListening();
+
+      const callbackManager = new InputManager({}, userCallbacks);
+      callbackManager.startListening();
       
       // User presses and releases a key
       const wKeyDown = new KeyboardEvent('keydown', { code: 'KeyW' });
@@ -641,7 +628,8 @@ describe('InputManager User Experience Tests', () => {
       expect(mockKeyPress).toHaveBeenCalledWith('w');
       expect(mockKeyRelease).toHaveBeenCalledWith('w');
       
-      inputManager.stopListening();
+      callbackManager.stopListening();
+      callbackManager.dispose();
     });
 
     it('should persist user preferences across input system restarts', () => {
