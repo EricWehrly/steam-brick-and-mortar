@@ -52,18 +52,6 @@ export interface LightingSystemReadyEvent extends BaseInteractionEvent {
     quality: string
 }
 
-export interface ArtworkTuningChangedEvent extends BaseInteractionEvent {
-    roughness?: number
-    metalness?: number
-    fresnelLift?: number
-    fresnelPower?: number
-}
-
-export interface ShadowContactTuningChangedEvent extends BaseInteractionEvent {
-    bias?: number
-    normalBias?: number
-}
-
 export const LightingEventTypes = {
     Toggle: 'lighting:toggle',
     DebugToggle: 'lighting:debug-toggle',
