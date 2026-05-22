@@ -137,6 +137,43 @@ These are scene-immersion improvements that do not require designing new clutter
    - Touch points: scene setup and material environment configuration paths.
    - Validation: highlight movement should track camera and light shifts naturally.
 
+### Derived Artwork Map Investigation
+
+This is a plausible next-step quality path if the current flat roughness envelope tops out visually.
+
+What to derive:
+- A low-frequency roughness mask from the artwork image, biased so dark ink-heavy regions stay slightly rougher and bright coated highlight regions can read a little smoother.
+- Optionally, a very conservative albedo modulation mask for broad wear/dust shaping only. Do not treat the box art itself as a height field; that usually produces fake embossed covers.
+
+Recommended implementation shape:
+- Keep derivation off the main thread by extending the existing artwork texture worker/pixel pipeline rather than generating maps in the render loop.
+- Derive maps from the same decoded source pixels already fetched for MID/HIGH artwork slices.
+- Quantize the derived output aggressively. A single-channel roughness mask is the best first candidate; avoid full RGB companion textures unless the visual win is proven.
+- Upload in clusters using the same frame-budget-aware scheduling approach already used for artwork texture array writes so worker completions do not stampede a single frame.
+
+Expected cost profile:
+- CPU/build cost: moderate startup or background processing cost, but mostly amortizable because pixel decode and image analysis can run in a worker.
+- Main-thread cost: still present when copying derived pixels into texture-array backing stores and triggering GPU upload. Worker offload does not eliminate upload cost.
+- VRAM cost: the main risk. A full extra MID and HIGH companion array for roughness would materially increase artwork memory usage.
+- Shader cost: relatively small if sampling one extra channel per fragment; much lower risk than the memory/upload side.
+
+Practical recommendation:
+- Start with derived roughness only, MID tier only, and cache the results.
+- Treat HIGH derived maps as optional follow-up once MID shows a clear visual benefit.
+- Avoid derived albedo in the first pass unless the goal is specifically a subtle print-fade or dust treatment; roughness is the safer realism lever.
+
+Suggested pipeline:
+1. Extend the artwork worker to emit an optional single-channel roughness buffer alongside the existing color pixels.
+2. Store the derived data in the same cache layer keyed by artwork URL plus derivation version.
+3. Add a compact roughness companion texture array for MID artwork first.
+4. Patch `LitArtworkMaterial` to sample the companion array and modulate `roughnessFactor` within narrow bounds.
+5. Gate uploads through the frame-budget scheduler and flush in small batches/clusters.
+6. Compare three cases: current scalar roughness, hash-based per-instance variation, and image-derived roughness.
+
+Go / no-go criteria:
+- Go if the visual gain is obvious in shelf-angle closeups and the extra upload path does not create noticeable frame dips during library population.
+- No-go if the improvement is only visible in stills, if VRAM growth is too high, or if HIGH texture churn becomes meaningfully worse.
+
 ### Tier 3: Atmosphere before clutter (1-3 days)
 1. Dust motes in lit cones.
    - Why: adds depth cues and "air" without adding geometry clutter.
