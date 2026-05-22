@@ -5,6 +5,11 @@
  * texture sampling while preserving Three.js lighting, shadow, tone-mapping,
  * and fog chunks.
  *
+ * IMPORTANT: This class depends on specific Three.js shader chunk anchors
+ * (for example '#include <map_fragment>'). That is intentionally a thin,
+ * tactical extension and can break if upstream chunk names or placement change.
+ * Replacements are guarded to fail loudly instead of silently degrading visuals.
+ *
  * Attributes injected per-instance (must exist on the geometry):
  *   textureIndex    – slot in the MID texture array
  *   lodLevel        – 0 = HIGH, 1 = MID
@@ -12,6 +17,27 @@
  */
 
 import * as THREE from 'three'
+import { Setting, type ApplicationSettings } from '../../../core/AppSettings'
+import vertDeclarations from './shaders/lit-artwork.vert.declarations.glsl?raw'
+import vertImpl from './shaders/lit-artwork.vert.impl.glsl?raw'
+import fragDeclarations from './shaders/lit-artwork.frag.declarations.glsl?raw'
+import fragMap from './shaders/lit-artwork.frag.map.glsl?raw'
+import fragRoughnessVariation from './shaders/lit-artwork.frag.roughness-variation.glsl?raw'
+
+export const LIT_ARTWORK_MATERIAL_SETTING_KEYS = [
+    Setting.ArtworkRoughness,
+    Setting.ArtworkMetalness,
+    Setting.ArtworkFresnelLift,
+    Setting.ArtworkFresnelPower,
+] as const satisfies ReadonlyArray<keyof ApplicationSettings>
+
+export function isLitArtworkMaterialSettingKey(
+    key: keyof ApplicationSettings
+): key is (typeof LIT_ARTWORK_MATERIAL_SETTING_KEYS)[number] {
+    return LIT_ARTWORK_MATERIAL_SETTING_KEYS.includes(
+        key as (typeof LIT_ARTWORK_MATERIAL_SETTING_KEYS)[number]
+    )
+}
 
 interface LitArtworkUniforms {
     artworkFresnelLift?: { value: number }
@@ -22,6 +48,29 @@ interface LitArtworkMaterialUserData {
     litArtworkUniforms?: LitArtworkUniforms
     litArtworkFresnelLift?: number
     litArtworkFresnelPower?: number
+}
+
+const SHADER_ANCHORS = {
+    common: '#include <common>',
+    beginVertex: '#include <begin_vertex>',
+    mapFragment: '#include <map_fragment>',
+    roughnessMapFragment: '#include <roughnessmap_fragment>',
+} as const
+
+function replaceRequiredShaderChunk(
+    shaderSource: string,
+    targetChunk: string,
+    replacement: string,
+    stage: 'vertex' | 'fragment'
+): string {
+    if (!shaderSource.includes(targetChunk)) {
+        throw new Error(
+            `[LitArtworkMaterial] Missing ${stage} shader chunk anchor: ${targetChunk}. `
+            + 'Three.js shader chunk layout may have changed.'
+        )
+    }
+
+    return shaderSource.replace(targetChunk, replacement)
 }
 
 /**
@@ -57,102 +106,7 @@ export interface GlossTuningParams {
     metalness?: number
 }
 
-/** GLSL declarations injected into the vertex shader. */
-const VERT_DECLARATIONS = /* glsl */ `
-attribute float textureIndex;
-attribute float lodLevel;
-attribute float highTextureSlot;
-
-varying float vTextureIndex;
-varying float vLodLevel;
-varying float vHighTextureSlot;
-varying float vFresnelFactor;
-varying float vRoughnessVariation;
-
-uniform float artworkFresnelPower;
-`
-
-/** GLSL injected at the end of the vertex main body. */
-const VERT_IMPL = /* glsl */ `
-vTextureIndex    = textureIndex;
-vLodLevel        = lodLevel;
-vHighTextureSlot = highTextureSlot;
-
-// Compute fresnel factor in vertex shader where we have access to normal.
-// vViewPosition is available and points from vertex toward camera.
-// We compute (1 - |V·N|) and raise to power; at grazing angles this approaches 1.
-vec3 viewDir = normalize( vViewPosition );
-float NdotV = max( 0.0, dot( normal, viewDir ) );
-vFresnelFactor = pow( 1.0 - NdotV, artworkFresnelPower );
-
-// Compute per-instance roughness variation from textureIndex.
-// Uses a simple hash to produce deterministic variation [0, 1] per instance.
-float x = sin( textureIndex * 12.9898 ) * 43758.5453;
-vRoughnessVariation = x - floor( x );
-`
-
-/** GLSL declarations injected into the fragment shader. */
-const FRAG_DECLARATIONS = /* glsl */ `
-uniform sampler2DArray textureArrayHigh;
-uniform sampler2DArray textureArrayMid;
-uniform float artworkFresnelLift;
-
-varying float vTextureIndex;
-varying float vLodLevel;
-varying float vHighTextureSlot;
-varying float vFresnelFactor;
-varying float vRoughnessVariation;
-`
-
-/**
- * GLSL that applies per-instance roughness variation.
- *
- * Maps the per-instance variation factor [0, 1] to a roughness offset
- * within strict bounds to break up the clone look without popping.
- */
-const FRAG_ROUGHNESS_VARIATION_CHUNK = /* glsl */ `
-{
-    // Apply per-instance roughness variation to break clone appearance.
-    // Variation [0, 1] is mapped to offset [-0.05, +0.05] around base 0.35.
-    // Clamped to [0.2, 0.6] to stay within valid specular response range.
-    float roughnessOffset = (vRoughnessVariation - 0.5) * 2.0 * 0.05;
-    roughnessFactor = clamp( roughnessFactor + roughnessOffset, 0.2, 0.6 );
-}
-`
-
-/**
- * GLSL that replaces the built-in #include <map_fragment> chunk.
- *
- * We must set diffuseColor (a vec4 used downstream by lighting chunks).
- * We do NOT call gl_FragColor directly — the standard material pipeline
- * writes the final output after tone-mapping, fog, and shadow averaging.
- *
- * UV orientation: DataArrayTextures are bottom-up in WebGL, so we flip V
- * to match the same convention as the legacy ShaderMaterial shaders.
- */
-const FRAG_MAP_CHUNK = /* glsl */ `
-{
-    // GAME_BOX_TEXTURE_BLEND_MARKER: artwork color is sourced from texture arrays here.
-    vec2 flippedUv = vec2( vMapUv.x, 1.0 - vMapUv.y );
-
-    bool useHigh = ( vHighTextureSlot >= 0.0 ) && ( vLodLevel < 0.5 );
-
-    vec4 sampledColor;
-    if ( useHigh ) {
-        sampledColor = texture( textureArrayHigh, vec3( flippedUv, vHighTextureSlot ) );
-    } else {
-        sampledColor = texture( textureArrayMid, vec3( flippedUv, vTextureIndex ) );
-    }
-
-    // Apply fresnel edge lift for silhouette readability.
-    // Fresnel factor was computed in vertex shader. At grazing angles, lift the color
-    // slightly to help boxes read at oblique camera positions.
-    sampledColor.rgb = mix( sampledColor.rgb, sampledColor.rgb * (1.0 + artworkFresnelLift), vFresnelFactor );
-
-    // Honour existing map tint (mapTexelToLinear handles color-space).
-    diffuseColor *= sampledColor;
-}
-`
+export type LitArtworkTuningParams = Partial<GlossTuningParams & FresnelTuningParams>
 
 export function createLitArtworkMaterial(options: LitArtworkMaterialOptions): THREE.MeshStandardMaterial {
     const whiteMap = new THREE.DataTexture(
@@ -192,33 +146,43 @@ export function createLitArtworkMaterial(options: LitArtworkMaterialOptions): TH
         }
 
         // Vertex: inject varyings + per-instance attribute reads + fresnel computation.
-        shader.vertexShader = shader.vertexShader.replace(
-            '#include <common>',
-            '#include <common>\n' + VERT_DECLARATIONS
+        shader.vertexShader = replaceRequiredShaderChunk(
+            shader.vertexShader,
+            SHADER_ANCHORS.common,
+            SHADER_ANCHORS.common + '\n' + vertDeclarations,
+            'vertex'
         )
-        shader.vertexShader = shader.vertexShader.replace(
-            '#include <begin_vertex>',
-            '#include <begin_vertex>\n' + VERT_IMPL
+        shader.vertexShader = replaceRequiredShaderChunk(
+            shader.vertexShader,
+            SHADER_ANCHORS.beginVertex,
+            SHADER_ANCHORS.beginVertex + '\n' + vertImpl,
+            'vertex'
         )
 
         // Fragment: inject uniform/varying declarations.
-        shader.fragmentShader = shader.fragmentShader.replace(
-            '#include <common>',
-            '#include <common>\n' + FRAG_DECLARATIONS
+        shader.fragmentShader = replaceRequiredShaderChunk(
+            shader.fragmentShader,
+            SHADER_ANCHORS.common,
+            SHADER_ANCHORS.common + '\n' + fragDeclarations,
+            'fragment'
         )
 
         // Fragment: replace the standard map_fragment chunk so we sample the
         // texture array instead of a plain map uniform, and apply fresnel.
-        shader.fragmentShader = shader.fragmentShader.replace(
-            '#include <map_fragment>',
-            FRAG_MAP_CHUNK
+        shader.fragmentShader = replaceRequiredShaderChunk(
+            shader.fragmentShader,
+            SHADER_ANCHORS.mapFragment,
+            fragMap,
+            'fragment'
         )
 
         // Fragment: inject per-instance roughness variation after roughness map processing.
         // This allows each instance to have subtle variation without popping.
-        shader.fragmentShader = shader.fragmentShader.replace(
-            '#include <roughnessmap_fragment>',
-            '#include <roughnessmap_fragment>\n' + FRAG_ROUGHNESS_VARIATION_CHUNK
+        shader.fragmentShader = replaceRequiredShaderChunk(
+            shader.fragmentShader,
+            SHADER_ANCHORS.roughnessMapFragment,
+            SHADER_ANCHORS.roughnessMapFragment + '\n' + fragRoughnessVariation,
+            'fragment'
         )
     }
 
@@ -271,6 +235,21 @@ export function tuneLitArtworkFresnel(
     if (uniforms?.artworkFresnelPower) {
         uniforms.artworkFresnelPower.value = fresnelPower
     }
+}
+
+export function applyLitArtworkTuning(
+    material: THREE.MeshStandardMaterial,
+    params?: LitArtworkTuningParams
+): void {
+    tuneLitArtworkGloss(material, {
+        roughness: params?.roughness,
+        metalness: params?.metalness,
+    })
+    tuneLitArtworkFresnel(material, {
+        fresnelLift: params?.fresnelLift,
+        fresnelPower: params?.fresnelPower,
+    })
+    material.needsUpdate = true
 }
 
 /**
