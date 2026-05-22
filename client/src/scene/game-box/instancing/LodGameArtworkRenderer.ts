@@ -200,7 +200,7 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
 
         this.material = createLitArtworkMaterial({ highTexture, midTexture })
 
-        this.applyArtworkMaterialTuningFromSettings()
+        this.onAppSettingsChanged()
 
         this.eventManager.registerEventHandler<SettingChangedEvent>(
             AppSettingsEventTypes.Changed,
@@ -553,7 +553,10 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
         LodGameArtworkRenderer.logger.lifecycle('Disposed')
     }
 
-    private applyArtworkMaterialTuningFromSettings(): void {
+    private onAppSettingsChanged(event?: CustomEvent<SettingChangedEvent>): void {
+        if (event && !isLitArtworkMaterialSettingKey(event.detail.settingName)) {
+            return
+        }
         if (!this.material) return
 
         applyLitArtworkTuning(this.material, {
@@ -562,13 +565,5 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
             fresnelLift: this.appSettings.getSetting(Setting.ArtworkFresnelLift),
             fresnelPower: this.appSettings.getSetting(Setting.ArtworkFresnelPower),
         })
-    }
-
-    private onAppSettingsChanged(event: CustomEvent<SettingChangedEvent>): void {
-        if (!isLitArtworkMaterialSettingKey(event.detail.settingName)) {
-            return
-        }
-
-        this.applyArtworkMaterialTuningFromSettings()
     }
 }
