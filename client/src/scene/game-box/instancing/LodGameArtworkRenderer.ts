@@ -16,17 +16,21 @@
  */
 
 import * as THREE from 'three'
-import { AppSettings } from '../../../core/AppSettings'
+import { AppSettings, Setting, type SettingChangedEvent } from '../../../core/AppSettings'
 import { EventManager } from '../../../core/EventManager'
+import { AppSettingsEventTypes } from '../../../types/InteractionEvents'
 import { RenderLoopRegistry } from '../../RenderLoopRegistry'
 import { SceneLayer } from '../../SceneLayers'
-import { ArtworkEventTypes, type ArtworkTuningChangedEvent } from '../../../types/LightingEvents'
 import { Logger } from '../../../utils/Logger'
 import { HighTextureCache, type HighTextureCacheConfig } from './HighTextureCache'
 import { SpatialPrewarmingManager, type PrewarmingConfig } from './SpatialPrewarmingManager'
 import { PlacementRunResettableInstancedBase } from './PlacementRunResettableInstancedBase'
 import type { RendererTextureSources } from './LodTypes'
-import { createLitArtworkMaterial, tuneLitArtworkGloss, tuneLitArtworkFresnel } from './LitArtworkMaterial'
+import {
+    applyLitArtworkTuning,
+    createLitArtworkMaterial,
+    isLitArtworkMaterialSettingKey,
+} from './LitArtworkMaterial'
 
 // Class-scoped logger will be attached to the class
 
@@ -121,7 +125,7 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
     private isRegisteredForRenderLoop: boolean = false
     private readonly eventManager: EventManager
     private readonly appSettings: AppSettings
-    private readonly artworkTuningChangedHandler: (event: CustomEvent<ArtworkTuningChangedEvent>) => void
+    private readonly appSettingsChangedHandler: (event: CustomEvent<SettingChangedEvent>) => void
     
     private readonly config: Required<Omit<LodGameArtworkRendererConfig, 'highTextureCacheConfig' | 'prewarmingConfig'>> & 
                              Pick<LodGameArtworkRendererConfig, 'highTextureCacheConfig' | 'prewarmingConfig'>
@@ -132,7 +136,7 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
         super(config.maxInstances)
         this.eventManager = EventManager.getInstance()
         this.appSettings = AppSettings.getInstance()
-        this.artworkTuningChangedHandler = this.onArtworkTuningChanged.bind(this)
+        this.appSettingsChangedHandler = this.onAppSettingsChanged.bind(this)
         this.lazyHighTextures = config.lazyHighTextures ?? false
         this.config = {
             maxInstances: config.maxInstances,
@@ -196,18 +200,11 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
 
         this.material = createLitArtworkMaterial({ highTexture, midTexture })
 
-        tuneLitArtworkGloss(this.material, {
-            roughness: this.appSettings.getSetting('artworkRoughness'),
-            metalness: this.appSettings.getSetting('artworkMetalness')
-        })
-        tuneLitArtworkFresnel(this.material, {
-            fresnelLift: this.appSettings.getSetting('artworkFresnelLift'),
-            fresnelPower: this.appSettings.getSetting('artworkFresnelPower')
-        })
+        this.applyArtworkMaterialTuningFromSettings()
 
-        this.eventManager.registerEventHandler<ArtworkTuningChangedEvent>(
-            ArtworkEventTypes.TuningChanged,
-            this.artworkTuningChangedHandler
+        this.eventManager.registerEventHandler<SettingChangedEvent>(
+            AppSettingsEventTypes.Changed,
+            this.appSettingsChangedHandler
         )
         
         // Create geometry
@@ -535,9 +532,9 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
         this.geometry?.dispose()
         this.material?.dispose()
 
-        this.eventManager.deregisterEventHandler<ArtworkTuningChangedEvent>(
-            ArtworkEventTypes.TuningChanged,
-            this.artworkTuningChangedHandler
+        this.eventManager.deregisterEventHandler<SettingChangedEvent>(
+            AppSettingsEventTypes.Changed,
+            this.appSettingsChangedHandler
         )
         
         // Dispose HIGH texture management
@@ -556,17 +553,22 @@ export class LodGameArtworkRenderer extends PlacementRunResettableInstancedBase 
         LodGameArtworkRenderer.logger.lifecycle('Disposed')
     }
 
-    private onArtworkTuningChanged(event: CustomEvent<ArtworkTuningChangedEvent>): void {
+    private applyArtworkMaterialTuningFromSettings(): void {
         if (!this.material) return
 
-        tuneLitArtworkGloss(this.material, {
-            roughness: event.detail.roughness,
-            metalness: event.detail.metalness,
+        applyLitArtworkTuning(this.material, {
+            roughness: this.appSettings.getSetting(Setting.ArtworkRoughness),
+            metalness: this.appSettings.getSetting(Setting.ArtworkMetalness),
+            fresnelLift: this.appSettings.getSetting(Setting.ArtworkFresnelLift),
+            fresnelPower: this.appSettings.getSetting(Setting.ArtworkFresnelPower),
         })
-        tuneLitArtworkFresnel(this.material, {
-            fresnelLift: event.detail.fresnelLift,
-            fresnelPower: event.detail.fresnelPower,
-        })
-        this.material.needsUpdate = true
+    }
+
+    private onAppSettingsChanged(event: CustomEvent<SettingChangedEvent>): void {
+        if (!isLitArtworkMaterialSettingKey(event.detail.settingName)) {
+            return
+        }
+
+        this.applyArtworkMaterialTuningFromSettings()
     }
 }
