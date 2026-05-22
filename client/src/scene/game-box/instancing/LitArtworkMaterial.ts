@@ -13,6 +13,17 @@
 
 import * as THREE from 'three'
 
+interface LitArtworkUniforms {
+    artworkFresnelLift?: { value: number }
+    artworkFresnelPower?: { value: number }
+}
+
+interface LitArtworkMaterialUserData {
+    litArtworkUniforms?: LitArtworkUniforms
+    litArtworkFresnelLift?: number
+    litArtworkFresnelPower?: number
+}
+
 /**
  * Compute a deterministic per-instance variation factor (0-1) from textureIndex.
  * Used to break up the synthetic appearance of identical instances with subtle
@@ -164,12 +175,21 @@ export function createLitArtworkMaterial(options: LitArtworkMaterialOptions): TH
     // result neutral so the array texture sampling controls the final color.
     material.map = whiteMap
 
+    const userData = material.userData as LitArtworkMaterialUserData
+    userData.litArtworkFresnelLift = 0.15
+    userData.litArtworkFresnelPower = 4.0
+
     material.onBeforeCompile = (shader) => {
         // Bind the texture arrays and fresnel parameters as custom uniforms.
         shader.uniforms.textureArrayHigh = { value: options.highTexture }
         shader.uniforms.textureArrayMid  = { value: options.midTexture  }
-        shader.uniforms.artworkFresnelLift = { value: 0.15 }
-        shader.uniforms.artworkFresnelPower = { value: 4.0 }
+        shader.uniforms.artworkFresnelLift = { value: userData.litArtworkFresnelLift ?? 0.15 }
+        shader.uniforms.artworkFresnelPower = { value: userData.litArtworkFresnelPower ?? 4.0 }
+
+        userData.litArtworkUniforms = {
+            artworkFresnelLift: shader.uniforms.artworkFresnelLift as { value: number },
+            artworkFresnelPower: shader.uniforms.artworkFresnelPower as { value: number },
+        }
 
         // Vertex: inject varyings + per-instance attribute reads + fresnel computation.
         shader.vertexShader = shader.vertexShader.replace(
@@ -236,16 +256,20 @@ export function tuneLitArtworkFresnel(
     material: THREE.MeshStandardMaterial,
     params?: Partial<FresnelTuningParams>
 ): void {
-    if (!material.userData) {
-        material.userData = {}
-    }
+    const userData = material.userData as LitArtworkMaterialUserData
+    const uniforms = userData.litArtworkUniforms
 
-    const shader = (material as any).__webglProgram
-    if (shader?.uniforms?.artworkFresnelLift) {
-        shader.uniforms.artworkFresnelLift.value = Math.min(0.3, Math.max(0.0, params?.fresnelLift ?? 0.15))
+    const fresnelLift = Math.min(0.3, Math.max(0.0, params?.fresnelLift ?? 0.15))
+    const fresnelPower = Math.min(8.0, Math.max(2.0, params?.fresnelPower ?? 4.0))
+
+    userData.litArtworkFresnelLift = fresnelLift
+    userData.litArtworkFresnelPower = fresnelPower
+
+    if (uniforms?.artworkFresnelLift) {
+        uniforms.artworkFresnelLift.value = fresnelLift
     }
-    if (shader?.uniforms?.artworkFresnelPower) {
-        shader.uniforms.artworkFresnelPower.value = Math.min(8.0, Math.max(2.0, params?.fresnelPower ?? 4.0))
+    if (uniforms?.artworkFresnelPower) {
+        uniforms.artworkFresnelPower.value = fresnelPower
     }
 }
 

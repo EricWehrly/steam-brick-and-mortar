@@ -18,12 +18,12 @@ import { PropRenderer } from './PropRenderer'
 import { LightingDebugHelper } from './LightingDebugHelper'
 import { AppSettings, LIGHTING_QUALITY, type LightingQuality } from '../core/AppSettings'
 import { EventManager, EventSource } from '../core/EventManager'
-import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent } from '../types/LightingEvents'
+import { LightingEventTypes, ArtworkEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent, type ShadowContactTuningChangedEvent } from '../types/LightingEvents'
 import { RoomEventTypes, type RoomResizedEvent } from '../types/InteractionEvents'
 import { StorePropsEventTypes } from './props/PropsEvents'
 import { LightFactory } from '../lighting/LightFactory'
 import { LightRegistry } from '../lighting/LightRegistry'
-import { applyRendererShadowPolicy, applyLightShadowPolicy, configureDirectionalShadow, configureDirectionalShadowForShelfContact, refitDirectionalShadowCameras } from '../lighting/ShadowPolicy'
+import { applyRendererShadowPolicy, applyLightShadowPolicy, applyShadowContactTuning, configureDirectionalShadow, configureDirectionalShadowForShelfContact, refitDirectionalShadowCameras } from '../lighting/ShadowPolicy'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor } from '../utils/PerformanceMonitor'
 import { GameSpotlight } from '../debug/GameSpotlight'
@@ -115,6 +115,11 @@ export class LightingRenderer {
         this.eventManager.registerEventHandler(LightingEventTypes.QualityChanged, (event: CustomEvent<LightingQualityChangedEvent>) => {
             this.updateLightingQuality(event.detail.quality)
         })
+
+        this.eventManager.registerEventHandler<ShadowContactTuningChangedEvent>(
+            ArtworkEventTypes.ShadowContactTuningChanged,
+            this.onShadowContactTuningChanged.bind(this)
+        )
 
         // Listen for room resizing events to update lighting, including initial room build.
         this.eventManager.registerEventHandler(RoomEventTypes.Resized, (event: CustomEvent<RoomResizedEvent>) => {
@@ -269,8 +274,22 @@ export class LightingRenderer {
         const mainDirectional = this.lightingGroup.getObjectByName(LIGHT_NAMES.MAIN_DIRECTIONAL)
         if (mainDirectional instanceof THREE.DirectionalLight) {
             this.attachDirectionalTarget(mainDirectional)
-            configureDirectionalShadowForShelfContact(mainDirectional, this.config, this.currentFootprint())
+            configureDirectionalShadowForShelfContact(mainDirectional, this.config, this.currentFootprint(), {
+                bias: AppSettings.get('shadowContactBias'),
+                normalBias: AppSettings.get('shadowContactNormalBias')
+            })
         }
+    }
+
+    private onShadowContactTuningChanged(event: CustomEvent<ShadowContactTuningChangedEvent>): void {
+        const mainDirectional = this.lightingGroup.getObjectByName(LIGHT_NAMES.MAIN_DIRECTIONAL)
+        if (!(mainDirectional instanceof THREE.DirectionalLight)) return
+
+        applyShadowContactTuning(mainDirectional, {
+            bias: event.detail.bias,
+            normalBias: event.detail.normalBias,
+        })
+        this.renderer.shadowMap.needsUpdate = true
     }
 
     private setupLightsByQuality(): void {

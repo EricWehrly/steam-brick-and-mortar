@@ -10,6 +10,11 @@ export interface RoomFootprint {
     depth: number
 }
 
+export interface ShadowContactTuning {
+    bias?: number
+    normalBias?: number
+}
+
 const SHADOW_MAP_SIZES = {
     LOW: 512,
     MEDIUM: 1024,
@@ -119,18 +124,22 @@ export function configureDirectionalShadow(
 export function configureDirectionalShadowForShelfContact(
     light: THREE.DirectionalLight,
     config: ShadowConfig,
-    footprint: RoomFootprint
+    footprint: RoomFootprint,
+    tuning?: ShadowContactTuning
 ): void {
     applyLightShadowPolicy(light, config)
     if (!light.castShadow) return
 
-    // More aggressive bias values for tighter contact shadows
-    // Slightly more negative bias pulls shadows closer to contact points
-    light.shadow.bias = -0.001
-    // Reduce normalBias to allow shadows to creep closer to surfaces
-    light.shadow.normalBias = 0.005
-    // Use tighter camera framing for shelf zones
+    applyShadowContactTuning(light, tuning)
     fitDirectionalShadowCameraForShelfContact(light, footprint)
+}
+
+export function applyShadowContactTuning(
+    light: THREE.DirectionalLight,
+    tuning?: ShadowContactTuning
+): void {
+    light.shadow.bias = tuning?.bias ?? -0.001
+    light.shadow.normalBias = tuning?.normalBias ?? 0.005
 }
 
 export function refitDirectionalShadowCameras(

@@ -28,8 +28,8 @@
     --error-color: #dc3545;
     
     /* Shared UI layout rails */
-    --ui-edge-gap: 10px;
-    --ui-top-inset: 20px;
+    --ui-edge-gap: 8px;
+    --ui-top-inset: 6px;
     --ui-control-size: 50px;
     --ui-stack-gap: 12px;
     --ui-wing-rail: 110px;

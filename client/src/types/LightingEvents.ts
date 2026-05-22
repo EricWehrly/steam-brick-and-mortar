@@ -52,16 +52,6 @@ export interface LightingSystemReadyEvent extends BaseInteractionEvent {
     quality: string
 }
 
-export const LightingEventTypes = {
-    Toggle: 'lighting:toggle',
-    DebugToggle: 'lighting:debug-toggle',
-    QualityChanged: 'lighting:quality-changed',
-    Created: 'lighting:created',
-    SystemReady: 'lighting:system-ready',
-    /** Request a point light be created by the lighting system (avoids direct scene add) */
-    PointLightRequested: 'lighting:point-light-requested',
-} as const
-
 export interface ArtworkTuningChangedEvent extends BaseInteractionEvent {
     roughness?: number
     metalness?: number
@@ -73,6 +63,16 @@ export interface ShadowContactTuningChangedEvent extends BaseInteractionEvent {
     bias?: number
     normalBias?: number
 }
+
+export const LightingEventTypes = {
+    Toggle: 'lighting:toggle',
+    DebugToggle: 'lighting:debug-toggle',
+    QualityChanged: 'lighting:quality-changed',
+    Created: 'lighting:created',
+    SystemReady: 'lighting:system-ready',
+    /** Request a point light be created by the lighting system (avoids direct scene add) */
+    PointLightRequested: 'lighting:point-light-requested',
+} as const
 
 export const ArtworkEventTypes = {
     TuningChanged: 'artwork:tuning-changed',

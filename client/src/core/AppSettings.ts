@@ -43,6 +43,12 @@ export const Setting = {
     ShadowQuality: 'shadowQuality',
     ShadowMapEnabled: 'shadowMapEnabled',
     PixelRatioScale: 'pixelRatioScale',
+    ArtworkRoughness: 'artworkRoughness',
+    ArtworkMetalness: 'artworkMetalness',
+    ArtworkFresnelLift: 'artworkFresnelLift',
+    ArtworkFresnelPower: 'artworkFresnelPower',
+    ShadowContactBias: 'shadowContactBias',
+    ShadowContactNormalBias: 'shadowContactNormalBias',
     CeilingHeight: 'ceilingHeight',
     EnableLighting: 'enableLighting',
     ShowLightingDebug: 'showLightingDebug',
@@ -93,6 +99,12 @@ export const SettingCategory = {
         Setting.ShadowQuality,
         Setting.ShadowMapEnabled,
         Setting.PixelRatioScale,
+        Setting.ArtworkRoughness,
+        Setting.ArtworkMetalness,
+        Setting.ArtworkFresnelLift,
+        Setting.ArtworkFresnelPower,
+        Setting.ShadowContactBias,
+        Setting.ShadowContactNormalBias,
         Setting.CeilingHeight,
         Setting.EnableLighting,
         Setting.ShowLightingDebug,
@@ -121,6 +133,12 @@ export interface ApplicationSettings {
     shadowQuality: number // 0=off, 1=low, 2=medium, 3=high, 4=ultra
     shadowMapEnabled: boolean
     pixelRatioScale: number
+    artworkRoughness: number
+    artworkMetalness: number
+    artworkFresnelLift: number
+    artworkFresnelPower: number
+    shadowContactBias: number
+    shadowContactNormalBias: number
     ceilingHeight: number
     enableLighting: boolean
     showLightingDebug: boolean
@@ -435,6 +453,12 @@ export class AppSettings {
             shadowQuality: 2, // Medium shadows by default
             shadowMapEnabled: true,
             pixelRatioScale: 1,
+            artworkRoughness: 0.35,
+            artworkMetalness: 0.05,
+            artworkFresnelLift: 0.15,
+            artworkFresnelPower: 4.0,
+            shadowContactBias: -0.001,
+            shadowContactNormalBias: 0.005,
             ceilingHeight: 4.2,
             enableLighting: true,
             showLightingDebug: false,
