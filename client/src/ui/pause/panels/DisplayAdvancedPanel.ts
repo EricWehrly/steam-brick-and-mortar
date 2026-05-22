@@ -14,7 +14,7 @@ import '../../../styles/pause-menu/settings-components.css'
 import { AppSettings, Setting } from '../../../core/AppSettings'
 import { EventManager } from '../../../core/EventManager'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
-import { ArtworkEventTypes, type ArtworkTuningChangedEvent, type ShadowContactTuningChangedEvent } from '../../../types/LightingEvents'
+
 
 const DEFAULTS = {
     artworkRoughness: 0.35,
@@ -65,7 +65,6 @@ export class DisplayAdvancedPanel extends PauseMenuPanel {
                 formatDisplay: (v) => v.toFixed(2),
                 onInput: (value) => {
                     this.appSettings.setSetting(Setting.ArtworkRoughness, value)
-                    eventManager.emit<ArtworkTuningChangedEvent>(ArtworkEventTypes.TuningChanged, { roughness: value })
                 }
             },
             {
@@ -74,7 +73,6 @@ export class DisplayAdvancedPanel extends PauseMenuPanel {
                 formatDisplay: (v) => v.toFixed(2),
                 onInput: (value) => {
                     this.appSettings.setSetting(Setting.ArtworkMetalness, value)
-                    eventManager.emit<ArtworkTuningChangedEvent>(ArtworkEventTypes.TuningChanged, { metalness: value })
                 }
             },
             {
@@ -83,7 +81,6 @@ export class DisplayAdvancedPanel extends PauseMenuPanel {
                 formatDisplay: (v) => v.toFixed(2),
                 onInput: (value) => {
                     this.appSettings.setSetting(Setting.ArtworkFresnelLift, value)
-                    eventManager.emit<ArtworkTuningChangedEvent>(ArtworkEventTypes.TuningChanged, { fresnelLift: value })
                 }
             },
             {
@@ -92,7 +89,6 @@ export class DisplayAdvancedPanel extends PauseMenuPanel {
                 formatDisplay: (v) => v.toFixed(1),
                 onInput: (value) => {
                     this.appSettings.setSetting(Setting.ArtworkFresnelPower, value)
-                    eventManager.emit<ArtworkTuningChangedEvent>(ArtworkEventTypes.TuningChanged, { fresnelPower: value })
                 }
             },
             {
@@ -101,7 +97,6 @@ export class DisplayAdvancedPanel extends PauseMenuPanel {
                 formatDisplay: (v) => v.toFixed(4),
                 onInput: (value) => {
                     this.appSettings.setSetting(Setting.ShadowContactBias, value)
-                    eventManager.emit<ShadowContactTuningChangedEvent>(ArtworkEventTypes.ShadowContactTuningChanged, { bias: value })
                 }
             },
             {
@@ -110,7 +105,6 @@ export class DisplayAdvancedPanel extends PauseMenuPanel {
                 formatDisplay: (v) => v.toFixed(3),
                 onInput: (value) => {
                     this.appSettings.setSetting(Setting.ShadowContactNormalBias, value)
-                    eventManager.emit<ShadowContactTuningChangedEvent>(ArtworkEventTypes.ShadowContactTuningChanged, { normalBias: value })
                 }
             },
         ])
@@ -133,17 +127,6 @@ export class DisplayAdvancedPanel extends PauseMenuPanel {
         this.appSettings.setSetting(Setting.ArtworkFresnelPower, DEFAULTS.artworkFresnelPower)
         this.appSettings.setSetting(Setting.ShadowContactBias, DEFAULTS.shadowContactBias)
         this.appSettings.setSetting(Setting.ShadowContactNormalBias, DEFAULTS.shadowContactNormalBias)
-
-        eventManager.emit<ArtworkTuningChangedEvent>(ArtworkEventTypes.TuningChanged, {
-            roughness: DEFAULTS.artworkRoughness,
-            metalness: DEFAULTS.artworkMetalness,
-            fresnelLift: DEFAULTS.artworkFresnelLift,
-            fresnelPower: DEFAULTS.artworkFresnelPower,
-        })
-        eventManager.emit<ShadowContactTuningChangedEvent>(ArtworkEventTypes.ShadowContactTuningChanged, {
-            bias: DEFAULTS.shadowContactBias,
-            normalBias: DEFAULTS.shadowContactNormalBias,
-        })
 
         // Re-render to sync sliders to reset values
         const container = document.getElementById(this.config.containerId ?? 'pause-menu-content')
