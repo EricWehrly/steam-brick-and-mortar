@@ -16,10 +16,10 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 import { BlockbusterColors } from '../utils/Colors'
 import { PropRenderer } from './PropRenderer'
 import { LightingDebugHelper } from './LightingDebugHelper'
-import { AppSettings, LIGHTING_QUALITY, type LightingQuality } from '../core/AppSettings'
+import { AppSettings, LIGHTING_QUALITY, Setting, type LightingQuality, type SettingChangedEvent } from '../core/AppSettings'
 import { EventManager, EventSource } from '../core/EventManager'
-import { LightingEventTypes, ArtworkEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent, type ShadowContactTuningChangedEvent } from '../types/LightingEvents'
-import { RoomEventTypes, type RoomResizedEvent } from '../types/InteractionEvents'
+import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent } from '../types/LightingEvents'
+import { RoomEventTypes, type RoomResizedEvent, AppSettingsEventTypes } from '../types/InteractionEvents'
 import { StorePropsEventTypes } from './props/PropsEvents'
 import { LightFactory } from '../lighting/LightFactory'
 import { LightRegistry } from '../lighting/LightRegistry'
@@ -116,9 +116,9 @@ export class LightingRenderer {
             this.updateLightingQuality(event.detail.quality)
         })
 
-        this.eventManager.registerEventHandler<ShadowContactTuningChangedEvent>(
-            ArtworkEventTypes.ShadowContactTuningChanged,
-            this.onShadowContactTuningChanged.bind(this)
+        this.eventManager.registerEventHandler<SettingChangedEvent>(
+            AppSettingsEventTypes.Changed,
+            this.onAppSettingsChanged.bind(this)
         )
 
         // Listen for room resizing events to update lighting, including initial room build.
@@ -281,13 +281,20 @@ export class LightingRenderer {
         }
     }
 
-    private onShadowContactTuningChanged(event: CustomEvent<ShadowContactTuningChangedEvent>): void {
+    private onAppSettingsChanged(event: CustomEvent<SettingChangedEvent>): void {
+        if (
+            event.detail.settingName !== Setting.ShadowContactBias
+            && event.detail.settingName !== Setting.ShadowContactNormalBias
+        ) {
+            return
+        }
+
         const mainDirectional = this.lightingGroup.getObjectByName(LIGHT_NAMES.MAIN_DIRECTIONAL)
         if (!(mainDirectional instanceof THREE.DirectionalLight)) return
 
         applyShadowContactTuning(mainDirectional, {
-            bias: event.detail.bias,
-            normalBias: event.detail.normalBias,
+            bias: AppSettings.get(Setting.ShadowContactBias),
+            normalBias: AppSettings.get(Setting.ShadowContactNormalBias),
         })
         this.renderer.shadowMap.needsUpdate = true
     }
