@@ -194,9 +194,10 @@ export class StartupEventTracker {
                 detail: `Loading cached games (${this.loadedGames}/${this.totalGames})...`
             })
         } else if (this.fetchingInProgress) {
+            const remainingBatches = Math.max(0, totalBatches - (batchIndex + 1))
             EventManager.getInstance().emit<GameLoadingPhaseChangedEvent>(AppEventTypes.GameLoadingPhaseChanged, {
                 loadingPhase: 'fetch',
-                detail: `Fetching ${totalBatches - batchIndex} remaining games from Steam...`
+                detail: `Fetching ${remainingBatches} remaining games from Steam...`
             })
             this.fetchingInProgress = batchIndex < totalBatches - 1
         }
