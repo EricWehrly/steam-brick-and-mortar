@@ -21,7 +21,8 @@
  * On layout switch: reset pure coordinators, dispose+reconstruct GPU owner.
  * On sort/filter switch: reset pure coordinators only (no GPU teardown needed).
  *
- * Activation is a side-effect of importing this module. No explicit init needed.
+ * Activation is explicit via StorePropsCoordinator.getInstance() from the default
+ * bootstrap path, which keeps showcase mode free of store-props side effects.
  */
 
 import * as THREE from 'three'
@@ -50,8 +51,9 @@ const RUNNER_MIN_DEPTH_METRES = 4.5
 const RUNNER_MARGIN_RATIO_PER_SIDE = 0.01
 const PERCENT_BASE = 100
 
-class StorePropsCoordinator {
+export class StorePropsCoordinator {
     private static readonly logger = Logger.createLogFunctions(StorePropsCoordinator.name)
+    private static instance: StorePropsCoordinator | null = null
 
     private readonly eventManager: EventManager
 
@@ -70,8 +72,11 @@ class StorePropsCoordinator {
     // Active layout mode - drives ShelfLayoutCoordinator on next batch run
     private activeLayoutMode: LayoutMode = 'arc'
 
-    static {
-        new StorePropsCoordinator()
+    public static getInstance(): StorePropsCoordinator {
+        if (!StorePropsCoordinator.instance) {
+            StorePropsCoordinator.instance = new StorePropsCoordinator()
+        }
+        return StorePropsCoordinator.instance
     }
 
     private constructor() {
@@ -116,8 +121,8 @@ class StorePropsCoordinator {
             }
         }
 
-        // ShelfLayoutCoordinator is a singleton - BatchCoordinator and GameBoxSpawner
-        // self-register at import time and need no explicit initialisation here.
+        // ShelfLayoutCoordinator remains lazy and process-wide; the default bootstrap
+        // path explicitly activates the adjacent runtime coordinators it depends on.
         if (!this.shelfLayoutCoordinator) {
             this.shelfLayoutCoordinator = ShelfLayoutCoordinator.getInstance(this.activeLayoutMode)
         }

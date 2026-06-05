@@ -21,32 +21,22 @@
 
 import * as THREE from 'three'
 import { SceneManager } from './SceneManager'
-import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
+import { SkyboxManager } from './SkyboxManager'
 import { LightingRenderer } from './LightingRenderer'
 import { RoomManager } from './RoomManager'
 import { EventManager } from '../core/EventManager'
-import { GameEventTypes } from '../types/InteractionEvents'
 import { DataManager } from '../core/data'
-// Initialize store props system (self-registering module with dedicated events)
-import { StorePropsEventTypes, type StorePropsSetupRequestEvent } from './props'
 import type { SteamGameData } from './game-box/types/GameData'
 import { StartupEventTracker, StartupPhase } from '../utils/StartupEventTracker'
 import { SharedMaterialManager } from '../utils/SharedMaterialManager'
 import { SceneSignManager } from './SceneSignManager'
 import { ShelfSignPlanner } from './ShelfSignPlanner'
 import { GameSorter } from './categorization/GameSorter'
-
-export interface SceneCoordinatorConfig {
-    environment?: {
-        skyboxPreset?: string
-        roomSize?: { width: number, depth: number, height: number }
-        proceduralTextures?: boolean
-    }
-    props?: {
-        enableTestObjects?: boolean
-    }
-    tests?: Record<string, string>
-}
+import type { BootstrapPath } from './bootstrap/BootstrapPath'
+import { DefaultBootstrapPath } from './bootstrap/DefaultBootstrapPath'
+import { ShowcaseBootstrapPath } from './bootstrap/ShowcaseBootstrapPath'
+import { StorePropsEventTypes } from './props'
+import { GameEventTypes } from '../types/InteractionEvents'
 
 export class SceneCoordinator {
     private sceneManager: SceneManager
@@ -54,7 +44,6 @@ export class SceneCoordinator {
     private lightingRenderer: LightingRenderer
     private roomManager: RoomManager
     private dataManager: DataManager
-    private eventManager: EventManager
     private gameSorter: GameSorter
     private sceneSignManager: SceneSignManager
     private shelfSignPlanner: ShelfSignPlanner
@@ -63,9 +52,8 @@ export class SceneCoordinator {
         // TODO: DI tho?
         this.sceneManager = sceneManager ?? new SceneManager()
         this.dataManager = DataManager.getInstance() // Fallback for backward compatibility
-        this.eventManager = EventManager.getInstance() // DI injection with fallback
-        
-        // Store props handlers are now self-registering via module import
+
+        // Store props runtime coordinators are activated explicitly by the default bootstrap path.
         
         // Initialize visual system renderers
         this.skyboxManager = new SkyboxManager()
@@ -79,19 +67,9 @@ export class SceneCoordinator {
         this.sceneSignManager = SceneSignManager.instance
         this.shelfSignPlanner = new ShelfSignPlanner()
 
-        // Track WorldBuild phase — opens here, closes when props complete
+        // Track WorldBuild phase — opens here, closed by each bootstrap path when done
         const tracker = StartupEventTracker.getInstance()
         tracker.phaseStart(StartupPhase.WorldBuild, 'Building 3D environment')
-        
-        // Listen for props setup completion to end WorldBuild and emit SceneReady
-        this.eventManager.registerEventHandler(StorePropsEventTypes.SetupCompleted, async () => {
-            tracker.phaseEnd(StartupPhase.WorldBuild)
-            tracker.milestone(StartupPhase.WorldBuild, 'Scene fully constructed')
-            
-            // Lighting upgrades automatically via SetupCompleted handler natively
-            
-            this.eventManager.emit(GameEventTypes.SceneReady, {})
-        })
 
         // NOTE: Scene setup is now DEFERRED - call startSceneSetup() explicitly after controls are ready
         // This allows the user to move around while the world builds in the background
@@ -110,45 +88,28 @@ export class SceneCoordinator {
         // Use setTimeout(0) to yield to main thread before starting heavy work
         // This ensures the render loop has started and user can see/interact
         setTimeout(() => {
-            this.loadEnhancedScene()
+            this.executeBootstrapPath()
         }, 0)
     }
 
-    private async loadEnhancedScene(config: SceneCoordinatorConfig['environment'] = {}): Promise<void> {
+    // TODO: I had wanted showcase to be an alternate scene with alternate logic, but
+    // we're creating this explicit bifrocation of loaders that I would prefer be instruction of loaders instead ... eventually
+    private async executeBootstrapPath(): Promise<void> {
+        const SHOWCASE_MODE_ENABLED = true
+        
+        const bootstrapPath: BootstrapPath = SHOWCASE_MODE_ENABLED 
+            ? new ShowcaseBootstrapPath()
+            : new DefaultBootstrapPath()
+        
+        const eventManager = EventManager.getInstance();
         const tracker = StartupEventTracker.getInstance()
 
-        // Kick off procedural material generation now, fire-and-forget.
-        // RoomManager and shelf renderers will receive flat-colour fallback materials
-        // immediately via getMaterial(), and upsertMaterial() will swap in the textured
-        // version once the worker resolves — no blocking, no warning.
-        SharedMaterialManager.getInstance().generateTexturesAsync()
-        
-        try {
-            // TODO: Skyboxmanager responds to ready event itself
-            tracker.milestone(StartupPhase.WorldBuild, 'Creating sky')
-            const presetName = config.skyboxPreset ?? 'aurora'
-            const preset = (SkyboxPresets as any)[presetName] || SkyboxPresets.aurora
-            await this.skyboxManager.applySkybox(preset)
-            
-        } catch (error) {
-            console.warn('⚠️ Skybox loading failed:', error)
-        }
-
-        // 🏪 Props (room, shelves, games — the heavy stuff)
-        tracker.milestone(StartupPhase.WorldBuild, 'Building store')
-        this.requestPropsSetup()
-        
-    }
-
-    private requestPropsSetup(): void {
-        // Simply emit the setup request - handlers will get dependencies themselves
-        this.eventManager.emit<StorePropsSetupRequestEvent>(StorePropsEventTypes.SetupRequest, {
-            config: {
-                enableShelves: true,
-                enableGameBoxes: true,
-                enableSignage: true
-            }
+        eventManager.registerEventHandler(StorePropsEventTypes.SetupCompleted, () => {
+            tracker.phaseEnd(StartupPhase.WorldBuild)
+            tracker.milestone(StartupPhase.WorldBuild, 'Scene fully constructed')
+            eventManager.emit(GameEventTypes.SceneReady, {})
         })
+        await bootstrapPath.execute()
     }
 
     /**

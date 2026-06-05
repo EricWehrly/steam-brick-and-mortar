@@ -8,7 +8,7 @@
  * Event lifecycle overview:
  *
  *   SetupRequest  ──→  StorePropsCoordinator (override handler)
- *                  →   LightingRenderer, SharedMaterialManager (side-effect observers)
+ *                  →   SkyboxManager, SharedMaterialManager, LightingRenderer
  *   SetupCompleted ─→  SceneCoordinator, LightingRenderer
  *   LibraryReloadRequest  ──→  StorePropsCoordinator (override handler)
  *

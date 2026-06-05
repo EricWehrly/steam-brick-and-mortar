@@ -30,10 +30,17 @@ interface ShelfPosition {
     sectionIndex: number
 }
 
+export type GamePlacementIntent = {
+    game: SteamGameData
+    position: THREE.Vector3
+    rotation: THREE.Quaternion
+}
+
 export class GameBoxSpawner {
     private static readonly logger = Logger.createLogFunctions(GameBoxSpawner.name)
     private static readonly GAME_BOX_INSTANCE_LIMIT = 2000
     private static readonly LABEL_BOX_INSTANCE_LIMIT = 512
+    private static instance: GameBoxSpawner | null = null
 
     private renderer: GpuGameBoxRenderer | null = null
     private shelfPositions: Map<number, ShelfPosition> = new Map()
@@ -43,8 +50,11 @@ export class GameBoxSpawner {
     private layoutDeterminedSinceLastSections = false
     private placementRunSequence = 0
 
-    static {
-        new GameBoxSpawner()
+    public static getInstance(): GameBoxSpawner {
+        if (!GameBoxSpawner.instance) {
+            GameBoxSpawner.instance = new GameBoxSpawner()
+        }
+        return GameBoxSpawner.instance
     }
 
     private constructor() {
@@ -241,7 +251,8 @@ export class GameBoxSpawner {
             )
             const shelfSlotCapacity = stockSurfaces.reduce((sum, s) => sum + s.capacity, 0)
             const batch = gameQueue.splice(0, shelfSlotCapacity)
-            const emittedIntents = this.assignIntentsFromStock(stockSurfaces, batch)
+            const intents = GameBoxUtils.stockSurfaces(stockSurfaces, batch);
+            const emittedIntents = GameBoxSpawner.emitPlacementIntents(intents);
             GameBoxSpawner.logger.debug(
                 `Section "${section.name}" shelf ${shelfIndex}: slots=${shelfSlotCapacity}, ` +
                 `gamesTaken=${batch.length}, intentsEmitted=${emittedIntents}, queueRemaining=${gameQueue.length}`
@@ -265,8 +276,9 @@ export class GameBoxSpawner {
         return shelvesUsed
     }
 
-    private assignIntentsFromStock(stockSurfaces: StockSurface[], games: SteamGameData[]): number {
-        const intents = GameBoxUtils.stockSurfaces(stockSurfaces, games)
+    public static emitPlacementIntents(
+        intents: ReadonlyArray<GamePlacementIntent>
+    ): number {
         for (const { game, position, rotation } of intents) {
             const appid = typeof game.appid === 'number' ? game.appid : 0
             EventManager.getInstance().emit<PlacementIntentReadyEvent>(
@@ -274,7 +286,7 @@ export class GameBoxSpawner {
                 { appid, game, position, rotation }
             )
         }
+
         return intents.length
     }
-
 }

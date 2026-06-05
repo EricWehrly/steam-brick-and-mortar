@@ -14,7 +14,6 @@
  * - ArtworkPrefetchCoordinator for batch-time artwork prewarm
  * 
  * RECEIVES:
- * - prefetchArtwork(appid, artworkHints, name) → Phase 1: load texture into atlas
  * - PlacementResolved events → unified placement (artwork or label fallback)
  * - PlacementRunResetRequested → wipe all GPU instances before re-sort
  * - addToScene(scene) → Attaches instanced meshes to scene
@@ -78,7 +77,7 @@ export class GpuGameBoxRenderer {
         this.instancedLabelRenderer = new InstancedLabelRenderer({ maxInstances: labelCapacity })
         this.lodArtworkRenderer = LodArtworkOrchestratorDebug.fromAppSettings(textureCapacity, placementCapacity)
         this.renderIntentCoordinator = new RenderIntentCoordinator()
-        this.artworkPrefetchCoordinator = new ArtworkPrefetchCoordinator({ renderer: this })
+        this.artworkPrefetchCoordinator = new ArtworkPrefetchCoordinator({ renderer: this.lodArtworkRenderer })
         this.boundHandleArtworkSettled = this.handleArtworkSettled.bind(this)
         this.boundHandlePlacementResolved = this.handlePlacementResolved.bind(this)
         this.boundHandlePlacementRunResetRequested = this.handlePlacementRunResetRequested.bind(this)
@@ -117,21 +116,6 @@ export class GpuGameBoxRenderer {
         this.failedLabelPlacements = 0
     }
 
-    /**
-     * Phase 1: fetch and cache artwork for a game without placing a GPU instance.
-     * Call as batches arrive. Idempotent — calling again for the same game is a no-op.
-     *
-     * Callers provide optional artwork hints. URL ordering and fallback policy are
-     * owned by the artwork provider/orchestrator pipeline.
-     */
-    public async prefetchArtwork(
-        appid: number,
-        artworkHints: { library?: string; header?: string } | undefined,
-        gameName: string
-    ): Promise<'prefetched' | 'cached' | 'skipped' | 'error'> {
-        return this.lodArtworkRenderer.prefetchArtwork(appid, artworkHints, gameName)
-    }
-
     private placeResolvedGame(
         game: SteamGameData,
         position: THREE.Vector3,
@@ -144,6 +128,9 @@ export class GpuGameBoxRenderer {
             return
         }
 
+        // TODO(placement-resolved-refactor): if we later move placement-time artwork
+        // loading directly into LodArtworkOrchestrator, preserve this label fallback
+        // contract instead of bypassing GpuGameBoxRenderer entirely.
         // Atlas miss — fall through to label
         this.placeLabelBox(game, position, rotation)
     }
