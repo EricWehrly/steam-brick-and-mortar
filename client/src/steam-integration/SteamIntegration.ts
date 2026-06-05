@@ -28,6 +28,7 @@ import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppSettings, Setting } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
 import { sortByNumericField } from '../scene/categorization/GameSortFunctions'
+import '../scene/batch/BatchCoordinator'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 import type { StorePropsLibraryReloadRequestEvent } from '../scene/props/PropsEvents'
 

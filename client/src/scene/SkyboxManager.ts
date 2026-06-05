@@ -8,6 +8,8 @@
 import * as THREE from 'three'
 import { DataManager } from '../core/data/DataManager'
 import { DataKey } from '../core/data/DataTypes'
+import { EventManager } from '../core/EventManager'
+import { StorePropsEventTypes, type StorePropsSetupRequestEvent } from './props/PropsEvents'
 import { skyboxAuroraUrl } from '../assets/runtimeAssetUrls'
 
 export interface SkyboxConfig {
@@ -24,6 +26,19 @@ export class SkyboxManager {
     constructor() {
         this.scene = DataManager.getInstance().getOrThrow<THREE.Scene>(DataKey.MainScene)
         this.textureLoader = new THREE.TextureLoader()
+
+        EventManager.getInstance().registerEventHandler(
+            // this event is at the right point in lifecycle, maybe a little late.
+            // Any event around this time should be fine
+            StorePropsEventTypes.SetupRequest,
+            this.handleSetupRequest.bind(this)
+        )
+    }
+
+    private async handleSetupRequest(detail: StorePropsSetupRequestEvent): Promise<void> {
+        const presetName = 'aurora' // TODO: resolve config
+        const preset = (SkyboxPresets as Record<string, SkyboxConfig>)[presetName] ?? SkyboxPresets.aurora
+        await this.applySkybox(preset)
     }
 
     /**

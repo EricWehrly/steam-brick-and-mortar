@@ -5,7 +5,6 @@
 export { SceneManager, type SceneManagerOptions } from './SceneManager'
 export { 
     SceneCoordinator, 
-    type SceneCoordinatorConfig 
 } from './SceneCoordinator'
 export { AssetLoader, type AssetLoadOptions, type LoadProgress } from './AssetLoader'
 export { 

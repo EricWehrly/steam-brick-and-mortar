@@ -377,7 +377,9 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             const artwork = this.artworkProvider.getArtwork(appid, gameName, 'library', artworkHints)
             await this.fetchAndCachePixels(artwork, textureIndex)
 
+            // this _really_ should be indexed by id, not name ...
             this.gameNameToTextureIndex.set(gameName, textureIndex)
+            // why have the reverse index? lookup should be doable
             this.textureIndexToGameName.set(textureIndex, gameName)
             this.prefetchedHighArtworkUrl.set(gameName, this.resolveHighArtworkUrl(appid, artworkHints))
 
