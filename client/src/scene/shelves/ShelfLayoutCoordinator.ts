@@ -40,9 +40,7 @@ export class ShelfLayoutCoordinator {
     /** Active layout mode. Set by orchestration before the next SectionsReady fires. */
     public layoutMode: LayoutMode
 
-    private computedLayoutMode: LayoutMode | null = null
     private shelvesByIndex = new Map<number, { position: THREE.Vector3; rotationY: number; sectionIndex: number }>()
-    private emittedShelfIndices = new Set<number>()
     private totalShelves = 0
 
     static getInstance(initialLayoutMode: LayoutMode = 'arc'): ShelfLayoutCoordinator {
@@ -75,14 +73,11 @@ export class ShelfLayoutCoordinator {
 
     private clearRunState(): void {
         this.shelvesByIndex.clear()
-        this.emittedShelfIndices.clear()
         this.totalShelves = 0
-        this.computedLayoutMode = null
     }
 
     private handleSectionsReady(detail: SectionsReadyEvent): void {
         this.clearRunState()
-        this.computedLayoutMode = this.layoutMode
 
         // Filter out sections with zero games to prevent empty shelves from being spawned.
         // Keep original section indices so downstream placement/signage mappings remain stable.
@@ -130,22 +125,19 @@ export class ShelfLayoutCoordinator {
 
         // Emit ShelfReady first so consumers (GameBoxSpawner) have shelf positions cached
         // before ShelfLayoutDetermined triggers placement.
-        let emitted = 0
-        for (const [idx, shelf] of this.shelvesByIndex) {
-            this.emittedShelfIndices.add(idx)
+        for (const [index, shelf] of this.shelvesByIndex) {
             EventManager.getInstance().emit<StorePropsProgressEvent>(StorePropsEventTypes.Progress, {
                 step: 'shelves',
-                current: idx + 1,
+                current: index + 1,
                 total: this.totalShelves,
-                detail: `Placing shelf ${idx + 1}`,
+                detail: `Placing shelf ${index + 1}`,
             })
             EventManager.getInstance().emit<ShelfReadyEvent>(StorePropsEventTypes.ShelfReady, {
-                shelfIndex: idx,
+                shelfIndex: index,
                 sectionIndex: shelf.sectionIndex,
                 position: shelf.position.clone(),
                 rotationY: shelf.rotationY,
             })
-            emitted++
         }
 
         // ShelfLayoutDetermined fires after ShelfReady so GameBoxSpawner has positions
@@ -167,7 +159,7 @@ export class ShelfLayoutCoordinator {
         )
 
         ShelfLayoutCoordinator.logger.debug(
-            `Layout ready: mode=${this.layoutMode}, sections=${nonEmptySections.length}, shelves=${emitted}, rows=${rowCount}, shelvesPerRow=${shelvesPerRow}`
+            `Layout ready: mode=${this.layoutMode}, sections=${nonEmptySections.length}, shelves=${this.shelvesByIndex.size}, rows=${rowCount}, shelvesPerRow=${shelvesPerRow}`
         )
     }
 

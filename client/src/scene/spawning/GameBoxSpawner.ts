@@ -48,7 +48,6 @@ export class GameBoxSpawner {
     private stockStrategy: IStockStrategy | null = null
     private layoutReadyForPlacement = false
     private layoutDeterminedSinceLastSections = false
-    private placementRunSequence = 0
 
     public static getInstance(): GameBoxSpawner {
         if (!GameBoxSpawner.instance) {
@@ -186,6 +185,7 @@ export class GameBoxSpawner {
     }
 
     private placeSections(
+        // TODO: If we're storing pending sections, they don't need to be passed to the method anymore
         detail: SectionsReadyForPlacementEvent,
         stockStrategy: IStockStrategy
     ): void {
@@ -208,16 +208,15 @@ export class GameBoxSpawner {
             return
         }
 
-        const placementRunId = ++this.placementRunSequence
         const totalGames = sections.reduce((sum, sectionEntry) => sum + sectionEntry.section.games.length, 0)
         GameBoxSpawner.logger.info(
-            `Placement run ${placementRunId}: sections=${sections.length}, ` +
+            `Placement run sections=${sections.length}, ` +
             `games=${totalGames}, shelves=${totalSectionShelves}`
         )
 
         if (totalGames > GameBoxSpawner.GAME_BOX_INSTANCE_LIMIT) {
             GameBoxSpawner.logger.warn(
-                `Placement run ${placementRunId}: projected placements (${totalGames}) exceed ` +
+                `Placement run projected placements (${totalGames}) exceed ` +
                 `game-box instance limit (${GameBoxSpawner.GAME_BOX_INSTANCE_LIMIT})`
             )
         }
