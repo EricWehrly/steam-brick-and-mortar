@@ -108,30 +108,31 @@ When working with Terraform infrastructure:
 
 
 ## Current Status & Roadmap
-- The active roadmap is now tracked in `docs/active/roadmap.md` (single source of truth for priorities and next steps).
+- Start at **`docs/README.md`** — the docs entry point and map. The planning layer is organized as **acts** (phases) in `docs/acts/`, with one doc per feature in `docs/features/`.
 
 ### Roadmap Navigation & Management
 When working with roadmap items, follow this structure and workflow:
 
 **📁 Roadmap File Organization**:
-- `docs/active/roadmap.md` - High-level overview and current status
-- `docs/roadmap-phase1-ready-for-me.md` - Detailed Phase 1 tasks and milestones
-- `docs/roadmap-phase2-ready-for-friends.md` - Detailed Phase 2 infrastructure and features  
-- `docs/roadmap-phase3-ready-for-everyone.md` - Detailed Phase 3 compliance and scaling
-- `docs/active/tech-debt.md` - Technical debt backlog with priority management
+- `docs/README.md` - Docs entry point and directory guide (start here)
+- `docs/acts/` - Primary planning layer: `act1-intermission-…`, `act2-ready-for-friends`, `act3-ready-for-everyone`, `act4-encore-someday-maybe`
+- `docs/features/` - One doc per feature (status, acceptance criteria, stories/tasks)
+- `docs/plans/` - Implementation/design plans, linked from their parent feature
+- `docs/tech-debt.md` - Technical debt backlog, keyed by `// TD: <tag-id>` source comments
 
 **🎯 Adding New Features**:
-1. **Determine Phase**: Phase 1 (core functionality) → Phase 2 (infrastructure) → Phase 3 (compliance)
-2. **Choose Section**: High-priority infrastructure → Main features, Enhancement features → "TBD" section, Technical improvements → tech-debt.md
+1. **Determine Act**: which act (`docs/acts/`) does the work belong to?
+2. **Add/Update Feature Doc**: create or update `docs/features/<feature>.md` and link it from the act doc
 3. **Use Standard Format**: Include Context, Tasks, Expected Deliverable, Acceptance, Priority, Timeline
-4. **Deferring**: Place in "TBD" with Deferral Reason, Dependencies, and Context
+4. **Build Plan**: add a `docs/plans/<feature>-plan.md` if the feature needs a how-to-build plan
+5. **Deferring**: record Deferral Reason, Dependencies, and Context (Encore items live in `act4-encore-someday-maybe.md`)
 
-**📍 Finding Current Work**: Check `docs/active/roadmap.md` for 🚧 CURRENT FOCUS markers and `docs/active/tech-debt.md` for immediate tasks
+**📍 Finding Current Work**: Check the act marked current in `docs/README.md`, and `docs/tech-debt.md` for tagged debt
 
-**✅ Completion**: Move to "Archived/Completed" in tech-debt.md with achievement details
+**✅ Completion**: Mark the feature/act item complete in its doc; archived debt details live in `docs/tech-debt.md`
 
 ## Reference Files
 - **JavaScript/Node.js**: `.github/javascript-guidelines.md`
-- **README Guidelines**: `docs/readme-guidelines.md`
-- **Architecture Decisions**: `docs/webxr-architecture.md`
+- **README Guidelines**: `docs/archive/readme-guidelines.md` (archived)
+- **Architecture Decisions**: `docs/architecture/webxr-architecture.md`
 - **Infrastructure Progress**: `.github/terraform-progress.md`
