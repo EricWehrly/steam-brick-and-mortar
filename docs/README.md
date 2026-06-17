@@ -3,7 +3,12 @@
 This directory is structured specifically as a knowledge base and entrypoint for AI agents (like Vex) working on the project.
 
 ## Current status
-**Intermission** — `openclaw/feat-neon-ui-intermission` — see [`acts/act1-intermission-technical-stewardship.md`](acts/act1-intermission-technical-stewardship.md)
+**Intermission: Technical Stewardship** — see [`acts/act1-intermission-technical-stewardship.md`](acts/act1-intermission-technical-stewardship.md).
+
+Active in-flight thread: **visual quality pass** (lighting/shading) — pulled forward from Act 2's
+[Lighting and Atmosphere](features/lighting-and-atmosphere.md). Immediate next step is the
+renderer visual baseline (tone mapping + environment lighting): see
+[`plans/renderer-visual-baseline-plan.md`](plans/renderer-visual-baseline-plan.md).
 
 ## Where to start
 1. Read the current act doc above — goals, feature list, completion criteria.
