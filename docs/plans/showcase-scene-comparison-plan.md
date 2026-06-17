@@ -1,6 +1,46 @@
 # Showcase Scene Comparison Plan
 
 ## Status
+Partially implemented on `feature/showcase-scene-comparison`. Scaffolding exists; it is **not
+yet a working comparison**. See the status update below before continuing.
+
+## Status Update (2026-06)
+
+**Landed:**
+- `ShowcaseBootstrapPath` (`client/src/scene/bootstrap/ShowcaseBootstrapPath.ts`) — branches the
+  deferred scene-setup seam exactly as planned. Suppresses normal shelves/boxes/signage, spawns
+  3 reference boxes on dark showcase shelves, prefetches artwork, emits placement intents.
+- `SHOWCASE_REFERENCE_GAMES` pins the first 3 `ANONYMOUS_STORE_USER` games (no library fetch).
+- Behind a `SHOWCASE_MODE_ENABLED` file toggle in `SceneCoordinator.executeBootstrapPath()`,
+  currently `false` (does not ship enabled). The `BootstrapPath` interface is the clean
+  extension seam the plan asked for.
+
+**The gap — it does not actually compare anything yet:**
+- `buildShowcaseComparisonGrid(tuningFamily)` does `void tuningFamily` and assigns
+  `presetName: 'baseline' | 'variant-a' | 'variant-b'` to the slots, but **no per-box tuning is
+  ever applied**. All three boxes render with the same global material settings, so the grid is
+  three identical boxes with different labels. The "one family varies, others fixed" acceptance
+  criterion is not met.
+
+**To square it up (remaining work):**
+1. Apply per-slot tuning: map each `presetName` to concrete values for the active family and call
+   the existing per-material tuning entry points (`applyLitArtworkTuning` / per-instance
+   roughness / shadow-contact tuning) on that box's material/instance. This is the missing core.
+2. Decide whether per-box material tuning is even feasible through the shared
+   `GpuGameBoxRenderer` instancing path, or whether the showcase needs per-instance overrides
+   (it currently routes all 3 boxes through one renderer with one material).
+3. Optional: debug labels per box ("roughness 0.6") and a family selector, per the original
+   nice-to-haves.
+
+## Sequencing note (important)
+
+Per `renderer-visual-baseline-plan.md`: the **renderer-global levers (tone mapping + exposure,
+environment/IBL) should land before** this showcase is finished. Those levers change the baseline
+every per-material delta is judged against, and they are global frame state that a 3-box grid
+cannot A/B anyway. Finish the global baseline, then make this showcase do its one job —
+per-material micro-comparison — against a baseline worth shipping.
+
+## Status (original)
 Planned spike for a follow-up branch after the current artwork/shadow tuning PR lands.
 
 ## Goal
