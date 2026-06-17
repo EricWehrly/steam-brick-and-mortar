@@ -1,46 +1,14 @@
-// ⚠️⚠️⚠️ CRITICAL RISK WARNING ⚠️⚠️⚠️
-// 
-// CUSTOM WEBXR TYPE DEFINITIONS - REQUIRES EXPERT REVIEW
+// ⚠️ CUSTOM WEBXR TYPE DEFINITIONS — DELIBERATE TECHNICAL DEBT
 //
-// This file contains CUSTOM WebXR type definitions instead of using official types.
-// 
-// RISK LEVEL: HIGH
-// - Incorrect WebXR types could cause PHYSICAL DISCOMFORT for VR users
-// - Vision-replacing VR environments require 100% correct spatial/timing assumptions
-// - Wrong pose/transform data could cause motion sickness or disorientation
+// Risk: HIGH — incorrect pose/transform types can cause physical discomfort in VR.
+// Decision: custom types chosen over @types/webxr for faster iteration (may be outdated).
+// Alternative: find a well-maintained community fork, or contribute to official types.
 //
-// DELIBERATE TECHNICAL DEBT:
-// - Decision: Use custom types for faster development iteration
-// - Rationale: Official @types/webxr may be outdated, faster to implement basic types
-// - Alternative: Find reliable community fork with updated WebXR types
-//
-// REQUIRED ACTION AFTER BASIC FUNCTIONALITY WORKS:
-// - EXPLICIT EXPERT REVIEW REQUIRED before production use
-// - Validate against actual WebXR implementations
-// - Consider switching to well-maintained community types
-// - Test extensively on real VR hardware for safety
-//
-// STATUS: ❌ NOT VALIDATED FOR VR SAFETY
-//
-// ⚠️⚠️⚠️ END CRITICAL RISK WARNING ⚠️⚠️⚠️
+// Status: ❌ NOT tested against real WebXR implementations
+//         ❌ NOT validated for VR safety
+//         🚨 Requires explicit expert review before production use
 
-// Global type definitions for WebXR
-// This will be automatically included by TypeScript
-
-// ⚠️ **CRITICAL RISK WARNING** ⚠️
-// CUSTOM WEBXR TYPE DEFINITIONS - DELIBERATE TECHNICAL DEBT
-// 
-// Risk Level: HIGH - Incorrect WebXR types could cause PHYSICAL DISCOMFORT for VR users
-// Decision: Using custom types instead of @types/webxr or official definitions
-// Rationale: Faster development iteration, official types may be outdated
-// 
-// 🚨 REQUIRED ACTION: EXPLICIT REVIEW REQUIRED after basic functionality works
-// Alternative: Find reliable fork with updates or contribute to official types
-// Impact: Vision-replacing VR environments require 100% correct spatial/timing assumptions
-//
-// Status: ❌ NOT TESTED against real WebXR implementations
-//         ❌ NOT VALIDATED for VR safety and comfort
-//         🚨 REQUIRES EXPERT REVIEW before production use
+// Global type definitions for WebXR — automatically included by TypeScript
 
 declare global {
   interface Navigator {
