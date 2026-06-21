@@ -177,7 +177,7 @@ export class LightingControlsPanel {
         }
 
         this.ensureLightState(light)
-        this.applyBrightnessToLight(light, lightType)
+        this.applyBrightnessToLight(light)
     }
 
     private scanLights(): void {
@@ -316,7 +316,7 @@ export class LightingControlsPanel {
                     lightValue.textContent = this.formatBrightness(lightMultiplier)
                 }
                 if (lightInfo) {
-                    lightInfo.textContent = this.getLightInfo(light, type)
+                    lightInfo.textContent = this.getLightInfo(light)
                 }
             })
         })
@@ -330,7 +330,17 @@ export class LightingControlsPanel {
     }
 
     private setMasterBrightness(brightness: number): void {
+        // TODO: When per-light tuning is needed, multiply proportionally rather than overwriting.
         this.masterBrightness = this.clampBrightness(brightness)
+
+        this.lightGroups.forEach((group, type) => {
+            group.brightness = this.masterBrightness
+            this.groupBrightnessByType.set(type, this.masterBrightness)
+            for (const light of group.lights) {
+                this.lightBrightnessById.set(light.id, this.masterBrightness)
+            }
+        })
+
         this.applyBrightnessToAllLights()
         this.updateControlStates()
     }
@@ -341,9 +351,11 @@ export class LightingControlsPanel {
 
         group.brightness = this.clampBrightness(brightness)
         this.groupBrightnessByType.set(type, group.brightness)
+        LightingControlsPanel.logger.debug(`Group brightness [${type}]: ${group.brightness.toFixed(2)}`)
 
         for (const light of group.lights) {
-            this.applyBrightnessToLight(light, type)
+            this.lightBrightnessById.set(light.id, group.brightness)
+            this.applyBrightnessToLight(light)
         }
 
         this.updateControlStates()
@@ -352,27 +364,26 @@ export class LightingControlsPanel {
     private setIndividualBrightness(light: THREE.Light, type: string, brightness: number): void {
         const clamped = this.clampBrightness(brightness)
         this.lightBrightnessById.set(light.id, clamped)
-        this.applyBrightnessToLight(light, type)
+        LightingControlsPanel.logger.debug(`Individual brightness [${light.name || light.id}] (${type}): ${clamped.toFixed(2)}`)
+        this.applyBrightnessToLight(light)
         this.updateControlStates()
     }
 
     private applyBrightnessToAllLights(): void {
-        this.lightGroups.forEach((group, type) => {
+        this.lightGroups.forEach((group) => {
             for (const light of group.lights) {
-                this.applyBrightnessToLight(light, type)
+                this.applyBrightnessToLight(light)
             }
         })
     }
 
-    private applyBrightnessToLight(light: THREE.Light, type: string): void {
+    private applyBrightnessToLight(light: THREE.Light): void {
         const baseIntensity = this.getBaseIntensity(light)
-        const groupMultiplier = this.groupBrightnessByType.get(type) ?? 1
         const lightMultiplier = this.lightBrightnessById.get(light.id) ?? 1
-        const effectiveMultiplier = this.masterBrightness * groupMultiplier * lightMultiplier
 
-        light.intensity = baseIntensity * effectiveMultiplier
+        light.intensity = baseIntensity * lightMultiplier
 
-        const isVisible = effectiveMultiplier > 0.001
+        const isVisible = lightMultiplier > 0.001
         light.visible = isVisible
         this.toggleDebugHelper(light, isVisible)
     }
@@ -393,12 +404,10 @@ export class LightingControlsPanel {
         return this.baseIntensityById.get(light.id) ?? 1
     }
 
-    private getLightInfo(light: THREE.Light, type: string): string {
+    private getLightInfo(light: THREE.Light): string {
         const info: string[] = []
-        const groupMultiplier = this.groupBrightnessByType.get(type) ?? 1
         const lightMultiplier = this.lightBrightnessById.get(light.id) ?? 1
-        const effectiveMultiplier = this.masterBrightness * groupMultiplier * lightMultiplier
-        info.push(`x${effectiveMultiplier.toFixed(2)}`)
+        info.push(`x${lightMultiplier.toFixed(2)}`)
 
         if (light instanceof THREE.PointLight || light instanceof THREE.SpotLight) {
             info.push(`D:${light.distance}`)
