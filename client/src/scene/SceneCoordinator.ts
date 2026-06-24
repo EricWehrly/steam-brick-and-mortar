@@ -95,7 +95,7 @@ export class SceneCoordinator {
     // TODO: I had wanted showcase to be an alternate scene with alternate logic, but
     // we're creating this explicit bifrocation of loaders that I would prefer be instruction of loaders instead ... eventually
     private async executeBootstrapPath(): Promise<void> {
-        const SHOWCASE_MODE_ENABLED = true
+        const SHOWCASE_MODE_ENABLED = false
         
         const bootstrapPath: BootstrapPath = SHOWCASE_MODE_ENABLED 
             ? new ShowcaseBootstrapPath()
