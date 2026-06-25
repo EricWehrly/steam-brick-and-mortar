@@ -42,6 +42,7 @@ export const Setting = {
     LightingQuality: 'lightingQuality',
     ShadowQuality: 'shadowQuality',
     ShadowMapEnabled: 'shadowMapEnabled',
+    SsaoEnabled: 'ssaoEnabled',
     PixelRatioScale: 'pixelRatioScale',
     ArtworkRoughness: 'artworkRoughness',
     ArtworkMetalness: 'artworkMetalness',
@@ -91,6 +92,7 @@ export const SettingCategory = {
         Setting.LightingQuality,
         Setting.ShadowQuality,
         Setting.ShadowMapEnabled,
+        Setting.SsaoEnabled,
         Setting.PixelRatioScale,
         Setting.ArtworkRoughness,
         Setting.ArtworkMetalness,
@@ -119,6 +121,7 @@ export interface ApplicationSettings {
     lightingQuality: LightingQuality
     shadowQuality: number // 0=off, 1=low, 2=medium, 3=high, 4=ultra
     shadowMapEnabled: boolean
+    ssaoEnabled: boolean
     pixelRatioScale: number
     artworkRoughness: number
     artworkMetalness: number
@@ -431,6 +434,7 @@ export class AppSettings {
             lightingQuality: LIGHTING_QUALITY.ENHANCED,
             shadowQuality: 2, // Medium shadows by default
             shadowMapEnabled: true,
+            ssaoEnabled: true,
             pixelRatioScale: 1,
             artworkRoughness: 0.35,
             artworkMetalness: 0.05,
@@ -499,7 +503,7 @@ export class AppSettings {
             'verboseLogging', 'showDebugInfo', 'showCompassRose',
             'autoSave', 'autoLoadProfile', 'developmentMode',
             'enableLabels', 'enableStickers', 'enableArtwork', 'useMultiAtlas', 'useLodAtlas',
-            'enableLighting', 'showLightingDebug', 'showCeiling', 'shadowMapEnabled'
+            'enableLighting', 'showLightingDebug', 'showCeiling', 'shadowMapEnabled', 'ssaoEnabled'
         ]
         for (const field of booleanFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'boolean') {

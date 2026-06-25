@@ -100,13 +100,13 @@
           Higher shadow quality improves depth perception but requires more processing power. Set to "Off" to disable shadows entirely.
         </p>
         <div class="setting-control">
-          <input 
-            type="range" 
-            id="shadow-quality" 
+          <input
+            type="range"
+            id="shadow-quality"
             class="setting-slider pause-slider"
-            min="0" 
-            max="4" 
-            step="1" 
+            min="0"
+            max="4"
+            step="1"
             value="{{shadowQuality}}"
           >
           <div class="slider-labels">
@@ -116,6 +116,12 @@
             <span>High</span>
             <span>Ultra</span>
           </div>
+        </div>
+        <div class="setting-control" style="margin-top: 0.75rem;">
+          <label class="checkbox-container ui-checkbox-row">
+            <input type="checkbox" class="ui-checkbox" id="ssao-enabled" {{#ssaoEnabled}}checked{{/ssaoEnabled}}>
+            Enable SSAO (contact shadows and crevice darkening in screen space)
+          </label>
         </div>
       </div>
     </section>
