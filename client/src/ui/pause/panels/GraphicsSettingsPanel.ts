@@ -98,6 +98,7 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             qualityUltra: this.appSettings.getSetting('qualityLevel') === 'ultra',
             fullscreenEnabled: !!document.fullscreenElement,
             shadowMapEnabled: this.appSettings.getSetting('shadowMapEnabled'),
+            ssaoEnabled: this.appSettings.getSetting('ssaoEnabled'),
             pixelRatioScale: this.appSettings.getSetting('pixelRatioScale'),
             pixelRatioScaleLabel: this.appSettings.getSetting('pixelRatioScale').toFixed(2),
 
@@ -188,6 +189,10 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             {
                 toggleId: 'shadow-map-enabled',
                 onChange: (checked) => this.updateSetting('shadowMapEnabled', checked)
+            },
+            {
+                toggleId: 'ssao-enabled',
+                onChange: (checked) => this.updateSetting('ssaoEnabled', checked)
             }
         ])
     }
@@ -395,6 +400,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         const shadowMapToggle = document.getElementById('shadow-map-enabled') as HTMLInputElement
         if (shadowMapToggle) {
             shadowMapToggle.checked = this.appSettings.getSetting('shadowMapEnabled')
+        }
+
+        const ssaoToggle = document.getElementById('ssao-enabled') as HTMLInputElement
+        if (ssaoToggle) {
+            ssaoToggle.checked = this.appSettings.getSetting('ssaoEnabled')
         }
 
         const pixelRatioSlider = document.getElementById('pixel-ratio-scale') as HTMLInputElement
