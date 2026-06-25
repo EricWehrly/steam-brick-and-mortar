@@ -157,10 +157,8 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
     private readonly lodConfigs: LodTierSpec[]
     private readonly lazyHighTextures: boolean
 
-    // Track game names to texture indices
     // TD: Why use names and not appIds?
     private gameNameToTextureIndex: Map<string, number> = new Map()
-    private textureIndexToGameName: Map<number, string> = new Map()
     private instanceMetadata: Map<number, InstanceMetadata> = new Map()
 
     // Library/high artwork URLs for prefetched games, keyed by game name.
@@ -377,10 +375,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
             const artwork = this.artworkProvider.getArtwork(appid, gameName, 'library', artworkHints)
             await this.fetchAndCachePixels(artwork, textureIndex)
 
-            // this _really_ should be indexed by id, not name ...
             this.gameNameToTextureIndex.set(gameName, textureIndex)
-            // why have the reverse index? lookup should be doable
-            this.textureIndexToGameName.set(textureIndex, gameName)
             this.prefetchedHighArtworkUrl.set(gameName, this.resolveHighArtworkUrl(appid, artworkHints))
 
             LodArtworkOrchestrator.logger.debug(`Prefetched artwork for "${gameName}" → slot ${textureIndex}`)
@@ -550,9 +545,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
                 return { success: false, instanceIndex: -1 }
             }
 
-            // Track mapping
             this.gameNameToTextureIndex.set(gameName, textureIndex)
-            this.textureIndexToGameName.set(textureIndex, gameName)
             this.instanceMetadata.set(instanceIndex, {
                 name: gameName,
                 appid,
@@ -604,7 +597,7 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         const effectiveLod = this.renderer.getInstanceLod(instanceIndex)
 
         if (previousLod !== effectiveLod) {
-            const gameName = this.textureIndexToGameName.get(instanceIndex) ?? `instance #${instanceIndex}`
+            const gameName = this.instanceMetadata.get(instanceIndex)?.name ?? `instance #${instanceIndex}`
             const tierName = effectiveLod === LOD_LEVEL.HIGH ? 'HIGH' : 'MID'
             const requestedName = lodLevel === LOD_LEVEL.HIGH ? 'HIGH' : 'MID'
             if (accepted) {
@@ -659,7 +652,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         this.renderer.dispose()
         this.textureManager.dispose()
         this.gameNameToTextureIndex.clear()
-        this.textureIndexToGameName.clear()
         this.instanceMetadata.clear()
         this.publishArtworkMetadataReference()
         this.prefetchedHighArtworkUrl.clear()
