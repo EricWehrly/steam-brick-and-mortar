@@ -258,7 +258,6 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
         }
 
         const gameNameToTextureIndex = this.getGameNameToTextureIndex() as Map<string, number>
-        const internalState = this as unknown as { textureIndexToGameName: Map<number, string> }
 
         const entries: SyntheticTextureEntry[] = []
         let prefetchFailures = 0
@@ -296,7 +295,6 @@ export class LodArtworkOrchestratorDebug extends LodArtworkOrchestrator {
 
             textureWritesSucceeded++
             gameNameToTextureIndex.set(gameName, slot)
-            internalState.textureIndexToGameName.set(slot, gameName)
             entries.push({ appid, gameName, textureIndex: slot })
         }
 
