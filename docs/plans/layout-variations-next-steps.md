@@ -196,3 +196,9 @@ sectionIndex: number  // NEW — which section owns this shelf
 **Coordinator lifecycle model (implemented):**
 - Resettable singletons: `ShelfLayoutCoordinator`, `BatchCoordinator`, `GameBoxSpawner`
 - Disposable GPU owners: `InstancedShelfRenderer`, `GpuGameBoxRenderer`
+
+---
+
+## Related
+
+- [Liminal Mode](../features/liminal-mode.md) — endless-treadmill presentation modifier built on top of this layout system; shares the in-place-reposition prerequisite with dynamic layout switching.
