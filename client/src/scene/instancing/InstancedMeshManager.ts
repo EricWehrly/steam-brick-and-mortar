@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 import { DataManager } from '../../core/data/DataManager'
+import { EventManager } from '../../core/EventManager'
+import { GameEventTypes } from '../../types/InteractionEvents'
 import { Logger } from '../../utils/Logger'
 import type { InstancedMeshConfig, InstanceAttribute } from './IInstancedRenderer'
 
@@ -10,15 +12,23 @@ export class InstancedMeshManager {
     private currentCount: number = 0
     private isInitialized: boolean = false
     private debugName: string
-    
+    private readonly boundUpdateGPU: () => void
+
     // Reusable objects for performance
     private static readonly DEFAULT_QUATERNION = new THREE.Quaternion()
     private static readonly DEFAULT_SCALE = new THREE.Vector3(1, 1, 1)
     private static readonly TEMP_MATRIX = new THREE.Matrix4()
-    
+
     constructor(debugName: string = 'InstancedMesh') {
         this.debugName = debugName
         this.maxInstances = 1000 // Default, overridden in initialize
+
+        this.boundUpdateGPU = this.updateGPU.bind(this)
+        const eventManager = EventManager.getInstance()
+        eventManager.registerEventHandler(GameEventTypes.SomeBatchesComplete, this.boundUpdateGPU)
+        // Layout-switch flows emit ShelfLayoutDetermined without new batch events;
+        // subscribe here so matrices flush to GPU even when SomeBatchesComplete does not fire.
+        eventManager.registerEventHandler(GameEventTypes.ShelfLayoutDetermined, this.boundUpdateGPU)
     }
     
     public initialize(config: InstancedMeshConfig): void {
@@ -163,11 +173,14 @@ export class InstancedMeshManager {
         return true
     }
 
+    // Called on each SomeBatchesComplete rather than AllBatchesComplete so instances
+    // become visible progressively as batches arrive — spreading buffer re-uploads
+    // across frames instead of a single large stall at the end.
     public updateGPU(): void {
         if (!this.instancedMesh) {
             return
         }
-        
+
         // Update instance matrices
         this.instancedMesh.instanceMatrix.needsUpdate = true
         if (this.instancedMesh.instanceColor) {
@@ -245,7 +258,11 @@ export class InstancedMeshManager {
     
     public dispose(): void {
         InstancedMeshManager.logger.debug(`🧹 Disposing ${this.debugName}`)
-        
+
+        const eventManager = EventManager.getInstance()
+        eventManager.deregisterEventHandler(GameEventTypes.SomeBatchesComplete, this.boundUpdateGPU)
+        eventManager.deregisterEventHandler(GameEventTypes.ShelfLayoutDetermined, this.boundUpdateGPU)
+
         this.removeFromMainScene()
         
         // NOTE: Geometry and material are shared - caller handles disposal

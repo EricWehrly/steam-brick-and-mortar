@@ -54,8 +54,6 @@ export interface IInstancedRenderer {
      */
     setInstance(index: number, data: InstanceData): Promise<boolean> | boolean
     
-    updateGPU(): void
-    
     reset(): void
     
     isReady(): boolean
