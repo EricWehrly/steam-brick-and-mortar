@@ -48,35 +48,22 @@ There's also a longer-term design where lighting presets and room variants (base
 
 ## Progress Snapshot (2026-06)
 
-What has landed recently on the "make the store look better" path:
-- Instanced game artwork moved to a lit material strategy (`MeshStandardMaterial` with array-texture sampling patch) so boxes now participate in scene lighting and shadows more convincingly.
-- Retail lighting was retuned (ambient/directional/spot/rim plus ceiling fixture intensity), producing better shelf readability and stronger artwork contrast.
-- Texture-array color handling was corrected in the pipeline (array texture color-space tagging and decode-path adjustments) to reduce muted artwork output.
-- Lighting controls panel was upgraded to multiplier sliders, making brightness balancing easier and more predictable during visual tuning.
-- Per-material micro-tuning landed: artwork gloss (roughness/metalness), fresnel edge lift, per-instance roughness variation, and shadow contact grounding — all wired to `AppSettings` and the Display Advanced panel. GLSL snippets were extracted to managed `.glsl` files.
-- A **showcase comparison scene** was scaffolded (`feature/showcase-scene-comparison`) to stage these tunings side-by-side — see `docs/plans/showcase-scene-comparison-plan.md` for its current (partial) state.
+Landed on the "make the store look better" path:
+- Artwork uses `MeshStandardMaterial` with array-texture sampling — boxes participate in scene lighting and shadows.
+- Retail lighting retuned (ambient/directional/spot/rim, ceiling fixture intensity) for better shelf readability.
+- Texture-array color handling corrected (color-space tagging, decode path) to reduce muted artwork.
+- Lighting controls panel upgraded to multiplier sliders.
+- Per-material micro-tuning: artwork roughness/metalness, fresnel edge lift, per-instance roughness variation, shadow contact grounding — all in `AppSettings` and the Display Advanced panel.
+- **Renderer visual baseline landed** (this branch): AgX tone mapping, IBL via `RoomEnvironment + PMREMGenerator`, directional shadow angle, SSAO. See `docs/plans/renderer-visual-baseline-plan.md` (now implemented) and `docs/plans/lighting-quality-plan.md` (technique reference + next steps).
 
-Current decision boundaries:
-- TSL/NodeMaterial was evaluated and deferred for now because it implies a broader renderer migration scope than this feature needs.
-- Near-term visual improvements should continue on the current WebGL material path unless a renderer-wide migration is explicitly scheduled.
-
-### Immediate next step — renderer visual baseline (do this first)
-
-The per-material tuning above is second-order. The two first-order levers that most determine
-how the scene reads are still unset at the renderer, and they are the recommended next move
-before any further micro-tuning:
-
-- **Tone mapping is `NoToneMapping`** — the renderer never sets `toneMapping`/`toneMappingExposure`, so highlights hard-clip to flat white. (The lit-artwork material "supports" tone mapping via the standard shader chunk, but that chunk is a no-op while the renderer operator is off — no tone mapping is actually applied.)
-- **No environment map** — `scene.environment` is never assigned, so the gloss/fresnel work has nothing to reflect.
-
-Both are global frame state (not per-object), so they belong on a live settings toggle, not the
-showcase grid. Full spec, touch points, and acceptance criteria: **`docs/plans/renderer-visual-baseline-plan.md`**.
+Decision boundaries:
+- TSL/NodeMaterial deferred — implies a broader renderer migration not needed here.
+- Visual improvements continue on the current WebGL material path.
 
 What remains in this feature:
-- Renderer visual baseline (tone mapping + exposure, environment/IBL) — see plan above.
 - Tone presets and in-scene "dongle" controls.
 - Atmosphere effects (dust motes, subtle spotlight shimmer).
-- Optional additional art-direction tuning once the baseline and preset architecture are in place.
+- Dynamic CubeCamera probe (scene-accurate specular), bloom for emissives, color LUT for atmosphere modes — see `docs/plans/lighting-quality-plan.md`.
 
 ## Pre-Clutter Immersion Checkpoint
 
