@@ -343,7 +343,9 @@ export class LightingRenderer {
         const exteriorLight = this.lightFactory.createDirectionalLight(0xD4DFF2, 0.52, {
             name: LIGHT_NAMES.EXTERIOR_AMBIENT,
             parent: this.lightingGroup,
-            position: [1, exteriorHeight, 10]
+            // Offset from overhead so shadows project outward from objects instead of hiding
+            // directly beneath them. A 2-unit XZ offset at ~6m height ≈ 18° angle.
+            position: [2, exteriorHeight, 2]
         })
         this.attachDirectionalTarget(exteriorLight)
         configureDirectionalShadow(exteriorLight, this.config, this.currentFootprint())
