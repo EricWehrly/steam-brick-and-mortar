@@ -157,9 +157,6 @@ export class LightingRenderer {
         
         LightingRenderer.logger.lifecycle(`💡 Setting up initial lighting (fast pass)...`)
         
-        // No shadows for fast startup
-        this.renderer.shadowMap.enabled = false
-        
         // Basic ambient + directional illumination
         LightingRenderer.logger.lifecycle('💡 Setting up basic illumination - ambient + directional light')
         this.setupAmbientAndMainDirectionalLighting()
