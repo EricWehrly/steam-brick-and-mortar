@@ -1,8 +1,7 @@
 # Renderer Visual Baseline Plan (Tone Mapping + Environment Lighting)
 
 ## Status
-Proposed — highest-impact next step for the "make the scene look right" thread. Not started.
-Recommended to land **before** further per-material micro-tuning in the showcase scene.
+**Implemented** — AgX tone mapping, PMREM environment (RoomEnvironment), and SSAO landed in `SceneManager.ts` on this branch. Exposure and environment intensity are hardcoded (see TODO comments); sliders are a follow-up.
 
 ## The core finding
 The recent visual-quality work has tuned *second-order* material levers — artwork
