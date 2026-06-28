@@ -18,6 +18,7 @@ import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { BlockbusterColors } from '../utils/Colors'
+import { RenderPipelineManager } from './RenderPipelineManager'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
 import { DataManager } from '../core/data/DataManager'
@@ -40,6 +41,7 @@ export class SceneManager {
     private scene: THREE.Scene
     private camera: THREE.PerspectiveCamera
     private renderer: THREE.WebGLRenderer
+    private renderPipelineManager: RenderPipelineManager
     private propRenderer: PropRenderer | null = null
     private skyboxManager: SkyboxManager
     private renderLoopRegistry: RenderLoopRegistry
@@ -86,6 +88,7 @@ export class SceneManager {
         this.setupRenderer(options)
         this.setupEnvironmentLighting()
         this.setupCamera()
+        this.renderPipelineManager = new RenderPipelineManager(this.renderer, this.scene, this.camera)
         this.setupEventListeners()
         this.initializeSkybox()
 
@@ -170,7 +173,13 @@ export class SceneManager {
             // Execute all registered render loop callbacks
             this.renderLoopRegistry.executeAll(now, deltaTime)
 
-            this.renderer.render(this.scene, this.camera)
+            // XR takes over projection entirely; post-processing pipeline bypassed in XR.
+            if (this.renderer.xr.isPresenting) {
+                console.warn('Skipping render pipeline (post-processing) for XR. We did not test this.')
+                this.renderer.render(this.scene, this.camera)
+            } else {
+                this.renderPipelineManager.render()
+            }
             this.renderLoopRegistry.afterRender()
         }
         this.renderer.setAnimationLoop(this.renderLoopCallback)
@@ -213,6 +222,7 @@ export class SceneManager {
         this.propRenderer?.dispose()
         this.envRenderTarget?.dispose()
         this.scene.environment = null
+        this.renderPipelineManager.dispose()
         this.renderer.dispose()
         document.body.removeChild(this.renderer.domElement)
     }
