@@ -13,6 +13,11 @@
             <span class="slider-value" id="all-lights-value">100%</span>
         </label>
         <label class="control-item">
+            <span class="control-label ui-control-label">Exposure</span>
+            <input type="range" min="0.05" max="2.0" step="0.01" id="exposure-slider" value="{{exposureValue}}">
+            <span class="slider-value" id="exposure-value">{{exposureValue}}</span>
+        </label>
+        <label class="control-item">
             <input type="checkbox" class="ui-checkbox" id="debug-indicator-toggle" {{#checked debugIndicatorEnabled}}checked{{/checked}}>
             <span class="control-label ui-control-label">Show Debug Indicators</span>
         </label>
