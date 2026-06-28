@@ -14,7 +14,9 @@
  */
 
 import * as THREE from 'three'
+// TODO: don't pull directly from threejs examples. this will break.
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { BlockbusterColors } from '../utils/Colors'
 import { SkyboxManager, SkyboxPresets } from './SkyboxManager'
 import { PropRenderer } from './PropRenderer'
@@ -39,6 +41,7 @@ export class SceneManager {
     private propRenderer: PropRenderer | null = null
     private skyboxManager: SkyboxManager
     private renderLoopRegistry: RenderLoopRegistry
+    private envRenderTarget: THREE.WebGLRenderTarget | null = null
 
     constructor(options: SceneManagerOptions = {}) {
         RectAreaLightUniformsLib.init()
@@ -79,6 +82,7 @@ export class SceneManager {
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
 
         this.setupRenderer(options)
+        this.setupEnvironmentLighting()
         this.setupCamera()
         this.setupEventListeners()
         this.initializeSkybox()
@@ -108,6 +112,18 @@ export class SceneManager {
         this.renderer.xr.enabled = true
         
         document.body.appendChild(this.renderer.domElement)
+    }
+
+    // using a blank room is fine as a baseline, only needs to be enhanced if we want to do more advanced reflections
+    private setupEnvironmentLighting(): void {
+        const pmremGenerator = new THREE.PMREMGenerator(this.renderer)
+        this.envRenderTarget = pmremGenerator.fromScene(new RoomEnvironment())
+        this.scene.environment = this.envRenderTarget.texture
+        // TODO: expose environmentIntensity as a live knob in GraphicsSettingsPanel / AppSettings
+        // 0.4 keeps IBL as an additive specular/ambient contribution on top of the hand-authored
+        // lights rather than competing with them.
+        this.scene.environmentIntensity = 0.3
+        pmremGenerator.dispose()
     }
 
     private setupCamera() {
@@ -191,6 +207,7 @@ export class SceneManager {
         if (this.propRenderer) {
             this.propRenderer.dispose()
         }
+        this.envRenderTarget?.dispose()
         this.renderer.dispose()
         document.body.removeChild(this.renderer.domElement)
     }
