@@ -12,7 +12,7 @@
 
 import * as THREE from 'three'
 import { EventManager, EventSource } from '../core/EventManager'
-import { LightingEventTypes, type LightCreatedEvent, type LightingSystemReadyEvent } from '../types/LightingEvents'
+import { LightingEventTypes, type LightCreatedEvent, type LightingSystemReadyEvent, type GroupBrightnessChangedEvent } from '../types/LightingEvents'
 import { AppSettings } from '../core/AppSettings'
 import { LightRegistry } from '../lighting/LightRegistry'
 import { Logger } from '../utils/Logger'
@@ -65,7 +65,8 @@ export class LightingControlsPanel {
         panel.id = 'lighting-controls-panel'
         panel.className = 'ui-panel lighting-controls-panel horizontally-collapsible horizontally-collapsed'
         panel.innerHTML = renderTemplate(lightingControlsPanelTemplate, {
-            debugIndicatorEnabled: this.debugIndicatorEnabled
+            debugIndicatorEnabled: this.debugIndicatorEnabled,
+            exposureValue: this.appSettings.getSetting('toneMappingExposure').toFixed(2)
         })
 
         // Hide the separate lighting controls button since we're integrating it into the panel
@@ -111,6 +112,19 @@ export class LightingControlsPanel {
                 this.debugIndicatorEnabled = debugToggle.checked
                 this.appSettings.setSetting('showLightingDebug', this.debugIndicatorEnabled, EventSource.UI)
                 this.toggleAllDebugHelpers(this.debugIndicatorEnabled)
+            })
+        }
+
+        // Exposure slider
+        const exposureSlider = document.getElementById('exposure-slider') as HTMLInputElement | null
+        if (exposureSlider) {
+            exposureSlider.addEventListener('input', () => {
+                const value = Number.parseFloat(exposureSlider.value)
+                if (Number.isFinite(value)) {
+                    this.appSettings.setSetting('toneMappingExposure', value, EventSource.UI)
+                    const exposureValue = document.getElementById('exposure-value')
+                    if (exposureValue) exposureValue.textContent = value.toFixed(2)
+                }
             })
         }
 

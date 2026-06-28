@@ -113,7 +113,6 @@ export class SceneManager {
         this.renderer.setPixelRatio(window.devicePixelRatio)
         this.renderer.outputColorSpace = options.outputColorSpace ?? THREE.SRGBColorSpace
         this.renderer.toneMapping = THREE.AgXToneMapping    // generally considered the most physically accurate tone mapping for PBR
-        // TODO: add a knob in the GUI
         this.renderer.toneMappingExposure = AppSettings.get('toneMappingExposure')
 
         // Enable WebXR
