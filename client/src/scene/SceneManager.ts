@@ -193,20 +193,11 @@ export class SceneManager {
         return this.renderer
     }
 
-    public getPropRenderer(): PropRenderer {
-        if (!this.propRenderer) {
-            this.propRenderer = new PropRenderer(this.scene)
-        }
-        return this.propRenderer
-    }
-
     public dispose() {
         this.renderer.setAnimationLoop(null)
         this.renderLoopCallback = null
         this.skyboxManager.dispose()
-        if (this.propRenderer) {
-            this.propRenderer.dispose()
-        }
+        this.propRenderer?.dispose()
         this.envRenderTarget?.dispose()
         this.renderer.dispose()
         document.body.removeChild(this.renderer.domElement)
