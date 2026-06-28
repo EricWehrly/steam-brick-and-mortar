@@ -26,7 +26,9 @@ import { RenderLoopRegistry } from './RenderLoopRegistry'
 import { FrameBudgetScheduler } from '../utils/FrameBudgetScheduler'
 import { ThreeWebGLRendererDebug } from '../debug/ThreeWebGLRendererDebug'
 import { EventManager } from '../core/EventManager'
-import { AppEventTypes } from '../types/InteractionEvents'
+import { AppSettings } from '../core/AppSettings'
+import type { SettingChangedEvent } from '../core/AppSettings'
+import { AppEventTypes, AppSettingsEventTypes } from '../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../types/InteractionEvents'
 
 export interface SceneManagerOptions {
@@ -107,14 +109,15 @@ export class SceneManager {
         this.renderer.setSize(window.innerWidth, window.innerHeight)
         this.renderer.setPixelRatio(window.devicePixelRatio)
         this.renderer.outputColorSpace = options.outputColorSpace ?? THREE.SRGBColorSpace
-        
+        this.renderer.toneMapping = THREE.AgXToneMapping    // generally considered the most physically accurate tone mapping for PBR
+        // TODO: add a knob in the GUI
+        this.renderer.toneMappingExposure = AppSettings.get('toneMappingExposure')
+
         // Enable WebXR
         this.renderer.xr.enabled = true
-        
         document.body.appendChild(this.renderer.domElement)
     }
 
-    // using a blank room is fine as a baseline, only needs to be enhanced if we want to do more advanced reflections
     private setupEnvironmentLighting(): void {
         const pmremGenerator = new THREE.PMREMGenerator(this.renderer)
         this.envRenderTarget = pmremGenerator.fromScene(new RoomEnvironment())
@@ -132,12 +135,22 @@ export class SceneManager {
     }
 
     private setupEventListeners() {
-        // Handle window resize
         window.addEventListener('resize', () => {
             this.camera.aspect = window.innerWidth / window.innerHeight
             this.camera.updateProjectionMatrix()
             this.renderer.setSize(window.innerWidth, window.innerHeight)
         })
+
+        EventManager.getInstance().registerEventHandler<SettingChangedEvent>(
+            AppSettingsEventTypes.Changed,
+            this.onSettingChanged.bind(this)
+        )
+    }
+
+    private onSettingChanged(event: CustomEvent<SettingChangedEvent>): void {
+        if (event.detail.settingName === 'toneMappingExposure') {
+            this.renderer.toneMappingExposure = event.detail.value as number
+        }
     }
 
     private renderLoopCallback: (() => void) | null = null
@@ -199,6 +212,7 @@ export class SceneManager {
         this.skyboxManager.dispose()
         this.propRenderer?.dispose()
         this.envRenderTarget?.dispose()
+        this.scene.environment = null
         this.renderer.dispose()
         document.body.removeChild(this.renderer.domElement)
     }

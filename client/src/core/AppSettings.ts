@@ -43,6 +43,7 @@ export const Setting = {
     ShadowQuality: 'shadowQuality',
     ShadowMapEnabled: 'shadowMapEnabled',
     SsaoEnabled: 'ssaoEnabled',
+    ToneMappingExposure: 'toneMappingExposure',
     PixelRatioScale: 'pixelRatioScale',
     ArtworkRoughness: 'artworkRoughness',
     ArtworkMetalness: 'artworkMetalness',
@@ -93,6 +94,7 @@ export const SettingCategory = {
         Setting.ShadowQuality,
         Setting.ShadowMapEnabled,
         Setting.SsaoEnabled,
+        Setting.ToneMappingExposure,
         Setting.PixelRatioScale,
         Setting.ArtworkRoughness,
         Setting.ArtworkMetalness,
@@ -122,6 +124,7 @@ export interface ApplicationSettings {
     shadowQuality: number // 0=off, 1=low, 2=medium, 3=high, 4=ultra
     shadowMapEnabled: boolean
     ssaoEnabled: boolean
+    toneMappingExposure: number
     pixelRatioScale: number
     artworkRoughness: number
     artworkMetalness: number
@@ -430,11 +433,13 @@ export class AppSettings {
             // Performance Settings
             qualityLevel: 'high',
             
+            // TODO: move any values we can into their owning/declaring domains
             // Graphics Settings
             lightingQuality: LIGHTING_QUALITY.ENHANCED,
             shadowQuality: 2, // Medium shadows by default
             shadowMapEnabled: true,
             ssaoEnabled: true,
+            toneMappingExposure: 0.25,
             pixelRatioScale: 1,
             artworkRoughness: 0.35,
             artworkMetalness: 0.05,
@@ -511,8 +516,11 @@ export class AppSettings {
             }
         }
 
-        if (settingsObj.pixelRatioScale !== undefined && typeof settingsObj.pixelRatioScale !== 'number') {
-            return false
+        const numberFields = ['pixelRatioScale', 'toneMappingExposure']
+        for (const field of numberFields) {
+            if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'number') {
+                return false
+            }
         }
 
         const stringFields = ['inputProfile', 'inputBindings', 'inputDevicesEnabled']
