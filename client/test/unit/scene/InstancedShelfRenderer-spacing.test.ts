@@ -175,15 +175,13 @@ describe('InstancedShelfRenderer - Shelf Spacing and Depth Fixes', () => {
             expect(renderer.isReady()).toBe(false)
         })
         
-        it('should handle GPU updates without errors', async () => {
+        it('should dispose without errors after instances are set', async () => {
             const renderer = new InstancedShelfRenderer()
             await renderer.initialize()
-            
+
             renderer.setInstance(0, { position: new THREE.Vector3(0, 0, 0) })
-            
-            expect(() => renderer.updateGPU()).not.toThrow()
-            
-            renderer.dispose()
+
+            expect(() => renderer.dispose()).not.toThrow()
         })
         
         it('should handle reset correctly', async () => {

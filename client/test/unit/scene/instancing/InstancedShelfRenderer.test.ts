@@ -320,12 +320,6 @@ describe('InstancedShelfRenderer', () => {
             expect(stats.shelfUnits).toBe(0)
         })
 
-        it('should handle GPU updates without errors', () => {
-            const position = new THREE.Vector3(0, 0, 0)
-            renderer.setInstance(0, { position })
-
-            expect(() => renderer.updateGPU()).not.toThrow()
-        })
     })
 
     describe('Error Handling and Resilience', () => {
@@ -375,29 +369,15 @@ describe('InstancedShelfRenderer', () => {
     })
 
     describe('Layout Switch Regression Guard', () => {
-        it('should flush GPU updates when ShelfLayoutDetermined is emitted', async () => {
+        it('should register each mesh manager for ShelfLayoutDetermined GPU flush', async () => {
             renderer = new InstancedShelfRenderer()
             await renderer.initialize()
 
-            const updateSpy = vi.spyOn(renderer, 'updateGPU')
             const registrations = mockEventManager.registerEventHandler.mock.calls as Array<[string, (...args: any[]) => void]>
-            const layoutDeterminedRegistration = registrations.find(([eventType]) => eventType === GameEventTypes.ShelfLayoutDetermined)
+            const layoutDeterminedRegistrations = registrations.filter(([eventType]) => eventType === GameEventTypes.ShelfLayoutDetermined)
 
-            expect(layoutDeterminedRegistration).toBeDefined()
-            if (!layoutDeterminedRegistration) {
-                throw new Error('ShelfLayoutDetermined handler was not registered')
-            }
-
-            const [, handler] = layoutDeterminedRegistration
-            handler(new CustomEvent(GameEventTypes.ShelfLayoutDetermined, {
-                detail: {
-                    shelfBounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1 },
-                    shelfLayout: { rows: 1 },
-                    stockStrategy: { order: () => [] },
-                },
-            }))
-
-            expect(updateSpy).toHaveBeenCalledTimes(1)
+            // One registration per InstancedMeshManager: angled boards, side boards, shelf boards, interior surfaces
+            expect(layoutDeterminedRegistrations).toHaveLength(4)
         })
     })
 

@@ -389,8 +389,7 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             expect(mockPlaceGame).toHaveBeenCalledTimes(4)
         })
 
-        it('skips prefetchArtwork for games with no appid and no artwork metadata', async () => {
-            // Only games with no appid AND no artwork metadata get no URL at all.
+        it('delegates prefetchArtwork to renderer even for games with no appid and no artwork metadata', async () => {
             const games = [{ appid: 0, name: 'No ID Game', playtime_forever: 0, img_icon_url: '', img_logo_url: '', artwork: undefined }]
 
             eventManager.emit<BatchReadyForPlacementEvent>(
@@ -399,8 +398,8 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             )
 
             await Promise.resolve()
-            // appid=0 is falsy so no CDN URL is constructed — prefetchArtwork not called.
-            expect(mockPrefetchArtwork).not.toHaveBeenCalled()
+            expect(mockPrefetchArtwork).toHaveBeenCalledOnce()
+            expect(mockPrefetchArtwork).toHaveBeenCalledWith(0, undefined, 'No ID Game')
         })
 
         it('emits GamesPlaced per shelf on GamesSort', () => {

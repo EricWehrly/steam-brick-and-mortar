@@ -12,8 +12,6 @@
  *
  * RECEIVES:
  * - setInstance(index, data) → Creates/updates shelf at index
- * - updateGPU() → Explicit GPU flush (e.g. on ShelfLayoutDetermined)
- * - ShelfLayoutDetermined event → Flushes GPU when layout fires without a batch event
  *
  * DELEGATES TO:
  * - InstancedMeshManager: Per-geometry-type instancing
@@ -124,7 +122,7 @@ export class InstancedShelfRenderer implements IInstancedRenderer {
     private sceneInsertCancelled = false
 
     private readonly boundHandleShelfReady: (event: CustomEvent<ShelfReadyEvent>) => void
-    
+
     // TODO: Consider making sticker system fully pluggable (dependency injection or optional feature)
     private readonly stickerHandler: ShelfStickerHandler
     
