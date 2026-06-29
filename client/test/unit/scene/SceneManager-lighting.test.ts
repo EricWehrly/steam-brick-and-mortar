@@ -1,13 +1,3 @@
-/**
- * SceneManager Lighting Tests  
- * 
- * Tests for       rectLights.forEach(light => {
-        expect(light.position.y).toBeLessThan(ceilingHeight)
-        expect(light.position.y).toBeCloseTo(3.005, 3) // Updated position calculation (fixtureY - 0.1)
-        expect(light.position.y).toBeGreaterThan(2.5) // Reasonable height range
-      })ng fixture positioning and lighting alignment
- */
-
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
 import { PropRenderer } from '../../../src/scene/PropRenderer'
@@ -29,13 +19,12 @@ describe('SceneManager Lighting Integration', () => {
     it('should position fixtures below ceiling height (fixes lighting alignment issue)', () => {
       // Test the specific bug: fixtures were at y=3.5 but ceiling is at y=3.2
       const ceilingHeight = 3.2
-      const fixtures = propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
-      
+      const { group: fixtures } = propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
+
       expect(fixtures).toBeInstanceOf(THREE.Group)
       expect(fixtures.name).toBe('CeilingLightFixtures')
-      
-      // Find the instanced mesh for light panels
-      const lightPanelInstanced = fixtures.children.find(child => 
+
+      const lightPanelInstanced = fixtures.children.find(child =>
         child instanceof THREE.InstancedMesh && child.userData?.isLightFixture && child.userData?.type === 'ceiling-fluorescent'
       ) as THREE.InstancedMesh
       
@@ -59,9 +48,9 @@ describe('SceneManager Lighting Integration', () => {
     it('should adapt positioning to different ceiling heights', () => {
       // Test with non-standard ceiling height
       const customCeilingHeight = 2.8
-      const fixtures = propRenderer.createCeilingLightFixtures(customCeilingHeight, 22, 16)
-      
-      const lightPanelInstanced = fixtures.children.find(child => 
+      const { group: fixtures } = propRenderer.createCeilingLightFixtures(customCeilingHeight, 22, 16)
+
+      const lightPanelInstanced = fixtures.children.find(child =>
         child instanceof THREE.InstancedMesh && child.userData?.isLightFixture
       ) as THREE.InstancedMesh
       
@@ -81,16 +70,15 @@ describe('SceneManager Lighting Integration', () => {
   describe('Phase 2.4 atmospheric props', () => {
     it('should create ceiling fixtures as part of atmospheric enhancement', () => {
       // Phase 2.4: "Implement basic ceiling fixtures" 
-      const fixtures = propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
-        emissiveIntensity: 0.8, // Enhanced visibility for atmosphere
+      const { group: fixtures } = propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
+        emissiveIntensity: 0.8,
         rows: 2,
         fixturesPerRow: 4
       })
-      
+
       expect(fixtures.name).toBe('CeilingLightFixtures')
-      
-      // Should create proper housing for realistic appearance (now as instanced mesh)
-      const housingInstanced = fixtures.children.find(child => 
+
+      const housingInstanced = fixtures.children.find(child =>
         child instanceof THREE.InstancedMesh && child.name === 'CeilingFixtureHousings'
       ) as THREE.InstancedMesh
       expect(housingInstanced).toBeDefined()
@@ -99,11 +87,11 @@ describe('SceneManager Lighting Integration', () => {
 
     it('should integrate with other atmospheric props', () => {
       // Create multiple atmospheric elements 
-      const ceilingFixtures = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+      const { group: ceilingFixtures } = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
       const wireRack = propRenderer.createWireRackDisplay(new THREE.Vector3(5, 0, -3))
       const divider = propRenderer.createCategoryDivider(new THREE.Vector3(0, 0, 1))
       const floorMarkers = propRenderer.createFloorMarkers(22, 16)
-      
+
       expect(ceilingFixtures).toBeInstanceOf(THREE.Group)
       expect(wireRack).toBeInstanceOf(THREE.Group)
       expect(divider).toBeInstanceOf(THREE.Group)

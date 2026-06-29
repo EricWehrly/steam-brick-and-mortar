@@ -18,7 +18,7 @@ import { PropRenderer } from './PropRenderer'
 import { LightingDebugHelper } from './LightingDebugHelper'
 import { AppSettings, LIGHTING_QUALITY, Setting, type LightingQuality, type SettingChangedEvent } from '../core/AppSettings'
 import { EventManager, EventSource } from '../core/EventManager'
-import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent } from '../types/LightingEvents'
+import { LightingEventTypes, type LightingToggleEvent, type LightingDebugToggleEvent, type LightingQualityChangedEvent, type GroupBrightnessChangedEvent } from '../types/LightingEvents'
 import { RoomEventTypes, type RoomResizedEvent, AppSettingsEventTypes } from '../types/InteractionEvents'
 import { StorePropsEventTypes } from './props/PropsEvents'
 import { LightFactory } from '../lighting/LightFactory'
@@ -75,7 +75,10 @@ export class LightingRenderer {
     private eventManager: EventManager
     private lightFactory: LightFactory
     private currentShelfLayout?: { rows: number; shelvesPerRow?: number }
+    private static readonly FIXTURE_PANEL_EMISSIVE = 1.08
     private currentFixtures: THREE.Group | null = null
+    private currentFixtureMaterial: THREE.MeshStandardMaterial | null = null
+    private fixtureRectAreaLightIds = new Set<number>()
     private lightingUpgradeStarted = false
     public static logger = Logger.createLogFunctions(LightingRenderer.name)
 
@@ -139,8 +142,19 @@ export class LightingRenderer {
             StorePropsEventTypes.SetupCompleted,
             this.upgradeLighting.bind(this)
         )
+
+        this.eventManager.registerEventHandler<GroupBrightnessChangedEvent>(
+            LightingEventTypes.GroupBrightnessChanged,
+            this.onGroupBrightnessChanged.bind(this)
+        )
         // PointLightRequested is handled by LightFactory directly — it self-registers
         // in its constructor so the factory owns all light creation, including event-driven requests.
+    }
+
+    private onGroupBrightnessChanged(event: CustomEvent<GroupBrightnessChangedEvent>): void {
+        if (this.currentFixtureMaterial && event.detail.lightIds.some(id => this.fixtureRectAreaLightIds.has(id))) {
+            this.currentFixtureMaterial.emissiveIntensity = LightingRenderer.FIXTURE_PANEL_EMISSIVE * event.detail.brightness
+        }
     }
 
     /**
@@ -156,7 +170,7 @@ export class LightingRenderer {
         this.config = this.getCurrentConfig()
         
         LightingRenderer.logger.lifecycle(`💡 Setting up initial lighting (fast pass)...`)
-        
+
         // Basic ambient + directional illumination
         LightingRenderer.logger.lifecycle('💡 Setting up basic illumination - ambient + directional light')
         this.setupAmbientAndMainDirectionalLighting()
@@ -298,7 +312,7 @@ export class LightingRenderer {
 
     private setupLightsByQuality(): void {
         const quality = this.config.quality ?? LIGHTING_QUALITY.ENHANCED
-        
+
         if (quality === LIGHTING_QUALITY.SIMPLE) {
             // Fallback/minimal tier: ambient + directional only.
             // ENHANCED and above are the normal retail-profile lighting levels.
@@ -308,9 +322,9 @@ export class LightingRenderer {
         } else {
             // Quality >= ENHANCED: baseline retail profile with optional feature escalation
             LightingRenderer.logger.lifecycle(`💡 Setting up ${quality} lighting - retail core + optional features`)
-            
+
             this.setupRetailCoreLighting()
-            
+
             // Feature escalation by numeric threshold
             if (quality >= LIGHTING_QUALITY.ADVANCED) {
                 this.addPointLights()
@@ -318,12 +332,14 @@ export class LightingRenderer {
             if (quality >= LIGHTING_QUALITY.OUCH_MY_EYES) {
                 this.addDramaticLighting()
             }
-            
+
             this.applyRetailProfileDefaults()
             LightingRenderer.logger.debug(`✅ ${quality} lighting: ${this.lightingGroup.children.length} lights/groups added`)
         }
     }
 
+    // RectAreaLight cannot cast shadows — Three.js engine constraint, not a config issue.
+    // See docs/plans/lighting-quality-plan.md § "Known gaps" for context and workaround options.
     private setupRetailCoreLighting(): void {
         // Ambient light — warm retail white, noticeable brightness.
         // ambientIntensity in config is near-zero by design (keeps specular bias down),
@@ -401,7 +417,7 @@ export class LightingRenderer {
         const fixturesPerRow = layout?.shelvesPerRow ?? 4
         const ceilingHeight = this.config.ceilingHeight
         
-        const fixtures = this.propRenderer.createCeilingLightFixtures(
+        const { group, lightIds } = this.propRenderer.createCeilingLightFixtures(
             ceilingHeight,
             CURRENT_ROOM_DIMENSIONS.WIDTH,
             CURRENT_ROOM_DIMENSIONS.DEPTH,
@@ -409,14 +425,20 @@ export class LightingRenderer {
                 width: 4,
                 height: 0.15,
                 depth: 0.6,
-                emissiveIntensity: 0.6, // Reduced from 0.8 for comfort
+                emissiveIntensity: LightingRenderer.FIXTURE_PANEL_EMISSIVE,
                 rows: fixtureRows,
                 fixturesPerRow: fixturesPerRow
             }
         )
-        
-        this.scene.add(fixtures)
-        this.currentFixtures = fixtures
+        this.currentFixtures = group
+        this.scene.add(this.currentFixtures)
+
+        // TODO: Rather than this hack, extend our definition of a "light" to track associated geometry, and also track any associated emissive materials (so it's easy to distinguish between geometry and "emissive" geometry)
+        const panels = this.currentFixtures.getObjectByName('CeilingLightPanels')
+        if (panels instanceof THREE.InstancedMesh) {
+            this.currentFixtureMaterial = panels.material as THREE.MeshStandardMaterial
+        }
+        this.fixtureRectAreaLightIds = new Set(lightIds)
         
         monitor.end({ fixtureCount: fixtureRows * fixturesPerRow, shelfRows })
         LightingRenderer.logger.debug(`💡 Created ${fixtureRows * fixturesPerRow} ceiling fixtures (${fixtureRows} rows x ${fixturesPerRow} per row) for ${shelfRows} shelf rows`)
@@ -519,6 +541,8 @@ export class LightingRenderer {
                 LightingRenderer.logger.debug('💡 Updating existing ceiling fixtures for room changes...')
                 this.scene.remove(this.currentFixtures)
                 this.currentFixtures = null
+                this.currentFixtureMaterial = null
+                this.fixtureRectAreaLightIds.clear()
             } else {
                 LightingRenderer.logger.debug('💡 Adding ceiling fixtures for shelf layout...')
             }
@@ -618,6 +642,7 @@ export class LightingRenderer {
         if (this.currentFixtures) {
             this.scene.remove(this.currentFixtures)
             this.currentFixtures = null
+            this.currentFixtureMaterial = null
         }
         this.debugHelper.dispose()
         if (this.propRenderer) {

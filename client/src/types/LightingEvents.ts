@@ -52,6 +52,11 @@ export interface LightingSystemReadyEvent extends BaseInteractionEvent {
     quality: string
 }
 
+export interface GroupBrightnessChangedEvent extends BaseInteractionEvent {
+    readonly lightIds: readonly number[]
+    readonly brightness: number
+}
+
 export const LightingEventTypes = {
     Toggle: 'lighting:toggle',
     DebugToggle: 'lighting:debug-toggle',
@@ -60,6 +65,7 @@ export const LightingEventTypes = {
     SystemReady: 'lighting:system-ready',
     /** Request a point light be created by the lighting system (avoids direct scene add) */
     PointLightRequested: 'lighting:point-light-requested',
+    GroupBrightnessChanged: 'lighting:group-brightness-changed',
 } as const
 
 export const ArtworkEventTypes = {
