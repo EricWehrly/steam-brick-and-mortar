@@ -24,6 +24,7 @@ import { StorePropsEventTypes } from './props/PropsEvents'
 import { LightFactory } from '../lighting/LightFactory'
 import { LightRegistry } from '../lighting/LightRegistry'
 import { applyRendererShadowPolicy, applyLightShadowPolicy, applyShadowContactTuning, configureDirectionalShadow, configureDirectionalShadowForShelfContact, refitDirectionalShadowCameras } from '../lighting/ShadowPolicy'
+import type { SceneLight } from '../lighting/SceneLight'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor } from '../utils/PerformanceMonitor'
 import { GameSpotlight } from '../debug/GameSpotlight'
@@ -64,6 +65,7 @@ export interface LightingConfig {
     quality?: LightingQuality
 }
 
+// TODO: rename — this class manages lighting lifecycle, not rendering. Candidates: LightingManager, LightingCoordinator
 export class LightingRenderer {
     private scene: THREE.Scene
     private renderer: THREE.WebGLRenderer
@@ -76,9 +78,7 @@ export class LightingRenderer {
     private lightFactory: LightFactory
     private currentShelfLayout?: { rows: number; shelvesPerRow?: number }
     private static readonly FIXTURE_PANEL_EMISSIVE = 1.08
-    private currentFixtures: THREE.Group | null = null
-    private currentFixtureMaterial: THREE.MeshStandardMaterial | null = null
-    private fixtureRectAreaLightIds = new Set<number>()
+    private fixtureLights: readonly SceneLight[] = []
     private lightingUpgradeStarted = false
     public static logger = Logger.createLogFunctions(LightingRenderer.name)
 
@@ -152,9 +152,20 @@ export class LightingRenderer {
     }
 
     private onGroupBrightnessChanged(event: CustomEvent<GroupBrightnessChangedEvent>): void {
-        if (this.currentFixtureMaterial && event.detail.lightIds.some(id => this.fixtureRectAreaLightIds.has(id))) {
-            this.currentFixtureMaterial.emissiveIntensity = LightingRenderer.FIXTURE_PANEL_EMISSIVE * event.detail.brightness
+        const intensity = LightingRenderer.FIXTURE_PANEL_EMISSIVE * event.detail.brightness
+        this.getEmissiveMaterialsForLights(event.detail.lightIds)
+            .forEach(mat => { mat.emissiveIntensity = intensity })
+    }
+
+    private getEmissiveMaterialsForLights(lightIds: readonly number[]): Set<THREE.MeshStandardMaterial> {
+        const ids = new Set(lightIds)
+        const materials = new Set<THREE.MeshStandardMaterial>()
+        for (const light of this.fixtureLights) {
+            if (ids.has(light.id)) {
+                light.emissiveMaterials.forEach(mat => materials.add(mat))
+            }
         }
+        return materials
     }
 
     /**
@@ -197,14 +208,14 @@ export class LightingRenderer {
     }
 
     /**
-     * Upgrade to full lighting system - called asynchronously after scene is visible
-     * 
-     * TODO: Currently disabled in SceneCoordinator (suspected startup hitch).
-    * Re-evaluate: this clears all lights then rebuilds from scratch, which forces
-    * a full shader recompile of every MeshStandardMaterial in the scene. If lights
-    * are already set up correctly in setupInitialLighting(), this method may be
-     * unnecessary — or should be restructured to add lights incrementally rather
-     * than clear-and-rebuild.
+     * Upgrade to full lighting system - called asynchronously after scene is visible.
+     * Clears initial lights before rebuilding so intensities don't double.
+     *
+     * The shader recompile concern from the previous TODO is already present
+     * with or without this clear: adding new light types in setupRetailCoreLighting()
+     * changes the light hash regardless. GameSpotlight is safe — its pool lives in
+     * a separate scene group (not lightingGroup) and uses raw THREE.SpotLight (not
+     * ManagedSpotLight), so it is unaffected by clearLights().
      */
     private upgradeLighting(): void {
         this.lightingUpgradeStarted = true
@@ -417,7 +428,7 @@ export class LightingRenderer {
         const fixturesPerRow = layout?.shelvesPerRow ?? 4
         const ceilingHeight = this.config.ceilingHeight
         
-        const { group, lightIds } = this.propRenderer.createCeilingLightFixtures(
+        this.fixtureLights = this.propRenderer.createCeilingLightFixtures(
             ceilingHeight,
             CURRENT_ROOM_DIMENSIONS.WIDTH,
             CURRENT_ROOM_DIMENSIONS.DEPTH,
@@ -430,15 +441,6 @@ export class LightingRenderer {
                 fixturesPerRow: fixturesPerRow
             }
         )
-        this.currentFixtures = group
-        this.scene.add(this.currentFixtures)
-
-        // TODO: Rather than this hack, extend our definition of a "light" to track associated geometry, and also track any associated emissive materials (so it's easy to distinguish between geometry and "emissive" geometry)
-        const panels = this.currentFixtures.getObjectByName('CeilingLightPanels')
-        if (panels instanceof THREE.InstancedMesh) {
-            this.currentFixtureMaterial = panels.material as THREE.MeshStandardMaterial
-        }
-        this.fixtureRectAreaLightIds = new Set(lightIds)
         
         monitor.end({ fixtureCount: fixtureRows * fixturesPerRow, shelfRows })
         LightingRenderer.logger.debug(`💡 Created ${fixtureRows * fixturesPerRow} ceiling fixtures (${fixtureRows} rows x ${fixturesPerRow} per row) for ${shelfRows} shelf rows`)
@@ -533,16 +535,13 @@ export class LightingRenderer {
         const layoutForFixtures = shelfLayout ?? this.currentShelfLayout
         const shouldRefreshFixtures = Boolean(layoutForFixtures) && (
             Boolean(shelfLayout) ||
-            (ceilingHeightChanged && Boolean(this.currentFixtures))
+            (ceilingHeightChanged && this.fixtureLights.length > 0)
         )
 
         if (shouldRefreshFixtures && layoutForFixtures) {
-            if (this.currentFixtures) {
+            if (this.fixtureLights.length > 0) {
                 LightingRenderer.logger.debug('💡 Updating existing ceiling fixtures for room changes...')
-                this.scene.remove(this.currentFixtures)
-                this.currentFixtures = null
-                this.currentFixtureMaterial = null
-                this.fixtureRectAreaLightIds.clear()
+                this.fixtureLights = []
             } else {
                 LightingRenderer.logger.debug('💡 Adding ceiling fixtures for shelf layout...')
             }
@@ -639,11 +638,7 @@ export class LightingRenderer {
 
     public dispose(): void {
         this.clearLights()
-        if (this.currentFixtures) {
-            this.scene.remove(this.currentFixtures)
-            this.currentFixtures = null
-            this.currentFixtureMaterial = null
-        }
+        this.fixtureLights = []
         this.debugHelper.dispose()
         if (this.propRenderer) {
             this.propRenderer.dispose()
