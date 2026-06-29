@@ -15,6 +15,7 @@ import { BlockbusterColors } from '../utils/Colors'
 import { LightFactory } from '../lighting/LightFactory'
 import { PerformanceMonitor } from '../utils/PerformanceMonitor'
 import { Logger } from '../utils/Logger'
+import type { SceneLight } from '../lighting/SceneLight'
 
 export interface LightFixtureOptions {
   width?: number
@@ -24,13 +25,6 @@ export interface LightFixtureOptions {
   rows?: number
   fixturesPerRow?: number
 }
-
-// TODO: light object (our definition) that gives us ids, meshes, emissive meshes, etc.
-export interface CeilingFixtureResult {
-  readonly group: THREE.Group
-  readonly lightIds: readonly number[]
-}
-
 
 export interface WireRackOptions {
   width?: number
@@ -50,6 +44,7 @@ export class PropRenderer {
   private scene: THREE.Scene
   private propsGroup: THREE.Group
   private lightFactory: LightFactory
+  private currentFixturesGroup: THREE.Group | null = null
 
   constructor(scene: THREE.Scene) {
   this.scene = scene
@@ -64,7 +59,7 @@ export class PropRenderer {
    * Positioned just below the ceiling surface for realistic appearance
    * TODO: Make this responsive to room resizing events
    */
-  public createCeilingLightFixtures(ceilingHeight: number, roomWidth: number, roomDepth: number, options: LightFixtureOptions = {}): CeilingFixtureResult {
+  public createCeilingLightFixtures(ceilingHeight: number, roomWidth: number, roomDepth: number, options: LightFixtureOptions = {}): readonly SceneLight[] {
     const monitor = PerformanceMonitor.start('create-ceiling-fixtures', PropRenderer.logger)
     
     const {
@@ -149,7 +144,7 @@ export class PropRenderer {
     fixturesGroup.add(housingInstanced)
     fixturesGroup.add(lightPanelInstanced)
 
-    const rectAreaLightIds: number[] = []
+    const sceneLights: SceneLight[] = []
 
     for (let row = 0; row < rows; row++) {
       const rowZ = -roomDepth / 2 + (row + 1) * fixtureSpacingZ
@@ -171,14 +166,23 @@ export class PropRenderer {
         rowIndex: row,
         fixtureCount: fixturesPerRow
       }
-      rectAreaLightIds.push(rowLight.id)
+      sceneLights.push({ id: rowLight.id, emissiveMaterials: [fixtureMaterial] })
     }
 
-    this.propsGroup.add(fixturesGroup)
+    this.clearCeilingFixtures()
+    this.currentFixturesGroup = fixturesGroup
+    this.propsGroup.add(this.currentFixturesGroup)
     console.log(`💡 Created ${rows * fixturesPerRow} ceiling fixtures with ${rows} RectAreaLights at height ${fixtureY.toFixed(2)}m`)
 
     monitor.end({ totalFixtures: rows * fixturesPerRow, rectAreaLights: rows })
-    return { group: fixturesGroup, lightIds: rectAreaLightIds }
+    return sceneLights
+  }
+
+  private clearCeilingFixtures(): void {
+    if (this.currentFixturesGroup) {
+      this.propsGroup.remove(this.currentFixturesGroup)
+      this.currentFixturesGroup = null
+    }
   }
 
   /**
@@ -386,6 +390,7 @@ export class PropRenderer {
    * Dispose of resources
    */
   public dispose(): void {
+    this.clearCeilingFixtures()
     this.clearProps()
     this.scene.remove(this.propsGroup)
   }

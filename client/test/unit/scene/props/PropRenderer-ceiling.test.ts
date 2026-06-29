@@ -15,8 +15,13 @@ describe('PropRenderer — ceiling light fixtures', () => {
         propRenderer.dispose()
     })
 
+    function getFixtureGroup(): THREE.Group {
+        return scene.getObjectByName('CeilingLightFixtures') as THREE.Group
+    }
+
     it('creates fixtures just below the ceiling height', () => {
-        const { group: fixtures } = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+        propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+        const fixtures = getFixtureGroup()
 
         expect(fixtures).toBeInstanceOf(THREE.Group)
         expect(fixtures.name).toBe('CeilingLightFixtures')
@@ -33,7 +38,8 @@ describe('PropRenderer — ceiling light fixtures', () => {
     })
 
     it('creates housing around each fixture', () => {
-        const { group: fixtures } = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+        propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+        const fixtures = getFixtureGroup()
 
         const housingInstanced = fixtures.children.find(child =>
             child instanceof THREE.InstancedMesh &&
@@ -45,10 +51,11 @@ describe('PropRenderer — ceiling light fixtures', () => {
     })
 
     it('respects custom fixture options', () => {
-        const { group: fixtures } = propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
+        propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
             rows: 3,
             fixturesPerRow: 2,
         })
+        const fixtures = getFixtureGroup()
 
         const lightPanels = fixtures.children.find(child =>
             child instanceof THREE.InstancedMesh && child.userData?.isLightFixture
@@ -57,26 +64,39 @@ describe('PropRenderer — ceiling light fixtures', () => {
         expect(lightPanels.count).toBe(6) // 3 rows × 2 fixtures
     })
 
-    it('returns one RectAreaLight ID per row', () => {
-        const { lightIds } = propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
+    it('returns one SceneLight per row', () => {
+        const lights = propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
             rows: 3,
             fixturesPerRow: 4,
         })
 
-        expect(lightIds).toHaveLength(3)
-        expect(lightIds.every(id => typeof id === 'number' && id > 0)).toBe(true)
+        expect(lights).toHaveLength(3)
+        expect(lights.every(l => typeof l.id === 'number' && l.id > 0)).toBe(true)
     })
 
-    it('returned IDs are unique and match actual lights in the group', () => {
-        const { group, lightIds } = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+    it('returned IDs match lights added to scene', () => {
+        const lights = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+        const fixtures = getFixtureGroup()
 
-        const groupLightIds: number[] = []
-        group.traverse(child => {
-            if (child instanceof THREE.RectAreaLight) groupLightIds.push(child.id)
+        const sceneLightIds: number[] = []
+        fixtures.traverse(child => {
+            if (child instanceof THREE.RectAreaLight) sceneLightIds.push(child.id)
         })
 
-        expect(lightIds).toHaveLength(groupLightIds.length)
-        expect([...lightIds].sort()).toEqual(groupLightIds.sort())
+        expect(lights).toHaveLength(sceneLightIds.length)
+        expect(lights.map(l => l.id).sort()).toEqual(sceneLightIds.sort())
+    })
+
+    it('each SceneLight references the panel emissive material', () => {
+        const lights = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+        const fixtures = getFixtureGroup()
+        const panels = fixtures.getObjectByName('CeilingLightPanels') as THREE.InstancedMesh
+        const panelMaterial = panels.material as THREE.MeshStandardMaterial
+
+        lights.forEach(light => {
+            expect(light.emissiveMaterials).toHaveLength(1)
+            expect(light.emissiveMaterials[0]).toBe(panelMaterial)
+        })
     })
 
     it('all meshes are named (no unnamed entries in drawCallReport)', () => {

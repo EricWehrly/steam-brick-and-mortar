@@ -29,17 +29,13 @@ describe('Phase 2.4 - Ceiling Fixtures', () => {
     const ceilingHeight = 3.2
     const roomWidth = 22
     const roomDepth = 16
-    
-    const { group: fixturesGroup } = propRenderer.createCeilingLightFixtures(
-      ceilingHeight,
-      roomWidth,
-      roomDepth,
-      {
-        rows: 2,
-        fixturesPerRow: 4,
-        height: 0.15
-      }
-    )
+
+    propRenderer.createCeilingLightFixtures(ceilingHeight, roomWidth, roomDepth, {
+      rows: 2,
+      fixturesPerRow: 4,
+      height: 0.15
+    })
+    const fixturesGroup = scene.getObjectByName('CeilingLightFixtures') as THREE.Group
 
     expect(fixturesGroup).toBeDefined()
     expect(fixturesGroup.name).toBe('CeilingLightFixtures')
@@ -88,9 +84,8 @@ describe('Phase 2.4 - Ceiling Fixtures', () => {
   })
 
   test('fixture materials have proper emissive properties', () => {
-    const { group: fixturesGroup } = propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
-      emissiveIntensity: 0.8
-    })
+    propRenderer.createCeilingLightFixtures(3.2, 22, 16, { emissiveIntensity: 0.8 })
+    const fixturesGroup = scene.getObjectByName('CeilingLightFixtures') as THREE.Group
 
     const lightPanelInstanced = fixturesGroup.getObjectByName('CeilingLightPanels') as THREE.InstancedMesh
     expect(lightPanelInstanced).toBeInstanceOf(THREE.InstancedMesh)
@@ -104,7 +99,8 @@ describe('Phase 2.4 - Ceiling Fixtures', () => {
   })
 
   test('PropRenderer can be properly disposed', () => {
-    const { group: fixturesGroup } = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+    propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+    const fixturesGroup = scene.getObjectByName('CeilingLightFixtures') as THREE.Group
 
     expect(fixturesGroup.children.length).toBeGreaterThan(0)
     
@@ -117,7 +113,8 @@ describe('Phase 2.4 - Ceiling Fixtures', () => {
   })
 
   test('fixtures have proper userData for identification', () => {
-    const { group: fixturesGroup } = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+    propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+    const fixturesGroup = scene.getObjectByName('CeilingLightFixtures') as THREE.Group
 
     const lightPanelInstanced = fixturesGroup.children.find(c =>
       c instanceof THREE.InstancedMesh && c.userData.isLightFixture

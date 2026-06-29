@@ -19,7 +19,8 @@ describe('SceneManager Lighting Integration', () => {
     it('should position fixtures below ceiling height (fixes lighting alignment issue)', () => {
       // Test the specific bug: fixtures were at y=3.5 but ceiling is at y=3.2
       const ceilingHeight = 3.2
-      const { group: fixtures } = propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
+      propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
+      const fixtures = scene.getObjectByName('CeilingLightFixtures') as THREE.Group
 
       expect(fixtures).toBeInstanceOf(THREE.Group)
       expect(fixtures.name).toBe('CeilingLightFixtures')
@@ -48,7 +49,8 @@ describe('SceneManager Lighting Integration', () => {
     it('should adapt positioning to different ceiling heights', () => {
       // Test with non-standard ceiling height
       const customCeilingHeight = 2.8
-      const { group: fixtures } = propRenderer.createCeilingLightFixtures(customCeilingHeight, 22, 16)
+      propRenderer.createCeilingLightFixtures(customCeilingHeight, 22, 16)
+      const fixtures = scene.getObjectByName('CeilingLightFixtures') as THREE.Group
 
       const lightPanelInstanced = fixtures.children.find(child =>
         child instanceof THREE.InstancedMesh && child.userData?.isLightFixture
@@ -70,11 +72,12 @@ describe('SceneManager Lighting Integration', () => {
   describe('Phase 2.4 atmospheric props', () => {
     it('should create ceiling fixtures as part of atmospheric enhancement', () => {
       // Phase 2.4: "Implement basic ceiling fixtures" 
-      const { group: fixtures } = propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
+      propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
         emissiveIntensity: 0.8,
         rows: 2,
         fixturesPerRow: 4
       })
+      const fixtures = scene.getObjectByName('CeilingLightFixtures') as THREE.Group
 
       expect(fixtures.name).toBe('CeilingLightFixtures')
 
@@ -87,7 +90,8 @@ describe('SceneManager Lighting Integration', () => {
 
     it('should integrate with other atmospheric props', () => {
       // Create multiple atmospheric elements 
-      const { group: ceilingFixtures } = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+      propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+      const ceilingFixtures = scene.getObjectByName('CeilingLightFixtures') as THREE.Group
       const wireRack = propRenderer.createWireRackDisplay(new THREE.Vector3(5, 0, -3))
       const divider = propRenderer.createCategoryDivider(new THREE.Vector3(0, 0, 1))
       const floorMarkers = propRenderer.createFloorMarkers(22, 16)
