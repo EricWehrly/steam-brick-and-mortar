@@ -83,8 +83,11 @@ describe('StorePropsCoordinator shelf reset ownership', () => {
     })
 
     it('resets shelf renderer on arrangement request, library reload, and batch-count changes', async () => {
-        const { EventManager } = await import('../../../src/core/EventManager')
-        await import('../../../src/scene/props/StorePropsCoordinator')
+        const [{ EventManager }, { StorePropsCoordinator }] = await Promise.all([
+            import('../../../src/core/EventManager'),
+            import('../../../src/scene/props/StorePropsCoordinator'),
+        ])
+        StorePropsCoordinator.getInstance()
 
         const eventManager = EventManager.getInstance() as unknown as EventManagerMockInstance
 

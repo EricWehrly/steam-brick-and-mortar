@@ -119,19 +119,19 @@ describe('Lighting Controls Panel Debug Helper Integration', () => {
         // Manually populate light groups to simulate discovered lights
         ;(lightingPanel as any).lightGroups = new Map([
             ['PointLight', {
-                type: 'PointLight',
                 lights: [pointLight],
-                enabled: true
+                collapsed: false,
+                brightness: 1
             }],
             ['SpotLight', {
-                type: 'SpotLight',
                 lights: [spotLight],
-                enabled: true
+                collapsed: false,
+                brightness: 1
             }],
             ['RectAreaLight', {
-                type: 'RectAreaLight',
                 lights: [rectAreaLight],
-                enabled: true
+                collapsed: false,
+                brightness: 1
             }]
         ])
 
@@ -148,106 +148,85 @@ describe('Lighting Controls Panel Debug Helper Integration', () => {
         document.body.innerHTML = ''
     })
 
-    it('should toggle point light debug helper when point light is toggled', () => {
-        // Initially both light and debug helper should be visible
+    it('should hide point light debug helper when brightness set to zero', () => {
         expect(pointLight.visible).toBe(true)
         expect(debugPointHelper.visible).toBe(true)
-        
-        // Call the private method to toggle the light
-        ;(lightingPanel as any).toggleIndividualLight(pointLight, false)
-        
-        // Light should be hidden
+
+        ;(lightingPanel as any).setIndividualBrightness(pointLight, 'PointLight', 0)
+
         expect(pointLight.visible).toBe(false)
-        
-        // Debug helper should also be hidden
         expect(debugPointHelper.visible).toBe(false)
-        
-        // Toggle back on
-        ;(lightingPanel as any).toggleIndividualLight(pointLight, true)
-        
+
+        ;(lightingPanel as any).setIndividualBrightness(pointLight, 'PointLight', 1)
+
         expect(pointLight.visible).toBe(true)
         expect(debugPointHelper.visible).toBe(true)
     })
 
-    it('should toggle spot light debug helper when spot light is toggled', () => {
-        // Initially both light and debug helper should be visible
+    it('should hide spot light debug helper when brightness set to zero', () => {
         expect(spotLight.visible).toBe(true)
         expect(debugSpotHelper.visible).toBe(true)
-        
-        // Toggle light off
-        ;(lightingPanel as any).toggleIndividualLight(spotLight, false)
-        
+
+        ;(lightingPanel as any).setIndividualBrightness(spotLight, 'SpotLight', 0)
+
         expect(spotLight.visible).toBe(false)
         expect(debugSpotHelper.visible).toBe(false)
-        
-        // Toggle back on
-        ;(lightingPanel as any).toggleIndividualLight(spotLight, true)
-        
+
+        ;(lightingPanel as any).setIndividualBrightness(spotLight, 'SpotLight', 1)
+
         expect(spotLight.visible).toBe(true)
         expect(debugSpotHelper.visible).toBe(true)
     })
 
-    it('should toggle rect area light debug helper when rect area light is toggled', () => {
-        // Initially both light and debug helper should be visible
+    it('should hide rect area light debug helper when brightness set to zero', () => {
         expect(rectAreaLight.visible).toBe(true)
         expect(debugRectHelper.visible).toBe(true)
-        
-        // Toggle light off
-        ;(lightingPanel as any).toggleIndividualLight(rectAreaLight, false)
-        
+
+        ;(lightingPanel as any).setIndividualBrightness(rectAreaLight, 'RectAreaLight', 0)
+
         expect(rectAreaLight.visible).toBe(false)
         expect(debugRectHelper.visible).toBe(false)
-        
-        // Toggle back on
-        ;(lightingPanel as any).toggleIndividualLight(rectAreaLight, true)
-        
+
+        ;(lightingPanel as any).setIndividualBrightness(rectAreaLight, 'RectAreaLight', 1)
+
         expect(rectAreaLight.visible).toBe(true)
         expect(debugRectHelper.visible).toBe(true)
     })
 
-    it('should toggle all debug helpers when toggling light groups', () => {
-        // Initially all should be visible
+    it('should hide group debug helpers when group brightness set to zero', () => {
         expect(pointLight.visible).toBe(true)
         expect(debugPointHelper.visible).toBe(true)
-        
-        // Toggle point light group off
-        ;(lightingPanel as any).toggleLightGroup('PointLight', false)
-        
+
+        ;(lightingPanel as any).setGroupBrightness('PointLight', 0)
+
         expect(pointLight.visible).toBe(false)
         expect(debugPointHelper.visible).toBe(false)
-        
-        // Toggle back on
-        ;(lightingPanel as any).toggleLightGroup('PointLight', true)
-        
+
+        ;(lightingPanel as any).setGroupBrightness('PointLight', 1)
+
         expect(pointLight.visible).toBe(true)
         expect(debugPointHelper.visible).toBe(true)
     })
 
-    it('should toggle all debug helpers when using master toggle', () => {
-        // Initially all should be visible
+    it('should hide all debug helpers when master brightness set to zero', () => {
         expect(pointLight.visible).toBe(true)
         expect(spotLight.visible).toBe(true)
         expect(rectAreaLight.visible).toBe(true)
         expect(debugPointHelper.visible).toBe(true)
         expect(debugSpotHelper.visible).toBe(true)
         expect(debugRectHelper.visible).toBe(true)
-        
-        // Toggle all lights off
-        ;(lightingPanel as any).toggleAllLights(false)
-        
-        // All lights should be off
+
+        ;(lightingPanel as any).setMasterBrightness(0)
+
         expect(pointLight.visible).toBe(false)
         expect(spotLight.visible).toBe(false)
         expect(rectAreaLight.visible).toBe(false)
-        
-        // All debug helpers should be off
         expect(debugPointHelper.visible).toBe(false)
         expect(debugSpotHelper.visible).toBe(false)
         expect(debugRectHelper.visible).toBe(false)
-        
-        // Toggle all back on
-        ;(lightingPanel as any).toggleAllLights(true)
-        
+
+        ;(lightingPanel as any).setMasterBrightness(1)
+
         expect(pointLight.visible).toBe(true)
         expect(spotLight.visible).toBe(true)
         expect(rectAreaLight.visible).toBe(true)
@@ -257,26 +236,22 @@ describe('Lighting Controls Panel Debug Helper Integration', () => {
     })
 
     it('should handle lights without debug helpers gracefully', () => {
-        // Create a light without a corresponding debug helper
         const orphanLight = new THREE.PointLight(0xffffff, 1, 5)
         orphanLight.name = 'orphan-light'
         scene.add(orphanLight)
-        
-        // This should not throw an error even though no debug helper exists
+
         expect(() => {
-            ;(lightingPanel as any).toggleIndividualLight(orphanLight, false)
+            ;(lightingPanel as any).setIndividualBrightness(orphanLight, 'PointLight', 0)
         }).not.toThrow()
-        
+
         expect(orphanLight.visible).toBe(false)
     })
 
-    it('should find debug helpers nested in groups', () => {
-        // Create a debug group (simulating LightingDebugHelper structure)
+    it('should find debug helpers registered in LightRegistry when brightness set to zero', () => {
         const debugGroup = new THREE.Group()
         debugGroup.name = 'lighting-debug'
         scene.add(debugGroup)
-        
-        // Create a nested debug helper
+
         const nestedDebugHelper = new THREE.Mesh(
             new THREE.SphereGeometry(1),
             new THREE.MeshBasicMaterial({ color: 0xff0000 })
@@ -284,25 +259,21 @@ describe('Lighting Controls Panel Debug Helper Integration', () => {
         nestedDebugHelper.name = 'debug-point-nested-light'
         nestedDebugHelper.visible = true
         debugGroup.add(nestedDebugHelper)
-        
-        // Create the corresponding light
+
         const nestedLight = new THREE.PointLight(0xffffff, 1, 10)
         nestedLight.name = 'nested-light'
         scene.add(nestedLight)
-        
-        // Register with LightRegistry (simulating what ManagedLights and LightingDebugHelper do)
+
         lightRegistry.registerLight(nestedLight, { source: 'test' })
         lightRegistry.attachGeometry(nestedLight, nestedDebugHelper)
-        
-        // Toggle the light - should find the nested debug helper via registry
-        ;(lightingPanel as any).toggleIndividualLight(nestedLight, false)
-        
+
+        ;(lightingPanel as any).setIndividualBrightness(nestedLight, 'PointLight', 0)
+
         expect(nestedLight.visible).toBe(false)
         expect(nestedDebugHelper.visible).toBe(false)
-        
-        // Toggle back on
-        ;(lightingPanel as any).toggleIndividualLight(nestedLight, true)
-        
+
+        ;(lightingPanel as any).setIndividualBrightness(nestedLight, 'PointLight', 1)
+
         expect(nestedLight.visible).toBe(true)
         expect(nestedDebugHelper.visible).toBe(true)
     })

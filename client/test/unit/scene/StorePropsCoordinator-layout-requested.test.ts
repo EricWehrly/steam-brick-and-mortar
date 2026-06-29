@@ -76,12 +76,13 @@ describe('StorePropsCoordinator layout replay', () => {
     })
 
     it('re-emits manifest and game data with recomputed batch count on layout switch', async () => {
-        const [{ DataManager }, { EventManager }] = await Promise.all([
+        const [{ DataManager }, { EventManager }, { StorePropsCoordinator }] = await Promise.all([
             import('../../../src/core/data/DataManager'),
             import('../../../src/core/EventManager'),
+            import('../../../src/scene/props/StorePropsCoordinator'),
         ])
 
-        await import('../../../src/scene/props/StorePropsCoordinator')
+        StorePropsCoordinator.getInstance()
 
         const dataManager = DataManager.getInstance()
         dataManager.set('steam.games', makeGames(19), {
