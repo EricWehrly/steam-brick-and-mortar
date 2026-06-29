@@ -1,12 +1,3 @@
-/**
- * Asset Loader - 3D Asset Loading and Management
- * 
- * Handles:
- * - GLTF model loading
- * - Asset caching
- * - Loading progress tracking
- */
-
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
@@ -24,80 +15,44 @@ export interface LoadProgress {
 }
 
 export class AssetLoader {
-    private gltfLoader: GLTFLoader
-    private loadedAssets: Map<string, THREE.Group> = new Map()
+    private static gltfLoader = new GLTFLoader()
+    private static loadedAssets: Map<string, THREE.Group> = new Map()
 
-    constructor() {
-        this.gltfLoader = new GLTFLoader()
-    }
-
-    /**
-     * Load a GLTF model
-     */
-    public async loadModel(
-        path: string, 
+    public static async loadModel(
+        path: string,
         options: AssetLoadOptions = {},
         onProgress?: (progress: LoadProgress) => void
     ): Promise<THREE.Group> {
-        // Check if already loaded
         if (this.loadedAssets.has(path)) {
             console.log(`📦 Using cached model: ${path}`)
-            const cachedModel = this.loadedAssets.get(path)
-            if (cachedModel) {
-                return cachedModel.clone()
-            }
+            return this.loadedAssets.get(path)!.clone()
         }
 
-        try {
-            console.log(`📦 Loading model: ${path}`)
-            
-            const gltf = await this.gltfLoader.loadAsync(path, (progressEvent) => {
-                if (onProgress && progressEvent.total > 0) {
-                    const progress: LoadProgress = {
-                        loaded: progressEvent.loaded,
-                        total: progressEvent.total,
-                        percentage: Math.round((progressEvent.loaded / progressEvent.total) * 100)
-                    }
-                    onProgress(progress)
-                }
-            })
+        console.log(`📦 Loading model: ${path}`)
 
-            const model = gltf.scene
-
-            // Apply options
-            if (options.scale !== undefined) {
-                model.scale.setScalar(options.scale)
+        const gltf = await this.gltfLoader.loadAsync(path, (progressEvent) => {
+            if (onProgress && progressEvent.total > 0) {
+                onProgress({
+                    loaded: progressEvent.loaded,
+                    total: progressEvent.total,
+                    percentage: Math.round((progressEvent.loaded / progressEvent.total) * 100),
+                })
             }
+        })
 
-            if (options.position) {
-                model.position.copy(options.position)
-            }
+        const model = gltf.scene
 
-            if (options.rotation) {
-                model.rotation.copy(options.rotation)
-            }
+        if (options.scale !== undefined) model.scale.setScalar(options.scale)
+        if (options.position) model.position.copy(options.position)
+        if (options.rotation) model.rotation.copy(options.rotation)
+        if (options.enableShadows ?? true) this.enableShadowsForModel(model)
 
-            // Enable shadows if requested
-            if (options.enableShadows ?? true) {
-                this.enableShadowsForModel(model)
-            }
-
-            // Cache the original model
-            this.loadedAssets.set(path, model.clone())
-
-            console.log(`✅ Model loaded successfully: ${path}`)
-            return model
-
-        } catch (error) {
-            console.error(`❌ Failed to load model: ${path}`, error)
-            throw error
-        }
+        this.loadedAssets.set(path, model.clone())
+        console.log(`✅ Model loaded successfully: ${path}`)
+        return model
     }
 
-    /**
-     * Enable shadows for all meshes in a model
-     */
-    private enableShadowsForModel(model: THREE.Group) {
+    private static enableShadowsForModel(model: THREE.Group): void {
         model.traverse((child) => {
             if (child instanceof THREE.Mesh) {
                 child.castShadow = true
@@ -106,42 +61,27 @@ export class AssetLoader {
         })
     }
 
-    /**
-     * Get cached asset
-     */
-    public getCachedAsset(path: string): THREE.Group | undefined {
+    public static getCachedAsset(path: string): THREE.Group | undefined {
         return this.loadedAssets.get(path)?.clone()
     }
 
-    /**
-     * Check if asset is cached
-     */
-    public isAssetCached(path: string): boolean {
+    public static isAssetCached(path: string): boolean {
         return this.loadedAssets.has(path)
     }
 
-    /**
-     * Clear asset cache
-     */
-    public clearCache() {
+    public static clearCache(): void {
         this.loadedAssets.clear()
         console.log('🗑️ Asset cache cleared')
     }
 
-    /**
-     * Get cache statistics
-     */
-    public getCacheStats() {
+    public static getCacheStats() {
         return {
             cachedAssets: this.loadedAssets.size,
-            assetPaths: Array.from(this.loadedAssets.keys())
+            assetPaths: Array.from(this.loadedAssets.keys()),
         }
     }
 
-    /**
-     * Preload multiple assets
-     */
-    public async preloadAssets(
+    public static async preloadAssets(
         assets: { path: string; options?: AssetLoadOptions }[],
         onProgress?: (current: number, total: number, currentAsset: string) => void
     ): Promise<THREE.Group[]> {
@@ -149,30 +89,19 @@ export class AssetLoader {
 
         for (let i = 0; i < assets.length; i++) {
             const asset = assets[i]
-            
-            if (onProgress) {
-                onProgress(i, assets.length, asset.path)
-            }
-
+            onProgress?.(i, assets.length, asset.path)
             try {
-                const model = await this.loadModel(asset.path, asset.options)
-                loadedModels.push(model)
+                loadedModels.push(await this.loadModel(asset.path, asset.options))
             } catch (error) {
                 console.warn(`⚠️ Failed to preload asset: ${asset.path}`, error)
             }
         }
 
-        if (onProgress) {
-            onProgress(assets.length, assets.length, 'Complete')
-        }
-
+        onProgress?.(assets.length, assets.length, 'Complete')
         return loadedModels
     }
 
-    /**
-     * Dispose of resources
-     */
-    public dispose() {
+    public static dispose(): void {
         this.clearCache()
     }
 }
