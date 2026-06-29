@@ -79,7 +79,7 @@ export class LightingRenderer {
     private currentShelfLayout?: { rows: number; shelvesPerRow?: number }
     private static readonly FIXTURE_PANEL_EMISSIVE = 1.08
     private fixtureLights: readonly SceneLight[] = []
-    private lightingUpgradeStarted = false
+    private isLightingEstablished = false
     public static logger = Logger.createLogFunctions(LightingRenderer.name)
 
     constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
@@ -140,7 +140,7 @@ export class LightingRenderer {
 
         this.eventManager.registerEventHandler(
             StorePropsEventTypes.SetupCompleted,
-            this.upgradeLighting.bind(this)
+            this.onSceneSetupCompleted.bind(this)
         )
 
         this.eventManager.registerEventHandler<GroupBrightnessChangedEvent>(
@@ -173,22 +173,21 @@ export class LightingRenderer {
      * This lets the scene become visible quickly without expensive fixtures
      */
     private setupInitialLighting(): void {
-        if (this.lightingUpgradeStarted) {
-            LightingRenderer.logger.debug('Skipping initial lighting because upgrade has already started')
+        if (this.isLightingEstablished) {
+            LightingRenderer.logger.debug('Skipping initial lighting — already established')
             return
         }
 
         this.config = this.getCurrentConfig()
-        
+
         LightingRenderer.logger.lifecycle(`💡 Setting up initial lighting (fast pass)...`)
 
-        // Basic ambient + directional illumination
         LightingRenderer.logger.lifecycle('💡 Setting up basic illumination - ambient + directional light')
         this.setupAmbientAndMainDirectionalLighting()
         LightingRenderer.logger.debug(`✅ Basic lighting: ${this.lightingGroup.children.length} lights added`)
 
-        if (this.lightingUpgradeStarted) {
-            LightingRenderer.logger.debug('Skipping remaining lighting work because upgrade started mid-pass')
+        if (this.isLightingEstablished) {
+            LightingRenderer.logger.debug('Skipping remaining initial lighting — establishment started mid-pass')
             return
         }
 
@@ -198,54 +197,42 @@ export class LightingRenderer {
         new GameSpotlight()
     }
 
-    /**
-     * Reconfigure lights with current config and quality settings
-     * Apply shadow policy and setup lights for the current quality level.
-     */
-    private reconfigureWithQuality(): void {
-        applyRendererShadowPolicy(this.renderer, this.config)
-        this.setupLightsByQuality()
+    // Guarded startup handler — only runs once per scene load.
+    // Fast pass (setupInitialLighting) already showed ambient+directional; this clears
+    // and rebuilds with full quality so those initial lights don't stack.
+    private onSceneSetupCompleted(): void {
+        if (this.isLightingEstablished) return
+        this.config = this.getCurrentConfig()
+        this.setLightingQuality()
     }
 
-    /**
-     * Upgrade to full lighting system - called asynchronously after scene is visible.
-     * Clears initial lights before rebuilding so intensities don't double.
-     *
-     * The shader recompile concern from the previous TODO is already present
-     * with or without this clear: adding new light types in setupRetailCoreLighting()
-     * changes the light hash regardless. GameSpotlight is safe — its pool lives in
-     * a separate scene group (not lightingGroup) and uses raw THREE.SpotLight (not
-     * ManagedSpotLight), so it is unaffected by clearLights().
-     */
-    private upgradeLighting(): void {
-        this.lightingUpgradeStarted = true
-        const monitor = PerformanceMonitor.start('lighting-upgrade', LightingRenderer.logger)
-        const startTime = window.performance.now()
-        this.config = this.getCurrentConfig()
-        
-        LightingRenderer.logger.lifecycle(`💡 Upgrading to ${this.config.quality} lighting...`)
-        
+    // GameSpotlight note: its pool lives in a separate scene group (not lightingGroup) and uses
+    // raw THREE.SpotLight (not ManagedSpotLight), so it is unaffected by clearLights().
+    private setLightingQuality(): void {
+        this.isLightingEstablished = true
+        const monitor = PerformanceMonitor.start('lighting-set-quality', LightingRenderer.logger)
+
+        this.fixtureLights = []
+        this.clearLights()
+
+        LightingRenderer.logger.lifecycle(`💡 Setting ${this.config.quality} lighting quality...`)
+
         try {
-            // Now do full setup with shadows and fixtures
-            this.reconfigureWithQuality()
-            monitor.end({ quality: this.config.quality })
-            
-            // Check current settings for debug helpers and lighting state
+            applyRendererShadowPolicy(this.renderer, this.config)
+            this.setupLightsByQuality()
+            this.forceShadowStateRefresh()
+
+            if (this.currentShelfLayout) {
+                this.setupFluorescentFixtures(this.currentShelfLayout)
+            }
+
             const appSettings = AppSettings.getInstance()
-            
-            // Only show debug helpers if setting is enabled
             if (appSettings.getSetting('showLightingDebug')) {
                 this.debugHelper.addHelpersForRegisteredLights()
             }
-            
-            // Don't call toggleLighting() here - it would overwrite individual visibility states
-            // Each light type has its own visibility set in setupEnhancedLighting()
-            // toggleLighting() is only for user-triggered master on/off via UI
-            
-            const duration = window.performance.now() - startTime
-            LightingRenderer.logger.debug(`✅ Advanced lighting setup complete in ${duration.toFixed(1)}ms!`)
-            
-            // Emit system ready event for UI components
+
+            monitor.end({ quality: this.config.quality })
+
             this.eventManager.emit(LightingEventTypes.SystemReady, {
                 scene: this.scene,
                 quality: this.config.quality,
@@ -253,8 +240,10 @@ export class LightingRenderer {
                 source: EventSource.System
             })
         } catch (error) {
-            LightingRenderer.logger.error('❌ Failed to upgrade lighting:', error)
-            // Keep basic lighting - better than nothing
+            LightingRenderer.logger.error('❌ Failed to establish lighting:', error)
+            this.clearLights()
+            this.config = { ...this.config, quality: LIGHTING_QUALITY.SIMPLE }
+            this.setupAmbientAndMainDirectionalLighting()
         }
     }
 
@@ -491,25 +480,8 @@ export class LightingRenderer {
 
     private updateLightingQuality(quality: LightingQuality): void {
         this.debugHelper.clearHelpers()
-        
-        // Refresh full config from AppSettings to get updated shadows/ceiling height too
         this.config = { ...this.getCurrentConfig(), quality }
-        this.reconfigureWithQuality()
-        this.forceShadowStateRefresh()
-        
-        // Only show debug helpers if setting is enabled
-        const appSettings = AppSettings.getInstance()
-        if (appSettings.getSetting('showLightingDebug')) {
-            this.debugHelper.addHelpersForRegisteredLights()
-        }
-        
-        // Emit system ready event for UI components
-        this.eventManager.emit(LightingEventTypes.SystemReady, {
-            scene: this.scene,
-            quality: this.config.quality,
-            timestamp: Date.now(),
-            source: EventSource.System
-        })
+        this.setLightingQuality()
     }
 
     private applyRoomFootprint(width: number, depth: number): boolean {
@@ -637,6 +609,7 @@ export class LightingRenderer {
     }
 
     public dispose(): void {
+        this.isLightingEstablished = false
         this.clearLights()
         this.fixtureLights = []
         this.debugHelper.dispose()
