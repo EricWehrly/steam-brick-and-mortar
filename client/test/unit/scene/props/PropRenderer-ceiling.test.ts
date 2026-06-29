@@ -16,7 +16,7 @@ describe('PropRenderer — ceiling light fixtures', () => {
     })
 
     it('creates fixtures just below the ceiling height', () => {
-        const fixtures = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+        const { group: fixtures } = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
 
         expect(fixtures).toBeInstanceOf(THREE.Group)
         expect(fixtures.name).toBe('CeilingLightFixtures')
@@ -33,7 +33,7 @@ describe('PropRenderer — ceiling light fixtures', () => {
     })
 
     it('creates housing around each fixture', () => {
-        const fixtures = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+        const { group: fixtures } = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
 
         const housingInstanced = fixtures.children.find(child =>
             child instanceof THREE.InstancedMesh &&
@@ -45,7 +45,7 @@ describe('PropRenderer — ceiling light fixtures', () => {
     })
 
     it('respects custom fixture options', () => {
-        const fixtures = propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
+        const { group: fixtures } = propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
             rows: 3,
             fixturesPerRow: 2,
         })
@@ -55,6 +55,28 @@ describe('PropRenderer — ceiling light fixtures', () => {
         ) as THREE.InstancedMesh
 
         expect(lightPanels.count).toBe(6) // 3 rows × 2 fixtures
+    })
+
+    it('returns one RectAreaLight ID per row', () => {
+        const { lightIds } = propRenderer.createCeilingLightFixtures(3.2, 22, 16, {
+            rows: 3,
+            fixturesPerRow: 4,
+        })
+
+        expect(lightIds).toHaveLength(3)
+        expect(lightIds.every(id => typeof id === 'number' && id > 0)).toBe(true)
+    })
+
+    it('returned IDs are unique and match actual lights in the group', () => {
+        const { group, lightIds } = propRenderer.createCeilingLightFixtures(3.2, 22, 16)
+
+        const groupLightIds: number[] = []
+        group.traverse(child => {
+            if (child instanceof THREE.RectAreaLight) groupLightIds.push(child.id)
+        })
+
+        expect(lightIds).toHaveLength(groupLightIds.length)
+        expect([...lightIds].sort()).toEqual(groupLightIds.sort())
     })
 
     it('all meshes are named (no unnamed entries in drawCallReport)', () => {

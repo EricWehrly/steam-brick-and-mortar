@@ -25,6 +25,13 @@ export interface LightFixtureOptions {
   fixturesPerRow?: number
 }
 
+// TODO: light object (our definition) that gives us ids, meshes, emissive meshes, etc.
+export interface CeilingFixtureResult {
+  readonly group: THREE.Group
+  readonly lightIds: readonly number[]
+}
+
+
 export interface WireRackOptions {
   width?: number
   height?: number
@@ -57,7 +64,7 @@ export class PropRenderer {
    * Positioned just below the ceiling surface for realistic appearance
    * TODO: Make this responsive to room resizing events
    */
-  public createCeilingLightFixtures(ceilingHeight: number, roomWidth: number, roomDepth: number, options: LightFixtureOptions = {}): THREE.Group {
+  public createCeilingLightFixtures(ceilingHeight: number, roomWidth: number, roomDepth: number, options: LightFixtureOptions = {}): CeilingFixtureResult {
     const monitor = PerformanceMonitor.start('create-ceiling-fixtures', PropRenderer.logger)
     
     const {
@@ -78,8 +85,8 @@ export class PropRenderer {
     // Create emissive material for the light panels (enhanced brightness)
     const fixtureMaterial = new THREE.MeshStandardMaterial({
       color: 0xFFFFF0, // Ivory (warmer and brighter than ghost white)
-      emissive: 0xF0F8FF, // Alice blue glow (brighter emissive)
-      emissiveIntensity: emissiveIntensity * 1.8, // Prominent, but not self-lit enough to wash out shadows
+      emissive: 0xF0F8FF,
+      emissiveIntensity,
       roughness: 0.05, // Even smoother for more reflection
       metalness: 0.02,
       transparent: true,
@@ -142,15 +149,14 @@ export class PropRenderer {
     fixturesGroup.add(housingInstanced)
     fixturesGroup.add(lightPanelInstanced)
 
-    // Create one RectAreaLight per shelf row for proper coverage
-    // Each light is positioned to match its corresponding row of fixtures
+    const rectAreaLightIds: number[] = []
+
     for (let row = 0; row < rows; row++) {
-      // Calculate Z position for this row (matches fixture positioning)
       const rowZ = -roomDepth / 2 + (row + 1) * fixtureSpacingZ
-      
+
       const rowLight = this.lightFactory.createRectAreaLight(
         BlockbusterColors.fluorescentCool,
-        6, // Brighter retail fixture balance per row
+        6,
         roomWidth * 0.8,
         depth * 0.9,
         {
@@ -158,22 +164,21 @@ export class PropRenderer {
           parent: fixturesGroup
         }
       )
-      // Position the light just below the mesh panels for this row
       rowLight.position.set(0, fixtureY - 0.12, rowZ)
       rowLight.rotation.x = -Math.PI / 2
-      
       rowLight.userData = {
         isShelfLight: true,
         rowIndex: row,
         fixtureCount: fixturesPerRow
       }
+      rectAreaLightIds.push(rowLight.id)
     }
 
     this.propsGroup.add(fixturesGroup)
     console.log(`💡 Created ${rows * fixturesPerRow} ceiling fixtures with ${rows} RectAreaLights at height ${fixtureY.toFixed(2)}m`)
-    
+
     monitor.end({ totalFixtures: rows * fixturesPerRow, rectAreaLights: rows })
-    return fixturesGroup
+    return { group: fixturesGroup, lightIds: rectAreaLightIds }
   }
 
   /**

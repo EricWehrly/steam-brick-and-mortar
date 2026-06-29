@@ -353,6 +353,10 @@ export class LightingControlsPanel {
             for (const light of group.lights) {
                 this.lightBrightnessById.set(light.id, this.masterBrightness)
             }
+            this.eventManager.emit<GroupBrightnessChangedEvent>(
+                LightingEventTypes.GroupBrightnessChanged,
+                { lightIds: group.lights.map(l => l.id), brightness: this.masterBrightness, source: EventSource.UI }
+            )
         })
 
         this.applyBrightnessToAllLights()
@@ -371,6 +375,11 @@ export class LightingControlsPanel {
             this.lightBrightnessById.set(light.id, group.brightness)
             this.applyBrightnessToLight(light)
         }
+
+        this.eventManager.emit<GroupBrightnessChangedEvent>(
+            LightingEventTypes.GroupBrightnessChanged,
+            { lightIds: group.lights.map(l => l.id), brightness: group.brightness, source: EventSource.UI }
+        )
 
         this.updateControlStates()
     }

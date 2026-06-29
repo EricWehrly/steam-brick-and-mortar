@@ -23,7 +23,7 @@ describe.skip('Ceiling Fixtures Positioning (strict)', () => {
 
   it('should position RectAreaLights at expected Y for default ceiling', () => {
     const ceilingHeight = 3.2
-    const fixtures = propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
+    const { group: fixtures } = propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
     const rectLights = fixtures.children.filter(child => child instanceof THREE.RectAreaLight)
     const expectedY = ceilingHeight - 0.075 - 0.02 - 0.1 // 3.005
     rectLights.forEach(light => {
@@ -33,7 +33,7 @@ describe.skip('Ceiling Fixtures Positioning (strict)', () => {
 
   it('should position RectAreaLights at expected Y for custom ceiling', () => {
     const ceilingHeight = 2.8
-    const fixtures = propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
+    const { group: fixtures } = propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
     const rectLights = fixtures.children.filter(child => child instanceof THREE.RectAreaLight)
     const expectedY = ceilingHeight - 0.075 - 0.02 - 0.1 // 2.605
     rectLights.forEach(light => {
@@ -43,7 +43,7 @@ describe.skip('Ceiling Fixtures Positioning (strict)', () => {
 
   it('should position fixture panels at expected heights', () => {
     const ceilingHeight = 3.2
-    const fixtures = propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
+    const { group: fixtures } = propRenderer.createCeilingLightFixtures(ceilingHeight, 22, 16)
     const expectedFixtureY = ceilingHeight - 0.075 - 0.02 // 3.105
     const expectedHousingY = expectedFixtureY - 0.025 // 3.08
     
@@ -64,7 +64,7 @@ describe.skip('Ceiling Fixtures Positioning (strict)', () => {
     const rows = 2
     const fixturesPerRow = 4
     
-    const fixtures = propRenderer.createCeilingLightFixtures(3.2, roomWidth, roomDepth, {
+    const { group: fixtures } = propRenderer.createCeilingLightFixtures(3.2, roomWidth, roomDepth, {
       rows,
       fixturesPerRow
     })
