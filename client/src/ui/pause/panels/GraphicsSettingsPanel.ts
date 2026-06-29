@@ -114,6 +114,10 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             
             // Ceiling Height
             ceilingHeight: this.appSettings.getSetting('ceilingHeight'),
+
+            // Environment
+            environmentIntensity: this.appSettings.getSetting('environmentIntensity'),
+            environmentIntensityLabel: this.appSettings.getSetting('environmentIntensity').toFixed(2),
             
             // Debug & Testing
             enableLighting: this.appSettings.getSetting('enableLighting'),
@@ -210,6 +214,12 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
                 valueDisplayId: 'ceiling-height-value',
                 formatDisplay: (v) => `${v}m`,
                 onChange: (value) => this.updateSetting('ceilingHeight', value)
+            },
+            {
+                sliderId: 'environment-intensity',
+                valueDisplayId: 'environment-intensity-value',
+                formatDisplay: (v) => v.toFixed(2),
+                onInput: (value) => this.updateSetting('environmentIntensity', value)
             },
             {
                 sliderId: 'lod-high-distance',

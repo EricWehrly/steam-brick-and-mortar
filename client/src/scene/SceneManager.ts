@@ -124,10 +124,7 @@ export class SceneManager {
         const pmremGenerator = new THREE.PMREMGenerator(this.renderer)
         this.envRenderTarget = pmremGenerator.fromScene(new RoomEnvironment())
         this.scene.environment = this.envRenderTarget.texture
-        // TODO: expose environmentIntensity as a live knob in GraphicsSettingsPanel / AppSettings
-        // 0.4 keeps IBL as an additive specular/ambient contribution on top of the hand-authored
-        // lights rather than competing with them.
-        this.scene.environmentIntensity = 0.3
+        this.scene.environmentIntensity = AppSettings.get('environmentIntensity')
         pmremGenerator.dispose()
     }
 
@@ -152,6 +149,9 @@ export class SceneManager {
     private onSettingChanged(event: CustomEvent<SettingChangedEvent>): void {
         if (event.detail.settingName === 'toneMappingExposure') {
             this.renderer.toneMappingExposure = event.detail.value as number
+        }
+        if (event.detail.settingName === 'environmentIntensity') {
+            this.scene.environmentIntensity = event.detail.value as number
         }
     }
 

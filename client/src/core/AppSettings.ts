@@ -44,6 +44,7 @@ export const Setting = {
     ShadowMapEnabled: 'shadowMapEnabled',
     SsaoEnabled: 'ssaoEnabled',
     ToneMappingExposure: 'toneMappingExposure',
+    EnvironmentIntensity: 'environmentIntensity',
     PixelRatioScale: 'pixelRatioScale',
     ArtworkRoughness: 'artworkRoughness',
     ArtworkMetalness: 'artworkMetalness',
@@ -95,6 +96,7 @@ export const SettingCategory = {
         Setting.ShadowMapEnabled,
         Setting.SsaoEnabled,
         Setting.ToneMappingExposure,
+        Setting.EnvironmentIntensity,
         Setting.PixelRatioScale,
         Setting.ArtworkRoughness,
         Setting.ArtworkMetalness,
@@ -125,6 +127,7 @@ export interface ApplicationSettings {
     shadowMapEnabled: boolean
     ssaoEnabled: boolean
     toneMappingExposure: number
+    environmentIntensity: number
     pixelRatioScale: number
     artworkRoughness: number
     artworkMetalness: number
@@ -440,6 +443,7 @@ export class AppSettings {
             shadowMapEnabled: true,
             ssaoEnabled: true,
             toneMappingExposure: 0.25,
+        environmentIntensity: 0.3,
             pixelRatioScale: 1,
             artworkRoughness: 0.35,
             artworkMetalness: 0.05,
@@ -516,7 +520,7 @@ export class AppSettings {
             }
         }
 
-        const numberFields = ['pixelRatioScale', 'toneMappingExposure']
+        const numberFields = ['pixelRatioScale', 'toneMappingExposure', 'environmentIntensity']
         for (const field of numberFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'number') {
                 return false
