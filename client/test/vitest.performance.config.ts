@@ -7,7 +7,7 @@ export default defineConfig({
     setupFiles: ['./test/setup.ts'],
     include: ['test/performance/**/*.test.ts'],
     exclude: ['test/unit/**', 'test/integration/**', 'test/live/**', 'test/visual/**'],
-    testTimeout: 30000, // Performance tests can take longer
+    testTimeout: 30000,
     hookTimeout: 30000,
     // Run performance tests serially to avoid resource conflicts
     pool: 'threads',

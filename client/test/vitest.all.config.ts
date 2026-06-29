@@ -17,8 +17,7 @@ export default defineConfig({
       '**/live/**',
       '**/visual/**'
     ],
-    testTimeout: 30000, // Higher timeout for performance and live tests
+    testTimeout: 30000,
     hookTimeout: 30000,
-
   },
 })
