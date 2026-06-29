@@ -8,7 +8,6 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
     watch: false,
-    // Reduce output verbosity
     silent: false,
     reporters: ['default'],
     testTimeout: 35000,
