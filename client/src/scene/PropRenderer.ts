@@ -16,6 +16,9 @@ import { LightFactory } from '../lighting/LightFactory'
 import { PerformanceMonitor } from '../utils/PerformanceMonitor'
 import { Logger } from '../utils/Logger'
 import type { SceneLight } from '../lighting/SceneLight'
+import { EventManager } from '../core/EventManager'
+import { StorePropsEventTypes, type UserPropGlbReadyEvent } from './props/PropsEvents'
+import { AssetLoader } from './AssetLoader'
 
 export interface LightFixtureOptions {
   width?: number
@@ -39,6 +42,10 @@ export interface EntranceMatOptions {
   depth?: number
 }
 
+// TODO: Either StorePropsCoordinator needs to own this,
+// or, we need to do probably the proper thing
+// and have a single PropsManager (or whatever) class, and smaller specific classes for each prop type
+// right now this kinda sucks
 export class PropRenderer {
   public static logger = Logger.createLogFunctions(PropRenderer.name)
   private scene: THREE.Scene
@@ -46,12 +53,44 @@ export class PropRenderer {
   private lightFactory: LightFactory
   private currentFixturesGroup: THREE.Group | null = null
 
+  // Tracks how many user-supplied models have been placed so far (for grid positioning)
+  private userPropCount = 0
+
+  // TODO: define some decoration prop class that can drive a placement strategy
+  // Spacing between user-supplied models in the placement grid
+  private static readonly USER_PROP_SPACING = 2
+  private static readonly USER_PROP_GRID_COLS = 5
+  private static readonly USER_PROP_ORIGIN = new THREE.Vector3(-4, 0, -4)
+
   constructor(scene: THREE.Scene) {
-  this.scene = scene
-  this.propsGroup = new THREE.Group()
-  this.propsGroup.name = 'AtmosphericProps'
-  this.scene.add(this.propsGroup)
+    this.scene = scene
+    this.propsGroup = new THREE.Group()
+    this.propsGroup.name = 'AtmosphericProps'
+    this.scene.add(this.propsGroup)
     this.lightFactory = new LightFactory(scene)
+
+    EventManager.getInstance().registerEventHandler(
+      StorePropsEventTypes.UserPropGlbReady,
+      (event: CustomEvent<UserPropGlbReadyEvent>) => void this.placeUserProp(event.detail)
+    )
+  }
+
+  private async placeUserProp(detail: UserPropGlbReadyEvent): Promise<void> {
+    const { url, filename } = detail
+    try {
+      const model = await AssetLoader.loadModel(url, { enableShadows: true })
+      const col = this.userPropCount % PropRenderer.USER_PROP_GRID_COLS
+      const row = Math.floor(this.userPropCount / PropRenderer.USER_PROP_GRID_COLS)
+      model.position.set(
+        PropRenderer.USER_PROP_ORIGIN.x + col * PropRenderer.USER_PROP_SPACING,
+        PropRenderer.USER_PROP_ORIGIN.y,
+        PropRenderer.USER_PROP_ORIGIN.z + row * PropRenderer.USER_PROP_SPACING,
+      )
+      this.propsGroup.add(model)
+      this.userPropCount++
+    } catch (error) {
+      PropRenderer.logger.warn(`placeUserProp: failed to load "${filename}"`, error)
+    }
   }
 
   /**

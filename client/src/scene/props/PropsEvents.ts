@@ -115,6 +115,22 @@ export enum BatchProcessingStatus {
 }
 
 // =============================================================================
+// USER PROP FOLDER EVENTS
+// =============================================================================
+
+/**
+ * Emitted by ScenePropsPanel when a GLB file from the user's chosen folder is
+ * ready to load. The url is a blob: URL created from a FileSystemFileHandle read;
+ * the scene layer loads it via AssetLoader and places it in the store.
+ *
+ * See docs/features/user-prop-folder.md for full context.
+ */
+export interface UserPropGlbReadyEvent extends BaseInteractionEvent {
+    readonly url: string
+    readonly filename: string
+}
+
+// =============================================================================
 // EVENT TYPE CONSTANTS
 // =============================================================================
 
@@ -135,6 +151,9 @@ export const StorePropsEventTypes = {
     // Debug / settings
     EnableShelfIndices:  'store-props:enable-shelf-indices',
     DisableShelfIndices: 'store-props:disable-shelf-indices',
+
+    // User prop folder (see docs/features/user-prop-folder.md)
+    UserPropGlbReady: 'scene-props:user-glb-ready',
 } as const
 
 export type StorePropsEventType = typeof StorePropsEventTypes[keyof typeof StorePropsEventTypes]
