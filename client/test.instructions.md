@@ -2,6 +2,23 @@
 applyTo: '**/*.test.*'
 ---
 
+# LLM Quick Reference
+
+**Run tests**: `yarn test` — always prints `FAILURES: N` as the first output line.
+**Full detail**: read `test-results/test-results.json` after any run — do not parse stdout.
+**Scoped run**: `yarn vitest run test/unit/scene/MyClass.test.ts`
+
+**Known pre-existing skipped tests** (9 total, not failures — do not chase):
+These are marked `skip` or `todo` in the source; vitest counts them as skipped, not failed.
+Check `yarn test` output: `FAILURES: 0` with skipped > 0 means everything is passing.
+
+**JSON report format** — `test-results/test-results.json` is pretty-printed with summary first:
+lines 1–8 always contain `summary` (passed/failed/skipped counts + timestamp).
+`failures` follows immediately after — if `FAILURES: 0`, the array is empty and files start at line 9.
+Slow tests (>2s) are flagged in the terminal output and listed with their actual duration.
+
+---
+
 # Test Organization Guidelines
 
 This document explains how tests are organized in the Steam Brick and Mortar project to ensure maintainability, clarity, and appropriate test execution.

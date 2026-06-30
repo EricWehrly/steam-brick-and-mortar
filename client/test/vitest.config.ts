@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config'
+import { createSummaryReporter } from './reporters/summary-reporter'
 
 export default defineConfig({
   maxWorkers: 4,
@@ -8,14 +9,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
     watch: false,
-    silent: false,
-    reporters: ['default', 'json'],
-    outputFile: './test-results/test-results.json',
+    reporters: [createSummaryReporter('./test-results/test-results.json')],
     testTimeout: 30000,
     hookTimeout: 15000,
-
-    // Default config excludes live tests, performance tests, integration, and visual/Playwright tests.
-    // Visual tests are opt-in tools — run explicitly via yarn test:visual
     exclude: [
       '**/node_modules/**',
       '**/dist/**',

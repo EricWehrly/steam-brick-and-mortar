@@ -16,6 +16,8 @@ export default defineConfig({
         singleThread: true
       }
     },
+    // TODO: replace 'verbose' with a custom reporter that writes per-test duration to
+    // the JSON output file, then summaryReporter can be added here and to vitest.all.config.ts.
     reporters: ['verbose', 'json'],
     outputFile: 'test-results/performance-results.json'
   }
