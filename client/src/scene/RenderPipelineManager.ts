@@ -1,29 +1,54 @@
 import * as THREE from 'three'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { AppSettings } from '../core/AppSettings'
 
 /**
  * Owns the rendering pipeline from base scene render through all post-processing passes.
  * SceneManager delegates its non-XR render call here.
  *
- * Current state: base render only — no post-processing passes.
- * Next: EffectComposer + SSAOPass land here, then Bloom, FXAA, LUT as separate commits.
+ * Pass order: RenderPass → SSAOPass → OutputPass
+ * OutputPass applies the renderer's toneMapping and outputColorSpace to the final frame —
+ * required when using EffectComposer with AgX or any non-linear tone mapping.
  */
 export class RenderPipelineManager {
-    private readonly renderer: THREE.WebGLRenderer
-    private readonly scene: THREE.Scene
-    private readonly camera: THREE.Camera
+    private readonly composer: EffectComposer
+    private readonly ssaoPass: SSAOPass
 
-    constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
-        this.renderer = renderer
-        this.scene = scene
-        this.camera = camera
-        console.log('[RenderPipelineManager] initialized')
+    constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
+        // HalfFloatType preserves HDR values through the pass chain before OutputPass tone-maps them.
+        const renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+            type: THREE.HalfFloatType,
+        })
+        this.composer = new EffectComposer(renderer, renderTarget)
+        this.composer.addPass(new RenderPass(scene, camera))
+
+        // three/examples/jsm SSAOPass produces blurry offset artifacts at this scene scale.
+        // This implementation is intentionally replaced by pmndrs/postprocessing SSAOEffect.
+        this.ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight)
+        this.ssaoPass.enabled = AppSettings.get('ssaoEnabled')
+        this.composer.addPass(this.ssaoPass)
+
+        this.composer.addPass(new OutputPass())
+    }
+
+    setSsaoEnabled(enabled: boolean): void {
+        this.ssaoPass.enabled = enabled
     }
 
     render(): void {
-        this.renderer.render(this.scene, this.camera)
+        this.composer.render()
+    }
+
+    setSize(width: number, height: number): void {
+        this.composer.setSize(width, height)
+        this.ssaoPass.setSize(width, height)
     }
 
     dispose(): void {
-        // Post-processing passes will be disposed here as they are added
+        this.ssaoPass.dispose()
+        this.composer.dispose()
     }
 }
