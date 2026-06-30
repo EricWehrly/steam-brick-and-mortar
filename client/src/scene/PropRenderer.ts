@@ -42,10 +42,10 @@ export interface EntranceMatOptions {
   depth?: number
 }
 
-// TODO: Either StorePropsCoordinator needs to own this,
-// or, we need to do probably the proper thing
-// and have a single PropsManager (or whatever) class, and smaller specific classes for each prop type
-// right now this kinda sucks
+//  TODO: Either StorePropsCoordinator needs to own this,
+//  or, we need to do probably the proper thing
+//  and have a single PropsManager (or whatever) class, and smaller specific classes for each prop type
+//  right now this kinda sucks
 export class PropRenderer {
   public static logger = Logger.createLogFunctions(PropRenderer.name)
   private scene: THREE.Scene
@@ -205,7 +205,7 @@ export class PropRenderer {
         rowIndex: row,
         fixtureCount: fixturesPerRow
       }
-      sceneLights.push({ id: rowLight.id, emissiveMaterials: [fixtureMaterial] })
+      sceneLights.push({ id: rowLight.id, emissiveMaterials: [fixtureMaterial], baseEmissiveIntensity: emissiveIntensity })
     }
 
     this.clearCeilingFixtures()

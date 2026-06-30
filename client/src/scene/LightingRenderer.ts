@@ -152,20 +152,16 @@ export class LightingRenderer {
     }
 
     private onGroupBrightnessChanged(event: CustomEvent<GroupBrightnessChangedEvent>): void {
-        const intensity = LightingRenderer.FIXTURE_PANEL_EMISSIVE * event.detail.brightness
-        this.getEmissiveMaterialsForLights(event.detail.lightIds)
-            .forEach(mat => { mat.emissiveIntensity = intensity })
-    }
-
-    private getEmissiveMaterialsForLights(lightIds: readonly number[]): Set<THREE.MeshStandardMaterial> {
+        const { brightness, lightIds } = event.detail
         const ids = new Set(lightIds)
-        const materials = new Set<THREE.MeshStandardMaterial>()
         for (const light of this.fixtureLights) {
             if (ids.has(light.id)) {
-                light.emissiveMaterials.forEach(mat => materials.add(mat))
+                const scaled = light.baseEmissiveIntensity * brightness
+                light.emissiveMaterials.forEach(mat => { mat.emissiveIntensity = scaled })
             }
         }
-        return materials
+        const baseEnvIntensity = AppSettings.getInstance().getSetting('environmentIntensity') as number
+        this.scene.environmentIntensity = baseEnvIntensity * brightness
     }
 
     /**
@@ -591,6 +587,9 @@ export class LightingRenderer {
         }
     }
 
+    // forceShadowStateRefresh is kind of gross, no?
+    // If it is needed for shadows, preferably the thing managing them should be doing that. More importantly, is there something we could potentially skip or not do with order of operations?
+    // Check with the way threejs works.
     private forceShadowStateRefresh(): void {
         this.renderer.shadowMap.needsUpdate = true
 
