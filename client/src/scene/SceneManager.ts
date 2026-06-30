@@ -138,6 +138,7 @@ export class SceneManager {
             this.camera.aspect = window.innerWidth / window.innerHeight
             this.camera.updateProjectionMatrix()
             this.renderer.setSize(window.innerWidth, window.innerHeight)
+            this.renderPipelineManager.setSize(window.innerWidth, window.innerHeight)
         })
 
         EventManager.getInstance().registerEventHandler<SettingChangedEvent>(
@@ -152,6 +153,9 @@ export class SceneManager {
         }
         if (event.detail.settingName === 'environmentIntensity') {
             this.scene.environmentIntensity = event.detail.value as number
+        }
+        if (event.detail.settingName === 'ssaoEnabled') {
+            this.renderPipelineManager.setSsaoEnabled(event.detail.value as boolean)
         }
     }
 
