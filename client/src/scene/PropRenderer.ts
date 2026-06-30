@@ -53,14 +53,14 @@ export class PropRenderer {
   private lightFactory: LightFactory
   private currentFixturesGroup: THREE.Group | null = null
 
-  // Tracks how many user-supplied models have been placed so far (for grid positioning)
   private userPropCount = 0
 
   // TODO: define some decoration prop class that can drive a placement strategy
-  // Spacing between user-supplied models in the placement grid
   private static readonly USER_PROP_SPACING = 2
   private static readonly USER_PROP_GRID_COLS = 5
   private static readonly USER_PROP_ORIGIN = new THREE.Vector3(-4, 0, -4)
+  // Matches DEFAULT_BOX_HEIGHT in LodArtworkOrchestrator — props scale to game-box height
+  private static readonly USER_PROP_TARGET_HEIGHT = 0.3
 
   constructor(scene: THREE.Scene) {
     this.scene = scene
@@ -79,13 +79,38 @@ export class PropRenderer {
     const { url, filename } = detail
     try {
       const model = await AssetLoader.loadModel(url, { enableShadows: true })
+
+      // Source Engine is Z-up; SourceIO preserves that orientation, so models arrive
+      // lying on their back in Three.js (Y-up). This corrects it until the GLBs are
+      // re-converted with the matching fix in convert_mdl.py, at which point this
+      // rotation should be removed.
+      model.rotation.x = Math.PI / 2
+
+      // Scale so the largest bounding dimension matches game box height.
+      model.updateMatrixWorld(true)
+      const box = new THREE.Box3().setFromObject(model)
+      const size = box.getSize(new THREE.Vector3())
+      const maxDim = Math.max(size.x, size.y, size.z)
+
       const col = this.userPropCount % PropRenderer.USER_PROP_GRID_COLS
       const row = Math.floor(this.userPropCount / PropRenderer.USER_PROP_GRID_COLS)
-      model.position.set(
-        PropRenderer.USER_PROP_ORIGIN.x + col * PropRenderer.USER_PROP_SPACING,
-        PropRenderer.USER_PROP_ORIGIN.y,
-        PropRenderer.USER_PROP_ORIGIN.z + row * PropRenderer.USER_PROP_SPACING,
-      )
+
+      if (maxDim > 0) {
+        const scale = PropRenderer.USER_PROP_TARGET_HEIGHT / maxDim
+        model.scale.setScalar(scale)
+        model.position.set(
+          PropRenderer.USER_PROP_ORIGIN.x + col * PropRenderer.USER_PROP_SPACING,
+          -box.min.y * scale,
+          PropRenderer.USER_PROP_ORIGIN.z + row * PropRenderer.USER_PROP_SPACING,
+        )
+      } else {
+        model.position.set(
+          PropRenderer.USER_PROP_ORIGIN.x + col * PropRenderer.USER_PROP_SPACING,
+          PropRenderer.USER_PROP_ORIGIN.y,
+          PropRenderer.USER_PROP_ORIGIN.z + row * PropRenderer.USER_PROP_SPACING,
+        )
+      }
+
       this.propsGroup.add(model)
       this.userPropCount++
     } catch (error) {
