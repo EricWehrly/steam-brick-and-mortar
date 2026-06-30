@@ -12,7 +12,7 @@ Most users will be on flatscreen. VR is the primary long-term goal but should no
 
 ## Current Pipeline
 
-Pass order: `RenderPass → NormalPass → EffectPass(SSAO) → EffectPass(ToneMapping AGX) → EffectPass(SMAA)`
+Pass order: `RenderPass → N8AOPostPass → EffectPass(ToneMapping AGX) → EffectPass(SMAA)`
 
 `renderer.toneMapping = NoToneMapping` — geometry renders linear HDR into the composer's HalfFloat buffer. `ToneMappingEffect(AGX)` applies the tone curve as the final LDR conversion step. `renderer.toneMappingExposure` remains active because `AgXToneMapping()` in the effect shader reads the Three.js uniform directly.
 
@@ -25,8 +25,8 @@ XR path: `renderer.toneMapping = AgXToneMapping` on `sessionstart`, reset on `se
 | Effect | Status | Notes |
 |---|---|---|
 | **ToneMappingEffect (AGX)** | ✅ Implemented | Final tone curve. `renderer.toneMappingExposure` still active. |
-| **SSAOEffect** | ✅ Implemented | Toggleable via `ssaoEnabled` setting. Parameters need visual tuning. |
-| **SMAAEffect (HIGH)** | ✅ Implemented | Runs after tone mapping in LDR space. Replaces hardware MSAA. |
+| **N8AOPostPass** | ✅ Implemented | Replaces SSAOEffect. HBAO-style AO from `n8ao` package. Quality follows `qualityLevel` setting; on/off via `ssaoEnabled`. `gammaCorrection = false` (ToneMappingEffect handles HDR→display). Initial params: `aoRadius 1.5`, `intensity 2.5` — needs visual tuning for scene scale. |
+| **SMAAEffect (HIGH preset)** | ✅ Implemented | Runs after tone mapping in LDR space. Preset follows `smaaPreset` setting. |
 
 ### Quality / Scene Effects (desktop, can be toggled)
 
@@ -83,7 +83,7 @@ Things commonly paired with pmndrs/postprocessing that are **not** in the librar
 
 | Package / Technique | What it does | Relevance |
 |---|---|---|
-| **`n8ao`** (npm) | N8Ambient Occlusion — HBAO-style with spiral sampling. Significantly better quality than SSAOEffect at similar cost. Works as an EffectComposer pass, drop-in compatible. | High: shelf edges and box corners would benefit. Evaluate as an SSAO upgrade when we revisit SSAO parameter tuning. |
+| **`n8ao`** (npm) | N8Ambient Occlusion — HBAO-style with spiral sampling. Significantly better quality than SSAOEffect at similar cost. Works as an EffectComposer pass via `needsDepthTexture`. | ✅ **Implemented** — replaced SSAOEffect. Parameters need visual tuning. |
 | **Screen Space Reflections (SSR)** | Reflections of scene content in glossy surfaces. `three/examples/jsm/postprocessing/SSRPass.js` exists but is not compatible with the pmndrs EffectComposer without glue. Custom integration is complex. | High: a polished retail floor reflecting overhead lights is very atmospheric. Deferred — complex to wire. |
 | **Temporal AA (TAA)** | Accumulates sub-pixel samples across frames. Better than SMAA on static camera, but ghosts on motion. Not in this version of postprocessing. | Low for VR (reprojection issues). Worth trying on desktop if shimmer on fine geometry becomes visible. |
 | **`three-mesh-bvh`** | BVH acceleration for raycasting. Not a postprocessing concern, but commonly used alongside for interaction. | Relevant when we implement interactable objects. |

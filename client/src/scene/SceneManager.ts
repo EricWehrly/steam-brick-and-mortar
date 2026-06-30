@@ -167,9 +167,6 @@ export class SceneManager {
         if (event.detail.settingName === 'environmentIntensity') {
             this.scene.environmentIntensity = event.detail.value as number
         }
-        if (event.detail.settingName === 'ssaoEnabled') {
-            this.renderPipelineManager.setSsaoEnabled(event.detail.value as boolean)
-        }
     }
 
     private renderLoopCallback: (() => void) | null = null
