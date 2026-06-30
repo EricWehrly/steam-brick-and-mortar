@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config'
+import { createSummaryReporter } from './reporters/summary-reporter'
 
 export default defineConfig({
   maxWorkers: 4,
@@ -8,12 +9,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
     watch: false,
-    silent: false,
-    reporters: ['default'],
+    reporters: [createSummaryReporter('./test-results/integration-results.json')],
     testTimeout: 35000,
     hookTimeout: 35000,
-
-    // Integration tests only
     include: [
       '**/integration/**/*.int.test.ts'
     ],

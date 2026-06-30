@@ -103,6 +103,9 @@ docker-compose.override.yml
 *.seed
 *.pid.lock
 
+# Test result files — generated on every run, not committed
+test-results/
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov

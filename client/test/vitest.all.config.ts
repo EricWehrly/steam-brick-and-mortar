@@ -8,6 +8,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
     watch: false,
+    // TODO: add summaryReporter here once performance tests have their own timing-aware
+    // reporter that captures per-test duration to test-results/performance-results.json.
+    // Until then, `yarn test:all` uses vitest's default reporter so perf timing is visible.
+    //
     // Include unit + integration + performance tests.
     // Live tests hit real external APIs: run explicitly via yarn test:live
     // Visual/Playwright tests are opt-in tools: run explicitly via yarn test:visual
