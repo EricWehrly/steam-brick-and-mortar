@@ -4,17 +4,19 @@ import {
     EffectPass,
     NormalPass,
     RenderPass,
+    SMAAEffect,
+    SMAAPreset,
     SSAOEffect,
     ToneMappingEffect,
     ToneMappingMode
 } from 'postprocessing'
-import { AppSettings } from '../core/AppSettings'
+import { AppSettings, QUALITY_LEVEL, type QualityLevel } from '../core/AppSettings'
 
 /**
  * Owns the rendering pipeline from base scene render through all post-processing passes.
  * SceneManager delegates its non-XR render call here.
  *
- * Pass order: RenderPass → NormalPass → EffectPass(SSAO) → EffectPass(ToneMapping)
+ * Pass order: RenderPass → NormalPass → EffectPass(SSAO) → EffectPass(ToneMapping) → EffectPass(SMAA)
  *
  * renderer.toneMapping is NoToneMapping so geometry renders into the HDR buffer without
  * pre-baked tone mapping. ToneMappingEffect(AGX) applies AgX as the final step.
@@ -22,8 +24,16 @@ import { AppSettings } from '../core/AppSettings'
  * the Three.js toneMappingExposure uniform directly.
  *
  * SSAO and tone mapping are in separate EffectPasses so SSAO can be toggled independently.
+ * SMAA is a separate pass after tone mapping so it runs edge detection in LDR space.
  * NormalPass renders view-space normals into its own texture; SSAOEffect reads that texture.
  */
+const SMAA_PRESET_MAP: Record<QualityLevel, SMAAPreset> = {
+    [QUALITY_LEVEL.LOW]: SMAAPreset.LOW,
+    [QUALITY_LEVEL.MEDIUM]: SMAAPreset.MEDIUM,
+    [QUALITY_LEVEL.HIGH]: SMAAPreset.HIGH,
+    [QUALITY_LEVEL.ULTRA]: SMAAPreset.ULTRA,
+}
+
 export class RenderPipelineManager {
     private readonly composer: EffectComposer
     private readonly ssaoPass: EffectPass
@@ -52,6 +62,8 @@ export class RenderPipelineManager {
         this.composer.addPass(this.ssaoPass)
 
         this.composer.addPass(new EffectPass(camera, new ToneMappingEffect({ mode: ToneMappingMode.AGX })))
+        const smaaQuality = AppSettings.get('smaaPreset') as QualityLevel
+        this.composer.addPass(new EffectPass(camera, new SMAAEffect({ preset: SMAA_PRESET_MAP[smaaQuality] })))
     }
 
     setSsaoEnabled(enabled: boolean): void {

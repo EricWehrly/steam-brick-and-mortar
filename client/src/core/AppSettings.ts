@@ -43,6 +43,7 @@ export const Setting = {
     ShadowQuality: 'shadowQuality',
     ShadowMapEnabled: 'shadowMapEnabled',
     SsaoEnabled: 'ssaoEnabled',
+    SmaaPreset: 'smaaPreset',
     ToneMappingExposure: 'toneMappingExposure',
     EnvironmentIntensity: 'environmentIntensity',
     PixelRatioScale: 'pixelRatioScale',
@@ -95,6 +96,7 @@ export const SettingCategory = {
         Setting.ShadowQuality,
         Setting.ShadowMapEnabled,
         Setting.SsaoEnabled,
+        Setting.SmaaPreset,
         Setting.ToneMappingExposure,
         Setting.EnvironmentIntensity,
         Setting.PixelRatioScale,
@@ -126,6 +128,7 @@ export interface ApplicationSettings {
     shadowQuality: number // 0=off, 1=low, 2=medium, 3=high, 4=ultra
     shadowMapEnabled: boolean
     ssaoEnabled: boolean
+    smaaPreset: QualityLevel
     toneMappingExposure: number
     environmentIntensity: number
     pixelRatioScale: number
@@ -442,6 +445,7 @@ export class AppSettings {
             shadowQuality: 2, // Medium shadows by default
             shadowMapEnabled: true,
             ssaoEnabled: true,
+            smaaPreset: 'high',
             toneMappingExposure: 0.25,
         environmentIntensity: 0.3,
             pixelRatioScale: 1,
@@ -503,6 +507,9 @@ export class AppSettings {
         
         // Validate specific fields if present
         if (settingsObj.qualityLevel && !Object.values(QUALITY_LEVEL).includes(settingsObj.qualityLevel as QualityLevel)) {
+            return false
+        }
+        if (settingsObj.smaaPreset && !Object.values(QUALITY_LEVEL).includes(settingsObj.smaaPreset as QualityLevel)) {
             return false
         }
         

@@ -20,6 +20,10 @@ The main thing we'll want to check in this "encore" act is: Can we embed an audi
 - **Dissolve animation system** — smooth entrance materialization for store geometry; eliminates jarring "pop" on load. See `docs/research/dissolve-animation-research.md`.
 - **Dust motes** — floating ambient particles, especially visible in light beams; ~1-2 day scope; see [Lighting and Atmosphere](../features/lighting-and-atmosphere.md)
 - **Animated spotlight effects** — edge feathering, subtle pulse, volumetric light rays; shader-based; see [Lighting and Atmosphere](../features/lighting-and-atmosphere.md)
+- **Post-processing atmosphere effects** (see [Post-Processing Effects](../features/postprocessing-effects.md)):
+  - Vignette — subtle screen-edge darkening; optional setting; try in XR as a comfort/locomotion technique
+  - God rays (GodRaysEffect) — ceiling light shafts; likely replacement for current spotlight approach; land after LUT/lighting balance is finalized
+  - User-opt-in Effects panel: noise/film grain, glitch, scanlines, chromatic aberration (flatscreen only); low-effort once the UI section is wired
 
 ## Layout Modes
 
