@@ -6,11 +6,13 @@
 
 The main thing we'll want to check in this "encore" act is: Can we embed an audio-video stream from another source? Can we sample other desktop windows? What if we were a desktop program ourselves? Can we drum up webpage views? Could we capture/replay with the help of a tray app...?
 
+> The "desktop program ourselves" thread is now captured concretely in [Native Desktop App](../features/desktop-app.md) — the umbrella for everything gated on filesystem/process/hardware access (local screenshots at scale, Source→glTF extraction, peripheral enumeration, launching games). **It is now under evaluation for *between Act 2 and 3*, not this someday list** (a Tauri spike is queued).
+
 ## Visual / Atmosphere
 
 - **Architectural columns & decorative variants** — optional in-room columns (Roman/Corinthian style) to break up wall runs and frame aisles
-- **Waist-height counter area** — service counter / check-out zone near front-of-store; strong video-store vibe anchor
-- **Working analog wall clock** — in-world prop with real-time hand movement; ambient polish
+- **Waist-height counter area** — service counter / check-out zone near front-of-store; strong video-store vibe anchor → graduated into [Fabricated Set Dressing](../features/fabricated-set-dressing.md)
+- **Working analog wall clock** — in-world prop with real-time hand movement; ambient polish → see [Fabricated Set Dressing](../features/fabricated-set-dressing.md)
 - Fill the camera up with steam after launching a game, so the effect of the frozen frame in application is .. steamy.
 - **Room variant — cozy basement** — see [Room Variants](../features/room-variants.md); Encore stretch beyond the Act 2 best-effort
 - **Poster walls from user media** — wall posters sourced from user-owned public screenshots/artwork, rotating by category/zone (needs rights/privacy review)
@@ -40,6 +42,7 @@ The main thing we'll want to check in this "encore" act is: Can we embed an audi
 
 ## Misc
 
+- **Friend stream projection (Tiers 2–4)** — presence data, Steam Broadcasting DASH, and native window capture; the `getDisplayMedia` Tier 1 proof is **pulled into Act 2**. See [Friend Stream Projection](../features/friend-stream-projection.md).
 - Portal-style portals linking different rooms
 would love to build to support inside the same room, but not at first
 Would love to build as much as possible, a "filter" drawing effect that causes the different appearance of the different "rooms"

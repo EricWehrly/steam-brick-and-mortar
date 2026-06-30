@@ -147,3 +147,17 @@ dist
 
 # reference materials
 reference/
+
+# Extracted intermediary files and converted game assets — personal-mode only, never commit
+desktop/extracted/
+desktop/output/
+desktop/tools/vpkedit/
+client/public/test-props/
+
+# Python bytecode (SourceIO addon in blender/addons/)
+**/__pycache__/
+*.py[cod]
+
+# SourceIO Blender addon — committed as zip, extracted directory is gitignored
+blender/addons/SourceIO/
+!blender/addons/SourceIO.zip
