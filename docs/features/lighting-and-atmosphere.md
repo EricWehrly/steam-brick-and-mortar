@@ -63,7 +63,9 @@ Decision boundaries:
 What remains in this feature:
 - Tone presets and in-scene "dongle" controls.
 - Atmosphere effects (dust motes, subtle spotlight shimmer).
-- Dynamic CubeCamera probe (scene-accurate specular), bloom for emissives, color LUT for atmosphere modes — see `docs/plans/lighting-quality-plan.md`.
+- Dynamic CubeCamera probe (scene-accurate specular) — see `docs/plans/lighting-quality-plan.md`.
+- Color LUT for atmosphere modes: LUTs are the primary implementation path for the "tone preset" feature (Corporate / Cheery / Dim / Dank). Comes after lighting balance is finalized. See `docs/features/postprocessing-effects.md` for sequencing — god rays (ceiling light shafts as spotlight replacement) land after LUTs.
+- SelectiveBloom for emissive fixtures and neon signs — see `docs/features/postprocessing-effects.md`.
 
 ## Pre-Clutter Immersion Checkpoint
 

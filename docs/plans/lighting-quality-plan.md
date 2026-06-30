@@ -1,8 +1,8 @@
 # Visual Quality — Renderer Techniques
 
 What is implemented, what is next, and what is deferred.  
-Architecture: `render-pipeline-manager-plan.md` (EffectComposer refactor).  
 IBL + tone mapping rationale: `renderer-visual-baseline-plan.md`.  
+Post-processing effects roadmap: `docs/features/postprocessing-effects.md`.  
 Shadow policy code: `src/lighting/ShadowPolicy.ts`.
 
 ---
@@ -11,60 +11,51 @@ Shadow policy code: `src/lighting/ShadowPolicy.ts`.
 
 | Technique | What it does |
 |---|---|
-| **AgX tone mapping** | Maps scene luminance to display output without clipping highlights to flat white. Ceiling fixtures and neon signs roll off rather than blowing out. |
-| **IBL (RoomEnvironment + PMREM)** | Gives PBR materials a reflection environment. Roughness, metalness, and fresnel have something to interact with. Generated once at startup; free per frame. Static probe — does not reflect actual scene content. |
-| **Directional shadow angle** | Main shadow light offset ~18° from overhead. Shadows project outward from objects where the player can see them. |
-| **SSAO** | Screen-space ambient occlusion. Darkens contact zones, crevices, and shelf corners. Toggleable via `ssaoEnabled` in Graphics settings. Compensates partially for missing ceiling fixture shadows. |
+| **HDR postprocessing pipeline** | `renderer.toneMapping = NoToneMapping`; `EffectComposer` (pmndrs/postprocessing, HalfFloat buffers) owns the full output path. |
+| **AgX tone mapping** | `ToneMappingEffect(AGX)` as final-to-LDR step. Highlights roll off; `toneMappingExposure` uniform still active. |
+| **IBL (RoomEnvironment + PMREM)** | Static probe; roughness/metalness/fresnel have something to reflect. Generated once at startup. |
+| **Directional shadow angle** | Main shadow light ~18° from overhead. Shadows project where the player sees them. |
+| **SSAO** | `SSAOEffect` via `NormalPass`. Darkens contact zones and shelf corners. Toggleable via `ssaoEnabled`. |
+| **SMAA** | `SMAAEffect(HIGH)` as the final pass, after tone mapping. Runs in LDR space for correct edge detection. |
 
 ---
 
 ## Next — scene quality baseline
 
-These close the biggest remaining gaps and should land before any atmosphere work.
-
-**1. Exposure control** (small)  
-`toneMappingExposure` and `scene.environmentIntensity` are hardcoded. Adding both as live
-sliders in GraphicsSettingsPanel lets us balance the scene without editing constants. The
-TODO is already in `SceneManager.ts`. This is the immediate next code change.
-
-**2. Brightness-to-black** (small)  
-The master brightness slider scales `THREE.Light.intensity` but not `scene.environmentIntensity`
-(IBL) or emissive material intensity on ceiling fixture meshes. Dragging to zero leaves residual
-ambient light. Fix: `LightingControlsPanel.setMasterBrightness()` also scales those.
-See `render-pipeline-manager-plan.md` for full diagnosis.
-
-**3. Dynamic CubeCamera probe** (medium)  
+**1. Dynamic CubeCamera probe** (medium)  
 Replaces the static `RoomEnvironment` IBL with a probe rendered from the actual scene. Specular
 highlights on glossy surfaces then reflect real shelves, neon signs, and game boxes rather than
 a generic indoor approximation. Rendered once after scene setup; free per frame.
 
-**4. Shadow resolution / CSM** (medium, if needed)  
+**2. Shadow resolution / CSM** (medium, if needed)  
 At quality=2 (1024px over ~20m), directional shadow texels are ~20mm — fine for large contact
 shadows but coarse on box spine edges. Cascaded Shadow Maps split the frustum so nearby
-geometry gets more resolution without increasing total map size. Defer until exposure and probe
-are in place, then evaluate whether shadow sharpness still reads as the gap.
+geometry gets more resolution without increasing total map size. Evaluate after dynamic probe.
 
 ---
 
 ## Later — atmosphere and finish
 
-These are real improvements but depend on the baseline above being stable first.
-
-**Bloom**  
-Models light scatter in camera optics. Makes emissive surfaces (neon signs, entrance spot)
-read as genuinely bright rather than just a brighter color. Natural fit for the neon sign
-feature when that lands. Not needed for general scene legibility.
-
-**FXAA / SMAA**  
-Fast anti-aliasing pass. Sub-millisecond. Polish step — add it once the scene reads correctly
-and edge quality becomes the bottleneck.
+**SelectiveBloom**  
+Bloom on specific objects only (neon signs, emissive fixtures). Implement alongside the neon
+sign feature. See `docs/features/postprocessing-effects.md` for full effects roadmap.
 
 **Color LUT**  
-3D lookup table applied to the final frame — cinematic color grade for atmosphere modes
-(warm retail, late-night, etc.). **Comes last.** A LUT locks in the visual character of a
-scene that is already correctly balanced. Tuning lights while a LUT is active means every
-lighting change fights the grade; removing it later destroys the visual. Establish neutral
-correct balance first, then apply LUT as an optional finishing layer.
+3D lookup table — cinematic color grade for atmosphere modes (warm retail, late-night, etc.).
+**Comes last.** A LUT locks in the visual character of a correctly-balanced scene. Establish
+neutral balance first, then apply LUT as a finishing layer. LUTs are the primary vehicle for
+the "tone preset" feature (see `lighting-and-atmosphere.md`).
+
+**Screen Space Reflections (SSR)**  
+Floor reflections of overhead lights and shelves would be highly atmospheric for a retail store
+scene. Not in pmndrs/postprocessing natively — requires either custom integration with
+`three/examples/jsm/postprocessing/SSRPass.js` or a separate implementation. Deferred: complex
+to wire correctly alongside the existing EffectComposer pipeline.
+
+**N8AO (SSAO upgrade)**  
+`n8ao` npm package — HBAO-style ambient occlusion, noticeably better quality than SSAOEffect
+at similar cost, works as an EffectComposer pass. Evaluate as a replacement for SSAOEffect
+when SSAO parameter tuning is on the table.
 
 ---
 
