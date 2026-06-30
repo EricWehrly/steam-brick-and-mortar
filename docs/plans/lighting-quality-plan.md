@@ -15,8 +15,8 @@ Shadow policy code: `src/lighting/ShadowPolicy.ts`.
 | **AgX tone mapping** | `ToneMappingEffect(AGX)` as final-to-LDR step. Highlights roll off; `toneMappingExposure` uniform still active. |
 | **IBL (RoomEnvironment + PMREM)** | Static probe; roughness/metalness/fresnel have something to reflect. Generated once at startup. |
 | **Directional shadow angle** | Main shadow light ~18° from overhead. Shadows project where the player sees them. |
-| **SSAO** | `SSAOEffect` via `NormalPass`. Darkens contact zones and shelf corners. Toggleable via `ssaoEnabled`. |
-| **SMAA** | `SMAAEffect(HIGH)` as the final pass, after tone mapping. Runs in LDR space for correct edge detection. |
+| **N8AO** | `N8AOPostPass` replaces SSAOEffect. HBAO-style AO; quality follows `qualityLevel`. Toggleable via `ssaoEnabled`. `gammaCorrection = false` (HDR pipeline). |
+| **SMAA** | `SMAAEffect` as the final pass, after tone mapping. Preset follows `smaaPreset` setting. |
 
 ---
 
@@ -52,10 +52,10 @@ scene. Not in pmndrs/postprocessing natively — requires either custom integrat
 `three/examples/jsm/postprocessing/SSRPass.js` or a separate implementation. Deferred: complex
 to wire correctly alongside the existing EffectComposer pipeline.
 
-**N8AO (SSAO upgrade)**  
-`n8ao` npm package — HBAO-style ambient occlusion, noticeably better quality than SSAOEffect
-at similar cost, works as an EffectComposer pass. Evaluate as a replacement for SSAOEffect
-when SSAO parameter tuning is on the table.
+**N8AO parameter tuning**  
+Initial parameters (`aoRadius: 1.5`, `intensity: 2.5`) were set conservatively for scene scale.
+Tune once the scene is visually stable — increase intensity for deeper crevice shadows, adjust
+radius to match box/shelf scale.
 
 ---
 

@@ -1,35 +1,76 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
 import { AppSettings } from '../../../src/core/AppSettings'
+import { EventManager } from '../../../src/core/EventManager'
 
-// Module-level captures populated when constructors are called from RenderPipelineManager
-let capturedComposer: { addPass: ReturnType<typeof vi.fn>; render: ReturnType<typeof vi.fn>; setSize: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> } | null = null
-let capturedSsaoPass: { enabled: boolean; setSize: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> } | null = null
+let capturedComposer: {
+    passes: unknown[]
+    addPass: ReturnType<typeof vi.fn>
+    render: ReturnType<typeof vi.fn>
+    setSize: ReturnType<typeof vi.fn>
+    dispose: ReturnType<typeof vi.fn>
+} | null = null
 
-// Regular function declarations — arrow functions cannot be used as constructors
-vi.mock('three/examples/jsm/postprocessing/EffectComposer.js', () => ({
+let capturedN8aoPass: {
+    enabled: boolean
+    configuration: Record<string, unknown>
+    setSize: ReturnType<typeof vi.fn>
+    setQualityMode: ReturnType<typeof vi.fn>
+    dispose: ReturnType<typeof vi.fn>
+} | null = null
+
+let capturedEffectPasses: { dispose: ReturnType<typeof vi.fn> }[] = []
+
+vi.mock('postprocessing', () => ({
     EffectComposer: function MockEffectComposer() {
-        capturedComposer = { addPass: vi.fn(), render: vi.fn(), setSize: vi.fn(), dispose: vi.fn() }
+        const passes: unknown[] = []
+        capturedComposer = {
+            passes,
+            addPass: vi.fn().mockImplementation((pass: unknown) => passes.push(pass)),
+            render: vi.fn(),
+            setSize: vi.fn(),
+            dispose: vi.fn(),
+        }
         return capturedComposer
     },
-}))
-
-vi.mock('three/examples/jsm/postprocessing/RenderPass.js', () => ({
-    RenderPass: function MockRenderPass() { return {} },
-}))
-
-vi.mock('three/examples/jsm/postprocessing/SSAOPass.js', () => ({
-    SSAOPass: function MockSSAOPass() {
-        capturedSsaoPass = { enabled: true, setSize: vi.fn(), dispose: vi.fn() }
-        return capturedSsaoPass
+    RenderPass: function MockRenderPass() { return { _type: 'RenderPass' } },
+    EffectPass: function MockEffectPass() {
+        const pass = { _type: 'EffectPass', dispose: vi.fn() }
+        capturedEffectPasses.push(pass)
+        return pass
     },
+    SMAAEffect: function MockSMAAEffect() { return {} },
+    ToneMappingEffect: function MockToneMappingEffect() { return {} },
+    ToneMappingMode: { AGX: 'AGX' },
+    SMAAPreset: { LOW: 0, MEDIUM: 1, HIGH: 2, ULTRA: 3 },
+    Pass: class MockPass {},
 }))
 
-vi.mock('three/examples/jsm/postprocessing/OutputPass.js', () => ({
-    OutputPass: function MockOutputPass() { return {} },
+vi.mock('n8ao', () => ({
+    N8AOPostPass: function MockN8AOPostPass() {
+        capturedN8aoPass = {
+            enabled: true,
+            configuration: {
+                aoRadius: 0,
+                intensity: 0,
+                distanceFalloff: 0,
+                gammaCorrection: true,
+            },
+            setSize: vi.fn(),
+            setQualityMode: vi.fn(),
+            dispose: vi.fn(),
+        }
+        return capturedN8aoPass
+    },
 }))
 
 import { RenderPipelineManager } from '../../../src/scene/RenderPipelineManager'
+import { AppSettingsEventTypes } from '../../../src/types/InteractionEvents'
+import { EventSource } from '../../../src/core/EventManager'
+
+function emitSettingChanged(settingName: string, value: unknown): void {
+    EventManager.getInstance().emit(AppSettingsEventTypes.Changed, { settingName, value, source: EventSource.System })
+}
 
 describe('RenderPipelineManager', () => {
     let pipeline: RenderPipelineManager
@@ -39,9 +80,11 @@ describe('RenderPipelineManager', () => {
 
     beforeEach(() => {
         capturedComposer = null
-        capturedSsaoPass = null
+        capturedN8aoPass = null
+        capturedEffectPasses = []
         localStorage.clear()
         AppSettings['instance'] = undefined as unknown as AppSettings
+        EventManager['instance'] = undefined as unknown as EventManager
 
         renderer = {} as unknown as THREE.WebGLRenderer
         scene = new THREE.Scene()
@@ -49,21 +92,22 @@ describe('RenderPipelineManager', () => {
         pipeline = new RenderPipelineManager(renderer, scene, camera)
     })
 
-    it('adds three passes to the composer (RenderPass, SSAOPass, OutputPass)', () => {
-        expect(capturedComposer!.addPass).toHaveBeenCalledTimes(3)
+    it('adds 4 passes to the composer (RenderPass, N8AOPostPass, ToneMappingEffect, SMAAEffect)', () => {
+        expect(capturedComposer!.addPass).toHaveBeenCalledTimes(4)
     })
 
-    it('initializes SSAOPass.enabled from AppSettings (default: true)', () => {
-        expect(capturedSsaoPass!.enabled).toBe(true)
+    it('initializes N8AOPostPass.enabled from AppSettings (default: true)', () => {
+        expect(capturedN8aoPass!.enabled).toBe(true)
     })
 
-    it('initializes SSAOPass.enabled false when setting is disabled', () => {
-        capturedSsaoPass = null
+    it('initializes N8AOPostPass.enabled false when ssaoEnabled setting is false', () => {
+        capturedN8aoPass = null
+        capturedEffectPasses = []
         AppSettings['instance'] = undefined as unknown as AppSettings
         vi.spyOn(AppSettings, 'get').mockReturnValue(false as never)
 
         const p = new RenderPipelineManager(renderer, scene, camera)
-        expect(capturedSsaoPass!.enabled).toBe(false)
+        expect(capturedN8aoPass!.enabled).toBe(false)
         p.dispose()
         vi.restoreAllMocks()
     })
@@ -73,23 +117,33 @@ describe('RenderPipelineManager', () => {
         expect(capturedComposer!.render).toHaveBeenCalledOnce()
     })
 
-    it('resizes both composer and SSAOPass on setSize()', () => {
+    it('resizes both composer and N8AOPostPass on setSize()', () => {
         pipeline.setSize(1280, 720)
         expect(capturedComposer!.setSize).toHaveBeenCalledWith(1280, 720)
-        expect(capturedSsaoPass!.setSize).toHaveBeenCalledWith(1280, 720)
+        expect(capturedN8aoPass!.setSize).toHaveBeenCalledWith(1280, 720)
     })
 
-    it('toggles SSAOPass.enabled via setSsaoEnabled()', () => {
-        pipeline.setSsaoEnabled(false)
-        expect(capturedSsaoPass!.enabled).toBe(false)
+    it('toggles N8AOPostPass.enabled when ssaoEnabled setting changes', () => {
+        emitSettingChanged('ssaoEnabled', false)
+        expect(capturedN8aoPass!.enabled).toBe(false)
 
-        pipeline.setSsaoEnabled(true)
-        expect(capturedSsaoPass!.enabled).toBe(true)
+        emitSettingChanged('ssaoEnabled', true)
+        expect(capturedN8aoPass!.enabled).toBe(true)
     })
 
-    it('disposes SSAOPass and composer on dispose()', () => {
+    it('disposes old SMAA EffectPass and adds a new one when smaaPreset setting changes', () => {
+        const smaaPassBeforeRebuild = capturedEffectPasses[1]
+        const passCountBefore = capturedComposer!.passes.length
+
+        emitSettingChanged('smaaPreset', 'low')
+
+        expect(smaaPassBeforeRebuild.dispose).toHaveBeenCalledOnce()
+        expect(capturedEffectPasses).toHaveLength(3)
+        expect(capturedComposer!.passes.length).toBe(passCountBefore)
+    })
+
+    it('disposes the composer on dispose()', () => {
         pipeline.dispose()
-        expect(capturedSsaoPass!.dispose).toHaveBeenCalledOnce()
         expect(capturedComposer!.dispose).toHaveBeenCalledOnce()
     })
 })

@@ -99,6 +99,10 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             fullscreenEnabled: !!document.fullscreenElement,
             shadowMapEnabled: this.appSettings.getSetting('shadowMapEnabled'),
             ssaoEnabled: this.appSettings.getSetting('ssaoEnabled'),
+            smaaPresetLow: this.appSettings.getSetting('smaaPreset') === 'low',
+            smaaPresetMedium: this.appSettings.getSetting('smaaPreset') === 'medium',
+            smaaPresetHigh: this.appSettings.getSetting('smaaPreset') === 'high',
+            smaaPresetUltra: this.appSettings.getSetting('smaaPreset') === 'ultra',
             pixelRatioScale: this.appSettings.getSetting('pixelRatioScale'),
             pixelRatioScaleLabel: this.appSettings.getSetting('pixelRatioScale').toFixed(2),
 
@@ -161,6 +165,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         UIComponentUtils.setupSelect<ApplicationSettings['lightingQuality']>(document.body, {
             selectId: 'lighting-quality',
             onChange: (quality) => this.updateSetting('lightingQuality', quality)
+        })
+
+        UIComponentUtils.setupSelect<ApplicationSettings['smaaPreset']>(document.body, {
+            selectId: 'smaa-preset',
+            onChange: (preset) => this.updateSetting('smaaPreset', preset)
         })
     }
 
@@ -415,6 +424,11 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         const ssaoToggle = document.getElementById('ssao-enabled') as HTMLInputElement
         if (ssaoToggle) {
             ssaoToggle.checked = this.appSettings.getSetting('ssaoEnabled')
+        }
+
+        const smaaPresetSelect = document.getElementById('smaa-preset') as HTMLSelectElement
+        if (smaaPresetSelect) {
+            smaaPresetSelect.value = this.appSettings.getSetting('smaaPreset')
         }
 
         const pixelRatioSlider = document.getElementById('pixel-ratio-scale') as HTMLInputElement

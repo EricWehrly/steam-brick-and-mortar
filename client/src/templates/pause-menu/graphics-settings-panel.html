@@ -120,8 +120,19 @@
         <div class="setting-control" style="margin-top: 0.75rem;">
           <label class="checkbox-container ui-checkbox-row">
             <input type="checkbox" class="ui-checkbox" id="ssao-enabled" {{#ssaoEnabled}}checked{{/ssaoEnabled}}>
-            Enable SSAO (contact shadows and crevice darkening in screen space)
+            Enable SSAO (contact shadows and crevice darkening)
           </label>
+        </div>
+        <div class="setting-control" style="margin-top: 0.75rem;">
+          <label class="setting-label" for="smaa-preset" style="font-weight: normal; font-size: 0.9rem;">
+            Anti-Aliasing (SMAA) <span class="setting-hint-badge hint-instant">✨ instant</span>
+          </label>
+          <select id="smaa-preset" class="setting-select pause-select">
+            <option value="low" {{#smaaPresetLow}}selected{{/smaaPresetLow}}>Low</option>
+            <option value="medium" {{#smaaPresetMedium}}selected{{/smaaPresetMedium}}>Medium</option>
+            <option value="high" {{#smaaPresetHigh}}selected{{/smaaPresetHigh}}>High</option>
+            <option value="ultra" {{#smaaPresetUltra}}selected{{/smaaPresetUltra}}>Ultra</option>
+          </select>
         </div>
       </div>
     </section>
