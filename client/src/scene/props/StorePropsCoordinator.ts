@@ -51,6 +51,8 @@ const RUNNER_MIN_DEPTH_METRES = 4.5
 const RUNNER_MARGIN_RATIO_PER_SIDE = 0.01
 const PERCENT_BASE = 100
 
+// TODO: Merge/refactor with PropsRenderer.
+// See note at the top of PropsRenderer.ts
 export class StorePropsCoordinator {
     private static readonly logger = Logger.createLogFunctions(StorePropsCoordinator.name)
     private static instance: StorePropsCoordinator | null = null
