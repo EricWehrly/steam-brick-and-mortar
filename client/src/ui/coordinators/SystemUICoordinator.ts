@@ -15,6 +15,7 @@ import { LightingControlsPanel } from '../LightingControlsPanel'
 import { CategoryReferencePanel } from '../CategoryReferencePanel'
 import { GameLibraryListPanel } from '../GameLibraryListPanel'
 import { LayoutControlPanel } from '../LayoutControlPanel'
+import { ScenePropsPanel } from '../ScenePropsPanel'
 import { EventManager } from '../../core/EventManager'
 import { AppSettings } from '../../core/AppSettings'
 import { UIEventTypes, InputEventTypes, type SceneCanvasClickEvent } from '../../types/InteractionEvents'
@@ -34,6 +35,7 @@ export class SystemUICoordinator {
     private categoryReferencePanel?: CategoryReferencePanel
     private gameLibraryListPanel?: GameLibraryListPanel
     private layoutControlPanel?: LayoutControlPanel
+    private scenePropsPanel?: ScenePropsPanel
     private eventManager: EventManager
     private appSettings: AppSettings
     private renderLoopRegistry: RenderLoopRegistry
@@ -116,6 +118,9 @@ export class SystemUICoordinator {
         // Spreadsheet-style metadata panel (dev/debug tool)
         this.initializeGameLibraryListPanel()
 
+        // User prop folder panel (see docs/features/user-prop-folder.md)
+        this.initializeScenePropsPanel()
+
         this.renderLoopRegistry.register(this.constructor.name, this.updatePerformanceStats.bind(this))
     }
 
@@ -169,6 +174,13 @@ export class SystemUICoordinator {
         if (!this.gameLibraryListPanel) {
             this.gameLibraryListPanel = new GameLibraryListPanel()
             this.gameLibraryListPanel.init()
+        }
+    }
+
+    private initializeScenePropsPanel(): void {
+        if (!this.scenePropsPanel) {
+            this.scenePropsPanel = new ScenePropsPanel()
+            this.scenePropsPanel.init()
         }
     }
 
