@@ -1,37 +1,57 @@
 import * as THREE from 'three'
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js'
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import {
+    EffectComposer,
+    EffectPass,
+    NormalPass,
+    RenderPass,
+    SSAOEffect,
+    ToneMappingEffect,
+    ToneMappingMode
+} from 'postprocessing'
 import { AppSettings } from '../core/AppSettings'
 
 /**
  * Owns the rendering pipeline from base scene render through all post-processing passes.
  * SceneManager delegates its non-XR render call here.
  *
- * Pass order: RenderPass → SSAOPass → OutputPass
- * OutputPass applies the renderer's toneMapping and outputColorSpace to the final frame —
- * required when using EffectComposer with AgX or any non-linear tone mapping.
+ * Pass order: RenderPass → NormalPass → EffectPass(SSAO) → EffectPass(ToneMapping)
+ *
+ * renderer.toneMapping is NoToneMapping so geometry renders into the HDR buffer without
+ * pre-baked tone mapping. ToneMappingEffect(AGX) applies AgX as the final step.
+ * renderer.toneMappingExposure still works — AgXToneMapping() in the effect shader reads
+ * the Three.js toneMappingExposure uniform directly.
+ *
+ * SSAO and tone mapping are in separate EffectPasses so SSAO can be toggled independently.
+ * NormalPass renders view-space normals into its own texture; SSAOEffect reads that texture.
  */
 export class RenderPipelineManager {
     private readonly composer: EffectComposer
-    private readonly ssaoPass: SSAOPass
+    private readonly ssaoPass: EffectPass
 
     constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
-        // HalfFloatType preserves HDR values through the pass chain before OutputPass tone-maps them.
-        const renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
-            type: THREE.HalfFloatType,
+        this.composer = new EffectComposer(renderer, {
+            frameBufferType: THREE.HalfFloatType
         })
-        this.composer = new EffectComposer(renderer, renderTarget)
+
         this.composer.addPass(new RenderPass(scene, camera))
 
-        // three/examples/jsm SSAOPass produces blurry offset artifacts at this scene scale.
-        // This implementation is intentionally replaced by pmndrs/postprocessing SSAOEffect.
-        this.ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight)
-        this.ssaoPass.enabled = AppSettings.get('ssaoEnabled')
+        const normalPass = new NormalPass(scene, camera)
+        this.composer.addPass(normalPass)
+
+        const ssaoEffect = new SSAOEffect(camera, normalPass.texture, {
+            samples: 16,
+            rings: 7,
+            radius: 0.1825,
+            bias: 0.025,
+            intensity: 1.0,
+            luminanceInfluence: 0.7,
+        })
+
+        this.ssaoPass = new EffectPass(camera, ssaoEffect)
+        this.ssaoPass.enabled = AppSettings.get('ssaoEnabled') as boolean
         this.composer.addPass(this.ssaoPass)
 
-        this.composer.addPass(new OutputPass())
+        this.composer.addPass(new EffectPass(camera, new ToneMappingEffect({ mode: ToneMappingMode.AGX })))
     }
 
     setSsaoEnabled(enabled: boolean): void {
@@ -44,11 +64,9 @@ export class RenderPipelineManager {
 
     setSize(width: number, height: number): void {
         this.composer.setSize(width, height)
-        this.ssaoPass.setSize(width, height)
     }
 
     dispose(): void {
-        this.ssaoPass.dispose()
         this.composer.dispose()
     }
 }

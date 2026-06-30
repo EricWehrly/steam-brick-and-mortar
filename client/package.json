@@ -41,6 +41,7 @@
     "vitest": "^4.1.2"
   },
   "dependencies": {
+    "postprocessing": "^6.39.1",
     "three": "^0.183.2"
   },
   "engines": {

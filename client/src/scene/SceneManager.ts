@@ -112,7 +112,9 @@ export class SceneManager {
         this.renderer.setSize(window.innerWidth, window.innerHeight)
         this.renderer.setPixelRatio(window.devicePixelRatio)
         this.renderer.outputColorSpace = options.outputColorSpace ?? THREE.SRGBColorSpace
-        this.renderer.toneMapping = THREE.AgXToneMapping    // generally considered the most physically accurate tone mapping for PBR
+        // NoToneMapping: RenderPipelineManager owns tone mapping via ToneMappingEffect(AGX).
+        // toneMappingExposure still works — AgXToneMapping() in the effect shader reads the uniform.
+        this.renderer.toneMapping = THREE.NoToneMapping
         this.renderer.toneMappingExposure = AppSettings.get('toneMappingExposure')
 
         // Enable WebXR
@@ -134,6 +136,9 @@ export class SceneManager {
     }
 
     private setupEventListeners() {
+        this.renderer.xr.addEventListener('sessionstart', this.onXrSessionStart.bind(this))
+        this.renderer.xr.addEventListener('sessionend', this.onXrSessionEnd.bind(this))
+
         window.addEventListener('resize', () => {
             this.camera.aspect = window.innerWidth / window.innerHeight
             this.camera.updateProjectionMatrix()
@@ -145,6 +150,14 @@ export class SceneManager {
             AppSettingsEventTypes.Changed,
             this.onSettingChanged.bind(this)
         )
+    }
+
+    private onXrSessionStart(): void {
+        this.renderer.toneMapping = THREE.AgXToneMapping
+    }
+
+    private onXrSessionEnd(): void {
+        this.renderer.toneMapping = THREE.NoToneMapping
     }
 
     private onSettingChanged(event: CustomEvent<SettingChangedEvent>): void {
@@ -178,7 +191,6 @@ export class SceneManager {
 
             // XR takes over projection entirely; post-processing pipeline bypassed in XR.
             if (this.renderer.xr.isPresenting) {
-                console.warn('Skipping render pipeline (post-processing) for XR. We did not test this.')
                 this.renderer.render(this.scene, this.camera)
             } else {
                 this.renderPipelineManager.render()
