@@ -1,0 +1,67 @@
+{
+  "game": "portal2",
+  "_search_hint": "python desktop/scripts/source-extract/vpk.py search portal2 <term> --ext .mdl",
+  "assets": [
+    {
+      "name": "companion_cube",
+      "mdl": "models/props/metal_box.mdl",
+      "materials_dirs": ["materials/models/props/"],
+      "output": "companion_cube.glb",
+      "status": "converted"
+    },
+    {
+      "name": "sentry_turret",
+      "mdl": "models/npcs/turret/turret.mdl",
+      "materials_dirs": ["materials/models/npcs/turret/"],
+      "output": "sentry_turret.glb",
+      "status": "converted"
+    },
+    {
+      "name": "weighted_sphere",
+      "mdl": "models/props/sphere.mdl",
+      "materials_dirs": ["materials/models/props/"],
+      "output": "weighted_sphere.glb",
+      "status": "excluded",
+      "notes": "Not needed in the store scene"
+    },
+    {
+      "name": "wheatley",
+      "mdl": "models/npcs/personality_sphere/personality_sphere.mdl",
+      "materials_dirs": ["materials/models/npcs/personality_sphere/"],
+      "output": "wheatley.glb",
+      "status": "converted"
+    },
+    {
+      "name": "glados",
+      "mdl": "models/npcs/glados/glados_animation.mdl",
+      "materials_dirs": ["materials/models/npcs/glados/"],
+      "output": "glados.glb",
+      "status": "converted",
+      "notes": "Full body+animation rig, 1.87 MB MDL → 6.4 MB GLB"
+    },
+    {
+      "name": "atlas",
+      "mdl": "models/player/ballbot/ballbot.mdl",
+      "materials_dirs": ["materials/models/player/ballbot/"],
+      "output": "atlas.glb",
+      "status": "converted",
+      "notes": "Blue co-op sphere robot"
+    },
+    {
+      "name": "pbody",
+      "mdl": "models/player/eggbot/eggbot.mdl",
+      "materials_dirs": ["materials/models/player/eggbot/"],
+      "output": "pbody.glb",
+      "status": "converted",
+      "notes": "Orange co-op egg robot"
+    },
+    {
+      "name": "chell",
+      "mdl": "models/player/chell/player.mdl",
+      "materials_dirs": ["materials/models/player/chell/"],
+      "output": "chell.glb",
+      "status": "converted",
+      "notes": "32 MB GLB — high-res character textures"
+    }
+  ]
+}
