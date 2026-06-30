@@ -41,6 +41,10 @@
 - [Game Detail Screen](../features/game-detail-screen.md) — design pass tied to VR; do once with VR in mind rather than twice
 - [Room Variants](../features/room-variants.md) — room structure cleanup first, then variant system; Cozy Basement is the target variant
 - [Lighting and Atmosphere](../features/lighting-and-atmosphere.md) — tone presets (corporate → dank), dongle switch panel; core lighting is done, this is the experiential layer
+- [Scene Clutter & Props (harvested)](../features/scene-clutter-and-props.md) — recognizable/ambient set dressing *sourced* from Steam art, CC0, and (personal-mode) extracted/fan/AI models; Tiers A/B ship in current arch, Tiers C/D are desktop-gated
+- [Fabricated Set Dressing](../features/fabricated-set-dressing.md) — concessions, employee counter + 90s PCs, coming-attractions board, peripheral cutouts; built procedurally like shelves/boxes, no IP risk; targeted for **late Act 2**
+- [Interactable Scene Objects](../features/interactable-objects.md) — generic prop interaction dispatch; layer infrastructure exists, dispatch gap is the work; prerequisite for any non-game-box clickable
+- [Friend Stream Projection](../features/friend-stream-projection.md) — Tier 1 only (Act 2): `getDisplayMedia` → `VideoTexture` on an in-scene TV; user picks any window (Twitch tab, OBS, friend's stream, anything); proves the rendering pipeline; requires Interactable Objects first for the button
 - [Procedural Texture Quality Pass](../features/procedural-texture-quality.md) — MDF veneer, popcorn ceiling, wood plank walls, carpet; carried from Act 1
 - [UI Standardization](../features/ui-standardization.md) — in-scene omnibar, 3D sign elements, component tokens (started in intermission, may extend into Act 2)
 - [Game Box Construction Chain](../features/game-box-construction-chain.md) — typed dependency chain replacing ad-hoc monolithic rebuilds in `LodGameArtworkRenderer`; each pipeline stage is an event with declared prerequisites; enables re-entry at any stage, clean failure signaling, and future taps (LOD streaming, preloading, perf logging); WIP plan, not yet started
