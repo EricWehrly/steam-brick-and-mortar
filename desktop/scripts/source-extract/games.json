@@ -1,0 +1,19 @@
+{
+  "portal2": {
+    "name": "Portal 2",
+    "vpk_windows": [
+      "C:/Program Files (x86)/Steam/steamapps/common/Portal 2/portal2/pak01_dir.vpk",
+      "D:/Steam/steamapps/common/Portal 2/portal2/pak01_dir.vpk",
+      "D:/SteamLibrary/steamapps/common/Portal 2/portal2/pak01_dir.vpk",
+      "C:/SteamLibrary/steamapps/common/Portal 2/portal2/pak01_dir.vpk"
+    ],
+    "vpk_linux": [
+      "~/.steam/steam/steamapps/common/Portal 2/portal2/pak01_dir.vpk",
+      "~/.local/share/Steam/steamapps/common/Portal 2/portal2/pak01_dir.vpk"
+    ],
+    "vpk_macos": [
+      "~/Library/Application Support/Steam/steamapps/common/Portal 2/portal2/pak01_dir.vpk"
+    ],
+    "_note": "Linux and macOS paths are unverified Steam defaults — confirm when testing on those platforms"
+  }
+}
