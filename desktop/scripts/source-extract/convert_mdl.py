@@ -21,7 +21,6 @@ Volume layout (project root mounted at /app):
     /app/desktop/extracted/            VPK extraction output (model + material files)
     /app/desktop/output/               converted .glb files land here
 """
-import math
 import os
 import sys
 import json
@@ -36,6 +35,10 @@ SOURCEIO_DIR  = '/app/blender/addons/SourceIO'
 
 
 def ensure_sourceio():
+    # Auto-extracts from the committed zip on first use — no manual setup step.
+    # A future desktop app will invoke this pipeline headlessly (run.sh, fire-and-forget);
+    # sys.exit() here gives a clean stderr message + nonzero exit for it to detect,
+    # rather than requiring an interactive prompt or a pre-flight setup script.
     if os.path.exists(SOURCEIO_DIR):
         return
     if not os.path.exists(SOURCEIO_ZIP):
@@ -70,13 +73,23 @@ def import_mdl(mdl_path):
     mdl_dir = os.path.dirname(mdl_path) + '/'
     mdl_name = os.path.basename(mdl_path)
     # Must pass directory + files — self.files is empty without Blender's file browser
-    result = bpy.ops.sourceio.mdl(
+    base_kwargs = dict(
         filepath=mdl_path,
         directory=mdl_dir,
         files=[{'name': mdl_name}],
         discover_resources=True,
     )
-    print(f"  import: {result}")
+    try:
+        result = bpy.ops.sourceio.mdl(**base_kwargs, import_animations=True)
+        print(f"  import (with animations): {result}")
+    except (TypeError, RuntimeError) as e:
+        # TypeError  → import_animations not supported in this SourceIO version
+        # RuntimeError → SourceIO animation import bug (e.g. off-by-one in keyframes)
+        print(f"  animation import failed ({type(e).__name__}), retrying without")
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        enable_sourceio()
+        result = bpy.ops.sourceio.mdl(**base_kwargs)
+        print(f"  import (no animations): {result}")
 
     objects = list(bpy.data.objects)
     if not objects:
@@ -96,16 +109,6 @@ def import_mdl(mdl_path):
     return True
 
 
-def apply_upright_rotation():
-    # Source Engine uses Z-up; SourceIO preserves that, but GLTF is Y-up.
-    # Blender's GLTF exporter handles the Z→Y conversion, but the import
-    # orientation leaves models lying on their back in Three.js. Rotating
-    # root objects +90° on X here bakes the correction into the GLB.
-    for obj in bpy.data.objects:
-        if obj.parent is None:
-            obj.rotation_euler[0] += math.radians(90)
-
-
 def export_glb(output_path):
     os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else OUTPUT_DIR, exist_ok=True)
     print(f"Exporting: {output_path}")
@@ -115,7 +118,6 @@ def export_glb(output_path):
         export_apply=True,
         use_selection=False,
         export_animations=True,
-        export_anim_mode='ACTIONS',
     )
     print(f"  export: {result}")
     if not os.path.exists(output_path):
@@ -132,7 +134,6 @@ def convert_one(mdl_rel, output_name):
     enable_sourceio()
     if not import_mdl(mdl_path):
         return False
-    apply_upright_rotation()
     return export_glb(output_path)
 
 
@@ -145,6 +146,9 @@ def parse_args():
     while i < len(argv):
         if argv[i] in ('--mdl', '--manifest') and i + 1 < len(argv):
             args[argv[i].lstrip('-')] = argv[i + 1]
+            i += 2
+        elif argv[i] == '--models' and i + 1 < len(argv):
+            args['models'] = set(argv[i + 1].split(','))
             i += 2
         else:
             i += 1
@@ -159,22 +163,29 @@ def main():
         with open(args['manifest']) as f:
             manifest = json.load(f)
 
+        models_filter = args.get('models')
         ok, fail, skip = [], [], []
         for asset in manifest['assets']:
-            status = asset.get('status', 'pending')
-            if status not in ('pending', 'extracted', None):
-                skip.append(asset['name'])
-                print(f"skip [{status}]: {asset['name']}")
-                continue
+            name = asset['name']
+            if models_filter:
+                if name not in models_filter:
+                    continue
+                # When targeting by name, bypass status — caller wants a re-convert
+            else:
+                status = asset.get('status', 'pending')
+                if status not in ('pending', 'extracted', None):
+                    skip.append(name)
+                    print(f"skip [{status}]: {name}")
+                    continue
             if not asset.get('mdl'):
-                skip.append(asset['name'])
+                skip.append(name)
                 continue
 
-            print(f"\n{'='*60}\nConverting: {asset['name']}")
+            print(f"\n{'='*60}\nConverting: {name}")
             if convert_one(asset['mdl'], asset['output']):
-                ok.append(asset['name'])
+                ok.append(name)
             else:
-                fail.append(asset['name'])
+                fail.append(name)
 
         print(f"\n{'='*60}")
         print(f"ok={ok}")

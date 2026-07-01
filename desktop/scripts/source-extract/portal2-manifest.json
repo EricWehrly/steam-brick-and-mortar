@@ -42,18 +42,18 @@
     {
       "name": "atlas",
       "mdl": "models/player/ballbot/ballbot.mdl",
-      "materials_dirs": ["materials/models/player/ballbot/"],
+      "materials_dirs": ["materials/models/player/coop_bots/"],
       "output": "atlas.glb",
       "status": "converted",
-      "notes": "Blue co-op sphere robot"
+      "notes": "Blue co-op sphere robot. materials/models/player/ballbot/ does not exist in the VPK — VMTs/VTFs for both bots live under coop_bots/"
     },
     {
       "name": "pbody",
       "mdl": "models/player/eggbot/eggbot.mdl",
-      "materials_dirs": ["materials/models/player/eggbot/"],
+      "materials_dirs": ["materials/models/player/coop_bots/", "materials/models/player/eggbot/"],
       "output": "pbody.glb",
       "status": "converted",
-      "notes": "Orange co-op egg robot"
+      "notes": "Orange co-op egg robot. Most textures are shared in coop_bots/; eggbot/ has a few model-specific variants"
     },
     {
       "name": "chell",

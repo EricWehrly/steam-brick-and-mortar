@@ -49,6 +49,15 @@ of the base implementation below.
   host the models. Document this in the UI.
 - No placement intelligence yet — initial version drops models at hardcoded anchor positions;
   a real placement system is tracked under [Scene Clutter & Props](scene-clutter-and-props.md).
+- **No animation for Source 1 character models**: SourceIO does not implement Source 1
+  animation import (its own `wiki/MDL_IMPORT.md` states "Load animations: Unimplemented!",
+  and the vendored copy's `TODO.md` still lists "Source1 animations support" unchecked as of
+  the latest release, 5.5.3). This is a feature gap in that upstream dependency, not something
+  we're building ourselves — models display in a static rest pose. Manual one-time posing
+  (hand-setting a few key bone rotations) is a cheap alternative worth trying since we do have
+  real bone hierarchies; true ragdoll physics or generic bipedal animation retargeting are not,
+  since Portal 2's co-op bots (Atlas/P-Body) use custom mechanical piston-leg rigs, not a
+  standard humanoid skeleton.
 
 ## Acceptance criteria
 

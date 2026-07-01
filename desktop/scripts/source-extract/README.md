@@ -4,48 +4,60 @@ Extracts and converts Source Engine (Source 1) models to GLB files for use in th
 
 ## Prerequisites
 
-- **vpkeditcli** — placed at `desktop/tools/vpkedit/vpkeditcli.exe` (unzipped from included vpkedit.zip).  
-  Tip: `python vpk.py list portal2` will tell you if it's missing and where to put it.
-- **Docker** — for the dockerized Blender conversion step.
-- **The game installed** — VPK paths are auto-detected from `games.json` for common Steam locations.
+- **Docker** — for the Blender conversion step.
+- **The game installed** — VPK paths are auto-detected from `games.json` for common Steam locations. `bash locate.sh <game>` confirms the path resolves.
 
-## Workflow
+Nothing to unzip by hand: `vpkedit.zip` (→ `desktop/tools/vpkedit/`) and `SourceIO.zip` (→
+`blender/addons/SourceIO/`) are both committed to the repo and auto-extract on first use —
+`vpk.py`'s `require_cli()` and `convert_mdl.py`'s `ensure_sourceio()` each check whether the
+extracted directory exists and unzip if not. This is intentional: the eventual goal is a desktop
+app that shells out to `run.sh` and treats it as fire-and-forget — either the pipeline succeeds
+and the scene gets new props, or it fails with a clear message in the log and the exit code, with
+no manual setup step in between to forget.
 
-### 1. (One-time) Build the file list cache
+## Quick start
 
-```bash
-python desktop/scripts/source-extract/vpk.py list portal2
-```
-
-Dumps all 29,000+ paths from the VPK into `desktop/extracted/.vpk-list-portal2.txt`. Takes ~30s. Cached indefinitely — use `--force` to rebuild.
-
-### 2. (One-time) Extract model and material files
+Run the full pipeline from the project root:
 
 ```bash
-python desktop/scripts/source-extract/vpk.py extract portal2
+# All pending assets:
+bash desktop/scripts/source-extract/run.sh
+
+# Specific models only (bypasses status, re-converts even if already done):
+bash desktop/scripts/source-extract/run.sh --models sentry_turret,wheatley
+
+# Re-convert without re-extracting (files already in desktop/extracted/):
+bash desktop/scripts/source-extract/run.sh --skip-extract --models companion_cube
+
+# Extract only, skip Blender:
+bash desktop/scripts/source-extract/run.sh --skip-convert
+
+# Dry run (shows what extract would do, no files written):
+bash desktop/scripts/source-extract/run.sh --dry-run
 ```
 
-Reads `portal2-manifest.json` and extracts each asset's `.mdl`, `.vvd`, `.vtx`, `.dx90.vtx` files plus its `materials_dirs` into `desktop/extracted/`. Skips assets with status `converted` or `excluded`.
+Output is logged to `desktop/logs/pipeline-TIMESTAMP.log`.
 
-### 3. Convert to GLB
+## Component scripts
 
-From the **project root** (not inside client/):
+| Script | Purpose |
+|--------|---------|
+| `run.sh` | **Entry point** — runs extract then convert, writes log file |
+| `extract.sh` | Extract model + material files from VPK into `desktop/extracted/` |
+| `convert.sh` | Convert extracted MDLs to GLB via Docker/Blender |
+| `locate.sh` | Print the detected VPK path for a game (diagnostic) |
+| `manifest.sh` | Show manifest asset status table |
 
-```bash
-# Batch — converts all 'pending'/'extracted' assets in the manifest:
-MSYS_NO_PATHCONV=1 bash desktop/scripts/source-extract/run_convert.sh \
-    --manifest /app/desktop/scripts/source-extract/portal2-manifest.json
+All scripts accept `--game portal2` (default) and `--models name1,name2`.
 
-# Single model (useful for testing a new path):
-MSYS_NO_PATHCONV=1 bash desktop/scripts/source-extract/run_convert.sh \
-    --mdl models/player/ballbot/ballbot.mdl
-```
+## Python utilities
 
-Output lands in `desktop/output/`.
-
-### 4. Load in-scene
-
-Copy GLBs to wherever ScenePropsPanel is configured to read from. The app loads them via File System Access API.
+| Script | Purpose |
+|--------|---------|
+| `vpk.py` | CLI: `list`, `search`, `extract`, `locate`, `manifest` subcommands |
+| `convert_mdl.py` | Blender Python script: MDL → GLB via SourceIO |
+| `games.json` | VPK locations per game and platform |
+| `portal2-manifest.json` | Asset list: model paths, material dirs, output names, status |
 
 ## Searching for models
 
@@ -53,19 +65,12 @@ Copy GLBs to wherever ScenePropsPanel is configured to read from. The app loads 
 # Find MDL files matching a term:
 python desktop/scripts/source-extract/vpk.py search portal2 turret --ext .mdl
 
-# Find materials for a model:
+# Find VTF textures for a model:
 python desktop/scripts/source-extract/vpk.py search portal2 ballbot --ext .vtf
+
+# Show all assets and their status:
+bash desktop/scripts/source-extract/manifest.sh
 ```
-
-## Files
-
-| File | Purpose |
-|------|---------|
-| `vpk.py` | CLI: `list`, `search`, `extract` subcommands |
-| `games.json` | VPK locations per game / platform |
-| `portal2-manifest.json` | Asset list for Portal 2: model paths, material dirs, output names, status |
-| `convert_mdl.py` | Blender Python script: MDL → GLB via SourceIO |
-| `run_convert.sh` | Docker wrapper around `convert_mdl.py` |
 
 ## Asset statuses (manifest)
 
@@ -73,17 +78,111 @@ python desktop/scripts/source-extract/vpk.py search portal2 ballbot --ext .vtf
 |--------|---------|
 | `pending` | Not yet extracted or converted |
 | `extracted` | Files in `desktop/extracted/`, ready to convert |
-| `converted` | GLB produced; skip on re-run |
-| `excluded` | Not wanted in the scene; skip permanently |
+| `converted` | GLB produced in `desktop/output/` |
+| `excluded` | Not wanted in the scene; skipped permanently |
 | `path_unknown` | VPK path not found; needs research |
 
-## Extending to a new game
+Targeting with `--models` bypasses status — useful for re-converting an already-`converted` asset after a Blender script change.
 
-1. Add VPK paths to `games.json`
-2. Create `<game>-manifest.json` (copy `portal2-manifest.json` as a template)
-3. Use `vpk.py search <game> <term>` to find model paths
-4. Update `materials_dirs` — model VMTs reference textures relative to the game root
+## Smart extract skip
+
+When running without `--force-extract`, the extract step automatically skips assets whose MDL + companion files already exist in `desktop/extracted/`. This avoids the ~30s VPK scan on repeated runs. Use `--force-extract` to override.
+
+## Adding a new game
+
+This section is written to be followed cold — by a human or an LLM — on a fresh machine, without
+re-deriving anything from scratch.
+
+### 1. Find the VPK file
+
+Source 1 games ship their models/materials inside one or more `.vpk` archives in the game's
+install folder. **The filename is not the same across games** — this is the #1 thing that trips
+people up. Known examples:
+
+| Game | VPK path (relative to Steam library) |
+|------|---------------------------------------|
+| Portal 2 | `steamapps/common/Portal 2/portal2/pak01_dir.vpk` |
+| Team Fortress 2 | `steamapps/common/Team Fortress 2/tf/tf2_misc_dir.vpk` |
+
+If adding a game not listed above: open the game's install folder and look for `*_dir.vpk`
+files (there may be several — sound, misc, textures, etc., split apart). Pick the one that
+actually contains `models/` and `materials/` paths. You can check any candidate directly:
+
+```bash
+python -c "
+import sys; sys.path.insert(0, 'desktop/scripts/source-extract')
+from vpk import vpk_file_tree, parse_vpk_tree
+paths = parse_vpk_tree(vpk_file_tree('C:/path/to/candidate_dir.vpk'))
+print(sum(1 for p in paths if p.startswith('models/')), 'model files')
+"
+```
+
+A VPK with 0 model files is the wrong one — keep looking at the other `*_dir.vpk` files in that
+folder.
+
+### 2. Register the game in `games.json`
+
+Add an entry keyed by a short game id (e.g. `tf2`) with candidate absolute paths per platform —
+list every Steam library location you might plausibly have (C:, D:, SteamLibrary folders, etc.),
+since `get_vpk_path()` just walks the list and returns the first one that exists on disk:
+
+```json
+"tf2": {
+  "name": "Team Fortress 2",
+  "vpk_windows": [
+    "C:/Program Files (x86)/Steam/steamapps/common/Team Fortress 2/tf/tf2_misc_dir.vpk",
+    "D:/SteamLibrary/steamapps/common/Team Fortress 2/tf/tf2_misc_dir.vpk"
+  ],
+  "vpk_linux": ["~/.steam/steam/steamapps/common/Team Fortress 2/tf/tf2_misc_dir.vpk"],
+  "vpk_macos": ["~/Library/Application Support/Steam/steamapps/common/Team Fortress 2/tf/tf2_misc_dir.vpk"]
+}
+```
+
+Verify it resolves:
+
+```bash
+bash desktop/scripts/source-extract/locate.sh tf2
+```
+
+If this prints "VPK not found," the game isn't installed at any listed path, or the path/filename
+is wrong — fix before continuing.
+
+### 3. Build the file list cache and search for models
+
+```bash
+python desktop/scripts/source-extract/vpk.py list tf2
+python desktop/scripts/source-extract/vpk.py search tf2 <term> --ext .mdl
+```
+
+### 4. Find the right `materials_dirs` — don't assume, verify
+
+**Important gotcha** (hit this exact issue with Portal 2's co-op bots): the materials folder for
+a model is *not always* a simple mirror of its `models/` path. E.g. `models/player/ballbot/ballbot.mdl`'s
+actual textures live in `materials/models/player/coop_bots/`, not `materials/models/player/ballbot/`
+(which doesn't exist at all in that VPK). Always confirm by searching for the actual `.vmt`/`.vtf`
+files rather than guessing from the model path:
+
+```bash
+python desktop/scripts/source-extract/vpk.py search tf2 <model-keyword> --ext .vtf
+python desktop/scripts/source-extract/vpk.py search tf2 <model-keyword> --ext .vmt
+```
+
+Use whatever directory the results actually live in.
+
+### 5. Create the manifest
+
+Copy `portal2-manifest.json` as a template → `tf2-manifest.json`. Each asset needs `name`, `mdl`
+(verified path), `materials_dirs` (verified per step 4), `output` (filename), `status: "pending"`.
+
+### 6. Run it
+
+```bash
+bash desktop/scripts/source-extract/run.sh --game tf2
+```
+
+Everything downstream (`extract.sh`, `convert.sh`) already takes `--game <id>` and resolves
+`games.json` / `<id>-manifest.json` automatically — no script changes needed for a new game.
 
 ## Output / extracted directories
 
-Both `desktop/extracted/` and `desktop/output/` are gitignored — they're large and machine-local. The manifest and scripts are committed; the binary assets are not.
+`desktop/extracted/`, `desktop/output/`, and `desktop/logs/` are gitignored — large and machine-local. The manifest and scripts are committed; binary assets and logs are not.
