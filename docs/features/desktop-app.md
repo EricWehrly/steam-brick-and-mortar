@@ -2,7 +2,7 @@
 
 **Act**: TBD — under evaluation for **between Act 2 and Act 3** (no longer parked in Act 4)
 **Status**: Exploratory — umbrella doc for "should we become a desktop program?" A **Tauri spike is
-queued ("soon")** to de-risk the wrapper.
+in progress**: [`docs/plans/desktop-tauri-spike-plan.md`](../plans/desktop-tauri-spike-plan.md).
 **Priority**: Low now, high *leverage* if pursued
 
 ## Why this doc exists
@@ -94,12 +94,19 @@ on startup. It also means the extraction pipeline doesn't block scene use.
 
 <!-- TODO: Act 3 / desktop app — implement IPC signal (PropConverted) and wire AssetLoader.loadModel() to it in a new DesktopPropBridge class -->
 
-## Framework options (not a decision)
+## Framework options — Tauri spike underway
 
-- **Tauri** (Rust shell + system webview) — tiny binary, reuses our Vite/Three client almost as-is,
-  native side in Rust; best fit for "wrap the existing app + add native capabilities."
-- **Electron** — heavier (bundles Chromium), maximal API surface and ecosystem, simplest porting.
-- Either keeps the WebXR/Three.js client intact and adds a native capability bridge.
+Full vehicle comparison (Tauri vs. Electron vs. a Node-launcher vs. the Godot fallback),
+the WebXR/WebView2 sourcing, and the decisive kill-switch experiment now live in
+[`docs/plans/desktop-tauri-spike-plan.md`](../plans/desktop-tauri-spike-plan.md) — this
+section is intentionally short so it doesn't drift out of sync with that doc.
+
+Short version: **Tauri** (Rust shell + system webview) is the lead candidate — tiny
+binary (WebView2 ships with Windows; nothing Chromium-sized to bundle), reuses our
+Vite/Three client almost as-is, native side in Rust for filesystem/HID/process-spawn.
+The one open question is whether WebView2 can actually enter `immersive-vr`; that's
+what the spike is resolving. Scaffold lives in `desktop/tauri-app/` (alongside
+`desktop/source-extract/`).
 
 ## Cost / risk
 
