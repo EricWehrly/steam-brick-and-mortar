@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Full asset pipeline: extract from VPK, then convert to GLB.
-# Output is streamed to console and saved to desktop/logs/.
+# Output is streamed to console and saved to desktop/source-extract/logs/.
 #
 # Usage (from project root or here):
-#   bash desktop/scripts/source-extract/run.sh [options]
+#   bash desktop/source-extract/run.sh [options]
 #
 # Options:
 #   --game portal2              Game to process (default: portal2)
 #   --models sentry,wheatley    Comma-delimited manifest names to target
-#   --manifest-file portal2-manifest.json   Manifest filename (relative to source-extract/)
-#   --force-extract             Re-extract even if files already exist in desktop/extracted/
+#   --manifest-file portal2-manifest.json   Manifest filename (relative to scripts/)
+#   --force-extract             Re-extract even if files already exist in extracted/
 #   --skip-extract              Skip VPK extraction (convert only — files must already exist)
 #   --skip-convert              Skip Blender conversion (extract only)
 #   --dry-run                   Show what would be extracted without doing it (extract step only)
@@ -23,8 +23,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-LOG_DIR="$PROJECT_ROOT/desktop/logs"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+LOG_DIR="$SCRIPT_DIR/logs"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 LOG_FILE="$LOG_DIR/pipeline-$TIMESTAMP.log"
 
@@ -53,7 +53,7 @@ run_pipeline() {
 
     if [[ "$SKIP_EXTRACT" == false ]]; then
         echo "--- Extract ---"
-        bash "$SCRIPT_DIR/extract.sh" "${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}"
+        bash "$SCRIPT_DIR/scripts/extract.sh" "${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}"
         echo
     else
         echo "--- Extract: skipped ---"
@@ -62,7 +62,7 @@ run_pipeline() {
 
     if [[ "$SKIP_CONVERT" == false ]]; then
         echo "--- Convert ---"
-        bash "$SCRIPT_DIR/convert.sh" "${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}"
+        bash "$SCRIPT_DIR/scripts/convert.sh" "${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}"
         echo
     else
         echo "--- Convert: skipped ---"

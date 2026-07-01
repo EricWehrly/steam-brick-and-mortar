@@ -3,12 +3,12 @@
 # Replaces the old run_convert.sh with --models support.
 #
 # Usage (from project root or here):
-#   bash desktop/scripts/source-extract/convert.sh [options]
+#   bash desktop/source-extract/scripts/convert.sh [options]
 #
 # Options:
 #   --game portal2              Game manifest to use (default: portal2)
 #   --models sentry,wheatley    Comma-delimited manifest names to target (bypasses status check)
-#   --manifest-file portal2-manifest.json   Override manifest filename (relative to source-extract/)
+#   --manifest-file portal2-manifest.json   Override manifest filename (relative to scripts/)
 
 set -euo pipefail
 
@@ -38,8 +38,8 @@ if [[ -z "$MANIFEST_FILE" ]]; then
     MANIFEST_FILE="${GAME}-manifest.json"
 fi
 
-MANIFEST_DOCKER="/app/desktop/scripts/source-extract/${MANIFEST_FILE}"
-SCRIPT_DOCKER="/app/desktop/scripts/source-extract/convert_mdl.py"
+MANIFEST_DOCKER="/app/desktop/source-extract/scripts/${MANIFEST_FILE}"
+SCRIPT_DOCKER="/app/desktop/source-extract/scripts/convert_mdl.py"
 
 MSYS_NO_PATHCONV=1 docker compose run --rm blender \
     blender --background \

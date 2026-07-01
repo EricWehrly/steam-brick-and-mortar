@@ -68,14 +68,14 @@ of the base implementation below.
 - [ ] All `.glb`/`.gltf` files in the folder load into the scene
 - [ ] Graceful skip on unreadable or unsupported files
 - [ ] Clear "personal mode" label in UI
-- [ ] Works end-to-end with a companion cube extracted by `desktop/convert_mdl.py`
+- [ ] Works end-to-end with a companion cube extracted by `desktop/source-extract/scripts/convert_mdl.py`
 
 ## Related
 
 - [Scene Clutter & Props](scene-clutter-and-props.md) — parent research; placement system
 - [Native Desktop App](desktop-app.md) — Firefox parity + zero-friction Steam path discovery
 - [Local File Investigation](local-file-investigation.md) — shares Program Files blocklist risk
-- `desktop/convert_mdl.py` — the extraction pipeline that produces the GLBs this feature loads
+- `desktop/source-extract/scripts/convert_mdl.py` — the extraction pipeline that produces the GLBs this feature loads
 
 ---
 *— A1 / O2*

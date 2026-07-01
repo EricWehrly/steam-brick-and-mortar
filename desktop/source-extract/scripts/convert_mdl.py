@@ -5,21 +5,21 @@ Usage (via Docker from project root):
 
   Single model (explicit path inside the container):
     MSYS_NO_PATHCONV=1 docker compose run --rm blender blender --background \\
-        --python /app/desktop/scripts/source-extract/convert_mdl.py -- --mdl models/props/turret_01.mdl
+        --python /app/desktop/source-extract/scripts/convert_mdl.py -- --mdl models/props/turret_01.mdl
 
   Batch from manifest:
     MSYS_NO_PATHCONV=1 docker compose run --rm blender blender --background \\
-        --python /app/desktop/scripts/source-extract/convert_mdl.py -- \\
-        --manifest /app/desktop/scripts/source-extract/portal2-manifest.json
+        --python /app/desktop/source-extract/scripts/convert_mdl.py -- \\
+        --manifest /app/desktop/source-extract/scripts/portal2-manifest.json
 
   Default (backwards compat — converts companion cube):
     MSYS_NO_PATHCONV=1 docker compose run --rm blender blender --background \\
-        --python /app/desktop/scripts/source-extract/convert_mdl.py
+        --python /app/desktop/source-extract/scripts/convert_mdl.py
 
 Volume layout (project root mounted at /app):
-    /app/blender/addons/SourceIO.zip   committed zip; auto-extracted on first run
-    /app/desktop/extracted/            VPK extraction output (model + material files)
-    /app/desktop/output/               converted .glb files land here
+    /app/blender/addons/SourceIO.zip           committed zip; auto-extracted on first run
+    /app/desktop/source-extract/extracted/     VPK extraction output (model + material files)
+    /app/desktop/source-extract/output/        converted .glb files land here
 """
 import os
 import sys
@@ -28,8 +28,8 @@ import zipfile
 
 import bpy
 
-EXTRACTED_DIR = '/app/desktop/extracted'
-OUTPUT_DIR    = '/app/desktop/output'
+EXTRACTED_DIR = '/app/desktop/source-extract/extracted'
+OUTPUT_DIR    = '/app/desktop/source-extract/output'
 SOURCEIO_ZIP  = '/app/blender/addons/SourceIO.zip'
 SOURCEIO_DIR  = '/app/blender/addons/SourceIO'
 

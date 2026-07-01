@@ -152,10 +152,10 @@ dist
 reference/
 
 # Extracted intermediary files, converted assets, and pipeline logs — personal-mode only, never commit
-desktop/extracted/
-desktop/output/
-desktop/logs/
-desktop/tools/vpkedit/
+desktop/source-extract/extracted/
+desktop/source-extract/output/
+desktop/source-extract/logs/
+desktop/source-extract/tools/vpkedit/
 client/public/test-props/
 
 # Python bytecode (SourceIO addon in blender/addons/)

@@ -13,4 +13,4 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 GAME="${1:-portal2}"
-python desktop/scripts/source-extract/vpk.py locate "$GAME"
+python desktop/source-extract/scripts/vpk.py locate "$GAME"
