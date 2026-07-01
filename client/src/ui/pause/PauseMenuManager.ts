@@ -75,6 +75,8 @@ export class PauseMenuManager {
     private tabGroups: Map<string, PauseMenuTabGroup> = new Map()
     private panelParentTabIds: Map<string, string> = new Map()
     private topLevelTabIds: string[] = []
+    private lastActivePanelId: string | null = null
+    private scrollPositionByPanelId: Map<string, number> = new Map()
     private overlay: HTMLElement | null = null
     private menuContainer: HTMLElement | null = null
     private cacheManagementPanel: CacheManagementPanel | null = null
@@ -217,8 +219,8 @@ export class PauseMenuManager {
             this.overlay.style.display = 'flex'
         }
 
-        // Show specific panel or first available
-        const targetPanel = panelId || this.getFirstPanelId()
+        // Show specific panel or fall back to the last one viewed this session, else first available
+        const targetPanel = panelId || this.lastActivePanelId || this.getFirstPanelId()
         if (targetPanel) {
             this.showPanel(targetPanel)
         }
@@ -231,7 +233,9 @@ export class PauseMenuManager {
         if (!this.state.isOpen) return
 
         this.state.isOpen = false
-        
+
+        this.captureActivePanelMemory()
+
         // Hide all panels
         this.hideAllPanels()
         
@@ -258,6 +262,7 @@ export class PauseMenuManager {
 
         // Hide current panel
         if (this.state.activePanel) {
+            this.captureActivePanelMemory()
             const currentPanel = this.panels.get(this.state.activePanel)
             currentPanel?.hide()
         }
@@ -267,10 +272,30 @@ export class PauseMenuManager {
         if (panel) {
             panel.show()
             this.state.activePanel = resolvedPanelId
+            this.lastActivePanelId = resolvedPanelId
             this.renderSubtabs(resolvedPanelId)
             this.updateActiveTab(resolvedPanelId)
             this.updateContentLayout(resolvedPanelId)
+            this.restoreScrollPosition(resolvedPanelId)
         }
+    }
+
+    private captureActivePanelMemory(): void {
+        if (!this.state.activePanel) return
+
+        this.lastActivePanelId = this.state.activePanel
+        const scrollTop = document.getElementById('pause-menu-content')?.scrollTop
+        if (scrollTop !== undefined) {
+            this.scrollPositionByPanelId.set(this.state.activePanel, scrollTop)
+        }
+    }
+
+    private restoreScrollPosition(panelId: string): void {
+        requestAnimationFrame(() => {
+            const content = document.getElementById('pause-menu-content')
+            if (!content) return
+            content.scrollTop = this.scrollPositionByPanelId.get(panelId) ?? 0
+        })
     }
 
     getState(): PauseMenuState {
