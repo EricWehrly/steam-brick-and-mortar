@@ -1,0 +1,28 @@
+{
+  "productName": "Steam Brick and Mortar",
+  "version": "0.1.0",
+  "identifier": "microslop.brickandmortar-games",
+  "build": {
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../../client/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Steam Brick and Mortar",
+        "width": 1440,
+        "height": 900,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": []
+  }
+}
