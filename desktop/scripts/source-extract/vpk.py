@@ -106,6 +106,10 @@ def parse_vpk_tree(tree_text):
 # ── VPK CLI wrapper ───────────────────────────────────────────────────────────
 
 def require_cli():
+    # Auto-extracts from the committed zip on first use — no manual setup step.
+    # A future desktop app will invoke this pipeline headlessly (run.sh, fire-and-forget);
+    # sys.exit() here gives a clean stderr message + nonzero exit for it to detect,
+    # rather than requiring an interactive prompt or a pre-flight setup script.
     if CLI_EXE.exists():
         return str(CLI_EXE)
     if not CLI_ZIP.exists():
@@ -239,16 +243,28 @@ def cmd_search(args):
     print(f"\n{len(results)} result(s)", file=sys.stderr)
 
 
+def is_extracted(asset):
+    if not asset.get('mdl'):
+        return False
+    mdl_base = re.sub(r'\.mdl$', '', asset['mdl'])
+    return all((EXTRACTED_DIR / f"{mdl_base}{ext}").exists() for ext in MODEL_EXTS_REQUIRED)
+
+
 def cmd_extract(args):
     positional = [a for a in args if not a.startswith('-')]
     game = positional[0] if positional else 'portal2'
     dry_run = '--dry-run' in args
+    force_extract = '--force-extract' in args
     manifest_path = None
+    models_filter = None
 
     i = 0
     while i < len(args):
         if args[i] == '--manifest' and i + 1 < len(args):
             manifest_path = args[i + 1]
+            i += 2
+        elif args[i] == '--models' and i + 1 < len(args):
+            models_filter = set(args[i + 1].split(','))
             i += 2
         else:
             i += 1
@@ -265,18 +281,29 @@ def cmd_extract(args):
     ok_count = skip_count = fail_count = 0
 
     for asset in manifest['assets']:
-        status = asset.get('status', 'pending')
-        if status in ('converted', 'excluded', 'path_unknown'):
-            print(f"skip [{status}]: {asset['name']}")
-            skip_count += 1
-            continue
+        name = asset['name']
+
+        if models_filter:
+            if name not in models_filter:
+                continue
+        else:
+            status = asset.get('status', 'pending')
+            if status in ('converted', 'excluded', 'path_unknown'):
+                print(f"skip [{status}]: {name}")
+                skip_count += 1
+                continue
 
         if not asset.get('mdl'):
-            print(f"skip [no mdl]: {asset['name']}")
+            print(f"skip [no mdl]: {name}")
             skip_count += 1
             continue
 
-        print(f"\n=== {asset['name']} ===")
+        if not force_extract and is_extracted(asset):
+            print(f"skip [exists]: {name}")
+            skip_count += 1
+            continue
+
+        print(f"\n=== {name} ===")
         mdl_base = re.sub(r'\.mdl$', '', asset['mdl'])
         asset_ok = True
 
@@ -315,7 +342,31 @@ def cmd_extract(args):
     print(f"\n{'[dry run] ' if dry_run else ''}Done — ok: {ok_count}  skip: {skip_count}  fail: {fail_count}")
 
 
-COMMANDS = {'list': cmd_list, 'search': cmd_search, 'extract': cmd_extract}
+def cmd_locate(args):
+    game = next((a for a in args if not a.startswith('-')), 'portal2')
+    print(get_vpk_path(game))
+
+
+def cmd_manifest(args):
+    game = next((a for a in args if not a.startswith('-')), 'portal2')
+    manifest_path = SCRIPT_DIR / f'{game}-manifest.json'
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+    print(f"{'NAME':<20}  {'STATUS':<12}  MDL PATH")
+    print('-' * 70)
+    for asset in manifest['assets']:
+        status = asset.get('status', 'pending')
+        mdl = asset.get('mdl', '—')
+        print(f"{asset['name']:<20}  {status:<12}  {mdl}")
+
+
+COMMANDS = {
+    'list': cmd_list,
+    'search': cmd_search,
+    'extract': cmd_extract,
+    'locate': cmd_locate,
+    'manifest': cmd_manifest,
+}
 
 if __name__ == '__main__':
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
