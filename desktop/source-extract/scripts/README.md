@@ -7,7 +7,7 @@ Extracts and converts Source Engine (Source 1) models to GLB files for use in th
 - **Docker** — for the Blender conversion step.
 - **The game installed** — VPK paths are auto-detected from `games.json` for common Steam locations. `bash locate.sh <game>` confirms the path resolves.
 
-Nothing to unzip by hand: `vpkedit.zip` (→ `desktop/tools/vpkedit/`) and `SourceIO.zip` (→
+Nothing to unzip by hand: `vpkedit.zip` (→ `desktop/source-extract/tools/vpkedit/`) and `SourceIO.zip` (→
 `blender/addons/SourceIO/`) are both committed to the repo and auto-extract on first use —
 `vpk.py`'s `require_cli()` and `convert_mdl.py`'s `ensure_sourceio()` each check whether the
 extracted directory exists and unzip if not. This is intentional: the eventual goal is a desktop
@@ -21,29 +21,29 @@ Run the full pipeline from the project root:
 
 ```bash
 # All pending assets:
-bash desktop/scripts/source-extract/run.sh
+bash desktop/source-extract/run.sh
 
 # Specific models only (bypasses status, re-converts even if already done):
-bash desktop/scripts/source-extract/run.sh --models sentry_turret,wheatley
+bash desktop/source-extract/run.sh --models sentry_turret,wheatley
 
-# Re-convert without re-extracting (files already in desktop/extracted/):
-bash desktop/scripts/source-extract/run.sh --skip-extract --models companion_cube
+# Re-convert without re-extracting (files already in desktop/source-extract/extracted/):
+bash desktop/source-extract/run.sh --skip-extract --models companion_cube
 
 # Extract only, skip Blender:
-bash desktop/scripts/source-extract/run.sh --skip-convert
+bash desktop/source-extract/run.sh --skip-convert
 
 # Dry run (shows what extract would do, no files written):
-bash desktop/scripts/source-extract/run.sh --dry-run
+bash desktop/source-extract/run.sh --dry-run
 ```
 
-Output is logged to `desktop/logs/pipeline-TIMESTAMP.log`.
+Output is logged to `desktop/source-extract/logs/pipeline-TIMESTAMP.log`.
 
 ## Component scripts
 
 | Script | Purpose |
 |--------|---------|
 | `run.sh` | **Entry point** — runs extract then convert, writes log file |
-| `extract.sh` | Extract model + material files from VPK into `desktop/extracted/` |
+| `extract.sh` | Extract model + material files from VPK into `desktop/source-extract/extracted/` |
 | `convert.sh` | Convert extracted MDLs to GLB via Docker/Blender |
 | `locate.sh` | Print the detected VPK path for a game (diagnostic) |
 | `manifest.sh` | Show manifest asset status table |
@@ -63,13 +63,13 @@ All scripts accept `--game portal2` (default) and `--models name1,name2`.
 
 ```bash
 # Find MDL files matching a term:
-python desktop/scripts/source-extract/vpk.py search portal2 turret --ext .mdl
+python desktop/source-extract/scripts/vpk.py search portal2 turret --ext .mdl
 
 # Find VTF textures for a model:
-python desktop/scripts/source-extract/vpk.py search portal2 ballbot --ext .vtf
+python desktop/source-extract/scripts/vpk.py search portal2 ballbot --ext .vtf
 
 # Show all assets and their status:
-bash desktop/scripts/source-extract/manifest.sh
+bash desktop/source-extract/scripts/manifest.sh
 ```
 
 ## Asset statuses (manifest)
@@ -77,8 +77,8 @@ bash desktop/scripts/source-extract/manifest.sh
 | Status | Meaning |
 |--------|---------|
 | `pending` | Not yet extracted or converted |
-| `extracted` | Files in `desktop/extracted/`, ready to convert |
-| `converted` | GLB produced in `desktop/output/` |
+| `extracted` | Files in `desktop/source-extract/extracted/`, ready to convert |
+| `converted` | GLB produced in `desktop/source-extract/output/` |
 | `excluded` | Not wanted in the scene; skipped permanently |
 | `path_unknown` | VPK path not found; needs research |
 
@@ -86,7 +86,7 @@ Targeting with `--models` bypasses status — useful for re-converting an alread
 
 ## Smart extract skip
 
-When running without `--force-extract`, the extract step automatically skips assets whose MDL + companion files already exist in `desktop/extracted/`. This avoids the ~30s VPK scan on repeated runs. Use `--force-extract` to override.
+When running without `--force-extract`, the extract step automatically skips assets whose MDL + companion files already exist in `desktop/source-extract/extracted/`. This avoids the ~30s VPK scan on repeated runs. Use `--force-extract` to override.
 
 ## Adding a new game
 
@@ -110,7 +110,7 @@ actually contains `models/` and `materials/` paths. You can check any candidate 
 
 ```bash
 python -c "
-import sys; sys.path.insert(0, 'desktop/scripts/source-extract')
+import sys; sys.path.insert(0, 'desktop/source-extract/scripts')
 from vpk import vpk_file_tree, parse_vpk_tree
 paths = parse_vpk_tree(vpk_file_tree('C:/path/to/candidate_dir.vpk'))
 print(sum(1 for p in paths if p.startswith('models/')), 'model files')
@@ -141,7 +141,7 @@ since `get_vpk_path()` just walks the list and returns the first one that exists
 Verify it resolves:
 
 ```bash
-bash desktop/scripts/source-extract/locate.sh tf2
+bash desktop/source-extract/scripts/locate.sh tf2
 ```
 
 If this prints "VPK not found," the game isn't installed at any listed path, or the path/filename
@@ -150,8 +150,8 @@ is wrong — fix before continuing.
 ### 3. Build the file list cache and search for models
 
 ```bash
-python desktop/scripts/source-extract/vpk.py list tf2
-python desktop/scripts/source-extract/vpk.py search tf2 <term> --ext .mdl
+python desktop/source-extract/scripts/vpk.py list tf2
+python desktop/source-extract/scripts/vpk.py search tf2 <term> --ext .mdl
 ```
 
 ### 4. Find the right `materials_dirs` — don't assume, verify
@@ -163,8 +163,8 @@ actual textures live in `materials/models/player/coop_bots/`, not `materials/mod
 files rather than guessing from the model path:
 
 ```bash
-python desktop/scripts/source-extract/vpk.py search tf2 <model-keyword> --ext .vtf
-python desktop/scripts/source-extract/vpk.py search tf2 <model-keyword> --ext .vmt
+python desktop/source-extract/scripts/vpk.py search tf2 <model-keyword> --ext .vtf
+python desktop/source-extract/scripts/vpk.py search tf2 <model-keyword> --ext .vmt
 ```
 
 Use whatever directory the results actually live in.
@@ -177,7 +177,7 @@ Copy `portal2-manifest.json` as a template → `tf2-manifest.json`. Each asset n
 ### 6. Run it
 
 ```bash
-bash desktop/scripts/source-extract/run.sh --game tf2
+bash desktop/source-extract/run.sh --game tf2
 ```
 
 Everything downstream (`extract.sh`, `convert.sh`) already takes `--game <id>` and resolves
@@ -185,4 +185,4 @@ Everything downstream (`extract.sh`, `convert.sh`) already takes `--game <id>` a
 
 ## Output / extracted directories
 
-`desktop/extracted/`, `desktop/output/`, and `desktop/logs/` are gitignored — large and machine-local. The manifest and scripts are committed; binary assets and logs are not.
+`desktop/source-extract/extracted/`, `desktop/source-extract/output/`, and `desktop/source-extract/logs/` are gitignored — large and machine-local. The manifest and scripts are committed; binary assets and logs are not.

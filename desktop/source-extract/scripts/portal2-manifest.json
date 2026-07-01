@@ -1,6 +1,6 @@
 {
   "game": "portal2",
-  "_search_hint": "python desktop/scripts/source-extract/vpk.py search portal2 <term> --ext .mdl",
+  "_search_hint": "python desktop/source-extract/scripts/vpk.py search portal2 <term> --ext .mdl",
   "assets": [
     {
       "name": "companion_cube",

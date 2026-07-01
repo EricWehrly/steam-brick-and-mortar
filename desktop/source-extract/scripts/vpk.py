@@ -15,14 +15,14 @@ Options for extract:
     --manifest <file>   Override default manifest path
     --dry-run           Print what would be extracted without running it
 
-Game configs: desktop/scripts/source-extract/games.json
-Cache: desktop/extracted/.vpk-list-<game>.txt  (gitignored)
+Game configs: desktop/source-extract/scripts/games.json
+Cache: desktop/source-extract/extracted/.vpk-list-<game>.txt  (gitignored)
 
 Usage examples (run from project root):
-    python desktop/scripts/source-extract/vpk.py list portal2
-    python desktop/scripts/source-extract/vpk.py search portal2 turret --ext .mdl
-    python desktop/scripts/source-extract/vpk.py extract portal2
-    python desktop/scripts/source-extract/vpk.py extract portal2 --dry-run
+    python desktop/source-extract/scripts/vpk.py list portal2
+    python desktop/source-extract/scripts/vpk.py search portal2 turret --ext .mdl
+    python desktop/source-extract/scripts/vpk.py extract portal2
+    python desktop/source-extract/scripts/vpk.py extract portal2 --dry-run
 """
 import re
 import sys
@@ -32,10 +32,10 @@ import subprocess
 import platform
 from pathlib import Path
 
-SCRIPT_DIR    = Path(__file__).parent
-DESKTOP_DIR   = SCRIPT_DIR.parent.parent
-TOOLS_DIR     = DESKTOP_DIR / 'tools'
-EXTRACTED_DIR = DESKTOP_DIR / 'extracted'
+SCRIPT_DIR         = Path(__file__).parent
+SOURCE_EXTRACT_ROOT = SCRIPT_DIR.parent
+TOOLS_DIR     = SOURCE_EXTRACT_ROOT / 'tools'
+EXTRACTED_DIR = SOURCE_EXTRACT_ROOT / 'extracted'
 GAMES_FILE    = SCRIPT_DIR / 'games.json'
 CLI_EXE       = TOOLS_DIR / 'vpkedit' / 'vpkeditcli.exe'
 CLI_ZIP       = TOOLS_DIR / 'vpkedit.zip'

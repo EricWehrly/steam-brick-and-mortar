@@ -3,7 +3,7 @@
 # Reads the manifest and skips already-extracted assets unless --force-extract is given.
 #
 # Usage (from project root or here):
-#   bash desktop/scripts/source-extract/extract.sh [options]
+#   bash desktop/source-extract/scripts/extract.sh [options]
 #
 # Options:
 #   --game portal2              Game to extract from (default: portal2)
@@ -31,4 +31,4 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-python desktop/scripts/source-extract/vpk.py extract "$GAME" "${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}"
+python desktop/source-extract/scripts/vpk.py extract "$GAME" "${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}"
