@@ -117,10 +117,14 @@ describe('RenderPipelineManager', () => {
         expect(capturedComposer!.render).toHaveBeenCalledOnce()
     })
 
-    it('resizes both composer and N8AOPostPass on setSize()', () => {
+    it('delegates setSize() to EffectComposer only (composer fans out to registered passes)', () => {
         pipeline.setSize(1280, 720)
         expect(capturedComposer!.setSize).toHaveBeenCalledWith(1280, 720)
-        expect(capturedN8aoPass!.setSize).toHaveBeenCalledWith(1280, 720)
+        // n8aoPass must NOT be resized directly here — EffectComposer.setSize() already
+        // resizes every pass in composer.passes using the drawing buffer size. A second,
+        // separate call using CSS-pixel dimensions would undersize N8AO's internal
+        // buffers whenever devicePixelRatio !== 1.
+        expect(capturedN8aoPass!.setSize).not.toHaveBeenCalled()
     })
 
     it('toggles N8AOPostPass.enabled when ssaoEnabled setting changes', () => {
