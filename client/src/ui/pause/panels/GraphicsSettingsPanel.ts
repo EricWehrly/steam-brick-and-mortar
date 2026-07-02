@@ -18,6 +18,7 @@ import type * as THREE from 'three'
 import { AppSettingsEventTypes, CeilingEventTypes } from '../../../types/InteractionEvents'
 import { LightingEventTypes, type CeilingToggleEvent, type LightingToggleEvent, type LightingDebugToggleEvent } from '../../../types/LightingEvents'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
+import { RangeControl, SelectControl } from '../../components/UIComponent'
 
 export class GraphicsSettingsPanel extends PauseMenuPanel {
     readonly id = 'graphics-settings'
@@ -89,60 +90,173 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
         const lodHighRatio = this.appSettings.getSetting('lodHighReductionRatio')
         const lodMedRatio = this.appSettings.getSetting('lodMedReductionRatio')
         const lodMaxHighSlots = this.appSettings.getSetting('lodMaxHighSlots')
-        
+        const qualityLevel = this.appSettings.getSetting('qualityLevel')
+        const lightingQuality = this.appSettings.getSetting('lightingQuality')
+        const smaaPreset = this.appSettings.getSetting('smaaPreset')
+        const shadowQuality = this.appSettings.getSetting('shadowQuality')
+        const pixelRatioScale = this.appSettings.getSetting('pixelRatioScale')
+
         return renderTemplate(graphicsSettingsPanelTemplate, {
-            // Renderer quality preset
-            qualityLow: this.appSettings.getSetting('qualityLevel') === 'low',
-            qualityMedium: this.appSettings.getSetting('qualityLevel') === 'medium',
-            qualityHigh: this.appSettings.getSetting('qualityLevel') === 'high',
-            qualityUltra: this.appSettings.getSetting('qualityLevel') === 'ultra',
             fullscreenEnabled: !!document.fullscreenElement,
             shadowMapEnabled: this.appSettings.getSetting('shadowMapEnabled'),
             ssaoEnabled: this.appSettings.getSetting('ssaoEnabled'),
-            smaaPresetLow: this.appSettings.getSetting('smaaPreset') === 'low',
-            smaaPresetMedium: this.appSettings.getSetting('smaaPreset') === 'medium',
-            smaaPresetHigh: this.appSettings.getSetting('smaaPreset') === 'high',
-            smaaPresetUltra: this.appSettings.getSetting('smaaPreset') === 'ultra',
-            pixelRatioScale: this.appSettings.getSetting('pixelRatioScale'),
-            pixelRatioScaleLabel: this.appSettings.getSetting('pixelRatioScale').toFixed(2),
-
-            // Lighting Quality
-            lightingQualitySimple: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.SIMPLE,
-            lightingQualityEnhanced: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.ENHANCED,
-            lightingQualityAdvanced: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.ADVANCED,
-            lightingQualityOuch: this.appSettings.getSetting('lightingQuality') === LIGHTING_QUALITY.OUCH_MY_EYES,
-            
-            // Shadow Settings
-            shadowQuality: this.appSettings.getSetting('shadowQuality'),
-            shadowQualityLabel: this.getShadowQualityLabel(this.appSettings.getSetting('shadowQuality')),
-            
-            // Ceiling Height
-            ceilingHeight: this.appSettings.getSetting('ceilingHeight'),
-
-            // Environment
-            environmentIntensity: this.appSettings.getSetting('environmentIntensity'),
-            environmentIntensityLabel: this.appSettings.getSetting('environmentIntensity').toFixed(2),
-            
-            // Debug & Testing
             enableLighting: this.appSettings.getSetting('enableLighting'),
             showLightingDebug: this.appSettings.getSetting('showLightingDebug'),
             showCeiling: this.appSettings.getSetting('showCeiling'),
-            
-            // LOD Settings - Distance thresholds
-            lodHighDistance: this.appSettings.getSetting('lodHighDistance'),
-            lodMedDistance: this.appSettings.getSetting('lodMedDistance'),
-            
-            // LOD Settings - VRAM management
-            lodMaxHighSlots: lodMaxHighSlots,
-            lodVramEstimate: this.calculateVramEstimate(lodMaxHighSlots, lodHighRatio),
-            
-            // LOD Settings - Texture quality ratios
-            lodHighReductionRatio: lodHighRatio,
-            lodHighRatioPercent: Math.round(lodHighRatio * 100),
-            lodHighDimensions: this.calculateDimensions(lodHighRatio),
-            lodMedReductionRatio: lodMedRatio,
-            lodMedRatioPercent: Math.round(lodMedRatio * 100),
-            lodMedDimensions: this.calculateDimensions(lodMedRatio)
+
+            qualityLevelControl: new SelectControl({
+                id: 'quality-level-select',
+                label: '⚙️ Renderer Quality Preset',
+                options: [
+                    { value: 'low', label: 'Low', selected: qualityLevel === 'low' },
+                    { value: 'medium', label: 'Medium', selected: qualityLevel === 'medium' },
+                    { value: 'high', label: 'High', selected: qualityLevel === 'high' },
+                    { value: 'ultra', label: 'Ultra', selected: qualityLevel === 'ultra' }
+                ]
+            }).render(),
+
+            pixelRatioControl: new RangeControl({
+                id: 'pixel-ratio-scale',
+                label: 'Pixel Ratio Scale',
+                hint: { text: 'experimental', kind: 'instant' },
+                min: 0.5,
+                max: 2.0,
+                step: 0.05,
+                value: pixelRatioScale,
+                formatDisplay: (v) => v.toFixed(2),
+                trackLabels: ['0.5', '2.0'],
+                valueId: 'pixel-ratio-value'
+            }).render(),
+
+            lightingQualityControl: new SelectControl({
+                id: 'lighting-quality',
+                label: '💡 Lighting Quality',
+                description: 'Higher quality provides better visuals but may impact performance. Changes apply immediately.',
+                options: [
+                    { value: LIGHTING_QUALITY.SIMPLE, label: 'Simple - Basic lighting only (higher ambient, fewer lights)', selected: lightingQuality === LIGHTING_QUALITY.SIMPLE },
+                    { value: LIGHTING_QUALITY.ENHANCED, label: 'Enhanced - Fluorescent fixtures + standard shadows', selected: lightingQuality === LIGHTING_QUALITY.ENHANCED },
+                    { value: LIGHTING_QUALITY.ADVANCED, label: 'Advanced - Point lights + soft shadows + enhanced quality', selected: lightingQuality === LIGHTING_QUALITY.ADVANCED },
+                    { value: LIGHTING_QUALITY.OUCH_MY_EYES, label: 'Ouch My Eyes - Dramatic spotlights + colored accents + ultra shadows', selected: lightingQuality === LIGHTING_QUALITY.OUCH_MY_EYES }
+                ]
+            }).render(),
+
+            shadowQualityControl: new RangeControl({
+                id: 'shadow-quality',
+                label: '🌓 Shadow Quality',
+                description: 'Higher shadow quality improves depth perception but requires more processing power. Set to "Off" to disable shadows entirely.',
+                hint: { text: '✨ instant', kind: 'instant' },
+                min: 0,
+                max: 4,
+                step: 1,
+                value: shadowQuality,
+                formatDisplay: (v) => this.getShadowQualityLabel(v),
+                trackLabels: ['Off', 'Low', 'Medium', 'High', 'Ultra']
+            }).render(),
+
+            smaaPresetControl: new SelectControl({
+                id: 'smaa-preset',
+                label: 'Anti-Aliasing (SMAA)',
+                hint: { text: '✨ instant', kind: 'instant' },
+                options: [
+                    { value: 'low', label: 'Low', selected: smaaPreset === 'low' },
+                    { value: 'medium', label: 'Medium', selected: smaaPreset === 'medium' },
+                    { value: 'high', label: 'High', selected: smaaPreset === 'high' },
+                    { value: 'ultra', label: 'Ultra', selected: smaaPreset === 'ultra' }
+                ]
+            }).render(),
+
+            ceilingHeightControl: new RangeControl({
+                id: 'ceiling-height',
+                label: '📏 Ceiling Height',
+                description: 'Adjust the store ceiling height for comfort and immersion. Changes require scene reload.',
+                hint: { text: '🔄 reload', kind: 'reload' },
+                requiresReload: true,
+                min: 2.5,
+                max: 5.0,
+                step: 0.1,
+                value: this.appSettings.getSetting('ceilingHeight'),
+                formatDisplay: (v) => `${v}m`,
+                trackLabels: ['2.5m', '5.0m']
+            }).render(),
+
+            environmentIntensityControl: new RangeControl({
+                id: 'environment-intensity',
+                label: '🌐 Environment Intensity',
+                description: 'IBL (image-based lighting) contribution from the room environment. Lower values let hand-authored lights dominate; higher values brighten specular reflections.',
+                hint: { text: '✨ instant', kind: 'instant' },
+                min: 0,
+                max: 2,
+                step: 0.05,
+                value: this.appSettings.getSetting('environmentIntensity'),
+                formatDisplay: (v) => v.toFixed(2),
+                trackLabels: ['0.0', '1.0', '2.0']
+            }).render(),
+
+            lodHighDistanceControl: new RangeControl({
+                id: 'lod-high-distance',
+                label: 'HIGH quality within',
+                min: 1,
+                max: 10,
+                step: 0.5,
+                value: this.appSettings.getSetting('lodHighDistance'),
+                formatDisplay: (v) => `${v}m`,
+                trackLabels: ['1m', '10m']
+            }).render(),
+
+            lodMedDistanceControl: new RangeControl({
+                id: 'lod-med-distance',
+                label: 'MED quality within',
+                min: 3,
+                max: 20,
+                step: 0.5,
+                value: this.appSettings.getSetting('lodMedDistance'),
+                formatDisplay: (v) => `${v}m`,
+                trackLabels: ['3m', '20m']
+            }).render(),
+
+            lodMaxHighSlotsControl: new RangeControl({
+                id: 'lod-max-high-slots',
+                label: 'Max HIGH texture slots',
+                labelExtra: `<span class="setting-hint" id="lod-vram-estimate">(~${this.calculateVramEstimate(lodMaxHighSlots, lodHighRatio)}MB VRAM)</span>`,
+                hint: { text: '🚧 disabled', kind: 'disabled' },
+                disabled: true,
+                requiresReload: true,
+                min: 32,
+                max: 512,
+                step: 32,
+                value: lodMaxHighSlots,
+                trackLabels: ['32 slots', '512 slots']
+            }).render(),
+
+            lodHighRatioControl: new RangeControl({
+                id: 'lod-high-ratio',
+                label: 'HIGH texture scale',
+                labelExtra: `<span class="setting-hint">(<span id="lod-high-dimensions">${this.calculateDimensions(lodHighRatio)}</span>)</span>`,
+                hint: { text: '🚧 disabled', kind: 'disabled' },
+                disabled: true,
+                requiresReload: true,
+                min: 0.25,
+                max: 1.0,
+                step: 0.05,
+                value: lodHighRatio,
+                formatDisplay: (v) => `${Math.round(v * 100)}%`,
+                trackLabels: ['25%', '100%']
+            }).render(),
+
+            lodMedRatioControl: new RangeControl({
+                id: 'lod-med-ratio',
+                label: 'MED texture scale',
+                labelExtra: `<span class="setting-hint">(<span id="lod-med-dimensions">${this.calculateDimensions(lodMedRatio)}</span>)</span>`,
+                hint: { text: '🚧 disabled', kind: 'disabled' },
+                disabled: true,
+                requiresReload: true,
+                min: 0.1,
+                max: 0.5,
+                step: 0.05,
+                value: lodMedRatio,
+                formatDisplay: (v) => `${Math.round(v * 100)}%`,
+                trackLabels: ['10%', '50%']
+            }).render()
         })
     }
 
@@ -431,38 +545,30 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             smaaPresetSelect.value = this.appSettings.getSetting('smaaPreset')
         }
 
-        const pixelRatioSlider = document.getElementById('pixel-ratio-scale') as HTMLInputElement
-        const pixelRatioValue = document.getElementById('pixel-ratio-value') as HTMLSpanElement
-        if (pixelRatioSlider && pixelRatioValue) {
-            const ratio = this.appSettings.getSetting('pixelRatioScale')
-            pixelRatioSlider.value = ratio.toString()
-            pixelRatioValue.textContent = ratio.toFixed(2)
-        }
+        UIComponentUtils.updateSliderValue(
+            document.body, 'pixel-ratio-scale', 'pixel-ratio-value',
+            this.appSettings.getSetting('pixelRatioScale'),
+            (v) => v.toFixed(2)
+        )
 
         // Update lighting quality select
         const lightingSelect = document.getElementById('lighting-quality') as HTMLSelectElement
         if (lightingSelect) {
             lightingSelect.value = this.appSettings.getSetting('lightingQuality')
         }
-        
-        // Update shadow quality slider
-        const shadowQualitySlider = document.getElementById('shadow-quality') as HTMLInputElement
-        const shadowQualityValue = document.getElementById('shadow-quality-value') as HTMLElement
-        if (shadowQualitySlider && shadowQualityValue) {
-            const quality = this.appSettings.getSetting('shadowQuality')
-            shadowQualitySlider.value = quality.toString()
-            shadowQualityValue.textContent = this.getShadowQualityLabel(quality)
-        }
-        
-        // Update ceiling height slider and display
-        const ceilingSlider = document.getElementById('ceiling-height') as HTMLInputElement
-        const ceilingValue = document.getElementById('ceiling-height-value') as HTMLSpanElement
-        if (ceilingSlider && ceilingValue) {
-            const height = this.appSettings.getSetting('ceilingHeight')
-            ceilingSlider.value = height.toString()
-            ceilingValue.textContent = `${height}m`
-        }
-        
+
+        UIComponentUtils.updateSliderValue(
+            document.body, 'shadow-quality', 'shadow-quality-value',
+            this.appSettings.getSetting('shadowQuality'),
+            (v) => this.getShadowQualityLabel(v)
+        )
+
+        UIComponentUtils.updateSliderValue(
+            document.body, 'ceiling-height', 'ceiling-height-value',
+            this.appSettings.getSetting('ceilingHeight'),
+            (v) => `${v}m`
+        )
+
         // Update lighting checkbox
         const lightingCheckbox = document.getElementById('enable-lighting') as HTMLInputElement
         if (lightingCheckbox) {
@@ -481,53 +587,41 @@ export class GraphicsSettingsPanel extends PauseMenuPanel {
             ceilingCheckbox.checked = this.appSettings.getSetting('showCeiling')
         }
         
-        // Update LOD high distance slider
-        const lodHighDistanceSlider = document.getElementById('lod-high-distance') as HTMLInputElement
-        const lodHighDistanceValue = document.getElementById('lod-high-distance-value') as HTMLSpanElement
-        if (lodHighDistanceSlider && lodHighDistanceValue) {
-            const distance = this.appSettings.getSetting('lodHighDistance')
-            lodHighDistanceSlider.value = distance.toString()
-            lodHighDistanceValue.textContent = `${distance}m`
-        }
-        
-        // Update LOD med distance slider
-        const lodMedDistanceSlider = document.getElementById('lod-med-distance') as HTMLInputElement
-        const lodMedDistanceValue = document.getElementById('lod-med-distance-value') as HTMLSpanElement
-        if (lodMedDistanceSlider && lodMedDistanceValue) {
-            const distance = this.appSettings.getSetting('lodMedDistance')
-            lodMedDistanceSlider.value = distance.toString()
-            lodMedDistanceValue.textContent = `${distance}m`
-        }
-        
-        // Update LOD max high slots slider
-        const lodMaxSlotsSlider = document.getElementById('lod-max-high-slots') as HTMLInputElement
-        const lodMaxSlotsValue = document.getElementById('lod-max-high-slots-value') as HTMLSpanElement
-        if (lodMaxSlotsSlider && lodMaxSlotsValue) {
-            const slots = this.appSettings.getSetting('lodMaxHighSlots')
-            lodMaxSlotsSlider.value = slots.toString()
-            lodMaxSlotsValue.textContent = `${slots}`
-            this.updateVramEstimate(slots)
-        }
-        
-        // Update LOD high ratio slider
-        const lodHighRatioSlider = document.getElementById('lod-high-ratio') as HTMLInputElement
-        const lodHighRatioValue = document.getElementById('lod-high-ratio-value') as HTMLSpanElement
-        if (lodHighRatioSlider && lodHighRatioValue) {
-            const ratio = this.appSettings.getSetting('lodHighReductionRatio')
-            lodHighRatioSlider.value = ratio.toString()
-            lodHighRatioValue.textContent = `${Math.round(ratio * 100)}%`
-            this.updateHighDimensions(ratio)
-        }
-        
-        // Update LOD med ratio slider
-        const lodMedRatioSlider = document.getElementById('lod-med-ratio') as HTMLInputElement
-        const lodMedRatioValue = document.getElementById('lod-med-ratio-value') as HTMLSpanElement
-        if (lodMedRatioSlider && lodMedRatioValue) {
-            const ratio = this.appSettings.getSetting('lodMedReductionRatio')
-            lodMedRatioSlider.value = ratio.toString()
-            lodMedRatioValue.textContent = `${Math.round(ratio * 100)}%`
-            this.updateMedDimensions(ratio)
-        }
+        UIComponentUtils.updateSliderValue(
+            document.body, 'lod-high-distance', 'lod-high-distance-value',
+            this.appSettings.getSetting('lodHighDistance'),
+            (v) => `${v}m`
+        )
+
+        UIComponentUtils.updateSliderValue(
+            document.body, 'lod-med-distance', 'lod-med-distance-value',
+            this.appSettings.getSetting('lodMedDistance'),
+            (v) => `${v}m`
+        )
+
+        const lodMaxSlots = this.appSettings.getSetting('lodMaxHighSlots')
+        UIComponentUtils.updateSliderValue(
+            document.body, 'lod-max-high-slots', 'lod-max-high-slots-value',
+            lodMaxSlots,
+            (v) => `${v}`
+        )
+        this.updateVramEstimate(lodMaxSlots)
+
+        const lodHighRatio = this.appSettings.getSetting('lodHighReductionRatio')
+        UIComponentUtils.updateSliderValue(
+            document.body, 'lod-high-ratio', 'lod-high-ratio-value',
+            lodHighRatio,
+            (v) => `${Math.round(v * 100)}%`
+        )
+        this.updateHighDimensions(lodHighRatio)
+
+        const lodMedRatio = this.appSettings.getSetting('lodMedReductionRatio')
+        UIComponentUtils.updateSliderValue(
+            document.body, 'lod-med-ratio', 'lod-med-ratio-value',
+            lodMedRatio,
+            (v) => `${Math.round(v * 100)}%`
+        )
+        this.updateMedDimensions(lodMedRatio)
     }
 
     private async setFullscreenEnabled(enabled: boolean): Promise<void> {

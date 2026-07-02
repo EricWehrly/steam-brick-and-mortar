@@ -1,5 +1,5 @@
 <div class="camera-settings-panel">
-    <!-- Camera Selector (for future multi-camera support) -->
+    <!-- TODO: Camera Selector (for future multi-camera support)
     <div class="camera-selector">
         <h4>📷 Camera Selection</h4>
         <div class="camera-navigation">
@@ -9,6 +9,7 @@
         </div>
         <p class="hint">Future: Switch between different cameras in the scene</p>
     </div>
+    -->
 
     <!-- Camera Presets -->
     <div class="preset-section">
@@ -44,43 +45,9 @@
     <div class="manual-controls">
         <h4>🎛️ Manual Adjustments</h4>
         
-        <!-- Field of View -->
-        <div class="control-group">
-            <label for="camera-fov">
-                Field of View (FOV)
-                <span class="control-hint">Wider = more peripheral vision</span>
-            </label>
-            <div class="slider-with-value">
-                <input type="range" id="camera-fov" min="30" max="120" step="1" value="{{fov}}" />
-                <span id="camera-fov-value" class="value-display">{{fov}}°</span>
-            </div>
-        </div>
-
-        <!-- Near Clipping Plane -->
-        <div class="control-group">
-            <label for="camera-near">
-                Near Clipping Plane
-                <span class="control-hint">Minimum visible distance</span>
-            </label>
-            <div class="slider-with-value">
-                <input type="range" id="camera-near" min="0.01" max="5" step="0.01" value="{{near}}" />
-                <span id="camera-near-value" class="value-display">{{near}}</span>
-            </div>
-            <p class="warning">⚠️ Too small (<0.01) causes Z-fighting</p>
-        </div>
-
-        <!-- Far Clipping Plane -->
-        <div class="control-group">
-            <label for="camera-far">
-                Far Clipping Plane
-                <span class="control-hint">Maximum visible distance</span>
-            </label>
-            <div class="slider-with-value">
-                <input type="range" id="camera-far" min="100" max="5000" step="10" value="{{far}}" />
-                <span id="camera-far-value" class="value-display">{{far}}</span>
-            </div>
-            <p class="warning">⚠️ Too large (>5000) reduces depth precision</p>
-        </div>
+        {{cameraFovControl}}
+        {{cameraNearControl}}
+        {{cameraFarControl}}
     </div>
 
     <!-- Info Panel -->

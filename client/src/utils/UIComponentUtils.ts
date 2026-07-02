@@ -81,11 +81,25 @@ export class UIComponentUtils {
 
         if (!slider) return
 
+        const followsThumb = valueDisplay?.hasAttribute('data-follows-thumb') ?? false
+        const labelsGroup = container.querySelector(`#${config.sliderId}-labels`) as HTMLElement | null
+
         const updateDisplay = (value: number) => {
             if (valueDisplay) {
-                valueDisplay.textContent = config.formatDisplay 
+                valueDisplay.textContent = config.formatDisplay
                     ? config.formatDisplay(value)
                     : value.toString()
+
+                if (followsThumb) {
+                    const min = parseFloat(slider.min)
+                    const max = parseFloat(slider.max)
+                    const percent = ((value - min) / (max - min)) * 100
+                    valueDisplay.style.left = `${percent}%`
+                }
+            }
+
+            if (labelsGroup) {
+                UIComponentUtils.highlightActiveStepLabel(labelsGroup, slider, value)
             }
         }
 
@@ -280,10 +294,35 @@ export class UIComponentUtils {
         }
 
         if (valueDisplay) {
-            valueDisplay.textContent = formatDisplay 
+            valueDisplay.textContent = formatDisplay
                 ? formatDisplay(value)
                 : value.toString()
+
+            if (slider && valueDisplay.hasAttribute('data-follows-thumb')) {
+                const min = parseFloat(slider.min)
+                const max = parseFloat(slider.max)
+                const percent = ((value - min) / (max - min)) * 100
+                valueDisplay.style.left = `${percent}%`
+            }
         }
+
+        const labelsGroup = container.querySelector(`#${sliderId}-labels`) as HTMLElement | null
+        if (slider && labelsGroup) {
+            UIComponentUtils.highlightActiveStepLabel(labelsGroup, slider, value)
+        }
+    }
+
+    private static highlightActiveStepLabel(
+        labelsGroup: HTMLElement,
+        slider: HTMLInputElement,
+        value: number
+    ): void {
+        const min = parseFloat(slider.min)
+        const activeIndex = Math.round(value - min)
+        const labels = labelsGroup.querySelectorAll('span')
+        labels.forEach((label, index) => {
+            label.classList.toggle('slider-label-active', index === activeIndex)
+        })
     }
 
     static renderTable<TRow>(
