@@ -15,6 +15,7 @@ import '../../../styles/pause-menu/camera-settings-panel.css'
 import { AppSettings } from '../../../core/AppSettings'
 import { DataManager } from '../../../core/data'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
+import { RangeControl } from '../../components/UIComponent'
 import type * as THREE from 'three'
 
 export interface CameraPreset {
@@ -95,26 +96,58 @@ export class CameraSettingsPanel extends PauseMenuPanel {
     render(): string {
         const camera = this.getCurrentCamera()
         const currentPreset = this.detectCurrentPreset(camera)
-        
+
+        const fov = camera?.fov ?? 90
+        const near = camera?.near ?? 0.1
+        const far = camera?.far ?? 1000
+
         return renderTemplate(cameraSettingsPanelTemplate, {
             // Camera selection
             cameraCount: this.cameras.length,
             currentCameraIndex: this.currentCameraIndex + 1,
             hasPrevCamera: this.currentCameraIndex > 0,
             hasNextCamera: this.currentCameraIndex < this.cameras.length - 1,
-            
-            // Current camera values
-            fov: camera?.fov?.toFixed(0) || 90,
-            near: camera?.near?.toFixed(2) || 0.1,
-            far: camera?.far?.toFixed(0) || 1000,
-            
+
             // Preset selections
             presetNormal: currentPreset === 'NORMAL',
             presetWide: currentPreset === 'WIDE',
             presetUltraWide: currentPreset === 'ULTRA_WIDE',
             presetCinematic: currentPreset === 'CINEMATIC',
             presetTelephoto: currentPreset === 'TELEPHOTO',
-            presetCustom: currentPreset === 'CUSTOM'
+            presetCustom: currentPreset === 'CUSTOM',
+
+            cameraFovControl: new RangeControl({
+                id: 'camera-fov',
+                label: 'Field of View (FOV)',
+                description: 'Wider = more peripheral vision',
+                min: 30,
+                max: 120,
+                step: 1,
+                value: fov,
+                formatDisplay: (v) => `${v.toFixed(0)}°`
+            }).render(),
+
+            cameraNearControl: new RangeControl({
+                id: 'camera-near',
+                label: 'Near Clipping Plane',
+                description: 'Minimum visible distance. ⚠️ Too small (<0.01) causes Z-fighting',
+                min: 0.01,
+                max: 5,
+                step: 0.01,
+                value: near,
+                formatDisplay: (v) => v.toFixed(2)
+            }).render(),
+
+            cameraFarControl: new RangeControl({
+                id: 'camera-far',
+                label: 'Far Clipping Plane',
+                description: 'Maximum visible distance. ⚠️ Too large (>5000) reduces depth precision',
+                min: 100,
+                max: 5000,
+                step: 10,
+                value: far,
+                formatDisplay: (v) => v.toFixed(0)
+            }).render()
         })
     }
     

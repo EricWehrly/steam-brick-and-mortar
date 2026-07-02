@@ -1,0 +1,96 @@
+/* Canonical settings-row control (UIComponent / RangeControl / SelectControl) */
+
+.ui-component-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-lg);
+}
+
+.ui-component-row:last-child {
+    margin-bottom: 0;
+}
+
+.ui-component-row.disabled-setting {
+    opacity: 0.55;
+}
+
+.ui-component-label {
+    flex: 0 1 auto;
+    max-width: 45%;
+    padding-top: var(--space-xs);
+    font-weight: normal;
+    font-size: var(--font-size-md);
+    color: var(--color-text-primary);
+}
+
+.ui-component-control {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    min-width: 0;
+}
+
+.ui-component-description {
+    flex-basis: 100%;
+    margin: var(--space-xs) 0 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+}
+
+.ui-range-control {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-top: var(--space-xs);
+}
+
+.ui-range-track-row {
+    position: relative;
+}
+
+.ui-range-input.setting-slider {
+    width: 100%;
+}
+
+.ui-range-value-bubble {
+    position: absolute;
+    top: 100%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    margin-top: var(--space-xs);
+    padding: 0 var(--space-xs);
+    font-size: var(--font-size-sm);
+    font-weight: bold;
+    color: var(--color-accent-bright);
+    /* Opaque so it fully occludes the min/max track labels it overlaps, rather than
+       blending into illegible overlapping text. */
+    background: var(--color-surface-1);
+    border-radius: var(--radius-sm);
+}
+
+.slider-label-active {
+    color: var(--color-accent-bright);
+    font-weight: bold;
+}
+
+.ui-select-input {
+    width: auto;
+    min-width: 200px;
+    max-width: 420px;
+}
+
+/* Below this width, stack label above control (matches the pre-standardization layout) */
+@container pause-menu-content (max-width: 420px) {
+    .ui-component-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .ui-component-control {
+        max-width: none;
+    }
+}

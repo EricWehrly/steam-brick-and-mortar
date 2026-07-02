@@ -5,49 +5,10 @@
     <!-- Artwork Material Tuning -->
     <section class="setting-section">
       <div class="setting-group">
-        <label class="setting-label">🎨 Artwork Material</label>
-        <p class="setting-description">
-          PBR surface properties for game box artwork. Roughness controls how matte vs. glossy
-          the surface reads; metalness adds specular character. Changes apply immediately.
-        </p>
+        <label class="setting-label">🎨 Game Box Artwork Material</label>
 
-        <div class="setting-control">
-          <label class="setting-label" for="artwork-roughness" style="font-weight: normal; font-size: 0.9rem;">
-            Roughness: <span id="artwork-roughness-value" class="value-display">{{artworkRoughnessLabel}}</span>
-          </label>
-          <input
-            type="range"
-            id="artwork-roughness"
-            class="setting-slider pause-slider"
-            min="0.2"
-            max="0.6"
-            step="0.01"
-            value="{{artworkRoughness}}"
-          >
-          <div class="slider-labels">
-            <span>0.2 (glossy)</span>
-            <span>0.6 (matte)</span>
-          </div>
-        </div>
-
-        <div class="setting-control" style="margin-top: 1rem;">
-          <label class="setting-label" for="artwork-metalness" style="font-weight: normal; font-size: 0.9rem;">
-            Metalness: <span id="artwork-metalness-value" class="value-display">{{artworkMetalnessLabel}}</span>
-          </label>
-          <input
-            type="range"
-            id="artwork-metalness"
-            class="setting-slider pause-slider"
-            min="0.0"
-            max="0.2"
-            step="0.01"
-            value="{{artworkMetalness}}"
-          >
-          <div class="slider-labels">
-            <span>0.0 (none)</span>
-            <span>0.2 (max)</span>
-          </div>
-        </div>
+        {{artworkRoughnessControl}}
+        {{artworkMetalnessControl}}
       </div>
     </section>
 
@@ -56,47 +17,11 @@
       <div class="setting-group">
         <label class="setting-label">✨ Fresnel Edge Lift</label>
         <p class="setting-description">
-          Brightens box silhouettes at oblique camera angles so artwork reads at the sides of
-          shelves. Lift controls brightness boost intensity; Power controls falloff sharpness.
+          Brightens box silhouettes at oblique camera angles so artwork reads at the sides of shelves.
         </p>
 
-        <div class="setting-control">
-          <label class="setting-label" for="artwork-fresnel-lift" style="font-weight: normal; font-size: 0.9rem;">
-            Lift: <span id="artwork-fresnel-lift-value" class="value-display">{{artworkFresnelLiftLabel}}</span>
-          </label>
-          <input
-            type="range"
-            id="artwork-fresnel-lift"
-            class="setting-slider pause-slider"
-            min="0.0"
-            max="0.3"
-            step="0.01"
-            value="{{artworkFresnelLift}}"
-          >
-          <div class="slider-labels">
-            <span>0.0 (off)</span>
-            <span>0.3 (max)</span>
-          </div>
-        </div>
-
-        <div class="setting-control" style="margin-top: 1rem;">
-          <label class="setting-label" for="artwork-fresnel-power" style="font-weight: normal; font-size: 0.9rem;">
-            Power: <span id="artwork-fresnel-power-value" class="value-display">{{artworkFresnelPowerLabel}}</span>
-          </label>
-          <input
-            type="range"
-            id="artwork-fresnel-power"
-            class="setting-slider pause-slider"
-            min="2.0"
-            max="8.0"
-            step="0.1"
-            value="{{artworkFresnelPower}}"
-          >
-          <div class="slider-labels">
-            <span>2.0 (wide)</span>
-            <span>8.0 (sharp)</span>
-          </div>
-        </div>
+        {{artworkFresnelLiftControl}}
+        {{artworkFresnelPowerControl}}
       </div>
     </section>
 
@@ -106,47 +31,10 @@
         <label class="setting-label">🌓 Shadow Contact Grounding</label>
         <p class="setting-description">
           Controls how tightly shadows hug surfaces at shelf-box intersections.
-          More negative Bias pulls shadow contact closer; lower Normal Bias tightens the
-          contact zone. Changes apply immediately.
         </p>
 
-        <div class="setting-control">
-          <label class="setting-label" for="shadow-contact-bias" style="font-weight: normal; font-size: 0.9rem;">
-            Bias: <span id="shadow-contact-bias-value" class="value-display">{{shadowContactBiasLabel}}</span>
-          </label>
-          <input
-            type="range"
-            id="shadow-contact-bias"
-            class="setting-slider pause-slider"
-            min="-0.005"
-            max="-0.0001"
-            step="0.0001"
-            value="{{shadowContactBias}}"
-          >
-          <div class="slider-labels">
-            <span>−0.005 (tighter)</span>
-            <span>−0.0001 (looser)</span>
-          </div>
-        </div>
-
-        <div class="setting-control" style="margin-top: 1rem;">
-          <label class="setting-label" for="shadow-contact-normal-bias" style="font-weight: normal; font-size: 0.9rem;">
-            Normal Bias: <span id="shadow-contact-normal-bias-value" class="value-display">{{shadowContactNormalBiasLabel}}</span>
-          </label>
-          <input
-            type="range"
-            id="shadow-contact-normal-bias"
-            class="setting-slider pause-slider"
-            min="0.0"
-            max="0.03"
-            step="0.001"
-            value="{{shadowContactNormalBias}}"
-          >
-          <div class="slider-labels">
-            <span>0.0 (tight)</span>
-            <span>0.03 (loose)</span>
-          </div>
-        </div>
+        {{shadowContactBiasControl}}
+        {{shadowContactNormalBiasControl}}
       </div>
     </section>
 

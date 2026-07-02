@@ -13,20 +13,10 @@
     <!-- Renderer Quality Preset -->
     <section class="setting-section">
       <div class="setting-group">
-        <label class="setting-label" for="quality-level-select">
-          ⚙️ Renderer Quality Preset
-        </label>
         <p class="setting-description">
           Coarse renderer preset for pixel ratio and shadow map defaults.
         </p>
-        <div class="setting-control">
-          <select id="quality-level-select" class="setting-select pause-select">
-            <option value="low" {{#qualityLow}}selected{{/qualityLow}}>Low</option>
-            <option value="medium" {{#qualityMedium}}selected{{/qualityMedium}}>Medium</option>
-            <option value="high" {{#qualityHigh}}selected{{/qualityHigh}}>High</option>
-            <option value="ultra" {{#qualityUltra}}selected{{/qualityUltra}}>Ultra</option>
-          </select>
-        </div>
+        {{qualityLevelControl}}
         <div class="setting-control" style="margin-top: 0.75rem;">
           <label class="checkbox-container ui-checkbox-row" style="margin-bottom: 0.75rem;">
             <input type="checkbox" class="ui-checkbox" id="fullscreen-enabled" {{#fullscreenEnabled}}checked{{/fullscreenEnabled}}>
@@ -39,153 +29,39 @@
             Enable Shadow Maps
           </label>
         </div>
-        <div class="setting-control" style="margin-top: 0.75rem;">
-          <label class="setting-label" for="pixel-ratio-scale" style="font-weight: normal; font-size: 0.9rem;">
-            Pixel Ratio Scale: <span id="pixel-ratio-value">{{pixelRatioScaleLabel}}</span>
-            <span class="setting-hint-badge hint-instant">experimental</span>
-          </label>
-          <input
-            type="range"
-            id="pixel-ratio-scale"
-            class="setting-slider pause-slider"
-            min="0.5"
-            max="2.0"
-            step="0.05"
-            value="{{pixelRatioScale}}"
-          >
-          <div class="slider-labels">
-            <span>0.5</span>
-            <span>1.0</span>
-            <span>2.0</span>
-          </div>
-        </div>
+        {{pixelRatioControl}}
       </div>
     </section>
     
     <!-- Lighting Quality Section -->
     <section class="setting-section">
       <div class="setting-group">
-        <label class="setting-label" for="lighting-quality">
-          💡 Lighting Quality
-        </label>
-        <p class="setting-description">
-          Higher quality provides better visuals but may impact performance. Changes apply immediately.
-        </p>
-        <div class="setting-control">
-          <select id="lighting-quality" class="setting-select">
-            <option value="simple" {{#lightingQualitySimple}}selected{{/lightingQualitySimple}}>
-              Simple - Basic lighting only (higher ambient, fewer lights)
-            </option>
-            <option value="enhanced" {{#lightingQualityEnhanced}}selected{{/lightingQualityEnhanced}}>
-              Enhanced - Fluorescent fixtures + standard shadows
-            </option>
-            <option value="advanced" {{#lightingQualityAdvanced}}selected{{/lightingQualityAdvanced}}>
-              Advanced - Point lights + soft shadows + enhanced quality
-            </option>
-            <option value="ouch-my-eyes" {{#lightingQualityOuch}}selected{{/lightingQualityOuch}}>
-              Ouch My Eyes - Dramatic spotlights + colored accents + ultra shadows
-            </option>
-          </select>
-        </div>
+        {{lightingQualityControl}}
       </div>
     </section>
 
     <!-- Shadow Settings Section -->
     <section class="setting-section">
       <div class="setting-group">
-        <label class="setting-label" for="shadow-quality">
-          🌓 Shadow Quality: <span id="shadow-quality-value">{{shadowQualityLabel}}</span> <span class="setting-hint-badge hint-instant">✨ instant</span>
-        </label>
-        <p class="setting-description">
-          Higher shadow quality improves depth perception but requires more processing power. Set to "Off" to disable shadows entirely.
-        </p>
-        <div class="setting-control">
-          <input
-            type="range"
-            id="shadow-quality"
-            class="setting-slider pause-slider"
-            min="0"
-            max="4"
-            step="1"
-            value="{{shadowQuality}}"
-          >
-          <div class="slider-labels">
-            <span>Off</span>
-            <span>Low</span>
-            <span>Medium</span>
-            <span>High</span>
-            <span>Ultra</span>
-          </div>
-        </div>
+        {{shadowQualityControl}}
         <div class="setting-control" style="margin-top: 0.75rem;">
           <label class="checkbox-container ui-checkbox-row">
             <input type="checkbox" class="ui-checkbox" id="ssao-enabled" {{#ssaoEnabled}}checked{{/ssaoEnabled}}>
-            Enable SSAO (contact shadows and crevice darkening)
+            Enable SSAO
           </label>
+          <p class="ui-component-description">Contact shadows and crevice darkening.</p>
         </div>
-        <div class="setting-control" style="margin-top: 0.75rem;">
-          <label class="setting-label" for="smaa-preset" style="font-weight: normal; font-size: 0.9rem;">
-            Anti-Aliasing (SMAA) <span class="setting-hint-badge hint-instant">✨ instant</span>
-          </label>
-          <select id="smaa-preset" class="setting-select pause-select">
-            <option value="low" {{#smaaPresetLow}}selected{{/smaaPresetLow}}>Low</option>
-            <option value="medium" {{#smaaPresetMedium}}selected{{/smaaPresetMedium}}>Medium</option>
-            <option value="high" {{#smaaPresetHigh}}selected{{/smaaPresetHigh}}>High</option>
-            <option value="ultra" {{#smaaPresetUltra}}selected{{/smaaPresetUltra}}>Ultra</option>
-          </select>
-        </div>
+        {{smaaPresetControl}}
       </div>
     </section>
 
     <!-- Environment Settings Section -->
     <section class="setting-section">
       <div class="setting-group">
-        <label class="setting-label" for="ceiling-height">
-          📏 Ceiling Height: <span id="ceiling-height-value">{{ceilingHeight}}m</span> <span class="setting-hint-badge hint-reload">🔄 reload</span>
-        </label>
-        <p class="setting-description">
-          Adjust the store ceiling height for comfort and immersion. Changes require scene reload.
-        </p>
-        <div class="setting-control">
-          <input 
-            type="range" 
-            id="ceiling-height" 
-            class="setting-slider pause-slider"
-            data-requires-reload
-            min="2.5" 
-            max="5.0" 
-            step="0.1" 
-            value="{{ceilingHeight}}"
-          >
-          <div class="slider-labels">
-            <span>2.5m</span>
-            <span>5.0m</span>
-          </div>
-        </div>
+        {{ceilingHeightControl}}
       </div>
       <div class="setting-group">
-        <label class="setting-label" for="environment-intensity">
-          🌐 Environment Intensity: <span id="environment-intensity-value">{{environmentIntensityLabel}}</span> <span class="setting-hint-badge hint-instant">✨ instant</span>
-        </label>
-        <p class="setting-description">
-          IBL (image-based lighting) contribution from the room environment. Lower values let hand-authored lights dominate; higher values brighten specular reflections.
-        </p>
-        <div class="setting-control">
-          <input
-            type="range"
-            id="environment-intensity"
-            class="setting-slider pause-slider"
-            min="0"
-            max="2"
-            step="0.05"
-            value="{{environmentIntensity}}"
-          >
-          <div class="slider-labels">
-            <span>0.0</span>
-            <span>1.0</span>
-            <span>2.0</span>
-          </div>
-        </div>
+        {{environmentIntensityControl}}
       </div>
     </section>
 
@@ -226,119 +102,17 @@
         </p>
         
         <!-- Distance Thresholds (real-time, no reload needed) -->
-        <div class="setting-control">
-          <label class="setting-label" for="lod-high-distance" style="font-weight: normal; font-size: 0.9rem;">
-            HIGH quality within: <span id="lod-high-distance-value">{{lodHighDistance}}m</span>
-          </label>
-          <input 
-            type="range" 
-            id="lod-high-distance" 
-            class="setting-slider pause-slider"
-            min="1" 
-            max="10" 
-            step="0.5" 
-            value="{{lodHighDistance}}"
-          >
-          <div class="slider-labels">
-            <span>1m</span>
-            <span>10m</span>
-          </div>
-        </div>
-        
-        <div class="setting-control" style="margin-top: 1rem;">
-          <label class="setting-label" for="lod-med-distance" style="font-weight: normal; font-size: 0.9rem;">
-            MED quality within: <span id="lod-med-distance-value">{{lodMedDistance}}m</span>
-          </label>
-          <input 
-            type="range" 
-            id="lod-med-distance" 
-            class="setting-slider pause-slider"
-            min="3" 
-            max="20" 
-            step="0.5" 
-            value="{{lodMedDistance}}"
-          >
-          <div class="slider-labels">
-            <span>3m</span>
-            <span>20m</span>
-          </div>
-        </div>
-        
+        {{lodHighDistanceControl}}
+        {{lodMedDistanceControl}}
+
         <!-- TODO: Re-enable after texture cache refactor (see docs/active/texture-cache-refactor-plan.md)
              These settings affect texture array dimensions which requires cache invalidation strategy.
              Currently disabled to avoid cache corruption during the refactor.
         -->
-        <!-- VRAM Management - DISABLED pending cache refactor -->
-        <div class="setting-control disabled-setting" style="margin-top: 1rem;">
-          <label class="setting-label" for="lod-max-high-slots" style="font-weight: normal; font-size: 0.9rem; opacity: 0.5;">
-            Max HIGH texture slots: <span id="lod-max-high-slots-value">{{lodMaxHighSlots}}</span>
-            <span class="setting-hint" id="lod-vram-estimate">(~{{lodVramEstimate}}MB VRAM)</span>
-            <span class="setting-hint-badge hint-disabled">🚧 disabled</span>
-          </label>
-          <input 
-            type="range" 
-            id="lod-max-high-slots" 
-            class="setting-slider pause-slider"
-            data-requires-reload
-            min="32" 
-            max="512" 
-            step="32" 
-            value="{{lodMaxHighSlots}}"
-            disabled
-          >
-          <div class="slider-labels" style="opacity: 0.5;">
-            <span>32 slots</span>
-            <span>512 slots</span>
-          </div>
-        </div>
-        
-        <!-- Texture Quality Ratios - DISABLED pending cache refactor -->
-        <div class="setting-control disabled-setting" style="margin-top: 1rem;">
-          <label class="setting-label" for="lod-high-ratio" style="font-weight: normal; font-size: 0.9rem; opacity: 0.5;">
-            HIGH texture scale: <span id="lod-high-ratio-value">{{lodHighRatioPercent}}%</span>
-            <span class="setting-hint">(<span id="lod-high-dimensions">{{lodHighDimensions}}</span>)</span>
-            <span class="setting-hint-badge hint-disabled">🚧 disabled</span>
-          </label>
-          <input 
-            type="range" 
-            id="lod-high-ratio" 
-            class="setting-slider pause-slider"
-            data-requires-reload
-            min="0.25" 
-            max="1.0" 
-            step="0.05" 
-            value="{{lodHighReductionRatio}}"
-            disabled
-          >
-          <div class="slider-labels" style="opacity: 0.5;">
-            <span>25%</span>
-            <span>100%</span>
-          </div>
-        </div>
-        
-        <div class="setting-control disabled-setting" style="margin-top: 1rem;">
-          <label class="setting-label" for="lod-med-ratio" style="font-weight: normal; font-size: 0.9rem; opacity: 0.5;">
-            MED texture scale: <span id="lod-med-ratio-value">{{lodMedRatioPercent}}%</span>
-            <span class="setting-hint">(<span id="lod-med-dimensions">{{lodMedDimensions}}</span>)</span>
-            <span class="setting-hint-badge hint-disabled">🚧 disabled</span>
-          </label>
-          <input 
-            type="range" 
-            id="lod-med-ratio" 
-            class="setting-slider pause-slider"
-            data-requires-reload
-            min="0.1" 
-            max="0.5" 
-            step="0.05" 
-            value="{{lodMedReductionRatio}}"
-            disabled
-          >
-          <div class="slider-labels" style="opacity: 0.5;">
-            <span>10%</span>
-            <span>50%</span>
-          </div>
-        </div>
-        
+        {{lodMaxHighSlotsControl}}
+        {{lodHighRatioControl}}
+        {{lodMedRatioControl}}
+
         <p class="setting-description" style="margin-top: 1rem; font-style: italic; color: #888;">
           ℹ️ Texture size settings are temporarily disabled while we refactor the caching system for better performance.
         </p>

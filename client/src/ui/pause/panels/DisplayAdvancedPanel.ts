@@ -14,7 +14,7 @@ import '../../../styles/pause-menu/settings-components.css'
 import { AppSettings, Setting } from '../../../core/AppSettings'
 import { EventManager } from '../../../core/EventManager'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
-
+import { RangeControl } from '../../components/UIComponent'
 
 const DEFAULTS = {
     artworkRoughness: 0.35,
@@ -40,18 +40,77 @@ export class DisplayAdvancedPanel extends PauseMenuPanel {
     render(): string {
         const s = this.appSettings
         return renderTemplate(displayAdvancedPanelTemplate, {
-            artworkRoughness: s.getSetting('artworkRoughness'),
-            artworkRoughnessLabel: s.getSetting('artworkRoughness').toFixed(2),
-            artworkMetalness: s.getSetting('artworkMetalness'),
-            artworkMetalnessLabel: s.getSetting('artworkMetalness').toFixed(2),
-            artworkFresnelLift: s.getSetting('artworkFresnelLift'),
-            artworkFresnelLiftLabel: s.getSetting('artworkFresnelLift').toFixed(2),
-            artworkFresnelPower: s.getSetting('artworkFresnelPower'),
-            artworkFresnelPowerLabel: s.getSetting('artworkFresnelPower').toFixed(1),
-            shadowContactBias: s.getSetting('shadowContactBias'),
-            shadowContactBiasLabel: s.getSetting('shadowContactBias').toFixed(4),
-            shadowContactNormalBias: s.getSetting('shadowContactNormalBias'),
-            shadowContactNormalBiasLabel: s.getSetting('shadowContactNormalBias').toFixed(3),
+            artworkRoughnessControl: new RangeControl({
+                id: 'artwork-roughness',
+                label: 'Roughness',
+                description: 'Controls how matte vs. glossy the surface reads.',
+                min: 0.2,
+                max: 0.6,
+                step: 0.01,
+                value: s.getSetting('artworkRoughness'),
+                formatDisplay: (v) => v.toFixed(2),
+                trackLabels: ['0.2 (glossy)', '0.6 (matte)']
+            }).render(),
+
+            artworkMetalnessControl: new RangeControl({
+                id: 'artwork-metalness',
+                label: 'Metalness',
+                description: 'Adds specular character. Changes apply immediately.',
+                min: 0.0,
+                max: 0.2,
+                step: 0.01,
+                value: s.getSetting('artworkMetalness'),
+                formatDisplay: (v) => v.toFixed(2),
+                trackLabels: ['0.0 (none)', '0.2 (max)']
+            }).render(),
+
+            artworkFresnelLiftControl: new RangeControl({
+                id: 'artwork-fresnel-lift',
+                label: 'Lift',
+                description: 'Controls brightness boost intensity.',
+                min: 0.0,
+                max: 0.3,
+                step: 0.01,
+                value: s.getSetting('artworkFresnelLift'),
+                formatDisplay: (v) => v.toFixed(2),
+                trackLabels: ['0.0 (off)', '0.3 (max)']
+            }).render(),
+
+            artworkFresnelPowerControl: new RangeControl({
+                id: 'artwork-fresnel-power',
+                label: 'Power',
+                description: 'Controls falloff sharpness.',
+                min: 2.0,
+                max: 8.0,
+                step: 0.1,
+                value: s.getSetting('artworkFresnelPower'),
+                formatDisplay: (v) => v.toFixed(1),
+                trackLabels: ['2.0 (wide)', '8.0 (sharp)']
+            }).render(),
+
+            shadowContactBiasControl: new RangeControl({
+                id: 'shadow-contact-bias',
+                label: 'Bias',
+                description: 'More negative pulls shadow contact closer.',
+                min: -0.005,
+                max: -0.0001,
+                step: 0.0001,
+                value: s.getSetting('shadowContactBias'),
+                formatDisplay: (v) => v.toFixed(4),
+                trackLabels: ['−0.005 (tighter)', '−0.0001 (looser)']
+            }).render(),
+
+            shadowContactNormalBiasControl: new RangeControl({
+                id: 'shadow-contact-normal-bias',
+                label: 'Normal Bias',
+                description: 'Lower tightens the contact zone. Changes apply immediately.',
+                min: 0.0,
+                max: 0.03,
+                step: 0.001,
+                value: s.getSetting('shadowContactNormalBias'),
+                formatDisplay: (v) => v.toFixed(3),
+                trackLabels: ['0.0 (tight)', '0.03 (loose)']
+            }).render()
         })
     }
 
