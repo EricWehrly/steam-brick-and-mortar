@@ -8,7 +8,7 @@ describe('PropRenderer — category dividers', () => {
 
     beforeEach(() => {
         scene = new THREE.Scene()
-        propRenderer = new PropRenderer(scene)
+        propRenderer = PropRenderer.getInstance(scene)
     })
 
     afterEach(() => {

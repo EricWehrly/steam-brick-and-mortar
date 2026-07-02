@@ -44,21 +44,34 @@ export interface EntranceMatOptions {
 //  or, we need to do probably the proper thing
 //  and have a single PropsManager (or whatever) class, and smaller specific classes for each prop type
 //  right now this kinda sucks
+//  Stopgap singleton (see docs/scratch/prop-renderer-restructure-notes.md for the bigger-picture
+//  proposal): this used to be constructed from two independent places (LightingRenderer's
+//  lazy init, StorePropsCoordinator's cached instance), which settled at exactly 2 instances
+//  app-wide and silently duplicated every user prop placed. getInstance() is now the only
+//  entry point.
 export class PropRenderer {
   public static logger = Logger.createLogFunctions(PropRenderer.name)
+  private static instance: PropRenderer | null = null
+
   private scene: THREE.Scene
   private propsGroup: THREE.Group
   private lightFactory: LightFactory
   private currentFixturesGroup: THREE.Group | null = null
 
+  public static getInstance(scene: THREE.Scene): PropRenderer {
+    if (!PropRenderer.instance) {
+      PropRenderer.instance = new PropRenderer(scene)
+    }
+    return PropRenderer.instance
+  }
 
-  constructor(scene: THREE.Scene) {
+  private constructor(scene: THREE.Scene) {
     this.scene = scene
     this.propsGroup = new THREE.Group()
     this.propsGroup.name = 'AtmosphericProps'
     this.scene.add(this.propsGroup)
     this.lightFactory = new LightFactory(scene)
-    new UserPropPlacer(scene)
+    UserPropPlacer.getInstance(scene)
   }
 
   /**
@@ -400,5 +413,8 @@ export class PropRenderer {
     this.clearCeilingFixtures()
     this.clearProps()
     this.scene.remove(this.propsGroup)
+    if (PropRenderer.instance === this) {
+      PropRenderer.instance = null
+    }
   }
 }

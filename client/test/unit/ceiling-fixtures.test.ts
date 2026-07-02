@@ -18,7 +18,7 @@ describe('Phase 2.4 - Ceiling Fixtures', () => {
 
   beforeEach(() => {
     scene = new THREE.Scene()
-    propRenderer = new PropRenderer(scene)
+    propRenderer = PropRenderer.getInstance(scene)
   })
 
   afterEach(() => {

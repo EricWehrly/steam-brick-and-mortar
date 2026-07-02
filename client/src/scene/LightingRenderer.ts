@@ -402,7 +402,7 @@ export class LightingRenderer {
         const monitor = PerformanceMonitor.start('ceiling-fixtures-setup', LightingRenderer.logger)
         
         if (!this.propRenderer) {
-            this.propRenderer = new PropRenderer(this.scene)
+            this.propRenderer = PropRenderer.getInstance(this.scene)
         }
         
         // Use provided layout, stored layout, or fall back to defaults
