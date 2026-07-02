@@ -1,8 +1,11 @@
 # Feature: Native Desktop App (Exploratory Vector)
 
 **Act**: TBD — under evaluation for **between Act 2 and Act 3** (no longer parked in Act 4)
-**Status**: Exploratory — umbrella doc for "should we become a desktop program?" A **Tauri spike is
-in progress**: [`docs/plans/desktop-tauri-spike-plan.md`](../plans/desktop-tauri-spike-plan.md).
+**Status**: Exploratory — umbrella doc for "should we become a desktop program?" A **Tauri PoC now
+builds and runs** (`bb4d1023 "working desktop build!"`): the WebView2 vehicle is proven for
+flatscreen parity, but **no Pillar-2 native capability is wired in yet** (the shell is the default
+Tauri builder — no filesystem, HID, or process-spawn commands). VR entry remains the open spike
+question. Details: [`docs/plans/desktop-tauri-spike-plan.md`](../plans/desktop-tauri-spike-plan.md).
 **Priority**: Low now, high *leverage* if pursued
 
 ## Why this doc exists
@@ -23,11 +26,26 @@ unlock and what it would cost, so the call can be made once.
 |---|---|---|
 | Arbitrary local filesystem read | Local screenshots at scale; [Local File Investigation](local-file-investigation.md) (AC4.4) | Chromium blocks `Program Files` from `showDirectoryPicker()`; Steam installs there by default |
 | Steam path discovery (`libraryfolders.vdf`, `appmanifest_*.acf`) | Knowing what's installed | No filesystem browse |
+| **Steam identity from disk** (`config/loginusers.vdf` → `PersonaName` + `SteamID64`) | Name + steamid with no login/network; groundwork for [Friends](friend-stream-projection.md) later | Same `Program Files` sandbox block; `loginusers.vdf` sits in the Steam root |
 | **Source→glTF extraction pipeline** | [Scene Clutter](scene-clutter-and-props.md) Tier C/D (Valve-IP props) | VPK parsing + Blender are native/offline |
 | SteamCMD / workshop download | Workshop content | No process spawn |
 | Keyboard/mouse detection in Firefox + full silent enumeration | [Fabricated Set Dressing](fabricated-set-dressing.md) controller cutouts | Controllers via Gamepad API work in both browsers; WebHID (keyboards/mice) is **Chromium-only** — Firefox parity for non-controller peripherals requires desktop; *all-devices, no-prompt* is desktop-only regardless |
 | Launching installed games | Long-standing goal | No process spawn |
 | Discovery queue / Play Next; window sampling; capture/replay tray | Coming-attractions content; act4 musings | Session/OS features not in any web API |
+
+## Library capture without a bookmarklet (improves, not unlocks)
+
+Distinct from the table above — this is a capability the desktop app *improves* rather than
+unlocks, since the browser can already do it via the [manual export
+bookmarklet](../plans/manual-library-export-feasibility.md). On desktop the user installs nothing:
+Tauri opens a second WebView2 window pointed at `steamcommunity.com`; the user logs in (cookies
+live in WebView2); we inject the same `rgGames`-reading JS and return the result over Tauri IPC.
+No `javascript:` install friction, no file round-trip, and it still works for **private** libraries.
+A Rust-side variant (CORS-free authenticated fetch of the `?xml=1` feed after login) is possible
+too, but the injected-webview route is cleaner. Net effect: the "bookmarklet" becomes an integrated
+**"Connect Steam"** button on desktop. Enrichment then has a native route as well — Rust can fetch
+`store.steampowered.com/api/appdetails` with no browser CORS, which is what lets the desktop build
+reach near-zero Steam traffic (see [Traffic Safety Review](../plans/traffic-safety-review.md)).
 
 ## The extraction pipeline is automatable (key finding)
 
@@ -128,6 +146,9 @@ what the spike is resolving. Scaffold lives in `desktop/tauri-app/` (alongside
 - [Fabricated Set Dressing](fabricated-set-dressing.md) — peripheral enumeration, coming-attractions content
 - [Local File Investigation](local-file-investigation.md) — AC4.4 re-entry; same FS-blocklist driver
 - [Input System](input-system.md) — in-browser peripheral-detection ceiling
+- [Manual Library Export](../plans/manual-library-export-feasibility.md) — the capture channel the desktop app integrates as "Connect Steam"
+- [Release Pipeline](../plans/release-pipeline-plan.md) — web + desktop release + the S3 cache bake
+- [Traffic Safety Review](../plans/traffic-safety-review.md) — reducing request volume to Steam (the real goal)
 - Act linkage: [Act 4 — Encore](../acts/act4-encore-someday-maybe.md)
 
 ---
