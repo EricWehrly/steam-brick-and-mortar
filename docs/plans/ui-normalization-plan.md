@@ -1,6 +1,6 @@
 # UI Normalization — Active Roadmap
 **Milestone**: 6.6  
-**Status**: 🔄 In Progress (Phase A Complete)  
+**Status**: 🔄 In Progress (Phase A Complete, Phase B underway — B0/B1/B3 implemented)  
 **Approach**: Incremental updates. One small component or panel at a time to ensure nothing breaks.
 
 ---
@@ -54,6 +54,47 @@ We will create component styles for:
 - `LightingControlsPanel.ts` checkboxes now use shared `.ui-checkbox` for master/group/light toggles.
 - `lighting-controls.css` no longer hard-overrides shared checkbox styling when `.ui-checkbox` is present.
 
+### B3. Canonical range/select control — `UIComponent` hierarchy (implemented)
+Settings panels previously hand-rolled slider/dropdown markup in at least three dialects
+(`GraphicsSettingsPanel`'s stacked `.setting-control`, `CameraSettingsPanel`'s older
+`.control-group`, and ad-hoc per-panel templates). `client/src/ui/components/UIComponent.ts`
+replaces these with a small class hierarchy:
+
+- `UIComponent` (abstract base) — owns the row shell, optional label, hint badge
+  (`.setting-hint-badge`/`hint-instant`/`hint-reload`/`hint-disabled`), and description
+  paragraph, rendered beneath the control.
+- `RangeControl` — renders `<input type="range">`. Continuous ranges get a thumb-following
+  value bubble (`data-follows-thumb`) with an opaque background so it can legibly overlap
+  track-end labels. Ranges whose `trackLabels` enumerate one label per integer step
+  (e.g. Off/Low/Medium/High/Ultra) auto-detect as discrete and highlight the active label
+  instead of drawing a floating bubble.
+- `SelectControl` — renders `<select>` + `<option>` list.
+
+Both are string-returning (`.render()` → HTML), consumed by each panel's existing
+`render()`/`attachEvents()` wiring — no DOM ownership, no persisted instances.
+`client/src/ui/components/ui-component.css` holds the shared row/label/control CSS,
+including a `~420px` container-query breakpoint that reverts to stacked (label above
+control) layout. `UIComponentUtils.setupSlider`/`setupSliders` gained the thumb-follow and
+discrete-label-highlight behavior; wiring call sites (`sliderId`, `valueDisplayId`,
+`onInput`/`onChange`) are otherwise unchanged.
+
+**`UIComponent` is not a mandatory base for every control.** Buttons, checkboxes, and other
+primitives get their uniformity from the shared CSS classes this phase already established
+(`.ui-button`, `.ui-checkbox`, etc.) consuming the same `client/src/ui/tokens.css` tokens —
+not from extending a TS class. That reconciliation isn't fully in play yet: `.pause-btn` and
+`.ui-checkbox-row` (in `client/src/styles/pause-menu/shared-components.css`) still use
+hardcoded hex colors rather than `--color-*` tokens, so they don't yet share a visual source
+of truth with `ui-component.css`. Tracked as a follow-up, not blocking further `UIComponent`
+adoption.
+
+**Migration status**:
+- ✅ Commit 1 — `GraphicsSettingsPanel`, `CameraSettingsPanel`, `DisplayAdvancedPanel` migrated
+  onto `RangeControl`/`SelectControl`. Dead pre-migration CSS removed from
+  `camera-settings-panel.css`.
+- 🔄 Commit 2 (next) — `LightingControlsPanel`: replace its hand-built per-light/per-group
+  `innerHTML` slider rows with `RangeControl.render()` calls inside the existing dynamic loop.
+- 🔮 Deferred, not yet scheduled — `GameSettingsPanel`, `LayoutControlPanel`, `ScenePropsPanel`.
+
 ---
 
 ## Phase C — Migrate Existing Panels (Incremental Roadmap)
@@ -77,8 +118,8 @@ We will create component styles for:
 - Keep results under `client/test-results/` (auto-archived in `client/test-results/archive/`).
 
 **Order of Migration** (Working from most standalone to most integrated):
-1. **Base Testing**: Convert one small panel first to test the utility classes. (e.g., `GraphicsSettingsPanel.ts`)
-2. **Settings / Debug**: `LightingControlsPanel.ts` and `LayoutControlPanel.ts`
+1. ✅ **Base Testing**: `GraphicsSettingsPanel.ts`, `CameraSettingsPanel.ts`, `DisplayAdvancedPanel.ts` — see B3 above.
+2. **Settings / Debug**: `LightingControlsPanel.ts` (Commit 2, next) and `LayoutControlPanel.ts`
 3. **Core Menus**: The Pause Menu system (`PauseMenuManager.ts` & `PauseMenuPanel.ts` & pause tabs)
 4. **Data/Integration**: `SteamUIPanel.ts`
 5. **Specialized UI**: `PerformanceMonitor.ts` (currently uses inline styles) and `CacheManagementUI.ts`

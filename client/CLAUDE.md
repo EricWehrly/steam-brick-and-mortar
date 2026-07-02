@@ -6,20 +6,9 @@ TypeScript WebXR application — Vite + Three.js. See root `CLAUDE.md` for proje
 
 ## Code Style
 
-- **Named functions**: No anonymous functions — named methods and function declarations give better stack traces
 - **No magic values**: Extract numbers and strings to named constants with semantic meaning
-- **Meaningful comments only**: Don't restate what well-named code says; only explain why, non-obvious constraints, or links to specs
 
-```typescript
-// ❌
-eventManager.registerEventHandler('progress', (event) => {
-    if (progress > 0.9) { /* ... */ }
-})
-
-// ✅
-private readonly CACHED_BATCH_THRESHOLD = 0.9
-eventManager.registerEventHandler('progress', this.handleProgress.bind(this))
-```
+(Named-function and comment conventions are covered by the global TypeScript instructions — not repeated here.)
 
 ## UI Development
 
@@ -34,6 +23,10 @@ onClick: this.handleClick.bind(this)
 onClick: () => { if (this.enabled) this.handleClick() }
 ```
 
+## Type Checking
+
+Run plain `yarn tsc` (no args, no piping/grep) after finishing a change, not just when explicitly asked. When everything compiles, output is just the yarn banner + `Done in Xs` — minimal tokens. Don't pre-filter with `Where-Object`/`grep` for a specific file; that produces a slightly different command every time, which re-triggers permission prompts. Only reach for filtering if the plain run actually shows unrelated pre-existing errors you need to distinguish from new ones.
+
 ## Testing
 
 ```
@@ -46,12 +39,24 @@ test/
 └── setup.ts
 ```
 
+### Running tests
+
 ```bash
-yarn test           # unit + integration
-yarn test:watch     # watch mode, no live
-yarn test:live      # live only
-yarn test:all       # everything
+yarn test                    # unit + integration — always prints FAILURES: N summary
+yarn test:watch              # watch mode with verbose reporter
+yarn test:integration        # integration suite only
+yarn test:live               # live network tests only
+yarn test:all                # everything except live
 ```
+
+Scoped runs (vitest pattern passthrough — faster for targeted fixes):
+```bash
+yarn vitest run test/unit/scene/
+yarn vitest run test/unit/scene/SceneManager-lighting.test.ts
+yarn vitest run --reporter=verbose   # full output when needed
+```
+
+**Reading results**: `yarn test` always prints `FAILURES: N` as the first line, followed by a `SLOW (>2s)` section if any tests exceeded that threshold. For full detail, read `test-results/test-results.json` — pretty-printed, summary in the first 8 lines, failures immediately after. Don't parse raw stdout.
 
 **Live test requirement**: filename must contain `live` (e.g., `steam-api-live.test.ts`) for vitest exclusion to work.
 
@@ -62,6 +67,34 @@ yarn test:all       # everything
 - Use `test/utils/test-helpers.ts` for shared fixtures and factories
 - Live tests: critical happy paths only; use real but safe data (public Steam games); handle timeouts and network failures
 - `vi.useFakeTimers()` for time-based tests
+
+## Logging
+
+Logger is in `src/utils/Logger.ts`. Default global level is **INFO** — `debug()` and `lifecycle()` calls are suppressed unless you opt in.
+
+**To see debug output for a class during development:**
+
+From the browser console (no code change needed):
+```js
+setLogLevel('PropUserModel', 'DEBUG')   // enable debug for one class
+setGlobalLogLevel('DEBUG')              // enable for everything
+listLogLevels()                         // see what's currently overridden
+resetLogLevel('PropUserModel')          // revert one class
+```
+
+From code (e.g. a dev-only shim, or temporarily in the class itself):
+```typescript
+import { Logger, LogLevel } from '../utils/Logger'
+Logger.setContextLevel('PropUserModel', LogLevel.DEBUG)
+```
+
+URL shortcut: `?debug=true` on the dev server sets global level to DEBUG on load.
+
+**Permanently silencing a noisy class**: add it to `initializeDefaultContextLevels()` in `Logger.ts` — that's the canonical place for context-level defaults.
+
+**`runtime` logs** are a separate category (disabled by default regardless of level — high-frequency frame events). Enable with `enableRuntimeLogs()` from the console.
+
+**During tests**: global level is automatically set to WARN to reduce noise.
 
 ## WebXR / Three.js
 
