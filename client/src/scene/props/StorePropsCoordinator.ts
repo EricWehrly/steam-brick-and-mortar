@@ -67,6 +67,7 @@ export class StorePropsCoordinator {
 
     private scene: THREE.Scene | null = null
     private entranceMat: THREE.Group | null = null
+    private propRenderer: PropRenderer | null = null
 
     // Tracks last-seen batch count to detect library switches
     private lastTotalBatches = 0
@@ -205,8 +206,10 @@ export class StorePropsCoordinator {
             this.entranceMat = null
         }
 
-        const propRenderer = new PropRenderer(this.scene)
-        this.entranceMat = propRenderer.createEntranceFloorMat(
+        if (!this.propRenderer) {
+            this.propRenderer = PropRenderer.getInstance(this.scene)
+        }
+        this.entranceMat = this.propRenderer.createEntranceFloorMat(
             dimensions.width,
             dimensions.depth,
             this.buildEntranceMatOptions(dimensions)

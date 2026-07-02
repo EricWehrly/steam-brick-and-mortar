@@ -18,10 +18,19 @@ export class UserPropPlacer {
     // Z-up; models come in lying on their back in Three.js/Y-up).
     private static readonly UPRIGHT_ROTATION = new THREE.Euler(Math.PI / 2, 0, 0)
 
+    private static instance: UserPropPlacer | null = null
+
     private readonly propsGroup: THREE.Group
     private placedCount = 0
 
-    constructor(scene: THREE.Scene) {
+    public static getInstance(scene: THREE.Scene): UserPropPlacer {
+        if (!UserPropPlacer.instance) {
+            UserPropPlacer.instance = new UserPropPlacer(scene)
+        }
+        return UserPropPlacer.instance
+    }
+
+    private constructor(scene: THREE.Scene) {
         this.propsGroup = new THREE.Group()
         this.propsGroup.name = 'UserModelProps'
         scene.add(this.propsGroup)
