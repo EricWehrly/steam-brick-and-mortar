@@ -106,8 +106,12 @@ export class RenderPipelineManager {
     }
 
     setSize(width: number, height: number): void {
+        // EffectComposer.setSize() already resizes every registered pass — including
+        // n8aoPass — using the drawing buffer size (CSS size × devicePixelRatio).
+        // A second manual n8aoPass.setSize(width, height) here used raw CSS pixels,
+        // undersizing N8AO's internal buffers whenever devicePixelRatio !== 1 and
+        // producing a scale-mismatched, visibly offset AO ("ghost store") after any resize.
         this.composer.setSize(width, height)
-        this.n8aoPass.setSize(width, height)
     }
 
     dispose(): void {
