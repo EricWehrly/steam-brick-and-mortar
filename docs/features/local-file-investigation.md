@@ -54,6 +54,7 @@ This is a non-tentpole feature for Act 2: we want to make a real attempt at it, 
 - **Metadata overlay design**: define additive local metadata schema + composer strategy that does not overwrite remote authority fields
 - **Research pass**: inventory relevant offline Steam files (`cloud-storage-namespace-1.json`, `localconfig.vdf`, `sharedconfig.vdf`, app manifests, related metadata) and document their locations on Windows/macOS/Linux
 - **AppID discovery pass**: identify and validate candidate local sources for game-list appids, measure completeness, and document data quality conditions
+- **Identity-from-disk pass**: read `config/loginusers.vdf` (SteamID64 → `PersonaName` / `AccountName` / `MostRecent`) to supply user identity — display name + steamid — with no network. Desktop-app-gated (`loginusers.vdf` lives in the Steam root under the `Program Files` sandbox block). Groundwork for [Friends](friend-stream-projection.md), not required by it. Tracked as a desktop capability in [`desktop-app.md`](desktop-app.md).
 - **Feasibility check**: determine what browser APIs can read these files in the current app architecture, and what UX/security constraints come with each approach
 - **User categories extraction**: treat VDF parsing as closed for modern Steam collections; collections come from the cloud sync JSON unless new evidence appears
 - **Other data audit**: document what additional offline fields look promising (play sessions, install metadata, cloud sync state, UI state, etc.) for future consideration

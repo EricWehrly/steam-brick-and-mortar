@@ -33,6 +33,7 @@ We don't have a concrete definition of what "correct" looks like yet. That needs
 - **Check-in pass**: load the anonymous store fresh; document what's working, what's broken, what's missing UX-wise
 - **First-visit UX**: ensure the initial camera position, lighting, and signage communicate the concept clearly
 - **Steam ID onboarding**: evaluate whether the current Steam profile input is discoverable for a new user; iterate if not
+- **Import-your-library affordance**: surface the manual library export/import channel (bookmarklet → JSON → file picker) as an onboarding option that also works for private profiles — see [`../plans/manual-library-export-feasibility.md`](../plans/manual-library-export-feasibility.md)
 - **Anonymous → connected transition**: what happens to the store when a Steam ID is entered mid-session?
 - **Performance baseline**: measure anonymous first-load time-to-interactive; tie into Key Metrics instrumentation
 
@@ -41,4 +42,4 @@ We don't have a concrete definition of what "correct" looks like yet. That needs
 - The anonymous store uses F2P games (currently TF2 appid 440 and similar) — is this the right fixture set for a first impression? Consider curating it slightly.
 - "Correct" is a product question as much as a technical one. Pin it before Gate 1, not during.
 - Ties into static hosting (Gate 1): the first-load experience can only be validated from a real public URL, not localhost.
-- Related: `docs/acts/act3-ready-for-everyone.md` has the offline/bookmarklet export-format research item — the anonymous store fixture format should eventually align with whatever static export shape we land on.
+- Related: `docs/acts/act3-ready-for-everyone.md` has the offline/bookmarklet export-format research item, now studied in [`../plans/manual-library-export-feasibility.md`](../plans/manual-library-export-feasibility.md) — the anonymous store fixture format should eventually align with whatever static export shape we land on.

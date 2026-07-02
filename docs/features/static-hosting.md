@@ -33,7 +33,7 @@ The backend already lives in AWS (Lambda + API Gateway at `https://steam-api-dev
 
 - **Decide hosting approach** — evaluate S3+CloudFront vs. alternatives; consider overlap with caching infrastructure
 - **Set up hosting** — provision chosen infrastructure; configure CORS, HTTPS, custom domain
-- **CI/CD or deploy script** — `yarn build` → deploy should be one command or a documented two-step
+- **CI/CD or deploy script** — `yarn build` → deploy should be one command or a documented two-step. Note the nomenclature: this "deploy/publish" step is distinct from the local **release** artifact (fetch S3 cache → build → pack) documented in [`../plans/release-pipeline-plan.md`](../plans/release-pipeline-plan.md)
 - **Smoke test** — verify full flow works from the public URL: Steam ID entry, library load, scene render
 
 ## Notes / Open Questions
