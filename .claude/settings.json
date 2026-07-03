@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(yarn test:*)",
+      "Bash(yarn tsc:*)",
+      "Bash(yarn vitest:*)",
+      "Bash(yarn lint:*)",
+      "Bash(yarn build:*)",
+      "PowerShell(yarn test:*)",
+      "PowerShell(yarn tsc:*)",
+      "PowerShell(yarn vitest:*)",
+      "PowerShell(yarn lint:*)",
+      "PowerShell(yarn build:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Read(//F:/FilePrograms/Dropbox/Projects/material-maker/**)"
+    ],
+    "additionalDirectories": [
+      "F:\\FilePrograms\\Dropbox\\Projects\\material-maker"
+    ]
+  }
+}

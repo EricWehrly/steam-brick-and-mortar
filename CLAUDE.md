@@ -14,6 +14,7 @@ WebXR-first VR environment that dynamically displays and launches Steam games. C
 
 - **WebXR + Three.js** — cross-platform VR environment (primary)
 - **Blender CLI** — procedural 3D asset generation via Python scripts
+- **Material Maker** — procedural PBR material authoring + CLI bake (clone + release binary at `F:\FilePrograms\Dropbox\Projects\material-maker`); plans: `docs/plans/procedural-materials-pipeline-plan.md`
 - **Steam Web API** — game library via serverless proxy
 - **AWS Lambda + Terraform** — serverless infrastructure
 - **Docker** — containerized dev environment
@@ -47,10 +48,10 @@ These rules apply to all production runtime paths. They are not preferences.
 ## Development
 
 ### Tooling
-- Use `scripts/scratch.sh` for complex multi-step operations
 - Prefer Docker Compose for reproducible builds
-- **Check your working directory before running commands.** Most terminal errors in this project trace back to being in the wrong directory. Read the error before assuming the command is broken.
+- **Check your working directory before running commands.** Most terminal errors in this project trace back to being in the wrong directory. Read the error before assuming the command is broken. Yarn commands (`test`, `tsc`, `vitest`, `build`) run from `client/` unless stated otherwise.
 - Don't chain failing commands: if `cd client && yarn tsc` fails because you're already in `client/`, just run `yarn tsc`
+- **Local sources before web research**: check local clones (siblings under `F:\FilePrograms\Dropbox\Projects\<name>`, e.g. `material-maker`), `docs/`, and bundled tool docs before spawning web research. Web research is for true gaps only — one focused agent, not a fan-out.
 
 ### TDD
 - Run unit tests before every commit
