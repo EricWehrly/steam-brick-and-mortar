@@ -1,9 +1,13 @@
 # Feature: Procedural Texture Quality Pass
 
 **Act**: 2 (Intermission — nice to have)  
-**Status**: In Progress (carried from Act 1)  
+**Status**: In Progress — **direction changed 2026-07**: adopting a Material Maker authoring/bake pipeline; the runtime worker-generation system is being retired  
 **Priority**: Low–Medium  
-**Implementation Plan**: See `docs/plans/enhanced-textures.md` — current parameter values, worker types, hardcoded knobs for future exposure.
+**Implementation Plans**:
+- [`docs/plans/procedural-materials-pipeline-plan.md`](../plans/procedural-materials-pipeline-plan.md) — cross-project tool choice + pipeline (current direction)
+- [`docs/plans/procedural-textures-project-plan.md`](../plans/procedural-textures-project-plan.md) — this store's texture inventory + phased adoption
+- [`docs/plans/procedural-materials-open-questions.md`](../plans/procedural-materials-open-questions.md) — pending decisions
+- `docs/plans/enhanced-textures.md` — **legacy** system reference (worker types, parameter values); useful until Phase 2 retirement completes
 
 ## Goal
 
@@ -34,7 +38,7 @@ These are grouped because they share an approach (iterating procedural worker ou
 - **Popcorn ceiling**: revisit bumpiness, color, and tiling at ceiling scale; tune or replace texture
 - **Wood plank walls**: evaluate current proportions, color variation, and grain fidelity; improve or replace
 - **Carpet**: design and implement custom carpet texture; integrate with floor rendering
-- **Godot investigation** (optional): prototype one texture in Godot's material/shader system and compare quality vs. current worker-based approach — if promising, expand
+- **Godot investigation** ✅ resolved by direction change: Material Maker (Godot-based) selected as the authoring tool — see the pipeline plan. The worker-based approach is being retired rather than iterated.
 
 ## Notes / Open Questions
 

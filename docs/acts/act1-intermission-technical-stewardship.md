@@ -33,6 +33,7 @@
 **Active Visual-Quality Thread (pulled forward from Act 2):**
 - The current branch work (lighting retune, lit artwork material, fresnel/gloss/shadow-contact tuning, showcase comparison scene) is Act 2's [Lighting and Atmosphere](../features/lighting-and-atmosphere.md) feature pulled forward, plus [Game Artwork Box Shading](../plans/game-artwork-box-shading-plan.md). Scene visuals — especially lighting and shading — were flagged as needing attention immediately, so this is being worked during the Intermission rather than waiting for the Act 2 ramp.
 - **Immediate next step**: renderer visual baseline (tone mapping + exposure, environment/IBL) before further per-material micro-tuning — [`plans/renderer-visual-baseline-plan.md`](../plans/renderer-visual-baseline-plan.md).
+- **Procedural textures direction change** (branch `procedural-textures`): retiring the hand-rolled worker texture generation in favor of a Material Maker authoring/bake pipeline — [Procedural Texture Quality](../features/procedural-texture-quality.md), plans at [`plans/procedural-materials-pipeline-plan.md`](../plans/procedural-materials-pipeline-plan.md) (cross-project) and [`plans/procedural-textures-project-plan.md`](../plans/procedural-textures-project-plan.md) (this store).
 - The showcase comparison scene is scaffolded but not yet a working comparison — see status in [`plans/showcase-scene-comparison-plan.md`](../plans/showcase-scene-comparison-plan.md).
 
 **Nice to Have (best effort, punt when stuck):**
