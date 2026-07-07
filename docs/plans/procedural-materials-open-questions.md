@@ -89,6 +89,9 @@ decision record.
    on the first wave. If the terms turn out unfriendly we lose a shortcut, not a feature — and
    unfriendly-licensed materials can still serve as *visual reference* while we build our own
    graphs.
+   **Resolved (2026-07-06):** checked. Community materials are predominantly **CC0/CC-BY** —
+   free for any use including commercial, sole restriction is not monetizing the library itself.
+   No blocker. Recorded in `materials/README.md`.
 
 9. **Headless/CI baking.**
    Does CLI export work without a display on Windows (and eventually Linux CI)? Godot headless

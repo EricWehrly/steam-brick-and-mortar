@@ -41,15 +41,16 @@ PBR material authoring, built on Godot 4. Local clone: `F:\FilePrograms\Dropbox\
 
 ### Locked decisions (2026-07-03, from the open-questions review)
 
-- **Run mode, now:** official 1.6 release binary —
-  `F:\FilePrograms\Dropbox\Projects\material-maker\release\material_maker_1_6_windows\material_maker.exe`
-  (ships with `library/`, `examples/`, `export/` presets, and offline `doc/`).
+- **Run mode, now:** ~~official 1.6 release binary~~ **CORRECTED by Phase 0 findings** — the
+  release binary's CLI export is broken (hard crash). We bake by running MM **from source** in a
+  real Godot editor runtime, and the CLI export path needs a **fork patch** (race condition). See
+  the [Phase 0 findings](#phase-0-findings-2026-07-03--cli-export-must-run-from-a-patched-fork)
+  below and the executor context doc `materials/mm-cli-export-patch-context.md`.
 - **Run mode, target state:** a **dockerized Material Maker service** built from our clone/fork
   — same philosophy as our Blender CLI usage: scriptable, repeatable across clones, no
-  manually-managed system dependencies. Adopt when we start making edits/customizations. Known
-  risk to verify first: export renders on the GPU, so GPU access inside the container must be
-  proven before depending on it. No publishing obligations — image builds from a declared
-  source repo (currently the local clone).
+  manually-managed system dependencies. This is now the *primary* path, not just target state,
+  since baking requires our patched source anyway. Known risk to verify: export renders on the
+  GPU, so GPU access inside the container must be proven before depending on it.
 - **Bake scripts are encapsulating wrappers:** they verify their dependencies (binary present,
   version expected) and are clear and usable for both humans and LLMs. No bare incantations in
   docs — the script is the interface.
@@ -59,6 +60,37 @@ PBR material authoring, built on Godot 4. Local clone: `F:\FilePrograms\Dropbox\
   `performance` (aggressive compromises, mostly resolution/compression). Budgets iterate from
   measurements, not up-front guesses. Tier resolution is stamped into the `.ptex` size
   parameter by the bake script (which also sidesteps the `--size` bug).
+
+### Phase 0 findings (2026-07-03) — CLI export must run from a patched fork
+
+Validation of the bake path surfaced a real obstacle (all verified on Windows, NVIDIA RTX 3080):
+
+- **Release binary CLI export is unusable** — `material_maker.exe --export-material` hard-crashes
+  with an access violation before writing anything, on both Vulkan and OpenGL3 drivers and every
+  target. (The GUI works fine.) A known class of Godot bug affecting *exported* builds.
+- **From-source CLI export works but is racy** — running MM's source via a Godot editor runtime
+  (4.6-stable; 4.7 behaves the same) exports without crashing, but MM's async compute-render
+  system hasn't settled when export captures buffers. Result: `buffer is invalid` errors and a
+  **different, incomplete** map subset on each run. Traced to `parse_args.gd` adding the graph to
+  the tree and exporting before buffer compute-shaders successfully compile; the existing
+  render-queue wait doesn't cover failed-to-compile buffers.
+- **No upstream fix exists** (GitHub checked): our HEAD is current `master`; the relevant files
+  are months stale; the open PR #1412 fixes `--size`/exit-codes/`--json` but **not** the race.
+  Maintainer treats CLI export as a fragile, community-fixed area.
+- **Decision:** patch our MM fork to make CLI export produce complete, deterministic PBR sets;
+  optionally fold in PR #1412 for `--size`/exit-code ergonomics. The bake wrapper
+  (`materials/scripts/mm-bake.ps1`) and from-source invocation are already built and are the
+  test harness.
+- **Resolved (2026-07-06)** — three distinct races found and fixed on our fork, branch
+  `fix/cli-export-buffer-race` (not pushed): (1) `RenderingDevice` creation race, (2) buffer
+  render-queue drain using a "count stopped changing" heuristic instead of drain-to-zero, (3)
+  the actual root cause of remaining nondeterminism — `MMTexture`'s GPU texture read-back
+  applied itself via a deferred (next-idle-frame) call that export's synchronous read raced
+  ahead of, silently returning `ERR_DOES_NOT_EXIST` with zero console output. Verified
+  deterministic across 6+3 consecutive runs on two different materials. Full writeup:
+  **`materials/mm-cli-export-patch-context.md`**. Phase 0 CLI-export blocker is closed; resume
+  the remaining Phase 0 items (bake wrapper hardening, tier stamping, asset-home decision) in
+  the project plan.
 
 ### What we are explicitly NOT doing
 

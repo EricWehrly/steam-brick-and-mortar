@@ -15,7 +15,7 @@ The main thing we'll want to check in this "encore" act is: Can we embed an audi
 - **Working analog wall clock** — in-world prop with real-time hand movement; ambient polish → see [Fabricated Set Dressing](../features/fabricated-set-dressing.md)
 - Fill the camera up with steam after launching a game, so the effect of the frozen frame in application is .. steamy.
 - **Room variant — cozy basement** — see [Room Variants](../features/room-variants.md); Encore stretch beyond the Act 2 best-effort
-- **Poster walls from user media** — wall posters sourced from user-owned public screenshots/artwork, rotating by category/zone (needs rights/privacy review)
+- **Poster walls / murals from user media** — see [User-Supplied Wall Media](../features/user-supplied-wall-media.md) (stub): wall posters/murals from user-owned images or public screenshots/artwork, rotating by category/zone (needs rights/privacy review); reuses the [User Prop Folder](../features/user-prop-folder.md) file-loading infra
 - **Blacklight room atmosphere** — UV-style ambient with glowing accent colors; pairs naturally with basement variant; add to lighting preset system when room variants exist
 - **Dissolve animation system** — smooth entrance materialization for store geometry; eliminates jarring "pop" on load. See `docs/research/dissolve-animation-research.md`.
 - **Dust motes** — floating ambient particles, especially visible in light beams; ~1-2 day scope; see [Lighting and Atmosphere](../features/lighting-and-atmosphere.md)

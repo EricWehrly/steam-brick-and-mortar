@@ -1,0 +1,13 @@
+{
+  "$schema-note": "Tier definitions consumed by future per-material variant/bake scripts (Phase 1+). Every material bakes at both tiers. Sizes are starting points (owner decision, 2026-07-03) -- iterate from measured download/GPU-memory numbers, not guesses.",
+  "tiers": {
+    "quality": {
+      "description": "As good as we can muster, KBs be damned.",
+      "size": 2048
+    },
+    "performance": {
+      "description": "Aggressive compromises, mostly resolution/compression.",
+      "size": 768
+    }
+  }
+}

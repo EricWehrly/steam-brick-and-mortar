@@ -39,8 +39,9 @@ copy the brand hex onto walls.
 
 | Surface | Wanted look | Current state | Material Maker notes |
 |---|---|---|---|
-| **Walls (default)** | **Mustard-yellow painted drywall** with sponge/mottle tonal variation (per reference photo — not flat paint), subtle orange-peel roller texture in the normal map, parameterized wear/scuffing near floor height. Brand-blue does NOT appear on walls (signage/lettering only) | Currently (terrible) wood planks — wrong look entirely | Fine-scale noise → normal for orange-peel; mid-frequency mottle in albedo (the thing that keeps flat yellow from reading "draining"); color + wear + mottle intensity exposed as parameters |
-| **Walls (variant)** | Good-looking **wood paneling** — reserved for the Cozy Basement variant AND as the fallback wall treatment if tuned drywall still reads flat/draining. No accent walls in the default store | The thing the current walls were failing to be | Community library has wood/plank starting points; needs groove profile in normal+AO, vertical grain, 70s-paneling color ramp |
+| **Walls (default)** | **Mustard-yellow painted drywall** with sponge/mottle tonal variation (per reference photo — not flat paint), subtle orange-peel roller normal, **recolorable at runtime** (any-color drywall + in-scene color picker). Brand-blue does NOT appear on walls (signage/lettering only) | Currently (terrible) wood planks — wrong look entirely | **Produced multiple ways and compared** (Phase 1): (a) procedural worker — retune the good popcorn-ceiling technique (fine orange-peel + low-freq mottle); (b) Material Maker baked; (c) optional sourced. Recolor via runtime HSV tint works on any base |
+| **Walls (paneling variant)** | Good-looking **wood paneling** — Cozy Basement variant AND fallback if drywall reads flat. No accent walls in the default store | The thing the current walls were failing to be | Hoped to come out far better via **Material Maker** than the retired worker planks — try a few recipes: groove profile in normal+AO, vertical grain, 70s ramp |
+| **Walls (brick)** | **Brick walls** — thematically wanted (the store is literally "brick and mortar") despite the Blockbuster starting aesthetic. Selectable wall option | None | Material Maker; the bundled `improved_brick` (baked in Phase 0, has albedo+normal+occlusion depth) is a ready candidate to adapt if the normal-mapped depth reads well |
 | **Ceiling** | **Popcorn ceiling — confirmed default** (matches reference photo); **acoustic drop-tile** authored later as a variant | Popcorn version exists, only texture arguably worth keeping — still replace | Popcorn: voronoi/worley blob scatter → height → normal. Drop-tile: tile fissure noise + grid lines with AO in the gaps |
 | **Floor** | **Commercial low-pile carpet — a few selectable types**: match for the current red diamond, 90s confetti scatter, plain dark gray (reference photo). Ship whichever is easiest first; all parameterized palette. Per-store variation → runtime tint or N variants (Phase 4) | Deep-red diamond-pattern carpet, worker-generated | Fiber micro-noise for roughness/normal; scatter pattern as a parameterized overlay; keep tile small (repetition handled at runtime — see below) |
 | **Shelving** | **MDF/laminate veneer** with brand-blue accent components | Worker-generated veneer, generic | Laminate = near-flat normal, tight roughness variation; blue accent as parameter for brand consistency |
@@ -62,32 +63,55 @@ library per the parent plan, not blocked on this project needing them.
 ## Phases
 
 ### Phase 0 — Tooling validation (small, gating)
-Release binary is already downloaded:
-`F:\FilePrograms\Dropbox\Projects\material-maker\release\material_maker_1_6_windows\material_maker.exe`.
-- Verify the GUI opens and a community-library material imports; check the site's material
-  licensing terms while there (open question 8).
-- **Verify CLI export end-to-end**: `material_maker.exe --export-material --target <target> -o <dir> <file.ptex>`
-  with a bundled example material; document behavior when no window/display is available.
-- Confirm resolution control via the material node's size parameter in `.ptex` JSON (the
-  `--size` flag is a no-op — decided: node-level parameter now, upstream PR opportunistically).
-- Build the **bake wrapper script** in `materials/scripts/`: verifies dependencies (binary
-  present/version), takes material + variant + tier (quality/performance), clear usage text —
-  usable by humans and LLMs alike. The script is the interface; no bare incantations.
-- Define the two export tiers in the variants manifest (starting points: quality ≈ 2K,
-  performance ≈ 512–1K) — decided in open questions 4/5.
-- Decide asset home + loading path (`client/public/textures/…` vs bundled import). Baked
-  output IS committed (decided, open question 2).
 
-### Phase 1 — First material end-to-end (painted drywall walls)
-The highest-value swap (wrong look → right look) and it exercises every pipeline stage.
-- Author/adapt drywall `.ptex` with exposed params (paint color, wear, orange-peel intensity).
-- Bake → package (PNG first; KTX2 compression can land in this phase or 2) → load via
-  three.js → apply through `SharedMaterialManager.upsertMaterial(MaterialType.WallWood → new WallPaint type)`.
-- Add the loading seam: a baked-texture material path in `SharedMaterialManager` parallel to
-  the worker path (worker path stays until Phase 2 completes).
-- Validate under all lighting presets + postprocessing (the feature doc's acceptance criteria:
-  no surface reads as procedurally generated).
-- Tests: material creation path, event emissions, fallback when texture fetch fails.
+> **Status 2026-07-06: COMPLETE.** Every checklist item below is resolved. Bake wrapper built
+> and defaults corrected (`materials/scripts/mm-bake.ps1` — defaults to the fork + Godot
+> 4.6-stable automatically; the known-broken release binary now requires an explicit
+> `-UseReleaseBinary` opt-in so it can never be hit by accident). Release-binary CLI export is
+> permanently unusable (crash) — baking runs MM from source on our fork, branch
+> `fix/cli-export-buffer-race`. Three races found and fixed (device creation, buffer
+> render-queue drain, and the actual root cause — a deferred texture-readback race in
+> `MMTexture`); verified deterministic across 9+ consecutive runs on two different materials,
+> re-confirmed independently after the fact. Full writeup:
+> [`materials/mm-cli-export-patch-context.md`](../../materials/mm-cli-export-patch-context.md);
+> library usage notes: [`materials/README.md`](../../materials/README.md). Fork branch is not
+> pushed/PR'd yet (deliberate — no urgency). **Phase 1 can start.**
+
+- ~~Verify the GUI opens and a community-library material imports~~ — GUI confirmed working
+  (prior session's user-data dir shows a real GUI run). Community-library licensing checked:
+  materials are predominantly **CC0/CC-BY**, free including commercial use, sole restriction is
+  not monetizing the library itself (open question 8, resolved — see `materials/README.md`).
+- ~~Verify CLI export end-to-end~~ — done via the patch investigation; see above.
+- ~~Confirm resolution control~~ — done: `-Size` on `mm-bake.ps1` stamps the `.ptex` material
+  node's size parameter directly (open questions 4/5, 7).
+- ~~Build the bake wrapper script~~ — done: `materials/scripts/mm-bake.ps1`. Per-material +
+  per-tier batch/variant scripting is NOT yet built — that's Phase 1+ scope, not Phase 0's.
+- ~~Define the two export tiers~~ — done: `materials/variants/tiers.json` (`quality` = 2048px,
+  `performance` = 768px, starting points per open questions 4/5 — iterate from measured
+  numbers in Phase 2).
+- ~~Decide asset home + loading path~~ — decided: bake output canonically lives in
+  `materials/baked/` (library-owned, committed); this project serves from
+  `client/public/textures/materials/<material>/<tier>/<map>.<ext>`, following the existing
+  static-asset convention (`client/src/assets/runtimeAssetUrls.ts` + `SkyboxManager.ts`'s
+  `new URL(path, import.meta.url).href` pattern), loaded via the already-generic
+  `TextureLoader.loadTexture(url)` — no loader code changes needed. The copy/package step from
+  `materials/baked/` into the client's public dir is Phase 1 work (not built yet).
+
+### Phase 1 — Wall materials (drywall multi-approach, recolorable)
+**Build plan: [`procedural-textures-phase1-plan.md`](procedural-textures-phase1-plan.md)** — full
+work breakdown, verified seam, comparison harness, recolor design, gotchas, acceptance criteria.
+
+Walls are the feedback target, so Phase 1 focuses there — and **produces drywall multiple ways
+and compares in-scene** rather than betting on one technique:
+- **Procedural** (retune the good popcorn-ceiling worker technique for drywall) + **Material
+  Maker baked** + optional **sourced** — all landing through the same
+  `SharedMaterialManager`/`upsertMaterial` seam, selectable live via an in-scene wall-material selector.
+- **Recolor pulled forward** (was Phase 3): runtime HSV tint + in-scene color picker = "any-color
+  drywall," base-agnostic. Doubles as part of the comparison control.
+- **Baked-load plumbing** (`SharedMaterialManager` baked path + `upsertMaterial` ORM-map
+  extension) — reused by all baked wall materials; worker path stays until Phase 2.
+- Validate under all lighting presets + postprocessing; graceful fallback; tests.
+- **Fast-follow (tracked, not gating):** wood **paneling** and **brick** via Material Maker.
 
 ### Phase 2 — Replace remaining materials, retire the worker painters
 - Carpet, ceiling, MDF veneer, wood paneling (as variant asset, even if the variant system
@@ -106,8 +130,9 @@ The highest-value swap (wrong look → right look) and it exercises every pipeli
   repeat-visible surfaces: carpet first, then ceiling/walls. WebGL2 GLSL via
   `onBeforeCompile`/ShaderMaterial — no TSL/WebGPU assumptions.
 - Detail normal for close-up VR inspection where needed.
-- **Runtime tint/HSV hue-shift hook** in the material path — recolor walls/carpet at runtime
-  (themes, variants) without rebaking. Cheap; not gated to high quality tiers.
+- ~~**Runtime tint/HSV hue-shift hook**~~ — **pulled forward into Phase 1** (delivered on walls
+  with an in-scene color picker; the same `onBeforeCompile` mechanism extends to carpet/other
+  surfaces as they adopt it). Recolor at runtime (themes, variants) without rebaking; cheap.
 - Each feature gated by graphics quality tier with plain-repeat fallback (graceful degradation
   is a hard requirement — this is the layer with a frame cost, unlike the textures themselves).
 - **Research spike (timeboxed, scheduled per owner):** MM-graph → WebGL2 GLSL extraction

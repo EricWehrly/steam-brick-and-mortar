@@ -16,6 +16,12 @@
       "Bash(git log:*)",
       "Bash(git show:*)",
       "Bash(git branch:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh search:*)",
       "Read(//F:/FilePrograms/Dropbox/Projects/material-maker/**)"
     ],
     "additionalDirectories": [
