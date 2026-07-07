@@ -303,7 +303,9 @@ export class RoomManager {
     private ensureWalls(dimensions: RoomDimensions): void {
         if (!this.roomGroup) return
         
-        const wallMaterial = this.materialManager.getMaterial(MaterialType.WallWood)
+        // Default wall material: painted drywall (was WallWood -- wrong look, wood planks).
+        // WallWood is retained as the future wood-paneling variant (Room Variants / Cozy Basement).
+        const wallMaterial = this.materialManager.getMaterial(MaterialType.WallPaint)
         const glassMaterial = this.materialManager.getMaterial(MaterialType.Glass)
         const halfHeight = dimensions.height / 2
         

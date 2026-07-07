@@ -30,6 +30,7 @@ import {
     WALL_WOOD_DIFFUSE_OPTIONS,
     WALL_WOOD_NORMAL_OPTIONS,
 } from './materials/presets/woodTextureProfiles'
+import { WALL_DRYWALL_DIFFUSE_OPTIONS, WALL_DRYWALL_NORMAL_OPTIONS } from './materials/presets/wallDrywallTextureProfiles'
 
 
 
@@ -41,6 +42,7 @@ export enum MaterialType {
     Carpet          = 'carpet',
     Ceiling         = 'ceiling',
     WallWood        = 'wallWood',
+    WallPaint       = 'wallPaint',
     Glass           = 'glass'
 }
 
@@ -115,6 +117,7 @@ export class SharedMaterialManager {
                 this.prewarmCarpet(worker),
                 this.prewarmCeiling(worker),
                 this.prewarmWallWood(worker),
+                this.prewarmWallPaint(worker),
             ])
 
             SharedMaterialManager.logger.debug(
@@ -253,6 +256,26 @@ export class SharedMaterialManager {
         )
     }
 
+    private async prewarmWallPaint(worker: ProceduralTextureWorker): Promise<void> {
+        const [d, n] = await Promise.all([
+            worker.generate('wall_drywall', { ...WALL_DRYWALL_DIFFUSE_OPTIONS }),
+            worker.generate('wall_drywall_normal', { ...WALL_DRYWALL_NORMAL_OPTIONS }),
+        ])
+        // repeat(4, 3): tuning value -- adjust once seen at real wall scale.
+        const diffuse = this.bitmapToTexture(d, 4, 3)
+        const normal  = this.bitmapToTexture(n, 4, 3)
+
+        FrameBudgetScheduler.getInstance().schedule(
+            () => this.upsertMaterial(MaterialType.WallPaint,
+                new THREE.MeshStandardMaterial({
+                    map: diffuse,
+                    normalMap: normal,
+                    roughness: 0.9, metalness: 0.0,
+                })),
+            { priority: 'normal', estimatedMs: 2, maxDeferMs: 0 }
+        )
+    }
+
     /** Wrap an ImageBitmap in a repeating THREE.Texture. */
     private bitmapToTexture(bitmap: ImageBitmap, repeatX: number, repeatY: number): THREE.Texture {
         const texture = new THREE.Texture(bitmap)
@@ -333,6 +356,7 @@ export class SharedMaterialManager {
             case MaterialType.Carpet:
             case MaterialType.Ceiling:
             case MaterialType.WallWood:
+            case MaterialType.WallPaint:
                 SharedMaterialManager.logger.debug(
                     `getMaterial(${type}) called before prewarm() — returning flat-color fallback (prewarm not yet complete)`
                 )
@@ -348,10 +372,11 @@ export class SharedMaterialManager {
      */
     private createProceduralFallback(type: MaterialType): THREE.MeshStandardMaterial {
         const FALLBACK_COLORS: Record<string, number> = {
-            [MaterialType.MdfVeneer]: 0xE6D3B7,
-            [MaterialType.Carpet]:    0x8B0000,
-            [MaterialType.Ceiling]:   0xF5F5DC,
-            [MaterialType.WallWood]:  0x8B4513,
+            [MaterialType.MdfVeneer]:  0xE6D3B7,
+            [MaterialType.Carpet]:     0x8B0000,
+            [MaterialType.Ceiling]:    0xF5F5DC,
+            [MaterialType.WallWood]:   0x8B4513,
+            [MaterialType.WallPaint]:  0xC4A052,
         }
         return new THREE.MeshStandardMaterial({
             color:     FALLBACK_COLORS[type] ?? 0x888888,

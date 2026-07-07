@@ -2,7 +2,12 @@
 
 **Parent:** [`procedural-textures-project-plan.md`](procedural-textures-project-plan.md) (Phase 1)
 **Pipeline/tooling:** [`procedural-materials-pipeline-plan.md`](procedural-materials-pipeline-plan.md) · bake harness `materials/scripts/mm-bake.ps1` · library `materials/README.md`
-**Status:** Ready to start (Phase 0 complete).
+**Status:** In progress. **WS1 (procedural drywall) landed 2026-07-07** — `wall-drywall.ts`
+painter (mottled-mustard albedo + subtle orange-peel normal) registered as a worker type,
+wired into `SharedMaterialManager` as `MaterialType.WallPaint`, and set as the default wall
+material in `RoomManager` (replacing `WallWood`, which is retained for the paneling variant).
+Owner has not yet visually judged the look in-app. WS2 (Material Maker authoring), WS3
+(sourced), and WS4 (recolor + selector UI) not started.
 
 ---
 

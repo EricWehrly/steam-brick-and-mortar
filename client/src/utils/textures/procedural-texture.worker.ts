@@ -17,6 +17,7 @@ import { paintCarpetNormal, type CarpetNormalOptions } from './painters/carpet-n
 import { paintCarpetEnhanced, type CarpetEnhancedOptions } from './painters/carpet-enhanced'
 import { paintCeilingPopcorn, paintCeilingPopcornNormal, type CeilingPopcornOptions, type CeilingPopcornNormalOptions } from './painters/ceiling-popcorn'
 import { paintCeilingEnhanced, type CeilingEnhancedOptions } from './painters/ceiling-enhanced'
+import { paintWallDrywall, paintWallDrywallNormal, type WallDrywallOptions, type WallDrywallNormalOptions } from './painters/wall-drywall'
 
 // Worker global scope
 const ctx: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope
@@ -35,6 +36,8 @@ export type ProceduralTextureType =
     | 'ceiling_popcorn'
     | 'ceiling_popcorn_normal'
     | 'ceiling_enhanced'
+    | 'wall_drywall'
+    | 'wall_drywall_normal'
 
 export interface GenerateTextureMessage {
     type: 'GENERATE'
@@ -98,6 +101,12 @@ async function handleGenerate(msg: GenerateTextureMessage): Promise<void> {
             break
         case 'ceiling_enhanced':
             paintCeilingEnhanced(data, width, height, options as CeilingEnhancedOptions)
+            break
+        case 'wall_drywall':
+            paintWallDrywall(data, width, height, options as WallDrywallOptions)
+            break
+        case 'wall_drywall_normal':
+            paintWallDrywallNormal(data, width, height, options as WallDrywallNormalOptions)
             break
         default:
             ctx.postMessage({
