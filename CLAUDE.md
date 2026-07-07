@@ -63,7 +63,7 @@ These rules apply to all production runtime paths. They are not preferences.
 ### Git
 - Stage only files you modified: `git add <file1> <file2>` — never `git add -A`
 - Meaningful commits: group related changes, describe what and why
-- Don't mix implementation with documentation in the same commit
+- **Don't mix planning with implementation.** Land planning docs (plans, open questions, roadmap/act updates) in their own commit *before* starting the work they describe — planning and building are different phases. Docs that are part of *landing* a change (updating a feature doc's status/acceptance criteria, linking the new plan) belong with that implementation commit; the rule separates phases, not "docs" from "code."
 - Secrets: `.env` files locally, AWS Secrets Manager in production — never commit keys
 
 ### Terraform
