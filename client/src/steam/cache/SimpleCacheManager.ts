@@ -173,6 +173,19 @@ export class CacheManager {
     }
 
     /**
+     * Remove entries whose unprefixed key starts with the given prefix (e.g. all
+     * "resolve_*" entries), leaving unrelated entries untouched. Saves immediately.
+     */
+    deleteByPrefix(prefix: string): void {
+        for (const key of this.getAllKeys()) {
+            if (key.startsWith(prefix)) {
+                this.cache.delete(this.config.cachePrefix + key)
+            }
+        }
+        this.saveImmediately()
+    }
+
+    /**
      * Force immediate save to storage (for critical operations)
      */
     saveImmediately(): void {

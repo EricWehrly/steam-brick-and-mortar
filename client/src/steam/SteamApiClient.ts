@@ -6,6 +6,8 @@ import { Logger } from '../utils/Logger'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import type { SteamGameMetadata } from './types/SteamMetadata'
 import { GamesLoader } from './GamesLoader'
+import { EventManager } from '../core/EventManager'
+import { SteamEventTypes } from '../types/InteractionEvents'
 
 export interface SteamGame extends SteamGameMetadata {
     appid: number
@@ -72,6 +74,9 @@ export class SteamApiClient {
         this.appDetailsCache.init().catch(error => {
             console.warn('⚠️ [SteamApiClient] Failed to initialize app details cache:', error)
         })
+        
+        const eventManager = EventManager.getInstance();
+        eventManager.registerEventHandler(SteamEventTypes.UserClear, this.clearCurrentUser.bind(this))
 
         this.gamesLoader = new GamesLoader(
             this.appDetailsCache,
@@ -192,6 +197,15 @@ export class SteamApiClient {
     public async clearCache(): Promise<void> {
         this.cache.clear()
         await this.appDetailsCache.clear()
+    }
+
+    /**
+     * Clears the cached user identity (vanity URL -> steamid resolution) only.
+     * Leaves the per-profile games cache and the artwork cache untouched - those are
+     * separate cache domains, refilled downstream once a new user is resolved.
+     */
+    public clearCurrentUser(): void {
+        this.cache.deleteByPrefix('resolve_')
     }
 
     public getCacheManager(): CacheManager { return this.cache }

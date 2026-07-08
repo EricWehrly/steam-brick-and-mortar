@@ -16,7 +16,7 @@ import { AppSettings } from '../../../core/AppSettings'
 import { EventManager } from '../../../core/EventManager'
 import { EventSource } from '../../../core/EventManager'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
-import { StorePropsEventTypes } from '../../../types/InteractionEvents'
+import { StorePropsEventTypes, SteamEventTypes, type SteamUserClearEvent } from '../../../types/InteractionEvents'
 
 export interface SteamSettings {
     // Steam Profile Settings (autoLoadProfile moved to AppSettings)
@@ -229,8 +229,32 @@ export class GameSettingsPanel extends PauseMenuPanel {
             {
                 buttonId: 'export-game-settings',
                 onClick: this.exportSettings.bind(this)
+            },
+            {
+                buttonId: 'reset-cached-profile',
+                onClick: this.clearCachedProfileAndReload.bind(this)
             }
         ])
+    }
+
+    /**
+     * Clears the cached Steam user identity and reloads. Games and artwork caches are
+     * untouched — only the vanity-url/steamid resolution is cleared, so the app has no
+     * profile to fall back to and lands on the anonymous store on the next load.
+     */
+    // TODO: look into preventing the multi-tab issue
+    private clearCachedProfileAndReload(): void {
+        const confirmed = window.confirm(
+            'Clear the cached Steam profile and reload?\n\n' +
+            'Game and artwork caches are left intact.\n\n' +
+            'If another tab or window has this app open, its cache may write back after reload — close them first for a clean reset.'
+        )
+        if (!confirmed) return
+
+        EventManager.getInstance().emit<SteamUserClearEvent>(SteamEventTypes.UserClear, {
+            source: EventSource.UI
+        })
+        window.location.reload()
     }
 
     private updateSetting<K extends keyof SteamSettings>(key: K, value: SteamSettings[K]): void {

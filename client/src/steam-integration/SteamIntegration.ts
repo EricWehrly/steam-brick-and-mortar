@@ -15,10 +15,11 @@ import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
 import type { SteamGameData } from '../scene'
 import { EventManager } from '../core/EventManager'
-import { SteamEventTypes, AppSettingsEventTypes, GameEventTypes, AppEventTypes } from '../types/InteractionEvents'
+import { SteamEventTypes, AppSettingsEventTypes, GameEventTypes } from '../types/InteractionEvents'
 import type {
     SteamLoadLibraryEvent,
     SteamCacheClearEvent,
+    SteamUserClearEvent,
     SteamGamesBatchEvent,
     SteamDataLoadedEvent,
     SteamLibraryManifestReadyEvent,
@@ -216,26 +217,26 @@ export class SteamIntegration {
     private async handleGameStart(): Promise<void> {
         const cachedUsers = this.steamClient.getCachedUsers()
 
-        // Empty-start fallback: load demo games when no cached profile exists.
-        // This keeps first-run experiences from stalling on an empty world.
-        if (cachedUsers.length === 0) {
-            SteamIntegration.logger.info('No cached user - loading anonymous store')
-            await this.loadDemoGames()
+        if (cachedUsers.length > 0 && AppSettings.get('autoLoadProfile')) {
+            const user = cachedUsers[0]
+            SteamIntegration.logger.info(`Auto-load: ${user.displayName} (${user.vanityUrl})`)
+
+            this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
+                userInput: user.vanityUrl
+            })
             return
         }
 
-        if (!AppSettings.get('autoLoadProfile')) {
-            SteamIntegration.logger.debug('Auto-load disabled')
-            this.eventManager.emit(AppEventTypes.StartupComplete, {})
-            return
-        }
-
-        const user = cachedUsers[0]
-        SteamIntegration.logger.info(`Auto-load: ${user.displayName} (${user.vanityUrl})`)
-
-        this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
-            userInput: user.vanityUrl
-        })
+        // Fallback to the demo/anonymous store whenever we're not auto-loading a real
+        // profile - covers both the true first-run case and auto-load being toggled off.
+        // Without this, a cached profile + disabled auto-load left the scene permanently
+        // empty (no shelves, no boxes) until the user manually submitted a profile.
+        SteamIntegration.logger.info(
+            cachedUsers.length === 0
+                ? 'No cached user - loading anonymous store'
+                : 'Auto-load disabled - loading anonymous store'
+        )
+        await this.loadDemoGames()
     }
 
     /**
