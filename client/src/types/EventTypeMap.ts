@@ -14,6 +14,7 @@ import type {
     SteamEventTypes,
     SteamLoadLibraryEvent,
     SteamCacheClearEvent,
+    SteamUserClearEvent,
     SteamCacheStatsEvent,
     SteamImageCacheClearEvent,
     SteamDataLoadedEvent,
@@ -51,6 +52,7 @@ export interface InteractionEventMap {
     // Steam events
     [SteamEventTypes.LoadLibrary]: SteamLoadLibraryEvent
     [SteamEventTypes.CacheClear]: SteamCacheClearEvent
+    [SteamEventTypes.UserClear]: SteamUserClearEvent
     [SteamEventTypes.CacheStats]: SteamCacheStatsEvent
     [SteamEventTypes.ImageCacheClear]: SteamImageCacheClearEvent
     // Integration/session signal (UI/cache refresh)

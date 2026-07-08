@@ -246,9 +246,16 @@ export interface SteamCacheClearEvent extends BaseInteractionEvent {
     // No additional data needed
 }
 
+/** Clears only the cached user identity (vanity-url/steamid resolution) - games and artwork caches are untouched. */
+export interface SteamUserClearEvent extends BaseInteractionEvent {
+    // No additional data needed
+}
+
 export const SteamEventTypes = {
     LoadLibrary: 'steam:load-library',
     CacheClear: 'steam:cache-clear',
+    /** Clears only the cached user identity - see SteamUserClearEvent. */
+    UserClear: 'steam:user-clear',
     CacheStats: 'steam:cache-stats',
     ImageCacheClear: 'steam:image-cache-clear',
     /** Session/integration signal (UI/cache panels), not pipeline readiness. */
