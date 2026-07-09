@@ -42,7 +42,6 @@ export interface AppConfig {
         mouseSensitivity?: number
     }
     steam?: {
-        apiBaseUrl?: string
         maxGames?: number
     }
     data?: {
@@ -52,8 +51,6 @@ export interface AppConfig {
     }
     tests?: Record<string, string>
 }
-
-const BACKEND_URL = 'https://steam-api-dev.wehrly.com';
 
 export class SteamBrickAndMortarApp {
     private readonly config: AppConfig // Store config for potential recreation
@@ -124,7 +121,6 @@ export class SteamBrickAndMortarApp {
 
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating SteamIntegration')
         this.steamIntegration = new SteamIntegration({
-            apiBaseUrl: config.steam?.apiBaseUrl ?? BACKEND_URL,
             maxGames: maxGames
         })
 

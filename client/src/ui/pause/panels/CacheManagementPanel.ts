@@ -8,7 +8,7 @@ import { PauseMenuPanel, type PauseMenuPanelConfig } from '../PauseMenuPanel'
 import { renderTemplate } from '../../../utils/TemplateEngine'
 import cacheManagementPanelTemplate from '../templates/cache-management-panel.html?raw'
 import { PixelDataCache } from '../../../scene/game-box/instancing/PixelDataCache'
-import { steamApi } from '../../../steam/SteamApiClient'
+import { SteamApiClient } from '../../../steam/SteamApiClient'
 import { EventManager, EventSource } from '../../../core/EventManager'
 import { SteamEventTypes } from '../../../types/InteractionEvents'
 import '../../../styles/pause-menu/cache-management-panel.css'
@@ -172,7 +172,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
      */
     private async loadCachedUsers(): Promise<void> {
         try {
-            this.cachedUsers = steamApi.getCachedUsers()
+            this.cachedUsers = SteamApiClient.getInstance().getCachedUsers()
             this.refreshCachedUsersDropdown()
         } catch (error) {
             console.error('Failed to load cached users:', error)
@@ -434,7 +434,7 @@ export class CacheManagementPanel extends PauseMenuPanel {
             await pixelCache.clear()
             
             // Also clear Steam API cache (metadata)
-            steamApi.clearCache()
+            await SteamApiClient.getInstance().clearCache()
 
             this.showSuccess('Cache cleared successfully')
             this.updateCacheStats()

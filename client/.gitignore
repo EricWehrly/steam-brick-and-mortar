@@ -12,6 +12,11 @@ dist/
 build/
 *.tsbuildinfo
 
+# Generated bookmarklet/userscript output (yarn build:bookmarklets) — export-library.js is the
+# checked-in source; these are derived, regenerate on demand.
+public/bookmarklets/export-library.min.js
+public/bookmarklets/export-library.user.js
+
 # Development
 .vite/
 .vitest/
@@ -19,6 +24,7 @@ coverage/
 
 # Environment
 .env
+.env.tauri
 .env.local
 .env.*.local
 

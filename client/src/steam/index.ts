@@ -6,7 +6,6 @@
 
 export {
     SteamApiClient,
-    steamApi,
     type SteamGame,
     type SteamUser,
     type SteamResolveResponse,

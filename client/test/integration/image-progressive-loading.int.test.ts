@@ -30,7 +30,8 @@ describe('Progressive Loading Integration Tests', () => {
         vi.clearAllMocks()
         
         // Create fresh Steam client
-        steamClient = new SteamApiClient('https://test-api.example.com')
+        SteamApiClient.dispose()
+        steamClient = SteamApiClient.getInstance()
     })
 
     afterEach(() => {

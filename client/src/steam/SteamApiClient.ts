@@ -53,9 +53,8 @@ const CACHED_USER_TTL = 48 * 60 * 60 * 1000 // 48 hours in milliseconds
  * Steam API client. Public surface kept intentionally small — heavy lifting
  * (progressive game loading, batch fetching, caching) lives in GamesLoader.
  */
-// TODO: make this class a singleton
-// but we need to resolve the two separate in-flight sets of changes first
 export class SteamApiClient {
+    private static instance: SteamApiClient | null = null
     private static readonly logger = Logger.createLogFunctions(SteamApiClient.name)
     private http: HttpClient
     private cache: CacheManager
@@ -65,8 +64,8 @@ export class SteamApiClient {
     private bakedCacheLoader: BakedCacheLoader
     private gamesLoader: GamesLoader
 
-    // TODO: resolve apiBaseUrl from terraform outputs
-    constructor(apiBaseUrl = 'https://steam-api-dev.wehrly.com') {
+    private constructor() {
+        const apiBaseUrl = import.meta.env.VITE_STEAM_API_BASE_URL
         this.http = new HttpClient({ baseUrl: apiBaseUrl })
         // Make the global cache duration infinite so items stay forever unless given a specific TTL
         this.cache = new CacheManager({ cachePrefix: 'steam_api_', cacheDuration: Infinity })
@@ -92,6 +91,18 @@ export class SteamApiClient {
             this.batchClient,
             SteamApiClient.logger
         )
+    }
+
+    public static getInstance(): SteamApiClient {
+        if (!SteamApiClient.instance) {
+            SteamApiClient.instance = new SteamApiClient()
+        }
+        return SteamApiClient.instance
+    }
+
+    /** For testing - resets the singleton so the next getInstance() call constructs fresh. */
+    public static dispose(): void {
+        SteamApiClient.instance = null
     }
 
     public async resolveVanityUrl(vanityUrl: string, ignoreCache = false): Promise<SteamResolveResponse> {
@@ -265,6 +276,3 @@ export class SteamApiClient {
         return cachedUsers.sort((a, b) => a.displayName.localeCompare(b.displayName))
     }
 }
-
-// Export a default instance for convenience
-export const steamApi = new SteamApiClient()

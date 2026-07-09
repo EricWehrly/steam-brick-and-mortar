@@ -82,7 +82,8 @@ describe('SteamApiClient Integration Tests', () => {
         localStorageMock.storage.clear()
         
         // Create fresh client instance
-        client = new SteamApiClient('https://test-api.example.com')
+        SteamApiClient.dispose()
+        client = SteamApiClient.getInstance()
     })
 
     describe('Cache Integration', () => {

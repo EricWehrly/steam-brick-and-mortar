@@ -5,7 +5,7 @@ import { renderTemplate } from '../utils/TemplateEngine'
 import uiErrorTemplate from '../templates/ui/error.html?raw'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
-import { steamApi } from '../steam'
+import { SteamApiClient } from '../steam'
 
 export class UIManager {
   private static instance: UIManager | null = null
@@ -37,7 +37,7 @@ export class UIManager {
 
   private async showCacheStats(): Promise<void> {
     try {
-      const cacheManager = steamApi.getCacheManager()
+      const cacheManager = SteamApiClient.getInstance().getCacheManager()
       const stats = cacheManager.getStats()
 
       if (stats) {

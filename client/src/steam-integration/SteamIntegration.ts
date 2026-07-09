@@ -34,7 +34,6 @@ import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 import type { StorePropsLibraryReloadRequestEvent } from '../scene/props/PropsEvents'
 
 export interface SteamIntegrationConfig {
-    apiBaseUrl?: string
     maxGames?: number
 }
 
@@ -57,7 +56,6 @@ export class SteamIntegration {
     private eventManager: EventManager
     private steamId: string
     private config: {
-        apiBaseUrl: string
         maxGames: number
     }
 
@@ -67,12 +65,11 @@ export class SteamIntegration {
 
     constructor(config: SteamIntegrationConfig = {}) {
         this.config = {
-            apiBaseUrl: config.apiBaseUrl || 'https://steam-api-dev.wehrly.com',
             maxGames: config.maxGames || 10
         }
 
         this.eventManager = EventManager.getInstance()
-        this.steamClient = new SteamApiClient(this.config.apiBaseUrl)
+        this.steamClient = SteamApiClient.getInstance()
         this.gameLibrary = new GameLibraryManager()
 
         SteamIntegration._instance = this
