@@ -15,21 +15,21 @@ import type {
 import type { SteamGame, SteamUser } from './SteamApiClient'
 
 export class GamesLoader {
+    private static readonly logger = Logger.createLogFunctions(GamesLoader.name)
+    private logger = GamesLoader.logger
+    
     private appDetailsCache: AppDetailsCache
     private cache: CacheManager
     private batchClient: BatchAppDetailsClient
-    private logger: ReturnType<typeof Logger.createLogFunctions>
 
     constructor(
         appDetailsCache: AppDetailsCache,
         cache: CacheManager,
-        batchClient: BatchAppDetailsClient,
-        logger: ReturnType<typeof Logger.createLogFunctions>
+        batchClient: BatchAppDetailsClient
     ) {
         this.appDetailsCache = appDetailsCache
         this.cache = cache
         this.batchClient = batchClient
-        this.logger = logger
     }
 
     /**

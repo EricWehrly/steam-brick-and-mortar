@@ -88,8 +88,7 @@ export class SteamApiClient {
         this.gamesLoader = new GamesLoader(
             this.appDetailsCache,
             this.cache,
-            this.batchClient,
-            SteamApiClient.logger
+            this.batchClient
         )
     }
 
