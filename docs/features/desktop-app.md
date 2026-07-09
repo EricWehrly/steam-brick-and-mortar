@@ -39,10 +39,12 @@ Distinct from the table above — this is a capability the desktop app *improves
 unlocks, since the browser can already do it via the [manual export
 bookmarklet](../plans/manual-library-export-feasibility.md). On desktop the user installs nothing:
 Tauri opens a second WebView2 window pointed at `steamcommunity.com`; the user logs in (cookies
-live in WebView2); we inject the same `rgGames`-reading JS and return the result over Tauri IPC.
-No `javascript:` install friction, no file round-trip, and it still works for **private** libraries.
-A Rust-side variant (CORS-free authenticated fetch of the `?xml=1` feed after login) is possible
-too, but the injected-webview route is cleaner. Net effect: the "bookmarklet" becomes an integrated
+live in WebView2); we inject the same extraction JS the web bookmarklet uses
+(`client/public/bookmarklets/export-library.js` — mines the React Query hydration blob on the
+games page; the old `rgGames`/`?xml=1` routes are confirmed dead, see
+[`manual-library-export-feasibility.md`](../plans/manual-library-export-feasibility.md)) and
+return the result over Tauri IPC. No `javascript:` install friction, no file round-trip, and it
+still works for **private** libraries. Net effect: the "bookmarklet" becomes an integrated
 **"Connect Steam"** button on desktop. Enrichment then has a native route as well — Rust can fetch
 `store.steampowered.com/api/appdetails` with no browser CORS, which is what lets the desktop build
 reach near-zero Steam traffic (see [Traffic Safety Review](../plans/traffic-safety-review.md)).

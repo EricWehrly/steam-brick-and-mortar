@@ -33,7 +33,7 @@ Three sources, in rough order of how much we've addressed them:
 | Traffic source | Reduction mechanism | Residual Steam traffic |
 |---|---|---|
 | Ownership list | **Manual export** (web bookmarklet) / **injected-webview capture** (desktop) — the user's own browser reads their own library; our infra never asks Steam | **Zero** for imported libraries. Online profile path still costs one Steam call per load |
-| Enrichment | **Bake the whole S3 cache into the release** (`aws s3 sync`, see [Release Pipeline](release-pipeline-plan.md)). A shipped instance already holds everything the Lambda has ever cached | Only genuine **cache-misses** (appids never seen before) reach Steam. On **desktop**, even those can go via Rust (CORS-free direct fetch) without the Lambda |
+| Enrichment | **Bake the whole S3 cache into the release** (`aws s3 sync`, see [Release Pipeline](release-pipeline-plan.md)). A shipped instance already holds everything the Lambda has ever cached | Only genuine **cache-misses** (appids never seen before) reach Steam. On **desktop**, even those can go via Rust (CORS-free direct fetch) without the Lambda. Note: Steam's `appdetails` endpoint has no batch/array mode (confirmed in `steam-api.js`) — cache hit rate is the only lever on miss volume, not request batching. See [Network Rate Limiting](../features/network-rate-limiting.md) for the full finding |
 | Artwork (CDN) | **Not yet addressed** — the next investigation | Currently **all of it** — every box pulls `library_600x900.jpg` etc. from Steam's CDN |
 
 ## The baked cache changes the enrichment picture a lot
@@ -64,6 +64,14 @@ investigate then (not now): bake common artwork into the release alongside the c
 artwork through our own CloudFront, or lazy/deprioritized loading. Tee'd up as a follow-on to this
 review — do **not** solve it here, but keep the release/bake mechanisms artwork-extensible.
 
+## Separately tracked: the broader Act 3 traffic audit
+
+This review is scoped to what we're actively building right now (Act 2, friends-scale). A second,
+broader pass — measuring actual outbound call volume at *public* scale and building a fresh-data
+batching/coalescing step (collapsing concurrent requests for the same still-uncached appid into one
+Steam call) — is real, necessary follow-on work, but distinct enough in scope and timing to have its
+own tracked story rather than living here. See **Production Infrastructure §9.2.1.4** (linked below).
+
 ## The two spikes this review wants stood up
 
 Both are prepped as self-contained briefs for a fresh (cheaper-model) context:
@@ -76,6 +84,8 @@ Both are prepped as self-contained briefs for a fresh (cheaper-model) context:
 - [Manual Library Export](manual-library-export-feasibility.md) — the ownership-traffic replacement
 - [Desktop App](../features/desktop-app.md) — the native routes that get desktop to near-zero
 - [Steam API Research](../research/steam-api-research.md) — original CORS/Lambda rationale
+- [Network Rate Limiting](../features/network-rate-limiting.md) — confirmed appdetails batching ceiling; current outbound-traffic implementation
+- [Production Infrastructure §9.2.1.4](../features/production-infrastructure.md) — the tracked early-Act-3 audit + coalescing story
 
 ---
 *— A1 / P1*
