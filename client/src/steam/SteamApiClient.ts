@@ -4,6 +4,7 @@ import { RateLimiter } from './rate-limit/RateLimiter'
 import { BatchAppDetailsClient } from './batch/BatchAppDetailsClient'
 import { Logger } from '../utils/Logger'
 import { AppDetailsCache } from './cache/AppDetailsCache'
+import { BakedCacheLoader } from './cache/BakedCacheLoader'
 import type { SteamGameMetadata } from './types/SteamMetadata'
 import { GamesLoader } from './GamesLoader'
 import { EventManager } from '../core/EventManager'
@@ -52,6 +53,8 @@ const CACHED_USER_TTL = 48 * 60 * 60 * 1000 // 48 hours in milliseconds
  * Steam API client. Public surface kept intentionally small — heavy lifting
  * (progressive game loading, batch fetching, caching) lives in GamesLoader.
  */
+// TODO: make this class a singleton
+// but we need to resolve the two separate in-flight sets of changes first
 export class SteamApiClient {
     private static readonly logger = Logger.createLogFunctions(SteamApiClient.name)
     private http: HttpClient
@@ -59,6 +62,7 @@ export class SteamApiClient {
     private rateLimiter: RateLimiter
     private batchClient: BatchAppDetailsClient
     private appDetailsCache: AppDetailsCache
+    private bakedCacheLoader: BakedCacheLoader
     private gamesLoader: GamesLoader
 
     // TODO: resolve apiBaseUrl from terraform outputs
@@ -69,12 +73,16 @@ export class SteamApiClient {
         this.rateLimiter = new RateLimiter({ requestsPerSecond: 4 })
         this.batchClient = new BatchAppDetailsClient(apiBaseUrl)
         this.appDetailsCache = new AppDetailsCache()
-        
-        // Initialize app details cache
-        this.appDetailsCache.init().catch(error => {
-            console.warn('⚠️ [SteamApiClient] Failed to initialize app details cache:', error)
-        })
-        
+        this.bakedCacheLoader = new BakedCacheLoader(this.appDetailsCache)
+
+        // Initialize app details cache, then seed it from the baked release bundles
+        // (fire-and-forget - never blocks scene startup; no-ops if already warm).
+        this.appDetailsCache.init()
+            .then(() => this.bakedCacheLoader.seedIfNeeded())
+            .catch(error => {
+                console.warn('⚠️ [SteamApiClient] Failed to initialize app details cache:', error)
+            })
+
         const eventManager = EventManager.getInstance();
         eventManager.registerEventHandler(SteamEventTypes.UserClear, this.clearCurrentUser.bind(this))
 

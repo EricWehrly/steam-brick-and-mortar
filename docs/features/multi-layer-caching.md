@@ -33,3 +33,22 @@ Without caching, every session re-fetches all artwork and metadata. At 800+ game
 - Steam CDN usage policies need explicit research — check for domain restrictions or API key requirements before building around it.
 - Self-hosted fallback (Docker-based local cache) is worth designing even if not the default path.
 - Related plan: `docs/plans/texture-cache-refactor-plan.md` — refactor to eliminate redundant blob cache (`ImageManager`), add MED texture caching to `PixelDataCache`, and unify the texture storage layer.
+
+### Cache-buster — tracked, required before Act 3 public ship
+
+A new cache layer landed as part of the [release pipeline](../plans/release-pipeline-plan.md): a
+static baked bundle (`client/public/steam-cache/*.json.gz`) seeded into `AppDetailsCache`
+(IndexedDB) at startup via `BakedCacheLoader`. That loader's "skip if IndexedDB already has entries"
+check is deliberately coarse — it can tell "something is cached" but not "the baked bundle changed
+since this was cached," so a schema change or a bad bake can't currently force a re-seed for existing
+users.
+
+There's a partial building block already in place: `AppDetailsCache.CURRENT_SCHEMA_VERSION` marks
+individual entries stale when the schema changes, forcing a refetch of *those* entries. What's
+missing is the layer above it — one lever that can invalidate **all** cache layers at once (baked
+bundle + IndexedDB + Lambda's S3 cache) when we decide a rebuild is needed, rather than relying on
+each layer's own local staleness logic. Not needed for Act 2 friends-testing. **Required before Act 3
+opens to the public** — without it, a bad bake or a restructuring decision made after shipping means
+every existing client silently keeps stale data with no way to force a refresh, which is exactly the
+kind of thing that turns into unnecessary repeat traffic against Steam (see
+[Traffic Safety Review](../plans/traffic-safety-review.md)).
