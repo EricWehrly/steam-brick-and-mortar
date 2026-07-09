@@ -142,7 +142,6 @@ describe.skip('Performance Measurements', () => {
                 antialias: false // Disable for faster initialization
             },
             steam: {
-                apiBaseUrl: 'http://test.com',
                 maxGames: 10 // Small number for faster tests
             }
         })

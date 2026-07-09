@@ -81,7 +81,6 @@ describe('Steam Data to Texture Integration', () => {
         try {
             app = new SteamBrickAndMortarApp({
                 steam: {
-                    apiBaseUrl: 'https://test-api.example.com',
                     maxGames: 5
                 }
             })

@@ -18,8 +18,8 @@ describe('Steam API Live Tests - Essential Validation', () => {
     let client: SteamApiClient
     
     beforeAll(() => {
-        // Use the actual deployed API endpoint
-        client = new SteamApiClient('https://steam-api-dev.wehrly.com')
+        // Uses the actual deployed API endpoint via VITE_STEAM_API_BASE_URL (client/.env)
+        client = SteamApiClient.getInstance()
     })
 
     describe('Core Live Integration', () => {

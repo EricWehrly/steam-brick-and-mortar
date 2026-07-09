@@ -21,25 +21,28 @@ vi.mock('../../../src/core/EventManager', () => ({
     }
 }))
 
-// Mock the SteamApiClient
-vi.mock('../../../src/steam', () => ({
-    SteamApiClient: vi.fn().mockImplementation(function() {
-        return {
-            resolveVanityUrl: vi.fn(),
-            getUserGames: vi.fn(),
-            loadGamesProgressively: vi.fn(),
-            clearCache: vi.fn(),
-            getCacheStats: vi.fn(),
-            getCacheManager: vi.fn().mockReturnValue({
-                getStats: vi.fn().mockReturnValue({
-                    totalEntries: 0,
-                    totalSize: 0
-                })
-            }),
-            downloadGameArtwork: vi.fn().mockResolvedValue({})
+// Mock the SteamApiClient singleton
+vi.mock('../../../src/steam', () => {
+    const mockSteamApiClient = {
+        resolveVanityUrl: vi.fn(),
+        getUserGames: vi.fn(),
+        loadGamesProgressively: vi.fn(),
+        clearCache: vi.fn(),
+        getCacheStats: vi.fn(),
+        getCacheManager: vi.fn().mockReturnValue({
+            getStats: vi.fn().mockReturnValue({
+                totalEntries: 0,
+                totalSize: 0
+            })
+        }),
+        downloadGameArtwork: vi.fn().mockResolvedValue({})
+    }
+    return {
+        SteamApiClient: {
+            getInstance: vi.fn(() => mockSteamApiClient)
         }
-    })
-}))
+    }
+})
 
 // Mock ValidationUtils
 vi.mock('../../../src/utils', () => ({
@@ -55,7 +58,6 @@ describe('SteamIntegration Unit Tests', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         steamIntegration = new SteamIntegration({
-            apiBaseUrl: 'https://test-api.example.com',
             maxGames: 20
         })
     })
@@ -68,7 +70,6 @@ describe('SteamIntegration Unit Tests', () => {
 
         test('should use custom configuration', () => {
             const customIntegration = new SteamIntegration({
-                apiBaseUrl: 'https://custom-api.example.com',
                 maxGames: 50
             })
             expect(customIntegration).toBeDefined()

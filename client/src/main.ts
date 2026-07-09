@@ -36,10 +36,7 @@ export async function initializeApp(): Promise<void> {
             scene: {
                 antialias: true
             },
-            steam: {
-                apiBaseUrl: 'https://steam-api-dev.wehrly.com'
-                // maxGames will be determined by AppSettings developmentMode default (20 when dev mode is enabled)
-            },
+            // steam.maxGames will be determined by AppSettings developmentMode default (20 when dev mode is enabled)
             input: {
                 speed: 0.1,
                 mouseSensitivity: 0.005
