@@ -83,6 +83,7 @@ export const Setting = {
     // Steam
     AutoLoadProfile: 'autoLoadProfile',
     DevelopmentMode: 'developmentMode',
+    MaxGames: 'maxGames',
     // Input
     InputProfile: 'inputProfile',
     InputBindings: 'inputBindings',
@@ -173,7 +174,8 @@ export interface ApplicationSettings {
     
     // Steam Settings (moved from GameSettings for centralization)
     autoLoadProfile: boolean
-    developmentMode: boolean // Limit to 20 games for testing
+    developmentMode: boolean
+    maxGames: number // How many games to load per profile; defaults lower in dev mode for faster iteration
 
     // Input Settings
     inputProfile: string
@@ -489,9 +491,10 @@ export class AppSettings {
             // General Settings
             autoSave: true,
             
-            // Steam Settings  
+            // Steam Settings
             autoLoadProfile: true,
             developmentMode: isDev, // Default based on environment
+            maxGames: isDev ? 20 : 9999,
 
             // Input Settings
             inputProfile: 'mouse-keyboard',
@@ -527,7 +530,7 @@ export class AppSettings {
             }
         }
 
-        const numberFields = ['pixelRatioScale', 'toneMappingExposure', 'environmentIntensity']
+        const numberFields = ['pixelRatioScale', 'toneMappingExposure', 'environmentIntensity', 'maxGames']
         for (const field of numberFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'number') {
                 return false

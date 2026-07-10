@@ -42,11 +42,12 @@ describe('SteamIntegration demo load ordering', () => {
     beforeEach(() => {
         DataManager.getInstance().clear()
         EventManager.getInstance().removeAllListeners()
+        SteamIntegration.dispose()
         vi.clearAllMocks()
     })
 
     it('emits readiness before batch events and yields between multi-batch emissions', async () => {
-        const integration = new SteamIntegration()
+        const integration = SteamIntegration.getInstance()
         const eventManager = EventManager.getInstance()
         const originalEmit = eventManager.emit.bind(eventManager)
         const emitSpy = vi.spyOn(eventManager, 'emit').mockImplementation((...args) => {

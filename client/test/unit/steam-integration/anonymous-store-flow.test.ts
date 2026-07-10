@@ -25,6 +25,7 @@ describe('Anonymous Store Data Storage (Bug Fix)', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        SteamIntegration.dispose()
         dataManager = DataManager.getInstance()
         dataManager.clear()
         eventManager = EventManager.getInstance()
@@ -66,7 +67,7 @@ describe('Anonymous Store Data Storage (Bug Fix)', () => {
     })
 
     it('should mark as anonymous when no userInput is set', () => {
-        const steamIntegration = new SteamIntegration()
+        const steamIntegration = SteamIntegration.getInstance()
 
         // Without calling storeSteamDataAndEmitEvent with a non-null userInput,
         // steam.userInput won't be set in DataManager
@@ -78,7 +79,7 @@ describe('Anonymous Store Data Storage (Bug Fix)', () => {
 
     it('should allow GameSorter to sort anonymous games by genre', async () => {
         // Setup: Create fresh instances
-        const steamIntegration = new SteamIntegration()
+        const steamIntegration = SteamIntegration.getInstance()
         const gameSorter = new GameSorter()
 
         // Simulate: Games in DataManager, no userInput set

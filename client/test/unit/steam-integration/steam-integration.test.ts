@@ -57,23 +57,8 @@ describe('SteamIntegration Unit Tests', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
-        steamIntegration = new SteamIntegration({
-            maxGames: 20
-        })
-    })
-
-    describe('Configuration', () => {
-        test('should use default configuration when none provided', () => {
-            const defaultIntegration = new SteamIntegration()
-            expect(defaultIntegration).toBeDefined()
-        })
-
-        test('should use custom configuration', () => {
-            const customIntegration = new SteamIntegration({
-                maxGames: 50
-            })
-            expect(customIntegration).toBeDefined()
-        })
+        SteamIntegration.dispose()
+        steamIntegration = SteamIntegration.getInstance()
     })
 
     describe('Cache Management', () => {

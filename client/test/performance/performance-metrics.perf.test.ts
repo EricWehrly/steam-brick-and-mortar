@@ -140,9 +140,6 @@ describe.skip('Performance Measurements', () => {
         app = new SteamBrickAndMortarApp({
             scene: {
                 antialias: false // Disable for faster initialization
-            },
-            steam: {
-                maxGames: 10 // Small number for faster tests
             }
         })
         
