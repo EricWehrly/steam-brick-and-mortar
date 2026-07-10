@@ -13,8 +13,12 @@ renderer visual baseline (tone mapping + environment lighting): see
 ## Where to start
 1. Read the current act doc above — goals, feature list, completion criteria.
 2. Read the relevant feature doc(s) in `features/` for the specific work at hand.
-3. Read `agent-context/startup-sequence.md` to understand the 5-phase startup architecture.
-4. Read `agent-context/component-interaction-map.md` **only when touching the DI/event layer** — deep-dive reference (~1700 lines), not required reading for every task.
+3. Check `../.github/lessons-learned.md` for entries relevant to the work at hand — especially
+   before adding a new load path, persistence key, validation routine, or event that might
+   duplicate something the codebase already has. This is an active step, not an optional
+   reference: skipping it is how duplicate mechanisms get built in the first place.
+4. Read `agent-context/startup-sequence.md` to understand the 5-phase startup architecture.
+5. Read `agent-context/component-interaction-map.md` **only when touching the DI/event layer** — deep-dive reference (~1700 lines), not required reading for every task.
 
 ## Tech Debt Tags
 

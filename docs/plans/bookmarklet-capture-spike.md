@@ -1,9 +1,13 @@
 # Spike: Bookmarklet Library Capture
 
-**Act**: 2 · **Status**: 🔵 Ready to start (self-contained brief for a fresh context) · **Model**: a cheaper model is fine
+**Act**: 2 · **Status**: 🟡 Half built — capture (Tasks 1–2) done and live-verified 2026-07-02; import (Tasks 3–4) remaining, ready for a fresh context · **Model**: a cheaper model is fine
 
 > This brief is intentionally standalone so it can be handed to a fresh, cheaper-model context.
-> Read the two reference docs below first; you should not need the conversation that produced this.
+> Read the reference docs below first; you should not need the conversation that produced this.
+> **Note**: the original version of this brief specified `rgGames`/`?xml=1` as the capture source.
+> Both are confirmed dead (Steam rebuilt profile pages as SSR React since). The real, working
+> mechanism is documented in `manual-library-export-feasibility.md` and already implemented in
+> `client/public/bookmarklets/export-library.js` — read that file, don't re-derive the extraction.
 
 ## Purpose (why this matters)
 
@@ -13,22 +17,28 @@ library. See [Traffic Safety Review](traffic-safety-review.md). This is the web-
 the desktop equivalent is [Rust CORS/Lambda Bypass Spike](rust-cors-bypass-spike.md).
 
 ## Read first
-- [`manual-library-export-feasibility.md`](manual-library-export-feasibility.md) — the full design, endpoint table, and CORS insight. **This spike implements it.**
-- `client/src/steam-integration/SteamIntegration.ts` — `loadGamesForUser` / `loadDemoGames` show the pipeline entry contract (`SteamUser { games: SteamGame[] }`).
-- `client/src/steam/fixtures/demo-games.ts` — how a games array is shaped and batch-emitted with no network.
+- [`manual-library-export-feasibility.md`](manual-library-export-feasibility.md) — the full design, the verified extraction mechanism, and the CORS insight.
+- `client/public/bookmarklets/export-library.js` — **the capture half, already built.** Read this before touching Tasks 1–2; they're done.
+- `client/src/steam-integration/SteamIntegration.ts` — `loadGamesForUser` / `loadDemoGames` show the pipeline entry contract (`SteamUser { games: SteamGame[] }`). Relevant to Task 3.
+- `client/src/steam/fixtures/demo-games.ts` — how a games array is shaped and batch-emitted with no network. Relevant to Task 3.
 
 ## Goal
 A working two-part flow: (1) a bookmarklet that captures the logged-in user's full library from their
 own Steam games page and downloads it as JSON; (2) an app-side import that feeds that JSON into the
-store, rendering with **enrichment disabled** (proving the zero-Steam-traffic path).
+store, rendering with **enrichment disabled** (proving the zero-Steam-traffic path). **Part 1 is done
+— this brief's remaining work is Part 2 (Tasks 3–4).**
 
 ## Tasks
-1. **Live-verify the source.** On `steamcommunity.com/my/games/?tab=all`, confirm the `rgGames` JS
-   variable still embeds the full owned list and capture its **current** field names (`appid`, `name`,
-   `hours_forever`/`playtime_forever`, logo). Confirm the `?xml=1` fallback shape too.
-2. **Build the export bookmarklet** (~15 lines): read `rgGames` → map to
-   `{ appid, name, playtime_forever }` → wrap in `{ schema:'sbam-library-export/v1', game_count, games }`
-   → `Blob` → synthetic `<a download>` Save dialog. Test on Chrome + Firefox.
+1. ✅ **Done.** Live-verified against a real Steam account (2026-07-02). Source is *not* `rgGames`
+   (confirmed dead) — it's a React Query hydration blob embedded in the current SSR games page,
+   keyed by a query named `OwnedGames`. Extraction implemented and tested: 862 games, all fields
+   correct. Full writeup in `manual-library-export-feasibility.md` → "The verified mechanism".
+2. ✅ **Done.** `client/public/bookmarklets/export-library.js` — finds the right `<script>`, extracts
+   the array, maps to `{ appid, name, playtime_forever }`, wraps in
+   `{ schema:'sbam-library-export/v1', game_count, games }`, downloads via `Blob` + synthetic
+   `<a download>`. Extraction logic tested live in-browser; the file itself has not yet been
+   installed as an actual `javascript:` bookmark and click-tested end-to-end, and Firefox is
+   unconfirmed — do that first if picking this up.
 3. **Build the importer** in the client: reuse the file-picker approach from
    [`steam-user-categories-filesystem-plan.md`](steam-user-categories-filesystem-plan.md) §2
    (`showOpenFilePicker` + `<input type=file>` fallback). Parse, validate the schema, map to
@@ -37,10 +47,10 @@ store, rendering with **enrichment disabled** (proving the zero-Steam-traffic pa
    boxes + names + playtime-sort must work from the file + CDN artwork alone.
 
 ## Acceptance
-- [ ] Bookmarklet downloads a valid `steam-library.json` from a real logged-in games page.
+- [x] Bookmarklet downloads a valid `steam-library.json` from a real logged-in games page. (Extraction logic verified live; full click-through-as-installed-bookmark pass still worth doing.)
 - [ ] App imports that file and populates the store.
 - [ ] Store renders with enrichment disabled — **no Steam ownership request made by our code**.
-- [ ] Graceful failure when `rgGames` is absent (clear message; `?xml=1` fallback documented).
+- [x] Graceful failure when the data block is absent (implemented: `alert()` with a clear message, no silent empty import).
 
 ## Verification
 - Manual: log into Steam, open own games page, click bookmarklet, inspect the JSON, import it, watch

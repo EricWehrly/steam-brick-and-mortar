@@ -23,7 +23,33 @@ this.eventManager.emit<VisibilityChangedEvent>(AppEventTypes.VisibilityChanged, 
 // SceneManager.constructor registers its own handler
 ```
 
-Singletons like `EventManager` don't need to be injected — call `EventManager.getInstance()` directly.
+Singletons like `EventManager` don't need to be injected — call `EventManager.getInstance()` directly. See below for the canonical shape.
+
+---
+
+## Singletons
+
+**Canonical pattern** (`EventManager`, `AppSettings`, `SteamApiClient`): private static instance, private constructor, a public static `getInstance()` that lazily constructs on first call.
+
+```typescript
+export class Foo {
+    private static instance: Foo | null = null
+    private constructor() { /* ... */ }
+
+    public static getInstance(): Foo {
+        if (!Foo.instance) {
+            Foo.instance = new Foo()
+        }
+        return Foo.instance
+    }
+}
+```
+
+Call `Foo.getInstance()` directly at the point of use — singletons don't need constructor injection.
+
+If tests need a clean instance between runs, add a `static dispose()` that nulls the instance so the next `getInstance()` call constructs fresh (see `AppSettings.dispose()`, `SteamApiClient.dispose()`).
+
+**Not the pattern to copy**: `SteamIntegration` uses a different shape — `static getInstance(): SteamIntegration | null`, which can return `null`, with the instance assigned *inside the constructor* (`SteamIntegration._instance = this`) rather than lazily created by `getInstance()` itself. This exists because `SteamIntegration` needs bootstrap-supplied config (e.g. `maxGames`) constructed once by `SteamBrickAndMortarApp` — its `getInstance()` only lets other code reach the already-constructed instance, it doesn't create one. Default to the lazy `getInstance()` pattern above for any new singleton; only reach for `SteamIntegration`'s registry-style shape if the class genuinely can't be constructed with no arguments.
 
 ---
 
