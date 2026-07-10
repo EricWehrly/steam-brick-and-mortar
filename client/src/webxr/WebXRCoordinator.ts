@@ -18,13 +18,10 @@ import { EventManager } from '../core/EventManager'
 import { WebXREventTypes } from '../types/InteractionEvents'
 import type { WebXRErrorEvent, WebXRSupportChangeEvent } from '../types/InteractionEvents'
 import { RenderLoopRegistry } from '../scene/RenderLoopRegistry'
+import { AppSettings } from '../core/AppSettings'
 
 export interface WebXRCoordinatorConfig {
     camera: THREE.Camera
-    input?: {
-        speed?: number
-        mouseSensitivity?: number
-    }
 }
 
 /**
@@ -51,9 +48,9 @@ export class WebXRCoordinator {
 
         // Initialize consolidated input manager.
         this.inputManager = new InputManager(
-            { 
-                speed: config.input?.speed ?? 0.075, 
-                mouseSensitivity: config.input?.mouseSensitivity ?? 0.005 
+            {
+                speed: AppSettings.get('inputSpeed'),
+                mouseSensitivity: AppSettings.get('inputMouseSensitivity')
             }
         )
     }

@@ -1,7 +1,7 @@
 /**
  * Scene Coordinator - Complete 3D Scene Management and Coordination
  * 
- * This coordinator manag    private setupRenderer(options: SceneManagerOptions) { scene lifecycle and delegates
+ * This coordinator manages scene lifecycle and delegates
  * specific rendering tasks to specialized renderers:
  * - Three.js scene, camera, and renderer initialization
  * - Lighting and atmospheric setup
@@ -32,11 +32,6 @@ import type { SettingChangedEvent } from '../core/AppSettings'
 import { AppEventTypes, AppSettingsEventTypes } from '../types/InteractionEvents'
 import type { VisibilityChangedEvent } from '../types/InteractionEvents'
 
-export interface SceneManagerOptions {
-    antialias?: boolean
-    outputColorSpace?: THREE.ColorSpace
-}
-
 export class SceneManager {
     private scene: THREE.Scene
     private camera: THREE.PerspectiveCamera
@@ -47,7 +42,7 @@ export class SceneManager {
     private renderLoopRegistry: RenderLoopRegistry
     private envRenderTarget: THREE.WebGLRenderTarget | null = null
 
-    constructor(options: SceneManagerOptions = {}) {
+    constructor() {
         RectAreaLightUniformsLib.init()
 
         this.scene = new THREE.Scene()
@@ -78,14 +73,14 @@ export class SceneManager {
 
         // Swap ThreeWebGLRendererDebug ↔ THREE.WebGLRenderer to toggle shader-compile
         // logging and slow-frame warnings. Both are identical at the type level.
-        this.renderer = new ThreeWebGLRendererDebug({ antialias: options.antialias ?? true })
-        // this.renderer = new THREE.WebGLRenderer({ antialias: options.antialias ?? true })
+        this.renderer = new ThreeWebGLRendererDebug({ antialias: AppSettings.get('antialias') })
+        // this.renderer = new THREE.WebGLRenderer({ antialias: AppSettings.get('antialias') })
         DataManager.getInstance().set(DataKey.Renderer, this.renderer, { domain: DataDomain.Scene })
 
         this.skyboxManager = new SkyboxManager()
         this.renderLoopRegistry = RenderLoopRegistry.getInstance()
 
-        this.setupRenderer(options)
+        this.setupRenderer()
         this.setupEnvironmentLighting()
         this.setupCamera()
         this.renderPipelineManager = new RenderPipelineManager(this.renderer, this.scene, this.camera)
@@ -108,10 +103,10 @@ export class SceneManager {
         }
     }
 
-    private setupRenderer(options: SceneManagerOptions) {
+    private setupRenderer() {
         this.renderer.setSize(window.innerWidth, window.innerHeight)
         this.renderer.setPixelRatio(window.devicePixelRatio)
-        this.renderer.outputColorSpace = options.outputColorSpace ?? THREE.SRGBColorSpace
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace
         // NoToneMapping: RenderPipelineManager owns tone mapping via ToneMappingEffect(AGX).
         // toneMappingExposure still works — AgXToneMapping() in the effect shader reads the uniform.
         this.renderer.toneMapping = THREE.NoToneMapping

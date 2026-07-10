@@ -39,6 +39,7 @@ export const Setting = {
     // Performance
     QualityLevel: 'qualityLevel',
     // Graphics
+    Antialias: 'antialias',
     LightingQuality: 'lightingQuality',
     ShadowQuality: 'shadowQuality',
     ShadowMapEnabled: 'shadowMapEnabled',
@@ -88,6 +89,8 @@ export const Setting = {
     InputProfile: 'inputProfile',
     InputBindings: 'inputBindings',
     InputDevicesEnabled: 'inputDevicesEnabled',
+    InputSpeed: 'inputSpeed',
+    InputMouseSensitivity: 'inputMouseSensitivity',
 } as const
 
 /** Settings grouped by UI panel/category for bulk operations */
@@ -125,6 +128,7 @@ export interface ApplicationSettings {
     qualityLevel: QualityLevel
     
     // Graphics Settings
+    antialias: boolean
     lightingQuality: LightingQuality
     shadowQuality: number // 0=off, 1=low, 2=medium, 3=high, 4=ultra
     shadowMapEnabled: boolean
@@ -181,6 +185,8 @@ export interface ApplicationSettings {
     inputProfile: string
     inputBindings: string
     inputDevicesEnabled: string
+    inputSpeed: number
+    inputMouseSensitivity: number
 }
 
 export interface SettingChangedEvent extends BaseInteractionEvent {
@@ -443,6 +449,7 @@ export class AppSettings {
             
             // TODO: move any values we can into their owning/declaring domains
             // Graphics Settings
+            antialias: true,
             lightingQuality: LIGHTING_QUALITY.ENHANCED,
             shadowQuality: 2, // Medium shadows by default
             shadowMapEnabled: true,
@@ -499,7 +506,9 @@ export class AppSettings {
             // Input Settings
             inputProfile: 'mouse-keyboard',
             inputBindings: '{}',
-            inputDevicesEnabled: '{}'
+            inputDevicesEnabled: '{}',
+            inputSpeed: 0.1,
+            inputMouseSensitivity: 0.005
         }
     }
 
@@ -518,11 +527,12 @@ export class AppSettings {
         
         // Validate boolean fields
         const booleanFields = [
-            'showFPS', 'showPerformanceStats', 'hideUIInVR', 
+            'showFPS', 'showPerformanceStats', 'hideUIInVR',
             'verboseLogging', 'showDebugInfo', 'showCompassRose',
             'autoSave', 'autoLoadProfile', 'developmentMode',
             'enableLabels', 'enableStickers', 'enableArtwork', 'useMultiAtlas', 'useLodAtlas',
-            'enableLighting', 'showLightingDebug', 'showCeiling', 'shadowMapEnabled', 'ssaoEnabled'
+            'enableLighting', 'showLightingDebug', 'showCeiling', 'shadowMapEnabled', 'ssaoEnabled',
+            'antialias'
         ]
         for (const field of booleanFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'boolean') {
@@ -530,7 +540,7 @@ export class AppSettings {
             }
         }
 
-        const numberFields = ['pixelRatioScale', 'toneMappingExposure', 'environmentIntensity', 'maxGames']
+        const numberFields = ['pixelRatioScale', 'toneMappingExposure', 'environmentIntensity', 'maxGames', 'inputSpeed', 'inputMouseSensitivity']
         for (const field of numberFields) {
             if (settingsObj[field] !== undefined && typeof settingsObj[field] !== 'number') {
                 return false
