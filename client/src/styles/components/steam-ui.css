@@ -1,5 +1,8 @@
 /* Steam UI Panel Styles */
 
+/* Structural panel behavior (header layout, collapse, toggle indicator) comes from the shared
+   .ui-panel / .vertically-collapsible system in ui-panel.css - only steam-ui's own visual
+   identity (brand color, background) lives here. */
 #steam-ui {
     position: relative;
     top: auto;
@@ -8,17 +11,35 @@
     background: rgba(0, 0, 0, 0.8);
     border: 1px solid #444;
     border-radius: 8px;
-    padding: 15px;
+    padding: 0;
+    /* Inherited from before the collapse/expand split - unclear if a fixed floor is still
+       needed now that .input-row's own children set their own sizing. Revisit later; leaving
+       as-is for now rather than guessing. */
     min-width: 320px;
     width: auto;
     z-index: 1000;
     backdrop-filter: blur(10px);
+    overflow: hidden;
 }
 
-#steam-ui h2 {
-    margin: 0 0 15px 0;
+/* #steam-ui's own min-width is ID-scoped, so it beats .ui-panel.vertically-collapsed's class-
+   scoped override in ui-panel.css on specificity alone regardless of source order - cancel it
+   here too so the collapsed pill can actually shrink to the header's content width. */
+#steam-ui.vertically-collapsed {
+    width: fit-content;
+    min-width: 0;
+}
+
+#steam-ui .panel-header:hover {
+    background: rgba(0, 170, 255, 0.08);
+}
+
+#steam-ui .panel-header h3 {
     color: #00aaff;
-    font-size: 18px;
+}
+
+#steam-ui .panel-content {
+    padding: 0 15px 15px 15px;
 }
 
 /* Label styling with responsive text */
@@ -175,54 +196,33 @@
     text-overflow: ellipsis;
 }
 
-/* Manual import instructions (bookmarklet install) */
-.import-instructions {
-    margin-top: 8px;
+/* Two branching library-source choices (profile lookup vs. manual import) */
+.library-option {
+    margin-top: 12px;
     padding: 10px 12px;
     border: 1px solid #444;
     border-radius: 4px;
-    background: rgba(0, 170, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
     color: #ccc;
     font-size: 13px;
 }
 
-.import-instructions summary {
-    cursor: pointer;
-    color: #00aaff;
-    font-size: 14px;
-}
-
-.import-instructions p {
+.library-option p {
     margin: 8px 0 0 0;
     line-height: 1.4;
 }
 
-.import-file-help {
-    color: #999;
-    font-size: 12px;
+.library-option-label {
+    margin: 0 !important;
+    color: #00aaff;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
-.console-paste-instructions {
-    margin-top: 8px;
-    padding-left: 4px;
-}
-
-.console-paste-instructions summary {
-    font-size: 12px;
-    color: #999;
-}
-
-.console-paste-instructions pre {
-    margin: 8px 0;
-    padding: 8px;
-    background: #111;
-    border: 1px solid #333;
-    border-radius: 4px;
-    max-height: 160px;
-    overflow: auto;
-    font-size: 11px;
-    color: #ccc;
-    white-space: pre;
+.import-file-link {
+    color: #00aaff;
 }
 
 .bookmarklet-link {

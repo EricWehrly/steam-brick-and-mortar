@@ -107,7 +107,7 @@
     height: 100%;
 }
 
-.panel-content {
+.pause-menu-panel .panel-content {
     color: #ccc;
     min-height: 200px;
     padding: 12px;

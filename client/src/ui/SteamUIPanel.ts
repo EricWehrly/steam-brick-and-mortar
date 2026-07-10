@@ -13,6 +13,7 @@ import type { SteamImportLibraryEvent } from '../types/InteractionEvents'
 import { SteamIntegration } from '../steam-integration/SteamIntegration'
 import { validateLibraryExportPayload } from '../steam-integration/LibrarySource'
 import type { SteamCacheClearEvent } from '../types/InteractionEvents'
+import { togglePanelCollapse } from './components/PanelCollapse'
 import { Logger } from '../utils/Logger'
 import steamCacheStatsTemplate from '../templates/steam-ui/cache-stats.html?raw'
 
@@ -21,26 +22,23 @@ import steamCacheStatsTemplate from '../templates/steam-ui/cache-stats.html?raw'
  *  to the bookmarks bar, and a `//` comment with no real newline left to end it would swallow
  *  everything after it. Fetched at runtime so the install link can't drift from what ships. */
 const BOOKMARKLET_SOURCE_URL = '/bookmarklets/export-library.min.js'
-/** The readable source, for the "paste into console" fallback — a console paste never gets
- *  flattened to one line, so comments are safe there and worth keeping for transparency. */
-const BOOKMARKLET_READABLE_SOURCE_URL = '/bookmarklets/export-library.js'
 
 export class SteamUIPanel {
   private static readonly logger = Logger.createLogFunctions(SteamUIPanel.name)
 
   private eventManager: EventManager
   private steamUI: HTMLElement | null
+  private steamUiHeader: HTMLElement | null
+  private steamUiToggleIndicator: HTMLElement | null
   private steamUserInput: HTMLInputElement | null
   private loadGamesButton: HTMLButtonElement | null
   private loadFromCacheButton: HTMLButtonElement | null
   private refreshCacheButton: HTMLButtonElement | null
   private clearCacheButton: HTMLButtonElement | null
   private showCacheStatsButton: HTMLButtonElement | null
-  private importFromFileButton: HTMLButtonElement | null
+  private importFromFileLink: HTMLAnchorElement | null
   private importFileInput: HTMLInputElement | null
   private bookmarkletInstallLink: HTMLAnchorElement | null
-  private bookmarkletConsoleSource: HTMLElement | null
-  private bookmarkletConsoleCopyButton: HTMLButtonElement | null
   private cacheInfoDiv: HTMLElement | null
   private steamStatus: HTMLElement | null
   private cacheCheckDebounceTimeout: TimeoutHandle | null = null
@@ -50,17 +48,17 @@ export class SteamUIPanel {
 
     // Get UI elements
     this.steamUI = document.getElementById('steam-ui')
+    this.steamUiHeader = document.getElementById('steam-ui-header')
+    this.steamUiToggleIndicator = document.getElementById('steam-ui-toggle-indicator')
     this.steamUserInput = getElementByIdSafe('steam-user-input') as HTMLInputElement
     this.loadGamesButton = getElementByIdSafe('load-steam-games') as HTMLButtonElement
     this.loadFromCacheButton = getElementByIdSafe('load-from-cache') as HTMLButtonElement
     this.refreshCacheButton = getElementByIdSafe('refresh-cache') as HTMLButtonElement
     this.clearCacheButton = getElementByIdSafe('clear-cache') as HTMLButtonElement
     this.showCacheStatsButton = getElementByIdSafe('show-cache-stats') as HTMLButtonElement
-    this.importFromFileButton = getElementByIdSafe('import-from-file') as HTMLButtonElement
+    this.importFromFileLink = getElementByIdSafe('import-from-file-link') as HTMLAnchorElement
     this.importFileInput = getElementByIdSafe('import-file-input') as HTMLInputElement
     this.bookmarkletInstallLink = getElementByIdSafe('bookmarklet-install-link') as HTMLAnchorElement
-    this.bookmarkletConsoleSource = document.getElementById('bookmarklet-console-source')
-    this.bookmarkletConsoleCopyButton = getElementByIdSafe('bookmarklet-console-copy') as HTMLButtonElement
     this.cacheInfoDiv = document.getElementById('cache-info')
     this.steamStatus = document.getElementById('steam-status')
   }
@@ -81,39 +79,21 @@ export class SteamUIPanel {
    * have. Dragging it installs it for later, for completing the capture on the Steam side.
    */
   private initBookmarkletInstallLink(): void {
-    if (this.bookmarkletInstallLink) {
-      fetch(BOOKMARKLET_SOURCE_URL)
-        .then(response => response.text())
-        .then(source => {
-          if (!this.bookmarkletInstallLink) return
-          this.bookmarkletInstallLink.href = `javascript:${source}`
-          // Not preventing default: clicking (not dragging) should run it right here.
-          this.bookmarkletInstallLink.addEventListener('click', () => {
-            this.showStatus('Opening your Steam games page — click the same bookmark again there to finish, or use the console-paste option below.', 'loading')
-          })
-        })
-        .catch(error => {
-          SteamUIPanel.logger.error('Failed to load bookmarklet source for install link:', error)
-        })
-    }
+    if (!this.bookmarkletInstallLink) return
 
-    if (this.bookmarkletConsoleSource || this.bookmarkletConsoleCopyButton) {
-      fetch(BOOKMARKLET_READABLE_SOURCE_URL)
-        .then(response => response.text())
-        .then(source => {
-          if (this.bookmarkletConsoleSource) this.bookmarkletConsoleSource.textContent = source
-          if (this.bookmarkletConsoleCopyButton) {
-            this.bookmarkletConsoleCopyButton.addEventListener('click', () => {
-              navigator.clipboard.writeText(source)
-                .then(() => this.showStatus('Code copied — paste it into the console on your Steam games page.', 'success'))
-                .catch(() => this.showStatus('Could not copy to clipboard.', 'error'))
-            })
-          }
+    fetch(BOOKMARKLET_SOURCE_URL)
+      .then(response => response.text())
+      .then(source => {
+        if (!this.bookmarkletInstallLink) return
+        this.bookmarkletInstallLink.href = `javascript:${source}`
+        // Not preventing default: clicking (not dragging) should run it right here.
+        this.bookmarkletInstallLink.addEventListener('click', () => {
+          this.showStatus('Opening your Steam games page — click the same bookmark again there to finish.', 'loading')
         })
-        .catch(error => {
-          SteamUIPanel.logger.error('Failed to load bookmarklet source for console-paste block:', error)
-        })
-    }
+      })
+      .catch(error => {
+        SteamUIPanel.logger.error('Failed to load bookmarklet source for install link:', error)
+      })
   }
 
   private setupEventListeners(): void {
@@ -122,7 +102,7 @@ export class SteamUIPanel {
     // isAnonymous() there is a single hinge point instead of separately wiring show/hide to
     // every event that could mean "a real profile just loaded."
     this.eventManager.registerEventHandler(SteamEventTypes.DataLoaded, () => {
-      if (SteamIntegration.getInstance()?.isAnonymous()) {
+      if (SteamIntegration.getInstance().isAnonymous()) {
         this.show()
       } else {
         this.hide()
@@ -182,8 +162,12 @@ export class SteamUIPanel {
       })
     }
 
-    if (this.importFromFileButton) {
-      this.importFromFileButton.addEventListener('click', () => this.importFileInput?.click())
+    if (this.importFromFileLink) {
+      this.importFromFileLink.addEventListener('click', this.handleImportFromFileLinkClick.bind(this))
+    }
+
+    if (this.steamUiHeader) {
+      this.steamUiHeader.addEventListener('click', this.toggleCollapsed.bind(this))
     }
 
     if (this.importFileInput) {
@@ -221,16 +205,9 @@ export class SteamUIPanel {
         
         // Debounce cache check for 250ms to avoid excessive calls while typing
         this.cacheCheckDebounceTimeout = setTimeout(() => {
-          const steamIntegration = SteamIntegration.getInstance()
-          
-          if (steamIntegration) {
-            const hasCache = steamIntegration.hasCachedData(userInput)
-            this.updateLoadFromCacheButtonVisibility(hasCache)
-          } else {
-            // No SteamIntegration instance, hide the button
-            this.updateLoadFromCacheButtonVisibility(false)
-          }
-          
+          const hasCache = SteamIntegration.getInstance().hasCachedData(userInput)
+          this.updateLoadFromCacheButtonVisibility(hasCache)
+
           this.cacheCheckDebounceTimeout = null
         }, 250)
       })
@@ -239,6 +216,16 @@ export class SteamUIPanel {
 
   }
   
+  private handleImportFromFileLinkClick(event: MouseEvent): void {
+    event.preventDefault()
+    this.importFileInput?.click()
+  }
+
+  private toggleCollapsed(): void {
+    if (!this.steamUI) return
+    togglePanelCollapse(this.steamUI, this.steamUiToggleIndicator, 'vertically-collapsed')
+  }
+
   private getUserInput(): string | null {
     if (!this.steamUserInput) return null
     

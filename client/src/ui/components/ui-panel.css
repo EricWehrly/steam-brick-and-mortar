@@ -100,7 +100,43 @@
 .ui-panel.horizontally-collapsed .panel-content {
     max-height: 0;
     max-width: 0;
+    min-height: 0;
     opacity: 0;
+}
+
+/**
+ * Vertical collapse variant: the header shrinks to hug its own content (a small pill showing
+ * just the heading) and the content below it collapses away entirely. Distinct from
+ * horizontally-collapsible (which shrinks the whole panel to a fixed icon-sized box) - this one
+ * has no icon, just text, so its collapsed size is derived from that text rather than a fixed
+ * constant.
+ */
+.ui-panel.vertically-collapsible .panel-content {
+    max-height: var(--panel-expanded-max-height);
+    max-width: var(--panel-expanded-max-width);
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height var(--panel-collapse-duration) ease,
+                max-width var(--panel-collapse-duration) ease,
+                opacity var(--panel-collapse-duration) ease;
+}
+
+.ui-panel.vertically-collapsed .panel-content {
+    max-height: 0;
+    max-width: 0;
+    min-height: 0;
+    opacity: 0;
+}
+
+.ui-panel.vertically-collapsed .toggle-indicator {
+    transform: rotate(-90deg);
+}
+
+/* Shrink to the header's natural content width, not the panel's expanded width - "collapsed"
+   should mean a small pill hugging the heading text, not a full-width bar with hidden content. */
+.ui-panel.vertically-collapsed {
+    width: fit-content;
+    min-width: 0;
 }
 
 /* Pause menu grouped-tab strip (kept in ui-panel primitives, not pause shared-components) */
