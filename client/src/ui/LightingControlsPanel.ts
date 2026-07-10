@@ -19,6 +19,7 @@ import { Logger } from '../utils/Logger'
 import { renderTemplate } from '../utils/TemplateEngine'
 import lightingControlsPanelTemplate from '../templates/ui/lighting-controls-panel.html?raw'
 import '../styles/lighting-controls-panel.css'
+import { togglePanelCollapse } from './components/PanelCollapse'
 
 interface LightGroupInfo {
     lights: THREE.Light[]
@@ -521,22 +522,12 @@ export class LightingControlsPanel {
     }
 
     private togglePanelContent(): void {
-        const content = document.getElementById('lighting-panel-content')
         const indicator = document.getElementById('toggle-indicator')
-        const panel = this.container
+        const collapsed = togglePanelCollapse(this.container, indicator, 'horizontally-collapsed')
 
-        if (!content || !indicator) return
-
-        const isCollapsed = panel.classList.contains('horizontally-collapsed')
-
-        if (isCollapsed) {
-            panel.classList.remove('horizontally-collapsed')
-            indicator.textContent = '▼'
+        if (!collapsed) {
             this.scanLights()
             this.updateUI()
-        } else {
-            panel.classList.add('horizontally-collapsed')
-            indicator.textContent = '▶'
         }
     }
 

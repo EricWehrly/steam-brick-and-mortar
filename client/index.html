@@ -47,58 +47,56 @@
             <div id="ui-right-center-group" class="ui-right-center-group"></div>
         </div>
         <div id="ui-slot-center-top" class="ui-slot ui-slot-center-top">
-            <div id="steam-ui" class="hidden">
-                <label for="steam-user-input">SteamID or (Custom or profile) URL:</label>
-                <div class="input-row">
-                    <input 
-                        type="text" 
-                        id="steam-user-input" 
-                        placeholder="e.g. 76561197960287930 / steamcommunity.com/id/GabeLoganNewell / steamcommunity.com/profiles/76561197960287930"
-                        autocomplete="off"
-                    />
-                    <!-- Supports: Custom URL, Steam ID (17-digit number), or profile URLs -->
-                    <button id="load-steam-games" class="load-button">Load Games</button>
-                </div>
-                <div class="button-group">
-                    <button id="load-from-cache" class="hidden button-cache">Load from Cache</button>
-                </div>
-
-                <!-- Manual library import: bookmarklet-driven, no Lambda call.
-                     See docs/plans/manual-library-export-feasibility.md.
-                     A userscript packaging of the same bookmarklet exists but is intentionally
-                     not wired up here (client/public/bookmarklets/export-library.user.js) —
-                     left in place as a "could have been" for a use case we don't expect to hit;
-                     see build-bookmarklets.mjs for why it's excluded from the build/validate step. -->
-                <div class="button-group">
-                    <button id="import-from-file">Import from file&hellip;</button>
-                    <input type="file" id="import-file-input" accept="application/json,.json" class="hidden" />
-                </div>
-
-                <!-- TODO: this should eventually "unfold" (collapsed by default, expanding into
-                     fuller guidance on demand / first use) rather than a static open block.
-                     Static for now — see docs/plans/bookmarklet-capture-spike.md. -->
-                <details class="import-instructions" open>
-                    <summary>Manual import setup (one-time)</summary>
-                    <p>Click or drag this to your bookmarks bar: <a id="bookmarklet-install-link" href="#" class="bookmarklet-link" draggable="true">📥 Steam Library Export</a> &mdash; clicking it opens your Steam games page; dragging it installs it there so you can click it again once you land.</p>
-                    <p class="import-file-help">"Import from file" above is for when the bookmarklet couldn't deliver directly &mdash; it downloads <code>steam-library.json</code> automatically instead. Pick that file here.</p>
-                    <details class="console-paste-instructions">
-                        <summary>Advanced: paste into browser console instead</summary>
-                        <p>On your Steam games page, open DevTools (F12) &rarr; Console, paste this, and press Enter:</p>
-                        <pre id="bookmarklet-console-source"></pre>
-                        <button id="bookmarklet-console-copy" type="button">Copy code</button>
-                    </details>
-                </details>
-
-                <!-- Progressive loading indicator -->
-                <div id="loading-progress" class="hidden">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progress-fill"></div>
+            <div id="steam-ui" class="hidden ui-panel vertically-collapsible vertically-collapsed">
+                <div class="panel-header clickable-header" id="steam-ui-header">
+                    <h3>Load Library From Steam</h3>
+                    <div class="header-controls">
+                        <span class="toggle-indicator" id="steam-ui-toggle-indicator">&#9654;</span>
                     </div>
-                    <div class="progress-text" id="progress-text">Loading games...</div>
-                    <div class="progress-game" id="progress-game"></div>
                 </div>
-                
-                <div id="steam-status" class="status-hidden"></div>
+                <div class="panel-content" id="steam-ui-content">
+                    <div class="library-option">
+                        <p class="library-option-label">Load from steam profile</p>
+                        <label for="steam-user-input">SteamID or (Custom or profile) URL:</label>
+                        <div class="input-row">
+                            <input
+                                type="text"
+                                id="steam-user-input"
+                                placeholder="e.g. 76561197960287930 / steamcommunity.com/id/GabeLoganNewell / steamcommunity.com/profiles/76561197960287930"
+                                autocomplete="off"
+                            />
+                            <!-- Supports: Custom URL, Steam ID (17-digit number), or profile URLs -->
+                            <button id="load-steam-games" class="load-button">Load Games</button>
+                        </div>
+                        <div class="button-group">
+                            <button id="load-from-cache" class="hidden button-cache">Load from Cache</button>
+                        </div>
+                    </div>
+
+                    <!-- Manual library import: bookmarklet-driven, no Lambda call.
+                         See docs/plans/manual-library-export-feasibility.md.
+                         A userscript packaging of the same bookmarklet exists but is intentionally
+                         not wired up here (client/public/bookmarklets/export-library.user.js) —
+                         left in place as a "could have been" for a use case we don't expect to hit;
+                         see build-bookmarklets.mjs for why it's excluded from the build/validate step. -->
+                    <div class="library-option">
+                        <p class="library-option-label">Load from bookmarklet export</p>
+                        <p>Drag this bookmarklet to your bookmarks bar: <a id="bookmarklet-install-link" href="#" class="bookmarklet-link" draggable="true">📥 Steam Library Export</a>
+                            <br />Clicking will navigate to your Steam games page. Once there, click it again and it will automatically export the data to this page. If it couldn't deliver directly, it downloads <code>steam-library.json</code> instead. <a id="import-from-file-link" href="#" class="import-file-link">Use this link to import that file</a>.</p>
+                        <input type="file" id="import-file-input" accept="application/json,.json" class="hidden" />
+                    </div>
+
+                    <!-- Progressive loading indicator -->
+                    <div id="loading-progress" class="hidden">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="progress-text" id="progress-text">Loading games...</div>
+                        <div class="progress-game" id="progress-game"></div>
+                    </div>
+
+                    <div id="steam-status" class="status-hidden"></div>
+                </div>
             </div>
         </div>
         <div id="ui-slot-center" class="ui-slot ui-slot-center"></div>

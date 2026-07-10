@@ -21,6 +21,7 @@ import type { LayoutRequestedEvent } from '../types/EnvironmentEvents'
 import type { ArrangementRequestedEvent, SectionsReadyEvent } from '../types/EnvironmentEvents'
 import type { AllBatchesCompleteEvent } from '../types/EnvironmentEvents'
 import '../styles/components/layout-sort-panel.css'
+import { togglePanelCollapse } from './components/PanelCollapse'
 
 // ─── Option definitions ───────────────────────────────────────────────────────
 
@@ -264,15 +265,10 @@ export class LayoutControlPanel {
     // ─── Visibility toggle ─────────────────────────────────────────────────────
 
     private toggleControlsVisibility(): void {
-        if (!this.panelContainer || !this.panelContent) return
+        if (!this.panelContainer) return
 
-        this.isControlsVisible = !this.isControlsVisible
-
-        this.panelContainer.classList.toggle('horizontally-collapsed', !this.isControlsVisible)
-
-        if (this.toggleIndicator) {
-            this.toggleIndicator.textContent = this.isControlsVisible ? '▼' : '▶'
-        }
+        const collapsed = togglePanelCollapse(this.panelContainer, this.toggleIndicator, 'horizontally-collapsed')
+        this.isControlsVisible = !collapsed
     }
 
     private registerKeyboardHandler(): void {
