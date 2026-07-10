@@ -79,11 +79,7 @@ describe('Steam Data to Texture Integration', () => {
         }
 
         try {
-            app = new SteamBrickAndMortarApp({
-                steam: {
-                    maxGames: 5
-                }
-            })
+            app = new SteamBrickAndMortarApp({})
             await app.init()
             webglAvailable = true
         } catch {

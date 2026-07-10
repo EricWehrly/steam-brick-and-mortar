@@ -23,9 +23,10 @@ describe('SteamIntegration Event Integration', () => {
         
         // Mock EventManager.getInstance to return our mock
         vi.spyOn(EventManager, 'getInstance').mockReturnValue(mockEventManager)
-        
+
         // Create SteamIntegration (should use our mocked EventManager)
-        steamIntegration = new SteamIntegration()
+        SteamIntegration.dispose()
+        steamIntegration = SteamIntegration.getInstance()
         
         // Access the steamClient through the integration to mock it
         // @ts-expect-error - Accessing private property for testing

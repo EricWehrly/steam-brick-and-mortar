@@ -86,12 +86,13 @@ describe('SteamIntegration manual library import', () => {
     beforeEach(() => {
         DataManager.getInstance().clear()
         EventManager.getInstance().removeAllListeners()
+        SteamIntegration.dispose()
         localStorage.clear()
         vi.clearAllMocks()
     })
 
     it('emits GamesBatchReady with appid-derived artwork and no network call', async () => {
-        const integration = new SteamIntegration()
+        const integration = SteamIntegration.getInstance()
         const eventManager = EventManager.getInstance()
         const batchHandler = vi.fn()
         eventManager.registerEventHandler<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, batchHandler)
@@ -107,14 +108,14 @@ describe('SteamIntegration manual library import', () => {
     })
 
     it('marks the session as non-anonymous whether or not a display name is known', async () => {
-        const integration = new SteamIntegration()
+        const integration = SteamIntegration.getInstance()
 
         await integration['applyImportedLibrary'](SAMPLE_GAMES, undefined, 'file')
         expect(integration.isAnonymous()).toBe(false)
     })
 
     it('uses the real display name for the sign title when known', async () => {
-        const integration = new SteamIntegration()
+        const integration = SteamIntegration.getInstance()
         const eventManager = EventManager.getInstance()
         const dataLoadedHandler = vi.fn()
         eventManager.registerEventHandler(SteamEventTypes.DataLoaded, dataLoadedHandler)
@@ -126,7 +127,7 @@ describe('SteamIntegration manual library import', () => {
     })
 
     it('omits a placeholder name when no real display name is known (falls through to the generic sign title)', async () => {
-        const integration = new SteamIntegration()
+        const integration = SteamIntegration.getInstance()
         const eventManager = EventManager.getInstance()
         const dataLoadedHandler = vi.fn()
         eventManager.registerEventHandler(SteamEventTypes.DataLoaded, dataLoadedHandler)
@@ -138,7 +139,7 @@ describe('SteamIntegration manual library import', () => {
     })
 
     it('ignores an empty games array without emitting anything', async () => {
-        const integration = new SteamIntegration()
+        const integration = SteamIntegration.getInstance()
         const eventManager = EventManager.getInstance()
         const batchHandler = vi.fn()
         eventManager.registerEventHandler(SteamEventTypes.GamesBatchReady, batchHandler)
@@ -150,7 +151,7 @@ describe('SteamIntegration manual library import', () => {
     })
 
     it('records which channel captured the library, for future diagnosability', async () => {
-        const integration = new SteamIntegration()
+        const integration = SteamIntegration.getInstance()
 
         await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', 'file')
 
@@ -162,12 +163,13 @@ describe('SteamIntegration manual library import', () => {
 
     describe('surviving a reload', () => {
         it('re-loads a previously imported library on startup instead of falling back to the anonymous store', async () => {
-            const first = new SteamIntegration()
+            const first = SteamIntegration.getInstance()
             await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', 'bookmarklet')
 
             // Simulate a fresh page load: new instance, no in-memory state carried over,
             // but localStorage (where persistLibrarySource wrote) survives a reload.
-            const second = new SteamIntegration()
+            SteamIntegration.dispose()
+            const second = SteamIntegration.getInstance()
             const eventManager = EventManager.getInstance()
             const batchHandler = vi.fn()
             eventManager.registerEventHandler<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, batchHandler)
@@ -181,11 +183,12 @@ describe('SteamIntegration manual library import', () => {
         })
 
         it('falls back to the anonymous store on startup once the persisted import has been cleared', async () => {
-            const first = new SteamIntegration()
+            const first = SteamIntegration.getInstance()
             await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', 'bookmarklet')
             first['handleClearCache'](new CustomEvent('noop', { detail: { scope: 'all' } }))
 
-            const second = new SteamIntegration()
+            SteamIntegration.dispose()
+            const second = SteamIntegration.getInstance()
             const eventManager = EventManager.getInstance()
             const batchHandler = vi.fn()
             eventManager.registerEventHandler<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, batchHandler)
@@ -200,14 +203,15 @@ describe('SteamIntegration manual library import', () => {
         })
 
         it('clears the persisted import on CacheClear scope "identity" ("Clear cached profile & reload"), unlike before this fix', async () => {
-            const first = new SteamIntegration()
+            const first = SteamIntegration.getInstance()
             await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', 'bookmarklet')
             expect(localStorage.getItem('sbam_library_source')).not.toBeNull()
 
             first['handleClearCache'](new CustomEvent('noop', { detail: { scope: 'identity' } }))
             expect(localStorage.getItem('sbam_library_source')).toBeNull()
 
-            const second = new SteamIntegration()
+            SteamIntegration.dispose()
+            const second = SteamIntegration.getInstance()
             const eventManager = EventManager.getInstance()
             const batchHandler = vi.fn()
             eventManager.registerEventHandler<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, batchHandler)

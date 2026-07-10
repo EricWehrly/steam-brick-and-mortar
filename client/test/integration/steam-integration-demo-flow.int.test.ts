@@ -15,12 +15,13 @@ describe('SteamIntegration demo flow integration', () => {
     beforeEach(() => {
         DataManager.getInstance().clear()
         EventManager.getInstance().removeAllListeners()
+        SteamIntegration.dispose()
         vi.clearAllMocks()
     })
 
     it('drives BatchCoordinator with readiness emitted before placement batches', async () => {
         const eventManager = EventManager.getInstance()
-        const integration = new SteamIntegration()
+        const integration = SteamIntegration.getInstance()
         const batchCoordinator = new (BatchCoordinator as any)()
 
         const sequence: string[] = []

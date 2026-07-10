@@ -41,9 +41,6 @@ export interface AppConfig {
         speed?: number
         mouseSensitivity?: number
     }
-    steam?: {
-        maxGames?: number
-    }
     data?: {
         enablePersistence?: boolean
         defaultTTL?: number
@@ -53,8 +50,6 @@ export interface AppConfig {
 }
 
 export class SteamBrickAndMortarApp {
-    private readonly config: AppConfig // Store config for potential recreation
-    
     // Services - will be resolved from container where available
     private sceneManager: SceneManager
     private sceneCoordinator!: SceneCoordinator // Will be resolved from DI container in init()
@@ -99,10 +94,7 @@ export class SteamBrickAndMortarApp {
         new StartupProgressUI()
         // Wire game-loading progress listeners now that we have an EventManager instance
         this.startupTracker.setupProgressListeners()
-        
-        // Store config for potential container recreation
-        this.config = config
-        
+
         // Initialize AppSettings first (needed for default values)
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Initializing AppSettings')
         this.appSettings = AppSettings.getInstance()
@@ -115,14 +107,8 @@ export class SteamBrickAndMortarApp {
         
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Preparing core coordinators')
 
-        const isDevelopmentMode = this.appSettings.getSetting('developmentMode')
-        const defaultMaxGames = isDevelopmentMode ? 20 : 9999
-        const maxGames = config.steam?.maxGames ?? defaultMaxGames
-
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating SteamIntegration')
-        this.steamIntegration = new SteamIntegration({
-            maxGames: maxGames
-        })
+        this.steamIntegration = SteamIntegration.getInstance()
 
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating WebXRCoordinator')
         this.webxrCoordinator = new WebXRCoordinator({

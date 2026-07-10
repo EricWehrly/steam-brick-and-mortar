@@ -118,16 +118,19 @@ vi.mock('../../../src/ui/PerformanceMonitor', () => ({
 }))
 
 // Steam integration mocks
-vi.mock('../../../src/steam-integration/SteamIntegration', () => ({
-    SteamIntegration: vi.fn().mockImplementation(function() { return {
+vi.mock('../../../src/steam-integration/SteamIntegration', () => {
+    const mockInstance = {
         loadGamesForUser: vi.fn().mockResolvedValue(undefined),
         clearCache: vi.fn(),
         getCacheStats: vi.fn().mockReturnValue({}),
         getImageCacheStats: vi.fn().mockReturnValue({}),
         refreshData: vi.fn().mockResolvedValue(undefined),
         dispose: vi.fn()
-    } })
-}))
+    }
+    const SteamIntegrationMock: any = vi.fn().mockImplementation(function() { return mockInstance })
+    SteamIntegrationMock.getInstance = vi.fn().mockReturnValue(mockInstance)
+    return { SteamIntegration: SteamIntegrationMock }
+})
 
 vi.mock('../../../src/steam-integration/SteamWorkflowManager', () => ({
     SteamWorkflowManager: vi.fn().mockImplementation(function() { return {

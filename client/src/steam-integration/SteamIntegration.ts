@@ -22,7 +22,7 @@ import { BatchEmitter } from '../steam/BatchEmitter'
 import { GameLayoutConstants } from '../scene/props/shared/GameBoxUtils'
 import type { SteamGameData } from '../scene'
 import { EventManager } from '../core/EventManager'
-import { SteamEventTypes, AppSettingsEventTypes, GameEventTypes } from '../types/InteractionEvents'
+import { SteamEventTypes, GameEventTypes } from '../types/InteractionEvents'
 import type {
     SteamLoadLibraryEvent,
     SteamCacheClearEvent,
@@ -31,17 +31,12 @@ import type {
     SteamImportLibraryEvent,
 } from '../types/InteractionEvents'
 import type { GameDataReadyEvent } from '../types/EnvironmentEvents'
-import type { SettingChangedEvent } from '../core/AppSettings'
-import { AppSettings, Setting } from '../core/AppSettings'
+import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
 import { sortByNumericField } from '../scene/categorization/GameSortFunctions'
 import '../scene/batch/BatchCoordinator'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 import type { StorePropsLibraryReloadRequestEvent } from '../scene/props/PropsEvents'
-
-export interface SteamIntegrationConfig {
-    maxGames?: number
-}
 
 export interface SteamUserIdentifier {
     vanityUrl: string
@@ -61,24 +56,23 @@ export class SteamIntegration {
     private gameLibrary: GameLibraryManager
     private eventManager: EventManager
     private steamId: string
-    private config: {
-        maxGames: number
-    }
 
-    static getInstance(): SteamIntegration | null {
+    static getInstance(): SteamIntegration {
+        if (!SteamIntegration._instance) {
+            SteamIntegration._instance = new SteamIntegration()
+        }
         return SteamIntegration._instance
     }
 
-    constructor(config: SteamIntegrationConfig = {}) {
-        this.config = {
-            maxGames: config.maxGames || 10
-        }
+    /** For testing - resets the singleton so the next getInstance() call constructs fresh. */
+    static dispose(): void {
+        SteamIntegration._instance = null
+    }
 
+    private constructor() {
         this.eventManager = EventManager.getInstance()
         this.steamClient = SteamApiClient.getInstance()
         this.gameLibrary = new GameLibraryManager()
-
-        SteamIntegration._instance = this
 
         // Register event handlers directly - no workflow manager needed
         this.registerEventHandlers()
@@ -93,7 +87,6 @@ export class SteamIntegration {
         this.eventManager.registerEventHandler(SteamEventTypes.LoadLibrary, this.handleLoadLibrary.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.ImportLibrary, this.handleImportLibrary.bind(this))
         this.eventManager.registerEventHandler(SteamEventTypes.CacheClear, this.handleClearCache.bind(this))
-        this.eventManager.registerEventHandler(AppSettingsEventTypes.Changed, this.handleSettingsChange.bind(this))
         this.eventManager.registerEventHandler(GameEventTypes.Start, this.handleGameStart.bind(this))
     }
 
@@ -162,7 +155,7 @@ export class SteamIntegration {
         this.gameLibrary.setUserData(userGames)
         
         await this.steamClient.loadGamesProgressively(userGames, {
-            maxGames: this.config.maxGames,
+            maxGames: AppSettings.get('maxGames'),
             sortFn: sortByNumericField('rtime_last_played', 'playtime_forever'),
         })
         
@@ -452,14 +445,5 @@ export class SteamIntegration {
         }
         clearPersistedLibrarySource()
         DataManager.getInstance().delete('steam.userInput')
-    }
-
-    private async handleSettingsChange(event: CustomEvent<SettingChangedEvent>): Promise<void> {
-        const { settingName, value } = event.detail
-
-        if (settingName !== Setting.DevelopmentMode) return
-
-        const maxGames = value ? 20 : 9999        
-        this.config.maxGames = maxGames
     }
 }

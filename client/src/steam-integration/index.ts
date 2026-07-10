@@ -6,7 +6,6 @@
 
 export {
     SteamIntegration,
-    type SteamIntegrationConfig,
     type LoadGamesOptions
 } from './SteamIntegration'
 
