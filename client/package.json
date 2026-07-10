@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "serve": "vite --open",
     "start": "vite --open",
     "build": "tsc && yarn build:bookmarklets && vite build",
     "build:bookmarklets": "node scripts/build-bookmarklets.mjs",
