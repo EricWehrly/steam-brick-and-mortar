@@ -62,7 +62,33 @@
                 <div class="button-group">
                     <button id="load-from-cache" class="hidden button-cache">Load from Cache</button>
                 </div>
-                
+
+                <!-- Manual library import: bookmarklet-driven, no Lambda call.
+                     See docs/plans/manual-library-export-feasibility.md.
+                     A userscript packaging of the same bookmarklet exists but is intentionally
+                     not wired up here (client/public/bookmarklets/export-library.user.js) —
+                     left in place as a "could have been" for a use case we don't expect to hit;
+                     see build-bookmarklets.mjs for why it's excluded from the build/validate step. -->
+                <div class="button-group">
+                    <button id="import-from-file">Import from file&hellip;</button>
+                    <input type="file" id="import-file-input" accept="application/json,.json" class="hidden" />
+                </div>
+
+                <!-- TODO: this should eventually "unfold" (collapsed by default, expanding into
+                     fuller guidance on demand / first use) rather than a static open block.
+                     Static for now — see docs/plans/bookmarklet-capture-spike.md. -->
+                <details class="import-instructions" open>
+                    <summary>Manual import setup (one-time)</summary>
+                    <p>Click or drag this to your bookmarks bar: <a id="bookmarklet-install-link" href="#" class="bookmarklet-link" draggable="true">📥 Steam Library Export</a> &mdash; clicking it opens your Steam games page; dragging it installs it there so you can click it again once you land.</p>
+                    <p class="import-file-help">"Import from file" above is for when the bookmarklet couldn't deliver directly &mdash; it downloads <code>steam-library.json</code> automatically instead. Pick that file here.</p>
+                    <details class="console-paste-instructions">
+                        <summary>Advanced: paste into browser console instead</summary>
+                        <p>On your Steam games page, open DevTools (F12) &rarr; Console, paste this, and press Enter:</p>
+                        <pre id="bookmarklet-console-source"></pre>
+                        <button id="bookmarklet-console-copy" type="button">Copy code</button>
+                    </details>
+                </details>
+
                 <!-- Progressive loading indicator -->
                 <div id="loading-progress" class="hidden">
                     <div class="progress-bar">

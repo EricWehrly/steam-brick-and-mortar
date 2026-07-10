@@ -9,6 +9,7 @@ import type { SteamGameMetadata } from './types/SteamMetadata'
 import { GamesLoader } from './GamesLoader'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
+import type { SteamCacheClearEvent } from '../types/InteractionEvents'
 
 export interface SteamGame extends SteamGameMetadata {
     appid: number
@@ -83,7 +84,7 @@ export class SteamApiClient {
             })
 
         const eventManager = EventManager.getInstance();
-        eventManager.registerEventHandler(SteamEventTypes.UserClear, this.clearCurrentUser.bind(this))
+        eventManager.registerEventHandler<SteamCacheClearEvent>(SteamEventTypes.CacheClear, this.handleCacheClear.bind(this))
 
         this.gamesLoader = new GamesLoader(
             this.appDetailsCache,
@@ -210,6 +211,25 @@ export class SteamApiClient {
         } = {}
     ): Promise<SteamGame[]> {
         return this.gamesLoader.loadGamesProgressively(steamUser, options)
+    }
+
+    /**
+     * Routes CacheClear to the right internal method for its scope - see CacheClearScope.
+     * Switches on the exact scope value (not an else-default) so an unhandled future scope
+     * no-ops here instead of silently running the wrong branch's clear; the `never` in
+     * `default` makes the compiler error if CacheClearScope grows a value this doesn't handle.
+     */
+    private async handleCacheClear(event: CustomEvent<SteamCacheClearEvent>): Promise<void> {
+        switch (event.detail.scope) {
+            case 'all':
+                await this.clearCache()
+                break
+            case 'identity':
+                this.clearCurrentUser()
+                break
+            default:
+                event.detail.scope satisfies never
+        }
     }
 
     public async clearCache(): Promise<void> {
