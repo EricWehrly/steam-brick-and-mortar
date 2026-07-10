@@ -12,7 +12,6 @@
  * high-level application lifecycle management.
  */
 
-import * as THREE from 'three'
 import { UIManager, StartupProgressUI, GameLibraryBinderUI } from '../ui'
 import { WebXRUICoordinator, SystemUICoordinator } from '../ui/coordinators'
 import { FocusCoordinator } from '../ui/coordinators/FocusCoordinator'
@@ -33,14 +32,6 @@ import { HeapMemoryReporter } from '../debug/HeapMemoryReporter'
 import '../debug/GpuMemoryEstimator'
 
 export interface AppConfig {
-    scene?: {
-        antialias?: boolean
-        outputColorSpace?: THREE.ColorSpace
-    }
-    input?: {
-        speed?: number
-        mouseSensitivity?: number
-    }
     data?: {
         enablePersistence?: boolean
         defaultTTL?: number
@@ -100,10 +91,7 @@ export class SteamBrickAndMortarApp {
         this.appSettings = AppSettings.getInstance()
         
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating SceneManager')
-        this.sceneManager = new SceneManagerDebug({
-            antialias: config.scene?.antialias ?? true,
-            outputColorSpace: config.scene?.outputColorSpace ?? THREE.SRGBColorSpace
-        })
+        this.sceneManager = new SceneManagerDebug()
         
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Preparing core coordinators')
 
@@ -112,11 +100,7 @@ export class SteamBrickAndMortarApp {
 
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating WebXRCoordinator')
         this.webxrCoordinator = new WebXRCoordinator({
-            camera: this.sceneManager.getCamera(),
-            input: {
-                speed: config.input?.speed ?? 0.1,
-                mouseSensitivity: config.input?.mouseSensitivity ?? 0.005
-            }
+            camera: this.sceneManager.getCamera()
         })
 
         this.startupTracker.logEvent(StartupPhase.CoreInit, 'Creating UIManager')

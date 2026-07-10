@@ -9,7 +9,7 @@
  */
 
 import * as THREE from 'three'
-import { SceneManager, type SceneManagerOptions } from '../scene/SceneManager'
+import { SceneManager } from '../scene/SceneManager'
 
 export interface DrawCallObject {
     name: string
@@ -35,8 +35,8 @@ export interface DrawCallReport {
 }
 
 export class SceneManagerDebug extends SceneManager {
-    constructor(options: SceneManagerOptions = {}) {
-        super(options)
+    constructor() {
+        super()
         this.attachToWindow()
     }
 

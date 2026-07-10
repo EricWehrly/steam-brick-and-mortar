@@ -53,7 +53,7 @@ describe('Taxonomy Analysis Demo', () => {
         DataManager.getInstance().set(DataKey.MainCamera, mockCamera, { domain: DataDomain.Scene })
 
         eventManager = EventManager.getInstance()
-        sceneManager = new SceneManager({})
+        sceneManager = new SceneManager()
         sceneCoordinator = new SceneCoordinator(sceneManager)
         
         ;(window as any).app = {

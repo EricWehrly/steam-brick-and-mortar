@@ -137,11 +137,7 @@ describe.skip('Performance Measurements', () => {
     it('should measure application initialization time', async () => {
         const startTime = window.performance.now()
         
-        app = new SteamBrickAndMortarApp({
-            scene: {
-                antialias: false // Disable for faster initialization
-            }
-        })
+        app = new SteamBrickAndMortarApp()
         
         await app.init()
         

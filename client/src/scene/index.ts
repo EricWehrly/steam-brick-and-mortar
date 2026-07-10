@@ -2,7 +2,7 @@
  * Scene Module - Exports for Three.js Scene Management
  */
 
-export { SceneManager, type SceneManagerOptions } from './SceneManager'
+export { SceneManager } from './SceneManager'
 export { 
     SceneCoordinator, 
 } from './SceneCoordinator'

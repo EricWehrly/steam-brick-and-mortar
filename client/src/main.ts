@@ -32,15 +32,7 @@ export async function initializeApp(): Promise<void> {
         
         
         
-        const app = new SteamBrickAndMortarApp({
-            scene: {
-                antialias: true
-            },
-            input: {
-                speed: 0.1,
-                mouseSensitivity: 0.005
-            }
-        })
+        const app = new SteamBrickAndMortarApp()
         
         await app.init()
         
