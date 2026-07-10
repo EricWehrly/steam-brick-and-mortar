@@ -19,6 +19,8 @@
 **Effort**: ~1-2 days (cache model refactor + migration + tests)  
 **Context**: Current cache persistence paths still rely on monolithic single-entry storage patterns (for example one serialized cache blob), which makes per-app invalidation, debugging, and incremental updates harder than needed. Move to appid-keyed entries in a dedicated cache namespace/store instead of extending the single-entry path.
 
+Confirmed evidence: a real `cache_state` blob was found holding 833 `game_<appid>` entries with no source in current `client/src/**/*.ts` that reads or writes that key shape — orphaned from a prior caching scheme, dead weight re-serialized on every save.
+
 **Decision (for now)**:
 - Do not refactor this in the current review pass.
 - Track as high-priority intermission debt and execute in a focused refactor.
@@ -34,6 +36,71 @@
 - `client/src/steam/cache/SimpleCacheManager.ts`
 - `client/src/steam/SteamApiClient.ts`
 - `client/src/steam/GamesLoader.ts`
+
+## id: user-games-cache-entanglement
+**Priority**: Medium  
+**Effort**: ~1 day (model split + migration)  
+**Context**: The app has three logically distinct cache domains — user identity (vanity url → steamid), games (library entities from Steam), and artwork (images). Today the "games" cache entry (`games_<steamid>`) bundles per-profile metadata (`playtime_forever`, etc.) together with the game entity data itself, so clearing/refreshing "the user" and clearing/refreshing "the games" aren't cleanly separable — a user-scoped reset can't touch identity without also reasoning about games data that's keyed by that same identity. See [[appid-keyed-cache-split]] for the related storage-format debt.
+
+**Decision (for now)**:
+- Do not refactor this now. `SteamApiClient.clearCurrentUser()` (added alongside the pause-menu "Clear Profile & Reload" button) only deletes `resolve_*` entries, leaving `games_*` and the artwork cache untouched — this works today because `getCachedUsers()` requires both a `resolve_` and `games_` entry to consider a profile "cached," so deleting just `resolve_` is sufficient to make the app treat no profile as loaded.
+- Revisit if/when per-profile metadata (playtime, hidden/favorite flags, etc.) needs to live somewhere other than inline on the cached game record.
+
+**Done when**:
+- Profile-specific metadata (playtime, etc.) is modeled separately from the shared game entity data
+- User, games, and artwork caches can each be cleared/invalidated independently without special-casing
+
+**Related files**:
+- `client/src/steam/SteamApiClient.ts`
+- `client/src/steam/cache/SimpleCacheManager.ts`
+- `client/src/steam-integration/SteamIntegration.ts`
+
+## id: cache-clear-domain-unification
+**Priority**: Medium  
+**Effort**: ~1 day (event redesign + 3 call-site migrations + tests)  
+**Context**: Three separate "clear cache" UI entry points exist - `SteamUIPanel`'s Clear Cache button, `GameSettingsPanel`'s "Clear cached profile & reload", and `CacheManagementPanel`'s Clear Cache button - each clearing an inconsistent, overlapping subset of five real cache/session domains (identity resolution, games/playtime, artwork metadata, pixel/texture data, and `SteamIntegration`'s own session state). Games (`games_<steamid>`, per-user) and metadata (`AppDetailsCache`, per-appid, shared across users) are already two structurally separate stores with different keys - not entangled, just always cleared together by call-site habit - and matter for the app's multi-profile-login goal: identity/games are correctly per-user already, metadata/pixels are correctly shared and should stay that way. `CacheManagementPanel.clearCache()` calls `PixelDataCache.clear()` and `SteamApiClient.clearCache()` directly rather than through events - a "zero cross-class dependencies" violation - and never touches `gameLibrary`/`LibrarySource`/`steam.userInput`, so it can resurrect the same stale-imported-library bug that `CacheClear`'s scope collapse fixed for the other two entry points. Separately, `SteamEventTypes.ImageCacheClear` already exists and `PixelDataCache` already listens for it, but nothing in the app currently emits it - dead wiring. See [[user-games-cache-entanglement]] for the narrower, separate debt of playtime being bundled *inside* the `games_<steamid>` record itself.
+
+**Decision (for now)**:
+- Do not implement yet - see `docs/plans/cache-clear-domain-unification-plan.md` for the proposed design and rollout.
+- The `CacheClear` scope collapse (`'all' | 'identity'`) done alongside the manual-import feature already tightened two of the three entry points onto one event contract; this entry tracks unifying all three and folding `ImageCacheClear` in as a real, checkable domain rather than a separate sibling event.
+
+**Done when**:
+- All three "clear cache" UI entry points route through the same event contract
+- Cache/session domains are expressed as strict types the compiler can check, not loosely-matched strings
+- `CacheManagementPanel` no longer calls `PixelDataCache`/`SteamApiClient` directly
+- `ImageCacheClear` either becomes a real, reachable domain or is removed if genuinely redundant
+
+**Related files**:
+- `client/src/ui/pause/panels/CacheManagementPanel.ts`
+- `client/src/ui/SteamUIPanel.ts`
+- `client/src/ui/pause/panels/GameSettingsPanel.ts`
+- `client/src/steam-integration/CacheClearEmitter.ts`
+- `client/src/scene/game-box/instancing/PixelDataCache.ts`
+
+**Plan reference**:
+- `docs/plans/cache-clear-domain-unification-plan.md`
+
+## id: steam-integration-loading-strategy-split
+**Priority**: Medium  
+**Effort**: ~1-2 days (extraction + tests, no behavior change intended)  
+**Context**: `SteamIntegration` is the single hinge point for every way a library can get loaded (online profile, anonymous demo, manual import) and remains the sole owner of `storeSteamDataAndEmitEvent`/`emitGamesInBatches`/`gameLibrary` mutation - correct per [[user-games-cache-entanglement]] and "Survey before you extend" (see `.github/lessons-learned.md`), since that shared substrate genuinely is one class's responsibility. But the three loading strategies (`handleLoadLibrary`, `loadDemoGames`, `handleImportLibrary`/`applyImportedLibrary`) are still interleaved in the same file as that substrate, `handleGameStart`'s auto-load branching, and cache-clear handling. A partial extraction already split out `LibrarySourceStore` (pure persistence I/O) and `ManualLibraryImportGateway` (the bookmarklet wire protocol) during the manual-import feature work; this entry is for what's left.
+
+**Decision (for now)**:
+- Do not refactor further in the current pass - the three strategies are coupled tightly enough to the shared substrate (each ends by calling `storeSteamDataAndEmitEvent`/`emitGamesInBatches`) that splitting them out needs its own dedicated design pass, not a bolt-on.
+- Revisit when adding a fourth loading strategy, or when `SteamIntegration.ts` next crosses roughly 500 lines while being actively edited - at that point, re-run the actual test (enumerate member functions, list the domains they represent, find what's outside the class's current intended scope) rather than treating line count alone as the verdict. See `.github/lessons-learned.md` "Survey Existing Implementations Before Adding a New One."
+
+**Done when**:
+- Each loading strategy (online, demo, import) is extractable/testable independent of the other two
+- The shared substrate (data storage, batch emission, cache-clear handling) has one clear owner that the strategies call into, not the other way around
+- `SteamIntegration.ts`'s member-function list reads as one coherent domain (session/library orchestration), not three
+
+**Related files**:
+- `client/src/steam-integration/SteamIntegration.ts`
+- `client/src/steam-integration/LibrarySourceStore.ts`
+- `client/src/steam-integration/ManualLibraryImportGateway.ts`
+
+**Source tag**:
+- `// TD: steam-integration-loading-strategy-split` in `client/src/steam-integration/SteamIntegration.ts`
 
 ## id: appsettings-default-vs-override-persistence
 **Priority**: Medium  

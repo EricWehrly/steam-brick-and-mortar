@@ -18,7 +18,9 @@ Lambda hop *and* the extra request amplification. This is the desktop counterpar
 - [`desktop-tauri-spike-plan.md`](desktop-tauri-spike-plan.md) — vehicle status, the CORS-via-Rust note, event-driven boundary rules for Tauri commands.
 - [`../features/desktop-app.md`](../features/desktop-app.md) — "Library capture without a bookmarklet" section (the injected-webview capture concept).
 - `desktop/tauri-app/src/lib.rs` — current shell (bare default builder; you'll add commands here).
-- [`manual-library-export-feasibility.md`](manual-library-export-feasibility.md) — the `rgGames` capture logic to reuse in the injected webview.
+- [`manual-library-export-feasibility.md`](manual-library-export-feasibility.md) — the verified extraction mechanism (React Query hydration blob mining — **not** `rgGames`/`?xml=1`, both confirmed dead 2026-07-02) to reuse in the injected webview.
+- `client/public/bookmarklets/export-library.js` — the actual extraction code; inject this (or its logic) into the login webview rather than re-deriving it.
+- [`../research/steam-profile-ssr-hydration-research.md`](../research/steam-profile-ssr-hydration-research.md) — full structure reference, including the `/my/` navigation-vs-fetch finding below.
 
 ## Goal
 Prove two Rust-side capabilities, each returning data to the frontend over a typed Tauri command
@@ -26,22 +28,32 @@ Prove two Rust-side capabilities, each returning data to the frontend over a typ
 
 1. **Enrichment fetch** — given an appid, Rust fetches `store.steampowered.com/api/appdetails?appids=<id>`
    directly and returns the JSON. (Replaces the Lambda enrichment hop for cache-misses on desktop.)
-2. **Ownership capture** — open a second WebView2 window at `steamcommunity.com/my/games/?tab=all`;
-   after the user is logged in, inject the `rgGames`-reading script; return the captured library over IPC.
+2. **Ownership capture** — open a second WebView2 window navigated (not `fetch()`ed — see below) to
+   `steamcommunity.com/my/games/?tab=all`. **Correction to an earlier version of this task**: `/my/`
+   is actually the *better* target, not a worse one — confirmed via real browser navigation (not
+   `fetch()`) that it resolves in a single `200` response with no vanity/steamid needed up front; the
+   client-side router repaints the address bar afterward. A `fetch()` to the same URL fails
+   (`503`/network error) — Steam appears to gate `/my/` against non-navigation requests, so the
+   WebView2 window must actually **navigate**, not issue a background request. Full detail:
+   [`../research/steam-profile-ssr-hydration-research.md`](../research/steam-profile-ssr-hydration-research.md)
+   §1. Once resolved, inject the extraction script from `export-library.js`; return the captured
+   library over IPC.
 
 ## Tasks
 1. Add a Rust `fetch_app_details(appid)` Tauri command (use `reqwest` or the Tauri HTTP plugin);
    return raw JSON to the frontend. Confirm no CORS error and no Lambda involvement.
 2. Add a login-window + JS-injection flow for ownership capture; return `{ appid, name, playtime }[]`.
-   (If injection proves fiddly, fall back to a Rust authenticated fetch of the `?xml=1` feed using the
-   webview's session cookies — document whichever works.)
+   (The `?xml=1`-feed fallback floated in an earlier draft of this brief is dead — confirmed live,
+   see `manual-library-export-feasibility.md`. If injection proves fiddly, the fallback direction
+   is a Rust-side authenticated fetch of the games page HTML using the webview's session cookies,
+   running the same blob-extraction logic against the fetched markup — untested, note findings if explored.)
 3. Expose both as typed commands and wire a minimal frontend call that logs the results — **do not**
    fully integrate into the store pipeline in this spike; just prove the data crosses the boundary.
 4. Note the production CORS/origin implications (`tauri.localhost`) already captured in the Tauri spike doc.
 
 ## Acceptance
 - [ ] `fetch_app_details` returns valid appdetails JSON in the Tauri window with no CORS error, no Lambda call.
-- [ ] Ownership capture returns a non-empty library for a logged-in user (injection or `?xml=1` route).
+- [ ] Ownership capture returns a non-empty library for a logged-in user (injection, or the untested Rust-fetch fallback if pursued).
 - [ ] Both are typed Tauri commands (respect the event-driven/typed-IPC boundary rules).
 - [ ] A short written finding: which ownership route worked, and any WebView2 gotchas.
 

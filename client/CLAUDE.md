@@ -101,3 +101,9 @@ URL shortcut: `?debug=true` on the dev server sets global level to DEBUG on load
 - `src/webxr.d.ts` — custom type definitions, handle carefully
 - VR safety: incorrect spatial or timing assumptions can cause physical discomfort — review carefully
 - **DataArrayTexture**: Always use `addLayerUpdate(slotIndex)` before `needsUpdate = true`. Never mark the entire array dirty — it uploads the full texture (~34MB) instead of just changed slots. See `.github/lessons-learned.md` for full context.
+
+### Webserver
+
+Stop trying to start / `yarn dev`. This has too many times resulted in a rogue background process that has to be hunted down and terminated to free the port. It's easier to just leave the thing running. Our typical state currently is that the dev server is running during development, and you should be able to curl localhost to quick check if it needs to come up. Ask the user to start it if it is not running. 
+If your MCP allows you to interface with the browser, you should be able to do so for whatever the "client" side of those permissions is configured for. Assume the webserver is available.
+(Side note, very project-specific: we should make a quick deterministic way to broadcast version so we can double-check that it's our workspace, or commit, or branch, or whatever works best that's running)

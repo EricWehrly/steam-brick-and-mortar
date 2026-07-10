@@ -16,7 +16,7 @@
 
 > Features that need to be solid before we hand this to anyone. Bugs here are embarrassing. Scope creep here is a trap.
 
-- [Static Hosting](../features/static-hosting.md) — public HTTPS URL, repeatable deploy, CORS wired to Lambda; **the** prerequisite for sharing anything; CloudFront is the likely choice (cost projection discussion to happen early Act 2)
+- [Static Hosting](../features/static-hosting.md) — public HTTPS URL, repeatable deploy, CORS wired to Lambda; **the** prerequisite for sharing anything; CloudFront is the likely choice (cost projection discussion to happen early Act 2); deploy consumes the local **release** artifact — see the Release Pipeline item below for what that build/pack step actually is
 - [First Load Experience](../features/first-load-experience.md) — anonymous store is coherent and inviting; new user is guided to connect their library; performance on first load is acceptable; definition of "correct" pinned before sign-off
 - [Network Rate Limiting](../features/network-rate-limiting.md) — substantially implemented (client `RateLimiter`, batching, backoff, circuit breaker; server-side 429 handling); client-side 429 handling and concurrency cap are the remaining gaps
 - [Multi-Layer Caching](../features/multi-layer-caching.md) — browser, Lambda L1, and S3/Lambda L2 all exist; CloudFront layer and AppDetailsCache TTL are the remaining gaps
@@ -51,6 +51,7 @@
 - Enhanced error handling — robust recovery for rate limits, invalid Steam IDs, timeouts, partial failures
 - Infrastructure monitoring — CloudWatch metrics, client telemetry, cache performance dashboards
 - ~~Test network isolation~~ — automatic blocking of external calls in tests is **done** (implemented via global fetch intercept in unit/integration test setup)
+- **Traffic safety / Release Pipeline** — reduce Steam-bound request volume before showing this around to anyone; see [Traffic Safety Review](../plans/traffic-safety-review.md). `scripts/release.sh` Steps 1–2 (pull the Lambda's S3 app-details cache, repack into two client-served bundles) are **done** — cuts enrichment traffic to near-zero for already-cached games; see [Release Pipeline](../plans/release-pipeline-plan.md). Steps 3–5 (`yarn build`, `cargo tauri build`, pack `release.zip`) are **not yet implemented** — currently stubbed functions in the same script. CDN artwork traffic (every game box currently pulls straight from Steam's CDN, uncached — likely the highest-volume Steam dependency of the three) is the explicit next front, not yet started.
 
 ## Completion Criteria
 
