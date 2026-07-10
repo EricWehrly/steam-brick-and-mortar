@@ -16,7 +16,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true, // Fail if port is occupied instead of auto-incrementing
-    open: true,
+    open: false,
     host: true,
     // Allow Docker containers to reach the dev server via host.docker.internal
     allowedHosts: ['host.docker.internal']
