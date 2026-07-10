@@ -28,7 +28,10 @@ export class UIManager {
     this.progressDisplay.init()
     this.webxrUIPanel.init()
 
-    this.steamUIPanel.show()
+    // steam-ui starts hidden (its markup default) and only shows once SteamIntegration
+    // resolves to the anonymous store — see SteamUIPanel's DataLoaded handler. Showing it
+    // unconditionally here used to make it briefly flash even when a real profile (online or
+    // imported) was about to auto-load.
     this.webxrUIPanel.showControlsHelp()
 
     const eventManager = EventManager.getInstance()

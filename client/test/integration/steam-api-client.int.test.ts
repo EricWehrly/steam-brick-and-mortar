@@ -16,6 +16,7 @@ import {
 import { setupIndexedDBMock } from '../mocks/indexeddb.mock'
 import { EventManager } from '../../src/core/EventManager'
 import { SteamEventTypes } from '../../src/types/InteractionEvents'
+import type { SteamCacheClearEvent } from '../../src/types/InteractionEvents'
 
 describe('SteamApiClient Integration Tests', () => {
     let client: SteamApiClient
@@ -131,7 +132,27 @@ describe('SteamApiClient Integration Tests', () => {
 
         it('should clear cache when requested', () => {
             client.clearCache()
-            
+
+            const stats = client.getCacheManager().getStats()
+            expect(stats.totalEntries).toBe(0)
+        })
+
+        it('routes CacheClear scope "identity" to resolve-only clearing, leaving other entries intact', () => {
+            client.getCacheManager().set('resolve_testuser', { steamid: '123' })
+            client.getCacheManager().set('games_123', { games: [] })
+
+            EventManager.getInstance().emit<SteamCacheClearEvent>(SteamEventTypes.CacheClear, { scope: 'identity' })
+
+            expect(client.getCacheManager().get('resolve_testuser')).toBeNull()
+            expect(client.getCacheManager().get('games_123')).not.toBeNull()
+        })
+
+        it('routes CacheClear scope "all" to a full cache wipe', () => {
+            client.getCacheManager().set('resolve_testuser', { steamid: '123' })
+            client.getCacheManager().set('games_123', { games: [] })
+
+            EventManager.getInstance().emit<SteamCacheClearEvent>(SteamEventTypes.CacheClear, { scope: 'all' })
+
             const stats = client.getCacheManager().getStats()
             expect(stats.totalEntries).toBe(0)
         })

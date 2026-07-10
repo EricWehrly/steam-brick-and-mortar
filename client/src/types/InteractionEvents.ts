@@ -21,6 +21,7 @@ import type { SteamGame } from '../steam'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
 import type { IStockStrategy } from '../scene/props/shared/StockStrategy'
 import type { LayoutMode } from './LayoutTypes'
+import type { ImportedGame, ImportChannel } from '../steam-integration/LibrarySource'
 
 // =============================================================================
 // STEAM EVENTS
@@ -242,20 +243,47 @@ export { StorePropsEventTypes, BatchProcessingStatus } from '../scene/props/Prop
 // EVENT TYPE CONSTANTS
 // =============================================================================
 
+/**
+ * 'all' wipes every Steam cache domain (identity resolution, games, artwork) plus the
+ * active library/session state. 'identity' clears only the cached vanity-url/steamid
+ * resolution and the active session pointer - games and artwork caches are left warm so
+ * re-resolving the same user later is cheap. Collapsed from two separate events
+ * (CacheClear/UserClear) that both meant "forget the user" at different granularity - see
+ * `.github/lessons-learned.md` "Survey Existing Implementations Before Adding a New One".
+ */
+export type CacheClearScope = 'all' | 'identity'
+
+/**
+ * `scope` is required, but that's only compiler-enforced when the call site provides the
+ * `<SteamCacheClearEvent>` generic explicitly - `eventManager.emit(SteamEventTypes.CacheClear,
+ * { source })` with no generic compiles fine and silently drops `scope`, and every listener
+ * treats a missing scope as doing nothing. Always write
+ * `eventManager.emit<SteamCacheClearEvent>(SteamEventTypes.CacheClear, { scope: ..., source })`.
+ */
 export interface SteamCacheClearEvent extends BaseInteractionEvent {
-    // No additional data needed
+    readonly scope: CacheClearScope
 }
 
-/** Clears only the cached user identity (vanity-url/steamid resolution) - games and artwork caches are untouched. */
-export interface SteamUserClearEvent extends BaseInteractionEvent {
-    // No additional data needed
+/**
+ * A minimal, offline-sourced game list (manual export bookmarklet, or a previously-saved
+ * export file). No playtime-history nuance beyond total playtime, no enrichment
+ * (categories/genres/tags) — SteamIntegration derives artwork from appid and treats this
+ * like any other library load.
+ */
+export interface SteamImportLibraryEvent extends BaseInteractionEvent {
+    readonly games: ReadonlyArray<ImportedGame>
+    /** Real vanity name only (e.g. from /id/<name>/) — omit rather than pass a placeholder. */
+    readonly displayName?: string
+    /** How this library was captured — see LibrarySource.ts for why this is real metadata. */
+    readonly channel: ImportChannel
 }
 
 export const SteamEventTypes = {
     LoadLibrary: 'steam:load-library',
+    /** A library captured offline (manual export bookmarklet/userscript/file) ready to load. */
+    ImportLibrary: 'steam:import-library',
+    /** Always emit with the <SteamCacheClearEvent> generic - see its doc comment for why. */
     CacheClear: 'steam:cache-clear',
-    /** Clears only the cached user identity - see SteamUserClearEvent. */
-    UserClear: 'steam:user-clear',
     CacheStats: 'steam:cache-stats',
     ImageCacheClear: 'steam:image-cache-clear',
     /** Session/integration signal (UI/cache panels), not pipeline readiness. */

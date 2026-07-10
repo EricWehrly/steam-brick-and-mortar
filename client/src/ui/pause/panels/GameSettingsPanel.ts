@@ -16,7 +16,8 @@ import { AppSettings } from '../../../core/AppSettings'
 import { EventManager } from '../../../core/EventManager'
 import { EventSource } from '../../../core/EventManager'
 import { UIComponentUtils } from '../../../utils/UIComponentUtils'
-import { StorePropsEventTypes, SteamEventTypes, type SteamUserClearEvent } from '../../../types/InteractionEvents'
+import { StorePropsEventTypes, SteamEventTypes } from '../../../types/InteractionEvents'
+import type { SteamCacheClearEvent } from '../../../types/InteractionEvents'
 
 export interface SteamSettings {
     // Steam Profile Settings (autoLoadProfile moved to AppSettings)
@@ -251,7 +252,8 @@ export class GameSettingsPanel extends PauseMenuPanel {
         )
         if (!confirmed) return
 
-        EventManager.getInstance().emit<SteamUserClearEvent>(SteamEventTypes.UserClear, {
+        EventManager.getInstance().emit<SteamCacheClearEvent>(SteamEventTypes.CacheClear, {
+            scope: 'identity',
             source: EventSource.UI
         })
         window.location.reload()

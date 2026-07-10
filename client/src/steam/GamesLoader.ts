@@ -6,9 +6,10 @@ import { PerformanceMonitor, ASYNC_CONTEXT, MAIN_THREAD_CONTEXT } from '../utils
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
 import { getTopSteamSpyTags } from './utils/SteamSpyTags'
+import { deriveArtworkFromAppId } from './utils/ArtworkUrls'
 import { GameLayoutConstants } from '../scene/props/shared/GameBoxUtils'
+import { BatchEmitter } from './BatchEmitter'
 import type {
-    SteamGamesBatchEvent,
     SteamNetworkFetchProgressEvent,
     SteamLibraryManifestReadyEvent,
 } from '../types/InteractionEvents'
@@ -79,7 +80,7 @@ export class GamesLoader {
                 total: sortedGames.length
             })
             const gameByAppid = new Map<number, SteamGame>(sortedGames.map(g => [g.appid, g]))
-            this.fetchAndEmitUncached(refreshAppids, gameByAppid, renderableBatchCount, emitter)
+            this.fetchAndEmitUncached(refreshAppids, gameByAppid, emitter)
         } else {
             await emitter.flush()
         }
@@ -109,7 +110,6 @@ export class GamesLoader {
     private fetchAndEmitUncached(
         uncachedAppids: number[],
         gameByAppid: Map<number, SteamGame>,
-        cachedBatchCount: number,
         emitter: BatchEmitter
     ): void {
         const fetchedAppDetails = new Map<number, AppDetailsData>()
@@ -138,9 +138,7 @@ export class GamesLoader {
                     cacheMonitor.end({ count: fetchedAppDetails.size })
                 }
 
-                this.logger.info(
-                    `[ASYNC] Emitted ${fetchedAppDetails.size} uncached games in ${emitter.batchIndex - cachedBatchCount} rendering batches`
-                )
+                this.logger.info(`[ASYNC] Emitted ${fetchedAppDetails.size} uncached games in the background`)
             })
             .catch(error => {
                 this.logger.error('[ASYNC] Background metadata fetch failed:', error)
@@ -246,10 +244,11 @@ export class GamesLoader {
     }
 
     private buildEnhancedGame(game: SteamGame, appDetails: AppDetailsData | undefined): SteamGame {
+        const derivedArtwork = deriveArtworkFromAppId(game.appid)
         const headerUrl = appDetails?.artwork?.header
             || appDetails?.artwork?.capsule_v5
             || appDetails?.artwork?.capsule
-            || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
+            || derivedArtwork.header
 
         return {
             ...game,
@@ -262,7 +261,7 @@ export class GamesLoader {
                     ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_logo_url}.jpg`
                     : '',
                 header: headerUrl,
-                library: `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`
+                library: derivedArtwork.library
             },
             categories: appDetails?.categories,
             genres: appDetails?.genres,
@@ -278,59 +277,5 @@ export class GamesLoader {
             userscore: appDetails?.userscore,
             owners: appDetails?.owners
         }
-    }
-}
-
-/**
- * Accumulates games and emits `GamesBatchReady` events in shelf-sized batches.
- *
- * `push(game)` adds a game; if the buffer hits `batchSize`, a batch is emitted
- * and the main thread yielded before returning.
- * `flush()` drains any remainder as a final partial batch.
- *
- * Both are async only because of the yield-to-main-thread between batches —
- * not because emission itself is async.
- */
-class BatchEmitter {
-    private readonly buffer: SteamGame[] = []
-    private readonly batchSize: number
-    private readonly totalBatches: number
-    private _batchIndex: number = 0
-
-    constructor(batchSize: number, totalBatches: number) {
-        this.batchSize = batchSize
-        this.totalBatches = totalBatches
-    }
-
-    /** Current number of batches emitted (readable by callers for logging). */
-    get batchIndex(): number {
-        return this._batchIndex
-    }
-
-    /** Add a game. Emits a batch and yields the main thread if the buffer is full. */
-    async push(game: SteamGame): Promise<void> {
-        this.buffer.push(game)
-        if (this.buffer.length >= this.batchSize) {
-            await this.emitBatch()
-        }
-    }
-
-    /** Drain any remaining games as a partial batch. No-op if buffer is empty. */
-    async flush(): Promise<void> {
-        if (this.buffer.length > 0) {
-            await this.emitBatch()
-        }
-    }
-
-    private async emitBatch(): Promise<void> {
-        const batch = this.buffer.splice(0, this.batchSize)
-        EventManager.getInstance().emit<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, {
-            games: batch as ReadonlyArray<Readonly<SteamGame>>,
-            batchIndex: this._batchIndex,
-            totalBatches: this.totalBatches
-        })
-        this._batchIndex++
-        // Yield the main thread between batches so rendering isn't starved.
-        await new Promise(resolve => setTimeout(resolve, 0))
     }
 }

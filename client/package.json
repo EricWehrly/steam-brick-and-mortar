@@ -7,8 +7,11 @@
     "dev": "vite",
     "serve": "vite --open",
     "start": "vite --open",
-    "build": "tsc && vite build",
+    "build": "tsc && yarn build:bookmarklets && vite build",
+    "build:bookmarklets": "node scripts/build-bookmarklets.mjs",
+    "release": "bash ../scripts/release.sh",
     "preview": "vite preview",
+
     "test": "vitest run --config test/vitest.config.ts",
     "test:watch": "vitest --reporter=verbose --config test/vitest.config.ts",
     "test:ui": "vitest --ui --config test/vitest.config.ts",
@@ -16,13 +19,14 @@
     "test:integration": "vitest run --config test/vitest.integration.config.ts",
     "test:live": "vitest run test/live --config test/vitest.live.config.ts",
     "test:all": "vitest run --config test/vitest.all.config.ts",
+    "test:visual": "playwright test --config playwright.config.ts",
+    "test:visual:docker": "docker compose -f ../docker-compose.yml run --rm playwright",
+
     "clean": "rm -rf dist node_modules .vite",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "type-check": "tsc --noEmit",
-    "validate": "yarn type-check && yarn test && yarn lint",
-    "test:visual": "playwright test --config playwright.config.ts",
-    "test:visual:docker": "docker compose -f ../docker-compose.yml run --rm playwright"
+    "validate": "yarn type-check && yarn test && yarn lint"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
