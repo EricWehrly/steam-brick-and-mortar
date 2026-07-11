@@ -2,11 +2,11 @@
  * Manual library import: the offline-sourced path (bookmarklet/file), as opposed to the online
  * resolve+fetch path covered elsewhere. What this file exists to pin down:
  * - validateLibraryExportPayload's actual behavior (pure, DOM-free — no fixtures needed)
- * - applyImportedLibrary's actual behavior (artwork derivation, display-name handling)
+ * - handleImportLibrary/applyLibrary's actual behavior (artwork derivation, display-name handling)
  * - the reload-survival bug: an imported library must persist across a page reload the same
  *   way an online cached profile does, or it silently reverts to the anonymous demo store
  * - the "Clear cached profile & reload" bug: that button only ever knew about the online
- *   profile cache — an imported LibrarySource survived it untouched
+ *   profile cache — an imported Library survived it untouched
  *
  * The bookmarklet postMessage protocol itself (handleWindowMessage) lives on
  * ManualLibraryImportGateway now, not here — see manual-library-import-gateway.test.ts.
@@ -16,14 +16,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DataManager } from '../../../src/core/data'
 import { EventManager } from '../../../src/core/EventManager'
 import { SteamIntegration } from '../../../src/steam-integration/SteamIntegration'
-import { validateLibraryExportPayload } from '../../../src/steam-integration/LibrarySource'
+import { validateLibraryExportPayload } from '../../../src/steam-integration/Library'
+import type { ImportChannel } from '../../../src/steam-integration/Library'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
-import type { SteamGamesBatchEvent } from '../../../src/types/InteractionEvents'
+import type { SteamGamesBatchEvent, SteamImportLibraryEvent } from '../../../src/types/InteractionEvents'
 
 const SAMPLE_GAMES = [
     { appid: 440, name: 'Team Fortress 2', playtime_forever: 100 },
     { appid: 620, name: 'Portal 2', playtime_forever: 50 },
 ]
+
+function importLibrary(
+    integration: SteamIntegration,
+    games: typeof SAMPLE_GAMES,
+    displayName: string | undefined,
+    steamId: string | undefined,
+    channel: ImportChannel
+): Promise<void> {
+    return integration['handleImportLibrary'](new CustomEvent<SteamImportLibraryEvent>('noop', {
+        detail: { games, displayName, steamId, channel }
+    }))
+}
 
 describe('validateLibraryExportPayload', () => {
     it('accepts a well-formed sbam-library-export/v1 payload', () => {
@@ -98,7 +111,7 @@ describe('SteamIntegration manual library import', () => {
         const batchHandler = vi.fn()
         eventManager.registerEventHandler<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, batchHandler)
 
-        await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
+        await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
 
         expect(batchHandler).toHaveBeenCalledOnce()
         const games = (batchHandler.mock.calls[0][0] as CustomEvent<SteamGamesBatchEvent>).detail.games
@@ -111,7 +124,7 @@ describe('SteamIntegration manual library import', () => {
     it('marks the session as non-anonymous whether or not a display name is known', async () => {
         const integration = SteamIntegration.getInstance()
 
-        await integration['applyImportedLibrary'](SAMPLE_GAMES, undefined, undefined, 'file')
+        await importLibrary(integration, SAMPLE_GAMES, undefined, undefined, 'file')
         expect(integration.isAnonymous()).toBe(false)
     })
 
@@ -121,7 +134,7 @@ describe('SteamIntegration manual library import', () => {
         const dataLoadedHandler = vi.fn()
         eventManager.registerEventHandler(SteamEventTypes.DataLoaded, dataLoadedHandler)
 
-        await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
+        await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
 
         const detail = dataLoadedHandler.mock.calls[0][0].detail
         expect(detail.userInput).toBe('Test Account')
@@ -133,7 +146,7 @@ describe('SteamIntegration manual library import', () => {
         const dataLoadedHandler = vi.fn()
         eventManager.registerEventHandler(SteamEventTypes.DataLoaded, dataLoadedHandler)
 
-        await integration['applyImportedLibrary'](SAMPLE_GAMES, undefined, undefined, 'file')
+        await importLibrary(integration, SAMPLE_GAMES, undefined, undefined, 'file')
 
         const detail = dataLoadedHandler.mock.calls[0][0].detail
         expect(detail.userInput).toBeUndefined()
@@ -145,7 +158,7 @@ describe('SteamIntegration manual library import', () => {
         const batchHandler = vi.fn()
         eventManager.registerEventHandler(SteamEventTypes.GamesBatchReady, batchHandler)
 
-        await integration['applyImportedLibrary']([], 'Test Account', undefined, 'bookmarklet')
+        await importLibrary(integration, [], 'Test Account', undefined, 'bookmarklet')
 
         expect(batchHandler).not.toHaveBeenCalled()
         expect(integration.isAnonymous()).toBe(true)
@@ -154,30 +167,57 @@ describe('SteamIntegration manual library import', () => {
     it('records which channel captured the library, for future diagnosability', async () => {
         const integration = SteamIntegration.getInstance()
 
-        await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'file')
+        await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'file')
 
         const persisted = JSON.parse(localStorage.getItem('sbam_library_source')!)
-        expect(persisted.type).toBe('imported')
-        expect(persisted.channel).toBe('file')
-        expect(persisted.importedAt).toEqual(expect.any(String))
+        expect(persisted.provenance.channel).toBe('file')
+        expect(persisted.provenance.capturedAt).toEqual(expect.any(String))
     })
 
     it('persists a captured steamid so a future re-fetch is possible', async () => {
         const integration = SteamIntegration.getInstance()
 
-        await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', '76561198000000000', 'bookmarklet')
+        await importLibrary(integration, SAMPLE_GAMES, 'Test Account', '76561198000000000', 'bookmarklet')
 
         const persisted = JSON.parse(localStorage.getItem('sbam_library_source')!)
-        expect(persisted.steamId).toBe('76561198000000000')
+        expect(persisted.owner.steamId).toBe('76561198000000000')
+    })
+
+    it('persists ownership fields plus name — never categories/artwork (Fork B2)', async () => {
+        const integration = SteamIntegration.getInstance()
+
+        await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'file')
+
+        const persisted = JSON.parse(localStorage.getItem('sbam_library_source')!)
+        expect(persisted.games).toEqual([
+            { appid: 440, name: 'Team Fortress 2', playtimeForever: 100 },
+            { appid: 620, name: 'Portal 2', playtimeForever: 50 },
+        ])
+    })
+
+    it('shows the real name immediately even with a cold entity cache, and it survives a reload', async () => {
+        const first = SteamIntegration.getInstance()
+        await importLibrary(first, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
+
+        SteamIntegration.dispose()
+        const second = SteamIntegration.getInstance()
+        const eventManager = EventManager.getInstance()
+        const batchHandler = vi.fn()
+        eventManager.registerEventHandler<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, batchHandler)
+
+        await second['handleGameStart']()
+
+        const games = (batchHandler.mock.calls[0][0] as CustomEvent<SteamGamesBatchEvent>).detail.games
+        expect(games.map(g => g.name)).toEqual(['Team Fortress 2', 'Portal 2'])
     })
 
     describe('surviving a reload', () => {
         it('re-loads a previously imported library on startup instead of falling back to the anonymous store', async () => {
             const first = SteamIntegration.getInstance()
-            await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
+            await importLibrary(first, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
 
             // Simulate a fresh page load: new instance, no in-memory state carried over,
-            // but localStorage (where persistLibrarySource wrote) survives a reload.
+            // but localStorage (where persistLibrary wrote) survives a reload.
             SteamIntegration.dispose()
             const second = SteamIntegration.getInstance()
             const eventManager = EventManager.getInstance()
@@ -194,7 +234,7 @@ describe('SteamIntegration manual library import', () => {
 
         it('falls back to the anonymous store on startup once the persisted import has been cleared', async () => {
             const first = SteamIntegration.getInstance()
-            await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
+            await importLibrary(first, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
             first['handleClearCache'](new CustomEvent('noop', { detail: { scope: 'all' } }))
 
             SteamIntegration.dispose()
@@ -214,7 +254,7 @@ describe('SteamIntegration manual library import', () => {
 
         it('clears the persisted import on CacheClear scope "identity" ("Clear cached profile & reload"), unlike before this fix', async () => {
             const first = SteamIntegration.getInstance()
-            await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
+            await importLibrary(first, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
             expect(localStorage.getItem('sbam_library_source')).not.toBeNull()
 
             first['handleClearCache'](new CustomEvent('noop', { detail: { scope: 'identity' } }))
@@ -233,7 +273,7 @@ describe('SteamIntegration manual library import', () => {
             expect(second.isAnonymous()).toBe(true)
         })
 
-        it.todo('a successful online profile load (handleLoadLibrary) also persists a LibrarySource, and a subsequent handleGameStart re-loads it via the source-of-truth path rather than the legacy getCachedUsers() scan — needs the SteamApiClient network mocking pattern from steam-integration.test.ts, not yet wired into this file')
+        it.todo('a successful online profile load (handleLoadLibrary) also persists a Library, and a subsequent handleGameStart re-loads it via applyLibrary — needs the SteamApiClient network mocking pattern from steam-integration.test.ts, not yet wired into this file')
     })
 })
 

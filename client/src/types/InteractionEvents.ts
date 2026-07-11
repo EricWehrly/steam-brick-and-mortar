@@ -21,7 +21,7 @@ import type { SteamGame } from '../steam'
 import type { SteamGameData } from '../scene/game-box/types/GameData'
 import type { IStockStrategy } from '../scene/props/shared/StockStrategy'
 import type { LayoutMode } from './LayoutTypes'
-import type { ImportedGame, ImportChannel } from '../steam-integration/LibrarySource'
+import type { ImportedGame, ImportChannel } from '../steam-integration/Library'
 
 // =============================================================================
 // STEAM EVENTS
@@ -276,7 +276,7 @@ export interface SteamImportLibraryEvent extends BaseInteractionEvent {
     readonly displayName?: string
     /** The account's steamid64, when the capture could recover one — omit rather than pass a placeholder. */
     readonly steamId?: string
-    /** How this library was captured — see LibrarySource.ts for why this is real metadata. */
+    /** How this library was captured — see Library.ts for why this is real metadata. */
     readonly channel: ImportChannel
 }
 
