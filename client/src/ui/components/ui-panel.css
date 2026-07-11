@@ -139,6 +139,26 @@
     min-width: 0;
 }
 
+/* Shared "draw attention" glow - set --attention-glow-rgb and animate: panel-attention-pulse.
+   Stowed for later: an edge-tracing version with a fading tail, if this doesn't read as enough. */
+.ui-panel.draw-attention {
+    --attention-glow-rgb: 0 170 255;
+    animation: panel-attention-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes panel-attention-pulse {
+    0%, 100% {
+        box-shadow:
+            0 -2px 6px 0 rgb(var(--attention-glow-rgb) / 0.4),
+            0 -3px 16px 2px rgb(var(--attention-glow-rgb) / 0.2);
+    }
+    50% {
+        box-shadow:
+            0 -3px 16px 3px rgb(var(--attention-glow-rgb) / 0.85),
+            0 -5px 36px 10px rgb(var(--attention-glow-rgb) / 0.5);
+    }
+}
+
 /* Pause menu grouped-tab strip (kept in ui-panel primitives, not pause shared-components) */
 .pause-menu-subtabs {
     display: flex;

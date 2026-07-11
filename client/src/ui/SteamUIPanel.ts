@@ -22,6 +22,8 @@ import steamCacheStatsTemplate from '../templates/steam-ui/cache-stats.html?raw'
  *  to the bookmarks bar, and a `//` comment with no real newline left to end it would swallow
  *  everything after it. Fetched at runtime so the install link can't drift from what ships. */
 const BOOKMARKLET_SOURCE_URL = '/bookmarklets/export-library.min.js'
+/** How long the panel can go unclicked before it starts the draw-attention pulse (ui-panel.css). */
+const ATTENTION_IDLE_MS = 40_000
 
 export class SteamUIPanel {
   private static readonly logger = Logger.createLogFunctions(SteamUIPanel.name)
@@ -42,6 +44,10 @@ export class SteamUIPanel {
   private cacheInfoDiv: HTMLElement | null
   private steamStatus: HTMLElement | null
   private cacheCheckDebounceTimeout: TimeoutHandle | null = null
+  private attentionTimeout: TimeoutHandle | null = null
+  /** Once the user has ever expanded the panel, the attention cue has done its job - it's a
+   *  one-time nudge toward a first interaction, not a recurring nag. */
+  private attentionDismissed = false
 
   constructor() {
     this.eventManager = EventManager.getInstance()
@@ -66,6 +72,24 @@ export class SteamUIPanel {
   init(): void {
     this.setupEventListeners()
     this.initBookmarkletInstallLink()
+    this.scheduleAttentionCue()
+  }
+
+  /** Restarts the idle clock for the draw-attention pulse (ui-panel.css); clears the pulse and
+   *  skips rescheduling while hidden (so it can't fire the instant the panel reappears) or once
+   *  dismissed (see dismissAttentionCue). */
+  private scheduleAttentionCue(): void {
+    if (this.attentionTimeout !== null) {
+      clearTimeout(this.attentionTimeout)
+      this.attentionTimeout = null
+    }
+    this.steamUI?.classList.remove('draw-attention')
+
+    if (this.attentionDismissed || !this.steamUI || this.steamUI.classList.contains('hidden')) return
+
+    this.attentionTimeout = setTimeout(() => {
+      this.steamUI?.classList.add('draw-attention')
+    }, ATTENTION_IDLE_MS)
   }
 
   /**
@@ -224,6 +248,17 @@ export class SteamUIPanel {
   private toggleCollapsed(): void {
     if (!this.steamUI) return
     togglePanelCollapse(this.steamUI, this.steamUiToggleIndicator, 'vertically-collapsed')
+    this.dismissAttentionCue()
+  }
+
+  /** The user has engaged with the panel at least once - the attention cue has done its job. */
+  private dismissAttentionCue(): void {
+    this.attentionDismissed = true
+    if (this.attentionTimeout !== null) {
+      clearTimeout(this.attentionTimeout)
+      this.attentionTimeout = null
+    }
+    this.steamUI?.classList.remove('draw-attention')
   }
 
   private getUserInput(): string | null {
@@ -275,12 +310,14 @@ export class SteamUIPanel {
     if (this.steamUI) {
       this.steamUI.classList.remove('hidden')
     }
+    this.scheduleAttentionCue()
   }
-  
+
   hide(): void {
     if (this.steamUI) {
       this.steamUI.classList.add('hidden')
     }
+    this.scheduleAttentionCue()
   }
   
   showStatus(message: string, type: 'loading' | 'success' | 'error'): void {
@@ -373,6 +410,10 @@ export class SteamUIPanel {
     if (this.cacheCheckDebounceTimeout !== null) {
       clearTimeout(this.cacheCheckDebounceTimeout)
       this.cacheCheckDebounceTimeout = null
+    }
+    if (this.attentionTimeout !== null) {
+      clearTimeout(this.attentionTimeout)
+      this.attentionTimeout = null
     }
   }
 }

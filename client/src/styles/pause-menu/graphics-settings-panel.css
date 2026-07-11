@@ -131,10 +131,12 @@
   gap: 0.5rem;
 }
 
-/* Show warning when ANY control has BOTH data-requires-reload AND data-changed */
+/* Show warning when ANY control has BOTH data-requires-reload AND data-changed.
+   Reuses ui-panel.css's panel-attention-pulse keyframe in warning-orange. */
 .graphics-settings-panel .settings-sections:has([data-requires-reload][data-changed]) .reload-warning {
   display: flex;
-  animation: pulse-warning 2s ease-in-out infinite;
+  --attention-glow-rgb: 255 152 0;
+  animation: panel-attention-pulse 2.4s ease-in-out infinite;
 }
 
 /* Highlight setting sections that contain changed reload-required controls */
@@ -147,11 +149,6 @@
 /* Individual control indicator - show when this specific control is changed */
 [data-requires-reload][data-changed] {
   box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.4);
-}
-
-@keyframes pulse-warning {
-  0%, 100% { background: rgba(255, 152, 0, 0.15); }
-  50% { background: rgba(255, 152, 0, 0.25); }
 }
 
 /* Panel Footer */
