@@ -15,8 +15,8 @@ import { deriveArtworkFromAppId } from '../steam/utils/ArtworkUrls'
 import { ValidationUtils } from '../utils'
 import { Logger } from '../utils/Logger'
 import { GameLibraryManager, type GameLibraryState } from './GameLibraryManager'
-import type { ImportedGame, ImportChannel } from './LibrarySource'
-import { persistLibrarySource, loadPersistedLibrarySource, clearPersistedLibrarySource } from './LibrarySourceStore'
+import type { Library, LibraryGame } from './Library'
+import { persistLibrary, loadPersistedLibrary, clearPersistedLibrary } from './LibraryStore'
 import { ManualLibraryImportGateway } from './ManualLibraryImportGateway'
 import { BatchEmitter } from '../steam/BatchEmitter'
 import { GameLayoutConstants } from '../scene/props/shared/GameBoxUtils'
@@ -102,10 +102,7 @@ export class SteamIntegration {
         const gameLibraryState = this.getGameLibraryState()
         const games: SteamGameData[] = gameLibraryState.userData?.games || []
         this.steamId = gameLibraryState.userData?.steamid
-        const vanityUrl = gameLibraryState.userData?.vanity_url?.trim()
-        const displayName = vanityUrl && !vanityUrl.toLowerCase().startsWith('steamid:')
-            ? vanityUrl
-            : undefined
+        const displayName = SteamIntegration.resolveDisplayName(gameLibraryState.userData?.vanity_url)
 
         SteamIntegration.logger.debug(`Storing ${games.length} games in DataManager`)
 
@@ -140,6 +137,13 @@ export class SteamIntegration {
     /** Returns true when no user identity has been established (anonymous/demo browse). */
     public isAnonymous(): boolean {
         return !DataManager.getInstance().get<string>('steam.userInput')
+    }
+
+    /** A real vanity name, never the internal "steamid:<id>" placeholder used when there's
+     *  no vanity — that placeholder should never surface as a display name. */
+    private static resolveDisplayName(vanityUrl: string | undefined): string | undefined {
+        const trimmed = vanityUrl?.trim()
+        return trimmed && !trimmed.toLowerCase().startsWith('steamid:') ? trimmed : undefined
     }
 
     private async loadGamesForUser(userInput: string, ignoreCache = false): Promise<GameLibraryState> {
@@ -217,47 +221,17 @@ export class SteamIntegration {
     }
 
     private async handleGameStart(): Promise<void> {
-        const source = loadPersistedLibrarySource()
+        const library = loadPersistedLibrary()
 
-        if (source?.type === 'imported') {
-            SteamIntegration.logger.info(`Auto-load: imported library (${source.channel}, ${source.games.length} games)`)
-            await this.applyImportedLibrary(source.games, source.displayName, source.steamId, source.channel)
+        if (library) {
+            SteamIntegration.logger.info(
+                `Auto-load: persisted library (${library.provenance.channel}, ${library.games.length} games)`
+            )
+            await this.applyLibrary(library)
             return
         }
 
-        if (source?.type === 'online' && AppSettings.get('autoLoadProfile')) {
-            SteamIntegration.logger.info(`Auto-load: ${source.userInput} (persisted library source)`)
-            this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
-                userInput: source.userInput
-            })
-            return
-        }
-
-        // Migration bridge: a cached online profile from before LibrarySource existed (or one
-        // whose LibrarySource write raced with an older client build) still auto-loads via the
-        // legacy cache scan. handleLoadLibrary() persists a LibrarySource on success, so this
-        // profile converges onto the source-of-truth path from its next reload on.
-        const cachedUsers = this.steamClient.getCachedUsers()
-
-        if (cachedUsers.length > 0 && AppSettings.get('autoLoadProfile')) {
-            const user = cachedUsers[0]
-            SteamIntegration.logger.info(`Auto-load: ${user.displayName} (${user.vanityUrl}, legacy cache scan)`)
-
-            this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
-                userInput: user.vanityUrl
-            })
-            return
-        }
-
-        // Fallback to the demo/anonymous store whenever we're not auto-loading a real
-        // profile - covers both the true first-run case and auto-load being toggled off.
-        // Without this, a cached profile + disabled auto-load left the scene permanently
-        // empty (no shelves, no boxes) until the user manually submitted a profile.
-        SteamIntegration.logger.info(
-            cachedUsers.length === 0 && !source
-                ? 'No cached user - loading anonymous store'
-                : 'Auto-load disabled - loading anonymous store'
-        )
+        SteamIntegration.logger.info('No persisted library - loading anonymous store')
         await this.loadDemoGames()
     }
 
@@ -286,94 +260,93 @@ export class SteamIntegration {
 
     /**
      * Load a library captured offline (manual export bookmarklet, or a previously-saved
-     * export file) — no Steam API network calls, artwork derived from appid.
+     * export file) — no Steam API network calls, artwork derived from appid, name from the
+     * capture itself (AppDetailsCache can still upgrade it — see applyLibrary).
      */
     private async handleImportLibrary(event: CustomEvent<SteamImportLibraryEvent>): Promise<void> {
-        await this.applyImportedLibrary(event.detail.games, event.detail.displayName, event.detail.steamId, event.detail.channel)
-    }
+        const { games, displayName, steamId, channel } = event.detail
 
-    /**
-     * Shared by the live import event handler and the startup auto-load path — persisted
-     * imported libraries survive reload the same way an online cached profile does, via the
-     * same LibrarySource record (see persistLibrarySource/loadPersistedLibrarySource below).
-     */
-    private async applyImportedLibrary(
-        games: readonly ImportedGame[],
-        displayName: string | undefined,
-        steamId: string | undefined,
-        channel: ImportChannel
-    ): Promise<void> {
         if (!games.length) {
             SteamIntegration.logger.warn('ImportLibrary had no games, ignoring')
             return
         }
 
+        const library: Library = {
+            owner: { steamId, displayName },
+            games: games.map((g): LibraryGame => ({ appid: g.appid, name: g.name, playtimeForever: g.playtime_forever })),
+            provenance: { channel, capturedAt: new Date().toISOString() }
+        }
+
+        if (await this.applyLibrary(library)) {
+            persistLibrary(library)
+            SteamIntegration.logger.info(`Imported library loaded: ${library.games.length} games (${channel})`)
+        }
+    }
+
+    /**
+     * Renders a Library immediately from whatever's already known — ownership fields plus a
+     * read-only AppDetailsCache join, no network fetch. The single render path for both a
+     * freshly-captured import and a persisted Library restored on startup, regardless of
+     * channel (Library's whole point — see docs/plans/library-source-convergence-plan.md).
+     *
+     * Fork A: if the library has a steamId, a background re-fetch is kicked off (gated by
+     * autoLoadProfile) to replace this snapshot with live data once it lands — re-fetchability
+     * is a property of having a steamId, not of the channel.
+     *
+     * Returns whether the render succeeded, so callers only persist a library they could
+     * actually show.
+     */
+    private async applyLibrary(library: Library): Promise<boolean> {
         try {
             if (this.gameLibrary.getState().userData?.games?.length) {
                 this.eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {})
-                SteamIntegration.logger.info('Emitted LibraryReloadRequest before imported library load')
+                SteamIntegration.logger.info('Emitted LibraryReloadRequest before library load')
             }
 
-            // No real display name (e.g. a bare /profiles/<steamid>/ with no vanity set) is
-            // treated the same as the anonymous demo store — falls through to the sign's
-            // existing generic "STEAM LIBRARY" title rather than showing a placeholder.
-            const ownedGames: SteamGame[] = games.map((g): SteamGame => ({
+            const ownedGames: SteamGame[] = library.games.map((g): SteamGame => ({
                 appid: g.appid,
                 name: g.name,
-                playtime_forever: g.playtime_forever,
+                playtime_forever: g.playtimeForever,
+                rtime_last_played: g.lastPlayed,
                 img_icon_url: '',
                 img_logo_url: '',
                 artwork: deriveArtworkFromAppId(g.appid)
             }))
-            // Read-only join against AppDetailsCache — gains categories/genres/canonical name
-            // whenever the shared entity cache already has them (baked bundle or a prior online
-            // session), without triggering a network fetch for the ones it doesn't. See
-            // GamesLoader.enrichFromCache for why this stays network-free.
             const enrichedGames = await this.steamClient.enrichFromCache(ownedGames)
 
-            const importedUser: SteamUser = {
-                steamid: steamId ?? '',
-                vanity_url: displayName ?? '',
+            // No real display name (e.g. a bare /profiles/<steamid>/ with no vanity set) is
+            // treated the same as the anonymous demo store — falls through to the sign's
+            // existing generic "STEAM LIBRARY" title rather than showing a placeholder.
+            const user: SteamUser = {
+                steamid: library.owner.steamId ?? '',
+                vanity_url: library.owner.displayName ?? '',
                 game_count: enrichedGames.length,
-                retrieved_at: new Date().toISOString(),
+                retrieved_at: library.provenance.capturedAt,
                 games: enrichedGames
             }
 
-            // Marker only — never rendered. The sign title is driven separately by
-            // importedUser.vanity_url above; this just keeps isAnonymous() correctly false
-            // for any successful import, named or not (it's real user data either way).
-            this.gameLibrary.setUserData(importedUser)
-            this.storeSteamDataAndEmitEvent(displayName ?? 'imported-library')
-            await this.emitGamesInBatches(importedUser.games)
-            persistLibrarySource({
-                type: 'imported',
-                channel,
-                importedAt: new Date().toISOString(),
-                displayName,
-                steamId,
-                games
-            })
+            this.gameLibrary.setUserData(user)
+            this.storeSteamDataAndEmitEvent(library.owner.displayName ?? 'imported-library')
+            await this.emitGamesInBatches(enrichedGames)
 
-            SteamIntegration.logger.info(`Imported library loaded: ${importedUser.games.length} games (${channel})`)
+            if (library.owner.steamId && AppSettings.get('autoLoadProfile')) {
+                SteamIntegration.logger.info(`Background re-fetch for steamId ${library.owner.steamId}`)
+                this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
+                    userInput: library.owner.steamId
+                })
+            }
+
+            return true
         } catch (error) {
-            SteamIntegration.logger.error('Failed to load imported library:', error)
+            SteamIntegration.logger.error('Failed to apply library:', error)
             // Nothing loaded yet (a startup auto-load, not a user retrying over an existing
             // session) — fall back to the demo store so DataLoaded still fires and the Steam
             // UI panel becomes visible instead of staying hidden with no recovery path.
             if (this.isAnonymous()) {
                 await this.loadDemoGames()
             }
+            return false
         }
-    }
-
-    /** Whatever string round-trips through LoadLibrary correctly on a future reload — see
-     *  LibrarySource's userInput field docs for why this isn't just vanity_url directly. */
-    private resolveReloadableUserInput(): string | null {
-        const userData = this.gameLibrary.getState().userData
-        if (!userData) return null
-        const vanity = userData.vanity_url?.trim()
-        if (vanity && !vanity.toLowerCase().startsWith('steamid:')) return vanity
-        return userData.steamid || null
     }
 
     /**
@@ -423,9 +396,24 @@ export class SteamIntegration {
             await this.loadGamesForUser(targetInput, forceUpdate)
             this.storeSteamDataAndEmitEvent(targetInput)
 
-            const reloadableInput = this.resolveReloadableUserInput()
-            if (reloadableInput) {
-                persistLibrarySource({ type: 'online', userInput: reloadableInput })
+            // Snapshot for a fast render on the next reload (applyLibrary) — Fork A's
+            // background re-fetch (gated on this same steamId + autoLoadProfile) is what keeps
+            // it fresh from there, so this doesn't need to be re-persisted more eagerly.
+            const userData = this.gameLibrary.getState().userData
+            if (userData?.steamid) {
+                persistLibrary({
+                    owner: {
+                        steamId: userData.steamid,
+                        displayName: SteamIntegration.resolveDisplayName(userData.vanity_url)
+                    },
+                    games: userData.games.map((g): LibraryGame => ({
+                        appid: g.appid,
+                        name: g.name,
+                        playtimeForever: g.playtime_forever,
+                        lastPlayed: g.rtime_last_played
+                    })),
+                    provenance: { channel: 'online', capturedAt: new Date().toISOString() }
+                })
             }
 
             SteamIntegration.logger.info(forceUpdate ? 'Library load (forced update) completed' : 'Library load completed')
@@ -452,7 +440,7 @@ export class SteamIntegration {
         if (event.detail.scope === 'all') {
             this.gameLibrary.clear()
         }
-        clearPersistedLibrarySource()
+        clearPersistedLibrary()
         DataManager.getInstance().delete('steam.userInput')
     }
 }

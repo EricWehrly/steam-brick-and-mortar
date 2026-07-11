@@ -12,7 +12,7 @@
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
 import type { SteamImportLibraryEvent } from '../types/InteractionEvents'
-import { validateLibraryExportPayload } from './LibrarySource'
+import { validateLibraryExportPayload } from './Library'
 import { Logger } from '../utils/Logger'
 
 export class ManualLibraryImportGateway {

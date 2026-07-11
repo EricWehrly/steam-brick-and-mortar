@@ -1,10 +1,8 @@
 /**
- * Where the currently-loaded library came from, and enough to reload it at startup without
- * re-deriving lost context — the single source of truth handleGameStart() reads, replacing
- * the old two-signal setup (a dedicated imported-library key, plus scanning SteamApiClient's
- * CacheManager for an online profile). CacheManager itself is untouched: it's a content cache
- * ("what did Steam last tell us about this steamid"), this is routing state ("what should
- * boot at startup"). See docs/plans/manual-library-export-feasibility.md.
+ * The resolved, in-hand library — same shape no matter how it was captured (online fetch,
+ * bookmarklet, or file import). The channel is decorative provenance, never an execution
+ * discriminant. Persisted so handleGameStart() can restore it on startup without re-deriving
+ * lost context. See docs/plans/library-source-convergence-plan.md.
  */
 
 export interface ImportedGame {
@@ -22,19 +20,46 @@ export interface ImportedGame {
  */
 export type ImportChannel = 'bookmarklet' | 'file'
 
-export type LibrarySource =
-    /** userInput: whatever string round-trips through LoadLibrary correctly on reload — a
-     *  real vanity name, or the raw SteamID64 digits when there's no vanity (never the
-     *  internal "steamid:<id>" placeholder, which parseSteamUserInput can't parse back). */
-    | { readonly type: 'online', readonly userInput: string }
-    | {
-        readonly type: 'imported'
-        readonly channel: ImportChannel
-        readonly importedAt: string
-        readonly displayName?: string
-        readonly steamId?: string
-        readonly games: readonly ImportedGame[]
-    }
+/** How a Library was captured. Decorative only — never switched on for execution. */
+export type LibraryChannel = 'online' | ImportChannel
+
+/** Who the library belongs to. steamId absent ⇒ not re-fetchable (see Fork A in the plan). */
+export interface LibraryOwner {
+    readonly steamId?: string
+    readonly displayName?: string
+}
+
+/**
+ * Ownership facts, plus the one entity field every channel already has for free at capture
+ * time and that's cheap and safe to duplicate: name is practically immutable and doesn't
+ * carry the staleness/multi-user-clearing stakes that categories/artwork/genres do (see
+ * user-games-cache-entanglement in docs/tech-debt.md — that entanglement was about *those*
+ * fields, not a label string). Keeping it here means a reload never depends on AppDetailsCache
+ * already having this appid, and there's no write-back path fabricating placeholder cache
+ * entries to cover the gap. AppDetailsCache can still resolve a better/canonical name at
+ * assembly time (see GamesLoader.buildEnhancedGame) — this is only the floor, never persisted
+ * artwork/categories/genres, which stay resolved from AppDetailsCache per-appid, never here.
+ * lastPlayed is carried so a restored online library keeps its shelf ordering without waiting
+ * on a re-fetch.
+ */
+export interface LibraryGame {
+    readonly appid: number
+    readonly name: string
+    readonly playtimeForever: number
+    readonly lastPlayed?: number
+}
+
+export interface LibraryProvenance {
+    readonly channel: LibraryChannel
+    /** When THIS data is from (SteamUser already carries retrieved_at in this spirit). */
+    readonly capturedAt: string
+}
+
+export interface Library {
+    readonly owner: LibraryOwner
+    readonly games: readonly LibraryGame[]
+    readonly provenance: LibraryProvenance
+}
 
 /** The wire shape both the bookmarklet's postMessage payload and a saved export file share. */
 export interface LibraryExportPayload {
