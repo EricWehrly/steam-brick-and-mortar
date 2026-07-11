@@ -57,28 +57,46 @@ Confirmed evidence: a real `cache_state` blob was found holding 833 `game_<appid
 
 ## id: cache-clear-domain-unification
 **Priority**: Medium  
-**Effort**: ~1 day (event redesign + 3 call-site migrations + tests)  
-**Context**: Three separate "clear cache" UI entry points exist - `SteamUIPanel`'s Clear Cache button, `GameSettingsPanel`'s "Clear cached profile & reload", and `CacheManagementPanel`'s Clear Cache button - each clearing an inconsistent, overlapping subset of five real cache/session domains (identity resolution, games/playtime, artwork metadata, pixel/texture data, and `SteamIntegration`'s own session state). Games (`games_<steamid>`, per-user) and metadata (`AppDetailsCache`, per-appid, shared across users) are already two structurally separate stores with different keys - not entangled, just always cleared together by call-site habit - and matter for the app's multi-profile-login goal: identity/games are correctly per-user already, metadata/pixels are correctly shared and should stay that way. `CacheManagementPanel.clearCache()` calls `PixelDataCache.clear()` and `SteamApiClient.clearCache()` directly rather than through events - a "zero cross-class dependencies" violation - and never touches `gameLibrary`/`LibrarySource`/`steam.userInput`, so it can resurrect the same stale-imported-library bug that `CacheClear`'s scope collapse fixed for the other two entry points. Separately, `SteamEventTypes.ImageCacheClear` already exists and `PixelDataCache` already listens for it, but nothing in the app currently emits it - dead wiring. See [[user-games-cache-entanglement]] for the narrower, separate debt of playtime being bundled *inside* the `games_<steamid>` record itself.
+**Effort**: ~0.5 day remaining (typed `CacheDomain` set + tests; call-site/dead-wiring fixes done)  
+**Context**: Originally three "clear cache" UI entry points existed with inconsistent, overlapping
+coverage of five real cache/session domains (identity resolution, games/playtime, artwork
+metadata, pixel/texture data, `SteamIntegration`'s session state). Games (`games_<steamid>`,
+per-user) and metadata (`AppDetailsCache`, per-appid, shared) are already two structurally
+separate stores with different keys - not entangled, just habitually cleared together - and that
+separation matters for the app's multi-profile-login goal. See [[user-games-cache-entanglement]]
+for the narrower, separate debt of playtime bundled *inside* the `games_<steamid>` record itself.
 
-**Decision (for now)**:
-- Do not implement yet - see `docs/plans/cache-clear-domain-unification-plan.md` for the proposed design and rollout.
-- The `CacheClear` scope collapse (`'all' | 'identity'`) done alongside the manual-import feature already tightened two of the three entry points onto one event contract; this entry tracks unifying all three and folding `ImageCacheClear` in as a real, checkable domain rather than a separate sibling event.
+**Resolved (2026-07-11)**:
+- `SteamUIPanel`'s "Clear Cache"/"Refresh Cache"/"Cache Info" buttons were dead code - they looked
+  up DOM ids (`clear-cache`, `refresh-cache`, `show-cache-stats`) that didn't exist in `index.html`
+  or any template, almost certainly orphaned by the "steam ui readability collapse" work. Removed
+  entirely rather than fixed, since there was nothing live to fix.
+- `CacheManagementPanel.clearCache()` now emits `CacheClear`(`scope: 'all'`) + `ImageCacheClear`
+  instead of calling `PixelDataCache`/`SteamApiClient` directly - closes both the
+  zero-cross-class-dependencies violation and the stale-session bug (`CacheClear`'s `'all'` scope
+  already clears `gameLibrary`/persisted `Library`/`steam.userInput` via `SteamIntegration`'s own
+  listener, which this call site now reaches).
+- `ImageCacheClear` is now actually emitted (previously dead wiring - `PixelDataCache` listened for
+  it but nothing sent it).
+- `SteamApiClient.clearCache()` now documents the pixel exclusion as intentional (different-origin
+  data), not an oversight.
 
-**Done when**:
-- All three "clear cache" UI entry points route through the same event contract
-- Cache/session domains are expressed as strict types the compiler can check, not loosely-matched strings
-- `CacheManagementPanel` no longer calls `PixelDataCache`/`SteamApiClient` directly
-- `ImageCacheClear` either becomes a real, reachable domain or is removed if genuinely redundant
+**Still open**:
+- Cache/session domains are still a loosely-matched `scope: 'all' | 'identity'` string plus a
+  bare sibling `ImageCacheClear` event, not a single typed `CacheDomain` set the compiler can
+  check - see `docs/plans/cache-clear-domain-unification-plan.md` for the proposed design.
+- Only two live "clear cache" entry points remain (`CacheManagementPanel`, `GameSettingsPanel`) -
+  `SteamUIPanel`'s is gone, not migrated, since it was never functional.
 
 **Related files**:
 - `client/src/ui/pause/panels/CacheManagementPanel.ts`
-- `client/src/ui/SteamUIPanel.ts`
 - `client/src/ui/pause/panels/GameSettingsPanel.ts`
-- `client/src/steam-integration/CacheClearEmitter.ts`
+- `client/src/steam/SteamApiClient.ts`
 - `client/src/scene/game-box/instancing/PixelDataCache.ts`
 
 **Plan reference**:
 - `docs/plans/cache-clear-domain-unification-plan.md`
+
 
 ## id: steam-integration-loading-strategy-split
 **Priority**: Medium  
