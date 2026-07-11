@@ -78,9 +78,11 @@ export interface LibraryOwner {
 
 export interface LibraryGame {
     readonly appid: number
+    readonly name: string
     readonly playtimeForever: number
-    // entity fields (name/artwork/categories/genres) — see the "one real fork" below for
-    // whether these live here or are resolved from AppDetailsCache at assembly time
+    // name is the one entity field kept here — see "Implementation refinement" under Fork B
+    // below for why. artwork/categories/genres are never here; those are resolved from
+    // AppDetailsCache per-appid at assembly time instead.
 }
 
 /** Decorative only. Never switched on for execution. */
@@ -137,6 +139,19 @@ with no steamId simply has nothing to refresh. **This honors decision #4** (chan
 while preserving online's freshness. Flagged because it's a behavior change for the imported path
 (a bookmarklet-with-steamId would now refresh on reload, which it doesn't today) and needs a yes.
 
+**Resolved: yes.** `owner.steamId` presence is a precondition for the background re-fetch; the
+existing `autoLoadProfile` setting (`AppSettings` - already gates the online-source auto-load path
+today) is the second gate. Re-fetch fires only when both are true, not on steamId presence alone.
+
+**Follow-up this unlocks**: the bookmarklet should try to capture a steamId, not just a display
+name, so more imported libraries become re-fetchable. Checked `export-library.js`:
+`readDisplayNameFromUrl()` only matches `/id/<vanity>/` and returns `null` for numeric
+`/profiles/<steamid>/` URLs - the id is sitting right there in `location.pathname`, unread. That
+half is a trivial regex addition. Whether a steamid is *also* recoverable from the OwnedGames
+hydration payload on a vanity-URL profile (so vanity captures get it too) isn't confirmed - needs
+a quick check against `docs/research/steam-profile-ssr-hydration-research.md` before promising it.
+Small, self-contained follow-up; doesn't block this plan.
+
 ### Fork B — does the persisted `Library` hold full game entities, or ownership only?
 
 - **Option B1 — full resolved entities in the persisted library.** Simple, self-contained, works
@@ -153,21 +168,61 @@ while preserving online's freshness. Flagged because it's a behavior change for 
 
 **Recommendation: B2.** It's the altitude that makes the whole plan coherent — it's what lets
 "user data" and "game data" be genuinely separate caches, and it turns "fold in the entanglement
-debt" from a side quest into the load-bearing wall. But it's the single biggest scope lever in
-this plan, so it's an explicit decision, not an assumption.
+debt" from a side quest into the load-bearing wall.
 
-## Entanglement: the resulting cache domains (if B2)
+**Resolved: B2.** And it's a smaller lever than first framed above - the codebase already separates
+these two concerns for the online path: `SteamApiClient.getUserGames()` resolves ownership+
+playtime only (the raw API response), and `GamesLoader.buildEnhancedGame()` is the join step that
+layers in `AppDetailsCache` entity data. B2 doesn't invent this split, it extends the split online
+already has to the other channels, which today bypass it (`applyImportedLibrary` calls
+`deriveArtworkFromAppId` directly instead of going through entity-cache enrichment). This isn't
+"the single biggest scope lever," it's "make three channels consistent with the one that already
+does this right."
+
+**Implementation approach** (per discussion): two TypeScript types, one for ownership
+(`LibraryGame` - appid/playtime/last_played) and one for entity data (name/artwork/categories/
+genres - `AppDetailsData`'s job already), with persistence only ever writing the ownership shape.
+The "join" happens by running ownership data through the same enrichment `GamesLoader` already
+provides for online, not by carrying entity fields through to the persisted `Library`. Resolving to
+fully-hydrated objects for consumers (scene/UI code) stays cheap either way - the join is a read-
+time lookup keyed by appid, not a structural fork in how data flows.
+
+**Implementation refinement: `name` moved back onto `LibraryGame`.** The first pass kept
+`LibraryGame` strictly ownership-only per the sketch above, which meant an imported game's name
+(known at capture time) had nowhere to live once persisted — reloading with a cold `AppDetailsCache`
+showed a blank name. The fix built for that was a `seedEntityNames` write-back: stash a name-only,
+mostly-fabricated `AppDetailsData` entry (guessed `type`/`is_free`/empty artwork) into
+`AppDetailsCache` at import time so a later read could recover it. On review this was rejected -
+fabricating placeholder entries into a cache meant to hold real Steam data is worse than the problem
+it solves. `name` is not the same kind of entity data that motivated B2 in the first place: the
+entanglement bug ([[user-games-cache-entanglement]]) was about categories/genres/artwork, which have
+real staleness and multi-user-clearing-independence stakes; a game's name is practically immutable,
+already known for free at capture time on every channel, and safe to duplicate. `LibraryGame` now
+carries `name` alongside `appid`/`playtimeForever`/`lastPlayed`; `AppDetailsCache` can still resolve
+a better/canonical name at assembly time (unchanged), but the persisted name is always a safe floor.
+No write-back path exists; `seedEntityNames` was deleted entirely.
+
+**Resolved: no exclusion/pruning logic for `AppDetailsCache`.** Whether it's scoped to "games this
+app's users actually own (+ F2P)" or just keeps everything it's ever resolved is a non-decision -
+it already fetches unconditionally regardless of who's asking, multi-profile use on one machine
+means overlap across libraries is the common case anyway, and adding exclusion logic is pure extra
+code for a problem that doesn't exist yet. Revisit only if cache size becomes a measured problem,
+not preemptively.
+
+## Entanglement: the resulting cache domains
 
 - **User/identity domain** (per-user): steamid, displayName, and the owned-appid list with
   playtime/last_played. `resolve_*` folds in here conceptually.
-- **Game entity domain** (shared, per-appid): `AppDetailsCache` as it already exists — name,
-  artwork, categories, genres.
+- **Game entity domain** (shared, per-appid, unscoped/unpruned per above): `AppDetailsCache` as it
+  already exists — name, artwork, categories, genres.
 - **Pixel domain**: `PixelDataCache`, untouched here.
 
 A resolved `Library` = join(user's owned list, entity data). This also gives the
 [[cache-clear-domain-unification]] plan real domains to name instead of the placeholder
-`identity | games | metadata | pixels` — **the two plans must be reconciled**; this one likely
-defines the taxonomy the other consumes.
+`identity | games | metadata | pixels`. **Resolved: this plan owns the taxonomy; the cache-clear
+plan consumes it.** Once this refactor's shape is settled, update
+`cache-clear-domain-unification-plan.md` to adopt these domains. They land in sequence — this one
+first.
 
 ## Persistence
 
@@ -184,39 +239,56 @@ defines the taxonomy the other consumes.
 
 ## Sequencing
 
-This plan assumes the two preceding steps are already done, in this order:
-1. **Commit the current reviewed work now-ish** (feature + event collapse + review fixes).
-2. **Make `SteamIntegration` a singleton** (short pit-stop). This is a prerequisite: several of
-   the findings from the recent review (e.g. the `ManualLibraryImportGateway` listener leak from
-   repeated construction) dissolve once there's exactly one `SteamIntegration`, and the
-   convergence work assumes a single owner of the loading pipeline.
-3. **This refactor.**
+1. ✅ **Commit the current reviewed work** (feature + event collapse + review fixes) — done.
+2. ✅ **Make `SteamIntegration` a singleton** — done. Resolved the `ManualLibraryImportGateway`
+   listener-leak finding from the recent review as a side effect, and moved `maxGames` out of
+   `SteamIntegration` into `AppSettings.getDefaultSettings()` (same dev/prod-default pattern as
+   `enableStickers`/`enableBlockingTracker`) along the way.
+3. **This refactor** — next. Broken into stories in
+   [`library-source-convergence-implementation.md`](./library-source-convergence-implementation.md).
 
-## Open questions / assumptions / ambiguities (resolve before implementation)
+## Open questions / assumptions / ambiguities
 
-1. **Fork A** (above): is background re-fetch gated on `owner.steamId` presence the agreed
-   replacement for channel-driven re-fetch? Behavior change for bookmarklet-with-steamId.
-2. **Fork B** (above): B1 (full entities persisted) or B2 (ownership-only + entity join)?
-   Recommendation is B2; it's the biggest scope decision here.
-3. **Scope of the entanglement fold-in**: do we execute the full user/game cache split in *this*
-   refactor, or land the unified `Library` shape first and split the caches in an immediate
-   follow-up? (B2 essentially requires the split; B1 lets it be deferred.)
-4. **Is `demo`/anonymous a channel?** Making it one unifies `loadDemoGames` into the same assemble
-   path (nice), but "provenance = demo" is slightly odd for a library with no real owner.
-   Alternative: demo is the absence of a `Library`, handled before assembly.
-5. **`isAnonymous()` definition** under the unified shape. Proposed: "no owner identity /
-   showing the demo store" — an owner with neither steamId nor a real imported list is anonymous;
-   any non-demo `Library` is not. Confirm this still matches every current caller's intent.
-6. **Provenance granularity.** Is `{ channel, capturedAt }` enough for "future diagnosis," or do
-   we also want the raw source hint (e.g. which file / which vanity input) retained? More metadata
-   = more to keep honest; less = thinner diagnostics.
-7. **Migration** of existing persisted `sbam_library_source` values (both old variants) into the
-   new shape, vs. a one-time safe reset. The install base is presumably just the developer today,
-   so a reset may be entirely acceptable — confirm.
-8. **Module layout** (above): one module or a small folder; where the validator and assemblers
-   live relative to the types.
-9. **Reconciliation with [[cache-clear-domain-unification]]**: which plan owns the final domain
-   taxonomy, and do they land together or in sequence?
+**All resolved** (below) as of this pass — nothing gates implementation start.
+
+1. ~~Fork A~~ — yes, gated on `owner.steamId` presence + the existing `autoLoadProfile` setting.
+   Follow-up tracked: bookmarklet steamid capture (see Fork A section).
+2. ~~Fork B~~ — B2, confirmed. Smaller lever than originally framed (extends an existing
+   ownership/entity split, doesn't invent one).
+3. ~~Entanglement fold-in scope~~ — resolved by #2: B2 requires the split, so it happens in this
+   refactor, not deferred.
+4. ~~AppDetailsCache pruning~~ — resolved: no exclusion logic, keep it unscoped (see Fork B section).
+5. ~~**Is `demo`/anonymous a channel?**~~ — Resolved (implementation's choice). Conceptually,
+   demo/anonymous is *the ownerless library we render in the absence of knowing which library to
+   render* — no owner is at the helm. Whether that's modeled as a `'demo'` channel or as the
+   absence of a `Library` handled before assembly is left to implementation: **pick whichever
+   yields the cleanest, easiest-to-follow-and-maintain code.** Not a blocker either way.
+6. ~~**`isAnonymous()` definition**~~ — Confirmed. "No owner identity / showing the demo store": an
+   owner with neither a steamId nor a real imported list is anonymous; any non-demo `Library` is
+   not. Matches current caller intent.
+7. ~~**Provenance granularity**~~ — Resolved: `{ channel, capturedAt }` plus the vanity input we
+   already retain. *Which file* is explicitly not worth keeping ("the moment that bytestream
+   closes, it's a stranger"). The current candidate set is sufficient for diagnosis; revisit only
+   if a real diagnostic gap appears.
+8. ~~**Migration vs. reset**~~ — Resolved: reset is acceptable (install base is effectively just
+   the developer). Optionally **spike/swag** a migration path as a low-stakes exercise in data
+   migration — validate the happy path first (load real data via a Firefox/Chrome profile), and
+   only commit to hand-rolling migration if the spike proves cheap. Not a prerequisite; the plan
+   proceeds on reset by default.
+9. ~~**Module layout**~~ — Resolved: unease dismissed. A types file gaining a related validator/
+   assembler "makes sense." Only split into a folder if the split is *meaningful* — never break
+   files out arbitrarily.
+10. ~~**Reconciliation with [[cache-clear-domain-unification]]**~~ — Resolved: **this plan owns the
+    domain taxonomy**; the cache-clear plan consumes it. This plan is the more mature of the two,
+    and folding in the entanglement (Fork B/B2) is what produces the real domains
+    (`user/identity`, `game-entity`, `pixel`) that the cache-clear plan currently names with
+    placeholders. **Action: once this refactor's shape is settled/landed, update
+    `cache-clear-domain-unification-plan.md` to adopt these domains** rather than its own guesses.
+    They land in sequence (this first), not together.
+
+**Tracked follow-up, non-blocking:**
+- Bookmarklet steamid capture (see Fork A section) — small, self-contained, can land before,
+  during, or after this refactor without changing its shape.
 
 ## Non-goals
 
@@ -224,11 +296,14 @@ This plan assumes the two preceding steps are already done, in this order:
   later as one assembler + one `LibraryChannel` member.
 - Any change to `PixelDataCache` or the texture pipeline (`texture-cache-refactor-plan.md`).
 - Actual merge/reconciliation of two libraries — explicitly rejected (decision #2).
-- The `SteamIntegration` singleton migration itself (prerequisite, tracked separately).
+- Pruning/scoping `AppDetailsCache` by ownership — explicitly rejected (see Fork B section).
+- The `SteamIntegration` singleton migration itself (prerequisite, tracked separately, now done).
 
 ## Related debt / docs
 
-- [[user-games-cache-entanglement]] — the entanglement this executes (if B2)
+- [`library-source-convergence-implementation.md`](./library-source-convergence-implementation.md)
+  — the story/task breakdown for building this
+- [[user-games-cache-entanglement]] — the entanglement this executes
 - [[appid-keyed-cache-split]] — adjacent storage-format debt (the orphaned `cache_state` blob)
 - [[steam-integration-loading-strategy-split]] — the loading-pipeline split this largely subsumes
 - [[cache-clear-domain-unification]] — must be reconciled; likely consumes this plan's taxonomy
@@ -236,7 +311,11 @@ This plan assumes the two preceding steps are already done, in this order:
 
 ---
 
-**Status**: 🔮 Proposed — not started; blocked on the singleton pit-stop and on resolving Forks A/B
+**Status**: ✅ Implemented (2026-07-11). Full suite green (1087 tests); verified live in-browser for
+demo load, import → immediate render, and import → reload → name-survival. Bookmarklet steamid
+capture landed separately (`afde55cb`) ahead of this. Remaining non-blocking follow-ups: updating
+`cache-clear-domain-unification-plan.md` to consume this plan's taxonomy, and investigating what
+other fields the bookmarklet capture could recover (see spawned follow-up).
 **Priority**: Medium-High (it's the seam the manual-import feature is currently wedged into)
 
 ---
