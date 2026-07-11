@@ -21,4 +21,5 @@ export interface SteamGameData extends SteamGameMetadata {
         header: string
         library: string
     }
+    playtime_disconnected?: number
 }

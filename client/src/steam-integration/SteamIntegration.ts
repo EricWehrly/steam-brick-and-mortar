@@ -273,7 +273,13 @@ export class SteamIntegration {
 
         const library: Library = {
             owner: { steamId, displayName },
-            games: games.map((g): LibraryGame => ({ appid: g.appid, name: g.name, playtimeForever: g.playtime_forever })),
+            games: games.map((g): LibraryGame => ({
+                appid: g.appid,
+                name: g.name,
+                playtimeForever: g.playtime_forever,
+                lastPlayed: g.rtime_last_played,
+                playtimeDisconnected: g.playtime_disconnected
+            })),
             provenance: { channel, capturedAt: new Date().toISOString() }
         }
 
@@ -310,7 +316,8 @@ export class SteamIntegration {
                 rtime_last_played: g.lastPlayed,
                 img_icon_url: '',
                 img_logo_url: '',
-                artwork: deriveArtworkFromAppId(g.appid)
+                artwork: deriveArtworkFromAppId(g.appid),
+                playtime_disconnected: g.playtimeDisconnected
             }))
             const enrichedGames = await this.steamClient.enrichFromCache(ownedGames)
 
