@@ -213,6 +213,10 @@ export class SteamApiClient {
         return this.gamesLoader.loadGamesProgressively(steamUser, options)
     }
 
+    public async enrichFromCache(games: SteamGame[]): Promise<SteamGame[]> {
+        return this.gamesLoader.enrichFromCache(games)
+    }
+
     /**
      * Routes CacheClear to the right internal method for its scope - see CacheClearScope.
      * Switches on the exact scope value (not an else-default) so an unhandled future scope

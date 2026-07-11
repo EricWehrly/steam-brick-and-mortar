@@ -91,6 +91,23 @@ export class GamesLoader {
         return renderableGames
     }
 
+    /**
+     * Read-only entity join against AppDetailsCache — no network fetch triggered, unlike
+     * loadGamesProgressively. Used by channels that must render immediately without a Lambda
+     * round-trip (imported libraries): an appid missing from the cache renders with its own
+     * ownership-supplied fields (name/playtime) and no categories/genres rather than queueing
+     * a background fetch, preserving the "zero-Lambda, works offline" property those channels
+     * exist for.
+     */
+    public async enrichFromCache(games: SteamGame[]): Promise<SteamGame[]> {
+        const appids = games.map(g => g.appid)
+        const cachedAppDetails = await this.appDetailsCache.getMany(appids)
+        return games.map(game => {
+            const cached = cachedAppDetails.get(game.appid)
+            return this.buildEnhancedGame(game, cached ? this.normalizeBatchData(cached) : undefined)
+        })
+    }
+
     private async emitCachedGames(
         sortedGames: SteamGame[],
         cachedAppids: number[],
