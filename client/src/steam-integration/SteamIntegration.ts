@@ -221,7 +221,7 @@ export class SteamIntegration {
 
         if (source?.type === 'imported') {
             SteamIntegration.logger.info(`Auto-load: imported library (${source.channel}, ${source.games.length} games)`)
-            await this.applyImportedLibrary(source.games, source.displayName, source.channel)
+            await this.applyImportedLibrary(source.games, source.displayName, source.steamId, source.channel)
             return
         }
 
@@ -289,7 +289,7 @@ export class SteamIntegration {
      * export file) — no Steam API network calls, artwork derived from appid.
      */
     private async handleImportLibrary(event: CustomEvent<SteamImportLibraryEvent>): Promise<void> {
-        await this.applyImportedLibrary(event.detail.games, event.detail.displayName, event.detail.channel)
+        await this.applyImportedLibrary(event.detail.games, event.detail.displayName, event.detail.steamId, event.detail.channel)
     }
 
     /**
@@ -300,6 +300,7 @@ export class SteamIntegration {
     private async applyImportedLibrary(
         games: readonly ImportedGame[],
         displayName: string | undefined,
+        steamId: string | undefined,
         channel: ImportChannel
     ): Promise<void> {
         if (!games.length) {
@@ -342,6 +343,7 @@ export class SteamIntegration {
                 channel,
                 importedAt: new Date().toISOString(),
                 displayName,
+                steamId,
                 games
             })
 

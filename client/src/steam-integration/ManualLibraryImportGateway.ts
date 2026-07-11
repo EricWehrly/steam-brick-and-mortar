@@ -59,6 +59,7 @@ export class ManualLibraryImportGateway {
         this.eventManager.emit<SteamImportLibraryEvent>(SteamEventTypes.ImportLibrary, {
             games: validated.games,
             displayName: validated.displayName ?? undefined,
+            steamId: validated.steamId ?? undefined,
             channel: 'bookmarklet'
         })
     }

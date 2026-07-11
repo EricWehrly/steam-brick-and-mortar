@@ -274,6 +274,8 @@ export interface SteamImportLibraryEvent extends BaseInteractionEvent {
     readonly games: ReadonlyArray<ImportedGame>
     /** Real vanity name only (e.g. from /id/<name>/) — omit rather than pass a placeholder. */
     readonly displayName?: string
+    /** The account's steamid64, when the capture could recover one — omit rather than pass a placeholder. */
+    readonly steamId?: string
     /** How this library was captured — see LibrarySource.ts for why this is real metadata. */
     readonly channel: ImportChannel
 }

@@ -30,9 +30,10 @@ describe('validateLibraryExportPayload', () => {
         const result = validateLibraryExportPayload({
             schema: 'sbam-library-export/v1',
             display_name: 'Test Account',
+            steam_id: '76561198000000000',
             games: SAMPLE_GAMES
         })
-        expect(result).toEqual({ games: SAMPLE_GAMES, displayName: 'Test Account' })
+        expect(result).toEqual({ games: SAMPLE_GAMES, displayName: 'Test Account', steamId: '76561198000000000' })
     })
 
     it('rejects a payload with the wrong (or missing) schema string', () => {
@@ -97,7 +98,7 @@ describe('SteamIntegration manual library import', () => {
         const batchHandler = vi.fn()
         eventManager.registerEventHandler<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, batchHandler)
 
-        await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', 'bookmarklet')
+        await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
 
         expect(batchHandler).toHaveBeenCalledOnce()
         const games = (batchHandler.mock.calls[0][0] as CustomEvent<SteamGamesBatchEvent>).detail.games
@@ -110,7 +111,7 @@ describe('SteamIntegration manual library import', () => {
     it('marks the session as non-anonymous whether or not a display name is known', async () => {
         const integration = SteamIntegration.getInstance()
 
-        await integration['applyImportedLibrary'](SAMPLE_GAMES, undefined, 'file')
+        await integration['applyImportedLibrary'](SAMPLE_GAMES, undefined, undefined, 'file')
         expect(integration.isAnonymous()).toBe(false)
     })
 
@@ -120,7 +121,7 @@ describe('SteamIntegration manual library import', () => {
         const dataLoadedHandler = vi.fn()
         eventManager.registerEventHandler(SteamEventTypes.DataLoaded, dataLoadedHandler)
 
-        await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', 'bookmarklet')
+        await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
 
         const detail = dataLoadedHandler.mock.calls[0][0].detail
         expect(detail.userInput).toBe('Test Account')
@@ -132,7 +133,7 @@ describe('SteamIntegration manual library import', () => {
         const dataLoadedHandler = vi.fn()
         eventManager.registerEventHandler(SteamEventTypes.DataLoaded, dataLoadedHandler)
 
-        await integration['applyImportedLibrary'](SAMPLE_GAMES, undefined, 'file')
+        await integration['applyImportedLibrary'](SAMPLE_GAMES, undefined, undefined, 'file')
 
         const detail = dataLoadedHandler.mock.calls[0][0].detail
         expect(detail.userInput).toBeUndefined()
@@ -144,7 +145,7 @@ describe('SteamIntegration manual library import', () => {
         const batchHandler = vi.fn()
         eventManager.registerEventHandler(SteamEventTypes.GamesBatchReady, batchHandler)
 
-        await integration['applyImportedLibrary']([], 'Test Account', 'bookmarklet')
+        await integration['applyImportedLibrary']([], 'Test Account', undefined, 'bookmarklet')
 
         expect(batchHandler).not.toHaveBeenCalled()
         expect(integration.isAnonymous()).toBe(true)
@@ -153,7 +154,7 @@ describe('SteamIntegration manual library import', () => {
     it('records which channel captured the library, for future diagnosability', async () => {
         const integration = SteamIntegration.getInstance()
 
-        await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', 'file')
+        await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'file')
 
         const persisted = JSON.parse(localStorage.getItem('sbam_library_source')!)
         expect(persisted.type).toBe('imported')
@@ -161,10 +162,19 @@ describe('SteamIntegration manual library import', () => {
         expect(persisted.importedAt).toEqual(expect.any(String))
     })
 
+    it('persists a captured steamid so a future re-fetch is possible', async () => {
+        const integration = SteamIntegration.getInstance()
+
+        await integration['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', '76561198000000000', 'bookmarklet')
+
+        const persisted = JSON.parse(localStorage.getItem('sbam_library_source')!)
+        expect(persisted.steamId).toBe('76561198000000000')
+    })
+
     describe('surviving a reload', () => {
         it('re-loads a previously imported library on startup instead of falling back to the anonymous store', async () => {
             const first = SteamIntegration.getInstance()
-            await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', 'bookmarklet')
+            await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
 
             // Simulate a fresh page load: new instance, no in-memory state carried over,
             // but localStorage (where persistLibrarySource wrote) survives a reload.
@@ -184,7 +194,7 @@ describe('SteamIntegration manual library import', () => {
 
         it('falls back to the anonymous store on startup once the persisted import has been cleared', async () => {
             const first = SteamIntegration.getInstance()
-            await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', 'bookmarklet')
+            await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
             first['handleClearCache'](new CustomEvent('noop', { detail: { scope: 'all' } }))
 
             SteamIntegration.dispose()
@@ -204,7 +214,7 @@ describe('SteamIntegration manual library import', () => {
 
         it('clears the persisted import on CacheClear scope "identity" ("Clear cached profile & reload"), unlike before this fix', async () => {
             const first = SteamIntegration.getInstance()
-            await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', 'bookmarklet')
+            await first['applyImportedLibrary'](SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
             expect(localStorage.getItem('sbam_library_source')).not.toBeNull()
 
             first['handleClearCache'](new CustomEvent('noop', { detail: { scope: 'identity' } }))
