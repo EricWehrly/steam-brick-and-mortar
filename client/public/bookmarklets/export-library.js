@@ -137,7 +137,17 @@
                 return {
                     appid: g.appid,
                     name: g.name,
-                    playtime_forever: g.playtime_forever || 0
+                    playtime_forever: g.playtime_forever || 0,
+                    rtime_last_played: g.rtime_last_played || undefined,
+                    playtime_disconnected: g.playtime_disconnected || undefined,
+                    capsule_filename: g.capsule_filename || undefined,
+                    has_dlc: g.has_dlc,
+                    has_workshop: g.has_workshop,
+                    has_market: g.has_market,
+                    has_community_visible_stats: g.has_community_visible_stats,
+                    has_leaderboards: g.has_leaderboards,
+                    content_descriptorids: g.content_descriptorids,
+                    img_icon_url: g.img_icon_url || undefined
                 };
             })
         };
