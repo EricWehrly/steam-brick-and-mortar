@@ -317,19 +317,26 @@ export class SteamIntegration {
             // No real display name (e.g. a bare /profiles/<steamid>/ with no vanity set) is
             // treated the same as the anonymous demo store — falls through to the sign's
             // existing generic "STEAM LIBRARY" title rather than showing a placeholder.
+            const ownedGames: SteamGame[] = games.map((g): SteamGame => ({
+                appid: g.appid,
+                name: g.name,
+                playtime_forever: g.playtime_forever,
+                img_icon_url: '',
+                img_logo_url: '',
+                artwork: deriveArtworkFromAppId(g.appid)
+            }))
+            // Read-only join against AppDetailsCache — gains categories/genres/canonical name
+            // whenever the shared entity cache already has them (baked bundle or a prior online
+            // session), without triggering a network fetch for the ones it doesn't. See
+            // GamesLoader.enrichFromCache for why this stays network-free.
+            const enrichedGames = await this.steamClient.enrichFromCache(ownedGames)
+
             const importedUser: SteamUser = {
-                steamid: '',
+                steamid: steamId ?? '',
                 vanity_url: displayName ?? '',
-                game_count: games.length,
+                game_count: enrichedGames.length,
                 retrieved_at: new Date().toISOString(),
-                games: games.map((g): SteamGame => ({
-                    appid: g.appid,
-                    name: g.name,
-                    playtime_forever: g.playtime_forever,
-                    img_icon_url: '',
-                    img_logo_url: '',
-                    artwork: deriveArtworkFromAppId(g.appid)
-                }))
+                games: enrichedGames
             }
 
             // Marker only — never rendered. The sign title is driven separately by
