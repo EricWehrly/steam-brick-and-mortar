@@ -47,6 +47,31 @@
         return match ? decodeURIComponent(match[1]) : null;
     }
 
+    /** A numeric /profiles/<steamid>/ URL carries the steamid64 directly — unlike the vanity
+     *  case, no lookup is needed. */
+    function readSteamIdFromProfileUrl() {
+        var match = /^\/profiles\/(\d+)/.exec(location.pathname);
+        return match ? match[1] : null;
+    }
+
+    /**
+     * On a vanity URL (/id/<name>/) the steamid isn't in the URL, but it rides along in the
+     * same hydration blob as OwnedGames: React Query keys every query by a tuple, and the
+     * PlayerLinkDetails query's own queryKey is `["PlayerLinkDetails", "<steamid64>"]` — the
+     * account's own (public, non-secret) numeric id, repeated in queryHash right after it.
+     * Deliberately reads only that tuple value, never the query's `data` (which carries
+     * account_name and other sensitive fields this must not touch). Verified live 2026-07-11
+     * against a real vanity-URL profile — see docs/research/steam-profile-ssr-hydration-research.md
+     * section 4 (note: that doc's PlayerLinkDetails field table describes `data`, not the
+     * queryKey this reads from). Best-effort: returns null on any structural mismatch rather
+     * than throwing, since this is enrichment, not the primary extraction the rest of the
+     * script depends on.
+     */
+    function extractSteamIdFromPlayerLinkDetails(scriptText) {
+        var match = /PlayerLinkDetails\\*"\s*,\s*\\*"(\d{10,20})\\*"/.exec(scriptText);
+        return match ? match[1] : null;
+    }
+
     function findOwnedGamesScript() {
         var scripts = document.scripts;
         for (var i = 0; i < scripts.length; i++) {
@@ -101,11 +126,12 @@
         return JSON.parse(raw);
     }
 
-    function buildExportPayload(games) {
+    function buildExportPayload(games, scriptText) {
         return {
             schema: 'sbam-library-export/v1',
             exported_at: new Date().toISOString(),
             display_name: readDisplayNameFromUrl(),
+            steam_id: readSteamIdFromProfileUrl() || extractSteamIdFromPlayerLinkDetails(scriptText),
             game_count: games.length,
             games: games.map(function (g) {
                 return {
@@ -244,7 +270,7 @@
             return;
         }
 
-        var payload = buildExportPayload(games);
+        var payload = buildExportPayload(games, scriptText);
         var targetOrigin = readTargetOriginFromHash();
 
         if (window.opener && !window.opener.closed) {

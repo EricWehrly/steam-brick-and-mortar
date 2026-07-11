@@ -32,6 +32,7 @@ export type LibrarySource =
         readonly channel: ImportChannel
         readonly importedAt: string
         readonly displayName?: string
+        readonly steamId?: string
         readonly games: readonly ImportedGame[]
     }
 
@@ -39,6 +40,7 @@ export type LibrarySource =
 export interface LibraryExportPayload {
     readonly schema: string
     readonly display_name?: string | null
+    readonly steam_id?: string | null
     readonly games: readonly ImportedGame[]
 }
 
@@ -47,7 +49,7 @@ export interface LibraryExportPayload {
  * shared so the two entry points can't drift into checking slightly different things. Pure and
  * DOM-free on purpose: easy to unit test without any browser fixtures.
  */
-export function validateLibraryExportPayload(payload: unknown): { games: ImportedGame[], displayName: string | null } | null {
+export function validateLibraryExportPayload(payload: unknown): { games: ImportedGame[], displayName: string | null, steamId: string | null } | null {
     const isObject = (value: unknown): value is Record<string, unknown> =>
         typeof value === 'object' && value !== null
 
@@ -60,5 +62,6 @@ export function validateLibraryExportPayload(payload: unknown): { games: Importe
     if (games.length === 0) return null
 
     const displayName = typeof payload.display_name === 'string' ? payload.display_name.trim() || null : null
-    return { games, displayName }
+    const steamId = typeof payload.steam_id === 'string' ? payload.steam_id.trim() || null : null
+    return { games, displayName, steamId }
 }
