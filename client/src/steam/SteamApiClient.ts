@@ -236,6 +236,14 @@ export class SteamApiClient {
         }
     }
 
+    /**
+     * Clears Steam-derived data caches only (identity, games, entity metadata) - never the
+     * pixel/texture cache. That's intentional, not an oversight: PixelDataCache holds decoded
+     * image data sourced directly from Steam's CDN, a different origin and lifecycle from the
+     * app data here. Callers that want "clear everything" fire a separate ImageCacheClear
+     * event alongside this one rather than this method reaching into PixelDataCache itself -
+     * see cache-clear-domain-unification-plan.md.
+     */
     public async clearCache(): Promise<void> {
         this.cache.clear()
         await this.appDetailsCache.clear()

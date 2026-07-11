@@ -12,7 +12,6 @@ import { SteamEventTypes } from '../types/InteractionEvents'
 import type { SteamImportLibraryEvent } from '../types/InteractionEvents'
 import { SteamIntegration } from '../steam-integration/SteamIntegration'
 import { validateLibraryExportPayload } from '../steam-integration/Library'
-import type { SteamCacheClearEvent } from '../types/InteractionEvents'
 import { togglePanelCollapse } from './components/PanelCollapse'
 import { Logger } from '../utils/Logger'
 import steamCacheStatsTemplate from '../templates/steam-ui/cache-stats.html?raw'
@@ -34,10 +33,11 @@ export class SteamUIPanel {
   private steamUiToggleIndicator: HTMLElement | null
   private steamUserInput: HTMLInputElement | null
   private loadGamesButton: HTMLButtonElement | null
+  // Probably vestigial (its siblings clear-cache/refresh-cache/show-cache-stats were dead code,
+  // removed) - the element it targets is `class="hidden"` in index.html with no obvious live
+  // caller un-hiding it. Not confirmed dead like the others were; worth a look next time this
+  // file is touched. See updateLoadFromCacheButtonVisibility.
   private loadFromCacheButton: HTMLButtonElement | null
-  private refreshCacheButton: HTMLButtonElement | null
-  private clearCacheButton: HTMLButtonElement | null
-  private showCacheStatsButton: HTMLButtonElement | null
   private importFromFileLink: HTMLAnchorElement | null
   private importFileInput: HTMLInputElement | null
   private bookmarkletInstallLink: HTMLAnchorElement | null
@@ -59,9 +59,6 @@ export class SteamUIPanel {
     this.steamUserInput = getElementByIdSafe('steam-user-input') as HTMLInputElement
     this.loadGamesButton = getElementByIdSafe('load-steam-games') as HTMLButtonElement
     this.loadFromCacheButton = getElementByIdSafe('load-from-cache') as HTMLButtonElement
-    this.refreshCacheButton = getElementByIdSafe('refresh-cache') as HTMLButtonElement
-    this.clearCacheButton = getElementByIdSafe('clear-cache') as HTMLButtonElement
-    this.showCacheStatsButton = getElementByIdSafe('show-cache-stats') as HTMLButtonElement
     this.importFromFileLink = getElementByIdSafe('import-from-file-link') as HTMLAnchorElement
     this.importFileInput = getElementByIdSafe('import-file-input') as HTMLInputElement
     this.bookmarkletInstallLink = getElementByIdSafe('bookmarklet-install-link') as HTMLAnchorElement
@@ -159,33 +156,6 @@ export class SteamUIPanel {
       })
     }
     
-    // Cache management buttons
-    if (this.refreshCacheButton) {
-      this.refreshCacheButton.addEventListener('click', () => {
-        this.eventManager.emit(SteamEventTypes.LoadLibrary, {
-          forceUpdate: true,
-          source: EventSource.UI
-        })
-      })
-    }
-    
-    if (this.clearCacheButton) {
-      this.clearCacheButton.addEventListener('click', () => {
-        this.eventManager.emit<SteamCacheClearEvent>(SteamEventTypes.CacheClear, {
-          scope: 'all',
-          source: EventSource.UI
-        })
-      })
-    }
-    
-    if (this.showCacheStatsButton) {
-      this.showCacheStatsButton.addEventListener('click', () => {
-        this.eventManager.emit(SteamEventTypes.CacheStats, {
-          source: EventSource.UI
-        })
-      })
-    }
-
     if (this.importFromFileLink) {
       this.importFromFileLink.addEventListener('click', this.handleImportFromFileLinkClick.bind(this))
     }
@@ -374,25 +344,16 @@ export class SteamUIPanel {
     if (this.cacheInfoDiv?.style.display === 'block') {
       this.showCacheStatsInfo(stats)
     }
-    
-    // Update button text to show entry count
-    if (this.showCacheStatsButton) {
-      this.showCacheStatsButton.textContent = `Cache Info (${stats.totalEntries})`
-    }
   }
-  
+
   showCacheStatsInfo(stats: { totalEntries: number; cacheHits: number; cacheMisses: number }): void {
     if (!this.cacheInfoDiv) return
-    
+
     this.cacheInfoDiv.innerHTML = renderTemplate(steamCacheStatsTemplate, stats)
-    
+
     // Toggle visibility
     const isHidden = this.cacheInfoDiv.style.display === 'none'
     this.cacheInfoDiv.style.display = isHidden ? 'block' : 'none'
-    
-    if (this.showCacheStatsButton) {
-      this.showCacheStatsButton.textContent = isHidden ? 'Hide Info' : 'Cache Info'
-    }
   }
   
   updateLoadFromCacheButtonVisibility(hasCache: boolean): void {
