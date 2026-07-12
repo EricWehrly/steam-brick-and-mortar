@@ -1,162 +1,51 @@
-# Texture Cache Refactor Plan
+# Texture Cache Refactor Plan — COMPLETED
 
-**Plan 1 of 2** in the CDN-artwork-traffic thread — see [Traffic Safety Review](traffic-safety-review.md)
-("Next front: the CDN images") for why this matters now. **Plan 2** is
-[F2P Artwork Bake](f2p-artwork-bake-plan.md), which depends on this one landing first: baking
-pre-fetched artwork into a release only makes sense once there's one clean cache layer to seed,
-not the current two-cache, double-fetch mess described below.
+**Archived 2026-07-11.** Plan 1 of 2 in the CDN-artwork-traffic thread — see
+[Traffic Safety Review](../plans/traffic-safety-review.md) ("Next front: the CDN images") for why this
+mattered. **Plan 2**, [F2P Artwork Bake](../plans/f2p-artwork-bake-plan.md), is now the active thread.
 
-## Problem Statement
+**Status**: 🟢 **All 4 phases done.** Phases 1-3 were found already-complete via an unrelated, larger
+artwork-pipeline rewrite that landed elsewhere in the codebase (this doc was stale until the audit
+below caught up with it). Phase 4 (re-enable the 3 disabled LOD graphics-settings sliders) was
+completed directly as a follow-up to the audit — see [`GraphicsSettingsPanel.ts:217-254`](../../client/src/ui/pause/panels/GraphicsSettingsPanel.ts)
+and [`graphics-settings-panel.html`](../../client/src/templates/pause-menu/graphics-settings-panel.html).
 
-The current texture/image caching system has **redundant storage** and **unused code paths**:
+## Original problem statement (historical — see audit below for current reality)
 
-1. **ImageManager** (`SteamGameImages` IndexedDB) caches JPEG blobs (~30-50KB each)
-2. **PixelDataCache** (`SteamTexturePixels` IndexedDB) caches decoded RGBA pixels (~540KB each)
-3. **The GPU texture pipeline doesn't use ImageManager at all** - TextureWorker fetches directly from CDN
+The texture/image caching system had **redundant storage** and **unused code paths**:
 
-### Current Data Flow (Wasteful)
+1. **ImageManager** (`SteamGameImages` IndexedDB) cached JPEG blobs (~30-50KB each)
+2. **PixelDataCache** (`SteamTexturePixels` IndexedDB) cached decoded RGBA pixels (~540KB each)
+3. **The GPU texture pipeline didn't use ImageManager at all** - TextureWorker fetched directly from CDN,
+   so first-time users downloaded every image twice, and MID (the default, most-visible tier) was never
+   cached to disk — only HIGH was.
 
-```
-Steam CDN
-    │
-    ├──► ImageManager.downloadImage() ──► SteamGameImages (blob) ──► CacheManagementPanel UI only
-    │    [Fire-and-forget warming in SteamIntegration.ts:167]       [UNUSED by rendering!]
-    │
-    └──► TextureWorker.fetchAndProcess() ──► GPU (MID textures, not cached)
-              │
-              └──► PixelDataCache (HIGH textures only) ──► GPU HIGH array
-```
+## Audit findings (2026-07-11)
 
-### Impact
+Before starting implementation, re-verified each claim against the current codebase (which had moved on
+significantly via other work since this plan was written). Result: **the pipeline was already rebuilt**,
+independently, into a different (and more capable) architecture than either this plan or
+[`docs/architecture/image-texture-pipeline.md`](../architecture/image-texture-pipeline.md) described.
+That architecture doc has been rewritten to match; see it for the current data flow.
 
-| User Type | Current Waste |
-|-----------|---------------|
-| **First-time** | Each image downloaded TWICE (ImageManager + TextureWorker) |
-| **Returning** | ~40MB blob cache sitting unused; only PixelDataCache helps |
-
-## Proposed Architecture
-
-### Goal: Single cache for texture data, with asymmetric HIGH/MED handling
-
-```
-Steam CDN
-    │
-    └──► TextureWorker.fetchAndProcess()
-              │
-              ├──► MedPixelCache (new) ──► GPU MID array
-              │    [Smaller pixels, 150×225 = 135KB each]
-              │
-              └──► PixelDataCache (existing) ──► GPU HIGH array
-                   [300×450 = 540KB each, LRU managed]
-```
-
-### Key Design Decisions
-
-#### 1. Remove ImageManager Blob Cache from GPU Pipeline
-
-- **Delete**: Fire-and-forget artwork warming in `SteamIntegration.ts`
-- **Keep**: ImageManager for non-GPU uses (if any remain after audit)
-- **Or**: Delete ImageManager entirely if no other consumers
-
-#### 2. Add MED Texture Caching
-
-Currently MED textures are fetched but **not cached** to IndexedDB. This hurts returning users.
-
-**Options:**
-- **A) Unified PixelDataCache** - Store both HIGH (300×450) and MED (150×225) in same DB, different keys
-- **B) Separate MedPixelCache** - Keep them isolated for easier cache management
-- **C) Blob cache for MED** - Store JPEG, decode on demand (smaller storage, decode cost)
-
-**Recommendation: Option A** - Unified cache with resolution in key:
-```
-Key: `${url}@${width}x${height}`
-Value: { pixels: Uint8ClampedArray, width, height, version }
-```
-
-#### 3. First-Time User Experience Priority
-
-For users with empty cache:
-1. **MED textures load first** (smaller, visible immediately)
-2. **HIGH textures load on-demand** when player approaches (existing behavior)
-3. **Background caching** continues after initial render
-
-No change needed here - current priority is correct.
-
-#### 4. Returning User Experience
-
-With proper caching:
-1. **MED textures: instant** from cache
-2. **HIGH textures: instant** when approaching (PixelDataCache hit)
-3. **No redundant blob cache** consuming space
-
-## Implementation Plan
-
-### Phase 1: Stop the Waste (Safe, Non-Breaking)
-
-1. **Remove fire-and-forget artwork warming** in `SteamIntegration.ts:167`
-   - Just delete the `downloadGameArtwork()` call
-   - ImageManager blob cache stops growing
-   
-2. **Add diagnostic logging** to confirm no other ImageManager consumers for textures
-
-### Phase 2: Add MED Caching
-
-1. **Extend PixelDataCache** to store MED textures
-   - Add resolution to cache key
-   - Update `TextureWorker` callers to cache MED results
-
-2. **Update LodArtworkRenderer** to check cache before fetch
-
-### Phase 3: Clean Up (After Verification)
-
-1. **Audit ImageManager consumers**:
-   - `CacheManagementPanel` - needs rework to show PixelDataCache stats
-   - `SteamApiClient.downloadGameImage()` - audit if still needed
-   
-2. **Either**:
-   - Repurpose ImageManager for non-texture uses
-   - Delete ImageManager if no consumers remain
-
-### Phase 4: Re-enable Graphics Settings
-
-1. **Cache invalidation strategy** for when texture dimensions change
-2. **Re-enable UI controls** in `graphics-settings-panel.html`
-
-## Files Affected
-
-| File | Change |
-|------|--------|
-| `SteamIntegration.ts` | Remove `downloadGameArtwork()` call |
-| `PixelDataCache.ts` | Add resolution-aware keys, MED support |
-| `LodArtworkRenderer.ts` | Check cache for MED before fetch |
-| `TextureWorker.ts` | Return results for caching |
-| `CacheManagementPanel.ts` | Show PixelDataCache stats instead of ImageManager |
-| `ImageManager.ts` | Audit consumers, potentially delete |
-| `graphics-settings-panel.html` | Re-enable after Phase 4 |
-
-## Migration Path
-
-1. **No user data migration needed** - blob cache can simply be abandoned
-2. **PixelDataCache version bump** if schema changes (existing version system)
-3. **Users clearing old cache** is fine - just re-downloads
-
-## Metrics for Success
-
-- [ ] First-time user: Each image fetched exactly once
-- [ ] Returning user: Zero network requests for cached games
-- [ ] IndexedDB usage: ~500MB for 800 games (pixels only) vs ~540MB (pixels + blobs)
-- [ ] Memory: No change (GPU arrays unchanged)
+| Phase | Plan's ask | Actual state |
+|---|---|---|
+| **1 — Stop the waste** | Remove `ImageManager` warming from `SteamIntegration.ts` | ✅ Done. `ImageManager.ts` doesn't exist as a file anymore — fully deleted, not just unhooked. No warming call remains. |
+| **2 — Add MED caching** | Unified `PixelDataCache` keyed by `${url}@${width}x${height}` (the plan's own "Option A") | ✅ Done, exactly as recommended. [`PixelDataCache.ts`](../../client/src/scene/game-box/instancing/PixelDataCache.ts) uses that key format. [`GameArtworkProvider.fetchPixels()`](../../client/src/scene/game-box/instancing/GameArtworkProvider.ts) checks disk cache before any network fetch, and always writes back after — for MID and HIGH alike, via the same code path (`GameArtworkRequest.getPixelsAtSize()`). The original double-fetch and "MID never cached" bugs are both gone. |
+| **3 — Clean up** | Rework `CacheManagementPanel` off `ImageManager`; delete or repurpose `ImageManager` | ✅ Done. `CacheManagementPanel.ts` already reads `PixelDataCache.getInstance()`. `ImageManager` is deleted outright, not repurposed. |
+| **4 — Re-enable graphics settings** | Cache-invalidation strategy + re-enable the 3 disabled LOD texture-size sliders | ✅ Done. The blocking concern ("texture dimensions change requires a cache invalidation strategy... to avoid cache corruption") turned out to already be solved as a side effect of the Phase 2 key design — because cache keys are resolution-qualified, changing a LOD ratio setting just produces a new key, with old-size entries going unused rather than colliding. Re-enabling was exactly flipping `disabled: true` → `false` on the three sliders (`lodMaxHighSlotsControl` / `lodHighRatioControl` / `lodMedRatioControl`) plus their hint badges (`disabled` → `reload`, matching the existing pattern for other reload-requiring settings), and removing the stale disabled-notice paragraph and TODO comment from the template. Verified live via browser automation: all three render enabled with sane current values (128 slots, 50%, 25%). |
 
 ## Related Documents
 
-- `docs/architecture/image-texture-pipeline.md` - Current architecture (to be updated)
-- `client/src/templates/pause-menu/graphics-settings-panel.html` - Settings UI (disabled controls)
-- [Traffic Safety Review](traffic-safety-review.md) - why this now matters beyond internal cleanup: returning users currently re-fetch most artwork from Steam's CDN every session (MID tier isn't cross-session cached), which is wasted bandwidth on both sides
-- [F2P Artwork Bake](f2p-artwork-bake-plan.md) - Plan 2, sequenced after this one
+- [Image/Texture Pipeline](../architecture/image-texture-pipeline.md) - current architecture (rewritten 2026-07-11 to match reality)
+- [Traffic Safety Review](../plans/traffic-safety-review.md) - why this mattered beyond internal cleanup
+- [F2P Artwork Bake](../plans/f2p-artwork-bake-plan.md) - Plan 2, now the active thread
 
 ---
 
-**Status**: 🚧 Planning  
-**Priority**: High (affects first-time user experience)  
-**Blocked by**: None  
-**Blocks**: Re-enabling texture size settings in Graphics panel
+**Status**: 🟢 Complete — all 4 phases done
+**Blocked by**: None
+**Blocks**: Nothing — this was the last blocker on re-enabling texture size settings in the Graphics panel
+
+---
+*— A1*
