@@ -1,0 +1,23 @@
+{
+  "_comment": "Curated anonymous-store appid seed. Source of truth for the F2P set used by scripts/repack-steam-cache.sh (appdetails) and the planned image-preload bake (docs/plans/f2p-artwork-bake-plan.md). Currently mirrors client/src/steam/fixtures/demo-games.ts's ANONYMOUS_STORE_USER list by hand - keep the two in sync until demo-games.ts generates from this file instead. Edit this list when the F2P set is properly revisited; both bake scripts pick up the change on next release run. Candidate future regeneration source: gamalytic.com/game-list (Steam-derived, appid in each row's URL, copiesSold + price on the free tier) - see f2p-artwork-bake-plan.md for findings; ToS/bulk-access not yet confirmed, so not wired in yet.",
+  "appids": [
+    440,
+    570,
+    730,
+    1172470,
+    1085660,
+    238960,
+    230410,
+    252950,
+    3164330,
+    386360,
+    1167630,
+    1097150,
+    359550,
+    812140,
+    1282100,
+    730640,
+    945360,
+    359320
+  ]
+}

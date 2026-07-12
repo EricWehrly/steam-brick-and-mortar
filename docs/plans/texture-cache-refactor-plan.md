@@ -1,5 +1,11 @@
 # Texture Cache Refactor Plan
 
+**Plan 1 of 2** in the CDN-artwork-traffic thread — see [Traffic Safety Review](traffic-safety-review.md)
+("Next front: the CDN images") for why this matters now. **Plan 2** is
+[F2P Artwork Bake](f2p-artwork-bake-plan.md), which depends on this one landing first: baking
+pre-fetched artwork into a release only makes sense once there's one clean cache layer to seed,
+not the current two-cache, double-fetch mess described below.
+
 ## Problem Statement
 
 The current texture/image caching system has **redundant storage** and **unused code paths**:
@@ -145,6 +151,8 @@ With proper caching:
 
 - `docs/architecture/image-texture-pipeline.md` - Current architecture (to be updated)
 - `client/src/templates/pause-menu/graphics-settings-panel.html` - Settings UI (disabled controls)
+- [Traffic Safety Review](traffic-safety-review.md) - why this now matters beyond internal cleanup: returning users currently re-fetch most artwork from Steam's CDN every session (MID tier isn't cross-session cached), which is wasted bandwidth on both sides
+- [F2P Artwork Bake](f2p-artwork-bake-plan.md) - Plan 2, sequenced after this one
 
 ---
 
