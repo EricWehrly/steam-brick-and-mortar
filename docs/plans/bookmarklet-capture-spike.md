@@ -1,6 +1,6 @@
 # Spike: Bookmarklet Library Capture
 
-**Act**: 2 · **Status**: 🟡 Half built — capture (Tasks 1–2) done and live-verified 2026-07-02; import (Tasks 3–4) remaining, ready for a fresh context · **Model**: a cheaper model is fine
+**Act**: 2 · **Status**: ✅ Fully built — capture (Tasks 1–2) live-verified 2026-07-02; import (Tasks 3–4) landed 2026-07-11 via `library-source-convergence-plan.md`, also live-verified · **Model**: a cheaper model is fine
 
 > This brief is intentionally standalone so it can be handed to a fresh, cheaper-model context.
 > Read the reference docs below first; you should not need the conversation that produced this.
