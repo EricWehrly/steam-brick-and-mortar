@@ -53,6 +53,17 @@ Would love to build as much as possible, a "filter" drawing effect that causes t
 like a cartoonish effect for a more Nikelodeon feel,
 art deco effect that adds a little emphasis on top of our 'blockbuster' scene
 
+## Data-Driven UI
+
+- **Gate sort/filter UI on data availability** — don't offer (or visibly disable/hint) a sort/filter
+  dimension the current library doesn't actually have data for yet, rather than letting it silently
+  no-op or produce a meaningless order. Most relevant to community tags/review score, whose only
+  source (SteamSpy) is slow and incremental — see
+  [Sort/Filter Data Provenance](../architecture/sort-filter-data-provenance.md) for the full field
+  → source map this gate would key off of. The natural mechanism is reusing an existing "intake"
+  event (e.g. `GameDataReady`) as the signal to re-evaluate and flip a gate open once a batch of
+  previously-missing data lands. Not designed, just noted.
+
 ## Deferred Re-entry Candidates
 
 - **AC4.4: Local collections import (filesystem API)** — revisit `cloud-storage-namespace-1.json` import only if we are ready to accept filesystem API UX/security complexity. Prior findings show categories are the main unique value; other local metadata did not justify shipping this in Act 2.
