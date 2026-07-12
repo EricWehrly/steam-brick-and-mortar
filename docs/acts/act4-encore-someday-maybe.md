@@ -56,13 +56,16 @@ art deco effect that adds a little emphasis on top of our 'blockbuster' scene
 ## Data-Driven UI
 
 - **Gate sort/filter UI on data availability** — don't offer (or visibly disable/hint) a sort/filter
-  dimension the current library doesn't actually have data for yet, rather than letting it silently
-  no-op or produce a meaningless order. Most relevant to community tags/review score, whose only
-  source (SteamSpy) is slow and incremental — see
-  [Sort/Filter Data Provenance](../architecture/sort-filter-data-provenance.md) for the full field
-  → source map this gate would key off of. The natural mechanism is reusing an existing "intake"
-  event (e.g. `GameDataReady`) as the signal to re-evaluate and flip a gate open once a batch of
-  previously-missing data lands. Not designed, just noted.
+  dimension the current library doesn't actually have data for. Two distinct cases, not one:
+  (1) *not-yet-fetched but reachable* (community tags/review score — SteamSpy is slow and
+  incremental, gate opens once data lands) and (2) *channel-exclusive, unreachable on this build at
+  all* (user categories — desktop-only, `local-file-investigation.md`; expected to grow as desktop
+  local-file mining expands, per that feature's re-entry notes). See
+  [Sort/Filter Data Provenance](../architecture/sort-filter-data-provenance.md) — designed to be the
+  spec this gate reads from, not just a reference doc. The natural mechanism is reusing an existing
+  "intake" event (e.g. `GameDataReady`) as the signal to re-evaluate gates once new data lands. Not
+  designed, just noted. **Sequencing**: revisit alongside `local-file-investigation.md`'s re-entry —
+  desktop data-mining findings will make the channel-exclusive case much more concrete than it is today.
 
 ## Deferred Re-entry Candidates
 
