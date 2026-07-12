@@ -138,7 +138,7 @@ of scope values.
 - Splitting playtime out of the `games_<steamid>` record itself - tracked separately in
   [[user-games-cache-entanglement]] / [[appid-keyed-cache-split]]
 - Any change to `PixelDataCache`'s internal storage format or the texture pipeline itself (see
-  `texture-cache-refactor-plan.md` for that surface)
+  `docs/architecture/image-texture-pipeline.md` for that surface)
 - Multi-select "clear specific domain" UI - the three existing buttons keep their current intent,
   just routed correctly
 - Actually building multi-profile login - this plan only ensures the cache-domain model doesn't

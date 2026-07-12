@@ -2,12 +2,12 @@
 
 **Plan 2 of 2** in the CDN-artwork-traffic thread — see [Traffic Safety Review](traffic-safety-review.md)
 ("Next front: the CDN images") for the research this is based on. **Plan 1**,
-[Texture Cache Refactor](texture-cache-refactor-plan.md), should land first or alongside this one —
-baking artwork into a release is wasted effort if it just feeds the current two-cache, double-fetch
-mess that plan is fixing.
+[Texture Cache Refactor](../archive/texture-cache-refactor-plan-COMPLETED.md), is done (archived
+2026-07-11) — there's one clean, cache-first pixel storage layer to seed now, no double-fetch to worry
+about feeding.
 
 **Act**: 2 · **Status**: 🟡 Plan — seed file created (`scripts/f2p-appid-seed.json`), scripts and client
-wiring not yet implemented.
+wiring not yet implemented. Now the active thread.
 
 ## Goal (one line)
 
@@ -102,15 +102,17 @@ Simpler than `repack-steam-cache.sh` — no gzip/merge/precedence logic, just N 
 in `client/public/artwork-cache/{appid}.jpg` (new directory, gitignored like `steam-cache/`), wired
 into `release.sh` as a new step alongside the existing S3 cache repack.
 
-## Client-side consumption (sketch, depends on Plan 1's outcome)
+## Client-side consumption (sketch)
 
-The existing texture pipeline (`texture-processing.worker.ts`'s `fetchImage(url)`) doesn't care where
-its URL points — it fetches, decodes, and caches whatever it's given. So the integration point is
-narrow: before handing an appid's artwork URL to the loader, check whether
-`/artwork-cache/{appid}.jpg` exists locally; if so, use that path instead of the Steam CDN URL. Nothing
-downstream needs to change. Exact seeding/check mechanism (a manifest file listing baked appids, vs. a
-plain fetch-and-fall-through like `BakedCacheLoader` does for appdetails) is a detail to settle during
-implementation, once Plan 1 has established which cache layer this should feed.
+Now that Plan 1 has landed, the cache layer to feed is clear: `PixelDataCache`, keyed
+`${url}@${width}x${height}` (see [Image/Texture Pipeline](../architecture/image-texture-pipeline.md)).
+The texture pipeline doesn't care where its URL points — `GameArtworkProvider.fetchPixels()` fetches,
+decodes, and caches whatever URL it's given via `TextureWorker`. So the integration point is narrow:
+before `GameArtworkProvider.buildUrlStrategy()` hands back its CDN URL candidates, check whether
+`/artwork-cache/{appid}.jpg` exists locally; if so, prepend it to the candidate list so it's tried
+first. Nothing downstream needs to change. Exact seeding/check mechanism (a manifest file listing baked
+appids, vs. a plain fetch-and-fall-through like `BakedCacheLoader` does for appdetails) is a detail to
+settle during implementation.
 
 ## Deferred, explicitly not solved here: launch-day traffic burst
 
@@ -150,7 +152,7 @@ scheduled yet.
 
 ## Open questions
 
-- Exact client-side check mechanism (manifest vs. fetch-and-fall-through) — depends on Plan 1.
+- Exact client-side check mechanism (manifest vs. fetch-and-fall-through) — to settle during implementation.
 - Should `release.sh` treat this as a fatal error if a bake download fails (18 games, cheap to retry) or
   skip-and-warn like the appdetails cache misses do? Leans skip-and-warn for consistency, not decided.
 - Whether to keep `demo-games.ts` and the seed file in manual sync indefinitely or eventually generate one from the other.
@@ -159,7 +161,8 @@ scheduled yet.
 ## Related
 
 - [Traffic Safety Review](traffic-safety-review.md) — the research this is based on
-- [Texture Cache Refactor Plan](texture-cache-refactor-plan.md) — Plan 1, sequenced first
+- [Texture Cache Refactor Plan](../archive/texture-cache-refactor-plan-COMPLETED.md) — Plan 1, done
+- [Image/Texture Pipeline](../architecture/image-texture-pipeline.md) — current cache architecture this plan feeds into
 - [Release Pipeline](release-pipeline-plan.md) — the appdetails-bake precedent this plan intentionally does *not* fully mirror (per-user artwork ≠ shared appdetails cache)
 - `client/src/steam/fixtures/demo-games.ts` — the upstream curated list
 - `scripts/f2p-appid-seed.json` — the extracted seed

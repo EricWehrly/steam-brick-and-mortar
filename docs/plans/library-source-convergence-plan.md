@@ -294,7 +294,7 @@ first.
 
 - Building the local-install source. This only shapes the convergence so that source drops in
   later as one assembler + one `LibraryChannel` member.
-- Any change to `PixelDataCache` or the texture pipeline (`texture-cache-refactor-plan.md`).
+- Any change to `PixelDataCache` or the texture pipeline (`docs/architecture/image-texture-pipeline.md`).
 - Actual merge/reconciliation of two libraries — explicitly rejected (decision #2).
 - Pruning/scoping `AppDetailsCache` by ownership — explicitly rejected (see Fork B section).
 - The `SteamIntegration` singleton migration itself (prerequisite, tracked separately, now done).

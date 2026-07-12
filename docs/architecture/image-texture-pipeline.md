@@ -1,8 +1,16 @@
 # Image/Texture Pipeline - Complete Data Flow Documentation
 
+**Rewritten 2026-07-11.** The previous version of this doc (ImageManager + TextureWorker as two parallel
+paths, `LodArtworkRenderer` as the top-level class) was stale — that architecture was replaced by the one
+described below, discovered during an audit for
+[Texture Cache Refactor Plan](../archive/texture-cache-refactor-plan-COMPLETED.md) (now archived —
+all 4 phases done). `ImageManager.ts` no longer exists in the codebase.
+
 ## Overview
 
-The Steam Brick and Mortar project has a sophisticated multi-layer caching and texture management system that moves game artwork from Steam's CDN to GPU texture arrays. This document traces the complete data flow from source to render.
+The Steam Brick and Mortar project has a multi-layer caching and texture management system that moves
+game artwork from Steam's CDN to GPU texture arrays. This document traces the complete data flow from
+source to render.
 
 ## High-Level Architecture
 
@@ -10,17 +18,21 @@ The Steam Brick and Mortar project has a sophisticated multi-layer caching and t
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │                              IMAGE/TEXTURE PIPELINE                                  │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                      │
-│   [Steam CDN URLs]  ────►  [Web Worker]  ────►  [IndexedDB Caches]  ────►  [GPU]    │
-│                             (fetch +              (2 caches)              Texture    │
-│                              decode)                                      Arrays     │
-│                                                                                      │
-│   Two parallel paths:                                                                │
-│   1. ImageManager → SteamGameImages (blob) → Preview/Management UI                   │
-│   2. TextureWorker → SteamTexturePixels (RGBA) → GPU Texture Arrays                  │
-│                                                                                      │
+│                                                                                       │
+│   [Steam CDN URLs]  ────►  [GameArtworkProvider]  ────►  [PixelDataCache]  ────►  [GPU]  │
+│                             (cache-first fetch,           (IndexedDB,          Texture   │
+│                              Web Worker decode)             resolution-        Arrays    │
+│                                                               qualified keys)             │
+│                                                                                       │
+│   One path, shared by MID and HIGH tiers alike:                                     │
+│   GameArtworkProvider.fetchPixels() → PixelDataCache.get() hit, or                  │
+│                                        TextureWorker fetch+decode → PixelDataCache.put() │
+│                                                                                       │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+There is no longer a separate blob-cache path. Both LOD tiers (MID and HIGH) go through the same
+cache-first `fetchPixels()` call, keyed by resolution — see §3.2.
 
 ---
 
@@ -41,136 +53,101 @@ artwork: {
 }
 ```
 
-**Steam CDN URL Patterns:**
+**Steam CDN URL Patterns** (`CDN_PATTERNS` in `GameArtworkProvider.ts`):
+
 | Image Type | URL Pattern | Dimensions | Use Case |
 |------------|-------------|------------|----------|
-| Header | `shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/header.jpg` | 460×215 | MID LOD textures |
-| Library (Portrait) | `cdn.akamai.steamstatic.com/steam/apps/{appid}/library_600x900.jpg` | 600×900 (serves 300×450) | HIGH LOD textures |
-| Capsule | `cdn.akamai.steamstatic.com/steam/apps/{appid}/capsule_231x231.jpg` | 231×231 | Fallback |
+| Library (Portrait) | `cdn.akamai.steamstatic.com/steam/apps/{appid}/library_600x900.jpg` | Path says 600×900, CDN actually serves 300×450 for most titles | Both MID and HIGH LOD (downscaled/native respectively) |
+| Header | `shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/header.jpg` | 460×215 | Fallback |
+| Capsule | `cdn.akamai.steamstatic.com/steam/apps/{appid}/capsule_616x353.jpg` | 616×353 | Fallback |
 
-**Two CDN Domains:**
-- `cdn.akamai.steamstatic.com` - Legacy CDN (library_600x900.jpg available)
-- `shared.akamai.steamstatic.com` - New CDN (header.jpg only, no portrait alternatives)
+`LodArtworkOrchestrator` normalizes HIGH to a 300×450 effective ceiling (`STEAM_EFFECTIVE_MAX_WIDTH/HEIGHT`)
+regardless of configured ratio, since upscaling past the CDN's real resolution just wastes VRAM — see the
+"Steam library image CDN reality check" comment block in `LodArtworkOrchestrator.ts`.
 
 ### URL Construction Logic
 
-```typescript
-// GpuGameBoxRenderer.selectBestArtworkUrl()
-// Priority: library > header > constructed fallback
-
-// HighTextureCache.convertToPortraitUrl() converts header URLs to portrait:
-// Input:  https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1145350/header.jpg
-// Output: https://cdn.akamai.steamstatic.com/steam/apps/1145350/library_600x900.jpg
-```
+`GameArtworkProvider.buildUrlStrategy(appId, format, artworkHints)` builds an ordered candidate list per
+format (library / header / capsule), preferring metadata-supplied hints (from the Lambda) over constructed
+CDN URLs, then falling back to a previously-successful URL for that appId/format if one was recorded this
+session. Format-specific ordering lives in `STRATEGY_BY_FORMAT`.
 
 ---
 
 ## 2. Fetch Trigger: What Starts the Download?
 
-### Trigger Chain
+### Trigger Chain (two-phase load/place split)
+
+Artwork loading and shelf placement are decoupled — artwork can be prefetched as soon as batch data
+arrives, before the shelf position for that game is known:
 
 ```
 User enters Steam profile
-    └──► SteamIntegration.loadCachedGames()
-        └──► GpuStorePropsRenderer.createShelfGames()
-            └──► GpuGameBoxRenderer.createGameBoxAuto(game, position)
-                └──► LodArtworkRenderer.setArtworkInstanceFromUrl(url)
-                    └──► TextureWorker.fetchAndProcess() ◄── ACTUAL FETCH
+    └──► SteamIntegration.loadCachedGames() / batch arrival
+        └──► LodArtworkOrchestrator.prefetchArtwork(appid, artworkHints, gameName)
+            │    - Allocates a texture slot
+            │    - GameArtworkProvider.getArtwork(...) → GameArtworkRequest
+            │    - fetchAndCachePixels() → artwork.getPixelsAtSize(midWidth, midHeight)
+            │    - Idempotent per gameName; safe to call again (no-op if already loaded)
+            ▼
+        (once shelf position is known)
+        └──► LodArtworkOrchestrator.placeInstance(appid, gameName, position, rotation)
+                 - Looks up the already-prefetched texture slot
+                 - LodGameArtworkRenderer.addInstance(...) creates the GPU instance
 ```
 
-**Key Decision Point:** `GpuGameBoxRenderer.createGameBoxAuto()`
-```typescript
-// ~67% probability of using artwork (vs. text labels)
-const shouldUseArtwork = Math.random() < ARTWORK_PROBABILITY
+`setArtworkInstanceFromUrl()` remains as a combined fetch+place entry point (implements
+`IGameArtworkPipeline` for `LodDistanceManager`) for callers that don't need the two-phase split.
 
-const artworkUrl = shouldUseArtwork ? this.selectBestArtworkUrl(game) : undefined
-if (artworkUrl) {
-    this.createGameBoxFromUrl(game, position, artworkUrl, side)
-}
-```
+**Key Decision Point:** `GameArtworkRequest.getPixelsAtSize()` (per-request handle returned by
+`GameArtworkProvider.getArtwork()`) is the shared fetch trigger for both phases and both LOD tiers — see
+§5.
 
 ---
 
-## 3. IndexedDB Caches (3 Separate Databases)
+## 3. Caches
 
-### 3.1 `SteamGameImages` Database - Blob Cache
-
-**Owner:** `ImageManager` (singleton)
-
-**Purpose:** UI preview, cache management panel, general image download cache
-
-**Schema:**
-```typescript
-interface ImageCacheEntry {
-    blob: Blob;              // Actual image data as browser Blob
-    url: string;             // Cache key (full CDN URL)
-    timestamp: number;       // When cached
-    size: number;            // Blob size in bytes
-    artworkType?: string;    // 'header', 'library', etc.
-    isFallback?: boolean;    // True if loaded from fallback URL
-}
-```
-
-**Storage:** ~30-50KB per image (JPEG compressed)
-
-**TTL:** 24 hours (checked on read, expired entries deleted)
-
-**Used By:**
-- `CacheManagementPanel` - preview cached images
-- `SteamUICoordinator.clearImageCache()`
-- Manual artwork downloads via `SteamApiClient.downloadGameImage()`
-
-**NOT used** by the GPU texture pipeline.
-
-### 3.2 `SteamTexturePixels` Database - Pixel Cache
+### 3.1 `SteamTexturePixels` Database - Pixel Cache
 
 **Owner:** `PixelDataCache` (singleton, Web Worker-based)
 
-**Purpose:** Cache decoded RGBA pixel data for HIGH LOD textures
+**Purpose:** Cache decoded RGBA pixel data for **both** MID and HIGH LOD textures — one unified cache,
+resolution-qualified.
 
 **Schema:**
 ```typescript
-// Key: URL string
+// Key: `${url}@${width}x${height}` — e.g. "https://.../library_600x900.jpg@150x225"
 // Value:
 {
-    pixels: Uint8ClampedArray;  // Raw RGBA pixel data
-    width: number;              // Image width (300 for HIGH)
-    height: number;             // Image height (450 for HIGH)
-    version: number;            // Cache version (invalidation)
+    pixelData: Uint8ClampedArray;  // Raw RGBA pixel data
+    width: number;
+    height: number;
 }
 ```
 
-**Storage:** ~540KB per image (300×450×4 bytes uncompressed)
-- For 800 games: ~432MB IndexedDB storage
+Because the key includes resolution, MID (150×225-ish) and HIGH (up to 300×450) entries for the same
+artwork URL coexist without collision, and changing a LOD ratio setting simply produces a new key —
+stale-size entries go unused rather than needing explicit invalidation.
 
-**Why Store Decoded Pixels?**
-- Avoids JPEG decode on cache hit
-- `createImageBitmap()` + `getImageData()` is expensive
-- Enables near-instant HIGH texture loading from cache
+**Operations run in a Web Worker** (`pixel-cache.worker.ts`): all IndexedDB reads/writes, zero main
+thread blocking, ArrayBuffer transfer for zero-copy.
 
-**Operations Run in Web Worker:**
-- All IndexedDB reads/writes
-- Zero main thread blocking
-- ArrayBuffer transfer for zero-copy
-
-### 3.3 `steam-app-details-cache` Database - Metadata Cache
+### 3.2 `steam-app-details-cache` Database - Metadata Cache
 
 **Owner:** `AppDetailsCache`
 
-**Purpose:** Cache Steam Store API metadata (categories, genres, artwork URLs)
+**Purpose:** Cache Steam Store API metadata (categories, genres, artwork URL hints)
 
 **Schema:**
 ```typescript
 interface CachedAppDetails {
     appid: number;
-    data: AppDetailsData;  // Full metadata including artwork URLs
+    data: AppDetailsData;  // Full metadata including artwork URL hints
     cached_at: number;
 }
 ```
 
-**Storage:** ~1-2KB per game (JSON)
-
-**TTL:** No expiration (Steam metadata rarely changes)
+Seeded from the baked release cache on first run — see [Release Pipeline](../plans/release-pipeline-plan.md).
 
 ---
 
@@ -178,22 +155,23 @@ interface CachedAppDetails {
 
 ### 4.1 Two-Tier LOD System
 
-**Owner:** `LodArtworkRenderer`
+**Owner:** `LodTextureArrayManager` (array creation/population) + `LodGameArtworkRenderer` (GPU instancing)
 
-| LOD Level | Resolution | Slots | VRAM | Purpose |
-|-----------|------------|-------|------|---------|
-| **HIGH** | 300×450 | 128 | ~65.9MB | Close-up detail (portrait format) |
-| **MID** | 150×225 | 910 | ~56.9MB | Distance viewing (quarter resolution) |
+| LOD Level | Resolution | Slots | Purpose |
+|-----------|------------|-------|---------|
+| **HIGH** | up to 300×450 (config-driven via `LodHighReductionRatio`, `LodMaxHighSlots` settings) | Configurable (default 64, LRU) | Close-up detail (portrait format) |
+| **MID** | Config-driven via `LodMedReductionRatio` | `maxTextures` (default 512) | Distance viewing, always loaded |
 
-**Total VRAM:** ~123MB for texture arrays
+VRAM totals are logged at startup by `LodArtworkOrchestrator.logConfig()` rather than fixed — they scale
+with the configured ratios and slot counts.
 
 ### 4.2 Texture Array Structure
 
 ```typescript
 // THREE.DataArrayTexture - 2D array texture (WebGL2)
 // Each "layer" is one game's texture
-const textureArrayMid = new THREE.DataArrayTexture(data, 150, 225, 910)
-const textureArrayHigh = new THREE.DataArrayTexture(data, 300, 450, 128)
+const textureArrayMid = new THREE.DataArrayTexture(data, midWidth, midHeight, maxTextures)
+const textureArrayHigh = new THREE.DataArrayTexture(data, highWidth, highHeight, totalHighSlots)
 ```
 
 **Why DataArrayTexture?**
@@ -203,17 +181,20 @@ const textureArrayHigh = new THREE.DataArrayTexture(data, 300, 450, 128)
 
 ### 4.3 HIGH Texture Lazy Loading
 
-**Problem:** Loading 910 HIGH textures upfront = 410MB+ VRAM
+**Problem:** Loading every HIGH texture upfront would use far more VRAM than needed for boxes not
+currently in view.
 
-**Solution:** `HighTextureCache` - LRU cache with 128 slots
+**Solution:** `HighTextureCache` - LRU cache with a configurable slot count (`LodMaxHighSlots`),
+state machine per game (`HighTextureState`: `LOADED` / `CACHING` / `LOADING` / etc.):
 
 ```typescript
 // Flow:
-// 1. Game added → MID texture loaded immediately
-// 2. Player approaches → LOD manager requests HIGH
+// 1. Game prefetched → MID texture loaded immediately (always)
+// 2. Player approaches → LOD manager calls requestHighTexture(gameIndex)
 // 3. HighTextureCache checks PixelDataCache (fast hit) or fetches (slow miss)
-// 4. On load complete → assigns slot 0-127, notifies LodArtworkRenderer
-// 5. LodArtworkRenderer updates highTextureSlot attribute
+//    - fetches go through the same GameArtworkProvider.fetchPixels() as MID
+// 4. On load complete → assigns slot, notifies LodGameArtworkRenderer via callback
+// 5. LodGameArtworkRenderer updates highTextureSlot attribute
 // 6. Cache full → evict LRU, reassign slot
 ```
 
@@ -221,148 +202,119 @@ const textureArrayHigh = new THREE.DataArrayTexture(data, 300, 450, 128)
 
 ## 5. Complete Data Flow: CDN → GPU
 
-### Path A: MID Texture (Immediate Load)
+Both LOD tiers share one fetch path (`GameArtworkProvider.fetchPixels()`); they differ only in *when*
+they're triggered and at what target resolution.
+
+### Shared fetch path
 
 ```
-1. [createGameBoxAuto] Game box requested
+1. [GameArtworkRequest.getPixelsAtSize(width, height)]
+       │  Called by LodArtworkOrchestrator (MID, always) or HighTextureCache (HIGH, on approach)
+       ▼
+2. [GameArtworkProvider.fetchPixels(url, width, height, cacheKey)]
+       │  sizedCacheUrl = `${url}@${width}x${height}`
+       ▼
+3. [PixelDataCache.get(sizedCacheUrl)]
        │
-       ▼
-2. [LodArtworkRenderer.setArtworkInstanceFromUrl] 
-       │  - Allocates textureIndex (0-909)
-       │  - Stores artworkUrl for lazy HIGH loading
-       ▼
-3. [TextureWorker.fetchAndProcessWithOptions]
-       │  - Runs in Web Worker
-       │  - fetch(url) → Blob
-       │  - createImageBitmap(blob)
-       │  - offscreenCanvas.drawImage() → scaled to 150×225
-       │  - getImageData() → Uint8ClampedArray (RGBA)
-       ▼
-4. [LodArtworkRenderer] Copy to texture array
-       │  const sliceSize = 150 * 225 * 4  // ~135KB
-       │  const offset = textureIndex * sliceSize
-       │  arrayData.set(result.imageData, offset)
-       │  state.pendingUpdates.add(textureIndex)
-       ▼
-5. [LodArtworkRenderer.updateGPU] Periodic flush
-       │  textureArrayMid.needsUpdate = true
-       ▼
-6. [Three.js Renderer] Uploads to GPU VRAM
+       ├──► HIT: return cached Uint8ClampedArray immediately (resized if dimensions differ)
        │
-       ▼
-7. [Shader] Samples texture
-       texture(textureArrayMid, vec3(uv, float(textureIndex)))
+       └──► MISS:
+              │
+              ▼
+        [TextureWorker.fetchAndProcessWithOptions(url, width, height)]
+              │  Runs in Web Worker
+              │  fetch(url) → Blob → createImageBitmap(blob)
+              │  offscreenCanvas.drawImage() → scaled to target size
+              │  getImageData() → Uint8ClampedArray (RGBA)
+              ▼
+        [PixelDataCache.put(sizedCacheUrl, pixels, width, height)] — always stores, single fetch
 ```
 
-### Path B: HIGH Texture (Lazy Load with Pixel Cache)
+### Path A: MID Texture (prefetch, immediate)
+
+```
+1. [LodArtworkOrchestrator.prefetchArtwork] Batch data arrives for a game
+       │  Allocates textureIndex from LodTextureArrayManager
+       ▼
+2. [GameArtworkProvider.getArtwork(...)] Returns a GameArtworkRequest handle
+       ▼
+3. [fetchAndCachePixels] → artwork.getPixelsAtSize(midWidth, midHeight)
+       │  (shared fetch path above)
+       ▼
+4. [LodTextureArrayManager.setSlotPixels(MID, textureIndex, pixels, w, h)]
+       ▼
+5. [LodArtworkOrchestrator.updateGPU] → textureManager.flushToGpu() / renderer.flushToGpu()
+       ▼
+6. [Shader] texture(textureArrayMid, vec3(uv, float(textureIndex)))
+```
+
+### Path B: HIGH Texture (lazy load with pixel cache)
 
 ```
 1. [LOD Manager] Player approaches game box → requestHighTexture(gameIndex)
-       │
        ▼
 2. [HighTextureCache.requestHighTexture]
-       │  if (entry.state === LOADED) return slot  // HIT
-       │  else triggerLoad(entry)                  // MISS
+       │  state === LOADED → return slot (HIT)
+       │  else → triggerLoad(entry)
        ▼
-3. [HighTextureCache.loadHighTexture]
-       │
-       ├──► [PixelDataCache.get(url)] Check pixel cache
-       │         │
-       │         ├──► HIT: Return cached Uint8ClampedArray instantly
-       │         │
-       │         └──► MISS: Start background caching
-       │                   │
-       │                   ▼
-       │              [TextureWorker.fetchAndProcessWithOptions]
-       │                   │  - useNativeSize: true (no resize)
-       │                   │  - Returns 300×450 RGBA pixels
-       │                   ▼
-       │              [PixelDataCache.put(url, pixels)] Store for future
-       │                   │
-       │                   ▼
-       │              Set entry.state = CACHING, return -1
-       │              (next request will find cache ready)
+3. [HighTextureCache.loadHighTexture] → GameArtworkProvider.fetchPixels(url, highW, highH, ...)
+       │  (shared fetch path above — PixelDataCache checked first, same as MID)
        ▼
-4. [On cache hit or background complete]
-       │  Schedule doTextureCompletion() via FrameBudgetScheduler
-       │  - Defers copy to avoid frame spikes
+4. [On cache hit or background fetch complete]
+       │  Schedule doTextureCompletion() via FrameBudgetScheduler (avoids frame spikes)
        ▼
-5. [doTextureCompletion] When frame budget available
-       │  const offset = slot * 300 * 450 * 4
-       │  highArrayData.set(imageData, offset)
-       │  dirtySlots.add(slot)
-       │  isDirty = true
+5. [doTextureCompletion] → highArrayData.set(imageData, offset); dirtySlots.add(slot)
        ▼
-6. [HighTextureCache.flushToGpu] Periodic flush
-       │  for (slot of dirtySlots)
-       │      dataArrayTexture.addLayerUpdate(slot)
-       │  dataArrayTexture.needsUpdate = true
-       │  // Partial upload: ~540KB per slot vs ~34MB for all
+6. [HighTextureCache.flushToGpu] → dataArrayTexture.addLayerUpdate(slot) per dirty slot
+       │  Partial upload: only changed slots, not the full array
        ▼
-7. [LodArtworkRenderer.onHighSlotChange] Callback
-       │  highTextureSlots[instanceIndex] = slot
-       │  pendingHighPromotion.set(textureIndex, slot)
+7. [LodGameArtworkRenderer.onHighSlotChange] → highTextureSlots[instanceIndex] = slot
        ▼
-8. [After GPU flush] Promote to HIGH LOD
-       │  lodLevelAttr.setX(instanceIndex, LOD_LEVEL.HIGH)
+8. [After GPU flush] Promote instance's lodLevel attribute to HIGH
        ▼
-9. [Shader] Samples HIGH texture
-       texture(textureArrayHigh, vec3(uv, float(highTextureSlot)))
+9. [Shader] texture(textureArrayHigh, vec3(uv, float(highTextureSlot)))
 ```
 
 ---
 
 ## 6. Cache Level Summary
 
-| Cache | Location | Format | Size | TTL | Purpose |
-|-------|----------|--------|------|-----|---------|
-| **AppDetailsCache** | IndexedDB `steam-app-details-cache` | JSON | ~1-2KB/game | Never | Metadata + artwork URLs |
-| **ImageManager** | IndexedDB `SteamGameImages` | Blob (JPEG) | ~30-50KB/image | 24h | UI preview, manual downloads |
-| **PixelDataCache** | IndexedDB `SteamTexturePixels` | RGBA pixels | ~540KB/image | Never* | HIGH LOD decoded pixels |
-| **TextureArrayMid** | GPU VRAM | RGBA | 56.9MB total | Session | MID LOD rendering |
-| **TextureArrayHigh** | GPU VRAM | RGBA | 65.9MB total | Session | HIGH LOD rendering (LRU) |
-
-*PixelDataCache has version-based invalidation, not TTL
+| Cache | Location | Format | TTL | Purpose |
+|-------|----------|--------|-----|---------|
+| **AppDetailsCache** | IndexedDB `steam-app-details-cache` | JSON | Never (schema-versioned) | Metadata + artwork URL hints |
+| **PixelDataCache** | IndexedDB `SteamTexturePixels` | RGBA pixels, resolution-qualified key | Never (key includes size) | Both MID and HIGH decoded pixels |
+| **TextureArrayMid** | GPU VRAM | RGBA | Session | MID LOD rendering, always loaded |
+| **TextureArrayHigh** | GPU VRAM | RGBA | Session | HIGH LOD rendering (LRU, lazy) |
 
 ---
 
 ## 7. In-Memory Caches
 
-### LodArtworkRenderer In-Memory State
+### GameArtworkProvider In-Memory State
 
 ```typescript
-// Game name → texture index mapping
-private textureSlots: Map<string, number>
+// appId+format → failure/success outcome (session only)
+private readonly failureCache: Map<string, RuntimeArtworkCacheEntry>
+private readonly successCache: Map<string, RuntimeArtworkCacheEntry>
+```
 
-// Texture index → instance index mapping  
-private textureIndexToInstance: Map<number, number>
+Permanent failure reasons (`NO_ARTWORK`, `CORS`, `DECODE`, `404`) are tracked so dead artwork isn't
+retried every load — see `isPermanentFailure()`.
 
-// Failed artwork tracking (24h persistent to localStorage)
-private failedArtwork: Map<string, { reason, url, timestamp }>
+### LodArtworkOrchestrator In-Memory State
 
-// Successful fallback URLs (persistent to localStorage)
-private fallbackSuccesses: Map<string, { originalUrl, fallbackUrl, fallbackType }>
-
-// Artwork URLs for lazy HIGH loading
-private artworkUrls: Map<number, string>  // textureIndex → url
+```typescript
+private gameNameToTextureIndex: Map<string, number>
+private instanceMetadata: Map<number, InstanceMetadata>
+private prefetchedHighArtworkUrl: Map<string, string>
 ```
 
 ### HighTextureCache In-Memory State
 
 ```typescript
-// Game entries with state and slot assignment
-private games: Map<number, GameEntry>  // gameIndex → entry
-
-// Slot allocation: which game is in which slot
-private slotToGame: number[]  // slot → gameIndex (-1 if free)
-
-// Currently loading (for throttling)
+private games: Map<number, GameEntry>       // gameIndex → { state, highSlot, ... }
+private slotToGame: number[]                // slot → gameIndex (-1 if free)
 private loadingPromises: Map<number, Promise<boolean>>
-
-// Queue for throttled loading
-private loadQueue: number[]
-
-// Stats for diagnostics
 private stats: { evictions, cacheHits, cacheMisses, pixelCacheHits, pixelCacheMisses }
 ```
 
@@ -394,12 +346,16 @@ void main() {
 
 ### LOD Promotion Flow
 
-1. **Request HIGH:** `LodArtworkRenderer.setInstanceLod(instanceIndex, LOD_LEVEL.HIGH)`
-2. **Check ready:** `highTextureCache.requestHighTexture(textureIndex)` returns slot or -1
-3. **Not ready:** Stay at MID, `requestHighTexture` triggers background load
+1. **Request HIGH:** `LodArtworkOrchestrator.setInstanceLod(instanceIndex, LOD_LEVEL.HIGH)`
+2. **Check ready:** `highTextureCache.requestHighTexture(textureIndex)` returns slot or triggers load
+3. **Not ready:** Stay at MID; load proceeds in background
 4. **Load complete:** `onHighSlotChange` callback queues for promotion
 5. **After GPU flush:** Promote LOD attribute to HIGH
 6. **Shader samples:** Uses `textureArrayHigh[highTextureSlot]` instead of `textureArrayMid[textureIndex]`
+
+The three settings controlling HIGH slot count and both tiers' ratios (`lodMaxHighSlotsControl`,
+`lodHighRatioControl`, `lodMedRatioControl` in `GraphicsSettingsPanel.ts`) are enabled and functional —
+see [Texture Cache Refactor Plan](../archive/texture-cache-refactor-plan-COMPLETED.md) (archived, complete).
 
 ---
 
@@ -411,18 +367,18 @@ void main() {
 
 ### Frame Budget Scheduling
 - `FrameBudgetScheduler` defers texture copies when frame budget exceeded
-- Prevents multiple worker responses from overwhelming single frame
+- Prevents multiple worker responses from overwhelming a single frame
 
 ### Partial GPU Upload
 - `DataArrayTexture.addLayerUpdate(slot)` marks specific layers dirty
-- Uploads only changed slots (~540KB) instead of full array (~34MB)
+- Uploads only changed slots instead of the full array
 
 ### Pixel Cache Strategy
 - Store decoded RGBA to skip decode on cache hit
-- 10-18x larger than JPEG but eliminates decode latency
+- Larger than JPEG but eliminates decode latency, and is shared by both LOD tiers
 
 ### Throttled Concurrent Loading
-- `maxConcurrentLoads: 2` prevents network/decode saturation
+- `maxConcurrentLoads` (HighTextureCache config) prevents network/decode saturation
 - Load queue processes sequentially
 
 ---
@@ -431,13 +387,20 @@ void main() {
 
 | Component | File |
 |-----------|------|
-| Image blob cache | `src/steam/images/ImageManager.ts` |
+| Artwork provider (cache-first fetch, URL strategy) | `src/scene/game-box/instancing/GameArtworkProvider.ts` |
+| Per-game artwork request handle | `src/scene/game-box/instancing/GameArtworkRequest.ts` |
 | Pixel data cache | `src/scene/game-box/instancing/PixelDataCache.ts` |
 | Pixel cache worker | `src/scene/game-box/instancing/pixel-cache.worker.ts` |
 | App details cache | `src/steam/cache/AppDetailsCache.ts` |
-| LOD artwork renderer | `src/scene/game-box/instancing/LodArtworkRenderer.ts` |
+| LOD orchestrator (top-level, prefetch/place split) | `src/scene/game-box/instancing/LodArtworkOrchestrator.ts` |
+| LOD texture array manager | `src/scene/game-box/instancing/LodTextureArrayManager.ts` |
+| LOD GPU renderer | `src/scene/game-box/instancing/LodGameArtworkRenderer.ts` |
 | HIGH texture LRU cache | `src/scene/game-box/instancing/HighTextureCache.ts` |
 | Texture processing worker | `src/scene/game-box/instancing/texture-processing.worker.ts` |
 | Texture worker manager | `src/scene/game-box/instancing/TextureWorker.ts` |
+| Pixel resize helper | `src/scene/game-box/instancing/ArtworkPixelUtils.ts` |
 | Game box renderer | `src/scene/game-box/GpuGameBoxRenderer.ts` |
 | Batch app details client | `src/steam/batch/BatchAppDetailsClient.ts` |
+
+---
+*— A1*
