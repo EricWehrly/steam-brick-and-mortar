@@ -18,6 +18,13 @@ client (or each release) re-syncing thousands of individual S3 objects.
 
 ## Why now
 
+This is one of several parallel tracks addressing the SteamSpy latency problem (a library-sized
+sequential fetch at ~1 req/sec is a bad first-run experience) — see
+[Traffic Safety Review](traffic-safety-review.md) and [Rust CORS/Lambda Bypass Spike](rust-cors-bypass-spike.md#the-steamspy-latency-problem-parallel-tracks-not-blocking-this-spike)
+for the full list. This plan's role in that list: serve everything the hydrator has *already*
+gathered from one cheap, publicly-fetchable object, so both web and desktop clients start from a
+warm baseline and only pay the slow per-appid SteamSpy fetch for the genuine remainder.
+
 Two motivations converged on this at once:
 1. **[[library-game-appid-metadata-duplication]]-adjacent**: the sort/filter data-provenance pass
    (`docs/architecture/sort-filter-data-provenance.md`) confirmed SteamSpy tag/review-score data —

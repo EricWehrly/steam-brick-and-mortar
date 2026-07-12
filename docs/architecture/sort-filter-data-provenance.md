@@ -30,7 +30,7 @@ never exist on this channel" becomes the honest answer.
 | By genre | `genres` | Steam `appdetails` (Lambda-proxied, or bookmarklet-direct per `steam-store-appdetails-cors-research.md`) | Web + desktop | One request per new appid, cached forever (S3 + client `AppDetailsCache`) once fetched |
 | By category (Co-op, Controller Support, etc.) | `categories` | Steam `appdetails`, same as genre | Web + desktop | Same as genre |
 | By developer/publisher | `developers` / `publishers` | Steam `appdetails` | Web + desktop | Same as genre |
-| By community tag | `steamspy_tags` / `steamspy_top_tags` | **SteamSpy** (`steamspy.com/api`), via the separate hydrator Lambda (`external-tool/infrastructure/lambda-hydrator-src`) | Web + desktop (same Lambda path either way) | **~1 request/second enforced (`STEAMSPY_DELAY_MS = 1100`), no bulk endpoint, no alternative confirmed yet — see below |
+| By community tag | `steamspy_tags` / `steamspy_top_tags` | **SteamSpy** (`steamspy.com/api`), via the hydrator Lambda **or**, as of the [Rust CORS/Lambda Bypass Spike](../plans/rust-cors-bypass-spike.md), a direct desktop fetch | Web (Lambda-only) + desktop (Lambda or direct Rust fetch) | **~1 request/second enforced (`STEAMSPY_DELAY_MS = 1100`), no bulk endpoint, no alternative confirmed yet.** The constraint is latency, not access — see below |
 | By review score | `positive`/`negative`/`userscore`/`owners` | SteamSpy, same path as tags | Web + desktop | Same as tags |
 | **By user category** | user-defined collection/category buckets | **Local Steam install only** — `cloud-storage-namespace-1.json` (see `docs/features/local-file-investigation.md`) | **Desktop-only, no web path exists** | Paused/deferred (AC4.4 target, but see note below) — not a rate-limit problem, a channel-access problem: the web client cannot reach this file at all, full stop |
 
@@ -69,25 +69,35 @@ incremental. `docs/research/steam-store-appdetails-cors-research.md` confirmed S
 absent from the data Steam itself serves. A library containing an appid SteamSpy hasn't hydrated
 yet has no tag data, full stop, until the hydrator gets to it.
 
-**Status: paused.** `docs/research/steamspy-bulk-alternatives-research-prompt.md` (the research into
-whether a bulk alternative exists) is intentionally on hold until the desktop local-file
-investigation (`local-file-investigation.md`) resumes and reports back — it's plausible desktop
-data-mining changes this calculus entirely (either by surfacing tag-equivalent data locally, or by
-clarifying that it doesn't and the online-source research is worth resuming). See
-`docs/plans/appdetails-bundle-lambda-plan.md` for the freshness/serving plan that stays useful
-regardless of how that research lands.
+**Status: active on multiple parallel tracks**, not paused waiting on one thing. The direct desktop
+fetch ([Rust CORS/Lambda Bypass Spike](../plans/rust-cors-bypass-spike.md)) proves calling SteamSpy
+client-side is viable, but doesn't by itself fix the several-minutes-per-library latency — that's
+being pursued via: a bulk-snapshot bundle from the hydrator's accumulated data
+(`docs/plans/appdetails-bundle-lambda-plan.md`), the progressive-gate mechanism below, a renewed
+bulk-alternative search (`docs/research/steamspy-bulk-alternatives-research-prompt.md`, no longer
+blocked on local-file investigation reporting back first), and — considered the best bet —
+desktop local-file data mining (`local-file-investigation.md`), which may surface a tag-equivalent
+local source and sidestep SteamSpy for desktop users entirely.
 
 ## How this table is meant to drive the gate (not designed yet, described here so it isn't lost)
 
 The mechanism itself isn't built. The intended shape: each row's "available" state is derived at
-runtime from whatever the app actually knows for the *current* library/session — e.g. "has the
-hydrator ever successfully tagged ≥N% of this library's appids" for the community-tag row, or
-simply "is this a desktop build" for channel-exclusive rows. An existing app "intake" event (e.g.
-`GameDataReady`, `LibraryManifestReady` in `client/src/types/InteractionEvents.ts`) is the natural
-signal to re-evaluate gates when new data lands — not a new event type, reuse what already marks
-"something just arrived." Tracked as a someday item in `docs/acts/act4-encore-someday-maybe.md`
-("Gate sort/filter UI on data availability"); this doc is the spec that work would consume, not a
-separate concern from it.
+runtime from whatever the app actually knows for the *current* library/session — e.g. simply "is this
+a desktop build" for channel-exclusive rows. An existing app "intake" event (e.g. `GameDataReady`,
+`LibraryManifestReady` in `client/src/types/InteractionEvents.ts`) is the natural signal to
+re-evaluate gates when new data lands — not a new event type, reuse what already marks "something
+just arrived." Tracked as a someday item in `docs/acts/act4-encore-someday-maybe.md` ("Gate sort/filter
+UI on data availability"); this doc is the spec that work would consume, not a separate concern from it.
+
+**The community-tag row specifically wants a coverage-percentage threshold, not a binary gate** — a
+concrete, currently-favored shape: "has the hydrator (or, on desktop, a direct SteamSpy fetch)
+successfully tagged ≥N% of this library's appids" (N is a product call, not yet pinned — 50% has been
+floated as a reasonable starting point). Below the threshold, the sort/filter option stays hidden or
+disabled exactly like any other not-yet-fetched row; once crossed, it activates even though some
+appids remain untagged (those just don't participate in a tag-based sort/filter, same as any missing
+field elsewhere in this table). This directly addresses the SteamSpy latency problem
+(`docs/plans/traffic-safety-review.md` / `docs/plans/rust-cors-bypass-spike.md`) — the feature doesn't
+have to wait for a multi-minute serial fetch to finish, just for it to get "far enough."
 
 ## Related
 - `docs/research/steam-store-appdetails-cors-research.md` — confirms genres/categories have
@@ -96,5 +106,7 @@ separate concern from it.
 - `docs/features/local-file-investigation.md` — the only channel-exclusive row today (user
   categories), and where more are likely to come from
 - `docs/plans/appdetails-bundle-lambda-plan.md` — automated bundle-freshness plan for the hydrated data
-- `docs/research/steamspy-bulk-alternatives-research-prompt.md` — paused research: is there a bulk/alternative source for tags at all
-- `external-tool/infrastructure/lambda-hydrator-src/index.js` — the only current path to SteamSpy data
+- `docs/research/steamspy-bulk-alternatives-research-prompt.md` — active research: is there a bulk/alternative source for tags at all
+- `docs/plans/rust-cors-bypass-spike.md` — the direct desktop-to-SteamSpy fetch path (a second path to this data, alongside the hydrator)
+- `docs/plans/traffic-safety-review.md` — why SteamSpy's rate limit is a latency problem, not a traffic-safety one
+- `external-tool/infrastructure/lambda-hydrator-src/index.js` — the Lambda-side path to SteamSpy data
