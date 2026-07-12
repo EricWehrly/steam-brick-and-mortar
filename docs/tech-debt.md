@@ -332,6 +332,25 @@ for the narrower, separate debt of playtime bundled *inside* the `games_<steamid
 
 ## Later (only true debt, not feature wish-list)
 
+## id: library-game-appid-metadata-duplication
+**Priority**: Low  
+**Effort**: ~1 day (new appid-keyed store + wiring) if ever picked up  
+**Context**: The manual-import bookmarklet mines a one-shot Steam profile page hydration blob that carries `capsule_filename`, `has_dlc`/`has_workshop`/`has_market`/`has_community_visible_stats`/`has_leaderboards`, `content_descriptorids`, and `img_icon_url` per game — data `AppDetailsCache` doesn't have, since it's fed only by the Lambda's Store API batch endpoint, a different source that doesn't return these fields. These are genuinely appid-level (describe the game, not the owner), so `ImportedGame` (`client/src/steam-integration/Library.ts`) captures and validates them — a saved export JSON file carries them — but they deliberately go no further: threading them into `LibraryGame` would duplicate appid-level data per-owner, the same entanglement [[user-games-cache-entanglement]] describes for the online games cache. Net effect: the app captures this data but currently has nowhere to put it, so it's dropped the moment `handleImportLibrary` converts `ImportedGame` to `LibraryGame` — the only way to retain it today is to keep the raw exported `.json` file. `playtime_disconnected` is not part of this problem: it's per-owner (like `playtime_forever`) and already threads through to `LibraryGame.playtimeDisconnected` normally.
+
+**Decision (for now)**:
+- Capture and validate at the wire layer only. Build the real per-appid store when a concrete feature needs one of these fields — don't grow `LibraryGame` to hold appid-level data in the meantime.
+
+**Done when**:
+- A shared, appid-keyed store (not per-owner) exists for this data, sourced from whichever channel captured it first or most recently
+- The captured `ImportedGame` fields feed that store instead of being discarded at import time
+
+**Related files**:
+- `client/src/steam-integration/Library.ts`
+- `client/src/steam-integration/SteamIntegration.ts`
+- `client/public/bookmarklets/export-library.js`
+
+---
+
 ## id: aisle-terminology-main-vs-row
 **Priority**: Low  
 **Effort**: ~1-2 hours  

@@ -9,6 +9,35 @@ export interface ImportedGame {
     readonly appid: number
     readonly name: string
     readonly playtime_forever: number
+    /** Unix timestamp, absent if the game has never been played — mirrors SteamGame's field
+     *  of the same name so both channels feed LibraryGame.lastPlayed the same way. */
+    readonly rtime_last_played?: number
+    /** Per-user, like playtime_forever — threaded through to LibraryGame.playtimeDisconnected. */
+    readonly playtime_disconnected?: number
+    /**
+     * The fields below are per-appid, not per-user — capsule_filename, the has_dlc-style flags,
+     * content_descriptorids, and img_icon_url describe the game itself, not this owner's
+     * relationship to it. They're captured
+     * here (validated, present in a saved export file) because the bookmarklet's one-shot mining
+     * of a profile page is the only place we currently see them — but they deliberately go no
+     * further than this wire type. There's no appid-keyed store for them yet (AppDetailsCache is
+     * fed only by the Lambda's Store API batch endpoint, a different source that doesn't return
+     * these fields), and duplicating them per-owner inside LibraryGame would recreate the
+     * categories/artwork entanglement documented on LibraryGame below. Thread them further only
+     * once that store exists. // TD: library-game-appid-metadata-duplication
+     *
+     * capsule_filename's format is inconsistent (sometimes hash-prefixed, sometimes not — see
+     * docs/research/steam-profile-ssr-hydration-research.md "Known quirks"); captured as-is,
+     * not reconstructed or used to build a URL.
+     */
+    readonly capsule_filename?: string
+    readonly has_dlc?: boolean
+    readonly has_workshop?: boolean
+    readonly has_market?: boolean
+    readonly has_community_visible_stats?: boolean
+    readonly has_leaderboards?: boolean
+    readonly content_descriptorids?: readonly number[]
+    readonly img_icon_url?: string
 }
 
 /**
@@ -39,14 +68,15 @@ export interface LibraryOwner {
  * entries to cover the gap. AppDetailsCache can still resolve a better/canonical name at
  * assembly time (see GamesLoader.buildEnhancedGame) — this is only the floor, never persisted
  * artwork/categories/genres, which stay resolved from AppDetailsCache per-appid, never here.
- * lastPlayed is carried so a restored online library keeps its shelf ordering without waiting
- * on a re-fetch.
+ * lastPlayed and playtimeDisconnected are carried because they're genuinely per-owner facts
+ * (same as playtimeForever) — see ImportedGame for the per-appid fields deliberately kept out.
  */
 export interface LibraryGame {
     readonly appid: number
     readonly name: string
     readonly playtimeForever: number
     readonly lastPlayed?: number
+    readonly playtimeDisconnected?: number
 }
 
 export interface LibraryProvenance {
@@ -69,11 +99,44 @@ export interface LibraryExportPayload {
     readonly games: readonly ImportedGame[]
 }
 
+type PrimitiveTypeName = 'number' | 'string' | 'boolean' | 'number[]'
+
+/** Every ImportedGame field beyond the three required ones, and the runtime type it must match
+ *  when present. Table-driven so adding a field is a one-line addition, not a new predicate. */
+const OPTIONAL_GAME_FIELD_TYPES: Record<string, PrimitiveTypeName> = {
+    rtime_last_played: 'number',
+    playtime_disconnected: 'number',
+    capsule_filename: 'string',
+    has_dlc: 'boolean',
+    has_workshop: 'boolean',
+    has_market: 'boolean',
+    has_community_visible_stats: 'boolean',
+    has_leaderboards: 'boolean',
+    content_descriptorids: 'number[]',
+    img_icon_url: 'string'
+}
+
+function matchesType(value: unknown, type: PrimitiveTypeName): boolean {
+    return type === 'number[]'
+        ? Array.isArray(value) && value.every(v => typeof v === 'number')
+        : typeof value === type
+}
+
 /**
  * Validates an untrusted payload from either capture channel (postMessage or a picked file) —
  * shared so the two entry points can't drift into checking slightly different things. Pure and
  * DOM-free on purpose: easy to unit test without any browser fixtures.
  */
+function isValidImportedGame(g: unknown): g is ImportedGame {
+    if (typeof g !== 'object' || g === null) return false
+    const candidate = g as Record<string, unknown>
+    if (typeof candidate.appid !== 'number' || typeof candidate.name !== 'string' || typeof candidate.playtime_forever !== 'number') {
+        return false
+    }
+    return Object.entries(OPTIONAL_GAME_FIELD_TYPES).every(([field, type]) =>
+        candidate[field] === undefined || matchesType(candidate[field], type))
+}
+
 export function validateLibraryExportPayload(payload: unknown): { games: ImportedGame[], displayName: string | null, steamId: string | null } | null {
     const isObject = (value: unknown): value is Record<string, unknown> =>
         typeof value === 'object' && value !== null
@@ -82,8 +145,7 @@ export function validateLibraryExportPayload(payload: unknown): { games: Importe
     if ((payload as Partial<LibraryExportPayload>).schema !== 'sbam-library-export/v1') return null
     if (!Array.isArray(payload.games)) return null
 
-    const games = payload.games.filter((g): g is ImportedGame =>
-        isObject(g) && typeof g.appid === 'number' && typeof g.name === 'string' && typeof g.playtime_forever === 'number')
+    const games = payload.games.filter(isValidImportedGame)
     if (games.length === 0) return null
 
     const displayName = typeof payload.display_name === 'string' ? payload.display_name.trim() || null : null

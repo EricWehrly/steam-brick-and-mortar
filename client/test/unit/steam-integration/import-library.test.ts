@@ -17,18 +17,18 @@ import { DataManager } from '../../../src/core/data'
 import { EventManager } from '../../../src/core/EventManager'
 import { SteamIntegration } from '../../../src/steam-integration/SteamIntegration'
 import { validateLibraryExportPayload } from '../../../src/steam-integration/Library'
-import type { ImportChannel } from '../../../src/steam-integration/Library'
+import type { ImportChannel, ImportedGame } from '../../../src/steam-integration/Library'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
 import type { SteamGamesBatchEvent, SteamImportLibraryEvent } from '../../../src/types/InteractionEvents'
 
-const SAMPLE_GAMES = [
+const SAMPLE_GAMES: ImportedGame[] = [
     { appid: 440, name: 'Team Fortress 2', playtime_forever: 100 },
     { appid: 620, name: 'Portal 2', playtime_forever: 50 },
 ]
 
 function importLibrary(
     integration: SteamIntegration,
-    games: typeof SAMPLE_GAMES,
+    games: ImportedGame[],
     displayName: string | undefined,
     steamId: string | undefined,
     channel: ImportChannel
@@ -83,6 +83,52 @@ describe('validateLibraryExportPayload', () => {
         const result = validateLibraryExportPayload({
             schema: 'sbam-library-export/v1',
             games: [{ appid: 'nope' }]
+        })
+        expect(result).toBeNull()
+    })
+
+    const FULLY_POPULATED_GAME = {
+        appid: 440,
+        name: 'Team Fortress 2',
+        playtime_forever: 100,
+        rtime_last_played: 1700000000,
+        playtime_disconnected: 5,
+        capsule_filename: 'ac2f074d.../library_600x900.jpg',
+        has_dlc: true,
+        has_workshop: true,
+        has_market: false,
+        has_community_visible_stats: true,
+        has_leaderboards: false,
+        content_descriptorids: [2, 5],
+        img_icon_url: 'abc123hash'
+    }
+
+    it('carries the optional per-game fields through when present, and tolerates their absence', () => {
+        const withFields = validateLibraryExportPayload({ schema: 'sbam-library-export/v1', games: [FULLY_POPULATED_GAME] })
+        expect(withFields?.games[0]).toEqual(FULLY_POPULATED_GAME)
+
+        const withoutFields = validateLibraryExportPayload({ schema: 'sbam-library-export/v1', games: SAMPLE_GAMES })
+        const game = withoutFields?.games[0]
+        expect(game?.rtime_last_played).toBeUndefined()
+        expect(game?.playtime_disconnected).toBeUndefined()
+        expect(game?.capsule_filename).toBeUndefined()
+        expect(game?.has_dlc).toBeUndefined()
+        expect(game?.content_descriptorids).toBeUndefined()
+        expect(game?.img_icon_url).toBeUndefined()
+    })
+
+    it.each([
+        ['rtime_last_played', 'yesterday'],
+        ['playtime_disconnected', 'a lot'],
+        ['capsule_filename', 12345],
+        ['has_dlc', 'yes'],
+        ['content_descriptorids', ['not', 'numbers']],
+        ['content_descriptorids', 'not-an-array'],
+        ['img_icon_url', 999],
+    ])('rejects a game entry whose %s is present but the wrong type', (field, badValue) => {
+        const result = validateLibraryExportPayload({
+            schema: 'sbam-library-export/v1',
+            games: [{ appid: 440, name: 'Team Fortress 2', playtime_forever: 100, [field]: badValue }]
         })
         expect(result).toBeNull()
     })
@@ -193,6 +239,66 @@ describe('SteamIntegration manual library import', () => {
             { appid: 440, name: 'Team Fortress 2', playtimeForever: 100 },
             { appid: 620, name: 'Portal 2', playtimeForever: 50 },
         ])
+    })
+
+    const RICH_IMPORTED_GAME: ImportedGame = {
+        appid: 440,
+        name: 'Team Fortress 2',
+        playtime_forever: 100,
+        rtime_last_played: 1700000000,
+        playtime_disconnected: 5,
+        capsule_filename: 'ac2f074d.../library_600x900.jpg',
+        has_dlc: true,
+        has_workshop: true,
+        has_market: false,
+        has_community_visible_stats: true,
+        has_leaderboards: false,
+        content_descriptorids: [2, 5],
+        img_icon_url: 'abc123hash'
+    }
+
+    it('threads the per-user fields through to the emitted game, but not the per-appid ones', async () => {
+        const integration = SteamIntegration.getInstance()
+        const eventManager = EventManager.getInstance()
+        const batchHandler = vi.fn()
+        eventManager.registerEventHandler<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, batchHandler)
+
+        await importLibrary(integration, [RICH_IMPORTED_GAME], 'Test Account', undefined, 'bookmarklet')
+
+        const game = (batchHandler.mock.calls[0][0] as CustomEvent<SteamGamesBatchEvent>).detail.games[0]
+        expect(game.rtime_last_played).toBe(1700000000)
+        expect(game.playtime_disconnected).toBe(5)
+        // Per-appid fields (capsule_filename, has_dlc, etc.) stop at ImportedGame — see
+        // library-game-appid-metadata-duplication in docs/tech-debt.md. Not present on SteamGame.
+        expect(game.img_icon_url).toBe('')
+    })
+
+    it('leaves the per-user fields undefined when the capture channel had none', async () => {
+        const integration = SteamIntegration.getInstance()
+        const eventManager = EventManager.getInstance()
+        const batchHandler = vi.fn()
+        eventManager.registerEventHandler<SteamGamesBatchEvent>(SteamEventTypes.GamesBatchReady, batchHandler)
+
+        await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'bookmarklet')
+
+        const game = (batchHandler.mock.calls[0][0] as CustomEvent<SteamGamesBatchEvent>).detail.games[0]
+        expect(game.rtime_last_played).toBeUndefined()
+        expect(game.playtime_disconnected).toBeUndefined()
+    })
+
+    it('persists the per-user fields on the imported library, and only those', async () => {
+        const integration = SteamIntegration.getInstance()
+
+        await importLibrary(integration, [RICH_IMPORTED_GAME], 'Test Account', undefined, 'bookmarklet')
+
+        const persisted = JSON.parse(localStorage.getItem('sbam_library_source')!)
+        expect(persisted.games[0]).toEqual({
+            appid: 440,
+            name: 'Team Fortress 2',
+            playtimeForever: 100,
+            lastPlayed: 1700000000,
+            playtimeDisconnected: 5
+        })
     })
 
     it('shows the real name immediately even with a cold entity cache, and it survives a reload', async () => {
