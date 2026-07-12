@@ -1,7 +1,7 @@
 # Manual Library Export — Feasibility Study
 
 **Act**: 2 (Ready for Friends — reduces reliance on hosted Lambda for library ingestion)
-**Status**: ✅ **Both halves built.** Export bookmarklet implemented and live-tested against a real Steam account (2026-07-02) — see `client/public/bookmarklets/export-library.js`. Import (Half 2) landed 2026-07-11 via the [library source convergence](library-source-convergence-plan.md): imports render immediately with zero Lambda calls, gain entity enrichment (categories/genres) when the shared cache already has it, and survive a reload.
+**Status**: ✅ **Both halves built.** Export bookmarklet implemented and live-tested against a real Steam account (2026-07-02) — see `client/public/bookmarklets/export-library.js`. Import (Half 2) landed 2026-07-11 via the [library source convergence](../plans/library-source-convergence-plan.md): imports render immediately with zero Lambda calls, gain entity enrichment (categories/genres) when the shared cache already has it, and survive a reload.
 **Primary question**: Can a user hand us their full Steam library *without us calling our Lambda* — ideally via a one-click bookmarklet that writes a JSON file we then import?
 
 ---
@@ -212,9 +212,9 @@ Where this sits among all five ingestion channels discussed:
 ## Related
 
 - [`../research/steam-profile-ssr-hydration-research.md`](../research/steam-profile-ssr-hydration-research.md) — the full structural reference this feature is built on
-- [`traffic-safety-review.md`](./traffic-safety-review.md) — **why** this channel matters: zero Steam ownership traffic
+- [`traffic-safety-review.md`](../plans/traffic-safety-review.md) — **why** this channel matters: zero Steam ownership traffic
 - [`bookmarklet-capture-spike.md`](./bookmarklet-capture-spike.md) — the self-contained brief that implements this
-- [`steam-user-categories-filesystem-plan.md`](./steam-user-categories-filesystem-plan.md) — the file-picker import mechanism to reuse
+- [`steam-user-categories-filesystem-plan.md`](../plans/steam-user-categories-filesystem-plan.md) — the file-picker import mechanism to reuse
 - [`../research/steam-api-research.md`](../research/steam-api-research.md) — the CORS/Lambda rationale this routes around
 - [`../features/local-file-investigation.md`](../features/local-file-investigation.md) — the sibling "local files" channel (deferred)
 - [`../features/desktop-app.md`](../features/desktop-app.md) — the vehicle that would unblock the local-files channel

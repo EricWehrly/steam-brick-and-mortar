@@ -4,7 +4,7 @@
 future work (expanding the bookmarklet, building the desktop injected-webview capture, or pulling
 more than just the games list) doesn't need to re-derive this from scratch. Implements/documents the
 mechanism used by [`client/public/bookmarklets/export-library.js`](../../client/public/bookmarklets/export-library.js)
-and specified in [`../plans/manual-library-export-feasibility.md`](../plans/manual-library-export-feasibility.md).
+and specified in [`../archive/manual-library-export-feasibility.md`](../archive/manual-library-export-feasibility.md).
 
 **Verified**: 2026-07-02, live, against a real Steam account. Machine/account-specific identifiers
 (steamid64, private account name, avatar hashes, wallet/location data) are **intentionally redacted**
@@ -12,7 +12,7 @@ below — same convention as `docs/research/local-steam/local-steam-buckets-find
 `SpiteMonger` is left in as-is since it's a public URL slug already visible throughout this
 project's docs and screenshots, not a secret.
 
-**Prior finding this supersedes**: earlier research (`../plans/manual-library-export-feasibility.md`,
+**Prior finding this supersedes**: earlier research (`../archive/manual-library-export-feasibility.md`,
 originally drafted 2026-07-01) proposed the `rgGames` global variable and the `?tab=all&xml=1` feed
 as the capture source. **Both are confirmed dead** as of this pass — Steam has since rebuilt profile
 pages as server-rendered React. This doc describes the mechanism that replaced them.
@@ -186,8 +186,8 @@ balance and approximate location are a different category of data than "which ga
 
 ## Related
 
-- [`../plans/manual-library-export-feasibility.md`](../plans/manual-library-export-feasibility.md) — the feature this research supports; has the "why a bookmarklet works" CORS framing
-- [`../plans/bookmarklet-capture-spike.md`](../plans/bookmarklet-capture-spike.md) — implementation spike status
+- [`../archive/manual-library-export-feasibility.md`](../archive/manual-library-export-feasibility.md) — the feature this research supports; has the "why a bookmarklet works" CORS framing
+- [`../archive/bookmarklet-capture-spike.md`](../archive/bookmarklet-capture-spike.md) — implementation spike status (done)
 - [`../plans/rust-cors-bypass-spike.md`](../plans/rust-cors-bypass-spike.md) — desktop capture; the `/my/` navigation-not-fetch finding applies there directly
 - `client/public/bookmarklets/export-library.js` — the implementation
 - [`../features/legal-privacy-compliance.md`](../features/legal-privacy-compliance.md) — where the privacy posture of any future expanded capture should be worked out

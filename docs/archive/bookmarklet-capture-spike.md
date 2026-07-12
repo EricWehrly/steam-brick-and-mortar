@@ -13,8 +13,8 @@
 
 **Traffic safety toward Steam.** Replacing the online "profile URL → Lambda → Steam `GetOwnedGames`"
 path with a user-provided export means our infrastructure asks Steam **zero times** for that user's
-library. See [Traffic Safety Review](traffic-safety-review.md). This is the web-side ownership fix;
-the desktop equivalent is [Rust CORS/Lambda Bypass Spike](rust-cors-bypass-spike.md).
+library. See [Traffic Safety Review](../plans/traffic-safety-review.md). This is the web-side ownership fix;
+the desktop equivalent is [Rust CORS/Lambda Bypass Spike](../plans/rust-cors-bypass-spike.md).
 
 ## Read first
 - [`manual-library-export-feasibility.md`](manual-library-export-feasibility.md) — the full design, the verified extraction mechanism, and the CORS insight.
@@ -39,17 +39,20 @@ store, rendering with **enrichment disabled** (proving the zero-Steam-traffic pa
    `<a download>`. Extraction logic tested live in-browser; the file itself has not yet been
    installed as an actual `javascript:` bookmark and click-tested end-to-end, and Firefox is
    unconfirmed — do that first if picking this up.
-3. **Build the importer** in the client: reuse the file-picker approach from
-   [`steam-user-categories-filesystem-plan.md`](steam-user-categories-filesystem-plan.md) §2
-   (`showOpenFilePicker` + `<input type=file>` fallback). Parse, validate the schema, map to
-   `SteamUser`, and feed the existing entry (`gameLibrary.setUserData` → batch-emit, demo-games style).
-4. **Prove the offline path**: render the imported store with the Lambda enrichment path **off** —
-   boxes + names + playtime-sort must work from the file + CDN artwork alone.
+3. ✅ **Done (2026-07-11).** Importer built via `SteamIntegration.handleImportLibrary`, feeding the
+   unified `Library` shape (not the originally-sketched `SteamUser`/`gameLibrary.setUserData` path
+   — see `library-source-convergence-plan.md`, Fork B2, for why). File-picker reuse from
+   [`steam-user-categories-filesystem-plan.md`](../plans/steam-user-categories-filesystem-plan.md) §2
+   landed as designed.
+4. ✅ **Done (2026-07-11), verified live in-browser.** Imported store renders with zero Lambda calls
+   from boxes + names + playtime-sort alone; separately, when `AppDetailsCache` already has an
+   appid (baked bundle or a prior online session), the import also gains categories/genres for
+   free with no network call of its own — see `GamesLoader.enrichFromCache`.
 
 ## Acceptance
 - [x] Bookmarklet downloads a valid `steam-library.json` from a real logged-in games page. (Extraction logic verified live; full click-through-as-installed-bookmark pass still worth doing.)
-- [ ] App imports that file and populates the store.
-- [ ] Store renders with enrichment disabled — **no Steam ownership request made by our code**.
+- [x] App imports that file and populates the store.
+- [x] Store renders with enrichment disabled — **no Steam ownership request made by our code**.
 - [x] Graceful failure when the data block is absent (implemented: `alert()` with a clear message, no silent empty import).
 
 ## Verification
@@ -63,7 +66,7 @@ store, rendering with **enrichment disabled** (proving the zero-Steam-traffic pa
 - Do not build the desktop variant here — that's the Rust spike.
 
 ## Related
-- [Manual Library Export](manual-library-export-feasibility.md) · [Traffic Safety Review](traffic-safety-review.md) · [First Load Experience](../features/first-load-experience.md)
+- [Manual Library Export](manual-library-export-feasibility.md) · [Traffic Safety Review](../plans/traffic-safety-review.md) · [First Load Experience](../features/first-load-experience.md)
 
 ---
 *— A1 / P1*
