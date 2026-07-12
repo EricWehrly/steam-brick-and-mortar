@@ -3,12 +3,15 @@
 This directory is structured specifically as a knowledge base and entrypoint for AI agents (like Vex) working on the project.
 
 ## Current status
-**Intermission: Technical Stewardship** — see [`acts/act1-intermission-technical-stewardship.md`](acts/act1-intermission-technical-stewardship.md).
+**Act 2: Ready for Friends** — see [`acts/act2-ready-for-friends.md`](acts/act2-ready-for-friends.md).
 
-Active in-flight thread: **visual quality pass** (lighting/shading) — pulled forward from Act 2's
-[Lighting and Atmosphere](features/lighting-and-atmosphere.md). Immediate next step is the
-renderer visual baseline (tone mapping + environment lighting): see
-[`plans/renderer-visual-baseline-plan.md`](plans/renderer-visual-baseline-plan.md).
+Active in-flight thread: **library population alternatives** — manual import (bookmarklet/file)
+now converges onto the same unified `Library` shape as the online path (both halves built and
+live-verified 2026-07-11; see [`plans/library-source-convergence-plan.md`](plans/library-source-convergence-plan.md)),
+closing out the ownership-traffic-avoidance work from
+[`archive/manual-library-export-feasibility.md`](archive/manual-library-export-feasibility.md).
+Next up: the desktop app's local Steam-files reading path (see
+[`features/desktop-app.md`](features/desktop-app.md)).
 
 ## Where to start
 1. Read the current act doc above — goals, feature list, completion criteria.

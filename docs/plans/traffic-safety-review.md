@@ -96,14 +96,14 @@ own tracked story rather than living here. See **Production Infrastructure §9.2
 
 Both are prepped as self-contained briefs for a fresh (cheaper-model) context:
 
-- [Bookmarklet Capture Spike](bookmarklet-capture-spike.md) — kills ownership traffic on web.
+- [Bookmarklet Capture Spike](../archive/bookmarklet-capture-spike.md) — kills ownership traffic on web.
 - [Rust CORS/Lambda Bypass Spike](rust-cors-bypass-spike.md) — kills ownership + enrichment traffic on desktop.
 
 ## Related
 - [Release Pipeline](release-pipeline-plan.md) — the `aws s3 sync` bake that pre-loads enrichment
 - [Texture Cache Refactor Plan](texture-cache-refactor-plan.md) — CDN-artwork Plan 1 (fix the double-fetch/no-MID-cache bug)
 - [F2P Artwork Bake](f2p-artwork-bake-plan.md) — CDN-artwork Plan 2 (bake the anonymous store's artwork)
-- [Manual Library Export](manual-library-export-feasibility.md) — the ownership-traffic replacement
+- [Manual Library Export](../archive/manual-library-export-feasibility.md) — the ownership-traffic replacement
 - [Desktop App](../features/desktop-app.md) — the native routes that get desktop to near-zero
 - [Steam API Research](../research/steam-api-research.md) — original CORS/Lambda rationale
 - [Network Rate Limiting](../features/network-rate-limiting.md) — confirmed appdetails batching ceiling; current outbound-traffic implementation

@@ -307,7 +307,7 @@ first.
 - [[appid-keyed-cache-split]] — adjacent storage-format debt (the orphaned `cache_state` blob)
 - [[steam-integration-loading-strategy-split]] — the loading-pipeline split this largely subsumes
 - [[cache-clear-domain-unification]] — must be reconciled; likely consumes this plan's taxonomy
-- `docs/plans/manual-library-export-feasibility.md` — the feature that surfaced all of this
+- `docs/archive/manual-library-export-feasibility.md` — the feature that surfaced all of this
 
 ---
 

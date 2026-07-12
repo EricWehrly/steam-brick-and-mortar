@@ -12,13 +12,13 @@
 which is the entire reason our Lambda exists. Tauri's **Rust** backend has **no browser CORS** and
 holds the user's WebView2 session — so on desktop we can talk to Steam directly and skip both the
 Lambda hop *and* the extra request amplification. This is the desktop counterpart to the web-only
-[Bookmarklet Capture Spike](bookmarklet-capture-spike.md). Framing: [Traffic Safety Review](traffic-safety-review.md).
+[Bookmarklet Capture Spike](../archive/bookmarklet-capture-spike.md). Framing: [Traffic Safety Review](traffic-safety-review.md).
 
 ## Read first
 - [`desktop-tauri-spike-plan.md`](desktop-tauri-spike-plan.md) — vehicle status, the CORS-via-Rust note, event-driven boundary rules for Tauri commands.
 - [`../features/desktop-app.md`](../features/desktop-app.md) — "Library capture without a bookmarklet" section (the injected-webview capture concept).
 - `desktop/tauri-app/src/lib.rs` — current shell (bare default builder; you'll add commands here).
-- [`manual-library-export-feasibility.md`](manual-library-export-feasibility.md) — the verified extraction mechanism (React Query hydration blob mining — **not** `rgGames`/`?xml=1`, both confirmed dead 2026-07-02) to reuse in the injected webview.
+- [`manual-library-export-feasibility.md`](../archive/manual-library-export-feasibility.md) — the verified extraction mechanism (React Query hydration blob mining — **not** `rgGames`/`?xml=1`, both confirmed dead 2026-07-02) to reuse in the injected webview.
 - `client/public/bookmarklets/export-library.js` — the actual extraction code; inject this (or its logic) into the login webview rather than re-deriving it.
 - [`../research/steam-profile-ssr-hydration-research.md`](../research/steam-profile-ssr-hydration-research.md) — full structure reference, including the `/my/` navigation-vs-fetch finding below.
 
@@ -67,7 +67,7 @@ Prove two Rust-side capabilities, each returning data to the frontend over a typ
 - This spike does **not** depend on the WebXR/VR question — it's pure native-capability proof.
 
 ## Related
-- [Desktop App](../features/desktop-app.md) · [Tauri Spike](desktop-tauri-spike-plan.md) · [Traffic Safety Review](traffic-safety-review.md) · [Bookmarklet Capture Spike](bookmarklet-capture-spike.md)
+- [Desktop App](../features/desktop-app.md) · [Tauri Spike](desktop-tauri-spike-plan.md) · [Traffic Safety Review](traffic-safety-review.md) · [Bookmarklet Capture Spike](../archive/bookmarklet-capture-spike.md)
 
 ---
 *— A1 / P1*
