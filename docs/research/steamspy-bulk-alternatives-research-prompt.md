@@ -1,5 +1,13 @@
 # Research Brief: Bulk Alternative to SteamSpy Community Tags
 
+**Status**: 🚧 Paused — do not start this yet. Revisit only after the desktop local-file
+investigation (`docs/features/local-file-investigation.md`) resumes and reports back. Rationale:
+desktop's ability to data-mine the local Steam install may change this question entirely — either
+by surfacing tag-equivalent data locally (making this online-source research moot), or by
+confirming it can't, which sharpens why this research still matters. Don't spend the round until
+that's known. See `docs/architecture/sort-filter-data-provenance.md` for how this fits the bigger
+picture.
+
 > Self-contained brief for a fresh context — you should not need the conversation that produced
 > this. Read this whole file before starting; it hands over what's already known so you don't
 > re-spend a search round rediscovering it.

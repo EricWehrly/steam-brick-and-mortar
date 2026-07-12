@@ -12,6 +12,10 @@
 - The only high-value unique field confirmed is user collections/categories from `cloud-storage-namespace-1.json`.
 - Additional local signals (install presence, local playtime/last-played, limited cloud/controller state) are useful but do not justify introducing filesystem API complexity right now.
 - Re-entry target: AC4.4 (see `docs/acts/act4-encore-someday-maybe.md`).
+- **On re-entry, also revisit**: `docs/architecture/sort-filter-data-provenance.md` (user categories
+  are the only channel-exclusive sort/filter dimension identified so far — this feature is where
+  more like it are likely to come from) and `docs/research/steamspy-bulk-alternatives-research-prompt.md`
+  (paused specifically pending what this investigation turns up).
 
 ## Goal
 
