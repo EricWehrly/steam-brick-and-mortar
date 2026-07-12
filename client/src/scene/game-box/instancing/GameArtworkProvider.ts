@@ -87,6 +87,14 @@ const CDN_PATTERNS: Record<CdnArtworkType, string> = {
     header: 'header.jpg'
 }
 
+/** Baked F2P/anonymous-store artwork - see docs/plans/f2p-artwork-bake-plan.md */
+const BAKED_ARTWORK_DIR = '/artwork-cache'
+const BAKED_ARTWORK_MANIFEST_URL = `${BAKED_ARTWORK_DIR}/manifest.json`
+
+interface BakedArtworkManifest {
+    readonly appids: readonly number[]
+}
+
 type ArtworkHintType = 'library' | 'header'
 
 const STRATEGY_BY_FORMAT: Record<ArtworkFormat, {
@@ -127,14 +135,16 @@ export class GameArtworkProvider {
     private pixelCache: PixelDataCache | null = null
     private readonly failureCache = new Map<string, RuntimeArtworkCacheEntry>()
     private readonly successCache = new Map<string, RuntimeArtworkCacheEntry>()
-    
+    private bakedArtworkAppIds: ReadonlySet<number> | null = null
+
     // Skip tracking (per session)
     private skipStats: Map<FailureReason, number> = new Map()
     private skippedGames: Array<{ appId: number; gameName: string; reason: FailureReason }> = []
-    
+
     private constructor() {
         this.textureWorker = new TextureWorker()
         this.initPixelCache()
+        this.initBakedArtworkManifest()
         this.logFailureStats()
     }
     
@@ -153,7 +163,38 @@ export class GameArtworkProvider {
             GameArtworkProvider.logger.warn('PixelDataCache init failed:', err)
         }
     }
-    
+
+    /**
+     * Loads the manifest of baked F2P/anonymous-store artwork, if this release shipped one.
+     * Fire-and-forget: a request that lands before this resolves just falls through to the
+     * normal CDN strategy, same as any other cache miss.
+     */
+    private async initBakedArtworkManifest(): Promise<void> {
+        try {
+            const response = await fetch(BAKED_ARTWORK_MANIFEST_URL)
+            if (!response.ok) {
+                this.bakedArtworkAppIds = new Set()
+                return
+            }
+            const manifest = await response.json() as BakedArtworkManifest
+            this.bakedArtworkAppIds = new Set(manifest.appids)
+            GameArtworkProvider.logger.debug(`Loaded baked F2P artwork manifest: ${this.bakedArtworkAppIds.size} appids`)
+        } catch (err) {
+            GameArtworkProvider.logger.debug('No baked F2P artwork manifest available:', err)
+            this.bakedArtworkAppIds = new Set()
+        }
+    }
+
+    /**
+     * Local artwork URL for a baked F2P game, or null if this appId wasn't baked into the release.
+     */
+    public getBakedArtworkUrl(appId: number): string | null {
+        if (!this.bakedArtworkAppIds?.has(appId)) {
+            return null
+        }
+        return `${BAKED_ARTWORK_DIR}/${appId}.jpg`
+    }
+
     /**
      * Get artwork for a game.
      * Returns a GameArtwork handle that can be queried for URL, pixels, etc.
@@ -208,6 +249,14 @@ export class GameArtworkProvider {
             seen.add(url)
             sourceByUrl.set(url, type)
             urls.push({ url, type })
+        }
+
+        // Baked F2P artwork ships as library_600x900.jpg locally, so it only applies to that format.
+        if (format === 'library') {
+            const bakedUrl = this.getBakedArtworkUrl(appId)
+            if (bakedUrl) {
+                addUrl(bakedUrl, 'baked-local')
+            }
         }
 
         const strategy = STRATEGY_BY_FORMAT[format]
