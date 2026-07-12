@@ -1,12 +1,12 @@
 # Research Brief: Bulk Alternative to SteamSpy Community Tags
 
-**Status**: 🚧 Paused — do not start this yet. Revisit only after the desktop local-file
-investigation (`docs/features/local-file-investigation.md`) resumes and reports back. Rationale:
-desktop's ability to data-mine the local Steam install may change this question entirely — either
-by surfacing tag-equivalent data locally (making this online-source research moot), or by
-confirming it can't, which sharpens why this research still matters. Don't spend the round until
-that's known. See `docs/architecture/sort-filter-data-provenance.md` for how this fits the bigger
-picture.
+**Status**: 🟢 Ready to start — no longer gated on local-file investigation reporting back first.
+**Correction to an earlier version of this doc**: this was previously paused pending desktop
+local-file investigation, on the theory that desktop data-mining might make this research moot. That
+gate is dropped — local-file investigation (`docs/features/local-file-investigation.md`) remains the
+*best bet* for a real fix (see [Traffic Safety Review](../plans/traffic-safety-review.md)), but this
+research is cheap, independently valuable, and runs in parallel rather than waiting its turn. See
+`docs/architecture/sort-filter-data-provenance.md` for how this fits the bigger picture.
 
 > Self-contained brief for a fresh context — you should not need the conversation that produced
 > this. Read this whole file before starting; it hands over what's already known so you don't
@@ -37,6 +37,14 @@ with no redundancy and a real, currently-unsolved cold-start cost for any new ap
 
 ## Promising leads worth checking specifically (not yet verified — check these first)
 
+- **Whether Steam's own store pages embed community tags client-side — check this one specifically,
+  it hasn't been executed yet.** Steam's store page for a game visibly displays community tags (the
+  "Popular user-defined tags for this product" section) — the app clearly has this data somewhere.
+  The open question is whether it's server-rendered-only, or embedded in a hydration payload the same
+  way `OwnedGames` turned out to be embedded in the profile page's hydration blob
+  (`docs/research/steam-profile-ssr-hydration-research.md`). If tags are similarly embedded, that's a
+  genuinely new, free, first-party, CORS-reachable-from-the-store-origin source — check it before
+  assuming SteamSpy is the only place this data lives.
 - **SteamSpy's own bulk/"all apps" request types.** SteamSpy has historically offered request types
   beyond the single-appid `appdetails` lookup (e.g. paginated "all owned apps" style endpoints) —
   this project's current hydrator only uses the per-appid form. Check SteamSpy's own API
@@ -53,14 +61,8 @@ with no redundancy and a real, currently-unsolved cold-start cost for any new ap
   close enough to Steam's community tags to be useful, and what their actual rate limits are (may
   still beat 1 req/sec by a wide margin even without being "unlimited bulk").
 - **Steam's own `ISteamUserStats`/`IPlayerService` or other lesser-known official endpoints** —
-  double-check there isn't an official (if obscure) Steamworks endpoint that exposes tags Steam
-  shows on its own store pages (Steam *does* display community tags on store pages — the app
-  clearly has this data somewhere; the open question is whether any officially-sanctioned endpoint
-  surfaces it, versus it only being embedded in the rendered store page HTML/hydration data, which
-  would put it in the same category as the `OwnedGames` hydration-blob finding
-  `docs/research/steam-profile-ssr-hydration-research.md` already used for ownership data — if tags
-  are similarly embedded in a Steam store page's hydration payload, that could be a genuinely new,
-  free, first-party path worth its own follow-up).
+  double-check there isn't an official (if obscure) Steamworks endpoint that exposes the tags Steam
+  shows on its own store pages, as a documented API distinct from the store-page-hydration lead above.
 
 ## Suggested approach (only if using the multi-tier pattern — see note below)
 

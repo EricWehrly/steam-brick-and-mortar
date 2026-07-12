@@ -4,14 +4,28 @@
 **Status**: Paused (research complete for now; implementation deferred to AC4.4)
 **Priority**: Medium
 
-> **Ways of working note**: The VDF-first hypothesis is no longer current. Modern Steam collections are not stored in `localconfig.vdf` / `sharedconfig.vdf`; the viable source is the local Steam cloud sync file `cloud-storage-namespace-1.json`. We are pausing this feature and deferring any filesystem API implementation until AC4.4.
+> **Ways of working note**: The VDF-first hypothesis is no longer current. Modern Steam collections are not stored in `localconfig.vdf` / `sharedconfig.vdf`; the viable source is the local Steam cloud sync file `cloud-storage-namespace-1.json`.
 
-## Decision (Act 2 Tie-Off)
+## Resumption trigger (supersedes the Act 2 tie-off below)
+
+This feature was tied off for Act 2 with re-entry deferred to AC4.4 (decision below, kept for
+history). **That deferral is being revisited now**, on different grounds than originally scoped:
+local data mining is considered the **best bet** for solving the SteamSpy tag-latency problem (a
+several-hundred-game library takes minutes to tag via SteamSpy's ~1 req/sec API with no bulk mode —
+see [Traffic Safety Review](../plans/traffic-safety-review.md) and
+[Sort/Filter Data Provenance](../architecture/sort-filter-data-provenance.md)). If desktop local
+files can surface tag-equivalent data (or something usable for sort/filter that doesn't depend on
+SteamSpy's pacing), that's a materially better outcome than any of the online-source mitigations
+being pursued in parallel. This is a new, Act-2-relevant motivation distinct from the original
+user-categories driver below — both apply now. A follow-up session is picking this thread back up
+with that framing.
+
+## Decision (Act 2 Tie-Off) — original framing, see resumption trigger above
 
 - We are stopping local-files implementation work in Act 2.
 - The only high-value unique field confirmed is user collections/categories from `cloud-storage-namespace-1.json`.
 - Additional local signals (install presence, local playtime/last-played, limited cloud/controller state) are useful but do not justify introducing filesystem API complexity right now.
-- Re-entry target: AC4.4 (see `docs/acts/act4-encore-someday-maybe.md`).
+- Re-entry target: AC4.4 (see `docs/acts/act4-encore-someday-maybe.md`) — **superseded by the SteamSpy-latency resumption trigger above**; re-entry is happening sooner than AC4.4 for that reason specifically.
 - **On re-entry, also revisit**: `docs/architecture/sort-filter-data-provenance.md` (user categories
   are the only channel-exclusive sort/filter dimension identified so far — this feature is where
   more like it are likely to come from) and `docs/research/steamspy-bulk-alternatives-research-prompt.md`
@@ -22,7 +36,9 @@
 Investigate what can be read from Steam's local installation files on the user's machine — with user categories as the primary motivator, but a broader interest in what else is available there.
 
 Current priority framing:
-- Primary value: user collections/categories as additive metadata
+- Primary value: user collections/categories as additive metadata, **and** — newly elevated, per the
+  resumption trigger above — any local signal that approximates or substitutes for SteamSpy community
+  tags, since that would sidestep the SteamSpy latency problem for desktop entirely
 - Secondary value: local game-list signals (especially appids) and data health/quality
 - Nice-to-have value: other local metadata that may improve UX but is not required
 
