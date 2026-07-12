@@ -1,7 +1,7 @@
 # Manual Library Export — Feasibility Study
 
 **Act**: 2 (Ready for Friends — reduces reliance on hosted Lambda for library ingestion)
-**Status**: 🟢 **Proven and built.** Export bookmarklet implemented and live-tested against a real Steam account (2026-07-02) — see `client/public/bookmarklets/export-library.js`. Import (Half 2) not yet built.
+**Status**: ✅ **Both halves built.** Export bookmarklet implemented and live-tested against a real Steam account (2026-07-02) — see `client/public/bookmarklets/export-library.js`. Import (Half 2) landed 2026-07-11 via the [library source convergence](library-source-convergence-plan.md): imports render immediately with zero Lambda calls, gain entity enrichment (categories/genres) when the shared cache already has it, and survive a reload.
 **Primary question**: Can a user hand us their full Steam library *without us calling our Lambda* — ideally via a one-click bookmarklet that writes a JSON file we then import?
 
 ---
@@ -189,8 +189,8 @@ This is materially more defensible than server-side scraping, but not zero-risk 
 
 1. ✅ **Done (2026-07-02).** Live-verified against a real Steam account. `rgGames` and `?xml=1` are both dead; the working mechanism is the React Query hydration blob mining described above (862 games extracted correctly, including names with special characters).
 2. ✅ **Done.** `client/public/bookmarklets/export-library.js` — extraction logic tested live in-browser before being committed to the file; download-trigger mechanics (`Blob` + synthetic `<a download>`) are standard and not separately at risk. Cross-browser (Firefox) confirmation still open.
-3. Prototype import reusing the collections file-picker; map into `SteamUser` and feed `loadGamesForUser`'s downstream (`setUserData` → `loadGamesProgressively`).
-4. Confirm a full store renders with enrichment **disabled** (zero-Lambda path), then with it enabled (soft-dependency path).
+3. ✅ **Done (2026-07-11).** Import lands via `SteamIntegration.handleImportLibrary` → the unified `Library` shape, not the originally-sketched `SteamUser`/`loadGamesProgressively` path — see `library-source-convergence-plan.md` for why (ownership/entity split, Fork B2).
+4. ✅ **Done (2026-07-11), verified live in-browser.** A cold-cache import renders immediately with zero Lambda calls (ownership + captured name only); when `AppDetailsCache` already has an appid (baked bundle or a prior online session), the import also picks up categories/genres/canonical name for free, with no network call from the import itself.
 5. Decide distribution surface for the bookmarklet (first-run help panel) and write the drag-to-install instructions + screenshot.
 
 ---

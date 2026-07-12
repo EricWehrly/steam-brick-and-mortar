@@ -311,11 +311,13 @@ first.
 
 ---
 
-**Status**: ✅ Implemented (2026-07-11). Full suite green (1087 tests); verified live in-browser for
+**Status**: ✅ Implemented (2026-07-11). Full suite green (1098 tests); verified live in-browser for
 demo load, import → immediate render, and import → reload → name-survival. Bookmarklet steamid
-capture landed separately (`afde55cb`) ahead of this. Remaining non-blocking follow-ups: updating
-`cache-clear-domain-unification-plan.md` to consume this plan's taxonomy, and investigating what
-other fields the bookmarklet capture could recover (see spawned follow-up).
+capture (`afde55cb`) and remaining-field capture (`cb9f6dbd` - `rtime_last_played`,
+`playtime_disconnected`, plus wire-layer-only appid metadata, see
+[[library-game-appid-metadata-duplication]]) both landed as follow-ups. Remaining non-blocking
+follow-up: updating `cache-clear-domain-unification-plan.md` to consume this plan's taxonomy
+(partially done - see that plan's own status).
 **Priority**: Medium-High (it's the seam the manual-import feature is currently wedged into)
 
 ---
