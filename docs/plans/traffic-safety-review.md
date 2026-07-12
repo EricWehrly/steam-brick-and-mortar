@@ -34,7 +34,7 @@ Three sources, in rough order of how much we've addressed them:
 |---|---|---|
 | Ownership list | **Manual export** (web bookmarklet) / **injected-webview capture** (desktop) — the user's own browser reads their own library; our infra never asks Steam | **Zero** for imported libraries. Online profile path still costs one Steam call per load |
 | Enrichment | **Bake the whole S3 cache into the release** (`aws s3 sync`, see [Release Pipeline](release-pipeline-plan.md)). A shipped instance already holds everything the Lambda has ever cached | Only genuine **cache-misses** (appids never seen before) reach Steam. On **desktop**, even those can go via Rust (CORS-free direct fetch) without the Lambda. Note: Steam's `appdetails` endpoint has no batch/array mode (confirmed in `steam-api.js`) — cache hit rate is the only lever on miss volume, not request batching. See [Network Rate Limiting](../features/network-rate-limiting.md) for the full finding |
-| Artwork (CDN) | **Researched (2026-07-09).** [Texture Cache Refactor](../archive/texture-cache-refactor-plan-COMPLETED.md) (Plan 1, fixes double-fetch + adds MID caching) is done. [F2P Artwork Bake](f2p-artwork-bake-plan.md) (Plan 2) is the active thread — see below for why the connected-library "rest" case doesn't get the same treatment | F2P set: will be zero once Plan 2 is built. Connected libraries: unchanged for now — see verdict below |
+| Artwork (CDN) | **Researched (2026-07-09), both plans built.** [Texture Cache Refactor](../archive/texture-cache-refactor-plan-COMPLETED.md) (Plan 1, fixes double-fetch + adds MID caching) is done. [F2P Artwork Bake](f2p-artwork-bake-plan.md) (Plan 2) is done — see below for why the connected-library "rest" case doesn't get the same treatment | F2P set: **zero**, built 2026-07-11. Connected libraries: unchanged — see verdict below |
 
 ## The baked cache changes the enrichment picture a lot
 
@@ -46,9 +46,9 @@ costs us one `aws s3 sync` and a small client-seeding change.
 
 ## Verdict by run mode (framed as Steam traffic)
 
-- **Web, anonymous store**: can hit Steam **zero times** once [F2P Artwork Bake](f2p-artwork-bake-plan.md)
-  is built — static fixture + baked enrichment + baked artwork. The cleanest win, and the only run mode
-  where artwork can realistically reach zero, since the F2P set is small and shared across every visitor.
+- **Web, anonymous store**: hits Steam **zero times**, as of [F2P Artwork Bake](f2p-artwork-bake-plan.md)
+  (built 2026-07-11) — static fixture + baked enrichment + baked artwork. The cleanest win, and the only
+  run mode where artwork can realistically reach zero, since the F2P set is small and shared across every visitor.
 - **Web, connected via import**: **zero** ownership traffic; enrichment traffic only on cache-miss
   appids; artwork still pulls from the CDN — **and stays that way**, deliberately (see below).
 - **Web, connected via online profile**: one ownership call + miss-only enrichment. Still far lighter
@@ -57,7 +57,7 @@ costs us one `aws s3 sync` and a small client-seeding change.
   both without our backend. Artwork is unaffected by the desktop vehicle either way (still a direct CDN
   pull, same as web); Pillar-2 native routes for ownership/enrichment are **not built yet**.
 
-## Next front: the CDN images — researched, Plan 1 done, Plan 2 (F2P bake) active
+## Next front: the CDN images — researched, both plans built
 
 Findings from a live pass against Steam's CDN (2026-07-09):
 
@@ -78,7 +78,7 @@ Findings from a live pass against Steam's CDN (2026-07-09):
 - **Blanket-baking artwork the way we baked appdetails doesn't transfer**: appdetails had a natural
   shared universal set (the S3 cache, accumulated across every user ever). Artwork doesn't — a real
   library is *personal* and potentially hundreds of MB. The **F2P/anonymous-store set is the one
-  exception** (not per-user, ~1 MB total) — **Plan 2**, [F2P Artwork Bake](f2p-artwork-bake-plan.md).
+  exception** (not per-user, ~1 MB total) — **Plan 2**, [F2P Artwork Bake](f2p-artwork-bake-plan.md), done.
 - **Deliberately not solved**: baking the F2P set sidesteps Steam-CDN traffic for those 18 games
   specifically, but a public launch could still cause a correlated burst of requests for popular
   overlapping titles across many *connected* users' libraries. Steam's CDN is Akamai-backed and built
@@ -103,7 +103,7 @@ Both are prepped as self-contained briefs for a fresh (cheaper-model) context:
 ## Related
 - [Release Pipeline](release-pipeline-plan.md) — the `aws s3 sync` bake that pre-loads enrichment
 - [Texture Cache Refactor Plan](../archive/texture-cache-refactor-plan-COMPLETED.md) — CDN-artwork Plan 1, done (fixed the double-fetch/no-MID-cache bug)
-- [F2P Artwork Bake](f2p-artwork-bake-plan.md) — CDN-artwork Plan 2, active (bake the anonymous store's artwork)
+- [F2P Artwork Bake](f2p-artwork-bake-plan.md) — CDN-artwork Plan 2, done (bake the anonymous store's artwork)
 - [Image/Texture Pipeline](../architecture/image-texture-pipeline.md) — current artwork cache architecture
 - [Manual Library Export](../archive/manual-library-export-feasibility.md) — the ownership-traffic replacement
 - [Desktop App](../features/desktop-app.md) — the native routes that get desktop to near-zero

@@ -6,8 +6,9 @@
 2026-07-11) — there's one clean, cache-first pixel storage layer to seed now, no double-fetch to worry
 about feeding.
 
-**Act**: 2 · **Status**: 🟡 Plan — seed file created (`scripts/f2p-appid-seed.json`), scripts and client
-wiring not yet implemented. Now the active thread.
+**Act**: 2 · **Status**: 🟢 Built (2026-07-11) — bake script, release.sh wiring, and client-side
+consumption (both MID and HIGH tiers) are all in place and verified live. The `repack-steam-cache.sh`
+seed-file switch noted below is the one item still open.
 
 ## Goal (one line)
 
@@ -54,11 +55,11 @@ curation criteria, whatever), editing this one file is the whole change — both
 the artwork bake pick it up on the next release run. Today's list is a placeholder in the sense that
 it hasn't had a dedicated curation pass yet, not in the sense that the mechanism is temporary.
 
-**Implementation follow-up, not done yet**: `scripts/repack-steam-cache.sh`'s F2P tier currently filters
-by `is_free == true` on the merged cache rather than reading this seed file. Switching it to read
+**Still open**: `scripts/repack-steam-cache.sh`'s F2P tier still filters by `is_free == true` on the
+merged cache rather than reading this seed file — `scripts/bake-f2p-artwork.sh` (the new artwork bake)
+reads the seed file, but the appdetails repack wasn't touched. Switching it to read
 `f2p-appid-seed.json` (via `jq --slurpfile seed`, selecting only those appids from the merged object)
-is a small, contained change to an already-working script — worth doing as part of implementing this
-plan, not before, so the two changes get tested together.
+is a small, contained follow-up, not done in this pass.
 
 **Not addressed here**: keeping `demo-games.ts` and the seed file in sync is manual for now.
 `demo-games.ts` carries presentation metadata (fake playtime, hand-picked genre labels for the UI) the
@@ -88,31 +89,39 @@ genuinely usable for regenerating this seed later:
   not a plain `curl`. Both are open questions to resolve **when** this seed is actually regenerated —
   not blocking today, since today's seed is still the hand-curated `demo-games.ts` list.
 
-## The bake script (sketch, not yet built)
+## The bake script (built)
 
-```bash
-# scripts/bake-f2p-artwork.sh <seed-file> <out-dir>
-for appid in $(jq -r '.appids[]' "$SEED_FILE"); do
-  curl -sf "https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg" \
-    -o "$OUT_DIR/${appid}.jpg"
-done
-```
+`scripts/bake-f2p-artwork.sh <seed-file> <out-dir>` downloads `library_600x900.jpg` for each seeded
+appid into `client/public/artwork-cache/{appid}.jpg` (gitignored like `steam-cache/`), and writes
+`manifest.json` listing only the appids that actually succeeded — skip-and-warn on individual failures,
+per the lean noted in the open questions below (resolved: skip-and-warn, not fatal). Wired into
+`release.sh` as a new `bake_f2p_artwork` step alongside the appdetails repack. Verified: 18/18 baked
+successfully in a real run.
 
-Simpler than `repack-steam-cache.sh` — no gzip/merge/precedence logic, just N downloads. Output lands
-in `client/public/artwork-cache/{appid}.jpg` (new directory, gitignored like `steam-cache/`), wired
-into `release.sh` as a new step alongside the existing S3 cache repack.
+One environment-specific fix worth flagging for anyone touching this script: `jq -r '.appids[]'` emits
+CRLF line endings in this dev environment, and word-splitting a `\r`-suffixed number in a bash `for`
+loop silently breaks every appid except the last (each URL 404s with an invisible trailing `\r`). Fixed
+by piping through `tr -d '\r'`.
 
-## Client-side consumption (sketch)
+## Client-side consumption (built)
 
-Now that Plan 1 has landed, the cache layer to feed is clear: `PixelDataCache`, keyed
-`${url}@${width}x${height}` (see [Image/Texture Pipeline](../architecture/image-texture-pipeline.md)).
-The texture pipeline doesn't care where its URL points — `GameArtworkProvider.fetchPixels()` fetches,
-decodes, and caches whatever URL it's given via `TextureWorker`. So the integration point is narrow:
-before `GameArtworkProvider.buildUrlStrategy()` hands back its CDN URL candidates, check whether
-`/artwork-cache/{appid}.jpg` exists locally; if so, prepend it to the candidate list so it's tried
-first. Nothing downstream needs to change. Exact seeding/check mechanism (a manifest file listing baked
-appids, vs. a plain fetch-and-fall-through like `BakedCacheLoader` does for appdetails) is a detail to
-settle during implementation.
+The cache layer fed is `PixelDataCache`, keyed `${url}@${width}x${height}` (see
+[Image/Texture Pipeline](../architecture/image-texture-pipeline.md)). Resolved: **manifest**, not
+fetch-and-fall-through — necessary because the two LOD tiers consume artwork URLs differently:
+
+- **MID** goes through `GameArtworkProvider.buildUrlStrategy()`, which already tries an ordered
+  candidate list until one succeeds. The baked local URL is prepended as the first candidate (only for
+  `format === 'library'`, since that's the only shape baked) — a 404 there just falls through to the
+  normal CDN chain exactly like any other candidate failure already does.
+- **HIGH** doesn't go through that chain at all — `LodArtworkOrchestrator.resolveHighArtworkUrl()`
+  resolves a single URL up front and `HighTextureCache` fetches it directly with no fallback. A
+  fetch-and-fall-through check wouldn't have worked here, so `resolveHighArtworkUrl()` checks the same
+  baked-artwork manifest first, ahead of the existing hint/CDN-construction logic.
+
+`GameArtworkProvider` loads `/artwork-cache/manifest.json` once, fire-and-forget, in its constructor
+(same spirit as `initPixelCache()`) and exposes `getBakedArtworkUrl(appId): string | null`. A request
+that lands before the manifest resolves just treats every appid as not-baked and falls through to CDN —
+a transient, self-correcting miss, not a bug.
 
 ## Deferred, explicitly not solved here: launch-day traffic burst
 
@@ -152,9 +161,11 @@ scheduled yet.
 
 ## Open questions
 
-- Exact client-side check mechanism (manifest vs. fetch-and-fall-through) — to settle during implementation.
-- Should `release.sh` treat this as a fatal error if a bake download fails (18 games, cheap to retry) or
-  skip-and-warn like the appdetails cache misses do? Leans skip-and-warn for consistency, not decided.
+- ~~Exact client-side check mechanism~~ — **resolved: manifest.** See "Client-side consumption" above.
+- ~~Fatal vs. skip-and-warn on bake failure~~ — **resolved: skip-and-warn.** A failed appid is simply
+  absent from `manifest.json`; the rest of the run continues.
+- `scripts/repack-steam-cache.sh` still uses `is_free == true` instead of reading the seed file — see
+  "Still open" note above. Small, contained, not done in this pass.
 - Whether to keep `demo-games.ts` and the seed file in manual sync indefinitely or eventually generate one from the other.
 - Gamalytic's Terms of Service and bulk-access mechanism — unread/unconfirmed, needed before regenerating any seed from it (F2P refinement or top-N).
 
