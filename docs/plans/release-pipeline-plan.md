@@ -2,7 +2,7 @@
 
 **Parent features**: [Static Hosting](../features/static-hosting.md) · [Native Desktop App](../features/desktop-app.md)
 **Act**: 2
-**Status**: 🟢 Steps 1-2 implemented and run end-to-end. `scripts/release.sh` (`fetch_s3_cache` → `scripts/repack-steam-cache.sh`) pulls 2790 raw S3 objects (9,006 KiB, independently gzipped) and repacks them into two client-ready bundles: `app-details-f2p.json.gz` (93 games, 207.5 KiB) and `app-details-rest.json.gz` (1268 games, 3.1 MiB) — combined ~3.3 MiB from ~9.0 MiB raw, via single-corpus compression + tier dedup. Client-side consumption (`BakedCacheLoader`) implemented and wired into `SteamApiClient`. Steps 3-5 (build/pack) still stubbed.
+**Status**: 🟢 Steps 1-2 and 2.5 implemented and run end-to-end. `scripts/release.sh` (`fetch_s3_cache` → `scripts/repack-steam-cache.sh`) pulls 2790 raw S3 objects (9,006 KiB, independently gzipped) and repacks them into two client-ready bundles: `app-details-f2p.json.gz` (93 games, 207.5 KiB) and `app-details-rest.json.gz` (1268 games, 3.1 MiB) — combined ~3.3 MiB from ~9.0 MiB raw, via single-corpus compression + tier dedup. Client-side consumption (`BakedCacheLoader`) implemented and wired into `SteamApiClient`. Step 2.5 (`bake_f2p_artwork` → `scripts/bake-f2p-artwork.sh`) bakes F2P artwork the same way — see [F2P Artwork Bake](f2p-artwork-bake-plan.md). Steps 3-5 (build/pack) still stubbed.
 
 ## Why this exists (the actual goal)
 
@@ -28,7 +28,7 @@ The rest of this doc is about **release**. Deploy/publish lives in
 
 ## `release.sh`
 
-Implemented at `scripts/release.sh` (Steps 1-2 are real; Steps 3-5 are stubbed, matching the shape below):
+Implemented at `scripts/release.sh` (Steps 1-2 and 2.5 are real; Steps 3-5 are stubbed, matching the shape below):
 
 ```bash
 #!/usr/bin/env bash
@@ -46,6 +46,11 @@ aws s3 sync s3://steam-brick-and-mortar-dev-game-cache/ .release-cache/raw/ \
 #    rationale below. Plain bash + jq + gzip, not a new language — see "Why bash, not
 #    Node/TS" below.
 scripts/repack-steam-cache.sh .release-cache/raw client/public/steam-cache
+
+# 2.5. Bake the F2P/anonymous-store artwork set (library_600x900.jpg per seeded appid) so it
+#      ships with the release and never touches Steam's CDN for those games. See
+#      docs/plans/f2p-artwork-bake-plan.md.
+scripts/bake-f2p-artwork.sh scripts/f2p-appid-seed.json client/public/artwork-cache
 
 # 3. Build the web client — dist/ does NOT embed the cache (it's a public/ asset, fetched
 #    async at runtime, not part of the JS bundle).
