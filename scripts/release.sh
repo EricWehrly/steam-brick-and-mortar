@@ -17,6 +17,8 @@ CACHE_BUCKET="steam-brick-and-mortar-dev-game-cache"
 CACHE_REGION="us-east-1"
 RAW_CACHE_DIR="$REPO_ROOT/.release-cache/raw"
 BAKED_CACHE_DIR="$REPO_ROOT/client/public/steam-cache"
+F2P_SEED_FILE="$REPO_ROOT/scripts/f2p-appid-seed.json"
+F2P_ARTWORK_DIR="$REPO_ROOT/client/public/artwork-cache"
 
 # ---------------------------------------------------------------------------
 # Step 1: Pull the whole app-details cache the Lambda has already built in S3.
@@ -67,6 +69,17 @@ repack_cache() {
 }
 
 # ---------------------------------------------------------------------------
+# Step 2.5: Bake the F2P/anonymous-store artwork set into the release so it
+# never touches Steam's CDN for those games - see scripts/bake-f2p-artwork.sh
+# and docs/plans/f2p-artwork-bake-plan.md.
+# ---------------------------------------------------------------------------
+bake_f2p_artwork() {
+    log_step "Baking F2P artwork set"
+
+    "$REPO_ROOT/scripts/bake-f2p-artwork.sh" "$F2P_SEED_FILE" "$F2P_ARTWORK_DIR"
+}
+
+# ---------------------------------------------------------------------------
 # Later steps - not yet implemented. See docs/plans/release-pipeline-plan.md.
 # ---------------------------------------------------------------------------
 build_web() {
@@ -84,6 +97,7 @@ pack_release() {
 main() {
     fetch_s3_cache
     repack_cache
+    bake_f2p_artwork
     # build_web
     # build_desktop
     # pack_release
