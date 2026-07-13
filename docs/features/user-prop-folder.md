@@ -53,11 +53,14 @@ of the base implementation below.
   animation import (its own `wiki/MDL_IMPORT.md` states "Load animations: Unimplemented!",
   and the vendored copy's `TODO.md` still lists "Source1 animations support" unchecked as of
   the latest release, 5.5.3). This is a feature gap in that upstream dependency, not something
-  we're building ourselves — models display in a static rest pose. Manual one-time posing
-  (hand-setting a few key bone rotations) is a cheap alternative worth trying since we do have
-  real bone hierarchies; true ragdoll physics or generic bipedal animation retargeting are not,
-  since Portal 2's co-op bots (Atlas/P-Body) use custom mechanical piston-leg rigs, not a
-  standard humanoid skeleton.
+  we're building ourselves — models display in a static rest pose. **Manual one-time posing is
+  built** (2026-07-12): `UserPropPlacer` applies per-model, per-bone rotation deltas from
+  `client/src/scene/props/model-poses.json` (Atlas and P-Body both seated). See
+  `desktop/source-extract/scripts/README.md`'s "Posing a character model" section for the
+  process (find bones via `inspect_skeleton.py`, tune live via `posePropBone()` in the browser
+  console, bake confirmed values into `model-poses.json`) — true ragdoll physics or generic
+  bipedal animation retargeting remain out of scope, since Portal 2's co-op bots use custom
+  mechanical piston-leg rigs, not a standard humanoid skeleton.
 
 ## Acceptance criteria
 
@@ -75,7 +78,9 @@ of the base implementation below.
 - [Scene Clutter & Props](scene-clutter-and-props.md) — parent research; placement system
 - [Native Desktop App](desktop-app.md) — Firefox parity + zero-friction Steam path discovery
 - [Local File Investigation](local-file-investigation.md) — shares Program Files blocklist risk
+- [Source Game Discovery](../plans/source-game-discovery-plan.md) — finding games/models on a different machine than the primary dev box
 - `desktop/source-extract/scripts/convert_mdl.py` — the extraction pipeline that produces the GLBs this feature loads
+- `client/src/scene/props/model-poses.json` — hand-tuned bone poses for character models (Atlas, P-Body)
 
 ---
 *— A1 / O2*
