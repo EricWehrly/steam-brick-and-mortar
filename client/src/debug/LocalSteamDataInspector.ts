@@ -16,6 +16,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
 import { Logger } from '../utils/Logger'
+import { LocalSteamDataWriter } from '../steam/LocalSteamDataWriter'
 
 interface SteamIdentity {
     steamid64: string
@@ -36,6 +37,16 @@ interface UserCollection {
     appids: number[]
 }
 
+interface LocalAppMetadata {
+    appid: number
+    name: string | null
+    developers: string[]
+    publishers: string[]
+    tags: string[]
+}
+
+const TAG_METADATA_PREVIEW_COUNT = 5
+
 const logger = Logger.createLogFunctions('LocalSteamDataInspector')
 
 export async function dumpLocalSteamData(): Promise<void> {
@@ -51,8 +62,9 @@ export async function dumpLocalSteamData(): Promise<void> {
         logger.warn('🗂️ [LocalSteamDataInspector] Failed to read identity:', error)
     }
 
+    let playtimes: AppPlaytime[] = []
     try {
-        const playtimes = await invoke<AppPlaytime[]>('read_steam_playtimes')
+        playtimes = await invoke<AppPlaytime[]>('read_steam_playtimes')
         logger.info(`🗂️ [LocalSteamDataInspector] Playtime: ${playtimes.length} apps`, playtimes)
     } catch (error) {
         logger.warn('🗂️ [LocalSteamDataInspector] Failed to read playtimes:', error)
@@ -66,6 +78,26 @@ export async function dumpLocalSteamData(): Promise<void> {
         }
     } catch (error) {
         logger.warn('🗂️ [LocalSteamDataInspector] Failed to read collections:', error)
+    }
+
+    if (playtimes.length > 0) {
+        try {
+            const previewAppids = playtimes.slice(0, TAG_METADATA_PREVIEW_COUNT).map(p => p.appid)
+            const metadata = await invoke<LocalAppMetadata[]>('read_local_app_metadata', { appids: previewAppids })
+            logger.info(`🗂️ [LocalSteamDataInspector] Tag/developer/publisher preview (${metadata.length} apps):`)
+            for (const item of metadata) {
+                logger.info(`  - appid ${item.appid}: "${item.name ?? '(no local name)'}" — ${item.developers.join(', ') || 'unknown developer'} — tags: ${item.tags.join(', ') || 'none'}`)
+            }
+        } catch (error) {
+            logger.warn('🗂️ [LocalSteamDataInspector] Failed to read local app metadata:', error)
+        }
+    }
+
+    try {
+        const written = await LocalSteamDataWriter.writeLocalAppMetadata()
+        logger.info(`🗂️ [LocalSteamDataInspector] Wrote ${written} entries into AppDetailsCache`)
+    } catch (error) {
+        logger.warn('🗂️ [LocalSteamDataInspector] Failed to write local app metadata into AppDetailsCache:', error)
     }
 }
 

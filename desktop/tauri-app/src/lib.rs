@@ -7,7 +7,7 @@ pub fn run() {
             steam::identity::read_steam_identity,
             steam::playtime::read_steam_playtimes,
             steam::collections::read_steam_collections,
-            steam::appinfo::read_steam_tags,
+            steam::appinfo::read_local_app_metadata,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
