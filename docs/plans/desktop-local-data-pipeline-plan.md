@@ -17,9 +17,15 @@ demo store entirely.
 
 ## Prerequisite check (before this plan's work starts)
 
-Two things needed verifying before depending on anything below.
-
 ### 1. Is the baked appdetails cache + F2P artwork bundle actually reaching the desktop build?
+
+**De-scoped, not blocking.** Local file mining (identity, playtime, collections — see below)
+turns out to cover what this plan actually needs without depending on the baked bundle at all.
+Leaving the investigation notes below for reference, but this is no longer gating anything in
+this plan — if the bake pipeline gets wired up later that's a bonus, not a dependency.
+
+<details>
+<summary>Original investigation (kept for reference, not acted on)</summary>
 
 **Checked. Architecturally sound, but never exercised end-to-end — treat as unverified, not broken.**
 
@@ -41,12 +47,12 @@ Two things needed verifying before depending on anything below.
   sequence a developer has to remember. There is also no CI workflow (`.github/workflows/` doesn't
   exist) that would catch a missed bake step.
 
-**Action before this plan depends on baked data being present in a desktop build**: run the manual
-sequence once (`release.sh`'s bake steps → `cd client && yarn build` → `cd desktop/tauri-app &&
-cargo tauri build`) and confirm `/steam-cache/app-details.json.gz` and `/artwork-cache/manifest.json`
-actually load in the built app — a 15-minute smoke test, not a code change. Track the real fix
-(wiring `build_web`/`build_desktop` into `release.sh`) as a small follow-up task in this plan's
-task list below; it's not this plan's core scope but it's now a known gap this plan's work depends on.
+**Action, if this ever becomes relevant again**: run the manual sequence once (`release.sh`'s bake
+steps → `cd client && yarn build` → `cd desktop/tauri-app && cargo tauri build`) and confirm
+`/steam-cache/app-details.json.gz` and `/artwork-cache/manifest.json` actually load in the built
+app. Not tracked as a task in this plan.
+
+</details>
 
 ### 2. Any other blockers?
 
@@ -123,22 +129,33 @@ and cached before that flow completes.
 
 ## Task breakdown
 
-Rust-side (new — `desktop/tauri-app/`):
-1. Text-KeyValues (VDF) reader: `loginusers.vdf`, `localconfig.vdf`, `libraryfolders.vdf`,
-   `appmanifest_*.acf`, `localization.vdf`. Trivial grammar, hand-roll or pull a small MIT crate
-   (`keyvalues-parser` or similar) — evaluate both, don't over-invest in the decision.
+Rust-side (new — `desktop/tauri-app/src/steam/`):
+1. ✅ **Done.** Text-KeyValues (VDF) reader (`keyvalues.rs`) — hand-rolled, ~200 lines, fixture-tested.
 2. Binary-KeyValues (`appinfo.vdf`) reader, string-table variant (magic `0x07564429`). Port of the
    byte-exact-validated research decoder described in the findings doc §6 — the format risk is
-   retired, this is a translation task.
-3. Local-scan orchestrator (Tauri command): runs the above against the detected Steam root +
-   userdata folder, returns identity, candidate appid set with playtime/last-played, user
-   collections, and per-appid `store_tags`/genre/category raw data.
-4. Steam-root/userdata discovery — reuse/extend the path-detection logic already prototyped in
-   `docs/research/local-steam/scan-local-steam-coverage.sh` (bash research script) as the spec for
-   what the Rust version needs to handle (Windows-only for v1 is fine — `desktop-app.md`'s current
-   scope is Windows/WebView2 first).
+   retired, this is a translation task. **Not started** — next up.
+3. ✅ **Done, partial.** Tauri commands for identity (`identity.rs`), playtime
+   (`playtime.rs`), and user collections (`collections.rs`) — each reads real files, each has a
+   real-machine `#[ignore]`d test verified against this dev machine's actual Steam install (see
+   commit `c86d5951`). Tag/genre/category data from `appinfo.vdf` still pending task 2.
+4. ✅ **Done, more thoroughly than originally scoped.** Steam-root/userdata discovery
+   (`paths.rs`) is a 4-strategy chain, not a single hardcoded path: Windows registry
+   (`HKCU\Software\Valve\Steam\SteamPath`, then `HKLM\...\InstallPath`) → per-OS default paths
+   (Windows exercised for real; macOS/Linux entries present but untestable on this machine) →
+   drive-letter scan (all-letter, not just `C:`) → Start Menu `.lnk` shortcut parsing
+   (`parselnk` crate, working-directory field). Verified on this machine, both called directly
+   (not just riding along behind the registry strategy in `find_steam_root`'s normal order):
+   registry lookup agrees with the overall chain
+   (`registry_lookup_matches_overall_discovery_on_this_machine`), and the Start Menu shortcut
+   trace independently resolves to the same install too
+   (`start_menu_shortcut_matches_overall_discovery_on_this_machine` — compares via
+   `canonicalize()` since the `.lnk`'s stored path came back lowercased,
+   `c:\program files (x86)\steam`, a harmless Windows case difference, not a wrong path).
+   **Still not exercised**: macOS/Linux default paths (no test machine) and the drive-letter
+   scan fallback (no non-`C:` install available to test against) — worth knowing those two
+   remain unverified rather than assuming the whole chain is proven end-to-end.
 
-Client-side (`client/src/`):
+Client-side (`client/src/`) — **not started**:
 5. Normalization: `store_tags` (+ `localization.vdf` names) → `steamspy_tags`-shaped
    `Record<string, number>`; local playtime/last-played/collections → `SteamGame` fields.
 6. New writer path into `AppDetailsCache` (alongside the existing Lambda-fetch writer) — same
@@ -148,12 +165,22 @@ Client-side (`client/src/`):
 8. First-run vs. subsequent-run branch: skip the demo-store phase when a prior local-scan result
    already exists in cache.
 
-Housekeeping:
-9. Wire `build_web()`/`build_desktop()` in `scripts/release.sh` (currently stubbed,
-   `scripts/release.sh:88-93`) so bake → build → package is one sequence instead of a
-   developer-remembered manual order — closes the prerequisite gap above for good, not just for
-   this smoke test.
+Verification aid (landed ahead of schedule): a `client/src/debug/LocalSteamDataInspector.ts`
+console-log tool (mirrors the existing `GameFinder.ts`/`GameArtworkInspector.ts` self-executing
+debug-tool convention) that calls the three Rust commands and prints results — lets the identity/
+playtime/collections data be manually inspected in a running desktop build before tasks 5-8 wire
+it into the real pipeline.
+
+Housekeeping / deferred:
+9. Wire `build_web()`/`build_desktop()` in `scripts/release.sh` — **de-scoped**, see prerequisite
+   check §1 above. Revisit only if the baked-cache path becomes relevant again.
 10. Source a static genre/category id→name table (low priority, redundant data — see above).
+11. **Act 3, pre-ship**: a manual "browse or paste your Steam install folder" fallback UI for
+    when all four `find_steam_root` strategies above come up empty (non-standard install, Steam
+    on a network drive, a future OS-version registry change, etc.). Not needed for this plan's
+    development/testing phase — every strategy or the dev machine's own install covers that — but
+    ship-blocking for real users whose machine doesn't match any of the four strategies. Track in
+    the relevant Act 3 doc when this plan reaches implementation of tasks 5-8.
 
 ## Explicitly out of scope for this plan
 
