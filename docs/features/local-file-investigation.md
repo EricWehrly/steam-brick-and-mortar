@@ -83,6 +83,32 @@ This is a non-tentpole feature for Act 2: we want to make a real attempt at it, 
 
 ## Notes / Open Questions
 
+### Desktop-App Follow-Up Probe (Named Data, Same Machine)
+
+- Re-walks the same install from the desktop app's angle (unrestricted Tauri filesystem access,
+  not the browser File System Access API's `Program Files` block). Confirms user categories
+  with real named data ("Ze Done", "Meh"), confirms identity + local playtime/last-played,
+  and surfaces an achievement cache (`appcache/librarycache/<appid>.json`) not previously
+  catalogued.
+- **Headline result**: `appcache/appinfo.vdf` (`common.store_tags`, top ~20 ranked tag IDs per
+  app) cross-referenced against `appcache/localization.vdf` (a 9.5 KB plain-text tag-name
+  table, all ~590 Steam tags) is **Valve's own first-party community-tag system, offline, zero
+  rate limit** — the same tag vocabulary SteamSpy scrapes, verified byte-exact and
+  name-correct on 4 sample appids. This is the strongest candidate yet for the "local mining
+  might sidestep SteamSpy entirely" resumption trigger at the top of this doc. `genres`/
+  `category`/`developer`/`publisher` are also present in the same file but are redundant with
+  `appdetails` (already solved elsewhere) — only the tag data is genuinely new leverage.
+- Also corrects an assumption: **no VDF/KeyValues parser exists yet in this codebase** — the
+  props-work "VDF tools" (`desktop/source-extract/scripts/vpk.py`) parse VPK (Source engine
+  asset archives), an unrelated format. A dependency-free (Rust) reader still needs to be
+  written; the binary appinfo format is now de-risked via a byte-exact research decode.
+- Also (re-)confirms the "showcases" naming collision: the `showcases.*` keys in
+  `cloud-storage-namespace-1.json` are Steam client Library-panel UI state, not the public
+  profile showcase widget the user's own profile displays — that one was not found locally.
+- Full writeup: `docs/research/local-steam/desktop-offline-data-mining-findings.md`.
+- Implementation plan for wiring this into the Tauri app's startup flow:
+  `docs/plans/desktop-local-data-pipeline-plan.md`.
+
 ### Latest Single-Machine Probe (Anonymized)
 
 - Coverage and bucket findings are documented in `docs/research/local-steam/local-steam-buckets-findings.md`.

@@ -99,6 +99,29 @@ field elsewhere in this table). This directly addresses the SteamSpy latency pro
 (`docs/plans/traffic-safety-review.md` / `docs/plans/rust-cors-bypass-spike.md`) — the feature doesn't
 have to wait for a multi-minute serial fetch to finish, just for it to get "far enough."
 
+## Update: a verified offline lead on the community-tag gap
+
+A desktop-focused local-file probe (`docs/research/local-steam/desktop-offline-data-mining-findings.md`
+§6) parsed `appcache/appinfo.vdf` (Steam client's binary-KeyValues app-info cache) byte-exact
+against 4 known appids and found:
+
+- `genres`/`category_N`/`developer`/`publisher`/`review_score` — present, but **redundant**
+  with what `appdetails` already gives us (this row is already "Redundant, low-risk,
+  effectively solved" above). Value is zero-fetch pre-warm on desktop, not new data. Not a
+  table change.
+- **`common.store_tags`** (top ~20 tag IDs, rank-ordered) **cross-referenced against
+  `appcache/localization.vdf`** (a 9.5 KB plain-text file holding Steam's entire ~590-tag
+  vocabulary, id→name) — this **is the same first-party Valve tag system SteamSpy itself draws
+  from**, available with zero network calls and no rate limit. Verified correct on all 4 sample
+  apps. This is the strongest candidate found so far for reducing or removing desktop's
+  SteamSpy dependency for the community-tag row below — not yet a table change, because
+  coverage/freshness across a full library (vs. 4 well-known titles) and the
+  rank-only-vs-vote-weighted shape mismatch are both still unverified at scale.
+
+Implementation is now planned: [`docs/plans/desktop-local-data-pipeline-plan.md`](../plans/desktop-local-data-pipeline-plan.md).
+Once that lands and coverage is measured against a real library, the community-tag row below
+should gain a second, desktop-only, zero-latency source alongside the SteamSpy/hydrator path.
+
 ## Related
 - `docs/research/steam-store-appdetails-cors-research.md` — confirms genres/categories have
   alternate paths; tags do not
