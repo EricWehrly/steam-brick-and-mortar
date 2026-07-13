@@ -66,7 +66,12 @@ export class SteamApiClient {
     private appDetailsCache: AppDetailsCache
     private bakedCacheLoader: BakedCacheLoader
     private gamesLoader: GamesLoader
+    // TODO: revisit whether getDemoGames() still needs to await this, or whether the demo list
+    // can be built downstream of app-details-cache readiness instead of blocking on it up front.
     private readonly appDetailsCacheReady: Promise<void>
+    // TODO: revisit whether getDemoGames() still needs to await this, or whether the demo store
+    // can rely on RenderIntentCoordinator's existing settle-on-artwork gating instead of blocking
+    // on the pack seed up front. Deliberately left as an upfront await for now (see docblock below).
     private readonly artworkPackReady: Promise<void>
 
     private constructor() {
