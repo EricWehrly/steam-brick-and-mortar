@@ -10,7 +10,6 @@
     "build:bookmarklets": "node scripts/build-bookmarklets.mjs",
     "release": "bash ../scripts/release.sh",
     "preview": "vite preview",
-
     "test": "vitest run --config test/vitest.config.ts",
     "test:watch": "vitest --reporter=verbose --config test/vitest.config.ts",
     "test:ui": "vitest --ui --config test/vitest.config.ts",
@@ -20,7 +19,6 @@
     "test:all": "vitest run --config test/vitest.all.config.ts",
     "test:visual": "playwright test --config playwright.config.ts",
     "test:visual:docker": "docker compose -f ../docker-compose.yml run --rm playwright",
-
     "clean": "rm -rf dist node_modules .vite",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
@@ -44,6 +42,7 @@
     "vitest": "^4.1.2"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2",
     "n8ao": "^1.10.2",
     "postprocessing": "^6.39.1",
     "three": "^0.183.2"
