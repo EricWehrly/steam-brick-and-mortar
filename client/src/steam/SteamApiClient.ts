@@ -7,6 +7,7 @@ import { AppDetailsCache } from './cache/AppDetailsCache'
 import { BakedCacheLoader } from './cache/BakedCacheLoader'
 import type { SteamGameMetadata } from './types/SteamMetadata'
 import { GamesLoader } from './GamesLoader'
+import { ArtworkPackSeeder } from '../scene/game-box/instancing/ArtworkPackSeeder'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes } from '../types/InteractionEvents'
 import type { SteamCacheClearEvent } from '../types/InteractionEvents'
@@ -66,6 +67,7 @@ export class SteamApiClient {
     private bakedCacheLoader: BakedCacheLoader
     private gamesLoader: GamesLoader
     private readonly appDetailsCacheReady: Promise<void>
+    private readonly artworkPackReady: Promise<void>
 
     private constructor() {
         const apiBaseUrl = import.meta.env.VITE_STEAM_API_BASE_URL
@@ -84,6 +86,13 @@ export class SteamApiClient {
             .then(() => this.bakedCacheLoader.seedIfNeeded())
             .catch(error => {
                 console.warn('⚠️ [SteamApiClient] Failed to initialize app details cache:', error)
+            })
+
+        // Same fire-and-forget-but-awaitable shape as appDetailsCacheReady, for the baked F2P
+        // artwork pack. getDemoGames() awaits both so first paint never races the seed.
+        this.artworkPackReady = new ArtworkPackSeeder().seedIfNeeded()
+            .catch(error => {
+                console.warn('⚠️ [SteamApiClient] Failed to seed artwork pack:', error)
             })
 
         const eventManager = EventManager.getInstance();
@@ -266,15 +275,17 @@ export class SteamApiClient {
      * GamesLoader.getDemoGames() for the actual is_free/undesirable_for_demo filtering and
      * enrichment (the "heavy lifting" this class's own docblock defers elsewhere).
      *
-     * Awaits the baked-cache seed first, so this reflects the full baked set even on a cold
-     * cache - the readiness wait belongs here since SteamApiClient owns that lifecycle. This
-     * means first-load demo store render is gated on the whole appdetails bundle finishing
-     * (fetch + decompress + IndexedDB write), not just the games actually shown. Assumed
-     * inconsequential (a few thousand small JSON entries, local IndexedDB) but not measured -
-     * worth a look if startup timing ever becomes a concern. See docs/plans/f2p-artwork-bake-plan.md.
+     * Awaits both the baked-cache seed and the artwork pack seed first, so this reflects the
+     * full baked set - and its artwork is already in PixelDataCache - even on a cold cache. The
+     * readiness wait belongs here since SteamApiClient owns that lifecycle. This means first-load
+     * demo store render is gated on the whole appdetails bundle *and* the artwork pack finishing
+     * (fetch + decode + IndexedDB write for both), not just the games actually shown. Assumed
+     * inconsequential (a few thousand small JSON entries plus one ~2.6MB image, decoded once,
+     * off the main thread) but not measured - worth a look if startup timing ever becomes a
+     * concern. See docs/plans/f2p-artwork-bake-plan.md.
      */
     public async getDemoGames(): Promise<SteamGame[]> {
-        await this.appDetailsCacheReady
+        await Promise.all([this.appDetailsCacheReady, this.artworkPackReady])
         return this.gamesLoader.getDemoGames()
     }
 

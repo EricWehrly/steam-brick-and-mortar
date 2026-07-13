@@ -78,8 +78,9 @@ for the renewed bulk-alternative search.
 ## Verdict by run mode (framed as Steam traffic)
 
 - **Web, anonymous store**: hits Steam **zero times**, as of [F2P Artwork Bake](f2p-artwork-bake-plan.md)
-  (built 2026-07-11) — static fixture + baked enrichment + baked artwork. The cleanest win, and the only
-  run mode where artwork can realistically reach zero, since the F2P set is small and shared across every visitor.
+  (built 2026-07-13) — is_free-derived game list + baked enrichment + baked artwork (pre-seeded into
+  PixelDataCache under the real CDN URL at startup). The cleanest win, and the only run mode where
+  artwork can realistically reach zero, since the F2P set is small and shared across every visitor.
 - **Web, connected via import**: **zero** ownership traffic; enrichment traffic only on cache-miss
   appids; artwork still pulls from the CDN — **and stays that way**, deliberately (see below).
 - **Web, connected via online profile**: one ownership call + miss-only enrichment. Still far lighter
@@ -112,8 +113,9 @@ Findings from a live pass against Steam's CDN (2026-07-09):
 - **Blanket-baking artwork the way we baked appdetails doesn't transfer**: appdetails had a natural
   shared universal set (the S3 cache, accumulated across every user ever). Artwork doesn't — a real
   library is *personal* and potentially hundreds of MB. The **F2P/anonymous-store set is the one
-  exception** (not per-user, ~1 MB total) — **Plan 2**, [F2P Artwork Bake](f2p-artwork-bake-plan.md), done.
-- **Deliberately not solved**: baking the F2P set sidesteps Steam-CDN traffic for those 18 games
+  exception** (not per-user, ~2.6 MB total as one packed grid image) — **Plan 2**,
+  [F2P Artwork Bake](f2p-artwork-bake-plan.md), done.
+- **Deliberately not solved**: baking the F2P set sidesteps Steam-CDN traffic for those games
   specifically, but a public launch could still cause a correlated burst of requests for popular
   overlapping titles across many *connected* users' libraries. Steam's CDN is Akamai-backed and built
   for far more than we'd generate, so likely a non-issue — but flagged, not investigated, revisit if a

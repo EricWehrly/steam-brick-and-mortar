@@ -572,14 +572,6 @@ export class LodArtworkOrchestrator implements IGameArtworkPipeline {
         appid: number | undefined,
         artworkHints: { library?: string; header?: string } | undefined
     ): string {
-        // Baked F2P artwork bypasses the CDN entirely - checked first since, unlike MID's
-        // fetch-and-fall-through strategy chain, HighTextureCache fetches this single URL
-        // directly with no retry candidates.
-        const bakedUrl = appid !== undefined ? this.artworkProvider.getBakedArtworkUrl(appid) : null
-        if (bakedUrl) {
-            return bakedUrl
-        }
-
         if (artworkHints?.library) {
             return artworkHints.library
         }

@@ -5,15 +5,21 @@
  * Extends ManagedWorker for standardised lifecycle and error handling.
  */
 
-import type { 
+import type {
     TextureProcessingMessage,
     TextureFetchMessage,
-    TextureProcessingResult, 
-    TextureProcessingError 
+    TextureProcessingResult,
+    TextureProcessingError,
+    ArtworkPackDecodeMessage,
+    ArtworkPackDecodeResult,
+    ArtworkPackEntry,
+    ArtworkPackTileResult
 } from './texture-processing.worker'
 import { Logger } from '../../../utils/Logger'
 import { ManagedWorker } from '../../../utils/ManagedWorker'
 import TextureProcessingWorker from './texture-processing.worker?worker'
+
+export type { ArtworkPackEntry, ArtworkPackTileResult }
 
 export interface FetchAndProcessResult {
     imageData: Uint8ClampedArray
@@ -36,8 +42,8 @@ export interface FetchAndProcessOptions {
     timeout?: number
 }
 
-type TWIn = TextureProcessingMessage | TextureFetchMessage
-type TWOut = TextureProcessingResult | TextureProcessingError
+type TWIn = TextureProcessingMessage | TextureFetchMessage | ArtworkPackDecodeMessage
+type TWOut = TextureProcessingResult | TextureProcessingError | ArtworkPackDecodeResult
 
 export class TextureWorker extends ManagedWorker<TWIn, TWOut> {
     public static logger = Logger.createLogFunctions(TextureWorker.name)
@@ -130,6 +136,42 @@ export class TextureWorker extends ManagedWorker<TWIn, TWOut> {
             this.includeBlobFor.delete(messageId)
             throw err
         }
+    }
+
+    /**
+     * Decode one "pack" grid image (see scripts/bake-f2p-artwork.sh) and crop+resize every tile
+     * to both MID and HIGH sizes in a single worker round-trip. Used for pre-seeding
+     * PixelDataCache at startup - see ArtworkPackSeeder.
+     */
+    public async decodeArtworkPack(
+        packBlob: Blob,
+        entries: ArtworkPackEntry[],
+        tileWidth: number,
+        tileHeight: number,
+        midWidth: number,
+        midHeight: number,
+        highWidth: number,
+        highHeight: number
+    ): Promise<ArtworkPackTileResult[]> {
+        const messageId = this.nextMsgId('pack')
+        const result = await this.send<ArtworkPackDecodeResult>({
+            type: 'DECODE_ARTWORK_PACK',
+            packBlob,
+            entries,
+            tileWidth,
+            tileHeight,
+            midWidth,
+            midHeight,
+            highWidth,
+            highHeight,
+            messageId
+        } as ArtworkPackDecodeMessage)
+
+        if (result.type !== 'ARTWORK_PACK_DECODED') {
+            throw new Error((result as unknown as TextureProcessingError).error)
+        }
+
+        return result.tiles
     }
 
     public override dispose(): void {

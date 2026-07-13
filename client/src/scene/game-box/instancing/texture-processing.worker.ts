@@ -46,6 +46,44 @@ export interface TextureFetchMessage {
     timeout?: number
 }
 
+/** One tile's position within an artwork pack grid image. */
+export interface ArtworkPackEntry {
+    appid: number
+    x: number
+    y: number
+}
+
+/**
+ * Decode a single "pack" image (a grid of uniformly-sized tiles - see
+ * scripts/bake-f2p-artwork.sh) once, crop out each tile, and resize each crop to both the MID
+ * and HIGH LOD target sizes - all in one worker round-trip instead of N.
+ */
+export interface ArtworkPackDecodeMessage {
+    type: 'DECODE_ARTWORK_PACK'
+    packBlob: Blob
+    entries: ArtworkPackEntry[]
+    tileWidth: number
+    tileHeight: number
+    midWidth: number
+    midHeight: number
+    highWidth: number
+    highHeight: number
+    messageId: string
+}
+
+export interface ArtworkPackTileResult {
+    appid: number
+    midPixels: Uint8ClampedArray
+    highPixels: Uint8ClampedArray
+}
+
+export interface ArtworkPackDecodeResult {
+    type: 'ARTWORK_PACK_DECODED'
+    messageId: string
+    tiles: ArtworkPackTileResult[]
+    processingTime: number
+}
+
 export interface TextureProcessingResult {
     type: 'TEXTURE_PROCESSED'
     imageData: Uint8ClampedArray
@@ -67,8 +105,8 @@ export interface TextureProcessingError {
     gameName?: string
 }
 
-export type WorkerMessage = TextureProcessingMessage | TextureFetchMessage
-export type WorkerResponse = TextureProcessingResult | TextureProcessingError
+export type WorkerMessage = TextureProcessingMessage | TextureFetchMessage | ArtworkPackDecodeMessage
+export type WorkerResponse = TextureProcessingResult | TextureProcessingError | ArtworkPackDecodeResult
 
 // Worker state
 let offscreenCanvas: OffscreenCanvas | null = null
@@ -208,6 +246,45 @@ async function processBlobWithDimensions(
 }
 
 /**
+ * Decode one pack image (see scripts/bake-f2p-artwork.sh) once, then crop+resize each tile to
+ * both the MID and HIGH LOD target sizes. One bitmap decode instead of N, off the main thread.
+ */
+async function decodeArtworkPack(
+    packBlob: Blob,
+    entries: ArtworkPackEntry[],
+    tileWidth: number,
+    tileHeight: number,
+    midWidth: number,
+    midHeight: number,
+    highWidth: number,
+    highHeight: number
+): Promise<ArtworkPackTileResult[]> {
+    const packBitmap = await createBitmapPreservingSourceColor(packBlob)
+    const tiles: ArtworkPackTileResult[] = []
+
+    for (const entry of entries) {
+        ensureCanvas(midWidth, midHeight)
+        offscreenContext!.clearRect(0, 0, midWidth, midHeight)
+        offscreenContext!.drawImage(packBitmap, entry.x, entry.y, tileWidth, tileHeight, 0, 0, midWidth, midHeight)
+        const midData = offscreenContext!.getImageData(0, 0, midWidth, midHeight)
+
+        ensureCanvas(highWidth, highHeight)
+        offscreenContext!.clearRect(0, 0, highWidth, highHeight)
+        offscreenContext!.drawImage(packBitmap, entry.x, entry.y, tileWidth, tileHeight, 0, 0, highWidth, highHeight)
+        const highData = offscreenContext!.getImageData(0, 0, highWidth, highHeight)
+
+        tiles.push({
+            appid: entry.appid,
+            midPixels: midData.data,
+            highPixels: highData.data
+        })
+    }
+
+    packBitmap.close()
+    return tiles
+}
+
+/**
  * Fetch image from URL with timeout
  */
 async function fetchImage(url: string, timeout: number = 10000): Promise<Blob> {
@@ -302,11 +379,27 @@ ctx.onmessage = async (event: MessageEvent<WorkerMessage>): Promise<void> => {
             
             // Transfer the ArrayBuffer to avoid copying
             ctx.postMessage(result, [processed.imageData.buffer])
-            
+
+        } else if (type === 'DECODE_ARTWORK_PACK') {
+            const { packBlob, entries, tileWidth, tileHeight, midWidth, midHeight, highWidth, highHeight } = event.data as ArtworkPackDecodeMessage
+
+            const tiles = await decodeArtworkPack(packBlob, entries, tileWidth, tileHeight, midWidth, midHeight, highWidth, highHeight)
+            const processingTime = performance.now() - startTime
+
+            const result: ArtworkPackDecodeResult = {
+                type: 'ARTWORK_PACK_DECODED',
+                messageId,
+                tiles,
+                processingTime
+            }
+
+            const transferList = tiles.flatMap(tile => [tile.midPixels.buffer, tile.highPixels.buffer])
+            ctx.postMessage(result, transferList)
+
         } else {
             console.log('Worker ignoring unknown message type:', type)
         }
-        
+
     } catch (error) {
         const gameName = (event.data as TextureFetchMessage).gameName
         const errorResult: TextureProcessingError = {
