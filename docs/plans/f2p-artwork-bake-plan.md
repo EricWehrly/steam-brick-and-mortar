@@ -6,8 +6,10 @@
 2026-07-11) — there's one clean, cache-first pixel storage layer to seed now, no double-fetch to worry
 about feeding.
 
-**Act**: 2 · **Status**: 🟢 Built (2026-07-12) — bake script, release.sh wiring, and client-side
-consumption (both artwork preference and demo-store filtering) are all in place and verified live.
+**Act**: 2 · **Status**: 🟢 Built (2026-07-13) — bake script (grid-pack image), release.sh wiring, and
+client-side consumption (pre-seeding PixelDataCache under the real CDN URL, plus demo-store filtering)
+are all in place and verified live. Superseded the original per-appid-file + runtime-manifest design
+from 2026-07-12 - see "Client-side consumption" below for why.
 
 ## Goal (one line)
 
@@ -61,47 +63,84 @@ pipeline with F2P-shaped domain knowledge — `repack-steam-cache.sh` no longer 
 own (see [Release Pipeline](release-pipeline-plan.md)). It:
 
 1. Reads the single combined `app-details.json.gz` bundle and filters `is_free == true` itself.
-2. Downloads `library_600x900.jpg` per F2P appid into `client/public/artwork-cache/{appid}.jpg`
-   (gitignored like `steam-cache/`), and writes `manifest.json` listing only the appids that
-   succeeded — skip-and-warn on individual failures, not fatal.
-3. **Writes back** `undesirable_for_demo: true` onto any F2P appid's entry in the appdetails bundle
+2. Downloads `library_600x900.jpg` per F2P appid into a scratch directory.
+3. **Stitches every successfully-downloaded image into one grid ("pack") JPEG** via ImageMagick's
+   `montage` (`client/public/artwork-cache/pack.jpg`), each tile a fixed 300×450 with zero gaps, plus
+   `pack-index.json` (`{tileWidth, tileHeight, entries: {appid: {x, y}}}`) recording each appid's pixel
+   offset in the grid. Individual per-appid files and the old runtime `manifest.json` are gone — see
+   "Client-side consumption" for why this replaced the original per-file design.
+4. **Writes back** `undesirable_for_demo: true` onto any F2P appid's entry in the appdetails bundle
    itself, for every appid whose `library_600x900.jpg` 404'd — a reliable signal the game has no usable
    portrait artwork on Steam's CDN at all (a runtime fetch would hit the same 404), not just that we
    skipped baking it. Non-F2P entries and successfully-baked F2P entries pass through untouched. The
    bundle is then re-gzipped back to the same file.
+
+**Why a grid image and not N separate files or a bespoke bundle format**: fewer requests (1 instead of
+N), a real size win from unifying JPEG quality across all tiles in one encode pass (measured: 75 images,
+4.2 MiB individually vs. 2.6 MiB as one 2700×4050 grid at quality 85 — about 38% smaller), and it's a
+plain JPEG — anyone can open `pack.jpg` in any image viewer and see exactly what it is, no bespoke
+format or tooling required to inspect it. Tile size (300×450) isn't arbitrary: `LodArtworkOrchestrator`
+already treats 300×450 as the effective ceiling for HIGH-tier textures regardless of source resolution
+(see its "Steam library image CDN reality check" comment), so normalizing every tile to that size loses
+nothing the renderer would have kept anyway.
 
 Wired into `release.sh` as `bake_f2p_artwork`, run after `repack_cache` (it needs Step 2's output to
 read). Verified live: 75/93 F2P games baked successfully (18 real 404s — likely tools/soundtracks/demos
 incorrectly carrying `is_free == true`, or delisted apps), all 1361 total games preserved in the
 re-packed bundle, only the 18 failed F2P entries flagged.
 
-One environment-specific fix worth flagging for anyone touching this script: `jq -r` emits CRLF line
-endings in this dev environment, and word-splitting a `\r`-suffixed number in a bash `for` loop silently
-breaks every appid except the last (each URL 404s with an invisible trailing `\r`). Fixed by piping
-through `tr -d '\r'`.
+Two environment-specific things worth flagging for anyone touching this script: (1) `jq -r` emits CRLF
+line endings in this dev environment, and word-splitting a `\r`-suffixed number in a bash `for` loop
+silently breaks every appid except the last (each URL 404s with an invisible trailing `\r`) — fixed by
+piping through `tr -d '\r'`; (2) requires ImageMagick (`magick`/`convert` + `montage`) on the machine
+running `release.sh` - a new toolchain dependency, but a very standard, widely-packaged one (present on
+most CI images by default), consistent with "boring standard tools" over a bespoke image-packing format.
 
-## Client-side consumption (built) — two separate concerns, don't conflate them
+## Client-side consumption (built) — pre-seed the pixel cache, don't teach the pipeline about "baked"
 
-**1. Which URL to fetch artwork from** (`GameArtworkProvider`) — unchanged by the redesign above. The
-cache layer fed is `PixelDataCache`, keyed `${url}@${width}x${height}` (see
-[Image/Texture Pipeline](../architecture/image-texture-pipeline.md)):
+**First attempt (2026-07-12), since superseded**: shipped N individual `{appid}.jpg` files plus a
+`manifest.json`, and taught `GameArtworkProvider`/`LodArtworkOrchestrator` to check that manifest and
+prefer a local URL over the CDN one. Two problems surfaced on review: it made the artwork pipeline
+*aware* of "baked artwork" as a concept (leaking into `buildUrlStrategy()`/`resolveHighArtworkUrl()`),
+and it meant serving N individual files from our own host at runtime - not meaningfully different from
+running a small CDN ourselves, undercutting the exact request-volume concern this whole thread exists to
+solve, just aimed at our own host instead of Steam's.
 
-- **MID** goes through `GameArtworkProvider.buildUrlStrategy()`, which already tries an ordered
-  candidate list until one succeeds. The baked local URL is prepended as the first candidate (only for
-  `format === 'library'`) — a 404 there just falls through to the normal CDN chain.
-- **HIGH** doesn't go through that chain — `LodArtworkOrchestrator.resolveHighArtworkUrl()` resolves a
-  single URL up front, so it checks the baked-artwork manifest first, ahead of hint/CDN-construction.
+**Current design**: `ArtworkPackSeeder` (`client/src/scene/game-box/instancing/ArtworkPackSeeder.ts`)
+runs once at startup and pre-seeds `PixelDataCache` directly, keyed under the **real** Steam CDN URL
+(`deriveArtworkFromAppId(appid).library`) - not a synthetic local path:
 
-`GameArtworkProvider` loads `/artwork-cache/manifest.json` once, fire-and-forget, via the shared
-`client/src/steam/utils/BakedArtworkManifest.ts` helper. This is still a runtime fetch, and still open
-for discussion (see the tracked follow-up in Related below).
+1. Fetches `pack-index.json` + `pack.jpg` (two requests total, not one per game).
+2. Skip check: if `PixelDataCache` already has an entry for the first indexed appid, assumes the whole
+   pack was already seeded this cache's lifetime and does nothing further.
+3. Otherwise, decodes the pack **once** in a worker (`TextureWorker.decodeArtworkPack()`, new method) -
+   one `createImageBitmap()` call, then crops+resizes each tile to both MID (150×225) and HIGH (300×450)
+   pixel arrays, off the main thread.
+4. Seeds `PixelDataCache.put(realCdnUrl, pixels, width, height)` for both sizes, per game.
 
-**2. Whether a game should appear in the demo store at all** (`GamesLoader.getDemoGames()`) — this is
-the part that changed. It no longer fetches `manifest.json` at runtime; it filters on
-`is_free === true && !undesirable_for_demo`, both of which arrive as ordinary fields on the same
-`AppDetailsCache` entries already seeded via `BakedCacheLoader`. No separate runtime check, no second
-fetch of anything artwork-shaped — the exclusion travels with the appdetails data through the same seed
-path everything else already uses.
+Because the cache key is the real CDN URL, `GameArtworkProvider.fetchPixels()` and
+`LodArtworkOrchestrator.resolveHighArtworkUrl()` need **zero** awareness that any of this happened - a
+pre-seeded entry is just a cache hit, indistinguishable from a returning visitor's warm cache. The
+`getBakedArtworkUrl()`/`bakedArtworkAppIds`/manifest-checking code added in the first attempt was
+deleted, not extended, along with the now-unused `BakedArtworkManifest.ts` helper.
+
+Sizes are hardcoded to the *default* LOD tier sizes (`getDefaultLodTierSpecs()` in `LodTypes.ts`), not
+read from the user's current `AppSettings` ratio configuration - a user who has customized their LOD
+ratios away from default simply won't get pre-seeded entries at their custom size and falls through to
+a normal CDN fetch, same as before this existed. Not worth the cross-layer coupling to
+`LodArtworkOrchestrator`'s dynamic config for a niche settings tweak.
+
+Awaited (not fire-and-forget) before `SteamIntegration.loadDemoGames()` builds the demo list - see
+`SteamApiClient.getDemoGames()`, which awaits `artworkPackReady` alongside `appDetailsCacheReady` for
+the same reason. **Tracked fast-follow, not yet built**: a fully loose-coupled version that doesn't
+block on this seed at all, relying on the existing "wait to render the game box until its artwork is
+ready" machinery already in the placement pipeline instead. Deferred because it wasn't obviously already
+sufficient here and the await is assumed inconsequential (~2.6MB image, decoded once, off the main
+thread) but unmeasured either way.
+
+Verified live: 2 total requests for all 75 games' artwork (down from 75), zero requests to any
+`steamstatic.com` domain, `PixelDataCache` holds entries under the real CDN URL at both MID and HIGH
+sizes for every baked appid.
 
 ## Deferred, explicitly not solved here: launch-day traffic burst
 
@@ -141,14 +180,16 @@ definition — F2P is `$0`, this is ranked among the rest), so it'd be its own b
 
 ## Open questions
 
-- ~~Exact client-side check mechanism (artwork URL preference)~~ — **resolved: manifest**, via
-  `GameArtworkProvider`. See "Client-side consumption" above.
+- ~~Exact client-side check mechanism (artwork URL preference)~~ — **resolved: pre-seed PixelDataCache
+  directly under the real CDN URL**, no manifest-aware branch anywhere in the artwork pipeline. See
+  "Client-side consumption" above.
 - ~~Exact client-side check mechanism (demo-store inclusion)~~ — **resolved: build-time flag**
   (`undesirable_for_demo`), no runtime fetch. See "Client-side consumption" above.
 - ~~Fatal vs. skip-and-warn on bake failure~~ — **resolved: skip-and-warn.**
-- Whether `GameArtworkProvider`'s own runtime fetch of `manifest.json` (for artwork URL preference,
-  concern #1 above) should also move to a build-time/data-driven mechanism — flagged, not yet discussed
-  in depth.
+- ~~Individual files vs. a packed bundle~~ — **resolved: one grid JPEG** (`pack.jpg` + `pack-index.json`).
+- **Fast-follow, tracked, not built**: loosen the `getDemoGames()` await on `artworkPackReady` to rely on
+  the existing artwork-ready render-gating machinery instead of blocking the demo list on the seed
+  finishing first.
 - Gamalytic's Terms of Service and bulk-access mechanism — unread/unconfirmed, needed before building
   Top-N from it.
 

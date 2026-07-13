@@ -47,9 +47,10 @@ aws s3 sync s3://steam-brick-and-mortar-dev-game-cache/ .release-cache/raw/ \
 scripts/repack-steam-cache.sh .release-cache/raw client/public/steam-cache
 
 # 2.5. Filter is_free == true from that bundle, bake the F2P/anonymous-store artwork set
-#      (library_600x900.jpg per F2P appid) so it ships with the release and never touches
-#      Steam's CDN for those games, and write undesirable_for_demo: true back onto any
-#      appid whose artwork 404'd. See docs/plans/f2p-artwork-bake-plan.md.
+#      (library_600x900.jpg per F2P appid) into one grid image so it ships with the release
+#      and never touches Steam's CDN for those games, and write undesirable_for_demo: true
+#      back onto any appid whose artwork 404'd. Requires ImageMagick (magick/montage) on
+#      whatever machine runs this. See docs/plans/f2p-artwork-bake-plan.md.
 scripts/bake-f2p-artwork.sh client/public/steam-cache/app-details.json.gz client/public/artwork-cache
 
 # 3. Build the web client — dist/ does NOT embed the cache (it's a public/ asset, fetched
