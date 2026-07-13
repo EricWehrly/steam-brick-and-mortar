@@ -25,6 +25,7 @@ import { TextureWorker } from './TextureWorker'
 import { PixelDataCache } from './PixelDataCache'
 import { GameArtworkRequest } from './GameArtworkRequest'
 import { resizePixels } from './ArtworkPixelUtils'
+import { bakedArtworkUrl, fetchBakedArtworkAppIds } from '../../../steam/utils/BakedArtworkManifest'
 
 // Class-scoped logger will be attached to the class
 
@@ -85,14 +86,6 @@ const CDN_PATTERNS: Record<CdnArtworkType, string> = {
     library: 'library_600x900.jpg',
     capsule: 'capsule_616x353.jpg',
     header: 'header.jpg'
-}
-
-/** Baked F2P/anonymous-store artwork - see docs/plans/f2p-artwork-bake-plan.md */
-const BAKED_ARTWORK_DIR = '/artwork-cache'
-const BAKED_ARTWORK_MANIFEST_URL = `${BAKED_ARTWORK_DIR}/manifest.json`
-
-interface BakedArtworkManifest {
-    readonly appids: readonly number[]
 }
 
 type ArtworkHintType = 'library' | 'header'
@@ -170,19 +163,8 @@ export class GameArtworkProvider {
      * normal CDN strategy, same as any other cache miss.
      */
     private async initBakedArtworkManifest(): Promise<void> {
-        try {
-            const response = await fetch(BAKED_ARTWORK_MANIFEST_URL)
-            if (!response.ok) {
-                this.bakedArtworkAppIds = new Set()
-                return
-            }
-            const manifest = await response.json() as BakedArtworkManifest
-            this.bakedArtworkAppIds = new Set(manifest.appids)
-            GameArtworkProvider.logger.debug(`Loaded baked F2P artwork manifest: ${this.bakedArtworkAppIds.size} appids`)
-        } catch (err) {
-            GameArtworkProvider.logger.debug('No baked F2P artwork manifest available:', err)
-            this.bakedArtworkAppIds = new Set()
-        }
+        this.bakedArtworkAppIds = await fetchBakedArtworkAppIds()
+        GameArtworkProvider.logger.debug(`Loaded baked F2P artwork manifest: ${this.bakedArtworkAppIds.size} appids`)
     }
 
     /**
@@ -192,7 +174,7 @@ export class GameArtworkProvider {
         if (!this.bakedArtworkAppIds?.has(appId)) {
             return null
         }
-        return `${BAKED_ARTWORK_DIR}/${appId}.jpg`
+        return bakedArtworkUrl(appId)
     }
 
     /**

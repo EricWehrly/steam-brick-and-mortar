@@ -18,6 +18,7 @@ import { EventManager } from '../../../src/core/EventManager'
 import { SteamIntegration } from '../../../src/steam-integration/SteamIntegration'
 import { validateLibraryExportPayload } from '../../../src/steam-integration/Library'
 import type { ImportChannel, ImportedGame } from '../../../src/steam-integration/Library'
+import { SteamApiClient, type SteamGame } from '../../../src/steam/SteamApiClient'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
 import type { SteamGamesBatchEvent, SteamImportLibraryEvent } from '../../../src/types/InteractionEvents'
 
@@ -142,6 +143,28 @@ describe('validateLibraryExportPayload', () => {
     })
 })
 
+/**
+ * Anonymous-store fallback tests need SteamApiClient.getDemoGames() to resolve with
+ * something - loadDemoGames() sources the demo store from it, not a hardcoded fixture. See
+ * docs/plans/f2p-artwork-bake-plan.md.
+ */
+function mockDemoGames(count: number): SteamGame[] {
+    const games: SteamGame[] = []
+    for (let index = 0; index < count; index++) {
+        const appid = 200000 + index
+        games.push({
+            appid,
+            name: `Demo Game ${index + 1}`,
+            playtime_forever: 0,
+            img_icon_url: '',
+            img_logo_url: '',
+            artwork: { icon: '', logo: '', header: '', library: '' },
+            genres: [{ id: '37', description: 'Free to Play' }],
+        })
+    }
+    return games
+}
+
 describe('SteamIntegration manual library import', () => {
     beforeEach(() => {
         DataManager.getInstance().clear()
@@ -149,6 +172,7 @@ describe('SteamIntegration manual library import', () => {
         SteamIntegration.dispose()
         localStorage.clear()
         vi.clearAllMocks()
+        vi.spyOn(SteamApiClient.getInstance(), 'getDemoGames').mockResolvedValue(mockDemoGames(5))
     })
 
     it('emits GamesBatchReady with appid-derived artwork and no network call', async () => {

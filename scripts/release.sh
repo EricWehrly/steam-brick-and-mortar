@@ -17,7 +17,7 @@ CACHE_BUCKET="steam-brick-and-mortar-dev-game-cache"
 CACHE_REGION="us-east-1"
 RAW_CACHE_DIR="$REPO_ROOT/.release-cache/raw"
 BAKED_CACHE_DIR="$REPO_ROOT/client/public/steam-cache"
-F2P_SEED_FILE="$REPO_ROOT/scripts/f2p-appid-seed.json"
+APP_DETAILS_BUNDLE="$BAKED_CACHE_DIR/app-details.json.gz"
 F2P_ARTWORK_DIR="$REPO_ROOT/client/public/artwork-cache"
 
 # ---------------------------------------------------------------------------
@@ -53,12 +53,12 @@ fetch_s3_cache() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 2: Repack the raw per-appid dump into two compact bundles the client
+# Step 2: Repack the raw per-appid dump into one compact bundle the client
 # fetches directly - see scripts/repack-steam-cache.sh and
 # docs/plans/release-pipeline-plan.md.
 # ---------------------------------------------------------------------------
 repack_cache() {
-    log_step "Repacking cache into client-ready bundles"
+    log_step "Repacking cache into a client-ready bundle"
 
     if ! command -v jq >/dev/null 2>&1; then
         log_error "jq not found. Install it and re-run."
@@ -69,14 +69,17 @@ repack_cache() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 2.5: Bake the F2P/anonymous-store artwork set into the release so it
-# never touches Steam's CDN for those games - see scripts/bake-f2p-artwork.sh
-# and docs/plans/f2p-artwork-bake-plan.md.
+# Step 2.5: Bake artwork for every F2P game in the bundle Step 2 just produced,
+# so it never touches Steam's CDN for those games. Must run after repack_cache -
+# reads app-details.json.gz and filters is_free == true itself (the only place
+# in this pipeline with F2P-shaped domain knowledge), then writes back
+# undesirable_for_demo: true onto any appid whose artwork 404'd. See
+# scripts/bake-f2p-artwork.sh and docs/plans/f2p-artwork-bake-plan.md.
 # ---------------------------------------------------------------------------
 bake_f2p_artwork() {
     log_step "Baking F2P artwork set"
 
-    "$REPO_ROOT/scripts/bake-f2p-artwork.sh" "$F2P_SEED_FILE" "$F2P_ARTWORK_DIR"
+    "$REPO_ROOT/scripts/bake-f2p-artwork.sh" "$APP_DETAILS_BUNDLE" "$F2P_ARTWORK_DIR"
 }
 
 # ---------------------------------------------------------------------------

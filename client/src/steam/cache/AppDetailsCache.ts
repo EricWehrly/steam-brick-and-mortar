@@ -182,6 +182,37 @@ export class AppDetailsCache {
     }
 
     /**
+     * Get every cached entry. Full-store scan: fine at our current cache size (a few thousand
+     * entries). Callers filter/interpret the results - this class only deals in storage.
+     */
+    async getAllEntries(): Promise<Map<number, AppDetailsCacheResult>> {
+        await this.init()
+        const results = new Map<number, AppDetailsCacheResult>()
+
+        if (!this.db) return results
+
+        return new Promise((resolve) => {
+            const transaction = this.db.transaction([AppDetailsCache.STORE_NAME], 'readonly')
+            const store = transaction.objectStore(AppDetailsCache.STORE_NAME)
+            const request = store.getAll()
+
+            request.onsuccess = () => {
+                const all = request.result as CachedAppDetails[]
+                for (const cached of all) {
+                    const isStale = cached.schema_version !== AppDetailsCache.CURRENT_SCHEMA_VERSION
+                    results.set(cached.appid, { ...cached.data, isStale })
+                }
+                resolve(results)
+            }
+
+            request.onerror = () => {
+                this.logger.error('❌ [AppDetailsCache] Failed to scan all entries:', request.error)
+                resolve(results)
+            }
+        })
+    }
+
+    /**
      * Store app details for a single game
      */
     async set(appid: number, data: AppDetailsData): Promise<void> {

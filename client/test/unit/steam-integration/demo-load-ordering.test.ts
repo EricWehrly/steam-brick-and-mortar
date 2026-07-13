@@ -3,40 +3,35 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DataManager } from '../../../src/core/data'
 import { EventManager } from '../../../src/core/EventManager'
 import { SteamIntegration } from '../../../src/steam-integration/SteamIntegration'
+import { SteamApiClient, type SteamGame } from '../../../src/steam/SteamApiClient'
 import {
     SteamEventTypes,
     GameEventTypes,
 } from '../../../src/types/InteractionEvents'
 
-vi.mock('../../../src/steam/fixtures/demo-games', () => {
-    const games = Array.from({ length: 36 }, (_, index) => {
+/**
+ * loadDemoGames() now sources the anonymous store from SteamApiClient.getDemoGames()
+ * (AppDetailsCache entries with is_free === true and undesirable_for_demo unset, enriched via
+ * GamesLoader.buildEnhancedGame) rather than a hardcoded fixture - see
+ * docs/plans/f2p-artwork-bake-plan.md. Mocked at that boundary instead of the removed
+ * demo-games.ts module.
+ */
+function mockDemoGames(count: number): SteamGame[] {
+    const games: SteamGame[] = []
+    for (let index = 0; index < count; index++) {
         const appid = 100000 + index
-        return {
+        games.push({
             appid,
             name: `Demo Game ${index + 1}`,
-            playtime_forever: 1000 - index,
+            playtime_forever: 0,
             img_icon_url: '',
             img_logo_url: '',
-            artwork: {
-                icon: '',
-                logo: '',
-                header: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
-                library: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`,
-            },
+            artwork: { icon: '', logo: '', header: '', library: '' },
             genres: [{ id: '37', description: 'Free to Play' }],
-        }
-    })
-
-    return {
-        ANONYMOUS_STORE_USER: {
-            steamid: '',
-            vanity_url: 'anonymous',
-            game_count: games.length,
-            retrieved_at: '2026-01-01T00:00:00.000Z',
-            games,
-        },
+        })
     }
-})
+    return games
+}
 
 describe('SteamIntegration demo load ordering', () => {
     beforeEach(() => {
@@ -44,6 +39,7 @@ describe('SteamIntegration demo load ordering', () => {
         EventManager.getInstance().removeAllListeners()
         SteamIntegration.dispose()
         vi.clearAllMocks()
+        vi.spyOn(SteamApiClient.getInstance(), 'getDemoGames').mockResolvedValue(mockDemoGames(36))
     })
 
     it('emits readiness before batch events and yields between multi-batch emissions', async () => {

@@ -2,7 +2,7 @@
 
 **Parent features**: [Static Hosting](../features/static-hosting.md) · [Native Desktop App](../features/desktop-app.md)
 **Act**: 2
-**Status**: 🟢 Steps 1-2 and 2.5 implemented and run end-to-end. `scripts/release.sh` (`fetch_s3_cache` → `scripts/repack-steam-cache.sh`) pulls 2790 raw S3 objects (9,006 KiB, independently gzipped) and repacks them into two client-ready bundles: `app-details-f2p.json.gz` (93 games, 207.5 KiB) and `app-details-rest.json.gz` (1268 games, 3.1 MiB) — combined ~3.3 MiB from ~9.0 MiB raw, via single-corpus compression + tier dedup. Client-side consumption (`BakedCacheLoader`) implemented and wired into `SteamApiClient`. Step 2.5 (`bake_f2p_artwork` → `scripts/bake-f2p-artwork.sh`) bakes F2P artwork the same way — see [F2P Artwork Bake](f2p-artwork-bake-plan.md). Steps 3-5 (build/pack) still stubbed.
+**Status**: 🟢 Steps 1-2 and 2.5 implemented and run end-to-end. `scripts/release.sh` (`fetch_s3_cache` → `scripts/repack-steam-cache.sh`) pulls raw S3 objects and repacks them into one client-ready bundle: `app-details.json.gz` (1361 games, ~3.4 MiB), via single-corpus compression + tier dedup. Client-side consumption (`BakedCacheLoader`) implemented and wired into `SteamApiClient`. Step 2.5 (`bake_f2p_artwork` → `scripts/bake-f2p-artwork.sh`) filters `is_free == true` from that bundle itself, bakes F2P artwork, and writes an `undesirable_for_demo` flag back onto any appid whose artwork 404'd — see [F2P Artwork Bake](f2p-artwork-bake-plan.md). (2026-07-12: the earlier F2P/rest bundle split was removed — see "Split" section below, superseded.) Steps 3-5 (build/pack) still stubbed.
 
 ## Why this exists (the actual goal)
 
@@ -41,16 +41,16 @@ aws s3 sync s3://steam-brick-and-mortar-dev-game-cache/ .release-cache/raw/ \
   --exclude "hydrator_state/*"
 
 # 2. Repack: gunzip every per-appid object, merge into ONE JSON object keyed by appid
-#    (hydrated tier wins over base tier per-appid), split into free-to-play vs. the rest,
-#    gzip each ONCE. Single-corpus compression beats N independent per-file gzips — see
-#    rationale below. Plain bash + jq + gzip, not a new language — see "Why bash, not
-#    Node/TS" below.
+#    (hydrated tier wins over base tier per-appid), gzip ONCE. Single-corpus compression
+#    beats N independent per-file gzips — see rationale below. Plain bash + jq + gzip, not
+#    a new language — see "Why bash, not Node/TS" below.
 scripts/repack-steam-cache.sh .release-cache/raw client/public/steam-cache
 
-# 2.5. Bake the F2P/anonymous-store artwork set (library_600x900.jpg per seeded appid) so it
-#      ships with the release and never touches Steam's CDN for those games. See
-#      docs/plans/f2p-artwork-bake-plan.md.
-scripts/bake-f2p-artwork.sh scripts/f2p-appid-seed.json client/public/artwork-cache
+# 2.5. Filter is_free == true from that bundle, bake the F2P/anonymous-store artwork set
+#      (library_600x900.jpg per F2P appid) so it ships with the release and never touches
+#      Steam's CDN for those games, and write undesirable_for_demo: true back onto any
+#      appid whose artwork 404'd. See docs/plans/f2p-artwork-bake-plan.md.
+scripts/bake-f2p-artwork.sh client/public/steam-cache/app-details.json.gz client/public/artwork-cache
 
 # 3. Build the web client — dist/ does NOT embed the cache (it's a public/ asset, fetched
 #    async at runtime, not part of the JS bundle).
@@ -121,34 +121,34 @@ applies the same precedence (`jq -s '.[0] + .[1]'`, base then hydrated — shall
 wins whole-value on key overlap), not a blind concatenation of both prefixes.
 
 **Measured (2026-07-03)**: 9,006 KiB raw (2790 independently-gzipped objects, base + hydrated tiers,
-with overlap) repacks to **207.5 KiB + 3.1 MiB ≈ 3.3 MiB** combined — well over 2x smaller, and that's
-*with* the F2P/rest split (below) rather than one single file, which would compress somewhat better
-still. The reduction comes from two effects at once: single-corpus compression (cross-record schema
-redundancy gzip can now see) and tier dedup (an appid present in both tiers is stored once, not twice).
+with overlap) repacked to well over 2x smaller as a single combined bundle. The reduction comes from
+two effects at once: single-corpus compression (cross-record schema redundancy gzip can now see) and
+tier dedup (an appid present in both tiers is stored once, not twice). Latest measured (2026-07-12,
+larger raw cache by then): 1361 games, ~3.4 MiB gzipped.
 
-### Split: free-to-play vs. the rest, not one file
-
-Beyond the single-file idea originally sketched here, the repack now produces **two** bundles:
-`app-details-f2p.json.gz` (93 games, 207.5 KiB) and `app-details-rest.json.gz` (1268 games, 3.1 MiB).
-This isn't a size-reduction curation — everything still ships, same as the "grab it all, no top-N"
-decision above — it's a **load-priority split**. The anonymous store's fixture (`demo-games.ts`) is
-exactly the free-to-play set, so the client can fetch the small F2P bundle first and populate the
-anonymous store almost immediately, then fetch the larger "rest" bundle in the background without
-blocking that first paint. `is_free` is already a field Steam returns per-game (`steam-api.js`
-already lifts it to `data.is_free`), so the split needs no external appid list or manual curation —
-it's a factual filter (`with_entries(select(.value.data.is_free == true))`) on data already in hand.
-
-Each bundle is wrapped in a small envelope — `{ generated_at, games }` — rather than a bare
+The bundle is wrapped in a small envelope — `{ generated_at, games }` — rather than a bare
 appid-keyed object, so there's room to add a cache-invalidation marker later (see "Cache-buster" in
 [Multi-layer Caching](../features/multi-layer-caching.md)) without a breaking format change. We use
 `generated_at` (a timestamp) rather than a "version" number — this is cache data with a natural
 recency concept, not a schema/API version; a timestamp is the more honest label for what it is.
 
+### Superseded: the F2P/rest load-priority split
+
+For a while, the repack produced **two** bundles (`app-details-f2p.json.gz` / `app-details-rest.json.gz`)
+so the client could fetch the small F2P bundle first and populate the anonymous store almost
+immediately, then fetch the larger "rest" bundle in the background. That stopped making sense once
+`SteamIntegration.loadDemoGames()` started awaiting the *full* baked-cache seed before building the demo
+list anyway (see [F2P Artwork Bake](f2p-artwork-bake-plan.md)) — the split's only reason to exist was
+moot the moment the client started waiting for everything regardless of tier. Removed 2026-07-12: back
+to one bundle, and F2P-specific filtering (`is_free == true`) moved to `bake-f2p-artwork.sh`, the one
+place in the pipeline that actually has F2P-shaped domain knowledge.
+
 ## The two real code touches
 
 1. **The repack script** (`scripts/repack-steam-cache.sh`) — implemented. Bash + `jq` + `gzip`/
-   `gunzip`; gunzip+merge each tier (hydrated-over-base precedence), split by `is_free`, gzip each
-   bundle. See "Why bash, not Node/TS" above for why this isn't a `.mjs` file.
+   `gunzip`; gunzip+merge each tier (hydrated-over-base precedence), gzip the combined bundle. No
+   `is_free` split — see "Superseded" above. See "Why bash, not Node/TS" above for why this isn't a
+   `.mjs` file.
 2. **Client-side consumption** (`client/src/steam/cache/BakedCacheLoader.ts`) — implemented, wired
    into `SteamApiClient`'s constructor alongside the existing `appDetailsCache.init()` fire-and-forget
    call (same non-blocking pattern already used there, so this doesn't introduce a new startup-timing
@@ -158,17 +158,19 @@ recency concept, not a schema/API version; a timestamp is the more honest label 
      not real cache invalidation — it can't detect "the baked bundle changed since this IndexedDB was
      populated," only "IndexedDB currently has *something*." The real lever is the cache-buster work
      tracked in [Multi-layer Caching](../features/multi-layer-caching.md), explicitly not built yet.
-   - **F2P tier first, rest second**: fetches and seeds `app-details-f2p.json.gz` before
-     `app-details-rest.json.gz`, both awaited inside the loader but the loader itself is never awaited
-     by its caller — so from the scene's perspective this all happens in the background regardless of
-     which tier is "first."
    - **Decompression**: `response.body.pipeThrough(new DecompressionStream('gzip'))` — the actual
      `.gz` bytes are shipped and decoded client-side (Compression Streams API, supported in all
      evergreen browsers this project already targets for WebXR), rather than relying on HTTP
-     content-encoding negotiation from a not-yet-decided host.
+     content-encoding negotiation from a not-yet-decided host. **Caveat found live (2026-07-12)**: some
+     static hosts (observed against this project's own Vite dev server) recognize the `.gz` extension
+     and set `Content-Encoding: gzip` on the response, which makes `fetch()` transparently decompress
+     the body *before* this code ever sees it — piping already-plain-JSON through a second
+     `DecompressionStream` then fails ("incorrect header check"). Fixed by branching on the actual
+     `Content-Encoding` response header rather than assuming either behavior; worth knowing since
+     different production static hosts may differ here too.
    - **Logging**: uses the project's `Logger` (`BakedCacheLoader` context) — `info` for the
-     lifecycle events (found/skipped existing cache, seeded N games per tier), `debug` for the
-     per-fetch play-by-play (which tier, which path, parsed counts). Enable during development with
+     lifecycle events (found/skipped existing cache, seeded N games), `debug` for the per-fetch
+     play-by-play (path, parsed counts). Enable during development with
      `setLogLevel('BakedCacheLoader', 'DEBUG')` in the browser console.
    - **Failure handling**: missing file (404), empty body, or parse failure all log a warning and
      return — no special-casing needed elsewhere, since this just falls through to the existing

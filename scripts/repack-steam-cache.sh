@@ -2,12 +2,19 @@
 set -euo pipefail
 
 # Repacks the raw per-appid S3 cache dump (thousands of independently-gzipped
-# files) into two compact, load-priority-ordered bundles the client fetches
-# directly. See docs/plans/release-pipeline-plan.md ("Repack into one file").
+# files) into one compact bundle the client fetches directly. See
+# docs/plans/release-pipeline-plan.md ("Repack into one file").
+#
+# No F2P/rest split here - that was purely a loading-priority trick (fetch a
+# tiny F2P bundle first) that stopped mattering once the client started
+# awaiting the full seed before building the demo store anyway. F2P-specific
+# filtering now lives in bake-f2p-artwork.sh, the one place in the pipeline
+# that actually has F2P-shaped domain knowledge - see
+# docs/plans/f2p-artwork-bake-plan.md.
 #
 # Usage: repack-steam-cache.sh <raw-dir> <out-dir>
 #   raw-dir must contain appdetails/*.json.gz and/or appDetailsWithTags/*.json.gz
-#   out-dir receives app-details-f2p.json.gz and app-details-rest.json.gz
+#   out-dir receives app-details.json.gz
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_ROOT/scripts/common.sh"
@@ -57,23 +64,14 @@ main() {
     local generated_at
     generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-    log_info "Splitting free-to-play vs. the rest..."
-    jq --arg gen "$generated_at" \
-        '{generated_at: $gen, games: (with_entries(select(.value.data.is_free == true)))}' \
-        "$WORK_DIR/merged.json" | gzip -9 > "$OUT_DIR/app-details-f2p.json.gz"
+    jq --arg gen "$generated_at" '{generated_at: $gen, games: .}' "$WORK_DIR/merged.json" \
+        | gzip -9 > "$OUT_DIR/app-details.json.gz"
 
-    jq --arg gen "$generated_at" \
-        '{generated_at: $gen, games: (with_entries(select(.value.data.is_free != true)))}' \
-        "$WORK_DIR/merged.json" | gzip -9 > "$OUT_DIR/app-details-rest.json.gz"
+    local count size
+    count=$(gunzip -c "$OUT_DIR/app-details.json.gz" | jq '.games | length')
+    size=$(du -h "$OUT_DIR/app-details.json.gz" | cut -f1)
 
-    local f2p_count rest_count f2p_size rest_size
-    f2p_count=$(gunzip -c "$OUT_DIR/app-details-f2p.json.gz" | jq '.games | length')
-    rest_count=$(gunzip -c "$OUT_DIR/app-details-rest.json.gz" | jq '.games | length')
-    f2p_size=$(du -h "$OUT_DIR/app-details-f2p.json.gz" | cut -f1)
-    rest_size=$(du -h "$OUT_DIR/app-details-rest.json.gz" | cut -f1)
-
-    log_success "app-details-f2p.json.gz: ${f2p_count} games, ${f2p_size}"
-    log_success "app-details-rest.json.gz: ${rest_count} games, ${rest_size}"
+    log_success "app-details.json.gz: ${count} games, ${size}"
 }
 
 main "$@"

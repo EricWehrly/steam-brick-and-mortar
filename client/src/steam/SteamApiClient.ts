@@ -65,6 +65,7 @@ export class SteamApiClient {
     private appDetailsCache: AppDetailsCache
     private bakedCacheLoader: BakedCacheLoader
     private gamesLoader: GamesLoader
+    private readonly appDetailsCacheReady: Promise<void>
 
     private constructor() {
         const apiBaseUrl = import.meta.env.VITE_STEAM_API_BASE_URL
@@ -76,9 +77,10 @@ export class SteamApiClient {
         this.appDetailsCache = new AppDetailsCache()
         this.bakedCacheLoader = new BakedCacheLoader(this.appDetailsCache)
 
-        // Initialize app details cache, then seed it from the baked release bundles
-        // (fire-and-forget - never blocks scene startup; no-ops if already warm).
-        this.appDetailsCache.init()
+        // Initialize app details cache, then seed it from the baked release bundles.
+        // Fire-and-forget for scene startup in general (never blocks); callers that need the
+        // seeded cache (e.g. the anonymous store's demo game list) await appDetailsCacheReady.
+        this.appDetailsCacheReady = this.appDetailsCache.init()
             .then(() => this.bakedCacheLoader.seedIfNeeded())
             .catch(error => {
                 console.warn('⚠️ [SteamApiClient] Failed to initialize app details cache:', error)
@@ -257,6 +259,23 @@ export class SteamApiClient {
      */
     public clearCurrentUser(): void {
         this.cache.deleteByPrefix('resolve_')
+    }
+
+    /**
+     * The anonymous store's game list, from the app details cache - see
+     * GamesLoader.getDemoGames() for the actual is_free/undesirable_for_demo filtering and
+     * enrichment (the "heavy lifting" this class's own docblock defers elsewhere).
+     *
+     * Awaits the baked-cache seed first, so this reflects the full baked set even on a cold
+     * cache - the readiness wait belongs here since SteamApiClient owns that lifecycle. This
+     * means first-load demo store render is gated on the whole appdetails bundle finishing
+     * (fetch + decompress + IndexedDB write), not just the games actually shown. Assumed
+     * inconsequential (a few thousand small JSON entries, local IndexedDB) but not measured -
+     * worth a look if startup timing ever becomes a concern. See docs/plans/f2p-artwork-bake-plan.md.
+     */
+    public async getDemoGames(): Promise<SteamGame[]> {
+        await this.appDetailsCacheReady
+        return this.gamesLoader.getDemoGames()
     }
 
     public getCacheManager(): CacheManager { return this.cache }
