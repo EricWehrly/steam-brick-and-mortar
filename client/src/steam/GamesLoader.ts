@@ -108,6 +108,40 @@ export class GamesLoader {
         })
     }
 
+    /**
+     * Discovers every cached appid fit to show in the anonymous store and builds a full
+     * SteamGame for each (see SteamIntegration.loadDemoGames). "Fit" means is_free === true
+     * AND not undesirable_for_demo - the latter is set by scripts/bake-f2p-artwork.sh when an
+     * appid's library_600x900.jpg 404'd against Steam's CDN at bake time, so the demo store never
+     * shows a degraded/label box in what's meant to be the app's showcase. Both flags travel with
+     * the same AppDetailsCache entry, so this filters more than just F2P despite the name.
+     *
+     * Unlike enrichFromCache, there's no known appid list to start from - this scans the whole
+     * cache to find the demo-eligible set itself, then reuses the same buildEnhancedGame() field
+     * mapping (artwork fallback chain, genres, categories, etc.) so the demo store gets
+     * properly-formed games instead of a hand-rolled subset of fields.
+     */
+    public async getDemoGames(): Promise<SteamGame[]> {
+        const allEntries = await this.appDetailsCache.getAllEntries()
+        const games: SteamGame[] = []
+
+        for (const [appid, data] of allEntries) {
+            if (data.is_free !== true || data.undesirable_for_demo === true) continue
+
+            const baseGame: SteamGame = {
+                appid,
+                name: data.name,
+                playtime_forever: 0,
+                img_icon_url: '',
+                img_logo_url: '',
+                artwork: { icon: '', logo: '', header: '', library: '' }
+            }
+            games.push(this.buildEnhancedGame(baseGame, this.normalizeBatchData(data)))
+        }
+
+        return games
+    }
+
     private async emitCachedGames(
         sortedGames: SteamGame[],
         cachedAppids: number[],

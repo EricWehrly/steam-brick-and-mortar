@@ -10,7 +10,6 @@
 // TD: steam-integration-loading-strategy-split
 
 import { SteamApiClient, type SteamGame, type SteamUser, type SteamResolveResponse } from '../steam'
-import { ANONYMOUS_STORE_USER } from '../steam/fixtures/demo-games'
 import { deriveArtworkFromAppId } from '../steam/utils/ArtworkUrls'
 import { ValidationUtils } from '../utils'
 import { Logger } from '../utils/Logger'
@@ -236,18 +235,28 @@ export class SteamIntegration {
     }
 
     /**
-     * Load hardcoded demo games for dev/test environments.
-     * Emits games directly into the batch pipeline - no network calls.
+     * Load the anonymous store from whatever the release's baked appdetails cache actually
+     * contains (is_free === true, undesirable_for_demo unset - see
+     * GamesLoader.getDemoGames()) - no hand-maintained game list, no network calls, no
+     * separate runtime check for artwork quality. Awaits the baked-cache seed so a cold cache
+     * still gets the full set. See docs/plans/f2p-artwork-bake-plan.md.
      */
     private async loadDemoGames(): Promise<void> {
         try {
-            const demoUser = ANONYMOUS_STORE_USER
-            const games = demoUser.games as SteamGame[]
+            const games = await this.steamClient.getDemoGames()
+
+            const demoUser: SteamUser = {
+                steamid: '',
+                vanity_url: '',
+                game_count: games.length,
+                retrieved_at: new Date().toISOString(),
+                games
+            }
 
             // Register games in gameLibrary so they're available for storeSteamDataAndEmitEvent().
-            // We set vanity_url and steamid to empty strings (not undefined) so the UI can access
-            // them without crashes, but isAnonymous() returns true because steam.userInput is not set.
-            this.gameLibrary.setUserData({ ...demoUser, vanity_url: '', steamid: '' })
+            // vanity_url/steamid are empty strings (not undefined) so the UI can access them
+            // without crashes, but isAnonymous() returns true because steam.userInput is not set.
+            this.gameLibrary.setUserData(demoUser)
 
             this.storeSteamDataAndEmitEvent(null)
             await this.emitGamesInBatches(games)
@@ -360,9 +369,8 @@ export class SteamIntegration {
      * Emits games as GamesBatchReady events in shelf-sized batches, yielding between each.
      * Shares BatchEmitter with GamesLoader's network-progressive path — see BatchEmitter's
      * own docs for why the batching contract is identical even though these games (demo
-     * fixtures / imported libraries) are already fully known in memory, unlike a network
-     * fetch. Games are cloned per-batch since the demo fixture (ANONYMOUS_STORE_USER) is a
-     * shared module-level object reused across every anonymous-store load.
+     * store / imported libraries) are already fully known in memory, unlike a network
+     * fetch. Games are cloned per-batch defensively, since callers may reuse the source array.
      */
     private async emitGamesInBatches(games: SteamGame[]): Promise<void> {
         const BATCH_SIZE = GameLayoutConstants.GAMES_PER_SURFACE * GameLayoutConstants.SURFACES_PER_SHELF

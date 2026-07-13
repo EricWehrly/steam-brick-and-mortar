@@ -13,7 +13,6 @@ import {
 import type { SteamGameData } from '../game-box/types/GameData'
 import { GpuGameBoxRenderer } from '../game-box/GpuGameBoxRenderer'
 import { GameBoxSpawner } from '../spawning/GameBoxSpawner'
-import { ANONYMOUS_STORE_USER } from '../../steam/fixtures/demo-games'
 import { DEFAULT_SHELF_CONFIG } from '../props/shared/SharedPropsTypes'
 
 export type ShowcaseTuningFamily = 'roughness' | 'fresnel' | 'shadowContact'
@@ -26,7 +25,10 @@ export interface ShowcaseComparisonSlot {
     readonly presetName: 'baseline' | 'variant-a' | 'variant-b'
 }
 
-export const SHOWCASE_REFERENCE_GAMES = ANONYMOUS_STORE_USER.games.slice(0, 3).map((game) => game.appid)
+// Fixed appids only - just needs 3 known-valid ids for grid layout, not full game data.
+// The full SteamGameData (name/artwork/genres) this used to borrow from demo-games.ts's
+// hardcoded fixture no longer has a synchronous source - see spawnComparisonGrid() below.
+export const SHOWCASE_REFERENCE_GAMES = [440, 570, 730]
 
 export function buildShowcaseComparisonGrid(tuningFamily: ShowcaseTuningFamily): ReadonlyArray<ShowcaseComparisonSlot> {
     void tuningFamily
@@ -68,50 +70,15 @@ export class ShowcaseBootstrapPath implements BootstrapPath {
     }
 
     private async spawnComparisonGrid(): Promise<void> {
-        const comparisonSlots = buildShowcaseComparisonGrid('roughness')
-        if (comparisonSlots.length === 0) {
-            return
-        }
-
-        this.addShowcaseShelves(comparisonSlots)
-
-        if (!this.showcaseGameBoxRenderer) {
-            this.showcaseGameBoxRenderer = new GpuGameBoxRenderer(32, 32, 16)
-        }
-
-        const lookup = new Map(ANONYMOUS_STORE_USER.games.map((game) => [game.appid, game]))
-        const showcaseGames = comparisonSlots.flatMap((slot) => {
-            const game = lookup.get(slot.appid)
-            return game ? [game] : []
-        })
-
-        // First trigger artwork prefetch
-        const eventManager = EventManager.getInstance()
-        eventManager.emit<BatchReadyForPlacementEvent>(StorePropsEventTypes.BatchReadyForPlacement, {
-            games: showcaseGames,
-            batchIndex: 0,
-            totalBatches: 1,
-        })
-
-        const readyPlacements = comparisonSlots.flatMap((slot) => {
-            const game = lookup.get(slot.appid)
-            if (!game) {
-                return []
-            }
-
-            return [{
-                game: game as SteamGameData,
-                position: new THREE.Vector3(
-                    slot.x,
-                    ShowcaseBootstrapPath.SHOWCASE_SHELF_Y + (ShowcaseBootstrapPath.SHOWCASE_GAME_HEIGHT / 2) + slot.y,
-                    -1.6 + slot.z
-                ),
-                rotation: new THREE.Quaternion(),
-            }]
-        })
-
-        GameBoxSpawner.emitPlacementIntents(readyPlacements)
-        console.info(`Showcase spawned ${comparisonSlots.length} comparison boxes`)
+        // BROKEN, INTENTIONALLY: this used to source full SteamGameData (name/artwork/genres)
+        // from demo-games.ts's hardcoded ANONYMOUS_STORE_USER fixture, which is gone - the
+        // anonymous store now builds its game list asynchronously from AppDetailsCache (see
+        // SteamIntegration.loadDemoGames), and this bootstrap path has no equivalent synchronous
+        // source to borrow from. SHOWCASE_MODE_ENABLED is hardcoded false in SceneCoordinator,
+        // so this is unreachable in practice. Wire this up to real demo-store data (await
+        // SteamApiClient.getFreeToPlayGames(), or a small fixed lookup of its own) before
+        // flipping that flag back on.
+        alert('ShowcaseBootstrapPath is broken - wire it up to real demo-store data before using it (see spawnComparisonGrid in ShowcaseBootstrapPath.ts)')
     }
 
     private addShowcaseShelves(slots: ReadonlyArray<ShowcaseComparisonSlot>): void {

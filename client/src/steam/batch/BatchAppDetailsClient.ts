@@ -22,6 +22,12 @@ export interface AppDetailsData extends SteamGameMetadata {
     };
     // Additional fields from Steam Store API
     full_data?: Record<string, unknown>;
+    /**
+     * Our own metadata, not sourced from Steam or SteamSpy - set by scripts/bake-f2p-artwork.sh
+     * when this appid's library_600x900.jpg 404'd against Steam's CDN at bake time. Only present
+     * (true) on the exceptional case; absent otherwise. See docs/plans/f2p-artwork-bake-plan.md.
+     */
+    undesirable_for_demo?: boolean;
     [key: string]: unknown;
 }
 

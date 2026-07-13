@@ -1,9 +1,7 @@
 /**
- * Seeds AppDetailsCache from the static bundles produced by
- * scripts/repack-steam-cache.sh (release.sh Step 2) - client/public/steam-cache/.
+ * Seeds AppDetailsCache from the static bundle produced by
+ * scripts/repack-steam-cache.sh (release.sh Step 2) - client/public/steam-cache/app-details.json.gz.
  *
- * Fetches the small free-to-play bundle first so the anonymous store can
- * render immediately, then the larger "rest" bundle in the background.
  * If IndexedDB already has entries, skips entirely - see docs/plans/release-pipeline-plan.md
  * for why this coarse check is a placeholder, not the real cache-buster.
  */
@@ -24,15 +22,7 @@ interface BakedCacheBundle {
     games: Record<string, BakedCacheEntry>
 }
 
-interface BakedCacheTier {
-    label: string
-    path: string
-}
-
-const BAKED_CACHE_TIERS: readonly BakedCacheTier[] = [
-    { label: 'f2p', path: '/steam-cache/app-details-f2p.json.gz' },
-    { label: 'rest', path: '/steam-cache/app-details-rest.json.gz' },
-]
+const BAKED_CACHE_BUNDLE_PATH = '/steam-cache/app-details.json.gz'
 
 export class BakedCacheLoader {
     private static readonly logger = Logger.createLogFunctions(BakedCacheLoader.name)
@@ -43,7 +33,7 @@ export class BakedCacheLoader {
     }
 
     /**
-     * Seed the cache from baked bundles, unless IndexedDB already has data.
+     * Seed the cache from the baked bundle, unless IndexedDB already has data.
      * Fire-and-forget from the caller - never blocks scene startup.
      */
     async seedIfNeeded(): Promise<void> {
@@ -53,22 +43,20 @@ export class BakedCacheLoader {
             return
         }
 
-        BakedCacheLoader.logger.info('No existing app-details cache found - seeding from baked release bundles')
-        for (const tier of BAKED_CACHE_TIERS) {
-            await this.seedTier(tier)
-        }
+        BakedCacheLoader.logger.info('No existing app-details cache found - seeding from baked release bundle')
+        await this.seedBundle()
     }
 
-    private async seedTier(tier: BakedCacheTier): Promise<void> {
-        BakedCacheLoader.logger.debug(`Fetching baked cache tier "${tier.label}" from ${tier.path}`)
+    private async seedBundle(): Promise<void> {
+        BakedCacheLoader.logger.debug(`Fetching baked cache bundle from ${BAKED_CACHE_BUNDLE_PATH}`)
 
         let response: Response
         try {
-            response = await fetch(tier.path)
+            response = await fetch(BAKED_CACHE_BUNDLE_PATH)
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error))
             BakedCacheLoader.logger.warn(
-                `Baked cache tier "${tier.label}" fetch rejected before any response arrived ` +
+                `Baked cache bundle fetch rejected before any response arrived ` +
                 `(${err.name}: ${err.message}). This means the request never completed - not a ` +
                 `404/missing file (those are handled separately below). Likely causes: offline/` +
                 `throttled network or a browser extension blocking the request.`
@@ -82,17 +70,28 @@ export class BakedCacheLoader {
             // reproduced only under rapid automated reloads, not realistic single-navigation use,
             // and not expected against a production static host or Tauri's asset protocol).
             // Either way, falling through to the normal Lambda-backed fetch path is correct.
-            BakedCacheLoader.logger.debug(`Baked cache tier "${tier.label}" unavailable (HTTP ${response.status}) - skipping`)
+            BakedCacheLoader.logger.debug(`Baked cache bundle unavailable (HTTP ${response.status}) - skipping`)
             return
         }
         if (!response.body) {
-            BakedCacheLoader.logger.warn(`Baked cache tier "${tier.label}" response has no body - skipping`)
+            BakedCacheLoader.logger.warn(`Baked cache bundle response has no body - skipping`)
             return
         }
 
         try {
-            const decompressed = response.body.pipeThrough(new DecompressionStream('gzip'))
-            const text = await new Response(decompressed).text()
+            // Some static hosts (observed: this project's Vite dev server) recognize the .gz
+            // extension and serve these files with Content-Encoding: gzip set. fetch() then
+            // transparently decompresses the body before we ever see it, leaving response.body
+            // as plain JSON already - piping that through another DecompressionStream fails
+            // ("incorrect header check", since JSON bytes aren't a valid gzip magic number).
+            // Other hosts serve the raw gzip bytes opaquely (no Content-Encoding, or
+            // Content-Encoding: identity) and expect us to decompress client-side, which is the
+            // whole point of shipping .gz files instead of a bigger plain .json. Branch on the
+            // header actually observed rather than assuming either behavior.
+            const alreadyDecompressed = response.headers.get('content-encoding')?.toLowerCase() === 'gzip'
+            const text = alreadyDecompressed
+                ? await response.text()
+                : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).text()
             const bundle = JSON.parse(text) as BakedCacheBundle
 
             const dataMap = new Map<number, AppDetailsData>(
@@ -100,16 +99,14 @@ export class BakedCacheLoader {
             )
 
             BakedCacheLoader.logger.debug(
-                `Parsed baked cache tier "${tier.label}": ${dataMap.size} games (generated_at: ${bundle.generated_at})`
+                `Parsed baked cache bundle: ${dataMap.size} games (generated_at: ${bundle.generated_at})`
             )
 
             await this.appDetailsCache.setMany(dataMap)
 
-            BakedCacheLoader.logger.info(
-                `Seeded ${dataMap.size} games from baked cache tier "${tier.label}"`
-            )
+            BakedCacheLoader.logger.info(`Seeded ${dataMap.size} games from baked cache bundle`)
         } catch (error) {
-            BakedCacheLoader.logger.warn(`Failed to parse/seed baked cache tier "${tier.label}":`, error)
+            BakedCacheLoader.logger.warn(`Failed to parse/seed baked cache bundle:`, error)
         }
     }
 }
