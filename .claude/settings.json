@@ -3,7 +3,9 @@
     "allow": [
       "Bash(yarn test *)",
       "Bash(git status *)",
-      "Bash(rtk git status *)"
+      "Bash(rtk git status *)",
+      "Bash(rtk git diff *)",
+      "Bash(rtk git log *)"
     ]
   }
 }
