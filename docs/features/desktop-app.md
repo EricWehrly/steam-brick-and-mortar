@@ -147,8 +147,10 @@ what the spike is resolving. Scaffold lives in `desktop/tauri-app/` (alongside
 - [Scene Clutter & Props (harvested)](scene-clutter-and-props.md) — Tier C/D depend on this
 - [Fabricated Set Dressing](fabricated-set-dressing.md) — peripheral enumeration, coming-attractions content
 - [Local File Investigation](local-file-investigation.md) — AC4.4 re-entry; same FS-blocklist driver
+- [Desktop Local Data Pipeline Plan](../plans/desktop-local-data-pipeline-plan.md) — concrete next step: wiring local Steam file mining into desktop startup, alongside the "Connect Steam" flow above
 - [Input System](input-system.md) — in-browser peripheral-detection ceiling
 - [Manual Library Export](../archive/manual-library-export-feasibility.md) — the capture channel the desktop app integrates as "Connect Steam"
+- [Source Game Discovery](../plans/source-game-discovery-plan.md) — Phase 1 (local script) built; Phase 2 (desktop app → Lambda → S3) deferred pending this doc's own decision
 - [Release Pipeline](../plans/release-pipeline-plan.md) — web + desktop release + the S3 cache bake
 - [Traffic Safety Review](../plans/traffic-safety-review.md) — reducing request volume to Steam (the real goal)
 - Act linkage: [Act 4 — Encore](../acts/act4-encore-someday-maybe.md)
