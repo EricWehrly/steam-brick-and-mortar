@@ -52,6 +52,13 @@ pub enum BinaryValue {
 }
 
 impl BinaryValue {
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            BinaryValue::Str(s) => Some(s),
+            _ => None,
+        }
+    }
+
     pub fn as_obj(&self) -> Option<&[(String, BinaryValue)]> {
         match self {
             BinaryValue::Obj(entries) => Some(entries),
@@ -72,9 +79,6 @@ impl BinaryValue {
         self.as_obj()?.iter().find(|(k, _)| k == key).map(|(_, v)| v)
     }
 
-    pub fn path(&self, keys: &[&str]) -> Option<&BinaryValue> {
-        keys.iter().try_fold(self, |node, key| node.get(key))
-    }
 }
 
 struct Reader<'a> {
@@ -222,9 +226,10 @@ impl AppInfoFile {
         Ok(AppInfoFile { data, string_table, spans })
     }
 
-    /// Decodes one app's `appinfo.common` block on demand. Returns `Ok(None)` if the appid
-    /// isn't in this file at all (the client has never cached info for it).
-    pub fn get_common(&self, appid: u32) -> Result<Option<BinaryValue>, String> {
+    /// Decodes one app's whole `appinfo` root (both `common` and `extended` children) on
+    /// demand. Returns `Ok(None)` if the appid isn't in this file at all (the client has never
+    /// cached info for it). Private: `get_local_metadata` is the public entry point.
+    fn decode_appinfo_root(&self, appid: u32) -> Result<Option<BinaryValue>, String> {
         let Some(&(start, end)) = self.spans.get(&appid) else {
             return Ok(None);
         };
@@ -242,32 +247,69 @@ impl AppInfoFile {
 
         let root = parse_kv_tree(&mut reader, &self.string_table)?;
         let root = BinaryValue::Obj(root);
-        Ok(root.path(&["appinfo", "common"]).cloned())
+        Ok(root.get("appinfo").cloned())
     }
 
-    /// This app's community tags, in the same popularity rank order Steam's store page shows,
-    /// as raw numeric tag IDs — resolve to names via `localization::TagNames`.
-    pub fn get_store_tag_ids(&self, appid: u32) -> Result<Vec<u32>, String> {
-        let Some(common) = self.get_common(appid)? else {
-            return Ok(Vec::new());
+    /// The fields this app's local metadata pipeline actually wants: name (from `common`), and
+    /// developer/publisher (single strings in `extended`, not the `common.associations` array
+    /// shape — both were confirmed identical in the research pass, `extended` is simpler to
+    /// read). Raw tag ids, not yet resolved to names — see `read_local_app_metadata` for that.
+    pub fn get_local_metadata(&self, appid: u32) -> Result<Option<RawLocalAppMetadata>, String> {
+        let Some(root) = self.decode_appinfo_root(appid)? else {
+            return Ok(None);
         };
-        let Some(tags) = common.get("store_tags").and_then(|v| v.as_obj()) else {
-            return Ok(Vec::new());
-        };
-        Ok(tags.iter().filter_map(|(_, v)| v.as_i64()).map(|id| id as u32).collect())
+        let common = root.get("common");
+        let extended = root.get("extended");
+
+        let name = common.and_then(|c| c.get("name")).and_then(|v| v.as_str()).map(str::to_string);
+        let developers = extended
+            .and_then(|e| e.get("developer"))
+            .and_then(|v| v.as_str())
+            .map(|s| vec![s.to_string()])
+            .unwrap_or_default();
+        let publishers = extended
+            .and_then(|e| e.get("publisher"))
+            .and_then(|v| v.as_str())
+            .map(|s| vec![s.to_string()])
+            .unwrap_or_default();
+        let tag_ids = common
+            .and_then(|c| c.get("store_tags"))
+            .and_then(|v| v.as_obj())
+            .map(|tags| tags.iter().filter_map(|(_, v)| v.as_i64()).map(|id| id as u32).collect())
+            .unwrap_or_default();
+
+        Ok(Some(RawLocalAppMetadata { name, developers, publishers, tag_ids }))
     }
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct AppTags {
+/// Un-resolved intermediate shape — `tag_ids` are still numeric, resolved to names by the
+/// Tauri command layer (which has access to `localization::TagNames`, not this module).
+#[derive(Debug, Default, PartialEq)]
+pub struct RawLocalAppMetadata {
+    pub name: Option<String>,
+    pub developers: Vec<String>,
+    pub publishers: Vec<String>,
+    pub tag_ids: Vec<u32>,
+}
+
+/// What the client's `AppDetailsCache` writer actually wants per appid: enough to build a
+/// partial-but-valid enrichment entry without touching the network. `name`/`developers`/
+/// `publishers` are `None`/empty when this appid has no cached appinfo entry at all (client
+/// never loaded info for it) rather than failing the whole batch — see
+/// `docs/plans/desktop-local-data-pipeline-plan.md` for how the client normalizes this.
+#[derive(Debug, Clone, Serialize, PartialEq, Default)]
+pub struct LocalAppMetadata {
     pub appid: u32,
+    pub name: Option<String>,
+    pub developers: Vec<String>,
+    pub publishers: Vec<String>,
     /// Rank-ordered (most popular first), resolved to names. IDs with no entry in
     /// `localization.vdf` are skipped rather than failing the whole app's result.
     pub tags: Vec<String>,
 }
 
 #[tauri::command]
-pub fn read_steam_tags(appids: Vec<u32>) -> Result<Vec<AppTags>, String> {
+pub fn read_local_app_metadata(appids: Vec<u32>) -> Result<Vec<LocalAppMetadata>, String> {
     let steam_root = super::paths::find_steam_root().ok_or("Steam install not found")?;
     let appinfo = AppInfoFile::load(&steam_root.join("appcache").join("appinfo.vdf"))?;
     let tag_names = super::localization::TagNames::load(
@@ -276,12 +318,19 @@ pub fn read_steam_tags(appids: Vec<u32>) -> Result<Vec<AppTags>, String> {
 
     let mut results = Vec::with_capacity(appids.len());
     for appid in appids {
-        let tag_ids = appinfo.get_store_tag_ids(appid)?;
-        let tags = tag_ids
+        let raw = appinfo.get_local_metadata(appid)?.unwrap_or_default();
+        let tags = raw
+            .tag_ids
             .into_iter()
             .filter_map(|id| tag_names.resolve(id).map(str::to_string))
             .collect();
-        results.push(AppTags { appid, tags });
+        results.push(LocalAppMetadata {
+            appid,
+            name: raw.name,
+            developers: raw.developers,
+            publishers: raw.publishers,
+            tags,
+        });
     }
     Ok(results)
 }
@@ -291,9 +340,10 @@ mod tests {
     use super::*;
 
     /// Builds a minimal but structurally real appinfo.vdf buffer: header, one app entry
-    /// (`common.name` = "Test Game", `common.store_tags` = [rank 0 -> id 10, rank 1 -> id 20]),
-    /// terminator, and a string table — enough to exercise every branch of the parser without
-    /// needing a real Steam install.
+    /// (`common.name` = "Test Game", `common.store_tags` = [rank 0 -> id 10, rank 1 -> id 20],
+    /// `extended.developer`/`.publisher` = "Test Studio"/"Test Publisher"), terminator, and a
+    /// string table — enough to exercise every branch of the parser without needing a real
+    /// Steam install.
     fn build_sample_appinfo() -> Vec<u8> {
         // String table indices, assigned in the order first used below.
         const IDX_APPINFO: u32 = 0;
@@ -302,10 +352,18 @@ mod tests {
         const IDX_STORE_TAGS: u32 = 3;
         const IDX_ZERO: u32 = 4; // key "0"
         const IDX_ONE: u32 = 5; // key "1"
-        let strings = ["appinfo", "common", "name", "store_tags", "0", "1"];
+        const IDX_EXTENDED: u32 = 6;
+        const IDX_DEVELOPER: u32 = 7;
+        const IDX_PUBLISHER: u32 = 8;
+        let strings = [
+            "appinfo", "common", "name", "store_tags", "0", "1", "extended", "developer", "publisher",
+        ];
 
         let mut kv = Vec::new();
-        // root: "appinfo" -> { "common" -> { "name" -> "Test Game", "store_tags" -> { "0": 10, "1": 20 } } }
+        // root: "appinfo" -> {
+        //   "common" -> { "name" -> "Test Game", "store_tags" -> { "0": 10, "1": 20 } },
+        //   "extended" -> { "developer" -> "Test Studio", "publisher" -> "Test Publisher" },
+        // }
         kv.push(TYPE_NONE);
         kv.extend_from_slice(&IDX_APPINFO.to_le_bytes());
         {
@@ -330,6 +388,20 @@ mod tests {
                     kv.push(TYPE_END); // close store_tags
                 }
                 kv.push(TYPE_END); // close common
+            }
+
+            kv.push(TYPE_NONE);
+            kv.extend_from_slice(&IDX_EXTENDED.to_le_bytes());
+            {
+                kv.push(TYPE_STRING);
+                kv.extend_from_slice(&IDX_DEVELOPER.to_le_bytes());
+                kv.extend_from_slice(b"Test Studio\0");
+
+                kv.push(TYPE_STRING);
+                kv.extend_from_slice(&IDX_PUBLISHER.to_le_bytes());
+                kv.extend_from_slice(b"Test Publisher\0");
+
+                kv.push(TYPE_END); // close extended
             }
             kv.push(TYPE_END); // close appinfo
         }
@@ -377,39 +449,50 @@ mod tests {
     }
 
     #[test]
-    fn parses_common_name() {
+    fn parses_store_tags_in_rank_order() {
         let file = AppInfoFile::parse(build_sample_appinfo()).unwrap();
-        let common = file.get_common(42).unwrap().unwrap();
-        assert!(matches!(common.get("name"), Some(BinaryValue::Str(s)) if s == "Test Game"));
+        let metadata = file.get_local_metadata(42).unwrap().unwrap();
+        assert_eq!(metadata.tag_ids, vec![10, 20]);
     }
 
     #[test]
-    fn parses_store_tags_in_rank_order() {
+    fn parses_local_metadata_including_extended_block() {
         let file = AppInfoFile::parse(build_sample_appinfo()).unwrap();
-        let tag_ids = file.get_store_tag_ids(42).unwrap();
-        assert_eq!(tag_ids, vec![10, 20]);
+        let metadata = file.get_local_metadata(42).unwrap().unwrap();
+        assert_eq!(metadata.name.as_deref(), Some("Test Game"));
+        assert_eq!(metadata.developers, vec!["Test Studio".to_string()]);
+        assert_eq!(metadata.publishers, vec!["Test Publisher".to_string()]);
+        assert_eq!(metadata.tag_ids, vec![10, 20]);
     }
 
     #[test]
     fn unknown_appid_returns_none_not_error() {
         let file = AppInfoFile::parse(build_sample_appinfo()).unwrap();
-        assert_eq!(file.get_common(999).unwrap(), None);
-        assert_eq!(file.get_store_tag_ids(999).unwrap(), Vec::<u32>::new());
+        assert_eq!(file.get_local_metadata(999).unwrap(), None);
     }
 
     /// Real-machine check — `#[ignore]`d by default. Verifies against Portal 2 (appid 620),
-    /// whose real `store_tags` were decoded and eyeballed during the original research pass
-    /// (Singleplayer/Platformer/Puzzle/... in that rank order) — this just re-confirms the
-    /// production Rust reader agrees with that research finding, not a new hardcoded appid
-    /// assumption about *this* machine (620 is Valve's own appid, not account-specific).
+    /// whose real name/developer/publisher/tags were decoded and eyeballed during the original
+    /// research pass — this re-confirms the production Rust reader agrees with that research
+    /// finding, not a new hardcoded assumption about *this* machine (620 is Valve's own appid,
+    /// not account-specific).
     #[test]
     #[ignore]
-    fn reads_real_portal_2_tags_on_this_machine() {
+    fn reads_real_portal_2_local_metadata_on_this_machine() {
         let steam_root = super::super::paths::find_steam_root().expect("expected a Steam install");
         let file = AppInfoFile::load(&steam_root.join("appcache").join("appinfo.vdf"))
             .expect("expected a readable appinfo.vdf");
-        let tag_ids = file.get_store_tag_ids(620).expect("expected readable store_tags for Portal 2");
-        assert!(!tag_ids.is_empty(), "expected Portal 2 to have cached store tags");
-        println!("Portal 2 raw tag IDs: {tag_ids:?}");
+        let metadata = file
+            .get_local_metadata(620)
+            .expect("expected readable local metadata for Portal 2")
+            .expect("expected Portal 2 to be present in appinfo.vdf");
+        assert_eq!(metadata.name.as_deref(), Some("Portal 2"));
+        assert_eq!(metadata.developers, vec!["Valve".to_string()]);
+        assert_eq!(metadata.publishers, vec!["Valve".to_string()]);
+        assert!(!metadata.tag_ids.is_empty(), "expected Portal 2 to have cached store tags");
+        println!(
+            "Portal 2 local metadata: name={:?} developers={:?} publishers={:?} tag_ids={:?}",
+            metadata.name, metadata.developers, metadata.publishers, metadata.tag_ids
+        );
     }
 }
