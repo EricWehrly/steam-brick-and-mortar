@@ -81,10 +81,11 @@ earlier just means more cache hits, fewer Lambda round-trips, sooner.
 Two shapes need a normalization step before they fit `AppDetailsData` (see findings doc §6 for the
 raw shapes):
 - `genres`/`category_N` (numeric IDs) → `AppDetailsData.genres` / `.categories`
-  (`[{id, description}]`) needs a static id→name table. Not present locally; source once (e.g.
-  scrape from any single live `appdetails` response, or SteamKit2's published enum) and ship as a
-  small static asset. Low priority — this data is redundant with `appdetails` per the provenance
-  doc, so a missing/incomplete table only means slower pre-warm, not missing functionality.
+  (`[{id, description}]`) needs an id→name table. **Decision** (see task 10 below and
+  `taxonomy-data-event-plan.md`): source it from the pre-baked `appdetails` bundle already present
+  in `client/public/steam-cache/`, not a live network fetch — this data is redundant with
+  `appdetails` per the provenance doc either way, so a missing/incomplete table only means slower
+  pre-warm, not missing functionality.
 - `store_tags` (rank-ordered ids) → `AppDetailsData.steamspy_tags` (`Record<string, number>`,
   vote-count-shaped) needs a rank→weight synthesis (e.g. `weight = 20 - rank_index`) and the
   `appcache/localization.vdf` id→name table (present locally, trivial text-VDF parse). Higher
@@ -155,32 +156,71 @@ Rust-side (new — `desktop/tauri-app/src/steam/`):
    scan fallback (no non-`C:` install available to test against) — worth knowing those two
    remain unverified rather than assuming the whole chain is proven end-to-end.
 
-Client-side (`client/src/`) — **not started**:
-5. Normalization: `store_tags` (+ `localization.vdf` names) → `steamspy_tags`-shaped
-   `Record<string, number>`; local playtime/last-played/collections → `SteamGame` fields.
-6. New writer path into `AppDetailsCache` (alongside the existing Lambda-fetch writer) — same
-   `setMany()`, no schema change unless the normalized shape needs a new optional field.
-7. Startup orchestration: call the Tauri command early, stream results through the
-   `BatchEmitter`-style event sequence described above.
-8. First-run vs. subsequent-run branch: skip the demo-store phase when a prior local-scan result
-   already exists in cache.
+Also **✅ Done**, not originally numbered: binary `appinfo.vdf` reader (`appinfo.rs`, magic
+`0x07564429`, string-table variant) plus `localization.vdf` tag-name resolution — was task 2/"next
+up" as of the last update to this doc; built and byte-exact-verified against real Portal 2 data
+in the same session (`get_local_metadata` returns name/developers/publishers/rank-ordered tags;
+see commit history for `appinfo.rs`/`localization.rs`).
 
-Verification aid (landed ahead of schedule): a `client/src/debug/LocalSteamDataInspector.ts`
-console-log tool (mirrors the existing `GameFinder.ts`/`GameArtworkInspector.ts` self-executing
-debug-tool convention) that calls the three Rust commands and prints results — lets the identity/
-playtime/collections data be manually inspected in a running desktop build before tasks 5-8 wire
-it into the real pipeline.
+Client-side (`client/src/`):
+5. ✅ **Done, partial.** Tags → `steamspy_tags`-shaped `Record<string, number>` (descending
+   rank-derived weight) — `LocalSteamDataWriter.buildWeightedTags`. **Not done**: local
+   playtime/last-played → `SteamGame` fields (nothing currently merges local playtime into the
+   game list — `LocalSteamDataWriter` only touches `AppDetailsCache`, not any `SteamGame`/
+   ownership-shaped structure), and **user collections have no home in the type system at all
+   yet** — `read_steam_collections` works and is console-logged, but nothing normalizes or
+   writes it anywhere. Both are real gaps, not follow-on polish — see the taxonomy-event plan
+   below, which needs collections wired in to do anything useful with them.
+6. ✅ **Done.** `LocalSteamDataWriter` writes into `AppDetailsCache` via the existing `setMany()`
+   — no `AppDetailsCache`/`GamesLoader` changes needed, confirming the plan's architecture bet.
+7. **Partially done — narrower than "finished."** The Tauri commands *are* called early
+   (`LocalSteamDataInspector`'s `GameEventTypes.Start` hook) and the write does happen before any
+   user interaction, so the spirit of "call it early" is satisfied. But this is currently a
+   single one-shot `await` chain living in a **debug tool**, not a first-class startup path, and
+   it does **not** stream through a `BatchEmitter`-style batched event sequence — there's exactly
+   one `setMany()` call, no progressive batches, no dedicated event marking "local taxonomy data
+   landed" (see the new taxonomy-event plan below — that gap is now the more important one, and
+   folds this task into it rather than finishing it standalone).
+8. Not started. Depends on the taxonomy-event work below reaching a point where "is there useful
+   cached data already" is answerable cheaply.
+
+New, not in the original list — **found via this session's identity-display investigation**:
+12. **Small, concrete bug, not just a desktop gap**: no UI anywhere — web or desktop — has ever
+    displayed a Steam persona name. The in-scene "X's Steam Library" sign
+    (`SceneSignManager.ts:104-115`) uses `resolveDisplayName(vanity_url)` (`SteamIntegration.ts:104,143-146`),
+    a URL slug, because `SteamUser` (`SteamApiClient.ts:33-39`) has no `personaname` field at all.
+    Desktop's `read_steam_identity` result dead-ends at `LocalSteamDataInspector`'s console.log —
+    nothing routes it into `storeSteamDataAndEmitEvent`'s displayName path. Fix is two small
+    pieces: (a) plumb `persona_name` into that path on desktop, (b) prefer it over `vanity_url`
+    wherever both are available (persona name is a real display name; the slug never was).
+13. **User collections schema + writer** — `AppDetailsData`/`SteamGame` need a field for "which
+    collection(s) does this appid belong to" before "sort by user collections" can exist at all.
+    Currently nothing (see task 5). Prerequisite for the taxonomy-event plan's desktop default-sort
+    behavior.
 
 Housekeeping / deferred:
 9. Wire `build_web()`/`build_desktop()` in `scripts/release.sh` — **de-scoped**, see prerequisite
    check §1 above. Revisit only if the baked-cache path becomes relevant again.
-10. Source a static genre/category id→name table (low priority, redundant data — see above).
+10. **Pulled forward — no longer low priority.** Static genre/category id→name table. Elevated
+    because the new taxonomy-event plan (see below) wants to offer genre/category as sort/filter
+    dimensions the same way it offers tags, and right now local genre/category data is numeric-id-only
+    with nowhere to resolve names. **Decision** (see
+    [`taxonomy-data-event-plan.md`](taxonomy-data-event-plan.md)): harvest from the **already-present
+    pre-baked `appdetails` bundle** (`client/public/steam-cache/app-details.json.gz`, confirmed on
+    disk this session) rather than live network `appdetails` responses — zero Lambda dependency,
+    reachable today regardless of the still-unwired `scripts/release.sh` re-bake automation (§1
+    above, which is about future re-bakes, not today's existing bundle). Coverage/freshness of that
+    bundle at real-library scale is explicitly deferred to a post-friends-testing data-integrity
+    audit, not blocking this task.
 11. **Act 3, pre-ship**: a manual "browse or paste your Steam install folder" fallback UI for
     when all four `find_steam_root` strategies above come up empty (non-standard install, Steam
     on a network drive, a future OS-version registry change, etc.). Not needed for this plan's
     development/testing phase — every strategy or the dev machine's own install covers that — but
     ship-blocking for real users whose machine doesn't match any of the four strategies. Track in
     the relevant Act 3 doc when this plan reaches implementation of tasks 5-8.
+14. **Roadmap note, not scheduled**: revisiting "Connect Steam" priority/framing on desktop,
+    achievement-cache data, and a bounded "eager ownership" heuristic — see the new subsection in
+    [`desktop-app.md`](../features/desktop-app.md#revisit-connect-steam-priority-ownership-signals-not-yet-scheduled).
 
 ## Explicitly out of scope for this plan
 
