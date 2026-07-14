@@ -278,7 +278,31 @@ impl AppInfoFile {
             .map(|tags| tags.iter().filter_map(|(_, v)| v.as_i64()).map(|id| id as u32).collect())
             .unwrap_or_default();
 
-        Ok(Some(RawLocalAppMetadata { name, developers, publishers, tag_ids }))
+        // `common.genres` is index->id ("0" -> 1, "1" -> 25, ...), not rank/name-keyed - just
+        // the numeric genre ids in whatever order Steam wrote them.
+        let genre_ids = common
+            .and_then(|c| c.get("genres"))
+            .and_then(|v| v.as_obj())
+            .map(|genres| genres.iter().filter_map(|(_, v)| v.as_i64()).map(|id| id as u32).collect())
+            .unwrap_or_default();
+
+        // `common.category` is a flat set of boolean flags keyed "category_<id>" -> 1, not a
+        // list - the category id lives in the key name itself, per
+        // docs/research/local-steam/desktop-offline-data-mining-findings.md.
+        let category_ids = common
+            .and_then(|c| c.get("category"))
+            .and_then(|v| v.as_obj())
+            .map(|categories| {
+                categories
+                    .iter()
+                    .filter(|(_, v)| v.as_i64().map(|flag| flag != 0).unwrap_or(false))
+                    .filter_map(|(key, _)| key.strip_prefix("category_"))
+                    .filter_map(|id| id.parse::<u32>().ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        Ok(Some(RawLocalAppMetadata { name, developers, publishers, tag_ids, genre_ids, category_ids }))
     }
 }
 
@@ -290,6 +314,8 @@ pub struct RawLocalAppMetadata {
     pub developers: Vec<String>,
     pub publishers: Vec<String>,
     pub tag_ids: Vec<u32>,
+    pub genre_ids: Vec<u32>,
+    pub category_ids: Vec<u32>,
 }
 
 /// What the client's `AppDetailsCache` writer actually wants per appid: enough to build a
@@ -306,6 +332,11 @@ pub struct LocalAppMetadata {
     /// Rank-ordered (most popular first), resolved to names. IDs with no entry in
     /// `localization.vdf` are skipped rather than failing the whole app's result.
     pub tags: Vec<String>,
+    /// Raw numeric ids, unresolved - no id->name table exists on the Rust side. The client
+    /// resolves these against the baked appdetails bundle (`TaxonomyIdResolver`) - see
+    /// docs/plans/taxonomy-data-event-plan.md.
+    pub genre_ids: Vec<u32>,
+    pub category_ids: Vec<u32>,
 }
 
 #[tauri::command]
@@ -330,6 +361,8 @@ pub fn read_local_app_metadata(appids: Vec<u32>) -> Result<Vec<LocalAppMetadata>
             developers: raw.developers,
             publishers: raw.publishers,
             tags,
+            genre_ids: raw.genre_ids,
+            category_ids: raw.category_ids,
         });
     }
     Ok(results)
@@ -341,6 +374,7 @@ mod tests {
 
     /// Builds a minimal but structurally real appinfo.vdf buffer: header, one app entry
     /// (`common.name` = "Test Game", `common.store_tags` = [rank 0 -> id 10, rank 1 -> id 20],
+    /// `common.genres` = {"0": 1, "1": 25}, `common.category` = {"category_2": 1, "category_9": 1},
     /// `extended.developer`/`.publisher` = "Test Studio"/"Test Publisher"), terminator, and a
     /// string table — enough to exercise every branch of the parser without needing a real
     /// Steam install.
@@ -355,13 +389,21 @@ mod tests {
         const IDX_EXTENDED: u32 = 6;
         const IDX_DEVELOPER: u32 = 7;
         const IDX_PUBLISHER: u32 = 8;
+        const IDX_GENRES: u32 = 9;
+        const IDX_CATEGORY: u32 = 10;
+        const IDX_CATEGORY_2: u32 = 11; // key "category_2"
+        const IDX_CATEGORY_9: u32 = 12; // key "category_9"
         let strings = [
             "appinfo", "common", "name", "store_tags", "0", "1", "extended", "developer", "publisher",
+            "genres", "category", "category_2", "category_9",
         ];
 
         let mut kv = Vec::new();
         // root: "appinfo" -> {
-        //   "common" -> { "name" -> "Test Game", "store_tags" -> { "0": 10, "1": 20 } },
+        //   "common" -> {
+        //     "name" -> "Test Game", "store_tags" -> { "0": 10, "1": 20 },
+        //     "genres" -> { "0": 1, "1": 25 }, "category" -> { "category_2": 1, "category_9": 1 },
+        //   },
         //   "extended" -> { "developer" -> "Test Studio", "publisher" -> "Test Publisher" },
         // }
         kv.push(TYPE_NONE);
@@ -386,6 +428,34 @@ mod tests {
                     kv.extend_from_slice(&20i32.to_le_bytes());
 
                     kv.push(TYPE_END); // close store_tags
+                }
+
+                kv.push(TYPE_NONE);
+                kv.extend_from_slice(&IDX_GENRES.to_le_bytes());
+                {
+                    kv.push(TYPE_INT32);
+                    kv.extend_from_slice(&IDX_ZERO.to_le_bytes());
+                    kv.extend_from_slice(&1i32.to_le_bytes());
+
+                    kv.push(TYPE_INT32);
+                    kv.extend_from_slice(&IDX_ONE.to_le_bytes());
+                    kv.extend_from_slice(&25i32.to_le_bytes());
+
+                    kv.push(TYPE_END); // close genres
+                }
+
+                kv.push(TYPE_NONE);
+                kv.extend_from_slice(&IDX_CATEGORY.to_le_bytes());
+                {
+                    kv.push(TYPE_INT32);
+                    kv.extend_from_slice(&IDX_CATEGORY_2.to_le_bytes());
+                    kv.extend_from_slice(&1i32.to_le_bytes());
+
+                    kv.push(TYPE_INT32);
+                    kv.extend_from_slice(&IDX_CATEGORY_9.to_le_bytes());
+                    kv.extend_from_slice(&1i32.to_le_bytes());
+
+                    kv.push(TYPE_END); // close category
                 }
                 kv.push(TYPE_END); // close common
             }
@@ -466,6 +536,16 @@ mod tests {
     }
 
     #[test]
+    fn parses_genre_and_category_ids() {
+        let file = AppInfoFile::parse(build_sample_appinfo()).unwrap();
+        let metadata = file.get_local_metadata(42).unwrap().unwrap();
+        assert_eq!(metadata.genre_ids, vec![1, 25]);
+        let mut category_ids = metadata.category_ids;
+        category_ids.sort_unstable();
+        assert_eq!(category_ids, vec![2, 9]);
+    }
+
+    #[test]
     fn unknown_appid_returns_none_not_error() {
         let file = AppInfoFile::parse(build_sample_appinfo()).unwrap();
         assert_eq!(file.get_local_metadata(999).unwrap(), None);
@@ -490,9 +570,12 @@ mod tests {
         assert_eq!(metadata.developers, vec!["Valve".to_string()]);
         assert_eq!(metadata.publishers, vec!["Valve".to_string()]);
         assert!(!metadata.tag_ids.is_empty(), "expected Portal 2 to have cached store tags");
+        assert!(!metadata.genre_ids.is_empty(), "expected Portal 2 to have cached genre ids");
+        assert!(!metadata.category_ids.is_empty(), "expected Portal 2 to have cached category ids");
         println!(
-            "Portal 2 local metadata: name={:?} developers={:?} publishers={:?} tag_ids={:?}",
-            metadata.name, metadata.developers, metadata.publishers, metadata.tag_ids
+            "Portal 2 local metadata: name={:?} developers={:?} publishers={:?} tag_ids={:?} genre_ids={:?} category_ids={:?}",
+            metadata.name, metadata.developers, metadata.publishers, metadata.tag_ids,
+            metadata.genre_ids, metadata.category_ids
         );
     }
 }
