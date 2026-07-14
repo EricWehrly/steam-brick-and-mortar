@@ -362,10 +362,9 @@ in on purpose is bad form — track it rather than let it go unrecorded.
 - `docs/plans/taxonomy-data-event-plan.md`
 
 ## id: lod-tier-reset-race-condition
-**Priority**: High — confirmed to break every second-and-later desktop launch that reloads a
-persisted library, not dormant as first assessed.
-**Effort**: ~0.5-1 day (see "Planned fix" below; root cause is now understood, this is
-implementation + tests).
+**Status**: Implemented (2026-07-14) — code + unit tests in, `yarn tsc`/`yarn test` clean
+(1163 passed). **Not yet manually verified against a real relaunch-with-persisted-library** on
+the desktop app itself — that verification is still open, see "Done when" below.
 **Context**: First observed via a `LibraryReloadRequest` mid-session reset (see
 `docs/plans/desktop-offline-first-plan.md`), and initially assessed as dormant once that specific
 trigger (Fork A firing for local-scan) was fixed. **That assessment was wrong** — a follow-up test
@@ -388,33 +387,40 @@ construction, so capacity *growth* genuinely needs a new array — see
 `docs/architecture/label-and-placement-reset-architecture-review.md`'s new "Library Reload Reset"
 section for the full reasoning and the planned two-tier design).
 
-**Planned fix** (design agreed, not yet implemented — supersedes an earlier `isDisposed`-guard
-prototype built by a background agent in an unmerged worktree, which fixed the symptom but not the
-unnecessary-dispose root cause):
-1. `GameBoxSpawner` distinguishes **capacity-compatible** reloads (new library fits the
-   already-allocated arrays — same/similar-size relaunch, future Round 2 "upgrade" patches) from
-   **capacity-incompatible** ones (needs bigger arrays — e.g. demo store → a real library) instead
-   of always calling `fullReset()`.
-2. Capacity-compatible reload path: a new soft reset, following the same
-   `resetForPlacementRun()`/`onPlacementRunReset()` template-method shape
-   `PlacementRunResettableInstancedBase` already uses for placement-run resets (see the
-   architecture doc). Nothing is disposed. `LodTextureArrayManager` gets a slot-allocator rewind
-   (the label pipeline's `LabelTextureArrayManager` already does the equivalent for placement
-   runs). `LodArtworkOrchestrator` clears its slot/placement maps and bumps a `generation` counter.
-3. The two async write sites that can straddle a reset (`fetchAndCachePixels` inside
-   `prefetchArtwork`, and `fetchAndPlaceArtwork`) capture `generation` on entry and compare before
-   writing into a slot; a stale generation means the write is silently dropped instead of landing
-   in a slot that's since been reassigned to a different game. This is the full extent of the
-   guard — two comparisons, not a scattered `isDisposed` check across the class.
-4. Capacity-incompatible reload path: unchanged, still `fullReset()` (dispose + rebuild at the new
-   capacity) — genuinely required here since a `DataArrayTexture` can't grow in place.
+**Fix implemented** (supersedes an earlier `isDisposed`-guard prototype built by a background
+agent in an unmerged worktree — that prototype fixed the symptom but not the unnecessary-dispose
+root cause, and was superseded rather than merged):
+1. `GameBoxSpawner.resetForLibraryReload()` now distinguishes **capacity-compatible** reloads (new
+   library fits the already-allocated arrays — same/similar-size relaunch, future Round 2
+   "upgrade" patches) from **capacity-incompatible** ones (needs bigger arrays — e.g. demo store →
+   a real library), via a new `incomingGameCount` field on `StorePropsLibraryReloadRequestEvent`
+   compared against a tracked `currentTextureCapacity`. Unknown count (an online reload that
+   hasn't fetched yet) conservatively falls back to the old behavior.
+2. Capacity-compatible path: `GpuGameBoxRenderer.resetForLibraryReload()` →
+   `LodArtworkOrchestrator.resetForLibraryReload()`. Nothing is disposed.
+   `LodTextureArrayManager.resetSlotAllocation()` rewinds the slot counter (mirrors
+   `LabelTextureArrayManager`'s existing placement-run rewind). `LodArtworkOrchestrator` clears its
+   slot/placement maps and bumps a `generation` counter; `HighTextureCache.resetForLibraryReload()`
+   clears its game registrations too (its `registerGame()` already no-ops on a still-registered
+   slot index, which would otherwise leak the previous library's HIGH registration into a reused
+   slot).
+3. The three async write sites that can straddle a reset (`fetchAndCachePixels`,
+   `fetchAndPlaceArtwork`'s two texture writes) capture `generation` on entry and compare before
+   writing into a slot; a stale generation drops the write instead of landing in a slot reassigned
+   to a different game.
+4. Capacity-incompatible path: unchanged, still `fullReset()` (dispose + rebuild at the new
+   capacity).
 
 **Done when**:
-- `GameBoxSpawner` no longer disposes/rebuilds the artwork pipeline for a same-capacity reload
-- A repro test exists for relaunch-with-persisted-library (or an equivalent forced
-  "skip demo store" path) proving no tier/slot errors and no stale-write bleed between libraries
-- Demo store → real library (capacity-incompatible) transition still works via `fullReset()`,
-  unchanged behavior
+- [x] `GameBoxSpawner` no longer disposes/rebuilds the artwork pipeline for a same-capacity reload
+- [x] Unit coverage: `LodArtworkOrchestrator.test.ts` (slot reuse + mid-flight-reset stale-write
+  drop), `LodTextureArrayManager.test.ts` (slot rewind), `HighTextureCache.test.ts` (registration
+  clear + slot freeing), `GameBoxSpawner.test.ts` (capacity-compatible vs incompatible vs unknown
+  routing)
+- [x] Demo store → real library (capacity-incompatible) transition still works via `fullReset()`,
+  unchanged behavior (existing tests for this path still pass unmodified)
+- [ ] Manually verified against a real relaunch-with-persisted-library on the desktop app (no
+  `Unknown tier: mid` errors, no stale artwork bleed between libraries) — open
 
 **Related files**:
 - `client/src/scene/spawning/GameBoxSpawner.ts`

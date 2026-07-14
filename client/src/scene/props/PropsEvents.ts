@@ -46,9 +46,20 @@ export interface StorePropsSetupCompletedEvent extends BaseInteractionEvent {
 
 /**
  * Emitted before loading a different library/user profile.
- * Consumers should fully dispose library-bound GPU resources and prefetch state.
+ * Consumers should clear library-bound placement/prefetch state. GPU texture-array capacity
+ * only needs disposing and rebuilding when the incoming library won't fit what's already
+ * allocated — see incomingGameCount below and GameBoxSpawner's capacity-vs-no-capacity-change
+ * reset split (docs/architecture/label-and-placement-reset-architecture-review.md, "Library
+ * Reload Lifecycle").
  */
-export interface StorePropsLibraryReloadRequestEvent extends BaseInteractionEvent {}
+export interface StorePropsLibraryReloadRequestEvent extends BaseInteractionEvent {
+    /**
+     * Game count of the library about to be rendered, when known at emit time. Undefined when
+     * the caller hasn't fetched the new library yet (e.g. an online reload that clears the scene
+     * before the network call resolves) — treat undefined as "assume capacity may not fit."
+     */
+    readonly incomingGameCount?: number
+}
 
 // =============================================================================
 // BATCH → PLACEMENT FLOW  (the runtime data pipeline)

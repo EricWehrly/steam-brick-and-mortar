@@ -263,6 +263,24 @@ export class HighTextureCache {
     public unregisterGame(gameIndex: number): void {
         this.games.delete(gameIndex)
     }
+
+    /**
+     * Reset for a capacity-compatible library reload. Game entries are keyed by gameIndex,
+     * which is the same slot index LodTextureArrayManager reuses for the MID tier on reload —
+     * without this, registerGame() would silently no-op for a reused slot (it already treats
+     * any existing entry as "already registered") and the new game would inherit the previous
+     * occupant's HIGH artwork registration. Does not touch the underlying texture pixel data;
+     * stale pixels are simply overwritten once the new occupant's HIGH load lands.
+     */
+    public resetForLibraryReload(): void {
+        this.games.clear()
+        this.loadingPromises.clear()
+        this.loadQueue = []
+        this.backgroundCachingGames.clear()
+        this.slotAllocator.clearAll()
+        this.slotToGame = this.slotAllocator.getSnapshot().slotToGame
+        HighTextureCache.logger.lifecycle('Reset for library reload (HIGH slots freed)')
+    }
     
     /**
      * Request HIGH texture for a game

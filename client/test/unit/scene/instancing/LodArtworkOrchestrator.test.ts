@@ -350,6 +350,76 @@ describe('LodArtworkOrchestrator', () => {
         })
     })
 
+    describe('resetForLibraryReload', () => {
+        function withScene(): THREE.Scene {
+            const mockScene = new THREE.Scene()
+            mockDataManager.get.mockImplementation((key: DataKey) => {
+                if (key === DataKey.MainScene) return mockScene
+                return null
+            })
+            return mockScene
+        }
+
+        function mockArtworkPixels(): void {
+            const provider = GameArtworkProvider.getInstance() as unknown as {
+                getArtwork: ReturnType<typeof vi.fn>
+            }
+            provider.getArtwork.mockReturnValue({
+                getPixelsAtSize: vi.fn().mockResolvedValue({
+                    pixels: new Uint8ClampedArray(150 * 225 * 4),
+                    width: 150,
+                    height: 225,
+                }),
+            })
+        }
+
+        it('clears texture-slot mappings and frees the slot for reuse, without disposing', async () => {
+            withScene()
+            mockArtworkPixels()
+            orchestrator = new LodArtworkOrchestrator()
+
+            expect(await orchestrator.prefetchArtwork(100, undefined, 'Old Game')).toBe('prefetched')
+            expect(orchestrator.placeInstance(100, 'Old Game', new THREE.Vector3())).toBeGreaterThanOrEqual(0)
+
+            expect(() => orchestrator.resetForLibraryReload()).not.toThrow()
+
+            // Old game's slot mapping is gone.
+            expect(orchestrator.placeInstance(100, 'Old Game', new THREE.Vector3())).toBe(-1)
+
+            // A new library's game can prefetch again (proves slot allocation was rewound,
+            // not left exhausted from the previous library).
+            expect(await orchestrator.prefetchArtwork(200, undefined, 'New Game')).toBe('prefetched')
+            expect(orchestrator.placeInstance(200, 'New Game', new THREE.Vector3())).toBeGreaterThanOrEqual(0)
+        })
+
+        it('drops a pixel write that resolves after a mid-flight reset instead of writing into a reassigned slot', async () => {
+            withScene()
+            orchestrator = new LodArtworkOrchestrator()
+
+            const provider = GameArtworkProvider.getInstance() as unknown as {
+                getArtwork: ReturnType<typeof vi.fn>
+            }
+            let resolvePixels: (value: { pixels: Uint8ClampedArray; width: number; height: number }) => void = () => {}
+            const pending = new Promise<{ pixels: Uint8ClampedArray; width: number; height: number }>((resolve) => {
+                resolvePixels = resolve
+            })
+            provider.getArtwork.mockReturnValue({
+                getPixelsAtSize: vi.fn().mockReturnValue(pending),
+            })
+
+            const prefetchPromise = orchestrator.prefetchArtwork(100, undefined, 'Stale Game')
+
+            // Library reload happens while the fetch above is still in-flight.
+            orchestrator.resetForLibraryReload()
+
+            resolvePixels({ pixels: new Uint8ClampedArray(150 * 225 * 4), width: 150, height: 225 })
+            const result = await prefetchPromise
+
+            expect(result).toBe('error')
+            expect(orchestrator.placeInstance(100, 'Stale Game', new THREE.Vector3())).toBe(-1)
+        })
+    })
+
     describe('Basic API', () => {
         beforeEach(() => {
             mockDataManager.get.mockReturnValue(null)  // No scene

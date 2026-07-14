@@ -1,11 +1,10 @@
 # Plan: Desktop Offline-First (Refresh Behavior & Transport)
 
-**Status**: Round 1 done. **Priority order** (see "Fourth test session" below for the corrected
-root cause): (1) fix `lod-tier-reset-race-condition` — root cause identified (disposal-ordering
-race, not a startup race), fix designed, not yet implemented; (2) Round 1.5 (don't block the first
-render on the network gap-fill); (3) Round 2 (upgrade not replace); (4) Round 3 (Tauri Rust HTTP
-client). The CORS/404 log-noise and pre-baking-known-failures items are follow-ups, not blocking
-any of the above.
+**Status**: Round 1 done. `lod-tier-reset-race-condition` fix implemented (2026-07-14, see
+"Fourth pass" below) — code + tests in, real-relaunch manual verification still open. **Next up**:
+(1) Round 1.5 (don't block the first render on the network gap-fill); (2) Round 2 (upgrade not
+replace); (3) Round 3 (Tauri Rust HTTP client). The CORS/404 log-noise and pre-baking-known-failures
+items are follow-ups, not blocking any of the above.
 **Parent feature**: [Native Desktop App](../features/desktop-app.md)
 **Related**: [Desktop Local Data Pipeline Plan](desktop-local-data-pipeline-plan.md), [Taxonomy Data Event Plan](taxonomy-data-event-plan.md)
 
@@ -102,6 +101,17 @@ An earlier fix attempt (an `isDisposed` guard checked after every `await` in
 crash but doesn't address the unnecessary dispose+rebuild itself, and adds a guard-check pattern
 that would need to be repeated at every future async call site in this class. Superseded by the
 design above before merging - not merged into the main tree.
+
+**Implemented (2026-07-14)**: `GameBoxSpawner`, `GpuGameBoxRenderer`, `LodArtworkOrchestrator`,
+`LodTextureArrayManager`, and `HighTextureCache` all updated per the design above.
+`StorePropsLibraryReloadRequestEvent` gained an optional `incomingGameCount` field, populated by
+`SteamIntegration.applyLibrary()` (known upfront) but left undefined by `handleLoadLibrary()`'s
+online-reload path (not known until after the fetch — falls back to the existing hard-reset
+behavior). `yarn tsc` clean, `yarn test` 1163 passed (9 new tests covering slot reuse, the
+mid-flight-reset stale-write race, and the capacity-compatible/incompatible/unknown routing).
+**Still open**: manual verification against a real desktop relaunch with a persisted library -
+unit tests exercise the mechanism directly but don't replace an actual end-to-end repro of the
+originally-reported bug.
 
 ## What was actually observed (one real test session, real library)
 

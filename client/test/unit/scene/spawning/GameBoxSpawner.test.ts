@@ -40,6 +40,7 @@ const mockPrefetchArtwork = vi.fn().mockResolvedValue('prefetched')
 const mockPlaceGame = vi.fn()
 const mockClearPlacements = vi.fn()
 const mockRendererDispose = vi.fn()
+const mockRendererSoftReset = vi.fn()
 
 vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
     const { ArtworkPrefetchCoordinator } = await import('../../../../src/scene/spawning/ArtworkPrefetchCoordinator')
@@ -54,6 +55,7 @@ vi.mock('../../../../src/scene/game-box/GpuGameBoxRenderer', async () => {
                 mockRendererDispose()
                 coordinator.dispose()
             })
+            this.resetForLibraryReload = vi.fn(() => mockRendererSoftReset())
         })
     }
 })
@@ -649,6 +651,32 @@ describe('GameBoxSpawner — Two-Phase Load/Place', () => {
             // After full reset, SectionsReady should not place (renderer gone, no prefetch results)
             emitSectionsReadyForPlacement(eventManager, { sections: [{ name: 'Test', games, groupMode: 'by-recency', sortMode: 'by-last-played' }], groupMode: 'by-recency', sortMode: 'by-last-played' })
             expect(mockPlaceGame).not.toHaveBeenCalled()
+        })
+
+        it('soft-resets (no dispose) when the incoming library fits the already-allocated capacity', () => {
+            // beforeEach already established capacity via LibraryManifestReady(totalGames: 500) -> 600 slots.
+            eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
+                incomingGameCount: 300,
+            })
+
+            expect(mockRendererSoftReset).toHaveBeenCalledTimes(1)
+            expect(mockRendererDispose).not.toHaveBeenCalled()
+        })
+
+        it('falls back to a full reset (dispose) when the incoming library exceeds capacity', () => {
+            eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
+                incomingGameCount: 5000,
+            })
+
+            expect(mockRendererDispose).toHaveBeenCalledTimes(1)
+            expect(mockRendererSoftReset).not.toHaveBeenCalled()
+        })
+
+        it('falls back to a full reset (dispose) when incomingGameCount is unknown', () => {
+            eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {})
+
+            expect(mockRendererDispose).toHaveBeenCalledTimes(1)
+            expect(mockRendererSoftReset).not.toHaveBeenCalled()
         })
 
         it('does not throw on library reload before the first renderer initialization', () => {

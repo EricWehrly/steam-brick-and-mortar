@@ -50,5 +50,13 @@ export interface IGameArtworkPipeline {
         rotation?: THREE.Quaternion
     ): number
 
+    /**
+     * Soft reset for a capacity-compatible library reload: clears slot/placement state and
+     * rewinds texture-slot allocation for reuse, without disposing GPU resources. Callers must
+     * only invoke this when the incoming library fits the already-allocated capacity — a larger
+     * library still needs dispose() + a freshly-sized instance.
+     */
+    resetForLibraryReload(): void
+
     dispose(): void
 }
