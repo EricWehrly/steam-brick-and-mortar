@@ -362,35 +362,68 @@ in on purpose is bad form — track it rather than let it go unrecorded.
 - `docs/plans/taxonomy-data-event-plan.md`
 
 ## id: lod-tier-reset-race-condition
-**Priority**: Medium
-**Effort**: Not yet scoped — needs tracing through `LodArtworkOrchestrator`'s reset/rebuild
-sequence before an estimate is honest.
-**Context**: Observed once via real testing (see `docs/plans/desktop-offline-first-plan.md`):
-a `StorePropsEventTypes.LibraryReloadRequest` mid-session (a library being replaced by another)
-was followed by 1400+ `[LodTextureArrayManager] ERROR Unknown tier: mid` lines — the MID texture
-tier, which had initialized cleanly on the session's first load, came back missing after the
-reset, so every subsequent artwork write silently failed. Root cause not fully traced — confirmed
-correlated with the reload timing, not confirmed exactly which line in the reset/rebuild sequence
-drops the tier. Not currently reachable through the primary desktop startup flow (the specific
-trigger was `applyLibrary()`'s Fork A firing automatically for the local-scan channel, fixed the
-same session — see the plan doc) — but any other path that legitimately fires
-`LibraryReloadRequest` (a real "Connect
-Steam" flow, a manual "Refresh Cache Now" button) could still hit it.
+**Priority**: High — confirmed to break every second-and-later desktop launch that reloads a
+persisted library, not dormant as first assessed.
+**Effort**: ~0.5-1 day (see "Planned fix" below; root cause is now understood, this is
+implementation + tests).
+**Context**: First observed via a `LibraryReloadRequest` mid-session reset (see
+`docs/plans/desktop-offline-first-plan.md`), and initially assessed as dormant once that specific
+trigger (Fork A firing for local-scan) was fixed. **That assessment was wrong** — a follow-up test
+(quit the desktop app, relaunch) reproduced it again, worse: 1328 `[LodTextureArrayManager] ERROR
+Unknown tier: mid` lines, plus `No label slots remaining` (956 occurrences) and elevated
+worker/postMessage traffic, across a 22,413-line log (vs. zero tier errors on the immediately-prior
+first-load-of-the-session log). A "startup-ordering race" theory was considered next and was also
+wrong.
 
-**Decision (for now)**:
-- Not urgent since the known trigger is gone. Revisit before shipping any feature that
-  legitimately re-fires `LibraryReloadRequest` mid-session (Connect Steam, manual refresh, Round 2
-  of the offline-first plan) — confirm this doesn't recur before relying on that reset path again.
+**Actual root cause (confirmed via code trace)**: a **disposal-ordering race**, not a startup
+race. `GameBoxSpawner.fullReset()` synchronously disposes `LodArtworkOrchestrator` (and its
+`LodTextureArrayManager`/renderer) on `StorePropsEventTypes.LibraryReloadRequest`, but in-flight
+`ArtworkPrefetchCoordinator`-initiated fetch promises for the *previous* library aren't cancelled —
+when they resolve afterward, they call back into the now-disposed orchestrator and write into its
+cleared `tiers` map, which no longer has a `mid` entry. `fullReset()` also unconditionally
+recreates the whole texture-array pipeline at a new capacity, even when the incoming library would
+fit the existing arrays (e.g. relaunching with the *same* persisted library) — the blanket dispose
+is a bigger hammer than the actual reason it exists (WebGL `DataArrayTexture` depth is fixed at
+construction, so capacity *growth* genuinely needs a new array — see
+`docs/architecture/label-and-placement-reset-architecture-review.md`'s new "Library Reload Reset"
+section for the full reasoning and the planned two-tier design).
+
+**Planned fix** (design agreed, not yet implemented — supersedes an earlier `isDisposed`-guard
+prototype built by a background agent in an unmerged worktree, which fixed the symptom but not the
+unnecessary-dispose root cause):
+1. `GameBoxSpawner` distinguishes **capacity-compatible** reloads (new library fits the
+   already-allocated arrays — same/similar-size relaunch, future Round 2 "upgrade" patches) from
+   **capacity-incompatible** ones (needs bigger arrays — e.g. demo store → a real library) instead
+   of always calling `fullReset()`.
+2. Capacity-compatible reload path: a new soft reset, following the same
+   `resetForPlacementRun()`/`onPlacementRunReset()` template-method shape
+   `PlacementRunResettableInstancedBase` already uses for placement-run resets (see the
+   architecture doc). Nothing is disposed. `LodTextureArrayManager` gets a slot-allocator rewind
+   (the label pipeline's `LabelTextureArrayManager` already does the equivalent for placement
+   runs). `LodArtworkOrchestrator` clears its slot/placement maps and bumps a `generation` counter.
+3. The two async write sites that can straddle a reset (`fetchAndCachePixels` inside
+   `prefetchArtwork`, and `fetchAndPlaceArtwork`) capture `generation` on entry and compare before
+   writing into a slot; a stale generation means the write is silently dropped instead of landing
+   in a slot that's since been reassigned to a different game. This is the full extent of the
+   guard — two comparisons, not a scattered `isDisposed` check across the class.
+4. Capacity-incompatible reload path: unchanged, still `fullReset()` (dispose + rebuild at the new
+   capacity) — genuinely required here since a `DataArrayTexture` can't grow in place.
 
 **Done when**:
-- Root cause identified (what in the reset/rebuild sequence fails to re-register the MID tier)
-- A repro exists (deliberately firing `LibraryReloadRequest` mid-session in a test/dev build) and
-  is fixed, not just avoided by luck of the current call graph
+- `GameBoxSpawner` no longer disposes/rebuilds the artwork pipeline for a same-capacity reload
+- A repro test exists for relaunch-with-persisted-library (or an equivalent forced
+  "skip demo store" path) proving no tier/slot errors and no stale-write bleed between libraries
+- Demo store → real library (capacity-incompatible) transition still works via `fullReset()`,
+  unchanged behavior
 
 **Related files**:
+- `client/src/scene/spawning/GameBoxSpawner.ts`
+- `client/src/scene/spawning/ArtworkPrefetchCoordinator.ts`
 - `client/src/scene/game-box/instancing/LodArtworkOrchestrator.ts`
 - `client/src/scene/game-box/instancing/LodTextureArrayManager.ts`
+- `client/src/scene/game-box/instancing/PlacementRunResettableInstancedBase.ts`
 - `client/src/scene/props/PropsEvents.ts` (`StorePropsEventTypes.LibraryReloadRequest`)
+- `docs/architecture/label-and-placement-reset-architecture-review.md`
 - `docs/plans/desktop-offline-first-plan.md`
 
 ## id: cors-blocked-local-scan-artwork
