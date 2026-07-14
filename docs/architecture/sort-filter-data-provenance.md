@@ -79,7 +79,19 @@ blocked on local-file investigation reporting back first), and — considered th
 desktop local-file data mining (`local-file-investigation.md`), which may surface a tag-equivalent
 local source and sidestep SteamSpy for desktop users entirely.
 
-## How this table is meant to drive the gate (not designed yet, described here so it isn't lost)
+## How this table is meant to drive the gate
+
+**Update — pulled out of "someday" and into active planning**:
+[`docs/plans/taxonomy-data-event-plan.md`](../plans/taxonomy-data-event-plan.md) is now the
+design doc for this mechanism. It **supersedes** the original idea below of reusing an existing
+ownership event (`GameDataReady`/`LibraryManifestReady`) as the re-evaluation signal — the
+desktop local-scan path (`LocalSteamDataWriter`) writes taxonomy data into `AppDetailsCache` on a
+completely decoupled timeline from however the game list itself gets populated, so an ownership
+event doesn't reliably cover "taxonomy data changed." The new plan proposes a dedicated event
+instead. No longer tracked in `act4-encore-someday-maybe.md` — moved to active work.
+
+<details>
+<summary>Original framing (superseded, kept for history)</summary>
 
 The mechanism itself isn't built. The intended shape: each row's "available" state is derived at
 runtime from whatever the app actually knows for the *current* library/session — e.g. simply "is this
@@ -88,6 +100,8 @@ a desktop build" for channel-exclusive rows. An existing app "intake" event (e.g
 re-evaluate gates when new data lands — not a new event type, reuse what already marks "something
 just arrived." Tracked as a someday item in `docs/acts/act4-encore-someday-maybe.md` ("Gate sort/filter
 UI on data availability"); this doc is the spec that work would consume, not a separate concern from it.
+
+</details>
 
 **The community-tag row specifically wants a coverage-percentage threshold, not a binary gate** — a
 concrete, currently-favored shape: "has the hydrator (or, on desktop, a direct SteamSpy fetch)

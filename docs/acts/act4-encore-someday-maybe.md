@@ -55,17 +55,14 @@ art deco effect that adds a little emphasis on top of our 'blockbuster' scene
 
 ## Data-Driven UI
 
-- **Gate sort/filter UI on data availability** — don't offer (or visibly disable/hint) a sort/filter
-  dimension the current library doesn't actually have data for. Two distinct cases, not one:
-  (1) *not-yet-fetched but reachable* (community tags/review score — SteamSpy is slow and
-  incremental, gate opens once data lands) and (2) *channel-exclusive, unreachable on this build at
-  all* (user categories — desktop-only, `local-file-investigation.md`; expected to grow as desktop
-  local-file mining expands, per that feature's re-entry notes). See
-  [Sort/Filter Data Provenance](../architecture/sort-filter-data-provenance.md) — designed to be the
-  spec this gate reads from, not just a reference doc. The natural mechanism is reusing an existing
-  "intake" event (e.g. `GameDataReady`) as the signal to re-evaluate gates once new data lands. Not
-  designed, just noted. **Sequencing**: revisit alongside `local-file-investigation.md`'s re-entry —
-  desktop data-mining findings will make the channel-exclusive case much more concrete than it is today.
+- ~~**Gate sort/filter UI on data availability**~~ — **graduated out of someday, now active
+  work**: [`docs/plans/taxonomy-data-event-plan.md`](../plans/taxonomy-data-event-plan.md).
+  Desktop local-file mining did make the channel-exclusive case concrete, as anticipated below,
+  and surfaced a second reason to act now: a dead, never-written gating stub
+  (`steam.hasRecencyData` in `LayoutControlPanel.ts`) turned out to already be sitting in the
+  codebase as an abandoned first attempt at exactly this. Kept here (struck through) for history;
+  see the plan doc for the current design, which also drops the "reuse an existing intake event"
+  idea floated below in favor of a dedicated event — see that doc's rationale.
 
 ## Deferred Re-entry Candidates
 

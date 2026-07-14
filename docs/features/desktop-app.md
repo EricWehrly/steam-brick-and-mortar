@@ -135,6 +135,47 @@ what the spike is resolving. Scaffold lives in `desktop/tauri-app/` (alongside
 - Product split: web + desktop parity, and which build is canonical.
 - VR story changes (WebXR-in-browser vs a desktop build) — needs thought.
 
+## Revisit: Connect Steam Priority, Ownership Signals (Not Yet Scheduled)
+
+Roadmap note, not a plan — captured so it isn't lost, revisit once
+[`desktop-local-data-pipeline-plan.md`](../plans/desktop-local-data-pipeline-plan.md) and
+[`taxonomy-data-event-plan.md`](../plans/taxonomy-data-event-plan.md) have landed enough to make
+these calls with real data instead of guessing.
+
+**Current reality, confirmed by investigation**: "Connect Steam" (the WebView2 cookie-injection
+flow described earlier in this doc) is **fully unbuilt** — no second-window code, no cookie
+injection, nothing in `desktop/tauri-app/src`. Desktop today gets library data through the exact
+same manual `#steam-ui` panel as web (`client/src/ui/SteamUIPanel.ts`), including its existing
+40-second idle "draw attention" pulse (`ATTENTION_IDLE_MS`, `panel-attention-pulse` in
+`client/src/ui/components/ui-panel.css`).
+
+**The revisit**: now that local file mining covers identity, playtime, user collections, and
+tags entirely offline, that panel's urgency on desktop should soften — it's no longer the only
+way to get a personalized experience, just the way to get full ownership completeness (see the
+pipeline plan's "hands are tied" gap above). Two concrete ideas, neither designed yet:
+- Soften or disable the idle attention-pulse on desktop specifically — ideally gated on "did the
+  local scan already establish an identity," not a bare `isTauri()` check, matching the
+  capability-based pattern used elsewhere.
+- Reword the panel's copy on desktop to frame it as "connect for full library accuracy" rather
+  than implying it's required to get anything at all.
+- The eventual "Connect Steam" WebView2 flow itself is unchanged in scope by this note — this is
+  about how hard the *current* fallback panel pushes, not about building the better flow sooner.
+
+**Achievement data** — `appcache/librarycache/<appid>.json` (per-app achievement cache, see
+`desktop-offline-data-mining-findings.md` §5) is a real, already-confirmed local data source not
+yet drawn into anything. Candidate future uses: a completion-% sort/filter dimension (via the
+taxonomy-event plan above) and a real achievements display feature. Not scoped further here.
+
+**Eager-but-bounded "owned" heuristic** — the pipeline plan's candidate appid set today is just
+"has a `localconfig.vdf` playtime entry," which misses owned-but-never-launched games. Widening
+it is worth doing, but needs a firm guardrail: the union of {installed
+(`appmanifest_*.acf`), registered in a library folder (`libraryfolders.vdf`), a member of any
+user collection, has an achievement cache entry} is a reasonable "probably owned" signal — but
+**bare presence in `appinfo.vdf` is explicitly excluded**, because that file covers every app the
+Steam client has ever loaded info for (browsing the store, wishlisting), not ownership. Skipping
+that exclusion is exactly how free-to-play games the user merely glanced at would pollute the
+library view — the concern that prompted this note in the first place.
+
 ## Open Questions
 
 - What's the **trigger** — clutter (Tier C/D), launching games, local collections (AC4.4), or the
@@ -148,6 +189,7 @@ what the spike is resolving. Scaffold lives in `desktop/tauri-app/` (alongside
 - [Fabricated Set Dressing](fabricated-set-dressing.md) — peripheral enumeration, coming-attractions content
 - [Local File Investigation](local-file-investigation.md) — AC4.4 re-entry; same FS-blocklist driver
 - [Desktop Local Data Pipeline Plan](../plans/desktop-local-data-pipeline-plan.md) — concrete next step: wiring local Steam file mining into desktop startup, alongside the "Connect Steam" flow above
+- [Taxonomy Data Event Plan](../plans/taxonomy-data-event-plan.md) — separates "what games are available" from "what sorts are available," triggered by this doc's local data pipeline work
 - [Input System](input-system.md) — in-browser peripheral-detection ceiling
 - [Manual Library Export](../archive/manual-library-export-feasibility.md) — the capture channel the desktop app integrates as "Connect Steam"
 - [Source Game Discovery](../plans/source-game-discovery-plan.md) — Phase 1 (local script) built; Phase 2 (desktop app → Lambda → S3) deferred pending this doc's own decision
