@@ -11,6 +11,18 @@ vi.mock('@tauri-apps/api/core', () => ({
     isTauri: isTauriMock,
 }))
 
+const { resolveGenresMock, resolveCategoriesMock } = vi.hoisted(() => ({
+    resolveGenresMock: vi.fn(),
+    resolveCategoriesMock: vi.fn(),
+}))
+
+vi.mock('../../../src/steam/TaxonomyIdResolver', () => ({
+    TaxonomyIdResolver: {
+        resolveGenres: resolveGenresMock,
+        resolveCategories: resolveCategoriesMock,
+    },
+}))
+
 import { LocalSteamDataWriter } from '../../../src/steam/LocalSteamDataWriter'
 import { AppDetailsCache } from '../../../src/steam/cache/AppDetailsCache'
 
@@ -19,27 +31,33 @@ describe('LocalSteamDataWriter', () => {
         setupIndexedDBMock()
         invokeMock.mockReset()
         isTauriMock.mockReset()
+        resolveGenresMock.mockReset().mockResolvedValue([])
+        resolveCategoriesMock.mockReset().mockResolvedValue([])
     })
 
     describe('buildAppDetailsEntry', () => {
-        it('returns null when appinfo.vdf has no name for this appid', () => {
-            const entry = LocalSteamDataWriter.buildAppDetailsEntry({
+        it('returns null when appinfo.vdf has no name for this appid', async () => {
+            const entry = await LocalSteamDataWriter.buildAppDetailsEntry({
                 appid: 620,
                 name: null,
                 developers: [],
                 publishers: [],
                 tags: [],
+                genre_ids: [],
+                category_ids: [],
             })
             expect(entry).toBeNull()
         })
 
-        it('builds a valid entry with rank-derived descending tag weights', () => {
-            const entry = LocalSteamDataWriter.buildAppDetailsEntry({
+        it('builds a valid entry with rank-derived descending tag weights', async () => {
+            const entry = await LocalSteamDataWriter.buildAppDetailsEntry({
                 appid: 620,
                 name: 'Portal 2',
                 developers: ['Valve'],
                 publishers: ['Valve'],
                 tags: ['Singleplayer', 'Puzzle', 'Co-op'],
+                genre_ids: [],
+                category_ids: [],
             })
 
             expect(entry).not.toBeNull()
@@ -62,17 +80,41 @@ describe('LocalSteamDataWriter', () => {
             })
         })
 
-        it('omits developers/publishers/steamspy_tags when empty rather than storing empty arrays', () => {
-            const entry = LocalSteamDataWriter.buildAppDetailsEntry({
+        it('omits developers/publishers/steamspy_tags/genres/categories when empty rather than storing empty arrays', async () => {
+            const entry = await LocalSteamDataWriter.buildAppDetailsEntry({
                 appid: 620,
                 name: 'Portal 2',
                 developers: [],
                 publishers: [],
                 tags: [],
+                genre_ids: [],
+                category_ids: [],
             })
             expect(entry?.developers).toBeUndefined()
             expect(entry?.publishers).toBeUndefined()
             expect(entry?.steamspy_tags).toBeUndefined()
+            expect(entry?.genres).toBeUndefined()
+            expect(entry?.categories).toBeUndefined()
+        })
+
+        it('resolves genre/category ids via TaxonomyIdResolver', async () => {
+            resolveGenresMock.mockResolvedValue([{ id: '1', description: 'Action' }])
+            resolveCategoriesMock.mockResolvedValue([{ id: 2, description: 'Single-player' }])
+
+            const entry = await LocalSteamDataWriter.buildAppDetailsEntry({
+                appid: 620,
+                name: 'Portal 2',
+                developers: [],
+                publishers: [],
+                tags: [],
+                genre_ids: [1],
+                category_ids: [2],
+            })
+
+            expect(resolveGenresMock).toHaveBeenCalledWith([1])
+            expect(resolveCategoriesMock).toHaveBeenCalledWith([2])
+            expect(entry?.genres).toEqual([{ id: '1', description: 'Action' }])
+            expect(entry?.categories).toEqual([{ id: 2, description: 'Single-player' }])
         })
     })
 
@@ -106,8 +148,8 @@ describe('LocalSteamDataWriter', () => {
                 if (command === 'read_local_app_metadata') {
                     expect(args?.appids).toEqual([620, 999])
                     return Promise.resolve([
-                        { appid: 620, name: 'Portal 2', developers: ['Valve'], publishers: ['Valve'], tags: ['Puzzle'] },
-                        { appid: 999, name: null, developers: [], publishers: [], tags: [] },
+                        { appid: 620, name: 'Portal 2', developers: ['Valve'], publishers: ['Valve'], tags: ['Puzzle'], genre_ids: [], category_ids: [] },
+                        { appid: 999, name: null, developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
                     ])
                 }
                 throw new Error(`unexpected command ${command}`)

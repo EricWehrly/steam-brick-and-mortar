@@ -43,6 +43,8 @@ interface LocalAppMetadata {
     developers: string[]
     publishers: string[]
     tags: string[]
+    genre_ids: number[]
+    category_ids: number[]
 }
 
 const TAG_METADATA_PREVIEW_COUNT = 5
@@ -86,7 +88,7 @@ export async function dumpLocalSteamData(): Promise<void> {
             const metadata = await invoke<LocalAppMetadata[]>('read_local_app_metadata', { appids: previewAppids })
             logger.info(`🗂️ [LocalSteamDataInspector] Tag/developer/publisher preview (${metadata.length} apps):`)
             for (const item of metadata) {
-                logger.info(`  - appid ${item.appid}: "${item.name ?? '(no local name)'}" — ${item.developers.join(', ') || 'unknown developer'} — tags: ${item.tags.join(', ') || 'none'}`)
+                logger.info(`  - appid ${item.appid}: "${item.name ?? '(no local name)'}" — ${item.developers.join(', ') || 'unknown developer'} — tags: ${item.tags.join(', ') || 'none'} — genre ids: ${item.genre_ids.join(', ') || 'none'} — category ids: ${item.category_ids.join(', ') || 'none'}`)
             }
         } catch (error) {
             logger.warn('🗂️ [LocalSteamDataInspector] Failed to read local app metadata:', error)

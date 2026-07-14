@@ -5,21 +5,23 @@
  *
  * No-ops entirely on the web build (isTauri() is false there).
  *
- * Known limitations, both intentional deferrals, not bugs:
+ * Known limitation, an intentional deferral, not a bug:
  * - `is_free` is always written as false: appinfo.vdf's local price fields aren't extracted yet,
  *   and it doesn't matter for this path anyway (these are the user's own played games, not
  *   candidates for the anonymous/demo store, which is the only place is_free is read).
- * - `categories`/`genres` are left undefined: appinfo.vdf only gives numeric ids for those, and
- *   no local id->name table has been found yet (see findings doc). Because
- *   GamesLoader.isMetadataComplete only treats an entry as cache-complete when categories or
- *   genres are present, these locally-written entries still queue a network refresh - the tag/
- *   developer/publisher data is visible to anything reading AppDetailsCache directly
- *   (GamesLoader.enrichFromCache), just not enough by itself to skip the network round-trip.
+ *
+ * `categories`/`genres` are resolved via `TaxonomyIdResolver` from the pre-baked appdetails
+ * bundle rather than a network call - see docs/plans/taxonomy-data-event-plan.md. An appid whose
+ * local genre/category ids aren't covered by that bundle still writes with tags/name/developer/
+ * publisher only, same as before this resolution existed - see
+ * docs/tech-debt.md#id-metadata-refetch-no-circuit-breaker for the known (low-priority) gap that
+ * leaves.
  */
 
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import type { AppDetailsData } from './batch/BatchAppDetailsClient'
+import { TaxonomyIdResolver } from './TaxonomyIdResolver'
 import { Logger } from '../utils/Logger'
 
 const LOCAL_APP_TYPE = 'game'
@@ -44,6 +46,9 @@ interface LocalAppMetadata {
     publishers: string[]
     /** Rank-ordered, most popular first - see appinfo.rs::LocalAppMetadata. */
     tags: string[]
+    /** Raw numeric ids, unresolved - see appinfo.rs::LocalAppMetadata and TaxonomyIdResolver. */
+    genre_ids: number[]
+    category_ids: number[]
 }
 
 export class LocalSteamDataWriter {
@@ -68,7 +73,7 @@ export class LocalSteamDataWriter {
         const metadata = await invoke<LocalAppMetadata[]>('read_local_app_metadata', { appids })
         const entries = new Map<number, AppDetailsData>()
         for (const item of metadata) {
-            const entry = LocalSteamDataWriter.buildAppDetailsEntry(item)
+            const entry = await LocalSteamDataWriter.buildAppDetailsEntry(item)
             if (entry) {
                 entries.set(item.appid, entry)
             }
@@ -89,10 +94,15 @@ export class LocalSteamDataWriter {
      * partial entry with a blank name would be worse than no entry (GamesLoader would treat it
      * as a real cache hit with a broken display name instead of queuing the normal network fetch).
      */
-    public static buildAppDetailsEntry(metadata: LocalAppMetadata): AppDetailsData | null {
+    public static async buildAppDetailsEntry(metadata: LocalAppMetadata): Promise<AppDetailsData | null> {
         if (!metadata.name) {
             return null
         }
+
+        const [genres, categories] = await Promise.all([
+            TaxonomyIdResolver.resolveGenres(metadata.genre_ids),
+            TaxonomyIdResolver.resolveCategories(metadata.category_ids),
+        ])
 
         return {
             type: LOCAL_APP_TYPE,
@@ -102,6 +112,8 @@ export class LocalSteamDataWriter {
             developers: metadata.developers.length > 0 ? metadata.developers : undefined,
             publishers: metadata.publishers.length > 0 ? metadata.publishers : undefined,
             steamspy_tags: LocalSteamDataWriter.buildWeightedTags(metadata.tags),
+            genres: genres.length > 0 ? genres : undefined,
+            categories: categories.length > 0 ? categories : undefined,
         }
     }
 

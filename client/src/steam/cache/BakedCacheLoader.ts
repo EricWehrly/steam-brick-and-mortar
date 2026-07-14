@@ -10,14 +10,14 @@ import type { AppDetailsData } from '../batch/BatchAppDetailsClient'
 import { AppDetailsCache } from './AppDetailsCache'
 import { Logger } from '../../utils/Logger'
 
-interface BakedCacheEntry {
+export interface BakedCacheEntry {
     success: boolean
     appid: number
     data: AppDetailsData
     retrieved_at: string
 }
 
-interface BakedCacheBundle {
+export interface BakedCacheBundle {
     generated_at: string
     games: Record<string, BakedCacheEntry>
 }
@@ -44,10 +44,26 @@ export class BakedCacheLoader {
         }
 
         BakedCacheLoader.logger.info('No existing app-details cache found - seeding from baked release bundle')
-        await this.seedBundle()
+        const bundle = await BakedCacheLoader.fetchBundle()
+        if (!bundle) {
+            return
+        }
+
+        const dataMap = new Map<number, AppDetailsData>(
+            Object.values(bundle.games).map(entry => [entry.appid, entry.data])
+        )
+        await this.appDetailsCache.setMany(dataMap)
+        BakedCacheLoader.logger.info(`Seeded ${dataMap.size} games from baked cache bundle`)
     }
 
-    private async seedBundle(): Promise<void> {
+    /**
+     * Fetches and parses the baked bundle without touching AppDetailsCache - shared by
+     * seedIfNeeded() above and TaxonomyIdResolver's genre/category id->name harvesting, which
+     * reads the same bundle for a different purpose (see docs/plans/taxonomy-data-event-plan.md).
+     * Returns null on any failure (missing file, network error, parse error) - every failure
+     * mode here is meant to fall through to whatever the caller's non-baked fallback is, not throw.
+     */
+    static async fetchBundle(): Promise<BakedCacheBundle | null> {
         BakedCacheLoader.logger.debug(`Fetching baked cache bundle from ${BAKED_CACHE_BUNDLE_PATH}`)
 
         let response: Response
@@ -61,7 +77,7 @@ export class BakedCacheLoader {
                 `404/missing file (those are handled separately below). Likely causes: offline/` +
                 `throttled network or a browser extension blocking the request.`
             )
-            return
+            return null
         }
 
         if (!response.ok) {
@@ -69,13 +85,13 @@ export class BakedCacheLoader {
             // intermittent 503 from the Vite dev server under full-page-reload request bursts -
             // reproduced only under rapid automated reloads, not realistic single-navigation use,
             // and not expected against a production static host or Tauri's asset protocol).
-            // Either way, falling through to the normal Lambda-backed fetch path is correct.
+            // Either way, falling through to the caller's non-baked fallback is correct.
             BakedCacheLoader.logger.debug(`Baked cache bundle unavailable (HTTP ${response.status}) - skipping`)
-            return
+            return null
         }
         if (!response.body) {
             BakedCacheLoader.logger.warn(`Baked cache bundle response has no body - skipping`)
-            return
+            return null
         }
 
         try {
@@ -94,19 +110,14 @@ export class BakedCacheLoader {
                 : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).text()
             const bundle = JSON.parse(text) as BakedCacheBundle
 
-            const dataMap = new Map<number, AppDetailsData>(
-                Object.values(bundle.games).map(entry => [entry.appid, entry.data])
-            )
-
             BakedCacheLoader.logger.debug(
-                `Parsed baked cache bundle: ${dataMap.size} games (generated_at: ${bundle.generated_at})`
+                `Parsed baked cache bundle: ${Object.keys(bundle.games).length} games (generated_at: ${bundle.generated_at})`
             )
 
-            await this.appDetailsCache.setMany(dataMap)
-
-            BakedCacheLoader.logger.info(`Seeded ${dataMap.size} games from baked cache bundle`)
+            return bundle
         } catch (error) {
-            BakedCacheLoader.logger.warn(`Failed to parse/seed baked cache bundle:`, error)
+            BakedCacheLoader.logger.warn(`Failed to parse baked cache bundle:`, error)
+            return null
         }
     }
 }
