@@ -173,26 +173,41 @@ Client-side (`client/src/`):
    below, which needs collections wired in to do anything useful with them.
 6. ✅ **Done.** `LocalSteamDataWriter` writes into `AppDetailsCache` via the existing `setMany()`
    — no `AppDetailsCache`/`GamesLoader` changes needed, confirming the plan's architecture bet.
-7. **Partially done — narrower than "finished."** The Tauri commands *are* called early
-   (`LocalSteamDataInspector`'s `GameEventTypes.Start` hook) and the write does happen before any
-   user interaction, so the spirit of "call it early" is satisfied. But this is currently a
-   single one-shot `await` chain living in a **debug tool**, not a first-class startup path, and
-   it does **not** stream through a `BatchEmitter`-style batched event sequence — there's exactly
-   one `setMany()` call, no progressive batches, no dedicated event marking "local taxonomy data
-   landed" (see the new taxonomy-event plan below — that gap is now the more important one, and
-   folds this task into it rather than finishing it standalone).
-8. Not started. Depends on the taxonomy-event work below reaching a point where "is there useful
-   cached data already" is answerable cheaply.
+7. ✅ **Done.** `client/src/steam/LocalSteamLibraryLoader.ts` (new) self-registers on
+   `GameEventTypes.Start`, reads identity + playtime, calls
+   `LocalSteamDataWriter.writeLocalAppMetadata()` (now returns the written
+   `Map<number, AppDetailsData>` instead of a count, and emits `TaxonomyDataReady` right after its
+   `cache.setMany()` — see `TaxonomyDataReadyEvent`/`SteamEventTypes.TaxonomyDataReady` in
+   `InteractionEvents.ts`), joins playtime numbers against the written entries' names
+   (`buildImportedGames`), and emits `SteamEventTypes.ImportLibrary` with
+   `channel: 'local-scan'` — the new `ImportChannel` variant added to `Library.ts`. This drives
+   the existing `SteamIntegration.handleImportLibrary` → `applyLibrary()` path unmodified, so
+   `BatchEmitter` streaming and `persistLibrary()` both apply for free, no new pipeline code.
+   `LocalSteamDataInspector` (the debug tool) no longer triggers the write itself — it's
+   read-only now, `LocalSteamLibraryLoader` is the sole production owner of that call.
+8. ✅ **Confirmed, not just assumed.** `SteamIntegration.handleGameStart()` already checks
+   `loadPersistedLibrary()` before falling back to the demo store — since task 7's loader
+   persists through the existing `persistLibrary()` call (same as any import), a subsequent
+   launch renders last session's local library immediately via that pre-existing check, no new
+   "is there useful cached data" logic was needed.
+   **Bonus, confirmed working, not the point of this task**: `applyLibrary()` threads
+   `library.owner.displayName` into `SteamUser.vanity_url`, which `resolveDisplayName` then
+   surfaces as-is — so `LocalSteamLibraryLoader` feeding `read_steam_identity`'s `persona_name` in
+   as `library.owner.displayName` resolves task 12 for the local-scan path specifically (unit-tested
+   in `LocalSteamLibraryLoader.test.ts`). The "Connect Steam"/online path's persona-name gap
+   (`SteamUser` has no `personaname` field at all) is unaffected and still open — see task 12 below.
 
 New, not in the original list — **found via this session's identity-display investigation**:
-12. **Small, concrete bug, not just a desktop gap**: no UI anywhere — web or desktop — has ever
-    displayed a Steam persona name. The in-scene "X's Steam Library" sign
-    (`SceneSignManager.ts:104-115`) uses `resolveDisplayName(vanity_url)` (`SteamIntegration.ts:104,143-146`),
-    a URL slug, because `SteamUser` (`SteamApiClient.ts:33-39`) has no `personaname` field at all.
-    Desktop's `read_steam_identity` result dead-ends at `LocalSteamDataInspector`'s console.log —
-    nothing routes it into `storeSteamDataAndEmitEvent`'s displayName path. Fix is two small
-    pieces: (a) plumb `persona_name` into that path on desktop, (b) prefer it over `vanity_url`
-    wherever both are available (persona name is a real display name; the slug never was).
+12. ✅ **Done for the local-scan path, as a side effect of task 7 — not resolved everywhere.**
+    No UI anywhere — web or desktop — had ever displayed a Steam persona name. The in-scene
+    "X's Steam Library" sign (`SceneSignManager.ts:104-115`) uses `resolveDisplayName(vanity_url)`
+    (`SteamIntegration.ts`), a URL slug, because `SteamUser` (`SteamApiClient.ts:33-39`) has no
+    `personaname` field at all. `LocalSteamLibraryLoader` now plumbs `read_steam_identity`'s
+    `persona_name` into `library.owner.displayName`, which `applyLibrary()`/`resolveDisplayName`
+    surface as the sign text — real for the local-scan channel. The "Connect Steam"/online path
+    still has no persona-name source at all (`SteamUser` itself has no field for it) — that gap
+    is untouched by this fix and would need its own investigation if it matters before "Connect
+    Steam" gets built.
 13. **User collections schema + writer** — `AppDetailsData`/`SteamGame` need a field for "which
     collection(s) does this appid belong to" before "sort by user collections" can exist at all.
     Currently nothing (see task 5). Prerequisite for the taxonomy-event plan's desktop default-sort

@@ -25,6 +25,8 @@ vi.mock('../../../src/steam/TaxonomyIdResolver', () => ({
 
 import { LocalSteamDataWriter } from '../../../src/steam/LocalSteamDataWriter'
 import { AppDetailsCache } from '../../../src/steam/cache/AppDetailsCache'
+import { EventManager } from '../../../src/core/EventManager'
+import { SteamEventTypes } from '../../../src/types/InteractionEvents'
 
 describe('LocalSteamDataWriter', () => {
     beforeEach(() => {
@@ -33,6 +35,7 @@ describe('LocalSteamDataWriter', () => {
         isTauriMock.mockReset()
         resolveGenresMock.mockReset().mockResolvedValue([])
         resolveCategoriesMock.mockReset().mockResolvedValue([])
+        EventManager.getInstance().removeAllListeners()
     })
 
     describe('buildAppDetailsEntry', () => {
@@ -121,8 +124,8 @@ describe('LocalSteamDataWriter', () => {
     describe('writeLocalAppMetadata', () => {
         it('no-ops on the web build without calling invoke', async () => {
             isTauriMock.mockReturnValue(false)
-            const count = await LocalSteamDataWriter.writeLocalAppMetadata()
-            expect(count).toBe(0)
+            const entries = await LocalSteamDataWriter.writeLocalAppMetadata()
+            expect(entries.size).toBe(0)
             expect(invokeMock).not.toHaveBeenCalled()
         })
 
@@ -132,8 +135,8 @@ describe('LocalSteamDataWriter', () => {
                 if (command === 'read_steam_playtimes') return Promise.resolve([])
                 throw new Error(`unexpected command ${command}`)
             })
-            const count = await LocalSteamDataWriter.writeLocalAppMetadata()
-            expect(count).toBe(0)
+            const entries = await LocalSteamDataWriter.writeLocalAppMetadata()
+            expect(entries.size).toBe(0)
         })
 
         it('writes resolved entries into AppDetailsCache, skipping nameless appids', async () => {
@@ -155,13 +158,51 @@ describe('LocalSteamDataWriter', () => {
                 throw new Error(`unexpected command ${command}`)
             })
 
-            const count = await LocalSteamDataWriter.writeLocalAppMetadata()
-            expect(count).toBe(1)
+            const entries = await LocalSteamDataWriter.writeLocalAppMetadata()
+            expect(entries.size).toBe(1)
+            expect(entries.get(620)?.name).toBe('Portal 2')
 
             const cache = new AppDetailsCache()
             const cached = await cache.get(620)
             expect(cached?.name).toBe('Portal 2')
             expect(await cache.get(999)).toBeNull()
+        })
+
+        it('emits TaxonomyDataReady with source local-scan after a successful write', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string) => {
+                if (command === 'read_steam_playtimes') {
+                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
+                }
+                if (command === 'read_local_app_metadata') {
+                    return Promise.resolve([
+                        { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
+                    ])
+                }
+                throw new Error(`unexpected command ${command}`)
+            })
+            const handler = vi.fn()
+            EventManager.getInstance().registerEventHandler(SteamEventTypes.TaxonomyDataReady, handler)
+
+            await LocalSteamDataWriter.writeLocalAppMetadata()
+
+            expect(handler).toHaveBeenCalledTimes(1)
+            const event = handler.mock.calls[0][0] as CustomEvent<{ origin: string }>
+            expect(event.detail.origin).toBe('local-scan')
+        })
+
+        it('does not emit TaxonomyDataReady when nothing was written', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string) => {
+                if (command === 'read_steam_playtimes') return Promise.resolve([])
+                throw new Error(`unexpected command ${command}`)
+            })
+            const handler = vi.fn()
+            EventManager.getInstance().registerEventHandler(SteamEventTypes.TaxonomyDataReady, handler)
+
+            await LocalSteamDataWriter.writeLocalAppMetadata()
+
+            expect(handler).not.toHaveBeenCalled()
         })
     })
 })

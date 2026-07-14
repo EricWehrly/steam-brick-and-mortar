@@ -1,9 +1,14 @@
 /**
- * Local Steam Data Inspector - Debug tool for the desktop app's local-file data pipeline
+ * Local Steam Data Inspector - read-only debug tool for the desktop app's local-file data
+ * pipeline.
  *
  * Calls the Rust-side Tauri commands that read identity, playtime, and user collections
  * directly from the local Steam install (see docs/plans/desktop-local-data-pipeline-plan.md)
  * and prints the results to the console. No-ops on the web build (isTauri() is false there).
+ *
+ * Purely diagnostic - writing this data into AppDetailsCache and building a renderable library
+ * from it is LocalSteamLibraryLoader's job, not this tool's. This module never calls
+ * LocalSteamDataWriter/invokes anything that mutates state.
  *
  * Usage:
  *   window.dumpLocalSteamData()   - re-run on demand from devtools
@@ -16,7 +21,6 @@ import { invoke, isTauri } from '@tauri-apps/api/core'
 import { EventManager } from '../core/EventManager'
 import { GameEventTypes } from '../types/InteractionEvents'
 import { Logger } from '../utils/Logger'
-import { LocalSteamDataWriter } from '../steam/LocalSteamDataWriter'
 
 interface SteamIdentity {
     steamid64: string
@@ -93,13 +97,6 @@ export async function dumpLocalSteamData(): Promise<void> {
         } catch (error) {
             logger.warn('🗂️ [LocalSteamDataInspector] Failed to read local app metadata:', error)
         }
-    }
-
-    try {
-        const written = await LocalSteamDataWriter.writeLocalAppMetadata()
-        logger.info(`🗂️ [LocalSteamDataInspector] Wrote ${written} entries into AppDetailsCache`)
-    } catch (error) {
-        logger.warn('🗂️ [LocalSteamDataInspector] Failed to write local app metadata into AppDetailsCache:', error)
     }
 }
 
