@@ -109,6 +109,35 @@ export class GamesLoader {
     }
 
     /**
+     * Fetches appdetails for the given appids directly from the network and writes them into
+     * AppDetailsCache - no cache check first (caller already knows these aren't cached), no
+     * BatchEmitter streaming (this is a one-off gap-fill, not the main progressive-load path).
+     * Used by LocalSteamLibraryLoader to resolve collection-referenced appids the local scan has
+     * no appinfo.vdf data for. A per-appid fetch failure is silently omitted from the returned
+     * map rather than failing the whole call - same tolerance as fetchAndEmitUncached.
+     */
+    public async fetchAndCacheAppDetails(appids: number[]): Promise<Map<number, AppDetailsData>> {
+        if (appids.length === 0) {
+            return new Map()
+        }
+
+        const batchResponses = await this.batchClient.fetchBatch(appids, { batchSize: 100 })
+        const normalized = new Map<number, AppDetailsData>()
+        for (const [appid, response] of batchResponses.entries()) {
+            const rawData = response.success === false && response.unlisted
+                ? (response as unknown as AppDetailsData)
+                : response.data
+            if (!rawData) continue
+            normalized.set(appid, this.normalizeBatchData(rawData))
+        }
+
+        if (normalized.size > 0) {
+            await this.appDetailsCache.setMany(normalized)
+        }
+        return normalized
+    }
+
+    /**
      * Discovers every cached appid fit to show in the anonymous store and builds a full
      * SteamGame for each (see SteamIntegration.loadDemoGames). "Fit" means is_free === true
      * AND not undesirable_for_demo - the latter is set by scripts/bake-f2p-artwork.sh when an

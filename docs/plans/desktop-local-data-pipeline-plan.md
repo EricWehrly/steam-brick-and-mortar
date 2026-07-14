@@ -162,6 +162,22 @@ up" as of the last update to this doc; built and byte-exact-verified against rea
 in the same session (`get_local_metadata` returns name/developers/publishers/rank-ordered tags;
 see commit history for `appinfo.rs`/`localization.rs`).
 
+**Bug found and fixed post-launch, real-user testing**: the optional 20-byte `binSha1` header
+field's presence was originally detected by peeking the next byte and checking for `TYPE_NONE`
+(0x00) — this is unreliable (a *present* `binSha1` whose first byte happens to be 0x00, a real
+~1/256 chance per entry, is indistinguishable from an *absent* one) and produced exactly the
+failure a first real user hit: `"unknown KV type 0x73 at offset ..."`, from every subsequent byte
+in that entry being read 20 bytes out of alignment. Fixed in `decode_appinfo_root` by trying both
+hypotheses (with/without the 20 bytes) and trusting `size` (already known) as ground truth —
+whichever hypothesis parses without error *and* lands the reader exactly on the entry's known end
+byte wins, no more guessing. Verified against this dev machine's real 3022-entry `appinfo.vdf`:
+3021/3022 decode cleanly (one unrelated, unrepro'd outlier remains — see
+`decodes_nearly_every_entry_in_this_machines_real_appinfo_without_error`, an `#[ignore]`d
+real-machine test). `read_local_app_metadata` also now catches a per-appid decode failure and
+skips just that appid (empty metadata) rather than failing the whole requested batch — a second,
+independent layer of resilience on top of the header fix, since a 1-in-3000-ish residual failure
+rate is realistic on any given real library.
+
 Client-side (`client/src/`):
 5. ✅ **Done, partial.** Tags → `steamspy_tags`-shaped `Record<string, number>` (descending
    rank-derived weight) — `LocalSteamDataWriter.buildWeightedTags`. **Not done**: local
@@ -183,8 +199,9 @@ Client-side (`client/src/`):
    `channel: 'local-scan'` — the new `ImportChannel` variant added to `Library.ts`. This drives
    the existing `SteamIntegration.handleImportLibrary` → `applyLibrary()` path unmodified, so
    `BatchEmitter` streaming and `persistLibrary()` both apply for free, no new pipeline code.
-   `LocalSteamDataInspector` (the debug tool) no longer triggers the write itself — it's
-   read-only now, `LocalSteamLibraryLoader` is the sole production owner of that call.
+   `LocalSteamDataInspector` (the debug tool that previously triggered the write) has since been
+   **removed entirely** — redundant once production data was properly wired in;
+   `LocalSteamLibraryLoader` is the sole owner of that call.
 8. ✅ **Confirmed, not just assumed.** `SteamIntegration.handleGameStart()` already checks
    `loadPersistedLibrary()` before falling back to the demo store — since task 7's loader
    persists through the existing `persistLibrary()` call (same as any import), a subsequent
@@ -208,10 +225,22 @@ New, not in the original list — **found via this session's identity-display in
     still has no persona-name source at all (`SteamUser` itself has no field for it) — that gap
     is untouched by this fix and would need its own investigation if it matters before "Connect
     Steam" gets built.
-13. **User collections schema + writer** — `AppDetailsData`/`SteamGame` need a field for "which
-    collection(s) does this appid belong to" before "sort by user collections" can exist at all.
-    Currently nothing (see task 5). Prerequisite for the taxonomy-event plan's desktop default-sort
-    behavior.
+13. ✅ **Done, then extended the same session.** `SteamGameMetadata.user_collections?: readonly
+    string[]` (`SteamMetadata.ts`) is the schema. `LocalSteamDataWriter.writeLocalAppMetadata()`
+    calls `read_steam_collections`, builds a per-appid collection-name map, and folds it into the
+    same `buildAppDetailsEntry()` write it already does for tags/genres/categories — **not** a
+    second `AppDetailsCache` writer, deliberately: `AppDetailsCache.set`/`setMany` fully replace
+    an entry (`store.put`, no merge), so a second writer targeting the same appids would have
+    clobbered whichever wrote second. A `read_steam_collections` failure degrades to "no
+    collections" rather than failing the whole write.
+    **Update**: collection membership now *does* expand the candidate appid set (reversing the
+    original scope boundary noted here) — `writeLocalAppMetadata()`'s candidate set is
+    `union(playtime appids, collection appids)`, and `LocalSteamLibraryLoader` falls back to a
+    direct network fetch (`AppDetailsCache.findMissing()` + `SteamApiClient.fetchAndCacheAppDetails()`)
+    for whatever's still unresolved after local resolution — a collection-only, never-launched
+    appid can now surface in the library, not just get tagged onto an appid already present via
+    playtime. `findMissing()` is generic (not collection-specific) and reused as-is for the
+    achievement-data roadmap note in `desktop-app.md`.
 
 Housekeeping / deferred:
 9. Wire `build_web()`/`build_desktop()` in `scripts/release.sh` — **de-scoped**, see prerequisite

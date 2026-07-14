@@ -15,7 +15,7 @@ The main thing we'll want to check in this "encore" act is: Can we embed an audi
 - **Working analog wall clock** — in-world prop with real-time hand movement; ambient polish → see [Fabricated Set Dressing](../features/fabricated-set-dressing.md)
 - Fill the camera up with steam after launching a game, so the effect of the frozen frame in application is .. steamy.
 - **Room variant — cozy basement** — see [Room Variants](../features/room-variants.md); Encore stretch beyond the Act 2 best-effort
-- **Poster walls from user media** — wall posters sourced from user-owned public screenshots/artwork, rotating by category/zone (needs rights/privacy review)
+- **Poster walls from user media** — graduated into [Wall Art & Framed Posters](../features/wall-art-framed-posters.md); the points-shop-cosmetics source stays a stretch pending rights/privacy review
 - **Blacklight room atmosphere** — UV-style ambient with glowing accent colors; pairs naturally with basement variant; add to lighting preset system when room variants exist
 - **Dissolve animation system** — smooth entrance materialization for store geometry; eliminates jarring "pop" on load. See `docs/research/dissolve-animation-research.md`.
 - **Dust motes** — floating ambient particles, especially visible in light beams; ~1-2 day scope; see [Lighting and Atmosphere](../features/lighting-and-atmosphere.md)
@@ -47,6 +47,7 @@ The main thing we'll want to check in this "encore" act is: Can we embed an audi
 ## Misc
 
 - **Friend stream projection (Tiers 2–4)** — presence data, Steam Broadcasting DASH, and native window capture; the `getDisplayMedia` Tier 1 proof is **pulled into Act 2**. See [Friend Stream Projection](../features/friend-stream-projection.md).
+- **SteamGridDB as a poster source** — community-curated poster-aspect-ratio art, richer than store screenshots, but per-asset licensing isn't permissive enough for us to bundle/host directly (same two-layer license problem as fan 3D models in [Scene Clutter & Props](../features/scene-clutter-and-props.md)). Nice-idea-probably-not tier: rather than pulling their art ourselves, point users at the site and let them supply their own picks (ties into the "load your own props/images from a folder" personal-mode pattern). See [Wall Art & Framed Posters](../features/wall-art-framed-posters.md).
 - Portal-style portals linking different rooms
 would love to build to support inside the same room, but not at first
 Would love to build as much as possible, a "filter" drawing effect that causes the different appearance of the different "rooms"
@@ -63,6 +64,12 @@ art deco effect that adds a little emphasis on top of our 'blockbuster' scene
   codebase as an abandoned first attempt at exactly this. Kept here (struck through) for history;
   see the plan doc for the current design, which also drops the "reuse an existing intake event"
   idea floated below in favor of a dedicated event — see that doc's rationale.
+- **"Easy achievements" as a sort/filter dimension** — idle idea, not scheduled, not intended to
+  ever be pulled forward without a separate ask: the per-app achievement cache
+  (`appcache/librarycache/<appid>.json`, surfaced by the desktop local-data pipeline work) could
+  in principle support a "games with easy/quick achievements" sort or filter, since Steam tracks
+  per-achievement global unlock percentages. Captured here purely so it isn't lost — no plan doc,
+  no commitment.
 
 ## Deferred Re-entry Candidates
 

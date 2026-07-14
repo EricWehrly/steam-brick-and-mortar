@@ -32,7 +32,7 @@ never exist on this channel" becomes the honest answer.
 | By developer/publisher | `developers` / `publishers` | Steam `appdetails` | Web + desktop | Same as genre |
 | By community tag | `steamspy_tags` / `steamspy_top_tags` | **SteamSpy** (`steamspy.com/api`), via the hydrator Lambda **or**, as of the [Rust CORS/Lambda Bypass Spike](../plans/rust-cors-bypass-spike.md), a direct desktop fetch | Web (Lambda-only) + desktop (Lambda or direct Rust fetch) | **~1 request/second enforced (`STEAMSPY_DELAY_MS = 1100`), no bulk endpoint, no alternative confirmed yet.** The constraint is latency, not access — see below |
 | By review score | `positive`/`negative`/`userscore`/`owners` | SteamSpy, same path as tags | Web + desktop | Same as tags |
-| **By user category** | user-defined collection/category buckets | **Local Steam install only** — `cloud-storage-namespace-1.json` (see `docs/features/local-file-investigation.md`) | **Desktop-only, no web path exists** | Paused/deferred (AC4.4 target, but see note below) — not a rate-limit problem, a channel-access problem: the web client cannot reach this file at all, full stop |
+| **By user category** | user-defined collection/category buckets (`AppDetailsData.user_collections`) | **Local Steam install only** — `cloud-storage-namespace-1.json` (see `docs/features/local-file-investigation.md`) | **Desktop-only, no web path exists** | ✅ **Implemented** — `LocalSteamDataWriter` writes it, `GroupModes.ByUserCollection` groups by it, gated into the UI by [`taxonomy-data-event-plan.md`](../plans/taxonomy-data-event-plan.md)'s presence-driven option list. Not a rate-limit problem, a channel-access problem: the web client cannot reach this file at all, full stop — this row will never gain a web path the way tags/genres might. |
 
 ## Two different kinds of "we don't have this yet"
 
@@ -81,14 +81,14 @@ local source and sidestep SteamSpy for desktop users entirely.
 
 ## How this table is meant to drive the gate
 
-**Update — pulled out of "someday" and into active planning**:
-[`docs/plans/taxonomy-data-event-plan.md`](../plans/taxonomy-data-event-plan.md) is now the
-design doc for this mechanism. It **supersedes** the original idea below of reusing an existing
-ownership event (`GameDataReady`/`LibraryManifestReady`) as the re-evaluation signal — the
-desktop local-scan path (`LocalSteamDataWriter`) writes taxonomy data into `AppDetailsCache` on a
-completely decoupled timeline from however the game list itself gets populated, so an ownership
-event doesn't reliably cover "taxonomy data changed." The new plan proposes a dedicated event
-instead. No longer tracked in `act4-encore-someday-maybe.md` — moved to active work.
+**Update — implemented.** [`docs/plans/taxonomy-data-event-plan.md`](../plans/taxonomy-data-event-plan.md)
+is the design doc this mechanism was built from — `TaxonomyDataReady` (a dedicated event, not a
+reuse of `GameDataReady`/`LibraryManifestReady` — the desktop local-scan path writes taxonomy
+data on a completely decoupled timeline from ownership, so an ownership event couldn't reliably
+cover "taxonomy data changed") plus `client/src/ui/TaxonomyOptionAvailability.ts`'s presence-driven
+dedup scan, wired into `LayoutControlPanel`. See that plan's "Implementation notes" section for
+exactly what landed and the one known gap (network-path emission not yet wired). No longer
+tracked in `act4-encore-someday-maybe.md`.
 
 <details>
 <summary>Original framing (superseded, kept for history)</summary>

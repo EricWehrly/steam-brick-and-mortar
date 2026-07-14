@@ -46,4 +46,11 @@ export interface SteamGameMetadata {
     negative?: number
     userscore?: number
     owners?: string
+
+    /**
+     * Names of the desktop user's own Steam library collections this appid belongs to (e.g.
+     * "Ze Done", "Meh") - desktop-only, sourced from local-scan (read_steam_collections), never
+     * present on web. See docs/plans/taxonomy-data-event-plan.md.
+     */
+    user_collections?: readonly string[]
 }

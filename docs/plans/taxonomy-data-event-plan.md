@@ -1,6 +1,9 @@
 # Plan: Taxonomy Data Event (separating "what games" from "what sorts")
 
-**Status**: Signed off — decisions below, ready to move to implementation planning
+**Status**: ✅ Implemented. `TaxonomyDataReadyEvent`, the `ByUserCollection` group mode, the
+presence-driven dynamic option list, the codified default-preference order, and the configurable
+coverage threshold are all built and tested — see "Implementation notes" at the end of this doc
+for what landed and exactly where.
 **Supersedes**: the "not a new event type" stance in
 [`sort-filter-data-provenance.md`](../architecture/sort-filter-data-provenance.md)'s gating
 section, and the someday item "Gate sort/filter UI on data availability" in
@@ -152,7 +155,10 @@ mechanism.
 been reasoned about, not measured against a real, large personal library. Revisit once a few
 friends' libraries have gone through this pipeline — fold into a broader data-integrity audit
 (bundle staleness, tag coverage, collection-parse edge cases) rather than a one-off check of this
-table alone.
+table alone. **Also fold in before Act 3**: achievement-cache presence implying ownership breaks
+down for a bought → played → refunded game (Steam doesn't purge the local achievement cache on
+refund) — see the "Refund complication" note in
+[`desktop-app.md`](../features/desktop-app.md#revisit-connect-steam-priority-ownership-signals-not-yet-scheduled).
 
 ## Achievement data and other local ownership hints (not scoped here, but not "just a sort dimension" either)
 
@@ -228,5 +234,37 @@ that assumption is shaky rather than assuming best-case network availability:
   (tags, collections) this plan's gate reacts to
 - `client/src/ui/LayoutControlPanel.ts`, `client/src/scene/categorization/GameSorter.ts`,
   `client/src/scene/categorization/SectionSorter.ts` — code this plan changes
-- `client/src/steam/GamesLoader.ts`, `client/src/steam/LocalSteamDataWriter.ts` — the two
-  `TaxonomyDataReady` emission points
+- `client/src/steam/LocalSteamDataWriter.ts` — the one `TaxonomyDataReady` emission point built so
+  far (local-scan path) — see "Implementation notes" below for the network-path gap
+
+## Implementation notes (what actually landed)
+
+- `TaxonomyDataReadyEvent`/`SteamEventTypes.TaxonomyDataReady` — `client/src/types/InteractionEvents.ts`.
+  Payload field is named `origin`, not `source` — `BaseInteractionEvent` already reserves `source`
+  for `EventSource` (a real type conflict, not a style choice).
+- Emission: `LocalSteamDataWriter.writeLocalAppMetadata()` emits it right after its
+  `AppDetailsCache.setMany()`. **Not yet wired on the network/Lambda path**
+  (`GamesLoader.fetchAndEmitUncached`) — the original proposal named this as a second emission
+  point, but it wasn't built this pass. Practical impact today is limited (the web channel already
+  refreshes `LayoutControlPanel`'s options via the pre-existing `GameDataReady` subscription,
+  which fires around the same time as most network metadata), but it's a real gap: a network
+  fetch happening *after* the panel already refreshed once (e.g. a slow trailing SteamSpy tag
+  hydration) won't trigger another dynamic-option refresh. Worth closing if that scenario turns
+  out to matter in practice.
+- `GroupModes.ByUserCollection` (`client/src/types/LayoutTypes.ts`) + `groupByUserCollectionMode`
+  (`client/src/scene/categorization/GroupResolver.ts`) — multi-bucket membership, same shape as
+  `groupByTagMode` (a game in two collections appears in both sections).
+- Dynamic option availability: `client/src/ui/TaxonomyOptionAvailability.ts`
+  (`computeAvailableDimensions`), a pure/testable dedup-scan over the current game list. Wired
+  into `LayoutControlPanel` via `refreshAvailableOptions()`, called on both `GameDataReady` and
+  `TaxonomyDataReady` — not just once at construction, which is the actual bug this whole plan
+  traces back to.
+- Default-preference order: `GameSorter.chooseDefaultModes()` — codifies the
+  `ByUserCollection` → `ByRecency` → `ByGenre` ranked list from the Decisions section above.
+- Coverage threshold: `AppSettings.taxonomyCoverageThreshold` (`Setting.TaxonomyCoverageThreshold`),
+  default `0.5`, standard `AppSettings` persistence/typed-access/event-notification — used only by
+  `GameSorter`'s default-selection check, not by `TaxonomyOptionAvailability` (menu visibility
+  stays a bare-presence gate, per the Decisions section — the threshold was scoped to default
+  *selection* only, not deliberately made a factor in what get offered as an option).
+- `steam.hasRecencyData` — deleted, not just stopped-reading. No remaining references outside
+  historical comments.

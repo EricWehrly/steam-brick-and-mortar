@@ -85,6 +85,7 @@ export const Setting = {
     AutoLoadProfile: 'autoLoadProfile',
     DevelopmentMode: 'developmentMode',
     MaxGames: 'maxGames',
+    TaxonomyCoverageThreshold: 'taxonomyCoverageThreshold',
     // Input
     InputProfile: 'inputProfile',
     InputBindings: 'inputBindings',
@@ -180,6 +181,11 @@ export interface ApplicationSettings {
     autoLoadProfile: boolean
     developmentMode: boolean
     maxGames: number // How many games to load per profile; defaults lower in dev mode for faster iteration
+    /** Fraction (0-1) of the current library that must carry a taxonomy dimension (currently:
+     *  user collections) before that dimension is chosen as the *default* group/sort - not a
+     *  gate on whether it's offered as an option at all, just on whether it wins as default.
+     *  See docs/plans/taxonomy-data-event-plan.md. */
+    taxonomyCoverageThreshold: number
 
     // Input Settings
     inputProfile: string
@@ -502,6 +508,7 @@ export class AppSettings {
             autoLoadProfile: true,
             developmentMode: isDev, // Default based on environment
             maxGames: isDev ? 20 : 9999,
+            taxonomyCoverageThreshold: 0.5,
 
             // Input Settings
             inputProfile: 'mouse-keyboard',

@@ -213,6 +213,17 @@ export class AppDetailsCache {
     }
 
     /**
+     * Given a candidate appid list, returns just the ones with no cache entry at all - "give me
+     * what's not already in the library." Used by LocalSteamLibraryLoader to find
+     * collection-referenced appids that need a network gap-fill fetch, but generic enough for
+     * any other caller with the same "what haven't we seen yet" question.
+     */
+    async findMissing(appids: number[]): Promise<number[]> {
+        const cached = await this.getMany(appids)
+        return appids.filter(appid => !cached.has(appid))
+    }
+
+    /**
      * Store app details for a single game
      */
     async set(appid: number, data: AppDetailsData): Promise<void> {

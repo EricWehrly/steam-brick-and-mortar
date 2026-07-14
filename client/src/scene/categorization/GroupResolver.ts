@@ -122,6 +122,9 @@ export function resolveGroups(
 
         case GroupModes.ByTag:
             return groupByTagMode(games, groupMode, sortMode)
+
+        case GroupModes.ByUserCollection:
+            return groupByUserCollectionMode(games, groupMode, sortMode)
     }
 }
 
@@ -216,4 +219,28 @@ function groupByTagMode(games: SteamGameData[], groupMode: GroupMode, sortMode: 
             return a.localeCompare(b, undefined, { sensitivity: 'base' })
         })
         .map(tag => ({ name: tag, games: groups.get(tag)!, groupMode, sortMode }))
+}
+
+/**
+ * Desktop-only, user-defined collections (see SteamGameMetadata.user_collections). Same
+ * multi-bucket-membership shape as groupByTagMode - a game in two collections appears in both
+ * sections - since collection names are arbitrary user text, not a fixed vocabulary.
+ */
+function groupByUserCollectionMode(games: SteamGameData[], groupMode: GroupMode, sortMode: SortMode): Section[] {
+    const groups = new Map<string, SteamGameData[]>()
+
+    for (const game of games) {
+        for (const collectionName of game.user_collections ?? []) {
+            if (!groups.has(collectionName)) groups.set(collectionName, [])
+            groups.get(collectionName)!.push(game)
+        }
+    }
+
+    return [...groups.keys()]
+        .sort((a, b) => {
+            const countDiff = groups.get(b)!.length - groups.get(a)!.length
+            if (countDiff !== 0) return countDiff
+            return a.localeCompare(b, undefined, { sensitivity: 'base' })
+        })
+        .map(name => ({ name, games: groups.get(name)!, groupMode, sortMode }))
 }
