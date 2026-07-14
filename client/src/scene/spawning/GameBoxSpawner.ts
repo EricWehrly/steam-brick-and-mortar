@@ -43,6 +43,7 @@ export class GameBoxSpawner {
     private static instance: GameBoxSpawner | null = null
 
     private renderer: GpuGameBoxRenderer | null = null
+    private currentTextureCapacity = 0
     private shelfPositions: Map<number, ShelfPosition> = new Map()
     private pendingSections: SectionsReadyForPlacementEvent | null = null
     private stockStrategy: IStockStrategy | null = null
@@ -75,29 +76,49 @@ export class GameBoxSpawner {
         )
         EventManager.getInstance().registerEventHandler(
             StorePropsEventTypes.LibraryReloadRequest,
-            (_e: CustomEvent<StorePropsLibraryReloadRequestEvent>) => this.resetForLibraryReload()
+            (e: CustomEvent<StorePropsLibraryReloadRequestEvent>) => this.resetForLibraryReload(e.detail)
         )
 
         GameBoxSpawner.logger.debug('Constructed')
     }
 
-    private fullReset(): void {
-        this.renderer?.dispose()
-        this.renderer = null
+    /**
+     * Two reset tiers instead of one blanket dispose+rebuild — see
+     * docs/architecture/label-and-placement-reset-architecture-review.md "Library Reload
+     * Lifecycle". A same-or-smaller incoming library fits the already-allocated GPU texture
+     * capacity, so it gets a soft reset (no disposal, slots rewound for reuse). A larger
+     * library — or an unknown size, e.g. an online reload that hasn't fetched data yet — still
+     * needs the old fullReset() behavior, since a WebGL DataArrayTexture can't grow in place.
+     */
+    private resetForLibraryReload(detail: StorePropsLibraryReloadRequestEvent): void {
+        const capacityCompatible =
+            this.renderer !== null &&
+            detail.incomingGameCount !== undefined &&
+            detail.incomingGameCount <= this.currentTextureCapacity
+
+        if (capacityCompatible) {
+            this.renderer?.resetForLibraryReload()
+        } else {
+            this.renderer?.dispose()
+            this.renderer = null
+            this.currentTextureCapacity = 0
+        }
+
         this.stockStrategy = null
         this.layoutReadyForPlacement = false
         this.layoutDeterminedSinceLastSections = false
         this.clearPlacementState()
-        GameBoxSpawner.logger.debug('Full reset (library reload)')
+
+        GameBoxSpawner.logger.debug(
+            capacityCompatible
+                ? 'Soft reset (library reload, capacity-compatible)'
+                : 'Full reset (library reload, capacity change or unknown)'
+        )
     }
 
     private clearPlacementState(): void {
         this.pendingSections = null
         this.shelfPositions.clear()
-    }
-
-    private resetForLibraryReload(): void {
-        this.fullReset()
     }
 
     private initializeRendererForLibrary(totalGames: number): void {
@@ -107,6 +128,7 @@ export class GameBoxSpawner {
         const placementCapacity = GameBoxSpawner.GAME_BOX_INSTANCE_LIMIT
         const labelCapacity = GameBoxSpawner.LABEL_BOX_INSTANCE_LIMIT
         this.renderer = new GpuGameBoxRenderer(textureCapacity, placementCapacity, labelCapacity)
+        this.currentTextureCapacity = textureCapacity
         GameBoxSpawner.logger.debug(
             `Renderer initialized: textureCapacity=${textureCapacity}, ` +
             `placementCapacity=${placementCapacity}, labelCapacity=${labelCapacity}`

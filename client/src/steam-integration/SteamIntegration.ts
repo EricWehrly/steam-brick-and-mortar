@@ -324,7 +324,9 @@ export class SteamIntegration {
     private async applyLibrary(library: Library): Promise<boolean> {
         try {
             if (this.gameLibrary.getState().userData?.games?.length) {
-                this.eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {})
+                this.eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {
+                    incomingGameCount: library.games.length
+                })
                 SteamIntegration.logger.info('Emitted LibraryReloadRequest before library load')
             }
 
@@ -413,6 +415,8 @@ export class SteamIntegration {
 
         try {
             // If a store is already loaded, clear it before the new user's data arrives.
+            // incomingGameCount is omitted — the new library hasn't been fetched yet at this
+            // point, so GameBoxSpawner conservatively treats capacity as unknown.
             if (this.gameLibrary.getState().userData?.games?.length) {
                 this.eventManager.emit<StorePropsLibraryReloadRequestEvent>(StorePropsEventTypes.LibraryReloadRequest, {})
                 SteamIntegration.logger.info('Emitted LibraryReloadRequest before library load')
