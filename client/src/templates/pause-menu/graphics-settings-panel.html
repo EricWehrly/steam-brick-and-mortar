@@ -17,13 +17,13 @@
           Coarse renderer preset for pixel ratio and shadow map defaults.
         </p>
         {{qualityLevelControl}}
-        <div class="setting-control" style="margin-top: 0.75rem;">
-          <label class="checkbox-container ui-checkbox-row" style="margin-bottom: 0.75rem;">
+        <div class="setting-row">
+          <label class="checkbox-container ui-checkbox-row">
             <input type="checkbox" class="ui-checkbox" id="fullscreen-enabled" {{#fullscreenEnabled}}checked{{/fullscreenEnabled}}>
             Fullscreen Mode
           </label>
         </div>
-        <div class="setting-control" style="margin-top: 0.75rem;">
+        <div class="setting-row">
           <label class="checkbox-container ui-checkbox-row">
             <input type="checkbox" class="ui-checkbox" id="shadow-map-enabled" {{#shadowMapEnabled}}checked{{/shadowMapEnabled}}>
             Enable Shadow Maps
@@ -32,19 +32,17 @@
         {{pixelRatioControl}}
       </div>
     </section>
-    
-    <!-- Lighting Quality Section -->
+
+    <!-- Lighting Quality - standalone setting, not part of a deliberate group -->
     <section class="setting-section">
-      <div class="setting-group">
-        {{lightingQualityControl}}
-      </div>
+      {{lightingQualityControl}}
     </section>
 
     <!-- Shadow Settings Section -->
     <section class="setting-section">
       <div class="setting-group">
         {{shadowQualityControl}}
-        <div class="setting-control" style="margin-top: 0.75rem;">
+        <div class="setting-row">
           <label class="checkbox-container ui-checkbox-row">
             <input type="checkbox" class="ui-checkbox" id="ssao-enabled" {{#ssaoEnabled}}checked{{/ssaoEnabled}}>
             Enable SSAO
@@ -59,8 +57,6 @@
     <section class="setting-section">
       <div class="setting-group">
         {{ceilingHeightControl}}
-      </div>
-      <div class="setting-group">
         {{environmentIntensityControl}}
       </div>
     </section>
@@ -74,18 +70,22 @@
         <p class="setting-description">
           Tools to help visualize and debug the lighting system for troubleshooting.
         </p>
-        <div class="setting-control">
-          <label class="checkbox-container ui-checkbox-row" style="margin-bottom: 0.75rem;">
+        <div class="setting-row">
+          <label class="checkbox-container ui-checkbox-row">
             <input type="checkbox" class="ui-checkbox" id="enable-lighting" {{#enableLighting}}checked{{/enableLighting}}>
             Enable Lighting (toggle lights on/off to compare lit vs unlit scene)
           </label>
-          <label class="checkbox-container ui-checkbox-row" style="margin-bottom: 0.75rem;">
+        </div>
+        <div class="setting-row">
+          <label class="checkbox-container ui-checkbox-row">
             <input type="checkbox" class="ui-checkbox" id="show-lighting-debug" {{#showLightingDebug}}checked{{/showLightingDebug}}>
             Show Red Debug Shapes (visualize where lights should affect the scene)
           </label>
+        </div>
+        <div class="setting-row">
           <label class="checkbox-container ui-checkbox-row">
             <input type="checkbox" class="ui-checkbox" id="show-ceiling" {{#showCeiling}}checked{{/showCeiling}}>
-            Show Ceiling ("Hollywood Soundstage Mode" for debugging lights)
+            Show Ceiling
           </label>
         </div>
       </div>

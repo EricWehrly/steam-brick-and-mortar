@@ -76,7 +76,6 @@
 }
 
 .graphics-settings-panel .setting-select {
-  width: 100%;
   padding: 0.75rem;
   background: var(--pause-background, #2a2a2a);
   border: 1px solid #444;

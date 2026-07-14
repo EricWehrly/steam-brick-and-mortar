@@ -3,9 +3,11 @@
 .ui-component-row {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: var(--space-lg);
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--radius-sm, 4px);
     margin-bottom: var(--space-lg);
 }
 
@@ -20,7 +22,6 @@
 .ui-component-label {
     flex: 0 1 auto;
     max-width: 45%;
-    padding-top: var(--space-xs);
     font-weight: normal;
     font-size: var(--font-size-md);
     color: var(--color-text-primary);
@@ -45,7 +46,6 @@
 .ui-range-control {
     flex: 1 1 auto;
     min-width: 0;
-    padding-top: var(--space-xs);
 }
 
 .ui-range-track-row {
@@ -79,7 +79,6 @@
 
 .ui-select-input {
     width: auto;
-    min-width: 200px;
     max-width: 420px;
 }
 

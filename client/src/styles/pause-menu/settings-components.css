@@ -37,8 +37,24 @@
     padding: 0.9rem 1rem;
 }
 
-/* Alternating row backgrounds */
-.setting-section:nth-child(even) .setting-group {
+/* A single labeled/checkbox control inside a .setting-group, standing in for the
+   auto-generated .ui-component-row that RangeControl/SelectControl produce. Both
+   count as "rows" for the zebra striping below. */
+.setting-row {
+    padding: 0.4rem 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.setting-row:last-child {
+    margin-bottom: 0;
+}
+
+/* Alternate background per row within a group, not per group — a lone standalone
+   setting (no .setting-group wrapper) has nothing to alternate against and stays plain.
+   ":nth-child(of S)" counts only siblings matching S, so descriptions/labels
+   interleaved between rows don't throw off the even/odd count. */
+.setting-group > :nth-child(even of .ui-component-row, .setting-row) {
     background: rgba(255, 255, 255, 0.04);
 }
 
