@@ -225,7 +225,10 @@ getting this wrong more than once:
 - **Apply deltas additively, on top of the bone's rest pose** — don't zero out the other two axes.
   Rest pose carries real geometry (stance-width angle, foot-to-ankle angle, etc.) on axes you
   aren't posing; zeroing them discards it and produces a kinked limb, since child bones (e.g. the
-  knee) were relying on the parent's original orientation.
+  knee) were relying on the parent's original orientation. Occasionally a bone's rest pose carries
+  stray rotation on an axis you're not intentionally posing, and the additive model can't clear it —
+  when live testing shows an *absolute* set (not additive) is what actually fixes a bone, use the
+  per-bone `"absolute": true` escape hatch (see step 3) instead of forcing everything additive.
 
 ### 1. Find the bone hierarchy
 
@@ -262,12 +265,29 @@ both are posed at once.
 Once values look right in the browser, write them into
 `client/src/scene/props/model-poses.json`, keyed by the model's filename (without extension).
 Each entry is additive degrees per axis (only specify the axes you're bending — omitted axes
-default to 0 delta, not an absolute zero):
+default to 0 delta, not an absolute zero). Add `"absolute": true` on a single bone entry only if
+live testing showed the additive model can't reach the right pose (see the rest-pose caveat above):
 
 ```json
 "my_new_model": {
   "legs": [{ "bone": "L_thigh", "z": -55 }],
   "arms": [{ "bone": "elbow_L", "z": 25 }]
+}
+```
+
+**Seated models also need `seatOffset`** (placement, not bone rotation — see
+`UserPropPlacer.positionModelOnShelf`). Standing props ground on their own bounding-box bottom,
+but a bent-into-a-sit-pose model's bounding-box bottom is wherever its lowest dangling foot lands,
+not its hips — so foot-grounding won't rest the seat on the shelf. `seatOffset.y` (metres) aligns
+the hips to the shelf top directly instead of grounding on the feet; `seatOffset.z` (metres) nudges
+depth so dangling legs clear the shelf's front edge rather than clipping into it. Also hand-tuned,
+same live-then-bake workflow — there's no way to derive it from the model's geometry automatically:
+
+```json
+"my_seated_model": {
+  "legs": [{ "bone": "L_thigh", "z": -55 }],
+  "arms": [{ "bone": "elbow_L", "z": 25 }],
+  "seatOffset": { "y": -0.05, "z": 0.03 }
 }
 ```
 
