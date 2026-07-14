@@ -61,6 +61,45 @@ Primary files involved:
   - listens to game-render:placement-run-reset-requested
   - rewinds write index for slot reuse
 
+### Library Reload Lifecycle (planned, not yet implemented)
+
+- Owner: GameBoxSpawner
+- Trigger today: `StorePropsEventTypes.LibraryReloadRequest` → `fullReset()`, unconditionally.
+  `fullReset()` disposes `GpuGameBoxRenderer` (and everything it owns, including
+  `LodArtworkOrchestrator`/`LodTextureArrayManager`) and rebuilds it from scratch at a new
+  capacity on the next `LibraryManifestReady`.
+- Problem: this is a strictly bigger reset than the placement-run reset above, applied for a
+  reason (GPU texture-array capacity is fixed at construction, so a *larger* incoming library
+  needs a new array — a `THREE.DataArrayTexture`'s depth cannot grow in place) that doesn't apply
+  to every case that currently triggers it. A relaunch with the *same* persisted library, or a
+  future Round 2 "upgrade, don't replace" patch (see
+  `docs/plans/desktop-offline-first-plan.md`), needs no capacity change at all — disposing and
+  rebuilding the whole GPU pipeline for those cases is pure waste, and is the confirmed root cause
+  of a disposal-ordering race: in-flight `ArtworkPrefetchCoordinator` fetches for the *previous*
+  library aren't cancelled, and when they resolve after `fullReset()` has already cleared
+  `LodTextureArrayManager`'s tier map, they fail (`Unknown tier: mid`). See
+  `docs/tech-debt.md#id-lod-tier-reset-race-condition` for the full incident writeup.
+- **Planned shape**: two reset tiers instead of one blanket `fullReset()`, mirroring the
+  capacity-vs-no-capacity-change distinction directly rather than papering over it:
+  - **Capacity-compatible reload** (soft): no disposal. Same template-method shape as
+    `PlacementRunResettableInstancedBase` above — `LodArtworkOrchestrator` clears its
+    slot/placement maps, `LodTextureArrayManager` rewinds its slot allocator for reuse (the same
+    pattern `LabelTextureArrayManager` already applies on placement-run reset, just one lifecycle
+    tier up), and a `generation` counter is bumped. The two places that write into a texture slot
+    after an `await` (`LodArtworkOrchestrator.fetchAndCachePixels`/`fetchAndPlaceArtwork`) capture
+    `generation` on entry and compare before writing; a stale generation means the fetch resolved
+    for a library that's no longer current, so the write is dropped. This is deliberately not an
+    `isDisposed`-style guard scattered across every method — nothing is ever disposed on this
+    path, so there is nothing to guard against except one specific stale-write race, checked at
+    exactly the two call sites that can straddle a reset.
+  - **Capacity-incompatible reload** (hard): unchanged — still `fullReset()`, since a genuinely
+    larger incoming library needs a new, bigger `DataArrayTexture` and there's no way around
+    disposing the old one first (double-buffering old+new during the swap was considered and
+    rejected as unnecessary complexity/VRAM cost for a transition — demo store → real library —
+    that's expected to be visually a hard cut anyway).
+  - `GameBoxSpawner` decides which tier applies by comparing the incoming library's game count
+    against the currently-allocated texture capacity, not by which event fired.
+
 ## Observed Anti-Patterns And Risks
 
 1. Ownership drift under iteration

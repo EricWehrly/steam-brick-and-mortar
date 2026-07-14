@@ -1,7 +1,11 @@
 # Plan: Desktop Offline-First (Refresh Behavior & Transport)
 
-**Status**: Round 1 done. Round 1.5 (don't block the first render on the network gap-fill) is now
-the top-priority next fix - see Correction below. Rounds 2+ scheduled but not started.
+**Status**: Round 1 done. **Priority order** (see "Fourth test session" below for the corrected
+root cause): (1) fix `lod-tier-reset-race-condition` — root cause identified (disposal-ordering
+race, not a startup race), fix designed, not yet implemented; (2) Round 1.5 (don't block the first
+render on the network gap-fill); (3) Round 2 (upgrade not replace); (4) Round 3 (Tauri Rust HTTP
+client). The CORS/404 log-noise and pre-baking-known-failures items are follow-ups, not blocking
+any of the above.
 **Parent feature**: [Native Desktop App](../features/desktop-app.md)
 **Related**: [Desktop Local Data Pipeline Plan](desktop-local-data-pipeline-plan.md), [Taxonomy Data Event Plan](taxonomy-data-event-plan.md)
 
@@ -29,8 +33,75 @@ and what the user's real collections/playtime reference. In this run: 208/208 mi
 ~13-14 seconds this time (down from ~40s previously, likely SteamSpy-hydration-warmth variance,
 not a fix). Fork A was real and worth fixing (it added a *second*, compounding scene-reset wait,
 and is confirmed gone in the second log - zero `Unknown tier: mid` occurrences), but it was never
-the *primary* blocking cause the user was pointing at. **This is the actual highest-priority item
-for the next round of this plan** - see "Round 1.5" below.
+the *primary* blocking cause the user was pointing at - see "Round 1.5" below. (Superseded by the
+third test session further down: the LOD tier race turned out to be even higher priority than
+this.)
+
+## Third test session: the LOD tier race is not dormant - it's the actual top priority now
+
+Two more logs (a fresh session's first load, then a quit-and-relaunch second load) confirmed the
+`lod-tier-reset-race-condition` tech debt item's "not currently reachable, revisit only before
+Connect Steam/Round 2" framing was wrong. First load: 2,138 log lines, **zero** tier errors.
+Second load (same session, app quit and relaunched, persisted library from the first load found
+on startup): 22,413 log lines, **1,328** `Unknown tier: mid` errors (worse than the original
+1,404-error observation), plus new fallout not seen before - `No label slots remaining` (956
+occurrences) and sharply elevated worker/`postMessage` traffic, both very likely downstream
+consequences of the MID tier being unusable for the whole session (labels and other fallback
+paths get leaned on harder when the primary texture path is broken).
+
+**Theory considered and rejected**: a "startup-ordering race" — the idea that a fresh session's
+demo store happens to give the texture pipeline enough real time to initialize before a
+subsequent, faster persisted-library launch races ahead of it. Superseded below.
+
+Net effect either way: **this reproduces on every second-and-later desktop launch with a
+persisted library**, which is the normal, expected, intended experience of using this app more
+than once - not a rare edge case. This is the single most important item in this plan, ahead of
+Round 1.5 - see the updated Status line above and `docs/tech-debt.md
+#id-lod-tier-reset-race-condition`.
+
+Analysis tooling note: both new logs were large enough (2K and 22K lines) that reading them
+linearly wasn't practical. `scripts/dedupe-log.js` (added to the repo this session) normalizes
+timestamps/ids and groups+counts by pattern - reach for it first on any future noisy log rather
+than scrolling.
+
+## Fourth pass: actual root cause is a disposal-ordering race, and the fix reshapes the reset itself
+
+Tracing `GameBoxSpawner`'s `LibraryReloadRequest` handler against `LodArtworkOrchestrator`/
+`LodTextureArrayManager` found the real mechanism, and it isn't about startup timing at all:
+`GameBoxSpawner.fullReset()` **synchronously disposes** the entire GPU artwork pipeline (texture
+arrays included) on every `LibraryReloadRequest`, but `ArtworkPrefetchCoordinator`'s in-flight
+fetch promises for the *previous* library aren't cancelled - when they resolve afterward, they
+write into the now-disposed, cleared `tiers` map, which no longer has a `mid` entry. That explains
+both the timing sensitivity (relaunch-with-persisted-library has more in-flight prefetches racing
+the reset than a slow first load does) and why it "looked" like a startup race without actually
+being one.
+
+It also surfaced a design problem worth fixing at the same time, not just patching around: 
+`fullReset()` disposes and rebuilds *unconditionally*, even when the incoming library would fit
+the already-allocated texture arrays (e.g. relaunching with the exact same persisted library).
+The only real reason a hard dispose+rebuild is ever necessary is that a `THREE.DataArrayTexture`'s
+depth is fixed at construction and can't grow - true when going from a small demo-store library to
+a large real one, not true for a same-size reload. Full design and reasoning now lives in
+`docs/architecture/label-and-placement-reset-architecture-review.md`'s "Library Reload Lifecycle"
+section; summary:
+
+- `GameBoxSpawner` will pick between two reset tiers based on whether the incoming library fits
+  the currently-allocated capacity, not based on which event fired.
+- **Capacity-compatible** reloads (same/similar-size relaunch, future Round 2 upgrade patches) get
+  a soft reset - no disposal, slot allocators rewound for reuse (mirroring the
+  `PlacementRunResettableInstancedBase` pattern already used for placement-run resets), plus a
+  `generation` counter that the two async pixel-write call sites check before writing, so a
+  late-resolving fetch from the *previous* library silently no-ops instead of writing into a
+  reassigned slot.
+- **Capacity-incompatible** reloads (demo store → real library) keep today's `fullReset()`
+  behavior unchanged - a bigger array is genuinely required, and this transition is an intentional
+  hard cut anyway.
+
+An earlier fix attempt (an `isDisposed` guard checked after every `await` in
+`LodArtworkOrchestrator`, built by a background agent in an isolated worktree) correctly stops the
+crash but doesn't address the unnecessary dispose+rebuild itself, and adds a guard-check pattern
+that would need to be repeated at every future async call site in this class. Superseded by the
+design above before merging - not merged into the main tree.
 
 ## What was actually observed (one real test session, real library)
 
@@ -46,13 +117,10 @@ for the next round of this plan** - see "Round 1.5" below.
 - **`[LodTextureArrayManager] ERROR Unknown tier: mid` (1404 times)** — the log shows a clean
   first texture-tier init during the initial demo-store load, then a second full re-init
   coinciding almost exactly with Fork A's `LibraryReloadRequest` reset, after which every
-  `setSlotPixels(MID, ...)` call failed because the tier map came back empty. Very likely a race
-  in `LodArtworkOrchestrator`/`LodTextureArrayManager`'s reset/rebuild sequence — not yet
-  root-caused beyond "the reload-driven reset is the trigger." Not currently reachable through
-  the primary flow anymore (see Round 1 below), but latent: any other path that legitimately
-  fires `LibraryReloadRequest` (a real "Connect Steam" flow, a manual "Refresh Cache Now") could
-  still hit it. Tracked as tech debt:
-  `docs/tech-debt.md#id-lod-tier-reset-race-condition`.
+  `setSlotPixels(MID, ...)` call failed because the tier map came back empty. Originally assessed
+  as no longer reachable once Fork A stopped firing - **that assessment was wrong; actual root
+  cause is the disposal-ordering race described in "Fourth pass" below.** Tracked as tech debt:
+  `docs/tech-debt.md#id-lod-tier-reset-race-condition` (High priority).
 - **~1240 CORS-blocked `fetch()` calls** to `cdn.akamai.steamstatic.com/steam/apps/<appid>/
   library_600x900.jpg` — a separate, independent problem, not caused by Fork A. Local-scan
   entries have no real capsule/header URL (local scan can't discover the CDN hash the way
@@ -78,7 +146,7 @@ the CORS-blocked artwork fallback. Round 1 just stops the one trigger that was f
 automatically on every desktop launch; both underlying issues are still real and still
 reachable through other paths.
 
-## Round 1.5 — not started, now the actual top priority: don't block the first render on the network gap-fill
+## Round 1.5 — not started, second priority (after the LOD tier race fix): don't block the first render on the network gap-fill
 
 Per the Correction above, this — not Fork A — is the real reason local-scan doesn't feel "fast,
 offline" on a library with a large local/collections gap. `LocalSteamLibraryLoader.
@@ -187,13 +255,21 @@ same failure every time. Not scoped in detail - depends on Round 3 landing first
 confirming "this really is a 404" needs the non-browser fetch path above.
 
 ## Related
+- `scripts/dedupe-log.js` - normalize/group/count a noisy console log dump; use before reading
+  any future large log linearly
 - `client/src/steam-integration/SteamIntegration.ts` - Fork A, `applyLibrary()`
 - `client/src/steam/LocalSteamLibraryLoader.ts` - the actual blocking gap-fill (Round 1.5)
 - `client/src/steam/utils/ArtworkUrls.ts` - `deriveArtworkFromAppId`, the CORS-blocked fallback
 - `client/src/scene/game-box/instancing/GameArtworkRequest.ts` - `categorizeError`, the CORS/404 ambiguity
 - `client/src/scene/game-box/instancing/GameArtworkProvider.ts` - `failureCache`, currently in-memory only
 - `client/src/scene/game-box/instancing/LodArtworkOrchestrator.ts`,
-  `LodTextureArrayManager.ts` - the reset-driven tier-loss race
+  `LodTextureArrayManager.ts`, `PlacementRunResettableInstancedBase.ts` - the reset-driven
+  tier-loss race and the shared soft-reset pattern the planned fix extends
+- `client/src/scene/spawning/GameBoxSpawner.ts`,
+  `client/src/scene/spawning/ArtworkPrefetchCoordinator.ts` - own the reload trigger and the
+  in-flight fetches that race it
+- `docs/architecture/label-and-placement-reset-architecture-review.md` - "Library Reload
+  Lifecycle" section has the full two-tier reset design
 - `docs/tech-debt.md#id-lod-tier-reset-race-condition` - tracked debt for the tier race
 - `docs/features/desktop-app.md` - umbrella feature doc
 
