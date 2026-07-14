@@ -119,6 +119,19 @@ describe('LocalSteamDataWriter', () => {
             expect(entry?.genres).toEqual([{ id: '1', description: 'Action' }])
             expect(entry?.categories).toEqual([{ id: 2, description: 'Single-player' }])
         })
+
+        it('attaches collection names when provided, omits user_collections otherwise', async () => {
+            const withCollections = await LocalSteamDataWriter.buildAppDetailsEntry(
+                { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
+                ['Ze Done', 'Meh']
+            )
+            expect(withCollections?.user_collections).toEqual(['Ze Done', 'Meh'])
+
+            const withoutCollections = await LocalSteamDataWriter.buildAppDetailsEntry({
+                appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [],
+            })
+            expect(withoutCollections?.user_collections).toBeUndefined()
+        })
     })
 
     describe('writeLocalAppMetadata', () => {
@@ -155,6 +168,9 @@ describe('LocalSteamDataWriter', () => {
                         { appid: 999, name: null, developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
                     ])
                 }
+                if (command === 'read_steam_collections') {
+                    return Promise.resolve([])
+                }
                 throw new Error(`unexpected command ${command}`)
             })
 
@@ -168,6 +184,83 @@ describe('LocalSteamDataWriter', () => {
             expect(await cache.get(999)).toBeNull()
         })
 
+        it('attempts local resolution for a collection-only appid with no playtime entry', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string, args?: Record<string, unknown>) => {
+                if (command === 'read_steam_playtimes') {
+                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
+                }
+                if (command === 'read_steam_collections') {
+                    return Promise.resolve([{ id: 'from-tag-Ze Done', name: 'Ze Done', appids: [620, 400] }])
+                }
+                if (command === 'read_local_app_metadata') {
+                    expect(args?.appids).toEqual(expect.arrayContaining([620, 400]))
+                    return Promise.resolve([
+                        { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
+                        { appid: 400, name: 'Portal', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
+                    ])
+                }
+                throw new Error(`unexpected command ${command}`)
+            })
+
+            const entries = await LocalSteamDataWriter.writeLocalAppMetadata()
+
+            expect(entries.get(400)).toMatchObject({ name: 'Portal', user_collections: ['Ze Done'] })
+        })
+
+        it('joins collection membership onto matching appids, including appids in multiple collections', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string) => {
+                if (command === 'read_steam_playtimes') {
+                    return Promise.resolve([
+                        { appid: 620, last_played: 1000, playtime_minutes: 60 },
+                        { appid: 240, last_played: 500, playtime_minutes: 30 },
+                    ])
+                }
+                if (command === 'read_local_app_metadata') {
+                    return Promise.resolve([
+                        { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
+                        { appid: 240, name: 'Counter-Strike: Source', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
+                    ])
+                }
+                if (command === 'read_steam_collections') {
+                    return Promise.resolve([
+                        { id: 'from-tag-Ze Done', name: 'Ze Done', appids: [620, 240] },
+                        { id: 'from-tag-Meh', name: 'Meh', appids: [620] },
+                    ])
+                }
+                throw new Error(`unexpected command ${command}`)
+            })
+
+            const entries = await LocalSteamDataWriter.writeLocalAppMetadata()
+
+            expect(entries.get(620)?.user_collections).toEqual(['Ze Done', 'Meh'])
+            expect(entries.get(240)?.user_collections).toEqual(['Ze Done'])
+        })
+
+        it('proceeds without collections when read_steam_collections fails', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string) => {
+                if (command === 'read_steam_playtimes') {
+                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
+                }
+                if (command === 'read_local_app_metadata') {
+                    return Promise.resolve([
+                        { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
+                    ])
+                }
+                if (command === 'read_steam_collections') {
+                    return Promise.reject(new Error('no collections file'))
+                }
+                throw new Error(`unexpected command ${command}`)
+            })
+
+            const entries = await LocalSteamDataWriter.writeLocalAppMetadata()
+
+            expect(entries.get(620)?.name).toBe('Portal 2')
+            expect(entries.get(620)?.user_collections).toBeUndefined()
+        })
+
         it('emits TaxonomyDataReady with source local-scan after a successful write', async () => {
             isTauriMock.mockReturnValue(true)
             invokeMock.mockImplementation((command: string) => {
@@ -178,6 +271,9 @@ describe('LocalSteamDataWriter', () => {
                     return Promise.resolve([
                         { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
                     ])
+                }
+                if (command === 'read_steam_collections') {
+                    return Promise.resolve([])
                 }
                 throw new Error(`unexpected command ${command}`)
             })

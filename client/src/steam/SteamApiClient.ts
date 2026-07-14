@@ -1,7 +1,7 @@
 import { HttpClient } from './http/HttpClient'
 import { CacheManager } from './cache/SimpleCacheManager'
 import { RateLimiter } from './rate-limit/RateLimiter'
-import { BatchAppDetailsClient } from './batch/BatchAppDetailsClient'
+import { BatchAppDetailsClient, type AppDetailsData } from './batch/BatchAppDetailsClient'
 import { Logger } from '../utils/Logger'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import { BakedCacheLoader } from './cache/BakedCacheLoader'
@@ -232,6 +232,12 @@ export class SteamApiClient {
 
     public async enrichFromCache(games: SteamGame[]): Promise<SteamGame[]> {
         return this.gamesLoader.enrichFromCache(games)
+    }
+
+    /** See GamesLoader.fetchAndCacheAppDetails - a direct network gap-fill fetch, not the
+     *  progressive/cached load path. */
+    public async fetchAndCacheAppDetails(appids: number[]): Promise<Map<number, AppDetailsData>> {
+        return this.gamesLoader.fetchAndCacheAppDetails(appids)
     }
 
     /**

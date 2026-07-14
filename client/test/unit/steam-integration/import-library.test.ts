@@ -405,6 +405,41 @@ describe('SteamIntegration manual library import', () => {
 
         it.todo('a successful online profile load (handleLoadLibrary) also persists a Library, and a subsequent handleGameStart re-loads it via applyLibrary — needs the SteamApiClient network mocking pattern from steam-integration.test.ts, not yet wired into this file')
     })
+
+    describe('Fork A background re-fetch', () => {
+        it('does not auto-refresh for the local-scan channel even with a steamId, unlike other channels', async () => {
+            const integration = SteamIntegration.getInstance()
+            const eventManager = EventManager.getInstance()
+            const loadLibraryHandler = vi.fn()
+            eventManager.registerEventHandler(SteamEventTypes.LoadLibrary, loadLibraryHandler)
+
+            await importLibrary(integration, SAMPLE_GAMES, 'Test Account', '76561198000000000', 'local-scan')
+
+            expect(loadLibraryHandler).not.toHaveBeenCalled()
+        })
+
+        it('still auto-refreshes for the bookmarklet/file channels when a steamId is present', async () => {
+            const integration = SteamIntegration.getInstance()
+            const eventManager = EventManager.getInstance()
+            const loadLibraryHandler = vi.fn()
+            eventManager.registerEventHandler(SteamEventTypes.LoadLibrary, loadLibraryHandler)
+
+            await importLibrary(integration, SAMPLE_GAMES, 'Test Account', '76561198000000000', 'bookmarklet')
+
+            expect(loadLibraryHandler).toHaveBeenCalledOnce()
+        })
+
+        it('never auto-refreshes any channel when there is no steamId at all', async () => {
+            const integration = SteamIntegration.getInstance()
+            const eventManager = EventManager.getInstance()
+            const loadLibraryHandler = vi.fn()
+            eventManager.registerEventHandler(SteamEventTypes.LoadLibrary, loadLibraryHandler)
+
+            await importLibrary(integration, SAMPLE_GAMES, 'Test Account', undefined, 'file')
+
+            expect(loadLibraryHandler).not.toHaveBeenCalled()
+        })
+    })
 })
 
 /**

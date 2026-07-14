@@ -18,7 +18,8 @@
 //!            u64 accessToken
 //!            [20]u8 textSha1
 //!            u32 changeNumber
-//!            [20]u8 binSha1      (present only if the next byte isn't a valid KV type-0x00)
+//!            [20]u8 binSha1      (optional - see decode_appinfo_root, presence isn't reliably
+//!                                 detectable by peeking the next byte)
 //!            KV tree             (keys are string-table indices; string values stay inline)
 //! trailer: u32 stringCount, then that many null-terminated UTF-8 strings
 //! ```
@@ -123,10 +124,6 @@ impl<'a> Reader<'a> {
         Ok(bytes[0])
     }
 
-    fn peek_u8(&self) -> Result<u8, String> {
-        self.data.get(self.pos).copied().ok_or_else(|| "unexpected end of data".to_string())
-    }
-
     fn take(&mut self, n: usize) -> Result<&'a [u8], String> {
         if self.remaining() < n {
             return Err(format!(
@@ -229,25 +226,47 @@ impl AppInfoFile {
     /// Decodes one app's whole `appinfo` root (both `common` and `extended` children) on
     /// demand. Returns `Ok(None)` if the appid isn't in this file at all (the client has never
     /// cached info for it). Private: `get_local_metadata` is the public entry point.
+    ///
+    /// The optional 20-byte `binSha1` field can't be reliably detected by peeking the next byte
+    /// and checking for `TYPE_NONE` (0x00) - a *present* binSha1 whose first byte happens to be
+    /// 0x00 (a real ~1/256 chance per entry, and real libraries have hundreds of entries) is
+    /// indistinguishable from an *absent* one that way, and misreading it desyncs every byte
+    /// after by 20, corrupting the KV parse (this is what produced the "unknown KV type 0x73"
+    /// failure seen on a real library). Instead, try both hypotheses and trust `size` (already
+    /// known, ground truth for how many bytes this entry occupies) to pick the right one: the
+    /// correct interpretation is whichever one parses without error AND lands the reader exactly
+    /// on `end` afterward.
     fn decode_appinfo_root(&self, appid: u32) -> Result<Option<BinaryValue>, String> {
         let Some(&(start, end)) = self.spans.get(&appid) else {
             return Ok(None);
         };
-        let mut reader = Reader::new(&self.data[..end]);
-        reader.pos = start;
 
-        let _info_state = reader.u32()?;
-        let _last_updated = reader.u32()?;
-        let _access_token = reader.u64()?;
-        let _text_sha1 = reader.take(20)?;
-        let _change_number = reader.u32()?;
-        if reader.peek_u8()? != TYPE_NONE {
-            let _bin_sha1 = reader.take(20)?;
-        }
+        const FIXED_HEADER_LEN: usize = 4 + 4 + 8 + 20 + 4; // infoState, lastUpdated, accessToken, textSha1, changeNumber
+        const OPTIONAL_BIN_SHA1_LEN: usize = 20;
 
-        let root = parse_kv_tree(&mut reader, &self.string_table)?;
-        let root = BinaryValue::Obj(root);
+        let root_entries = self
+            .try_parse_kv_tree_from(start + FIXED_HEADER_LEN, end)
+            .or_else(|| self.try_parse_kv_tree_from(start + FIXED_HEADER_LEN + OPTIONAL_BIN_SHA1_LEN, end))
+            .ok_or_else(|| format!(
+                "failed to decode appinfo entry for appid {appid}: KV tree didn't parse cleanly \
+                 with or without an optional 20-byte binSha1 header"
+            ))?;
+
+        let root = BinaryValue::Obj(root_entries);
         Ok(root.get("appinfo").cloned())
+    }
+
+    /// Attempts a KV-tree parse starting at `kv_start`, succeeding only if parsing doesn't error
+    /// AND the reader lands exactly on `end` afterward - see decode_appinfo_root's doc comment
+    /// for why exact-consumption is the validation signal, not a byte peek.
+    fn try_parse_kv_tree_from(&self, kv_start: usize, end: usize) -> Option<Vec<(String, BinaryValue)>> {
+        if kv_start > end {
+            return None;
+        }
+        let mut reader = Reader::new(&self.data[..end]);
+        reader.pos = kv_start;
+        let entries = parse_kv_tree(&mut reader, &self.string_table).ok()?;
+        (reader.pos == end).then_some(entries)
     }
 
     /// The fields this app's local metadata pipeline actually wants: name (from `common`), and
@@ -349,7 +368,17 @@ pub fn read_local_app_metadata(appids: Vec<u32>) -> Result<Vec<LocalAppMetadata>
 
     let mut results = Vec::with_capacity(appids.len());
     for appid in appids {
-        let raw = appinfo.get_local_metadata(appid)?.unwrap_or_default();
+        // A single unparseable entry (unusual format variant, corrupted local cache) shouldn't
+        // fail the whole batch - every other requested appid still deserves a result. Falls
+        // through to Default (no local metadata for this one appid), same as a genuinely-absent
+        // entry.
+        let raw = match appinfo.get_local_metadata(appid) {
+            Ok(value) => value.unwrap_or_default(),
+            Err(error) => {
+                eprintln!("Failed to decode local appinfo metadata for appid {appid}: {error}");
+                RawLocalAppMetadata::default()
+            }
+        };
         let tags = raw
             .tag_ids
             .into_iter()
@@ -379,6 +408,10 @@ mod tests {
     /// string table — enough to exercise every branch of the parser without needing a real
     /// Steam install.
     fn build_sample_appinfo() -> Vec<u8> {
+        build_sample_appinfo_with_bin_sha1(None)
+    }
+
+    fn build_sample_appinfo_with_bin_sha1(bin_sha1: Option<[u8; 20]>) -> Vec<u8> {
         // String table indices, assigned in the order first used below.
         const IDX_APPINFO: u32 = 0;
         const IDX_COMMON: u32 = 1;
@@ -478,17 +511,19 @@ mod tests {
         kv.push(TYPE_END); // close root
 
         // Every real entry has this 40-byte fixed header before its KV tree: infoState(4) +
-        // lastUpdated(4) + accessToken(8) + textSha1(20) + changeNumber(4). The reader peeks
-        // the byte right after this header to decide whether an optional 20-byte binSha1
-        // follows; using zeroed fields here means that peek lands on the KV tree's own leading
-        // TYPE_NONE (0x00) byte, so the reader correctly infers "no binSha1" — same as it does
-        // on this dev machine's real appinfo.vdf entries that lack that optional field.
+        // lastUpdated(4) + accessToken(8) + textSha1(20) + changeNumber(4), optionally followed
+        // by a 20-byte binSha1. decode_appinfo_root tries "no binSha1" first, then "with
+        // binSha1" - whichever parses cleanly and consumes exactly to `end` wins, so either
+        // fixture shape resolves correctly regardless of try-order.
         let mut entry_body = Vec::new();
         entry_body.extend_from_slice(&0u32.to_le_bytes()); // infoState
         entry_body.extend_from_slice(&0u32.to_le_bytes()); // lastUpdated
         entry_body.extend_from_slice(&0u64.to_le_bytes()); // accessToken
         entry_body.extend_from_slice(&[0u8; 20]); // textSha1
         entry_body.extend_from_slice(&0u32.to_le_bytes()); // changeNumber
+        if let Some(bin_sha1) = bin_sha1 {
+            entry_body.extend_from_slice(&bin_sha1);
+        }
         entry_body.extend_from_slice(&kv);
 
         let appid: u32 = 42;
@@ -549,6 +584,69 @@ mod tests {
     fn unknown_appid_returns_none_not_error() {
         let file = AppInfoFile::parse(build_sample_appinfo()).unwrap();
         assert_eq!(file.get_local_metadata(999).unwrap(), None);
+    }
+
+    /// Regression test for the real-library failure ("unknown KV type 0x73 at offset ...") - a
+    /// *present* binSha1 whose first byte happens to be 0x00 used to be misread as *absent*
+    /// (the old logic just peeked one byte and checked for TYPE_NONE), desyncing every
+    /// subsequent read by 20 bytes. decode_appinfo_root now tries both hypotheses and validates
+    /// by exact byte consumption instead.
+    #[test]
+    fn parses_correctly_when_bin_sha1_is_present_and_starts_with_a_zero_byte() {
+        let buf = build_sample_appinfo_with_bin_sha1(Some([0u8; 20]));
+        let file = AppInfoFile::parse(buf).unwrap();
+        let metadata = file.get_local_metadata(42).unwrap().unwrap();
+        assert_eq!(metadata.name.as_deref(), Some("Test Game"));
+        assert_eq!(metadata.tag_ids, vec![10, 20]);
+    }
+
+    #[test]
+    fn parses_correctly_when_bin_sha1_is_present_and_does_not_start_with_zero() {
+        let mut bin_sha1 = [0xABu8; 20];
+        bin_sha1[0] = 0x42;
+        let buf = build_sample_appinfo_with_bin_sha1(Some(bin_sha1));
+        let file = AppInfoFile::parse(buf).unwrap();
+        let metadata = file.get_local_metadata(42).unwrap().unwrap();
+        assert_eq!(metadata.name.as_deref(), Some("Test Game"));
+    }
+
+    /// Real-machine, whole-file check — `#[ignore]`d by default. Decodes every appid this
+    /// machine's real appinfo.vdf actually has an entry for (not just Portal 2) - the regression
+    /// the two tests above target only synthetically; this confirms the fix against the real
+    /// byte layout at scale. Tolerates a small number of failures rather than requiring zero:
+    /// on this dev machine's real 3022-entry file, this caught the widespread binSha1 bug (which
+    /// affected far more than a handful) while one single unrelated outlier remains genuinely
+    /// unparseable (a real format variant this reader doesn't handle yet, or a corrupted local
+    /// cache entry - not investigated further, since `read_local_app_metadata` already treats a
+    /// per-appid decode failure as "no local metadata for this one" rather than failing the
+    /// whole batch). A regression that breaks *many* entries again would blow past this bound.
+    #[test]
+    #[ignore]
+    fn decodes_nearly_every_entry_in_this_machines_real_appinfo_without_error() {
+        const MAX_TOLERATED_FAILURES: usize = 5;
+
+        let steam_root = super::super::paths::find_steam_root().expect("expected a Steam install");
+        let file = AppInfoFile::load(&steam_root.join("appcache").join("appinfo.vdf"))
+            .expect("expected a readable appinfo.vdf");
+
+        let appids: Vec<u32> = file.spans.keys().copied().collect();
+        let total = appids.len();
+        let mut failures: Vec<(u32, String)> = Vec::new();
+        for appid in &appids {
+            if let Err(error) = file.get_local_metadata(*appid) {
+                failures.push((*appid, error));
+            }
+        }
+
+        println!("Decoded {}/{} real appinfo.vdf entries without error", total - failures.len(), total);
+        for (appid, error) in &failures {
+            println!("  FAILED appid {appid}: {error}");
+        }
+        assert!(
+            failures.len() <= MAX_TOLERATED_FAILURES,
+            "{} of {} entries failed to decode (tolerating up to {})",
+            failures.len(), total, MAX_TOLERATED_FAILURES
+        );
     }
 
     /// Real-machine check — `#[ignore]`d by default. Verifies against Portal 2 (appid 620),

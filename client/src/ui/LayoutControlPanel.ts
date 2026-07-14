@@ -3,10 +3,16 @@
  *
  * Three-axis control bar in #ui-right-center-group:
  *   - Layout  (Arc / Row / Spoke)  → emits UIEventTypes.LayoutRequested
- *   - Group   (None / Genre / Recency / Playtime / Rating)  ─╮
- *   - Sort    (Alphabetical / Playtime / Rating / Last Played) ╰→ emits UIEventTypes.ArrangementRequested
+ *   - Group   (None / Genre / Recency / Playtime / Rating / Tag / User Collection)  ─╮
+ *   - Sort    (Alphabetical / Playtime / Rating / Last Played)                       ╰→ emits UIEventTypes.ArrangementRequested
  *
  * A toggle button (⚏) shows/hides the bar. Hotkey: Shift+L.
+ *
+ * Group/Sort options are filtered to what's actually present in the current game data
+ * (TaxonomyOptionAvailability.computeAvailableDimensions) - re-evaluated on GameDataReady and
+ * SteamEventTypes.TaxonomyDataReady, not just once at construction. This replaces the previous
+ * `steam.hasRecencyData` flag, which was written nowhere and only checked once - see
+ * docs/plans/taxonomy-data-event-plan.md.
  *
  * All controls are disabled while the pipeline is executing.
  * Re-enabled on SectionsReady (arrangement applied).
@@ -14,12 +20,14 @@
 
 import { EventManager } from '../core/EventManager'
 import { DataManager } from '../core/data/DataManager'
-import { GameEventTypes, UIEventTypes } from '../types/InteractionEvents'
+import { GameEventTypes, SteamEventTypes, UIEventTypes } from '../types/InteractionEvents'
 import { GroupModes, SortModes } from '../types/LayoutTypes'
 import type { GroupMode, SortMode, LayoutMode } from '../types/LayoutTypes'
 import type { LayoutRequestedEvent } from '../types/EnvironmentEvents'
 import type { ArrangementRequestedEvent, SectionsReadyEvent } from '../types/EnvironmentEvents'
 import type { AllBatchesCompleteEvent } from '../types/EnvironmentEvents'
+import type { SteamGameData } from '../scene/game-box/types/GameData'
+import { computeAvailableDimensions, type AvailableDimensions } from './TaxonomyOptionAvailability'
 import '../styles/components/layout-sort-panel.css'
 import { togglePanelCollapse } from './components/PanelCollapse'
 
@@ -32,6 +40,7 @@ const LAYOUT_OPTIONS = [
 ] as const
 
 const GROUP_OPTIONS = [
+    { key: GroupModes.ByUserCollection, label: 'By Collection' },
     { key: GroupModes.ByRecency,  label: 'By Recency'  },
     { key: GroupModes.ByGenre,    label: 'By Genre'     },
     { key: GroupModes.ByTag,      label: 'By Tag'       },
@@ -61,19 +70,14 @@ export class LayoutControlPanel {
     private activeLayoutKey: LayoutMode = 'arc'
     private activeGroupKey: GroupMode = GroupModes.ByRecency
     private activeSortKey: SortMode = SortModes.ByLastPlayed
+    private availableDimensions: AvailableDimensions = computeAvailableDimensions([])
 
     private isControlsVisible = false
     private keyboardHandler: ((e: KeyboardEvent) => void) | null = null
 
-    constructor() {
-        if (DataManager.getInstance().get<boolean>('steam.hasRecencyData') === false) {
-            this.activeGroupKey = GroupModes.ByPlaytime
-            this.activeSortKey = SortModes.ByPlaytime
-        }
-    }
-
     public init(): void {
         const slot = document.getElementById('ui-right-center-group') ?? document.body
+        this.availableDimensions = computeAvailableDimensions(this.getCurrentGames())
         this.createPanel(slot)
         this.registerKeyboardHandler()
         EventManager.getInstance().registerEventHandler(
@@ -84,6 +88,35 @@ export class LayoutControlPanel {
             GameEventTypes.SectionsReady,
             (event: CustomEvent<SectionsReadyEvent>) => this.handleSectionsReady(event.detail)
         )
+        EventManager.getInstance().registerEventHandler(
+            GameEventTypes.GameDataReady,
+            () => this.refreshAvailableOptions()
+        )
+        EventManager.getInstance().registerEventHandler(
+            SteamEventTypes.TaxonomyDataReady,
+            () => this.refreshAvailableOptions()
+        )
+    }
+
+    private getCurrentGames(): SteamGameData[] {
+        return DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
+    }
+
+    /**
+     * Re-scans current game data for which dimensions are actually present and rebuilds the
+     * Group/Sort dropdown option lists in place, preserving the current selection if it's still
+     * offered. Called on every GameDataReady/TaxonomyDataReady, not just once at construction -
+     * closes the other half of why the dead `steam.hasRecencyData` flag never worked even when
+     * it was read.
+     */
+    private refreshAvailableOptions(): void {
+        this.availableDimensions = computeAvailableDimensions(this.getCurrentGames())
+        if (this.groupSelect) {
+            this.populateSelect(this.groupSelect, GROUP_OPTIONS, this.availableDimensions.groupModes, this.activeGroupKey)
+        }
+        if (this.sortSelect) {
+            this.populateSelect(this.sortSelect, SORT_OPTIONS, this.availableDimensions.sortModes, this.activeSortKey)
+        }
     }
 
     private handleSectionsReady(detail: SectionsReadyEvent): void {
@@ -100,7 +133,7 @@ export class LayoutControlPanel {
 
     private createPanel(parentSlot: HTMLElement): void {
         this.panelContainer = document.createElement('div')
-        this.panelContainer.className = 'ui-panel layout-sort-panel horizontally-collapsible horizontally-collapsed'
+        this.panelContainer.className = 'ui-panel ui-right-rail-panel layout-sort-panel horizontally-collapsible horizontally-collapsed'
 
         const header = document.createElement('div')
         header.className = 'panel-header clickable-header'
@@ -189,16 +222,7 @@ export class LayoutControlPanel {
         select.className = 'layout-sort-select'
         select.title = 'Group mode'
         this.groupSelect = select
-
-        const hasRecencyData = DataManager.getInstance().get<boolean>('steam.hasRecencyData') ?? true
-        for (const option of GROUP_OPTIONS) {
-            if (!hasRecencyData && option.key === GroupModes.ByRecency) continue
-            const el = document.createElement('option')
-            el.value = option.key
-            el.textContent = option.label
-            el.selected = option.key === this.activeGroupKey
-            select.appendChild(el)
-        }
+        this.populateSelect(select, GROUP_OPTIONS, this.availableDimensions.groupModes, this.activeGroupKey)
 
         select.addEventListener('change', () => {
             this.activeGroupKey = select.value as GroupMode
@@ -224,16 +248,7 @@ export class LayoutControlPanel {
         select.className = 'layout-sort-select'
         select.title = 'Sort order'
         this.sortSelect = select
-
-        const hasRecencyData = DataManager.getInstance().get<boolean>('steam.hasRecencyData') ?? true
-        for (const option of SORT_OPTIONS) {
-            if (!hasRecencyData && option.key === SortModes.ByLastPlayed) continue
-            const el = document.createElement('option')
-            el.value = option.key
-            el.textContent = option.label
-            el.selected = option.key === this.activeSortKey
-            select.appendChild(el)
-        }
+        this.populateSelect(select, SORT_OPTIONS, this.availableDimensions.sortModes, this.activeSortKey)
 
         select.addEventListener('change', () => {
             this.activeSortKey = select.value as SortMode
@@ -243,6 +258,30 @@ export class LayoutControlPanel {
         group.appendChild(label)
         group.appendChild(select)
         return group
+    }
+
+    /**
+     * Shared by both dropdowns' initial build and refreshAvailableOptions(): clears and
+     * repopulates a <select> from an option list filtered to `availableKeys`, restoring
+     * `activeKey` as selected if it's still offered (falls through to whatever the browser
+     * defaults an empty selection to otherwise - the next real ArrangementRequested/
+     * SectionsReady corrects it).
+     */
+    private populateSelect<K extends string>(
+        select: HTMLSelectElement,
+        options: ReadonlyArray<{ key: K; label: string }>,
+        availableKeys: ReadonlySet<K>,
+        activeKey: K
+    ): void {
+        select.innerHTML = ''
+        for (const option of options) {
+            if (!availableKeys.has(option.key)) continue
+            const el = document.createElement('option')
+            el.value = option.key
+            el.textContent = option.label
+            el.selected = option.key === activeKey
+            select.appendChild(el)
+        }
     }
 
     private emitArrangement(): void {

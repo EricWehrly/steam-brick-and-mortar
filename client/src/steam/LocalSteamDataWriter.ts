@@ -16,6 +16,13 @@
  * publisher only, same as before this resolution existed - see
  * docs/tech-debt.md#id-metadata-refetch-no-circuit-breaker for the known (low-priority) gap that
  * leaves.
+ *
+ * The candidate appid set this class processes is `union(playtime appids, collection appids)`,
+ * not playtime alone - a collection-referenced appid with no local playtime entry (owned but
+ * never launched) still gets a local metadata lookup attempted. If `read_local_app_metadata` has
+ * nothing for it either (never cached by the Steam client - e.g. never viewed in the store),
+ * it's still absent from the returned map; LocalSteamLibraryLoader is what falls back to a
+ * network fetch for appids this class can't resolve locally at all.
  */
 
 import { invoke, isTauri } from '@tauri-apps/api/core'
@@ -53,6 +60,12 @@ interface LocalAppMetadata {
     category_ids: number[]
 }
 
+interface LocalUserCollection {
+    id: string
+    name: string
+    appids: number[]
+}
+
 export class LocalSteamDataWriter {
     private static readonly logger = Logger.createLogFunctions(LocalSteamDataWriter.name)
 
@@ -69,7 +82,8 @@ export class LocalSteamDataWriter {
         }
 
         const playtimes = await invoke<LocalAppPlaytime[]>('read_steam_playtimes')
-        const appids = playtimes.map(playtime => playtime.appid)
+        const collectionNamesByAppid = await LocalSteamDataWriter.readCollectionNamesByAppid()
+        const appids = [...new Set([...playtimes.map(playtime => playtime.appid), ...collectionNamesByAppid.keys()])]
         if (appids.length === 0) {
             return new Map()
         }
@@ -77,7 +91,8 @@ export class LocalSteamDataWriter {
         const metadata = await invoke<LocalAppMetadata[]>('read_local_app_metadata', { appids })
         const entries = new Map<number, AppDetailsData>()
         for (const item of metadata) {
-            const entry = await LocalSteamDataWriter.buildAppDetailsEntry(item)
+            const collectionNames = collectionNamesByAppid.get(item.appid) ?? []
+            const entry = await LocalSteamDataWriter.buildAppDetailsEntry(item, collectionNames)
             if (entry) {
                 entries.set(item.appid, entry)
             }
@@ -103,7 +118,10 @@ export class LocalSteamDataWriter {
      * partial entry with a blank name would be worse than no entry (GamesLoader would treat it
      * as a real cache hit with a broken display name instead of queuing the normal network fetch).
      */
-    public static async buildAppDetailsEntry(metadata: LocalAppMetadata): Promise<AppDetailsData | null> {
+    public static async buildAppDetailsEntry(
+        metadata: LocalAppMetadata,
+        collectionNames: readonly string[] = []
+    ): Promise<AppDetailsData | null> {
         if (!metadata.name) {
             return null
         }
@@ -123,7 +141,36 @@ export class LocalSteamDataWriter {
             steamspy_tags: LocalSteamDataWriter.buildWeightedTags(metadata.tags),
             genres: genres.length > 0 ? genres : undefined,
             categories: categories.length > 0 ? categories : undefined,
+            user_collections: collectionNames.length > 0 ? collectionNames : undefined,
         }
+    }
+
+    /**
+     * A collections-read failure (no collections file, unusual multi-account edge case in
+     * active_userdata_dir()) shouldn't block writing name/tags/genres/categories - collections
+     * are the least-critical field here, so this degrades to "no collections" rather than
+     * failing the whole write.
+     */
+    private static async readCollectionNamesByAppid(): Promise<Map<number, string[]>> {
+        let collections: LocalUserCollection[] = []
+        try {
+            collections = await invoke<LocalUserCollection[]>('read_steam_collections')
+        } catch (error) {
+            LocalSteamDataWriter.logger.warn('Failed to read Steam collections, proceeding without them:', error)
+        }
+
+        const namesByAppid = new Map<number, string[]>()
+        for (const collection of collections) {
+            for (const appid of collection.appids) {
+                const names = namesByAppid.get(appid)
+                if (names) {
+                    names.push(collection.name)
+                } else {
+                    namesByAppid.set(appid, [collection.name])
+                }
+            }
+        }
+        return namesByAppid
     }
 
     /**

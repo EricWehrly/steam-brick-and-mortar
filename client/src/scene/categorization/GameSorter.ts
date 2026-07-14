@@ -14,15 +14,21 @@
  *
  * Emits SectionsReady with the resulting sections + provenance (groupMode, sortMode).
  *
- * Default arrangement:
- *   Anonymous users → GroupMode.ByGenre + SortMode.ByPlaytime
- *   Authenticated   → GroupMode.ByRecency + SortMode.ByLastPlayed
+ * Default arrangement, first qualifying rank wins (see docs/plans/taxonomy-data-event-plan.md
+ * "Preference order, codified once"):
+ *   1. GroupMode.ByUserCollection + SortMode.ByLastPlayed  — if user-collection coverage across
+ *      the current library crosses AppSettings.taxonomyCoverageThreshold (default 50%).
+ *      Desktop-only in practice (user_collections is only ever populated by the local-scan
+ *      channel), but the check itself is presence-driven, not a platform check.
+ *   2. GroupMode.ByRecency + SortMode.ByLastPlayed  — authenticated, no qualifying collection data.
+ *   3. GroupMode.ByGenre + SortMode.ByPlaytime  — anonymous/demo fallback, unchanged.
  *
  * Re-exports bucket helpers (moved to GroupResolver) for backward-compat callers.
  */
 
 import { EventManager } from '../../core/EventManager'
 import { DataManager } from '../../core/data/DataManager'
+import { AppSettings } from '../../core/AppSettings'
 import { Logger } from '../../utils/Logger'
 import { GameEventTypes, UIEventTypes } from '../../types/InteractionEvents'
 import { GroupModes, SortModes } from '../../types/LayoutTypes'
@@ -100,16 +106,30 @@ export class GameSorter {
 
     private handleGameDataReady(): void {
         if (this.activeGroupMode === null || this.activeSortMode === null) {
-            // First load: choose defaults based on auth state
-            if (SteamIntegration.getInstance().isAnonymous()) {
-                this.activeGroupMode = GroupModes.ByGenre
-                this.activeSortMode = SortModes.ByPlaytime
-            } else {
-                this.activeGroupMode = GroupModes.ByRecency
-                this.activeSortMode = SortModes.ByLastPlayed
-            }
+            const games = DataManager.getInstance().get<SteamGameData[]>('steam.games') ?? []
+            const defaults = this.chooseDefaultModes(games)
+            this.activeGroupMode = defaults.groupMode
+            this.activeSortMode = defaults.sortMode
         }
         this.arrange(this.activeGroupMode, this.activeSortMode)
+    }
+
+    /** First qualifying rank wins - see the class doc comment for the full preference order. */
+    private chooseDefaultModes(games: SteamGameData[]): { groupMode: GroupMode; sortMode: SortMode } {
+        if (this.hasQualifyingUserCollectionCoverage(games)) {
+            return { groupMode: GroupModes.ByUserCollection, sortMode: SortModes.ByLastPlayed }
+        }
+        if (!SteamIntegration.getInstance().isAnonymous()) {
+            return { groupMode: GroupModes.ByRecency, sortMode: SortModes.ByLastPlayed }
+        }
+        return { groupMode: GroupModes.ByGenre, sortMode: SortModes.ByPlaytime }
+    }
+
+    private hasQualifyingUserCollectionCoverage(games: SteamGameData[]): boolean {
+        if (games.length === 0) return false
+        const withCollections = games.filter(game => (game.user_collections?.length ?? 0) > 0).length
+        const coverage = withCollections / games.length
+        return coverage >= AppSettings.get('taxonomyCoverageThreshold')
     }
 
     private handleArrangementRequested(detail: ArrangementRequestedEvent): void {

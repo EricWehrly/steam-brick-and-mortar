@@ -306,8 +306,17 @@ export class SteamIntegration {
      * channel (Library's whole point — see docs/plans/library-source-convergence-plan.md).
      *
      * Fork A: if the library has a steamId, a background re-fetch is kicked off (gated by
-     * autoLoadProfile) to replace this snapshot with live data once it lands — re-fetchability
-     * is a property of having a steamId, not of the channel.
+     * autoLoadProfile) to replace this snapshot with live data once it lands - except for the
+     * 'local-scan' channel, which skips it. Local-scan already has real filesystem-sourced data
+     * for this run; auto-firing Fork A here meant every desktop launch immediately triggered a
+     * full online re-fetch (a 40+ second, 3-Lambda-batch wait observed in testing) *and* emitted
+     * its own LibraryReloadRequest reset on top of the one already emitted below, tearing down a
+     * scene that had just finished rendering from local data - not the "fast, offline" story
+     * this channel exists for. "Connect Steam" remains the explicit, user-initiated way to get
+     * full online completeness; this exclusion doesn't change that flow at all, only whether
+     * local-scan additionally triggers it automatically. Revisit once a real "upgrade, don't
+     * replace" refresh mechanism exists (compare fetched vs. rendered data, patch only what
+     * changed) - tracked as a roadmap item, not solved here.
      *
      * Returns whether the render succeeded, so callers only persist a library they could
      * actually show.
@@ -346,7 +355,7 @@ export class SteamIntegration {
             this.storeSteamDataAndEmitEvent(library.owner.displayName ?? 'imported-library')
             await this.emitGamesInBatches(enrichedGames)
 
-            if (library.owner.steamId && AppSettings.get('autoLoadProfile')) {
+            if (library.owner.steamId && library.provenance.channel !== 'local-scan' && AppSettings.get('autoLoadProfile')) {
                 SteamIntegration.logger.info(`Background re-fetch for steamId ${library.owner.steamId}`)
                 this.eventManager.emit<SteamLoadLibraryEvent>(SteamEventTypes.LoadLibrary, {
                     userInput: library.owner.steamId

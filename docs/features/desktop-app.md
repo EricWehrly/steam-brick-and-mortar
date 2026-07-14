@@ -6,7 +6,12 @@ builds and runs** (`bb4d1023 "working desktop build!"`): the WebView2 vehicle is
 flatscreen parity, but **no Pillar-2 native capability is wired in yet** (the shell is the default
 Tauri builder — no filesystem, HID, or process-spawn commands). VR entry remains the open spike
 question. Details: [`docs/plans/desktop-tauri-spike-plan.md`](../plans/desktop-tauri-spike-plan.md).
-**Priority**: Low now, high *leverage* if pursued
+**Priority**: Raised as of 2026-07-14 — desktop-local extraction proved comparatively far cheaper
+than the equivalent web path for at least one concrete feature (screenshots, see [Wall Art & Framed
+Posters](wall-art-framed-posters.md)), prompting a general sequencing call: **prefer desktop-native
+implementations for filling out store content going forward, and reserve new web/browser
+infrastructure for features flagged critical**. Not a full priority rewrite of this doc — just the
+standing default for new "fill out the store" feature work until revisited.
 
 ## Why this doc exists
 
@@ -142,6 +147,16 @@ Roadmap note, not a plan — captured so it isn't lost, revisit once
 [`taxonomy-data-event-plan.md`](../plans/taxonomy-data-event-plan.md) have landed enough to make
 these calls with real data instead of guessing.
 
+**Related, found via first two real end-to-end tests**: local-scan's first real run against a
+real library surfaced that `applyLibrary()`'s automatic background re-fetch ("Fork A") was firing
+for the local-scan channel too, compounding a scene reset on top of an already-slow load — fixed
+for that channel this session. A second test then corrected the diagnosis: the *primary* blocking
+cause is actually `LocalSteamLibraryLoader` itself awaiting a full network gap-fill before its
+first render, unrelated to Fork A — now the top-priority next fix. The broader "refresh should
+upgrade, not replace" redesign (applicable to web too) and routing desktop's network calls through
+Tauri's Rust HTTP client instead of the browser's `fetch()` remain scheduled after that — see
+[`desktop-offline-first-plan.md`](../plans/desktop-offline-first-plan.md).
+
 **Current reality, confirmed by investigation**: "Connect Steam" (the WebView2 cookie-injection
 flow described earlier in this doc) is **fully unbuilt** — no second-window code, no cookie
 injection, nothing in `desktop/tauri-app/src`. Desktop today gets library data through the exact
@@ -163,18 +178,40 @@ pipeline plan's "hands are tied" gap above). Two concrete ideas, neither designe
 
 **Achievement data** — `appcache/librarycache/<appid>.json` (per-app achievement cache, see
 `desktop-offline-data-mining-findings.md` §5) is a real, already-confirmed local data source not
-yet drawn into anything. Candidate future uses: a completion-% sort/filter dimension (via the
-taxonomy-event plan above) and a real achievements display feature. Not scoped further here.
+yet drawn into anything. Proposed shape, following the pattern `user_collections` established
+(see `SteamGameMetadata.user_collections` and `LocalSteamDataWriter`): a directly-referenceable
+property on the game object (e.g. `achievements_unlocked`/`achievements_total`, or a completion
+fraction) written the same way — folded into the same `AppDetailsCache` entry, not a second
+writer. Candidate future uses: a completion-% sort/filter dimension (via the taxonomy-event plan
+above) and a real achievements display feature.
 
-**Eager-but-bounded "owned" heuristic** — the pipeline plan's candidate appid set today is just
-"has a `localconfig.vdf` playtime entry," which misses owned-but-never-launched games. Widening
-it is worth doing, but needs a firm guardrail: the union of {installed
-(`appmanifest_*.acf`), registered in a library folder (`libraryfolders.vdf`), a member of any
-user collection, has an achievement cache entry} is a reasonable "probably owned" signal — but
-**bare presence in `appinfo.vdf` is explicitly excluded**, because that file covers every app the
-Steam client has ever loaded info for (browsing the store, wishlisting), not ownership. Skipping
-that exclusion is exactly how free-to-play games the user merely glanced at would pollute the
-library view — the concern that prompted this note in the first place.
+Also apply the **same "have I seen this appid" expansion check** the collection-appid work
+established this session: an appid with an achievement-cache entry but no local playtime/collection
+membership is real evidence of ownership and should widen the local-scan candidate set the same
+way collection membership now does — `AppDetailsCache.findMissing()` (generic, already built for
+this) plus `SteamApiClient.fetchAndCacheAppDetails()` for the network gap-fill, same mechanism,
+new source. Not scoped further here — this is a roadmap note, not a plan.
+
+**Eager-but-bounded "owned" heuristic** — the pipeline plan's candidate appid set was originally
+just "has a `localconfig.vdf` playtime entry," missing owned-but-never-launched games. **Partially
+widened already**: collection membership now expands the candidate set too (this session — see
+`LocalSteamLibraryLoader`/`LocalSteamDataWriter`), with unresolvable appids falling back to a
+network fetch rather than being dropped. Still open: {installed (`appmanifest_*.acf`), registered
+in a library folder (`libraryfolders.vdf`), has an achievement cache entry} — the remaining three
+of the original four signals. **Bare presence in `appinfo.vdf` remains explicitly excluded**,
+because that file covers every app the Steam client has ever loaded info for (browsing the store,
+wishlisting), not ownership. Skipping that exclusion is exactly how free-to-play games the user
+merely glanced at would pollute the library view — the concern that prompted this note in the
+first place.
+
+**Refund complication (flagged, not resolved)**: achievement-cache presence implying ownership
+breaks down for a bought → played → refunded game — Steam doesn't purge the local achievement
+cache on refund, so this signal would keep surfacing a game the user no longer owns. Deliberately
+not addressed here (too much context to pull into this note); tracked instead as a review item
+for the data-integrity audit already planned before showing this around in Act 3 — see the
+"post-friends-testing data-integrity audit" note in
+[`taxonomy-data-event-plan.md`](../plans/taxonomy-data-event-plan.md)'s genre/category
+harvesting section.
 
 ## Open Questions
 

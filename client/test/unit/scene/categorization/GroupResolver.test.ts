@@ -51,3 +51,26 @@ describe('resolveGroups by-tag', () => {
         expect(names).toEqual(['OnlyTopTag'])
     })
 })
+
+describe('resolveGroups by-user-collection', () => {
+    it('groups by each game user_collections membership, duplicating multi-collection games', () => {
+        const games: SteamGameData[] = [
+            game({ appid: 1, name: 'Game 1', user_collections: ['Ze Done', 'Meh'] }),
+            game({ appid: 2, name: 'Game 2', user_collections: ['Ze Done'] }),
+            game({ appid: 3, name: 'Game 3' }),
+        ]
+
+        const sections = resolveGroups(games, GroupModes.ByUserCollection, SortModes.Alphabetical)
+        const byName = new Map(sections.map(section => [section.name, section]))
+
+        expect(byName.get('Ze Done')?.games.map(g => g.appid)).toEqual([1, 2])
+        expect(byName.get('Meh')?.games.map(g => g.appid)).toEqual([1])
+        expect(sections.map(s => s.name)).not.toContain('')
+    })
+
+    it('produces no sections when no game has user_collections', () => {
+        const games: SteamGameData[] = [game({ appid: 1, name: 'Game 1' })]
+        const sections = resolveGroups(games, GroupModes.ByUserCollection, SortModes.Alphabetical)
+        expect(sections).toHaveLength(0)
+    })
+})

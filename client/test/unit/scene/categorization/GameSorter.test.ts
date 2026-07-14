@@ -238,6 +238,35 @@ describe('GameSorter', () => {
         expect(payload.sortMode).toBe('by-playtime')
     })
 
+    it('default arrangement is by-user-collection when coverage crosses the configured threshold', () => {
+        mockIsAnonymous = false
+        mockGames = [
+            { ...makeGame(1, 0, 100), user_collections: ['Ze Done'] } as SteamGameData,
+            { ...makeGame(2, 0, 50), user_collections: ['Meh'] } as SteamGameData,
+            makeGame(3, 0, 20),
+        ]
+        new GameSorter()
+        fireGameDataReady()
+
+        const payload = lastEmittedPayload(GameEventTypes.SectionsReady)
+        expect(payload.groupMode).toBe('by-user-collection')
+        expect(payload.sortMode).toBe('by-last-played')
+    })
+
+    it('falls back past by-user-collection when coverage is below the configured threshold', () => {
+        mockIsAnonymous = false
+        mockGames = [
+            { ...makeGame(1, 100, 100), user_collections: ['Ze Done'] } as SteamGameData,
+            makeGame(2, 0, 50),
+            makeGame(3, 0, 20),
+        ]
+        new GameSorter()
+        fireGameDataReady()
+
+        const payload = lastEmittedPayload(GameEventTypes.SectionsReady)
+        expect(payload.groupMode).toBe('by-recency')
+    })
+
     it('produces only Never Played section when no recently-played data exists', () => {
         mockGames = [makeGame(1, 0), makeGame(2, 0)]
         new GameSorter()

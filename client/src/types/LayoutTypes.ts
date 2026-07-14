@@ -40,6 +40,9 @@ export const GroupModes = {
     ByRecency: 'by-recency',
     ByPlaytime: 'by-playtime',
     ByRating:  'by-rating',
+    /** Desktop-only - see SteamGameMetadata.user_collections. A game can belong to multiple
+     *  collections, so (like ByTag) it can appear in more than one section. */
+    ByUserCollection: 'by-user-collection',
 } as const
 
 export type GroupMode = typeof GroupModes[keyof typeof GroupModes]

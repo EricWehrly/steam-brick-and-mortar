@@ -332,6 +332,92 @@ for the narrower, separate debt of playtime bundled *inside* the `games_<steamid
 
 ## Later (only true debt, not feature wish-list)
 
+## id: metadata-refetch-no-circuit-breaker
+**Priority**: Low  
+**Effort**: ~2-3 hours (bounded-retry/give-up state + tests)  
+**Context**: `GamesLoader.isMetadataComplete()` (`client/src/steam/GamesLoader.ts:206-259`) gates on
+`categories.length>0 || genres.length>0`. Desktop's `LocalSteamDataWriter` currently leaves both
+undefined on locally-seeded cache entries, so those entries are always judged "incomplete" and
+queue a network `appdetails` refetch on every run, with no cap on retries and no "good enough,
+stop asking" state. Once `docs/plans/taxonomy-data-event-plan.md`'s baked-bundle genre/category
+harvesting lands, this resolves itself for any appid the bundle covers — but any appid missing
+from both the bundle and a live fetch (Lambda unreachable, never-baked title) retries forever.
+Not expected to actually bite anyone today (identified while explicitly reasoning about a
+Lambda-goes-away scenario, not from an observed failure), but leaving a known infinite-retry path
+in on purpose is bad form — track it rather than let it go unrecorded.
+
+**Decision (for now)**:
+- Not urgent — the baked-bundle harvesting work should close most of this gap as a side effect.
+  Revisit only if it doesn't, or if a real "Lambda unreachable" report surfaces first.
+
+**Done when**:
+- `isMetadataComplete` (or its caller) treats a bounded number of failed refetch attempts per
+  appid as "give up, render with what we have" rather than retrying indefinitely
+- Local-only entries with tags/name/developer/publisher but no genre/category are not treated as
+  permanently incomplete once the give-up state is reached
+
+**Related files**:
+- `client/src/steam/GamesLoader.ts`
+- `client/src/steam/LocalSteamDataWriter.ts`
+- `docs/plans/taxonomy-data-event-plan.md`
+
+## id: lod-tier-reset-race-condition
+**Priority**: Medium
+**Effort**: Not yet scoped — needs tracing through `LodArtworkOrchestrator`'s reset/rebuild
+sequence before an estimate is honest.
+**Context**: Observed once via real testing (see `docs/plans/desktop-offline-first-plan.md`):
+a `StorePropsEventTypes.LibraryReloadRequest` mid-session (a library being replaced by another)
+was followed by 1400+ `[LodTextureArrayManager] ERROR Unknown tier: mid` lines — the MID texture
+tier, which had initialized cleanly on the session's first load, came back missing after the
+reset, so every subsequent artwork write silently failed. Root cause not fully traced — confirmed
+correlated with the reload timing, not confirmed exactly which line in the reset/rebuild sequence
+drops the tier. Not currently reachable through the primary desktop startup flow (the specific
+trigger was `applyLibrary()`'s Fork A firing automatically for the local-scan channel, fixed the
+same session — see the plan doc) — but any other path that legitimately fires
+`LibraryReloadRequest` (a real "Connect
+Steam" flow, a manual "Refresh Cache Now" button) could still hit it.
+
+**Decision (for now)**:
+- Not urgent since the known trigger is gone. Revisit before shipping any feature that
+  legitimately re-fires `LibraryReloadRequest` mid-session (Connect Steam, manual refresh, Round 2
+  of the offline-first plan) — confirm this doesn't recur before relying on that reset path again.
+
+**Done when**:
+- Root cause identified (what in the reset/rebuild sequence fails to re-register the MID tier)
+- A repro exists (deliberately firing `LibraryReloadRequest` mid-session in a test/dev build) and
+  is fixed, not just avoided by luck of the current call graph
+
+**Related files**:
+- `client/src/scene/game-box/instancing/LodArtworkOrchestrator.ts`
+- `client/src/scene/game-box/instancing/LodTextureArrayManager.ts`
+- `client/src/scene/props/PropsEvents.ts` (`StorePropsEventTypes.LibraryReloadRequest`)
+- `docs/plans/desktop-offline-first-plan.md`
+
+## id: cors-blocked-local-scan-artwork
+**Priority**: Medium — flagged as the next thing to fix after the offline-first plan's rounds are scheduled
+**Effort**: Not yet scoped — depends which of the two options in the plan doc gets picked (a
+narrow placeholder-artwork fallback vs. folding into the larger Rust-HTTP-client migration)
+**Context**: `ArtworkUrls.ts`'s `deriveArtworkFromAppId()` guesses a direct Steam CDN URL
+(`cdn.akamai.steamstatic.com/steam/apps/<appid>/library_600x900.jpg`) for games with no real
+capsule/header URL. Desktop's local-scan entries always lack one (local scan can't discover the
+CDN hash), so this fallback now runs at whole-library scale instead of its original rare-fallback
+use — observed ~1240 CORS-blocked `fetch()` calls in one real test session. Doesn't block the
+library from loading, but artwork for most locally-resolved games is currently broken/missing.
+
+**Decision (for now)**:
+- Not fixed this session. See `docs/plans/desktop-offline-first-plan.md`'s "Next up" section for
+  the two considered approaches - decide between them before starting.
+
+**Done when**:
+- Locally-resolved games with no real artwork URL either get real artwork through a CORS-safe
+  path, or degrade to an intentional placeholder - not a silently-failed cross-origin fetch either way
+
+**Related files**:
+- `client/src/steam/utils/ArtworkUrls.ts`
+- `docs/plans/desktop-offline-first-plan.md`
+
+---
+
 ## id: library-game-appid-metadata-duplication
 **Priority**: Low  
 **Effort**: ~1 day (new appid-keyed store + wiring) if ever picked up  
