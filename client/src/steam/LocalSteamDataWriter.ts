@@ -22,6 +22,8 @@ import { invoke, isTauri } from '@tauri-apps/api/core'
 import { AppDetailsCache } from './cache/AppDetailsCache'
 import type { AppDetailsData } from './batch/BatchAppDetailsClient'
 import { TaxonomyIdResolver } from './TaxonomyIdResolver'
+import { EventManager } from '../core/EventManager'
+import { SteamEventTypes, type TaxonomyDataReadyEvent } from '../types/InteractionEvents'
 import { Logger } from '../utils/Logger'
 
 const LOCAL_APP_TYPE = 'game'
@@ -55,19 +57,21 @@ export class LocalSteamDataWriter {
     private static readonly logger = Logger.createLogFunctions(LocalSteamDataWriter.name)
 
     /**
-     * Reads playtime + tag/developer/publisher data from the local Steam install and writes it
-     * into AppDetailsCache. Returns the number of entries written (0 on web, or if the local
-     * scan finds nothing to write).
+     * Reads playtime + tag/developer/publisher/genre/category data from the local Steam install
+     * and writes it into AppDetailsCache. Returns the entries actually written, keyed by appid
+     * (empty on web, or if the local scan finds nothing to write) - callers that also need the
+     * resolved name per appid (e.g. to build a renderable game list) can read it off the
+     * returned map instead of re-invoking read_local_app_metadata themselves.
      */
-    public static async writeLocalAppMetadata(): Promise<number> {
+    public static async writeLocalAppMetadata(): Promise<Map<number, AppDetailsData>> {
         if (!isTauri()) {
-            return 0
+            return new Map()
         }
 
         const playtimes = await invoke<LocalAppPlaytime[]>('read_steam_playtimes')
         const appids = playtimes.map(playtime => playtime.appid)
         if (appids.length === 0) {
-            return 0
+            return new Map()
         }
 
         const metadata = await invoke<LocalAppMetadata[]>('read_local_app_metadata', { appids })
@@ -80,13 +84,18 @@ export class LocalSteamDataWriter {
         }
 
         if (entries.size === 0) {
-            return 0
+            return entries
         }
 
         const cache = new AppDetailsCache()
         await cache.setMany(entries)
         LocalSteamDataWriter.logger.info(`Wrote ${entries.size} locally-sourced AppDetailsCache entries`)
-        return entries.size
+
+        EventManager.getInstance().emit<TaxonomyDataReadyEvent>(SteamEventTypes.TaxonomyDataReady, {
+            origin: 'local-scan',
+        })
+
+        return entries
     }
 
     /**

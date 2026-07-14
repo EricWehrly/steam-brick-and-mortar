@@ -34,6 +34,7 @@ import { AppSettings } from '../core/AppSettings'
 import { DataManager, DataDomain } from '../core/data'
 import { sortByNumericField } from '../scene/categorization/GameSortFunctions'
 import '../scene/batch/BatchCoordinator'
+import '../steam/LocalSteamLibraryLoader'
 import { StorePropsEventTypes } from '../scene/props/PropsEvents'
 import type { StorePropsLibraryReloadRequestEvent } from '../scene/props/PropsEvents'
 

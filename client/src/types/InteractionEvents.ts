@@ -280,6 +280,18 @@ export interface SteamImportLibraryEvent extends BaseInteractionEvent {
     readonly channel: ImportChannel
 }
 
+/**
+ * Fired whenever taxonomy-shaped data (genres/categories/tags/user-collections) is written into
+ * AppDetailsCache, from any source (network Lambda fetch, desktop local-scan). Deliberately
+ * near-payload-free - listeners re-derive "what's available" by scanning AppDetailsCache/the
+ * current game list themselves rather than trusting event contents. See
+ * docs/plans/taxonomy-data-event-plan.md.
+ */
+export interface TaxonomyDataReadyEvent extends BaseInteractionEvent {
+    /** Named `origin`, not `source` - BaseInteractionEvent already reserves `source` for EventSource. */
+    readonly origin: 'network' | 'local-scan'
+}
+
 export const SteamEventTypes = {
     LoadLibrary: 'steam:load-library',
     /** A library captured offline (manual export bookmarklet/userscript/file) ready to load. */
@@ -293,7 +305,9 @@ export const SteamEventTypes = {
     /** Immutable membership signal for a load run (appid set + counts). */
     LibraryManifestReady: 'steam:library-manifest-ready',
     GamesBatchReady: 'steam:games-batch-ready',
-    NetworkFetchProgress: 'steam:network-fetch-progress'
+    NetworkFetchProgress: 'steam:network-fetch-progress',
+    /** New/changed genre/category/tag/collection data landed in AppDetailsCache - see TaxonomyDataReadyEvent. */
+    TaxonomyDataReady: 'steam:taxonomy-data-ready'
 } as const
 
 export const RoomEventTypes = {
