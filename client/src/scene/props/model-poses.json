@@ -9,18 +9,20 @@
     "arms": [
       { "bone": "elbow_L", "z": 25 },
       { "bone": "elbow_R", "z": -25 }
-    ]
+    ],
+    "seatOffset": { "y": -0.1, "z": 0.1 }
   },
   "pbody": {
     "legs": [
-      { "bone": "thigh_A_L", "x": -30 },
-      { "bone": "thigh_A_R", "x": 30 },
+      { "bone": "thigh_A_L", "x": -30, "absolute": true },
+      { "bone": "thigh_A_R", "x": 30, "absolute": true },
       { "bone": "knee_A_L", "y": 60 },
       { "bone": "knee_A_R", "y": 75 }
     ],
     "arms": [
       { "bone": "elbow_A_L", "z": 25 },
       { "bone": "elbow_A_R", "z": -25 }
-    ]
+    ],
+    "seatOffset": { "y": -0.2, "z": 0.1 }
   }
 }
