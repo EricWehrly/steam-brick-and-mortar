@@ -89,10 +89,15 @@ export class LocalSteamDataWriter {
         }
 
         const metadata = await invoke<LocalAppMetadata[]>('read_local_app_metadata', { appids })
+
+        const cache = new AppDetailsCache()
+        const existingEntries = await cache.getMany(appids)
+
         const entries = new Map<number, AppDetailsData>()
         for (const item of metadata) {
             const collectionNames = collectionNamesByAppid.get(item.appid) ?? []
-            const entry = await LocalSteamDataWriter.buildAppDetailsEntry(item, collectionNames)
+            const existingArtwork = existingEntries.get(item.appid)?.artwork
+            const entry = await LocalSteamDataWriter.buildAppDetailsEntry(item, collectionNames, existingArtwork)
             if (entry) {
                 entries.set(item.appid, entry)
             }
@@ -102,7 +107,6 @@ export class LocalSteamDataWriter {
             return entries
         }
 
-        const cache = new AppDetailsCache()
         await cache.setMany(entries)
         LocalSteamDataWriter.logger.info(`Wrote ${entries.size} locally-sourced AppDetailsCache entries`)
 
@@ -117,10 +121,19 @@ export class LocalSteamDataWriter {
      * Skips appids with no local name - appinfo.vdf has no cached info for them at all, and a
      * partial entry with a blank name would be worse than no entry (GamesLoader would treat it
      * as a real cache hit with a broken display name instead of queuing the normal network fetch).
+     *
+     * existingArtwork, when passed, is preserved instead of NO_LOCAL_ARTWORK. AppDetailsCache.
+     * setMany() is a full replace, not a merge (see AppDetailsCache doc comments), and this method
+     * runs unconditionally on every local-scan load - without this, a real artwork-bearing entry
+     * from the baked seed bundle or a prior network fetch would get silently overwritten with
+     * NO_LOCAL_ARTWORK the moment local-scan re-resolves that appid (which happens every load, not
+     * just the first). Since the appid is then no longer "missing" from the cache, it would never
+     * get network-resolved again either - a permanent regression, not a transient one.
      */
     public static async buildAppDetailsEntry(
         metadata: LocalAppMetadata,
-        collectionNames: readonly string[] = []
+        collectionNames: readonly string[] = [],
+        existingArtwork?: AppDetailsData['artwork']
     ): Promise<AppDetailsData | null> {
         if (!metadata.name) {
             return null
@@ -135,7 +148,7 @@ export class LocalSteamDataWriter {
             type: LOCAL_APP_TYPE,
             name: metadata.name,
             is_free: false,
-            artwork: NO_LOCAL_ARTWORK,
+            artwork: existingArtwork ?? NO_LOCAL_ARTWORK,
             developers: metadata.developers.length > 0 ? metadata.developers : undefined,
             publishers: metadata.publishers.length > 0 ? metadata.publishers : undefined,
             steamspy_tags: LocalSteamDataWriter.buildWeightedTags(metadata.tags),

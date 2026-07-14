@@ -264,6 +264,22 @@ artwork bake) so future launches skip the doomed request entirely instead of re-
 same failure every time. Not scoped in detail - depends on Round 3 landing first, since reliably
 confirming "this really is a 404" needs the non-browser fetch path above.
 
+## Fifth pass: second-launch artwork collapse was a real, separate bug - fixed
+
+A second-launch report (596/1539 placed, only 84 with real artwork, 943 with neither artwork nor
+a label) traced to a genuine regression in `LocalSteamDataWriter`, unrelated to the LOD tier race
+above: it wrote a hardcoded `NO_LOCAL_ARTWORK` unconditionally on every local-scan load via a
+full-replace `AppDetailsCache.setMany()`, silently destroying any real artwork a prior baked-seed
+or network fetch had already stored for that appid - and since the appid then reads as "not
+missing," it was never eligible for the network gap-fill again either. `BakedCacheLoader`'s
+fire-and-forget seed races this write on the very first launch (explaining why launch 1 sometimes
+looks fine), but seeding skips entirely once the cache is non-empty - true from launch 2 onward -
+so every relaunch after the first deterministically wiped real artwork. Full writeup:
+`docs/bugs.md` "Local-scan write silently wipes artwork on every relaunch, not just first
+launch". Fixed by preserving each appid's existing `artwork` field across the local-scan write;
+`yarn tsc`/`yarn test` clean (1166 passed). Manual verification against a real second launch is
+still open.
+
 ## Related
 - `scripts/dedupe-log.js` - normalize/group/count a noisy console log dump; use before reading
   any future large log linearly

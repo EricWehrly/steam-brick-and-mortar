@@ -120,6 +120,38 @@ describe('LocalSteamDataWriter', () => {
             expect(entry?.categories).toEqual([{ id: 2, description: 'Single-player' }])
         })
 
+        it('preserves existing artwork instead of overwriting it with NO_LOCAL_ARTWORK', async () => {
+            const realArtwork = {
+                header: 'https://cdn.example.com/620/header.jpg',
+                capsule: 'https://cdn.example.com/620/capsule.jpg',
+                capsule_v5: null,
+                background: null,
+                background_raw: null,
+            }
+
+            const entry = await LocalSteamDataWriter.buildAppDetailsEntry(
+                { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
+                [],
+                realArtwork
+            )
+
+            expect(entry?.artwork).toEqual(realArtwork)
+        })
+
+        it('falls back to NO_LOCAL_ARTWORK when no existing artwork is passed', async () => {
+            const entry = await LocalSteamDataWriter.buildAppDetailsEntry({
+                appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [],
+            })
+
+            expect(entry?.artwork).toEqual({
+                header: null,
+                capsule: null,
+                capsule_v5: null,
+                background: null,
+                background_raw: null,
+            })
+        })
+
         it('attaches collection names when provided, omits user_collections otherwise', async () => {
             const withCollections = await LocalSteamDataWriter.buildAppDetailsEntry(
                 { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
@@ -182,6 +214,51 @@ describe('LocalSteamDataWriter', () => {
             const cached = await cache.get(620)
             expect(cached?.name).toBe('Portal 2')
             expect(await cache.get(999)).toBeNull()
+        })
+
+        it('does not wipe an appid\'s existing artwork on a repeat local-scan write (second-launch regression)', async () => {
+            isTauriMock.mockReturnValue(true)
+            invokeMock.mockImplementation((command: string) => {
+                if (command === 'read_steam_playtimes') {
+                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
+                }
+                if (command === 'read_local_app_metadata') {
+                    return Promise.resolve([
+                        { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: ['Puzzle'], genre_ids: [], category_ids: [] },
+                    ])
+                }
+                if (command === 'read_steam_collections') {
+                    return Promise.resolve([])
+                }
+                throw new Error(`unexpected command ${command}`)
+            })
+
+            // Simulates a baked-seed or prior network fetch that already gave this appid real
+            // artwork, before local-scan ever touches it (e.g. a fresh install's first launch,
+            // where BakedCacheLoader.seedIfNeeded() races LocalSteamDataWriter and wins).
+            const realArtwork = {
+                header: 'https://cdn.example.com/620/header.jpg',
+                capsule: 'https://cdn.example.com/620/capsule.jpg',
+                capsule_v5: null,
+                background: null,
+                background_raw: null,
+            }
+            const seedCache = new AppDetailsCache()
+            await seedCache.set(620, {
+                type: 'game',
+                name: 'Portal 2',
+                is_free: false,
+                artwork: realArtwork,
+            })
+
+            // A second local-scan write (e.g. relaunching the desktop app) must not regress the
+            // artwork this appid already had - only local-scan-authoritative fields should update.
+            await LocalSteamDataWriter.writeLocalAppMetadata()
+
+            const cache = new AppDetailsCache()
+            const cached = await cache.get(620)
+            expect(cached?.artwork).toEqual(realArtwork)
+            expect(cached?.steamspy_tags).toEqual({ Puzzle: 1 })
         })
 
         it('attempts local resolution for a collection-only appid with no playtime entry', async () => {
