@@ -75,6 +75,39 @@ Active bugs and issues that need investigation or fixing.
 
 ## Resolved Bugs
 
+### Local-scan write silently wipes artwork on every relaunch, not just first launch
+**Status**: 🟢 Fixed
+**Reported**: 2026-07-14
+**Description**: Desktop local-scan startup was "okay" on first launch but rendered mostly bare
+shelves on a second launch (596/1539 placed, only 84 with real artwork, 943 with neither artwork
+nor a label - label capacity is a fixed 512-slot cap, so anything beyond that renders as nothing).
+**Root cause**: `LocalSteamDataWriter.buildAppDetailsEntry()` always wrote a hardcoded
+`NO_LOCAL_ARTWORK` artwork field (local scan structurally cannot discover a real CDN artwork
+hash), and `writeLocalAppMetadata()` ran this write unconditionally on every local-scan load via
+`AppDetailsCache.setMany()`, which is a full replace, not a merge. `BakedCacheLoader.seedIfNeeded()`
+(seeds the cache from a release-baked bundle with real artwork) is fire-and-forget and races
+`LocalSteamDataWriter`'s own write on the very first launch - if the seed happens to win that
+race, the first launch looks fine. `seedIfNeeded()` skips entirely once IndexedDB has any entries
+at all (`stats.count > 0`), which is true starting on the *second* launch - so from then on, only
+`writeLocalAppMetadata()`'s unconditional overwrite touches those appids, deterministically
+stomping any previously-good artwork (seeded or network-fetched) back to `NO_LOCAL_ARTWORK` on
+every subsequent load. Since the appid is then no longer "missing" from the cache, it's also never
+eligible for `LocalSteamLibraryLoader`'s network gap-fill again - a permanent regression per
+appid, not a transient one.
+**Fix**: `writeLocalAppMetadata()` now reads existing cache entries for the candidate appids
+first and passes each one's existing `artwork` through to `buildAppDetailsEntry()`, which prefers
+it over `NO_LOCAL_ARTWORK`. Local-scan-authoritative fields (tags, genres, categories,
+developers, publishers, user_collections) still refresh normally on every load - only the
+artwork field, which local-scan can never legitimately improve, is preserved.
+**Tests**: `client/test/unit/steam/LocalSteamDataWriter.test.ts` - existing-artwork preservation
+in `buildAppDetailsEntry`, and an end-to-end `writeLocalAppMetadata()` test seeding a real cache
+entry then proving a repeat write doesn't wipe it.
+**Files**: `client/src/steam/LocalSteamDataWriter.ts`, `client/src/steam/cache/BakedCacheLoader.ts`
+(race partner, not modified), `client/src/steam/LocalSteamLibraryLoader.ts` (why a stomped entry
+never recovers)
+**Not yet done**: manual verification against a real second-launch desktop session - unit tests
+prove the mechanism, not the end-to-end symptom the user reported.
+
 ### Uncached profile first load creates "cursed room"
 **Status**: 🟢 Fixed
 **Reported**: 2026-01-16
