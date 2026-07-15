@@ -55,8 +55,8 @@ describe('resolveGroups by-tag', () => {
 describe('resolveGroups by-user-collection', () => {
     it('groups by each game user_collections membership, duplicating multi-collection games', () => {
         const games: SteamGameData[] = [
-            game({ appid: 1, name: 'Game 1', user_collections: ['Ze Done', 'Meh'] }),
-            game({ appid: 2, name: 'Game 2', user_collections: ['Ze Done'] }),
+            game({ appid: 1, name: 'Game 1', user_collections: [{ id: 'ze-done', name: 'Ze Done' }, { id: 'meh', name: 'Meh' }] }),
+            game({ appid: 2, name: 'Game 2', user_collections: [{ id: 'ze-done', name: 'Ze Done' }] }),
             game({ appid: 3, name: 'Game 3' }),
         ]
 
@@ -72,5 +72,18 @@ describe('resolveGroups by-user-collection', () => {
         const games: SteamGameData[] = [game({ appid: 1, name: 'Game 1' })]
         const sections = resolveGroups(games, GroupModes.ByUserCollection, SortModes.Alphabetical)
         expect(sections).toHaveLength(0)
+    })
+
+    it('does not merge two different collections that happen to share a display name', () => {
+        const games: SteamGameData[] = [
+            game({ appid: 1, name: 'Game 1', user_collections: [{ id: 'favorites-a', name: 'Favorites' }] }),
+            game({ appid: 2, name: 'Game 2', user_collections: [{ id: 'favorites-b', name: 'Favorites' }] }),
+        ]
+
+        const sections = resolveGroups(games, GroupModes.ByUserCollection, SortModes.Alphabetical)
+
+        expect(sections).toHaveLength(2)
+        expect(sections.every(section => section.name === 'Favorites')).toBe(true)
+        expect(sections.flatMap(section => section.games.map(g => g.appid)).sort()).toEqual([1, 2])
     })
 })

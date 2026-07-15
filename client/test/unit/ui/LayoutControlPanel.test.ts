@@ -90,7 +90,7 @@ describe('LayoutControlPanel', () => {
         const panel = new LayoutControlPanel()
         panel.init()
 
-        mockGames = [game({ appid: 1, user_collections: ['Ze Done'] })]
+        mockGames = [game({ appid: 1, user_collections: [{ id: 'ze-done', name: 'Ze Done' }] })]
         fire(SteamEventTypes.TaxonomyDataReady, { origin: 'local-scan' })
 
         const groupSelect = document.querySelector('.layout-sort-control-group select[title="Group mode"]') as HTMLSelectElement
