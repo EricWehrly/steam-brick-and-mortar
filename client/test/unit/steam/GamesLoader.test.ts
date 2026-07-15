@@ -1,21 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { GamesLoader } from '../../../src/steam/GamesLoader'
 import type { AppDetailsData, AppDetailsResponse } from '../../../src/steam/batch/BatchAppDetailsClient'
+
+const { setManyMock } = vi.hoisted(() => ({
+    setManyMock: vi.fn(),
+}))
+
+vi.mock('../../../src/steam/cache/AppDetailsCache', () => ({
+    AppDetailsCache: { setMany: setManyMock },
+}))
+
+import { GamesLoader } from '../../../src/steam/GamesLoader'
 
 const NO_ARTWORK: AppDetailsData['artwork'] = {
     header: null, capsule: null, capsule_v5: null, background: null, background_raw: null,
 }
 
 describe('GamesLoader.fetchAndCacheAppDetails', () => {
-    let setManyMock: ReturnType<typeof vi.fn>
     let fetchBatchMock: ReturnType<typeof vi.fn>
     let loader: GamesLoader
 
     beforeEach(() => {
-        setManyMock = vi.fn().mockResolvedValue(undefined)
+        setManyMock.mockReset().mockResolvedValue(undefined)
         fetchBatchMock = vi.fn()
         loader = new GamesLoader(
-            { setMany: setManyMock } as any,
             {} as any,
             { fetchBatch: fetchBatchMock } as any
         )

@@ -19,16 +19,13 @@ export class GamesLoader {
     private static readonly logger = Logger.createLogFunctions(GamesLoader.name)
     private logger = GamesLoader.logger
     
-    private appDetailsCache: AppDetailsCache
     private cache: CacheManager
     private batchClient: BatchAppDetailsClient
 
     constructor(
-        appDetailsCache: AppDetailsCache,
         cache: CacheManager,
         batchClient: BatchAppDetailsClient
     ) {
-        this.appDetailsCache = appDetailsCache
         this.cache = cache
         this.batchClient = batchClient
     }
@@ -101,7 +98,7 @@ export class GamesLoader {
      */
     public async enrichFromCache(games: SteamGame[]): Promise<SteamGame[]> {
         const appids = games.map(g => g.appid)
-        const cachedAppDetails = await this.appDetailsCache.getMany(appids)
+        const cachedAppDetails = await AppDetailsCache.getMany(appids)
         return games.map(game => {
             const cached = cachedAppDetails.get(game.appid)
             return this.buildEnhancedGame(game, cached ? this.normalizeBatchData(cached) : undefined)
@@ -124,7 +121,7 @@ export class GamesLoader {
 
         const { normalized } = await this.fetchAndNormalizeBatch(appids)
         if (normalized.size > 0) {
-            await this.appDetailsCache.setMany(normalized)
+            await AppDetailsCache.setMany(normalized)
         }
         return normalized
     }
@@ -169,7 +166,7 @@ export class GamesLoader {
      * properly-formed games instead of a hand-rolled subset of fields.
      */
     public async getDemoGames(): Promise<SteamGame[]> {
-        const allEntries = await this.appDetailsCache.getAllEntries()
+        const allEntries = await AppDetailsCache.getAllEntries()
         const games: SteamGame[] = []
 
         for (const [appid, data] of allEntries) {
@@ -227,7 +224,7 @@ export class GamesLoader {
 
                 if (normalized.size > 0) {
                     const cacheMonitor = PerformanceMonitor.start('cache-metadata', this.logger, ASYNC_CONTEXT)
-                    await this.appDetailsCache.setMany(normalized)
+                    await AppDetailsCache.setMany(normalized)
                     cacheMonitor.end({ count: normalized.size })
                 }
 
@@ -251,7 +248,7 @@ export class GamesLoader {
         renderableAppDetails: Map<number, AppDetailsData>
         staleAppids: number[]
     }> {
-        const cachedAppDetails = await this.appDetailsCache.getMany(appids)
+        const cachedAppDetails = await AppDetailsCache.getMany(appids)
         const renderableAppDetails = new Map<number, AppDetailsData>()
         const renderableAppids: number[] = []
         const staleAppids: number[] = []

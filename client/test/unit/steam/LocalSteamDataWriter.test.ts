@@ -27,24 +27,16 @@ import { LocalSteamDataWriter } from '../../../src/steam/LocalSteamDataWriter'
 import { AppDetailsCache } from '../../../src/steam/cache/AppDetailsCache'
 import { EventManager } from '../../../src/core/EventManager'
 import { SteamEventTypes } from '../../../src/types/InteractionEvents'
-import { DataManager } from '../../../src/core/data/DataManager'
-import { DataDomain, DataKey } from '../../../src/core/data/DataTypes'
-
-/** Marks the baked-cache seed as already settled - the default for every test except the one that pins the wait-for-seed race itself. */
-function markAppDetailsCacheSeeded(): void {
-    DataManager.getInstance().set(DataKey.AppDetailsCacheSeeded, true, { domain: DataDomain.Cache })
-}
 
 describe('LocalSteamDataWriter', () => {
     beforeEach(() => {
         setupIndexedDBMock()
+        AppDetailsCache.resetForTesting()
         invokeMock.mockReset()
         isTauriMock.mockReset()
         resolveGenresMock.mockReset().mockResolvedValue([])
         resolveCategoriesMock.mockReset().mockResolvedValue([])
         EventManager.getInstance().removeAllListeners()
-        DataManager.getInstance().clear()
-        markAppDetailsCacheSeeded()
     })
 
     describe('buildAppDetailsEntry', () => {
@@ -75,7 +67,7 @@ describe('LocalSteamDataWriter', () => {
             expect(entry).not.toBeNull()
             expect(entry?.name).toBe('Portal 2')
             expect(entry?.type).toBe('game')
-            expect(entry?.is_free).toBe(false)
+            expect(entry?.is_free).toBeUndefined()
             expect(entry?.artwork).toEqual({
                 header: null,
                 capsule: null,
@@ -129,25 +121,7 @@ describe('LocalSteamDataWriter', () => {
             expect(entry?.categories).toEqual([{ id: 2, description: 'Single-player' }])
         })
 
-        it('preserves existing artwork instead of overwriting it with NO_LOCAL_ARTWORK', async () => {
-            const realArtwork = {
-                header: 'https://cdn.example.com/620/header.jpg',
-                capsule: 'https://cdn.example.com/620/capsule.jpg',
-                capsule_v5: null,
-                background: null,
-                background_raw: null,
-            }
-
-            const entry = await LocalSteamDataWriter.buildAppDetailsEntry(
-                { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
-                [],
-                realArtwork
-            )
-
-            expect(entry?.artwork).toEqual(realArtwork)
-        })
-
-        it('falls back to NO_LOCAL_ARTWORK when no existing artwork is passed', async () => {
+        it('always writes NO_LOCAL_ARTWORK - preserving real artwork is AppDetailsCache.mergeMany\'s job, not this method\'s', async () => {
             const entry = await LocalSteamDataWriter.buildAppDetailsEntry({
                 appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [],
             })
@@ -193,53 +167,6 @@ describe('LocalSteamDataWriter', () => {
             expect(entries.size).toBe(0)
         })
 
-        it('waits for the baked-cache seed to settle before reading/writing AppDetailsCache', async () => {
-            isTauriMock.mockReturnValue(true)
-            invokeMock.mockImplementation((command: string) => {
-                if (command === 'read_steam_playtimes') {
-                    return Promise.resolve([{ appid: 620, last_played: 1000, playtime_minutes: 60 }])
-                }
-                if (command === 'read_local_app_metadata') {
-                    return Promise.resolve([
-                        { appid: 620, name: 'Portal 2', developers: [], publishers: [], tags: [], genre_ids: [], category_ids: [] },
-                    ])
-                }
-                if (command === 'read_steam_collections') {
-                    return Promise.resolve([])
-                }
-                throw new Error(`unexpected command ${command}`)
-            })
-
-            // Seed the cache with real artwork, but hold the "seed ready" signal open - if the
-            // write doesn't actually wait for it, it would read/write before this resolves and
-            // never see the seeded entry (the exact race this fix closes).
-            const realArtwork = {
-                header: 'https://cdn.example.com/620/header.jpg',
-                capsule: null,
-                capsule_v5: null,
-                background: null,
-                background_raw: null,
-            }
-            const seedCache = new AppDetailsCache()
-            await seedCache.set(620, { type: 'game', name: 'Portal 2', is_free: false, artwork: realArtwork })
-
-            // Override the beforeEach default - pretend the seed attempt hasn't settled yet.
-            DataManager.getInstance().clear()
-
-            const writePromise = LocalSteamDataWriter.writeLocalAppMetadata()
-            let settled = false
-            writePromise.then(() => { settled = true })
-
-            await new Promise((resolve) => setTimeout(resolve, 0))
-            expect(settled).toBe(false)
-
-            markAppDetailsCacheSeeded()
-            EventManager.getInstance().emit(SteamEventTypes.AppDetailsCacheSeeded)
-            const entries = await writePromise
-
-            expect(entries.get(620)?.artwork).toEqual(realArtwork)
-        })
-
         it('writes resolved entries into AppDetailsCache, skipping nameless appids', async () => {
             isTauriMock.mockReturnValue(true)
             invokeMock.mockImplementation((command: string, args?: Record<string, unknown>) => {
@@ -266,10 +193,9 @@ describe('LocalSteamDataWriter', () => {
             expect(entries.size).toBe(1)
             expect(entries.get(620)?.name).toBe('Portal 2')
 
-            const cache = new AppDetailsCache()
-            const cached = await cache.get(620)
+            const cached = await AppDetailsCache.get(620)
             expect(cached?.name).toBe('Portal 2')
-            expect(await cache.get(999)).toBeNull()
+            expect(await AppDetailsCache.get(999)).toBeNull()
         })
 
         it('does not wipe an appid\'s existing artwork on a repeat local-scan write (second-launch regression)', async () => {
@@ -299,20 +225,19 @@ describe('LocalSteamDataWriter', () => {
                 background: null,
                 background_raw: null,
             }
-            const seedCache = new AppDetailsCache()
-            await seedCache.set(620, {
+            await AppDetailsCache.set(620, {
                 type: 'game',
                 name: 'Portal 2',
-                is_free: false,
                 artwork: realArtwork,
             })
 
             // A second local-scan write (e.g. relaunching the desktop app) must not regress the
-            // artwork this appid already had - only local-scan-authoritative fields should update.
+            // artwork this appid already had - AppDetailsCache.mergeMany keeps existing.artwork
+            // since incoming's is NO_LOCAL_ARTWORK (all null, not meaningful), while local-scan's
+            // own fields (steamspy_tags here) still update normally.
             await LocalSteamDataWriter.writeLocalAppMetadata()
 
-            const cache = new AppDetailsCache()
-            const cached = await cache.get(620)
+            const cached = await AppDetailsCache.get(620)
             expect(cached?.artwork).toEqual(realArtwork)
             expect(cached?.steamspy_tags).toEqual({ Puzzle: 1 })
         })

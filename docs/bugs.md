@@ -126,6 +126,11 @@ web-vs-desktop CORS difference, just a write path that only exists on desktop.
 seed-ready promise resolves.
 **Files**: `client/src/steam/SteamApiClient.ts` (new `waitForAppDetailsCacheSeed()`),
 `client/src/steam/LocalSteamDataWriter.ts`
+**Superseded 2026-07-15**: `waitForAppDetailsCacheSeed()` and the readiness-event plumbing it
+required are gone - replaced by `AppDetailsCache.mergeMany()`, which merges per-field instead of
+overwriting, so neither writer needs to wait on the other at all. The race this follow-up made
+merely-safe is now structurally impossible rather than ordered-around. See the load-ordering
+plan's 2026-07-15 addendum.
 **Still open**: the CORS-blocked CDN fetch itself (`cors-blocked-local-scan-artwork`) is a
 separate, structural problem - the browser can't reliably `fetch()` Steam's CDN cross-origin
 regardless of whether the URL is guessed or real. Neither fix above touches that; it needs Round 3

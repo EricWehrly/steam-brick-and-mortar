@@ -58,7 +58,7 @@ Amber boxes are not implemented today - see "Answered questions."
 | Tier | Description | Status |
 |---|---|---|
 | 1 | Render a persisted library immediately if one exists | **Done** — `handleGameStart()` |
-| 2a | Hydrate `AppDetailsCache` from the baked gzip bundle | **Done** — `BakedCacheLoader.seedIfNeeded()`, awaited via `waitForAppDetailsCacheSeed()` |
+| 2a | Hydrate `AppDetailsCache` from the baked gzip bundle | **Done** — `BakedCacheLoader.seedIfNeeded()`. No ordering dependency on 2c's write anymore (see note below) - each writes independently and safely. |
 | 2b | Render the demo store when nothing is persisted yet | **Done** — `loadDemoGames()` |
 | 2c | Run local scan when desktop-capable; replace what's rendered if different | **Done, but implicitly sequenced** — `LocalSteamLibraryLoader` is a second, independent `GameEventTypes.Start` listener, not an explicit "after Tier 1/2b" step. It also runs on *every* launch regardless of Tier 1 (that's how second-launch change-detection works, not just a cold-cache fallback) - the "if I can get to local files" framing is slightly different from what's implemented: local scan always runs on desktop, it's the *render replacement* that's now conditional (Tier A). |
 | 2c (replace) | Skip re-render when scan reproduces what's rendered | **Done** — Tier A, `computeLibraryDiff()`/`isDiffEmpty()` in `Library.ts`, called from the loader's own skip-check against `loadPersistedLibrary()` |
@@ -66,6 +66,19 @@ Amber boxes are not implemented today - see "Answered questions."
 | 2c (progressive replace) | Phase the real library in instead of a hard cutover | **Not built** — deferred, see below |
 | 3 | Background remote reconciliation after local render | **Not built for desktop.** Exists for the `online` channel only (`applyLibrary()`'s Fork A), and is explicitly excluded for `local-scan` - deliberately deferred, see "Answered questions" below. |
 | 3 (refresh, same identity) | Diff-and-patch instead of full replace | **The mechanism exists (Tier B, above)**, but nothing yet computes a diff against a *remote* fetch — only against the persisted local-scan library. Wiring Tier 3 to reuse it is future work. **Prerequisite when built**: `reconcileForLibraryReload` doesn't reclaim removed games' texture slots, which is harmless today (one reconcile per fresh-process launch) but leaks the atlas across *repeated in-session* reconciles — Tier 3's periodic refresh is exactly that. Needs slot reclamation / compaction on reconcile before shipping. Tracked as [`reconcile-slot-leak-on-repeated-reload`](../tech-debt.md#id-reconcile-slot-leak-on-repeated-reload), which [Idempotent Library Scene Sync](../features/idempotent-library-scene-sync.md) is meant to close as part of its diff step. |
+
+**2026-07-15 addendum — the Tier 2a/2c write race is solved a level below this doc's diff-and-patch,
+not by sequencing.** This doc's Tier B/3 diff-and-patch is about the *rendered game list* (which
+games are on the shelf). A separate, lower-level race existed in `AppDetailsCache` itself: Tier 2a's
+baked-cache seed and Tier 2c's local-scan write both populate the same cache with no ordering
+guarantee between them, and one landing last could stomp real data the other just wrote (e.g. a
+seeded artwork URL getting overwritten by local-scan's `NO_LOCAL_ARTWORK`). The original fix was an
+event-based wait (`LocalSteamDataWriter` blocking on a `SteamApiClient` readiness signal before
+touching the cache) - that's been replaced with `AppDetailsCache.mergeMany()`, which merges
+per-field, per-entry (meaningful + at-least-as-new data wins per field, never a blind overwrite).
+Neither writer needs to wait on the other anymore; whichever lands first is safe. This also means
+Tier 3's eventual remote-refresh write can land through the same `mergeMany` with zero new
+sequencing work - one more reason to prefer it over a bespoke Tier-3-specific merge.
 
 ## Answered questions (2026-07-14)
 

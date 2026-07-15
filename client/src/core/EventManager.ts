@@ -24,6 +24,12 @@ export interface EventHandlerOptions extends AddEventListenerOptions {
     isOverride?: boolean
 }
 
+// TODO: consider a "replay to late subscribers" event kind - a fire-once event where a handler
+// registered after it already fired gets called immediately with the last detail, instead of
+// missing it. Would remove the need for callers to pair a one-shot event with a DataManager flag
+// just to cover the "subscribed after it already happened" case. Add when we actually need it
+// again, not speculatively.
+
 // Type alias for cleaner code
 // Handler type for internal use
 type HandlerFunction = (event: CustomEvent<BaseInteractionEvent>) => void

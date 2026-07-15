@@ -1,18 +1,19 @@
 # Artwork Resolution Flow
 
 Traces how a game box picks its artwork URL, and why the desktop local-scan flow (not web) was
-regressing artwork. See `docs/bugs.md` for the two fixes this reflects (2026-07-14): preserving
-existing artwork on a local-scan rewrite, and making the baked-cache seed a guaranteed
-predecessor rather than a race.
+regressing artwork. See `docs/bugs.md` for the original fixes (2026-07-14: preserving existing
+artwork on a local-scan rewrite, then making the baked-cache seed a guaranteed predecessor via an
+awaited readiness event) and the 2026-07-15 follow-up that replaced the readiness-event ordering
+with `AppDetailsCache.mergeMany()` - both writers below now write independently and safely; the
+race isn't ordered around anymore, it's structurally impossible.
 
 ```mermaid
 flowchart TD
     subgraph WRITE["Writing AppDetailsCache (desktop only - web never runs LocalSteamDataWriter)"]
         SEED["BakedCacheLoader.seedIfNeeded()\n(SteamApiClient constructor, app bootstrap)\nreal header/capsule/capsule_v5 URLs from the release bundle"]
-        LS["LocalSteamDataWriter.writeLocalAppMetadata()\n(every local-scan load, gated on GameEventTypes.Start)"]
-        SEED -->|"awaited via SteamApiClient.waitForAppDetailsCacheSeed()\n(fixed 2026-07-14 - was a race, seed could lose)"| LS
-        LS -->|"artwork: existing.artwork ?? NO_LOCAL_ARTWORK\n(fixed 2026-07-14 - previously always NO_LOCAL_ARTWORK,\nsilently wiping the seed on every relaunch)"| CACHE[(AppDetailsCache)]
-        SEED --> CACHE
+        LS["LocalSteamDataWriter.writeLocalAppMetadata()\n(every local-scan load, gated on GameEventTypes.Start)\nartwork always NO_LOCAL_ARTWORK - never claims to know better"]
+        SEED -->|"AppDetailsCache.mergeMany()\nmerges per-field/per-entry - no ordering\ndependency between SEED and LS"| CACHE[(AppDetailsCache)]
+        LS -->|"AppDetailsCache.mergeMany()\nNO_LOCAL_ARTWORK's nulls never beat a\nreal artwork URL already in the cache"| CACHE
         GAP["Network gap-fill\n(only for appids fully MISSING from cache)"] -->|"artwork: real header/capsule/capsule_v5 URLs\nfrom Store API — Store API has no 'library' field at all,\nsee external-tool/infrastructure/lambda-src/services/steam-api.js"| CACHE
     end
 
@@ -53,11 +54,12 @@ flowchart TD
   `deriveArtworkFromAppId()` for every game on every channel — real data was never available to
   put there, on desktop or web.
 - **The desktop-only symptom was the write side, not the fetch side.** `LocalSteamDataWriter` is
-  the only thing that unconditionally overwrites `AppDetailsCache` entries with a placeholder
-  artwork object, and it only runs on desktop (`isTauri()` no-ops it on web). Two bugs compounded:
-  it always wrote `NO_LOCAL_ARTWORK` even over a real existing entry, and it had no guaranteed
-  ordering against the baked-cache seed, so it could win a race and write first. Both fixed
-  2026-07-14 - see `docs/bugs.md`.
+  the only thing that writes a placeholder artwork object into `AppDetailsCache`, and it only runs
+  on desktop (`isTauri()` no-ops it on web). Two bugs compounded: it used to overwrite a real
+  existing entry, and it used to have no guaranteed ordering against the baked-cache seed. Both
+  fixed 2026-07-14 via artwork preservation + an awaited readiness event - see `docs/bugs.md`.
+  2026-07-15: the readiness event was itself replaced by `AppDetailsCache.mergeMany()`, so there's
+  no ordering dependency left to get wrong.
 - **Still open, structural, affects both platforms once triggered**: the CDN fetch itself
   (`cdn.akamai.steamstatic.com`) doesn't reliably send CORS headers to a browser `fetch()`,
   regardless of whether the URL came from a real Store API field or a guess. That's

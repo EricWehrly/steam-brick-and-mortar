@@ -5,10 +5,9 @@
  *
  * No-ops entirely on the web build (isTauri() is false there).
  *
- * Known limitation, an intentional deferral, not a bug:
- * - `is_free` is always written as false: appinfo.vdf's local price fields aren't extracted yet,
- *   and it doesn't matter for this path anyway (these are the user's own played games, not
- *   candidates for the anonymous/demo store, which is the only place is_free is read).
+ * `is_free` is omitted, not defaulted - appinfo.vdf's local price fields aren't extracted yet, so
+ * this path genuinely doesn't know. Writing `false` here would look like real data to
+ * AppDetailsCache.mergeMany and could beat out a real answer from elsewhere.
  *
  * `categories`/`genres` are resolved via `TaxonomyIdResolver` from the pre-baked appdetails
  * bundle rather than a network call - see docs/plans/taxonomy-data-event-plan.md. An appid whose
@@ -32,8 +31,6 @@ import type { SteamUserCollectionMembership } from './types/SteamMetadata'
 import { TaxonomyIdResolver } from './TaxonomyIdResolver'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes, type TaxonomyDataReadyEvent } from '../types/InteractionEvents'
-import { DataManager } from '../core/data/DataManager'
-import { DataKey } from '../core/data/DataTypes'
 import { Logger } from '../utils/Logger'
 
 const LOCAL_APP_TYPE = 'game'
@@ -73,26 +70,6 @@ export class LocalSteamDataWriter {
     private static readonly logger = Logger.createLogFunctions(LocalSteamDataWriter.name)
 
     /**
-     * Resolves once SteamApiClient's baked-cache seed attempt has settled - checks
-     * DataKey.AppDetailsCacheSeeded first so a seed that already finished resolves immediately,
-     * otherwise waits for the one-shot SteamEventTypes.AppDetailsCacheSeeded event. Event-based
-     * rather than a direct SteamApiClient method call, so this class doesn't need to know
-     * SteamApiClient exists at all.
-     */
-    private static waitForAppDetailsCacheSeeded(): Promise<void> {
-        if (DataManager.getInstance().get<boolean>(DataKey.AppDetailsCacheSeeded)) {
-            return Promise.resolve()
-        }
-        return new Promise(resolve => {
-            EventManager.getInstance().registerEventHandler(
-                SteamEventTypes.AppDetailsCacheSeeded,
-                () => resolve(),
-                { once: true }
-            )
-        })
-    }
-
-    /**
      * Reads playtime + tag/developer/publisher/genre/category data from the local Steam install
      * and writes it into AppDetailsCache. Returns the entries actually written, keyed by appid
      * (empty on web, or if the local scan finds nothing to write) - callers that also need the
@@ -115,21 +92,10 @@ export class LocalSteamDataWriter {
 
         const metadata = await invoke<LocalAppMetadata[]>('read_local_app_metadata', { appids })
 
-        // Wait for the baked-cache seed to have already landed (or failed) before touching
-        // AppDetailsCache ourselves. Both this write and the seed start around app startup with
-        // no ordering guarantee between them; without this wait, this write can land first and
-        // "win" the race, so existingArtwork below sees nothing to preserve even though the seed
-        // was about to provide real data for the same appids a moment later.
-        await LocalSteamDataWriter.waitForAppDetailsCacheSeeded()
-
-        const cache = new AppDetailsCache()
-        const existingEntries = await cache.getMany(appids)
-
         const entries = new Map<number, AppDetailsData>()
         for (const item of metadata) {
             const collections = collectionsByAppid.get(item.appid) ?? []
-            const existingArtwork = existingEntries.get(item.appid)?.artwork
-            const entry = await LocalSteamDataWriter.buildAppDetailsEntry(item, collections, existingArtwork)
+            const entry = await LocalSteamDataWriter.buildAppDetailsEntry(item, collections)
             if (entry) {
                 entries.set(item.appid, entry)
             }
@@ -139,7 +105,11 @@ export class LocalSteamDataWriter {
             return entries
         }
 
-        await cache.setMany(entries)
+        // mergeMany, not setMany - this write and the baked-cache seed both start around app
+        // startup with no ordering guarantee between them. Merging per-field means whichever
+        // lands first is safe: neither can stomp real data the other already has (see
+        // AppDetailsCache.mergeMany's doc comment).
+        await AppDetailsCache.mergeMany(entries, Date.now())
         LocalSteamDataWriter.logger.info(`Wrote ${entries.size} locally-sourced AppDetailsCache entries`)
 
         EventManager.getInstance().emit<TaxonomyDataReadyEvent>(SteamEventTypes.TaxonomyDataReady, {
@@ -154,18 +124,13 @@ export class LocalSteamDataWriter {
      * partial entry with a blank name would be worse than no entry (GamesLoader would treat it
      * as a real cache hit with a broken display name instead of queuing the normal network fetch).
      *
-     * existingArtwork, when passed, is preserved instead of NO_LOCAL_ARTWORK. AppDetailsCache.
-     * setMany() is a full replace, not a merge (see AppDetailsCache doc comments), and this method
-     * runs unconditionally on every local-scan load - without this, a real artwork-bearing entry
-     * from the baked seed bundle or a prior network fetch would get silently overwritten with
-     * NO_LOCAL_ARTWORK the moment local-scan re-resolves that appid (which happens every load, not
-     * just the first). Since the appid is then no longer "missing" from the cache, it would never
-     * get network-resolved again either - a permanent regression, not a transient one.
+     * Always writes NO_LOCAL_ARTWORK (local-scan has no artwork source of its own) - safe to do
+     * unconditionally now that writeLocalAppMetadata merges via AppDetailsCache.mergeMany rather
+     * than overwriting: a null artwork field here can't beat a real URL already in the cache.
      */
     public static async buildAppDetailsEntry(
         metadata: LocalAppMetadata,
-        collections: readonly SteamUserCollectionMembership[] = [],
-        existingArtwork?: AppDetailsData['artwork']
+        collections: readonly SteamUserCollectionMembership[] = []
     ): Promise<AppDetailsData | null> {
         if (!metadata.name) {
             return null
@@ -179,8 +144,7 @@ export class LocalSteamDataWriter {
         return {
             type: LOCAL_APP_TYPE,
             name: metadata.name,
-            is_free: false,
-            artwork: existingArtwork ?? NO_LOCAL_ARTWORK,
+            artwork: NO_LOCAL_ARTWORK,
             developers: metadata.developers.length > 0 ? metadata.developers : undefined,
             publishers: metadata.publishers.length > 0 ? metadata.publishers : undefined,
             steamspy_tags: LocalSteamDataWriter.buildWeightedTags(metadata.tags),

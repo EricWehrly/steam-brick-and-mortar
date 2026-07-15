@@ -26,12 +26,10 @@ const { getManyMock, findMissingMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('../../../src/steam/cache/AppDetailsCache', () => ({
-    AppDetailsCache: vi.fn().mockImplementation(function AppDetailsCacheMock() {
-        return {
-            getMany: getManyMock,
-            findMissing: findMissingMock,
-        }
-    }),
+    AppDetailsCache: {
+        getMany: getManyMock,
+        findMissing: findMissingMock,
+    },
 }))
 
 const { fetchAndCacheAppDetailsMock } = vi.hoisted(() => ({

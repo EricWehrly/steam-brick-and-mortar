@@ -17,6 +17,12 @@ client) and wiring Tier B's diff-and-patch mechanism to a remote fetch (Tier 3 i
 plan), neither started. CORS/404 log-noise and pre-baking-known-failures are follow-ups.
 `lod-tier-reset-race-condition` fix landed 2026-07-14 but the sixth pass shows the reset it guards
 is itself a *symptom* of the double-render, not the disease.
+
+**2026-07-15**: a related but distinct race - the baked-cache seed and local-scan's disk write both
+populating `AppDetailsCache` with no ordering guarantee - is now solved by `AppDetailsCache.mergeMany()`
+(per-field merge, not a blind overwrite) rather than by sequencing either writer. See the load-ordering
+plan's 2026-07-15 addendum. This is a cache-layer fix, unrelated to this doc's scene-level Tier A/B
+diff-and-patch above.
 **Parent feature**: [Native Desktop App](../features/desktop-app.md)
 **Related**: [Desktop Local Data Pipeline Plan](desktop-local-data-pipeline-plan.md), [Taxonomy Data Event Plan](taxonomy-data-event-plan.md), [artwork resolution flow diagram](../diagrams/artwork.md), [Desktop Startup Load Ordering](desktop-startup-load-ordering-plan.md)
 
