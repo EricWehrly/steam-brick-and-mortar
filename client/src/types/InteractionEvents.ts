@@ -307,7 +307,13 @@ export const SteamEventTypes = {
     GamesBatchReady: 'steam:games-batch-ready',
     NetworkFetchProgress: 'steam:network-fetch-progress',
     /** New/changed genre/category/tag/collection data landed in AppDetailsCache - see TaxonomyDataReadyEvent. */
-    TaxonomyDataReady: 'steam:taxonomy-data-ready'
+    TaxonomyDataReady: 'steam:taxonomy-data-ready',
+    /**
+     * Fires once (success or failure) after the baked-cache seed attempt settles. Late
+     * subscribers should check DataKey.AppDetailsCacheSeeded in DataManager first - this event
+     * won't refire for them once it's already happened.
+     */
+    AppDetailsCacheSeeded: 'steam:app-details-cache-seeded'
 } as const
 
 export const RoomEventTypes = {

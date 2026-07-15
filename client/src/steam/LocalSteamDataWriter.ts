@@ -30,9 +30,10 @@ import { AppDetailsCache } from './cache/AppDetailsCache'
 import type { AppDetailsData } from './batch/BatchAppDetailsClient'
 import type { SteamUserCollectionMembership } from './types/SteamMetadata'
 import { TaxonomyIdResolver } from './TaxonomyIdResolver'
-import { SteamApiClient } from './SteamApiClient'
 import { EventManager } from '../core/EventManager'
 import { SteamEventTypes, type TaxonomyDataReadyEvent } from '../types/InteractionEvents'
+import { DataManager } from '../core/data/DataManager'
+import { DataKey } from '../core/data/DataTypes'
 import { Logger } from '../utils/Logger'
 
 const LOCAL_APP_TYPE = 'game'
@@ -72,6 +73,26 @@ export class LocalSteamDataWriter {
     private static readonly logger = Logger.createLogFunctions(LocalSteamDataWriter.name)
 
     /**
+     * Resolves once SteamApiClient's baked-cache seed attempt has settled - checks
+     * DataKey.AppDetailsCacheSeeded first so a seed that already finished resolves immediately,
+     * otherwise waits for the one-shot SteamEventTypes.AppDetailsCacheSeeded event. Event-based
+     * rather than a direct SteamApiClient method call, so this class doesn't need to know
+     * SteamApiClient exists at all.
+     */
+    private static waitForAppDetailsCacheSeeded(): Promise<void> {
+        if (DataManager.getInstance().get<boolean>(DataKey.AppDetailsCacheSeeded)) {
+            return Promise.resolve()
+        }
+        return new Promise(resolve => {
+            EventManager.getInstance().registerEventHandler(
+                SteamEventTypes.AppDetailsCacheSeeded,
+                () => resolve(),
+                { once: true }
+            )
+        })
+    }
+
+    /**
      * Reads playtime + tag/developer/publisher/genre/category data from the local Steam install
      * and writes it into AppDetailsCache. Returns the entries actually written, keyed by appid
      * (empty on web, or if the local scan finds nothing to write) - callers that also need the
@@ -99,7 +120,7 @@ export class LocalSteamDataWriter {
         // no ordering guarantee between them; without this wait, this write can land first and
         // "win" the race, so existingArtwork below sees nothing to preserve even though the seed
         // was about to provide real data for the same appids a moment later.
-        await SteamApiClient.getInstance().waitForAppDetailsCacheSeed()
+        await LocalSteamDataWriter.waitForAppDetailsCacheSeeded()
 
         const cache = new AppDetailsCache()
         const existingEntries = await cache.getMany(appids)

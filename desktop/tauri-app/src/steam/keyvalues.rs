@@ -42,6 +42,23 @@ impl KeyValue {
     pub fn path(&self, keys: &[&str]) -> Option<&KeyValue> {
         keys.iter().try_fold(self, |node, key| node.get(key))
     }
+
+    /// Converts to `serde_json::Value` so a caller can deserialize a block into a
+    /// `#[derive(Deserialize)]` struct (via `serde_json::from_value`) instead of a chain of
+    /// `.get("key")` calls. Keys are lowercased in the conversion to preserve `get()`'s
+    /// case-insensitive matching - use lowercase `#[serde(rename = "...")]` field names on the
+    /// target struct to match.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        match self {
+            KeyValue::Str(s) => serde_json::Value::String(s.clone()),
+            KeyValue::Obj(entries) => serde_json::Value::Object(
+                entries
+                    .iter()
+                    .map(|(k, v)| (k.to_ascii_lowercase(), v.to_json_value()))
+                    .collect(),
+            ),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -172,6 +189,19 @@ mod tests {
         let kv = parse(r#""AccountName"  "johndoe" "PersonaName" "John Doe""#).unwrap();
         assert_eq!(kv.get("AccountName").and_then(|v| v.as_str()), Some("johndoe"));
         assert_eq!(kv.get("PersonaName").and_then(|v| v.as_str()), Some("John Doe"));
+    }
+
+    #[test]
+    fn to_json_value_lowercases_keys_and_preserves_shape() {
+        #[derive(serde::Deserialize, Default)]
+        struct Entry {
+            #[serde(rename = "lastplayed")]
+            last_played: Option<String>,
+        }
+
+        let kv = parse(r#""LastPlayed" "1415156113""#).unwrap();
+        let entry: Entry = serde_json::from_value(kv.to_json_value()).unwrap();
+        assert_eq!(entry.last_played, Some("1415156113".to_string()));
     }
 
     #[test]

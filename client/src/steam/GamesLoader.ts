@@ -1,5 +1,5 @@
 import { CacheManager } from './cache/SimpleCacheManager'
-import { BatchAppDetailsClient, type AppDetailsData } from './batch/BatchAppDetailsClient'
+import { BatchAppDetailsClient, type AppDetailsData, type AppDetailsResponse } from './batch/BatchAppDetailsClient'
 import { AppDetailsCache, type AppDetailsCacheResult } from './cache/AppDetailsCache'
 import { Logger } from '../utils/Logger'
 import { PerformanceMonitor, ASYNC_CONTEXT, MAIN_THREAD_CONTEXT } from '../utils/PerformanceMonitor'
@@ -113,33 +113,46 @@ export class GamesLoader {
      * AppDetailsCache - no cache check first (caller already knows these aren't cached), no
      * BatchEmitter streaming (this is a one-off gap-fill, not the main progressive-load path).
      * Used by LocalSteamLibraryLoader to resolve collection-referenced appids the local scan has
-     * no appinfo.vdf data for. A per-appid fetch failure is silently omitted from the returned
-     * map rather than failing the whole call - same tolerance as fetchAndEmitUncached.
+     * no appinfo.vdf data for. Awaitable and cache-only, unlike fetchAndEmitUncached (fire-and-
+     * forget, pushes into a BatchEmitter) - the two share fetchAndNormalizeBatch for the actual
+     * network call and unlisted-shell handling.
      */
     public async fetchAndCacheAppDetails(appids: number[]): Promise<Map<number, AppDetailsData>> {
         if (appids.length === 0) {
             return new Map()
         }
 
-        const batchResponses = await this.batchClient.fetchBatch(appids, { batchSize: 100 })
-        const normalized = new Map<number, AppDetailsData>()
-        for (const [appid, response] of batchResponses.entries()) {
-            // An unlisted response is a deliberately minimal shell (see the Lambda's steam-api.js
-            // comment) with no name - it exists so a later SteamSpy hydration pass can merge in a
-            // real name, which doesn't happen on this gap-fill path. Caching it as-is produced a
-            // renderable game with name: undefined, which crashes label rendering downstream.
-            // Skip it; the appid stays absent from the cache and gets retried next load, same
-            // "known, not solved" tradeoff as docs/tech-debt.md#id-metadata-refetch-no-circuit-breaker.
-            if (response.success === false && response.unlisted) continue
-            const rawData = response.data
-            if (!rawData) continue
-            normalized.set(appid, this.normalizeBatchData(rawData))
-        }
-
+        const { normalized } = await this.fetchAndNormalizeBatch(appids)
         if (normalized.size > 0) {
             await this.appDetailsCache.setMany(normalized)
         }
         return normalized
+    }
+
+    /**
+     * Shared by fetchAndCacheAppDetails and fetchAndEmitUncached: fetches a batch and normalizes
+     * each response into AppDetailsData, skipping unlisted shells. Returns both the raw responses
+     * (fetchAndEmitUncached needs them to find every requested appid, including ones with no
+     * normalized data) and the normalized map (what actually gets cached).
+     */
+    private async fetchAndNormalizeBatch(appids: number[]): Promise<{
+        responses: Map<number, AppDetailsResponse>
+        normalized: Map<number, AppDetailsData>
+    }> {
+        const responses = await this.batchClient.fetchBatch(appids, { batchSize: 100 })
+        const normalized = new Map<number, AppDetailsData>()
+        for (const [appid, response] of responses.entries()) {
+            // An unlisted response is a deliberately minimal shell (see the Lambda's steam-api.js
+            // comment) with no name - it exists so a later SteamSpy hydration pass can merge in a
+            // real name, which doesn't happen on either caller of this method. Caching it as-is
+            // would produce a renderable game with name: undefined, which crashes label rendering
+            // downstream. Skip it; the appid stays absent and gets retried next load, same
+            // "known, not solved" tradeoff as docs/tech-debt.md#id-metadata-refetch-no-circuit-breaker.
+            if (response.success === false && response.unlisted) continue
+            if (!response.data) continue
+            normalized.set(appid, this.normalizeBatchData(response.data))
+        }
+        return { responses, normalized }
     }
 
     /**
@@ -197,39 +210,28 @@ export class GamesLoader {
         gameByAppid: Map<number, SteamGame>,
         emitter: BatchEmitter
     ): void {
-        const fetchedAppDetails = new Map<number, AppDetailsData>()
-
-        this.batchClient.fetchBatch(uncachedAppids, { batchSize: 100 })
-            .then(async (batchResponses) => {
-                for (const [appid, response] of batchResponses.entries()) {
-                    // An unlisted response (see fetchAndCacheAppDetails above) has no real
-                    // AppDetailsData to offer - buildEnhancedGame() below already accepts
-                    // undefined and renders correctly via baseGame's own owned-game name, so this
-                    // only affects whether we cache a meaningless shell, not whether it renders.
-                    const isUnlisted = response.success === false && response.unlisted
-                    const normalized = isUnlisted || !response.data
-                        ? undefined
-                        : this.normalizeBatchData(response.data)
-                    if (normalized) {
-                        fetchedAppDetails.set(appid, normalized)
-                    }
-
+        this.fetchAndNormalizeBatch(uncachedAppids)
+            .then(async ({ responses, normalized }) => {
+                // buildEnhancedGame() below already accepts undefined and renders correctly via
+                // baseGame's own owned-game name, so an appid with no normalized data (unlisted
+                // or otherwise missing) still renders - it just won't have appdetails cached.
+                for (const appid of responses.keys()) {
                     const baseGame = gameByAppid.get(appid)
                     if (!baseGame) continue
 
-                    const enhanced = this.buildEnhancedGame(baseGame, normalized)
+                    const enhanced = this.buildEnhancedGame(baseGame, normalized.get(appid))
                     await emitter.push(enhanced)
                 }
 
                 await emitter.flush()
 
-                if (fetchedAppDetails.size > 0) {
+                if (normalized.size > 0) {
                     const cacheMonitor = PerformanceMonitor.start('cache-metadata', this.logger, ASYNC_CONTEXT)
-                    await this.appDetailsCache.setMany(fetchedAppDetails)
-                    cacheMonitor.end({ count: fetchedAppDetails.size })
+                    await this.appDetailsCache.setMany(normalized)
+                    cacheMonitor.end({ count: normalized.size })
                 }
 
-                this.logger.info(`[ASYNC] Emitted ${fetchedAppDetails.size} uncached games in the background`)
+                this.logger.info(`[ASYNC] Emitted ${normalized.size} uncached games in the background`)
             })
             .catch(error => {
                 this.logger.error('[ASYNC] Background metadata fetch failed:', error)

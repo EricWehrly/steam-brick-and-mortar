@@ -3,7 +3,7 @@
 //! `playtime_forever` / `rtime_last_played` return, sourced offline. See
 //! `docs/research/local-steam/desktop-offline-data-mining-findings.md` §2.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use super::keyvalues;
@@ -15,6 +15,18 @@ pub struct AppPlaytime {
     pub last_played: Option<i64>,
     /// Minutes, matching the ownership API's `playtime_forever` unit.
     pub playtime_minutes: Option<u32>,
+}
+
+/// Shape of a per-app block under `UserLocalConfigStore.Software.Valve.Steam.apps.<appid>` -
+/// named fields via serde instead of a `.get("LastPlayed")` string-literal chain. Both values
+/// are still VDF strings on the wire (Valve quotes everything), so they're parsed to numbers
+/// separately after deserializing.
+#[derive(Deserialize, Default)]
+struct RawAppFields {
+    #[serde(rename = "lastplayed")]
+    last_played: Option<String>,
+    #[serde(rename = "playtime")]
+    playtime: Option<String>,
 }
 
 const CONFIG_STORE_PATH: [&str; 5] = ["UserLocalConfigStore", "Software", "Valve", "Steam", "apps"];
@@ -32,14 +44,9 @@ pub fn parse_playtimes(raw: &str) -> Result<Vec<AppPlaytime>, String> {
         let Ok(appid) = appid_str.parse::<u32>() else {
             continue; // skip non-numeric keys if any ever show up here
         };
-        let last_played = entry
-            .get("LastPlayed")
-            .and_then(|v| v.as_str())
-            .and_then(|s| s.parse::<i64>().ok());
-        let playtime_minutes = entry
-            .get("Playtime")
-            .and_then(|v| v.as_str())
-            .and_then(|s| s.parse::<u32>().ok());
+        let fields: RawAppFields = serde_json::from_value(entry.to_json_value()).unwrap_or_default();
+        let last_played = fields.last_played.and_then(|s| s.parse::<i64>().ok());
+        let playtime_minutes = fields.playtime.and_then(|s| s.parse::<u32>().ok());
 
         if last_played.is_none() && playtime_minutes.is_none() {
             continue; // entry exists for another reason (e.g. only a "cloud" sub-block)
