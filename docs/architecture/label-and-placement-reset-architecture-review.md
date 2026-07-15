@@ -101,6 +101,12 @@ Primary files involved:
   - `GameBoxSpawner` decides which tier applies by comparing the incoming library's game count
     against the currently-allocated texture capacity *and* checking whether `removedGameNames` is
     present — not by which event fired.
+- **Where this is headed**: the two-tier split itself is not the final shape. [Idempotent Library
+  Scene Sync](../features/idempotent-library-scene-sync.md) (captured from the same review, F4) is
+  the north star — fold capacity growth into "grow the texture array in place, then apply the diff"
+  so reconcile becomes the only path and the full-reset dispose branch (and its latent disposal
+  race, F5) goes away entirely. Not scheduled; recorded so the two-tier split isn't mistaken for
+  the end state.
 
 ## Observed Anti-Patterns And Risks
 
