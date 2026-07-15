@@ -218,6 +218,29 @@ for the data-integrity audit already planned before showing this around in Act 3
 [`taxonomy-data-event-plan.md`](../plans/taxonomy-data-event-plan.md)'s genre/category
 harvesting section.
 
+## Local Data Left on the Table
+
+A pass over the Rust steam module (2026-07-15) turned up local data that's either already
+decoded and just not surfaced, or confirmed present in the underlying VDF/JSON but never read at
+all. Nothing here is scheduled — recorded so it isn't rediscovered from scratch if a future
+feature wants it:
+
+- **Per-app hidden/favorite flags** — Steam's own star/hide toggles, distinct from user-named
+  collections. Real curation signal (a "Favorites" shelf, a "Hidden" exclusion), but the file/key
+  location isn't even confirmed yet — no research pass has inspected `sharedconfig.vdf`'s actual
+  key structure, only grepped it for appid substrings (zero hits, which doesn't rule it in or
+  out). Needs a real probe before any Rust work.
+- **Steam Deck / SteamOS compatibility rating** — `appinfo.vdf`'s `common.steam_deck_compatibility`.
+  Already decoded into `appinfo.rs`'s generic KV tree at runtime, just never extracted into a
+  struct field — cheap Rust wiring, real filter dimension ("show Deck-verified games").
+- **DLC list** — `appinfo.vdf`'s `extended.listofdlc` (comma-separated DLC appids). Same
+  decoded-but-discarded situation. Not a sort/filter dimension, more of a detail-screen
+  "you own the base game, here's DLC you don't own" callout.
+- **Misc `appinfo.vdf common` fields, no strong angle yet** — `controller_support`,
+  `primary_genre` (redundant with the existing `genre_ids[0]`), `oslist`. Sitting decoded
+  alongside the above; not worth Rust work on their own, but essentially free if a future feature
+  needs them.
+
 ## Open Questions
 
 - What's the **trigger** — clutter (Tier C/D), launching games, local collections (AC4.4), or the
